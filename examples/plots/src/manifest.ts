@@ -21,5 +21,6 @@ export const manifest = {
     { name: "monitor", local: true, summary: "This machine, live", args: [], flags: [] },
     { name: "rungs", local: true, summary: "The failure box at every height and width rung", args: [], flags: [] },
     { name: "mosaic", local: true, summary: "Layouts named as a picture", args: [], flags: [] },
+    { name: "image", local: true, summary: "Eight fixtures — five about placement, three about the decoder", args: [], flags: [] },
   ],
 } as const;

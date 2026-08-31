@@ -16,6 +16,8 @@
 import { b } from "@fmx/calcium";
 import type { AdapterDocument, Block, TerminalCapabilities, ViewDocument } from "@fmx/calcium";
 import os from "node:os";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { CATALOGUE, everyVariant, FORMS, refusals, rungId, variantsOf } from "./catalogue.ts";
 import type { PlotForm } from "./catalogue.ts";
 import { bars, barsFull, curve, distribution, heat, hierarchy, walk } from "./figures.ts";
@@ -599,6 +601,60 @@ export function faults(): Block {
       render: (v) => walk(Array.isArray(v) ? (v as number[]) : [], 6),
     }),
   ], { id: "faults" });
+}
+
+// --- /image ------------------------------------------------------------------
+
+/** Beside `src/`, written by `tools/fixtures.mjs` and committed. */
+const ASSETS = join(dirname(fileURLToPath(import.meta.url)), "..", "assets");
+
+/**
+ * The eight fixtures, and **five are about placement while three are about the
+ * decoder** (C09 §4c, §8b).
+ *
+ * The split is why there are eight rather than one. A photograph, a screenshot,
+ * a diagram, a tall portrait and a single pixel exercise the **geometry** —
+ * aspect, scaling, the clamp, the degenerate case — and every one of them is a
+ * question only a terminal answers. The 16-bit, palette and interlaced files
+ * exercise the **decoder**, and those are answered in a container: `make` runs
+ * `tools/fixtures.mjs`, which puts each through `decodePng` and fails if any
+ * fixture stops doing what it is named for.
+ *
+ * **Two of them draw at `kitty` and refuse here** (F413). The protocol arm needs
+ * the decoder for the aspect alone, and `decodePng` reads the IHDR before it
+ * refuses — so an interlaced PNG places and draws on a terminal that decodes it,
+ * and shows the `status` box with its reason on one that does not. That pair is
+ * the demonstration; a caption saying so is not.
+ *
+ * **Synthetic, and said rather than implied.** None is a photograph of anything.
+ * The first is *continuous tone*, which is the property under test — the
+ * half-block rung exists because a gradient braille can only stipple arrives as
+ * a gradient. A real photograph would test the same property and carry a licence.
+ */
+const FIXTURES: readonly (readonly [string, number, string])[] = [
+  ["photo.png", 16, "2000x1500 continuous tone — the case the half-block rung exists for"],
+  ["screenshot.png", 12, "1200x800 flat fills and hard edges — a UI, where shape wins some ground back"],
+  ["diagram.png", 10, "720x480 one-pixel rules — braille resolves these and a half block averages them away"],
+  ["portrait.png", 18, "600x1600, taller than wide — the aspect the column count is derived from"],
+  ["pixel.png", 2, "1x1 — a cell is two pixels and this is one (C09 §8b G9)"],
+  ["palette.png", 8, "colour type 3, depth 8 — a palette PNG, and the control: this one we DO read"],
+  ["depth16.png", 6, "bit depth 16 — refused here by name, and drawn at kitty (F413)"],
+  ["interlaced.png", 6, "Adam7 — the same pair, and the reason the box says which refusal"],
+];
+
+export function images(): Block {
+  return b.group("column", [
+    b.notice(
+      "info",
+      "eight fixtures — five about placement, three about the decoder. " +
+        "The last two refuse HERE and place at kitty: the arm that rasterises needs pixels, " +
+        "the protocol arm needs only the extent, and the IHDR survives the refusal",
+    ),
+    ...FIXTURES.flatMap(([file, h, says]) => [
+      caption(`${file} · ${says}`),
+      b.image({ id: `img-${file}`, path: join(ASSETS, file), height: h, alt: `${file} — ${says}` }),
+    ]),
+  ], { id: "images" });
 }
 
 // --- /rungs and /mosaic ------------------------------------------------------

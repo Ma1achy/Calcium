@@ -25,8 +25,7 @@ import type { Block, ViewDocument } from "@fmx/calcium";
 import { CATALOGUE, everyVariant, FORMS, refusals, variantsOf } from "../src/catalogue.ts";
 import type { Entry } from "../src/catalogue.ts";
 import {
-  adaptSample, compare, everyForm, faults, formFull, greetingDocument, liveFor, monitor,
-  mosaics, rungs, unknown,
+  adaptSample, compare, everyForm, faults, formFull, greetingDocument, images, liveFor, monitor, mosaics, rungs, unknown,
 } from "../src/commands.ts";
 import { manifest } from "../src/manifest.ts";
 
@@ -335,6 +334,13 @@ describe("every command composes a document the transcript would accept", () => 
     // design, so `T-doc6` is where it is exercised as a *frame*.
     rungs: () => [as("rungs", [rungs()])],
     mosaic: () => [as("mosaic", [mosaics(0)])],
+    // **The two refusing fixtures are the reason this row is here** (F413).
+    // `depth16.png` and `interlaced.png` are PNGs `decodePng` will not read, and
+    // the document must still validate and compose: the block carries its bytes
+    // and its extent, and it is the *arm* that refuses, at render, not the
+    // document. A row that only held readable images would pass on the day the
+    // refusal moved back onto the block.
+    image: () => [as("image", [images()])],
   };
 
   it("T-doc1: the coverage table names every command the manifest declares", () => {
@@ -358,9 +364,11 @@ describe("every command composes a document the transcript would accept", () => 
       }
     }
     expect(bad).toEqual([]);
-    // 46 forms twice, plus /all, /faults, /monitor, /rungs, /mosaic, and
-    // sample's two.
-    expect(checked, "documents built").toBe(FORMS.length * 2 + 7);
+    // 46 forms twice, plus /all, /faults, /monitor, /rungs, /mosaic, /image
+    // and sample's two — eight singletons. The count is asserted so a document
+    // appearing or vanishing has to be attributed rather than noticed: `/image`
+    // is what moved this from seven.
+    expect(checked, "documents built").toBe(FORMS.length * 2 + 8);
   });
 
   it("T-doc3: an unknown form is a document too", () => {

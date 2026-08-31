@@ -209,10 +209,22 @@ sizes["screenshot.png"] = await raw(1200, 800, screenshot, "screenshot.png", { c
 sizes["diagram.png"] = await raw(720, 480, diagram, "diagram.png", { compressionLevel: 9 });
 sizes["portrait.png"] = await raw(600, 1600, portrait, "portrait.png", { compressionLevel: 9 });
 sizes["pixel.png"] = await raw(1, 1, () => [220, 90, 70], "pixel.png");
-sizes["palette.png"] = await raw(320, 240, (x, y) => {
-  const i = (Math.floor(x / 40) + Math.floor(y / 40)) % 6;
-  return [[220, 60, 60], [230, 150, 50], [230, 220, 70], [90, 200, 110], [70, 150, 220], [150, 90, 210]][i];
-}, "palette.png", { palette: true, colours: 8 });
+// **`bitdepth: 8` explicitly, and the first version did not say it.** `sharp`
+// picks the smallest depth a palette fits, so six colours came out at **depth 2**
+// — which `decodePng` refuses on `depth !== 8`, making the file a third refusal
+// wearing a control's label. The fixture that is meant to *decode* has to be
+// shown to decode, which is what the verification pass below is for.
+// **More than sixteen distinct colours, because `bitdepth` alone did not do it.**
+// Asking for `bitdepth: 8` over a six-colour checkerboard still wrote **depth 4**:
+// the option is a ceiling and the quantiser picks what the palette needs. A 12x12
+// grid of 144 hues needs eight bits by construction, which is the honest way to
+// ask for an 8-bit palette rather than to request one and hope.
+sizes["palette.png"] = await raw(360, 360, (x, y) => {
+  const i = Math.floor(x / 30);
+  const j = Math.floor(y / 30);
+  const n = j * 12 + i;
+  return [40 + ((n * 17) % 210), 40 + ((n * 53) % 210), 40 + ((n * 97) % 210)];
+}, "palette.png", { palette: true, colours: 200, bitdepth: 8 });
 sizes["interlaced.png"] = await raw(320, 240, (x, y) => [x % 256, y % 256, (x + y) % 256], "interlaced.png", {
   progressive: true,
 });
@@ -221,13 +233,51 @@ const sixteen = png16(320, 240, (x, y) => [(x * 205) & 0xffff, (y * 273) & 0xfff
 writeFileSync(join(OUT, "depth16.png"), sixteen);
 sizes["depth16.png"] = sixteen.length;
 
-// **The header of each, read back** — a fixture claiming to be interlaced and
-// written progressive-by-name is the thing this checks.
+/**
+ * **Each fixture put through the decoder it is a fixture for.**
+ *
+ * A header read alone is not enough: a file *claiming* to be a palette PNG and a
+ * file the decoder actually reads are different claims, and the first version of
+ * this script conflated them — `palette: true` gave depth 2, which `decodePng`
+ * refuses, so the one fixture meant to succeed was a third refusal carrying a
+ * control's name. **A fixture must be shown to respond to the thing under test
+ * before it is asserted against** (`test/support/README.md`).
+ */
+const { readFileSync } = await import("node:fs");
+const { decodePng } = await import("../../../dist/presentation/image/index.js");
+
+const EXPECTED = {
+  "photo.png": "reads",
+  "screenshot.png": "reads",
+  "diagram.png": "reads",
+  "portrait.png": "reads",
+  "pixel.png": "reads",
+  "palette.png": "reads",
+  "interlaced.png": "refuses",
+  "depth16.png": "refuses",
+};
+
+let wrong = 0;
 for (const [name, bytes] of Object.entries(sizes)) {
-  const b = new Uint8Array(await sharp(join(OUT, name)).toBuffer().catch(() => Buffer.alloc(0)));
-  void b;
-  const file = new Uint8Array((await import("node:fs")).readFileSync(join(OUT, name)));
+  const file = new Uint8Array(readFileSync(join(OUT, name)));
+  const d = decodePng(file);
+  const got = d.ok ? "reads" : "refuses";
+  const want = EXPECTED[name];
+  const mark = got === want ? "  " : "!!";
+  if (got !== want) wrong += 1;
+  const why = d.ok ? `${d.pixels.width}x${d.pixels.height}` : d.fault;
   console.log(
-    `${name.padEnd(18)} ${String(bytes).padStart(8)} bytes  depth=${file[24]} colour=${file[25]} interlace=${file[28]}`,
+    `${mark} ${name.padEnd(16)} ${String(bytes).padStart(7)}B  ` +
+      `depth=${String(file[24]).padStart(2)} colour=${file[25]} interlace=${file[28]}  ` +
+      `${got.padEnd(8)} ${why}`,
   );
+  // **The extent survives a refusal** (F413) — the property `/image` depends on.
+  if (!d.ok && d.size === undefined && want === "refuses") {
+    console.log(`   ^ NOTE: refused with no size — this one cannot be laid out at kitty`);
+  }
 }
+if (wrong > 0) {
+  console.error(`\n${String(wrong)} fixture(s) do not do what they are named for`);
+  process.exit(1);
+}
+console.log("\nevery fixture does what it is named for");

@@ -28,7 +28,7 @@
 import { createTui, defaultTheme } from "@fmx/calcium";
 import type { Adapter, Block, LocalHandler } from "@fmx/calcium";
 import {
-  adaptSample, compare, everyForm, faults, formFull, formIn, greetingDocument, liveFor,
+  adaptSample, compare, everyForm, faults, formFull, formIn, greetingDocument, images, liveFor,
   monitor, mosaics, rungs, unknown,
 } from "./src/commands.ts";
 import { faultyDefinition } from "./src/faulty.ts";
@@ -93,7 +93,26 @@ const tui = createTui({
     rungs: ((_argv, ctx) => doc(ctx.command, [rungs()])) satisfies LocalHandler,
 
     mosaic: ((_argv, ctx) => doc(ctx.command, [mosaics(0)])) satisfies LocalHandler,
+
+    image: ((_argv, ctx) => doc(ctx.command, [images()])) satisfies LocalHandler,
   },
+  /**
+   * **`--ambiguous-wide` demotes the glyph ladder by one rung** (C09 I37).
+   *
+   * `TuiConfig.capabilities` is a published member no example named, and this is
+   * the honest use for it: `▀` is `East_Asian_Width=Ambiguous`, so a terminal
+   * declaring `wide` cannot spend a cell on two colours without drawing the
+   * picture at double the width `imageCells` measured. Passing it here is how the
+   * same images are read on **both** arms in one terminal — the comparison no
+   * capability detection can produce, because a terminal reports one answer.
+   *
+   * From `argv` rather than the environment, deliberately: C02 owns
+   * `process.env` and an app reaching for it to fake a capability would be
+   * working around the seam that exists for this.
+   */
+  ...(process.argv.includes("--ambiguous-wide")
+    ? { capabilities: { ambiguousWidth: "wide" as const } }
+    : {}),
   greeting: greetingDocument,
 });
 
