@@ -1391,13 +1391,51 @@ becomes free. But the first frame still renders 50,000 lines, so on its own this
 *continuous* lag into *one long stall* — better, and not enough.
 
 **3. Render only the visible window of a block.** This is the one that actually fixes it, and
-it is the heterogeneous-windowing finding from step 3 with its consumer finally present.
-`windowPatch` already proves the pattern: **reduce a `Patch` to a valid smaller `Patch`**, so
-the standard measurer measures it normally and no second height codepath appears.
+**the seam is built and wired — two kinds of five have taken it.** `C09 I25`'s
+`BlockDefinition.window` exists, `registry.windowSequence` composes it across a run counting
+`gapBefore` correctly, and `session.ts:921` calls it on the transcript render path with the
+range keyed into the render cache. A kind that declares no `window` is kept whole and paid for
+out of `skipRows`, so the seam is optional and silent — which is why its state is not
+obvious from either end.
 
-**Per divisible kind** — `patch`, `table`, `keyValue`, `logs`, `code` all reduce cleanly. The
-plot does not, and that is permanent (C12 I1: reducing a plot's data changes nothing about
-its height). **Granular where the kind divides, atomic where it does not.**
+```
+patch      WINDOWS   presentation/patch/definition.ts:214 → windowRows
+logs       WINDOWS   presentation/blocks/kinds/structured.ts:172
+code       kept whole
+table      kept whole
+keyValue   kept whole
+plot       atomic, permanently (C12 I1)
+```
+
+**MEASURED 2026-09-01, and the gap is 1 400×.** Registry against `dist/`, one block, painting
+the top 40 rows:
+
+```
+kind    rows      measure ms   paint 40 rows ms   window keeps
+code     5 000        2.68            82.96        5 000 of 5 000
+logs     5 000        0.00             0.35           40 of 5 000
+code    50 000       14.68           913.79       50 000 of 50 000
+logs    50 000       0.00             0.65           40 of 50 000
+```
+
+**The kind that took the seam paints a 50 000-row block in 0.65 ms; the kind that did not takes
+914 ms for the same forty rows.** `logs` also measures in 0.00 ms because its height is
+`lines.length` arithmetic, where `code` must wrap-measure every line — so the remaining cost
+splits into a `window` and a `measure` and the second is not free for every kind.
+
+**So the work is three windows, not a mechanism**: `code`, `table`, `keyValue`. `windowPatch`
+proved the pattern and `windowRows` is the pattern *in `BlockDefinition.window`'s own shape* —
+its doc reasons the `skipRows` accounting through C25 I18 and I19 and states why the pushed
+view and the transcript need two functions rather than one parameter. That is the template the
+three follow, and the non-trivial half is `skipRows` rather than the slice.
+
+**The plot does not divide, and that is permanent** (C12 I1: reducing a plot's data changes
+nothing about its height). **Granular where the kind divides, atomic where it does not.**
+
+**A survey by directory got this wrong first.** Globbing `presentation/blocks/kinds/` reported
+`logs` alone, because `patch`'s definition lives in `presentation/patch/`. *A scan covers the
+directory and names its exceptions*; the reliable question is asked of the registry — window a
+tall block and see whether it shrank.
 
 **4. [`cells()`'s ASCII fast path](#cells-fast-path).** Only worth measuring after 1–3, because most calls
 disappear with the cache.

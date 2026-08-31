@@ -13860,6 +13860,60 @@ terminal did not change, and the gap between those two is the whole finding.
 
 ---
 
+## F424 — an optional seam with a silent fallback, and nothing says who declined it ★★★★☆
+
+**C09 I25's `BlockDefinition.window` is built, composed and wired.** `registry.windowSequence`
+walks a run counting `gapBefore` correctly, `session.ts:921` calls it on the transcript render path,
+and the range is keyed into the render cache. Roadmap 17 lists *render only the visible window of a
+block* as the step that actually fixes large blocks, and it is right — for the kinds that took it.
+
+**Two of five.** `patch` (`patch/definition.ts:214` → `windowRows`) and `logs`
+(`structured.ts:172`). `code`, `table` and `keyValue` do not declare one.
+
+**And declining is silent by design.** `windowSequence`'s own doc: *"A kind without `window` is kept
+whole, and its rows are paid for out of `skipRows`. That is what makes the seam optional rather than
+obligatory."* Correct, and it means a kind that never took the seam produces **no error, no warning
+and no fault** — only a slower frame. Measured against `dist`, painting the top forty rows of one
+block:
+
+```
+kind    rows      measure ms   paint 40 rows ms   window keeps
+code     5 000        2.68            82.96        5 000 of 5 000
+logs     5 000        0.00             0.35           40 of 5 000
+code    50 000       14.68           913.79       50 000 of 50 000
+logs    50 000       0.00             0.65           40 of 50 000
+```
+
+**1 400×, and the failure mode is a number nobody is looking at.** This is *absence
+indistinguishable from failure* with the absence being an unimplemented optional method: every
+assertion about `code` passes, the frame is correct, the rows are right, and the entry takes
+914 ms.
+
+**The instrument this wants is a list, not an assertion.** Which kinds divide is a judgement — the
+plot does not and never will (C12 I1) — so the check cannot be *every kind declares `window`*. It is
+the shape the repo already uses for exemptions: **the divisible kinds are named, each non-declaring
+one carries a reason, and the list is compared by equality** so a sixth kind cannot join silently.
+`NOT_INSTRUMENTS` is the precedent, and `windowRows`'s own doc is the template for the reason a
+declaration needs.
+
+### The survey got it wrong first, and the way it was wrong is the reusable part
+
+Globbing `src/presentation/blocks/kinds/*.ts` for a `window` declaration reported **one** kind, and
+the answer is two: `patch`'s definition lives in `src/presentation/patch/`, beside its renderer. *A
+scan covers the directory and names its exceptions*, and this one covered a directory and did not
+know it had any. **The reliable question is asked of the registry rather than of the tree** — window
+a tall block and see whether it shrank — and that is what the figures above do.
+
+**It also nearly produced a wrong finding in the other direction.** The first reading of
+`windowSequence` at `session.ts:921` said *step 3 is built*; the second said *four of five kinds
+decline it*; the third, asked of the artefact, says two of five. **Three answers from one question,
+and the middle one would have been recorded had the fixtures not been checked** — `patch`, `table`
+and `keyValue` measured **1 row** in the first probe, which is a degenerate fixture and not a kind
+that declines to window. A fixture must be shown to respond to the thing under test before it is
+asserted against.
+
+---
+
 ## F423 — a plan's falsification condition aimed at the wrong artefact, and it would have closed a 544 ms defect ★★★★★
 
 **Roadmap 19 diagnoses a resize drag and names the cost.** *"Each one forces an immediate frame
