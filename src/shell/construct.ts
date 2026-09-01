@@ -912,15 +912,29 @@ export async function constructGraph(
   let refreshAnchors: () => void = () => undefined;
 
   at("resize", () => {
-    lifecycle.onResize((size) => {
-      // **The width, and not the height** (C22 I34). Width is what invalidates
-      // every cached height (C14 I8) and is knowable here; the height is the
-      // *region's*, which only the composed frame knows, so `#render` sets it.
-      // Setting both here is what made the viewport three rows too tall — two
-      // writers with different ideas of one quantity, and the wrong one ran
-      // first. The height passed through is the one C14 already holds, so this
-      // call carries no opinion about it.
-      stores.viewport.resize({ width: size.columns, height: stores.viewport.scroll.viewportHeight });
+    lifecycle.onResize(() => {
+      // **The viewport is not resized here, and that is where the 544 ms was**
+      // (C03 I15, F423). The comment this replaces said *the width, and not the
+      // height* — two writers with different ideas of one quantity, which is
+      // C22 I34's own sentence about the height. It was true one field over:
+      // `render-frame.ts` already resizes the viewport from the composed frame,
+      // **width and height together**, before any row is read, and C14 I21 makes
+      // the second call a no-op. So this line's only effect was to do the
+      // re-measure per `SIGWINCH` instead of per frame — thirty full re-measures
+      // of the transcript for a drag, 544 ms at a thousand entries.
+      //
+      // **Nothing here needs to know the new width**, and a frame composed for
+      // any other reason cannot be stale: `compose` reads `lifecycle.size()`
+      // fresh, and the only reader of viewport rows is `paintDeps`, whose two
+      // call sites are both after the resize (C03 §8a, the classification
+      // table's third row). The size argument is therefore unread, which is why
+      // it is not taken.
+      //
+      // **`refreshAnchors` stays per signal rather than per frame**, and it is
+      // cheap: `promptAnchor` composes for `region.height` and `promptRows`
+      // only — layout, no paint — and reads `lifecycle.size()` fresh, so it
+      // never depended on the viewport having been resized first.
+
       // **The anchors, before the frame is asked for** (C15 I14, C19 I23). An
       // anchored layer stores the row it was placed against, and every writer
       // of that row was a keystroke path — so a resize left an open menu

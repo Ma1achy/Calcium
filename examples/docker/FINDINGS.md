@@ -13860,6 +13860,73 @@ terminal did not change, and the gap between those two is the whole finding.
 
 ---
 
+## F425 — the cheapness claim reasoned about the write, and five documents inherited it ★★★★★
+
+**F423 found roadmap 19 naming the wrong cause. This is where that came from**, found by following
+the citation chain rather than by measuring again — and the root is not a mistake, it is a correct
+argument about half the cost.
+
+`docs/notes/TUI_NOTE_resize_and_compositor.md`, §*Why the drag case is not the hard one*:
+
+> *`SIGWINCH` during a drag fires many times. D31's decision not to debounce means many full
+> repaints — and that is affordable precisely because of virtualisation: each repaint writes the
+> visible range, roughly forty rows, not the transcript.*
+>
+> *That is worth stating because it is counter-intuitive. **Uncoalesced resize sounds expensive and
+> is cheap**…*
+
+**Every word about the write is true.** C14 selects visible rows, so a repaint is `O(visible)` and
+forty rows is right. **The measure is not mentioned**, and a width change invalidates every cached
+height (C14 I8), so the index re-measures `O(transcript)`. Virtualisation is exactly what makes the
+two diverge — it fixes the render and leaves the measure alone — so the property the note cites as
+the reason for cheapness is the property that hides the cost.
+
+Measured: **544 ms of blocking work for a 30-event drag at a thousand entries.**
+
+### Five restatements, each citing the one before it
+
+```
+the note        "uncoalesced resize sounds expensive and is cheap"   — reasoned, not measured
+A01 D31         "Resize is not debounced"                            — recorded on that reasoning
+C01 T3.19       "neither does C03: resize is immediate there"        — cites C03 §3 and C03 I2
+C03 §3, rule 1, T3.13                                                — three sites, all citing I2
+frame-scheduler.ts                "never delayed (C03 I2)"           — the fifth site, at runtime
+roadmap 19      "a full Fenwick rebuild"                             — names a cause that is 0.07%
+```
+
+**And I2 names two reasons.** Its text is *`input` and `completion` commits are never delayed by any
+amount*. Five places cited it for `resize`, one of them in another component's spec and one in a
+`RangeError` a user could read. **`make enforce` resolves 12 742 invariant references and none of
+these is a violation**: the rule checks that a citation names an invariant which exists, never that
+the invariant says the cited thing — SP9's stated blind spot, and this is what it looks like at
+scale.
+
+### D31 is the interesting one, because the wording forbade the fix and the reason asked for it
+
+*Resize is not debounced.* **A debounce and a fixed window are not the same thing.** A debounce
+waits for the events to stop, so a three-second drag draws nothing for three seconds. A fixed 16 ms
+deadline draws throughout, at most one window behind. What D31 protects — C01 T5.4's
+*continuously correct during a drag* — **survives the second and is destroyed by the first.**
+
+So the decision's literal text refused the change and its purpose required it, and the honest move
+was to amend the wording rather than to argue the wording already permitted it. That temptation is
+the same shape as the thing being fixed: a sentence that reads as covering the case.
+
+### The blind spot is the walk's, and it is new
+
+C03 §8a is two artefacts — a sequence trace and a classification table — **indexed by C03's rules
+and C22's**. D31 is in A01, a layer above both, and **neither shape reaches it**. The walk found
+four things before any code and did not find the one decision that forbade the whole change; a test
+comment did, at the point of failing.
+
+**A walk indexed by a component's rules cannot see an architecture decision that governs it.** That
+is not fixed by adding rows. The cheap habit is the one this campaign already uses in the other
+direction — *ask where the claim is written down* — asked before the walk rather than after: **which
+decision records already govern this component, and does the change contradict one?** Grepping A01's
+table for the component's subject is ten seconds.
+
+---
+
 ## F424 — an optional seam with a silent fallback, and nothing says who declined it ★★★★☆
 
 **C09 I25's `BlockDefinition.window` is built, composed and wired.** `registry.windowSequence`

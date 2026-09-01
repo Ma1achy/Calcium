@@ -64,7 +64,7 @@ function createFrameScheduler(opts: {
 |---|---|---|
 | `input` | 0 ms | Input feedback latency is the thing users notice. Never delayed |
 | `completion` | 0 ms | The user is waiting on a result they asked for |
-| `resize` | 0 ms, plus implicit `invalidate()` | Dimensions changed; a diff against the old frame is meaningless |
+| `resize` | **16 ms, fixed**, plus implicit `invalidate()` | Dimensions changed; a diff against the old frame is meaningless — hence the invalidate, which is set **eagerly at commit** and not at flush (I7, I15). The window is not tunable: unlike `stream` and `spinner`, whose window makes a frame *stale*, this one makes it *wrong*, so a config may not lengthen it (I15) |
 | `stream` | 33 ms | ~30 frames/s ceiling, matching the A02 §7 budget. Configurable down to 16 ms, but terminals generally benefit from fewer, larger writes — the default is the conservative end deliberately |
 | `spinner` | 100 ms | Animation only; a faster tick conveys nothing |
 
@@ -90,7 +90,9 @@ downstream of it look like a decision deferred rather than a chain broken** — 
 worth keeping now that the chain is joined, because it is a fact about reading a spec and not
 about this defect.
 
-**Immediate reasons cannot be made coalesced.** `windows` may tune `stream` and `spinner` only; supplying a window for `input`, `completion` or `resize` is rejected at construction. A config file must not be able to introduce input lag (I2).
+**Immediate reasons cannot be made coalesced.** `windows` may tune `stream` and `spinner` only; supplying a window for `input` or `completion` is rejected at construction, because a config file must not be able to introduce input lag (I2) — and for `resize`, because its window is fixed for a different reason (I15).
+
+**Both rejections used to cite I2 and I2 names two reasons.** Its text is *`input` and `completion` commits are never delayed by any amount*; three places in this document cited it for `resize` as well, and the roadmap quoted it back as *"input, completion and resize are never delayed"* — a quotation of a sentence that does not exist. `make enforce` resolves 12 742 invariant references and cannot see it: it checks that a citation names an invariant which exists, never that the invariant says the cited thing (SP9's stated blind spot). The two reasons are genuinely different — input lag is about *latency the user causes*, a resize window is about *a frame that is wrong rather than stale* — so they are two invariants and not one widened (F423).
 
 **Windows are throughput ceilings, not deadlines.** `stream`'s 33 ms exists to cap streaming at ~30 fps; `spinner`'s 100 ms is an animation cadence. They encode different kinds of requirement, so the shortest ceiling governs: a pending timer is re-armed when a commit arrives whose window is **strictly shorter**, and left alone otherwise.
 
@@ -187,8 +189,8 @@ Three states plus an orthogonal `contaminated` flag. `writing` is transient but 
 
 | From ↓ / call → | `commit(input\|completion)` | `commit(resize)` | `commit(stream\|spinner)` | `flush()` | `invalidate()` |
 |---|---|---|---|---|---|
-| **idle** | → writing → idle (T1.1) | set flag, → writing → idle (T1.10) | → pending, timer set (T1.3) | no-op (T3.1) | flag set, idle (T1.8) |
-| **pending** | cancel timer, → writing → idle (T1.5) | set flag, cancel timer, → writing → idle (T3.16) | → pending; timer unchanged unless the arriving window is strictly shorter, in which case it is re-armed (T1.4, T3.12) | cancel timer, → writing → idle (T1.6) | flag set, pending (T3.6) |
+| **idle** | → writing → idle (T1.1) | set flag, → pending, timer set at 16 ms (T1.10, T1.21) | → pending, timer set (T1.3) | no-op (T3.1) | flag set, idle (T1.8) |
+| **pending** | cancel timer, → writing → idle (T1.5) | set flag; timer re-armed only if 16 ms is strictly shorter than the one standing (T3.16, T1.22) | → pending; timer unchanged unless the arriving window is strictly shorter, in which case it is re-armed (T1.4, T3.12) | cancel timer, → writing → idle (T1.6) | flag set, pending (T3.6) |
 | **writing** | defer (T3.7) | defer, flag set (T3.17) | defer (T3.18) | no-op (T3.8) | flag set (T3.19) |
 
 Orthogonal: a write while `contaminated` calls `repaint()` rather than `render()` and clears the flag once that repaint returns (T1.9, T3.5). `resize` sets that flag as part of the commit (I7).
@@ -214,12 +216,14 @@ Orthogonal: a write while `contaminated` calls `repaint()` rather than `render()
 - **I13** — **Suspension gates `render` and never `repaint`.** While suspended an ordinary frame is not written and a contaminated one is, so `resize` — which implies contamination (I7) — reaches the terminal regardless of suspension. Suspension may make the screen *stale*, which is what it is for; it may not make the screen *unknown*, and it may not hold a screen that already is. `suspend()` during a write applies to the next frame, as `invalidate()` does.
 - **I14** — **Suspension introduces no queue.** `flush()` while suspended forces nothing beyond what I13 already allows, and `resume()` writes an ordinary frame rather than a repaint: suspension writes nothing, so the terminal still holds the last frame written and the diff's model of it is still true. C03's memory of deferred work stays one `state` and one `deferred` reason under suspension, exactly as without it.
 
+- **I15** — **`resize` is coalesced on a fixed 16 ms window, and the window is not configurable.** It is not immediate and it is not tunable, and those are two rulings with two reasons. *Not immediate*, because the cost of a resize is not the frame: the width is what invalidates every cached height (C14 I8), so a drag of thirty `SIGWINCH`es was thirty re-measures of the whole transcript — **544 ms at a thousand entries, of which the index rebuild everyone named was 0.07%** (F423). *Not tunable*, because `stream` and `spinner` windows make a frame **stale** where this one makes it **wrong**, and I2's reasoning — a config may not introduce lag — reaches the second case for a different reason than the first. **Contamination is set eagerly at commit and never at flush** (I7, §5), which is what lets an `input` commit arriving inside the window write a correct frame rather than a diff against dimensions that no longer exist.
+
 ---
 
 ## 7. Commitments
 
-1. Commits are classified by reason; `input`, `completion` and `resize` are immediate, `stream` and `spinner` are coalesced (I2, I7).
-2. Windows are 33 ms for stream and 100 ms for spinner, tunable at construction. Immediate reasons have no window and cannot be given one (I2).
+1. Commits are classified by reason; `input` and `completion` are immediate, `resize`, `stream` and `spinner` are coalesced (I2, I7, I15).
+2. Windows are 16 ms for resize, 33 ms for stream and 100 ms for spinner; the last two are tunable at construction and resize's is not (I15). Immediate reasons have no window and cannot be given one (I2).
 3. An immediate commit cancels a pending one; final content is never lost (I4).
 4. At most one timer is outstanding at a time (I3).
 5. Nothing is written while the terminal is not acquired (I1).
@@ -231,8 +235,9 @@ Orthogonal: a write while `contaminated` calls `repaint()` rather than `render()
 11. C03 receives a live read-only view of C01 and cannot acquire or release (I12).
 12. A commit arriving during a write is deferred and coalesced to the strictest reason, written inline at most once, and escalated to the timer thereafter. The chain is bounded at two writes and nothing is dropped (I10).
 13. C03 writes only the synchronised-update markers, through an injected bound `write`. Frame bytes leave through `render()`, which C03 does not own (I6, I8).
-14. `suspend()` holds the screen still without letting it become unknown: ordinary frames wait, contaminated ones are written, and a resize is therefore never deferred (I13).
+14. `suspend()` holds the screen still without letting it become unknown: ordinary frames wait, contaminated ones are written, and **suspension therefore never holds a resize back** (I13). *Never deferred* is what this said, and the walk falsified it: a resize is deferred by its own window (I15), and by a write in progress (I10), and neither is suspension. The claim is about which mechanism may hold it, not about whether anything can — C03 §8a A4.
 15. Suspension is bounded state, not a buffer: `flush()` forces nothing while suspended and `resume()` writes an ordinary diffed frame, not a repaint (I14). **`suspend()` and `resume()` are new members on a published L0 interface and are freeze-relevant.**
+16. **A resize is coalesced on a fixed, non-configurable 16 ms window, and the frame is where the viewport learns its size** (I15). L4 composes from `lifecycle.size()` read fresh and resizes the viewport from the composed frame before any row is read, so a commit of any reason arriving inside the window writes a frame at the *current* width — the wrong-frame hazard is closed by that ordering rather than by immediacy. C22 I34 owns that ordering and §8a A2 is the row that checked it.
 
 ---
 
@@ -251,6 +256,9 @@ Fake `schedule`, spy `render`/`repaint`, fabricated capabilities.
 - **T1.5** (I4): `commit("stream")` then `commit("input")` at 4 ms → `render()` called once, at 4 ms. Advancing past 33 ms — the window the cancelled timer would have fired in — produces no second call.
 - **T1.6**: `commit("spinner")` then `flush()` → `render()` called immediately, timer cancelled, `pending` false.
 - **T1.7**: `commit("spinner")` schedules at 100 ms, not at the 33 ms stream window.
+- **T1.21** (I15): `commit("resize")` from `idle` → **`pending` with a 16 ms timer, and nothing written** until the injected counter advances past it. The contamination flag is set at the commit, not at the flush — asserted here rather than in T1.10, because *set eagerly* and *set at all* are different claims and only the first survives the window.
+- **T1.22** (I15): two `commit("resize")` calls inside one window → **one write**, and the timer is not re-armed by the second. A window re-armed per event never fires during a continuous drag, which is the starvation case §8a A1 names and the one a per-event `setTimeout` produces.
+- **T1.23** (I15): `commit("input")` while a resize is pending → the timer is cancelled and the frame is written immediately, **and it is a `repaint`** — because the resize set contamination at commit time. This is the row that shows the coalescing costs no correctness: a keystroke mid-drag draws at the current dimensions, not a diff against the old ones.
 - **T1.8** (I5): `invalidate()` then `commit("input")` → `repaint()` called, `render()` not; `contaminated` false afterwards.
 - **T1.9** (I5): two writes after one `invalidate()` → first is `repaint()`, second is `render()`.
 - **T1.10** (I7): `commit("resize")` → `repaint()` called immediately without an explicit `invalidate()`.
@@ -288,7 +296,7 @@ Fake `schedule`, spy `render`/`repaint`, fabricated capabilities.
 - **T3.10**: `acquired` flips false and back to true while pending → the pending write happens once.
 - **T3.11**: a hundred `commit("stream")` calls in one synchronous block → exactly one timer, one render.
 - **T3.12** (I3): alternating `stream` and `spinner` commits → the shortest ceiling governs, in both orderings. Stream-then-spinner leaves the 33 ms timer alone — 100 is not shorter. Spinner-then-stream re-arms the 100 ms timer at 33 ms. A longer window never pushes the frame out.
-- **T3.13** (I2): `windows: { input: 50 }` at construction → **throws**. Same for `completion` and `resize`.
+- **T3.13** (I2, I15): `windows: { input: 50 }` at construction → **throws**. Same for `completion` — those two by I2 — and for `resize`, **by I15 and for a different reason**, which is why the row names both. A single citation here read as one rule covering three reasons and I2 covers two (F423). **The two messages are asserted separately in T2.5**, which is where the partition lives: a shared message would restate the conflation this replaces, and a reader told *never delayed* about a reason that is delayed by 16 ms has a sentence they cannot check against the behaviour.
 - **T3.14** (I1): `flush()` from pending while `acquired` is false → the timer is cancelled, nothing is written, `pending` is false. The one path where an explicit flush discards a frame silently.
 - **T3.15** (I3, I10): a coalesced commit deferred during a write schedules a **fresh** window measured from the end of the write, not from the original commit. No timer is outstanding at that moment, so I3 holds.
 - **T3.16**: `commit("resize")` while pending → timer cancelled, repaint written immediately.
@@ -337,10 +345,69 @@ PTY harness, real timers, real terminal.
 - **T6.9** (A02 §7): adding a `CommitReason` without a window → T2.5 fails at build time.
 - **T6.10** (I10): dropping a re-entrant commit → T3.21 fails on the lost frame. Draining the deferral in a loop rather than escalating the second one → T3.20 does not fail, it *hangs*: the chain is flat and infinite, so it exhausts the heap rather than the stack. That is the failure the escalation exists to prevent, and the reason I10 bounds the inline writes by count rather than by depth.
 - **T6.11** (I12): snapshotting `acquired` at construction → T3.22 fails.
+- **T6.16** (I15): making `resize` immediate again → **T1.21 and T1.22 fail, and T1.23 does not** — a frame written per `SIGWINCH` is still correct, just thirty times over. That asymmetry is the row's content: the defect this window exists for is invisible to every assertion about what a frame contains, which is why it survived to be measured rather than reviewed (F423).
 - **T6.12** (I2): allowing an immediate reason to be given a window → T3.13 fails. Distinct from T6.1: that reverts the behaviour, this reverts the construction-time rejection.
 - **T6.13** (I3): re-arming the pending timer on every coalesced commit, or on one whose window is merely *not longer* → T1.4 fails, since 33 against 33 would slide the window. Never re-arming → T3.12 fails on the spinner-then-stream ordering. Strictly-shorter is what holds both directions; either comparison relaxed by one step breaks one of them.
 - **T6.14** (C13): passing frame content to `write` rather than through `render()` → T2.7 fails on the third string.
 - **T6.15** (I12): snapshotting `acquired` in the L4 wiring rather than in C03 → T3.24 fails. The failure C03 cannot prevent structurally, so it is demonstrated instead.
+
+---
+
+## 8a. The walk — resize as a coalesced reason
+
+**Two artefacts, because this reason has state and structure.** The state is C03's own machine
+plus a window in flight; the structure is *who owns the terminal's width at rest*, which no
+sequence of events produces and no trace row can reach. Taking the trace alone because the state
+machine is the obvious thing is how the structural half goes unexamined.
+
+**Written before the code, against the measurement in F423**: a 30-event drag costs 544 ms at
+1 000 entries, of which the Fenwick rebuild the roadmap named is 0.07%. The cost is a re-measure
+of every entry, and the walk's job was to find where it can be made to happen once.
+
+### The trace — a resize is in flight and something else happens
+
+| # | in flight | event | rules that meet | ruling |
+|---|---|---|---|---|
+| A1 | resize pending | another `SIGWINCH` | §5's window rule | **The deadline is the first event's.** A window re-armed per event never fires during a continuous drag — the starvation case, and the one a naive `setTimeout` per event produces. §5 already says the timer is unchanged unless the arriving window is *strictly shorter*; resize's window is a constant, so the existing rule gives this and no new clause is needed |
+| A2 | resize pending | `commit("input")` — a keystroke mid-drag | I2 · §5 strictness · **C22's compose order** | **This row decides the design.** The frame an input commit writes is at the *current* terminal width whether or not the resize's own frame has been written — because `render-frame.ts` sets the viewport's size from `frame.size` before any row is read, and `frame.size` is `lifecycle.size()` read fresh. The wrong-frame hazard I2's reasoning names for `resize` is closed **structurally, in another component**, not by immediacy |
+| A3 | resize pending | `commit("stream")` | §5 strictness | 16 ms is strictly shorter than stream's 33 ms, so the resize's timer stands. Existing rule |
+| A4 | resize pending | `suspend()` | I13 · I14 · **commitment 14** | I13 is about *whether* a contaminated frame is written and the window is about *when*; they do not conflict. **But commitment 14's wording does** — *"a resize is therefore never deferred (I13)"* is true of suspension and becomes false in a second sense the moment a window exists. **Found here, and it is the reason a walk is scheduled rather than diligent**: nothing about writing the window would have re-read that sentence |
+| A5 | resize pending | the terminal is released | C01 I12b · I1 | The timer fires and the write is dropped silently by I1. **No cancel**, because adding one is a second expression of an invariant that already holds — the reimplemented-rule shape |
+| A6 | startup deferred on a failed size gate | `SIGWINCH` | C22 I8 | **No effect.** That continuation is a second `onResize` subscriber (`session.ts:323`), not a commit, so C03's window is not in its path. Checked rather than assumed, because a 16 ms delay to a deferral that once *deferred for ever* is the kind of thing that reads as harmless |
+| A7 | resize pending | `flush()` | §5 | Cancel timer, write now. Existing rule |
+| A8 | `writing` | `SIGWINCH` | I10 · §5's eager contamination | **The walk said *unchanged* and the implementation disproved it.** The flag is still set at commit time, which is the half that was right. But `runWrite` gives a deferred *coalesced* reason a fresh window from the end of the write (T3.15), and `resize` is one now — so it no longer writes inline, it waits 16 ms like a stream. Safe for the same reason as A2: the flag is already set, so whenever the write lands it is a repaint at whatever width the terminal then has. **Recorded rather than smoothed over: this is the row the code got to disprove, and a walk that is never disproved is one nobody checked** |
+
+### The classification table — who owns the width, at rest
+
+No event between these; two statements that are simultaneously true.
+
+| at rest | `lifecycle.size().columns` | the viewport's width | what a reader sees |
+|---|---|---|---|
+| steady | W | W | W |
+| today, between `SIGWINCH` and its frame | W′ | W′ — the handler wrote it | W′ |
+| **with the handler's write removed** | W′ | **W — stale** | **W′** |
+| a reader of viewport rows outside a frame | W′ | W | — |
+
+**The third row is the one that looks like a defect and is not**, and only a table asks it: the
+viewport genuinely holds a stale width between the signal and the frame. It is unobservable
+because `composeFrame` orders itself `composed()` → `resizeViewport()` → `paint(…, paintDeps(…))`,
+and `paintDeps` — the only thing that reads viewport rows — has exactly two call sites, both
+after the resize. The fourth row is therefore empty: **there is no reader outside a frame.**
+
+**So the handler's `viewport.resize` is a second writer of the width whose only effect is to do
+the re-measure early**, and C22 I34 already named that shape for the *height*: *two writers with
+different ideas of one quantity*. The same sentence, one field over, and the field it was written
+about is the one that got fixed.
+
+### What the walk changed before any code
+
+1. **The window is C03's, and the handler's write is deleted** — not a coalescing timer in C22,
+   which was the shape before the walk. The re-measure moves onto the frame path, where C03's
+   window already coalesces it.
+2. **A2**: nothing needs to flush a pending resize. Ten `commit("input")` call sites would each
+   have had to, which is the reimplemented-rule hazard avoided by finding the ordering instead.
+3. **A4**: commitment 14's wording is falsified by the change and is corrected with it.
+4. **A5**: no cancel-on-release, on the grounds that I1 already says it.
 
 ---
 

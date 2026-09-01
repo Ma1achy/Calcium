@@ -98,6 +98,10 @@ describe("C22 §6b — the write is a difference", () => {
     // thing that can produce a write at all, which is the point of the row.
     resize({ columns: 100, rows: 24 });
     await settle();
+    // **The window** (C03 I15). `settle()` is a `setImmediate` flush, so it
+    // returns before a 16 ms timer fires — a resize is coalesced now and the
+    // write this row is about happens on the timer, not on the signal.
+    await new Promise((done) => setTimeout(done, 40));
 
     const written = stdout.chunks.slice(before).join("");
     expect(written, "the resize produced a write").not.toBe("");
@@ -147,6 +151,11 @@ describe("C22 §6b — the write is a difference", () => {
     // draws in the middle of the transcript with a gap beneath it.
     resize({ columns: 100, rows: 40 });
     await settle();
+    // **The window** (C03 I15). `settle()` is a `setImmediate` flush and the
+    // resize's frame is now written on a 16 ms timer, so the screen read below
+    // would be the frame from *before* the resize — which is a stale anchor
+    // read as a fresh one, exactly the confusion this row exists to catch.
+    await new Promise((done) => setTimeout(done, 40));
 
     const after = screen().rows;
     const promptAfter = rowOf("❯", after);
