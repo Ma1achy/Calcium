@@ -43,7 +43,15 @@ export function killed(output) {
  * start; this catches one that goes blind in the middle, which is what happened:
  * a suite piped into `grep -q` under `pipefail`, the writer taking SIGPIPE, exit
  * 141 and a buffer cut before the summary. Every mutation after it would have
- * reported a survivor. */
+ * reported a survivor.
+ *
+ * **The second cause is output volume, and it looks identical.** `c11-table-window`
+ * went blind on three of nine: a mutation that makes *every* window wrong emits a
+ * conformance report with thousands of failure rows, `execSync`'s 1 MiB default
+ * `maxBuffer` cuts the child off, and the throw carries a truncated `stdout` with
+ * the summary sheared away. Same symptom, no signal involved — and it is worse
+ * than the SIGPIPE case, because it strikes exactly the mutations that break the
+ * most. A run whose subject is a sweep sets `maxBuffer` explicitly. */
 export function ran(output) {
   return /Tests\s+\d+ (failed|passed)/.test(strip(output)) || timedOut(output);
 }

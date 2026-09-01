@@ -631,6 +631,24 @@ export const BUILDER_OMISSIONS = Object.freeze({
   "status.elapsedMs": "C09 I32, C23 I52 — supplied by whoever holds the clock, which is the refresh driver and never a builder",
   "status.spinner": "C09 I32 — the frame set is the renderer's, chosen per capability set; a consumer owning a `status` (C24 I30) is handed no frames to name",
 
+  "keyValue.keyWidth":
+    "C09 I25a — the same argument as `patch.numberWidth`, and it had no entry because MG27 " +
+    "could not see the field (F430). It is what a *window* carries so its key column describes " +
+    "the block it came from rather than the slice it shows; a hand-built keyValue setting it " +
+    "would assert a column its own labels do not justify. `window` is the one writer",
+
+  "table.actionBar":
+    "C11 I18 — a presence rather than a width, and not the producer's either. The bar is " +
+    "derived from `rows.some(r => r.actions)`, so a window moves it in both directions and " +
+    "pins what the *parent* derived; a hand-built table setting it would assert two rows its " +
+    "own rows do not justify. `window` is the one writer and it recomputes rather than " +
+    "remembers, so the pin cannot describe the previous document",
+  "table.presorted":
+    "C11 I19 — the same argument one field over, about an order rather than a presence. " +
+    "`sortedRows` is not idempotent under a slice because `kindOf` reads the values present, " +
+    "so a window hands its rows over already ordered; a producer setting it would assert an " +
+    "order nothing can check the block against (FINDINGS F429)",
+
   "patch.numberWidth":
     "C25 I21a — not the producer's to set. It is what a *window* carries so its gutter " +
     "describes the block it came from rather than the slice it shows, and a hand-built patch " +
@@ -804,11 +822,32 @@ export function checkBuilderCoverage(
   const typeNames = [...union[1].matchAll(/\|\s*(\w+)/gu)].map((m) => m[1]);
 
   const fieldsOf = (name) => {
-    // `export type Rule = Readonly<{ … }> & Gap;` is one line, and a body regex
-    // written for the multi-line form silently attributed a neighbour's fields
-    // to it. Non-greedy to the first closing brace at column 0, or the line's.
-    const m = new RegExp(`export type ${name} = Readonly<\\{([\\s\\S]*?)\\n?\\}>`, "u").exec(types);
-    if (m === null) return [];
+    // **Brace-matched, and it was a non-greedy regex** (F430). `export type Rule
+    // = Readonly<{ … }> & Gap;` is one line, so the body cannot be taken to the
+    // first `}>` at column 0 — but taking it to the first `}>` *anywhere* ends
+    // the body at the first nested `Readonly<{ … }>` on a line of its own, and
+    // every field declared after one is invisible. Measured: 3 types, 6 fields —
+    // `Table.showHeader`, `.emptyMessage`, `.actionBar`, `.presorted`,
+    // `KeyValue.keyWidth` and `Hunk.collapsedBefore`.
+    //
+    // **The failure read as the inverse.** An invisible field never reaches
+    // `unreached`, so the bidirectional arm below reports its `BUILDER_OMISSIONS`
+    // entry as *stale* — "the builder now sets it" — about a field no builder
+    // mentions at all. And `KeyValue.keyWidth`, the pin `keyValue`'s whole window
+    // rests on, had no entry and was never asked for one.
+    //
+    // Counting braces handles both forms and has no first-closer to pick.
+    const head = new RegExp(`export type ${name} = Readonly<\\{`, "u").exec(types);
+    if (head === null) return [];
+    let end = head.index + head[0].length;
+    let braces = 1;
+    while (end < types.length && braces > 0) {
+      const ch = types[end];
+      if (ch === "{") braces += 1;
+      else if (ch === "}") braces -= 1;
+      end += 1;
+    }
+    const m = [null, types.slice(head.index + head[0].length, end - 1)];
     let depth = 0;
     const out = [];
     for (const line of m[1].split("\n")) {
@@ -1709,6 +1748,7 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   "ConformanceReport.findings": "C09 §7 — as `subject`",
   "ConformanceReport.skipped": "C09 §7 — as `subject`, and the reference app reads it in five places",
   "ConformanceReport.kindsCovered": "C09 §7 — measurement-conformance coverage, asserted by the harness's own row",
+  "ConformanceReport.exactness": "C09 §2a — how many windows were compared row for row and how many the EXACT_ROWS bound left out. A report, so its consumer is the row that reads it: `block-window.test.ts` asserts `read`, because a bound nobody can see reads as coverage",
   "Failure.check": "C09 §7 — measurement failure record, asserted by the harness",
   "Failure.expected": "C09 §7 — as `check`",
   "ElementFailure.predicate":

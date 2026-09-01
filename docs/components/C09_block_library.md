@@ -1549,6 +1549,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.11** (I7): the module graph shows no kind importing the registry; container kinds resolve children solely through `measureChild`.
 - **T2.16** (§3): over the adversarial corpus — CJK, ZWJ sequences, variation selectors, combining marks — `cells(s)` equals the width Ink lays `s` out at. The one number two implementations compute, held to agreement rather than assumed into it.
 - **T2.17** (I4, §3): a source scan finds no `color=` or `backgroundColor=` prop in `src/presentation/` (A03 SS37), and no import from `src/terminal/` beyond `escapes.js` and type-only capability imports.
+- **T2.20** (I26): the row property has a subject — a window of the **right size and the wrong rows**. T2.15 shortens a window and `window-height` fires; this reverses the content and keeps the count, and `window-rows` fires while `window-height` does not. That is the shape of every real failure at this seam: a different parse (F426), a slice in declaration order, a comparator re-derived from the slice (F429).
+- **T2.21** (I26a): `tableDefinition.window` handed the registry's measurer and handed a stub returning 1 cuts in different places — `dropRows` of 2 against 1 for the same range. Asserting the signature would pass against a window that accepted the parameter and ignored it, which is how `table` came to be unwindowable for want of one (F428).
 - **T2.18** (I17, C04 I25): a sequence measures `Σ` its blocks plus one row per `gapBefore`, and renders exactly that many; a `row` group ignores the field.
 - **T2.10**: golden frames for every kind at four widths in both themes and both unicode modes.
 

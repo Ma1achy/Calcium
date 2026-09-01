@@ -479,6 +479,49 @@ export type Table = Readonly<{
   sort?: Readonly<{ key: string; direction: "asc" | "desc" }>;
   showHeader?: boolean;
   emptyMessage?: string;
+  /**
+   * The action bar's presence, **declared** rather than derived (C11 I18).
+   *
+   * **A presence, not a width** — which is what makes it a different claim from
+   * `keyValue.keyWidth` and `Patch.numberWidth` rather than the same one again.
+   * A pinned width says *a slice must not draw a narrower column*; this says
+   * *the bar is there*, and the bar is derived from `rows.some(r => r.actions)`,
+   * so a window moves it in **both** directions: a slice dropping the only row
+   * that declares `actions` loses two rows the parent counted, and a mid-table
+   * slice that happens to keep one draws a bar in the middle of a scrolled
+   * table.
+   *
+   * **Not a producer's** (MG27). It describes what a *parent* derived, and a
+   * hand-built table setting it would assert two rows its own rows do not
+   * justify. `window` is the one writer, and it recomputes rather than
+   * remembers — a `true` carried across a patch that removed the last `actions`
+   * would be a two-row lie surviving into the next frame.
+   *
+   * Suppressing the bar by stripping `actions` is **not** the same change: that
+   * removes the row's affordances (C26).
+   */
+  actionBar?: boolean;
+  /**
+   * The rows are already in `sort`'s order and are not sorted again (C11 I19).
+   *
+   * **`sortedRows` is not idempotent over a slice, and that is the whole
+   * reason.** `kindOf` decides a column's comparator from **the values present
+   * in it** — one `abc` in a column of numbers makes the whole column text — so
+   * a window that drops the one non-numeric value re-classifies the column and
+   * reorders its own rows. Measured on `2 · 10 · abc` ascending: the whole block
+   * renders `10 · 2 · abc` and its first two rows, windowed, render `2 · 10`.
+   * Reversed, with every count, every height and every `skipRows` correct, which
+   * is the one failure C09 I26 cannot see (FINDINGS F429).
+   *
+   * **`sort` is kept beside it**, because the ` ↑` / ` ↓` indicator is drawn
+   * from `sort` alone (C11 §4) and a table that lost its arrow the moment a
+   * reader scrolled would be a visible regression in the one place a reader
+   * looks to learn why the rows are in this order.
+   *
+   * **Not a producer's** (MG27), on `actionBar`'s argument: it asserts an order
+   * the block cannot be checked against.
+   */
+  presorted?: boolean;
 }> & Gap & Floor;
 
 export type Steps = Readonly<{

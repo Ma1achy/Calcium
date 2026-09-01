@@ -13860,6 +13860,58 @@ terminal did not change, and the gap between those two is the whole finding.
 
 ---
 
+## F430 — MG27 stops reading a type at its first nested member, and reports the inverse ★★★★★
+
+**Found by adding a field, and the message was the opposite of the truth.** Two new `Table`
+members landed with `BUILDER_OMISSIONS` entries, and `make enforce` said *`BUILDER_OMISSIONS`
+names `table.actionBar`, which the builder now sets. Remove the entry.* No builder mentions
+either field. The bidirectional arm — the one that exists so an exemption cannot outlive its
+reason — fires when a key is not in `unreached`, and a field the walk never saw is never
+unreached.
+
+### The cause is one optional character in a regex, and it was added by a correction
+
+```js
+export type ${name} = Readonly<\{([\s\S]*?)\n?\}>
+```
+
+Non-greedy to the first `}>`, with the newline **optional** — so the body ends at the first
+nested `Readonly<{ … }>` closing on its own line. `Table` declares
+`sort?: Readonly<{ key: string; direction: "asc" | "desc" }>;` two members in, and everything
+after it is invisible.
+
+**The comment above it records the bug it fixed and not the one it introduced**: *`export type
+Rule = Readonly<{ … }> & Gap;` is one line, and a body regex written for the multi-line form
+silently attributed a neighbour's fields to it.* True, and the repair — make the newline
+optional — traded a wrong body for a short one. **A correction that fixes one shape and breaks
+another leaves a comment about the shape it fixed**, which is why re-reading it does not find
+this.
+
+### Measured, by brace-matching the same bodies
+
+```
+KeyValue   invisible: keyWidth
+Table      invisible: showHeader, emptyMessage, actionBar, presorted
+Hunk       invisible: collapsedBefore
+                                    3 types · 6 fields · of 41 types
+```
+
+**`KeyValue.keyWidth` is the one that matters.** It is the pin `keyValue`'s whole window rests
+on, landed with the explicit argument that it is **not a producer's to set** — the same argument
+`patch.numberWidth` carries, in `BUILDER_OMISSIONS`, with five lines of reason. Its twin has **no
+entry at all**, and MG27 never asked for one. The guard exists for one of a matched pair and not
+the other, and the only difference between them is where in the type the field was declared.
+
+**Fixed by counting braces**, which has no first-closer to pick and handles both forms. The
+fixed rule's first run found exactly that gap and nothing else — `Table.showHeader` and
+`.emptyMessage` are set by `b.table`, and `Hunk.collapsedBefore` by `b.patch`, so the invisible
+region was three-quarters harmless and one-quarter the field the seam depends on.
+
+**Group 11's shape with the diagnostic pointing the wrong way**, which is what makes it worse
+than a silent pass: a reader following the message deletes a correct exemption.
+
+---
+
 ## F429 — a sort is a permutation of the rows it can see, and a window changes which rows those are ★★★★★
 
 **The fix everybody reaches for is to slice the sorted order, and it is not enough.** C09 §6b's

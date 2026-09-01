@@ -128,6 +128,8 @@ export const keyValueDefinition: BlockDefinition<KeyValue> = {
     return Object.freeze({
       block: { ...block, rows: block.rows.slice(lo, hi), keyWidth: keyColumn(block, width) },
       skipRows: 0,
+      // A row is one row, so the slice ends where the range does (I26).
+      dropRows: 0,
     });
   },
 
@@ -218,6 +220,8 @@ export const logsDefinition: BlockDefinition<Logs> = {
     return Object.freeze({
       block: { ...block, lines: block.lines.slice(lo, hi) },
       skipRows: 0,
+      // A line is one row, so nothing can hang past `to` (I26).
+      dropRows: 0,
     });
   },
 

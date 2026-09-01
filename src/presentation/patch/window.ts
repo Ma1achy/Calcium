@@ -232,7 +232,7 @@ export function windowRows(
   width: number,
   from: number,
   to: number,
-): Readonly<{ block: Patch; skipRows: number }> {
+): Readonly<{ block: Patch; skipRows: number; dropRows: number }> {
   const layout = layoutFor(patch, width);
   const rows = rowsOf(patch, layout);
   const lo = Math.max(0, Math.min(Math.trunc(from), rows.length));  // cells-ok — a row index, not a width
@@ -309,7 +309,11 @@ export function windowRows(
     numberWidth: numberWidth(patch),
   } as Patch);
 
-  return Object.freeze({ block: block_, skipRows });
+  // **No trailing slack** (C09 I26). A patch's slack is a path header and a hunk
+  // header, and both *lead*; its units are one row each below them, so nothing
+  // can hang past `to`. `table` is the kind that can, which is why the field
+  // exists (F428).
+  return Object.freeze({ block: block_, skipRows, dropRows: 0 });
 }
 
 /**

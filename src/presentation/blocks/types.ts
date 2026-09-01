@@ -148,6 +148,29 @@ export type RenderContextInput = Omit<RenderContext, "measureChild" | "renderChi
 export type Windowed = Readonly<{
   block: Block;
   skipRows: number;
+  /**
+   * The **trailing** rows of it the caller drops (I26).
+   *
+   * **Slack falls at both ends and only one end had a name.** `skipRows` was
+   * sufficient for the kinds that took the seam first: `patch`'s slack is a path
+   * header and a hunk header, which lead, and `logs` and `keyValue` have units
+   * of one row and cannot overhang at all. `table` is the first kind whose last
+   * unit can hang past `to` — a range ending inside an expanded row gets the
+   * whole row — and both ends of a table can be asked for alone, where the
+   * header case puts its surplus after the header (F428).
+   *
+   * **Required rather than optional, and that is the point.** A default of zero
+   * would let the next kind not think about it, which is exactly how the first
+   * four did not: the whole finding is that nobody had considered the trailing
+   * end. Four call sites is the cost of making it a question.
+   *
+   * **It names a drop the consumer already makes.** `session.ts` renders the
+   * window and writes `rows.slice(0, ve.takeRows)`, so trailing rows past the
+   * viewport's own count have been discarded on every frame since the seam
+   * landed. The alternative was relaxing I26 to `≥`, and containment is
+   * satisfied by every wrong answer inside the bounds.
+   */
+  dropRows: number;
 }>;
 
 /**
@@ -238,9 +261,23 @@ export interface BlockDefinition<B extends Block = Block> {
    * later edit while a branch returning the block unchanged can.
    *
    * The contract is one line and it is checked generically:
-   * `measure(result.block, width) − result.skipRows === to − from`.
+   * `measure(result.block, width) − result.skipRows − result.dropRows === to − from`.
+   *
+   * **`measureChild`, and the argument for it was already written one member
+   * below** (I26a). A table row's offset is `header + Σ(1 + detailHeight(row))`
+   * and `detailHeight` measures the expanded detail through the child seam, so
+   * the unit boundaries are not a function of `(block, width)` alone. `logs`,
+   * `patch` and `keyValue` have units of one row and never needed it, which is
+   * why nothing connected the two — and `table` could not divide for want of a
+   * parameter rather than for want of a rule (F428).
    */
-  window?: (block: B, width: number, from: number, to: number) => Windowed;
+  window?: (
+    block: B,
+    width: number,
+    from: number,
+    to: number,
+    measureChild: MeasureFn,
+  ) => Windowed;
   /**
    * What this block offers to keyboard and pointer (C26 §5, I3).
    *

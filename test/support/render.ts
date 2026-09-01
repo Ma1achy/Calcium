@@ -162,7 +162,7 @@ export function measurable(
     width: number,
     from: number,
     to: number,
-  ) => Readonly<{ block: Block; skipRows: number }> | undefined;
+  ) => Readonly<{ block: Block; skipRows: number; dropRows: number }> | undefined;
 }> {
   const r = registry(options.definitions ?? [], options.onError ?? LOUD);
   const render: RenderOptions = {
@@ -180,7 +180,10 @@ export function measurable(
     registry: r,
     window: (block, width, from, to) => {
       const definition = r.get(block.kind);
-      return definition?.window?.(block, width, from, to);
+      // **`r.measure` is the child seam** (C09 I26a). Handing the suite's own
+      // measurer here rather than a stub is what keeps the property honest for a
+      // kind whose unit boundaries are a child's height.
+      return definition?.window?.(block, width, from, to, r.measure);
     },
   };
 }

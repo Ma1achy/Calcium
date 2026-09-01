@@ -57,18 +57,47 @@ describe("C26 §5 — one declaration, keyboard and pointer", () => {
     expect(report.kinds, "the kind that declares them is covered").toContain("table");
   });
 
-  it("T2.17 (C26 I7): the window × elements agreement is VACUOUS, and says so", () => {
-    // **F102's disposal: the exemption records which premise it rests on.**
-    // `window` has two implementers and `elements` has one, so the intersection
-    // is empty and the strongest predicate has no subject. Asserted rather than
-    // described, because the day a kind declares both this row fails and the
-    // agreement becomes live with nothing new to write.
+  it("T2.17 (C26 I7): the window × elements agreement is live, and it holds", () => {
+    // **This row was the assertion that it was vacuous, and it failed on the
+    // commit that added `table.window`** — which is the whole reason a vacuity
+    // is asserted rather than described. `window` had two implementers and
+    // `elements` had one, the intersection was empty, and the strongest
+    // predicate here had no subject; `table` is now in both.
     const report = checkElements(nav(), TABLE_CORPUS);
-    expect(
-      report.agreements,
-      "a kind now declares both — C26 I7 is no longer vacuous, and this row should be inverted",
-    ).toBe(0);
-    expect(formatElementReport(report)).toContain("VACUOUS");
+    expect(report.agreements, "table declares both").toBeGreaterThan(0);
+    expect(report.failures.map((f) => f.predicate), formatElementReport(report)).not.toContain(
+      "window-agreement",
+    );
+    expect(formatElementReport(report)).not.toContain("VACUOUS");
+  });
+
+  it("T2.17a (C26 I7): the agreement has a subject — an element shifted by one", () => {
+    // **The fabricated violation, because the predicate was declared in the type
+    // and emitted nowhere for as long as it was vacuous.** A window whose
+    // elements are all one row lower is exactly F134's shape at this seam: a
+    // position computed over the whole block against a slice that moved.
+    const real = nav();
+    const bentWindow: NavigableRegistry = {
+      measure: (b, w) => real.measure(b, w),
+      elementsOf: (b, w) => real.elementsOf(b, w),
+      get: (k) => {
+        const d = real.get(k);
+        if (d?.window === undefined) return d;
+        const w = d.window;
+        return {
+          ...d,
+          window: (block, width, from, to, measureChild) => {
+            const out = w(block, width, from, to, measureChild);
+            return { ...out, skipRows: out.skipRows + 1 };
+          },
+        };
+      },
+    };
+
+    const report = checkElements(bentWindow, TABLE_CORPUS);
+    expect(report.failures.map((f) => f.predicate), formatElementReport(report)).toContain(
+      "window-agreement",
+    );
   });
 
   it("T2.18: an empty sweep is refused, not reported as clean", () => {

@@ -268,6 +268,9 @@ Six tiers. No state machine — C11 is pure over the block.
 - **T1.16**: missing values sort last ascending *and* descending.
 - **T1.17** (I15): a `role: "expand"` column draws `expand` collapsed, `collapse` expanded, and blank on a row that is not expandable at this width. The same table with the role removed draws that column's cell data and no marker anywhere.
 - **T1.18** (I17): a table whose rows declare actions measures two rows taller than the same table without them, and **measures the same with focus on a row, with focus elsewhere and with no focus at all**. The three-way equality is the assertion — a bar drawn only when focused satisfies the first half exactly.
+- **T1.20** (I19): the whole block sorts to `bravo · alpha · charl` because one cell reads `abc`; the window `[0, 3)` renders the same two rows in the same order, and **the same window with `presorted` cleared renders them reversed** — same count, same height, same `skipRows`. The control is the row: without it the assertion passes against an implementation that never pinned anything.
+- **T1.21** (I18): a window covering the bar declares `actionBar: true` although its slice holds no `actions`, and a mid-table window whose slice **does** hold the row with `actions` declares `false`. Both directions, because a pin asserted in one is satisfied by a renderer that always says yes.
+- **T1.22** (I20): `[0, 1)` keeps a row and charges it to `dropRows`, and renders the header rather than the empty message; `[n−1, n)` keeps a row and charges it to `skipRows`, with `showHeader: false`. Neither end of a table is a row, and the two are paid at opposite ends.
 - **T1.19** (I17): the bar carries the focused row's action labels; with focus on a different row it carries that row's; with no focus it is blank and the height is unchanged. The blank case is what stops the row being conditional in the renderer while looking unconditional in the measurer.
 
 ### Tier 2 — contract / interface

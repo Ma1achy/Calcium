@@ -430,7 +430,12 @@ class Registry implements BlockRegistry {
       let piece: Block = block;
       let dropped = localFrom;
       if (windowable !== undefined && (localFrom > 0 || localTo < height)) {
-        const out = windowable(resolved.block, w, localFrom, localTo);
+        // **`this.measure` is the child seam** (C09 I26a), the same one
+        // `#elements` hands over four members up: a kind whose unit boundaries
+        // depend on a child's height — a table row's detail — cannot compute
+        // them from `(block, width)` alone, and a window that guessed would
+        // slice at the wrong row while I26's arithmetic still balanced.
+        const out = windowable(resolved.block, w, localFrom, localTo, this.measure);
         piece = out.block;
         dropped = out.skipRows;
       }

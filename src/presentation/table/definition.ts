@@ -24,7 +24,7 @@ import { createElement, type ReactElement } from "react";
 import { atLeastOne, insetWidth, normaliseWidth, sequenceHeight } from "../../data/viewmodel/index.js";
 import type { MeasureFn, Table, TableRow } from "../../data/viewmodel/index.js";
 import { clampSpans, paint, tone } from "../blocks/paint.js";
-import type { BlockDefinition, NavElement, RenderContext } from "../blocks/types.js";
+import type { BlockDefinition, NavElement, RenderContext, Windowed } from "../blocks/types.js";
 import { emptySpans, headerSpans, rowSpans } from "./cells.js";
 import { detailBlocks, isExpandable } from "./detail.js";
 import { planColumns } from "./plan.js";
@@ -40,7 +40,12 @@ import { sortedRows } from "./sort.js";
  * measurement cannot catch, because each half is right on its own.
  */
 function hasActionBar(block: Table): boolean {
-  return block.rows.some((r) => (r.actions ?? []).length > 0); // cells-ok
+  // **The pin first, because a window's slice is not the document** (I18). A
+  // presence derived from `rows` moves in both directions under a slice: one
+  // that drops the only row declaring `actions` loses two rows the parent
+  // counted, and one that keeps a row mid-table draws a bar where the parent
+  // has data. `window` is the only writer (MG27).
+  return block.actionBar ?? block.rows.some((r) => (r.actions ?? []).length > 0); // cells-ok
 }
 
 /** Whether the header row is drawn. `showHeader` defaults to true (C04 §3). */
@@ -74,6 +79,32 @@ function detailHeight(
   return sequenceHeight(detailBlocks(block, row, plan), insetWidth(width), measureChild);
 }
 
+/**
+ * A table's divisible units, in **display** order (C11 §5a).
+ *
+ * **The units are not rows**, which is the whole of why a window here is more
+ * than a slice: the header is one unit, a row *with its detail* is one, and the
+ * gap-plus-bar is one. A range that ends inside an expanded row gets the whole
+ * row and the surplus hangs past `to`, which is what `Windowed.dropRows` is for
+ * (C09 I26, F428).
+ *
+ * **Display order, because the range is in display space.** `measure` walks
+ * `block.rows` and `render` walks `sortedRows`, and the counts agree — so a
+ * slice taken in declaration order passes C09 I26 exactly while showing different
+ * rows than the reader asked for (C09 §6b, F426's shape one kind over).
+ */
+type Unit = Readonly<{ rows: number; row: TableRow | null; bar: boolean }>;
+
+function unitsOf(block: Table, width: number, measureChild: MeasureFn): readonly Unit[] {
+  const out: Unit[] = [];
+  if (hasHeader(block)) out.push({ rows: 1, row: null, bar: false });
+  for (const row of sortedRows(block)) {
+    out.push({ rows: 1 + detailHeight(block, row, width, measureChild), row, bar: false });
+  }
+  if (hasActionBar(block)) out.push({ rows: 2, row: null, bar: true });
+  return out;
+}
+
 export const tableDefinition: BlockDefinition<Table> = {
   kind: "table",
 
@@ -97,6 +128,99 @@ export const tableDefinition: BlockDefinition<Table> = {
     if (hasActionBar(block)) total += 2;
 
     return atLeastOne(total);
+  },
+
+  /**
+   * Rows `[from, to)` as a smaller table (C09 I25, C09 I26; C11 §5a).
+   *
+   * **Four things a window could change, and only two of them want a field.**
+   * The question is not *does a window change this* but *does a window change
+   * what this is derived from*:
+   *
+   * - **The column plan does not move.** `planColumns(cols, width)` takes no
+   *   rows — C11 §3 plans from declarations, never from cell content — which is
+   *   the structural reason `table` needs no width pin where `keyValue` did.
+   * - **The header is a declared flag** and was expressible all along.
+   * - **The action bar is a presence derived from the rows**, so it is pinned:
+   *   a slice moves it in both directions (I18).
+   * - **The display order is derived from the rows too**, through `kindOf`, and
+   *   re-deriving it can reverse the slice — so the rows are handed over already
+   *   ordered and `presorted` stops the second sort (I19, F429).
+   *
+   * **A window never holds zero rows** (I20). Both ends of a table can be asked
+   * for alone: `[0, 1)` is the header, and a bodyless table measures
+   * `header + 1` with the surplus *after* the header; `[n−2, n)` is the gap and
+   * the bar, and a bar whose existence derives from the rows cannot be drawn
+   * beside none. So the nearest row unit is kept and charged to whichever
+   * residual it falls outside.
+   */
+  window(
+    block: Table,
+    width: number,
+    from: number,
+    to: number,
+    measureChild: MeasureFn,
+  ): Windowed {
+    const w = normaliseWidth(width);
+    // **`tableDefinition.measure` by name, never `this.measure`.** A definition's
+    // members are extracted and called free — `navigation-conformance.ts` reads
+    // `registry.get(kind)?.window` and invokes it — and `this` is then
+    // undefined. The measurement suite calls it as `definition.window?.(…)`,
+    // which binds, so the first form passed every window in that file and threw
+    // on the first call from the second consumer. The other kinds are arrow
+    // properties and have no `this` to lose.
+    const total = tableDefinition.measure(block, w, measureChild);
+    const lo = Math.max(0, Math.min(Math.trunc(from), total - 1)); // cells-ok
+    const hi = Math.max(lo + 1, Math.min(Math.trunc(to), total)); // cells-ok
+
+    // A bodyless table is one message row under a header: there is nothing to
+    // divide, so it is kept whole and both ends are slack. The same answer
+    // `windowSequence` gives a kind that declares no window at all.
+    if (!hasBody(block)) {
+      return Object.freeze({ block, skipRows: lo, dropRows: total - hi }); // cells-ok
+    }
+
+    const units = unitsOf(block, w, measureChild);
+    const tops: number[] = [];
+    let cursor = 0; // cells-ok — a row cursor, not a width
+    for (const unit of units) {
+      tops.push(cursor);
+      cursor += unit.rows;
+    }
+    const bottomOf = (i: number): number => (tops[i] ?? 0) + (units[i]?.rows ?? 0);
+
+    let first = units.length - 1; // cells-ok — a unit index, not a width
+    let last = 0;
+    for (let i = 0; i < units.length; i += 1) { // cells-ok — a unit index, not a width
+      if (bottomOf(i) > lo && (tops[i] ?? 0) < hi) {
+        first = Math.min(first, i);
+        last = Math.max(last, i);
+      }
+    }
+
+    // **I20 — extend to the nearest row rather than return a bodyless block.**
+    // Widening only ever moves `first` down or `last` up, so both residuals stay
+    // non-negative by construction.
+    if (!units.slice(first, last + 1).some((u) => u.row !== null)) {
+      const rowIndices = units.map((u, i) => (u.row === null ? -1 : i)).filter((i) => i >= 0);
+      const firstRow = rowIndices[0] ?? 0;
+      const lastRow = rowIndices[rowIndices.length - 1] ?? 0; // cells-ok — an index, not a width
+      if (last < firstRow) last = firstRow;
+      else first = lastRow;
+    }
+
+    const kept = units.slice(first, last + 1);
+    return Object.freeze({
+      block: {
+        ...block,
+        rows: kept.map((u) => u.row).filter((r): r is TableRow => r !== null),
+        showHeader: first === 0 && hasHeader(block),
+        actionBar: kept.some((u) => u.bar),
+        presorted: true,
+      },
+      skipRows: lo - (tops[first] ?? 0), // cells-ok
+      dropRows: bottomOf(last) - hi, // cells-ok
+    });
   },
 
   render(block: Table, ctx: RenderContext): ReactElement {

@@ -32,7 +32,12 @@
  * block while the window shows a slice — and it is the one property here with the
  * force of `window`'s equality.
  *
- * **It is vacuous today, and that is recorded rather than left to be found.**
+ * **It stopped being vacuous when `table` declared a window** (C11 §5a), and the
+ * row asserting the vacuity is what said so — it failed on the commit that added
+ * the member, which is the whole reason a vacuity is asserted rather than
+ * described. The paragraph below is kept as the record of what it was.
+ *
+ * **It was vacuous, and that was recorded rather than left to be found.**
  * `window` has two implementers (`logs`, `patch`) and `elements` has one
  * (`table`); the intersection is empty, so `agreements` will report 0 and
  * `checkElements` says so instead of reporting a pass. F102's disposal: **the
@@ -47,7 +52,21 @@ import type { NavElement } from "../presentation/blocks/index.js";
 export interface NavigableRegistry {
   measure(block: Block, width: number): number;
   elementsOf(block: Block, width: number): readonly NavElement[];
-  get(kind: string): Readonly<{ elements?: unknown; window?: unknown }> | undefined;
+  get(kind: string): Readonly<{
+    elements?: unknown;
+    /**
+     * Typed rather than `unknown`, because the agreement below **calls** it.
+     * It was `unknown` for as long as the property was vacuous — a signature
+     * sufficient to count implementers and not to check one.
+     */
+    window?: (
+      block: Block,
+      width: number,
+      from: number,
+      to: number,
+      measureChild: (b: Block, w: number) => number,
+    ) => Readonly<{ block: Block; skipRows: number; dropRows: number }>;
+  }> | undefined;
 }
 
 export type ElementFailure = Readonly<{
@@ -122,6 +141,39 @@ export function checkElements(
       const fail = (predicate: ElementFailure["predicate"], detail: string): void => {
         failures.push({ kind: block.kind, blockId: block.id, width, predicate, detail });
       };
+
+      // **The `window` × `elements` agreement, live since `table` declared both**
+      // (C26 I7). The elements of a window are the elements of the whole,
+      // restricted to the window's rows and shifted — F134's gutter defect one
+      // field along, where a derivation computed over the whole block meets a
+      // slice.
+      //
+      // **Mapped through `skipRows`, which is where the arithmetic lives.** The
+      // caller drops that many leading rows, so window-block row `r` is whole
+      // row `from + r − skipRows`. An element the window does not carry is
+      // skipped rather than failed: a window is allowed to hold fewer things,
+      // and only the ones it does hold owe their position.
+      const windowOf = registry.get(block.kind)?.window;
+      if (windowOf !== undefined && width === WIDTHS[0]) {
+        const whole = new Map(elements.map((e) => [e.id, e]));
+        for (let from = 0; from < height; from += 1) {
+          for (let to = from + 1; to <= height; to += 1) {
+            const w = windowOf(block, width, from, to, (b, wd) => registry.measure(b, wd));
+            for (const e of registry.elementsOf(w.block, width)) {
+              const whole_ = whole.get(e.id);
+              if (whole_ === undefined) continue;
+              const mapped = { from: from + e.rows.from - w.skipRows, to: from + e.rows.to - w.skipRows };
+              if (mapped.from !== whole_.rows.from || mapped.to !== whole_.rows.to) {
+                fail(
+                  "window-agreement",
+                  `${e.id} sits at rows [${String(whole_.rows.from)}, ${String(whole_.rows.to)}) of the block ` +
+                    `and at [${String(mapped.from)}, ${String(mapped.to)}) through the window [${String(from)}, ${String(to)})`,
+                );
+              }
+            }
+          }
+        }
+      }
 
       let previous: NavElement | null = null;
       for (const e of elements) {

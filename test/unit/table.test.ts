@@ -459,3 +459,127 @@ describe("C11 — an element's `copy` is its source, not its rendering (C26 §5c
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// C11 §5a — the window, and the three things a slice moves.
+// ---------------------------------------------------------------------------
+
+/** A sortable column whose kind flips under a slice (F429). */
+const flip = (): Table => ({
+  kind: "table",
+  id: "flip",
+  columns: [
+    { key: "name", label: "Name", align: "left", priority: 1, minWidth: 8, sortable: true },
+    { key: "v", label: "V", align: "right", priority: 2, minWidth: 5, sortable: true },
+  ],
+  rows: [
+    { id: "a", cells: { name: { text: "alpha" }, v: { text: "2" } } },
+    { id: "b", cells: { name: { text: "bravo" }, v: { text: "10" } } },
+    // **The one non-numeric value.** Every row above it parses as a number, so
+    // `kindOf` calls the column text *because of this cell alone* — and a window
+    // that drops it re-classifies the column as numeric.
+    { id: "c", cells: { name: { text: "charl" }, v: { text: "abc" } } },
+  ],
+  sort: { key: "v", direction: "asc" },
+});
+
+const barred = (): Table => ({
+  kind: "table",
+  id: "bar",
+  columns: [{ key: "name", label: "Name", align: "left", priority: 1, minWidth: 8, sortable: false }],
+  rows: [
+    { id: "r0", cells: { name: { text: "row-0" } } },
+    // The only row declaring actions, so the bar's presence hangs on this row
+    // surviving a slice (I18).
+    {
+      id: "r1",
+      cells: { name: { text: "row-1" } },
+      actions: [{ kind: "exec", label: "⏎ open", command: "open" }],
+    },
+    { id: "r2", cells: { name: { text: "row-2" } } },
+  ],
+});
+
+const windowOf = (block: Table, from: number, to: number, width = 40) => {
+  const out = tableDefinition.window?.(block, width, from, to, registry.measure);
+  if (out === undefined) throw new Error("table declares no window");
+  return out;
+};
+
+describe("C11 §5a — the window", () => {
+  it("T1.20 (I19): a slice keeps display order, and re-deriving it would reverse this one", () => {
+    // **The measurement, not the argument.** `sortedRows` looks like a
+    // permutation, so sort-then-slice looks idempotent — and `kindOf` reads the
+    // values *present*, so the slice classifies differently from the block.
+    const block = flip();
+    const whole = registry.renderToLines(block, 40).slice(1).map((l) => visible(l).trim().split(/\s+/)[0]);
+    expect(whole, "text order, because `abc` is in the column").toEqual(["bravo", "alpha", "charl"]);
+
+    // `[1, 3)` is the header plus the first two rows in display order.
+    const w = windowOf(block, 0, 3);
+    const rows = registry.renderToLines(w.block, 40).slice(1).map((l) => visible(l).trim().split(/\s+/)[0]);
+    expect(rows, "the window shows what the block showed at those offsets").toEqual(["bravo", "alpha"]);
+
+    // **The control, and it is the defect this field exists for.** The same two
+    // rows without the flag re-sort as a numeric column and come back reversed —
+    // with the same count, the same height and the same `skipRows`.
+    const unpinned: Table = { ...(w.block as Table), presorted: false };
+    const reversed = registry
+      .renderToLines(unpinned, 40)
+      .slice(1)
+      .map((l) => visible(l).trim().split(/\s+/)[0]);
+    expect(reversed, "re-derived, the slice reverses itself").toEqual(["alpha", "bravo"]);
+    expect(registry.measure(unpinned, 40), "and nothing about the height moves").toBe(
+      registry.measure(w.block, 40),
+    );
+  });
+
+  it("T1.21 (I18): the bar's presence is pinned, in both directions", () => {
+    const block = barred();
+    const total = registry.measure(block, 40);
+    // header + 3 rows + blank + labels
+    expect(total).toBe(6);
+
+    // **Direction one — the slice drops the row that declares `actions`.** The
+    // range covers the bar, so the bar must be drawn; derived from the slice it
+    // would not be.
+    const overBar = windowOf(block, 4, 6);
+    expect((overBar.block as Table).actionBar, "the bar is declared").toBe(true);
+    expect(
+      registry.measure(overBar.block, 40) - overBar.skipRows - overBar.dropRows,
+      "and the window is exactly the two rows asked for",
+    ).toBe(2);
+
+    // **Direction two — the slice keeps the row that declares `actions` and the
+    // range does not reach the bar.** Derived, this window would draw a bar in
+    // the middle of a scrolled table.
+    const midTable = windowOf(block, 2, 3);
+    expect((midTable.block as Table).actionBar, "no bar here").toBe(false);
+    expect((midTable.block as Table).rows.map((r) => r.id), "and it is the row with actions").toEqual([
+      "r1",
+    ]);
+    expect(registry.measure(midTable.block, 40), "one row, no bar").toBe(1);
+  });
+
+  it("T1.22 (I20): neither end of a table is a row, and a window holds one anyway", () => {
+    const block = barred();
+
+    // `[0, 1)` — the header alone. A bodyless table measures `header + 1`, so a
+    // window with no rows would answer 2 for a range of 1, with the surplus
+    // *after* the header where `skipRows` cannot reach it.
+    const head = windowOf(block, 0, 1);
+    expect((head.block as Table).rows.length, "a row is kept").toBeGreaterThan(0);
+    expect(head.skipRows, "nothing leads it").toBe(0);
+    expect(head.dropRows, "and the kept row is charged to the trailing residual").toBe(1);
+    const headRow = registry.renderToLines(head.block, 40)[0] ?? "";
+    expect(visible(headRow), "the header, not the empty message").toContain("Name");
+
+    // `[5, 6)` — the bar's label row alone. A bar whose existence derives from
+    // the rows cannot be drawn beside none, so the nearest row leads it.
+    const bar = windowOf(block, 5, 6);
+    expect((bar.block as Table).rows.length, "a row is kept").toBeGreaterThan(0);
+    expect(bar.skipRows, "and charged to the leading residual").toBe(2);
+    expect(bar.dropRows).toBe(0);
+    expect((bar.block as Table).showHeader, "the header is out of range").toBe(false);
+  });
+});
