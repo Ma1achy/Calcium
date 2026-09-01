@@ -52,11 +52,38 @@ const COMMITMENT = /^(\d+)\.\s+(.*)$/;
  * exists to prevent, reappearing inside the rule itself, and the third pass over
  * the citation graph is what found it.
  */
-const GROUP = /\((?!→)([^()]*)\)/g;
-const INV_TOKEN = /\b(I\d+[a-z]?)\b/g;
+/**
+ * One paren group, and **every** group — including one opening with `→` (F437).
+ *
+ * This was `/\((?!→)([^()]*)\)/g`, which took every group that did not *open*
+ * with an arrow and then read every `I\d+` inside it as **local**. A group can
+ * hold the arrow in the middle — `(I66, §6g, → C10 I25)` — and eight commitments
+ * do, so eight cross-references were resolved against the citing spec rather than
+ * the cited one. **Wrong in both directions**: silent where the local spec
+ * happened to declare the same number, which was 8 of 8, and a false failure the
+ * first time one did not.
+ */
+const GROUP = /\(([^()]*)\)/g;
 
-/** `(→ C09 I5)`, `(→ A01 A.1)`, `(→ C06 I3)`. */
-const CROSS = /\(→\s*([AC]\d{2})\s+([^)]+)\)/g;
+/**
+ * The tokens inside a group, in order, with what re-targets them.
+ *
+ * `→ Cnn` sets the spec; a **bare** `Cnn` re-targets only once a spec is already
+ * set, which is what makes `(→ C04 I73, C10 I31)` attach `I31` to C10 rather
+ * than to C04. Before any arrow a bare `Cnn` is left alone.
+ *
+ * **Stated blind spot**: a commitment writing a cross-reference with no arrow at
+ * all — `(C11 I17, I9)` — still reads as local, and deliberately. The intent of
+ * the second token there is genuinely ambiguous between C11's and the citing
+ * spec's, and a rule that guessed would be resolving a citation against the wrong
+ * document in the other direction. The arrow is the mark that says *elsewhere*,
+ * and this rule only follows the mark.
+ */
+const TOKEN = /→\s*([AC]\d{2})|\b([AC]\d{2})\b|\b(I\d+[a-z]?)\b/g;
+
+// `CROSS` is gone: it required a group to **open** with the arrow, which is the
+// half of F437 that made a mixed group invisible to the cross arm. Its job is
+// done by `TOKEN`'s first alternative, which finds the arrow wherever it falls.
 
 function specPath(id) {
   const files = readdirSync(COMPONENTS);
@@ -177,12 +204,34 @@ function citations(text) {
   GROUP.lastIndex = 0;
   let m;
   while ((m = GROUP.exec(text))) {
-    INV_TOKEN.lastIndex = 0;
+    // **One walk per group rather than two passes over the text** (F437). The
+    // old shape harvested locals with one regex and cross-references with a
+    // second, so a token's *owner* was decided by which pattern reached it
+    // first — and neither pattern could see where the arrow fell.
+    let spec = null;
+    /** Specs an arrow named in this group, and whether an invariant attached. */
+    const arrows = new Map();
+    TOKEN.lastIndex = 0;
     let t;
-    while ((t = INV_TOKEN.exec(m[1]))) local.push(t[1]);
+    while ((t = TOKEN.exec(m[1]))) {
+      if (t[1] !== undefined) { spec = t[1]; if (!arrows.has(spec)) arrows.set(spec, false); continue; }
+      if (t[2] !== undefined) { if (spec !== null) { spec = t[2]; if (!arrows.has(spec)) arrows.set(spec, false); } continue; }
+      if (spec === null) { local.push(t[3]); continue; }
+      arrows.set(spec, true);
+      cross.push({ spec, target: t[3] });
+    }
+    // **An arrow naming a section rather than an invariant is still a citation**
+    // — `(→ A02 §1)` is how eight commitments name whose rule they are, and the
+    // old two-pass parser counted them because `CROSS` captured everything after
+    // the spec id without asking what it was. The walk has to say so explicitly,
+    // and this is the line that says it: a spec with no invariant attached
+    // contributes a reference with nothing to resolve. Dropping it turned eight
+    // correctly-written commitments into *cites nothing*, which is the shape of
+    // repair that trades one silent defect for eight loud ones.
+    for (const [named, attached] of arrows) {
+      if (!attached) cross.push({ spec: named, target: null });
+    }
   }
-  CROSS.lastIndex = 0;
-  while ((m = CROSS.exec(text))) cross.push({ spec: m[1], target: m[2].trim() });
   return { local, cross };
 }
 
@@ -246,14 +295,19 @@ export function checkCommitments(files, readFile = (f) => readFileSync(f, "utf8"
           continue;
         }
 
-        const wanted = /^(I\d+[a-z]?)/.exec(ref.target);
-        if (wanted !== null && !invariants(target).has(wanted[1])) {
+        // **One token, because `citations` now attaches each one to its own
+        // spec** (F437). This read `/^(I\d+[a-z]?)/` off the start of a target
+        // that was *everything after the spec id*, so `(→ C04 I67, I68)`
+        // resolved I67 and dropped I68 — ten groups, twenty tokens, half of them
+        // never checked. Both halves of that are the same defect: a parser that
+        // decides an owner by position rather than by the mark.
+        if (ref.target !== null && !invariants(target).has(ref.target)) {
           violations.push({
             rule: "SP1",
             file: `${file}:${String(c.line)}`,
             spec: "A02 §1 · A03 §5",
             message:
-              `commitment ${String(c.n)} cross-references ${ref.spec} ${wanted[1]}, ` +
+              `commitment ${String(c.n)} cross-references ${ref.spec} ${ref.target}, ` +
               `which ${ref.spec} does not declare. A cross-reference that does not ` +
               `resolve is the overclaim it was meant to replace, one indirection on.`,
           });

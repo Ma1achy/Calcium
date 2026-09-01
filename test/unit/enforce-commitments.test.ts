@@ -218,8 +218,113 @@ describe("A03 SP1 — commitment/invariant pairing", () => {
     // Found by running the rule, not by reading it. `(→ C04 I28)` matched the
     // local-citation pattern first and reported a dangling reference in the one
     // spec that had got the cross-reference right.
+    //
+    // **This row is true and it tests one of the two ways to write one** (F437).
+    // The arrow can fall in the middle of a group and eight commitments put it
+    // there; those went to the local arm for four years of this rule's life. The
+    // four rows below are the other way, and the second of them is the direction
+    // this row's shape cannot reach.
     const source = spec([["I1", "one."]], ["Elsewhere's (→ C04 I28)."]);
     expect(checkCommitments(["docs/components/C99_x.md"], at(source))).toEqual([]);
+  });
+
+  it("SP1: an arrow in the MIDDLE of a group still names another spec (F437)", () => {
+    // `GROUP` was `/\((?!→)([^()]*)\)/g` — every group that did not *open* with
+    // an arrow, with every `I\d+` inside read as local. `(I1, → C09 I9999)` is
+    // such a group, so this reported `cites I9999` against C99.
+    const source = spec([["I1", "one."]], ["Both (I1, → C09 I9999)."]);
+    const violations = checkCommitments(["docs/components/C99_x.md"], at(source));
+
+    expect(violations).toHaveLength(1);
+    // The message is the assertion, not the count: reported *as a
+    // cross-reference*. `cites I9999` would be the old arm firing for the old
+    // reason, and a bare `toHaveLength(1)` cannot tell those apart.
+    expect(violations[0]?.message).toContain("cross-references C09 I9999");
+    expect(violations[0]?.message).not.toContain("cites I9999");
+  });
+
+  it("SP1: the FALSE PASS — a foreign id colliding with a real local one (F437)", () => {
+    // **The direction the row above cannot reach, and the one that actually
+    // happened: 8 of 8.** Every mixed group in the corpus named a foreign
+    // invariant whose number the citing spec also declared, so the local arm
+    // found it and said nothing — a verdict decided by a coincidence of
+    // numbering rather than by resolution.
+    //
+    // C99 declares I28. C09 does **not** declare I28 (it stops at I38 but has no
+    // I28 gap — asserted below rather than assumed, because a fixture that
+    // agreed with the rule by accident is what this whole finding is about).
+    const source = spec([["I28", "a local one with the same number."]], ["Collides (I1x, → C09 I9999)."]);
+    const collide = spec([["I9999", "the local homonym."]], ["Collides (→ C09 I9999)."]);
+
+    // Control first: the fabrication's own I9999 exists, so a rule reading the
+    // token as local finds it and reports nothing. That is the pre-fix verdict.
+    expect(invariantsOf("docs/components/C99_x.md", at(collide)).has("I9999")).toBe(true);
+
+    // And the rule reports it anyway, because it resolves against C09.
+    const violations = checkCommitments(["docs/components/C99_x.md"], at(collide));
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.message).toContain("cross-references C09 I9999");
+
+    // The mixed form of the same collision, which is where the eight live.
+    const mixed = spec([["I1", "one."], ["I9999", "the local homonym."]], ["Collides (I1, → C09 I9999)."]);
+    const mv = checkCommitments(["docs/components/C99_x.md"], at(mixed));
+    expect(mv).toHaveLength(1);
+    expect(mv[0]?.message).toContain("cross-references C09 I9999");
+
+    void source;
+  });
+
+  it("SP1: every token after the arrow is resolved, not just the first (F437)", () => {
+    // The cross arm read `/^(I\d+[a-z]?)/` off the START of a target that was
+    // *everything after the spec id*, so `(→ C04 I67, I68)` checked I67 and
+    // dropped I68. Ten groups in the corpus, twenty tokens, ten unchecked.
+    const source = spec([["I1", "one."]], ["Two of C09's (→ C09 I5, I9999)."]);
+    const violations = checkCommitments(["docs/components/C99_x.md"], at(source));
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.message).toContain("cross-references C09 I9999");
+  });
+
+  it("SP1: a second spec inside one group re-targets what follows it (F437)", () => {
+    // `(→ C04 I73, C10 I31)` means C10's I31 and not C04's. Asserted on **which
+    // spec the message names**, because reporting the right token against the
+    // wrong document is the defect rather than a cosmetic difference.
+    const source = spec([["I1", "one."]], ["Two specs (→ C09 I5, C10 I9999)."]);
+    const violations = checkCommitments(["docs/components/C99_x.md"], at(source));
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.message).toContain("cross-references C10 I9999");
+    expect(violations[0]?.message).not.toContain("C09 I9999");
+  });
+
+  it("SP1: an arrow naming a section and no invariant is still a citation (F437)", () => {
+    // **The repair's own regression, caught by running it.** The walk that
+    // replaced the two-pass parser emitted a cross-reference only when an
+    // invariant token attached, and `(→ A02 §1)` has none — so eight correctly
+    // written commitments across C01, C05 and others became *cites nothing*.
+    // Trading one silent defect for eight loud ones is still a defect.
+    const source = spec([["I1", "one."]], ["Whose rule it is (→ A02 §1)."]);
+    expect(checkCommitments(["docs/components/C99_x.md"], at(source))).toEqual([]);
+
+    // And its control: a bare group with neither an invariant nor an arrow must
+    // still fail, or the row above passes by making the rule permissive.
+    const bare = spec([["I1", "one."]], ["Nothing at all (§4)."]);
+    expect(checkCommitments(["docs/components/C99_x.md"], at(bare))).toHaveLength(1);
+  });
+
+  it("SP1: a cross-reference written without the arrow stays local — the stated blind spot (F437)", () => {
+    // **Recorded rather than fixed.** `(C11 I17, I9)` is genuinely ambiguous:
+    // the second token is either C11's or the citing spec's, and a rule that
+    // guessed would resolve a citation against the wrong document in the other
+    // direction. The arrow is the mark that says *elsewhere*; this rule follows
+    // the mark and nothing else.
+    const source = spec([["I1", "one."]], ["No arrow (C09 I1)."]);
+    expect(checkCommitments(["docs/components/C99_x.md"], at(source))).toEqual([]);
+
+    // The blind spot made visible: C09's I9999 does not exist and this passes,
+    // because with no arrow the token is read as C99's — which it has.
+    const blind = spec([["I9999", "the local one."]], ["No arrow (C09 I9999)."]);
+    expect(checkCommitments(["docs/components/C99_x.md"], at(blind))).toEqual([]);
   });
 });
 

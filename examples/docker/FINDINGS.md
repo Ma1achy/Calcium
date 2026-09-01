@@ -13860,6 +13860,102 @@ terminal did not change, and the gap between those two is the whole finding.
 
 ---
 
+## F437 — a citation's owner decided by position, and the verdict by a coincidence of numbering ★★★★★
+
+**A03 SP1 pairs every commitment to an invariant and resolves what it cites.** Writing one that
+cross-referenced another spec, it refused a correct citation:
+
+```
+commitment 42 cites I83, which C22 does not declare.
+```
+
+The commitment reads `(§6c, → C12 I83)`. **It is C12's I83 and the rule asked C22 for it.**
+
+### The parser decided an owner by position rather than by the mark
+
+```js
+const GROUP = /\((?!→)([^()]*)\)/g;   // every group that does not OPEN with an arrow
+const INV_TOKEN = /\b(I\d+[a-z]?)\b/g;    // …and every I-token inside it is LOCAL
+const CROSS = /\(→\s*([AC]\d{2})\s+([^)]+)\)/g;   // …and a cross-reference must OPEN with one
+```
+
+Two passes over the same text, and **a token's owner was whichever pattern reached it first**.
+An arrow in the *middle* of a group is invisible to `CROSS` and transparent to `GROUP`, so the
+token after it went to the local arm.
+
+### Wrong in both directions, which is the shape to watch for
+
+```
+mixed groups inside commitments                                    8
+foreign tokens they hold                                           8
+silent, because the citing spec declares the same number      8 of 8
+genuinely dangling in the target                                   0
+```
+
+**Every one of the eight was silent for the wrong reason**, and mine was the ninth — the first
+to land on a number the citing spec happens to lack. So the rule produced a **false pass** eight
+times and a **false failure** once, and which it produced was decided by whether two documents
+had numbered an invariant the same.
+
+**And there was a second defect in the same arm.** The cross check read
+`/^(I\d+[a-z]?)/` off the *start* of a target that was everything after the spec id, so
+`(→ C04 I67, I68)` resolved I67 and dropped I68 — **ten groups, twenty tokens, ten never
+checked.** Same cause: a parser deciding ownership by where a thing sits.
+
+### Nothing was hiding, and that had to be measured rather than inferred
+
+*Genuinely dangling: 0* was first measured with a hand-written parser, which is the shape that
+cannot find a transcription defect — my parser and my fix would share an assumption. So it was
+re-measured **through the repaired rule**: each of the eight real cross-references perturbed to
+a number its target does not declare, and each must be reported **against the target spec**.
+
+```
+C04 (I34, → C23 I31)        REPORTED against C23      C22 (I67, → C13 I20)   REPORTED against C13
+C04 (I39, → C09 I5)         REPORTED against C09      C25 (I12, → C10 I16)   REPORTED against C10
+C10 (I12, → C02 I5)         REPORTED against C02      C26 (I9,  → C11 I14)   REPORTED against C11
+C22 (I61, → C02 I7)         REPORTED against C02
+C22 (I66, §6g, → C10 I25)   REPORTED against C10      control · untouched corpus: 0 violations
+```
+
+**8 of 8, and the corpus is clean.** So the tree loses nothing and gains a rule whose verdict is
+its own.
+
+### The existing fixture was true and tested one of the two ways to write one
+
+```
+it("SP1: a cross-reference is not read as a local citation", …)
+   →  spec([["I1", "one."]], ["Elsewhere's (→ C04 I28)."])
+```
+
+An **arrow-opening** group. The row's name is general and its fabrication is specific, which is
+F84's class in a test: the sentence is true, and it does not constrain the decision it is
+attached to. Six rows now, and **the one that matters is the false pass** — a mixed group whose
+foreign id collides with a real local number, which is the direction the original could not
+reach and the one that shipped eight times.
+
+### And the repair had its own regression, caught by running it
+
+Replacing two passes with one walk emitted a cross-reference only when an invariant token
+attached — and `(→ A02 §1)` has none. **Eight correctly written commitments across C01, C05 and
+others became *cites nothing*.** Trading one silent defect for eight loud ones is still a defect;
+it has its own row, with a control that keeps the fix from being permissive instead of correct.
+
+### The blind spot, stated rather than closed
+
+A cross-reference written **without** the arrow — `(C11 I17, I9)` — still reads as local. The
+second token there is genuinely ambiguous between C11's and the citing spec's, and a rule that
+guessed would resolve a citation against the wrong document in the other direction. **The arrow
+is the mark that says *elsewhere*, and this rule follows the mark and nothing else.** It has a
+test that demonstrates the blind spot rather than a sentence describing it.
+
+**Fixed** — `tools/enforce/commitments.mjs`, six fabricated violations, and
+`tools/mutate/runs/enforce-sp1-citations.mjs` at 6/6 with a control. **SP3 caught the mutation
+run itself** on the first attempt: a fabricated `C09 I9999` in a run file is a dangling
+reference, reported by a sibling of the rule under repair. The expectations name test rows
+instead, which is the stronger assertion anyway.
+
+---
+
 ## F436 — the rewrite reached the section that argues and not the ones that summarise ★★★★★
 
 **One commit earlier, `docs/notes/CALCIUM_3D_DESIGN.md` was rewritten against its own new ruling
