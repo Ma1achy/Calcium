@@ -327,6 +327,25 @@ export function checkTriageInventory(io) {
   // The declared total, which is the sentence that went stale. Per-group numbers
   // are not checked — see the limits above — but the total is derivable from the
   // same table and is what the self-check actually asserts.
+  //
+  // **The limit now carries its measurement, because an unrecorded figure reads
+  // as a small gap** (F434). Measured over the tree: **6 of 14 ranking rows
+  // disagree with the ids keyed in their own section**, by −1, +1, −3, +1, +4 and
+  // −1 — and **the total passes because the errors cancel**. So this check is
+  // not merely silent about attribution; it is satisfiable by a document where
+  // six rows are wrong.
+  //
+  // **The failure mode is one move**: write the entry beside the finding it
+  // relates to, increment the count on the group the finding belongs to. Two
+  // groups, one id, and the sum is unchanged. It happened twice in one session.
+  //
+  // **Not gated, and the reason is that "keyed" has no definition strong enough
+  // yet.** The loose reading — any bolded id in the section — counts a mention
+  // in another entry's prose; the strict one, an id opening a paragraph, leaves
+  // 8 ids of 435 owned by nothing and puts 7 of 14 rows out. Closing this means
+  // reconciling the counts first, and several of them carry prose meaning the
+  // column does not ("13 open, 5 closed"). A gate over numbers nobody maintains
+  // would be red on arrival and edited to fit.
   const declared = [...triage.matchAll(/^\|\s*(?:\*\*)?(?:\d+|—)(?:\*\*)?\s*\|[^|]*\|\s*(\d+)\s*\|/gmu)].map(
     (m) => Number(m[1]),
   );

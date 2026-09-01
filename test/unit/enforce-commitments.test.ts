@@ -727,7 +727,7 @@ describe("A03 SP3 — invariant references resolve outside the specs too", () =>
     expect(violations[0]?.message).toContain("has outlived its reason");
   });
 
-  it("SP3: the exception list is five entries in two kinds, and the kinds are named", () => {
+  it("SP3: the exception list is four entries in two kinds, and the kinds are named", () => {
     // Written out rather than counted, because the interesting fact is *which*.
     // **And partitioned, because the second kind arrived inside the first.** The
     // row read *two entries, and both are fabrication sites* — true when written,
@@ -743,8 +743,17 @@ describe("A03 SP3 — invariant references resolve outside the specs too", () =>
     // the paragraph. Excused on the same argument `docs/archive/` is: rewriting
     // one to cite ids the tool's way falsifies the record it exists to be. Named
     // one by one so the rest of `docs/notes/` stays checked.
+    //
+    // **`CALCIUM_3D_DESIGN.md` was here and is gone**, and the bidirectional arm
+    // is what removed it rather than anyone remembering. Its reason named a
+    // condition — *the design's premise is open pending a measurement* — the
+    // measurement was taken and the note rewritten against it, so every
+    // reference in it resolves and the excuse became a violation of its own
+    // rule. **A reason that names a condition is one a gate can retire**, which
+    // is what the deferral problem usually cannot manage: there the condition is
+    // prose and nothing watches it, and here it was *the file being wrong*,
+    // which the rule already checks every run (F431).
     const DATED_NOTES = [
-      "docs/notes/CALCIUM_3D_DESIGN.md",
       "docs/notes/CALCIUM_BLOCK_STATES.md",
       "docs/notes/CALCIUM_ML_BLOCKS.md",
     ];

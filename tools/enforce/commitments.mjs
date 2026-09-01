@@ -807,8 +807,14 @@ export const REFERENCE_EXCEPTIONS = {
   // Named individually because the rest of `docs/notes/` resolves today and a
   // directory-wide exemption would stop checking it — an exemption is counted,
   // not widened until it stops costing anything.
-  "docs/notes/CALCIUM_3D_DESIGN.md":
-    "dated design note; a bare `I11` in prose, and the design's premise is open pending a measurement",
+  // **`CALCIUM_3D_DESIGN.md` was here and is struck**, by the bidirectional arm
+  // rather than by anyone remembering. Its reason named a condition — *the
+  // design's premise is open pending a measurement* — the measurement was taken
+  // (F431), the note was rewritten against it, and every reference in it now
+  // resolves. **A reason that names a condition is one a gate can retire**,
+  // which is the shape the deferral problem in CLAUDE.md wants and rarely gets:
+  // there, the condition is prose and nothing watches it; here it happened to be
+  // *the file being wrong*, which the rule already checks every run.
   "docs/notes/CALCIUM_BLOCK_STATES.md":
     "dated design note; a bare `I1` in a sentence about geometry against content",
   "docs/notes/CALCIUM_ML_BLOCKS.md":

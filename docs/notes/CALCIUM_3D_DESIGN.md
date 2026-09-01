@@ -1,33 +1,5 @@
 # `plot3d` — a 3D renderer for the terminal
 
-> **RULED BY MEASUREMENT — F431. Read this before the design.**
->
-> The premise below — *a braille dot is square, so a projection into the dot grid needs no
-> aspect correction* — was measured against the repo's own cell box (`8.41 × 16`) and against
-> the two alternatives, one surface and one teapot-shaped solid, at 80×24 cells:
->
-> | arm | samples | what it shows |
-> |---|---|---|
-> | braille | 160×96 binary + 80×24 colour | a smudge — the rings gone, no lid seam, no volume |
-> | half block `▀` | 80×48 full colour | every structure the image arm has |
-> | image protocol | 673×384 full colour | the form, with detail |
->
-> **Inside the outline the braille channel is a constant**: 6931 of 7254 lit dots are interior
-> and every one of them is on, so 95% of the dot grid carries nothing and the whole interior is
-> the 80×24 cell colours. Four numbers said the dot grid held it — 0.3% and 1.5% silhouette
-> disagreement, the handle's hole four dots clear, 163 shade levels of 186 — and the picture
-> disagreed with all four.
->
-> **The premise is true and buys nothing.** A braille dot is `4.205 × 4.0` px, 1.051 : 1, and a
-> half-block cell is `8.41 × 8.0` — *the same ratio*. The aspect is a property of the cell, not
-> of braille.
->
-> **So: 3D is a terminal form, on the half-block rung.** C09 commitment 35 had already ruled it
-> for images — *a half block spends a cell on two full colours where braille spends it on eight
-> dots, so a photograph arrives as a photograph and a diagram is better served one rung down* —
-> and a shaded 3D render is a photograph. The depth buffer is **80×48**; **shading is the primary
-> channel and the silhouette is not**, which inverts this design's emphasis rather than trimming
-> it; §11–§12's costs are about the wrong rung.
 
 
 **The refusal was wrong and it was wrong for a stated reason.** *A novelty, not a tool* is a
@@ -41,23 +13,76 @@ component has already solved twice.
 
 ---
 
-## The fact that makes this work: braille dots are square
+## The rung, and it was measured rather than assumed
+
+**This document used to open on *braille dots are square, so a projection into the dot grid needs
+no aspect correction — every other terminal 3D attempt fights this and this one gets it free*.**
+That sentence is true. It is off by 5%. And it argues for the wrong rung, which is why it was
+measured before anything here was built (F431).
+
+### What was measured
+
+One surface and one teapot-shaped solid, three arms, **one screen area of 80×24 cells**. The cell
+box is the repo's own frame renderer's — `8.41 × 16` — so this compares against the thing that
+draws every catalogue sheet rather than an assumed cell.
+
+| arm | samples | what it shows |
+|---|---|---|
+| braille | 160×96 binary dots **+** 80×24 cells of colour | a smudge: the surface's rings gone, the teapot with no lid seam and no volume |
+| half block `▀` | 80×48 full-colour samples | every structure the image arm has |
+| image protocol | 673×384 full-colour samples | the form, with detail |
+
+**Four numbers said the dot grid held it** — 0.3% and 1.5% silhouette disagreement against the
+pixel truth, the handle's hole four dots clear, 163 distinct shade levels of 186 — and the picture
+disagreed with all four. **One line explains it:**
 
 ```
-a cell        1 wide × 2 tall        (roughly, in every monospace font)
-braille       divides it 2 × 4
-ONE DOT       1/2 wide × 1/2 tall    ← SQUARE
+surface   7254 dots lit ·  323 on the boundary (4.5%)  ·  6931 interior, every one of them on
+teapot    2021 dots lit ·  219 on the boundary (10.8%) ·  1802 interior, every one of them on
 ```
 
-**So a projection into the braille dot grid needs no aspect correction at all.** The cell's
-2:1 distortion and braille's 2:4 subdivision cancel exactly — the same cancellation that
-makes `circle.ts`'s pie genuinely round where granite's is an ellipse.
+**Inside the outline the braille channel is a constant.** 89–96% of the lit dots carry nothing, so
+the whole interior — which is where a 3D form lives — is the **cell colours**, and the silhouette
+metric was measuring the one thing that was fine. A 3D form is not its outline: a lid seam, a
+shoulder, the trough of a ripple are shading discontinuities.
 
-**Every other terminal 3D attempt fights this.** This one gets it free, and it is the reason
-to build on the dot grid rather than on cells.
+### The ruling, and the repo had already written it
 
-**At cell resolution the correction returns** — `rx = 2·ry`, already the rule in `circle.ts`
-— which is the `plotStyle: "line"` arm and is a real second tier rather than a fallback.
+**C09 commitment 35 (I37):** *a half block spends a cell on two full colours where braille spends
+it on eight dots, so a photograph arrives as a photograph and a diagram is better served one rung
+down.* That sentence is about images. **A shaded 3D render is a photograph**, and nobody had
+applied it because this document predates the ladder.
+
+**So 3D is a terminal form on the half-block rung.** The half-block arm at a **quarter** of the
+braille arm's samples shows the teapot's lid seam, its knob, its spout and an open handle hole.
+
+**And the premise buys nothing, which is the part to keep.** A braille dot is `4.205 × 4.0` px —
+1.051 : 1, not square — and a half-block cell is `8.41 × 8.0`, **the same ratio**. The aspect is a
+property of the *cell*, and every rung on the ladder has it. A correct sentence justifying the
+wrong decision, which review cannot catch because the sentence is true.
+
+---
+
+## The sample grid — a rule, and the numbers here are measurements of it
+
+**`80×48` is not a constant and must not be read as one.** It is the sample grid at the size the
+measurement ran in — 80×24 cells — and the rung gives two vertical samples per cell:
+
+```
+                 across            down          at 80×24      at 120×30
+braille          cells × 2         cells × 4     160 × 96      240 × 120
+half blocks      cells × 1         cells × 2      80 × 48      120 ×  60
+```
+
+**So it is `width × 1` by `height × 2`**, and nothing about 3D is hardcoded to a viewport. The
+projection scales to the sample grid, the sample grid to the block, and the block to whatever the
+region gives it — **the same chain every other form already uses**, and the one `imageCells` and
+every raster in C12 use.
+
+**Every absolute figure in this document is a measurement at 80×24 and none of them is a
+threshold.** 7254 dots, 6931 interior, 673×384, the triangle counts in §7 — all of them scale with
+the region, and a reader who takes one as a limit will build a renderer that is correct at one
+terminal size.
 
 ---
 
@@ -67,13 +92,17 @@ to build on the dot grid rather than on cells.
 world  →  view      one 3×3 rotation from (azimuth, elevation), then translate by distance
 view   →  clip      frustum cull: drop what is behind the camera or outside the view
 clip   →  NDC       perspective divide (x/z, y/z), or drop z entirely for orthographic
-NDC    →  dots      scale to the dot grid. NO ASPECT CORRECTION (braille)
-dots   →  raster    depth-tested writes into the grid
-raster →  shade     glyph from the density ramp, colour from the continuous palette
+NDC    →  samples   scale to the sample grid — width × 1 by height × 2, the cell's own
+                    1.051 : 1 and not a correction the rung avoids
+sample →  raster    depth-tested writes into the buffer
+raster →  paint     a cell is `▀` with two colours: the upper sample as foreground, the
+                    lower as background. NO GLYPH CHOICE — the shade is the colour
 ```
 
-**Six stages, four of which already exist in some form.** The new work is the rotation, the
-depth buffer, and the shading — and the shading reuses two mechanisms built for other forms.
+**Six stages, four of which already exist in some form.** The new work is the rotation, the depth
+buffer and the lighting — and **the last stage got smaller rather than larger**: on the dot grid
+the shade had to be encoded in a glyph from a density ramp, and on this rung the shade *is* the
+colour. The ramp does not appear in the pipeline at all.
 
 ---
 
@@ -118,19 +147,29 @@ is active**, which is a ruling rather than an accident.
 ## 2 · Depth
 
 ```ts
-const depth = new Float32Array(dotWidth * dotHeight);   // 80×24 → 15,360 floats
+// Sized from the block, never from a constant. `sampleWidth = width` and
+// `sampleHeight = height × 2` on the half-block rung (see The sample grid).
+const depth = new Float32Array(sampleWidth * sampleHeight);
 ```
 
-**Sixty kilobytes at a typical size.** That buys exact hidden-surface removal — no painter's
-algorithm, no sorting, no artefacts at intersections.
+**Allocated per render, and sized from the block's actual width and its declared height.** C12 I11
+forbids state that *survives* a render and permits a local buffer, so this is allowed — and it is
+the reason it must be allocated rather than kept: a module-level buffer would be exactly the state
+I11 forbids, and would also be the wrong size the first time a region changed.
+
+**About 60 KB at 120×30** — `120 × 60 × 4` — which the earlier note measured as trivial for the
+GC. The figure moves with the region; it is not a budget.
+
+That buys exact hidden-surface removal — no painter's algorithm, no sorting, no artefacts at
+intersections.
 
 ```
-write(x, y, z, glyphData):
-    if (z < depth[y * dotWidth + x])  { depth[...] = z; grid.set(x, y, glyphData); }
+write(x, y, z, shade):
+    if (z < depth[y * sampleWidth + x])  { depth[...] = z; samples.set(x, y, shade); }
 ```
 
-**Cleared to +∞ per render**, and it is per-render state inside a pure function, which is
-allowed — I11 forbids state that *survives* a render, not a local buffer.
+**Cleared to +∞ per render.** A sample carries a shade and a colour, not a glyph: the glyph is
+always `▀` and the two samples in a cell become its foreground and background.
 
 ### Culling, in order
 
@@ -254,28 +293,45 @@ face normal · light →  intensity 0..1          →  GLYPH DENSITY
 at once. **matplotlib's surface plot has one colour channel; this has colour and dither
 pattern**, which is more information per cell rather than less.
 
-#### Dithering is what makes it look 3D
+#### Shading — and the dither that used to be here is gone
 
-**A braille cell is 8 subcells, so an ordered dither over a 2×4 Bayer matrix gives 9
-intensity levels per cell with no banding.**
+**This section used to say *dithering is what makes it look 3D*, and it was right about the dot
+grid.** A braille cell is eight subcells, so an ordered dither over a 2×4 matrix gives nine
+intensity levels per cell — which is a lot when the alternative is one bit, and nothing when the
+alternative is a 24-bit colour. On this rung the shade is the colour: no ramp is indexed, no
+pattern is chosen, and adjacent cells at the same intensity are the same colour because they are
+the same intensity.
+
+**Measured before it was removed rather than after** (F433). The question was reopened against
+`colourDepth` rather than against the rung, because C02 answers 1 / 4 / 8 / 24 and the rung is the
+same at all four:
 
 ```
-intensity 0.0   ⠀        intensity 0.5   ⠳ ⣄ ⡜  (pattern varies by position)
-intensity 0.25  ⠌        intensity 0.75  ⣷
-intensity 1.0   ⣿
+depth  greys   4×4 block-mean MAE, plain → dithered      ratio
+  24     256   0.0002 → 0.0002                           1.09×
+   8      26   0.0025 → 0.0018                           1.43×
+   4       4   0.0473 → 0.0135                           3.51×
+   1       2   0.2528 → 0.0323                           7.84×
 ```
 
-**The pattern depends on the cell's grid position**, which is what makes it a dither rather
-than a ramp — adjacent cells at the same intensity use different sub-patterns, so a gradient
-reads smooth instead of stepping.
+**1.09× at 24-bit is nothing**, and at 4-bit — where the ratio is real — the plain quantisation
+still reads more cleanly, because a 4×4 Bayer cell is 1/20 of an 80-wide raster and this rung's
+scarce axis is space, not tone. See §6 for the disposition: **it is C10's business at low colour
+depth and applies to every raster equally.**
 
-**This is a fourth ramp axis and it must declare itself**: `rampFor("dither", caps)` beside
-height, density and column. **A dither ramp indexed as a density ramp is the encoding-rule
-violation the type exists to prevent**, and the two look interchangeable at a glance.
+**And the section named a mechanism that does not exist.** `rampFor("dither", caps)` — the tree
+has `ladderFor` over `LadderAxis`, which is `Extract<Encoding, "height" | "density">`: **two** axes
+of `Encoding`'s four, not three, and `Serves` is a `Record` over them, so widening it is a compile
+error at every existing ladder. Nothing is widened, because the ruling adds no axis.
 
-**At ASCII, `.:-=+*#@` ordered-dithered by the same matrix.** Coarser, still smooth.
+#### Lighting — **and this is the load-bearing section now**
 
-#### Lighting
+**On the dot grid the silhouette carried the form and lighting was a refinement.** On this rung the
+silhouette is 4–11% of the samples and every interior sample is a colour, so **the lighting *is* the
+picture**: studio, the specular term and the depth attenuation below are what a half-block surface
+is read by. Where braille had nine dither levels and no colour, this has two full colours per cell
+and no dither at all (F433, and §6).
+
 
 **One directional light, and where it lives decides everything.**
 
@@ -498,31 +554,64 @@ surface is fine and intended.
 ## 6 · The style tiers
 
 ```
-plotStyle: "braille"      the dot grid — 2×4 per cell, square dots, no aspect correction.
-                          THE DEFAULT. Points, lines and dithered surfaces
-plotStyle: "line"         cell resolution with box drawing. Wireframes with real joins;
-                          surfaces fall to solid blocks. rx = 2·ry aspect correction returns
-plotStyle: "ascii"        the ASCII arm — . : - = + * # @ ordered-dithered, and the
-                          marker set's ASCII rung
+plotStyle: "half"         `▀`, two full colours per cell — width × 1 by height × 2.
+                          THE DEFAULT, and the measurement is why (F431)
+plotStyle: "braille"      the dot grid — 2×4 per cell. NOT for surfaces: the interior
+                          samples are all lit and carry nothing. Points and lines,
+                          where the whole primitive IS its outline
+plotStyle: "line"         cell resolution with box drawing. Wireframes with real joins
+plotStyle: "ascii"        the ASCII arm, and the marker set's ASCII rung
 ```
+
+**Braille is demoted rather than deleted, and the split is by primitive rather than by taste.** A
+scatter and a wireframe are outline all the way through — every dot they light is a boundary dot —
+so the dot grid's 4× sample count is entirely spent on signal. A *surface* is 89–96% interior, and
+there the dot grid is a stipple over a colour the cell was going to paint anyway.
 
 **And the capability ladder crosses it:**
 
 ```
-24-bit    colour + dither, both channels
-8-bit     quantised colour + dither
-4-bit     DITHER ONLY — the colormap is vacuous at 4-bit (C10 I26), which is already ruled
-1-bit     dither only, and depth reads through marker size for points
+24-bit    colour, and that is the whole channel
+8-bit     colour quantised to the 26-grey ramp — 1.43× from a dither, so still colour
+4-bit     the dither earns its place here (3.51×) and it is C10's, not 3D's
+1-bit     the dither, at 7.84×, and depth reads through marker size for points
 ```
 
-**The 4-bit rung is the one to state explicitly**, because it is where colour exists and
-cannot carry magnitude — the same rung the heatmap has and the same answer.
+### The dither is not ported, and it was measured rather than assumed
+
+**It was in this design because braille had one channel** — eight dots, nine levels, no colour. The
+premise is gone, so the question was reopened and measured against `colourDepth` rather than
+against the rung (F433):
+
+```
+depth  greys   4×4 block-mean MAE, plain → dithered      ratio
+  24     256   0.0002 → 0.0002                           1.09×
+   8      26   0.0025 → 0.0018                           1.43×
+   4       4   0.0473 → 0.0135                           3.51×
+   1       2   0.2528 → 0.0323                           7.84×
+```
+
+**At 24-bit it buys nothing.** And at 4-bit, where it buys 3.51× on tone, the plain quantisation
+still *reads* more cleanly — posterised contours but a sharp cone — because a 4×4 Bayer cell is
+**1/20 of an 80-wide raster**. A dither buys tone by spending space, and space is the axis this rung
+has least of: 1/67 of the image protocol's samples.
+
+**So: the dither is a function of colour depth, not of this form.** Where it earns its place it
+belongs to whatever quantises a colour and helps a heatmap, an image and a surface identically —
+**a technique that helps every raster equally is not a property of the form that noticed it.** It is
+not on `Serves` either: `Serves` is `Record<LadderAxis, boolean>` over the **two** axes that are
+ladders (`height`, `density`) out of `Encoding`'s four, and the half-block rung is colour rather
+than a ladder step, so no axis is added and no existing ladder changes.
 
 ---
 
 ## 7 · The test cases, and each catches something different
 
 **Your list, with what each one is for:**
+
+**Every figure in this section is at 80×24 cells** — the size the measurement ran in — and none of
+them is a threshold. A triangle count that is comfortable at 80×24 is four times the work at
+160×48, and the sample grid scales with the region rather than with a constant.
 
 ```
 SPHERE            normals vary smoothly — catches shading discontinuities, and
@@ -536,8 +625,10 @@ AXIS PLANES       x=0, y=0, z=0 — THE EDGE-ON CASE. A plane projects to a LINE
                   every face has zero area, the normal is undefined and the
                   lighting divides by zero. WRITE THIS TEST FIRST
 
-TILTED PLANE      the general case, and where dithering banding shows if the
-                  Bayer matrix is wrong
+TILTED PLANE      the general case, and where BANDING shows. On the dot grid the
+                  suspect was the Bayer matrix; on this rung there is no matrix,
+                  so a band is the colour quantisation and the row reads the
+                  `colourDepth` it ran at
 
 z = sin(x)·cos(y) a known egg-carton — verifiable by eye, and the standard
                   surface-plot demo everywhere
@@ -660,6 +751,17 @@ speculative — everything after it is improvement rather than proof.
 ---
 
 ## 11 · Animation — and 3D breaks the assumption 2D rests on
+
+> **Both this section and §12 were costed on the dot grid and have not been re-run.** Every
+> per-frame figure below — the raster stage, the bytes to the terminal, the scaling rows — was
+> measured against 160×96 binary dots plus 80×24 colours. This rung writes **80×48 full-colour
+> samples**, a quarter of the sample count and a different last stage: no glyph is chosen, so the
+> ramp lookup leaves the loop and the bytes per cell change from one glyph plus one SGR to one
+> glyph plus two. **The shapes of the arguments hold and the numbers do not**, and the honest
+> reading is that they are re-measurable rather than approximately right — the first pass of the
+> dither measurement is the standing reminder that a number carried across a changed premise can
+> be exactly correct about the wrong thing (F433).
+
 
 **The 2D animation story is measured and holds**: the render cache keys on `(rev, width,
 focus, theme)`, a `replace` patch bumps one entry's `rev`, and `render-frame.ts` diffs the
@@ -838,8 +940,9 @@ P16  mesh       100 · 1,000 · 10,000 · 69,451 triangles at a fixed width
 P17  height     8 · 24 · 48 rows
 ```
 
-**Width and height scale the dot grid quadratically; mesh size scales the geometry
-linearly.** If the measured curves disagree with that, the loop structure is wrong and the
+**Width and height scale the sample grid quadratically; mesh size scales the geometry
+linearly.** The sample grid is `width × 1` by `height × 2` here, so a row that fixes one and
+varies the other is varying a quarter of what it varied on the dot grid. If the measured curves disagree with that, the loop structure is wrong and the
 row says which one.
 
 ### The comparison rows

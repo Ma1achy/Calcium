@@ -40,6 +40,47 @@ describe("C02 detection", () => {
     expect(caps({ TERM: "xterm-kitty", TMUX: "/tmp/x", COLORTERM: "truecolor" }).colourDepth).toBe(24);
   });
 
+  it("T1.12b (I11): the identification is gated once, and every reader sees the gate", () => {
+    // **All three readers in one row, and that is the assertion.** The gate is a
+    // single expression in `detect`; a row naming one capability passes just as
+    // well against a gate applied to that one alone, which is the state this file
+    // was in — 34 capability tests passed unchanged when the gate landed, because
+    // nothing had ever asserted the three together inside tmux.
+    const inside = caps({ TERM: "xterm-ghostty", TMUX: "/tmp/x" });
+    expect(
+      [inside.imageProtocol, inside.synchronisedUpdate, inside.colourDepth],
+      "inside a multiplexer every reader answers as if there were no identification",
+    ).toEqual(["none", false, 4]);
+
+    // And the same environment without `TMUX`, so the row cannot pass by the
+    // identification having stopped working (F432).
+    const outside = caps({ TERM: "xterm-ghostty" });
+    expect(
+      [outside.imageProtocol, outside.synchronisedUpdate, outside.colourDepth],
+      "outside it, all three follow the name",
+    ).toEqual(["kitty", true, 24]);
+  });
+
+  it("T1.12c (I11): the gate is measured behaviour, not caution", () => {
+    // **What tmux does with the bytes, which is why the gate is right** (F432).
+    // Measured on tmux 3.5a in its own output: an unwrapped APC transmission is
+    // absent and `ESC [ ? 2026 h` is absent, against a bare pty where both are
+    // present. So `imageProtocol` addressed an image that never arrived and
+    // `synchronisedUpdate` promised a wrapper nothing received — the record was
+    // false rather than merely optimistic.
+    //
+    // The DCS-wrapped form *does* reach the emulator at tmux's default, so this
+    // is a gate awaiting a wrapper in `escapes.ts` rather than a permanent no.
+    expect(caps({ TERM: "xterm-kitty", TMUX: "/tmp/x" }).imageProtocol).toBe("none");
+    expect(caps({ TERM: "xterm-kitty", TMUX: "/tmp/x" }).synchronisedUpdate).toBe(false);
+    // `TERM_PROGRAM` survives the hop where `TERM` does not, which is the route
+    // that made this reachable at all.
+    expect(caps({ TERM: "screen-256color", TERM_PROGRAM: "ghostty" }).imageProtocol).toBe("kitty");
+    expect(
+      caps({ TERM: "screen-256color", TERM_PROGRAM: "ghostty", TMUX: "/tmp/x" }).imageProtocol,
+    ).toBe("none");
+  });
+
   it("T1.2: COLORTERM=24bit, the less common spelling, is also 24", () => {
     expect(caps({ TERM: "xterm", COLORTERM: "24bit" }).colourDepth).toBe(24);
   });

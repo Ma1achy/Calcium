@@ -147,26 +147,25 @@ function detectColourDepth(
   term: string | undefined,
   colorterm: string | undefined,
   terminal: TerminalName | null,
-  inTmux: boolean,
 ): TerminalCapabilities["colourDepth"] {
   // Order matters, and the dumb gate comes first: a dumb terminal renders no
   // colour whatever COLORTERM claims about the emulator (T3.3). Absent TERM is
   // dumb — see §3.
   if (term === undefined || term === "dumb") return 1;
   if (colorterm === "truecolor" || colorterm === "24bit") return 24;
-  // **The identification, below `COLORTERM` and gated by `TMUX`** (I11). A real
-  // Ghostty sets `COLORTERM`, so this row looks like an artefact of our own
-  // harness stripping it — and it is not: **`ssh` allocates a pty and forwards
-  // `TERM`, never `COLORTERM`**. A kitty user connecting to a machine running a
-  // Calcium app got 24-bit images and 4-bit colour from one terminal, decided by
-  // which variable survived.
+  // **The identification, below `COLORTERM`** (I11). A real Ghostty sets
+  // `COLORTERM`, so this row looks like an artefact of our own harness stripping
+  // it — and it is not: **`ssh` allocates a pty and forwards `TERM`, never
+  // `COLORTERM`**. A kitty user connecting to a machine running a Calcium app got
+  // 24-bit images and 4-bit colour from one terminal, decided by which variable
+  // survived.
   //
   // Below `COLORTERM` because that is the terminal speaking for itself and a name
-  // is us inferring. Gated by `TMUX` because inside a multiplexer we are not
-  // talking to the emulator we identified — `mouse`'s rule (D34) reaching a
-  // second capability — and the gate is deliberately conservative: outside tmux
-  // it fixes the measured defect, inside it changes nothing.
-  if (terminal !== null && !inTmux) return 24;
+  // is us inferring. **The `TMUX` gate used to be this line's and is now the
+  // identification's** — `detect` hands over a `terminal` that is already `null`
+  // inside a multiplexer, so the rule is stated once for every reader instead of
+  // once per reader (F432).
+  if (terminal !== null) return 24;
   if (term.includes("256color")) return 8;
   return 4;
 }
@@ -334,11 +333,29 @@ function detect(env: Readonly<NodeJS.ProcessEnv>): TerminalCapabilities {
   // **Asked once, read three times** (I11). Not gated by `usable`, on §3's
   // boundary: `TERM=dumb` is a statement about terminfo and iTerm2 supports
   // synchronised update whatever it claims.
-  const terminal = identifyTerminal(term, termProgram);
+  const identified = identifyTerminal(term, termProgram);
   const inTmux = read(env, "TMUX") !== undefined;
+  // **Identification is not capability, and the second question is asked here**
+  // (I11, F432). *Which emulator is this* and *does a sequence reach it* are
+  // different questions; inside a multiplexer we are not talking to the emulator
+  // we identified, so every reader below sees `null` rather than each of them
+  // remembering to gate.
+  //
+  // **Measured rather than assumed**, tmux 3.5a with `-f /dev/null`, searched in
+  // tmux's own output: an unwrapped APC transmission is **absent** and
+  // `ESC [ ? 2026 h` is **absent**, against a bare pty where both are present.
+  // Not near misses — the bytes are consumed, so `imageProtocol` addressed an
+  // image that never arrived and `synchronisedUpdate` promised a wrapper nothing
+  // received.
+  //
+  // **The fix is not here.** The DCS-wrapped form does reach the emulator, at
+  // tmux's default config, and wrapping a sequence belongs to `escapes.ts` — the
+  // file that owns every sequence. Until then this is the conservative answer,
+  // and it is the one `mouse` (D34) and `colourDepth` already give.
+  const terminal = inTmux ? null : identified;
 
   return {
-    colourDepth: detectColourDepth(term, read(env, "COLORTERM"), terminal, inTmux),
+    colourDepth: detectColourDepth(term, read(env, "COLORTERM"), terminal),
     unicode: detectUnicode(read(env, "LC_ALL"), read(env, "LC_CTYPE"), read(env, "LANG")),
     ambiguousWidth: detectAmbiguousWidth(
       read(env, "LC_ALL"),

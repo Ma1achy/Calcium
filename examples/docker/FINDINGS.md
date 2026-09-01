@@ -13860,6 +13860,90 @@ terminal did not change, and the gap between those two is the whole finding.
 
 ---
 
+## F434 — a total that passes because its errors cancel ★★★☆☆
+
+**SP6 checks that every finding is keyed in some group and that the ranking table's column sums to
+the number of distinct ids.** Its own comment records that per-group numbers are not checked.
+Measured, because a recorded limit with no figure reads as a small one:
+
+```
+group   declared   keyed      group   declared   keyed
+    1         18      17          8         24      25
+    2         50      51          9         56      60
+    7         44      41         11        161     160
+                                      6 of 14 rows disagree
+```
+
+**And the total passes**, because −1, +1, −3, +1, +4 and −1 cancel. So the check is not merely
+silent about attribution: it is satisfied by a document with six wrong rows.
+
+**The failure mode is one move, and it is the natural one.** Write the entry beside the finding it
+relates to; increment the count on the group the finding belongs to. Two groups, one id, sum
+unchanged. It happened **twice in one session** — F432 written into group 7's body with group 10's
+count raised, then F433 into group 10's body with group 9's raised. Both were caught by reading the
+diff, which is the only instrument that reaches it.
+
+**Not gated, and the reason is that *keyed* has no definition strong enough yet.** The loose reading
+counts a mention in another entry's prose; the strict one — an id opening a paragraph — leaves 8 ids
+of 435 owned by nothing and puts 7 of 14 rows out. Closing it means reconciling the counts first,
+and several carry prose the column does not (*13 open, 5 closed*). **A gate over numbers nobody
+maintains is red on arrival and gets edited to fit**, which is worse than a limit that says so.
+The limit now says so, with the figures.
+
+---
+
+## F433 — the dither belongs to colour depth, and on this rung it spends the scarce axis ★★★★☆
+
+**Measured before porting, because the premise it served was overturned.** The ordered dither was
+in the 3D design because braille had one channel — eight dots, nine levels, no colour. The
+half-block rung has two full colours per cell, so the question is open rather than settled.
+
+**The measurement is not rung against rung. It is dither against `colourDepth`**, because C02
+answers 1 / 4 / 8 / 24 and the rung is the same at all four. Greys only, which is the honest floor
+for a lit surface — one hue, and the cube's off-diagonal entries would flatter every depth equally.
+
+```
+depth  greys   per-sample MAE       4×4 block-mean MAE
+               plain    dither      plain     dither    ratio
+  24     256   0.0010   0.0013      0.0002    0.0002    1.09×
+   8      26   0.0099   0.0132      0.0025    0.0018    1.43×
+   4       4   0.0840   0.1125      0.0473    0.0135    3.51×
+   1       2   0.3548   0.4342      0.2528    0.0323    7.84×
+```
+
+### The first two metrics were correct and useless, which is the part to keep
+
+The first pass reported **per-sample MAE** and a **neighbour-jump count**, and both said the dither
+was worse at every depth. Both are true. Both measure exactly what a dither *sacrifices*: it trades
+per-sample accuracy for spatially averaged accuracy, so MAE loses to plain quantisation by
+construction, and counting neighbour jumps is counting the mechanism. **Two metrics measuring the
+technique's own cost, reading as an answer** — and a ruling taken from them would have been right
+by accident and wrong in its reason.
+
+### And then the block metric disagreed with the picture
+
+At 4-bit the dither is **3.51× better** on block-mean error, and the plain quantisation **reads more
+cleanly**: posterised contours, but a sharp cone and an unambiguous trough, where the dithered
+version is a stipple the eye has to integrate.
+
+**Both are right, and the cause is the sample count.** A dither buys tone by spending space, and a
+4×4 Bayer cell is **1/20 of an 80-wide raster**. At 673×384 that block is nothing; at 80×48 it is a
+feature. The block metric is correct about tone and blind to what the block costs.
+
+**So the ruling is sharper than either instrument alone gave**: the dither's value is a function of
+colour depth **and** sample count, and the half-block rung is exactly where sample count is
+scarcest — 1/67 of the image protocol's.
+
+### Ruled — not ported
+
+**The dither does not go into the 3D design.** At 24-bit it buys 1.09×, which is nothing; at low
+depth it buys tone with the one axis this rung has least of. And where it *is* worth having — 4-bit
+and 1-bit, at 3.51× and 7.84× — it is not 3D's: it belongs to whatever quantises a colour, and
+applies to a heatmap, an image and a surface identically. **A technique that helps every raster
+equally is not a property of the form that noticed it.**
+
+---
+
 ## F432 — the measurement named the wrong unknown, and that is what made it look untakeable ★★★★★
 
 **C02 carried a written decision not to rule F418's fourth instance**: *"It is named here and not
