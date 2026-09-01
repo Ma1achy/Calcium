@@ -31,7 +31,7 @@ type change.
 |---|---|---|---|---|---|
 | **1** | [The consumer cannot reach a fact the framework holds](#1) | 18 | **10 open** | ⚠ C07 · C24 | real Calcium work, with consumers |
 | **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 50 | **5 open** (9 closed) | ⚠ C04 · C23 | real Calcium work · **7 of 13 fixed** — and F165 is the first found by roadmap 48's residue rather than by a consumer reaching for something |
-| **3** | [A block cannot express what the surface needs](#3) | 6 | **4 open** | ⚠ C04 | mixed — two absorbed |
+| **3** | [A block cannot express what the surface needs](#3) | 7 | **4 open** | ⚠ C04 | mixed — two absorbed |
 | **4** | [A change axis distinct from `Tone`](#4) | 4 | **4 open** | ⚠ C04 · C09 · C10 | real Calcium work · needs a ruling |
 | **5** | [The far side's shape is not the framework's contract](#5) | 10 | **2 open** | ⚠ C05 | mostly app-side · one shim |
 | **6** | [Rendered from data that has since moved](#6) | 2 | **2 open** | ⚠ C04 | real Calcium work |
@@ -196,7 +196,9 @@ mechanism.
 | **F141** | `b.logs` is reached by one test fixture, and S12 composes `raw` |
 
 
-## 3 · A block cannot express what the surface needs — **4 open** ⚠
+## 3 · A block cannot express what the surface needs — **5 open** ⚠
+
+**F428** — `table`'s window, built and reverted. The walk had four interactions; the implementation found three more. **`window` did not take `measureChild`**, and the argument for it was written on the neighbouring member, about this kind and this quantity — so `table` could not divide for want of a parameter rather than a rule. **A header-only window measures 2 against a range of 1**, because C11 §5's empty-table rule fires on a window that holds no rows — C09 I26 meeting C11 §5, each right about its own case. And the blocker: **`Windowed`'s `skipRows` is leading only**, while a range ending inside an expanded row overhangs at the *end*. `patch`'s slack leads, `logs` and `keyValue` have one-row units — **`table` is the first kind that can overhang**, so this is C09 §2a's contract and not `Table`'s field. Reverted: a window failing the invariant written to make windows safe is worse than a kind declaring none.
 
 | | | verdict |
 |---|---|---|

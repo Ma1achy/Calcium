@@ -13860,6 +13860,63 @@ terminal did not change, and the gap between those two is the whole finding.
 
 ---
 
+## F428 — `Windowed` has leading slack and no trailing, and `table` is the first kind that overhangs ★★★★★
+
+**The walk gave `table` four interactions (C09 §6b). Building it found three more, and the third
+cannot be fixed inside the kind.** Written up from an implementation that was reverted rather than
+shipped, because the reason it fails is a contract and not a bug.
+
+### 5 · `window` did not take `measureChild`, and the argument for it was one member below
+
+`BlockDefinition.window` is `(block, width, from, to)`. A table row's offset is
+`header + Σ(1 + detailHeight(row))` and `detailHeight` measures the expanded detail through the
+child seam — so the offsets are **not a function of `(block, width)` alone**, and a window that
+guessed them would slice at the wrong row.
+
+**That sentence is already written**, on `elements` immediately below `window` in the same
+interface: *"`measureChild`, because the positions are not a function of `(block, width)` alone
+(C26 §8b.3). **A table row's offset is `header + Σ(1 + detailHeight(row))`** — so without the seam
+an implementation would guess, and a guessed position is a pointer landing on the wrong row."* The
+right kind, the right quantity, the right reasoning, on the neighbouring member. **`table` could
+not divide for want of a parameter rather than for want of a rule**, and nothing connected the two
+because `logs`, `patch` and `keyValue` have units of one row and never needed it.
+
+### 6 · A header-only window is not an empty table, and C11 §5 says it is
+
+`[0, 1)` on any table is the header alone. The window keeps no data rows, `hasBody` is false, and
+C11 §5's rule fires: *an empty table measures `header + 1` — header plus the empty message, never
+zero* (T1.10). So the window measures **2** against a range of **1**.
+
+**C09 I26 meeting C11 §5, and each is right about the case it was written for.** Fixable with a
+field — a window saying *I hold no rows and I am not empty* — and the name for it was the third
+thing this found: **`emptyMessage` already exists on `Table` as a `string`**, the message's own
+text. Invented without checking, in the same session whose standing instruction is to run the
+where-is-this-written check on every named mechanism. The check is owed by the person adding a
+name as much as by the person citing one.
+
+### 7 · The blocker: a unit can overhang the *end* of a range
+
+`[0, 3)` on a table whose second row is expanded measures **4**. The units are `header(1)`,
+`row0(1)`, `row1(1 + detail)` — so a range ending inside row1's detail gets the whole unit, and the
+surplus is at the **end**.
+
+**`Windowed` is `{ block, skipRows }` and `skipRows` is leading only.** Its doc says so plainly —
+*the leading rows of it the caller drops* — and that was sufficient for every kind so far:
+`patch`'s slack is a path header and a hunk header, which lead; `logs` and `keyValue` have units of
+one row and cannot overhang at all. **`table` is the first kind whose last unit can hang past `to`,
+and there is no field for it.**
+
+So this is not `Table`'s to fix. It is C09 §2a's: either `Windowed` grows trailing slack — which
+changes I26's identity for every kind and the generic conformance property with it — or `table`
+declines ranges that end inside an expanded row, which is a window that sometimes is not one.
+
+**Reverted rather than shipped.** A window failing the one invariant written to make windows safe
+is worse than a kind that declares none, and F424 already says what a non-declaring kind costs:
+`logs` paints forty rows of fifty thousand in 0.65 ms and `code` takes 914 ms. **The number is the
+argument for doing it and not the argument for doing it wrongly.**
+
+---
+
 ## F426 — a window of a code block is a different parse, and I26 cannot see it ★★★★★
 
 **Roadmap 17's step 3 wants `code` to declare a window**, and the question put to the walk was
