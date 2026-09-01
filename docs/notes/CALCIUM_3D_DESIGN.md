@@ -134,9 +134,25 @@ auto-orbit     azimuth += δ per frame — the stream window is 33ms, so 30fps i
 manual         ← → azimuth · ↑ ↓ elevation · + − distance · r resets
 ```
 
-**The render cache key gains the camera**, which is the third instance of that story after
-the scroll offset and the crosshair. **Add it with the feature.** A cached frame served after
-an orbit is a plot that does not move, and it looks like a hang rather than a bug.
+**The render cache key gains the camera — and so does the shell, which is the half this
+sentence used to miss.** It read *the third instance of that story after the scroll offset and
+the crosshair*, and **the crosshair is not an instance of it**:
+
+```
+                   read by                        written by                in a key
+scrollOffsets      containers                     construct.ts's nudge       yes
+cursorPositions    plot/definition.ts             NOTHING in src/            no
+```
+
+C12 §3s already says so — *a complete mechanism with nothing on the other side, the shape MG24
+exists for*. So the crosshair is not the precedent; **it is the failure this must not repeat.**
+The four real axes are `focus`, `theme`, the scroll offset and `tick`, and `session.ts` names
+each beside the way it fails — silently for the offset, intermittently for the tick.
+
+**So the camera is two stories at once and they land in one commit.** A key axis with no writer
+is vacuous until the orbit exists; a context field with no writer is `cursorPositions` again.
+The field, the axis and one binding go together. **Add it with the feature** — a cached frame
+served after an orbit is a plot that does not move, and it looks like a hang rather than a bug.
 
 **Auto-orbit and the readout cursor are mutually exclusive** — a moving camera and a fixed
 sample index disagree about what the reader is pointing at. **Orbit pauses while the cursor
@@ -282,16 +298,31 @@ type Surface3 = Readonly<{
 }>;
 ```
 
-**Two independent inputs, and this is where it beats matplotlib:**
+**Two inputs, and whether they are two CHANNELS is now open — the rung change falsified the
+claim and this is the one residue that is not a stale noun.**
 
 ```
-field (or height)  →  the continuous palette   →  COLOUR
-face normal · light →  intensity 0..1          →  GLYPH DENSITY
+                       on the dot grid                  on this rung
+field (or height)  →   the palette      → COLOUR    →   the palette   ┐
+face normal · light →  intensity 0..1   → DENSITY   →   intensity     ┘ ONE colour
 ```
 
-**Multiply them.** A loss landscape coloured by *loss* and shaded by *slope*, both readable
-at once. **matplotlib's surface plot has one colour channel; this has colour and dither
-pattern**, which is more information per cell rather than less.
+**On the dot grid they were genuinely independent**, because the cell had two carriers: a
+foreground colour and a glyph chosen from a density ramp. Here both readings write the *same*
+sample, so a dark cell is a low field value **or** a face turned away and nothing in the picture
+says which. *matplotlib's surface plot has one colour channel; this has colour and dither
+pattern* was true and is not.
+
+**And the collision is worst on the map that was chosen to avoid collisions.** A perceptually
+uniform colormap makes lightness monotonic in the value — that is what viridis is *for* — so
+multiplying it by a Lambertian intensity puts the field and the slope on the same perceptual
+axis by construction.
+
+**So: one channel until something separates them, and the candidate is named rather than
+ruled.** Hue and chroma for the field, lightness for the shading, which is what a 3D surface
+renderer with a colormap normally does. Whether it survives a terminal's quantisation is a
+**measurement**, and it belongs to step 6 beside the reference comparison — not to a sentence
+carried across a changed premise, which is how this one got here.
 
 #### Shading — and the dither that used to be here is gone
 
@@ -384,25 +415,41 @@ distance    × (1 − 0.3 · normalisedDepth)                far is dimmer
 as a **hole** rather than a surface, which is worse than being wrong about the light.
 
 **The specular term is cheap and buys more than it costs.** On a sphere it is **the difference
-between a disc and a ball** — and at nine dither levels there is enough range to show a
-highlight without it blowing out to solid white.
+between a disc and a ball**, and this rung has the range to show one: a highlight is a step in a
+24-bit colour rather than a rung on a nine-level ladder, so it can be *bright* without being
+*white*. That is a stronger argument than the one this paragraph used to make, and it is the
+same term.
 
-**Depth attenuation is one multiply and a free depth cue.** It stacks with the dither rather
-than competing, because both write to the same intensity channel and the reader sees one
-result.
+**Depth attenuation is one multiply and a free depth cue.** Every term above writes the same
+intensity and this multiplies it, so the reader sees one result rather than two channels
+competing for a cell.
 
-**Clamped to `[0, 1]` before the dither ramp indexes it** — a specular highlight can push past
-1 and the ramp's top rung is `⣿`, so an unclamped value is an array overrun rather than a
-brighter cell.
+**Clamped to `[0, 1]` before the colour is resolved**, and **the reason changed with the rung**.
+On the dot grid the sentence said *an array overrun*, because the intensity indexed a ramp whose
+top rung is `⣿`. There is no ramp here and no array to run off: past 1 is a colour component
+past 255, and the failure is a wrap or a silent saturate — **diagnosable only by looking at the
+picture**, where an overrun throws. Same line, different failure, and worth stating because a
+reader sent to a ramp would go looking for one that this rung does not have.
 
 #### What is refused, and why
 
-**Cast shadows.** They need a second depth pass from the light's position, and at nine
-intensity levels the result is banding rather than shadow. **Ambient occlusion is the cheaper
-lie** if contact darkening is ever wanted, and neither belongs here.
+**Both refusals below were argued from nine dither levels, and that argument is gone.**
+Re-argued rather than kept, because a refusal whose reason has been falsified is one the next
+reader deletes.
 
-**A second light.** It doubles the shading code and the terminal cannot show the difference —
-nine levels is not enough range for two directions to be separable.
+**Cast shadows.** A second depth pass from the light's position — **and under `studio` the light
+is camera-relative**, so the shadow map is rebuilt on every orbit frame rather than cached with
+the scene. That doubles the per-frame cost on the one path §11 says is already the budget, and
+it buys a cue the lighting already gives. The *banding* half of the old reason survives only at
+4-bit and 1-bit, which is C10's rung rather than this form's (F433). **Ambient occlusion is the
+cheaper lie** if contact darkening is ever wanted, and neither belongs here.
+
+**A second light.** *The terminal cannot show the difference* was true of nine levels and is
+false of two 24-bit colours. What refuses it now is narrower and is the `studio` ruling itself:
+a second light **in view space** rotates with the first, so it changes a constant rather than
+the picture, and a second light **in world space** reintroduces exactly the dead angle the
+default exists to avoid. So it is refused as *no second view-space light, and world-fixed is
+already the escape hatch* — `light: { azimuth, elevation }`, one of them.
 
 #### Normals
 
@@ -689,14 +736,14 @@ strokePolyline        lines, wireframes, axis lines — plus a depth test
 glyphForMask          the box-drawing arm at cell resolution
 createGrid / setDot   the raster, plus the depth buffer beside it
 the continuous palette   colour by height, depth or field
-the density ramp      the dither ramp is a fourth axis beside it
+halfBlockRows         the LAST STAGE, shipped: `▀` with two colours, and `image.ts` paints it
 niceAxis              tick selection on all three axes, unchanged
 formatReadout         axis labels and the readout
 the frame scheduler   auto-orbit at 30fps, free
-RenderContext         the camera, exactly as the crosshair
+RenderContext         the camera — the crosshair's SLOT, and not its wiring (§1)
 ```
 
-**Genuinely new: the rotation, the depth buffer, the dither ramp, the 3D axis layout.**
+**Genuinely new: the rotation, the depth buffer, the lighting, the 3D axis layout.**
 Everything else is a fold over what exists.
 
 ---
@@ -711,8 +758,8 @@ self-contained. It touches nothing existing except `RenderContext` and the rende
 ```
 3D scatter        embeddings, PCA, t-SNE, a three-parameter sweep. NOTHING in a
                   terminal does this and people screenshot embedding plots constantly
-surface plot      loss landscapes, response surfaces, any z = f(x,y). The colour+dither
-                  separation makes it MORE informative than matplotlib's, not less
+surface plot      loss landscapes, response surfaces, any z = f(x,y). NOT claimed to be
+                  more informative than matplotlib's — that rested on the dither (§3c)
 ```
 
 **What is marginal:**
@@ -732,21 +779,33 @@ four times.
 ## 10 · Build order
 
 ```
-1   the camera type, RenderContext wiring, the cache key
+1   the camera type, RenderContext wiring, the cache key — AND ONE WRITER (§1)
 2   projection + the depth buffer + frustum culling
 3   POINTS — the cheapest primitive and the most useful. A 3D scatter ships here
 4   the 3D axis layout, billboarded labels, the back-face box
 5   LINES — strokePolyline with a depth test. Wireframes
-6   the dither ramp as a fourth encoding axis
-7   SURFACES — normals, lighting, the colour/shading separation
-8   backface culling, the wireframe-over-surface mode and its depth bias
-9   auto-orbit and manual camera controls
-10  the test suite: sphere, cube, axis planes, tilted plane, the three equations
-11  golden frames at four capability sets, catalogue fixtures, the animated example
+6   SURFACES — normals, lighting, the colour/shading separation
+7   backface culling, the wireframe-over-surface mode and its depth bias
+8   auto-orbit and manual camera controls
+9   the test suite: sphere, cube, axis planes, tilted plane, the three equations
+10  golden frames at four capability sets, catalogue fixtures, the animated example
 ```
 
 **Steps 1–3 ship a working 3D scatter.** That is the point at which it stops being
 speculative — everything after it is improvement rather than proof.
+
+**The old step 6 — *the dither ramp as a fourth encoding axis* — is gone, and its removal is the
+residue worth naming.** §3c and §6 were rewritten to refuse the dither and this list was not, so
+the build order kept a step for a mechanism the document two sections up had ruled out. **A
+ruling reaches the section it is argued in and not the list that schedules it** — F86, F89 and
+F92's mechanism running the other way round, and the thing that surfaced it was a reader's own
+step list silently disagreeing with this one.
+
+**And the degenerate rows cannot be parked.** `tools/enforce/todo-expiry.mjs` matches a blocker
+as `C\d{2}` or `L\d` only, and C12 exists — so `it.todo("… waits on surfaces")` cannot be
+written and `waits on C12` expires the day it is written. The edge-on plane therefore splits by
+step: its **projected extent of zero** is writable at step 2 and its **zero-area face, undefined
+normal and divide-by-zero lighting** at step 6. First within its own step, both times.
 
 ---
 
@@ -807,7 +866,7 @@ normal, one dot for the lighting, then rasterisation across however many dots it
 ```
 projection only        3,200 triangles, no rasterisation — is the matrix maths the cost?
 + rasterisation        with the depth test — is the fill the cost?
-+ shading              normals, lighting, dither — is the per-cell work the cost?
++ shading              normals and lighting — is the per-cell work the cost?
 the whole frame        and against the frame scheduler's 33ms stream window
 ```
 
@@ -892,7 +951,7 @@ isolation, on the same input, so the profile names a stage rather than a total.
 |---|---|---|
 | **P1** | rotation + projection only, no writes | 3,200 triangles |
 | **P2** | + rasterisation with the depth test | 3,200 triangles |
-| **P3** | + normals, lighting, dither | 3,200 triangles |
+| **P3** | + normals and lighting | 3,200 triangles |
 | **P4** | the whole frame, end to end | 3,200 triangles |
 | **P5** | P1–P4 again at 69,451 | the Stanford bunny |
 | **P6** | points only, no faces | 10,000 points |

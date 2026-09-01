@@ -2950,9 +2950,23 @@ By how much each fights the character grid:
 ```
 easy       bar · histogram · line (exists) · sparkline (exists) · HEATMAP
 medium     candlestick · pie (circle approximation, looks rough)
-hard       sankey (edge routing — the same problem as Mermaid layout)
-no         3D — perspective in a character grid is a novelty, not a tool
+hard       sankey (edge routing — the same problem as Mermaid layout) · 3D
 ```
+
+**3D was the `no` row, on *perspective in a character grid is a novelty, not a tool* — and
+that is a fit argument asserted rather than measured.** Measured (F431): one surface and one
+teapot-shaped solid at 80×24 cells, three arms. Four metrics said the braille dot grid held it
+— 0.3% and 1.5% silhouette disagreement against the pixel truth, the handle's hole four dots
+clear, 163 distinct shade levels of 186 — **and the picture disagreed with all four**, because
+**6931 of 7254 lit dots are interior and every one of them is on**. A 3D form is not its
+outline; a lid seam and the trough of a ripple are shading discontinuities, and the braille
+channel is a constant inside the silhouette. On the **half-block** rung — `▀`, two full colours
+a cell, a *quarter* of braille's samples — every structure the image arm has is there.
+
+So it moves to `hard` for the reason sankey is there: **the 3D axis layout is the work.** The
+renderer is a projection, a depth buffer and one light, and the last stage is `halfBlockRows`,
+which already ships for images. `docs/notes/CALCIUM_3D_DESIGN.md` carries the design and entry
+52 orders it.
 
 **Heatmap is the sleeper.** A grid of coloured cells is *exactly* what a terminal is. It
 needs colour maps, and it degrades beautifully — colour → `░▒▓█` shading at 1-bit. For ML
@@ -2990,11 +3004,16 @@ an ML platform's TUI.
 - **Video / GIF.** Redrawing a rectangle at 15 fps inside a frame scheduler built around
   *one frame per input batch* fights the architecture at its root. **A GIF's first frame as
   an image, with a note, gets 90% of the value for 5% of the work.**
-- **3D plots.** Perspective in a character grid is a novelty.
 - **An embedded text editor.** `/tty vim` already hands the terminal over, vim runs, you
   come back — the handoff is built and correct. An embedded editor is a much larger thing
   for less.
 - **Wrapping matplotlib** — above.
+
+**3D plots were on this list and have been retracted, not deleted.** *Perspective in a character
+grid is a novelty* was refused without measuring; the measurement overturned it (F431, above).
+Recorded here rather than removed silently, because **a refusal that vanishes is one somebody
+restores** — and because this list is the one `roadmap-status.mjs` cannot see: it skips every row
+whose order column is `—`, so a refusal outliving its reason sits outside every gate. Entry 52.
 
 ---
 
@@ -4256,7 +4275,24 @@ THE SETS LANDED 2026-08-15 AND 51 IS
                                    and the band itself is a SPINNER's — a counter and a
                                    two-frame toggle are other categories, which is why one band
                                    over all three reported three false rows. T2.70–T2.75
-      —  video · 3D · embedded editor · matplotlib wrapper · rewind/undo
+      52 3D PLOTS                  RETRACTED FROM *deliberately not doing*, and the refusal
+                                   was a fit argument asserted rather than measured (F431).
+                                   HALF-BLOCK RUNG: `▀`, two full colours a cell. The sample
+                                   grid is `width × 1` by `height × 2` — 80×48 at 80×24 cells,
+                                   120×60 at 120×30 — so nothing is hardcoded to a viewport,
+                                   and every absolute figure in the design note is a
+                                   measurement at 80×24 rather than a threshold. THE DITHER IS
+                                   NOT PORTED: it is a function of `colourDepth`, not of this
+                                   form, measured at 1.09× / 1.43× / 3.51× / 7.84× and worth
+                                   nothing where the rung lives (F433). Steps 1–3 of §10 ship a
+                                   3D scatter, which is where it stops being speculative.
+                                   THE CAMERA IS THE PART WITH A SCAR: `cursorPositions` is
+                                   read in `src/presentation/plot/definition.ts` and written by
+                                   nothing in `src/` — a complete mechanism with nothing on the
+                                   other side (C12 §3s) — so a camera on `RenderContext` with no
+                                   writer repeats it exactly. The field, the cache-key axis and
+                                   one binding land together or none does.
+      —  video · embedded editor · matplotlib wrapper · rewind/undo
 ```
 
 ### How to read the status column — checked 2026-08-13
@@ -4338,7 +4374,7 @@ base moved with the tree and the ratio did not (32.6% → 31.8%). The variant's 
 **not** re-measured here, because it is a proposal rather than a shipped signal and re-running
 it is the entry's work rather than a sweep's — said so, because a refreshed number beside a
 stale one reads as though both were taken. · **26**, **32** — the symbols the entries name are
-absent  · **49** joins them the day it is filed, measured rather than assumed: `test/golden/` holds **five** test files — four when this was written, and `fallback-docker.test.ts` since — and **not one imports from `src/shell/`**. Re-measured 2026-08-15 after roadmap 51: still five and still none, so a capability field, a palette and sixteen spinner sets all landed without a golden frame seeing one — which is the entry's claim demonstrating itself rather than being restated, so nothing in that category reaches `paint.ts` — and its README calls the snapshots frames (F163). · **3** joins them on 2026-08-15 by ceasing to be uncheckable rather than by being swept: its gate was `prism-tui` and the gate is not one, so what remains is greppable from here and was measured — `docs/notes/CALCIUM_PLOT_PRIOR_ART.md` is in the tree and lists the chart types, and `tensor` and `heatmap` occur **zero** times in the whole of `src/`, which is the entry itself rather than only its home: what is built is C12, the machinery the ML package would extend.
+absent  · **49** joins them the day it is filed, measured rather than assumed: `test/golden/` holds **five** test files — four when this was written, and `fallback-docker.test.ts` since — and **not one imports from `src/shell/`**. Re-measured 2026-08-15 after roadmap 51: still five and still none, so a capability field, a palette and sixteen spinner sets all landed without a golden frame seeing one — which is the entry's claim demonstrating itself rather than being restated, so nothing in that category reaches `paint.ts` — and its README calls the snapshots frames (F163). · **3** joins them on 2026-08-15 by ceasing to be uncheckable rather than by being swept: its gate was `prism-tui` and the gate is not one, so what remains is greppable from here and was measured — `docs/notes/CALCIUM_PLOT_PRIOR_ART.md` is in the tree and lists the chart types, and `tensor` and `heatmap` occur **zero** times in the whole of `src/`, which is the entry itself rather than only its home: what is built is C12, the machinery the ML package would extend. · **52** joins them on the day it is written, measured rather than assumed: `camera`, `azimuth`, `elevation` and `halfBlockRows` occur **zero** times in `src/presentation/plot/`, and the whole of 3D is a design note. The entry is open because it was just un-refused, which is the one state that reads as *nobody looked*.
 
 **33 left this list on 2026-08-15**, and its evidence expired the moment the code landed —
 *no queue of any kind in `src/shell/`, the word does not appear* is now false by construction.

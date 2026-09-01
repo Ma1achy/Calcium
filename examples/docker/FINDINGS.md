@@ -13860,6 +13860,93 @@ terminal did not change, and the gap between those two is the whole finding.
 
 ---
 
+## F436 — the rewrite reached the section that argues and not the ones that summarise ★★★★★
+
+**One commit earlier, `docs/notes/CALCIUM_3D_DESIGN.md` was rewritten against its own new ruling
+— the dither is refused (F433), the rung is half blocks (F431).** Read again before building
+from it, it carries **fourteen** sentences the rewrite did not reach:
+
+```
+where                        what it still says                          count
+§3c's own body               nine dither levels · the ⣿ ramp · an array     5
+                             overrun · banding at nine levels
+§3c's channel argument       "colour and dither pattern" · GLYPH DENSITY    2
+§8 · §9 · §10 · §11 · §12    the dither ramp as a step, a stage, a reuse    5
+§1 and §8                    the camera "exactly as the crosshair"          2
+```
+
+**F86, F89 and F92 running the other way round.** There a body stayed correct and a summary
+dropped the condition that made it true. Here the summary is correct — §3c's heading was
+*promoted to load-bearing* by that very commit — and the **body underneath it was not re-read**.
+The promotion is written at the top of a section and the argument is forty lines below, which is
+exactly far enough for a rewrite to feel finished.
+
+**One of the fourteen is load-bearing and one is a claim rather than a noun.**
+
+*The clamp.* §3c said **clamped before the dither ramp indexes it — an unclamped value is an
+array overrun**. On this rung there is no ramp and no array: past 1 is a colour component past
+255, and the failure is a wrap or a silent saturate rather than a throw. Same line, different
+failure, and the old wording sends an implementer looking for a ramp the rung does not have.
+
+*The two channels.* §3c claimed **field → colour and normal·light → glyph density**, two
+independent readings, *this is where it beats matplotlib*. That was a property of the **dot
+grid**, where a cell had two carriers. Here both write the same sample, so a dark cell is a low
+field value or a face turned away and nothing says which — **and the collision is worst on a
+perceptually uniform map, which is the one chosen to avoid collisions.** The claim is retracted
+and its replacement is named as a *measurement* for step 6 rather than ruled from the chair:
+hue and chroma for the field, lightness for the shading.
+
+**Found by a reader's own copy of the build order disagreeing with §10's.** Not a gate, not a
+sweep — a second copy of one list. §10 still had *step 6 · the dither ramp as a fourth encoding
+axis*, two sections below the paragraph that ruled the dither out. **A ruling reaches the
+section it is argued in and not the list that schedules it**, and nothing checks a build order
+against the design above it.
+
+**The habit that reaches it: after ruling something out, grep its name in the document that
+ruled it.** Twelve of the fourteen answer to `grep dither`, and the grep costs nothing.
+
+**Fixed** — all fourteen, in this commit.
+
+---
+
+## F435 — a refusal a measurement overturned, still standing in the document that holds it ★★★★★
+
+**`docs/notes/CALCIUM_3D_DESIGN.md` opens *the refusal was wrong and it was wrong for a stated
+reason*.** The refusal is in `CALCIUM_ROADMAP.md`, in **three** places, and the note never
+touches it:
+
+```
+2954   no    3D — perspective in a character grid is a novelty, not a tool
+2993   **3D plots.** Perspective in a character grid is a novelty.
+4259   —  video · 3D · embedded editor · matplotlib wrapper · rewind/undo
+```
+
+**And the document's only gate cannot see any of the three.** `roadmap-status.mjs` resolves the
+Order column's claims and parses `/^(.{6})(\d+|—) /`; a row whose order column is `—` is
+skipped by construction — `if (m[2] === "—") { current = null; continue; }` — and the other two
+sites are prose outside the Order block entirely. So a 52-entry gate that checks every claim
+resolves reads **none** of the places this document says no.
+
+**A gate over a table checks the rows that carry a key, and a refusal is exactly the row that
+does not.** That is the general form, and it is why this could sit for the life of the project:
+the gate is real, it runs on every `make all`, and its population is *ordered work*. Refusals
+are not ordered.
+
+**Wrong in a way that is worth separating from stale.** The refusal was never measured — *a
+novelty, not a tool* is a fit argument asserted — so it was not a correct claim that expired. It
+was an unmeasured one that nothing forced anybody to check. **And the note that overturned it was
+itself wrong about the rung** (F431), so the two documents were wrong about different things and
+neither could have corrected the other.
+
+**Fixed** — retracted at all three sites, each carrying the measurement rather than a pointer;
+`3D` moves from `no` to `hard` beside sankey, for the reason sankey is there. **Recorded rather
+than deleted**: a refusal that vanishes is one somebody restores, which is
+`record-why-a-catalogue-diverged`'s rule in the document that most needs it. Entry **52** orders
+it and joins the confirmed-OPEN set measured rather than assumed — `camera`, `azimuth`,
+`elevation` and `halfBlockRows` occur **zero** times in `src/presentation/plot/`.
+
+---
+
 ## F434 — a total that passes because its errors cancel ★★★☆☆
 
 **SP6 checks that every finding is keyed in some group and that the ranking table's column sums to
