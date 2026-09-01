@@ -176,7 +176,8 @@ needs anything to have happened.
 
 | # | kind | what `↓` does at the edge, in the tree | does an `ArrowPolicy` value say it |
 |---|---|---|---|
-| 1 | **`table`** — the only kind declaring `elements` (`presentation/table/definition.ts`, `tableElements`) | `↑` at the **first** element leaves to the prompt (`rowUp`, `shell/keys.ts`); `↓` at the **last** does nothing (`rowDown`, same file, `if (next !== undefined)`) | **no.** `escape-vertical` names an *axis* and the tree escapes in one *direction* — back the way focus came in, since entry is `↓` from the prompt past history's bottom (`historyNext`). There is no value for *escape up, stop down* |
+| 0 | **`plot` with a `camera`** — the second kind to declare `elements`, and the row that stops row 1's parenthesis being true (C12 I85) | one **block-level** element, so `↓` from the prompt lands on the whole plot and `↑` leaves it; there is nothing inside to step | **the question does not arise** — a single element has no interior edge, so *what `↓` does at this kind's edge* is answered by leaving, which is row 1's answer for a different reason |
+| 1 | **`table`** — was the only kind declaring `elements` until C12 I85, and this parenthesis is what that ruling had to come back and correct (`presentation/table/definition.ts`, `tableElements`) | `↑` at the **first** element leaves to the prompt (`rowUp`, `shell/keys.ts`); `↓` at the **last** does nothing (`rowDown`, same file, `if (next !== undefined)`) | **no.** `escape-vertical` names an *axis* and the tree escapes in one *direction* — back the way focus came in, since entry is `↓` from the prompt past history's bottom (`historyNext`). There is no value for *escape up, stop down* |
 | 2 | **`logs`** | declares `window` and no `elements` (`presentation/blocks/kinds/structured.ts`), so `↓` never steps an element in it at all | **the question does not arise** — and §4 above predicted *`table` and `logs` will both fit*. They are not two instances of one shape: by what each declares they are in different cells, which is the prediction falsified by the two fields rather than by a reading |
 | 3 | **`patch` in a pushed view** | `↓` is `viewPageDown` and `n`/`p` step hunks (`interaction/router/keymap.ts`, the `pushedView` target) | **no, and there is no edge.** The policy answers *what happens when stepping runs out*; here `↓` was never stepping |
 | 4 | **a scrollable container** (roadmap 46) | unbuilt — but `pushedView` **is** a scroller and it already answers: `↓` scrolls, in navigate mode, with no interact mode involved | **no**, for row 3's reason |
@@ -202,7 +203,7 @@ already declared:
 
 | declares | `↓` | kinds today |
 |---|---|---|
-| `elements` only | steps elements | `table` |
+| `elements` only | steps elements | `table`, and **`plot` when it declares a `camera`** (C12 I85) |
 | `window` only | moves a viewport | `logs`, `patch` |
 | **both** | **ruled in §4b** — `↓` steps and the window follows; it was never two readings of one key | **none, and the build kept it that way** — see the correction below |
 | neither | passes through; the block is atomic | `keyValue`, `code`, `plot` |

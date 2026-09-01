@@ -1052,7 +1052,7 @@ const UNCITED_INVARIANTS = Object.freeze([
   "C25 I11", "C25 I14", "C25 I15", "C25 I16", "C25 I17", "C25 I19a", "C25 I20a", "C25 I20b",
   "C26 I1", "C26 I11", "C26 I15", "C26 I16", "C26 I17", "C26 I20", "C26 I8", "C26 I9",
   // The camera's loan, struck on the commit that builds it — see above.
-  "C04 I75", "C12 I83", "C12 I84", "C22 I71",
+  "C04 I75", "C12 I83", "C12 I84", "C12 I85", "C22 I71",
 ]);
 
 /**
