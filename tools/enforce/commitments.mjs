@@ -968,6 +968,15 @@ export function scanSections(file, src, options = {}) {
  * commit — and the loan is what keeps a spec commit honest rather than green by
  * omission.
  *
+ * **`C04 I75`, `C12 I83`, `C12 I84` and `C22 I71` are the fourth**, taken on the
+ * spec commit that rules the camera: the block's initial view, the context record
+ * it arrives in, the sample grid and its per-render depth buffer, and the render
+ * key's sixth axis. No row can name them yet — `CAM1`–`CAM5` and
+ * `T4.17e`–`T4.17g` are written in the specs and reference a `Camera` no file
+ * declares — and they are struck on the commit that builds it. **Fourth
+ * instance, repaid three times out of three so far**, which is what distinguishes
+ * a loan from a list that grows.
+ *
  * **Stated blind spot: the corpus is `.ts` only**, matching what `walk` collects,
  * so an invariant named solely by a `.mjs` fixture reads as uncited. Widening it
  * is not obviously right: `TOPICS["fixture"] = "C01"`, and the bare `I17` in
@@ -988,6 +997,8 @@ const UNCITED_INVARIANTS = Object.freeze([
   "C24 I20", "C24 I22", "C24 I25", "C24 I26", "C24 I28", "C24 I6", "C24 I7", "C25 I10",
   "C25 I11", "C25 I14", "C25 I15", "C25 I16", "C25 I17", "C25 I19a", "C25 I20a", "C25 I20b",
   "C26 I1", "C26 I11", "C26 I15", "C26 I16", "C26 I17", "C26 I20", "C26 I8", "C26 I9",
+  // The camera's loan, struck on the commit that builds it — see above.
+  "C04 I75", "C12 I83", "C12 I84", "C22 I71",
 ]);
 
 /**

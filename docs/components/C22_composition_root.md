@@ -854,6 +854,52 @@ geometry**. Two axes are added and each is measured rather than assumed:
 currently varies is indistinguishable from a key that is complete, and the
 difference appears the day someone threads one value through one call.
 
+### The sixth axis — the camera, and the symptom is a hang rather than a stale frame
+
+**Five axes have been added to `(entryId, rev, width)`, and every one of them was found by
+naming what a reader sees rather than by auditing the key.** The list has never been in one
+place; it is written out here because the sixth is being added **before** its writer exists
+rather than after somebody reported it, and the only way to justify that is the symptom.
+
+| # | axis | what a reader sees when it is missing |
+|---|---|---|
+| 1 | `focus` | the selection moves down a table and no row changes tone — the frame is the one they left (trace row 4) |
+| 2 | the theme's identity | `/theme dark`, and the transcript stays light while the prompt does not. **No hook**: the fact travels with `ResolvedTheme.name` |
+| 3 | the window range | a tall entry scrolled through keeps drawing the rows it was first windowed to — **the right number of rows, from the wrong part of the document** |
+| 4 | the scroll offset | scroll a container away and back, and it is where you left it. **Fails silently** — nothing fails until a row scrolls twice and somebody reads the frame (C04 I48) |
+| 5 | `ctx.tick` | a spinner that turns when something else invalidated the slot and freezes when nothing did. **Fails intermittently**, which is why it carries its own mutation rather than riding with the pair that supplies the counter (I60, F227) |
+| 6 | **the camera** | **an orbit draws the same picture.** And this one does not read as a stale frame — it reads as a **hang** |
+
+**Row 6's symptom is the argument for the axis, and it is not the others'.** The five above
+produce a *wrong* frame: a row in the wrong tone, a container at the wrong offset, a spinner on
+the wrong glyph. A reader sees something incorrect and reports it against the thing they
+touched. A cached 3D plot under an orbit produces a **correct** frame — the previous one — and
+at thirty of those a second the picture is simply still. **That is what a stopped process looks
+like**, so the report is *it froze*, pointing at the scheduler, the runner, or the terminal.
+None of the three is where the defect is, and none of them can be measured into it.
+
+### And the axis is not the whole of it, because the crosshair is the counter-example
+
+`RenderContext` already carries a field with this shape and it has never needed a key axis:
+
+```
+                   read by                    written by              in a key
+scrollOffsets      containers                 construct.ts's nudge    yes
+cursorPositions    plot/definition.ts         NOTHING in src/         no
+```
+
+**`cursorPositions` is in no key because nothing can change it** (C12 §3s — *a complete
+mechanism with nothing on the other side, the shape MG24 exists for*). So a camera field added
+to the context without a writer would be correct, complete, keyed or unkeyed indistinguishably,
+and **its first observable behaviour would arrive with whatever built the orbit** — which is the
+day a reader reports a hang.
+
+**The pair is the invariant, not the axis** (I71). Either `RenderContext` gains the camera *and*
+something in `src/` can move it, or neither lands. This is I60's own ruling one component along:
+*the axis was absent and the value was constant, so the day one was threaded the other was owed.*
+Here both halves are owed on the same day by construction, which is the cheap version of the
+same lesson.
+
 ---
 
 ## 6e. The prompt window, walked by hand — roadmap entry 28
@@ -1712,6 +1758,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 
 - **I70** — **A frame that cannot hold the rows it was given reports and does not refuse.** `visibleRows` trims each entry to `takeRows`, and the trim was reconciling C09's rendered rows against C14's index in silence — a block over-drawing took the block after it off the frame with no fault and no diagnostic (F230). It reports through the same sink `BlockFault` uses. **It does not throw**, and the asymmetry with `paint.ts`'s region check is the reason: that refusal is affordable because I34 makes it unreachable, and this one is reachable by construction the moment a floor exists. A frame that dies because one block over-drew is worse than a frame that truncates and complains.
 ---
+- **I71** — **The render key's sixth axis is the camera, and the axis and a writer for it land together.** The key discriminates `(entryId, rev, width)` plus focus, the theme's identity, the window range, the scroll offset and `ctx.tick`; a camera changes what is rendered and moves none of them, so without the axis an orbit is served the frame it started from. **Its symptom is what distinguishes it from the other five and is why it is added before a report rather than after one**: those produce a *wrong* frame and this produces a *correct stale* one, thirty times a second, which is indistinguishable from a stopped process — so the report names the scheduler or the runner and not the cache (§6c). **The pair is the invariant.** `cursorPositions` is the counter-example already in the tree: read in one place, written by nothing in `src/`, and in no key — correct and unobservable together (C12 §3s). A camera field with no writer is that again, so either the context gains the camera *and* something can move it, or neither lands. I60's ruling one component along, paid on the day it is taken rather than the day it is noticed (→ C12 I83, C04 I75).
 
 ## 11. Commitments
 
@@ -1777,6 +1824,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 38. **The state directory ignores itself**, written when it is created rather than left to the app's own ignore rules — because what lands there is a preference today and a transcript the moment a verb declares one (I67, → C13 I20).
 39. **The terminal's polarity chooses the opening theme where the reader has not usably stated one, and is never written down** — a search of the set by `variant`, silent when it matches nothing, and inert when the terminal says nothing (I68, §6h). The three-valued polarity it reads and the field it searches on are both elsewhere (→ C02 I10, C10 I27).
 40. **A height the shell discovers is raised after the frame and guarded by the field itself** (I69). The frame that finds the need completes single-pass; the request is issued where the ticker is armed, because a write to the transcript inside the read that produced it is a write inside the frame it would change. It terminates on `block.minHeight` already holding the value and is discarded on a `rev` that moved (→ C04 I67, I68).
+42. **The camera is the render key's sixth axis and it does not land without a writer** (I71). Five axes were added to `(entryId, rev, width)` and each was found by naming the symptom; the sixth's symptom is a **hang** rather than a stale frame, because a cached 3D plot under an orbit is *correct* and merely previous. `cursorPositions` is the counter-example the tree already holds — a context field nothing writes is in no key and needs none — so the axis and the writer are one commitment rather than two (§6c) (→ C12 I83).
 41. **A frame that cannot hold what it was given complains rather than dies** (I70, F230). The per-entry trim was reconciling two components' answers in silence and taking the next block with it; it reports through the sink that already exists for a block giving way, and it does not refuse — the region check one level up can refuse only because nothing can reach it.
 
 ---
@@ -1929,6 +1977,9 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T4.16** (I58): one entry, drawn twice with nothing changed → the registry's `renderSequence` is called **once**. Asserted with a counting registry rather than by timing, because a timing assertion under contention is a flake and the claim is *it did not render again*, not *it was faster*.
 - **T4.17** (I58): one entry, a width change and then focus entering the block and moving between two rows → a render for each. Three sub-cases and not one, because a key missing any single axis passes every assertion about the others; **two rows and not one**, because with a single row *focused* and *unfocused* are the only states and a key that merely knew whether anything is focused would pass. **`rev` is named as not driven** — it needs a stream or a `settle(id, doc)`, neither reachable from a local handler, and a second invocation makes a new entry rather than a new revision. It is C14's axis and not one this cache had to decide; the row says so rather than letting its title imply coverage.
 - **T4.17d** (I58, C10 I11): `/theme light` → a render. **Its own session, because focus is stateful**: written as a fourth step of T4.17 it failed against working code, since after two `↓` the keys are going to the live block and the command never reached the prompt. `light` and not `dark` because the session starts dark and `setVariant` is correctly a no-op for the active variant (C10 T3.6) — the first draft failed on that too. Both are the fixture not responding to the thing under test, and the number each produced was indistinguishable from a key that omits the theme.
+- **T4.17e** (I71): the **key axis alone** — the camera store is nudged directly and the entry renders twice, and both renders happen. It goes deliberately **around** the binding, so the row can only be about the key.
+- **T4.17f** (I71): the **writer alone** — a key press moves the store, asserted on the store and rendering nothing. Its control is a nudge of zero, which must leave the key unchanged: a key that distinguished *moved by nothing* from *never touched* would miss on every frame while every correctness assertion still passed (`focusKey`'s own warning, and `ScrollOffsets.key`'s zeros clause).
+- **T4.17g** (I71): **the pair, end to end** — keystroke, frame, keystroke, frame, and the two frames differ. This is the row that matches what a reader does, and it is the one that **cannot discriminate**: it dies to either half being removed. Kept for what it asserts and named here for what it cannot, because a suite holding only this row would report *the pair is wired* and never say which half is not (T6.81, T6.82).
 - **T4.18a** (I58): `delete` drops one slot and leaves its neighbours. **The class, not the wiring**, and the row says so.
 - **T4.18b** (I58): `/clear` through the real graph drops every slot, asserted on **`size`** rather than on a render count. The first version of this row was inert and removing the arm left it green: an evicted or cleared entry is gone from the transcript and `visibleRows` never asks for it again, so a render count cannot see an eviction at all. The claim is about memory, and `Viewport.stats` is the precedent for making a cache's size observable (C14 T2.3b).
 - **The `evict` arm's wiring is not drivable and the gap is named rather than papered over.** C13's cap is 100,000 blocks (C13 I17) and `construct.ts` passes no cap — `createTranscriptStore` accepts one and only `retainPayloads` is threaded through — so reaching an eviction through the real graph would take 100,001 appends. `clear` exercises the same subscription in the same wiring; the `evict` branch inside it is covered by reading. A citation reads as coverage, and this is where that would have happened.
@@ -2042,6 +2093,8 @@ PTY harness.
 - **T6.42** (I58): dropping the theme identity from the key → T4.17's theme case fails, and `/theme light` repaints the chrome while the transcript keeps its dark colours. C03's `invalidate` still fires, which is what makes this survivable-looking: the *frame* is repainted from a cache that was not.
 - **T6.43** (I58): keying on `(entryId, rev)` alone — C14's key minus width, which is the key F90 proposed → T4.17's width case fails, and a resize redraws the transcript at the old wrapping.
 - **T6.44** (I59): deleting T4.19 → nothing fails, and that is the point of the row: it is the only executable statement that this stage leaves the first frame alone.
+- **T6.81** (I71): dropping the camera from the slot string → **T4.17e** fails and **T4.17f** passes. T4.17g fails too, which is why it is not the row this cites: the mutation that removes the key must be separable from the one that removes the writer, or the two are one assertion wearing two names.
+- **T6.82** (I71): removing the binding that nudges the store → **T4.17f** fails and **T4.17e** passes. The mirror of T6.81, and the pair of rows is the check that the pair of mutations is not asserting one thing. **A field with a key axis and no writer is `cursorPositions`** — correct, complete and unobservable — so the row that fails here is the one that says somebody can move it.
 - **T6.45** (I58): removing the `clear` arm from the subscription → T4.18b fails. **It did not fail the row this replaced**, which asserted a render count: the mutation was applied, the suite stayed green, and the survivor is what said the assertion was about the wrong thing.
 - **T6.38** (I55): handing C03 the same callback for `render` and `repaint` — which is what the tree did before this — → T4.14 fails, and a `SIGWINCH`, a `SIGCONT`, a handoff and a theme change all diff against a screen nobody knows. The mutation is a deletion of two lines and it restores a state in which C03's entire invalidation mechanism, and the comment in `frame-scheduler.ts` reasoning about it, reach nothing.
 - **T6.39** (I56): setting the record after the write instead of clearing it before → T4.15 fails. Nothing else does: every frame on a healthy path is identical under both orders, so this is a row about the fault path or it is not a row at all.

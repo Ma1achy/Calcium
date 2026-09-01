@@ -841,6 +841,49 @@ second arm and by nothing else:
 
 The seventh member this pass adds, `Annotation.fill`, is ruled in I52 and needs nothing here.
 
+#### `camera` — admitted by the second arm, and it is the INITIAL view
+
+```typescript
+camera?: Partial<Camera>;
+
+export type Camera = Readonly<{
+  azimuth: number;                            // radians, about the vertical axis
+  elevation: number;                          // radians, −π/2 below to +π/2 above
+  distance: number;                           // eye distance in world units
+  projection: "perspective" | "orthographic"; // `distance` is ignored by the second
+}>;
+```
+
+**It fails the first arm and the correction above is what admits it.** `plotHeight` is a
+function of `form`, `height`, `axes`, `legend` and `xTitle` (C12 I1) and not one of them moves
+with a viewing angle — so a camera changes **no cell of the layout**, which under the test as
+originally written would have refused it. It is admitted by the second arm: **the decision is
+the caller's alone.** No theme resolves where a reader is standing, and no renderer constant
+settles it — the same shape as `origin` and `align`, and for once the member is not even
+arguable as decoration, because there is nothing a palette could say about an azimuth.
+
+**It is the block's *initial* view and never the live one, and that is the whole of the
+member.** A block is data: it is built by a producer, cached by `rev`, windowed and re-rendered,
+and **a block that carried the live camera would move its own `rev` thirty times a second under
+an orbit** — every patch a document write, every write a cache eviction, and C13's store paying
+for a rotation. The live camera is view state and arrives the way focus and the scroll offset
+do, through `RenderContext` (C22 I71, C12 I83). This member says where the view *starts*.
+
+**`Partial<Camera>` rather than `Camera`**, because the four fields are independent statements
+and a caller who wants to look from above has not thereby chosen a projection. The renderer
+fills the rest from one exported default, so *a camera declaring only an elevation* and *the
+default with that elevation* are the same view rather than two.
+
+**Declared here rather than beside the renderer, and the layer is the reason.**
+`RenderContext` is L1 and this type is L0; L1 reads down and L0 never up. A `Camera` living in
+`presentation/plot/` would make this member an upward import — the one edge A02 §1 does not
+bend — so the type is declared where the block is and the renderer reads it.
+
+**What is refused, and it is the member somebody will ask for next.** No `orbit` field on the
+block. A block cannot declare that it animates: `measure` never sees `tick` (C09 I8) and a
+producer emitting *this plot rotates* would be a document making a claim about frames. Whether
+the camera moves is L4's, exactly as whether a spinner turns is (C22 I60).
+
 #### `calendarUnit` — the cell picks the grid, and the span was already sayable
 
 ```typescript
@@ -2182,6 +2225,7 @@ persisted document rests on.
 - **I72** — **The grid's two axes divide by `Share`, and a spanning region takes the sum of what it spans.** `columns` and `rows` are one entry per grid line rather than per child, so a region covering two columns is weighted by both; absent is an equal split, a mismatched length is refused on `flex`'s precedent, and fixed `{cells: n}` shares come off the budget before the weights divide the remainder because any other order makes a cell count a suggestion (I44). **The arithmetic is extracted and not copied** — one `divideShares` for the group's widths and both of the mosaic's axes — which is the four-gutter hazard of `presentation/plot/` named where it can still be avoided. **The vertical axis is the new half**: a column group has no height to divide, because its height is what its children measure; a mosaic declares one, so `rows` divides a known budget with the same rule against a different total. **The remainder is distributed after the division and not inside it** — `facetWidths`' ruling, because a mosaic tiles and its lines must reach the edge, while a `row` group has a gutter and T3.16 pins its remainder where it is; the leftover goes one cell each to the earliest non-fixed lines, so a cell count stays a cell count. **A shared scale across cells is refused and `yMin`/`yMax` are the answer** (I29), because harmonising means measuring both children's data before laying either out — a pass over content this layer does not read — and the field that says it already exists.
 - **I73** — **An image is a block that declares rows and carries bytes, an identity and an `alt`.** It measures, scrolls, degrades and caches like every other kind, which F247 and F248 established before it was designed: `cells(placeholder)` is 1, the diacritics add 0, Ink lays out what `cells()` measures, Ink re-emits the full frame on a one-row change, and both `truncate` and the window leave the grid addressing correctly. **`path` is the builder's arm and `data` is the block's**, because `node:fs` appears nowhere in `src/presentation/` and a renderer reading a file would make `measure` and `render` disagree the moment the file changed between them. **The identity is a digest computed once at construction, never the data** — a megabyte of base64 in a cache key costs more than it saves, and the digest is what the protocol keys transmission on, so two blocks of one image transmit once. **The width is derived from `columnsForAspect` and clamped by `measure`**, which receives the width: over-drawing here is worse than wrong, because a placeholder outside its rectangle addresses part of an image the terminal is not drawing there (C09 I35, F245). **Refused at both gates**, each naming its part: neither `data` nor `path`, both together, a non-positive `height`, an empty `alt`, bytes that are not a PNG, and a decoded size past a cap. **`alt` is required rather than optional** because at `imageProtocol: "none"` with no dither it is the whole of what the reader receives.
 - **I74** — **An overlay is a scalar field over an image's cell rectangle, and its rendering differs by arm.** At the dither this framework owns the glyph and the colour, so the braille cell carries the picture and the foreground carries the field, with C10's colormap and its 8-bit floor applying unchanged and **no rung beneath it**: the cell's other axis is spent on the picture, and a threshold-to-tone fallback would put a binary mask on screen wearing a continuous field's clothes. At `kitty` the cell's rendering is the terminal's — the two diacritics are spent on position and the 24-bit foreground on the image id — so the overlay is **composited into the pixels before transmission**, which gives up the palette and the degradation at `kitty` specifically and loses nothing, because there is nothing below `kitty` for it to degrade *to*. **The values are the author's resolution and never the cell grid's**, since the rectangle is a function of the render width; the resample averages, because a point sample turns a gradient into a staircase and can lose a single hot cell entirely. **The scale is `yMin`/`yMax` — the plot family's members, resolved by the plot family's function** (I29, §3h.4): independently optional, replacing rather than widening, collapsing to a constant on a reversed pin, and drawn mid-ramp at a zero span. `heatmap.ts` had already ruled that a field form spends those two on the **value** range rather than on the ordinate, and an overlay is a field form over a picture. A derived range is right for a single overlay and wrong for a set: §3h.3 measures the residual that a per-panel extent draws as loud as the panels it is the difference of, and `sharedRange` is what a set is read on — computed by `b.samples` across its items, on C24's surface for every other composition, and **a caller's own bound always wins**. **The picture's identity is not the image's** — `digest` keys the decode and `imageKey` keys the transmission, because two blocks of one image with different overlays otherwise transmit once and both draw the first, which is the wrong picture rather than none. **Refused at both gates from one function**: a non-rectangular or empty matrix, a non-finite value, an unknown colormap, a non-finite pin, and an alpha outside `0..1` (→ C09 I36, C10 I31, FINDINGS F251 · F252 · F253).
+- **I75** — **A plot's `camera` is the initial view, and the live one is not the block's.** It is admitted to `Plot` by the second arm of the widening test — the decision is the caller's alone, since no theme resolves a viewing angle and no renderer constant settles one — and **not** by the first, because `plotHeight` reads `form`, `height`, `axes`, `legend` and `xTitle` and a camera moves none of them (C12 I1). The member is `Partial<Camera>`, so a caller stating an elevation has not thereby stated a projection and the renderer completes it from one exported default; a partial view and the default carrying the same field are one view rather than two. **A block carrying the live camera would move its own `rev` under an orbit** — a document write per frame, an eviction per write, and C13's store paying for a rotation — so the live one is view state and reaches the renderer through `RenderContext` (→ C22 I71, C12 I83). The type is declared in this component and not beside the renderer, because `RenderContext` is L1 and a `Camera` in `presentation/` would make this member an upward import (A02 §1). **No `orbit` member**: `measure` never sees `tick` (C09 I8), so a block cannot declare that it animates, and whether the camera moves is L4's exactly as whether a spinner turns is (→ C22 I60).
 
 
 ## 7. Commitments
@@ -2262,6 +2306,7 @@ persisted document rests on.
 70. **A mosaic is a grid named by a string, refused four ways at both gates** (I71). It exists because every nesting of rows and columns is a slicing figure and the pinwheel is not one — measured, against a five-rectangle slicing control, so the difference is the figure and not the size. `height` is required because omitting it draws one blank row rather than a degenerate box, and `children` is the field name because the validator's recursion reads it structurally (→ FINDINGS F244).
 71. **The grid divides both axes by `Share`, with one arithmetic serving the group and the mosaic** (I72). A spanning region takes the sum of what it spans; fixed shares precede weights; a shared scale is refused with `yMin`/`yMax` named as the answer already built (→ I29, I44).
 72. **An image is a block, and the three things that make it one are the digest, the derived width and the builder's path** (I73). It measures before it draws, its identity is not its data, and its geometry is clamped rather than clipped — the mosaic's ruling one component over (→ C09 I35, I36, FINDINGS F247 · F248).
+74. **A plot declares where the view starts and never where it is** (I75). `camera` is `Partial<Camera>`, admitted by the widening test's *caller alone* arm rather than by its area arm — a viewing angle changes no cell of the layout and nothing but the caller decides it. The live camera is view state through `RenderContext`, because a block holding it would move its own `rev` thirty times a second under an orbit (→ C22 I71, C12 I83). The type lives here because L0 may not import L1, and there is no `orbit` member because a block cannot declare that it animates (→ C09 I8, C22 I60).
 73. **An overlay is a field on the image whose rendering differs by arm** (I74). Placed at the dither, composited at `kitty`, and the split is a mechanism rather than an arrangement — the one thing in phase 2 that is. Its declared scale is what a set of panels shares, and its identity is the picture's rather than the image's (→ C09 I36, C10 I31, FINDINGS F251 · F252 · F253).
 
 ---
@@ -2302,6 +2347,8 @@ The generic suite. **These run against every registered block kind, including ap
 
 - **T2.1** (I7, the headline): for every registered kind × a fixture corpus × widths {40, 60, 80, 100, 120, 160, 200}, `measure(block, w)` equals the line count of the rendered output at width `w`. This is the single most valuable test in the system.
 - **T2.2** (I7): `measure` is pure — a hundred repeat calls return the same number and perform no I/O.
+- **T2.4c** (I75, C12 I1): `measure` is **identical across every camera** — the same block at eight `(azimuth, elevation, distance, projection)` values measures one number, and the assertion is over the *set* rather than against a first element. **The degenerate values are in the set on purpose**: elevation at exactly ±π/2 and `distance: 0` are where a projection divides by zero, and a height that survived the general case by returning early would pass a row built only from comfortable angles.
+- **T2.4d** (I75): a `Partial<Camera>` stating one field and the default carrying that field render **byte-identically** — the completion is total, and there is one default rather than a per-site `??`. Its control is a *different* value in the same field, which must differ; without it the row passes on a renderer that ignores the member entirely.
 - **T2.3** (I7): `measure` is total — a corpus of malformed, empty and adversarial blocks (empty rows, zero-length strings, null-ish fields, 10,000-character cells) produces a number, never a throw.
 - **T2.4**: `measure` is monotone — appending a row to any collection block never decreases the result.
 - **T2.5**: `measure` never returns a negative or non-integer value, at any width including 1.
@@ -2401,6 +2448,7 @@ The generic suite. **These run against every registered block kind, including ap
 - **T6.27** (I46): dropping the finiteness check back to `typeof === "number"` → T2.19 fails, and `NaN` persists as `null` under a validator that agrees twice.
 - **T6.28** (I46): checking that a numeric array *is* an array without checking its elements — the state that shipped → T2.19 fails on `Cell.spark`.
 - **T6.29** (I64): eleven mutations in `c04-hierarchy.mjs`, all caught — each clause of the walk dropped in turn (→ `HG1`), the bound removed (→ `HG3`), the form refusal removed (→ `HG2`), and the path replaced by the block's (→ `HG1`). **The eleventh is the one HG5 exists for**: the treemap stopping reading its own hierarchy → `HG5` fails and nothing else does, because a record mutated in `types.ts` is invisible to a row that reads frames and is caught by `HG2` instead. The two rows are not one row. *The guard it mutates appears twice in `definition.ts` verbatim, so the anchor is the function it sits in — F219's class, one commit after it was filed.*
+- **T6.30** (I75): giving `Plot` an `orbit` member and letting a block declare that it animates → nothing in this component fails, and that is the row. **The refusal is checked one component up** (C09 I8 — `measure` never receives `tick`), so the mutation is recorded here with the file that would catch it named, rather than left reading as covered by a rule that does not reach it.
 - **T6.16** (§4b): freezing inside C24's `b` as well as in the constructor → T1.18 fails on the spy count.
 
 ---

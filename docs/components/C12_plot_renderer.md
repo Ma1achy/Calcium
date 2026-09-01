@@ -7415,6 +7415,122 @@ cannot see a value that arrives through a transform**, which is what this whole 
 ---
 ---
 ---
+## 3al. The camera — where it arrives from, what it may not touch, and the grid it projects into
+
+**`docs/notes/CALCIUM_3D_DESIGN.md` carries the design and this section carries the contract.**
+The rung was measured rather than assumed (F431) and the dither was refused rather than ported
+(F433); what follows is only the part this component is bound by.
+
+### It is context, and it is a record rather than a value
+
+**C12 owns no state** (I11), so the live camera cannot be here. The block declares where a view
+**starts** (C04 I75) and `RenderContext` carries where it **is**, exactly as focus and the scroll
+offset do.
+
+```ts
+cameras?: Readonly<Record<string, Camera>>;   // by block id, absent is the block's own
+```
+
+**A record and not a value, and the reason is a document rather than a plot.** Two 3D plots can
+sit in one document — a loss landscape beside its parameter sweep is the obvious pair — and a
+camera threaded down the tree as a scalar would give them one view, so orbiting either would
+turn both. That is `scrollOffsets`' own shape and its own reason: *a record the container looks
+itself up in rather than a value threaded down*.
+
+**The axis and its writer are C22's and they are one commitment** (C22 I71). Nothing here is
+observable until something in `src/` can move a camera, and a context field with no writer is
+`cursorPositions` — read in one place, written by nothing, correct and unobservable together
+(§3s). This component states what it draws; C22 states that somebody can change it.
+
+### Geometry is invariant under the camera, and `measure` cannot see it at all
+
+**`plotHeight` reads `form`, `height`, `axes`, `legend` and `xTitle`** (I1, `height.ts`'s
+`PlotGeometry`) and a camera is none of them, so **the same block is the same number of rows at
+every viewing angle**. That is not a courtesy: a plot whose height moved as it turned would move
+every block below it thirty times a second, which is the failure I1 exists for arriving through
+a new door.
+
+**And it is structural rather than asserted.** `measure` is `(block, width)`; the camera reaches
+only `render`, so deriving a height from it is unspellable in the same way `PlotGeometry` makes a
+height from the series unspellable. `tick`'s treatment exactly (I8) — appearance animates,
+geometry never does.
+
+**The width, too — and here the camera forces a ruling rather than inheriting one.** A cartesian
+form spends `AXIS_GUTTER` on a fixed left column of labels. **A 3D form has three axes, two of
+them not vertical, and every label moves as the camera turns** — so a gutter is the wrong shape
+for them and they are drawn *inside* the plot area, billboarded at their projected anchors. So a
+3D form's `HAS_Y_GUTTER` is `false` and it spends no `AXIS_GUTTER`, which is the same answer the
+matrix family gives for a different reason.
+
+### The sample grid — a rule, and every number in the note is a measurement of it
+
+```
+                 across            down          at 80×24      at 120×30
+braille          cells × 2         cells × 4     160 × 96      240 × 120
+half blocks      cells × 1         cells × 2      80 × 48      120 ×  60
+```
+
+**`80×48` is not a constant and must not be read as one.** It is the grid at the size the
+measurement ran in. The projection scales to the sample grid, the grid to the block, and the
+block to whatever region it is given — the chain every raster in this component already uses.
+
+**The depth buffer is `Float32Array(sampleWidth × sampleHeight)`, allocated per render.** I11
+forbids state that *survives* a render and permits a local, and this is why the distinction
+matters rather than being pedantry: a module-level buffer would be exactly the state I11
+forbids, and would also be the wrong size the first time a region changed. About 60 KB at
+120×30, and the figure moves with the region rather than being a budget.
+
+### The shading model — one sample carrying both, and the disambiguation is an OPEN MEASUREMENT
+
+**The design note used to claim two independent channels and that claim is retracted** (F436).
+It is restated here as what it now is, because the retracted version's natural home is a spec
+section and a reader who does not find the correction here will find the claim there.
+
+```
+                       on the dot grid                       on this rung
+field (or height)  →   the palette      → COLOUR         →   the palette   ┐
+face normal · light →  intensity 0..1   → GLYPH DENSITY  →   intensity     ┘  ONE sample
+```
+
+**On the dot grid the two were genuinely independent, because a cell had two carriers**: a
+foreground colour and a glyph chosen from a density ramp. A half block has **one carrier per
+sample**, so the shading multiplies the colour and a dark sample is a low field value **or** a
+face turned away, with nothing in the picture to say which.
+
+**And the collision is worst on the map chosen to avoid collisions.** A perceptually uniform
+colormap makes lightness monotonic in the value — that is what viridis is *for* — so multiplying
+it by a Lambertian term puts the field and the slope on one perceptual axis by construction.
+
+**This is deliberately not an invariant, and the reason is the same one A03 §2 gives about
+vacuity.** Its subject does not exist: there is no surface renderer, no member carries a second
+reading, and an invariant here would hold trivially while reading as settled — which is exactly
+how the retracted claim survived a rewrite. So it is a **question owed at step 6**, with its
+candidate and its falsifier written down now:
+
+| | |
+|---|---|
+| the candidate | hue and chroma carry the field, lightness carries the shading |
+| how it is settled | a measurement against two references per form — a terminal implementation and matplotlib — looking at the images, not at an error metric |
+| what would falsify the candidate | a terminal's quantisation collapsing the chroma at 8-bit, where the 26-grey ramp has no chroma at all |
+| the outcome if it fails | **one reading, and the caller picks which** — no member is added, and `colourBy` already has the shape |
+
+**No axis is added to `Encoding` either way.** `ladderFor` is over `LadderAxis`, which is
+`Extract<Encoding, "height" | "density">` — **two** of `Encoding`'s four — and `Serves` is a
+`Record` over them, so widening it is a compile error at every existing ladder. The half-block
+rung is colour rather than a ladder step, so nothing here touches either.
+
+### Two more rulings the camera forces
+
+**Orbit and the readout cursor are mutually exclusive.** A moving camera and a fixed sample index
+disagree about what the reader is pointing at, so orbit pauses while the cursor is active. It is
+recorded now and it is **not testable until the orbit exists** (step 8), which is said here rather
+than left as a row that passes by having no subject.
+
+**Nothing animates through `measure`.** A block cannot declare that it orbits (C04 I75), for
+`tick`'s reason: whether a picture moves is L4's, exactly as whether a spinner turns is.
+
+---
+
 ## 3q. One value axis across the bands, and the record it never had
 
 **This section is written because three code comments cite it and it did not exist.** The
@@ -8677,6 +8793,8 @@ orientation — and belongs in the classification table as its own rows.
 - **I80** — **A member that resolves a competition for one cell is legitimate where both answers fit at once.** `plotBox` chooses how a **one-row** box spends its single row — on mass, or on a stroke heavier than the whisker — because at `plotDetail: "compact"` the box has no top or bottom edge to carry the range (I46). At the default detail it decides nothing, and in the second arm it decides nothing either: the IQR box there is `fill-opacity="0.35"` **and** `stroke-width="1.5"` in one rect, so it carries both. *Measured before the rule: `boxplot/compact-box-solid` and `boxplot/compact-box-line` draw `███` against `━━━` in the terminal and byte-identical documents here* (F365, C12 §3ak.46). **A second kind of `legitimate`**: F355's four are legitimate because each **is** a quantity in cells; this is a **choice forced by** cells, found by asking why a choice exists rather than what unit it is in. **Stated blind spot**: it says nothing about a member that is blocked rather than legitimate — `plotFill` chooses fill against outline for a density, which a pixel curve can also do, and it has nowhere to be read until `violin` draws. That is a dependency, and a remainder that mixes the two reports the wrong amount of work.
 - **I81** — **What a callout says crosses; the rung that degrades it and the row it lands on do not.** `yCallout` writes a name or a reading at each series' end, and the second arm read none of it — it drew a legend instead, the *same* legend for all three callout variants. **And the legend clause was in one resolver and not the crossed one**: `legendPlacement` has carried *a name at the line's end **is** the legend* since §3ag and `legendOf` had not, so this arm drew a legend the terminal removes and would have drawn it beside the callouts — the identity three times. I48's sentence **selects** rather than excludes, which is what lets one clause serve both. **Three things were in one function and one of them crosses**: the strings (`calloutOf`), the capability rung (below the colour floor the family stacks into labelled strips, so a name there is a third copy — applied *over* the strings), and the anchor (`lastInkRow` in cells, the last point of the last polyline here — the same question in two units, as I78 said one member earlier). *Measured before the rule: `line/callout-last`, `callout-name` and `callout-both` drew one document; the terminal draws three, and moving the strings moved 0 of 1840 terminal frames* (F349, F368, C12 §3ak.47). **Stated blind spot**: it says nothing about *where* a callout may go when two series end on the same row — the terminal has a collision rule and this arm stacks text at the same y, which no corpus variant exercises.
 - **I82** — **A member crosses as what must not be decided twice, and each arm keeps the room and the arithmetic.** `xTitle` crosses as the *words* — the terminal spends a row on the caption and the second arm spends pixels — and `axisCross` as *whether the rules cross*, because `positionAxisAt`'s `zeroAt` and `normalisedOf(0)` are the same question in two units and only a domain **strictly** straddling zero has a crossing (§3ad A4). Forwarding `axisCross` itself would make the second arm re-derive which of its values means cross. *Measured before the rule: `line/x-title` and `line/x-captions` drew one document, and `axisCross` at `unset`, `"zero"` and `"edge"` drew one* (F369, F370, C12 §3ak.48). **Stated blind spot**: the reader map that found these counted **names in `svg.ts`**, not values reaching the arm — `calendarUnit` and `startDate` had crossed since F322 through `drawnBlock` and were counted owed for six commits, because a grep over names cannot see a value arriving through a transform.
+- **I83** — **The camera reaches the renderer through `RenderContext`, as a record by block id, and no geometry may read it.** C12 owns no state (I11), so the live camera is view state and the block declares only where a view starts (C04 I75). **A record rather than a value**, because a document can hold two 3D plots and a scalar threaded down the tree would give them one view — `scrollOffsets`' shape and `scrollOffsets`' reason. **Geometry is invariant under it and structurally so**: `plotHeight` reads `form`, `height`, `axes`, `legend` and `xTitle` (I1) and `measure` is `(block, width)`, so a height derived from a viewing angle is unspellable rather than merely forbidden — `tick`'s treatment (I8). **The width is ruled and not inherited**: a 3D form's three axis labels move as the camera turns, so they are billboarded inside the plot area rather than written in a fixed gutter, and the form spends no `AXIS_GUTTER`. Nothing here is observable until something can move a camera, which is why the axis and its writer are one commitment elsewhere (→ C22 I71).
+- **I84** — **The sample grid is derived from the block and the rung, and the depth buffer is allocated per render.** `width × 1` by `height × 2` on the half-block rung and `width × 2` by `height × 4` on braille; `80 × 48` is the grid at the size the measurement ran in and **not a constant**, so every absolute figure in `docs/notes/CALCIUM_3D_DESIGN.md` is a measurement at 80×24 rather than a threshold. The depth buffer is `Float32Array(sampleWidth × sampleHeight)` **allocated per render**: I11 forbids state that survives a render and permits a local, and the distinction is load-bearing rather than pedantic — a module-level buffer is exactly the forbidden state *and* is the wrong size the first time a region changes. **The shading model is one sample carrying both readings, and whether they can be separated is an open measurement rather than a rule** (§3al, F436): the two-channel claim was a property of the dot grid's two carriers, it is retracted, and it is deliberately not stated as an invariant because its subject does not exist yet.
 
 
 ## 8. Commitments
@@ -8762,6 +8880,8 @@ orientation — and belongs in the classification table as its own rows.
 79. **A remedy that removes a state is not a fix for a wrong value in it** (I79, C12 §3ak.45). The second arm's `return null` on an empty figure was written against a real defect — *five gridlines labelled 0 to 1 over an empty box, a plot of a range the block never had* — and it fixed the false axis by deleting the difference between *no data* and *not supported*, which F259 says are the two things a refusal must keep apart. `line/empty` and `violin/default` were byte-identical. **The half the comment earns is kept**: an empty figure draws no axis, because there is no range for one to be about. And `emptyMessage` could not have crossed first — a member with no corpus instance has nowhere to be read while the whole state is a `null` (F259, F355, F363).
 80. **A remainder that does not separate *undecided* from *blocked* reports the wrong amount of work** (I80, C12 §3ak.46). F355 owed eleven members and paired `plotFill` with `plotBox` under one note — *every variant is a `violin`, which this arm refuses*. `plotBox` is the **boxplot** form's, read at two sites inside `boxplot:`, so a fixture was buildable all along and the corpus placement was an accident; built, it is **legitimate**, because a one-row box spends its single row on mass or on a stroke and a pixel box carries both in one rect. `plotFill` is violin-only and *does* have a meaning here — a pixel density can be filled or stroked — so it is **blocked on a form**, which is a dependency and not a decision anybody owes (F355, F365).
 81. **A rule written into one resolver and not the crossed one draws the picture the other arm removes** (I48, I55, I81, C12 §3ak.47). `legendPlacement` has held *a name at the line's end **is** the legend* since §3ag; `legendOf` never did, so the second arm drew `alpha` and `beta` in a legend the terminal deliberately removes — identically for all three callout variants, which is what a member with no reader looks like from outside. **Only the strings cross**: the capability rung stays where the capability is, and the anchor is each arm's own, a cell row against a pixel y. 1840 terminal frames moved 0, which is what separates an extraction from a second derivation (F349, F368).
+83. **The camera is context, by block id, and geometry cannot see it** (I83). A record rather than a value, because two 3D plots in one document must not turn together; invariant for `plotHeight` **structurally**, because `measure` is `(block, width)` and a camera is not in it; and a 3D form's labels are billboarded inside the area rather than written in a gutter, because three axes turn and a gutter is a fixed column. Observable only once something can move it, which is one commitment along (→ C22 I71, C04 I75).
+84. **The sample grid is derived and the depth buffer is per render** (I84). `width × 1` by `height × 2` at the half-block rung, `× 2` by `× 4` at braille, and `80 × 48` is a measurement of that rule at 80×24 rather than a number to hardcode. The buffer is local because I11 forbids a survivor — and because a module-level one is the wrong size the first time a region changes, which is the failure a purity argument alone would not have predicted. **The shading is one sample carrying both readings**, the two-channel claim is retracted (F436), and its replacement is an open measurement at step 6 rather than an invariant with no subject.
 82. **A reader map counts names and a rendered comparison counts readers** (I82, C12 §3ak.48). Eleven members came back `svg=0` and it was read as *the arm does not read it*; `calendarUnit` and `startDate` had crossed since F322 through `drawnBlock` → `calendarRows`, and five blocks differing only in them draw **five distinct documents**. F355's member sweep shares the blind spot, reading the type against the files. The genuinely owed two cross as **what must not be decided twice** — the caption's words, and *whether* the rules cross — with the room and the arithmetic staying in each arm, and their fixtures went through the collision sweep **before** either member was touched (F322, F369, F370).
 
 ---
@@ -8783,6 +8903,12 @@ Six tiers. No state machine — C12 is pure over the block.
 - **HZ5** (I52, I16): a reading at the range minimum draws ink. **A fixture that can respond to it first**: `sin50` reaches its minimum at two adjacent columns in three shipped frames, which is where the two-cell break came from.
 - **HZ6** (I52, I19): `legend: false` on a horizon is refused at both gates, **with both controls** — a diverging map is accepted and a sequential one is accepted on unsigned data, because a refusal that fires on everything refuses nothing.
 - **HZ7** (I52, §3z H7): the legend row is declared, spent and drawn — `plotHeight` accounts for it, the rendered frame is that many rows, and the last of them is the scale. **The row the mutation pass asked for**: setting `FURNITURE_ROWS.horizon` to 0 leaves the grid untouched, so every geometry row passes while `composeRows` cuts the scale off the bottom. A test that calls the mechanism misses the wiring.
+- **CAM1** (I83, I1): `plotHeight` and `measure` are **identical across every camera** — one block at eight `(azimuth, elevation, distance, projection)` values, asserted over the **set** and not against element zero. The degenerate values are in the set on purpose: elevation at exactly ±π/2, `distance: 0`, and both projections. A collapse-onto-zero mutation survives a row that checks the first member.
+- **CAM2** (I83): two 3D plots in one document, given different cameras, render **differently from each other** — and each renders identically to the same block alone at that camera. The row that fails on a scalar threaded down the tree, which no document holding one plot can see.
+- **CAM3** (I83, I8): the camera is unreachable from `measure` — **structural**, asserted on the signature and on `PlotGeometry`'s `Pick`, not on a rendered number. A row asserting *the height did not change* is satisfied by a renderer that reads the camera and happens to return the same value.
+- **CAM4** (I84): the sample grid is `width × 1` by `height × 2`, measured at **three widths × two heights**, and the braille arm is `× 2` by `× 4` at the same six. The control is that the two arms disagree, which is what says the row is reading a grid rather than a constant.
+- **CAM5** (I84, I11): the depth buffer does not survive a render — the **second** render of one block at a new camera equals a fresh render at that camera. Asserted on the second, because a module-level buffer is correct on the first by construction.
+- **CAM6** (I83, §3al): orbit pauses while the readout cursor is active. **Owed at step 8 and not written now** — the orbit does not exist, so the row would pass by having no subject, which is the vacuity this suite has recorded three times.
 - **YA1** (I47): `yAxis: "both"` renders the same tick values on both sides, from **one** `yLabels` call — asserted as equality of the two label sets rather than as each being correct, which is the half a per-side assertion cannot see.
 - **YA2** (I47): `yAxis: "right"` draws no left label column and the plot area starts where the border does; the labels are the same strings `"left"` puts on the other side, at the same rows.
 - **YA2b** (I47): at `yAxis: "right"` the left border is `│` on every row and never `┤`, with the converse asserted on the same fixture with the axis left. **The row the mutation pass asked for**: YA2 compares the gutters' *contents*, which are empty on that side either way, so it passes against a border still drawing a stub that points out at a column zero cells wide.
@@ -9050,6 +9176,10 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T6.17** (I24): the gutter measuring or padding against a default `ambiguousWidth` → T3.17 fails, and the axis bends by one cell on the labelled row only. **One row and not two**, because either half alone produces it: the budget and the drawing disagreeing is the failure, and which of them moved is the diff's job.
 - **T6.18** (I15, I22): `yLabels` calling `niceAxis` instead of `axisFor` → S9 fails, and a log plot is labelled linearly. Invisible from the block: `positionalForm` picks the right ticks and reads only `.range` off them, so the correct set is computed and discarded while the labels are derived a second time from the linear arm.
 - **T6.21** (I34, I11): replacing the jitter hash with a counter → T1.71 fails, and the same block renders differently on its second draw. **Nothing else sees it**: every width, row-count and glyph-set assertion passes against a moving strip, because each render is internally consistent and only the pair disagrees.
+- **T6.71** (I83, I1): letting `plotAreaRows` read the camera — a 3D form whose rows follow its elevation → **CAM1** fails at the degenerate angles and passes at the comfortable ones, which is why CAM1 asserts over the set rather than against a first element.
+- **T6.72** (I83): threading the camera as a scalar rather than a record → **CAM2** fails and CAM1 passes. Two 3D plots in one document turn together, which is correct-looking on every document holding one.
+- **T6.73** (I84): hardcoding the sample grid to 80×48 → **CAM4** fails at every width but 80 and every height but 24. The row that would pass on the fixtures the measurement was taken with, which is why CAM4 crosses three widths and two heights.
+- **T6.74** (I84): hoisting the depth buffer to module level → **CAM5** fails. It is the optimisation the design already refuses and the one a profile invites; the row asserts the *second* render rather than the first, because a surviving buffer is right the first time by construction.
 - **T6.31** (I36): dispatching candlestick through `styleRasteriser` → CS1 fails, and the `Rasteriser` type describes a function that ignores the argument it is keyed on.
 - **T6.30** (I35): computing each band's bounds from its own samples → T1.98 fails, and three distributions of different spread draw one shape with every count agreeing.
 - **T6.29** (I34): choosing the rung from each band's own width rather than from the narrowest → T1.97 fails, and a chart whose band count does not divide its width draws two different figures with the boundary set by the remainder.
