@@ -1,5 +1,35 @@
 # `plot3d` — a 3D renderer for the terminal
 
+> **RULED BY MEASUREMENT — F431. Read this before the design.**
+>
+> The premise below — *a braille dot is square, so a projection into the dot grid needs no
+> aspect correction* — was measured against the repo's own cell box (`8.41 × 16`) and against
+> the two alternatives, one surface and one teapot-shaped solid, at 80×24 cells:
+>
+> | arm | samples | what it shows |
+> |---|---|---|
+> | braille | 160×96 binary + 80×24 colour | a smudge — the rings gone, no lid seam, no volume |
+> | half block `▀` | 80×48 full colour | every structure the image arm has |
+> | image protocol | 673×384 full colour | the form, with detail |
+>
+> **Inside the outline the braille channel is a constant**: 6931 of 7254 lit dots are interior
+> and every one of them is on, so 95% of the dot grid carries nothing and the whole interior is
+> the 80×24 cell colours. Four numbers said the dot grid held it — 0.3% and 1.5% silhouette
+> disagreement, the handle's hole four dots clear, 163 shade levels of 186 — and the picture
+> disagreed with all four.
+>
+> **The premise is true and buys nothing.** A braille dot is `4.205 × 4.0` px, 1.051 : 1, and a
+> half-block cell is `8.41 × 8.0` — *the same ratio*. The aspect is a property of the cell, not
+> of braille.
+>
+> **So: 3D is a terminal form, on the half-block rung.** C09 commitment 35 had already ruled it
+> for images — *a half block spends a cell on two full colours where braille spends it on eight
+> dots, so a photograph arrives as a photograph and a diagram is better served one rung down* —
+> and a shaded 3D render is a photograph. The depth buffer is **80×48**; **shading is the primary
+> channel and the silhouette is not**, which inverts this design's emphasis rather than trimming
+> it; §11–§12's costs are about the wrong rung.
+
+
 **The refusal was wrong and it was wrong for a stated reason.** *A novelty, not a tool* is a
 fit argument asserted without checking whether it holds — and it does not: a 3D scatter of an
 embedding space and a surface plot of a loss landscape are both things people screenshot,

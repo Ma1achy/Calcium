@@ -13860,6 +13860,90 @@ terminal did not change, and the gap between those two is the whole finding.
 
 ---
 
+## F431 — 3D is a terminal form, and the design note put it on the wrong rung ★★★★★
+
+**The premise was *a braille dot is square, so a projection into the dot grid needs no aspect
+correction — every other terminal 3D attempt fights this and this one gets it free*.** It is
+true, it is off by 5%, and it is irrelevant. Measured before the design was read, which is the
+order this was asked for.
+
+### The three arms, one screen area of 80×24 cells
+
+```
+braille        160×96 binary dots  +  80×24 cells of 24-bit colour
+half block ▀    80×48 full-colour samples
+image proto    673×384 full-colour samples          (80 × 8.41, 24 × 16)
+```
+
+`8.41 × 16` is the repo's own frame renderer's cell box (`catalogue-png.mjs`), so the comparison
+is against the thing that draws every catalogue sheet rather than against an assumed cell.
+
+### What the numbers said, and they were wrong about the picture
+
+| | surface | teapot |
+|---|---|---|
+| dot-grid silhouette against the pixel truth | 24 of 7271 disagree (**0.3%**) | 31 of 2044 (**1.5%**) |
+| the handle's hole | — | **4 dots** clear, against 5.5 dots' worth of pixels |
+| distinct shade levels emitted | 163 terminal · 186 image | 145 · 186 |
+
+Every one of those says the dot grid holds it. **The frame is a smudge**: the surface's rings are
+gone and it reads as a flat lozenge with a bright patch; the teapot reads as a round thing with a
+handle, no lid seam, no volume.
+
+### The measurement that explains it, and it is one line
+
+```
+surface   7254 dots lit ·  323 on the boundary (4.5%)  ·  6931 interior, every one of them on
+teapot    2021 dots lit ·  219 on the boundary (10.8%) ·  1802 interior, every one of them on
+```
+
+**Inside the outline the braille channel is a constant.** Every interior dot is lit, so 89–96% of
+the dots carry nothing; the whole of the interior — which is where a 3D form lives — is the
+**80×24 cell colours**, 1/8 of the dot grid and 1/135 of the image arm.
+
+**So the silhouette metric was measuring the one thing that was fine.** A 3D form is not its
+outline: the lid seam, the shoulder, the trough of a ripple are shading discontinuities, and
+shading is the coarse channel. *Containment is not correctness* arriving at a resolution
+argument — the boundary agreed to 1.5% and the interior was never asked.
+
+### The ruling, and the repo had already written it
+
+**C09 commitment 35 (I37):** *"A half block spends a cell on two full colours where braille spends
+it on eight dots, so a photograph arrives as a photograph and a diagram is better served one rung
+down."* That sentence is about images. **A shaded 3D render is a photograph**, and nobody had
+applied it, because the note predates the ladder.
+
+Rendered: the half-block arm at **80×48 — a quarter of the braille arm's samples** — shows the
+teapot's lid seam, its knob, its spout and an open handle hole, and the surface's cone, trough and
+outer ripple. Every structure the image arm has. The braille arm has none of them.
+
+**So the cell grid holds the silhouette and 3D is a terminal form — on the half-block rung.**
+
+### The premise is true and buys nothing, which is the reusable part
+
+A braille dot is `4.205 × 4.0` px — **1.051 : 1**, not square, 5% out. And a half-block cell is
+`8.41 × 8.0` — **the same 1.051 : 1**. So the aspect the note treats as braille's advantage is a
+property of the *cell*, and every rung on the ladder has it. **A correct sentence justifying the
+wrong decision**, which review cannot catch because the sentence is true (MG24's shape, in a
+design note rather than a rule).
+
+### What this moves in `docs/notes/CALCIUM_3D_DESIGN.md`
+
+- The depth buffer is **80×48**, not 160×96.
+- **Shading is the primary channel and the silhouette is not**, which inverts the design's
+  emphasis rather than trimming it.
+- §11–§12's animation costs are about the wrong medium — the errata already said so and gave the
+  wrong reason: not because 3D became an image form, but because the rung changed.
+- The `Serves` question does not arise. The half-block rung is colour, not a ladder step —
+  and the errata's ordinal is about `Serves`, which is `Record<LadderAxis, boolean>` over **two**
+  axes, while `Encoding` has four (`position | height | density | fill`). Measured, not inferred.
+
+**Method note.** Eleven findings in docker-tui's step 8 and not one came from a test written to
+look for it. This is the same table: four numbers agreed, and the finding came from looking at
+the picture.
+
+---
+
 ## F430 — MG27 stops reading a type at its first nested member, and reports the inverse ★★★★★
 
 **Found by adding a field, and the message was the opposite of the truth.** Two new `Table`
