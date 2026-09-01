@@ -416,6 +416,18 @@ function plot(
     yAxis?: Plot["yAxis"];
     yCallout?: Plot["yCallout"];
     vectors?: Plot["vectors"];
+    /** A 3D scatter's cloud, and the channel colour spends (C04 I76, C12 I87). */
+    points3?: Plot["points3"];
+    colourBy?: Plot["colourBy"];
+    /**
+     * Where the view starts (C04 I75).
+     *
+     * **Held back until a form could use it**, and the reason was sharper than
+     * *not yet built*: a plot declaring a camera becomes focusable (C12 I85), so
+     * exposing it earlier handed callers a way to add a focus stop to a 2D plot
+     * and no way to draw anything. `scatter3d` is what released it.
+     */
+    camera?: Plot["camera"];
     levels?: Plot["levels"];
     layers?: Plot["layers"];
     fieldDim?: Plot["fieldDim"];
@@ -504,7 +516,7 @@ function plot(
     yScale?: Plot["yScale"];
   },
 ): Plot {
-  const { quartiles, categories, segments, bands, graph, graphLayout, series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, vectors, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, xTitle, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, treeLayout, matrixAnchor, legend, plotFrame, width, aspect, align, origin, axisCross, calendarUnit, startDate, layout, binning, offsets, totals, facets, emptyMessage, xScale, yScale } =
+  const { quartiles, categories, segments, bands, graph, graphLayout, series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, vectors, points3, colourBy, camera, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, xTitle, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, treeLayout, matrixAnchor, legend, plotFrame, width, aspect, align, origin, axisCross, calendarUnit, startDate, layout, binning, offsets, totals, facets, emptyMessage, xScale, yScale } =
     spec;
   // **The same refusal the validator makes** (C04 I50a). Two expressions of one
   // rule, which is this file's shape throughout: the constructor is where an
@@ -781,6 +793,35 @@ function plot(
           `draws, and "series" carries one number per cell`,
       );
     }
+    // **`vectors`' four refusals, one dimension along** (C04 I76). The
+    // *member* rules are here and in the validator; the walk over every point
+    // for a finite `value` is the validator's alone, exactly as `vectors`'
+    // rectangularity is — a statement about members belongs at both gates and a
+    // walk over the data belongs at the one that reports rather than throws.
+    if (points3 !== undefined && drawn !== "scatter3d") {
+      throw new TypeError(
+        `b.plot: "points3" on form "${drawn}" (C04 I76) — only a scatter3d draws a point ` +
+          `cloud, and three coordinates per sample mean nothing to any other form`,
+      );
+    }
+    if (drawn === "scatter3d" && points3 === undefined) {
+      throw new TypeError(
+        `b.plot: form "scatter3d" has no "points3" (C04 I76) — a point cloud is what it ` +
+          `draws, and "series" carries one reading per position`,
+      );
+    }
+    if (colourBy !== undefined && drawn !== "scatter3d") {
+      throw new TypeError(
+        `b.plot: "colourBy" on form "${drawn}" (C04 I76) — it names which of three readings ` +
+          `colour carries, and no other form has three competing for it`,
+      );
+    }
+    if (drawn === "scatter3d" && axes === true) {
+      throw new TypeError(
+        `b.plot: "axes" on form "scatter3d" (C04 I76) — three axes turn with the camera and ` +
+          `are drawn inside the area, so there is no gutter and no bottom rule to switch on`,
+      );
+    }
     if (levels !== undefined && drawn !== "contour") {
       throw new TypeError(
         `b.plot: "levels" on form "${drawn}" (C04 I61) — only a contour draws iso-lines, ` +
@@ -815,6 +856,9 @@ function plot(
       ...(yAxis === undefined ? {} : { yAxis }),
       ...(yCallout === undefined ? {} : { yCallout }),
       ...(vectors === undefined ? {} : { vectors }),
+      ...(points3 === undefined ? {} : { points3 }),
+      ...(colourBy === undefined ? {} : { colourBy }),
+      ...(camera === undefined ? {} : { camera }),
       ...(levels === undefined ? {} : { levels }),
       ...(layers === undefined ? {} : { layers }),
       ...(fieldDim === undefined ? {} : { fieldDim }),

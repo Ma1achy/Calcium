@@ -128,7 +128,15 @@ describe("C12 I86 — the projection's degenerate cases", () => {
     // **The plane is built from the basis**, spanned by `forward` and a
     // direction halfway between `right` and `up`: it therefore contains the eye
     // — which is what edge-on means — and its image is diagonal.
-    const basis = basisOf(CAMERA_DEFAULT, ASPECT(80, 24));
+    //
+    // **The camera is pinned rather than defaulted, and F440 is why.** This row
+    // built its plane against `CAMERA_DEFAULT` and spans +/-3 along the view
+    // axis, which was comfortably inside the frustum at a distance of 10 and put
+    // one control point **behind the near plane** the day the default became 6.
+    // Nothing about the projection changed; a framing constant moved under a
+    // geometry fixture. The rules this row asserts do not depend on where the
+    // default camera stands, so it says where its own stands.
+    const basis = basisOf({ ...CAMERA_DEFAULT, distance: 10 }, ASPECT(80, 24));
     const h = Math.SQRT1_2;
     const d: Vec3 = {
       x: basis.right.x * h + basis.up.x * h,

@@ -127,6 +127,10 @@ type Record_ = "refused" | Claimed;
  * described. `line` at 16 of 86 is the `ohlc` and non-default-`origin` variants.
  */
 const MEASURED = {
+  // **`SVG_FAMILY.scatter3d` is `null` and the reason is ruled** (C12 §3am):
+  // no emitter carries a projection, and routed through `scatter` it would
+  // draw the x and y of a 3D cloud as a flat one and report as supported.
+  scatter3d: "refused",
   // **`line.interiorRules` went 68/70 to 70/70 when the SVG's axis became the
   // figure's — a disagreement WIDENING, and the record says so rather than
   // rounding it toward the story.** The tick count is `ticksFor(areaRows)` now
@@ -582,7 +586,11 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // **46, and the last two are the density family** (F383). This was 44 for as
     // long as `violin` and `ridgeline` were `null` in `SVG_FAMILY`.
     expect(claimed.length, "forms the SVG arm claims").toBe(46); // cells-ok — a form count
-    expect(Object.values(MEASURED).length - claimed.length, "forms it refuses").toBe(0); // cells-ok — a form count
+    // **One refused again, and it is `scatter3d`** — the count went to zero
+    // when F383 gave the density family an emitter, and a form whose geometry
+    // this path cannot compute brought it back (C12 §3am). The refusal is what
+    // `U11` needed to wake up.
+    expect(Object.values(MEASURED).length - claimed.length, "forms it refuses").toBe(1); // cells-ok — a form count
     // 46 forms x 8 columns; two more forms claimed is sixteen more cells (F383).
     expect(open + closed + legitimate, "cells over claimed forms").toBe(368); // cells-ok — a cell count
     expect(legitimate, "cells whose difference is a resolution fact, not work owed").toBe(46); // cells-ok — a cell count
@@ -844,11 +852,25 @@ describe("AD — the two arms decide separately, and here is where", () => {
     const t = collisionsIn(new Map([...corpus].map(([k, f]) => [k, f.t])));
     const s = collisionsIn(new Map([...corpus].map(([k, f]) => [k, f.s])));
 
-    expect(corpus.size, "variants in the corpus").toBe(188); // cells-ok — a variant count
-    expect(t.distinct, "distinct terminal frames").toBe(181); // cells-ok — a frame count
+    // **193, and the five are `scatter3d`'s** — one per variant, and the count
+    // moves with the catalogue rather than being pinned to a number nobody can
+    // re-derive.
+    expect(corpus.size, "variants in the corpus").toBe(193); // cells-ok — a variant count
+    // **186, five up on 181** — every one of `scatter3d`'s five variants draws a
+    // distinct frame, so none of them collides with another and none with each
+    // other. That is the sweep saying the variants are variants: `default` and
+    // `colour-value` differ only in *colour*, and this instrument compares the
+    // painted row rather than the stripped one, which is why they separate here
+    // and would not in a text corpus (SC11's point, from the other side).
+    expect(t.distinct, "distinct terminal frames").toBe(186); // cells-ok — a frame count
     // **134 -> 148**: the density family draws, so nineteen violin variants and
     // one ridgeline stop colliding in the single refusal group (F383).
-    expect(s.distinct, "distinct documents").toBe(152); // cells-ok — a frame count
+    // **153, one up on 152, and the one is a *collision*** — `scatter3d`'s five
+    // variants all return `null`, so they are one group here where they are five
+    // distinct frames in the terminal. The refusal group F383 emptied is back,
+    // and the asymmetry is the point of this sweep: one arm's five pictures are
+    // the other arm's one absence.
+    expect(s.distinct, "distinct documents").toBe(153); // cells-ok — a frame count
 
     // **The terminal's four are F350's**, and asserting them keeps that finding
     // alive: three are variants whose names state a claim their block does not
@@ -907,6 +929,17 @@ describe("AD — the two arms decide separately, and here is where", () => {
       // terminal draws them identically too: the forms differ in the direction
       // tiles grow, which is not a question a flat categorical block asks.
       ["line/default", "line/size-left", "line/size-centre", "line/size-right", "line/corners-sharp"],
+      // **`scatter3d`'s five, and this collision is a refusal rather than a
+      // dropped field** — `SVG_FAMILY` is `null` for the form, so all five
+      // variants return one absence where the terminal draws five distinct
+      // frames (AD13's count above). It belongs in this list rather than in an
+      // exemption: the sweep's job is to report every collision and let the
+      // reason be read, and *the arm refuses the form* is a reason a reader can
+      // check against `SVG_FAMILY` in one line.
+      [
+        "scatter3d/default", "scatter3d/colour-value", "scatter3d/colour-series",
+        "scatter3d/orthographic", "scatter3d/coplanar",
+      ],
       ["violin/vertical-braille", "violin/vertical", "violin/compact-vertical-line-box", "violin/compact-vertical-braille", "violin/compact-vertical"],
       ["contour/default", "contour/style-line", "contour/dim-floor", "contour/ink-contrast"],
       ["pie/solid", "pie/default-40", "pie/narrow-20"],

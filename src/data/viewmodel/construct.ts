@@ -93,6 +93,9 @@ function requireGlyph(tone: Tone | undefined, glyph: Glyph | undefined, where: s
  */
 const DECLARES_HEIGHT: Readonly<Record<PlotForm, boolean>> = {
   sparkline: false,
+  // The sample grid is `height x 2` (C12 I84), so a derived height would make
+  // the grid a function of the data — which is I1's rule, one step earlier.
+  scatter3d: true,
   waffle: false,
   // A field declares its rows like every other matrix form (C12 I49).
   contour: true,
@@ -244,6 +247,11 @@ const ORIENTABLE: Readonly<Record<Plot["form"], boolean>> = Object.freeze({
   bar: true, histogram: true, boxplot: true, violin: true,
   // The matrix family's reason: two real axes already, and neither is a choice.
   contour: false, quiver: false,
+  // **A fourth reason, and it is not *not built*.** `orientation` is a
+  // two-valued version of what `camera.azimuth` answers continuously, so the
+  // member would be a coarse second control on an axis that already has a fine
+  // one (C04 I75, C12 I87).
+  scatter3d: false,
   // Not built: each needs its own column renderer and none was asked for.
   lollipop: false, dotplot: false, funnel: false, dumbbell: false, forest: false,
   ridgeline: false,

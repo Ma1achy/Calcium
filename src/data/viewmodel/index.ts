@@ -67,6 +67,8 @@ export type {
   Rule,
   Series,
   VectorSeries,
+  Point3,
+  Point3Series,
   Steps,
   Table,
   TableRow,

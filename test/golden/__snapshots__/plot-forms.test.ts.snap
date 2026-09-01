@@ -1384,6 +1384,46 @@ exports[`golden frames — every form > scatter · full · 80 1`] = `
    [38;2;98;98;98m0.0     0.5       1.0      1.5       2.0      2.5      3.0       3.5     4.0[39m"
 `;
 
+exports[`golden frames — every form > scatter3d · ascii-1bit-wide · 40 1`] = `
+"── scatter3d · measured 6 · rendered 6
+
+                    ,
+                   .@  .
+
+                ,
+"
+`;
+
+exports[`golden frames — every form > scatter3d · ascii-1bit-wide · 80 1`] = `
+"── scatter3d · measured 6 · rendered 6
+
+                                        ,
+                                        @  .
+
+                                    ,
+"
+`;
+
+exports[`golden frames — every form > scatter3d · full · 40 1`] = `
+"── scatter3d · measured 6 · rendered 6
+
+                    [38;2;68;1;84m▀[39m
+                   [38;2;253;231;37m[48;2;253;231;37m▀▀[49m[39m  [38;2;53;94;141m▄[39m
+
+                [38;2;72;34;115m▀[39m
+"
+`;
+
+exports[`golden frames — every form > scatter3d · full · 80 1`] = `
+"── scatter3d · measured 6 · rendered 6
+
+                                        [38;2;68;1;84m▀[39m
+                                       [38;2;253;231;37m[48;2;253;231;37m▀▀[49m[39m  [38;2;53;94;141m▄[39m
+
+                                    [38;2;72;34;115m▀[39m
+"
+`;
+
 exports[`golden frames — every form > slope · ascii-1bit-wide · 40 1`] = `
 "── slope · measured 9 · rendered 9
  [2m+-------------------------------------+[22m

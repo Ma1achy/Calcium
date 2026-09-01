@@ -185,6 +185,12 @@ export const HAS_VALUE_AXIS = {
   // being read carefully, because review checks whether a justification is true
   // and this one was (F267).
   smallmultiples: true, pairplot: true,
+  // **`funnel` and `bullet`'s class, and `scatter` is the wrong answer to
+  // copy** (F330, C12 §3am). A `Figure` holds **one** `value`, and a 3D scatter
+  // has three ranges — x, y and z — so no true one exists. The neighbouring
+  // form is `true` and answering from it is exactly how the five silent cells
+  // above were written.
+  scatter3d: false,
 } as const satisfies Readonly<Record<PlotForm, boolean>>;
 
 /** A normalised point — both axes on `[0, 1]`, origin at the value axis's floor. */
@@ -656,6 +662,10 @@ export type Figure = Readonly<{
  * sequential one is the single most common chart defect there is.
  */
 export const RAMP_DEFAULT: Readonly<Record<PlotForm, ColormapName | null>> = Object.freeze({
+  // **Depth reads as recession and a perceptual ramp is what says so**
+  // (C12 I89). Read through `rampOf` by the renderer under both `colourBy:
+  // "depth"` and `"value"`, so the entry is consumed rather than decorative.
+  scatter3d: "viridis",
   heatmap: "viridis",
   contour: "viridis",
   // Magnitude reads as *more*, and a perceptual ramp is what says so.
@@ -944,7 +954,22 @@ export function calloutOf(block: Plot): readonly (string | null)[] | null {
  * `legendEntries`' own source expression: a segmented figure is one series cut
  * into named pieces, so the pieces are the identities.
  */
-export function identityOf(block: Pick<Plot, "segments" | "series">): readonly string[] {
+export function identityOf(
+  block: Pick<Plot, "segments" | "series" | "points3" | "colourBy">,
+): readonly string[] {
+  // **The third carrier, and `colourBy` is the gate** (C12 I89, C04 I76). A 3D
+  // scatter's identities are its clouds' labels — but only under
+  // `colourBy: "series"`, because under the other two arms colour is a ramp and
+  // a categorical legend would name a channel the picture does not use.
+  //
+  // **One rule decides the legend's contents and its presence**, since
+  // `legendPlacement`'s count reads this: two rules would be a second place for
+  // them to disagree, which is I81's mechanism.
+  const cloud = block.points3;
+  if (cloud !== undefined && block.colourBy === "series") {
+    return cloud.map((c, i) => c.label ?? `series ${String(i + 1)}`);
+  }
+  if (cloud !== undefined) return [];
   const segs = block.segments;
   return segs !== undefined && segs.length > 0 // cells-ok — a segment count
     ? segs.map((sg) => sg.label)

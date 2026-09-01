@@ -96,15 +96,19 @@ describe("SB — the SVG baseline (C12 §3ak.10, F275)", () => {
     // which is backwards, because an empty set is the good news and a returning
     // refusal is the thing this row exists to catch.
     //
-    // Every form draws: 46 of 46, and no degenerate block refuses either. So the
-    // whole corpus is the drawn side, asserted by equality. **The placard check
-    // below still runs over the refusals** — over none of them today, which is
-    // vacuous by success rather than by oversight, and the equality is what
-    // stops that being silent.
+    // **The refusal returned, and the equality is what said so on the day.**
+    // `scatter3d` is `SVG_FAMILY: null` — no emitter here carries a projection
+    // (C12 §3am) — so its five variants are five placards. The placard check
+    // below now has something to run over, which it did not while every form
+    // drew, and it is asserted as the **exact set** rather than as a count: a
+    // second form joining is a decision somebody makes here.
     const refusals = [...fresh.entries()].filter(([, v]) => v === refusal).map(([k]) => k);
-    expect(refusals, "no frame in the corpus is a refusal").toEqual([]);
+    expect([...refusals].sort(), "the refused frames, by name").toEqual([
+      "scatter3d-colour-series.svg", "scatter3d-colour-value.svg", "scatter3d-coplanar.svg",
+      "scatter3d-default.svg", "scatter3d-orthographic.svg",
+    ]);
     const drawn = [...fresh.entries()].filter(([, v]) => v !== refusal).map(([k]) => k);
-    expect(drawn.length, "so the drawn side is the whole corpus").toBe(fresh.size);
+    expect(drawn.length, "and the drawn side is the rest of it").toBe(fresh.size - refusals.length);
     expect(refusals.length + drawn.length, "refused and drawn are the whole corpus").toBe(fresh.size);
     for (const name of refusals) {
       expect(readFileSync(join(DIR, name), "utf8"), name).toBe(refusal);

@@ -586,6 +586,47 @@ export type VectorSeries = Readonly<{
   label?: string;
 }>;
 
+/**
+ * One sample of a 3D point cloud (C04 I76, C12 I87).
+ *
+ * **A record and not a tuple, and `VectorSeries` above is why the two differ.**
+ * A vector is two numbers with no optional part, so `readonly [u, v] | null` is
+ * the whole of it. A 3D sample has a position **and** an optional fourth
+ * reading on a different axis — `value`, which colour may be spent on — and
+ * `[x, y, z, value?]` makes an optional element positional, which is the one
+ * thing a tuple is bad at.
+ *
+ * **No `null` in the element type**, for the reason there *is* one in the other
+ * two: a gap is a position that produced no reading, and a point cloud has no
+ * positions except the ones it lists.
+ *
+ * **No `label`, and it is a refusal rather than an omission.** A per-point
+ * label is billboarded text in the scene, which has no renderer — and a member
+ * nothing draws is indistinguishable from one not yet implemented.
+ */
+export type Point3 = Readonly<{
+  x: number;
+  y: number;
+  z: number;
+  /** The scalar `colourBy: "value"` reads. Required by that arm, at both gates. */
+  value?: number;
+}>;
+
+/**
+ * A named cloud (C04 I76).
+ *
+ * **No `marker`**, where `Series` has one. It would be a second writer on the
+ * channel the depth tier owns: on the glyph arm the mark *is* the depth reading
+ * (C12 I88), so a caller's shape and the tier's shape are one cell with two
+ * claims on it. The shape within a tier is the series index, exactly as the
+ * tone is.
+ */
+export type Point3Series = Readonly<{
+  points: readonly Point3[];
+  label?: string;
+  tone?: Tone;
+}>;
+
 export type Series = Readonly<{
   /**
    * The readings, oldest first. **`null` is a gap** — a position that produced
@@ -690,11 +731,33 @@ export type Camera = Readonly<{
  * Three-quarters round and a third of the way up is the angle every 3D plotting
  * library opens on, and for the reason matplotlib gives: at zero azimuth two axes
  * project onto each other and the figure reads flat.
+ *
+ * **`distance` was 10 and it was set with nothing drawing** (FINDINGS F440). The
+ * renderer normalises each axis to `[-1, 1]` (C12 I86), so the data always sits
+ * in a cube of half-extent 1 whose corners are `sqrt(3)` from the origin — which
+ * makes the framing a property of the normalisation rather than of anybody's
+ * data, and therefore a number that can be measured rather than chosen.
+ * Measured at 80x12 cells over the cube's eight corners and a 400-point sphere
+ * shell, at three elevations x two azimuths:
+ *
+ * ```
+ * distance   figure fills            corners clear the frame edge
+ *   10       50% of the height       yes
+ *    6       67%                     yes  <- the largest that does
+ *    5.5     ~70%                    no — two of six cameras touch
+ *    5       75%                     no
+ *    4       92%                     no
+ * ```
+ *
+ * So **6**: the largest distance at which the worst case in the sweep still
+ * clears the edge. The sphere shell never touches at any of these — its radius
+ * is 1 where a corner's is `sqrt(3)` — which is what says the cube is the
+ * binding case rather than the convenient one.
  */
 export const CAMERA_DEFAULT: Camera = Object.freeze({
   azimuth: Math.PI / 4,
   elevation: Math.PI / 6,
-  distance: 10,
+  distance: 6,
   projection: "perspective",
 });
 
@@ -711,7 +774,8 @@ export type PlotForm =
   | "density" | "violin" | "ridgeline"
   | "smallmultiples" | "pairplot"
   | "pie" | "radar"
-  | "horizon";
+  | "horizon"
+  | "scatter3d";
 
 /**
  * A claim about the ordinate, drawn beside the data (C12 §3e, I52).
@@ -1194,6 +1258,30 @@ export type Plot = Readonly<{
    */
   vectors?: readonly VectorSeries[];
   /**
+   * The point cloud a `scatter3d` draws (C04 I76, C12 I87).
+   *
+   * Required on that form and refused on every other, which is `vectors`'
+   * shape one dimension along: a `Series` is one reading per position and a 3D
+   * sample is three, so reusing it would mean three parallel arrays whose
+   * agreement nothing checks. `series` is empty on this form, as a quiver's is.
+   */
+  points3?: readonly Point3Series[];
+  /**
+   * Which reading colour carries on a 3D scatter (C04 I76, C12 I89).
+   *
+   * Three readings compete for one channel — recession, a scalar field, and
+   * identity — so a renderer that guessed would break C12 I6 by omission
+   * rather than by design. `"depth"` is the default because it is the reading
+   * a projection *creates*: a cloud has a depth whether or not the caller
+   * supplied anything else.
+   *
+   * **It decides the legend too, and from the same rule** (C12 I89). Under
+   * `"series"` the block's identities are these labels and the key is drawn;
+   * under the other two `identityOf` answers nothing, so a categorical legend
+   * naming a channel the picture does not use never appears.
+   */
+  colourBy?: "depth" | "value" | "series";
+  /**
    * Where a matrix puts a row shorter than its width (C12 §3o).
    *
    * `"stretch"` spreads the readings across the area, `"window"` keeps the
@@ -1404,6 +1492,12 @@ export const ORIGIN_DEFAULT: Readonly<Record<PlotForm, Origin | null>> = Object.
   ecdf: "bottom-left", slope: "bottom-left", bubble: "bottom-left",
   density: "bottom-left",
 
+  // **The corner moves under an orbit** (C12 I87, §3am). `origin` asks which
+  // way the axes run, and a projected cloud's answer is a function of the
+  // camera — true at one azimuth and wrong a keypress later. A fixed entry
+  // would be a claim about a picture that turns.
+  scatter3d: null,
+
   // Matrix — the direction is `columnMap` and `matrixRows`' loop, and a row
   // index grows downward, so the first datum is already in the top-left corner.
   heatmap: "top-left", calendar: "top-left", correlation: "top-left",
@@ -1461,6 +1555,10 @@ export const HONOURS_AXIS_CROSS: Readonly<Record<PlotForm, boolean>> = Object.fr
   // axis is a reference row merged behind the data there.
   line: true, scatter: true, step: true, ecdf: true, slope: true,
   bubble: true, density: true,
+
+  // **`overlaidRows` does not compose this area** — the form rasterises its
+  // own, so there is no layered row for a reference rule to merge behind.
+  scatter3d: false,
 
   // Matrix — a corner, and no zero to cross at.
   heatmap: false, calendar: false, correlation: false, confusion: false,
@@ -1524,6 +1622,11 @@ export const HONOURS_AXIS_CROSS: Readonly<Record<PlotForm, boolean>> = Object.fr
  * drawing; which sides a form *has* is a fact about the contract.
  */
 export const HAS_Y_GUTTER: Readonly<Record<PlotForm, boolean>> = Object.freeze({
+  // **The ordinate is drawn in the scene and it turns** (C12 I87, §3am). A
+  // gutter is a fixed column beside a picture whose vertical axis is wherever
+  // the camera put it, so a scale there names a direction the frame does not
+  // have.
+  scatter3d: false,
   // A scale in the gutter, one label per labelled row.
   line: true, scatter: true, step: true, ecdf: true, density: true,
   slope: true, bubble: true, stackedarea: true, streamgraph: true,
@@ -1611,6 +1714,8 @@ export const HAS_Y_GUTTER: Readonly<Record<PlotForm, boolean>> = Object.freeze({
 export const HAS_DETAIL_RUNGS: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   // The two distribution ladders §3i is written about.
   boxplot: true, violin: true,
+  // No `RUNGS` entry, and C12 T2.10 asserts the pair rather than trusting it.
+  scatter3d: false,
   // Everything else. A form joining this list needs a `RUNGS` entry with it, or
   // the refusal stops firing and nothing starts drawing.
   line: false, sparkline: false, heatmap: false, scatter: false, step: false,
@@ -1679,6 +1784,7 @@ export const HIERARCHY_ROLE: Readonly<Record<PlotForm, "magnitude" | "structure"
   // belongs to (C04 I69).
   graph: null,
   // Everything else draws a series, a matrix or a field.
+  scatter3d: null,
   line: null, sparkline: null, heatmap: null, scatter: null, step: null,
   ecdf: null, bar: null, histogram: null, forest: null, dumbbell: null,
   lollipop: null, dotplot: null, waffle: null, boxplot: null, violin: null,
@@ -1692,6 +1798,11 @@ export const HIERARCHY_ROLE: Readonly<Record<PlotForm, "magnitude" | "structure"
 });
 
 export const HAS_X_TITLE: Readonly<Record<PlotForm, boolean>> = Object.freeze({
+  // **Three axes, and `xTitle` names one** (C12 §3am). A caption row centred
+  // under a projected cloud would name the abscissa and say nothing about the
+  // other two, and there is no reason it should be x — which is worse than no
+  // caption. The axis names are billboarded in the scene, with the axes.
+  scatter3d: false,
   // Composed by `axed`, `axedWithCursor` or `categoricalColumnForm` — the
   // positional family and the categorical one.
   line: true, scatter: true, step: true, ecdf: true,
@@ -1713,6 +1824,9 @@ export const HAS_X_TITLE: Readonly<Record<PlotForm, boolean>> = Object.freeze({
 });
 
 export const HAS_CALLOUT: Readonly<Record<PlotForm, boolean>> = Object.freeze({
+  // A callout annotates the **last** reading at the right edge, and a cloud's
+  // rightmost sample is a camera artefact rather than a last anything.
+  scatter3d: false,
   // Everything `positionalForm` renders, including the two that derive a block
   // first — an ECDF's last value is its own last reading, and a density's is the
   // estimate at the right edge, which is what the figure draws in both cases.
@@ -1768,7 +1882,7 @@ export const IS_MATRIX: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   // `axes: false` would take the row labels *and* the level legend, and the
   // legend is the only thing that says which line is which level (C12 I49).
   contour: true,
-  line: false, sparkline: false, scatter: false, step: false, ecdf: false,
+  line: false, sparkline: false, scatter: false, step: false, ecdf: false, scatter3d: false,
   density: false, bar: false, histogram: false, boxplot: false, violin: false,
   ridgeline: false, forest: false, dumbbell: false, lollipop: false,
   dotplot: false, waffle: false, flame: false, icicle: false, treemap: false, tree: false, graph: false,
@@ -1780,6 +1894,9 @@ export const IS_MATRIX: Readonly<Record<PlotForm, boolean>> = Object.freeze({
 
 export const IS_FIELD_FORM: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   contour: true, quiver: true,
+  // `layers` orders a field against what is drawn over it; a cloud is the one
+  // thing drawn and there is no second to order.
+  scatter3d: false,
   // Every other matrix form paints its cells and draws nothing over them. They
   // are *fields* in the survey's sense and not in this one: `layers` on a
   // `spectrogram` has no second thing to order.
@@ -1798,6 +1915,15 @@ export const IS_FIELD_FORM: Readonly<Record<PlotForm, boolean>> = Object.freeze(
 export type PlotStyleArm = NonNullable<Plot["plotStyle"]>;
 
 export const STYLE_ARMS: Readonly<Record<PlotForm, readonly PlotStyleArm[]>> = Object.freeze({
+  // **Empty, and it is a ruling rather than a gap** (C12 I87, §3am). Every
+  // other positional form lists arms a caller may force, because `braille`
+  // against `line` is a taste — both available at any capability that has
+  // either. `scatter3d`'s two arms are selected by `halfBlockEligible`, which
+  // reads `unicode`, `ambiguousWidth` and `colourDepth`, so the choice is the
+  // terminal's and there is nothing left for the member to select. Listing an
+  // arm the renderer does not have is F207's member accepted and ignored; a
+  // braille arm joins this entry on the commit that builds one.
+  scatter3d: [],
   // The positional family: braille dots or box-drawing strokes, and the two
   // curve forms that can carry candles.
   line: ["braille", "line", "candlestick"], step: ["braille", "line", "candlestick"],

@@ -101,7 +101,11 @@ describe("FV — the shared axis, and a record with something to be wrong about"
     // same.** Eleven forms have a ramp; if that ever reaches zero the row above
     // is vacuous and says so here first.
     const ramped = (Object.keys(RAMP_DEFAULT) as PlotForm[]).filter((f) => RAMP_DEFAULT[f] !== null);
-    expect(ramped.length, "forms whose readings are a colour").toBe(11); // cells-ok — a form count
+    // **12, and the twelfth is `scatter3d`** — depth and value both go on a
+    // ramp there, which is why its `HAS_VALUE_AXIS` is `false` and why copying
+    // `scatter`'s `true` would have been caught by this row's *other* half
+    // rather than by design (F441).
+    expect(ramped.length, "forms whose readings are a colour").toBe(12); // cells-ok — a form count
   });
 
   it("FV1b (C12 I60): the exemption is an identity, not a number that looks like one", () => {

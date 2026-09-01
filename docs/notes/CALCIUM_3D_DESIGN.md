@@ -794,6 +794,30 @@ four times.
 **Steps 1–3 ship a working 3D scatter.** That is the point at which it stops being
 speculative — everything after it is improvement rather than proof.
 
+**Steps 1–3 have landed, and four things this note said turned out to need correcting** — which
+is what building it was for:
+
+- **`CAMERA_DEFAULT.distance` was 10 and it frames the data at 11% of an 80-column frame.** The
+  number was set one step before anything could project, so nothing could be wrong about it.
+  Measured over the normalised cube's corners at six cameras: **6** is the largest distance whose
+  worst case clears the frame edge. F440.
+- **§3a's marker table is the *glyph arm's* and does not port to the raster.** On the half-block
+  rung every cell is `HALF_BLOCK` and the whole picture is the two colours, so a tier there is a
+  **sample count** — `2×2`, `1×2`, `1×1` — rather than a glyph. One table cannot serve both arms
+  (C12 I88).
+- **§6's tier list conflates a caller's choice with a capability rung.** `plotStyle: "half"` and
+  `"ascii"` are not members of `plotStyle` and should not be: `halfBlockEligible` reads `unicode`,
+  `ambiguousWidth` and `colourDepth`, so the arm is the terminal's. `STYLE_ARMS.scatter3d` is
+  empty, and that is a ruling (C12 I87).
+- **The rung needed a glyph it did not have.** A photograph inks every cell so the image arm needs
+  only `HALF_BLOCK`; a scatter is mostly empty, and a cell inked only below needs `▄`. Found by
+  writing the second consumer. F443.
+
+**And the external check**: `make refdiff` puts the form beside matplotlib's `scatter3D` at
+**7.8% ink disagreement, fourth of 31 compared forms** — behind `dotplot`, `step` and `scatter`.
+The remaining difference is a framing convention: matplotlib stretches the data box to fill the
+axes and this preserves the cube's proportions, which is what makes a sphere look like a sphere.
+
 **The old step 6 — *the dither ramp as a fourth encoding axis* — is gone, and its removal is the
 residue worth naming.** §3c and §6 were rewritten to refuse the dither and this list was not, so
 the build order kept a step for a mechanism the document two sections up had ruled out. **A

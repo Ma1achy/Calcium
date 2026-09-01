@@ -536,6 +536,60 @@ export function spinnerFrames(
 }
 
 /**
+ * A 3D scatter's marks, three tiers deep (C12 I88, §3am).
+ *
+ * **Three rows, because depth buckets into three tiers** — a terminal cannot
+ * scale a mark smoothly and a reader cannot separate more than three sizes, so
+ * the ceiling is a decision rather than a limitation. **Several shapes per row,
+ * because the shape within a tier is the series**: the tier is the depth and the
+ * column is the identity, which is the only way one glyph carries both.
+ *
+ * **Filled, hollow, dot — weight rather than size.** A character grid has one
+ * cell whatever the tier, so *bigger* has to be spelled as *heavier*: a solid
+ * mark reads as nearer than an outline of the same shape, and an outline as
+ * nearer than a point. It survives the colour floor, which is the whole reason
+ * the tier exists on the glyph arm (C12 I88).
+ *
+ * **`narrowOnly` and the wide arm is required rather than optional** (A03 SS47,
+ * C02 I9). Every glyph in the unicode rows is `East_Asian_Width=Ambiguous` —
+ * `● ○ ◆ ◇ ▲ △ ■ □ ★ ☆ · ∙ •` all answer 1 under `narrow` and 2 under `wide` —
+ * so a terminal declaring `wide` draws every mark at twice the column the
+ * projection put it in, which is a picture with the wrong geometry rather than
+ * an ugly one.
+ */
+export type Marker3Set = Readonly<{
+  near: readonly string[];
+  mid: readonly string[];
+  far: readonly string[];
+}>;
+
+const MARKER3_UNICODE: Marker3Set = Object.freeze({
+  near: Object.freeze(["\u25CF", "\u25C6", "\u25B2", "\u25A0", "\u2605"]),
+  mid: Object.freeze(["\u25CB", "\u25C7", "\u25B3", "\u25A1", "\u2606"]),
+  far: Object.freeze(["\u00B7", "\u2219", "\u2022", "\u02D9", "\u2027"]),
+});
+
+const MARKER3_ASCII: Marker3Set = Object.freeze({
+  near: Object.freeze(["@", "#", "$", "&", "%"]),
+  mid: Object.freeze(["o", "x", "+", "=", "*"]),
+  far: Object.freeze([".", ",", ":", ";", "\u0027"]),
+});
+
+/**
+ * The marker table for this terminal (C12 I88).
+ *
+ * Two arms rather than a refusal, which is `spinnerFrames`' rule above and for
+ * its reason: a mark that changes width between terminals moves the picture,
+ * and a scatter with no marks is not a scatter.
+ */
+export function markers3(
+  caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+): Marker3Set {
+  if (caps.unicode === "ascii") return MARKER3_ASCII;
+  return caps.ambiguousWidth === "wide" ? MARKER3_ASCII : MARKER3_UNICODE;
+}
+
+/**
  * A determinate bar's on/off pair (roadmap 51's bar half, roadmap 22's sibling).
  *
  * **The same shape as `SpinnerSet` and for the same reason.** A style is a pair

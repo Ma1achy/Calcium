@@ -1,0 +1,13 @@
+── scatter3d · colour-series · 1bit · 80w
+                                                                         █ alpha
+                                                                         ▚ beta
+                                                                         ▞ gamma
+                                  ○○○▲▲▲▲
+                                  ·○▲▲▲▲▲▲
+                                  ··▲▲▲▲▲
+
+                                ◇◇◇◇◇
+                                ◆◆◆◆◆
+                                ◇◇◇◆◇
+
+

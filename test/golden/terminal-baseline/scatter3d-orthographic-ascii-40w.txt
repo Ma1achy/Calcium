@@ -1,0 +1,13 @@
+── scatter3d · orthographic · ascii · 40w
+        ooo           ......
+        @                  ..o
+        @@@@                  oo
+                               o
+             ........          o
+        .....        ......   @@
+        o                  .@@@
+        o@@            @@@@@  ..
+           @@@@@@@@@@@@        .
+                               oo
+                              oo
+                            ooo

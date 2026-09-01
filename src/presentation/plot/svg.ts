@@ -363,6 +363,17 @@ export const SVG_FAMILY = {
   // contour routed through it would draw a heatmap with the lines missing and
   // report as supported — the plausible wrong figure a `null` arm refuses.
   contour: "field", quiver: "field",
+  // **A claimed form must put ink on the page** (G7b), and no emitter here
+  // carries a projection: routed through `scatter` it would draw the x and y
+  // of a 3D cloud as a flat scatter and report as supported — the plausible
+  // wrong figure a `null` arm refuses, which is `contour`'s own lesson.
+  //
+  // **The seam for the day it crosses is ruled now rather than after it
+  // disagrees** (C12 §3am): the projection happens **above** the seam, so the
+  // figure carries projected, normalised `point` marks and neither arm
+  // computes a basis. That is §3ak's finding applied before the second arm
+  // exists rather than 73 cells after.
+  scatter3d: null,
 } satisfies Record<PlotForm, SvgFamily | null>;
 
 /** The family, or `null` where the form carries geometry this path does not. */

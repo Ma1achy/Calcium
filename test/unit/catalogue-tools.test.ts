@@ -246,7 +246,7 @@ describe("PC — the phase catalogue's two claims", () => {
     const refused = forms.filter((f) => SVG_FAMILY[f as keyof typeof SVG_FAMILY] === null);
     const claimed = forms.filter((f) => SVG_FAMILY[f as keyof typeof SVG_FAMILY] !== null);
     expect(refused.length + claimed.length, "every form is on exactly one side").toBe(forms.length);
-    expect(forms.length, "and the union is 46").toBe(46);
+    expect(forms.length, "and the union is 47").toBe(47);
     // **The refused set is empty, and the sentence above is why that is asserted
     // by equality** (F383). *A number here would be a row that fails on every
     // commit that works* was right about a **count**; it stopped being right the
@@ -254,8 +254,11 @@ describe("PC — the phase catalogue's two claims", () => {
     // now empty* and a returning refusal would pass it. The partition is still
     // the claim — exhaustive and disjoint, above — and this is the one value the
     // shrinking set can no longer shrink past.
-    expect(refused, "nothing is refused: F383 claimed the last two forms").toEqual([]);
-    expect(claimed.length, "so the claimed side is the whole union").toBe(forms.length);
+    // **And the shrinking set grew, which is the day the equality was written
+    // for.** `scatter3d` carries geometry this path does not compute (C12
+    // §3am), so the refusal it names is a decision rather than a gap.
+    expect(refused, "the refused forms, derived from SVG_FAMILY").toEqual(["scatter3d"]);
+    expect(claimed.length, "and the claimed side is the rest of it").toBe(forms.length - 1);
   });
 
   it("PC2: the ordering hazard is real — the sweeper would delete these frames", () => {
@@ -321,7 +324,16 @@ describe("PR — the pair catalogue's partition, which is the counter restated (
     // reached zero. The partition above still holds over an empty set, so the
     // row keeps its shape and gains the one fact the bound cannot carry: a
     // refusal reappearing fails here, named.
-    expect(allRefused, "no frame in the corpus is refused").toEqual([]);
+    // **And a refusal returned, which is what the equality was for** (C12
+    // §3am). `scatter3d` is `SVG_FAMILY: null`, so all five of its variants are
+    // refused **by family** rather than by variant — the partition above is
+    // what says which side they land on, and it says family, which is the
+    // truth: no variant of the form draws and none could.
+    expect(allRefused, "the refused frames, by name").toEqual([
+      "scatter3d/colour-series", "scatter3d/colour-value", "scatter3d/coplanar",
+      "scatter3d/default", "scatter3d/orthographic",
+    ]);
+    expect(part.family.sort(), "and every one of them is a family refusal").toEqual(allRefused);
     // **Not a magnitude** (F310). `> 50` was a number that had to be edited every
     // time a form landed and said nothing when it did — and this pass has moved
     // it from 77 to 45 in eight commits. What the row needs is that the partition
@@ -406,8 +418,14 @@ describe("PR — the pair catalogue's partition, which is the counter restated (
     // except no such form exists any more, so the fallback has no witness in the
     // corpus. Asserted by equality so the row wakes up if one returns; `pick`'s
     // own placard arm keeps its unit coverage in PR6.
+    // **And one returned, so `pick`'s fallback has a witness in the corpus
+    // again.** `scatter3d` is refused in every variant, which is the state this
+    // row was written against and lost when F383 gave the density family an
+    // emitter. `pick` must still return a variant — a placard is a frame — and
+    // the assertion is that it does rather than throwing or returning nothing.
     const allDead = Object.keys(map).filter((f) => Object.values(map[f]!).every(Boolean));
-    expect(allDead, "no form is refused in every variant").toEqual([]);
+    expect(allDead, "the forms refused in every variant").toEqual(["scatter3d"]);
+    expect(map["scatter3d"]?.[pick("scatter3d")], "and pick still names one of them").toBe(true);
   });
 
   it("PR7 (F315): the terminal scale is constant, so tiles compare with each other too", () => {

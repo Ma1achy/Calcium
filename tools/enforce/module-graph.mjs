@@ -637,13 +637,12 @@ export const BUILDER_OMISSIONS = Object.freeze({
     "the block it came from rather than the slice it shows; a hand-built keyValue setting it " +
     "would assert a column its own labels do not justify. `window` is the one writer",
 
-  // **Omitted until a form can use it, and the reason is sharper than *not yet
-  // built*.** `camera` has one meaning — the initial view of a 3D plot — and no
-  // 3D form exists. What it would do on a `line` today is not nothing, which is
-  // the trap: a plot declaring a camera becomes **focusable** (C12 I85), so
-  // exposing this before the form exists hands callers a way to add a focus stop
-  // to a 2D plot and no way to draw anything. It arrives with `scatter3d`.
-  "plot.camera": "the initial view of a 3D plot; no 3D form exists, and on a 2D one it would add a focus stop and nothing else (C12 I85)",
+  // **`plot.camera` was here and is gone**, on the commit that built
+  // `scatter3d`. Its reason was sharper than *not yet built* — a plot declaring
+  // a camera becomes focusable (C12 I85), so exposing it earlier handed callers
+  // a focus stop and no way to draw anything — and the form is what made it
+  // safe. `points3` and `colourBy` landed on `b.plot` beside it rather than
+  // arriving here, because a carrier with a renderer needs no excuse.
 
   "table.actionBar":
     "C11 I18 — a presence rather than a width, and not the producer's either. The bar is " +
@@ -1406,19 +1405,25 @@ export function checkOneStorePerComponent(files, readFile = (f) => readFileSync(
 
 /** Members whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_MEMBERS = Object.freeze({
-  // **Step 2 of \`docs/notes/CALCIUM_3D_DESIGN.md\` §10 lands before step 3**, which
-  // is the step that reads it. Every entry below expires on the same symbol —
-  // \`scatter3d\` in \`PlotForm\` — and the equality arm refuses all of them the
-  // day it arrives, which is what makes this a loan rather than a list.
+  // **Three \`Basis\` members and five \`project3\` functions left here at once**,
+  // on the commit that built \`scatter3d\` — one loan, one symbol, one release,
+  // which is what the equality arm makes possible and a membership check would
+  // not. The entries said *until scatter3d* and \`scatter3d\` arrived.
   //
-  // **The split is the design's and the alternative was measured**: folding the
-  // projection into the form would put the degenerate rows behind a renderer, and
-  // PR1 — the row that shows a sample behind the eye lands *inside the frame* —
-  // needs to reach the basis directly. Building a wrong projector into \`src/\` to
-  // avoid an exemption would be worse than the exemption.
-  "Basis.eye": "PR1 computes what an unculled projector would give, to show the wrong answer is in frame; no src/ consumer until scatter3d",
-  "Basis.forward": "the same row's view-space z; no src/ consumer until scatter3d",
-  "Basis.orthographic": "the arm project() branches on; nothing in src/ chooses a projection until scatter3d",
+  // **Two of the eight did not leave, and their reason is a different one.**
+  // \`Basis.forward\` and \`Basis.orthographic\` are read by \`project\` in the same
+  // module, so they are consumed — MG24 asks whether a member is named
+  // *elsewhere in \`src/\`*, and a record whose fields exist for one function is
+  // exactly the shape that answers no. The type is exported because \`basisOf\`
+  // returns it, not because a consumer is expected to read into it: a renderer
+  // branching on \`basis.orthographic\` would be re-deciding what \`project\`
+  // already decided. \`right\`, \`up\`, \`f\` and \`aspect\` are not here because
+  // their names are shared with other owners, which is MG24's own stated blind
+  // spot — so the rule reaches three of the seven fields and the record is one
+  // thing either way.
+  "Basis.eye": "read by project() in the same module — the same reason, and the field the whole frame is anchored on",
+  "Basis.forward": "read by project() in the same module; Basis is exported because basisOf returns it, and a renderer branching on the view frame would re-decide what project already has",
+  "Basis.orthographic": "the same — project() picks the arm, and a second reader of this field would be a second place the projection is chosen",
 
   // --- published ahead of the value that makes it readable ------------------
   //
@@ -2599,21 +2604,10 @@ export function checkExportedArguments(files, readFile = (f) => readFileSync(f, 
 
 /** Functions whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_FUNCTIONS = Object.freeze({
-  // **Step 2 of \`docs/notes/CALCIUM_3D_DESIGN.md\` §10 lands before step 3**, which
-  // is the step that reads it. Every entry below expires on the same symbol —
-  // \`scatter3d\` in \`PlotForm\` — and the equality arm refuses all of them the
-  // day it arrives, which is what makes this a loan rather than a list.
-  //
-  // **The split is the design's and the alternative was measured**: folding the
-  // projection into the form would put the degenerate rows behind a renderer, and
-  // PR1 — the row that shows a sample behind the eye lands *inside the frame* —
-  // needs to reach the basis directly. Building a wrong projector into \`src/\` to
-  // avoid an exemption would be worse than the exemption.
-  sampleGrid: "C12 I84 — width x 1 by height x 2; nothing rasterises into a sample grid until scatter3d",
-  unitOf: "C12 I86 — the unit cube, with a zero extent mapping to the centre; no src/ caller until scatter3d",
-  basisOf: "C12 I83 — the camera resolved to an eye and a frame; no src/ caller until scatter3d",
-  createDepth: "C12 I84, C12 I11 — allocated per render; no src/ caller until scatter3d",
-  writeDepth: "C12 I84 — the depth test; no src/ caller until scatter3d",
+  // **\`sampleGrid\`, \`unitOf\`, \`basisOf\`, \`createDepth\` and \`writeDepth\` were
+  // here and are gone**, released by \`scatter3d\` exactly as their reasons said.
+  // Five entries, one symbol, one commit — and the equality arm is what turned
+  // *the day it arrives* into a rule rather than a promise.
 
   // **Six entries left here at once, and the equality arm is what removed them.**
   //

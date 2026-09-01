@@ -81,7 +81,7 @@ describe("HG2 (C04 I64): a hierarchy on a form that reads none is refused", () =
     const nulls = ALL_FORMS.filter((f) => HIERARCHY_ROLE[f] === null);
     // **41 of 44.** Asserted so the row cannot pass against a record that is
     // `null` everywhere — the shape of the defect it exists to prevent.
-    expect(nulls).toHaveLength(42);
+    expect(nulls).toHaveLength(43); // cells-ok — a form count; 42 before `scatter3d`
     for (const form of nulls) {
       expect(errs(form, good), form).toHaveLength(1);
       expect(errs(form, good)[0], form).toMatch(/draws a series, a matrix or a field/u);

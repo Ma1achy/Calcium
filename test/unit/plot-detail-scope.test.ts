@@ -39,7 +39,7 @@ describe("PD1 (C12 I34): a form with no ladder refuses the member", () => {
     }
     // The fixture responds: the record is not all-`true`, and the count is the
     // measurement rather than a restatement of the table.
-    expect(refused).toBe(44);
+    expect(refused).toBe(45); // cells-ok — a form count; 44 before `scatter3d`
   });
 
   it("the builder refuses it too — both gates", () => {

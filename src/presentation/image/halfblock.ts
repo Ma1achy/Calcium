@@ -33,6 +33,23 @@ import type { TerminalCapabilities } from "../../terminal/capabilities.js";
  */
 export const HALF_BLOCK = "▀";
 
+/**
+ * The other one, and the **sparse** case is why it exists (C12 I88, §3am).
+ *
+ * A photograph inks every cell, so the image arm never needs it: both halves
+ * always have a colour and `HALF_BLOCK` with a foreground and a background says
+ * everything. A **scatter** is mostly empty, and there the two halves disagree
+ * about whether they are drawn at all — a cell inked only below cannot be
+ * `HALF_BLOCK` with no foreground, because the terminal paints the top half in
+ * whatever the current foreground is rather than leaving it alone.
+ *
+ * So the sparse raster has three glyphs where the dense one has one: a blank, a
+ * `HALF_BLOCK` for the top and this for the bottom, with both halves inked
+ * falling back to `HALF_BLOCK` and a background. **Found by building the second
+ * consumer**, which is where the first arm's unstated assumption always shows.
+ */
+export const HALF_BLOCK_LOWER = "▄";
+
 /** One cell: the pixel above the midline and the pixel below it. */
 export type HalfCell = Readonly<{ top: ColourValue; bottom: ColourValue }>;
 

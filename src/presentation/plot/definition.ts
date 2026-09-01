@@ -66,6 +66,7 @@ import { ROW_IS_AN_IDENTITY, markOf, partSeparator, refOf as slotOf, seriesRefOf
 import { strips, tiles } from "./hierarchy.js";
 import { sparkline } from "./sparkline.js";
 import { bubbleRows, scatterRows, stepRows } from "./scatter.js";
+import { scatter3dRows } from "./scatter3.js";
 import { quartileRange } from "../../data/viewmodel/distribution.js";
 import { boxplotBand, boxplotColumn, bulletRow, forestRow, dumbbellRow, lagRow, timelineRow } from "./glyph-row.js";
 import { barColumn, barRow, lollipopRow, dotplotRow, stackedBarRow, funnelRow, ganttRow, waterfallRow, type BandRow } from "./categorical.js";
@@ -2246,6 +2247,46 @@ const FORM_ROWS: Readonly<
   line: (block, width, ctx) => positionalForm(block, width, ctx, styleRasteriser(block, ctx.capabilities, curveRows)),
 
   scatter: (block, width, ctx) => positionalForm(block, width, ctx, scatterRows),
+
+  /**
+   * The 3D scatter (C12 I87, I88, I89, §3am).
+   *
+   * **It composes its own rows rather than calling `axed`**, because `axed`'s
+   * furniture is a frame, a rule and an x-label row and `axes` is refused on
+   * this form (C04 I76): three axes turn with the camera and are drawn inside
+   * the area. What it does keep is the legend — reserved before the raster is
+   * laid out, on `reservedFor`'s recorded reason, and composited onto finished
+   * rows exactly as `axed` does it.
+   *
+   * **`composeRows` reconciles the count rather than the call site agreeing by
+   * convention** (I24), which is what `FURNITURE_ROWS.scatter3d` returning 0
+   * and `legendRows` adding its own term rely on.
+   */
+  scatter3d: (block, width, ctx) => {
+    const placement = legendPlacement(block, ctx.capabilities);
+    const reserved = reservedFor(block, width, ctx);
+    const area = scatter3dRows(block, Math.max(1, width - reserved), ctx); // cells-ok — a cell width
+    const entries = placement === null ? [] : legendEntries(block, ctx);
+    const amb = ctx.capabilities.ambiguousWidth;
+    const body =
+      placement !== "left" && placement !== "right"
+        ? area
+        : area.map((r, i) => {
+            const col = paint(legendColumn(entries, i, reserved, ctx));
+            const fitted = fitStyled(r, Math.max(1, width - reserved), SGR_RESET, amb); // cells-ok — a cell width
+            return placement === "right" ? fitted + col : col + fitted;
+          });
+    const horizontal =
+      placement === "above" || placement === "below"
+        ? [legendRow(entries, width, ctx)]
+        : [];
+    return composeRows(
+      plotHeight(block),
+      placement === "above" ? horizontal : [],
+      body,
+      placement === "below" ? horizontal : [],
+    );
+  },
   step: (block, width, ctx) => positionalForm(block, width, ctx, styleRasteriser(block, ctx.capabilities, stepRows, "step")),
   // **The derived block comes from the seam** (C12 I70, §3ak.27). This built its
   // own, so the second arm had nowhere to read it from and drew the raw samples

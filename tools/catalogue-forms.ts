@@ -171,7 +171,64 @@ const PIE_SEGMENTS = [
   { label: "Other", value: 8 },
 ] as const;
 
+/**
+ * A helix and two clusters — geometry a reader can check against the picture.
+ *
+ * **Deterministic, because a catalogue frame is compared byte for byte.** The
+ * clusters are a lattice with a fixed offset rather than a sample from a
+ * generator, so the same sheet renders twice the same way.
+ */
+const helix3 = (n: number): { x: number; y: number; z: number; value: number }[] =>
+  Array.from({ length: n }, (_v, i) => { // cells-ok — a point count
+    const t = (i / (n - 1)) * Math.PI * 4; // cells-ok — a point index
+    return { x: Math.cos(t), y: Math.sin(t), z: (i / (n - 1)) * 2 - 1, value: t }; // cells-ok — a point index
+  });
+
+const cluster3 = (cx: number, cy: number, cz: number, n: number) =>
+  Array.from({ length: n }, (_v, i) => { // cells-ok — a point count
+    const a = i * 2.399963; // cells-ok — a point index; the golden angle, so the lattice does not band
+    const r = 0.35 * Math.sqrt((i + 0.5) / n); // cells-ok — a point index
+    return {
+      x: cx + r * Math.cos(a),
+      y: cy + r * Math.sin(a),
+      z: cz + 0.4 * ((i % 5) / 4 - 0.5), // cells-ok — a point index
+      value: r,
+    };
+  });
+
 export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.freeze({
+  scatter3d: {
+    // C12 I87 — the colour raster above `halfBlockEligible`, the marker glyphs
+    // below it, and the same block draws both.
+    default: { form: "scatter3d", height: 12, series: [], points3: [{ label: "helix", points: helix3(160) }] },
+    // C12 I89 — the ramp over `value`, which is not the depth.
+    "colour-value": {
+      form: "scatter3d", height: 12, series: [], colourBy: "value",
+      points3: [{ label: "helix", points: helix3(160) }],
+    },
+    // C12 I89 — the categorical palette, and the legend that falls out of it.
+    "colour-series": {
+      form: "scatter3d", height: 12, series: [], colourBy: "series",
+      points3: [
+        { label: "alpha", points: cluster3(-0.5, -0.4, 0.3, 90) },
+        { label: "beta", points: cluster3(0.6, 0.3, -0.4, 90) },
+        { label: "gamma", points: cluster3(0, 0.6, 0.6, 90) },
+      ],
+    },
+    // C12 I86 — the projection with no divide. Parallel edges stay parallel.
+    orthographic: {
+      form: "scatter3d", height: 12, series: [], camera: { projection: "orthographic", distance: 4 },
+      points3: [{ label: "helix", points: helix3(160) }],
+    },
+    // **C12 I86's degenerate, in the catalogue rather than only in a unit row.**
+    // A coplanar cloud has a zero extent on one axis, every sample takes that
+    // axis's centre, and the picture is a plane — which is a frame a reader can
+    // check and an assertion about a number is not.
+    coplanar: {
+      form: "scatter3d", height: 10, series: [],
+      points3: [{ label: "plane", points: helix3(120).map((p) => ({ ...p, z: 0.25 })) }],
+    },
+  },
   line: {
     // C12 §3g — all four placements, and the default that turns itself on.
     "legend-right": {

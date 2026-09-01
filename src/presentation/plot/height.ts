@@ -99,6 +99,8 @@ export function plotAreaRows(plot: PlotGeometry): number {
 const heightOrOne = (plot: PlotGeometry): number => Math.max(1, Math.floor(plot.height ?? 1));
 const AREA_ROWS: Readonly<Record<PlotForm, (plot: PlotGeometry) => number>> = {
   sparkline: () => 1,
+  // The declared rows are the sample grid's halves (C12 I84).
+  scatter3d: heightOrOne,
   waffle: () => 10,
   contour: heightOrOne, quiver: heightOrOne,
   line: heightOrOne,
@@ -139,6 +141,11 @@ const axedFurniture = (plot: PlotGeometry): number =>
   plot.axes === true ? AXIS_ROWS + FRAME_ROWS : 0;
 const FURNITURE_ROWS: Readonly<Record<PlotForm, (plot: PlotGeometry) => number>> = {
   sparkline: () => 0,
+  // **No frame, no rule, no x-labels** — `axes` is refused on this form
+  // (C04 I76) and its three axis names are billboarded in the scene rather
+  // than written under it. A horizontal legend still costs its row, and that
+  // is `legendRows`' term, added centrally.
+  scatter3d: () => 0,
   waffle: () => 0,
   line: axedFurniture,
   heatmap: () => AXIS_ROWS,

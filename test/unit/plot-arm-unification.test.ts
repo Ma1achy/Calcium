@@ -642,7 +642,7 @@ describe("U — the seam, asserted from both arms", () => {
         tally[i]![kind] += 1;
       });
     }
-    expect(forms, "forms traced").toBe(46); // cells-ok — a form count
+    expect(forms, "forms traced").toBe(47); // cells-ok — a form count
 
     // **The record, and it is the specification.** A cell moving is a finding:
     // a rung that stops changing a form, or starts changing one it did not.
@@ -674,11 +674,22 @@ describe("U — the seam, asserted from both arms", () => {
     // A `same` cell on a capability edge is the one to distrust: it reads as
     // *this rung does not reach this form* and it can mean *this form does not
     // answer this rung*.
+    //
+    // **`scatter3d` contributed one cell to each edge and all four are
+    // different**, which is the record earning its keep on the first form added
+    // after it was written:
+    //
+    // | edge | cell | why |
+    // |---|---|---|
+    // | 24 → 8 | `colour` | the raster arm both sides; the depth ramp quantises |
+    // | 8 → 1 | `layout` | **the arm switches** — `halfBlockEligible` needs 8, so below the floor the picture becomes marker glyphs at different coordinates |
+    // | 1 → ascii | `glyph` | the marker arm both sides, unicode marks to ASCII marks at the same positions |
+    // | 24 → wide | `layout` | **the arm switches again, on `ambiguousWidth` rather than on colour** — the one rung where a *width* capability moves geometry, and the reason `halfBlockEligible` reads three fields rather than one |
     expect(tally).toEqual([
-      { same: 1, colour: 45, glyph: 0, layout: 0 },
-      { same: 1, colour: 21, glyph: 3, layout: 21 },
-      { same: 0, colour: 0, glyph: 37, layout: 9 },
-      { same: 0, colour: 0, glyph: 38, layout: 8 },
+      { same: 1, colour: 46, glyph: 0, layout: 0 },
+      { same: 1, colour: 21, glyph: 3, layout: 22 },
+      { same: 0, colour: 0, glyph: 38, layout: 9 },
+      { same: 0, colour: 0, glyph: 38, layout: 9 },
     ]);
   });
 
@@ -782,7 +793,7 @@ describe("U — the seam, asserted from both arms", () => {
     // drawable at this rung and `truncate` reserves both its cells since F292,
     // so its width is a cost and not a defect. `~` is the *repertoire* fallback,
     // which is a different question (§3ak.24).
-    expect(frames, "catalogue variants rendered at the wide rung").toBe(188); // cells-ok — a frame count
+    expect(frames, "catalogue variants rendered at the wide rung").toBe(193); // cells-ok — a frame count
     expect([...seen.keys()].sort(), "two-cell characters still emitted").toEqual(["…"]);
   });
 
@@ -1173,32 +1184,41 @@ describe("U — the seam, asserted from both arms", () => {
       ...(form === "violin" ? { categories: ["a"] } : {}),
     } as Plot);
 
-    // **This row's original subject no longer exists, and that is asserted
-    // rather than assumed** (F383). `violin` was the refused child it was built
-    // around — *this path computes no density* — and F383 gave both density
-    // forms an emitter. Measured over the whole union, **nothing is refused**.
+    // **The row woke up.** Its original subject was `violin` — *this path
+    // computes no density* — and F383 gave both density forms an emitter, which
+    // left the interaction *does a composition refuse when a child does* with no
+    // constructible witness. The equality below was written to wake the row up
+    // the day one returned, and `scatter3d` is that day: `SVG_FAMILY` is `null`
+    // for it because no emitter here carries a projection (C12 §3am).
     //
-    // So the interaction *does a composition refuse when a child does* has no
-    // constructible witness here. The equality below is what wakes the row up
-    // the day one returns; until then the positional half is what it can test,
-    // and that half was always the part a frame could get wrong.
+    // **Asserted as the exact set rather than as non-empty**, so a second
+    // refusal arriving is a decision somebody makes here rather than a fixture
+    // silently changing meaning.
     const refused = (Object.keys(SVG_FAMILY) as PlotForm[]).filter((f) => SVG_FAMILY[f] === null);
-    expect(refused, "no form is refused, so this row's child cannot be built").toEqual([]);
+    expect(refused, "exactly one form is refused, and it is this row's child").toEqual(["scatter3d"]);
     expect(plotToSvg(kid("violin", "v"), DARK_THEME), "the old subject draws now").not.toBeNull();
+
+    // **The refused child, built** — a `scatter3d` takes `points3` and refuses
+    // `axes`, so it cannot come from `kid`.
+    const refusedKid = block({
+      kind: "plot", id: "r", form: "scatter3d", height: 6, series: [],
+      points3: [{ label: "r", points: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 1, z: 1 }] }],
+    } as Plot);
+    expect(plotToSvg(refusedKid, DARK_THEME), "and it is genuinely refused alone").toBeNull();
 
     const mixed = block({
       kind: "plot", id: "mix", form: "smallmultiples", height: 10, axes: true, series: [],
-      facets: [kid("line", "a"), kid("violin", "b"), kid("scatter", "c")],
+      facets: [kid("line", "a"), refusedKid, kid("scatter", "c")],
     } as Plot);
     const svg = plotToSvg(mixed, DARK_THEME);
-    expect(svg, "the composition draws").not.toBeNull();
+    expect(svg, "the composition draws even though a child does not").not.toBeNull();
 
-    // **A nested document per child, each at the x its position gives it** —
-    // three now rather than two, and the positional claim is unchanged: a column
-    // belongs to a facet by position, so the third child sits at the third
-    // offset whatever its neighbours did.
+    // **A nested document per child that drew — two of three**, and the third
+    // child still sits at the *third* offset. That is the whole of the rule:
+    // a column belongs to a facet by position, not by content, so a refused
+    // middle child must not pull its right-hand sibling leftwards.
     const kids = [...(svg ?? "").matchAll(/<svg x="([-\d.]+)"/gu)].map((m) => Number(m[1]));
-    expect(kids.length, "one nested document per child that drew").toBe(3); // cells-ok — a facet count
+    expect(kids.length, "one nested document per child that drew").toBe(2); // cells-ok — a facet count
     // **A column belongs to a facet by position**, which is what this row is
     // really for and the half that survived the refusal going away. Asserted
     // against `facetWidths` rather than against `width / 3`, because the divider
@@ -1214,8 +1234,11 @@ describe("U — the seam, asserted from both arms", () => {
     // defect. It did: `expected 214 to be close to 427`.
     const widths = facetWidths(SVG_DEFAULT_LAYOUT.width, 3);
     expect(kids[0], "the first child is at the left edge").toBeCloseTo(0, 6);
-    expect(kids[1], "the second is one column in").toBeCloseTo(widths[0] ?? 0, 6);
-    expect(kids[2], "and the third is in the third column")
+    // **The second document drawn is the *third* child**, which is the assertion
+    // the refusal makes possible and the one no all-drawing corpus can make: a
+    // renderer that packed the survivors would put it at `widths[0]`, and the
+    // frame would look perfectly reasonable.
+    expect(kids[1], "the surviving right-hand child keeps the third column")
       .toBeCloseTo((widths[0] ?? 0) + (widths[1] ?? 0), 6);
 
     // **Two children sharing an id share a clip path**, and the corpus cannot

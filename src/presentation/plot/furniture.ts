@@ -42,7 +42,7 @@ import { FACING_DEFAULT, facingOf } from "./scale.js";
 import type { Plot } from "../../data/viewmodel/index.js";
 import type { ColourRef } from "../theme/index.js";
 import { SHARES_CELLS, markOf } from "./marks.js";
-import { legendSlots, type FrameStyle } from "./figure.js";
+import { identityOf, legendSlots, type FrameStyle } from "./figure.js";
 import type { RenderContext } from "../blocks/types.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 
@@ -759,7 +759,14 @@ export function legendPlacement(
   // a one-series plot need the row exactly as two series do.
   const labelled = (block.annotations ?? [])
     .filter((a) => (a as { label?: string }).label !== undefined).length; // cells-ok — an annotation count
-  const count = (block.segments?.length ?? 0) || block.series.length; // cells-ok — a series count
+  // **`identityOf` rather than a second copy of its rule** (C12 I89). This read
+  // `(segments?.length ?? 0) || series.length`, which is that function's body
+  // spelled again — behaviour-identical on every form that has only those two
+  // carriers, and **one form short** the day a third arrived. A 3D scatter's
+  // identities are its clouds and only under `colourBy: "series"`, so the
+  // legend's presence and its contents now fall out of one rule and cannot
+  // disagree, which is I81's mechanism avoided rather than repaired.
+  const count = identityOf(block).length; // cells-ok — a series count
   // **A labelled annotation earns the row on any form that draws annotations**,
   // and it does not join `count`. `SHARES_CELLS` partitions forms by whether
   // *categories* share cells; an annotation's label is not a category, so

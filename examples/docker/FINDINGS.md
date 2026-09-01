@@ -13860,6 +13860,226 @@ terminal did not change, and the gap between those two is the whole finding.
 
 ---
 
+## F446 — two survivors, and both rows counted where they had to identify ★★★★★
+
+The `scatter3d` pass ran ten mutations and **two survived**. Neither was about the code.
+
+```
+SURVIVED   SC7   the last sample wins the cell, not the nearest
+SURVIVED   SC8   a zero value span reads at the ramp's floor
+```
+
+**SC7 asserted `new Set(colours).size > 1` — *both clouds appear*.** A renderer with no depth
+test at all satisfies it: the losing cloud still draws everywhere the winner is not, so the frame
+has two colours in it either way. **SC8 asserted `cs.size === 1` — *one reading, one colour*.** A
+zero span has exactly one colour whatever rule picks it; the count is true at the floor, at the
+top and at the middle.
+
+**One mechanism twice, in rows written by someone holding the sentence that names it.** Both
+comments were right about what the row was for — *resolve to the nearer one's colour*, *is
+mid-ramp* — and both assertions were about a **count**. Containment is not correctness, and a
+count is the containment defect one level up: it says the answer is in the set of plausible
+answers.
+
+**Fixed by identifying rather than counting.** SC7 renders each cloud alone, takes the contested
+cell's colour from each, asserts the two differ, and asserts the contested cell in the combined
+frame is the *near* one's. SC8 computes `continuousColour(map, 0.5)` and `continuousColour(map, 0)`
+from the ramp itself, asserts they differ, and asserts the frame's one colour is the first. Both
+mutations die now.
+
+**The instrument is the only one that asks a row whether it can fail**, and this is the fourth
+disposition it has produced: not *the code is wrong*, not *the test is right and a second defect
+masks it*, not *the spec sentence forbids nothing* — but *the assertion is about the wrong
+property, and the comment above it names the right one*. Review cannot separate those two, because
+the comment reads as the assertion.
+
+---
+
+## F445 — a sub-sample bias no assertion reaches, and the reference renderer that did ★★★★☆
+
+The raster arm paints a `bw x bh` block of samples per point, sized by the depth tier. It placed
+the block at `floor(x) - (bw >> 1)`, which for an even block is **half a sample left and up** at
+every near point. Systematic, small, and in a direction no test looked.
+
+**`make refdiff` is what found it** — the pane against matplotlib's `scatter3D`, where our helix
+sat about two columns left of theirs with the same shape. Fixed by rounding the block's *origin*
+off the exact coordinate, `round(fx - bw/2)`, which centres it at both parities. The external
+number went **8.8% → 7.8%**, fourth of 31 compared forms.
+
+**No suite row catches it, and three attempts to write one all failed for the same reason.** A
+bounding box is unmoved because the shift is sub-sample; a symmetry assertion cannot reach it
+because every cloud symmetric enough to assert against has a **degenerate depth span**, which puts
+every point in the middle tier where `bw` is 1 and the two placements are arithmetically identical;
+and a width sweep found zero asymmetric widths under both. A row that passes either way is A03 §2's
+vacuity class, so the row was **removed** rather than shipped green.
+
+**The reusable part is about where this class lives.** A half-sample bias is invisible to
+arithmetic, to a bounding box, to a stripped frame and to a golden frame that was recorded after
+the defect existed. What sees it is an *independent renderer of the same geometry* — and that is
+the argument for the reference comparison being a gate rather than a curiosity. The mutation is
+recorded in `c12-scatter3d.mjs` as one that kills nothing, with the reason, rather than left out.
+
+---
+
+## F444 — a rule reimplemented where its third carrier could not reach it ★★★★☆
+
+`legendPlacement` decides whether a form gets a key. Its count read:
+
+```ts
+const count = (block.segments?.length ?? 0) || block.series.length;
+```
+
+and `identityOf`, forty lines away in another file, read:
+
+```ts
+return segs !== undefined && segs.length > 0 ? segs.map(...) : block.series.map(...);
+```
+
+**Those are the same sentence.** Both say *a block's identities are its segments, or its series if
+it has none* — and they agree on every form, byte for byte, because there were exactly two carriers
+and both clauses enumerate them.
+
+**A third carrier is what separates them.** `scatter3d` holds its identities in `points3`, and only
+under `colourBy: "series"` — so `identityOf` learned a third arm and the copy in `legendPlacement`
+could not, because nothing about it was wrong. The result would have been a legend that is **present
+and empty**: `count` reads `series.length`, which is `0` on this form, so no key is drawn at all —
+and the *contents* rule and the *presence* rule would have been in two places disagreeing.
+
+**This is [the reimplemented rule keeps its birthday clauses] in its cheapest form**, and the
+signal was that a correct fix to `identityOf` changed nothing observable. Both copies read as
+correct; the question that reaches it is *which callers do not call the function* — and the answer
+was the one resolver whose whole job is to ask the same question.
+
+**Fixed** — `legendPlacement` calls `identityOf(block)` and takes its length. Behaviour-identical on
+all forty-four existing forms, which is what makes it a safe change and what made it invisible.
+
+---
+
+## F443 — the sparse case needs an alphabet the dense case does not ★★★★☆
+
+The half-block rung has shipped since C09: `halfBlockRows` averages an image into `HalfCell`s and
+`image.ts` paints each one as `HALF_BLOCK` with a foreground and a background. One glyph, and it has
+never needed another.
+
+**Writing the second consumer is what showed why.** A photograph inks every cell, so both halves of
+every cell always have a colour. A **scatter** is mostly empty, and there the two halves disagree
+about whether they are drawn at all:
+
+```
+both halves inked     `▀` with a foreground and a background       — the image arm's only case
+top only              `▀` with a foreground and no background
+bottom only           `▄` with a foreground                        — and this glyph did not exist
+neither               a space
+```
+
+The tempting cell is *bottom only* as `HALF_BLOCK` with no foreground: the terminal then paints the
+top half in whatever the current foreground happens to be, so a blank half comes out as a solid bar
+in the default text colour. Every assertion about the bottom half passes.
+
+**`HALF_BLOCK_LOWER` lands beside `HALF_BLOCK`**, in `image/halfblock.ts`, on that file's own
+recorded reason for holding the first one: it is a rendering primitive rather than an alphabet a
+ladder indexes. The unstated assumption in the first arm was *density*, and nothing in the module
+said so because nothing had ever been sparse.
+
+---
+
+## F442 — drawn-ness read from the colour, and two thresholds that happen to agree ★★★★★
+
+The 3D scatter's raster keeps one colour per sample and composes cells from pairs of them. The first
+draft used the colour itself as the drawn flag:
+
+```ts
+const top = ink[i];
+if (top === undefined && bottom === undefined) line.push({ text: " " });
+```
+
+**`continuousColour` returns `undefined` below its own floor.** So a sample the depth buffer had
+accepted, drawn in a terminal with no continuous colour, would have composed as *nothing there* — a
+point silently deleted, with the block still the right height and every geometry assertion passing.
+
+**It is unreachable today, and that is the finding rather than the reprieve.** `halfBlockEligible`
+requires `colourDepth >= 8` and `CONTINUOUS_FLOOR` is `8`. Two thresholds, in two components, written
+by two different arguments — one about how many colours a cell needs to carry a picture, one about
+when a perceptual ramp stops being a ramp — that happen to be the same number. Either moving alone
+turns a drawn point into a blank, and neither has any reason to consult the other.
+
+**Fixed** — the depth buffer is the source: `Number.isFinite(depth.z[i])` is *drawn*, and the colour
+is what it is drawn in, `undefined` included. The glyph arm was already correct, because it keys on a
+separate table index and its `-1` means absent; the raster arm conflated the two because it had only
+one array.
+
+**[Two blockers read as one]** in the other direction: there the signal was a correct fix changing
+nothing, here it is a correct-looking defect that no capability set in the corpus can reach.
+
+---
+
+## F441 — twenty-three questions, and the neighbouring form is the wrong answer to seven ★★★★☆
+
+Adding `scatter3d` to `PlotForm` produced **23 compile errors in `src/`** and 5 more in `test/` and
+`tools/` — every total `Record<PlotForm, …>` demanding a cell. The plan estimated ~19; the measured
+number is what it is, and the count is not the point.
+
+**The point is that `scatter` answers seven of them wrongly.** A 3D scatter is a scatter in name and
+in nothing a record asks about:
+
+| record | `scatter` | `scatter3d` | why the copy would be wrong |
+|---|---|---|---|
+| `HAS_VALUE_AXIS` | `true` | `false` | a `Figure` holds **one** `value` and this form has three ranges — F330's exact class |
+| `ORIGIN_DEFAULT` | `"bottom-left"` | `null` | the corner moves under an orbit |
+| `HONOURS_AXIS_CROSS` | `true` | `false` | `overlaidRows` does not compose this area |
+| `HAS_Y_GUTTER` | `true` | `false` | the ordinate is in the scene and turns |
+| `HAS_X_TITLE` | `true` | `false` | three axes, and `xTitle` names one of them |
+| `HAS_CALLOUT` | `true` | `false` | the rightmost sample is a camera artefact |
+| `HAS_POSITION_AXIS` | `true` | `false` | the abscissa is a projected x, not a sample index |
+| `STYLE_ARMS` | `["braille","line"]` | `[]` | the arms are a capability, not a taste |
+
+**Eight, counting `STYLE_ARMS`.** F330 measured the same shape from the other end — five record cells
+that stayed silent for as long as their forms were refused, because a cell nobody can observe reads
+as deliberate. This adds twenty-three at once, and the mechanism only works if each one is answered
+on its own reason: a `Record` forces an answer and cannot check it.
+
+**The one to watch is `HAS_VALUE_AXIS`.** It is `true` on every neighbour, it is checked by a
+cross-record row (`FV1c`) that only forbids `ramp && valueAxis`, and `RAMP_DEFAULT.scatter3d` is
+`"viridis"` — so the wrong answer would have been caught here by luck rather than by design. The
+right answer has a reason F330 already wrote down one form over.
+
+---
+
+## F440 — a default set with nothing drawing, and the framing was measurable all along ★★★★★
+
+`CAMERA_DEFAULT.distance` was `10`. It was written on the commit that ruled the camera type, one
+step before anything could project, and there was no way to be wrong about it: no frame, no
+assertion, no consumer. **An invariant is vacuous until its subject exists**, and so is a constant.
+
+Step 3 gave it one. Measured at 80×12 cells over the normalised cube's eight corners and a
+400-point sphere shell, at three elevations × two azimuths:
+
+```
+distance   figure fills          corners clear the frame edge
+  10       50% of the height     yes
+   6       67%                   yes  <- the largest that does
+   5.5     ~70%                  no — two of six cameras touch
+   5       75%                   no
+   4       92%                   no
+   3      100%                   no
+```
+
+At `10` the picture occupied **11% of an 80-column frame** — a helix of 160 points rendered as a
+nine-column smudge in the middle of the block, arithmetically correct and unreadable.
+
+**The number is a property of the normalisation and not of anybody's data**, which is what makes it
+measurable rather than a taste. `unitOf` maps every axis to `[−1, 1]` independently, so the extremes
+always sit at ±1 and the bounding sphere always has radius `√3` — the framing cannot depend on the
+cloud. The sphere shell never touches an edge at any of these distances, because its radius is 1;
+the **cube's corners** are the binding case, which is what says the sweep found the worst input
+rather than the convenient one.
+
+**Corrected to 6**, with both figures and the sweep recorded beside the constant. The old value is
+not *wrong* in any way a reader could have checked, and that is the whole finding: the frame-read is
+the only instrument that reaches a number whose only observable is a picture.
+
+---
+
 ## F439 — an identity check and a cleared check, both green over one shared buffer ★★★★★
 
 **PR8's job is to stop a scratch buffer**, which is the optimisation a 30fps orbit invites and

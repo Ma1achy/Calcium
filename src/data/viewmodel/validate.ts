@@ -1438,6 +1438,7 @@ function plotFieldErrors(
       }
     }
   }
+  checkPoints3(b, form, at, e);
   // **A layer with no data is refused at the gate**, because the alternative is
   // an empty plot area that reads as a field with nothing in it.
   if (Array.isArray(layers) && layers.includes("quiver") && vectors === undefined) {
@@ -1445,6 +1446,95 @@ function plotFieldErrors(
       `${at}: "layers" names "quiver" and there are no "vectors" (C04 I61) — a layer ` +
         `with no data draws an empty area that reads as a field with nothing in it`,
     );
+  }
+}
+
+/**
+ * A 3D scatter's geometry and its colour channel (C04 I76, C12 I87).
+ *
+ * **`vectors`' shape one dimension along**, and the four refusals are the four
+ * §3am names: the carrier off the form, the form with no carrier, the channel
+ * off the form, and `axes` on it.
+ *
+ * **`axes` is F207's rule rather than a deferral.** Three axes turn with the
+ * camera and are drawn inside the area, so there is no gutter and no bottom
+ * rule for `axes: true` to switch on — and a member accepted and ignored tells
+ * the caller nothing. The blocker is the in-scene axis renderer rather than a
+ * step number, so a grep for `axesAt3` is what expires this clause.
+ */
+function checkPoints3(
+  b: Record<string, unknown>,
+  form: unknown,
+  at: string,
+  e: string[],
+): void {
+  const pts = b["points3"];
+  const by = b["colourBy"];
+  if (pts !== undefined && form !== "scatter3d") {
+    e.push(
+      `${at}: "points3" on form "${String(form)}" (C04 I76) — only a scatter3d draws a ` +
+        `point cloud, and three coordinates per sample mean nothing to any other form`,
+    );
+  }
+  if (form === "scatter3d" && pts === undefined) {
+    e.push(
+      `${at}: form "scatter3d" has no "points3" (C04 I76) — a point cloud is what it ` +
+        `draws, and "series" carries one reading per position`,
+    );
+  }
+  if (by !== undefined && form !== "scatter3d") {
+    e.push(
+      `${at}: "colourBy" on form "${String(form)}" (C04 I76) — it names which of three ` +
+        `readings colour carries, and no other form has three competing for it`,
+    );
+  }
+  if (form === "scatter3d" && b["axes"] === true) {
+    e.push(
+      `${at}: "axes" on form "scatter3d" (C04 I76) — three axes turn with the camera and ` +
+        `are drawn inside the area, so there is no gutter and no bottom rule to switch on`,
+    );
+  }
+  if (pts === undefined) return;
+  if (!Array.isArray(pts)) {
+    e.push(`${at}: "points3" must be an array of clouds`);
+    return;
+  }
+  // **Every point walked, and only for the arm that reads the value** (C04 I76).
+  // A point missing a `value` still has a position, so under `colourBy:
+  // "value"` it would be drawn in *some* colour — dropping it silently is
+  // C12 I8's class and the ramp's floor is indistinguishable from a floor
+  // reading. Under the other two arms the field is not read and its absence is
+  // not a fault.
+  let si = 0;
+  for (const cloud of pts as readonly Record<string, unknown>[]) {
+    const points = cloud?.["points"];
+    if (!Array.isArray(points)) {
+      e.push(`${at}: a "points3" cloud has no "points" array`);
+      si += 1; // cells-ok — a cloud index
+      continue;
+    }
+    let pi = 0;
+    for (const p of points as readonly Record<string, unknown>[]) {
+      const finite = (v: unknown): boolean => typeof v === "number" && Number.isFinite(v);
+      if (!finite(p?.["x"]) || !finite(p?.["y"]) || !finite(p?.["z"])) {
+        e.push(
+          `${at}: points3[${String(si)}].points[${String(pi)}] is not a finite (x, y, z) ` +
+            `(C04 I76) — a gap is a position that produced no reading, and a cloud lists ` +
+            `only the positions it has`,
+        );
+        break;
+      }
+      if (by === "value" && !finite(p["value"])) {
+        e.push(
+          `${at}: points3[${String(si)}].points[${String(pi)}] has no finite "value" and ` +
+            `"colourBy" is "value" (C04 I76) — the point still has a position, so it would ` +
+            `be drawn in a colour nothing chose`,
+        );
+        break;
+      }
+      pi += 1; // cells-ok — a point index
+    }
+    si += 1; // cells-ok — a cloud index
   }
 }
 
@@ -1784,6 +1874,7 @@ const PLOT_FORM_MEMBERS = {
   pie: true, radar: true,
   horizon: true,
   contour: true, quiver: true,
+  scatter3d: true,
 } satisfies Record<PlotForm, true>;
 const PLOT_FORMS: ReadonlySet<string> = new Set(Object.keys(PLOT_FORM_MEMBERS));
 

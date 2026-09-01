@@ -1,0 +1,13 @@
+── scatter3d · colour-series · ascii · 40w
+                                 # alpha
+                                 / beta
+                                 \ gamma
+              ooo$$$$
+              .o$$$$$$
+              ..$$$$$
+
+            xxxxx
+            #####
+            xxx#x
+
+
