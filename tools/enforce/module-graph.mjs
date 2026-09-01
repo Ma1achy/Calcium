@@ -644,6 +644,7 @@ export const BUILDER_OMISSIONS = Object.freeze({
   // exposing this before the form exists hands callers a way to add a focus stop
   // to a 2D plot and no way to draw anything. It arrives with `scatter3d`.
   "plot.camera": "the initial view of a 3D plot; no 3D form exists, and on a 2D one it would add a focus stop and nothing else (C12 I85)",
+
   "table.actionBar":
     "C11 I18 — a presence rather than a width, and not the producer's either. The bar is " +
     "derived from `rows.some(r => r.actions)`, so a window moves it in both directions and " +
@@ -1405,6 +1406,20 @@ export function checkOneStorePerComponent(files, readFile = (f) => readFileSync(
 
 /** Members whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_MEMBERS = Object.freeze({
+  // **Step 2 of \`docs/notes/CALCIUM_3D_DESIGN.md\` §10 lands before step 3**, which
+  // is the step that reads it. Every entry below expires on the same symbol —
+  // \`scatter3d\` in \`PlotForm\` — and the equality arm refuses all of them the
+  // day it arrives, which is what makes this a loan rather than a list.
+  //
+  // **The split is the design's and the alternative was measured**: folding the
+  // projection into the form would put the degenerate rows behind a renderer, and
+  // PR1 — the row that shows a sample behind the eye lands *inside the frame* —
+  // needs to reach the basis directly. Building a wrong projector into \`src/\` to
+  // avoid an exemption would be worse than the exemption.
+  "Basis.eye": "PR1 computes what an unculled projector would give, to show the wrong answer is in frame; no src/ consumer until scatter3d",
+  "Basis.forward": "the same row's view-space z; no src/ consumer until scatter3d",
+  "Basis.orthographic": "the arm project() branches on; nothing in src/ chooses a projection until scatter3d",
+
   // --- published ahead of the value that makes it readable ------------------
   //
   // **A single-value union has nothing for a consumer to branch on**, which is
@@ -2584,6 +2599,22 @@ export function checkExportedArguments(files, readFile = (f) => readFileSync(f, 
 
 /** Functions whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_FUNCTIONS = Object.freeze({
+  // **Step 2 of \`docs/notes/CALCIUM_3D_DESIGN.md\` §10 lands before step 3**, which
+  // is the step that reads it. Every entry below expires on the same symbol —
+  // \`scatter3d\` in \`PlotForm\` — and the equality arm refuses all of them the
+  // day it arrives, which is what makes this a loan rather than a list.
+  //
+  // **The split is the design's and the alternative was measured**: folding the
+  // projection into the form would put the degenerate rows behind a renderer, and
+  // PR1 — the row that shows a sample behind the eye lands *inside the frame* —
+  // needs to reach the basis directly. Building a wrong projector into \`src/\` to
+  // avoid an exemption would be worse than the exemption.
+  sampleGrid: "C12 I84 — width x 1 by height x 2; nothing rasterises into a sample grid until scatter3d",
+  unitOf: "C12 I86 — the unit cube, with a zero extent mapping to the centre; no src/ caller until scatter3d",
+  basisOf: "C12 I83 — the camera resolved to an eye and a frame; no src/ caller until scatter3d",
+  createDepth: "C12 I84, C12 I11 — allocated per render; no src/ caller until scatter3d",
+  writeDepth: "C12 I84 — the depth test; no src/ caller until scatter3d",
+
   // **Six entries left here at once, and the equality arm is what removed them.**
   //
   // The seven family emitters landed one commit at a time, each with the same

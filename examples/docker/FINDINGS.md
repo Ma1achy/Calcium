@@ -13860,6 +13860,101 @@ terminal did not change, and the gap between those two is the whole finding.
 
 ---
 
+## F439 — an identity check and a cleared check, both green over one shared buffer ★★★★★
+
+**PR8's job is to stop a scratch buffer**, which is the optimisation a 30fps orbit invites and
+which C12 I11 forbids. Its first draft asserted the two obvious things:
+
+```ts
+expect(b.z).not.toBe(a.z);                                  // a distinct buffer
+expect([...b.z].every((v) => v === Infinity)).toBe(true);    // nothing carried over
+```
+
+**Both pass over a shared buffer.** The mutation hands out `SCRATCH.subarray(0, w * h)`:
+`subarray` returns a **fresh view object** on every call, so the identity check passes, and the
+mutation's own `fill(Infinity)` clears the view, so the second passes too. Two green assertions,
+one array underneath.
+
+**The property a shared buffer cannot have is that an earlier render survives a later one.**
+Allocating `b` wipes the memory `a` is looking at, so the row is now:
+
+```ts
+writeDepth(a, 1, 1, 0.5);
+const b = createDepth(4, 4);
+expect(a.z[1 * 4 + 1]).toBe(0.5);   // allocating b did not disturb a
+```
+
+**Both original assertions were proxies for allocation and neither was allocation.** Identity is
+a necessary condition and it is cheap to satisfy; *cleared* is a property of the view rather than
+of the memory. Kept beside the real one rather than deleted, because a necessary condition that
+fails is still a finding.
+
+**Found by the mutation pass and by nothing else.** The row passed, the suite was green, and the
+scratch buffer it exists to refuse walked straight through it — which is the case for mutating
+every row rather than the rows that look uncertain.
+
+### And the rule that would have caught it cannot be widened
+
+SS24 forbids a module-level binding in `plot/`, `table/`, `patch/` and `parser/`. Its `why` says
+**binding**; its pattern says `let|var`. **A `const` bound to a mutable is a module-level binding
+by any reading of that sentence**, and the rule cannot see one — F84's class, in a rule rather
+than in a spec.
+
+**Measured**: one instance in the whole scope, `plot/field.ts`'s `const DIM_FACTORS = new Map()`.
+It is a memo over frozen framework data keyed by a colormap's name, so no render can observe it —
+a pure function's cache, which C10 I11 already permits one component over. **So widening the
+pattern would fire on the legitimate case**, take an exemption, and leave that exemption as the
+next reader's evidence that module-level mutables are fine. No regex separates *a cache of a pure
+function of frozen data* from *a cache of anything else*.
+
+**The hazard is covered by a row instead**, and the blind spot is recorded beside the rule with
+the figure — an unrecorded limit reads as strength.
+
+---
+
+## F438 — three drafts of one sentence about geometry, and the first two were measured against the case to hand ★★★★☆
+
+**§3al's edge-on rule took three attempts and only the third was measured.**
+
+```
+draft 1   "the projected extent is zero on one screen axis"
+draft 2   "both screen axes spread; only the extent ACROSS the line is zero"
+draft 3   the image is a LINE; a zero screen extent is a special case of that
+```
+
+Each of the first two was **true of the plane it was written against**. Draft 1 was written from
+an axis-aligned plane and an axis-aligned camera; the implementation refuted it with a tilted
+one. Draft 2 was written from the tilted one and the implementation refuted *it* — screen y
+collapsed to `1.1e-16`.
+
+**The third is measured over a family.** An edge-on plane contains the view direction; its other
+in-plane direction sets the image's angle:
+
+```
+the plane's in-plane direction      collinear?   screen-x spread   screen-y spread
+right                                    yes           2.12e-1          1.11e-16
+0.866 right + 0.500 up                   yes           1.84e-1           1.86e-1
+0.707 right + 0.707 up                   yes           1.50e-1           2.63e-1
+up                                       yes          1.67e-16           3.72e-1
+```
+
+**Collinearity holds in every row and a zero screen extent in two of five.** So the general
+property is that the image is a line, and axis-alignment is where that line happens to be
+parallel to a frame axis.
+
+**Two probes agreed with themselves before the third disagreed.** The first two built the plane
+in *world* space and then ran it through `unitOf`, which normalises each axis by its **own**
+extent — an anisotropic affine map, so the eye is no longer in the plane it was placed in. Only
+azimuth 0 survived, by symmetry, and a probe that produces one honest row and four wrong ones
+reads as a measurement. The third builds the plane **from the basis**, out of `forward` and a
+diagonal of `right` and `up`, so it is edge-on by construction.
+
+**The reusable half is about which case a sentence was written from.** A claim about geometry
+written while looking at one configuration is a claim about that configuration; the family is
+cheap to sweep and it is the only thing that separates *true* from *true here*.
+
+---
+
 ## F437 — a citation's owner decided by position, and the verdict by a coincidence of numbering ★★★★★
 
 **A03 SP1 pairs every commitment to an invariant and resolves what it cites.** Writing one that

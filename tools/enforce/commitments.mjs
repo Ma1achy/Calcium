@@ -1033,19 +1033,25 @@ export function scanSections(file, src, options = {}) {
  * `C12 I85` — the focusable-plot ruling the *implementation* found rather than
  * the walk — was added to the loan and repaid within the same arc.
  *
- * **`C12 I84` stays, and it is the first entry here with a condition rather than
- * a commit.** Its subject is a renderer: the sample grid is `width × 1` by
- * `height × 2` and the depth buffer is allocated per render, and **nothing
- * rasterises anything into a sample grid yet**. A row written now would be
- * vacuous — there is no answer for it to be wrong about — and a vacuous row is
- * how this list stops meaning anything. It is struck when `scatter3d` lands,
- * which is the step that gives it a subject.
+ * **`C12 I84` was taken as a *conditional* loan and the condition was wrong.**
+ * It was listed on the reasoning that its subject is a renderer — *the sample
+ * grid is `width × 1` by `height × 2` and the depth buffer is allocated per
+ * render, and nothing rasterises into a sample grid yet* — with `scatter3d`
+ * named as the symbol that would release it. **One commit later `PR7` and `PR8`
+ * cite it**: a grid is testable without anything drawing into it, and a buffer's
+ * allocation is testable by allocating two. `C12 I86` rode in on the same
+ * reasoning and left on the same commit.
  *
- * **The distinction is worth naming because it is the one that could rot.** A
- * one-commit loan expires by being noticed; a conditional one expires only if
- * somebody goes and looks. The condition is a symbol — `scatter3d` in
- * `PlotForm` — so picking up that step begins by grepping it, which is the
- * deferral habit CLAUDE.md already carries.
+ * **The equality arm is what said so**, and this is the case it was built for:
+ * a subset check would have left both sitting here, correct-looking, for as long
+ * as anyone cared to look. A one-commit loan expires by being noticed; a
+ * conditional one expires only if somebody goes and looks — and here nobody had
+ * to, because the rule refused an entry that had stopped excusing anything.
+ *
+ * **So the conditional form is not a second kind of loan.** It was a wrong
+ * estimate of when a row could exist, and the honest reading is that *nothing
+ * rasterises yet* was a claim about the renderer where the invariant is about
+ * the grid.
  *
  * **Stated blind spot: the corpus is `.ts` only**, matching what `walk` collects,
  * so an invariant named solely by a `.mjs` fixture reads as uncited. Widening it
@@ -1067,8 +1073,6 @@ const UNCITED_INVARIANTS = Object.freeze([
   "C24 I20", "C24 I22", "C24 I25", "C24 I26", "C24 I28", "C24 I6", "C24 I7", "C25 I10",
   "C25 I11", "C25 I14", "C25 I15", "C25 I16", "C25 I17", "C25 I19a", "C25 I20a", "C25 I20b",
   "C26 I1", "C26 I11", "C26 I15", "C26 I16", "C26 I17", "C26 I20", "C26 I8", "C26 I9",
-  // Struck when `scatter3d` lands — its subject is a rasteriser. See above.
-  "C12 I84", "C12 I86",
 ]);
 
 /**

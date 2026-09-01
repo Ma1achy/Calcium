@@ -460,6 +460,30 @@ export const SCANS = [
     ], allow: [],
     why: "C11, C12 and C25 own no state: a module-level binding is a cache two blocks share and only one of them invalidates" },
 
+  // **Stated blind spot: the `why` says *binding* and the pattern says
+  // `let|var`.** A `const` bound to a mutable is a module-level binding by any
+  // reading of that sentence and this rule cannot see one — F84's class, a
+  // correct justification attached to a narrower mechanism, in the rule rather
+  // than in a spec.
+  //
+  // **Measured rather than assumed**: one instance in the whole scope,
+  // `plot/field.ts`'s `const DIM_FACTORS = new Map()`. It is a memo over frozen
+  // framework data keyed by a colormap's name, so no render can observe it — a
+  // pure function's cache, which is what C10 I11 already permits one component
+  // over.
+  //
+  // **And that is why the pattern is not widened.** Catching the scratch buffer
+  // would mean catching `DIM_FACTORS`, and no regex distinguishes *a cache of a
+  // pure function of frozen data* from *a cache of anything else*. The rule
+  // would fire on the legitimate case, get an exemption, and the exemption would
+  // be the next reader's evidence that module-level mutables are fine.
+  //
+  // **What covers the hazard is a row rather than a rule** — `PR8` allocates two
+  // depth buffers and requires the first to survive the second, which is the
+  // property a shared array cannot have. It caught a scratch buffer handed out
+  // as `SCRATCH.subarray(0, n)`, which passes an identity check and a cleared-to-
+  // Infinity check both.
+
   // C18 I11 and C05 I18, as one rule.
   //
   // **Its subject was always "a shared text primitive with one implementation";

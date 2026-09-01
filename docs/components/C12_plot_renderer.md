@@ -7583,9 +7583,29 @@ axis has no spread, so every sample sits in the middle of it — which draws a p
 **line** and a coincident set as a **point**, both of which are the truth. Dividing by the
 extent is what the rule replaces, and the three rows differ only in how many axes take it.
 
-**A plane viewed edge-on keeps its line and loses its labels** (§4's rule, arriving early): the
-*projected* extent is zero on one screen axis even though the data's is not, which is a
-different zero from row 3 and needs its own row.
+**A plane viewed edge-on keeps its line and loses its labels** (§4's rule, arriving early), and
+it is a **different zero from row 3**: the data spreads on all three axes and the *projection*
+collapses to a line.
+
+**Not *a zero extent on one screen axis*, and this sentence took three attempts.** It first
+said exactly that; the second draft over-corrected to *both screen axes spread*; the third is
+measured over a family rather than over the case to hand. An edge-on plane contains the view
+direction, and its other in-plane direction sets the image's angle:
+
+```
+the plane's in-plane direction      collinear?   screen-x spread   screen-y spread
+right                                    yes           2.12e-1          1.11e-16
+0.866 right + 0.500 up                   yes           1.84e-1           1.86e-1
+0.707 right + 0.707 up                   yes           1.50e-1           2.63e-1
+up                                       yes          1.67e-16           3.72e-1
+```
+
+**Collinearity holds throughout and a zero screen extent does not.** It appears only where the
+line is parallel to a screen axis, which is two of five rows — so it is a special case of the
+image being a line, not the rule. Screen x and screen y are the frame's axes and the figure has
+its own. **The row asserts collinearity, which is frame-independent, and asserts that both
+screen extents are non-zero in the diagonal case** — because that is the half the first draft
+denied.
 
 ### Two more rulings the camera forces
 
@@ -8980,7 +9000,7 @@ Six tiers. No state machine — C12 is pure over the block.
 - **PR3** (I86): a `distance` of zero projects **nothing at all** from a full point set, and the plot is empty rather than refused.
 - **PR4** (I86): coplanar data — a zero extent on one axis — maps every sample to that axis's **centre**, and the projected figure is a **line**. Asserted over the set rather than on one member.
 - **PR5** (I86): collinear data, zero on two axes, and coincident data, zero on three: a point, and no `NaN` in either. **Three rows rather than one parameterised row**, because the count of degenerate axes is what differs and a single row taking a parameter tests whichever value it is given last.
-- **PR6** (I86, §4): a **plane viewed edge-on** projects to a zero *screen* extent on one axis while its data extent is non-zero — a different zero from PR4, and the one §4's *hide the labels, keep the line* rests on.
+- **PR6** (I86, §4): a **plane viewed edge-on** projects to a **line** while spreading on all three data axes — a different zero from PR4, and the one §4's *hide the labels, keep the line* rests on. **Collinearity rather than a zero screen extent**: the row's first draft asserted the latter and the implementation refuted it, because a tilted plane's image is a line at whatever angle the geometry gives and both screen axes still spread. Its control is the same plane from a camera *not* in it, which must not be collinear.
 - **PR7** (I84): the sample grid is `width × 1` by `height × 2` at **three widths and two heights**, and the braille arm is `× 2` by `× 4` at the same six. The control is that the two arms disagree, which is what says the row reads a rule rather than a constant.
 - **PR8** (I84, I11): the depth buffer is **allocated per render**. Two calls return distinct buffers and a write to the first is not visible in the second — asserted on the *second*, because a module-level buffer is correct on the first by construction. **The row exists before the optimisation does**: a scratch buffer is what step 8's 30fps orbit invites, and SS24 cannot see one declared `const`.
 - **CAM1** (I83, I1): `plotHeight` and `measure` are **identical across every camera** — one block at eight `(azimuth, elevation, distance, projection)` values, asserted over the **set** and not against element zero. The degenerate values are in the set on purpose: elevation at exactly ±π/2, `distance: 0`, and both projections. A collapse-onto-zero mutation survives a row that checks the first member.
