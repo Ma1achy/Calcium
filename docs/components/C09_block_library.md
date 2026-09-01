@@ -1181,7 +1181,7 @@ forty rows of a 50 000-row block costs **0.65 ms** for the kind that declares a 
 | `logs` | nothing — the level column is a constant and the message takes the residual | **windows**, exactly |
 | `patch` | the gutter, via `numberWidth` | **windows**, with the width **pinned** (C25 I21a) |
 | `keyValue` | the key column, via `widest` | **windows**, with the width **pinned** — the same argument one kind over |
-| `table` | nothing the rows decide — `planColumns` reads the column definitions and the width (F134) | **can window**; the accounting is the header, the action bar, expanded detail rows, and **`sortedRows`** — the render sorts, so a slice must be taken in *rendered* order or it shows different rows than the range C14 addressed |
+| `table` | **two things, and only one was recorded.** `planColumns` reads the column definitions and the width, never the rows (F134) — so the *column* layout is safe. But `hasActionBar` is `rows.some(r => r.actions)`, and it costs **two rows** of height | **not yet** — four interactions, below |
 | `code` | **the parse** | **cannot** — see below |
 | `plot` | the whole series | atomic, permanently (C12 I1) |
 
@@ -1210,6 +1210,29 @@ context is a guess; carrying the lexical continuation means a field on `Code` ho
 internal mode, which is a public type carrying another library's state. Until that is ruled, `code`
 stays atomic and its cost is answered by the *other* half of roadmap 17 — a per-block cap with a
 visible marker, which needs no lexical context at all.
+
+### What `table` owes, which is more than a slice
+
+Written down rather than attempted, because four interactions in one window is where a rushed
+change earns its defect.
+
+1. **`sortedRows`.** `measure` walks `block.rows` and `render` walks `sortedRows(block)`. The
+   counts agree, so I26 passes either way — and *which* row sits at a given index does not, so a
+   slice taken in declaration order shows different rows than the range C14 addressed. **A
+   count-based invariant passing while the content is wrong** is F426's shape, one kind over.
+2. **The header.** `hasHeader` is `showHeader !== false`, so a window past row 0 can say
+   `showHeader: false`. Expressible today — the only one of the four that is.
+3. **The action bar.** `hasActionBar` is `rows.some(r => r.actions)` and it costs two rows
+   (I17). A window mid-table whose slice happens to carry actions draws a bar the reader is not
+   looking at; one whose slice does not drops two rows the parent counted. **Derived from the
+   rows, like `widest`** — so it wants pinning, and there is no field for it. Stripping `actions`
+   to suppress it is not the same change: it removes the row's affordances (C26).
+4. **Expanded detail rows.** An expanded row is one indivisible unit taller than one row, so a
+   boundary inside it is `skipRows` rather than a shorter slice — the accounting `windowRows`
+   already reasons through for a hunk.
+
+**So `table` needs a public field before it needs a window**, exactly as `keyValue` did — and the
+field is a *presence* rather than a width, which is a different argument and wants its own ruling.
 
 ### The trace — two windows of one block, and whether they agree
 
