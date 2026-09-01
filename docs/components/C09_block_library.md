@@ -1164,6 +1164,64 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 
 ---
 
+## 6b. The walk — which kinds can be windowed, and the one that cannot
+
+**Two artefacts, because the question has both shapes.** The classification table asks which kinds
+divide, which is structural and holds at rest. The trace asks what a *scroll* does — two windows of
+one block, and whether they agree — which is event-mediated and is where C25 I21a's defect lived.
+
+**Measured first** (F423, F424): the seam is built and wired at `session.ts`, and painting the top
+forty rows of a 50 000-row block costs **0.65 ms** for the kind that declares a window and
+**913.79 ms** for the kind that does not. 1 400×, with every assertion passing and the frame correct.
+
+### The table — what each kind derives from rows outside the slice
+
+| kind | derived from the whole | verdict |
+|---|---|---|
+| `logs` | nothing — the level column is a constant and the message takes the residual | **windows**, exactly |
+| `patch` | the gutter, via `numberWidth` | **windows**, with the width **pinned** (C25 I21a) |
+| `keyValue` | the key column, via `widest` | **windows**, with the width **pinned** — the same argument one kind over |
+| `table` | nothing the rows decide — `planColumns` reads the column definitions and the width (F134) | **can window**; the accounting is the header, the action bar, expanded detail rows, and **`sortedRows`** — the render sorts, so a slice must be taken in *rendered* order or it shows different rows than the range C14 addressed |
+| `code` | **the parse** | **cannot** — see below |
+| `plot` | the whole series | atomic, permanently (C12 I1) |
+
+**`widest` and `numberWidth` are the same problem and `tokenise` is not**, which is the ruling this
+walk exists to make. A width can travel with a window: the block says what its parent measured and
+the renderer prefers that over deriving. **A parse cannot travel**, because it is not a number
+attached to the block — it is a function of every character before the slice.
+
+### Why `code` is refused, measured
+
+`tokenise` runs over the whole text. Slicing lines out changes what they *are*:
+
+```
+a block comment opening at line 2 and closing at line 11, tokenised whole
+    slots present:  comment  keyword  null  number
+the same lines 4–7, tokenised as a window
+    slots present:           keyword  null  number
+```
+
+**Lines that are commented out come back as live code.** And `measure` never tokenises (C09 §3,
+T2.13), so the height is identical — **C09 I26's equality holds perfectly while the colours are
+wrong**, and no geometric assertion can see it. Containment is not correctness.
+
+**The fix is not a wider slice.** A comment can open at line 1 of a 50 000-line file, so any bounded
+context is a guess; carrying the lexical continuation means a field on `Code` holding a highlighter's
+internal mode, which is a public type carrying another library's state. Until that is ruled, `code`
+stays atomic and its cost is answered by the *other* half of roadmap 17 — a per-block cap with a
+visible marker, which needs no lexical context at all.
+
+### The trace — two windows of one block, and whether they agree
+
+| # | first window | then | rules that meet | ruling |
+|---|---|---|---|---|
+| B1 | rows 0–40 | scroll to 200–240 | I25 · the kind's own layout | **The drift is a difference between two windows**, so a row asserting one window against a constant passes against a pin that is simply wrong. C25 T3.20 says the sweep and not one offset; `keyValue`'s row copies it |
+| B2 | any | the window covers the whole block | `windowSequence` | The block is passed through unsliced and carries **no pin** — and that is correct, because deriving from the whole block is what the pin would have said. Asserting the *field* rather than the effective width reports this as drift; the observable is what the renderer will use |
+| B3 | any | the kind declares no `window` | I25 | Kept whole, paid out of `skipRows`. Silent by design, and F424 is the finding that nothing reports which kinds declined |
+| B4 | rows spanning a detail block | scroll one row | C25 I19's shape in `table` | An expanded row is an indivisible unit taller than one row, so a boundary inside it is `skipRows`, not a shorter slice — the accounting `windowRows` already reasons through |
+
+---
+
 ## 7. Invariants
 
 - **I1** — For every registered kind, `measure(b, w)` equals the row count of `render(b, ctx)` at width `w`. The system's most load-bearing invariant.
@@ -1192,6 +1250,7 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 - **I23** — **A grammar can be registered after construction, and registering one invalidates the memo.** §4a promised that an unregistered language is readable now and highlighted *whenever someone registers it*; the constructor shipped with a fixed pair and no registration path, so the promise had no mechanism (F93). The invalidation is half the invariant rather than an implementation note: `tokenise` caches the plain-text fallback under the same key, so registration without it leaves every block already rendered flat until an unrelated cap eviction. **Measurement is unaffected by both**, which is what makes registration safe at any time — tokens change appearance and never line count (I8, T2.13).
 - **I24** — **A grammar in the default set has its emitted classes mapped, or the omission has a reason.** Shipping a grammar whose classes `SLOTS` does not carry is indistinguishable from not shipping it — measured: `markdown` emitted four runs and coloured none. Three classes are unmapped deliberately: `hljs-params` is ordinary identifiers, `hljs-strong` and `hljs-emphasis` are appearance rather than a rôle, and **`hljs-addition` / `hljs-deletion` are a change axis, which C04's ruling says is a marker and never a tone** (F30, F81).
 - **I25** — **A kind that divides declares `window`, and a window is a valid block of the same kind plus a residual offset.** `window(b, w, from, to)` returns `{ block, skipRows }`; the caller renders `block` and drops `skipRows` leading rows, and what remains is exactly what the full rendering would have put at rows `[from, to)`. The offset is not a convenience — it is what makes an indivisible unit (C25 I19) and a sticky header (C25 I18) expressible without inventing a row C14 never measured, which is drift three components from its cause. **A window is a block and never a list of rows**, because `Block[]` is what both consumers hold and a slice of rendered output would be a second height codepath.
+- **I25a** — **A kind whose layout is derived from its rows pins that layout into the window; a kind whose *parse* is cannot be windowed at all.** `patch` pins `numberWidth` and `keyValue` pins `keyWidth`, because a window whose slice happens to hold shorter values would draw a narrower column and every row would shift sideways as the reader scrolls — measured at 14 cells against 3 for `keyValue`, and 4 against 1 for `patch` (C25 I21a). **`code` is refused on the other half of the same sentence**: `tokenise` is a function of every character before the slice, so a window is a different *parse* rather than a narrower column — lines inside a block comment come back as live code, and `measure` never tokenises, so I26 holds while the rendering is wrong (F426). A width travels with a window; a parse does not.
 - **I26** — **`measure(window(b, w, from, to).block, w) − skipRows === to − from`, checked generically over every kind that declares `window`.** The form without `skipRows` is the one the seam invites and it is false for any window that costs slack. Enforced by `measurement-conformance.ts` rather than per kind, so an application's own arm is held to it — without that a consumer's window is silently short and the frame describes a document nobody holds. It is I1's rule over a window rather than over a block.
 - **I27** — **A kind that does not divide has no `window` member, and that is how atomicity is expressed.** `plot` is the case and it is permanent: C12 I1 makes height a function of the block alone, so reducing the series changes nothing and reducing `height` rescales the curve. An absent member cannot be deleted by a later edit; a branch returning the block unchanged can, and reads as an oversight either way.
 - **I28** — **A progress bar clamps its fill and never its number.** The bar has no cells past its last one; the percentage is the true fraction, so `150` of `100` draws a full bar and reads `150%`. Clamping both makes `100/100` and `150/100` one picture, which is the same objection `examples/docker`'s CPU bar was built around and the reason the two now agree rather than each being defensible about its own quantity. A `total` of zero has no proportion: an empty bar and `0%`, which is a floor and not a measurement. **A negative `current` is floored for the same reason** — `repeat()` with a negative count throws, so the block would not render at all (I2). Found by the mutation pass, which is where a guard with no fixture behind it shows up.
@@ -1248,6 +1307,8 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 
 35. **The glyph axis is a ladder of three and its top rung is gated on the block as well as the terminal** (I37). A half block spends a cell on two full colours where braille spends it on eight dots, so a photograph arrives as a photograph and a diagram is better served one rung down — and the ladder takes the richest rung the terminal honours rather than asking the content. `▀` is ambiguous-width where braille is not, which is why the hazard is new at exactly this rung; and a block carrying an `overlay` skips it, because both colour channels are already the picture (→ C02 I9, C10 I31, A03 SS50).
 36. **An image that cannot be decoded says which refusal it is** (I38). The decoder computes a reason for every rejection and the block discarded all of them, so *a corrupt file* and *a format phase 1 does not read* arrived as the same `alt`. It draws the `status` box the rest of the framework draws, at `error`, with `alt` kept beneath as the caption — and the fault is scoped to **this** decoder, not to the picture (→ C04 I73, C09 §8b G7).
+
+37. **A kind whose layout is derived from its rows pins that layout into its window, and a kind whose parse is cannot be windowed** (I25a). `patch` pins `numberWidth`, `keyValue` pins `keyWidth`, and both are one sentence: a window says what its *parent* measured rather than deriving it from the slice, or every row shifts sideways as the reader scrolls. `code` is refused on the same sentence's other half — `tokenise` reads every character before the slice, so a window is a different parse and lines inside a block comment render as live code, invisible to I26 because `measure` never tokenises (→ C25 I21a, C12 I1, FINDINGS F426).
 
 ---
 

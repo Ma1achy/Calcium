@@ -13860,6 +13860,81 @@ terminal did not change, and the gap between those two is the whole finding.
 
 ---
 
+## F426 — a window of a code block is a different parse, and I26 cannot see it ★★★★★
+
+**Roadmap 17's step 3 wants `code` to declare a window**, and the question put to the walk was
+whether a slice could break a grapheme cluster or a syntax run — *the highlighter colours a token,
+and a slice through one leaves an open SGR or a half-token*.
+
+**That half is already handled, and the real hazard is one level deeper.** `code`'s render
+tokenises the whole source once, `tokenLines` splits tokens across newlines explicitly (*a block
+comment is one token across four lines*), `sliceTokens` cuts them to each row, and every row is
+painted standalone — so no SGR spans rows and a boundary token is already sliced. The problem is not
+the boundary. **It is that a slice is a different parse.**
+
+Measured, `typescript`, a block comment opening at line 2 and closing at line 11:
+
+```
+tokenised whole            slots present:  comment  keyword  null  number
+lines 4–7 as a window      slots present:           keyword  null  number
+```
+
+**Lines that are commented out come back as live code** — `const` a keyword, the literals numbers,
+in text the file says is a comment.
+
+**And nothing geometric can see it.** `measure` never tokenises (C09 §3, T2.13) — a `code` block
+measures identically whether or not its language is even registered — so **C09 I26's equality holds
+perfectly at every window while the rendering is wrong.** *Containment is not correctness*, arriving
+through the one invariant written to make windows safe.
+
+**A width travels with a window and a parse does not**, which is the whole ruling (C09 I25a,
+commitment 37). `patch` pins `numberWidth` and `keyValue` now pins `keyWidth` because a column is a
+number attached to the block. A continuation is a function of every character before the slice: a
+comment can open at line 1 of a 50 000-line file, so no bounded context is safe, and carrying it
+means a field on `Code` holding a highlighter's internal mode — a public type carrying another
+library's state, which is a ruling and not a slice.
+
+**The repo had already written the answer and nobody had gone to read it.** `logs`' own window
+comment says it: *`widest` a whole `keyValue` and `tokenise` a whole code block are the two still
+open*. Two names, one sentence, and **they are not the same kind of blocker** — one is a width and
+one is a parse, which is why they separated here instead of landing together.
+
+**So `code` stays atomic**, and its 914 ms is answered by roadmap 17's other half — a per-block cap
+with a visible marker, which needs no lexical context.
+
+---
+
+## F427 — two negative claims about the tree, both true when written ★★★★☆
+
+Found while widening the window conformance corpus. Both say *nothing in the tree does X*, and both
+stopped being true without anything noticing — the shape that **passes hardest the day it becomes
+false**.
+
+**C25 I21a**: *"the generic check does not reach a patch at all, **because a patch does not declare
+`BlockDefinition.window`** — this window is C25's own route (§3c)."* `patch/definition.ts:213`
+declares one. The invariant's *claim* — the gutter is pinned — is true and measured; the reason it
+gives for the generic check not reaching it is false.
+
+**`test/contract/block-window.test.ts`'s header**: *"no corpus in either file holds a `logs` block,
+which is currently **the only kind that declares a window**."* Written to explain why the file
+exists, and correct then.
+
+**Together they left a real hole**: the generic I26 property covered `logs` and **not `patch`**,
+while a spec said it could not reach it and a test said there was nothing else to reach. Two
+documents agreeing, neither checked, and the agreement is what made it invisible — *repetition is
+not corroboration*, in the direction where both are about absence.
+
+Closed by putting `keyValue` in the corpus and stating what the corpus is for. `patch` is not in it
+yet: it registers from `presentation/patch/`, not from the default registry, so the corpus needs the
+definition injected — named here rather than left, because a hole reported and not closed is worth
+more than one closed silently and worth less than one closed.
+
+**The habit this argues for is the one already written down**: when a claim is about to be carried
+into another step, ask which file holds it — and for a claim of the form *nothing does X*, the file
+that holds it cannot be the one making the claim.
+
+---
+
 ## F425 — the cheapness claim reasoned about the write, and five documents inherited it ★★★★★
 
 **F423 found roadmap 19 naming the wrong cause. This is where that came from**, found by following

@@ -450,6 +450,25 @@ export type KeyValue = Readonly<{
     /** The cells the bar occupies. Required when `bar` is present (I51). */
     barWidth?: number;
   }>[];
+  /**
+   * The key column's width, in cells, **pinned when this block is a window of a
+   * larger one** (C09 I25, C25 I21a one kind over).
+   *
+   * `widest` walks every row's label, so a window whose keys all happen to be
+   * short draws a narrow key column and **every value shifts sideways as the
+   * reader scrolls** — the drift C14 exists to prevent, arriving through a
+   * layout derived from the slice rather than from the block.
+   *
+   * **The same argument `Patch.numberWidth` already carried**, and the reason
+   * `keyValue` was one of the two kinds recorded as still open: *`widest` a
+   * whole `keyValue` and `tokenise` a whole code block* (`structured.ts`). A
+   * width can travel with the window; a parse cannot, which is why the two
+   * separated here rather than landing together.
+   *
+   * A producer building one by hand leaves it absent and nothing changes; it
+   * exists so a *window* can say what its parent measured.
+   */
+  keyWidth?: number;
 }> & Gap & Floor;
 
 export type Table = Readonly<{

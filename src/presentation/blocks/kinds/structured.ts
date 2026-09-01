@@ -80,17 +80,60 @@ function valueOf(
   return detail === "" ? run : `${run}${" ".repeat(COLUMN_GAP)}${detail}`;
 }
 
+/**
+ * The key column, derived from the whole block.
+ *
+ * **One function, because two would be the drift.** The window pins what this
+ * returns and the render prefers the pin; a second expression of the same
+ * arithmetic is how a pinned width comes to disagree with the one it was pinned
+ * from — which is the defect the pin exists to prevent, reintroduced one level
+ * down.
+ */
+function keyColumn(block: KeyValue, width: number): number {
+  return widest(
+    block.rows.map((r) => stripControl(r.label)),
+    Math.min(KEY_COLUMN_CAP, Math.max(1, normaliseWidth(width) - 4)),
+  );
+}
+
 export const keyValueDefinition: BlockDefinition<KeyValue> = {
   kind: "keyValue",
 
   measure: (block: KeyValue): number => atLeastOne(block.rows.length), // cells-ok
 
+  /**
+   * C09 I25 — rows `[from, to)`, as a smaller `keyValue` with its key column
+   * pinned.
+   *
+   * **This kind was one of the two recorded as still open**, in `logs`' own
+   * window comment below: *`widest` a whole `keyValue` and `tokenise` a whole
+   * code block*. The blocker was real — `widest` walks every label, so a slice
+   * whose keys are short draws a narrower column and every value shifts
+   * sideways as the reader scrolls, which is the drift C14 exists to prevent.
+   *
+   * **It is a width, so it travels** (`KeyValue.keyWidth`, C25 I21a's argument
+   * one kind over): the window says what its parent measured rather than
+   * deriving it again. `tokenise` does not travel, which is why the two
+   * separated instead of landing together — a slice of a code block is a
+   * different *parse*, not a narrower column, and lines inside a block comment
+   * come back as live code (F426).
+   *
+   * Rows are one row each (`measure` is `rows.length`) and nothing here is
+   * derived from rows outside the slice once the width is pinned, so the window
+   * is exact and `skipRows` is 0.
+   */
+  window: (block: KeyValue, width: number, from: number, to: number): Windowed => {
+    const lo = Math.max(0, Math.min(Math.trunc(from), block.rows.length)); // cells-ok
+    const hi = Math.max(lo + 1, Math.min(Math.trunc(to), block.rows.length)); // cells-ok
+    return Object.freeze({
+      block: { ...block, rows: block.rows.slice(lo, hi), keyWidth: keyColumn(block, width) },
+      skipRows: 0,
+    });
+  },
+
   render(block: KeyValue, ctx: RenderContext): ReactElement {
     const width = normaliseWidth(ctx.width);
-    const keyWidth = widest(
-      block.rows.map((r) => stripControl(r.label)),
-      Math.min(KEY_COLUMN_CAP, Math.max(1, width - 4)),
-    );
+    const keyWidth = block.keyWidth ?? keyColumn(block, width);
     const valueWidth = Math.max(1, width - keyWidth - COLUMN_GAP);
 
     return rows(
