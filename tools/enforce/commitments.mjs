@@ -1068,7 +1068,7 @@ const UNCITED_INVARIANTS = Object.freeze([
   "C25 I11", "C25 I14", "C25 I15", "C25 I16", "C25 I17", "C25 I19a", "C25 I20a", "C25 I20b",
   "C26 I1", "C26 I11", "C26 I15", "C26 I16", "C26 I17", "C26 I20", "C26 I8", "C26 I9",
   // Struck when `scatter3d` lands — its subject is a rasteriser. See above.
-  "C12 I84",
+  "C12 I84", "C12 I86",
 ]);
 
 /**
