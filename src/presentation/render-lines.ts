@@ -43,6 +43,8 @@ export type RenderOptions = Readonly<{
   scrollOffsets?: RenderContext["scrollOffsets"];
   /** Per-plot cursor positions, in sample indices. Absent is no cursor. */
   cursorPositions?: RenderContext["cursorPositions"];
+  /** Per-plot live cameras (C12 I83). Absent is each block's own. */
+  cameras?: RenderContext["cameras"];
 }>;
 
 /**
@@ -67,6 +69,7 @@ export function renderToLines(
     focus: options.focus ?? null,
     ...(options.scrollOffsets === undefined ? {} : { scrollOffsets: options.scrollOffsets }),
     ...(options.cursorPositions === undefined ? {} : { cursorPositions: options.cursorPositions }),
+    ...(options.cameras === undefined ? {} : { cameras: options.cameras }),
     tick: options.tick ?? 0,
     onAction: options.onAction ?? (() => undefined),
   };
@@ -116,6 +119,7 @@ export function renderSequenceToLines(
     focus: options.focus ?? null,
     ...(options.scrollOffsets === undefined ? {} : { scrollOffsets: options.scrollOffsets }),
     ...(options.cursorPositions === undefined ? {} : { cursorPositions: options.cursorPositions }),
+    ...(options.cameras === undefined ? {} : { cameras: options.cameras }),
     tick: options.tick ?? 0,
     onAction: options.onAction ?? (() => undefined),
   };

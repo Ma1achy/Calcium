@@ -18,6 +18,15 @@
 import { describe, expect, it } from "vitest";
 
 import { buildGraph } from "../support/session.js";
+import { baselineOf } from "../../src/shell/cameras.js";
+import { CAMERA_DEFAULT } from "../../src/data/viewmodel/index.js";
+import type { InputEvent } from "../../src/interaction/router/types.js";
+
+/** One key, as the decoder would deliver it (C22 I24 — events, never bytes). */
+const press = (name: string): InputEvent => ({
+  kind: "key",
+  key: { name, ctrl: false, meta: false, shift: false, sequence: name },
+});
 import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
 
 const doc = (id: string) => ({
@@ -36,6 +45,114 @@ const doc = (id: string) => ({
     transport: "local" as const,
     origin: "user" as const,
   },
+});
+
+/** A plot with a camera, so the live entry has something focusable (C12 I85). */
+const PLOT_DOC = {
+  schema: "tui.view/1" as const,
+  command: "/loss",
+  status: "ok" as const,
+  blocks: [
+    {
+      kind: "plot" as const,
+      id: "p",
+      form: "line" as const,
+      height: 3,
+      camera: { azimuth: 0 },
+      series: [{ label: "s", values: [1, 2, 3] }],
+    },
+  ] as unknown[],
+  meta: {
+    verb: "loss",
+    adapter: "test",
+    exitCode: 0,
+    durationMs: 0,
+    truncated: false,
+    argv: ["loss"],
+    stderr: "",
+    transport: "local" as const,
+    origin: "user" as const,
+  },
+};
+
+describe("C22 §6c — the camera, and the two halves separated", () => {
+  // **The pair has to be separable or neither half is asserted.** A camera
+  // reaching a frame needs three things — a store that keys, a binding that
+  // writes it, and `session.ts` composing the key into the slot — and an
+  // end-to-end row dies to all three without saying which. These two rows each
+  // hold exactly one; the third has one witness and T4.17g says so.
+  it("T4.17e (C22 I71): the key alone — the store moved, no key pressed", async () => {
+    // **Deliberately around the binding.** It nudges the store directly, so it
+    // survives the binding being deleted and can only be about what the key
+    // says.
+    const { graph } = await buildGraph();
+    const id = graph.transcript.append(PLOT_DOC as never);
+    expect(graph.cameras.key(id), "an untouched entry keys as nothing").toBe("");
+
+    graph.cameras.nudge(id, "p", { azimuth: 0 }, { azimuth: 0.5 });
+    expect(graph.cameras.key(id), "a turned camera keys").not.toBe("");
+
+    // **Baselines omitted, not zeros — the one rule this store could not inherit
+    // from `ScrollOffsets`.** There zero *is* the absent state; here the absent
+    // state is the block's own declared view, and `distance: 0` is a degenerate
+    // camera rather than an absent one. A camera returned to its baseline renders
+    // identically to one never touched, so keying them apart would give one
+    // appearance two slots — a cache that misses on every frame while every
+    // correctness assertion still passes (`focusKey`'s own warning).
+    graph.cameras.nudge(id, "p", { azimuth: 0 }, { azimuth: -0.5 });
+    expect(graph.cameras.key(id), "back to the baseline keys as untouched").toBe("");
+
+    // And its control: **the baseline is not zero**. A camera sitting at
+    // `azimuth: 0` with a *declared* azimuth of 0.5 has moved, and a key that
+    // omitted zeros rather than baselines would call this untouched.
+    const other = graph.transcript.append(PLOT_DOC as never);
+    graph.cameras.nudge(other, "p", { azimuth: 0.5 }, { azimuth: -0.5 });
+    expect(graph.cameras.key(other), "at zero, away from a non-zero baseline").not.toBe("");
+  });
+
+  it("T2.4c (C04 I75): the baseline is the block's declared view, completed", async () => {
+    // **The member is the INITIAL view and the store is what makes that true.**
+    // A block declaring nothing is drawn from `CAMERA_DEFAULT`; one declaring a
+    // `Partial` is drawn from the default with those fields replaced — so a
+    // partial and the full equivalent are **one view rather than two**, which is
+    // what `Partial<Camera>` costs if it is four independent fallbacks instead
+    // of one completion.
+    expect(baselineOf(undefined)).toEqual(CAMERA_DEFAULT);
+    expect(baselineOf({ elevation: 0.25 })).toEqual({ ...CAMERA_DEFAULT, elevation: 0.25 });
+    expect(baselineOf({ ...CAMERA_DEFAULT, elevation: 0.25 })).toEqual(baselineOf({ elevation: 0.25 }));
+
+    // **And the degenerate values are in the set on purpose.** `distance: 0` is
+    // a camera at the target and `projection: "orthographic"` ignores distance
+    // entirely; both are views a caller may declare, and neither is *absent*.
+    // A completion that treated a falsy field as unstated would replace them.
+    expect(baselineOf({ distance: 0 }).distance, "zero is a declaration").toBe(0);
+    expect(baselineOf({ azimuth: 0 }).azimuth, "so is a zero azimuth").toBe(0);
+  });
+
+  it("T4.17f (C22 I71): the writer alone — a key pressed, nothing keyed", async () => {
+    // **Asserted on `forEntry` and never on `key`**, so it survives the key
+    // being emptied and can only be about whether a keystroke reaches the store.
+    const { graph } = await buildGraph();
+    graph.transcript.append(PLOT_DOC as never, { streaming: true });
+    const id = graph.transcript.liveId as string;
+
+    // **The element is asserted before the keystroke**, because a row that
+    // pressed `[` and found nothing could be failing for either reason — the
+    // binding, or a plot nothing can focus. C12 I85 is what puts an element
+    // here at all, and it is the half this row would otherwise blame the
+    // binding for.
+    expect(graph.liveElements().map((e) => e.blockId), "the plot is focusable").toEqual(["p"]);
+
+    // `↓` from the prompt past history's bottom enters the live block (C16 I22).
+    graph.router.dispatch(press("down"));
+    expect(graph.router.target, "focus is in the block").toBe("liveBlock");
+    expect(graph.cameras.forEntry(id)["p"], "nothing has moved yet").toBeUndefined();
+
+    graph.router.dispatch(press("["));
+    const after = graph.cameras.forEntry(id)["p"];
+    expect(after, "the binding reached the store").toBeDefined();
+    expect(after?.azimuth, "one step left of the declared azimuth").toBeCloseTo(-Math.PI / 8, 10);
+  });
 });
 
 describe("C22 §6c — the cache's C13 arms", () => {

@@ -358,6 +358,20 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // **Movement moves focus; paging moves the window** (C26 I18). These never
   // touch focus, which is what makes a focused element outside the box a legal
   // state rather than a thing to correct.
+  // **The camera's one writer, and `[` `]` rather than `←` `→`** (C22 I71).
+  // The design's manual scheme is arrows and step 8 owns it; claiming them here
+  // would take two keys from every focused block for a feature one block kind
+  // has, and `←` at `liveBlock` falls through to the prompt today. `[` and `]`
+  // are free at this target, and a plain printable owned by a focused block is
+  // `y`'s precedent and C26 I2's ruling — *the block owns its keys while the
+  // reader is inside it*.
+  //
+  // **The effect is a no-op on a block with no camera**, which is a key consumed
+  // and nothing drawn. That is the cost of binding before the form exists, and
+  // it is smaller than the alternative: a field nothing can move is
+  // `cursorPositions` (C12 §3s).
+  { target: "liveBlock", key: { name: "[" }, action: "orbitLeft" },
+  { target: "liveBlock", key: { name: "]" }, action: "orbitRight" },
   { target: "liveBlock", key: { name: "pagedown" }, action: "blockPageDown" },
   { target: "liveBlock", key: { name: "pageup" }, action: "blockPageUp" },
 ];

@@ -84,13 +84,20 @@ const MUTATIONS = [
     // row could not be written until the store did.
     name: "the render cache key ignores the scroll offset",
     file: "src/shell/session.ts",
-    // **Re-pointed when the tick axis joined the slot** (F227). The line used to
-    // end at `${offsets}` and now carries `${animated}` after it, so the old
-    // anchor named a string that no longer exists. The mutation is unchanged —
-    // it still drops the offsets and leaves everything else — and the pass was
-    // re-run on the commit that moved it (F219).
-    from: "\\u0000${offsets}${animated}`;",
-    to: "${animated}`;",
+    // **Re-pointed twice, and the second time by a rule rather than by
+    // luck.** It first ended at `${offsets}`; the tick axis appended
+    // `${animated}` (F227); the camera axis then inserted `${orbits}` between
+    // them (C22 I71). The second move was caught by `anchors.mjs` on the commit
+    // that made it — 24 missing where there had been 23 — which is that
+    // instrument's whole purpose and the third recorded instance of it.
+    //
+    // The mutation is unchanged: it still drops the offsets and leaves every
+    // other axis alone, and the pass was re-run on the commit that moved it.
+    // **Never re-anchor without running the pass** — a re-pointed anchor can sit
+    // on a line that has changed meaning, which is the one thing this instrument
+    // cannot see.
+    from: "\\u0000${offsets}\\u0000${orbits}${animated}`;",
+    to: "\\u0000${orbits}${animated}`;",
     expect: "T4.41",
   },
   {

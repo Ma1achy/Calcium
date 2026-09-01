@@ -419,7 +419,20 @@ describe("C22 integration — the frame's viewport", () => {
 
     // The control: help arrived at all. Without it every assertion below is
     // about an empty screen and the row passes when nothing rendered.
-    expect(text, "the keymap document is on the frame").toContain("c+r");
+    //
+    // **It used to be `toContain("c+r")` and that was positional.** The keys
+    // document is longer than a 40-row frame and the frame shows its **tail**,
+    // so the control was really asserting *`c+r` is within the last 38
+    // bindings* — which two new `liveBlock` rows falsified by pushing it above
+    // the fold (C22 I71's camera binding). Nothing about help had broken.
+    //
+    // **A control that moves when an unrelated binding is added is measuring
+    // the ordering, not the arrival.** This counts rendered binding rows
+    // instead: it fails on an empty screen, which is its job, and it does not
+    // fail on the next binding anybody adds — which the old form would have,
+    // for whoever added it rather than for whoever wrote this.
+    const bindingRows = frame.filter((r) => /^\S+\s+\w+: \w+/u.test(r.trim())).length;
+    expect(bindingRows, "the keymap document is on the frame").toBeGreaterThan(10);
 
     for (const shown of ["pageup", "pagedown", "c+home", "c+end"]) {
       expect(text, `/help shows ${shown}`).toContain(shown);

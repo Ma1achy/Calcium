@@ -86,7 +86,8 @@ import { smallMultiplesRows } from "./facet.js";
 import { stripHeights } from "./strips.js";
 import type { Annotation, OHLC, QuartileSummary, Plot, PlotForm, Series } from "../../data/viewmodel/index.js";
 import type { ColourRef } from "../theme/index.js";
-import type { BlockDefinition, RenderContext } from "../blocks/types.js";
+import type { BlockDefinition, NavElement, RenderContext } from "../blocks/types.js";
+import type { MeasureFn } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 
 /**
@@ -3045,8 +3046,43 @@ const render = (block: Plot, ctx: RenderContext): ReactElement => {
   return rows(pad === 0 ? [...body] : body.map((r) => " ".repeat(pad) + r)); // cells-ok
 };
 
+/**
+ * One block-level element, and **only when the block declares a camera** (I85).
+ *
+ * **An element is what a reader can act on.** A plot with no camera affords
+ * nothing — there is no view to turn — and `table` already declares elements
+ * only where it has rows. Gating on the member rather than on the form is also
+ * what makes this invisible: no block in the tree declares a camera, so no
+ * document gains a focus stop and no shipped frame moves.
+ *
+ * **The implementation is what found the ruling.** C22 I71 requires the camera
+ * field and a writer to land together; the writer reads `focus.current`, focus
+ * reaches only a kind declaring `elements`, and until now that was `table`
+ * alone (C26 §4a). A binding no focus can reach is `cursorPositions` in a
+ * different coat.
+ *
+ * **The whole block, not a row inside it.** There is nothing to step: a camera
+ * belongs to the plot, so `↓` lands on it and `↑` leaves, which is C26 §4a
+ * row 1's answer reached because there is no interior rather than because the
+ * edge was ruled.
+ */
+function elements(block: Plot, width: number, measureChild: MeasureFn): readonly NavElement[] {
+  if (block.camera === undefined) return NO_ELEMENTS;
+  return [
+    Object.freeze({
+      id: block.id,
+      level: "block" as const,
+      rows: Object.freeze({ from: 0, to: measureChild(block, width) }),
+      cols: Object.freeze({ from: 0, to: width }),
+    }),
+  ];
+}
+
+const NO_ELEMENTS: readonly NavElement[] = Object.freeze([]);
+
 export const plotDefinition: BlockDefinition<Plot> = {
   kind: "plot",
   measure,
   render,
+  elements,
 };

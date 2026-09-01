@@ -637,6 +637,13 @@ export const BUILDER_OMISSIONS = Object.freeze({
     "the block it came from rather than the slice it shows; a hand-built keyValue setting it " +
     "would assert a column its own labels do not justify. `window` is the one writer",
 
+  // **Omitted until a form can use it, and the reason is sharper than *not yet
+  // built*.** `camera` has one meaning — the initial view of a 3D plot — and no
+  // 3D form exists. What it would do on a `line` today is not nothing, which is
+  // the trap: a plot declaring a camera becomes **focusable** (C12 I85), so
+  // exposing this before the form exists hands callers a way to add a focus stop
+  // to a 2D plot and no way to draw anything. It arrives with `scatter3d`.
+  "plot.camera": "the initial view of a 3D plot; no 3D form exists, and on a 2D one it would add a focus stop and nothing else (C12 I85)",
   "table.actionBar":
     "C11 I18 — a presence rather than a width, and not the producer's either. The bar is " +
     "derived from `rows.some(r => r.actions)`, so a window moves it in both directions and " +

@@ -48,6 +48,7 @@ import { loadTheme, type ThemeStore } from "../presentation/theme/index.js";
 import { createTranscriptStore } from "../viewport/transcript/index.js";
 import { createViewport } from "../viewport/viewport/index.js";
 import { RenderCache } from "./render-cache.js";
+import { Cameras } from "./cameras.js";
 import { ScrollOffsets } from "./scroll-offsets.js";
 import { createOverlayManager } from "../viewport/overlay/index.js";
 import { createEditor } from "../interaction/editor/index.js";
@@ -238,6 +239,8 @@ export type Graph = Readonly<{
   liveElements: () => readonly Readonly<{ blockId: string; element: NavElement }>[];
   /** C04 I48 — page the focused container, in rows, focus unmoved (C26 I18). */
   pageBlock: (direction: 1 | -1) => void;
+  /** C22 I71 — turn the focused plot camera. A no-op where there is none. */
+  orbitBlock: (direction: 1 | -1) => void;
   /** Is the prompt answering keys under the top layer (I51, C19 I20)? */
   promptUnderMenu: () => boolean;
   /** Past the blink threshold since the last key (C22 I64). */
@@ -288,6 +291,7 @@ export type Graph = Readonly<{
    */
   rendered: RenderCache;
   scrollOffsets: ScrollOffsets;
+  cameras: Cameras;
   overlays: ReturnType<typeof createOverlayManager>;
   history: Awaited<ReturnType<typeof openHistory>>;
   editor: ReturnType<typeof createEditor>;
@@ -589,15 +593,21 @@ export async function constructGraph(
     // would be two places for a future eviction path to reach one and miss the
     // other.
     const scrollOffsets = new ScrollOffsets();
+    // **The camera joins the same subscription**, for the reason the comment
+    // above gives about the offsets: a third callback would be a third place for
+    // an eviction path to reach two and miss one (C22 I71).
+    const cameras = new Cameras();
     transcript.subscribe((change) => {
       if (change.kind === "evict") {
         for (const id of change.ids) {
           rendered.delete(id);
           scrollOffsets.delete(id);
+          cameras.delete(id);
         }
       } else if (change.kind === "clear") {
         rendered.clear();
         scrollOffsets.clear();
+        cameras.clear();
       }
     });
 
@@ -834,6 +844,7 @@ export async function constructGraph(
       viewport,
       rendered,
       scrollOffsets,
+      cameras,
       overlays,
       history,
       editor,
@@ -1196,6 +1207,38 @@ export async function constructGraph(
     scheduler.commit("input");
   };
 
+  /**
+   * Turn the focused plot's camera one step (C22 I71, C12 I83).
+   *
+   * **`pageBlock`'s shape and one difference**: this reads the block's own
+   * declared `camera` and hands it to the store, because the baseline a key is
+   * normalised against is the view the block would be drawn from with no entry
+   * at all — and only the block knows that (`cameras.ts`'s header).
+   *
+   * **A block that is not a plot, or a plot declaring no camera, is a no-op.**
+   * The binding is static and cannot see a block, so the gate is here; it is a
+   * key consumed and nothing drawn, which is the stated cost of landing the
+   * writer with the field rather than after the form.
+   *
+   * **Focus does not move**, exactly as paging does not (C26 I18).
+   */
+  const orbitBlock = (direction: 1 | -1): void => {
+    const entryId = stores.transcript.liveId;
+    if (entryId === null) return;
+    const at = focus.current;
+    if (at.at !== "liveBlock" || at.element === null) return;
+
+    const entry = stores.transcript.entries.find((e) => e.id === entryId);
+    const block = entry?.doc.blocks.find((b) => b.id === at.element?.blockId);
+    if (block === undefined || block.kind !== "plot" || block.camera === undefined) return;
+
+    // One sixteenth of a turn, which is the step that reads as a rotation rather
+    // than a jump at the sample counts this rung has. The scheme is step 8's;
+    // this is the one writer the field needs to be observable at all.
+    stores.cameras.nudge(entryId, block.id, block.camera, { azimuth: (direction * Math.PI) / 8 });
+    scheduler.commit("input");
+  };
+
   const keys = createKeyEffects({
     editor: stores.editor,
     completion: built.completion,
@@ -1228,6 +1271,7 @@ export async function constructGraph(
     // falsified by this very walk: both call `liveElements()`.
     liveElements,
     pageBlock,
+    orbitBlock,
     liveEntryId: () => stores.transcript.liveId,
     // C23 I16 — the dispatcher is C23's and is supplied, never built here.
     onAction: (action, from) => {
@@ -1569,6 +1613,7 @@ export async function constructGraph(
     cursorIdle: () => config.clock() - lastInputAt >= CURSOR_BLINK_MS,
     liveElements,
     pageBlock,
+    orbitBlock,
     capabilities: detection.capabilities,
     /**
      * C22 I6a — construction, then the session, then what the session contained.

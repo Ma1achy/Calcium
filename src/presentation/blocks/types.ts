@@ -6,7 +6,7 @@
  * renderer (C09 §1).
  */
 import type { ReactElement } from "react";
-import type { Action, Block, Measure, MeasureFn } from "../../data/viewmodel/index.js";
+import type { Action, Block, Camera, Measure, MeasureFn } from "../../data/viewmodel/index.js";
 import type { ResolvedTheme } from "../theme/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 
@@ -92,6 +92,25 @@ export type RenderContext = Readonly<{
    */
   scrollOffsets?: Readonly<Record<string, number>>;
   cursorPositions?: Readonly<Record<string, number>>;
+  /**
+   * The live camera of each 3D plot, by block id (C12 I83, C22 I71).
+   *
+   * **A record and not a value, and the reason is a document rather than a
+   * plot.** Two 3D plots can sit in one document — a loss landscape beside its
+   * parameter sweep — and a camera threaded down the tree as a scalar would give
+   * them one view, so orbiting either would turn both. `scrollOffsets`' shape,
+   * and `scrollOffsets`' reason: a record the container looks itself up in.
+   *
+   * **Absent is the block's own** `camera`, completed from `CAMERA_DEFAULT`.
+   *
+   * **This field is not `cursorPositions`, and the difference is the only thing
+   * that makes it worth having.** That one is read here and written by nothing in
+   * `src/` — a complete mechanism with nothing on the other side (C12 §3s). This
+   * arrives with `Cameras` in `shell/`, a binding that moves it and the render
+   * key's sixth axis, because a context field with no writer is correct,
+   * complete and unobservable at once.
+   */
+  cameras?: Readonly<Record<string, Camera>>;
   focus: FocusState | null;
   /**
    * A monotonic counter, incremented by C03's spinner commit. A renderer

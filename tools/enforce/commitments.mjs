@@ -1028,8 +1028,24 @@ export function scanSections(file, src, options = {}) {
  * key's sixth axis. No row can name them yet — `CAM1`–`CAM5` and
  * `T4.17e`–`T4.17g` are written in the specs and reference a `Camera` no file
  * declares — and they are struck on the commit that builds it. **Fourth
- * instance, repaid three times out of three so far**, which is what distinguishes
- * a loan from a list that grows.
+ * instance, and **four of the five are struck on the commit that builds it**:
+ * `T2.4c`, `T4.17e`–`T4.17h` name C04 I75, C12 I83, C12 I85 and C22 I71.
+ * `C12 I85` — the focusable-plot ruling the *implementation* found rather than
+ * the walk — was added to the loan and repaid within the same arc.
+ *
+ * **`C12 I84` stays, and it is the first entry here with a condition rather than
+ * a commit.** Its subject is a renderer: the sample grid is `width × 1` by
+ * `height × 2` and the depth buffer is allocated per render, and **nothing
+ * rasterises anything into a sample grid yet**. A row written now would be
+ * vacuous — there is no answer for it to be wrong about — and a vacuous row is
+ * how this list stops meaning anything. It is struck when `scatter3d` lands,
+ * which is the step that gives it a subject.
+ *
+ * **The distinction is worth naming because it is the one that could rot.** A
+ * one-commit loan expires by being noticed; a conditional one expires only if
+ * somebody goes and looks. The condition is a symbol — `scatter3d` in
+ * `PlotForm` — so picking up that step begins by grepping it, which is the
+ * deferral habit CLAUDE.md already carries.
  *
  * **Stated blind spot: the corpus is `.ts` only**, matching what `walk` collects,
  * so an invariant named solely by a `.mjs` fixture reads as uncited. Widening it
@@ -1051,8 +1067,8 @@ const UNCITED_INVARIANTS = Object.freeze([
   "C24 I20", "C24 I22", "C24 I25", "C24 I26", "C24 I28", "C24 I6", "C24 I7", "C25 I10",
   "C25 I11", "C25 I14", "C25 I15", "C25 I16", "C25 I17", "C25 I19a", "C25 I20a", "C25 I20b",
   "C26 I1", "C26 I11", "C26 I15", "C26 I16", "C26 I17", "C26 I20", "C26 I8", "C26 I9",
-  // The camera's loan, struck on the commit that builds it — see above.
-  "C04 I75", "C12 I83", "C12 I84", "C12 I85", "C22 I71",
+  // Struck when `scatter3d` lands — its subject is a rasteriser. See above.
+  "C12 I84",
 ]);
 
 /**

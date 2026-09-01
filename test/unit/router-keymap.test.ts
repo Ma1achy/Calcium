@@ -330,6 +330,13 @@ describe("§6 — the default table (C17 I12)", () => {
       "liveBlock s+up": ["\u001b[1;2A"],
       "liveBlock s+down": ["\u001b[1;2B"],
       "liveBlock y": ["y"],
+      // **A plain printable, and T2.13 is what said the first choice was not.**
+      // The binding was written as a bare key name and this table has no default:
+      // a row with no wire form fails, which is how it was found that nobody
+      // could press it. `[` and `]` are their own bytes, exactly as `y` is —
+      // and this table is what measured that rather than assuming it.
+      "liveBlock [": ["["],
+      "liveBlock ]": ["]"],
 
       // Copy mode's entry, at both targets it is bound to (C16 §5b). The key is
       // provisional — which key enters copy mode is the rebindable-keys row's

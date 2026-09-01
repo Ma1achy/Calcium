@@ -229,6 +229,8 @@ export type KeyAction =
   | "focusPrompt"
   | "rowUp"
   | "rowDown"
+  | "orbitLeft"
+  | "orbitRight"
   | "blockPageDown"
   | "blockPageUp"
   // `enter` on a focused row, and the union's gap was the whole of F21: a row

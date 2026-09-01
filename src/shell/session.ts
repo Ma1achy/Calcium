@@ -944,10 +944,23 @@ function visibleRows(
     // **Per kind, so an entry holding nothing animated keys exactly as before.**
     // Adding `tick` to every slot would bust the whole cache on every spinner
     // commit, which is the opposite of what the cache is for.
+    // **The sixth axis, and it is the one whose symptom is a hang** (C22 I71,
+    // §6c). The other five produce a *wrong* frame and a reader reports it
+    // against whatever they touched; a cached 3D plot under an orbit produces a
+    // **correct** frame — the previous one — thirty times a second, which is
+    // indistinguishable from a stopped process. So the report says *it froze*
+    // and names the scheduler, the runner or the terminal, and none of the three
+    // is where the defect would be.
+    //
+    // **Baselines omitted rather than zeros**, which is where this differs from
+    // the offsets one line up: a camera's absent state is the block's own
+    // declared view, and `distance: 0` is degenerate rather than absent.
+    const orbits = graph.cameras.key(entry.id);
+
     const cadence = animationIntervalOf(windowed.blocks);
     if (cadence !== null && (fastest === null || cadence < fastest)) fastest = cadence;
     const animated = cadence === null ? "" : `\u0000${String(tick)}`;
-    const slot = `${key}\u0000${range}\u0000${offsets}${animated}`;
+    const slot = `${key}\u0000${range}\u0000${offsets}\u0000${orbits}${animated}`;
     const held = graph.rendered.get(entry.id, entry.rev, width, slot, theme);
     // **Faults from here are this entry's** (I69). A `BlockFault` names a block
     // and ids are unique within a document and not across entries (C04 I14), so
@@ -975,6 +988,11 @@ function visibleRows(
         // indistinguishable from doing nothing.
           tick,
           scrollOffsets: graph.scrollOffsets.forEntry(entry.id),
+          // **The field and its writer landed together** (C22 I71). A camera on
+          // `RenderContext` that nothing could move would be `cursorPositions`
+          // again — read in one place, written by nothing in `src/`, correct and
+          // unobservable at once (C12 §3s).
+          cameras: graph.cameras.forEntry(entry.id),
         }),
       );
     if (held === undefined) {

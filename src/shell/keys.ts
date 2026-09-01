@@ -144,6 +144,14 @@ export type KeyDeps = Readonly<{
    */
   pageBlock: (direction: 1 | -1) => void;
   /**
+   * Turn the focused plot's camera one step (C22 I71, C12 I83).
+   *
+   * **A no-op where the focused block declares no camera**, resolved in the
+   * effect rather than in the keymap for `pageBlock`'s own reason: the binding
+   * table is static and cannot see a block.
+   */
+  orbitBlock: (direction: 1 | -1) => void;
+  /**
    * C23's dispatcher (C23 I16). Supplied, never constructed here — an action is
    * a submission by another route, and L4's routing component owns routes.
    */
@@ -756,6 +764,8 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // pager does and what makes a reader able to join two screens. The store
     // floors at zero and the renderer bounds the top, so nothing here clamps
     // (C04 §3c cell 4).
+    orbitLeft: () => void deps.orbitBlock(-1),
+    orbitRight: () => void deps.orbitBlock(1),
     blockPageDown: () => void deps.pageBlock(1),
     blockPageUp: () => void deps.pageBlock(-1),
     scrollTop: () => void deps.viewport.scrollToTop(),

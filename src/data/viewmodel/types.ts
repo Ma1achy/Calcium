@@ -661,6 +661,43 @@ export { COLORMAP_MEMBERS, COLORMAP_NAMES } from "../colormaps/index.js";
  * the line arm at three sites and compiled — which is a heatmap rendering as a
  * curve, silently and at the right height (C12 §6a).
  */
+/**
+ * Where a 3D plot is looked at from (C04 I75, C12 I83).
+ *
+ * **This is L0 and not `presentation/`, and the layer is the reason.**
+ * `RenderContext` is L1 and a `Plot` member typed from it would be an upward
+ * import — the one edge A02 §1 does not bend. So the type is declared beside the
+ * block and the renderer reads down to it.
+ */
+export type Camera = Readonly<{
+  /** Radians about the vertical axis. */
+  azimuth: number;
+  /** Radians, −π/2 below the subject to +π/2 above it. */
+  elevation: number;
+  /** Eye distance in world units. Ignored by `"orthographic"`. */
+  distance: number;
+  projection: "perspective" | "orthographic";
+}>;
+
+/**
+ * The view a block that declares nothing is drawn from.
+ *
+ * **One default rather than a `??` per field per call site**, so *a camera
+ * stating only an elevation* and *this with that elevation* are the same view
+ * rather than two — which is what makes `Partial<Camera>` a completion instead of
+ * four independent fallbacks (C04 I75, T2.4d).
+ *
+ * Three-quarters round and a third of the way up is the angle every 3D plotting
+ * library opens on, and for the reason matplotlib gives: at zero azimuth two axes
+ * project onto each other and the figure reads flat.
+ */
+export const CAMERA_DEFAULT: Camera = Object.freeze({
+  azimuth: Math.PI / 4,
+  elevation: Math.PI / 6,
+  distance: 10,
+  projection: "perspective",
+});
+
 export type PlotForm =
   | "line" | "sparkline" | "heatmap"
   | "scatter" | "step" | "ecdf"
@@ -1014,6 +1051,30 @@ export type Plot = Readonly<{
    * the second channel to save the first.
    */
   glyphInk?: "own" | "contrast";
+  /**
+   * Where the view **starts**, and never where it is (C04 I75, C12 I83).
+   *
+   * **Admitted to `Plot` by the second arm of §3's widening test.** It changes no
+   * cell of the layout — `plotHeight` reads `form`, `height`, `axes`, `legend`
+   * and `xTitle`, and a viewing angle is none of them — so the area arm would
+   * have refused it. What admits it is *the decision is the caller's alone*: no
+   * theme resolves where a reader is standing and no renderer constant settles
+   * it.
+   *
+   * **A block carrying the LIVE camera would move its own `rev` under an
+   * orbit** — a document write per frame, an eviction per write, and C13's store
+   * paying for a rotation. The live one is view state and arrives through
+   * `RenderContext.cameras`, exactly as focus and the scroll offset do (C22 I71).
+   *
+   * `Partial` because the four fields are independent statements: a caller
+   * wanting to look from above has not thereby chosen a projection, and the
+   * renderer completes the rest from `CAMERA_DEFAULT`.
+   *
+   * **There is no `orbit` member and there will not be one.** `measure` never
+   * receives `tick` (C09 I8), so a block cannot declare that it animates —
+   * whether the camera moves is L4's, exactly as whether a spinner turns is.
+   */
+  camera?: Partial<Camera>;
   plotStyle?: "auto" | "braille" | "line" | "candlestick" | "solid";
   /**
    * Whether a shape's interior is drawn (C04 I59, C12 I43, §3w).
