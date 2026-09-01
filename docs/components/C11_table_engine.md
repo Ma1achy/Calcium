@@ -153,6 +153,49 @@ So the bar is drawn whenever **any** row declares `actions`, and its label row i
 
 ---
 
+## 5a. The window (C09 §2a)
+
+**A table divides, and its units are not rows.** The header is one unit, each row *with its
+detail* is one, and the gap-plus-bar is one. `window` walks them in **display** order, keeps every
+unit the range touches, and pays the difference at both ends — `skipRows` before the first and
+`dropRows` after the last (C09 I26). The unit heights are not a function of `(block, width)`, so
+the seam is handed `measureChild` (C09 I26a): a detail's height is a child's.
+
+Two fields make that expressible, and each says a different kind of thing.
+
+**`actionBar` is a presence, not a width.** `keyValue` pins `keyWidth` and `patch` pins
+`numberWidth` because a slice of narrower values would draw a narrower column and every row would
+shift sideways as the reader scrolls. A bar does not get narrower — it is there or it is not. And
+because `hasActionBar` is `rows.some(r => r.actions)`, a window moves it in **both** directions: a
+slice dropping the only row that declares `actions` loses two rows the parent counted, and a
+mid-table slice that happens to keep one draws a bar in the middle of a scrolled table. Present on
+the block it is the answer; absent, the rows are asked. **Stripping `actions` to suppress it is not
+the same change** — that removes the row's affordances (C26).
+
+**`presorted` says the rows are already in `sort`'s order.** It exists because `sortedRows` is not
+idempotent over a slice: `kindOf` decides a column's comparator from **the values present**, so a
+window that drops the one non-numeric value in a numeric-looking column re-classifies it and
+reorders its own rows — `2 · 10 · abc` renders `10 · 2 · abc` whole and `2 · 10` windowed, with
+every count and every height correct (F429). The window sorts, slices, and sets the flag.
+
+**`sort` itself is kept.** The indicator is drawn from it (§4), and a table that lost its arrow the
+moment a reader scrolled would be a visible regression in the one place a reader looks to know why
+the rows are in this order. Setting the sorted column `sortable: false` would suppress the re-sort
+and keep the indicator with no new field at all — and it is wrong for the reason stripping
+`actions` is wrong: `sortable` is an affordance, and a window may not change what a table offers.
+
+**A window never holds zero rows.** Both ends of a table can be asked for alone — `[0, 1)` is the
+header, `[n−2, n)` is the gap and the bar — and a bodyless window is a different block: C11 §5's
+empty-table rule fires and it measures `header + 1`, while a bar whose existence derives from the
+rows cannot be drawn without one. So the nearest row unit is kept and paid for in whichever
+residual it falls outside: `dropRows` at the top, `skipRows` at the bottom.
+
+**Neither field is a producer's to set** (MG27, `BUILDER_OMISSIONS`). Both describe what a *parent*
+derived, and a hand-built table setting either would assert something its own rows do not justify —
+`numberWidth`'s argument, one kind over (C25 I21a).
+
+---
+
 ## 6. Invariants
 
 - **I1** — No horizontal scroll is ever emitted, at any width.
@@ -172,6 +215,9 @@ So the bar is drawn whenever **any** row declares `actions`, and its label row i
 - **I15** — The expand marker is drawn only into a column declaring `role: "expand"`, and `planColumns` never reads `role`. A table declaring no such column shows no marker; C11 neither synthesises a column nor reserves a gutter, because either would change width arithmetic the surfaces already state.
 - **I16** — C11 registers through C09's public `register`; it is not privileged.
 - **I17** — The action bar's **presence** depends on the data and never on focus: a blank separator and a label row whenever any row declares `actions`, with the labels blank when nothing is focused. A height that varied with focus would move without `rev` moving, so C14's cache could not invalidate it — I9 broken in the one way measurement cannot catch, since `measure` never sees focus at all.
+- **I18** — The action bar's presence is `actionBar` when the block declares it and `rows.some(r => r.actions)` otherwise. **A window declares it and a producer does not**: the presence is derived from the rows, so a slice moves it in both directions — losing two rows the parent counted, or drawing a bar in the middle of a scrolled table. I17 is unchanged by this: the pin is computed from the parent's data at the moment the window is taken, so presence still never follows focus.
+- **I19** — A window's rows are in **display** order and carry `presorted`, and `sortedRows` returns a `presorted` block's rows untouched. Without it the slice re-derives its own comparator — `kindOf` reads the values present — and a window can reverse its own rows while every count and every height stays correct, which is the one failure C09 I26 cannot see.
+- **I20** — A window of a table holds at least one row. A bodyless window is a different block: the empty-table rule fires and it measures `header + 1`, and an action bar whose existence derives from the rows cannot be drawn beside none. The row that makes it non-empty is paid for in `skipRows` or `dropRows` according to which end it falls outside.
 
 ---
 
@@ -192,6 +238,9 @@ So the bar is drawn whenever **any** row declares `actions`, and its label row i
 13. The expand marker fills a column the surface declared, and planning ignores `role` (I15).
 14. `planColumns` is pure, total and holds no cache (I7, I11).
 15. A table with actions on any row draws one trailing bar; its presence follows the data and its content follows focus (I17).
+16. **A window pins the bar's presence, because a presence is as derived as a width** (I18). Both directions: a slice can lose a bar the parent counted and a slice can draw one the parent put somewhere else. Set by `window` and by no producer (→ C09 I25a, MG27).
+17. **A window's rows are in display order and are not sorted again** (I19). `sortedRows` is not idempotent over a slice — `kindOf` reads the values present — so a window that re-sorted could reverse itself with every count correct (→ FINDINGS F429).
+18. **A window holds at least one row, and both ends of a table are paid for** (I20). The header alone is bodyless and the bar alone cannot exist, so the nearest row is kept and charged to `skipRows` or `dropRows` (→ C09 I26).
 
 ---
 

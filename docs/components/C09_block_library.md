@@ -196,6 +196,35 @@ same suite a consumer runs for `measure`/`render` — so an app's own arm is hel
 to it too. Without that, a consumer's window can be silently short and the frame
 describes a document nobody holds.
 
+**And the residual is a pair, because slack falls at both ends.** `skipRows` is
+leading only — its own sentence says *the leading rows of it the caller drops* —
+and that was sufficient for every kind that took the seam first: `patch`'s slack
+is a path header and a hunk header, which lead; `logs` and `keyValue` have units
+of one row and cannot overhang at all. **`table` is the first kind whose last
+unit can hang past `to`** — a range ending inside an expanded row gets the whole
+row, and the surplus is at the end (F428). So the identity is:
+
+```
+measure(w.block, width) − w.skipRows − w.dropRows  ===  to − from
+```
+
+**This names a drop the consumer has always made.** `session.ts` renders the
+window and writes `rows.slice(0, ve.takeRows)`: trailing rows past the viewport's
+own count have been discarded on every frame since the seam landed, and no
+contract said they could be. The weaker repair is worse than either — relaxing
+the identity to `≥` would let every wrong answer inside the bounds pass, which is
+the one thing the property exists to prevent.
+
+**And `window` takes `measureChild`, for the reason `elements` already states one
+member below it.** A table row's offset is `header + Σ(1 + detailHeight(row))`
+and `detailHeight` measures the expanded detail through the child seam, so the
+unit boundaries are **not a function of `(block, width)` alone** and a window
+that guessed them would slice at the wrong row. The sentence was already
+written — the right kind, the right quantity, the right reasoning — on the
+neighbouring member; `logs`, `patch` and `keyValue` have units of one row and
+never needed it, so nothing connected the two, and `table` could not divide for
+want of a parameter rather than for want of a rule.
+
 **A plot has no `window` and never will.** C12 I1 makes a plot's height a
 function of the block alone: reducing its series changes nothing and reducing its
 `height` rescales the curve rather than windowing it. **Atomicity is expressed by
@@ -1211,28 +1240,59 @@ internal mode, which is a public type carrying another library's state. Until th
 stays atomic and its cost is answered by the *other* half of roadmap 17 — a per-block cap with a
 visible marker, which needs no lexical context at all.
 
-### What `table` owes, which is more than a slice
+### What `table` owes — two fields, one parameter and a residual
 
-Written down rather than attempted, because four interactions in one window is where a rushed
-change earns its defect.
+Written down before it was attempted, because four interactions in one window is where a rushed
+change earns its defect. **The question to ask of each is not *does a window change this* but
+*does a window change what this is derived from*** — the first needs a field, the second often
+does not, and the six answers are not the same.
 
-1. **`sortedRows`.** `measure` walks `block.rows` and `render` walks `sortedRows(block)`. The
-   counts agree, so I26 passes either way — and *which* row sits at a given index does not, so a
-   slice taken in declaration order shows different rows than the range C14 addressed. **A
-   count-based invariant passing while the content is wrong** is F426's shape, one kind over.
-2. **The header.** `hasHeader` is `showHeader !== false`, so a window past row 0 can say
-   `showHeader: false`. Expressible today — the only one of the four that is.
-3. **The action bar.** `hasActionBar` is `rows.some(r => r.actions)` and it costs two rows
-   (I17). A window mid-table whose slice happens to carry actions draws a bar the reader is not
-   looking at; one whose slice does not drops two rows the parent counted. **Derived from the
-   rows, like `widest`** — so it wants pinning, and there is no field for it. Stripping `actions`
-   to suppress it is not the same change: it removes the row's affordances (C26).
-4. **Expanded detail rows.** An expanded row is one indivisible unit taller than one row, so a
-   boundary inside it is `skipRows` rather than a shorter slice — the accounting `windowRows`
-   already reasons through for a hunk.
+| what it derives | derived from | what a window moves | verdict |
+|---|---|---|---|
+| the column plan | `columns` and `width` | **neither** | **Nothing.** `planColumns(cols, width)` takes no rows at all: C11 §3 plans from *declarations* — `minWidth`, `maxWidth`, `flex`, `priority` — and never from cell content. **That is the structural reason `table` needs no width pin where `keyValue` did**, and it is a fact about the signature rather than a finding that cleared it |
+| the header | `showHeader` | neither — a declared flag | Expressible today, and the only one of the six that was |
+| the empty message | `rows.length > 0` | what it is derived from | **Nothing, once a window never goes bodyless** — the two mirror cases below |
+| the action bar's **presence** | `rows.some(r => r.actions)` | what it is derived from | **A field**, and it declares a *presence* rather than a width: `Table.actionBar` (C11 I18) |
+| the display **order** | `sortedRows`, through `kindOf(rows, key)` | what it is derived from, **and the derived thing changes** | **A field**, and the one nobody had named: `Table.presorted` (C11 I19, F429) |
+| an expanded row's unit | `detailHeight`, through `measureChild` | neither — the unit travels with its row | **A parameter and a residual**, not a field: `window` takes `measureChild` (I26a) and the surplus is paid by `dropRows` (I26) |
 
-**So `table` needs a public field before it needs a window**, exactly as `keyValue` did — and the
-field is a *presence* rather than a width, which is a different argument and wants its own ruling.
+**Row 5 is measured rather than reasoned, and it is the one that inverts an assumption.**
+`sortedRows` looks like a permutation, so slicing the sorted order and letting `render` sort the
+slice again looks idempotent. It is not: `kindOf` decides a column's comparator **from the values
+present**, so a window that drops the one non-numeric value in a numeric-looking column
+re-classifies it. Measured, a sortable column of `2 · 10 · abc` ascending — the whole block
+classifies as text and renders `10 · 2 · abc`; its first two rows, windowed, classify as numeric
+and render **`2 · 10`**. Reversed, with every count and every height correct. F426's shape one
+kind over, reached by a fix that looked like the obvious one.
+
+### The two mirror cases, and each is paid at a different end
+
+**Neither end of a table is a row, and both ends can be asked for alone.**
+
+- `[0, 1)` is the header. A window holding no rows is *bodyless*, C11 §5's empty-table rule fires,
+  and it measures `header + 1` against a range of 1 — with the surplus **after** the header, where
+  `skipRows` cannot reach.
+- `[n−2, n)` is the gap and the bar. A window holding no rows cannot draw a bar at all, because the
+  bar's existence is derived from the rows it would describe.
+
+**So a window never goes bodyless.** It keeps the nearest row unit and pays for it in whichever
+residual the row falls outside — `dropRows` for the header case, `skipRows` for the bar. The other
+way round for the first was to render the empty message and drop it, which costs the same row and
+puts a sentence on a frame that is false about the document it came from.
+
+**And the pin is an argument rather than a memory.** `actionBar` is recomputed from the block
+`window` was handed, so there is no moment at which it describes the previous document; a `true`
+carried across a patch that removed the last `actions` would be a two-row lie surviving into the
+next frame. MG27 is what keeps a producer from writing one (`BUILDER_OMISSIONS`).
+
+### The table trace — a window, and then something happens
+
+| # | window | then | rules that meet | ruling |
+|---|---|---|---|---|
+| T1 | `[10, 20)` of a sorted table | the reader sorts on another column | I8's height-neutrality · the range is in **display** space | Height-neutrality says C14 need not remeasure; the window's *contents* change completely, because the range addresses drawn rows. Both correct, about different things — and a window caching its rows against `rev` alone would still be right, since a sort moves `rev` and does not move the height |
+| T2 | any | a row **above** the window expands | I9 | Everything below shifts by the detail's height, so the same viewport offset is now a different range. The window is re-taken per frame and carries no `from` of its own |
+| T3 | one covering the bar | the last `actions` are patched away | I17 · the pin | The parent loses two rows and `rev` moves. The pin is recomputed, so it cannot be the stale half of a pair |
+| T4 | `[0, 1)`, then `[0, 2)` | the reader scrolls one row | C11 §5 · I26 | The first is bodyless-by-range and the second is not, so the residual moves while the block gains a row. **A row asserting one offset passes against a residual that is simply wrong** — the sweep is what catches it, as C25 T3.20 already says for `keyValue` |
 
 ### The trace — two windows of one block, and whether they agree
 
@@ -1274,7 +1334,8 @@ field is a *presence* rather than a width, which is a different argument and wan
 - **I24** — **A grammar in the default set has its emitted classes mapped, or the omission has a reason.** Shipping a grammar whose classes `SLOTS` does not carry is indistinguishable from not shipping it — measured: `markdown` emitted four runs and coloured none. Three classes are unmapped deliberately: `hljs-params` is ordinary identifiers, `hljs-strong` and `hljs-emphasis` are appearance rather than a rôle, and **`hljs-addition` / `hljs-deletion` are a change axis, which C04's ruling says is a marker and never a tone** (F30, F81).
 - **I25** — **A kind that divides declares `window`, and a window is a valid block of the same kind plus a residual offset.** `window(b, w, from, to)` returns `{ block, skipRows }`; the caller renders `block` and drops `skipRows` leading rows, and what remains is exactly what the full rendering would have put at rows `[from, to)`. The offset is not a convenience — it is what makes an indivisible unit (C25 I19) and a sticky header (C25 I18) expressible without inventing a row C14 never measured, which is drift three components from its cause. **A window is a block and never a list of rows**, because `Block[]` is what both consumers hold and a slice of rendered output would be a second height codepath.
 - **I25a** — **A kind whose layout is derived from its rows pins that layout into the window; a kind whose *parse* is cannot be windowed at all.** `patch` pins `numberWidth` and `keyValue` pins `keyWidth`, because a window whose slice happens to hold shorter values would draw a narrower column and every row would shift sideways as the reader scrolls — measured at 14 cells against 3 for `keyValue`, and 4 against 1 for `patch` (C25 I21a). **`code` is refused on the other half of the same sentence**: `tokenise` is a function of every character before the slice, so a window is a different *parse* rather than a narrower column — lines inside a block comment come back as live code, and `measure` never tokenises, so I26 holds while the rendering is wrong (F426). A width travels with a window; a parse does not.
-- **I26** — **`measure(window(b, w, from, to).block, w) − skipRows === to − from`, checked generically over every kind that declares `window`.** The form without `skipRows` is the one the seam invites and it is false for any window that costs slack. Enforced by `measurement-conformance.ts` rather than per kind, so an application's own arm is held to it — without that a consumer's window is silently short and the frame describes a document nobody holds. It is I1's rule over a window rather than over a block.
+- **I26** — **`measure(window(b, w, from, to, measureChild).block, w) − skipRows − dropRows === to − from`, checked generically over every kind that declares `window`.** The form without the residuals is the one the seam invites and it is false for any window that costs slack. **Both terms, because slack falls at both ends**: `skipRows` is leading only, and `table` is the first kind whose last unit can hang past `to` (F428). The consumer has always dropped the trailing rows — `session.ts` writes `rows.slice(0, ve.takeRows)` — so `dropRows` names an operation the seam already relied on and could not state. Relaxing the identity to `≥` was the other option and it is the worse one: containment is satisfied by every wrong answer inside the bounds. Enforced by `measurement-conformance.ts` rather than per kind, so an application's own arm is held to it — without that a consumer's window is silently short and the frame describes a document nobody holds. It is I1's rule over a window rather than over a block.
+- **I26a** — **`window` receives `measureChild`, on `elements`' argument and for the same quantity.** A kind whose unit boundaries depend on a child's height cannot compute them from `(block, width)` alone — a table row's offset is `header + Σ(1 + detailHeight(row))` — and a window that guessed would slice at the wrong row while I26's arithmetic still balanced. Supplied by the registry, so a kind cannot reach for its own (A02 Seam 1).
 - **I27** — **A kind that does not divide has no `window` member, and that is how atomicity is expressed.** `plot` is the case and it is permanent: C12 I1 makes height a function of the block alone, so reducing the series changes nothing and reducing `height` rescales the curve. An absent member cannot be deleted by a later edit; a branch returning the block unchanged can, and reads as an oversight either way.
 - **I28** — **A progress bar clamps its fill and never its number.** The bar has no cells past its last one; the percentage is the true fraction, so `150` of `100` draws a full bar and reads `150%`. Clamping both makes `100/100` and `150/100` one picture, which is the same objection `examples/docker`'s CPU bar was built around and the reason the two now agree rather than each being defensible about its own quantity. A `total` of zero has no proportion: an empty bar and `0%`, which is a floor and not a measurement. **A negative `current` is floored for the same reason** — `repeat()` with a negative count throws, so the block would not render at all (I2). Found by the mutation pass, which is where a guard with no fixture behind it shows up.
 - **I29** — **Every containment reports what it swallowed, through a sink supplied at construction.** `createBlockRegistry({ onError })`, called by all **three** catches — `measure`, `render` and `elements` — with the block, the member and the error. **Four, when this was written**: the ownership question carried a catch of its own, and I30 folded it into `elements` because the two are one answer, so the fourth is gone rather than unreported. The implementation is the first thing that could disprove the count, and it did. A containment that reports nothing hides the bugs it exists to survive, and both of the two that shipped reported nothing at all: `measure`'s catch is bare, and `render`'s discards the error the moment it has read the message off it. **T3.14 has said `logged` for as long as the row has existed and nothing anywhere logged** — an effect named in a test row with no mechanism, satisfied by the half of the sentence that was true (F223). L4 wires the sink to C23's record of what the pipeline's bare catches swallowed (C23 I48), which exists and is already drained; the test harness supplies one that fails the run, and that is what makes a caught throw a red suite rather than a quiet frame.
@@ -1332,6 +1393,8 @@ field is a *presence* rather than a width, which is a different argument and wan
 36. **An image that cannot be decoded says which refusal it is** (I38). The decoder computes a reason for every rejection and the block discarded all of them, so *a corrupt file* and *a format phase 1 does not read* arrived as the same `alt`. It draws the `status` box the rest of the framework draws, at `error`, with `alt` kept beneath as the caption — and the fault is scoped to **this** decoder, not to the picture (→ C04 I73, C09 §8b G7).
 
 37. **A kind whose layout is derived from its rows pins that layout into its window, and a kind whose parse is cannot be windowed** (I25a). `patch` pins `numberWidth`, `keyValue` pins `keyWidth`, and both are one sentence: a window says what its *parent* measured rather than deriving it from the slice, or every row shifts sideways as the reader scrolls. `code` is refused on the same sentence's other half — `tokenise` reads every character before the slice, so a window is a different parse and lines inside a block comment render as live code, invisible to I26 because `measure` never tokenises (→ C25 I21a, C12 I1, FINDINGS F426).
+38. **The window's residual is a pair, and `window` is handed `measureChild`** (I26, I26a). Slack falls at both ends: `skipRows` is leading only, and `table` is the first kind whose last unit can hang past `to`. The consumer has been dropping trailing rows on every frame — `session.ts` writes `rows.slice(0, ve.takeRows)` — so `dropRows` states an operation the seam already depended on, rather than granting a new one; and the identity keeps its equality, because relaxing it to `≥` would pass every wrong answer inside the bounds (→ FINDINGS F428).
+39. **A kind pins a *presence* as readily as a width, and `table` pins two things and re-sorts nothing** (C11 I18, I19, I20). The action bar exists or does not, so a window moves it in **both** directions; the display order is not idempotent under slicing, because `kindOf` reads the values present and a slice can re-classify its own column. Neither field is a producer's, on `numberWidth`'s argument (→ C11 §5a, C25 I21a, FINDINGS F429).
 
 ---
 

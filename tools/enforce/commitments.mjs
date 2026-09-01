@@ -955,6 +955,13 @@ export function scanSections(file, src, options = {}) {
  * Two instances now, both repaid on the next commit, which is the evidence that
  * the shape is a loan rather than a way to grow the list.
  *
+ * **`C09 I26a` and `C11 I18`–`I20` are the third**, ruled by the spec commit that
+ * gave `table` a window and named by no row until the commit after it: the
+ * seam's `measureChild`, the action bar's pinned presence, the display order a
+ * slice can reverse, and the rule that a window holds at least one row. Three
+ * instances, all repaid next commit — and the loan is what keeps the spec commit
+ * honest rather than green by omission.
+ *
  * **Stated blind spot: the corpus is `.ts` only**, matching what `walk` collects,
  * so an invariant named solely by a `.mjs` fixture reads as uncited. Widening it
  * is not obviously right: `TOPICS["fixture"] = "C01"`, and the bare `I17` in
@@ -964,6 +971,7 @@ export function scanSections(file, src, options = {}) {
  * one would under-report, silently.
  */
 const UNCITED_INVARIANTS = Object.freeze([
+  "C09 I26a", "C11 I18", "C11 I19", "C11 I20",
   "C01 I15", "C01 I16", "C01 I17", "C03 I11", "C04 I18", "C04 I20", "C04 I21", "C04 I22", "C04 I24",
   "C04 I32", "C04 I33", "C04 I66", "C05 I13", "C05 I14", "C06 I21", "C06 I22", "C06 I23",
   "C07 I16", "C07 I17", "C07 I21", "C08 I16", "C09 I15", "C09 I16", "C10 I18", "C10 I19",

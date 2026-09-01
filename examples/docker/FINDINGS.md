@@ -13860,6 +13860,56 @@ terminal did not change, and the gap between those two is the whole finding.
 
 ---
 
+## F429 — a sort is a permutation of the rows it can see, and a window changes which rows those are ★★★★★
+
+**The fix everybody reaches for is to slice the sorted order, and it is not enough.** C09 §6b's
+walk had already ruled that `measure` walks `block.rows` while `render` walks `sortedRows(block)`,
+so a slice taken in declaration order shows different rows than the range C14 addressed. The
+remedy is obvious — sort, then slice — and it rests on an assumption nobody stated: that
+`sortedRows` applied to an already-sorted slice is the identity.
+
+**It is not, and the reason is one function below.** `kindOf(rows, key)` decides whether a column
+compares numerically, by duration or lexically **from the values present in it**, and its own
+comment says why: *one `AUC 0.912` in a column of numbers makes the whole column text, because a
+comparator that returns null for some of its input is a comparator with no defined order.* A
+window drops rows. A window can therefore drop the one value that made the column text.
+
+Measured, one sortable column, ascending:
+
+```
+rows          a: "2"      b: "10"      c: "abc"
+whole block   kindOf = text      → b, a, c        ("10" < "2" < "abc")
+rows [0,2)    kindOf = numeric   → a, b           ("2" < "10")
+```
+
+**The window's own two rows come back reversed**, and every count, every height and every
+`skipRows` is correct. C09 I26 holds perfectly — the identity is about rows, and this is about
+which row sits at an index. **F426's shape, one kind over**, and reached this time not by a
+missing rule but by a fix that looked like the obvious one.
+
+**Ruled: `Table.presorted`** (C11 I19, commitment 17). The window sorts, slices and sets it;
+`sortedRows` returns a `presorted` block's rows untouched.
+
+**Two repairs were cheaper and both are wrong, which is the part worth keeping.**
+
+- **Strip `sort`.** `sortedRows` returns `block.rows` when `sort` is absent, so the re-sort stops —
+  and `headerSpans` draws the ` ↑` / ` ↓` indicator from `block.sort` alone, so a table would lose
+  its arrow the moment a reader scrolled. A visible regression in the one place a reader looks to
+  learn why the rows are in this order.
+- **Set the sorted column `sortable: false`.** `sortedRows` returns early on an unsortable column
+  *and* the indicator is drawn without consulting `sortable`, so this suppresses the re-sort and
+  keeps the arrow, with no new field at all. It is wrong for the reason the walk had already given
+  against stripping `actions` to suppress the action bar: **`sortable` is an affordance, and a
+  window may not change what a table offers.** The same objection, arriving at a second field a
+  step later — which is what says it was a rule rather than a one-off.
+
+**And it generalises past `table`.** I25a says a kind whose *layout* derives from its rows pins
+that layout, and a kind whose *parse* does cannot be windowed. This is a third thing: a kind whose
+**ordering** derives from its rows must pin the order, because the comparator is derived too. A
+width travels with a window, a parse does not, and an order travels only if you carry it.
+
+---
+
 ## F428 — `Windowed` has leading slack and no trailing, and `table` is the first kind that overhangs ★★★★★
 
 **The walk gave `table` four interactions (C09 §6b). Building it found three more, and the third
@@ -13914,6 +13964,22 @@ declines ranges that end inside an expanded row, which is a window that sometime
 is worse than a kind that declares none, and F424 already says what a non-declaring kind costs:
 `logs` paints forty rows of fifty thousand in 0.65 ms and `code` takes 914 ms. **The number is the
 argument for doing it and not the argument for doing it wrongly.**
+
+### Ruled — and §6's field was not needed, because §6 and §7 are one thing
+
+**Both ends of a table can be asked for alone, and both surpluses are at the wrong end for
+`skipRows`.** A header-only window is bodyless and measures `header + 1` with the surplus *after*
+the header; a range ending inside an expanded row keeps the whole unit and the surplus is *after*
+the last row. **So §6 does not want a field: it wants the same residual §7 wants**, and the field
+whose name collided with `emptyMessage` was never needed.
+
+**And `dropRows` grants nothing new.** `session.ts` renders the window and writes
+`rows.slice(0, ve.takeRows)` — trailing rows past the viewport's count have been discarded on every
+frame since the seam landed, and no contract said they could be. The invariant keeps its equality:
+relaxing I26 to `≥` was the alternative, and containment is satisfied by every wrong answer inside
+the bounds.
+
+Landed as C09 I26 (the pair), I26a (`measureChild`) and C11 §5a.
 
 ---
 
