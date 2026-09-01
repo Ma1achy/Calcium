@@ -7619,6 +7619,168 @@ than left as a row that passes by having no subject.
 
 ---
 
+## 3am. `scatter3d` — two arms, and a tier that means a different thing in each
+
+**This is the form step 3 ships, and it is where 3D stops being speculative.** Everything before it
+is a camera nothing looks through and a projector nothing draws with; everything after it is
+improvement rather than proof.
+
+### The two arms, and the terminal picks
+
+```
+halfBlockEligible(caps, false)     a colour raster: samples at width x 1 by height x 2 (I84),
+                                   halfBlockRows averaging the identity, and `HALF_BLOCK` with
+                                   two colours a cell. THE RUNG F431 MEASURED
+otherwise                          one marker glyph per cell, with a unicode rung and an ASCII
+                                   rung. The glyph carries the depth tier; colour carries what
+                                   the terminal has left
+```
+
+**`STYLE_ARMS.scatter3d` is empty and that is a ruling.** Every other positional form lists the
+arms a caller may force, because `braille` against `line` is a taste — a dot grid against
+box-drawing strokes, both available at every capability that has either. These two arms are not:
+`halfBlockEligible` reads `unicode`, `ambiguousWidth` and `colourDepth`, so the choice belongs to
+the terminal and there is nothing left for the member to select. **Declaring an arm the renderer
+does not have is F207's class** — a member accepted and ignored — so the list stays empty and a
+braille arm joins it on the commit that builds one.
+
+### The tier, and the two arms mean different things by it
+
+**Three tiers, bucketed on view `z`, exactly as the density ramp buckets on value.** A terminal
+cannot scale a mark smoothly and a reader cannot tell more than three sizes apart, so the ceiling
+is a decision rather than a limitation.
+
+```
+              colour raster                 glyph arm
+near          a 2x2 block of samples        the near row of the marker table
+mid           a 1x2 block                   the mid row
+far           one sample                    the far row
+```
+
+**One table cannot serve both, and that is the finding rather than a detail.** The design note's
+marker table is a table of *glyphs*, and on the colour raster there are no glyphs — every cell is
+`HALF_BLOCK` and the picture is entirely in the two colours. A tier there is a **sample count**.
+Reading the note's table onto both arms would put a `?` in a cell whose text is fixed.
+
+**The tier is the only depth channel the glyph arm has**, which is why it is not an ornament.
+Below the colour floor a ramp says nothing, and a near point is bigger — so a 3D scatter at one
+bit still reads as three-dimensional, and that is the honest degradation rather than a consolation.
+
+**A near point at the frame's edge clips per sample.** `writeDepth` refuses an out-of-bounds
+coordinate and returns `false`, so the in-bounds quarter of a 2x2 block draws and the rest does
+not. The alternative — dropping the point because its block does not fit — deletes data at the
+edge of every frame, which is the one place a reader is most likely to be looking.
+
+**The tier never sees a culled sample**, because the cull runs first (I86). That ordering is not a
+convenience: a tier bucketed on a view `z` at or behind the eye is bucketing a number the
+projection has already declared meaningless.
+
+### Colour, and the one rule that decides two things
+
+```
+colourBy: "depth"    the ramp over the view-z range        reads as recession    (the default)
+colourBy: "value"    the ramp over point.value             reads as a field
+colourBy: "series"   the categorical palette               reads as identity
+```
+
+**`colourBy` decides both what colour means and whether there is a legend, from one rule.** Under
+`"series"` the block's identities are its `points3` labels, `identityOf` answers them, and
+`legendPlacement`'s count is non-zero, so the key is drawn. Under `"depth"` and `"value"`
+`identityOf` answers nothing, the count is zero, and a categorical legend naming a channel the
+picture does not use never appears. **Two rules here would be a second place for them to
+disagree** — which is I81's mechanism, avoided rather than repaired.
+
+**`SHARES_CELLS` is `true`, and the legend is what makes that cell observable.** Two series'
+samples land in one cell and the depth buffer keeps the nearer, so the cell shows one series and
+nothing in the picture says which. Without the legend the record's entry would be a cell nobody
+could be wrong about, which is F330's class exactly.
+
+**The value ramp's zero-span rule is the field family's own** — mid-ramp at a zero span (C04 I74) —
+and is not re-derived here. The **position** extent's zero rule is I86's centre. They are different
+axes answering different questions, and the reason to say so is that both are called "a zero
+extent" and only one of them is about geometry.
+
+### The twenty-three answers, because each is a question
+
+Adding a member to `PlotForm` produces **23 compile errors in `src/`** across total
+`Record<PlotForm, ...>`s, and 5 more in `test/` and `tools/`. That is the mechanism working: each
+one is a question the form must answer. **None of them is answered from the neighbouring form** —
+`scatter` is `true` at seven cells where this is `false`, and copying it is how F330's five silent
+cells were written.
+
+| record | answer | why, and it is not `scatter`'s reason |
+|---|---|---|
+| `DECLARES_HEIGHT` | `true` | the sample grid is `height x 2`; a derived height would make the grid a function of the data |
+| `ORIENTABLE` | `false` | `orientation` is a two-valued version of what `camera.azimuth` answers continuously — not *unbuilt*, which is the other three reasons in that record |
+| `ORIGIN_DEFAULT` | `null` | the corner the data grows from **moves under an orbit**; a fixed answer would be true at one azimuth |
+| `HONOURS_AXIS_CROSS` | `false` | `overlaidRows` does not compose this area — the form rasterises its own |
+| `HAS_Y_GUTTER` | `false` | the ordinate is drawn in the scene and turns; a gutter is a fixed column |
+| `HAS_DETAIL_RUNGS` | `false` | no `RUNGS` entry, and T2.10 asserts the pair |
+| `HIERARCHY_ROLE` | `null` | draws a series, not a containment |
+| `HAS_X_TITLE` | `false` | there are **three** axes and `xTitle` names one; a caption row naming one of three is worse than none |
+| `HAS_CALLOUT` | `false` | a callout annotates the last reading at the right edge, and the rightmost sample here is a camera artefact |
+| `IS_MATRIX` | `false` | — |
+| `IS_FIELD_FORM` | `false` | — |
+| `STYLE_ARMS` | `[]` | the arms are a capability, not a taste (above) |
+| `PLOT_FORM_MEMBERS` | `true` | mechanical |
+| `FORM_ROWS` | the renderer | — |
+| `HAS_VALUE_AXIS` | `false` | **a `Figure` holds one `value` and this form has three ranges** — F330's exact class, and `scatter`'s `true` is the wrong answer to copy |
+| `RAMP_DEFAULT` | `"viridis"` | depth reads as recession and a perceptual ramp is what says so; consumed through `rampOf`, so the entry is not decorative |
+| `MATRIX_LAYOUT` | `null` | not a matrix, which is a different answer from *a matrix with no preference* |
+| `AREA_ROWS` | `heightOrOne` | — |
+| `FURNITURE_ROWS` | `() => 0` | no frame, no rule, no x-labels; a horizontal legend is `legendRows`' and is accounted centrally |
+| `HAS_POSITION_AXIS` | `false` | the abscissa is a **projected** x, not a sample index |
+| `ROW_IS_AN_IDENTITY` | `true` | a `Point3Series` is a thing the caller named; whether colour *carries* that identity is `colourBy`'s decision, which is a different question |
+| `SHARES_CELLS` | `true` | the depth buffer keeps one of two, and the legend is what makes it readable |
+| `SVG_FAMILY` | `null` | a claimed form must put ink on the page (G7b), and no emitter here carries a projection |
+
+**The seam for the day the SVG arm crosses is ruled now rather than after it disagrees.** The
+projection happens **above** the seam: the figure would carry projected, normalised `point` marks
+and neither arm would compute a basis. That is §3ak's finding applied before the second arm exists,
+which is the whole of what 73 disagreeing cells cost the first time.
+
+---
+
+## 6e. The 3D scatter walk — a table, because the interactions are structural
+
+**The shape is a decision and this one is a table.** §3al's own walk was a trace: a camera changes
+because something happened. Nothing here is event-mediated — the arm, the tier, the ramp, the
+identity and the depth buffer all hold at rest, and two of them meet because of what the *block*
+says rather than because of what a reader did. A trace indexed by events cannot reach a cell where
+two records are simply both true, which is C19's `--flag=value` defect in a different component.
+
+Indexed by rule interaction. A row governed by one rule restates that rule and finds nothing.
+
+| # | the two rules | the input | ruling |
+|---|---|---|---|
+| 1 | the glyph arm x `colourBy: "depth"` | 4-bit terminal, default `colourBy` | the glyph arm has one foreground per cell and no ramp below the colour floor, so **depth reads through the tier alone**. The tier is load-bearing rather than decorative, which is I88's whole reason for existing |
+| 2 | the colour raster x the tier | 24-bit, a near point | a "size" on a raster with a fixed glyph is a **sample count**, not a glyph — 2x2, 1x2, 1x1. The note's marker table is the glyph arm's and does not port |
+| 3 | the colour raster x `colourBy: "series"` | two clouds, 24-bit | no conflict on the colour channel — series colour replaces the ramp. The conflict is with the tier: under `"series"` **depth is carried by tier alone even on the raster**, because the raster's one channel is spent |
+| 4 | `colourBy: "value"` x an absent `value` | one point of one series with none | the point has a position, so it would be drawn in some colour. **Refused at the gate** — dropping it is I8's class and a floor colour is indistinguishable from a floor reading (C04 I76) |
+| 5 | `colourBy: "depth"` x a zero z extent | a coplanar cloud | I86's centre rule gives every sample the axis's centre, so the ramp is evaluated at 0.5 and the picture is one flat colour. **That is true**: they are all at the same depth |
+| 6 | the depth buffer x `colourBy: "series"` | two series in one cell | the nearer wins the cell, colour and all. This is why `SHARES_CELLS` is `true` and why the legend is load-bearing rather than polite |
+| 7 | the cull x the depth buffer | every sample behind the eye | nothing is written; the block draws **blank**, not an error — I86's `distance: 0` ruling generalised |
+| 8 | `identityOf` x `colourBy` | `"depth"` with two labelled series | no identities, so no legend. **One rule for both effects**, because two would be a second place to disagree |
+| 9 | the glyph arm x `colourDepth: 1` | monochrome | no colour at all, and the tier is the entire picture. `colourBy` is accepted and decides nothing, which is the honest degradation rather than a refusal |
+| 10 | the tier x the cull | a sample exactly at the near plane | the cull runs first, so the tier never buckets a view `z` at or behind the eye and never divides by zero doing it |
+| 11 | the near tier x the frame edge | a near point at column 0 | `writeDepth` refuses out of bounds per sample, so the in-bounds quarter draws. Dropping the whole point deletes data at the edge of every frame |
+| 12 | the value ramp x a zero **value** span | every point carrying the same `value` | **the field family already answers this** — mid-ramp at a zero span (C04 I74) — and it is not I86's centre rule, which is about the *position* extent. Two things called a zero extent, one of them not about geometry |
+
+**What the table found that no list of inputs would have.** Rows 2 and 3 are the same discovery
+from two directions: the tier and the colour are **one budget of two channels**, and which reading
+each carries depends on the arm *and* on `colourBy` together. A suite indexed by inputs would test
+`colourBy` against every arm and agree with itself every time, because each rule is individually
+satisfied in every cell. Row 12 is the *who else already solved this* instrument: the answer was in
+the field family and re-deriving it here would have been a second zero-span rule to keep in step.
+
+**And the throw's residue, asked because a ruling chose to throw.** Row 4's refusal is at the gate,
+before construction, so it leaves nothing half-built — which is the answer, and it is only an
+answer because it was asked. The refusal that would have residue is one taken *inside* the render,
+and there is none: every degenerate case here draws something or draws nothing, and none of them
+throws.
+
+---
+
 ## 3q. One value axis across the bands, and the record it never had
 
 **This section is written because three code comments cite it and it did not exist.** The
@@ -8885,6 +9047,9 @@ orientation — and belongs in the classification table as its own rows.
 - **I84** — **The sample grid is derived from the block and the rung, and the depth buffer is allocated per render.** `width × 1` by `height × 2` on the half-block rung and `width × 2` by `height × 4` on braille; `80 × 48` is the grid at the size the measurement ran in and **not a constant**, so every absolute figure in `docs/notes/CALCIUM_3D_DESIGN.md` is a measurement at 80×24 rather than a threshold. The depth buffer is `Float32Array(sampleWidth × sampleHeight)` **allocated per render**: I11 forbids state that survives a render and permits a local, and the distinction is load-bearing rather than pedantic — a module-level buffer is exactly the forbidden state *and* is the wrong size the first time a region changes. **The shading model is one sample carrying both readings, and whether they can be separated is an open measurement rather than a rule** (§3al, F436): the two-channel claim was a property of the dot grid's two carriers, it is retracted, and it is deliberately not stated as an invariant because its subject does not exist yet.
 - **I85** — **A `plot` declares one block-level element exactly when it declares a camera.** Elements are what a reader can act on, and a plot with no camera affords nothing; one with a camera can be turned, which needs focus to be able to land on it. **The implementation is what found this and the spec did not**: C22 I71 requires the field and a writer to land together, and the writer runs off `focus.current` — which can only reach a kind declaring `elements`, and until now that was `table` alone (C26 §4a row 1). A binding that no focus can reach is `cursorPositions` in a different coat. **Gated on the member and not on the form**, which is also what makes the change invisible to every shipped frame: no block in the tree declares a camera, so no document gains a focus stop (→ C26 I8, C22 I71).
 - **I86** — **The frustum cull is on view `z` and happens before the divide; a zero extent maps to the centre.** Five degenerate cases, and **the first draws a plausible picture**: a sample behind the eye has a negative view `z`, the perspective divide sends it to a finite coordinate *inside* the frame mirrored through the origin, and nothing downstream can tell it from a real one — an assertion about bounds is satisfied by it, and so is a frame read. So the cull is on view `z` against a near plane of **0.01 view units** and it runs **before** the divide, which is the only point at which the information still exists; the orthographic arm takes the same cull, because a sample behind the reader is behind the reader whether or not there is a divide. **A `distance` of zero draws nothing** — the eye is on the target, everything is at or behind the near plane, and an empty picture is what standing inside the data looks like, which is why it is not a construction error. **A zero extent maps to the axis's centre** rather than to its minimum or to `NaN`: a degenerate axis has no spread, so a coplanar set draws as a line and a coincident set as a point, and the coplanar, collinear and coincident rows differ only in how many axes take the rule (§3al).
+- **I87** — **A 3D scatter has two arms, the terminal chooses between them, and `plotStyle` selects nothing.** Above `halfBlockEligible` the picture is a colour raster — samples at `width × 1` by `height × 2` (I84), `halfBlockRows` averaging the identity, and `HALF_BLOCK` carrying two colours a cell, which is the rung F431 measured. Below it the picture is one **marker glyph per cell**, with a unicode rung and an ASCII rung: every glyph in the table is `East_Asian_Width=Ambiguous`, so the wide arm is required rather than optional (→ A03 SS47, C02 I9). **`STYLE_ARMS` is empty for this form and that is a ruling rather than a gap.** Every other positional form lists arms a caller may force because `braille` against `line` is a taste available at any capability that has either; these two are selected by `unicode`, `ambiguousWidth` and `colourDepth`, so the choice is the terminal's and there is nothing left to select. Declaring an arm the renderer does not have is a member accepted and ignored (→ FINDINGS F207), so the list stays empty and a braille arm joins it on the commit that builds one (§3am).
+- **I88** — **Depth buckets into three tiers, and a tier is a sample count on one arm and a glyph on the other.** Continuous scaling has no spelling in a character grid and a reader cannot separate more than three sizes, so the ceiling is a decision; the bucketing is on view `z`, exactly as the density ramp buckets on value. **One table cannot serve both arms**: on the colour raster every cell is `HALF_BLOCK` and the picture is entirely in the two colours, so a tier is how many samples the point paints — `2×2` near, `1×2` mid, `1×1` far — while on the glyph arm it is which row of the marker table the glyph comes from. **The tier is the only depth channel the glyph arm has**, and the only one either arm has once `colourBy` is `"series"`, which is why it is not an ornament: below the colour floor a near point is bigger and a 3D scatter at one bit still reads as three-dimensional. **A near point at the frame's edge clips per sample** — `writeDepth` refuses an out-of-bounds coordinate, so the in-bounds quarter draws where dropping the point would delete data at the edge of every frame. The tier never sees a culled sample, because the cull runs first and a view `z` at or behind the eye is a number the projection has already declared meaningless (→ I86, C04 I76).
+- **I89** — **`colourBy` decides what colour means and whether there is a legend, from one rule.** Under `"series"` the block's identities are its `points3` labels, `identityOf` answers them, and `legendPlacement`'s count is non-zero, so the key is drawn; under `"depth"` and `"value"` `identityOf` answers nothing and a categorical legend naming a channel the picture does not use never appears. **Two rules would be a second place for them to disagree**, which is I81's mechanism avoided rather than repaired. **`SHARES_CELLS` is `true` and the legend is what makes that cell observable**: two series' samples land in one cell, the depth buffer keeps the nearer, and nothing in the picture says which series won — without a legend the record's entry would be a cell nobody could be wrong about (→ FINDINGS F330). **The value ramp's zero-span rule is the field family's own** — mid-ramp at a zero span (→ C04 I74) — and is not re-derived here; I86's centre rule is about the **position** extent. Both are called a zero extent and only one is about geometry (§3am).
 
 
 ## 8. Commitments
@@ -8975,6 +9140,9 @@ orientation — and belongs in the classification table as its own rows.
 85. **A plot is focusable exactly when it has a camera** (I85). An element is a thing a reader can act on, and a plot with no view to turn affords nothing — so the gate is the member rather than the form, which is also why no shipped document gains a focus stop. **Found by building the writer**, not by the walk: `orbitBlock` reads `focus.current`, focus reaches only a kind declaring `elements`, and `table` was the only one (→ C26 I8, C22 I71).
 84. **The sample grid is derived and the depth buffer is per render** (I84). `width × 1` by `height × 2` at the half-block rung, `× 2` by `× 4` at braille, and `80 × 48` is a measurement of that rule at 80×24 rather than a number to hardcode. The buffer is local because I11 forbids a survivor — and because a module-level one is the wrong size the first time a region changes, which is the failure a purity argument alone would not have predicted. **The shading is one sample carrying both readings**, the two-channel claim is retracted (F436), and its replacement is an open measurement at step 6 rather than an invariant with no subject.
 82. **A reader map counts names and a rendered comparison counts readers** (I82, C12 §3ak.48). Eleven members came back `svg=0` and it was read as *the arm does not read it*; `calendarUnit` and `startDate` had crossed since F322 through `drawnBlock` → `calendarRows`, and five blocks differing only in them draw **five distinct documents**. F355's member sweep shares the blind spot, reading the type against the files. The genuinely owed two cross as **what must not be decided twice** — the caption's words, and *whether* the rules cross — with the room and the arithmetic staying in each arm, and their fixtures went through the collision sweep **before** either member was touched (F322, F369, F370).
+87. **The two arms are a capability and not a taste, so the style member selects nothing** (I87). The colour raster above `halfBlockEligible` and the marker glyph below it are chosen by `unicode`, `ambiguousWidth` and `colourDepth` — where `braille` against `line` is a choice available at any capability that has either — so `STYLE_ARMS` is empty rather than inheriting `scatter`'s two. An arm listed and not built is a member accepted and ignored, which is the one thing F207 rules out (§3am, A03 SS47).
+88. **The tier is the depth channel, and it means a different thing in each arm** (I88). Three buckets on view `z`, because a grid cannot scale smoothly and a reader cannot read four sizes. On the raster a tier is a **sample count** and on the glyph arm a **table row** — one table cannot serve both, which is what reading the design note's glyph table onto the raster would have done. It is the only depth channel the glyph arm has and the only one either arm has under `colourBy: "series"`, so a scatter at one bit still reads as three-dimensional; and a near point at the edge clips per sample rather than being dropped whole (→ I86, C04 I76).
+89. **One rule decides what colour means and whether there is a key** (I89). `identityOf` answers `points3` labels under `colourBy: "series"` and nothing otherwise, so the legend's presence and its contents fall out together and cannot disagree — I81's mechanism avoided rather than repaired. `SHARES_CELLS` is `true` because the depth buffer keeps one of two samples in a cell, and the legend is what makes that entry observable rather than a cell nobody can be wrong about. The value ramp's zero span is the field family's rule and not I86's centre, which is about the position extent (→ C04 I74, FINDINGS F330).
 
 ---
 
@@ -9008,6 +9176,18 @@ Six tiers. No state machine — C12 is pure over the block.
 - **CAM3** (I83, I8): the camera is unreachable from `measure` — **structural**, asserted on the signature and on `PlotGeometry`'s `Pick`, not on a rendered number. A row asserting *the height did not change* is satisfied by a renderer that reads the camera and happens to return the same value.
 - **CAM4** (I84): the sample grid is `width × 1` by `height × 2`, measured at **three widths × two heights**, and the braille arm is `× 2` by `× 4` at the same six. The control is that the two arms disagree, which is what says the row is reading a grid rather than a constant.
 - **CAM5** (I84, I11): the depth buffer does not survive a render — the **second** render of one block at a new camera equals a fresh render at that camera. Asserted on the second, because a module-level buffer is correct on the first by construction.
+- **SC1** (I87): the arm is the terminal's — one block rendered at four capability sets draws `HALF_BLOCK` at 24-bit and 8-bit and **never** at 4-bit or `unicode: "ascii"`, where it draws marker glyphs. **The control is that the two arms disagree in the frame**, which is what says the row read a capability rather than a constant.
+- **SC2** (I87, C04 I59): `plotStyle` is refused on this form at both gates, over **every** member of the union rather than one — an empty `STYLE_ARMS` entry and a missing one produce different errors, and a row testing `"braille"` alone passes against a record that lists it.
+- **SC3** (I88): the three tiers are distinguishable in the frame at both arms — on the raster a near point inks **four** samples and a far point one, and on the glyph arm the near and far glyphs differ. Asserted over a cloud spanning the depth range, **not** against a hand-placed pair: a two-point fixture agrees with a renderer that buckets on the point's index.
+- **SC4** (I88): at `colourDepth: 1` a 3D scatter still reads as three-dimensional — the frame carries **all three** tier glyphs and no colour. The row that says the degradation is honest rather than a consolation; its control is the same block at 24-bit, whose glyphs are all one tier's because the raster arm drew it.
+- **SC5** (I88, I86): a near point at column 0 draws its **in-bounds** samples and the render does not throw. The control is the same point one tier further away, which fits whole — without it the row passes against a renderer that clips everything.
+- **SC6** (I89): `colourBy: "series"` draws a legend naming the `points3` labels; `"depth"` and `"value"` draw **none**, on the same block. Three renders, one fixture, and the row asserts the legend's *contents* rather than its presence — a legend drawn from `series` would be empty and present.
+- **SC7** (I89): two series' samples landing in one cell resolve to the **nearer** one's colour, asserted on the cell rather than on the picture. The row `SHARES_CELLS` exists for, and the reason the legend is load-bearing.
+- **SC8** (I89, C04 I74): every point carrying the same `value` under `colourBy: "value"` draws **mid-ramp**, which is the field family's rule and not I86's centre. Paired with the row that a zero *position* extent draws at the axis's centre, because the two are called the same thing and answer different questions.
+- **SC9** (I86, I88): every sample behind the eye draws a **blank block of the declared height**, not an empty document and not a refusal. `plotHeight` is asserted alongside the frame, because a form that returned no rows would pass a content assertion and break I24.
+- **SC10** (I84, I11): the frame at `colourBy: "depth"` is **identical** across two consecutive renders of one block, and differs from the render at a second camera. The row that a per-render depth buffer is actually per render — asserted on the second render, because a survivor is correct on the first by construction.
+- **SC11** (I87, I88): the **frame read in colour** — a PTY capture through `painter().styled()`, `ansiToSvg` and `sharp`, at 24-bit. A stripped capture cannot judge this arm at all: the glyph is `HALF_BLOCK` in every cell and the entire picture is the two colours, so a text assertion reports a correct render and a blank one identically.
+- **SC12** (I87, C12 I2): the form renders through the registry at every width in the sweep and `measure` equals the row count, over both arms. The generic contract, named here because a form composing its own rows outside `axed` is the shape that has broken I24 twice.
 - **CAM6** (I83, §3al): orbit pauses while the readout cursor is active. **Owed at step 8 and not written now** — the orbit does not exist, so the row would pass by having no subject, which is the vacuity this suite has recorded three times.
 - **YA1** (I47): `yAxis: "both"` renders the same tick values on both sides, from **one** `yLabels` call — asserted as equality of the two label sets rather than as each being correct, which is the half a per-side assertion cannot see.
 - **YA2** (I47): `yAxis: "right"` draws no left label column and the plot area starts where the border does; the labels are the same strings `"left"` puts on the other side, at the same rows.
