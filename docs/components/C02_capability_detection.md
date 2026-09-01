@@ -65,6 +65,8 @@ Environment-based. **C02 never queries the terminal and never awaits a reply.** 
 | `synchronisedUpdate` | The terminal is identified (below) → true. Every emulator this file can name implements it |
 | `bracketedPaste` | `TERM` present and ≠ `dumb` |
 | `mouse` | `TERM` present and ≠ `dumb`, **and** `TMUX` unset. Disabled inside tmux by default — sequence passthrough is unreliable and keyboard parity means nothing is lost (D34) |
+| `synchronisedUpdate` | The terminal is identified **and** `TMUX` is unset. Measured: tmux consumes `ESC [ ? 2026 h` and it never reaches the emulator, so the claim was false inside a multiplexer and the frame was written unwrapped regardless (F432) |
+| `imageProtocol` | From the identification, and `none` when `TMUX` is set. Measured: tmux consumes an unwrapped APC transmission. The DCS-wrapped form does reach the emulator at tmux's default, which is the fix — in `escapes.ts`, not here (F432) |
 | `imageProtocol` | The identification's own column (below): iTerm2 → `iterm2`; kitty and Ghostty → `kitty`; WezTerm and Windows Terminal → `none`, **unmeasured rather than absent**; unidentified → `none` |
 | `backgroundPolarity` | `COLORFGBG`'s **last** `;`-separated field: 0–6 or 8 → `dark`; 7 or 9–15 → `light`; absent, non-numeric or outside 0–15 → `unknown`. Not gated by `dumb` — the rule is derived from `COLORFGBG` and not from `TERM` |
 | `altScreen` | `TERM` present and ≠ `dumb` |
@@ -120,23 +122,46 @@ emulator we identified, so the identification does not raise the depth there and
 what it is today. This is `mouse`'s rule (D34) reaching a second capability, and it is deliberately
 **conservative**: outside tmux it fixes the measured defect, and inside it changes nothing.
 
-### The axis none of the three states, which is the fourth instance
+### The axis none of the three stated, which was the fourth instance — measured and ruled
 
 **Identification is not capability.** *Which emulator is this* and *does a sequence reach it* are
-different questions, and only `mouse` has ever asked the second. `imageProtocol` and
-`synchronisedUpdate` are claimed from a name inside `tmux` exactly as they are outside it, and the
-image case is the one that matters: **nothing in `src/` wraps an escape in tmux's passthrough form**
-— greppable, and the reason this is a real question rather than a stylistic one — so an APC
-transmission is emitted raw and C09 §4c's failure is a placement addressing an image that never
-arrived, which draws *nothing*.
+different questions, and for a long time only `mouse` asked the second. `imageProtocol` and
+`synchronisedUpdate` were claimed from a name inside `tmux` exactly as outside it, and **nothing in
+`src/` wraps an escape in tmux's passthrough form** — greppable, and the reason this was a real
+question rather than a stylistic one.
 
-**It is named here and not ruled, because ruling it needs a measurement this repository cannot
-take.** What unwrapped APC does inside a given tmux is not a fact about our code, and F421 is the
-standing lesson about carrying that kind of claim on repetition. **The instrument is one run**:
-`tools/terminal-probe/probe.py` inside `tmux` on the same Ghostty that produced `result.txt`. The
-manifest loop reads the terminal's reply, so a swallowed transmission is visible as an absent or
-error verdict rather than as a blank rectangle nobody can diagnose. Whoever next runs the read owns
-the answer, and T1.7's tmux row is asserted *as it stands* until then.
+**This section used to say the ruling needed a measurement this repository could not take**, and
+that was wrong in an instructive way: it named the unknown as *what unwrapped APC does inside a
+given tmux*, and the instrument as one `probe.py` run inside tmux on the same Ghostty. **The
+unknown is tmux's, not the emulator's.** tmux's own output is what reaches the emulator, so if the
+bytes never leave tmux there is nothing for an emulator to do — and that is measurable with a pty
+and no emulator at all (F432).
+
+Measured, tmux 3.5a, `-f /dev/null`, the sequence searched for in tmux's own output:
+
+| | reaches the emulator |
+|---|---|
+| bare pty · unwrapped APC | **present** — the control, and a probe whose reader cannot see the thing reports every absence as a finding |
+| tmux · unwrapped APC | **absent** |
+| tmux · DCS-wrapped APC, tmux's default config | **present** |
+| tmux · `ESC [ ? 2026 h` | **absent** |
+| bare pty · `ESC [ ? 2026 h` | **present** — the second control |
+
+**So both capabilities claimed from the identification are false inside tmux**, and neither is a
+near miss: the bytes are consumed. An APC transmission is swallowed and C09 §4c's failure is a
+placement addressing an image that never arrived, which draws *nothing*; a `BSU` is swallowed and
+the frame is written unwrapped, which the degradation table already accepts.
+
+**Ruled: the identification is gated by `TMUX` once, and every capability derived from it reads the
+gated value.** `colourDepth` and `mouse` already asked the second question; `synchronisedUpdate` and
+`imageProtocol` now read a `terminal` that is `null` inside a multiplexer, so there is one gate
+rather than four sites remembering to apply it.
+
+**And the remedy is a feature with a demonstrated mechanism rather than a hope.** The DCS-wrapped
+form reaches the emulator at tmux's default — `allow-passthrough` is `on` in 3.5a, so wrapping
+alone is sufficient there and no user setting is required. It belongs to whoever writes the escapes
+(`terminal/escapes.ts`), not to detection, and it is what would let `imageProtocol` survive a
+multiplexer instead of being switched off in one.
 
 ### Ghostty, and how the second list came to be kept up
 
@@ -278,7 +303,7 @@ Alternate screen is the sole hard requirement (D28). A fullscreen application on
 
 - **I10** — **`backgroundPolarity` is read from `COLORFGBG` alone, answers `unknown` wherever it is not certain, and chooses nothing.** The background is the field after the **last** `;`, which is right for `fg;bg` and for rxvt's `fg;default;bg` alike; 0–6 and 8 are `dark`, 7 and 9–15 are `light`, and everything else — absent, empty, non-numeric, or an index above 15 — is `unknown`. **The third value is the invariant's load-bearing half**: *nothing stated* and *stated light* are different facts, and a two-valued field makes them one, which is exactly the distinction its only consumer branches on. **C02 does not choose a theme**, on commitment 9's shape — a depth is reported and never interpreted, and a polarity is the same kind of fact: what it *means* for which theme opens is C22's, decided against a set C02 cannot see (→ C22 I68).
 
-- **I11** — **The emulator is identified once, and no capability matches an emulator name itself.** One function takes `TERM` and `TERM_PROGRAM` and answers with a terminal or nothing; every rule that depends on *which emulator this is* reads that answer and never re-derives it. **Three rules derived it separately and two of them disagreed** — `TERM=xterm-ghostty` alone gave `imageProtocol: kitty` with `synchronisedUpdate: false`, one terminal answering opposite ways in the environment this project demos in. The invariant is not that the lists agree; it is that **there is one list**, because agreement between three copies is a property nothing checks and single-sourcing is a property a scan can (→ T1.12, T6.11).
+- **I11** — **The emulator is identified once, no capability matches an emulator name itself, and the identification is gated where the sequence does not reach it.** *Which emulator is this* and *does a sequence reach it* are two questions, and the second is asked **once**, on the identification, rather than by each capability that consults it — `TMUX` set means the value every reader sees is `null`, because inside a multiplexer we are not talking to the emulator we identified. Measured rather than assumed: tmux consumes an unwrapped APC transmission *and* `ESC [ ? 2026 h`, so both capabilities that read a name were false there (F432). One function takes `TERM` and `TERM_PROGRAM` and answers with a terminal or nothing; every rule that depends on *which emulator this is* reads that answer and never re-derives it. **Three rules derived it separately and two of them disagreed** — `TERM=xterm-ghostty` alone gave `imageProtocol: kitty` with `synchronisedUpdate: false`, one terminal answering opposite ways in the environment this project demos in. The invariant is not that the lists agree; it is that **there is one list**, because agreement between three copies is a property nothing checks and single-sourcing is a property a scan can (→ T1.12, T6.11).
 
 ---
 
@@ -297,7 +322,7 @@ Alternate screen is the sole hard requirement (D28). A fullscreen application on
 11. Warnings about rejected overrides are returned to the caller, never printed (I8).
 12. **`ambiguousWidth` is detected from the locale, overridden by declaration, and constant for the session** — and `cells()` takes it as a parameter rather than reading it, because only L1 measures and L0's data half must not learn about terminals (I9). `cells()` is C09's and takes it as an argument.
 13. **`backgroundPolarity` is detected from `COLORFGBG`, is three-valued, and is never acted on here** — the certain range is 0–15 because the range beyond it is C10's table and C10 is a layer up, and *not stated* keeps its own value because the consumer branches on it (I10). What a polarity *means* for which theme opens is decided against a set C02 cannot see (→ C22 I68).
-14. **The emulator is identified once and every capability consults that identification** — `synchronisedUpdate` and `imageProtocol` read it, and `colourDepth` reads it too but is outranked by `COLORTERM` and gated by `TMUX`, because that variable is the terminal speaking for itself where a name is us inferring (I11). **Identification is not capability**: whether a sequence *reaches* the emulator is a second question, and `mouse` is still the only rule that asks it (§3).
+14. **The emulator is identified once, every capability consults that identification, and the identification is gated by `TMUX` before any of them see it** — `synchronisedUpdate` and `imageProtocol` read it, and `colourDepth` reads it too but is outranked by `COLORTERM`, because that variable is the terminal speaking for itself where a name is us inferring (I11). **Identification is not capability**, and the second question — *does a sequence reach it* — is asked in one place rather than by each reader: measured, tmux consumes both an unwrapped APC and `ESC [ ? 2026 h`, and the wrapped form is what survives (§3, FINDINGS F432).
 
 ---
 

@@ -13860,6 +13860,55 @@ terminal did not change, and the gap between those two is the whole finding.
 
 ---
 
+## F432 — the measurement named the wrong unknown, and that is what made it look untakeable ★★★★★
+
+**C02 carried a written decision not to rule F418's fourth instance**: *"It is named here and not
+ruled, because ruling it needs a measurement this repository cannot take. What unwrapped APC does
+inside a given tmux is not a fact about our code."* The instrument it named was one `probe.py` run
+inside tmux **on the same Ghostty**.
+
+**The emulator is irrelevant.** tmux's own output is what reaches it, so if the bytes never leave
+tmux there is nothing for an emulator to do — and whether they leave is answerable with a pty, a
+tmux and no emulator at all. The unknown was one process nearer than the instrument assumed, and
+naming the far end is what made a takeable measurement look untakeable.
+
+### Measured — tmux 3.5a, `-f /dev/null`, searched in tmux's own output
+
+```
+1   bare pty · unwrapped APC              PRESENT     the control
+2   tmux     · unwrapped APC              ABSENT
+3   tmux     · DCS-wrapped APC            PRESENT     tmux's default config
+3b  tmux     · DCS-wrapped, default opts  PRESENT     `allow-passthrough` is `on` in 3.5a
+4   tmux     · ESC [ ? 2026 h             ABSENT
+4b  bare pty · ESC [ ? 2026 h             PRESENT     the second control
+```
+
+**Two controls, because a probe whose reader cannot see the thing reports every absence as a
+finding.** Rows 1 and 4b are those; rows 2 and 4 are the answer.
+
+**Both capabilities claimed from the identification were false inside tmux, and neither is a near
+miss** — the bytes are consumed. An APC transmission is swallowed and C09 §4c's failure is a
+placement addressing an image that never arrived, which draws nothing; a `BSU` is swallowed and the
+frame is written unwrapped, which the degradation table already accepts.
+
+**Ruled: one gate, on the identification.** `TMUX` set means every reader of the terminal's identity
+sees `null` — so `synchronisedUpdate` and `imageProtocol` join `colourDepth` and `mouse`, and there
+is one place that answers *does a sequence reach it* rather than four sites remembering to.
+
+**And the remedy is now a mechanism rather than a hope.** The DCS-wrapped form reaches the emulator
+at tmux's **default** config, so wrapping alone suffices on 3.5a and no user setting is required.
+That belongs to `escapes.ts` — the file that owns every sequence — and it is what would let
+`imageProtocol` survive a multiplexer instead of being switched off in one.
+
+**The reusable part is not about tmux.** A blocker that names *whose* behaviour is unknown can name
+the wrong party, and the wrong party is usually the far one — the emulator rather than the
+multiplexer, the terminal rather than the pty, the far side rather than the seam. **Ask which
+process the bytes stop at**, and the measurement often moves inside reach. Sibling of the sixth
+blind spot: that one asks where a claim is written down, and this one asks whose behaviour it is
+about.
+
+---
+
 ## F431 — 3D is a terminal form, and the design note put it on the wrong rung ★★★★★
 
 **The premise was *a braille dot is square, so a projection into the dot grid needs no aspect
