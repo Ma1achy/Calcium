@@ -11,7 +11,8 @@
 // with nothing to be wrong about passes exactly like a rule that is satisfied,
 // and this one is especially exposed to that, because a document with no
 // Commitments section produces no findings and looks compliant.
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { checkFindings, checkTriageInventory } from "../../tools/enforce/findings.mjs";
 import {
@@ -726,14 +727,37 @@ describe("A03 SP3 — invariant references resolve outside the specs too", () =>
     expect(violations[0]?.message).toContain("has outlived its reason");
   });
 
-  it("SP3: the exception list is two entries, and both are fabrication sites", () => {
-    // Written out rather than counted, because the interesting fact is *which*:
-    // the only files excused are the two that fabricate specs for these very
-    // tests. Every other id in the tree resolves.
-    expect(Object.keys(REFERENCE_EXCEPTIONS).sort()).toEqual([
+  it("SP3: the exception list is five entries in two kinds, and the kinds are named", () => {
+    // Written out rather than counted, because the interesting fact is *which*.
+    // **And partitioned, because the second kind arrived inside the first.** The
+    // row read *two entries, and both are fabrication sites* — true when written,
+    // and a third category appeared the day three dated design notes were
+    // unpacked into `docs/notes/`. Widening a count would have absorbed it: the
+    // list would still have been "the exceptions" and nobody would have seen
+    // that "every file excused fabricates a spec" had stopped being true.
+    const FABRICATION = [
       "test/unit/enforce-commitments.test.ts",
       "tools/enforce/commitments.mjs",
-    ]);
+    ];
+    // Dated working documents citing a bare invariant whose owner is plain in
+    // the paragraph. Excused on the same argument `docs/archive/` is: rewriting
+    // one to cite ids the tool's way falsifies the record it exists to be. Named
+    // one by one so the rest of `docs/notes/` stays checked.
+    const DATED_NOTES = [
+      "docs/notes/CALCIUM_3D_DESIGN.md",
+      "docs/notes/CALCIUM_BLOCK_STATES.md",
+      "docs/notes/CALCIUM_ML_BLOCKS.md",
+    ];
+
+    expect(Object.keys(REFERENCE_EXCEPTIONS).sort()).toEqual(
+      [...FABRICATION, ...DATED_NOTES].sort(),
+    );
+    // **Every excused file exists**, or an exception outlives its subject — the
+    // shape the row above this one tests for a stale reason, one field over.
+    for (const f of Object.keys(REFERENCE_EXCEPTIONS)) {
+      const at = join(import.meta.dirname, "..", "..", f);
+      expect(existsSync(at), `${f} is excused and must exist`).toBe(true);
+    }
   });
 });
 

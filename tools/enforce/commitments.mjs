@@ -796,6 +796,23 @@ export const REFERENCE_EXCEPTIONS = {
     "fabricated specs — `I99` and a synthetic `I20a` that resolve against nothing by design",
   "tools/enforce/commitments.mjs":
     "this file: SP1's and SP2's worked examples, including the `(I5, I99)` hole they document",
+  // **Three dated working documents, named one by one rather than by directory.**
+  // Each cites a bare invariant in prose whose owner is plain from the paragraph
+  // and not to a resolver — `I11 forbids state that survives a render`, `I1,
+  // three lines`, `I8's the ones that fit plus a count of the rest`. This is the
+  // reason `docs/archive/` is excluded two comments down, applied to a file
+  // rather than a tree: **rewriting a dated document to cite ids the way the
+  // tool wants falsifies the record it exists to be.**
+  //
+  // Named individually because the rest of `docs/notes/` resolves today and a
+  // directory-wide exemption would stop checking it — an exemption is counted,
+  // not widened until it stops costing anything.
+  "docs/notes/CALCIUM_3D_DESIGN.md":
+    "dated design note; a bare `I11` in prose, and the design's premise is open pending a measurement",
+  "docs/notes/CALCIUM_BLOCK_STATES.md":
+    "dated design note; a bare `I1` in a sentence about geometry against content",
+  "docs/notes/CALCIUM_ML_BLOCKS.md":
+    "dated design note; a bare `I8` naming a ruling that already existed when it was written",
 };
 
 /**
