@@ -21960,3 +21960,69 @@ would have been read as a safety margin.
 with `closed` unset against 222.3 ms with it. Dropping 47% of the faces saves **3.3%**. Whatever
 `closed: true` is worth, it is not throughput.
 
+---
+
+## F479 — no `Tone` is validated anywhere, and an unknown one draws no colour and no error ★★★☆☆
+
+`Tone` is a ten-member union and the runtime gate does not check membership. Measured, with
+`tone: "chartreuse"` on six carriers:
+
+```
+notice  ACCEPTED     plot series  ACCEPTED     points3  ACCEPTED
+lines3  ACCEPTED     surfaces3    ACCEPTED     table cell  ACCEPTED
+```
+
+**And the renderer's answer is silence.** `slot("tone.chartreuse", …)` returns `{}` — no colour,
+no throw — so the mark draws with whatever the cell already had. The failure is an *uncoloured*
+element rather than a refused document or a wrong colour, which is the hardest of the three to
+notice and the only one that leaves no trace.
+
+**Found while walking a fourth tone field into existence.** `AxisSpec3.tone` would inherit this,
+and the first instinct was to validate the new field — which would have been the wrong repair and
+the sort that reads as diligence: one member of a ten-member union checked on one of seven
+carriers, so a caller learns the rule exists and then meets six places it does not hold.
+
+**Not fixed here, and the reason is the shape rather than the cost.** A tone check belongs to C04's
+validator across every carrier at once, is a different owner's work, and the compiler already
+enforces it for every caller writing TypeScript — the exposure is an adapter's JSON, which is
+exactly where C04's gate exists to stand. Recorded as a known limit with its measurement so it is a
+gap somebody chose rather than one nobody saw.
+
+---
+
+## F480 — the measurement F436 deferred did run, and nothing checks it ★★★★☆
+
+F436 retracted *colour and dither are two channels* and named the replacement as **a measurement
+for step 6**: hue and chroma for the field, lightness for the shading. Asked where that landed:
+**it ran** — F455, with 21 field values × 11 intensities on six shipped colormaps — and its result
+is written in five places.
+
+```
+FINDINGS F455                   the measurement and the per-map table
+CALCIUM_3D_DESIGN.md §3c        the table again, and the retraction it settles
+C12 I94                         the ruling, and F457's interval correction
+colormap.ts's `shadeColour`     the mechanism, in the function that implements it
+scatter3.ts:668                 the clamp's reason, at the call site
+```
+
+**And nothing asserts any of it.** `shadeColour` is named by no test file in the corpus. The claim
+that carries the whole scheme — *scaling in linear light holds chromaticity, so the field is
+recoverable from hue at 3.9× on viridis and inverts to 0.01× on magma* — is a number in five
+documents and no row.
+
+**What would notice is a golden frame, and that is the wrong instrument for this.** Changing
+`toSrgb(toLinear(c) * k)` to `c * k` moves every 3D frame, so `make golden` fails — but it fails
+the same way for any change to the colour path, and a reader looking at the diff learns that the
+picture moved rather than that the hue ratio collapsed. *A snapshot records, it does not check*,
+and here the thing it does not check is the one sentence the design rests on.
+
+**The shape is the inverse of the sixth blind spot.** That one asks where a claim is written down
+and finds nothing; this one asks and finds **five** places, all of them prose. Five records of an
+unchecked measurement are one unchecked measurement, and the count reads as coverage — which is the
+same arithmetic F58 got wrong in the other direction.
+
+**Closed by a row**, which asserts the ratio per map rather than the frame: viridis and plasma
+above 3×, magma and inferno and coolwarm below 0.1×, and `gray` at zero chroma — the per-map split
+being the finding, so a row that asserted only viridis would pass against a renderer that had lost
+the property everywhere else.
+
