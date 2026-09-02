@@ -909,27 +909,46 @@ and no holes. A real mesh has all three**, and they are what break a renderer.
 | **Utah teapot** | ~1,000 quads | a KNOWN silhouette — wrong is instantly visible. The handle self-occludes, which is the z-buffer's real test rather than its synthetic one |
 | **Stanford bunny** | 69,451 triangles | scale, and **it has holes in the base** from the original scan — so it tests backface culling on a mesh that is not closed but looks like it should be |
 | **Suzanne** (Blender) | ~500 quads | sharp and smooth regions in ONE mesh — flat versus smooth shading side by side, in a single frame |
-| **Cornell box** | 36 faces | the lighting reference. Published correct renders exist, so the shading has an external check rather than an internal one |
+| ~~**Cornell box**~~ | 36 faces | **REFUSED** (F477). The published renders are radiosity solutions and the scene exists to show colour bleeding; one light direction, no interreflection and terms summing to 1 (F457) cannot produce it, so every interesting difference would be a feature of the model rather than a defect |
 
 **All four are public domain or freely licensed.** OBJ parsing is vertices, faces and optional
 normals — **about fifty lines, test-only, never in `src/`.**
 
-**Three things they catch that the synthetic list cannot:**
+**Three things they catch that the synthetic list cannot — and two of the three are FALSE of
+every mesh here** (C12 §6k, F475). Measured before a fixture existed:
 
-**Inconsistent winding.** Real meshes have faces wound both ways, so backface culling drops
-random triangles and the surface fills with holes. **Every renderer hits this once and
-synthetic geometry never shows it.**
+```
+                 triangles   degenerate   inconsistent edges   boundary edges   non-manifold
+teapot               6,320            0                    0            1,036              0
+stanford-bunny      69,451            0                    0              223              0
+suzanne                968            0                    0               42              1
+```
 
-**Degenerate triangles scattered at random.** Zero-area faces from the modelling tool — the
-same class as the edge-on plane, but **in unknown places rather than a known one**, which is
-the difference between a test that passes and a renderer that works.
+~~**Inconsistent winding.**~~ **0 inconsistently wound edges in all three.** *Every renderer hits
+this once and synthetic geometry never shows it* is the most confident sentence in this section and
+it is false of the corpus written to justify it. C12 I95's confident-sign case has to be **constructed**,
+and WF3 constructs it.
 
-**Scale.** 69k triangles at 80×24 is roughly 2,000 triangles per cell. **That is the
-performance test**, and it is where the projection loop and the shading loop separate — one
-of them is the bottleneck and only a real mesh says which.
+~~**Degenerate triangles scattered at random.**~~ **0 in all three.** The degenerate faces in this
+repo are the *synthetic* ones — a UV sphere's 42 poles of 576 (F473). This section reasoned from
+raw scanner output, and nobody distributes that.
 
-**And the visual check is unambiguous.** A teapot either looks like a teapot or it does not.
-No arguing about whether the shading is subtly wrong.
+**Scale.** True, and exactly: the bunny is **69,451** triangles. And it costs **1.56×** a synthetic
+grid of the same count at the same frame — 222.3 ms against 142.7 — because the budget tracks
+**depth-tested samples** and not triangles (F478).
+
+**AND THE PROPERTY NONE OF THIS NAMED IS PRESENT IN ALL THREE: they are OPEN.** 1,036 boundary
+edges on the teapot, 223 on the bunny, 42 on Suzanne — the case `closed: true` was written for and
+could not be given a fixture. The orientation holds across all of it: `cullSign` reads +2.587,
++2.031 and +1.966.
+
+**And the visual check is not unambiguous.** *A teapot either looks like a teapot or it does not*
+was the reason for choosing it, and the first thing it was asked it got wrong: OBJ carries no
+up-axis, all three files are Y-up, `basisOf` builds its eye about `z`, and a teapot drawn on its
+back inks 188 cells and reads as a plausible egg (F476). **The argument also needs a size and none
+is given here** — 60, 144, 336 and 726 inked cells at heights 12, 20, 32 and 48, a lid from about
+24 rows, and widening does nothing because the figure is aspect-bound to the height. A transcript
+block is 12 to 20 rows.
 
 **They are fixtures, not catalogue entries.** A teapot in `docs/catalogue/` is fun and it is
 not what the catalogue is for — the catalogue shows what a form does for a reader, and a
@@ -1000,6 +1019,7 @@ four times.
 9   the test suite: sphere, cube, axis planes, tilted plane, the three equations
     — and six of §7's clauses do not survive the shape they name (C12 §6j)
 10  golden frames at four capability sets, catalogue fixtures, the animated example
+    — three meshes and not four, and two of the three reasons for them were wrong (C12 §6k)
 11  a colour per axis — `AxisSpec3.tone`, the one of three that is not built
 ```
 

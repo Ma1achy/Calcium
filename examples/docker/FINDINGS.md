@@ -21820,3 +21820,130 @@ the symmetry** — so the geometry rows take an asymmetric azimuth, and the one 
 input.** The convenient view is the symmetric one for the same reason it is convenient: it is the
 one where the three axes are arranged most regularly with respect to the eye.
 
+---
+
+## F475 — two of the three reasons for real meshes are false of every real mesh here ★★★★★
+
+The design note's §7 gives three things a real mesh catches that synthetic geometry cannot:
+**inconsistent winding**, **degenerate triangles scattered at random**, and **scale**. Measured
+over the teapot, the Stanford bunny and Suzanne, in the pipeline's own reading:
+
+```
+                 triangles   degenerate   inconsistent edges   boundary edges   non-manifold
+teapot               6,320            0                    0            1,036              0
+stanford-bunny      69,451            0                    0              223              0
+suzanne                968            0                    0               42              1
+```
+
+**Every one is consistently wound and none has a degenerate face.** *Every renderer hits this once
+and synthetic geometry never shows it* is the note's most confident sentence and it is false of the
+corpus it was written to justify — I95's confident-sign case still has to be **constructed**, which
+`WF3` already does. And the degenerate faces in this repo are the synthetic ones: a UV sphere's
+poles, 42 of 576 (F473).
+
+**Scale survives, exactly.** The bunny is 69,451 triangles, which is the figure the note names.
+
+**And the property present in all three is the one it never mentioned.** Every mesh here is an
+**open** surface that reads as closed — 1,036 boundary edges on the teapot from its lid, spout and
+handle rims, 223 on the bunny from the scanner's blind spot beneath the base, 42 on Suzanne. That
+is precisely the case `closed: true` was written for and could not be given a fixture, and the
+volume orientation holds across all of it: `cullSign` sees **+2.587**, **+2.031** and **+1.966**,
+confident and correct at 42, 223 and 1,036 boundary edges.
+
+**What the cull actually buys, which is the half neither document states.** On the bunny,
+`closed: true` drops **32,974 of 69,451** faces and the frame is **byte-identical** — every culled
+face was behind one that draws, so the depth test would have rejected it anyway. It costs 222.3 ms
+against 229.9 ms without, so **culling 47% of the triangles saves 3.3% of the frame**. The cull's
+value is not throughput and it is not visible on a closed body: it is the *open* meshes, where it
+changes 2 cells on the teapot and 4 on Suzanne — the interior surface you would otherwise see
+through the spout.
+
+**So the argument for the real meshes stands and every reason given for it was wrong.** They are
+worth having because they are open, irregular in triangle size and honestly scaled — not because
+they are broken. The note reasoned from *scanned data is messy*, which is true of raw scans and
+not of the cleaned meshes anybody actually distributes.
+
+---
+
+## F476 — all three meshes are Y-up, the camera is Z-up, and at these sizes you cannot tell ★★★★★
+
+OBJ carries no up-axis. `basisOf` builds its eye from `elevation` about **z**, and the convention
+in all three files is **Y-up** — so loaded unchanged, every mesh is drawn lying on its back.
+
+**And the frame does not say so.** The teapot on its side inks **188** cells; upright it inks
+**192** and grows a lid knob. Both read as a plausible solid at 120 × 24. The statistic that
+separates them is the interior holes, because a silhouette seen along an axis of near-symmetry has
+none and one seen across the body has several:
+
+```
+              as-is        rotated
+teapot        188 / 2      192 / 0
+bunny         183 / 18     172 / 0
+suzanne       173 / 6      156 / 1
+```
+
+**This is the note's own argument failing on its own terms.** *A teapot either looks like a teapot
+or it does not — no arguing about whether the shading is subtly wrong* is why the mesh was chosen,
+and the first thing it was asked cost twenty minutes to get wrong: the wrong orientation is not
+obviously wrong, it is an egg, and an egg is what a teapot looks like at this resolution anyway.
+
+**Which is the second half: the known-silhouette argument needs a size and the note gives none.**
+Swept at heights 12, 20, 32 and 48 with the width at five times the height, the teapot inks 60,
+144, 336 and 726 cells and shows a recognisable lid only from about 24 rows. **Widening does
+nothing** — the figure is aspect-bound to the block's height (C12 §3p), so a 240-column frame draws
+the same 40-column teapot as a 120-column one. A transcript block is 12 to 20 rows. So *wrong is
+instantly visible* is true at a height no reader will give it, and the fixtures say which height
+they were read at.
+
+**The rotation is applied in the loader, once, with these numbers** — not per fixture, where the
+next mesh added would inherit the default and nothing would say so.
+
+---
+
+## F477 — the Cornell box is refused, and the reason is that its check does not transfer ★★★☆☆
+
+The note's fourth mesh is the Cornell box, for *the lighting reference — published correct renders
+exist, so the shading has an external check rather than an internal one*.
+
+**The published renders are radiosity solutions.** The scene exists to show **colour bleeding**:
+light reflected off the red and green walls tinting the diffuse white boxes. That is
+interreflection, and this renderer has none — one light direction, ambient plus diffuse plus
+specular, terms summing to 1 (F457), no bounce and no area source. A frame compared against a
+correct render would differ everywhere the published image is interesting, and every difference
+would be a feature of the model rather than a defect in the implementation.
+
+**So the external check is not available, and the honest form of that is a refusal with the
+mechanism rather than a fixture that gets waived.** What would give this renderer an external check
+is a comparison against another *direct-lighting* rasteriser at the same camera — which is §7's
+reference comparison and is a different piece of work.
+
+**Recorded because a refusal accumulates reasons.** The thin version is *we could not find an OBJ*,
+and three canonical URLs did 404 while this was being written. That is a cost argument in
+fit-argument clothes, and it would have been replaced the day somebody found a fourth URL.
+
+---
+
+## F478 — a triangle count does not determine the frame cost, and the synthetic figure understates by 1.6× ★★★★☆
+
+§11 and §12 express the per-frame budget per triangle, and step 8's re-measurement took its figure
+from a subdivided grid. Measured against a real mesh at the same triangle count, the same frame
+size and the same warmup protocol — three warm calls, median of five:
+
+```
+synthetic grid, 69,192 triangles      142.7 ms
+stanford bunny, 69,451 triangles      222.3 ms      1.56x
+```
+
+**The count is equal and the cost is not**, because a subdivided grid's triangles are uniform and
+cover the frame once, while the bunny's 35,947 vertices pack ~30 triangles into every sample of a
+60 × 40 grid. What the budget is actually proportional to is **depth-tested samples**, and a
+triangle count is a proxy that holds only for meshes as regular as the one it was measured on.
+
+**The same fixture-regularity error the geometry suite found, arriving in the performance model.**
+F474 found it in the camera and F475 in the mesh; here it is in the budget, and it is the one that
+would have been read as a safety margin.
+
+**And the third figure is the one that changes what the cull is for**: the bunny costs 229.9 ms
+with `closed` unset against 222.3 ms with it. Dropping 47% of the faces saves **3.3%**. Whatever
+`closed: true` is worth, it is not throughput.
+
