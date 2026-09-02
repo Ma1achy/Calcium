@@ -20845,3 +20845,115 @@ it has; T1 crosses widths because the terminal's truncation rungs are width deci
 layout is fractions. **A refusal is a frame** — `plotToSvg` returns `null` for 86 of the 178, every
 one a decision (F259), and a corpus that skipped them would let a claimed form quietly stop drawing,
 which is the one thing a `null` arm must not do.
+
+---
+
+## F451 — a true observation promoted to a universal claim, in the comment that records the measurement ★★★☆☆
+
+F450's fix landed with a comment explaining why no frame comparison could see the defect. It said
+the clipped remainder **never reaches the screen at any distance this camera model can produce**.
+
+**The test committed on the same day measures the opposite.** `AX6` sweeps six distances at
+`CAMERA_DEFAULT` and its own comment says *the clipped remainder reaches the screen at one of the
+six*. Re-measured to settle it: three segments straddle at `distance: 1.7` and **one of them
+reaches the frame**; at 1.5, 1.2, 1.0, 0.5 and 0.2, none does.
+
+So both sentences describe the same sweep and only one of them is true. The observation — *no
+frame comparison in the sweep I ran distinguished the three outcomes* — was correct and got
+promoted one quantifier too far on its way into a comment.
+
+**Which direction it is wrong in is the whole cost.** A reader who believes *never at any
+distance* concludes that a frame row for the clip is impossible and does not write one. A reader
+who knows it is *five of six* writes the row at 1.7. The stronger sentence forecloses the cheaper
+instrument, and it reads as more rigorous than the true one.
+
+This is the class the memory already names — measure the case that would falsify your own
+falsification — arriving in the artefact that records a finding rather than in the finding.
+
+---
+
+## F452 — the frame drew first under a comment saying the order did not matter ★★★★☆
+
+`scatter3dArea` drew the reference frame before the data, with this beside it:
+
+> Order does not decide occlusion here — `writeDepth` is strictly nearer-wins — so the frame going
+> in first is a reading convenience rather than a rule.
+
+**The first clause is false.** Strictly-nearer means a tie goes to whoever wrote first, so order
+decides exactly the coincident case — and coincidence is not exotic here. `unitOf` normalises the
+**data's own extent**, so the extreme samples lie on the box by construction, and a wireframe of a
+bounding volume coincides with the reference box **entirely**.
+
+The first `wireframe` catalogue fixture was an axis-aligned cube, and its eight corners normalised
+to the box's eight corners. The frame is `tone.muted`; the picture came out with the reader's own
+geometry drawn in the furniture's grey, some edges winning and some losing on the last bits of a
+float.
+
+**Fixed by drawing the frame last**, which changes nothing else: a frame edge genuinely in front of
+a sample still wins, because that test is unchanged and is what `box3: "full"` means. Only ties
+move, and they move to the data.
+
+**Two things had to move with it.** The frame's callback now clears the tier code as well as
+setting the mark — `glyphRows` reads `glyph` before `mark`, so a frame cell that won a marker's
+sample would otherwise have drawn the marker in the frame's colour, a defect the old order could
+not have. And the fixture was turned 30° about z, because a wireframe that exactly coincides with
+the box cannot say whether lines draw at all: it only says which of two identical strokes won.
+
+**The comment is the finding.** It is a sentence that reads as a justification, is attached to a
+real mechanism, and is wrong about the one case the mechanism decides — MG24's shape at F84,
+except that there the sentence was true and irrelevant, and here it is relevant and false.
+
+---
+
+## F453 — one file, two rasterisation conventions, half a sample apart ★★★★☆
+
+`strokeSeg` placed a sample with `Math.round`; every other writer in `scatter3.ts` places one with
+`Math.floor`. Rounding puts sample `i` over `[i − 0.5, i + 0.5)` and flooring puts it over
+`[i, i + 1)`, so for the **same projected coordinate** the two disagree for half of all values.
+
+**The consequence is that a line drifts off its own vertices.** A trajectory drawn through a point
+cloud is the case: the marker lands in one cell and the path's vertex in the neighbouring one, by
+up to a sample, systematically.
+
+**And it defeats the rule that depends on the agreement.** *Points draw before lines so a marker is
+never swallowed* is about ties, and a tie requires both writers to be talking about the same cell.
+They were not, so the ordering rule was decorative wherever the fractional part crossed a half.
+
+**This is F445 one function over.** There the block origin was floored after subtracting half its
+width, which biased every even-sized marker half a sample up and left; the fix was to round the
+origin off the exact coordinate. The sample placement inside `strokeSeg` kept the other
+convention, and neither is visibly wrong on its own — only together.
+
+---
+
+## F454 — a tie that is not a tie, because the buffer is narrower than the comparison ★★★★★
+
+`writeDepth` compares a `number` against a `Float32Array` slot:
+
+```ts
+if (!(z < (d.z[i] as number))) return false;
+d.z[i] = z;
+```
+
+**Storing rounds and comparing does not.** A writer stores `z`; the slot holds `fround(z)`. A
+second writer hands over the **identical double** and the test is `z < fround(z)` — which is
+`true` whenever the rounding went **up**. About half of all ties, decided by the last bits of a
+number nobody looks at.
+
+So *strictly nearer, so a tie is stable, so first-drawn wins* — I84's own sentence, and the thing
+F452's reordering rests on — was **false as implemented**, and stayed false through the reordering
+that was written to depend on it.
+
+**Nothing that compares depths can see it.** As doubles the two values are equal; a row asserting
+`a.depth === b.depth` passes. It shows up only as a glyph that should not be there: a two-point
+cloud with a segment between them lost one of its markers, and which one it lost changed when an
+unrelated rounding convention changed (F453).
+
+`Math.fround(z)` on both sides is the whole fix — compare what will be stored against what is
+stored.
+
+**The reusable shape: a value that is stored in one precision and compared in another has an
+equality that is a coin flip**, and every rule phrased over *equal depth* inherits the flip. The
+same pair — a `Float32Array` and a `double` — is the ordinary way to write a depth buffer, so this
+is not a mistake so much as the default being wrong for any rule that reads a tie.
+
