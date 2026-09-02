@@ -7781,6 +7781,145 @@ throws.
 
 ---
 
+## 3an. The 3D axes — three lines in a frame that turns, and the corner is a computation
+
+**This is more work than the renderer it decorates**, which the design note says and which the
+build confirmed: three projected lines whose labels stay legible as the camera orbits, in a
+coordinate system the reader is moving.
+
+### The corner is three sign tests, and one computation serves two consumers
+
+**The axes draw from the box corner furthest from the eye**, so they sit behind the data and
+never occlude it. The design note calls this three dot products; in a **world-aligned** box it is
+three *sign tests* — `eye · x̂` is `eye.x` — and saying so is the difference between a rule a
+reader can check and one they have to trust.
+
+```
+far corner   = (−sign(eye.x), −sign(eye.y), −sign(eye.z))
+back faces   = the three faces whose outward normal points away from the eye
+```
+
+**Those are the same three signs and they are computed once.** The three back faces meet at the
+far corner by construction, so two computations would be two places for one fact — which is
+exactly the shape F444 measured one commit earlier, caught here before it was written rather than
+after a third carrier arrived.
+
+**A zero component ties to the negative end.** At azimuth 0 the eye's `y` is exactly zero and
+there is no furthest corner on that axis. `Math.sign(0)` is `0`, which names no corner at all, so
+the tie is broken **deterministically toward the negative end** — because a camera crossing the
+plane would otherwise make the axes jump twice, once into the degenerate state and once out.
+
+### An edge-on axis keeps its line and loses its labels
+
+**The degenerate arrives as a feature.** F438's edge-on plane is the same geometry: when an axis
+projects to near-zero length its ticks collapse into one point and its labels stack on each other.
+**Hide the labels, keep the line** — the axis is still information about *orientation* when its
+scale is unreadable, and a reader turning the camera needs to see which axis is coming round.
+
+**And it needs no second rule for priority.** An axis with no visible extent has no labels to
+place, so it neither collides with another axis's labels nor competes for precedence: the collision
+rule is *drop the later, order by projected extent*, and a zero extent sorts last by construction.
+Writing a separate *edge-on axes do not compete* clause would be a second statement of one fact.
+
+### A segment with one endpoint behind the eye is clipped, not dropped
+
+**The step-2 cull is per sample and an axis is not a sample.** `project` returns `null` for a point
+behind the near plane and deliberately has no lateral clip — *a triangle is not one sample and needs
+a real lateral cull, which arrives with the surface* — and the **depth** direction has the same
+problem one step earlier. An axis running from the far corner toward the reader can have its near
+end behind the eye at a small `distance`.
+
+**Dropping the segment makes the axis vanish as the camera approaches**, which is I86's
+plausible-picture class in a second place: the frame is legal, the geometry is self-consistent, and
+the reference frame is simply gone. So a segment with one endpoint behind the near plane is
+**clipped to it** — the parameter where view `z` crosses `NEAR` — and the visible part draws.
+
+### The box is the data's extent; the ticks are nice values inside it
+
+**Turning the axes on does not move the data.** The alternative is what matplotlib does — extend
+the range to the nearest nice bounds, so the box corners are round numbers — and it means a reader
+toggling a reference frame watches the picture rescale under them. **`unitOf` normalises the data's
+own extent (I86) whether or not the axes draw**, and the ticks are `niceAxis`'s values *clamped
+inside* that box. A tick that would land outside is not drawn rather than the box being grown to
+meet it.
+
+### The labels are billboarded and cost no gutter
+
+**Always horizontal, never rotated, moving with their anchor and nothing else** — the ruling that
+makes the rest tractable, and the one the camera forced (I83): three axis labels move as the view
+turns, so a fixed column beside the plot could only ever name one of them. They are drawn **inside
+the plot area**, and a 3D form spends no `AXIS_GUTTER`.
+
+**Cell resolution, over a sub-cell raster.** A label is text and the raster arm's samples are half
+a cell tall, so a label overwrites whole **cells** — half a cell of label is not a thing. That is
+the one place in this component where the two resolutions meet, and the rule is that text wins the
+cell it occupies.
+
+**Depth-tested at the anchor and drawn over.** A string is not a sample: testing every cell would
+draw half a label, which is worse than none and reads as corruption rather than as occlusion.
+
+### The four members, and the one that is not here
+
+```ts
+axes3?: "corner" | "origin" | "centre" | false;   // where the three LINES are
+origin3?: "auto" | "min" | "centre" | { x, y, z }; // where coordinate zero SITS
+box3?: "none" | "back" | "full";                   // the wireframe reference frame
+axisStyle3?: { x?: AxisSpec3; y?: AxisSpec3; z?: AxisSpec3 };
+```
+
+**`axes3` and `origin3` are two decisions and conflating them is how a plot ends up unable to show
+a signed field.** Where the lines are drawn and where zero sits are independent; `origin3` is read
+by `axes3: "origin"` and by nothing else, so it is **refused** on the other three — F207's rule,
+and the same shape as `yCallout` needing `yAxis: "right"`.
+
+**`box3`, not the note's `box`.** `plotBox` already exists and means a boxplot's interquartile run,
+so a bare `box` would be two members one letter apart meaning unrelated things. The `3` suffix is
+this form's convention and it is what the other three carry.
+
+**`AxisSpec3` has no `scale`, and that is an omission with a reason rather than a deferral.** The
+note asks for per-axis `ScaleType` — log z with linear x and y — and it is right that one scale for
+three axes is the wrong shape. It is not here because **nothing would read it**: the log transform
+is threaded through `positionalForm`'s machinery and this form composes its own rows, so the member
+would be accepted and ignored, which is the state C04 §3 refuses. It arrives with the code that
+transforms an axis, not with the field that names one.
+
+---
+
+## 6f. The axis walk — a table, and the fifth row is the one that matters
+
+**A table again, and for §6e's reason**: nothing here is event-mediated. The corner changes with
+the camera, but it changes *because the camera is a value*, not because something happened — every
+rule below holds at rest.
+
+| # | the two rules | the input | ruling |
+|---|---|---|---|
+| 1 | far corner × back faces | any camera | **one computation, both read it.** The three back faces meet at the far corner by construction, so two derivations would be two places for one fact — F444's shape, caught before it was written |
+| 2 | far corner × a zero eye component | azimuth 0, so `eye.y` is exactly 0 | `Math.sign(0)` is `0` and names no corner. **Tie to the negative end**, deterministically, or a camera crossing the plane makes the axes jump twice |
+| 3 | edge-on × labels | elevation ±π/2, the z axis | keep the line, drop the labels — the axis is orientation even when its scale is unreadable |
+| 4 | edge-on × label priority | two axes edge-on at once | no second rule needed: a zero extent has no labels to place and sorts last, so *drop the later, order by extent* already covers it |
+| 5 | a segment × the near plane | a small `distance`, the far corner behind the eye | **clip to the near plane.** Dropping the segment makes the reference frame vanish as the camera approaches — I86's plausible picture in a second place, and `project`'s missing lateral clip arriving one dimension early |
+| 6 | an axis line × the depth buffer | a point in front of the axis | the line is depth-tested and loses that cell, which is what *never occlude the data* means read from the other side |
+| 7 | a label × the depth buffer | a label over the cloud | tested at the **anchor** and drawn **over**; per-cell testing draws half a label, which reads as corruption rather than as occlusion |
+| 8 | label × label | two labels claiming one cell | drop the later, ordered by projected extent — `niceAxis`'s own rule, reused rather than restated |
+| 9 | `axes3: false` × `box3: "back"` | both set | independent: the box draws with no axes, which is a legitimate render and not a state to refuse |
+| 10 | `origin3` × `axes3` | `origin3` with `"corner"` | `origin3` decides nothing there, so it is **refused** — a member accepted and ignored tells the caller nothing (F207) |
+| 11 | ticks × the data extent | a nice tick outside the range | the box is the data's extent and the tick is dropped; **turning the axes on never moves the data** |
+| 12 | `show: false` × the box | one axis hidden | the box is not an axis: hiding x's line and labels leaves the box's x edges, because they are the reference frame rather than the scale |
+| 13 | the raster × text | a label's cells | labels are **cell** resolution and the raster is sub-cell, so text wins the whole cell. The one place the two resolutions meet |
+| 14 | the glyph arm × labels | 4-bit, ascii | the same labels: the arm changes the marks and not the text, so nothing here is per-arm |
+
+**Row 5 is the one that would have shipped.** Every other cell is a decision between two reasonable
+answers; that one has a wrong answer that draws a legal frame. **Row 1 is F444 arriving as a
+prediction rather than as a finding**, which is the first time this discipline has been able to
+name the shape before building it — the entry exists because a rule with two derivations was
+measured one commit earlier.
+
+**And the throw's residue: there is none.** Every refusal here is at the gate, before construction,
+so nothing is half-built when one fires. Asked because a ruling that throws owes the question, and
+the answer is only an answer because it was asked.
+
+---
+
 ## 3q. One value axis across the bands, and the record it never had
 
 **This section is written because three code comments cite it and it did not exist.** The
@@ -9050,6 +9189,9 @@ orientation — and belongs in the classification table as its own rows.
 - **I87** — **A 3D scatter has two arms, the terminal chooses between them, and `plotStyle` selects nothing.** Above `halfBlockEligible` the picture is a colour raster — samples at `width × 1` by `height × 2` (I84), `halfBlockRows` averaging the identity, and `HALF_BLOCK` carrying two colours a cell, which is the rung F431 measured. Below it the picture is one **marker glyph per cell**, with a unicode rung and an ASCII rung: every glyph in the table is `East_Asian_Width=Ambiguous`, so the wide arm is required rather than optional (→ A03 SS47, C02 I9). **`STYLE_ARMS` is empty for this form and that is a ruling rather than a gap.** Every other positional form lists arms a caller may force because `braille` against `line` is a taste available at any capability that has either; these two are selected by `unicode`, `ambiguousWidth` and `colourDepth`, so the choice is the terminal's and there is nothing left to select. Declaring an arm the renderer does not have is a member accepted and ignored (→ FINDINGS F207), so the list stays empty and a braille arm joins it on the commit that builds one (§3am).
 - **I88** — **Depth buckets into three tiers, and a tier is a sample count on one arm and a glyph on the other.** Continuous scaling has no spelling in a character grid and a reader cannot separate more than three sizes, so the ceiling is a decision; the bucketing is on view `z`, exactly as the density ramp buckets on value. **One table cannot serve both arms**: on the colour raster every cell is `HALF_BLOCK` and the picture is entirely in the two colours, so a tier is how many samples the point paints — `2×2` near, `1×2` mid, `1×1` far — while on the glyph arm it is which row of the marker table the glyph comes from. **The tier is the only depth channel the glyph arm has**, and the only one either arm has once `colourBy` is `"series"`, which is why it is not an ornament: below the colour floor a near point is bigger and a 3D scatter at one bit still reads as three-dimensional. **A near point at the frame's edge clips per sample** — `writeDepth` refuses an out-of-bounds coordinate, so the in-bounds quarter draws where dropping the point would delete data at the edge of every frame. The tier never sees a culled sample, because the cull runs first and a view `z` at or behind the eye is a number the projection has already declared meaningless (→ I86, C04 I76).
 - **I89** — **`colourBy` decides what colour means and whether there is a legend, from one rule.** Under `"series"` the block's identities are its `points3` labels, `identityOf` answers them, and `legendPlacement`'s count is non-zero, so the key is drawn; under `"depth"` and `"value"` `identityOf` answers nothing and a categorical legend naming a channel the picture does not use never appears. **Two rules would be a second place for them to disagree**, which is I81's mechanism avoided rather than repaired. **`SHARES_CELLS` is `true` and the legend is what makes that cell observable**: two series' samples land in one cell, the depth buffer keeps the nearer, and nothing in the picture says which series won — without a legend the record's entry would be a cell nobody could be wrong about (→ FINDINGS F330). **The value ramp's zero-span rule is the field family's own** — mid-ramp at a zero span (→ C04 I74) — and is not re-derived here; I86's centre rule is about the **position** extent. Both are called a zero extent and only one is about geometry (§3am).
+- **I90** — **The axes draw from the box corner furthest from the eye, and one computation names it and the back faces both.** In a world-aligned box the three dot products the design note asks for are three **sign tests** — `eye · x̂` is `eye.x` — and the corner is `(−sign(eye.x), −sign(eye.y), −sign(eye.z))`. **The three back faces meet at that corner by construction**, so `box3: "back"` reads the same three signs rather than deriving them again: two derivations of one fact are two places to disagree, which is F444's measured shape caught before it was written. **A zero component ties to the negative end**, deterministically, because `Math.sign(0)` names no corner and a camera crossing the plane would otherwise make the axes jump twice — once into the degenerate state and once out. The axes sit behind the data and are **depth-tested against it**, which is what *never occlude the data* means read from the other side (→ I84, I86, C04 I77).
+- **I91** — **An edge-on axis keeps its line and loses its labels, and a segment behind the eye is clipped rather than dropped.** When an axis projects to near-zero length its ticks collapse to a point and its labels stack, so the labels are hidden and the **line stays**: an axis is information about orientation when its scale is unreadable, and a reader turning the camera needs to see which axis is coming round. It needs no separate priority clause — a zero extent has no labels to place and sorts last under *drop the later, order by projected extent*, which is `niceAxis`'s rule reused. **The near-plane case is the one that would have shipped**: `project` refuses a point behind the near plane and an axis is not a point, so a segment with one endpoint behind it is clipped to the crossing parameter and its visible part draws. Dropping it makes the reference frame **vanish as the camera approaches** — a legal frame, a self-consistent geometry, and no axes — which is I86's plausible picture in a second place (→ I86, §3an).
+- **I92** — **Labels are billboarded, cell-resolution and drawn over; the box is the data's extent and the ticks are nice values inside it.** Always horizontal, moving with their anchor and nothing else, **inside the plot area** — a 3D form spends no `AXIS_GUTTER` because three labels move as the view turns and a fixed column can only name one of them (I83). A label is **text over a sub-cell raster**, so it wins the whole cell: half a cell of label is not a thing, and this is the one place in this component where the two resolutions meet. **Depth-tested at the anchor and drawn over**, because per-cell testing draws half a string, which reads as corruption rather than as occlusion. **Turning the axes on does not move the data**: `unitOf` normalises the data's own extent whether or not they draw, and a `niceAxis` tick outside that box is dropped rather than the box being grown to meet it — the alternative rescales the picture under a reader who only asked for a reference frame (→ I83, I86, C04 I77).
 
 
 ## 8. Commitments
@@ -9143,6 +9285,9 @@ orientation — and belongs in the classification table as its own rows.
 87. **The two arms are a capability and not a taste, so the style member selects nothing** (I87). The colour raster above `halfBlockEligible` and the marker glyph below it are chosen by `unicode`, `ambiguousWidth` and `colourDepth` — where `braille` against `line` is a choice available at any capability that has either — so `STYLE_ARMS` is empty rather than inheriting `scatter`'s two. An arm listed and not built is a member accepted and ignored, which is the one thing F207 rules out (§3am, A03 SS47).
 88. **The tier is the depth channel, and it means a different thing in each arm** (I88). Three buckets on view `z`, because a grid cannot scale smoothly and a reader cannot read four sizes. On the raster a tier is a **sample count** and on the glyph arm a **table row** — one table cannot serve both, which is what reading the design note's glyph table onto the raster would have done. It is the only depth channel the glyph arm has and the only one either arm has under `colourBy: "series"`, so a scatter at one bit still reads as three-dimensional; and a near point at the edge clips per sample rather than being dropped whole (→ I86, C04 I76).
 89. **One rule decides what colour means and whether there is a key** (I89). `identityOf` answers `points3` labels under `colourBy: "series"` and nothing otherwise, so the legend's presence and its contents fall out together and cannot disagree — I81's mechanism avoided rather than repaired. `SHARES_CELLS` is `true` because the depth buffer keeps one of two samples in a cell, and the legend is what makes that entry observable rather than a cell nobody can be wrong about. The value ramp's zero span is the field family's rule and not I86's centre, which is about the position extent (→ C04 I74, FINDINGS F330).
+90. **The corner is three sign tests, and the back faces are the same three** (I90). A world-aligned box turns the design note's three dot products into three signs, which is the difference between a rule a reader can check and one they have to trust; the far corner and the three back faces are one computation with two consumers, because two derivations of one fact are F444's shape and it was measured one commit earlier. A zero component ties to the negative end so a camera crossing the plane does not make the axes jump twice (→ C04 I77).
+91. **An edge-on axis keeps its line, and a segment behind the eye is clipped** (I91). The first is F438's degenerate arriving as a feature — orientation survives when scale does not — and it needs no priority clause, because a zero extent sorts last under the collision rule already there. The second is the one that would have shipped: dropping a segment whose near end is behind the eye makes the reference frame vanish as the camera approaches, and the frame is legal (→ I86).
+92. **The labels are billboarded, they win their cell, and the box does not move the data** (I92). Three labels turn with the view, so no gutter is spent and they are drawn inside the area; text is cell-resolution over a sub-cell raster and takes the whole cell; and the box is the data's own extent with nice ticks clamped inside it, so a reader switching a reference frame on does not watch the picture rescale (→ I83, I86, C04 I77).
 
 ---
 
@@ -9188,6 +9333,18 @@ Six tiers. No state machine — C12 is pure over the block.
 - **SC9** (I86, I88): every sample behind the eye draws a **blank block of the declared height**, not an empty document and not a refusal. `plotHeight` is asserted alongside the frame, because a form that returned no rows would pass a content assertion and break I24.
 - **SC10** (I84, I11): the frame at `colourBy: "depth"` is **identical** across two consecutive renders of one block, and differs from the render at a second camera. The row that a per-render depth buffer is actually per render — asserted on the second render, because a survivor is correct on the first by construction.
 - **SC11** (I87, I88): the **frame read in colour** — a PTY capture through `painter().styled()`, `ansiToSvg` and `sharp`, at 24-bit. A stripped capture cannot judge this arm at all: the glyph is `HALF_BLOCK` in every cell and the entire picture is the two colours, so a text assertion reports a correct render and a blank one identically.
+- **AX1** (I90): the far corner is `(−sign(eye.x), −sign(eye.y), −sign(eye.z))` at **eight cameras**, one per octant, asserted against the corner measured as *the box vertex of greatest view depth* rather than against a restatement of the formula. The two agree or the formula is wrong.
+- **AX2** (I90): `box3: "back"` draws **nine** of the twelve box edges and the three it omits are the ones meeting the **near** corner — asserted as the omitted set, because a count of nine is satisfied by nine wrong edges. `"full"` draws twelve and `"none"` none.
+- **AX3** (I90): the corner and the back faces come from **one** computation — asserted structurally, over eight cameras, as *the three back faces all contain the far corner*. The row that fails on a second derivation before the two have had time to disagree.
+- **AX4** (I90): at azimuth 0, where `eye.y` is exactly zero, the corner is stable — the frame at `azimuth: −1e−9`, at `0` and at `+1e−9` names **two** distinct corners and not three, so the degenerate does not get one of its own.
+- **AX5** (I91, §4): an axis edge-on **keeps its line and drops its labels** — at `elevation: π/2` the z axis has near-zero projected extent, the frame carries no z tick label, and the number of inked cells is **greater** than with `axes3: false`. The control is the same block at `elevation: π/6`, whose z labels are present.
+- **AX6** (I91): a segment with one endpoint behind the near plane is **clipped rather than dropped** — at a `distance` small enough to put the far corner behind the eye, the axes still ink cells. The control is the same camera with `axes3: false`, which inks fewer: without it the row passes on a renderer that draws nothing and on one that draws everything.
+- **AX7** (I92, I1): `plotHeight` and `measure` are **identical** across all four `axes3` values and all three `box3` values, at three widths. The furniture is inside the area and costs no row and no gutter.
+- **AX8** (I92): a label is drawn **over** the cloud rather than depth-tested per cell — a dense cloud at the anchor still shows the whole string, asserted as the label's text appearing intact rather than as any cell being inked.
+- **AX9** (I92): turning the axes on **does not move the data** — the inked cells of the cloud are identical at `axes3: false` and `axes3: "corner"`, compared over the cells the axes do not occupy. The row that fails if the box is niced rather than the data's own extent.
+- **AX10** (C04 I77): `origin3` is refused on every `axes3` but `"origin"`, at **both** gates, each with its converse; and `axes3: "origin"` with no `origin3` is accepted, because the member has a default.
+- **AX11** (I92): `axisStyle3.x.show: false` removes the x line and its labels and **leaves the box's x edges**, asserted as both halves — the box is the reference frame and the axis is the scale, and a row asserting only the removal passes against a renderer that removed the box too.
+- **AX12** (I92): the labels are the same strings on **both arms** — the raster at 24-bit and the marker glyphs at `ascii` carry identical text, because the arm changes the marks and not the words.
 - **SC12** (I87, C12 I2): the form renders through the registry at every width in the sweep and `measure` equals the row count, over both arms. The generic contract, named here because a form composing its own rows outside `axed` is the shape that has broken I24 twice.
 - **CAM6** (I83, §3al): orbit pauses while the readout cursor is active. **Owed at step 8 and not written now** — the orbit does not exist, so the row would pass by having no subject, which is the vacuity this suite has recorded three times.
 - **YA1** (I47): `yAxis: "both"` renders the same tick values on both sides, from **one** `yLabels` call — asserted as equality of the two label sets rather than as each being correct, which is the half a per-side assertion cannot see.

@@ -947,6 +947,62 @@ area, so there is no gutter and no bottom rule for `axes: true` to switch on. A 
 ignored tells the caller nothing. It becomes accepted on the commit that builds the in-scene axis
 renderer, and **the blocker is that renderer rather than a step number** (C12 §3am).
 
+#### `axes3`, `origin3`, `box3` and `axisStyle3` — a reference frame that turns
+
+```typescript
+axes3?: "corner" | "origin" | "centre" | false;    // default "corner"
+origin3?: "auto" | "min" | "centre" | Readonly<{ x: number; y: number; z: number }>;
+box3?: "none" | "back" | "full";                   // default "back"
+axisStyle3?: Readonly<{ x?: AxisSpec3; y?: AxisSpec3; z?: AxisSpec3 }>;
+
+export type AxisSpec3 = Readonly<{
+  label?: string;
+  show?: boolean;
+  ticks?: boolean | number;
+  format?: Plot["yFormat"];
+  range?: readonly [number, number];
+  arrow?: boolean;
+}>;
+```
+
+**`axes3` and `origin3` are two decisions, and conflating them is how a plot ends up unable to
+show a signed field.** Where the three lines are *drawn* and where coordinate zero *sits* are
+independent: a scatter of an embedding is centred on nothing in particular and wants its axes at
+the box corner, and a signed field is centred on zero and wants them crossing there — axes at the
+corner put the reference frame nowhere near the thing it references.
+
+**`origin3` is read by `axes3: "origin"` and by nothing else, so it is refused on the other
+three.** It decides where the lines cross; where there is no crossing it decides nothing, and a
+member accepted and ignored tells the caller nothing (F207). The same shape as `yCallout` needing
+`yAxis: "right"`.
+
+**`box3`, and not the design note's `box`.** `plotBox` already exists and means a compact box
+plot's interquartile run (I56), so a bare `box` would be two members one letter apart meaning
+unrelated things. The `3` suffix is this form's convention and the other three carry it.
+
+**`axisStyle3` is per axis because the axes genuinely differ**, which is the same argument
+`xScale`/`yScale` already makes in 2D one dimension down. `show: false` on one axis is not
+`axes3: false`: a height field over a regular grid often wants z labelled and x and y not, because
+the grid is the x/y reference and the labels are noise.
+
+**`arrow` exists because `axes3: "origin"` needs it.** An axis extending both ways from a crossing
+has to say which end is positive, and `→ ↑ ↗` are all `East_Asian_Width=Ambiguous`, so the ASCII
+rung is `>`, `^` and `/` (A03 SS47).
+
+**There is no `scale`, and it is an omission with a reason rather than a deferral.** The design
+note asks for a per-axis `ScaleType` — log z with linear x and y is the common case — and it is
+right that one scale for three axes is the wrong shape. It is not here because **nothing would
+read it**: the log transform is threaded through `positionalForm`'s machinery and this form
+composes its own rows, so the member would be accepted and ignored. It arrives with the code that
+transforms an axis, not with the field that names one.
+
+**And `axes` stays refused on this form, which corrects the sentence that refused it.** I76 said
+the refusal expires *on the commit that builds the in-scene axis renderer*. That named the wrong
+condition: the renderer is here and `axes` is still refused, because what it lacked was never a
+renderer but a **member** — `axes` is a boolean that buys a gutter, a rule and a label row, and
+this form has none of the three. `axes3` is a different member with four values, and the two are
+not one field with a wider type.
+
 #### `calendarUnit` — the cell picks the grid, and the span was already sayable
 
 ```typescript
@@ -2290,6 +2346,7 @@ persisted document rests on.
 - **I74** — **An overlay is a scalar field over an image's cell rectangle, and its rendering differs by arm.** At the dither this framework owns the glyph and the colour, so the braille cell carries the picture and the foreground carries the field, with C10's colormap and its 8-bit floor applying unchanged and **no rung beneath it**: the cell's other axis is spent on the picture, and a threshold-to-tone fallback would put a binary mask on screen wearing a continuous field's clothes. At `kitty` the cell's rendering is the terminal's — the two diacritics are spent on position and the 24-bit foreground on the image id — so the overlay is **composited into the pixels before transmission**, which gives up the palette and the degradation at `kitty` specifically and loses nothing, because there is nothing below `kitty` for it to degrade *to*. **The values are the author's resolution and never the cell grid's**, since the rectangle is a function of the render width; the resample averages, because a point sample turns a gradient into a staircase and can lose a single hot cell entirely. **The scale is `yMin`/`yMax` — the plot family's members, resolved by the plot family's function** (I29, §3h.4): independently optional, replacing rather than widening, collapsing to a constant on a reversed pin, and drawn mid-ramp at a zero span. `heatmap.ts` had already ruled that a field form spends those two on the **value** range rather than on the ordinate, and an overlay is a field form over a picture. A derived range is right for a single overlay and wrong for a set: §3h.3 measures the residual that a per-panel extent draws as loud as the panels it is the difference of, and `sharedRange` is what a set is read on — computed by `b.samples` across its items, on C24's surface for every other composition, and **a caller's own bound always wins**. **The picture's identity is not the image's** — `digest` keys the decode and `imageKey` keys the transmission, because two blocks of one image with different overlays otherwise transmit once and both draw the first, which is the wrong picture rather than none. **Refused at both gates from one function**: a non-rectangular or empty matrix, a non-finite value, an unknown colormap, a non-finite pin, and an alpha outside `0..1` (→ C09 I36, C10 I31, FINDINGS F251 · F252 · F253).
 - **I75** — **A plot's `camera` is the initial view, and the live one is not the block's.** It is admitted to `Plot` by the second arm of the widening test — the decision is the caller's alone, since no theme resolves a viewing angle and no renderer constant settles one — and **not** by the first, because `plotHeight` reads `form`, `height`, `axes`, `legend` and `xTitle` and a camera moves none of them (C12 I1). The member is `Partial<Camera>`, so a caller stating an elevation has not thereby stated a projection and the renderer completes it from one exported default; a partial view and the default carrying the same field are one view rather than two. **A block carrying the live camera would move its own `rev` under an orbit** — a document write per frame, an eviction per write, and C13's store paying for a rotation — so the live one is view state and reaches the renderer through `RenderContext` (→ C22 I71, C12 I83). The type is declared in this component and not beside the renderer, because `RenderContext` is L1 and a `Camera` in `presentation/` would make this member an upward import (A02 §1). **No `orbit` member**: `measure` never sees `tick` (C09 I8), so a block cannot declare that it animates, and whether the camera moves is L4's exactly as whether a spinner turns is (→ C22 I60).
 - **I76** — **A 3D scatter carries its geometry in `points3` and names the channel colour spends in `colourBy`.** Three coordinates have no spelling on `Series`, which is I61's wall at two numbers per cell one dimension along — so the form takes a new carrier and leaves `series` empty exactly as `quiver` does. **A record rather than a tuple**, because a sample has an optional fourth reading on a different axis and a tuple is bad at optional elements, where a vector has none. **No per-point `label` and no per-series `marker`**: the first has no renderer, and the second is a second writer on the channel the depth tier owns (→ C12 I88). `colourBy` exists because three readings compete for one channel and a guessed default breaks C12 I6 by omission; it defaults to `"depth"`, the reading a projection creates. **`colourBy: "value"` with any point lacking a finite `value` is refused** — the point still has a position and would be drawn in some colour, and both dropping it silently and colouring it at the floor are claims the data does not support; it is the only refusal here that depends on a *combination* of members, and **the only one that is the validator's alone**, on `vectors`' own split: member rules at both gates, a walk over the data at the gate that reports rather than throws. Four refusals: `points3` off the form, the form with none, `colourBy` off the form, and `axes` on it — the last because three axes turn with the camera and are drawn inside the area, so `axes: true` would switch on furniture that does not exist (→ C12 I87, C12 I88, C12 I89, FINDINGS F207).
+- **I77** — **A 3D plot's reference frame is four members, and the first two are two decisions rather than one.** `axes3` says where the three lines are drawn and `origin3` says where coordinate zero sits; conflating them is how a plot ends up unable to show a signed field, because axes at the box corner put the reference frame nowhere near the thing it references. **`origin3` is read by `axes3: "origin"` and by nothing else and is refused on the other three** — it decides nothing there, and a member accepted and ignored tells the caller nothing (→ FINDINGS F207). `box3` carries the `3` suffix rather than the design note's bare `box`, because `plotBox` already means a compact box plot's interquartile run and two members one letter apart meaning unrelated things is a defect waiting for a reader in a hurry (I56). `axisStyle3` is **per axis** on `xScale`/`yScale`'s own argument one dimension down, and `show: false` on one axis is not `axes3: false`: a height field over a regular grid wants z labelled and its grid unlabelled. `arrow` exists because an axis extending both ways from a crossing must say which end is positive, and its glyphs are Ambiguous so the ASCII rung is required (→ A03 SS47). **There is no per-axis `scale` and that is an omission rather than a deferral**: nothing would read it, because the log transform is `positionalForm`'s and this form composes its own rows. **`axes` stays refused, and I76's expiry condition was wrong** — it named the renderer, and what was missing was a member: `axes` is a boolean that buys a gutter, a rule and a label row, and this form has none of the three (→ C12 I90, C12 I91, C12 I92).
 
 
 ## 7. Commitments
@@ -2372,6 +2429,7 @@ persisted document rests on.
 72. **An image is a block, and the three things that make it one are the digest, the derived width and the builder's path** (I73). It measures before it draws, its identity is not its data, and its geometry is clamped rather than clipped — the mosaic's ruling one component over (→ C09 I35, I36, FINDINGS F247 · F248).
 74. **A plot declares where the view starts and never where it is** (I75). `camera` is `Partial<Camera>`, admitted by the widening test's *caller alone* arm rather than by its area arm — a viewing angle changes no cell of the layout and nothing but the caller decides it. The live camera is view state through `RenderContext`, because a block holding it would move its own `rev` thirty times a second under an orbit (→ C22 I71, C12 I83). The type lives here because L0 may not import L1, and there is no `orbit` member because a block cannot declare that it animates (→ C09 I8, C22 I60).
 73. **An overlay is a field on the image whose rendering differs by arm** (I74). Placed at the dither, composited at `kitty`, and the split is a mechanism rather than an arrangement — the one thing in phase 2 that is. Its declared scale is what a set of panels shares, and its identity is the picture's rather than the image's (→ C09 I36, C10 I31, FINDINGS F251 · F252 · F253).
+76. **A reference frame is four members and two of them are two decisions** (I77). Where the axis lines are drawn and where coordinate zero sits are independent, and conflating them is how a signed field ends up with its frame in the wrong place; `origin3` is refused wherever it decides nothing. `box3` takes the form's suffix because `plotBox` is one letter away and means something else. There is no per-axis `scale`, and that is an omission with a reason — nothing would read it. **And I76's expiry condition for `axes` was wrong**: it named a renderer where the missing thing was a member, which is a deferral naming the wrong blocker one commit after it was written (→ C12 I90, C12 I91, C12 I92, FINDINGS F207).
 75. **Three coordinates get a carrier, and the channel colour spends is named rather than guessed** (I76). `series` holds one reading per position and a 3D sample holds three, which is I61's ruling at two numbers per cell one dimension along — so `points3` is a new carrier and `series` is empty, as a quiver's is. A record rather than a tuple because the fourth reading is optional; no per-point label and no per-series marker because neither has a channel free. `colourBy` defaults to `"depth"`, and `"value"` with a point that has none is refused rather than drawn in a colour the data does not justify — the one refusal here that a single member cannot express, and the one the validator owns alone, on the split `vectors` already made between a rule about members and a walk over data (→ C12 I87, C12 I88, C12 I89).
 
 ---
@@ -2413,6 +2471,7 @@ The generic suite. **These run against every registered block kind, including ap
 - **T2.1** (I7, the headline): for every registered kind × a fixture corpus × widths {40, 60, 80, 100, 120, 160, 200}, `measure(block, w)` equals the line count of the rendered output at width `w`. This is the single most valuable test in the system.
 - **T2.2** (I7): `measure` is pure — a hundred repeat calls return the same number and perform no I/O.
 - **T2.4c** (I75, C12 I1): `measure` is **identical across every camera** — the same block at eight `(azimuth, elevation, distance, projection)` values measures one number, and the assertion is over the *set* rather than against a first element. **The degenerate values are in the set on purpose**: elevation at exactly ±π/2 and `distance: 0` are where a projection divides by zero, and a height that survived the general case by returning early would pass a row built only from comfortable angles.
+- **T2.4f** (I77): `origin3` is refused on `"corner"`, `"centre"` and `false` at **both** gates, each with its converse — and `axes3: "origin"` with no `origin3` is **accepted**, because the member has a default and a required field would be a fifth decision nobody asked for.
 - **T2.4e** (I76): the four **member** refusals at **both** gates, **each with its converse** — `points3` on a `scatter`, a `scatter3d` with none, `colourBy` on a `line`, and `axes: true` on a `scatter3d`; and the same four members in their legal position accepted. A refusal that fires on everything refuses nothing, and the converse is where that shows. The fifth rule — every point carrying a finite `value` under `colourBy: "value"` — is **not** in this row, because it is a walk over the data and lives at one gate (T3.53).
 - **T2.4d** (I75): a `Partial<Camera>` stating one field and the default carrying that field render **byte-identically** — the completion is total, and there is one default rather than a per-site `??`. Its control is a *different* value in the same field, which must differ; without it the row passes on a renderer that ignores the member entirely.
 - **T2.3** (I7): `measure` is total — a corpus of malformed, empty and adversarial blocks (empty rows, zero-length strings, null-ish fields, 10,000-character cells) produces a number, never a throw.
@@ -2516,6 +2575,7 @@ The generic suite. **These run against every registered block kind, including ap
 - **T6.27** (I46): dropping the finiteness check back to `typeof === "number"` → T2.19 fails, and `NaN` persists as `null` under a validator that agrees twice.
 - **T6.28** (I46): checking that a numeric array *is* an array without checking its elements — the state that shipped → T2.19 fails on `Cell.spark`.
 - **T6.29** (I64): eleven mutations in `c04-hierarchy.mjs`, all caught — each clause of the walk dropped in turn (→ `HG1`), the bound removed (→ `HG3`), the form refusal removed (→ `HG2`), and the path replaced by the block's (→ `HG1`). **The eleventh is the one HG5 exists for**: the treemap stopping reading its own hierarchy → `HG5` fails and nothing else does, because a record mutated in `types.ts` is invisible to a row that reads frames and is caught by `HG2` instead. The two rows are not one row. *The guard it mutates appears twice in `definition.ts` verbatim, so the anchor is the function it sits in — F219's class, one commit after it was filed.*
+- **T6.76** (I77): making `axes` an alias for `axes3: "corner"` on this form — accepting the boolean and mapping it — → **T2.4e fails**, and the row is named because the change reads as a kindness to callers. `axes` buys a gutter, a rule and a label row on forty-six forms and none of the three exists here, so the alias would put one member's name on two unrelated contracts.
 - **T6.75** (I76): removing the completeness check behind `colourBy: "value"` — the clause that walks every point for a finite `value` — → **T3.53 fails**. The row is named because the field is optional and the type still compiles: the check is the only thing between an optional member and a point drawn in a colour nothing chose.
 - **T6.30** (I75): giving `Plot` an `orbit` member and letting a block declare that it animates → nothing in this component fails, and that is the row. **The refusal is checked one component up** (C09 I8 — `measure` never receives `tick`), so the mutation is recorded here with the file that would catch it named, rather than left reading as covered by a rule that does not reach it.
 - **T6.16** (§4b): freezing inside C24's `b` as well as in the constructor → T1.18 fails on the spy count.
