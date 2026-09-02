@@ -2215,7 +2215,7 @@ export const STYLE_ARMS: Readonly<Record<PlotForm, readonly PlotStyleArm[]>> = O
   // not have is F207's member accepted and ignored, and that rule does not
   // relax because the other two are scheduled — `"braille"` and `"line"` are
   // added by the commits that make them draw.
-  scatter3d: ["braille", "marker"],
+  scatter3d: ["braille", "line", "marker"],
   // The positional family: braille dots or box-drawing strokes, and the two
   // curve forms that can carry candles.
   line: ["braille", "line", "candlestick"], step: ["braille", "line", "candlestick"],

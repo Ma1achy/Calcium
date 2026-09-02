@@ -677,6 +677,8 @@ function strokeThin(
     const asProjected = (w: Screen): { x: number; y: number; depth: number } => ({
       x: w.x / grid.width, y: w.y / grid.height, depth: w.vp.z,
     });
+    // **Strictly nearer**: this arm writes a colour, and a colour has one
+    // question — a tie belongs to whoever drew first (C12 I101, F452).
     strokeSeg(asProjected(p), asProjected(q), grid, depth, (i, t, z) => {
       const n = lerpV(p.n, q.n, t);
       const vp = { ...lerpV(p.vp, q.vp, t), z };
@@ -687,7 +689,7 @@ function strokeThin(
         intensity: shade(n, vp, light, z, span),
         edge: own && tri.skin.wire !== false,
       });
-    });
+    }, false);;
   }
 }
 

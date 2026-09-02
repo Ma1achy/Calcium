@@ -99,17 +99,17 @@ describe("SC: the 3D scatter", () => {
     // **And the list holds only what draws.** An arm listed before it is built
     // is F207's member accepted and ignored, so `"braille"` and `"line"` are
     // still refused here and each joins on the commit that makes it draw.
-    for (const ps of ["line", "candlestick", "solid"] as const) {
+    for (const ps of ["candlestick", "solid"] as const) {
       expect(
         errorsOf({ kind: "plot", id: "s", ...spec({ plotStyle: ps }) }).join(" "),
         `plotStyle: ${ps}`,
-      ).toMatch(/arms for braille, marker/u);
+      ).toMatch(/arms for braille, line, marker/u);
     }
     // **The built arms**, which are what stop the loop above passing against a
     // form that refuses everything — the state this row used to assert. The
     // list grows one entry per commit that makes an arm draw, so this pair is
     // the row's real subject and the loop is its converse.
-    for (const ps of ["marker", "braille"] as const) {
+    for (const ps of ["marker", "braille", "line"] as const) {
       expect(
         errorsOf({ kind: "plot", id: "s", ...spec({ plotStyle: ps }) }),
         `\`${ps}\` is built, so it is listed and accepted`,

@@ -278,6 +278,14 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
         { label: "gamma", points: cluster3(0, 0.6, 0.6, 90) },
       ],
     },
+    // C12 I101 — the box-drawing arm, and the sheet is the record of a refusal
+    // re-argued: `plotStyle: "line"` is what §3am declined to build, on four
+    // arguments of which one was circular and one conditional on a premise a
+    // caller naming the arm at 24-bit removes (F483).
+    "line-wire": {
+      form: "scatter3d", height: 14, series: [], plotStyle: "line",
+      lines3: cubeEdges3(0.9, 0.5),
+    },
     // C12 I100 — the dot grid on the primitive it was measured for. A cube's
     // twelve edges are boundary all the way through, which is F482's other
     // half: the half rung's second colour is spent on 5.6% of an outline

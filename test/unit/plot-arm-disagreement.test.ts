@@ -852,7 +852,7 @@ describe("AD — the two arms decide separately, and here is where", () => {
     const t = collisionsIn(new Map([...corpus].map(([k, f]) => [k, f.t])));
     const s = collisionsIn(new Map([...corpus].map(([k, f]) => [k, f.s])));
 
-    // **212, and twenty-four are `scatter3d`'s** — one per variant, and the count
+    // **213, and twenty-five are `scatter3d`'s** — one per variant, and the count
     // moves with the catalogue rather than being pinned to a number nobody can
     // re-derive. Twelve after the polyline carrier brought `trajectory`,
     // `wireframe` and `lines-series` (C04 I78); nineteen after the surface
@@ -861,19 +861,22 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // arm (C12 I99), which is the **first variant of this form that renders on
     // the glyph arm at full capability** — and F487 is what that turned up two
     // rows away; twenty-four with the braille arm's wireframe and its surface,
-    // which is the rung F482 measured and F485 corrected (C12 I100).
+    // which is the rung F482 measured and F485 corrected (C12 I100);
+    // twenty-five with the box-drawing arm, which is a refusal re-argued at its
+    // own site rather than a form gaining a variant (C12 I101, F483).
     // **`closed` brought none, and
     // that is a measurement rather than an omission**: a culled frame is
     // byte-identical to its unculled one in all four modes, so the variant
     // would have collided here and this sweep would have reported it (F461).
-    expect(corpus.size, "variants in the corpus").toBe(212); // cells-ok — a variant count
-    // **205, twelve up on 193** — every one of `scatter3d`'s twenty-four variants
+    expect(corpus.size, "variants in the corpus").toBe(213); // cells-ok — a variant count
+    // **206, thirteen up on 193** — every one of `scatter3d`'s twenty-five variants
     // draws a distinct frame, so none of them collides with another and none
     // with each other. **The marker arm separating is not free**: it draws the
     // same cloud as `colour-series` in the same colours and differs only in the
     // glyph, so a sweep comparing stripped text would fold them and this one
     // does not. **And the two braille variants separate from everything**,
-    // which is the rung being a rung rather than a restyle. **The seven surfaces separating is the row's content
+    // which is the rung being a rung rather than a restyle, and so does the
+    // box-drawing one, which is a third alphabet. **The seven surfaces separating is the row's content
     // here**: `surface` and `saddle` are different geometry, `surface-field`
     // differs from `surface` only in the *field*, and `surface-smooth` from
     // `surface-flat` only in the normals — three pairs that a coarser
@@ -885,12 +888,12 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // compares the painted row rather than the stripped one, which is why they
     // separate here and would not in a text corpus (SC11's point, from the
     // other side).
-    expect(t.distinct, "distinct terminal frames").toBe(205); // cells-ok — a frame count
+    expect(t.distinct, "distinct terminal frames").toBe(206); // cells-ok — a frame count
     // **134 -> 148**: the density family draws, so nineteen violin variants and
     // one ridgeline stop colliding in the single refusal group (F383).
     // **153, and the addition is a *collision*** — `scatter3d`'s variants all
     // return `null`, so they are one group here where they are twenty-two
-    // distinct frames in the terminal, and three more of them change nothing. The refusal group F383 emptied is back,
+    // distinct frames in the terminal, and four more of them change nothing. The refusal group F383 emptied is back,
     // and the asymmetry is the point of this sweep: one arm's five pictures are
     // the other arm's one absence.
     expect(s.distinct, "distinct documents").toBe(153); // cells-ok — a frame count; the four axis variants join the one refusal group

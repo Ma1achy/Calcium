@@ -265,6 +265,26 @@ export function createDepth(width: number, height: number): Depth {
  * over, and for its reason: a rasteriser that has to bounds-check every call has
  * the check in the wrong place.
  */
+/**
+ * The same comparison, **read without writing** (C12 I101, §3am).
+ *
+ * `writeDepth` answers *did this sample win*, which is the only question a
+ * colour has. A **mask** has a second one: a cell accumulates up to four edge
+ * bits resolved after all strokes, so the second edge arriving at a shared
+ * vertex — at exactly the first's depth — must still contribute its direction
+ * or the join is refused at precisely the cell that needs it. That is §3am's
+ * argument two, and the remedy it names: **equal-or-nearer for the mask,
+ * strictly-nearer for the colour, on one buffer.**
+ *
+ * **Compared in the buffer's own precision**, for F454's reason one function
+ * along: `z` is a `double` and `d.z` is a `Float32Array`, so an equality asked
+ * of the unrounded value is an equality about a number nothing stores.
+ */
+export function equalDepth(d: Depth, x: number, y: number, z: number): boolean {
+  if (x < 0 || y < 0 || x >= d.width || y >= d.height) return false;
+  return Math.fround(z) === d.z[y * d.width + x]; // cells-ok — a sample offset
+}
+
 export function writeDepth(d: Depth, x: number, y: number, z: number): boolean {
   if (x < 0 || y < 0 || x >= d.width || y >= d.height) return false;
   const i = y * d.width + x; // cells-ok — a sample offset
@@ -299,7 +319,22 @@ export function strokeSeg(
   pb: Projected,
   grid: Readonly<{ width: number; height: number }>,
   depth: Depth,
-  paint: (i: number, t: number, z: number) => void,
+  /**
+   * `nearer` is `false` on a sample that merely tied, and `px`/`py` are the
+   * sample's own coordinates — which a mask needs and a colour does not, since
+   * a direction is a property of the *step* rather than of the cell (C12 I101).
+   */
+  paint: (i: number, t: number, z: number, nearer: boolean, px: number, py: number) => void,
+  /**
+   * Whether a tie is painted at all — **required, so each of the five callers
+   * states its rule** rather than inheriting one (C12 I101, §3am).
+   *
+   * `false` is the behaviour every caller had and four of them keep: the frame's
+   * box, its axis lines, its ticks and the surface's degenerate stroke all write
+   * a colour, and a colour has one question. The polyline carrier passes `true`
+   * on the mask arm and only there.
+   */
+  onEqual: boolean,
 ): void {
   const x0 = pa.x * grid.width;
   const y0 = pa.y * grid.height;
@@ -311,6 +346,8 @@ export function strokeSeg(
     const px = Math.floor(x0 + (x1 - x0) * t); // cells-ok — a sample coordinate
     const py = Math.floor(y0 + (y1 - y0) * t); // cells-ok — a sample coordinate
     const z = pa.depth + (pb.depth - pa.depth) * t;
-    if (writeDepth(depth, px, py, z)) paint(py * grid.width + px, t, z); // cells-ok — a sample offset
+    const at = py * grid.width + px; // cells-ok — a sample offset
+    if (writeDepth(depth, px, py, z)) paint(at, t, z, true, px, py);
+    else if (onEqual && equalDepth(depth, px, py, z)) paint(at, t, z, false, px, py);
   }
 }

@@ -19,6 +19,7 @@ import { HALF_BLOCK, HALF_BLOCK_LOWER, halfBlockEligible } from "../image/index.
 import { paint, slot, type Span } from "../blocks/paint.js";
 import { arrows3, glyphs, MARKER3_COLUMNS, markerColumn, markers3 } from "../blocks/glyphs.js";
 import { cells } from "../text.js";
+import { glyphForMask, LINE_DOWN, LINE_LEFT, LINE_RIGHT, LINE_UP } from "./linedraw.js";
 import { BRAILLE_DOTS, createGrid, foldBraille, setDot } from "./raster.js";
 import {
   axisLines,
@@ -48,6 +49,7 @@ import { seriesRefOf } from "./marks.js";
 import {
   basisOf,
   createDepth,
+  equalDepth,
   extentOf,
   project,
   sampleGrid,
@@ -342,7 +344,7 @@ const BRAILLE_TIER: readonly (readonly [number, number])[] = Object.freeze([
 ]);
 
 /** Which rung this block draws at (C12 I87, I100, §3am). */
-type Arm = "half" | "braille" | "glyph";
+type Arm = "half" | "braille" | "mask" | "glyph";
 
 /**
  * `auto` is the terminal's and a named arm is the caller's (C12 I87, §3am).
@@ -364,6 +366,10 @@ function armOf(
   const ps = block.plotStyle;
   if (ps === "marker") return "glyph";
   if (ps === "braille" && caps.unicode !== "ascii") return "braille";
+  // **No floor**, because `glyphForMask` already has one: it falls to `+ - |`
+  // at `ascii` and at `ambiguousWidth: "wide"` rather than refusing, which is
+  // the same degradation `lineDrawRows` gives the 2D family (C12 I101, I54).
+  if (ps === "line") return "mask";
   return halfBlockEligible(caps, false) ? "half" : "glyph";
 }
 
@@ -423,7 +429,11 @@ function frameOf(
     const p = clipProject(scene.basis, seg);
     if (p === null) return null;
     const mark = frameMark(p.a, p.b, ctx);
-    strokeSeg(p.a, p.b, grid, depth, (i) => { paint(i, mark, ink); });
+    // **`false`: the frame writes a colour and a colour has one question**
+    // (C12 I101). It draws last and loses a tie to the data by construction —
+    // F452's ruling — so painting on equal here would take back every cell the
+    // reordering exists to give away.
+    strokeSeg(p.a, p.b, grid, depth, (i) => { paint(i, mark, ink); }, false);
     return p;
   };
 
@@ -524,7 +534,7 @@ function frameOf(
     const p = clipProject(scene.basis, line.seg);
     if (p !== null) {
       const mark = frameMark(p.a, p.b, ctx);
-      strokeSeg(p.a, p.b, grid, depth, (i) => { paint(i, mark, ink); });
+      strokeSeg(p.a, p.b, grid, depth, (i) => { paint(i, mark, ink); }, false);
     }
     if (extent < EDGE_ON) continue;
     const [lo, hi] = spanOf(scene.lo, line.axis);
@@ -532,7 +542,7 @@ function frameOf(
       const pt = clipProject(scene.basis, { a: t.on, b: t.out });
       if (pt !== null) {
         const mark = frameMark(pt.a, pt.b, ctx);
-        strokeSeg(pt.a, pt.b, grid, depth, (i) => { paint(i, mark, ink); });
+        strokeSeg(pt.a, pt.b, grid, depth, (i) => { paint(i, mark, ink); }, false);
       }
       // **Pushed along `outward`, not scaled from the origin.** The first draft
       // multiplied the whole position vector by 1.35, which moves a point near
@@ -595,10 +605,19 @@ export function scatter3dArea(
   // data.
   const arm = armOf(block, ctx.capabilities);
   const half = arm === "half";
+  const masked = arm === "mask";
   // **The two arms that paint a tier as a *block* rather than as a glyph**, and
   // the distinction the code needs more often than the arm's name: a sample is
   // sub-cell on both, so a marker is an area and a line is a run of samples.
-  const sub = arm !== "glyph";
+  //
+  // **Written as `arm !== "glyph"` and that was F489's own class a third time**,
+  // in the predicate added to fix the first two. The mask arm is not the glyph
+  // arm and is not sub-cell either — its grid is cells — so a near marker asked
+  // for a `4 × 4` block of *cells*, `glyph[]` was never written, and the whole
+  // cloud composed to blanks: 23 inked cells against the glyph arm's 131, all
+  // of them the frame. The members have to be listed, because *not the other
+  // one* stops being a definition at three.
+  const sub = half || arm === "braille";
   const grid =
     half ? sampleGrid(w, rows, "half")
     : arm === "braille" ? sampleGrid(w, rows, "braille")
@@ -666,6 +685,81 @@ export function scatter3dArea(
     grid.width * grid.height, // cells-ok — a sample count
   ).fill(undefined);
 
+  /**
+   * The box-drawing mask — **four edge bits a cell, resolved after all strokes**
+   * (C12 I101, §3am).
+   *
+   * Parallel to `mark` and not packed into it, for `mark`'s own reason one array
+   * along: a literal glyph and an accumulator are two different things and one
+   * number meaning both is `SHARES_CELLS`' lesson in a third place. Allocated on
+   * every arm because the cost is one `Array` of the cell count and the branch
+   * that would avoid it is a second place to be wrong about which arm is live.
+   */
+  const bits: number[] = new Array<number>(w * rows).fill(0); // cells-ok — a cell count
+
+  /**
+   * Link two cells a step apart — **both directions, and a diagonal claims
+   * both axes** (C12 I101).
+   *
+   * `strokePolyline` steps axis-aligned so every move crosses exactly one edge;
+   * `strokeSeg` steps on the dominant screen axis, so the other may also advance
+   * by one and the move crosses a *corner*. The cell that corner passes through
+   * is **not** drawn, because nothing tested its depth — so a diagonal
+   * contributes both axes' bits to the cells it actually leaves and enters, and
+   * the picture is a staircase of corner glyphs rather than a line through a
+   * cell no depth test claimed. Inventing that cell is the one thing this arm
+   * must not do: it would draw a wireframe edge in front of a surface that owns
+   * the cell.
+   */
+  const at = (cx: number, cy: number, b: number): void => {
+    if (cx < 0 || cy < 0 || cx >= w || cy >= rows) return; // cells-ok — a bound
+    bits[cy * w + cx] = (bits[cy * w + cx] ?? 0) | b; // cells-ok — a cell offset
+  };
+  /** One axis-aligned move: the edge it leaves by and the edge it arrives at. */
+  const step = (ax: number, ay: number, bx: number, by: number): void => {
+    if (bx > ax) { at(ax, ay, LINE_RIGHT); at(bx, by, LINE_LEFT); }
+    else if (bx < ax) { at(ax, ay, LINE_LEFT); at(bx, by, LINE_RIGHT); }
+    else if (by > ay) { at(ax, ay, LINE_DOWN); at(bx, by, LINE_UP); }
+    else if (by < ay) { at(ax, ay, LINE_UP); at(bx, by, LINE_DOWN); }
+  };
+  /**
+   * Link two cells a step apart, **through the corner when the step is
+   * diagonal** — and the corner is depth-tested like any other sample.
+   *
+   * `strokePolyline` steps axis-aligned so every move crosses exactly one edge
+   * and the mask is unambiguous; `strokeSeg` steps on the dominant screen axis,
+   * so the other may advance too and the move crosses a **corner cell** the
+   * walk does not visit. Read off the frame: without it a run of diagonal steps
+   * gives every cell four bits — `┼` at each — because a cell is both entered
+   * and left on two axes, so a staircase drew as a column of crossings.
+   *
+   * **The corner is a cell the segment really passes through, not one invented
+   * to make the glyph tidy**, which is why it takes the same depth test as
+   * every other sample: claimed on equal-or-nearer, and where it is occluded
+   * the link falls back to the dominant axis alone — two bits rather than four,
+   * so the join degrades to a stub instead of to a crossing.
+   *
+   * Returns the corner's offset when it claimed one, so the caller can give it
+   * the same colour as the samples either side. A cell with bits and no ink
+   * would draw the mask uncoloured, which reads as the frame's rather than the
+   * data's.
+   */
+  const link = (
+    from: readonly [number, number] | null, x: number, y: number, z: number,
+  ): number | null => {
+    if (from === null) return null;
+    const [fx, fy] = from;
+    if (x !== fx && y !== fy) {
+      if (writeDepth(depth, x, fy, z) || equalDepth(depth, x, fy, z)) {
+        step(fx, fy, x, fy);
+        step(x, fy, x, y);
+        return fy * w + x; // cells-ok — a cell offset
+      }
+    }
+    step(fx, fy, x, y);
+    return null;
+  };
+
   const frameInk = slot("tone.muted", ctx.theme, ctx.capabilities).colour;
 
   for (const d of drawn) {
@@ -729,8 +823,29 @@ export function scatter3dArea(
     // The whole of what the arm buys is a line at twice the resolution in each
     // axis, so writing a literal `│` here would spend it on the one primitive
     // it was measured for (F482).
-    const glyphMark = sub ? undefined : frameMark(st.a, st.b, ctx);
-    strokeSeg(st.a, st.b, grid, depth, (i, t, z) => {
+    const glyphMark = arm === "glyph" ? frameMark(st.a, st.b, ctx) : undefined;
+    // **The mask's own cursor.** A direction is a property of the *step*, so the
+    // walk has to remember where it was — and it updates on a tie as well,
+    // because a tied sample is exactly the shared vertex the second depth rule
+    // exists for and dropping it there would break the join it came for.
+    let prev: readonly [number, number] | null = null;
+    strokeSeg(st.a, st.b, grid, depth, (i, t, z, nearer, px, py) => {
+      if (masked) {
+        const corner = link(prev, px, py, z);
+        prev = [px, py];
+        // The corner takes the step's own colour, or a cell with edges and no
+        // ink draws the mask in nothing and reads as the frame's.
+        if (corner !== null) {
+          ink[corner] = colourOf(
+            block, ctx, { depth: z, value: st.va ?? st.vb, series: st.series },
+            scene.identities, span,
+          );
+          glyph[corner] = -1;
+        }
+        // **Equal-or-nearer for the mask, strictly-nearer for the colour**
+        // (C12 I101, §3am). The bits are in; the ink is not this sample's.
+        if (!nearer) return;
+      }
       // **Interpolated per sample under the two ramp arms** (C12 I93). The
       // depth is here at every step, and one colour for a segment crossing the
       // figure contradicts the cue the whole form rests on.
@@ -749,7 +864,7 @@ export function scatter3dArea(
       // series` and `% clouds`, a decode that no longer exists (C12 I99).
       mark[i] = glyphMark;
       glyph[i] = -1;
-    });
+    }, masked);
   }
 
   // **The surfaces go in after the marks and before the frame** (C12 I94,
@@ -830,7 +945,7 @@ export function scatter3dArea(
   const composed =
     half ? halfRows(ink, depth, grid.width, rows)
     : arm === "braille" ? brailleRows(ink, depth, mark, w, rows)
-    : glyphRows(ink, glyph, mark, w, rows, ctx);
+    : glyphRows(ink, glyph, mark, masked ? bits : undefined, w, rows, ctx, block.plotCorners ?? "rounded");
   // **`w` and not `grid.width`, which were the same number until this arm.**
   // Both call sites read the sample grid where they meant the cell width, and
   // both were right by coincidence on every rung that existed (F489).
@@ -984,9 +1099,16 @@ function glyphRows(
   ink: readonly (ColourValue | undefined)[],
   glyph: readonly number[],
   mark: readonly (string | undefined)[],
+  /**
+   * The mask, on the arm that has one — **and `undefined` rather than an array
+   * of zeroes**, so *this arm does not use a mask* and *this cell has no edges*
+   * are two states rather than one (C12 I101).
+   */
+  bits: readonly number[] | undefined,
   w: number,
   rows: number,
   ctx: RenderContext,
+  corners: "rounded" | "sharp",
 ): readonly (readonly Span[])[] {
   const marks = markers3(ctx.capabilities);
   const table = [marks.near, marks.mid, marks.far] as const;
@@ -999,10 +1121,16 @@ function glyphRows(
       const g = glyph[i] ?? -1;
       if (g < 0) {
         const colour = ink[i];
+        // **Data, then the mask, then the frame** — `glyphRows`' own precedence
+        // extended by one rung (C12 I101, F488). A marker outranks a line
+        // through it for F452's reason, and a caller's wireframe outranks the
+        // frame's own stroke for I90's: the axes never occlude the data.
+        const edges = bits?.[i] ?? 0;
+        const drawn = edges !== 0 ? glyphForMask(edges, corners, ctx.capabilities) : framed;
         line.push(
-          framed === undefined ? { text: " " }
-          : colour === undefined ? { text: framed }
-          : { text: framed, style: { colour } },
+          drawn === undefined ? { text: " " }
+          : colour === undefined ? { text: drawn }
+          : { text: drawn, style: { colour } },
         );
         continue;
       }

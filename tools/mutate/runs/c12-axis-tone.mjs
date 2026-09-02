@@ -51,8 +51,12 @@ const results = await runPass({
       // the data rather than counting coloured cells anywhere.
       name: "the axis tone never reaches the stroke",
       file: SCATTER,
-      from: "      strokeSeg(p.a, p.b, grid, depth, (i) => { paint(i, mark, ink); });",
-      to: "      strokeSeg(p.a, p.b, grid, depth, (i) => { paint(i, mark); });",
+      //
+      // **Re-anchored when `strokeSeg` took the tie rule as a required
+      // argument** (C12 I101): the axis line writes a colour, so it passes
+      // `false` — and the mutation is unchanged, the ink never arriving.
+      from: "      strokeSeg(p.a, p.b, grid, depth, (i) => { paint(i, mark, ink); }, false);",
+      to: "      strokeSeg(p.a, p.b, grid, depth, (i) => { paint(i, mark); }, false);",
       expect: "AT1",
     },
     {

@@ -22372,8 +22372,8 @@ was still missed twice.
 
 ## F489 — a distinction that did not exist until there were three of something ★★★★☆
 
-Adding a third rung to `scatter3d` turned up **two latent defects and one new one**, all of the same
-shape: a variable that meant two things at once while the two things happened to be equal.
+Adding a third rung to `scatter3d` turned up **two latent defects and one new one**, and a fourth
+rung turned up a third — all of the same shape: a variable that meant two things at once while the two things happened to be equal.
 
 **One — `grid.width` was the cell width and the sample width.** `frameOf` places a label's *row*
 from `rows` (cells) and its *column* from `grid.width` (samples). On the half-block rung
@@ -22402,6 +22402,14 @@ wireframe          26    27    22    26     22    27    17    16
 **Three against seventy-six is not a coverage artefact.** The wireframe's row — even across all
 eight, because it is genuinely sparse — is the control that says the instrument reads the cell
 correctly and the surface's row is the surface's.
+
+**Three — `const sub = arm !== "glyph"`, in the predicate added to fix the first two.** `sub` means
+*paints a sub-cell sample*, and it was written as *not the glyph arm* because at the time those were
+the same set. The **fourth** rung — box drawing at cell resolution — is neither: not the glyph arm,
+and not sub-cell. So a near marker asked for a `4 × 4` block of **cells**, the tier code was never
+written, and the whole cloud composed to blanks. **23 inked cells against the glyph arm's 131, all
+of them the frame.** The remedy is to list the members — `half || arm === "braille"` — because *not
+the other one* stops being a definition at three.
 
 **The shape to carry: a boolean that names one of two arms becomes a lie the moment there is a
 third, and it does not become a compile error.** `half` was `true` or `false`, and every `!half`
@@ -22445,3 +22453,52 @@ that makes an extent assertion survive lattice noise is the same tolerance that 
 **And the row's own comment was already right about the mechanism** — it named the lattice straddle
 and set ±1 for it — which is what made the draft convincing. A correct reason for a tolerance is
 not a reason the tolerance leaves anything to measure.
+
+---
+
+## F491 — a refusal's mechanism was exact and its consequence was a tenth of what the wording implied ★★★★☆
+
+C12 §3am refuses box-drawing joins, and its second argument is the only one of four that is a
+mechanism rather than a reason:
+
+> a mask cell accumulates up to four bits from up to four segments and `glyphForMask` resolves it
+> **after** all strokes, so a per-bit depth test has no carrier … the test is strictly-nearer, so at
+> a shared vertex the second edge is refused **by construction** — which is exactly the cell where a
+> join is needed.
+
+**Every clause is true.** Built both ways and measured on a cube's twelve edges:
+
+```
+                    corners ╭╮╰╯   tees ├┤┬┴   crossings   straights
+equal-or-nearer              36            8           0          55
+strictly nearer              29            5           0          57
+```
+
+**Seven corners and three tees — about a tenth of the drawn glyphs.** Not a figure coming apart at
+every vertex, which is what *refused by construction, at exactly the cell where a join is needed*
+reads as.
+
+**And three fixtures built to make it categorical are identical under both rules:**
+
+```
+L, two entries sharing an endpoint     0 corners,  0 tees   ·   0 corners,  0 tees
+closed triangle                       19 corners,  1 tee    ·  18 corners,  1 tee
+four entries meeting at the origin     2 corners,  0 tees   ·   2 corners,  0 tees
+```
+
+**The reason is the corner routing, which the arm needs for a different reason.** A diagonal step
+crosses a cell the walk does not visit, so the mask routes through it — and that routing produces
+corner glyphs from a **single** stroke. So a corner is not evidence of two edges meeting, and the
+first draft of the row asserting the rule counted corners and survived its own mutation. The tee is
+the glyph that needs three bits; there are eight of them and the rule is worth three.
+
+**What this changes: the row asserting the rule asserts it at the function.** `strokeSeg` with a
+tied second stroke paints every sample under `onEqual` and none without — categorical, exact, and
+unreachable from a frame. A second row asserts the *call site*, on a threshold between 36 and 29
+with both figures written beside it, because a test that calls the mechanism misses the wiring.
+
+**The class: a refusal states a mechanism and a consequence, and only the mechanism is checkable
+from the armchair.** Both were carried for four steps as one claim. The mechanism survived contact
+with the code exactly; the consequence was an order of magnitude out, and nothing in the sentence
+distinguished them — *refused by construction* is a statement about a code path and reads as a
+statement about a picture.

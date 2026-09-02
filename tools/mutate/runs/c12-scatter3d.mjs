@@ -158,8 +158,8 @@ const results = await runPass({
       // satisfied by the mutant.
       name: "scatter3d takes scatter's style arms",
       file: T,
-      from: '  scatter3d: ["braille", "marker"],',
-      to: '  scatter3d: ["line", "candlestick"],',
+      from: '  scatter3d: ["braille", "line", "marker"],',
+      to: '  scatter3d: ["candlestick", "solid"],',
       expect: "SC2",
     },
     {

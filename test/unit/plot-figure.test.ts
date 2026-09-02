@@ -104,7 +104,7 @@ describe("FV — the shared axis, and a record with something to be wrong about"
     expect(exempted, "numeric labels the figure named itself").toBeGreaterThan(0); // cells-ok — a label count
     // **Counted, not excluded** — a clause with no instances reads exactly like
     // one that is satisfied, and this one has 96.
-    expect(gutterless, "triples skipped for having no gutter to read").toBe(100); // cells-ok — a frame count
+    expect(gutterless, "triples skipped for having no gutter to read").toBe(102); // cells-ok — a frame count
     expect(offenders, "a form marked `false` drew a number on an axis").toEqual([]);
   });
 

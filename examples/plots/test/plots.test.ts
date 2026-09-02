@@ -255,17 +255,24 @@ describe("the plot demo", () => {
     expect(checked, "and every declared rung was checked").toBe(everyVariant().length);
     // **The count, by equality** — so a rung appearing or vanishing is a failure
     // that names itself rather than a number nobody reads.
-    // **60, where it was 53** — seven rungs for the five members `b.plot` gained
-    // that the four new *forms* did not exercise: `layout` ×3, `binning` ×2,
-    // `yScale`, `emptyMessage`. A builder taking a member and a consumer naming
-    // one are different claims, and `publicSurfaceUseSignal` counts the second.
-    expect(everyVariant().length, "rungs beyond the defaults").toBe(60);
-    // **47 + 60, where it was 46 + 60** — `scatter3d` is the forty-seventh form
+    // **65, where it was 60** — seven rungs for the five members `b.plot` gained
+    // that the four new *forms* did not exercise (`layout` ×3, `binning` ×2,
+    // `yScale`, `emptyMessage`), and five more for `scatter3d`'s style arms. A
+    // builder taking a member and a consumer naming one are different claims,
+    // and `publicSurfaceUseSignal` counts the second.
+    expect(everyVariant().length, "rungs beyond the defaults").toBe(65);
+    // **47 + 65, where it was 47 + 60** — `scatter3d` is the forty-seventh form
     // and it arrives buildable, which is what a builder gaining the members with
-    // the form looks like from here. It adds **no rung**: its variants are the
-    // reference frame's, and `everyVariant` counts members `b.plot` gained that
-    // the forms do not exercise (C24 I30).
-    expect(FORMS.length - refusals().length + everyVariant().length, "figures /all draws").toBe(107);
+    // the form looks like from here.
+    //
+    // **It added no rung and now adds five**, which is the sentence this comment
+    // used to end on and the reason to correct it rather than only the number:
+    // `plotStyle` selected nothing on this form, so its variants were the
+    // reference frame's and `everyVariant` counted members `b.plot` gained that
+    // the forms do not exercise. Three arms later the member selects three
+    // things, and a caller naming one is exactly the second claim this count is
+    // about (C24 I30, C12 I99 · I100 · I101).
+    expect(FORMS.length - refusals().length + everyVariant().length, "figures /all draws").toBe(112);
   });
 });
 

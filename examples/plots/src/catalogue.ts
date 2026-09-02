@@ -403,6 +403,19 @@ export const CATALOGUE: Readonly<Record<PlotForm, Entry>> = Object.freeze({
  * out, and there is no field that selects them (C12 §3i's ladder). That is why
  * `Variant` has both.
  */
+/**
+ * A helix at a given radius — the 3D variants' fixture (C04 I76).
+ *
+ * **Phase-free, like `S1` beside it.** `/all` draws every variant at a phase and
+ * `/form` at zero; a fixture that moved with the phase would make the two pages
+ * disagree about a figure neither is animating.
+ */
+const helix3d = (n: number, r: number): { x: number; y: number; z: number; value: number }[] =>
+  Array.from({ length: n }, (_v, i) => {
+    const t = (i / (n - 1)) * Math.PI * 4;
+    return { x: Math.cos(t) * r, y: Math.sin(t) * r, z: (i / (n - 1)) * 2 - 1, value: t };
+  });
+
 /** One band's samples — the compact rungs' fixture, phase-free (C04 I56). */
 const S1: Series = s(wave(60, 0, 27, 6, 14), "measure");
 
@@ -426,6 +439,45 @@ const VARIANTS = {
     "compact-braille": { says: "the floor, in dots", spec: { categories: ["measure"], series: [S1], plotStyle: "braille" }, height: 3 },
     "compact-line-box": { says: "the floor with a ruled box", spec: { categories: ["measure"], series: [S1], plotBox: "line" }, height: 3 },
     "compact-vertical": { says: "the floor, stood up", spec: { categories: ["measure"], series: [S1], orientation: "vertical" }, height: 3 },
+  },
+  // **The three arms `plotStyle` now names on this form** (C12 I99, I100, I101).
+  // `/all` and `/form` draw them beneath the default, which is the terminal's
+  // own choice — so one page carries the capability arm and the three a caller
+  // can ask for, at the size they are actually read at rather than as a tile.
+  scatter3d: {
+    "marker": {
+      says: "the glyph table above the colour floor — shape is identity, size is depth",
+      spec: { plotStyle: "marker" },
+    },
+    // **The named shape needs its own cloud**, because the base entry's is one
+    // series and the fallback *is* the series index: a single unnamed cloud
+    // draws the same glyph either way, so a variant that only sets `plotStyle`
+    // cannot show the field at all.
+    "marker-named": {
+      says: "two clouds, one naming its shape and one taking its index's",
+      spec: {
+        plotStyle: "marker",
+        colourBy: "series",
+        lines3: [],
+        surfaces3: [],
+        points3: [
+          { label: "star", points: helix3d(60, 0.9), marker: "star" },
+          { label: "index", points: helix3d(60, 0.4) },
+        ],
+      },
+    },
+    "braille": {
+      says: "the dot grid — twice the positional resolution, one colour a cell",
+      spec: { plotStyle: "braille" },
+    },
+    "line": {
+      says: "box drawing with real joins, which C12 §3am refused and F483 re-argued",
+      spec: { plotStyle: "line" },
+    },
+    "line-sharp": {
+      says: "the same arm, square corners",
+      spec: { plotStyle: "line", plotCorners: "sharp" },
+    },
   },
   boxplot: {
     "vertical": { says: "columns rather than bands", spec: { orientation: "vertical" } },
