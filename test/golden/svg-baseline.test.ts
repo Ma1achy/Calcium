@@ -115,6 +115,13 @@ describe("SB — the SVG baseline (C12 §3ak.10, F275)", () => {
       "scatter3d-default.svg",
       "scatter3d-lines-series.svg",
       "scatter3d-orthographic.svg",
+      "scatter3d-saddle.svg",
+      "scatter3d-surface-field.svg",
+      "scatter3d-surface-flat.svg",
+      "scatter3d-surface-light.svg",
+      "scatter3d-surface-path.svg",
+      "scatter3d-surface-smooth.svg",
+      "scatter3d-surface.svg",
       "scatter3d-trajectory.svg",
       "scatter3d-wireframe.svg",
     ]);

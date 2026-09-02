@@ -653,6 +653,71 @@ export type Line3 = Readonly<{
 }>;
 
 /**
+ * A shaded surface in the same space (C04 I79, C12 I94).
+ *
+ * **A fourth carrier on I78's argument, unchanged** — only the primitive
+ * differs, and composition forces it: a path through a loss landscape is a
+ * surface *and* a line in one plot area.
+ *
+ * **Two arms and exactly one per surface.** `heights` with `xRange` and
+ * `yRange` is a height field `z = f(x, y)` over a regular grid; `vertices` with
+ * `faces` is an explicit mesh, which is what a sphere or a closed shape needs.
+ * Both, neither, and `faces` without `vertices` are refused at both gates —
+ * `origin3`'s rule, that a member deciding nothing on the arm it was given
+ * tells the caller nothing.
+ *
+ * **The field is per arm rather than per surface.** A height field's `field` is
+ * a parallel grid of the same shape, so colour and height are independent — a
+ * Gaussian coloured by curvature rather than by height. A mesh's field is the
+ * `value` already on each `Point3`, because a mesh has no grid to be parallel
+ * to, and a grid indexed by a vertex number is not a thing.
+ *
+ * **`shading` defaults to `"smooth"`**, because a sphere with face normals
+ * reads as a geodesic dome. `"flat"` is the honest reading of a faceted mesh.
+ *
+ * **`closed` and `wireframe` are not here.** They arrive with the backface
+ * culling and the depth bias that read them; a member accepted and ignored
+ * tells the caller nothing, which is the same rule `origin3` is refused by.
+ */
+export type Surface3 = Readonly<{
+  /** A height field's grid: `heights[j][i]` is `z` at row `j`, column `i`. */
+  heights?: readonly (readonly number[])[];
+  /** The `x` span the grid's columns are laid across. */
+  xRange?: readonly [number, number];
+  /** The `y` span the grid's rows are laid across. */
+  yRange?: readonly [number, number];
+  /** An explicit mesh's positions. Their `value` is this arm's field. */
+  vertices?: readonly Point3[];
+  /** Triangles, as indices into `vertices`. */
+  faces?: readonly (readonly [number, number, number])[];
+  /** The height-field arm's colour source, parallel to `heights` and independent of it. */
+  field?: readonly (readonly number[])[];
+  /** Face normals or vertex normals. Defaults to `"smooth"`. */
+  shading?: "flat" | "smooth";
+  label?: string;
+  tone?: Tone;
+}>;
+
+/**
+ * Where the light is (C04 I79, C12 I94).
+ *
+ * **`"studio"` is the default and it lives in view space**, up and to the right
+ * of wherever the reader is looking — the standard key-light setup, and it has
+ * **no dead angle**: orbit to the far side of a world-fixed light and the
+ * subject is a black blob, technically correct and useless.
+ *
+ * **The trade is stated rather than hidden**: because the light moves with the
+ * camera, orbiting does not change the shading pattern, and world-fixed shading
+ * changing under rotation is a genuine depth cue this gives up. It is the right
+ * default anyway, because most terminal 3D views are static — and the explicit
+ * `{ azimuth, elevation }` is there for the case that is not.
+ */
+export type Light3 =
+  | "studio"
+  | "headlight"
+  | Readonly<{ azimuth: number; elevation: number }>;
+
+/**
  * One axis of a 3D reference frame (C04 I77, C12 I92).
  *
  * **Per axis rather than per plot, because the axes genuinely differ** — a loss
@@ -1342,6 +1407,23 @@ export type Plot = Readonly<{
    * were two, and none of the three is about this member.
    */
   lines3?: readonly Line3[];
+  /**
+   * The shaded surfaces a `scatter3d` draws — loss landscapes, response
+   * surfaces, any `z = f(x, y)`, and explicit meshes (C04 I79, C12 I94).
+   *
+   * **The fourth carrier, and any one alone is a complete document.** The
+   * form's refusal reads the carrier *set*, so a surface with no cloud and no
+   * path is accepted exactly as a wireframe is.
+   */
+  surfaces3?: readonly Surface3[];
+  /**
+   * Where the light is, for the surfaces in this block (C04 I79, C12 I94).
+   *
+   * **The block's and not the surface's**: two surfaces lit differently is a
+   * picture that cannot be read as one figure, and the member that would say so
+   * is a member no reader could interpret.
+   */
+  light3?: Light3;
   /**
    * Which reading colour carries on a 3D scatter (C04 I76, C12 I89).
    *

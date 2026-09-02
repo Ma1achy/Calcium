@@ -27,7 +27,7 @@ import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import type { Span } from "../blocks/paint.js";
 import type { ColourRef, ColourValue, Style } from "../theme/types.js";
 import type { Colormap } from "../theme/colormap.js";
-import { ansi256Hex, nearestAnsi256 } from "../theme/colormap.js";
+import { ansi256Hex, nearestAnsi256, overChannels } from "../theme/colormap.js";
 import { DEFAULT_FLOOR, luminance, ratio } from "../theme/contrast.js";
 import { glyphForMask, LINE_DOWN, LINE_LEFT, LINE_RIGHT, LINE_UP } from "./linedraw.js";
 // **The marching-squares core, the levels and the layer membership are
@@ -363,26 +363,25 @@ export function dimFactorFor(map: Colormap, indexed = false): number {
   return factor;
 }
 
-/** A colour dimmed by a factor, in whatever encoding it arrived in. */
+/**
+ * A colour dimmed by a factor, in whatever encoding it arrived in.
+ *
+ * **Scaled in the encoding and not in linear light**, which is the difference
+ * between this and `shadeColour` one layer over. `fieldDim: "floor"` is about a
+ * **contrast ratio against white**, and `dimFactorFor` searches for its factor
+ * in encoded space against that ratio — so the two functions answer different
+ * questions and share only the traversal.
+ *
+ * **The 8-bit arm returned its argument once** (C12 §3y). `continuousColour`
+ * gives `ansi256` below 24-bit, so `fieldDim: "floor"` was applied, ignored and
+ * silent on every terminal between the colour floor and true colour, while the
+ * member's own doc said it was inert only *below* the floor. `overChannels`
+ * carries that arm now, and 0–15 come back unchanged because those are the
+ * terminal's own palette and have no value we can read.
+ */
 export function dimColour(colour: ColourValue, factor: number): ColourValue {
   if (factor >= 1) return colour;
-  const scale = (hex: string): string => {
-    const n = (i: number): number => Math.round(parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16) * factor);
-    return `#${[0, 1, 2].map((i) => n(i).toString(16).padStart(2, "0")).join("")}`;
-  };
-  if (colour.kind === "rgb") return { kind: "rgb", hex: scale(colour.hex) };
-  // **The 8-bit arm, which returned its argument** (C12 §3y). `continuousColour`
-  // gives `ansi256` below 24-bit, so `fieldDim: "floor"` was applied, ignored
-  // and silent on every terminal between the colour floor and true colour —
-  // while the member's own doc said it was inert only *below* the floor.
-  if (colour.kind === "ansi256") {
-    const hex = ansi256Hex(colour.index);
-    // 0\u201315 are the terminal's own palette and have no value we can read, so
-    // there is nothing to scale: returning the argument is the honest answer
-    // here and was the wrong one above.
-    return hex === null ? colour : { kind: "ansi256", index: nearestAnsi256(scale(hex)) };
-  }
-  return colour;
+  return overChannels(colour, (c) => c * factor);
 }
 
 /** Black or white, whichever clears the floor against this background (I51). */

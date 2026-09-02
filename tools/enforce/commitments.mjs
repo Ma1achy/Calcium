@@ -1088,13 +1088,6 @@ const UNCITED_INVARIANTS = Object.freeze([
   "C24 I20", "C24 I22", "C24 I25", "C24 I26", "C24 I28", "C24 I6", "C24 I7", "C25 I10",
   "C25 I11", "C25 I14", "C25 I15", "C25 I16", "C25 I17", "C25 I19a", "C25 I20a", "C25 I20b",
   "C26 I1", "C26 I11", "C26 I15", "C26 I16", "C26 I17", "C26 I20", "C26 I8", "C26 I9",
-  // **A loan, and the two entries below are repaid by the next commit.** Spec
-  // edits land alone and ahead of code, so an invariant is written one commit
-  // before the row that names it — and SP9 reads *test* files. The list is
-  // compared by equality, so leaving them here after the rows land fails the
-  // cleared check, which is what makes the loan self-collecting rather than a
-  // promise. Step 6, C04 I79 / C12 I94.
-  "C04 I79", "C12 I94",
 ]);
 
 /**

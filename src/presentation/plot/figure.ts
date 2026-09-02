@@ -955,7 +955,7 @@ export function calloutOf(block: Plot): readonly (string | null)[] | null {
  * into named pieces, so the pieces are the identities.
  */
 export function identityOf(
-  block: Pick<Plot, "segments" | "series" | "points3" | "lines3" | "colourBy">,
+  block: Pick<Plot, "segments" | "series" | "points3" | "lines3" | "surfaces3" | "colourBy">,
 ): readonly string[] {
   // **The third carrier, and `colourBy` is the gate** (C12 I89, C04 I76). A 3D
   // scatter's identities are its clouds' labels — but only under
@@ -972,15 +972,17 @@ export function identityOf(
   // different colours with one string.
   const cloud = block.points3;
   const paths = block.lines3;
-  if (cloud !== undefined || paths !== undefined) {
+  const skins = block.surfaces3;
+  if (cloud !== undefined || paths !== undefined || skins !== undefined) {
     if (block.colourBy !== "series") return [];
-    const clouds = cloud ?? [];
-    return [
-      ...clouds.map((c, i) => c.label ?? `series ${String(i + 1)}`),
-      ...(paths ?? []).map(
-        (l, i) => l.label ?? `series ${String(clouds.length + i + 1)}`, // cells-ok — a cloud count
-      ),
+    // **One numbering across every carrier, in the order the renderer builds
+    // them** (C04 I78, C04 I79). A default name continues where the last carrier
+    // stopped, because the palette slot it draws in does — a legend that
+    // restarted would name two different colours with one string.
+    const named: readonly { label?: string }[] = [
+      ...(cloud ?? []), ...(paths ?? []), ...(skins ?? []),
     ];
+    return named.map((x, i) => x.label ?? `series ${String(i + 1)}`);
   }
   const segs = block.segments;
   return segs !== undefined && segs.length > 0 // cells-ok — a segment count

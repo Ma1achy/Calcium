@@ -573,11 +573,31 @@ three steps before this — so nothing divides by a normal's length anywhere in 
 with no normal shades at **ambient only**, which is the honest reading: `dot(0, l)` is `0`, and
 C12 I86 already draws a collapsed set rather than refusing it.
 
-**The genuinely degenerate face is produced by the normalisation, not by the caller.** A height
-field with a zero-width `xRange` has perfectly good faces in data space and **8 of 8** zero
-normals after `unitOf`, because a zero extent maps to the axis's centre and collapses the surface
-to a line. That is the case the *refuse the face* remedy is for, and it arrives through the
-projector rather than through the input — so a caller cannot avoid it by validating their mesh.
+**The genuinely degenerate face is produced by the normalisation, not by the caller** — and the
+condition is narrower than the first version of this paragraph said. A zero-width `xRange` alone is
+**not** enough:
+
+```
+xRange 0, heights vary along x        0 of 8 zero normals
+xRange 0, heights constant along x    8 of 8
+xRange 0, heights constant along y    0 of 8
+xRange 0, heights all flat            8 of 8
+xRange 0 AND yRange 0                 8 of 8
+normal ranges, heights all flat       0 of 8
+```
+
+After `unitOf` the collapsed axis contributes nothing to either edge vector, so the cross product is
+`(−Δz_x · Δy, 0, 0)` — zero exactly when the surface is **also** constant along the axis that
+collapsed. Two collapsed axes always do it, because then the cell is collinear.
+
+**The first wording here was *a zero-width `xRange` gives 8 of 8*, which is true of the grid it was
+measured on and false of the next one** — F451's own class, arriving in the paragraph written to
+record F456. It cost nothing because the row that asserts it failed on the first run; it would have
+cost a reader the belief that a range check at the gate could catch this.
+
+The case arrives through the **projector** rather than through the input either way, so a caller
+cannot avoid it by validating their mesh and the gate cannot refuse it without refusing a legal
+document.
 
 The two zeros and their rulings are C12 §6h rows 1–4.
 
@@ -912,7 +932,24 @@ four times.
 8   auto-orbit and manual camera controls
 9   the test suite: sphere, cube, axis planes, tilted plane, the three equations
 10  golden frames at four capability sets, catalogue fixtures, the animated example
+11  a colour per axis — `AxisSpec3.tone`, the one of three that is not built
 ```
+
+**Step 11 is one member and the other two asks it arrived with are already shipped**, which is why
+it is one row rather than three. Checked against the tree rather than against this list:
+
+| asked for | where it is |
+|---|---|
+| the origin in the middle, with positive **and** negative axes | `axes3: "origin"` — crosses at the data's origin and extends both ways, and `arrow` exists *because* it does: an axis running both ways has to say which end is positive |
+| the origin somewhere else | `origin3: "auto" \| "min" \| "centre" \| {x, y, z}`, plus `axes3: "centre"` for the box's midpoint when zero is out of range |
+| a colour per axis | **nowhere.** `AxisSpec3` carries `label`, `show`, `ticks`, `format`, `range` and `arrow`, and every axis is drawn in `tone.muted` |
+
+**And the third is not a fourth member on the plot.** `AxisSpec3` is already per axis, so it is a
+`tone` there — the same field `Point3Series`, `Line3` and `Surface3` each carry, resolved by the
+same `slot`. What needs deciding when it lands is the **default**: `tone.muted` for all three is
+what ships now, and three different tones by default would make the frame compete with the data,
+which is the thing `box3: "back"` exists to avoid. So the member is opt-in and the default does not
+move — the shape `arrow` already has.
 
 **Steps 1–3 ship a working 3D scatter.** That is the point at which it stops being
 speculative — everything after it is improvement rather than proof.

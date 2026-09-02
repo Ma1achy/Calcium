@@ -21024,11 +21024,23 @@ zero-extent rule one dimension up. So a face with no normal shades at **ambient*
 dropping it.
 
 **Wrong in both directions, which is the shape.** It is not degenerate for the reason given, and
-there **is** a genuinely degenerate face nobody stated: a height field with a zero-width `xRange`
-has good faces in data space and **8 of 8** zero normals after `unitOf`, because a zero extent maps
-to the axis's centre and collapses the surface to a line. That case arrives through the **projector**
-rather than through the input, so a caller cannot avoid it by validating their mesh and the gate
-cannot refuse it without refusing a legal document.
+there **is** a genuinely degenerate face nobody stated: it arrives through the **projector** rather
+than through the input, so a caller cannot avoid it by validating their mesh and the gate cannot
+refuse it without refusing a legal document.
+
+**And the first statement of that half was itself over-general — F451's class, in the finding
+written to record this one.** *A zero-width `xRange` gives 8 of 8 zero normals* is true of the grid
+it was measured on and false of the next:
+
+```
+xRange 0, heights vary along x        0 of 8        xRange 0, heights all flat      8 of 8
+xRange 0, heights constant along x    8 of 8        xRange 0 AND yRange 0           8 of 8
+xRange 0, heights constant along y    0 of 8        normal ranges, all flat         0 of 8
+```
+
+After the collapse the cross product is `(−Δz_x · Δy, 0, 0)`, so it is zero exactly when the surface
+is **also** constant along the axis that collapsed. It cost nothing — SF2 failed on its first run —
+and what it would have cost is a reader believing a range check at the gate could catch this.
 
 **The old reason would be falsified by any change to a mesh format; the real one only by `unitOf`
 losing its centre rule.** Twenty minutes to measure, and the fourth instance of the instrument that
@@ -21089,3 +21101,90 @@ is colour. The diffuse range narrows 5:1 → 4:1, which is not visible at a term
 measured over. The reusable form: when a measurement endorses a mechanism, record the domain in the
 finding, because the design that consumes it will grow past the domain before anyone re-reads the
 probe.
+
+---
+
+## F458 — the mutation harness blamed its control for a tree that would not compile ★★★★☆
+
+`runPass` refuses to report until two things are shown: the clean tree passes, and a control
+mutation whose kill is not in doubt is seen to be killed. **The first of those two is checked with
+the wrong predicate.**
+
+```js
+restore();
+if (killed(run())) throw new BlindHarnessError("the unmutated suite already fails …");
+```
+
+`killed` is `/Tests\s+\d+ failed/` over the summary. **A suite that never reaches a summary is
+therefore `false` here** — and `false` is the passing answer. So a tree that does not compile walks
+through the clean-tree gate, produces no summary for the control either, and the pass throws naming
+**the control**:
+
+> a mutation that cannot survive was not caught — every row reads a drawn surface or a refusal
+> about one
+
+Two runs failed that way, with two different controls, and the fault was in neither: a fixture
+carrying `Math.exp(-(x) ** 2)`, which esbuild refuses because a unary minus may not sit directly in
+front of `**`. The message sends a reader to the control mutation and to the rows it is meant to
+kill — the two artefacts that are correct — while the one that is broken is not mentioned.
+
+**The predicate that answers it is in the same file, three functions up.** `ran` exists for exactly
+this distinction and its own comment says so: *a run that never finished and a run that finished
+green are the same `false`, and they mean opposite things.* It was written for a mid-pass blindness
+— a `SIGPIPE`, a truncated buffer — and the clean-tree gate at the top was never given it.
+
+**The shape: a guard that is correct about its own subject and silent about its precondition.** The
+control pair asks *can this harness see a kill*, and it can only be asked of a tree that builds. Two
+sequential checks where the first is weaker than the second means the second one's failure absorbs
+the first one's, and the message a reader gets names the check that fired rather than the one that
+should have.
+
+Fixed by reading `ran` before `killed`, with its own message naming the tree. **The cost was
+entirely in the diagnosis** — both mutations were fine, both suites were fine, and the twenty
+minutes went on the two artefacts the message pointed at.
+
+---
+
+## F459 — five survivors, and four of them are the fixture agreeing with both branches ★★★★★
+
+Eleven mutations against the surface carrier; **five survived**, and none because the code was
+untested. Each row cited the right invariant and ran on an input where the rule's two answers
+coincide.
+
+| mutation | why the row could not see it |
+|---|---|
+| the normal dotted with the light in **world space** | SF3 asserted *smooth has more distinct shades than flat*, which is true under the defect. **The defect the frame found had no row at all** |
+| the stroke threshold at **exactly zero** rather than one sample | the fixture is exactly edge-on, where both thresholds behave identically |
+| the shading terms back to **0.2 / 0.8 / 0.4** | SF4 recomputed the formula in the test with the coefficients written out |
+| smooth normals **unit-averaged** rather than accumulated | the fixture is a UV sphere, whose faces are near-equal in area |
+| the extent taken **without the surfaces** | the fixture had a cloud already spanning the cube, so the extent was unchanged either way |
+
+**Four of the five are one shape**: a row indexed by the rule it cites, run on the one input where
+the rule's branches agree. That is the convenient fixture — a sphere, an exactly-degenerate plane, a
+block with a cloud in it — and the convenient fixture is usually the degenerate one.
+
+**The first is the one worth the star.** The world-space normal was found by *reading a frame*, and
+the suite written afterwards could not see it. A `dot` of two unit vectors is in `[−1, 1]` whichever
+frames they are in, so the ambient floor holds, nothing is `NaN`, the colours vary and a terminator
+crosses the sphere — every property a reader would think to assert. What is *not* satisfied is the
+light arriving from a direction. **1.47× brighter up-and-right of centre than down-and-left, against
+1.02×** with the normal left in world space: one statistic, and it is about the picture rather than
+about the arithmetic.
+
+**The fourth took three forms before it held, which is the finding inside the finding.** A sphere
+cannot see the weighting; a graded grid compared against an even grid cannot either, because the
+shading differs under **both** schemes and the row was comparing two fixtures rather than two rules.
+What works is asserting against the **rejected alternative**: compute the unit average in the row and
+require the shipped normals to be more than 30° from it, with a planar quad — where the two schemes
+provably coincide — as the control. **A row that compares two inputs is not a row about the rule
+that reads them.**
+
+**And it indicted the spec rather than the test.** §6h row 6 justified accumulating raw
+cross products by saying a unit average *lets a zero-area face pull its neighbours* — which is
+false, because `unit` returns the zero vector unchanged and such a face contributes nothing under
+either scheme. Measured: the two agree to **13.682°** with and without a collapsed column, the same
+number. The real argument is area weighting on faces of **unequal** size — 13.7° apart on an even
+grid, 24.0° at cubic column spacing, **49.2°** at quintic — and the ruling survives with a different
+reason, which is the disposition the mutation pass exists to force. **The reason as written named
+the single input on which its own two options are identical.**
+

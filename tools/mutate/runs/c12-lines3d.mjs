@@ -61,7 +61,7 @@ const results = await runPass({
       // is a complete document and this rejects it.
       name: "the form is refused unless it has points3",
       file: V,
-      from: '  if (form === "scatter3d" && pts === undefined && lns === undefined) {',
+      from: '  if (form === "scatter3d" && CARRIERS_3D.every((k) => b[k] === undefined)) {',
       to: '  if (form === "scatter3d" && pts === undefined) {',
       expect: "T2.4g",
     },
@@ -91,7 +91,9 @@ const results = await runPass({
       // over `[i - 0.5, i + 0.5)` where every other writer here uses
       // `[i, i + 1)`, so a path drifts off its own markers.
       name: "a stroke's samples are rounded rather than floored",
-      file: S,
+      // **`strokeSeg` moved to `project3.ts`** when the surface's degenerate arm
+      // became its third caller (C12 I94). Same two lines, one file down.
+      file: P,
       from: "    const px = Math.floor(x0 + (x1 - x0) * t); // cells-ok — a sample coordinate\n    const py = Math.floor(y0 + (y1 - y0) * t); // cells-ok — a sample coordinate",
       to: "    const px = Math.round(x0 + (x1 - x0) * t); // cells-ok — a sample coordinate\n    const py = Math.round(y0 + (y1 - y0) * t); // cells-ok — a sample coordinate",
       expect: "LN3",

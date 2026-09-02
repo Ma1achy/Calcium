@@ -419,6 +419,8 @@ function plot(
     /** A 3D scatter's cloud, and the channel colour spends (C04 I76, C12 I87). */
     points3?: Plot["points3"];
     lines3?: Plot["lines3"];
+    surfaces3?: Plot["surfaces3"];
+    light3?: Plot["light3"];
     colourBy?: Plot["colourBy"];
     /** The 3D reference frame — four members and two decisions (C04 I77). */
     axes3?: Plot["axes3"];
@@ -522,7 +524,7 @@ function plot(
     yScale?: Plot["yScale"];
   },
 ): Plot {
-  const { quartiles, categories, segments, bands, graph, graphLayout, series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, vectors, points3, lines3, colourBy, camera, axes3, origin3, box3, axisStyle3, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, xTitle, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, treeLayout, matrixAnchor, legend, plotFrame, width, aspect, align, origin, axisCross, calendarUnit, startDate, layout, binning, offsets, totals, facets, emptyMessage, xScale, yScale } =
+  const { quartiles, categories, segments, bands, graph, graphLayout, series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, vectors, points3, lines3, surfaces3, light3, colourBy, camera, axes3, origin3, box3, axisStyle3, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, xTitle, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, treeLayout, matrixAnchor, legend, plotFrame, width, aspect, align, origin, axisCross, calendarUnit, startDate, layout, binning, offsets, totals, facets, emptyMessage, xScale, yScale } =
     spec;
   // **The same refusal the validator makes** (C04 I50a). Two expressions of one
   // rule, which is this file's shape throughout: the constructor is where an
@@ -816,12 +818,31 @@ function plot(
           `through three-dimensional space, and there is no projection to draw it with`,
       );
     }
-    // **Neither carrier** (C04 I78). A wireframe is edges with no cloud and a
-    // parametric curve is a path with no samples, so either alone is complete.
-    if (drawn === "scatter3d" && points3 === undefined && lines3 === undefined) {
+    if (surfaces3 !== undefined && drawn !== "scatter3d") {
+      throw new Error(
+        `b.plot: "surfaces3" on form "${drawn}" (C04 I79) — only a scatter3d shades a ` +
+          `surface, and there is no projection, no depth buffer and no light to shade it with`,
+      );
+    }
+    if (light3 !== undefined && drawn !== "scatter3d") {
+      throw new Error(
+        `b.plot: "light3" on form "${drawn}" (C04 I79) — it says where the light is, and ` +
+          `only a shaded surface reads one`,
+      );
+    }
+    // **No carrier at all, and the set is what it reads** (C04 I79). A wireframe
+    // is edges with no cloud, a parametric curve is a path with no samples, and a
+    // loss landscape has neither — so any one alone is a complete document. The
+    // validator reads `CARRIERS_3D`; this gate is the same rule at the other
+    // side, and the two messages name the same list.
+    if (
+      drawn === "scatter3d" && points3 === undefined && lines3 === undefined
+      && surfaces3 === undefined
+    ) {
       throw new TypeError(
-        `b.plot: form "scatter3d" has neither "points3" nor "lines3" (C04 I78) — a cloud ` +
-          `or a path is what it draws, and "series" carries one reading per position`,
+        `b.plot: form "scatter3d" has none of "points3", "lines3", "surfaces3" (C04 I79) — ` +
+          `a cloud, a path or a surface is what it draws, and "series" carries one reading ` +
+          `per position`,
       );
     }
     if (colourBy !== undefined && drawn !== "scatter3d") {
@@ -881,6 +902,8 @@ function plot(
       ...(vectors === undefined ? {} : { vectors }),
       ...(points3 === undefined ? {} : { points3 }),
       ...(lines3 === undefined ? {} : { lines3 }),
+      ...(surfaces3 === undefined ? {} : { surfaces3 }),
+      ...(light3 === undefined ? {} : { light3 }),
       ...(colourBy === undefined ? {} : { colourBy }),
       ...(axes3 === undefined ? {} : { axes3 }),
       ...(origin3 === undefined ? {} : { origin3 }),

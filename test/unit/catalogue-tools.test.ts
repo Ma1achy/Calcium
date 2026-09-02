@@ -340,6 +340,13 @@ describe("PR — the pair catalogue's partition, which is the counter restated (
       "scatter3d/default",
       "scatter3d/lines-series",
       "scatter3d/orthographic",
+      "scatter3d/saddle",
+      "scatter3d/surface",
+      "scatter3d/surface-field",
+      "scatter3d/surface-flat",
+      "scatter3d/surface-light",
+      "scatter3d/surface-path",
+      "scatter3d/surface-smooth",
       "scatter3d/trajectory",
       "scatter3d/wireframe",
     ]);

@@ -1462,6 +1462,18 @@ function plotFieldErrors(
  * the caller nothing. The blocker is the in-scene axis renderer rather than a
  * step number, so a grep for `axesAt3` is what expires this clause.
  */
+/**
+ * The carriers a `scatter3d` draws, as **one list two rules read** (C04 I79).
+ *
+ * **The class rather than the instance.** The gate's *neither carrier* refusal
+ * and `colourBy: "value"`'s completeness walk are both over this set, and each
+ * was written against one carrier and widened by hand when the second arrived
+ * (C12 §6g rows 2 and 3). At the third that stops being a pair of edits: a
+ * fifth carrier is one entry here, and two places that must agree become one
+ * place that cannot disagree.
+ */
+const CARRIERS_3D = Object.freeze(["points3", "lines3", "surfaces3"] as const);
+
 function checkPoints3(
   b: Record<string, unknown>,
   form: unknown,
@@ -1470,6 +1482,7 @@ function checkPoints3(
 ): void {
   const pts = b["points3"];
   const lns = b["lines3"];
+  const sfs = b["surfaces3"];
   const by = b["colourBy"];
   if (pts !== undefined && form !== "scatter3d") {
     e.push(
@@ -1488,10 +1501,27 @@ function checkPoints3(
   // alone is a complete document. The refusal as first written read the cloud
   // only, and nothing about the member would have shown it — it is the carrier
   // rule meeting the *other* carrier, which is C12 §6g row 2.
-  if (form === "scatter3d" && pts === undefined && lns === undefined) {
+  if (sfs !== undefined && form !== "scatter3d") {
     e.push(
-      `${at}: form "scatter3d" has neither "points3" nor "lines3" (C04 I78) — a cloud or a ` +
-        `path is what it draws, and "series" carries one reading per position`,
+      `${at}: "surfaces3" on form "${String(form)}" (C04 I79) — only a scatter3d shades a ` +
+        `surface, and there is no projection, no depth buffer and no light to shade it with`,
+    );
+  }
+  if (b["light3"] !== undefined && form !== "scatter3d") {
+    e.push(
+      `${at}: "light3" on form "${String(form)}" (C04 I79) — it says where the light is, and ` +
+        `only a shaded surface reads one`,
+    );
+  }
+  // **The carrier set, not a widened pair of names** (C04 I79, C12 §6g row 2).
+  // A wireframe has no cloud, a parametric curve has no samples, and a loss
+  // landscape has neither — so the refusal is *no carrier at all*, and the list
+  // it reads is the one the completeness walk below reads.
+  if (form === "scatter3d" && CARRIERS_3D.every((k) => b[k] === undefined)) {
+    e.push(
+      `${at}: form "scatter3d" has none of ${CARRIERS_3D.map((k) => `"${k}"`).join(", ")} ` +
+        `(C04 I79) — a cloud, a path or a surface is what it draws, and "series" carries one ` +
+        `reading per position`,
     );
   }
   if (by !== undefined && form !== "scatter3d") {
@@ -1521,6 +1551,188 @@ function checkPoints3(
   // `points3` only would pass T3.53 and every row derived from it.
   walkPoints3(pts, "points3", by, at, e);
   walkPoints3(lns, "lines3", by, at, e);
+  walkSurfaces3(sfs, by, at, e);
+}
+
+/**
+ * A surface's arms and its field (C04 I79).
+ *
+ * **Exactly one arm per surface**, and the refusals are `origin3`'s rule: a
+ * member deciding nothing on the arm it was given tells the caller nothing. The
+ * `field` check is the height-field arm's alone, because a mesh's field is the
+ * `value` already on each vertex — one member cannot mean both, and a grid
+ * indexed by a vertex number is not a thing.
+ */
+function walkSurfaces3(
+  carrier: unknown,
+  by: unknown,
+  at: string,
+  e: string[],
+): void {
+  if (carrier === undefined) return;
+  if (!Array.isArray(carrier)) {
+    e.push(`${at}: "surfaces3" must be an array`);
+    return;
+  }
+  let si = 0;
+  for (const raw of carrier as readonly Record<string, unknown>[]) {
+    const sf = raw ?? {};
+    const where = `${at}: surfaces3[${String(si)}]`;
+    si += 1; // cells-ok — a surface index
+    const heights = sf["heights"];
+    const verts = sf["vertices"];
+    const grid = Array.isArray(heights);
+    const mesh = Array.isArray(verts);
+    if (grid && mesh) {
+      e.push(
+        `${where} has both "heights" and "vertices" (C04 I79) — a surface is a height field ` +
+          `or a mesh, and a renderer given both would silently pick one`,
+      );
+      continue;
+    }
+    if (!grid && !mesh) {
+      e.push(
+        `${where} has neither "heights" nor "vertices" (C04 I79) — those are the two ways to ` +
+          `say what the surface is, and a surface with no geometry draws nothing`,
+      );
+      continue;
+    }
+    if (!grid && sf["faces"] === undefined) {
+      e.push(
+        `${where} has "vertices" and no "faces" (C04 I79) — positions alone are a point cloud, ` +
+          `and "points3" is the carrier that draws one`,
+      );
+      continue;
+    }
+    if (grid) walkHeights3(heights as readonly unknown[], sf, by, where, e);
+    else walkMesh3(verts as readonly unknown[], sf, by, where, e);
+  }
+}
+
+/** The height-field arm: a rectangular grid, a matching field, and two ranges. */
+function walkHeights3(
+  heights: readonly unknown[],
+  sf: Record<string, unknown>,
+  by: unknown,
+  where: string,
+  e: string[],
+): void {
+  const finite = (v: unknown): boolean => typeof v === "number" && Number.isFinite(v);
+  const width = Array.isArray(heights[0]) ? (heights[0] as readonly unknown[]).length : 0; // cells-ok — a grid width
+  if (heights.length < 2 || width < 2) { // cells-ok — a grid extent
+    e.push(
+      `${where} has a ${String(heights.length)}x${String(width)} "heights" grid (C04 I79) — a ` +
+        `cell needs two rows and two columns, so nothing below that has a face to shade`,
+    );
+    return;
+  }
+  for (const row of heights) {
+    if (!Array.isArray(row) || row.length !== width) { // cells-ok — a grid width
+      e.push(`${where} has a ragged "heights" grid (C04 I79) — a height field is over a regular grid`);
+      return;
+    }
+    for (const v of row as readonly unknown[]) {
+      if (!finite(v)) {
+        e.push(
+          `${where} has a non-finite "heights" entry (C04 I79) — a gap is a position that ` +
+            `produced no reading, and a grid has a reading everywhere by construction`,
+        );
+        return;
+      }
+    }
+  }
+  for (const k of ["xRange", "yRange"] as const) {
+    const r = sf[k];
+    if (!Array.isArray(r) || r.length !== 2 || !finite(r[0]) || !finite(r[1])) { // cells-ok — a pair
+      e.push(`${where} has no finite "${k}" pair (C04 I79) — the grid has no span without it`);
+      return;
+    }
+  }
+  const field = sf["field"];
+  if (field !== undefined) {
+    if (
+      !Array.isArray(field) ||
+      field.length !== heights.length || // cells-ok — a grid height
+      !field.every((row) => Array.isArray(row) && row.length === width) // cells-ok — a grid width
+    ) {
+      e.push(
+        `${where} has a "field" whose shape is not "heights"' (C04 I79) — the field is parallel ` +
+          `to the grid, which is what makes colour independent of height`,
+      );
+      return;
+    }
+  }
+  // **The completeness walk's third carrier** (C04 I79, C12 §6h row 13). Under
+  // `"value"` the surface's colour is the field, so a cell without one would be
+  // shaded in a colour nothing chose — `walkPoints3`'s rule over a grid.
+  if (by !== "value") return;
+  const src = field ?? heights;
+  for (let j = 0; j < src.length; j += 1) { // cells-ok — a row index
+    const row = src[j] as readonly unknown[];
+    for (let i = 0; i < row.length; i += 1) { // cells-ok — a column index
+      if (!finite(row[i])) {
+        e.push(
+          `${where}.${field === undefined ? "heights" : "field"}[${String(j)}][${String(i)}] ` +
+            `is not finite and "colourBy" is "value" (C04 I79) — the cell still has a position, ` +
+            `so it would be shaded in a colour nothing chose`,
+        );
+        return;
+      }
+    }
+  }
+}
+
+/** The mesh arm: finite positions, in-range face indices, and the value walk. */
+function walkMesh3(
+  verts: readonly unknown[],
+  sf: Record<string, unknown>,
+  by: unknown,
+  where: string,
+  e: string[],
+): void {
+  const finite = (v: unknown): boolean => typeof v === "number" && Number.isFinite(v);
+  const faces = sf["faces"];
+  if (!Array.isArray(faces)) {
+    e.push(`${where} has a non-array "faces" (C04 I79)`);
+    return;
+  }
+  let vi = 0;
+  for (const p of verts as readonly Record<string, unknown>[]) {
+    if (!finite(p?.["x"]) || !finite(p?.["y"]) || !finite(p?.["z"])) {
+      e.push(
+        `${where}.vertices[${String(vi)}] is not a finite (x, y, z) (C04 I79) — a gap is a ` +
+          `position that produced no reading, and a mesh lists only the positions it has`,
+      );
+      return;
+    }
+    if (by === "value" && !finite(p["value"])) {
+      e.push(
+        `${where}.vertices[${String(vi)}] has no finite "value" and "colourBy" is "value" ` +
+          `(C04 I79) — the vertex still has a position, so it would be shaded in a colour ` +
+          `nothing chose`,
+      );
+      return;
+    }
+    vi += 1; // cells-ok — a vertex index
+  }
+  let fi = 0;
+  for (const f of faces as readonly unknown[]) {
+    if (!Array.isArray(f) || f.length !== 3) { // cells-ok — a triangle
+      e.push(`${where}.faces[${String(fi)}] is not a triple (C04 I79) — a face is a triangle`);
+      return;
+    }
+    for (const ix of f as readonly unknown[]) {
+      if (typeof ix !== "number" || !Number.isInteger(ix) || ix < 0 || ix >= verts.length) { // cells-ok — a vertex count
+        e.push(
+          `${where}.faces[${String(fi)}] names vertex ${String(ix)} of ` +
+            `${String(verts.length)} (C04 I79) — an index outside the array is a face the ` + // cells-ok — a vertex count
+            `renderer would read as a hole`,
+        );
+        return;
+      }
+    }
+    fi += 1; // cells-ok — a face index
+  }
 }
 
 /**

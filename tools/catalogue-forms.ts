@@ -184,6 +184,45 @@ const helix3 = (n: number): { x: number; y: number; z: number; value: number }[]
     return { x: Math.cos(t), y: Math.sin(t), z: (i / (n - 1)) * 2 - 1, value: t }; // cells-ok — a point index
   });
 
+/** `z = f(x, y)` over a regular grid, as the height-field arm takes it. */
+const field3 = (n: number, f: (x: number, y: number) => number): number[][] =>
+  Array.from({ length: n }, (_r, j) => // cells-ok — a grid height
+    Array.from({ length: n }, (_c, i) => // cells-ok — a grid width
+      f((i / (n - 1)) * 4 - 2, (j / (n - 1)) * 4 - 2))); // cells-ok — a grid index
+
+/**
+ * A UV sphere, as the mesh arm takes it — **the fixture `shading` is about**.
+ *
+ * A height field cannot be a sphere, and face normals on one read as a geodesic
+ * dome, so this is the only fixture where `"flat"` and `"smooth"` differ enough
+ * to be worth a sheet.
+ */
+const sphere3 = (rings: number, bands: number): {
+  vertices: { x: number; y: number; z: number; value: number }[];
+  faces: [number, number, number][];
+} => {
+  const vertices: { x: number; y: number; z: number; value: number }[] = [];
+  for (let j = 0; j <= bands; j += 1) { // cells-ok — a band index
+    const phi = (j / bands) * Math.PI; // cells-ok — a band index
+    for (let i = 0; i <= rings; i += 1) { // cells-ok — a ring index
+      const th = (i / rings) * 2 * Math.PI; // cells-ok — a ring index
+      vertices.push({
+        x: Math.sin(phi) * Math.cos(th), y: Math.sin(phi) * Math.sin(th),
+        z: Math.cos(phi), value: j / bands, // cells-ok — a band index
+      });
+    }
+  }
+  const faces: [number, number, number][] = [];
+  const at = (i: number, j: number): number => j * (rings + 1) + i; // cells-ok — a grid offset
+  for (let j = 0; j < bands; j += 1) { // cells-ok — a band index
+    for (let i = 0; i < rings; i += 1) { // cells-ok — a ring index
+      faces.push([at(i, j), at(i + 1, j), at(i + 1, j + 1)]);
+      faces.push([at(i, j), at(i + 1, j + 1), at(i, j + 1)]);
+    }
+  }
+  return { vertices, faces };
+};
+
 /**
  * A wireframe cube — two closed rings and four uprights, **turned about z**.
  *
@@ -275,6 +314,68 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
       form: "scatter3d", height: 14, series: [], colourBy: "series",
       points3: [{ label: "cloud", points: cluster3(0, 0, 0, 60) }],
       lines3: [{ label: "orbit", points: helix3(60), closed: true }],
+    },
+    // C12 I94 — **the height-field arm**, and the form the whole rung was
+    // measured for: a shaded surface is 89–96% interior, so the picture is
+    // entirely in the lighting (F431).
+    surface: {
+      form: "scatter3d", height: 14, series: [], colormap: "viridis",
+      surfaces3: [{
+        heights: field3(28, (x, y) => Math.exp(-(x * x + y * y))),
+        xRange: [-2, 2], yRange: [-2, 2],
+      }],
+    },
+    // C12 I94 — **the field is not the height** (C04 I79). The same Gaussian,
+    // coloured by a ramp that shares nothing with its geometry, which is what
+    // the two members being independent buys.
+    "surface-field": {
+      form: "scatter3d", height: 14, series: [], colourBy: "value", colormap: "magma",
+      surfaces3: [{
+        heights: field3(28, (x, y) => Math.exp(-(x * x + y * y))),
+        field: field3(28, (x, y) => x * y),
+        xRange: [-2, 2], yRange: [-2, 2],
+      }],
+    },
+    // C12 I94 — a saddle, where the surface passes through itself in projection
+    // and the depth buffer is doing the work rather than the draw order.
+    saddle: {
+      form: "scatter3d", height: 14, series: [], colormap: "coolwarm",
+      surfaces3: [{
+        heights: field3(28, (x, y) => (x * x - y * y) / 4),
+        xRange: [-2, 2], yRange: [-2, 2],
+      }],
+    },
+    // C12 I94 — **the mesh arm and the shading member**, which only a sphere
+    // shows: face normals give a geodesic dome and vertex normals a ball.
+    "surface-smooth": {
+      form: "scatter3d", height: 14, series: [], colormap: "viridis",
+      surfaces3: [{ ...sphere3(28, 20), shading: "smooth" }],
+    },
+    "surface-flat": {
+      form: "scatter3d", height: 14, series: [], colormap: "viridis",
+      surfaces3: [{ ...sphere3(14, 10), shading: "flat" }],
+    },
+    // C12 I94 — the light, which is the member `studio` exists to make
+    // unnecessary: a world-fixed light has a dead angle and this is it.
+    "surface-light": {
+      form: "scatter3d", height: 14, series: [], colormap: "viridis",
+      light3: { azimuth: 2.4, elevation: -0.3 },
+      surfaces3: [{ ...sphere3(28, 20) }],
+    },
+    // C12 I94, §6h row 11 — **a trajectory over a landscape**, which is the
+    // composition that forces a carrier rather than a form: two primitives in
+    // one plot area, and the marks keep their cells because they draw first.
+    "surface-path": {
+      form: "scatter3d", height: 14, series: [], colormap: "viridis",
+      surfaces3: [{
+        heights: field3(24, (x, y) => Math.exp(-(x * x + y * y))),
+        xRange: [-2, 2], yRange: [-2, 2],
+      }],
+      lines3: [{ label: "descent", points: Array.from({ length: 40 }, (_v, i) => { // cells-ok — a point count
+        const t = (i / 39) * 3.2; // cells-ok — a point index
+        return { x: 1.8 * Math.cos(t) * (1 - t / 4), y: 1.8 * Math.sin(t) * (1 - t / 4),
+                 z: Math.exp(-((1.8 * (1 - t / 4)) ** 2)) + 0.04 };
+      }) }],
     },
     // **The bare picture** — no frame at all, which is the render step 3 shipped
     // and the comparison every axis row is against.

@@ -30,9 +30,17 @@ import {
   type Axis3,
   type Seg3,
 } from "./axes3.js";
-import { continuousColour } from "../theme/colormap.js";
+import { continuousColour, shadeColour } from "../theme/colormap.js";
 import { colormapFor } from "./heatmap.js";
 import { CELL_ASPECT } from "./aspect.js";
+import {
+  densityGlyph,
+  drawTri,
+  lightDirOf,
+  surfacePoints,
+  trianglesOf,
+  type Tri3,
+} from "./surface3.js";
 import { plotAreaRows } from "./height.js";
 import { seriesRefOf } from "./marks.js";
 import {
@@ -41,6 +49,7 @@ import {
   extentOf,
   project,
   sampleGrid,
+  strokeSeg,
   unitOf,
   writeDepth,
   type Basis,
@@ -154,10 +163,11 @@ type Stroke = Readonly<{
  */
 type Identity = Readonly<{ tone?: Tone; label?: string }>;
 
-/** The samples, the paths, the frame they sit in, and the basis for all of it. */
+/** The samples, the paths, the faces, the frame they sit in, and the basis for all of it. */
 type Scene = Readonly<{
   drawn: readonly Drawn[];
   strokes: readonly Stroke[];
+  tris: readonly Tri3[];
   identities: readonly Identity[];
   basis: Basis;
   lo: Vec3;
@@ -174,6 +184,7 @@ type Scene = Readonly<{
 function drawnOf(block: Plot, ctx: RenderContext, aspect: number): Scene {
   const clouds = block.points3 ?? [];
   const paths = block.lines3 ?? [];
+  const skins = block.surfaces3 ?? [];
   const all: Vec3[] = [];
   for (const c of clouds) for (const p of c.points) all.push(p);
   // **Both carriers, or the frame describes a different document** (C04 I78,
@@ -182,6 +193,11 @@ function drawnOf(block: Plot, ctx: RenderContext, aspect: number): Scene {
   // screen, inside the box, and drawn to the wrong scale — which no bounds
   // assertion and no ink comparison can see. That is T6.77.
   for (const l of paths) for (const p of l.points) all.push(p);
+  // **And the fourth**, on the same rule (C04 I79, C12 §6h row 10). A surface
+  // normalised against a cloud somewhere else has its relief flattened, and
+  // that is the truth — the drawn geometry *is* the normalised one — but a
+  // surface left out of the extent entirely draws against the unit cube.
+  for (const sf of skins) for (const p of surfacePoints(sf)) all.push(p);
   const extent = extentOf(all);
   // **The live camera wins and the block's is the fallback** (C04 I75, C12 I83).
   // `RenderContext` carries the one an orbit moves; the member says where the
@@ -225,10 +241,19 @@ function drawnOf(block: Plot, ctx: RenderContext, aspect: number): Scene {
     }
     si += 1; // cells-ok — a path index
   }
+  // **Normals come from the normalised geometry** (C12 I94, §6h row 1), which is
+  // why the triangles are built here with the extent in hand rather than by the
+  // renderer with the surface alone.
+  const tris: Tri3[] = [];
+  for (const sf of skins) {
+    tris.push(...trianglesOf(sf, extent, si));
+    si += 1; // cells-ok — a surface index
+  }
   return {
     drawn: out,
     strokes,
-    identities: [...clouds, ...paths],
+    tris,
+    identities: [...clouds, ...paths, ...skins],
     basis,
     lo: extent.min,
     hi: extent.max,
@@ -276,47 +301,6 @@ const RASTER_TIER: readonly (readonly [number, number])[] = Object.freeze([
   [1, 2], // mid
   [1, 1], // far
 ]);
-
-/**
- * A projected segment into the sample grid, depth-tested (C12 I90).
- *
- * **Stepped on the dominant screen axis**, so a shallow line inks one sample
- * per column and a steep one per row — the ordinary rule, and the reason a
- * segment never leaves gaps at either slope.
- *
- * `writeDepth` refuses an out-of-bounds sample, so a line running off the frame
- * clips per sample exactly as a near point's block does (C12 I88) rather than
- * being dropped at the segment.
- *
- * **Floored, not rounded, and it is the same defect F445 fixed one function
- * over** (F453). A rounded sample puts sample `i` over `[i − 0.5, i + 0.5)`
- * where every other writer in this file puts it over `[i, i + 1)`: the glyph
- * arm floors a point's coordinate and the raster arm's `round(fx − bw/2)` is
- * `floor(fx)` at the unit tier. Mixing the two conventions offsets a line from
- * its own vertices by up to a sample — so a trajectory drifts off the markers
- * it passes through, and the tie the draw order depends on never happens
- * because the two writers are never talking about the same cell.
- */
-function strokeSeg(
-  pa: Projected,
-  pb: Projected,
-  grid: Readonly<{ width: number; height: number }>,
-  depth: Depth,
-  paint: (i: number, t: number, z: number) => void,
-): void {
-  const x0 = pa.x * grid.width;
-  const y0 = pa.y * grid.height;
-  const x1 = pb.x * grid.width;
-  const y1 = pb.y * grid.height;
-  const steps = Math.max(1, Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)))); // cells-ok — a sample count
-  for (let i = 0; i <= steps; i += 1) { // cells-ok — a sample index
-    const t = i / steps; // cells-ok — a sample index
-    const px = Math.floor(x0 + (x1 - x0) * t); // cells-ok — a sample coordinate
-    const py = Math.floor(y0 + (y1 - y0) * t); // cells-ok — a sample coordinate
-    const z = pa.depth + (pb.depth - pa.depth) * t;
-    if (writeDepth(depth, px, py, z)) paint(py * grid.width + px, t, z); // cells-ok — a sample offset
-  }
-}
 
 /** The frame's marks, by the segment's dominant screen direction. */
 function frameMark(
@@ -550,6 +534,16 @@ export function scatter3dArea(
     reading(st.a.depth, st.va);
     reading(st.b.depth, st.vb);
   }
+  // **And the surfaces**, or a landscape under a cloud saturates one end of the
+  // map and the depth cue keys to a set the picture does not hold (C04 I79).
+  // Projected here rather than threaded back from `drawTri`, because a culled
+  // vertex has no depth and the span must not be told otherwise.
+  for (const t of scene.tris) {
+    for (const w of [t.a, t.b, t.c]) {
+      const pr = project(scene.basis, w.p);
+      if (pr !== null) reading(pr.depth, w.v);
+    }
+  }
   const span = { nearD, farD, loV, hiV };
 
   const depth = createDepth(grid.width, grid.height);
@@ -634,6 +628,28 @@ export function scatter3dArea(
       // neither, so a line index reaching it breaks the `% clouds` decode —
       // the cell is cleared rather than encoded.
       mark[i] = glyphMark;
+      glyph[i] = -1;
+    });
+  }
+
+  // **The surfaces go in after the marks and before the frame** (C12 I94,
+  // §6h row 11). Ties go to whoever drew first, so points and lines keep their
+  // cells against a surface they sit on — and a height field's boundary *is* the
+  // extent's boundary by construction, so a full-extent surface takes the box's
+  // coincident edges. That is F452's ruling arriving where the coincidence is
+  // structural rather than incidental.
+  const lit = lightDirOf(block.light3, scene.basis);
+  for (const t of scene.tris) {
+    drawTri(t, scene.basis, grid, depth, lit, span, (i, sm) => {
+      const base = colourOf(block, ctx, sm, scene.identities, span);
+      // **The shading scales the colour in linear light** (C12 I94, F455), and
+      // the intensity arrives already clamped, because the ratio that makes the
+      // field recoverable from hue holds over `[0, 1]` and nowhere else.
+      ink[i] = base === undefined ? undefined : shadeColour(base, sm.intensity);
+      // **The glyph arm's second channel** (§6h row 12): the colour carries the
+      // field and the mark carries the shading, which is F436's retracted claim
+      // holding on the arm that kept two carriers.
+      mark[i] = half ? undefined : densityGlyph(sm.intensity, ctx.capabilities);
       glyph[i] = -1;
     });
   }

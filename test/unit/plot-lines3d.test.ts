@@ -104,11 +104,13 @@ describe("plot — the polyline carrier", () => {
     }
     // **Neither carrier is the refusal, and this is the half that is the row**
     // (C12 §6g row 2). The member rule alone reads as correct and refuses a
-    // wireframe, which is a complete document.
+    // wireframe, which is a complete document. **The message names the carrier
+    // set** since C04 I79 — the third carrier is where the pair of hand-widened
+    // names became one constant, and `T2.4h` is where that is the row.
     expect(errorsOf({ kind: "plot", id: "s", form: "scatter3d", height: 4, series: [] }).join(" "))
-      .toMatch(/neither "points3" nor "lines3"/u);
+      .toMatch(/has none of "points3", "lines3", "surfaces3"/u);
     expect(() => b.plot({ form: "scatter3d", height: 4, series: [] } as never))
-      .toThrow(/neither "points3" nor "lines3"/u);
+      .toThrow(/has none of "points3", "lines3", "surfaces3"/u);
     for (const good of [
       { form: "scatter3d", height: 4, series: [], lines3: path },
       { form: "scatter3d", height: 4, series: [], points3: pts },

@@ -12,6 +12,11 @@ import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
 const FIELD = "src/presentation/plot/field.ts";
+// **`dimColour`'s traversal moved to `colormap.ts`** when `shadeColour` needed
+// the same one (C12 I94). The mutation below is re-anchored rather than
+// dropped: it is now a wider cut — both callers lose their 8-bit arm — and
+// LY8b still names the one this run is about.
+const CMAP = "src/presentation/theme/colormap.ts";
 const HEAT = "src/presentation/plot/heatmap.ts";
 // The marching-squares core, the levels and the layer membership moved above
 // both rasterisers with C12 I71 — the derivation is what both arms share.
@@ -173,9 +178,9 @@ const results = runPass({
       // argument — applied, ignored, silent, on every terminal between the
       // colour floor and true colour (C12 §3y).
       name: "the dim is applied only to an rgb colour, so 8-bit gets none",
-      file: FIELD,
-      from: '  if (colour.kind === "ansi256") {',
-      to: "  if (false) {",
+      file: CMAP,
+      from: '  if (colour.kind === "ansi256") {\n    const hex = ansi256Hex(colour.index);',
+      to: "  if (false) {\n    const hex = ansi256Hex(colour.index);",
       expect: "LY8b",
     },
     {

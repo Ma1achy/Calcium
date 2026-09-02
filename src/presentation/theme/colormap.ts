@@ -105,6 +105,68 @@ export function continuousColour(
  */
 export const CUBE_LEVELS = [0, 95, 135, 175, 215, 255] as const;
 
+/**
+ * A colour with every channel remapped, **in whatever encoding it arrived in**.
+ *
+ * The traversal `dimColour` had and `shadeColour` would otherwise have copied:
+ * parse the hex, map the three channels, and put an `ansi256` back through the
+ * cube it came from. Two copies of it are two places for the 8-bit arm to stop
+ * agreeing, which is the defect `dimColour`'s own comment records.
+ *
+ * **0–15 are returned unchanged**, because those are the terminal's own palette
+ * and have no value we can read — there is nothing to scale.
+ */
+export function overChannels(colour: ColourValue, f: (c: number) => number): ColourValue {
+  const map = (hex: string): string => {
+    const n = (i: number): number => {
+      const v = f(parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16) / 255);
+      return Math.max(0, Math.min(255, Math.round(v * 255)));
+    };
+    return `#${[0, 1, 2].map((i) => hex2(n(i))).join("")}`;
+  };
+  if (colour.kind === "rgb") return { kind: "rgb", hex: map(colour.hex) };
+  if (colour.kind === "ansi256") {
+    const hex = ansi256Hex(colour.index);
+    return hex === null ? colour : { kind: "ansi256", index: nearestAnsi256(map(hex)) };
+  }
+  return colour;
+}
+
+/** The sRGB transfer function, both directions. */
+const toLinear = (c: number): number =>
+  c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+const toSrgb = (c: number): number =>
+  c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+
+/**
+ * A colour under an illumination of `intensity`, **scaled in linear light**
+ * (C12 I94, FINDINGS F455).
+ *
+ * **Linear and not encoded, for two independent reasons.** Light is linear, so
+ * a face at 20% illumination should carry 20% of the luminance — scaling the
+ * *encoded* value by 0.2 gives about 2.9% of it, which turns the ambient floor
+ * back into the hole it exists to prevent. And scaling in linear light is
+ * exactly *hold chromaticity, change luminance*, which is what makes the field
+ * recoverable from hue under the shading: 0.0330 rad of drift on viridis
+ * against a 0.1292 rad step between adjacent field values, 3.9× (F455).
+ *
+ * **That ratio holds over `[0, 1]` and nowhere else**, which is why the
+ * intensity is clamped before it arrives here rather than after: past 1 a
+ * channel clips, a clipped channel rotates hue, and viridis's ratio falls to
+ * 0.01× (F457). The clamp in `overChannels` is the last guard and not the rule.
+ *
+ * **Per map rather than per rung.** The field survives the shading exactly when
+ * the map travels in hue, and three of the six shipped maps do not — magma,
+ * inferno and coolwarm invert the ratio, and `gray` has no chroma to carry
+ * anything. That is a consequence of the caller's `colormap` and not a branch
+ * here (F455).
+ */
+export function shadeColour(colour: ColourValue, intensity: number): ColourValue {
+  const k = intensity < 0 ? 0 : intensity > 1 ? 1 : intensity;
+  if (k === 1) return colour;
+  return overChannels(colour, (c) => toSrgb(toLinear(c) * k));
+}
+
 /** The nearest cube index to a hex colour — the greyscale ramp is not searched. */
 export function nearestAnsi256(hex: string): number {
   const at = (i: number): number => {

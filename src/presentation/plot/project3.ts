@@ -1,6 +1,13 @@
 /**
- * The 3D pipeline's first three stages — normalise, project, cull — and the
- * depth buffer beside them (C12 §3al, C12 I84, C12 I86).
+ * The 3D pipeline's first three stages — normalise, project, cull — the depth
+ * buffer beside them, and the depth-tested segment walk that is its only
+ * non-trivial caller (C12 §3al, C12 I84, C12 I86, C12 I93).
+ *
+ * **`strokeSeg` lives here rather than in one renderer** because it has three:
+ * the axis lines, the polyline carrier, and the surface's degenerate arm, which
+ * strokes a triangle too thin to fill (C12 I94). A second copy of the stepping
+ * loop is a second place for the floor convention to drift, which is exactly
+ * the defect F453 was.
  *
  * **The cull is on view `z` and it happens before the divide**, which is the
  * whole reason these live in one file. Four of the five degenerate cases are
@@ -103,18 +110,27 @@ export type Basis = Readonly<{
   orthographic: boolean;
 }>;
 
-const sub = (a: Vec3, b: Vec3): Vec3 => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z });
-const dot = (a: Vec3, b: Vec3): number => a.x * b.x + a.y * b.y + a.z * b.z;
-const cross = (a: Vec3, b: Vec3): Vec3 => ({
+export const sub = (a: Vec3, b: Vec3): Vec3 => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z });
+export const dot = (a: Vec3, b: Vec3): number => a.x * b.x + a.y * b.y + a.z * b.z;
+export const cross = (a: Vec3, b: Vec3): Vec3 => ({
   x: a.y * b.z - a.z * b.y,
   y: a.z * b.x - a.x * b.z,
   z: a.x * b.y - a.y * b.x,
 });
-const unit = (a: Vec3): Vec3 => {
+/**
+ * A vector normalised, **and a zero-length one comes back unchanged rather than
+ * as `NaN`** — which is `axis`'s rule one dimension up: the caller that produced
+ * it is degenerate and the picture it draws is empty, not corrupt.
+ *
+ * **This is the whole of the surface's *undefined normal* case** (C12 I94,
+ * F456). The design note's remedy — *refuse the face rather than dividing by
+ * its length* — names a divide that has never been in this pipeline: a face
+ * whose cross product is the zero vector gets the zero vector back, `dot(0, l)`
+ * is `0`, and it shades at ambient. Refusing it would contradict I86, which
+ * already draws a collapsed set rather than dropping it.
+ */
+export const unit = (a: Vec3): Vec3 => {
   const n = Math.hypot(a.x, a.y, a.z);
-  // **A zero-length vector normalises to itself rather than to `NaN`**, which is
-  // `axis`'s rule one dimension up: the caller that produced it is degenerate
-  // and the picture it draws is empty, not corrupt.
   return n === 0 ? a : { x: a.x / n, y: a.y / n, z: a.z / n };
 };
 
@@ -160,6 +176,22 @@ export function basisOf(camera: Partial<Camera> | undefined, aspect: number): Ba
 
 /** A sample on the screen, in `[0, 1]²`, with its view depth. */
 export type Projected = Readonly<{ x: number; y: number; depth: number }>;
+
+/**
+ * A **direction** into the camera's frame (C12 I94).
+ *
+ * Not a point: no eye is subtracted, so this rotates rather than transforms —
+ * which is what a normal needs. `z` is along `forward`, so a normal pointing
+ * back at the reader has a **negative** `z`, and that sign is what the
+ * two-sided flip reads.
+ *
+ * **The flip reads this and never the screen winding.** A degenerate triangle's
+ * screen area is a *signed* zero — `1/area` measures `−Infinity` — so a winding
+ * test answers from a sign nobody set (F456).
+ */
+export function viewDir(basis: Basis, v: Vec3): Vec3 {
+  return { x: dot(v, basis.right), y: dot(v, basis.up), z: dot(v, basis.forward) };
+}
 
 /**
  * World to screen, **culled before the divide** (C12 I86).
@@ -234,4 +266,45 @@ export function writeDepth(d: Depth, x: number, y: number, z: number): boolean {
   if (!(q < (d.z[i] as number))) return false;
   d.z[i] = q;
   return true;
+}
+
+/**
+ * A projected segment into the sample grid, depth-tested (C12 I90).
+ *
+ * **Stepped on the dominant screen axis**, so a shallow line inks one sample
+ * per column and a steep one per row — the ordinary rule, and the reason a
+ * segment never leaves gaps at either slope.
+ *
+ * `writeDepth` refuses an out-of-bounds sample, so a line running off the frame
+ * clips per sample exactly as a near point's block does (C12 I88) rather than
+ * being dropped at the segment.
+ *
+ * **Floored, not rounded, and it is the same defect F445 fixed one function
+ * over** (F453). A rounded sample puts sample `i` over `[i − 0.5, i + 0.5)`
+ * where every other writer in this file puts it over `[i, i + 1)`: the glyph
+ * arm floors a point's coordinate and the raster arm's `round(fx − bw/2)` is
+ * `floor(fx)` at the unit tier. Mixing the two conventions offsets a line from
+ * its own vertices by up to a sample — so a trajectory drifts off the markers
+ * it passes through, and the tie the draw order depends on never happens
+ * because the two writers are never talking about the same cell.
+ */
+export function strokeSeg(
+  pa: Projected,
+  pb: Projected,
+  grid: Readonly<{ width: number; height: number }>,
+  depth: Depth,
+  paint: (i: number, t: number, z: number) => void,
+): void {
+  const x0 = pa.x * grid.width;
+  const y0 = pa.y * grid.height;
+  const x1 = pb.x * grid.width;
+  const y1 = pb.y * grid.height;
+  const steps = Math.max(1, Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)))); // cells-ok — a sample count
+  for (let i = 0; i <= steps; i += 1) { // cells-ok — a sample index
+    const t = i / steps; // cells-ok — a sample index
+    const px = Math.floor(x0 + (x1 - x0) * t); // cells-ok — a sample coordinate
+    const py = Math.floor(y0 + (y1 - y0) * t); // cells-ok — a sample coordinate
+    const z = pa.depth + (pb.depth - pa.depth) * t;
+    if (writeDepth(depth, px, py, z)) paint(py * grid.width + px, t, z); // cells-ok — a sample offset
+  }
 }
