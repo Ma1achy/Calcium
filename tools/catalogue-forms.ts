@@ -377,6 +377,38 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
                  z: Math.exp(-((1.8 * (1 - t / 4)) ** 2)) + 0.04 };
       }) }],
     },
+    // C12 I95, §6i rows 9 and 13 — **the wireframe over its own fill**. The
+    // edge is the fill's own sample rather than a stroke over it, so nothing
+    // z-fights and the grid lines are the caller's own, not the triangulation's
+    // diagonals (F462). The grid is coarse on purpose: a wireframe needs about
+    // six samples a cell to read, and a 28 × 28 grid at a catalogue width
+    // leaves 1% interior — the wireframe *is* the surface.
+    "surface-wire": {
+      form: "scatter3d", height: 14, series: [], colormap: "viridis",
+      surfaces3: [{
+        heights: field3(9, (x, y) => Math.exp(-(x * x + y * y))),
+        xRange: [-2, 2], yRange: [-2, 2], wireframe: "over",
+      }],
+    },
+    // C12 I95, §6i row 11 — **edges alone, and it still occludes.** The face
+    // writes depth and paints nothing but its edges, so the far side of the
+    // fold is hidden: hidden-line rather than see-through, because a committed
+    // frame cannot be orbited.
+    "surface-cage": {
+      form: "scatter3d", height: 14, series: [], colormap: "viridis",
+      surfaces3: [{
+        heights: field3(9, (x, y) => Math.exp(-(x * x + y * y))),
+        xRange: [-2, 2], yRange: [-2, 2], wireframe: true,
+      }],
+    },
+    // **`closed` has no variant here and that is the measurement** (F461). A
+    // closed mesh's culled frame is byte-identical to its unculled one in all
+    // four modes — solid, `wireframe: true`, `wireframe: "over"` and
+    // `shading: "flat"` — because the cull removes exactly the faces the depth
+    // buffer would have refused. It is a **cost** decision and not a picture
+    // one, so a catalogue entry for it would collide with `surface-smooth` and
+    // record a defect that is not one. WF1–WF3 and WF9 carry the member; this
+    // corpus is where a frame differs.
     // **The bare picture** — no frame at all, which is the render step 3 shipped
     // and the comparison every axis row is against.
     "axes-none": {

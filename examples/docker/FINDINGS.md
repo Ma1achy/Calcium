@@ -21230,6 +21230,16 @@ back.
 back hemisphere lights correctly and the frame is a plausible hollow shell rather than a bug.
 Nothing in the picture says which.
 
+**And nothing in *any* picture could.** Measured after the build: a closed mesh's culled frame is
+**byte-identical** to its unculled one — solid, `wireframe: true`, `wireframe: "over"` and
+`shading: "flat"`, all four — because the cull removes exactly the faces the depth buffer would
+have refused. Backface culling on a closed surface is a **cost** decision, not a picture one, and
+that is what puts this finding out of reach of every frame-shaped instrument the repo has. (At a
+large enough figure it is *nearly* rather than exactly identical: 6 cells of 306 at 140 × 30, all
+at the silhouette, where a back face takes a sample the front hemisphere does not cover.) It also
+means the member earns no catalogue variant: an entry for it would collide with `surface-smooth`
+and the collision sweep would report a defect that is not one.
+
 **So `closed: true` does two things, and the second is the one to state.** It enables culling,
 and it *licenses the renderer to orient the cull from the mesh's own signed volume* rather than
 from the caller's winding — `Σ dot(a, cross(b, c)) / 6`, one pass. Measured: the natural and the
@@ -21332,3 +21342,85 @@ measured on the one input shape where a different mechanism produces the same nu
 carried forward as a general property. *Ask where a settled claim is written down* reached it, and
 the answer was **a previous turn's probe** — the weakest form of record, which reads like one of
 the strongest because it arrives with a figure.
+
+---
+
+## F464 — the invariant said *mask* and the row said *frame*, and they are not one claim ★★★★☆
+
+C12 I95 was written from the walk: *oriented from the volume, the natural and reversed spheres
+give byte-identical masks*. The test row derived from it said **frames**. Measured, the invariant
+is exactly right and the row is false:
+
+```
+kept-face set            576 of 576 identical
+drawn sample mask        0 of 8960 samples differ
+frame, shading "flat"    0 of 300 inked cells differ
+frame, shading "smooth"  6 of 300 inked cells differ
+```
+
+**And the first metric was wrong in the safe direction, which is how it survived.** Those figures
+began as character positions in the ANSI string, where **one differing cell early in a line shifts
+every SGR sequence after it**: the same six-cell difference read as *71.3% of 11315 characters*,
+and a genuinely tiny one read as 0.058%. Both are unusable and only the large one looks it. Aligned
+row by row and compared cell against cell, the picture is the one above. An instrument that reports
+a plausible small number is not thereby working.
+
+**The residue is the rasteriser's tie and not the cull's.** A sample lying exactly on the edge two
+triangles share is claimed by whichever one rounds its barycentric weight non-negative; the two
+windings compute that weight from different operands — `2·area(a, c, p)` about `a` where the other
+computes `2·area(c, a, p)` about `c` — so the sign at a hairline can differ. Both answers are
+correct coverage. What differs is *which* face's normal the sample interpolates, and adjacent faces
+on a coarse sphere are several degrees apart: worst intensity gap **6.5e-3**, against **1.2e-15**
+under `"flat"`, where the three vertices share one normal and there is nothing to disagree about.
+Measured over the frame, 298 of 641 drawn samples differ under smooth and 286 of 641 under flat —
+the *count* is the same class of noise either way and only the magnitude separates them, which is
+why a count of differing samples says nothing and the intensity gap says everything.
+This renderer has no fill rule and giving it one would move every golden frame; the honest move is
+to state the mask.
+
+**And the fix written first was for a mechanism that cannot fire.** The obvious suspect was the
+two-sided flip: reversing a winding negates every normal **exactly** — measured, 1728 of 1728
+vertex normals and every face normal — so at `raw.z === 0` the two windings pick *opposite*
+representatives. A lexicographic fall-through to `x` then `y` was written, verified correct by
+hand for all five cases, and **changed nothing**. The value is unreachable: the plane `x = 0` from
+a camera inside it gives a view-space `z` of **`6.123e-17`**, which is `Math.cos(π/2)`, and no
+camera produces the exact zero. It was reverted.
+
+**A third measurement fell out on the way, and it is about `closed` rather than about winding.**
+Culling a convex closed mesh is *nearly* invisible rather than invisible: **6 cells of 306**, all at
+the silhouette, where a back face otherwise takes a sample the front hemisphere does not cover. The
+claim to make is a bound, not an equality — and it is the strongest form of the argument for the
+orientation ruling, because it says a frame cannot report which hemisphere drew.
+
+**Two lessons and they point the same way.** A claim that survives being copied between two
+artefacts can change meaning in one word — *mask* and *frame* differ by everything a colour
+quantisation does — and the copy is where it happens, because the invariant is re-read and the row
+is written fresh. And a fix that changes nothing is a finding about the diagnosis: the mutation
+pass asks that of a test, and it is the same question to ask of a repair.
+
+---
+
+## F465 — a threshold in samples is not asserted by any count of samples ★★★☆☆
+
+`EDGE_HALF = 0.7` says *a sample is on the edge below 0.7 of one sample away from it*. Widening it
+to **3** — a band four times as wide — survived every assertion in the row that owns it:
+
+```
+the grid marks fewer samples than every triangle edge   still true
+the grid leaves interior for the cells to show in       still true
+both arms draw the same total                           still true
+with `wireframe` unset nothing is an edge               still true
+```
+
+**Because the fixture's cells are fifteen samples across.** A six-sample band still leaves an
+interior, and every relation the row asserts is between two masks that widen *together*. The
+quantity the constant is about — the band's **width** — appears in none of them.
+
+**A ratio against the geometry is what states it.** One large triangle, all three edges marked:
+edge samples divided by the projected perimeter is the band's width in samples, measured **0.916**
+at 0.7 and about four times that at 3. Resolution-independent, mesh-independent, and it fails the
+mutation immediately.
+
+**The general form is the one worth keeping**: a constant expressed in units of X is not tested by
+counting Xs, because a count scales with the fixture and the constant does not. Ask what the
+constant is a *ratio* of, and assert that.

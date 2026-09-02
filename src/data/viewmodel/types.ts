@@ -675,9 +675,13 @@ export type Line3 = Readonly<{
  * **`shading` defaults to `"smooth"`**, because a sphere with face normals
  * reads as a geodesic dome. `"flat"` is the honest reading of a faceted mesh.
  *
- * **`closed` and `wireframe` are not here.** They arrive with the backface
- * culling and the depth bias that read them; a member accepted and ignored
- * tells the caller nothing, which is the same rule `origin3` is refused by.
+ * **`closed` is the mesh arm's and `wireframe` is both arms'** (C04 I80). The
+ * first enables backface culling and is refused on a height field, because the
+ * renderer cannot tell an open surface from a closed one: an open surface's
+ * signed volume is **not** zero — a 9×9 Gaussian measures `0.1742` — and the
+ * zero the opposite premise rested on belongs to `unitOf` centring a *planar*
+ * patch on its own extent (F463). The second is about the edges the input
+ * already has, and a height field has the most structured ones.
  */
 export type Surface3 = Readonly<{
   /** A height field's grid: `heights[j][i]` is `z` at row `j`, column `i`. */
@@ -694,6 +698,38 @@ export type Surface3 = Readonly<{
   field?: readonly (readonly number[])[];
   /** Face normals or vertex normals. Defaults to `"smooth"`. */
   shading?: "flat" | "smooth";
+  /**
+   * Mesh arm only: the surface encloses a volume, so faces turned away may be
+   * dropped (C04 I80, C12 I95).
+   *
+   * **It licenses a correction as well as the cull**, which is the half a
+   * one-line description loses: the renderer orients the cull from the mesh's
+   * own **signed volume** rather than from the winding, because the obvious UV
+   * sphere — rings by segments, two triangles a quad in grid order — measures
+   * `−4.16` and is wound *inward*. Trusting it culls the front and draws the
+   * back, which two-sided shading then lights correctly, so the frame is a
+   * plausible hollow shell rather than a bug (F461).
+   *
+   * **What it does not promise is a correct picture from an inconsistently
+   * wound mesh**, and the sensitivity there is inverted relative to the damage:
+   * a systematically half-reversed mesh cancels its own volume to `1e-15` and
+   * is drawn **uncalled**, while one face in eight reversed leaves a confident
+   * sign and gets about 32 faces of 2304 wrong in silence.
+   */
+  closed?: boolean;
+  /**
+   * Draw the caller's own edges: `true` for edges alone, `"over"` for edges
+   * over the shaded fill (C04 I80, C12 I95).
+   *
+   * **`true` still occludes.** The face writes depth and paints nothing but its
+   * edges, so a cage hides what is behind it — hidden-line rather than
+   * see-through, because a committed frame cannot be orbited.
+   *
+   * **The edges are the input's and not the triangulation's**: a height field's
+   * grid lines, where the diagonal each cell is split on is not an edge, and a
+   * mesh's triangles, which are all the structure a mesh has.
+   */
+  wireframe?: boolean | "over";
   label?: string;
   tone?: Tone;
 }>;

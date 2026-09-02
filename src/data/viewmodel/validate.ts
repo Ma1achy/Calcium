@@ -1604,6 +1604,29 @@ function walkSurfaces3(
       );
       continue;
     }
+    // **`closed` is the mesh arm's, and the refusal is here because the
+    // renderer cannot take it** (C04 I80, F463). An open surface's signed
+    // volume is not zero — a 9×9 Gaussian measures `0.1742` — so `|V| < ε`
+    // cannot stand in for *is this closed*, and the zero the opposite premise
+    // rested on belongs to `unitOf`: it centres each axis on the extent, so
+    // every **planar** surface normalises onto a plane through the origin and
+    // cancels. Three fixtures returned zero for that reason and read as
+    // corroboration.
+    //
+    // **`wireframe` is not refused here and the pair is deliberate** (§6i row
+    // 15). It is about the edges the input already has and a grid has the most
+    // structured ones; copying one member's refusal onto the other because they
+    // arrived together is the bundled-row mistake with a member in place of a
+    // blocker.
+    if (grid && sf["closed"] !== undefined) {
+      e.push(
+        `${where} has "closed" on a height field (C04 I80) — it enables backface culling, ` +
+          `which needs a surface with an inside; a grid has none, and the renderer cannot ` +
+          `tell an open surface from a closed one because an open one's signed volume is ` +
+          `not zero`,
+      );
+      continue;
+    }
     if (grid) walkHeights3(heights as readonly unknown[], sf, by, where, e);
     else walkMesh3(verts as readonly unknown[], sf, by, where, e);
   }

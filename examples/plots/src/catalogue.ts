@@ -189,6 +189,30 @@ export const CATALOGUE: Readonly<Record<PlotForm, Entry>> = Object.freeze({
         return { x: Math.cos(t), y: Math.sin(t), z: (i / 119) * 2 - 1, value: t };
       }),
     }],
+    // **The surface the helix runs through, as a wireframe** (C04 I79, I80).
+    // Solid it would swallow the cloud the entry is about — `writeDepth` is
+    // strictly nearer and a bowl through the middle of a helix hides half of
+    // it — so the cage is the reading that lets a composed figure stay legible,
+    // and it is the mode worth showing: the edge is the fill's own sample, so
+    // the grid lines are the caller's own and nothing z-fights (C12 I95).
+    //
+    // **Coarse on purpose.** A wireframe needs about six samples a cell to
+    // read; at this width a 9 × 9 grid leaves interior and a 28 × 28 one draws
+    // solid. `light3` is named here because the shading is the picture on this
+    // rung and `"headlight"` is the one arm with no terminator — it says the
+    // member exists and what choosing it costs.
+    surfaces3: [{
+      label: "bowl",
+      heights: Array.from({ length: 9 }, (_v, j) => Array.from({ length: 9 }, (_w, i) => {
+        const u = (i / 4) - 1;
+        const v = (j / 4) - 1;
+        return (u * u + v * v) - 1.2;
+      })),
+      xRange: [-1.4, 1.4] as [number, number],
+      yRange: [-1.4, 1.4] as [number, number],
+      wireframe: true as const,
+    }],
+    light3: "studio" as const,
     ...x }) },
   sparkline: { says: "a shape, no furniture", at: (p, h, x) => plot("sparkline", Math.min(h, 1), {
     series: [s(wave(40, p, 5, 6, 10))], ...x }) },

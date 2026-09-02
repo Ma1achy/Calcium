@@ -852,25 +852,31 @@ describe("AD — the two arms decide separately, and here is where", () => {
     const t = collisionsIn(new Map([...corpus].map(([k, f]) => [k, f.t])));
     const s = collisionsIn(new Map([...corpus].map(([k, f]) => [k, f.s])));
 
-    // **207, and nineteen are `scatter3d`'s** — one per variant, and the count
+    // **209, and twenty-one are `scatter3d`'s** — one per variant, and the count
     // moves with the catalogue rather than being pinned to a number nobody can
     // re-derive. Twelve after the polyline carrier brought `trajectory`,
     // `wireframe` and `lines-series` (C04 I78); nineteen after the surface
-    // brought seven more (C04 I79).
-    expect(corpus.size, "variants in the corpus").toBe(207); // cells-ok — a variant count
-    // **200, seven up on 193** — every one of `scatter3d`'s nineteen variants
+    // brought seven more (C04 I79); twenty-one after the wireframe brought
+    // `surface-wire` and `surface-cage` (C04 I80). **`closed` brought none, and
+    // that is a measurement rather than an omission**: a culled frame is
+    // byte-identical to its unculled one in all four modes, so the variant
+    // would have collided here and this sweep would have reported it (F461).
+    expect(corpus.size, "variants in the corpus").toBe(209); // cells-ok — a variant count
+    // **202, nine up on 193** — every one of `scatter3d`'s twenty-one variants
     // draws a distinct frame, so none of them collides with another and none
     // with each other. **The seven surfaces separating is the row's content
     // here**: `surface` and `saddle` are different geometry, `surface-field`
     // differs from `surface` only in the *field*, and `surface-smooth` from
     // `surface-flat` only in the normals — three pairs that a coarser
-    // comparison would fold together. That is the sweep saying the variants are
-    // variants:
+    // comparison would fold together. **And two more with the wireframe**:
+    // `surface-wire` and `surface-cage` differ from `surface` and from each
+    // other, which is the mask and the interior's clearing each showing up.
+    // That is the sweep saying the variants are variants:
     // `default` and `colour-value` differ only in *colour*, and this instrument
     // compares the painted row rather than the stripped one, which is why they
     // separate here and would not in a text corpus (SC11's point, from the
     // other side).
-    expect(t.distinct, "distinct terminal frames").toBe(200); // cells-ok — a frame count
+    expect(t.distinct, "distinct terminal frames").toBe(202); // cells-ok — a frame count
     // **134 -> 148**: the density family draws, so nineteen violin variants and
     // one ridgeline stop colliding in the single refusal group (F383).
     // **153, and the addition is a *collision*** — `scatter3d`'s variants all

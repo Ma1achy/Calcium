@@ -1,5 +1,6 @@
 /**
- * SF1–SF8 and T2.4h/T3.57/T3.58 — the surface carrier (C12 I94, C04 I79, §6h).
+ * SF1–SF8, WF1–WF9 and T2.4h/T3.57–T3.60 — the surface carrier and its cull
+ * (C12 I94, C12 I95, C04 I79, C04 I80, §6h, §6i).
  *
  * **The rows are indexed by §6h's table**, and the two the design note said to
  * write first are SF1 and SF2 — which are the *same* case in the note and two
@@ -13,10 +14,11 @@ import { describe, expect, it } from "vitest";
 import { validateBlock } from "../../src/data/viewmodel/index.js";
 import { b } from "../../src/shell/builders/index.js";
 import {
-  basisOf, createDepth, extentOf, viewDir, type Vec3,
+  basisOf, createDepth, extentOf, project, viewDir, type Vec3,
 } from "../../src/presentation/plot/project3.js";
 import {
-  densityGlyph, drawTri, lightDirOf, shade, surfacePoints, trianglesOf,
+  backfaceCulled, densityGlyph, drawTri, edgeIntensity, lightDirOf, shade,
+  surfacePoints, trianglesOf, type Tri3,
 } from "../../src/presentation/plot/surface3.js";
 import { ladderFor } from "../../src/presentation/plot/ramp.js";
 import { defaultTheme, loadTheme } from "../../src/presentation/theme/index.js";
@@ -171,6 +173,36 @@ const cross3 = (a: Vec3, b: Vec3): Vec3 => ({
 const norm3 = (a: Vec3): Vec3 => {
   const n = Math.hypot(a.x, a.y, a.z);
   return n === 0 ? a : { x: a.x / n, y: a.y / n, z: a.z / n };
+};
+
+/**
+ * The raw sample mask of one surface — **edge samples against interior ones**,
+ * read off `drawTri` rather than off a frame.
+ *
+ * The half-block arm folds two samples into a cell and keeps one colour, so a
+ * frame cannot say how many samples were edges. This is the quantity §6i row 9
+ * is about, and 150 × 90 is wide enough for a cell to have an interior at all —
+ * at 62 × 14 a 9 × 9 grid leaves **1%**, and the wireframe is the surface.
+ */
+const maskOf = (s: unknown): { edge: number; fill: number } => {
+  const grid = { width: 150, height: 90 };
+  const basis = basisOf({}, grid.width / grid.height);
+  const surf = s as Parameters<typeof trianglesOf>[0];
+  const tris = trianglesOf(surf, extentOf(surfacePoints(surf)), 0);
+  const depth = createDepth(grid.width, grid.height);
+  const kind = new Int8Array(grid.width * grid.height).fill(-1); // cells-ok — a sample count
+  for (const t of tris) {
+    drawTri(t, basis, grid, depth, lightDirOf(undefined, basis), { nearD: 4, farD: 8 }, (i, sm) => {
+      kind[i] = sm.edge ? 1 : 0;
+    });
+  }
+  let edge = 0;
+  let fill = 0;
+  for (const k of kind) { // cells-ok — a sample count
+    if (k === 1) edge += 1; // cells-ok — a sample count
+    if (k === 0) fill += 1; // cells-ok — a sample count
+  }
+  return { edge, fill };
 };
 
 const gaussian = (n: number): number[][] =>
@@ -550,10 +582,16 @@ describe("plot — the surface carrier", () => {
       (p.x - basis.eye.x) * basis.forward.x + (p.y - basis.eye.y) * basis.forward.y
       + (p.z - basis.eye.z) * basis.forward.z;
     const vert = (p: Vec3) => ({ p, n: { x: 0, y: 0, z: 1 }, v: undefined });
+    const plain = {
+      fn: { x: 0, y: 0, z: 1 },
+      edges: [true, true, true] as const,
+      series: 0,
+      skin: { cull: 0, wire: false } as const,
+    };
     // One corner behind the eye and two in front, at the default `distance: 1`.
     const straddle = {
       a: vert({ x: -1, y: -1, z: 0 }), b: vert({ x: 1, y: 1, z: 0 }), c: vert({ x: 1, y: -1, z: 0 }),
-      series: 0,
+      ...plain,
     };
     expect(
       [straddle.a, straddle.b, straddle.c].filter((w) => zOf(w.p) <= 0.01).length,
@@ -575,12 +613,362 @@ describe("plot — the surface carrier", () => {
     // Past the eye along `+x`, where the camera sits at `distance: 1`.
     const away = {
       a: vert({ x: 2, y: -1, z: 0 }), b: vert({ x: 3, y: 1, z: 0 }), c: vert({ x: 3, y: -1, z: 1 }),
-      series: 0,
+      ...plain,
     };
     expect(
       [away.a, away.b, away.c].every((w) => zOf(w.p) <= 0.01),
       "the control is entirely behind the near plane",
     ).toBe(true);
     expect(painted(away), "a face entirely behind draws nothing").toBe(0);
+  });
+
+  // ---- step 7: the cull and the wireframe (C12 I95, C04 I80, §6i) ----------
+
+  it("WF1 (C12 I95, §6i rows 1–2): the cull's direction is the face's, and the constant cannot see the eye", () => {
+    const s = { ...sphere(48, 24), closed: true };
+    const tris = trianglesOf(s, extentOf(surfacePoints(s)), 0);
+    // **The rejected alternative, computed here** — the design note's
+    // `dot(normal, view) < 0` with `view` a view-space constant. Comparing the
+    // shipped rule against a restatement of itself finds nothing (F459).
+    //
+    // **Both are oriented by the volume**, or the comparison measures §6i row
+    // 3's ruling instead of row 1's and reports 92.7% at every distance. This
+    // row is about the *direction* alone, so the sign is held fixed.
+    const byConstant = (t: Tri3, basis: ReturnType<typeof basisOf>): boolean =>
+      viewDir(basis, t.fn).z * t.skin.cull > 0;
+    const at = (distance: number): { dis: number; kept: number; keptConst: number } => {
+      const basis = basisOf({ distance }, 2);
+      let dis = 0;
+      let kept = 0;
+      let keptConst = 0;
+      for (const t of tris) {
+        const ship = backfaceCulled(t, basis);
+        const con = byConstant(t, basis);
+        if (!ship) kept += 1; // cells-ok — a face count
+        if (!con) keptConst += 1; // cells-ok — a face count
+        if (ship !== con) dis += 1; // cells-ok — a face count
+      }
+      return { dis, kept, keptConst };
+    };
+    const near = at(1.5);
+    const far = at(6);
+    const pct = (n: number): number => (n / tris.length) * 100; // cells-ok — a face count
+    expect(pct(far.dis), "at distance 6 the two answers are close").toBeLessThan(10);
+    expect(pct(near.dis), "at 1.5 a third of the faces are wrong").toBeGreaterThan(30);
+    // **The half that says what is wrong with the constant, and it is not the
+    // disagreement**: a view-space `z` test cannot read the eye's position, so
+    // it returns the same count at every distance while the truth halves.
+    expect(far.keptConst, "the constant answers identically at both distances").toBe(near.keptConst);
+    expect(far.kept, "and the shipped rule does not").not.toBe(near.kept);
+    // And *removes ~half* is the `d → ∞` limit. 44.5% by face count at distance
+    // 6, against the 41.7% by area that `(1 − r/d)/2` gives — a UV sphere's
+    // polar faces are slivers, so the two figures are not the same measurement.
+    expect(pct(far.kept)).toBeGreaterThan(43);
+    expect(pct(far.kept)).toBeLessThan(46);
+  });
+
+  it("WF2 (C12 I95, §6i rows 3–4): reversing the winding keeps the same faces and inks the same samples", () => {
+    const natural = { ...sphere(24, 12), closed: true };
+    const reversed = {
+      ...natural,
+      faces: natural.faces.map(([x, y, z]) => [x, z, y] as [number, number, number]),
+    };
+    const ext = extentOf(surfacePoints(natural));
+    const ta = trianglesOf(natural, ext, 0);
+    const tb = trianglesOf(reversed, ext, 0);
+    const basis = basisOf({}, 2);
+    const keep = (tris: readonly Tri3[]): boolean[] => tris.map((t) => !backfaceCulled(t, basis));
+    const ka = keep(ta);
+    const kb = keep(tb);
+    expect(ka, "the two windings keep the same faces").toEqual(kb);
+    expect(ka.filter(Boolean).length, "and culling actually happened").toBeLessThan(ka.length * 0.5);
+    // **The control is the cull that trusts the winding**, computed here. It is
+    // the whole content of the ruling, and it disagrees almost everywhere —
+    // which is why the frame is no help: two-sided shading lights the far
+    // hemisphere correctly and a sphere's silhouette is the same either way.
+    const naive = ta.map((t) => {
+      const c = {
+        x: (t.a.p.x + t.b.p.x + t.c.p.x) / 3,
+        y: (t.a.p.y + t.b.p.y + t.c.p.y) / 3,
+        z: (t.a.p.z + t.b.p.z + t.c.p.z) / 3,
+      };
+      return !(t.fn.x * (c.x - basis.eye.x) + t.fn.y * (c.y - basis.eye.y)
+        + t.fn.z * (c.z - basis.eye.z) > 0);
+    });
+    const agree = naive.filter((v, i) => v === ka[i]).length; // cells-ok — a face count
+    expect(agree / ka.length, "trusting the winding draws the other hemisphere").toBeLessThan(0.15);
+    // **The drawn sample mask, which is the claim I95 makes** — and asserting
+    // the *frame* instead is F464: two of 3449 characters differ under
+    // `smooth`, because a sample lying exactly on a shared edge goes to
+    // whichever triangle rounds its barycentric weight non-negative and the two
+    // windings compute that weight from different operands. That is the
+    // rasteriser's tie, not the cull's, and this renderer has no fill rule.
+    const drawnBy = (tris: readonly Tri3[]): string => {
+      const grid = { width: 140, height: 64 };
+      const bs = basisOf({}, grid.width / grid.height);
+      const d = createDepth(grid.width, grid.height);
+      const m = new Uint8Array(grid.width * grid.height); // cells-ok — a sample count
+      for (const t of tris) {
+        drawTri(t, bs, grid, d, lightDirOf(undefined, bs), { nearD: 5, farD: 7 }, (i) => { m[i] = 1; });
+      }
+      return m.join("");
+    };
+    expect(drawnBy(ta), "the two windings ink exactly the same samples").toBe(drawnBy(tb));
+    // **The frame, compared cell by cell rather than by string position** —
+    // one differing cell early in a line shifts every SGR after it, and the
+    // first version of this row reported 71% for a six-cell difference. Aligned
+    // at 140 × 30: `flat` is identical under the two windings (0 of 300), and
+    // `smooth` differs in 6 of 300 from the rasteriser's shared-edge tie.
+    const at = (sf: unknown, shading: string): (string | null)[][] =>
+      frame(bare({ surfaces3: [{ ...(sf as object), shading }], height: 30 }),
+        capsFor("24bit"), 140, "wf2").map((line) => {
+        const row: (string | null)[] = [];
+        for (const run of runsOf(line)) for (const ch of [...run.text]) row.push(ch === " " ? null : run.colour);
+        return row;
+      });
+    const apart = (x: (string | null)[][], y: (string | null)[][]): [number, number] => {
+      let d = 0; // cells-ok — a cell count
+      let ink = 0; // cells-ok — a cell count
+      for (let r = 0; r < Math.max(x.length, y.length); r += 1) { // cells-ok — a row index
+        const rx = x[r] ?? [];
+        const ry = y[r] ?? [];
+        for (let c = 0; c < Math.max(rx.length, ry.length); c += 1) { // cells-ok — a column index
+          const p = rx[c] ?? null;
+          const q = ry[c] ?? null;
+          if (p !== null || q !== null) ink += 1; // cells-ok — a cell count
+          if (p !== q) d += 1; // cells-ok — a cell count
+        }
+      }
+      return [d, ink];
+    };
+    expect(apart(at(natural, "flat"), at(reversed, "flat"))[0], "flat is identical").toBe(0);
+    const [dSmooth, inkSmooth] = apart(at(natural, "smooth"), at(reversed, "smooth"));
+    expect(dSmooth / inkSmooth, "and smooth differs only in the rasteriser's own tie")
+      .toBeLessThan(0.05);
+    // The second half of the ruling's reason, and the whole of why the frame is
+    // no help: culling a **convex** closed mesh is very nearly invisible — 6
+    // cells of 306, all at the silhouette — so nothing on screen could report
+    // which hemisphere drew.
+    const [dCull, inkCull] = apart(at(natural, "flat"), at(sphere(24, 12), "flat"));
+    expect(dCull / inkCull, "culling a sphere is all but invisible").toBeLessThan(0.05);
+  });
+
+  it("WF3 (C12 I95, §6i row 5): a mesh whose winding cancels its own volume is not culled", () => {
+    const s = sphere(24, 12);
+    // Half reversed, by latitude — the shape that cancels to floating-point
+    // zero and is therefore the one the guard catches.
+    const half = {
+      ...s,
+      closed: true,
+      faces: s.faces.map((f, i) =>
+        i >= s.faces.length / 2 ? [f[0], f[2], f[1]] as [number, number, number] : f), // cells-ok — a face count
+    };
+    const ext = extentOf(surfacePoints(s));
+    const basis = basisOf({}, 2);
+    const tris = trianglesOf(half, ext, 0);
+    expect(tris.every((t) => !backfaceCulled(t, basis)), "nothing is culled").toBe(true);
+    expect(tris[0]?.skin.cull, "and the sign is refused rather than guessed").toBe(0);
+    // The control: consistently wound, the same mesh culls.
+    const whole = trianglesOf({ ...s, closed: true }, ext, 0);
+    expect(whole.some((t) => backfaceCulled(t, basis)), "a consistent mesh does cull").toBe(true);
+  });
+
+  it("WF4 (C12 I95, C04 I80, §6i rows 6 and 15): `closed` is refused on a grid and `wireframe` is not", () => {
+    const grid = { heights: [[0, 1], [1, 0]], xRange: [0, 1], yRange: [0, 1] };
+    const mesh = {
+      vertices: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }, { x: 0, y: 1, z: 0 }],
+      faces: [[0, 1, 2]],
+    };
+    const at = (sf: unknown): string =>
+      errorsOf({ kind: "plot", id: "s", form: "scatter3d", height: 4, series: [], surfaces3: [sf] }).join(" ");
+    expect(at({ ...grid, closed: true })).toMatch(/"closed" on a height field/u);
+    expect(() => b.plot({ form: "scatter3d", height: 4, series: [], surfaces3: [{ ...grid, closed: true }] } as never))
+      .toThrow(/"closed" on a height field/u);
+    // **The three accepts are the row**, not decoration: a refusal copied from
+    // one member onto the other reads exactly like a rule, and the two arrived
+    // together (§6i row 15).
+    expect(at({ ...mesh, closed: true })).toBe("");
+    expect(at({ ...grid, wireframe: true })).toBe("");
+    expect(at({ ...mesh, wireframe: "over" })).toBe("");
+    // T3.60: with neither arm resolved, the arm refusal is what a caller reads.
+    expect(at({ closed: true, label: "empty" })).toMatch(/has neither "heights" nor "vertices"/u);
+    expect(at({ closed: true, label: "empty" })).not.toMatch(/"closed" on a height field/u);
+  });
+
+  it("WF5 (C12 I95, §6i row 9): a height field's wireframe is its grid lines and not its triangulation's", () => {
+    const n = 6;
+    const heights = gaussian(n);
+    const asGrid = { heights, xRange: [-2, 2], yRange: [-2, 2], wireframe: "over" as const };
+    // The same surface handed over as an explicit mesh, where every triangle
+    // edge IS the caller's structure — the control, and the rejected alternative.
+    const vertices: { x: number; y: number; z: number }[] = [];
+    for (let j = 0; j < n; j += 1) { // cells-ok — a row index
+      for (let i = 0; i < n; i += 1) { // cells-ok — a column index
+        vertices.push({
+          x: (i / (n - 1)) * 4 - 2, // cells-ok — a column index
+          y: (j / (n - 1)) * 4 - 2, // cells-ok — a row index
+          z: (heights[j] as number[])[i] as number,
+        });
+      }
+    }
+    const faces: [number, number, number][] = [];
+    const at2 = (i: number, j: number): number => j * n + i; // cells-ok — a grid offset
+    for (let j = 0; j + 1 < n; j += 1) { // cells-ok — a row index
+      for (let i = 0; i + 1 < n; i += 1) { // cells-ok — a column index
+        faces.push([at2(i, j), at2(i + 1, j), at2(i + 1, j + 1)]);
+        faces.push([at2(i, j), at2(i + 1, j + 1), at2(i, j + 1)]);
+      }
+    }
+    const asMesh = { vertices, faces, wireframe: "over" as const };
+    const g = maskOf(asGrid);
+    const m = maskOf(asMesh);
+    expect(g.edge, "the grid marks fewer samples than every triangle edge").toBeLessThan(m.edge);
+    expect(g.fill, "and leaves interior for the cells to be visible in").toBeGreaterThan(0);
+    // The two draw the same geometry, or the counts above compare two pictures.
+    expect(g.edge + g.fill).toBe(m.edge + m.fill);
+    // And with the member unset nothing is an edge at all.
+    expect(maskOf({ heights, xRange: [-2, 2], yRange: [-2, 2] }).edge).toBe(0);
+    // **The band's width, in samples, and it is the half the counts above
+    // cannot see** (§6i row 8). A mutation widening `EDGE_HALF` from 0.7 to
+    // **three** survived every assertion here: the cells are 15 samples across
+    // at this size, so a six-sample band still leaves interior and the grid
+    // still marks fewer samples than the mesh. What the constant claims is a
+    // band about **one sample wide**, and that is a ratio against the projected
+    // perimeter rather than a count — measured `0.916` at 0.7, and four times
+    // that at 3.
+    const big = {
+      a: { p: { x: 0, y: -0.8, z: -0.8 }, n: { x: 0, y: 0, z: -1 }, v: undefined },
+      b: { p: { x: 0, y: 0.8, z: -0.8 }, n: { x: 0, y: 0, z: -1 }, v: undefined },
+      c: { p: { x: 0, y: 0, z: 0.8 }, n: { x: 0, y: 0, z: -1 }, v: undefined },
+      fn: { x: 1, y: 0, z: 0 },
+      edges: [true, true, true] as const,
+      series: 0,
+      skin: { cull: 0, wire: "over" } as const,
+    };
+    const box = { width: 200, height: 200 };
+    const bs = basisOf({ azimuth: 0, elevation: 0, distance: 6 }, 1);
+    let band = 0; // cells-ok — a sample count
+    drawTri(big, bs, box, createDepth(box.width, box.height), lightDirOf(undefined, bs),
+      { nearD: 5, farD: 7 }, (_i, sm) => { if (sm.edge) band += 1; }); // cells-ok — a sample count
+    const corners = [big.a, big.b, big.c].map((w) => {
+      const pr = project(bs, w.p) as { x: number; y: number };
+      return { x: pr.x * box.width, y: pr.y * box.height }; // cells-ok — a sample coordinate
+    });
+    const perimeter = corners.reduce((sum, q, i) => {
+      const r = corners[(i + 1) % 3] as { x: number; y: number };
+      return sum + Math.hypot(r.x - q.x, r.y - q.y);
+    }, 0);
+    expect(band / perimeter, "the edge band is about one sample wide").toBeGreaterThan(0.5);
+    expect(band / perimeter, "and not three").toBeLessThan(2);
+  });
+
+  it("WF6 (C12 I95, §6i row 11): a cage still occludes what is behind it", () => {
+    const cage = { ...sphere(16, 8), closed: true, wireframe: true as const };
+    const behind = { x: 0, y: 0, z: -6 };
+    const front = { x: 0, y: 0, z: 6 };
+    // **The two blocks differ in one number**, which is what makes this a row
+    // about occlusion: adding the cloud at all changes the palette and the
+    // legend, so a comparison against a surface-only frame measures that
+    // instead.
+    const shot = (p: { x: number; y: number; z: number }, sf: unknown): string =>
+      frame(
+        bare({ surfaces3: [sf], points3: [{ label: "p", points: [p] }], colourBy: "series" }),
+        capsFor("24bit"), 60, "wf6",
+      ).join("\n");
+    expect(shot(front, cage), "the two positions are not the same picture")
+      .not.toBe(shot(behind, cage));
+    expect(inked(shot(front, cage).split("\n")), "a point in front of the cage draws")
+      .toBeGreaterThan(inked(shot(behind, cage).split("\n")));
+    // **The control is the member**: with `wireframe` unset the same pair
+    // behaves the same way, so the row is about the cage's depth write and not
+    // about the surface being there at all.
+    const solid = { ...sphere(16, 8), closed: true };
+    expect(inked(shot(front, solid).split("\n")))
+      .toBeGreaterThan(inked(shot(behind, solid).split("\n")));
+  });
+
+  it("WF7 (C12 I95, §6i row 13): an edge is its own face at half the intensity, and a constant cannot be", () => {
+    const g = { heights: gaussian(5), xRange: [-2, 2] as const, yRange: [-2, 2] as const };
+    const solid = frame(bare({ surfaces3: [g] }), capsFor("24bit"), 110, "wf7a");
+    const over = frame(bare({ surfaces3: [{ ...g, wireframe: "over" }] }), capsFor("24bit"), 110, "wf7b");
+    const lums = (rows: readonly string[]): number[] =>
+      cellsOf(rows).map((c) => lumOf(c.colour)).filter((l) => l >= 0);
+    const a = lums(solid);
+    const bl = lums(over);
+    expect(a.length, "both frames draw the same surface").toBe(bl.length);
+    // **Cell by cell rather than by extremes.** The brightest cell may itself
+    // be an edge, so *the maximum is unchanged* is a claim about where the
+    // grid lines fall — the claim about the rule is that nothing brightens.
+    expect(bl.filter((l, i) => l > (a[i] as number)).length, "no cell brightens").toBe(0);
+    expect(bl.filter((l, i) => l < (a[i] as number)).length, "and the edges darken")
+      .toBeGreaterThan(0);
+    // **The edges go below the solid frame's floor**, which is what a ratio buys
+    // and a constant cannot: the fill's own intensity spans 0.1332–0.7871, so
+    // any absolute edge value collides with the fill somewhere inside it.
+    expect(Math.min(...bl), "the dimmed edges sit under the fill's darkest cell")
+      .toBeLessThan(Math.min(...a));
+    // The ratio itself, asserted against the rejected alternative rather than
+    // restated: halving separates at every intensity the fill reaches.
+    for (const i of [0.1332, 0.5, 0.7871, 1]) {
+      expect(edgeIntensity(i, "over"), String(i)).toBeLessThan(i);
+      expect(edgeIntensity(i, true), "and `true` does not dim, having no fill to separate from")
+        .toBe(i);
+    }
+  });
+
+  it("WF8 (C12 I95, §6i row 10): the near-plane clip's own edge is not one of the caller's", () => {
+    // A big triangle with one vertex behind the eye. Its clipped form is one
+    // triangle whose third side is the cut — and the cut must not be an edge.
+    const wire = { cull: 0, wire: "over" } as const;
+    const vert = (p: Vec3) => ({ p, n: { x: 0, y: 0, z: -1 }, v: undefined });
+    const basis = basisOf({ distance: 1 }, 2);
+    const grid = { width: 90, height: 44 };
+    const edgesOf = (tri: Tri3): number => {
+      const d = createDepth(grid.width, grid.height);
+      let n = 0; // cells-ok — a sample count
+      drawTri(tri, basis, grid, d, lightDirOf(undefined, basis), { nearD: 0, farD: 2 }, (_i, sm) => {
+        if (sm.edge) n += 1; // cells-ok — a sample count
+      });
+      return n;
+    };
+    const straddle = {
+      a: vert({ x: -1, y: -1, z: 0 }), b: vert({ x: 1, y: 1, z: 0 }), c: vert({ x: 1, y: -1, z: 0 }),
+      fn: { x: 0, y: 0, z: -1 }, series: 0, skin: wire,
+    };
+    const none = edgesOf({ ...straddle, edges: [false, false, false] });
+    const all = edgesOf({ ...straddle, edges: [true, true, true] });
+    expect(none, "with no caller edge the clip contributes none of its own").toBe(0);
+    expect(all, "and the surviving originals still draw").toBeGreaterThan(0);
+    // **The row**: exactly the two edges that survive the clip are marked, so
+    // marking a third — the cut — would add samples. Asserted against the
+    // rejected alternative: one caller edge at a time, summing to the whole.
+    const one = ([0, 1, 2] as const).map((k) =>
+      edgesOf({ ...straddle, edges: [k === 0, k === 1, k === 2] }));
+    expect(one.filter((v) => v > 0).length, "two of the three original sides survive").toBe(2);
+    expect(one.reduce((x, y) => x + y, 0), "and together they are the whole edge set")
+      .toBeGreaterThanOrEqual(all);
+  });
+
+  it("WF9 (C12 I95, §6i row 12): the cull reads the face normal under both shading arms", () => {
+    const s = { ...sphere(24, 12), closed: true };
+    const ext = extentOf(surfacePoints(s));
+    const basis = basisOf({}, 2);
+    const set = (shading: "flat" | "smooth"): boolean[] =>
+      trianglesOf({ ...s, shading }, ext, 0).map((t) => backfaceCulled(t, basis));
+    expect(set("smooth"), "smooth and flat cull the same faces").toEqual(set("flat"));
+    // **The control is the substitution**, or the row passes against a cull
+    // that reads a vertex normal: on a sphere the two are close, so *something
+    // was culled* is satisfied either way.
+    const smooth = trianglesOf({ ...s, shading: "smooth" }, ext, 0);
+    const byVertex = smooth.map((t) => {
+      const c = {
+        x: (t.a.p.x + t.b.p.x + t.c.p.x) / 3,
+        y: (t.a.p.y + t.b.p.y + t.c.p.y) / 3,
+        z: (t.a.p.z + t.b.p.z + t.c.p.z) / 3,
+      };
+      return t.a.n.x * (c.x - basis.eye.x) + t.a.n.y * (c.y - basis.eye.y)
+        + t.a.n.z * (c.z - basis.eye.z) < 0;
+    });
+    expect(byVertex, "and a vertex normal answers differently").not.toEqual(set("smooth"));
   });
 });

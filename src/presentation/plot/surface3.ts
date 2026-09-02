@@ -42,8 +42,37 @@ import {
 /** A vertex with everything a sample interpolated from it needs. */
 type Vert = Readonly<{ p: Vec3; n: Vec3; v: number | undefined }>;
 
-/** One triangle of one surface, in **unit** space. */
-export type Tri3 = Readonly<{ a: Vert; b: Vert; c: Vert; series: number }>;
+/**
+ * What a whole surface decides, held once and shared by reference across its
+ * triangles (C12 I95).
+ *
+ * `cull` is `0` for *do not*, and otherwise the sign the mesh's own signed
+ * volume gave — never the caller's winding (§6i row 3, F461).
+ */
+export type Skin = Readonly<{ cull: 0 | 1 | -1; wire: boolean | "over" }>;
+
+/**
+ * One triangle of one surface, in **unit** space.
+ *
+ * **`fn` is the face's own normal and it is not the shading normal.** Under
+ * `shading: "smooth"` the vertices carry averages, and an average over adjacent
+ * faces does not describe any face's orientation — so the cull reads this and
+ * the lighting reads `a.n`/`b.n`/`c.n` (§6i row 12). The smooth arm computed it
+ * already; storing it costs nothing.
+ *
+ * **`edges` is which of `ab`, `bc`, `ca` the *caller* drew**, in that order,
+ * matching `fill`'s `w0`/`w1`/`w2`. A height field's cell diagonal is not one
+ * of them; a mesh's triangles are all the structure a mesh has (§6i row 9).
+ */
+export type Tri3 = Readonly<{
+  a: Vert;
+  b: Vert;
+  c: Vert;
+  fn: Vec3;
+  edges: readonly [boolean, boolean, boolean];
+  series: number;
+  skin: Skin;
+}>;
 
 /** What a shaded sample hands back to whoever is composing the raster. */
 export type Shaded = Readonly<{
@@ -52,6 +81,8 @@ export type Shaded = Readonly<{
   series: number;
   /** The clamped lighting, `[0, 1]`. Ambient is its floor and it is never zero. */
   intensity: number;
+  /** On one of the caller's own edges, within `EDGE_HALF` of a sample (C12 I95). */
+  edge: boolean;
 }>;
 
 /**
@@ -83,6 +114,57 @@ const SPECULAR = 0.2;
 const SHINE = 16;
 /** How much the far end of the figure dims. One multiply and a free depth cue. */
 const FALLOFF = 0.3;
+
+/**
+ * How near an edge a sample has to be, **in samples** (C12 I95, §6i rows 7–8).
+ *
+ * **The wireframe is not a second primitive and there is no depth bias**, which
+ * is the ruling this constant replaces. The design note asked for *one number,
+ * stated in the spec rather than tuned until it looks right* — and measured,
+ * the number does not exist: `strokeSeg` floors its coordinates and steps on
+ * the dominant screen axis where `fill` samples at `+0.5` centres, so an edge
+ * disagrees with its **own** face by a median `1.60e-2` and a maximum
+ * `4.31e-1`, against a sample row of `4.17e-2` on a figure spanning 2. Swept,
+ * bias 0 draws 22.6% of edge samples, `1e-3` draws 27.6%, and the ceiling of
+ * 55.4% costs `3e-1` — 15% of the whole figure's depth, which a far wireframe
+ * would then punch through near geometry with (F462).
+ *
+ * `w0` is twice the sub-triangle's area, so `w0 / |ab|` is the perpendicular
+ * distance to edge `ab` **in samples**. The edge is then the fill's own write:
+ * no second rasteriser, no bias, no z-fight constructible, and hidden-line
+ * removal exact rather than approximate — an edge sample is occluded exactly
+ * when its face's sample is. Being in screen samples, it does not move with the
+ * mesh's density.
+ */
+const EDGE_HALF = 0.7;
+
+/**
+ * What `wireframe: "over"` scales an edge's intensity by (C12 I95, §6i row 13).
+ *
+ * **A ratio and not a value, because a value cannot separate everywhere.** The
+ * fill's own intensity spans `0.1332 … 0.7871` over a Gaussian, so an edge
+ * pinned to any constant collides with the fill wherever the fill reaches it.
+ * Halving keeps the shading and the depth attenuation on the edge and separates
+ * at every intensity — worst case `0.1332` against `0.0666`, at the ambient
+ * floor. On the glyph arm the same number moves the density ramp down, so one
+ * rule serves both arms.
+ *
+ * **It applies to `"over"` alone**, because what it buys is separation from a
+ * fill: under `wireframe: true` the edge *is* the surface and dimming it would
+ * darken the whole picture for nothing to contrast with.
+ */
+const EDGE_DIM = 0.5;
+
+/**
+ * Below this the mesh's volume decides nothing (C12 I95, §6i row 5).
+ *
+ * A closed mesh in unit space has a volume of the same order as the cube's own
+ * **8** — `unitOf` normalises the extent, so a thin closed slab measures
+ * `8.0000` rather than something small — while a mesh whose winding cancels
+ * itself measures `1e-15` to `1e-16`. Fifteen orders separate them, so the
+ * threshold is not a tuning.
+ */
+const VOLUME_EPS = 1e-9;
 
 /**
  * The studio key light, in **view** space (C04 I79).
@@ -161,6 +243,8 @@ function gridPoints(s: Surface3): readonly Vec3[] {
 export function trianglesOf(s: Surface3, extent: Extent3, series: number): readonly Tri3[] {
   const pts = surfacePoints(s).map((p) => unitOf(p, extent));
   const idx = facesOf(s);
+  const mask = edgeMask(s, idx.length); // cells-ok — a face count
+  const skin: Skin = { cull: cullSign(s, pts, idx), wire: s.wireframe ?? false };
   const flat = s.shading === "flat";
   // The face normals, unnormalised — their length is twice the area, which is
   // what makes the accumulation below area-weighted without a second term.
@@ -187,9 +271,81 @@ export function trianglesOf(s: Surface3, extent: Extent3, series: number): reado
       n: flat ? fn : (vertN[k] as Vec3),
       v: values[k],
     });
-    out.push({ a: at(ia), b: at(ib), c: at(ic), series });
+    out.push({
+      a: at(ia),
+      b: at(ib),
+      c: at(ic),
+      fn,
+      edges: mask[f] as readonly [boolean, boolean, boolean],
+      series,
+      skin,
+    });
   }
   return out;
+}
+
+/**
+ * Which of each triangle's three edges the **caller** drew (C12 I95, §6i row 9).
+ *
+ * **A height field is triangulated before it is drawn, and the diagonal is not
+ * an edge.** `facesOf` splits every cell into `[a, b, c]` and `[a, c, d]`, so
+ * the diagonal is the first triangle's `ca` and the second's `ab` — one per
+ * cell, and on a 9×9 grid that is **64** edges the caller never drew, against
+ * the grid's own 144. Rendered with all three marked, a 6×6 Gaussian gives 258
+ * edge samples to 36 interior and no cell is legible; masked, it gives 168 to
+ * 126 and the grid reads.
+ *
+ * **A mesh's mask is all true**, because a mesh's triangles are all the
+ * structure it has — so a dense mesh's wireframe is solid, which is honest
+ * rather than a defect.
+ */
+function edgeMask(
+  s: Surface3,
+  faces: number,
+): readonly (readonly [boolean, boolean, boolean])[] {
+  if (s.vertices !== undefined) {
+    return new Array<readonly [boolean, boolean, boolean]>(faces).fill([true, true, true]); // cells-ok — a face count
+  }
+  const out: (readonly [boolean, boolean, boolean])[] = [];
+  for (let f = 0; f < faces; f += 2) { // cells-ok — a face index
+    out.push([true, true, false], [false, true, true]);
+  }
+  return out.slice(0, faces); // cells-ok — a face count
+}
+
+/**
+ * The signed volume of a closed mesh, and the sign the cull reads (C12 I95,
+ * §6i rows 3 and 5, F461).
+ *
+ * **`closed` licenses this, and that is its second power.** The obvious UV
+ * sphere — rings by segments, two triangles a quad in grid order — measures
+ * **−4.16** and is wound *inward*, so trusting the winding culls the front and
+ * draws the back. Two-sided shading then lights the far hemisphere correctly,
+ * which makes the result a plausible hollow shell rather than a bug: oriented
+ * from the volume, the natural and reversed spheres produce byte-identical
+ * masks, and no assertion about a colour or a silhouette separates them.
+ *
+ * **Inconsistent winding is not covered, and the sensitivity is inverted
+ * relative to the damage.** Half a sphere reversed cancels to `1e-15` and the
+ * guard refuses to cull at all — the safe answer — while one face in eight
+ * leaves a confident `−3.12` and gets about 32 faces of 2304 wrong in silence.
+ * The badly wound mesh is caught and the mildly wound one is not.
+ *
+ * `unitOf` is an affine map with a positive scale per axis, so it preserves
+ * orientation and the sign here is the sign in data space.
+ */
+function cullSign(
+  s: Surface3,
+  pts: readonly Vec3[],
+  idx: readonly (readonly [number, number, number])[],
+): 0 | 1 | -1 {
+  if (s.closed !== true) return 0;
+  let v = 0;
+  for (const [a, b, c] of idx) {
+    v += dot(pts[a] as Vec3, cross(pts[b] as Vec3, pts[c] as Vec3));
+  }
+  v /= 6;
+  return Math.abs(v) < VOLUME_EPS ? 0 : v < 0 ? -1 : 1;
 }
 
 /** The triangles, by arm: a mesh states them and a grid implies two per cell. */
@@ -258,15 +414,47 @@ export function drawTri(
   span: Readonly<{ nearD: number; farD: number }>,
   paint: (i: number, sample: Shaded) => void,
 ): void {
+  if (backfaceCulled(tri, basis)) return;
   const zOf = (p: Vec3): number => dot(sub(p, basis.eye), basis.forward);
   const vs = [tri.a, tri.b, tri.c];
   const behind = vs.filter((w) => zOf(w.p) <= NEAR);
   if (behind.length === 3) return; // cells-ok — a vertex count
-  for (const t of clipNear(vs as [Vert, Vert, Vert], zOf)) {
-    const s = t.map((w) => toScreen(w, basis, grid));
+  for (const t of clipNear(vs as [Vert, Vert, Vert], tri.edges, zOf)) {
+    const s = t.v.map((w) => toScreen(w, basis, grid));
     if (s.some((q) => q === null)) continue;
-    fill(s as [Screen, Screen, Screen], tri.series, grid, depth, light, span, paint);
+    fill(s as [Screen, Screen, Screen], tri, t.e, grid, depth, light, span, paint);
   }
+}
+
+/**
+ * Backface culling, **per face and oriented by the mesh** (C12 I95, §6i rows
+ * 1–3).
+ *
+ * Exported so a row can call it rather than restate its arithmetic — `shade`'s
+ * rule one function along, and F459's lesson about a row that writes the
+ * formula out and then agrees with any version of it.
+ *
+ * **The direction to the eye is this face's, never a view-space constant.** The
+ * design note's `dot(normal, view) < 0` is the orthographic limit: measured on
+ * a 2304-face sphere the two disagree on **7.29%** of faces at `distance: 6`
+ * and **34.03%** at 1.5, and the constant answers *48.18% visible* at every
+ * distance because a view-space `z` test cannot read the eye's position at all,
+ * while the truth `(1 − r/d)/2` falls from 41.67% to 16.67% (F460). *Removes
+ * ~half the faces of a sphere* is the same limit — the cull removes **58%** at
+ * distance 6 and **83%** at 1.5, or 44.5% by face count rather than by area,
+ * because a UV sphere's polar faces are slivers.
+ *
+ * **A face with no normal is never culled**: `unit` hands the zero vector back,
+ * `dot` is `0`, and `0 > 0` is false — the same rule that shades it at ambient.
+ */
+export function backfaceCulled(tri: Tri3, basis: Basis): boolean {
+  if (tri.skin.cull === 0) return false;
+  const c = {
+    x: (tri.a.p.x + tri.b.p.x + tri.c.p.x) / 3,
+    y: (tri.a.p.y + tri.b.p.y + tri.c.p.y) / 3,
+    z: (tri.a.p.z + tri.b.p.z + tri.c.p.z) / 3,
+  };
+  return dot(tri.fn, sub(c, basis.eye)) * tri.skin.cull > 0;
 }
 
 /**
@@ -279,30 +467,57 @@ export function drawTri(
  */
 function clipNear(
   v: readonly [Vert, Vert, Vert],
+  edges: readonly [boolean, boolean, boolean],
   zOf: (p: Vec3) => number,
-): readonly (readonly [Vert, Vert, Vert])[] {
+): readonly Readonly<{ v: readonly [Vert, Vert, Vert]; e: readonly [boolean, boolean, boolean] }>[] {
   const IN = NEAR * (1 + 1e-6);
   const z = v.map((w) => zOf(w.p));
-  const out = v.filter((_, i) => (z[i] as number) > NEAR);
-  if (out.length === 3) return [v]; // cells-ok — a vertex count
-  if (out.length === 0) return []; // cells-ok — a vertex count
-  const cut = (a: Vert, b: Vert): Vert => {
-    const za = zOf(a.p);
-    const zb = zOf(b.p);
-    return lerpVert(a, b, (IN - za) / (zb - za));
+  const inFront = (i: number): boolean => (z[i] as number) > NEAR;
+  const kept = [0, 1, 2].filter(inFront); // cells-ok — a vertex index
+  if (kept.length === 3) return [{ v, e: edges }]; // cells-ok — a vertex count
+  if (kept.length === 0) return []; // cells-ok — a vertex count
+  const dropped = [0, 1, 2].filter((i) => !inFront(i)); // cells-ok — a vertex index
+  // **Every output vertex carries which of the caller's edges it lies on**, as
+  // three bits (§6i row 10). An original vertex `i` lies on edges `i` and
+  // `(i + 2) % 3`; a vertex cut from `(x, y)` lies on the one edge between them.
+  // Two output vertices then share an edge exactly when their bits intersect —
+  // and the shared bit is unique, because two triangle vertices meet on one side.
+  const ON = [0b101, 0b011, 0b110]; // vertex 0 → edges ca,ab · 1 → ab,bc · 2 → bc,ca
+  const between = (x: number, y: number): number =>
+    1 << ((x + y === 1 ? 0 : x + y === 3 ? 1 : 2)); // cells-ok — an edge index
+  const cut = (a: number, b: number): { w: Vert; on: number } => {
+    const va = v[a] as Vert;
+    const vb = v[b] as Vert;
+    const za = zOf(va.p);
+    const zb = zOf(vb.p);
+    return { w: lerpVert(va, vb, (IN - za) / (zb - za)), on: between(a, b) };
   };
-  const keep = v.filter((_, i) => (z[i] as number) > NEAR) as Vert[];
-  const drop = v.filter((_, i) => !((z[i] as number) > NEAR)) as Vert[];
-  if (keep.length === 1) { // cells-ok — a vertex count
-    const k = keep[0] as Vert;
-    return [[k, cut(k, drop[0] as Vert), cut(k, drop[1] as Vert)]];
+  const orig = (i: number): { w: Vert; on: number } => ({ w: v[i] as Vert, on: ON[i] as number });
+  const shape = (
+    p: { w: Vert; on: number },
+    q: { w: Vert; on: number },
+    r: { w: Vert; on: number },
+  ): Readonly<{ v: readonly [Vert, Vert, Vert]; e: readonly [boolean, boolean, boolean] }> => {
+    const kept3 = [[p, q], [q, r], [r, p]].map(([x, y]) => {
+      const shared = (x as { on: number }).on & (y as { on: number }).on;
+      if (shared === 0) return false;
+      // The lowest set bit names the edge, and there is only ever one.
+      return edges[31 - Math.clz32(shared & -shared)] === true; // cells-ok — an edge index
+    });
+    return { v: [p.w, q.w, r.w], e: kept3 as [boolean, boolean, boolean] };
+  };
+  if (kept.length === 1) { // cells-ok — a vertex count
+    const k = kept[0] as number;
+    return [shape(orig(k), cut(k, dropped[0] as number), cut(k, dropped[1] as number))];
   }
-  // Two kept: the remainder is a quad, which is two triangles sharing a diagonal.
-  const [k0, k1] = keep as [Vert, Vert];
-  const d = drop[0] as Vert;
+  // Two kept: the remainder is a quad, which is two triangles sharing a diagonal
+  // — and the diagonal is not one of the caller's edges, which is what `shape`
+  // works out rather than being told.
+  const [k0, k1] = kept as [number, number];
+  const d = dropped[0] as number;
   const c0 = cut(k0, d);
   const c1 = cut(k1, d);
-  return [[k0, k1, c1], [k0, c1, c0]];
+  return [shape(orig(k0), orig(k1), c1), shape(orig(k0), c1, c0)];
 }
 
 /**
@@ -357,7 +572,8 @@ function toScreen(
  */
 function fill(
   s: readonly [Screen, Screen, Screen],
-  series: number,
+  tri: Tri3,
+  e: readonly [boolean, boolean, boolean],
   grid: Readonly<{ width: number; height: number }>,
   depth: Depth,
   light: Vec3,
@@ -365,11 +581,22 @@ function fill(
   paint: (i: number, sample: Shaded) => void,
 ): void {
   const [a, b, c] = s;
+  const series = tri.series;
   const area = (b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y);
   if (!(Math.abs(area) >= 1)) {
-    strokeThin(s, series, grid, depth, light, span, paint);
+    strokeThin(s, tri, e, grid, depth, light, span, paint);
     return;
   }
+  // **The edge lengths, folded once** (C12 I95, §6i row 8). `w0` is twice the
+  // sub-triangle's area, so `w0 / |ab|` is the perpendicular distance to `ab`
+  // in samples — and the whole test is skipped when no edge of this triangle
+  // is the caller's, which is every triangle of a surface with no wireframe.
+  const wire = tri.skin.wire !== false && (e[0] || e[1] || e[2]);
+  const len: readonly [number, number, number] = [
+    Math.hypot(b.x - a.x, b.y - a.y),
+    Math.hypot(c.x - b.x, c.y - b.y),
+    Math.hypot(a.x - c.x, a.y - c.y),
+  ];
   const lo = (f: (q: Screen) => number): number =>
     Math.max(0, Math.floor(Math.min(f(a), f(b), f(c)))); // cells-ok — a sample coordinate
   const hi = (f: (q: Screen) => number, n: number): number =>
@@ -413,6 +640,10 @@ function fill(
         value: blend(a.v, b.v, c.v, ua, ub, uc),
         series,
         intensity: shade(n, vp, light, z, span),
+        edge: wire
+          && ((e[0] && w0 / (len[0] as number) < EDGE_HALF)
+            || (e[1] && w1 / (len[1] as number) < EDGE_HALF)
+            || (e[2] && w2 / (len[2] as number) < EDGE_HALF)),
       });
     }
   }
@@ -427,17 +658,22 @@ function fill(
  */
 function strokeThin(
   s: readonly [Screen, Screen, Screen],
-  series: number,
+  tri: Tri3,
+  e: readonly [boolean, boolean, boolean],
   grid: Readonly<{ width: number; height: number }>,
   depth: Depth,
   light: Vec3,
   span: Readonly<{ nearD: number; farD: number }>,
   paint: (i: number, sample: Shaded) => void,
 ): void {
-  const pairs: readonly (readonly [Screen, Screen])[] = [
-    [s[0], s[1]], [s[1], s[2]], [s[2], s[0]],
+  const series = tri.series;
+  const pairs: readonly (readonly [Screen, Screen, boolean])[] = [
+    [s[0], s[1], e[0]], [s[1], s[2], e[1]], [s[2], s[0], e[2]],
   ];
-  for (const [p, q] of pairs) {
+  // **All three still stroke, and only the caller's carry `edge`.** A degenerate
+  // triangle is a line whichever member is set, so the arm that keeps it does
+  // not change; what changes is which of its three strokes a wireframe paints.
+  for (const [p, q, own] of pairs) {
     const asProjected = (w: Screen): { x: number; y: number; depth: number } => ({
       x: w.x / grid.width, y: w.y / grid.height, depth: w.vp.z,
     });
@@ -449,6 +685,7 @@ function strokeThin(
         value: p.v === undefined || q.v === undefined ? p.v ?? q.v : p.v + (q.v - p.v) * t,
         series,
         intensity: shade(n, vp, light, z, span),
+        edge: own && tri.skin.wire !== false,
       });
     });
   }
@@ -496,6 +733,16 @@ export function shade(
   // **A zero-length normal survives as itself** (F456). `dot` is then `0`, so
   // the face takes ambient and nothing divides by anything.
   const raw = unit(normal);
+  // **The flip's tie at `raw.z === 0` is not reachable and there is no
+  // tie-break here** (F464). It looks like it needs one: reversing a mesh's
+  // winding negates every normal **exactly** — measured, 1728 of 1728 vertex
+  // normals and every face normal — so the two windings would pick *opposite*
+  // representatives at exactly zero. A lexicographic fall-through to `x` then
+  // `y` was written, and it changed **nothing**, because the value cannot be
+  // reached: the plane `x = 0` viewed from a camera inside it gives a
+  // view-space `z` of `6.123e-17` rather than `0`, which is `Math.cos(π/2)`.
+  // The two windings' residue is the **rasteriser's** shared-edge tie instead,
+  // and it is recorded on I95 rather than repaired here.
   const n = raw.z > 0 ? { x: -raw.x, y: -raw.y, z: -raw.z } : raw;
   const nl = dot(n, light);
   const lit = nl > 0 ? nl : 0;
@@ -522,6 +769,10 @@ export function shade(
  * axis, braille at unicode and `.:-=+*#@` at ASCII, so no encoding axis is
  * widened and the ambiguous-width question is already answered.
  */
+/** What `wireframe: "over"` scales an edge's intensity by. Exported so a row reads it. */
+export const edgeIntensity = (intensity: number, wire: boolean | "over"): number =>
+  wire === "over" ? intensity * EDGE_DIM : intensity;
+
 export function densityGlyph(
   intensity: number,
   caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,

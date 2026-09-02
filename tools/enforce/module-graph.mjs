@@ -1429,6 +1429,25 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   // reason the entry was written with rather than a date.
   "Basis.orthographic": "project() picks the arm, and a second reader of this field would be a second place the projection is chosen",
 
+  // **`Skin` is `Basis`'s shape one carrier along**, and the same reading
+  // applies: a record whose fields exist for one function, exported because
+  // `trianglesOf` returns it on every `Tri3`. `skin.wire` *is* read outside —
+  // `scatter3.ts` owns the paint policy, because it owns `ink`, `mark` and
+  // `glyph` — and `skin.cull` is not, because the only question it answers is
+  // asked inside `drawTri`.
+  //
+  // **A second reader would be a second cull**, which is the failure the sign
+  // exists to prevent: the whole point of orienting from the signed volume is
+  // that one place decides which side is out. And §6i row 14 rules that the
+  // cull changes neither the extent nor the depth span, so the composition
+  // layer has no question this field answers.
+  "Skin.cull":
+    "C12 I95, §6i rows 3 and 14 — `drawTri` asks the only question this answers, " +
+    "and a second reader would be a second place the mesh's orientation is " +
+    "decided, which is what the signed volume exists to make single. The " +
+    "composition layer reads `skin.wire` because it owns the paint policy, and " +
+    "has no use for this: the cull moves neither the extent nor the depth span.",
+
   // --- published ahead of the value that makes it readable ------------------
   //
   // **A single-value union has nothing for a consumer to branch on**, which is

@@ -830,6 +830,20 @@ function plot(
           `only a shaded surface reads one`,
       );
     }
+    // **`closed` is the mesh arm's** (C04 I80). The same refusal `validate`
+    // makes, at the other gate: it enables backface culling, culling needs an
+    // inside, and a grid has none — and the renderer cannot stand in for the
+    // check, because an open surface's signed volume is not zero (F463).
+    // `wireframe` is deliberately not beside it; it is about the edges the
+    // input already has and a grid has the most structured ones.
+    for (const [i, sf] of (surfaces3 ?? []).entries()) { // cells-ok — a surface index
+      if (sf.heights !== undefined && sf.closed !== undefined) {
+        throw new TypeError(
+          `b.plot: surfaces3[${String(i)}] has "closed" on a height field (C04 I80) — it ` +
+            `enables backface culling, which needs a surface with an inside; a grid has none`,
+        );
+      }
+    }
     // **No carrier at all, and the set is what it reads** (C04 I79). A wireframe
     // is edges with no cloud, a parametric curve is a path with no samples, and a
     // loss landscape has neither — so any one alone is a complete document. The

@@ -75,7 +75,7 @@ const results = await runPass({
       // keeping its line.
       name: "a degenerate triangle is filled rather than stroked",
       file: F,
-      from: "  if (!(Math.abs(area) >= 1)) {\n    strokeThin(s, series, grid, depth, light, span, paint);\n    return;\n  }",
+      from: "  if (!(Math.abs(area) >= 1)) {\n    strokeThin(s, tri, e, grid, depth, light, span, paint);\n    return;\n  }",
       to: "  if (!(Math.abs(area) >= 1)) {\n    return;\n  }",
       expect: "SF1",
     },
@@ -173,6 +173,112 @@ const results = await runPass({
       from: "  const src = s.field ?? s.heights;",
       to: "  const src = s.heights ?? s.field;",
       expect: "SF5",
+    },
+
+    // ---- step 7: the cull and the wireframe (C12 I95, C04 I80, §6i) --------
+
+    {
+      // **The view direction back to the constant** (§6i row 1). The design
+      // note's own form, and it is the orthographic limit: the two disagree on
+      // 7.29% of a sphere's faces at distance 6 and 34.03% at 1.5, and the
+      // constant answers the *same* visible count at every distance because it
+      // cannot read the eye's position.
+      name: "the cull tests a view-space constant rather than the face's own direction",
+      file: F,
+      from: "  return dot(tri.fn, sub(c, basis.eye)) * tri.skin.cull > 0;",
+      to: "  return dot(tri.fn, basis.forward) * tri.skin.cull > 0;",
+      expect: "WF1",
+    },
+    {
+      // **The winding trusted** (§6i row 3, F461). The obvious UV sphere is
+      // wound inward at −4.16, so this culls the front and draws the back —
+      // and two-sided shading lights it correctly, which is why the frame does
+      // not say so.
+      name: "`closed` trusts the caller's winding",
+      file: F,
+      from: "  return Math.abs(v) < VOLUME_EPS ? 0 : v < 0 ? -1 : 1;",
+      to: "  return 1;",
+      expect: "WF2",
+    },
+    {
+      // **The degenerate-volume guard removed** (§6i row 5). A mesh whose
+      // winding cancels its own volume then gets a sign from `1e-15` — a
+      // confident answer read off floating-point noise.
+      name: "a cancelled volume still orients the cull",
+      file: F,
+      from: "  return Math.abs(v) < VOLUME_EPS ? 0 : v < 0 ? -1 : 1;",
+      to: "  return v < 0 ? -1 : 1;",
+      expect: "WF3",
+    },
+    {
+      // **`closed` accepted on a height field** (C04 I80, §6i row 6). T6.79's
+      // named revert: the block type-checks, renders, and draws a *plausible*
+      // surface with the underside of every fold culled away.
+      name: "`closed` is accepted on the height-field arm",
+      file: V,
+      from: "    if (grid && sf[\"closed\"] !== undefined) {",
+      to: "    if (false && sf[\"closed\"] !== undefined) {",
+      expect: "WF4",
+    },
+    {
+      // **The wireframe follows the triangulation** (§6i row 9). Every triangle
+      // edge marked, so a height field's cell diagonals draw — 64 edges the
+      // caller never drew on a 9×9, and no cell is legible.
+      name: "a height field's cell diagonals are edges",
+      file: F,
+      from: "    out.push([true, true, false], [false, true, true]);",
+      to: "    out.push([true, true, true], [true, true, true]);",
+      expect: "WF5",
+    },
+    {
+      // **The edge band wide enough to swallow the cells.** In samples rather
+      // than as a fraction, so this is the same defect at any mesh density: the
+      // interior disappears and the wireframe is the surface.
+      name: "the edge band is three samples rather than 0.7",
+      file: F,
+      from: "const EDGE_HALF = 0.7;",
+      to: "const EDGE_HALF = 3;",
+      expect: "WF5",
+    },
+    {
+      // **The cage turned see-through** (§6i row 11). `wireframe: true` stops
+      // clearing its interior, so a point behind the surface draws through it —
+      // and every assertion about the wireframe itself still passes.
+      name: "`wireframe: true` does not clear the samples it claims",
+      file: S,
+      from: "      if (wire === true && !sm.edge) {",
+      to: "      if (wire === \"over\" && !sm.edge) {",
+      expect: "WF6",
+    },
+    {
+      // **The edge no longer dims** (§6i row 13). An edge over its own face has
+      // the same normal, so it takes the same colour and `\"over\"` draws
+      // nothing — the defect the ratio exists to prevent.
+      name: "an edge over the fill takes its face's own intensity",
+      file: F,
+      from: "const EDGE_DIM = 0.5;",
+      to: "const EDGE_DIM = 1;",
+      expect: "WF7",
+    },
+    {
+      // **The clip's own edge marked** (§6i row 10). `clipNear` makes vertices
+      // the caller never supplied, and passing the mask through unchanged draws
+      // a seam across every face entering the camera.
+      name: "a near-plane cut counts as one of the caller's edges",
+      file: F,
+      from: "      if (shared === 0) return false;",
+      to: "      if (shared === 0) return true;",
+      expect: "WF8",
+    },
+    {
+      // **The cull reading a vertex normal** (§6i row 12). On a sphere the
+      // vertex and face normals are close, so *something was culled* is
+      // satisfied and the set is wrong at the silhouette.
+      name: "the cull reads a shading normal rather than the face's",
+      file: F,
+      from: "  return dot(tri.fn, sub(c, basis.eye)) * tri.skin.cull > 0;",
+      to: "  return dot(tri.a.n, sub(c, basis.eye)) * tri.skin.cull > 0;",
+      expect: "WF9",
     },
   ],
 });

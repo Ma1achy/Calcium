@@ -36,6 +36,7 @@ import { CELL_ASPECT } from "./aspect.js";
 import {
   densityGlyph,
   drawTri,
+  edgeIntensity,
   lightDirOf,
   surfacePoints,
   trianglesOf,
@@ -640,16 +641,36 @@ export function scatter3dArea(
   // structural rather than incidental.
   const lit = lightDirOf(block.light3, scene.basis);
   for (const t of scene.tris) {
+    const wire = t.skin.wire;
     drawTri(t, scene.basis, grid, depth, lit, span, (i, sm) => {
+      // **`wireframe: true` writes depth and paints nothing but the edges**
+      // (C12 I95, §6i row 11). The depth write already happened — `drawTri`
+      // calls it before this — so the face occludes what is behind it and the
+      // surface is a solid whose interior is not painted rather than a
+      // transparent cage. **The ink has to be cleared with it**, or a nearer
+      // carrier's colour survives at a sample it has just lost, which is I90's
+      // rule about the frame's write one carrier along. Hidden-line rather than
+      // see-through, because a committed frame cannot be orbited.
+      if (wire === true && !sm.edge) {
+        ink[i] = undefined;
+        mark[i] = undefined;
+        glyph[i] = -1;
+        return;
+      }
       const base = colourOf(block, ctx, sm, scene.identities, span);
+      // **An edge under `"over"` is its own face at half the intensity**
+      // (§6i row 13): the only rule that cannot collapse into a fill whose own
+      // range is `0.1332 … 0.7871`, and it keeps the shading and the depth
+      // attenuation on the edge rather than pinning it to a constant.
+      const k = sm.edge ? edgeIntensity(sm.intensity, wire) : sm.intensity;
       // **The shading scales the colour in linear light** (C12 I94, F455), and
       // the intensity arrives already clamped, because the ratio that makes the
       // field recoverable from hue holds over `[0, 1]` and nowhere else.
-      ink[i] = base === undefined ? undefined : shadeColour(base, sm.intensity);
+      ink[i] = base === undefined ? undefined : shadeColour(base, k);
       // **The glyph arm's second channel** (§6h row 12): the colour carries the
       // field and the mark carries the shading, which is F436's retracted claim
       // holding on the arm that kept two carriers.
-      mark[i] = half ? undefined : densityGlyph(sm.intensity, ctx.capabilities);
+      mark[i] = half ? undefined : densityGlyph(k, ctx.capabilities);
       glyph[i] = -1;
     });
   }
