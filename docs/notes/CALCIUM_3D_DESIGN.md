@@ -321,10 +321,20 @@ type Surface3 = Readonly<{
   faces?: readonly (readonly [number, number, number])[];   // triangle indices
 
   field?: readonly (readonly number[])[];   // colour source, INDEPENDENT of height
-  closed?: boolean;                          // enables backface culling
-  wireframe?: boolean | "over";              // edges only, or edges over the fill
+  shading?: "flat" | "smooth";               // face normals or vertex normals
+  closed?: boolean;                          // enables backface culling      — STEP 7
+  wireframe?: boolean | "over";              // edges only, or edges over the fill — STEP 7
 }>;
 ```
+
+**`heights` is optional and so is `vertices`, with exactly one of them per surface.** The sketch
+above had `heights` required, which makes every mesh caller supply a grid it does not have. The
+refusal is `origin3`'s shape — a member that decides nothing on the arm it is given is refused
+rather than ignored.
+
+**`closed` and `wireframe` land at step 7 with the culling and the bias that read them**, not
+here. A member accepted and ignored tells the caller nothing, and an export nothing consumes is
+what the repo's own rule forbids.
 
 **Two inputs, and whether they are two CHANNELS is now open — the rung change falsified the
 claim and this is the one residue that is not a stale noun.**
@@ -463,10 +473,31 @@ code path.
 
 ```
 ambient     0.2                                          a floor, never zero
-diffuse     0.8 · max(0, dot(normal, lightDir))          Lambertian
-specular    0.4 · pow(max(0, dot(reflect, view)), 16)    a highlight on curvature
+diffuse     0.6 · max(0, dot(normal, lightDir))          Lambertian
+specular    0.2 · pow(max(0, dot(reflect, view)), 16)    a highlight on curvature
 distance    × (1 − 0.3 · normalisedDepth)                far is dimmer
 ```
+
+**The coefficients were `0.2 / 0.8 / 0.4` and they summed to 1.4** — which made the clamp below
+the load-bearing part of the formula rather than a guard, and it cost the specular almost all of
+itself (F457). Measured at the specular's own maximum, where the normal is the half-vector between
+the light and the view: diffuse and ambient reach **0.9501** on their own, the specular takes it to
+**1.3501**, and clamping the intensity to 1 leaves **0.0499 of 0.4000 — 12.5%**. On viridis's mid
+entry that is `(33, 145, 140)` against `(32, 142, 137)`, three parts in 255 and invisible. **The
+term §3c argues is the difference between a disc and a ball was being deleted by the line three
+paragraphs down.**
+
+**And the obvious repair is worse, for a reason F455 already measured.** Clamping the *colour
+component* instead lets the intensity run to 1.4 and gives a real highlight — `(39, 166, 161)` on
+the same entry — and it clips a channel, and **a clipped channel rotates hue**: viridis's field
+ratio falls from **3.91× to 0.01×**, plasma's from 9.20× to 0.00×. That is F455's own gamut
+mechanism arriving on the scheme F455 *endorsed*, because scaling past 1 leaves the gamut exactly
+as forcing `L` did.
+
+**So the terms are rebalanced to sum to 1.** The specular keeps its full 0.2 instead of 12.5% of
+0.4, the intensity never leaves `[0, 1]`, and F455's measurement applies to the range that ships —
+which it did not before, since **F455 measured intensities 0.2–1.0 and neither document records
+that**. The diffuse range narrows from 5:1 to 4:1 and the terminator is unaffected at that ratio.
 
 **The ambient term is not optional**: without it a face turned fully away is black and reads
 as a **hole** rather than a surface, which is worse than being wrong about the light.
@@ -487,6 +518,15 @@ top rung is `⣿`. There is no ramp here and no array to run off: past 1 is a co
 past 255, and the failure is a wrap or a silent saturate — **diagnosable only by looking at the
 picture**, where an overrun throws. Same line, different failure, and worth stating because a
 reader sent to a ramp would go looking for one that this rung does not have.
+
+**With the terms summing to 1 the clamp is a guard and cannot fire on the design** — which is the
+point of rebalancing them rather than a weakness in the clamp. It reaches exactly 1 under
+`light: "headlight"`, where the light and the view coincide so a face pointing at the reader takes
+`0.2 + 0.6 + 0.2`; it exceeds it never. **It stays because three floating-point products do not sum
+to exactly 1**, and the cost of the alternative is a colour component past 255 in a renderer whose
+whole output is colour. A `Math.min` against a defect that is diagnosable only by eye is the
+asymmetry rule, and the figures are here so the next reader does not delete it after failing to
+reproduce one.
 
 #### What is refused, and why
 
@@ -518,9 +558,28 @@ smooth shading. **Face normals give a faceted look and vertex normals give a smo
 a sphere needs the second to read as a sphere rather than a geodesic dome. Both are worth
 having; `shading?: "flat" | "smooth"`, defaulting to `"smooth"`.
 
-**And the degenerate case is the edge-on plane's**: a zero-area face has no normal, and the
-cross product is the zero vector. **Refuse the face rather than dividing by its length** —
-which is the first test written.
+**And the degenerate case is not the edge-on plane's — measured, and it is wrong in both
+directions** (F456). The plane `x = 0` seen from a camera inside it: 32 faces, **every one with a
+3D area of 0.125**, **zero degenerate normals of 32**, and the first normal `(0.25, 0, 0)` — the
+plane's own, pointing along `x`. Nothing about the geometry is undefined and nothing divides by
+anything. **The zero is in the projection**: every face's *screen* area is exactly `0`, `1/area`
+is `−Infinity` — a **signed** zero — and the barycentric weights a rasteriser computes from it are
+`NaN`. So the divide-by-zero this paragraph scheduled as the first test is real and it is in the
+**rasteriser**, two stages away from the lighting it sends a reader to.
+
+**And the divide it names does not exist.** `project3.ts`'s `unit` already returns a zero-length
+vector unchanged rather than `NaN` — one dimension up from `axis`'s zero-extent rule, and written
+three steps before this — so nothing divides by a normal's length anywhere in the pipeline. A face
+with no normal shades at **ambient only**, which is the honest reading: `dot(0, l)` is `0`, and
+C12 I86 already draws a collapsed set rather than refusing it.
+
+**The genuinely degenerate face is produced by the normalisation, not by the caller.** A height
+field with a zero-width `xRange` has perfectly good faces in data space and **8 of 8** zero
+normals after `unitOf`, because a zero extent maps to the axis's centre and collapses the surface
+to a line. That is the case the *refuse the face* remedy is for, and it arrives through the
+projector rather than through the input — so a caller cannot avoid it by validating their mesh.
+
+The two zeros and their rulings are C12 §6h rows 1–4.
 
 ---
 
@@ -725,9 +784,10 @@ CUBE              flat faces, hard edges — catches z-fighting at the seams and
                   normal calculation on a degenerate quad. Also: the six faces
                   should be six distinct intensities under one light
 
-AXIS PLANES       x=0, y=0, z=0 — THE EDGE-ON CASE. A plane projects to a LINE,
-                  every face has zero area, the normal is undefined and the
-                  lighting divides by zero. WRITE THIS TEST FIRST
+AXIS PLANES       x=0, y=0, z=0 — THE EDGE-ON CASE. A plane projects to a LINE
+                  and its faces keep their area, their normals and their
+                  lighting; the rasteriser is what divides by zero. WRITE THIS
+                  TEST FIRST  (three of this row's four clauses were false — F456)
 
 TILTED PLANE      the general case, and where BANDING shows. On the dot grid the
                   suspect was the Bayer matrix; on this rung there is no matrix,
@@ -744,9 +804,13 @@ a Gaussian        smooth, single peak — the cleanest test of the colour/shadin
                   separation, because height and field can be set independently
 ```
 
-**The edge-on plane is the one that will break things.** Zero-area faces, undefined normals,
-a divide by zero in the lighting, and a projected extent of zero for the axis. **First test
-written, and the degenerate row every field form owes.**
+**The edge-on plane is the one that will break things, and not in the place this said.**
+Measured (F456): the faces have area `0.125`, the normals are the plane's own `(1, 0, 0)`, and
+**zero of 32** are degenerate — so there is no undefined normal and no divide in the lighting.
+What is zero is the **projected** area, exactly, giving `1/area = −Infinity` and `NaN` barycentric
+weights. **First test written, and the degenerate row every field form owes** — pointed at the
+rasteriser. The undefined normal is a real case and it belongs to a **zero-width range**, where
+`unitOf` collapses an axis and 8 of 8 faces come back with the zero vector.
 
 ### And then real meshes, because synthetic geometry is too well-behaved
 

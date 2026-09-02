@@ -20993,3 +20993,99 @@ probe asks it, and only the second finds the per-map split.
 
 **At 8-bit both collapse on every map** — hue drift 1.57–5.83 rad, minimum field step 0.0000
 everywhere — which is C10's rung and what `CUBE_LEVELS`' own comment already says.
+
+---
+
+## F456 — the degenerate scheduled first is not degenerate, and the divide it names does not exist ★★★★★
+
+The design note schedules the edge-on plane as **the first test written** for step 6, in two places
+and with four clauses: *a plane projects to a LINE, every face has zero area, the normal is
+undefined and the lighting divides by zero.* **Three of the four are false**, and the claim carried
+into the step cited **F451**, which is about the comment on `clipProject`'s clipped remainder and
+says nothing about a normal.
+
+**Measured.** The plane `x = 0` as a 4×4 grid of quads, normalised through `unitOf` and projected
+from a camera inside it:
+
+```
+faces 32 · 3D area 0.125 every one · zero normals 0 of 32 · first normal (0.25, 0, 0)
+projected area 0.0000 every one · 1/area −Infinity · barycentric weight NaN · culled 0
+```
+
+The normal is `(1, 0, 0)` — **the plane's own** — and there is nothing undefined about it. What is
+zero is the **projected** area, and the divide that breaks is the **rasteriser's** barycentric,
+two stages from the lighting the note sends a reader to.
+
+**And the remedy names a divide the pipeline does not contain.** *Refuse the face rather than
+dividing by its length* assumes something normalises the normal by hand; `project3.ts`'s `unit`
+has returned a zero-length vector unchanged rather than `NaN` since step 2, which is `axis`'s
+zero-extent rule one dimension up. So a face with no normal shades at **ambient** — `dot(0, l)` is
+`0` — and refusing it would contradict I86, which already draws a collapsed set rather than
+dropping it.
+
+**Wrong in both directions, which is the shape.** It is not degenerate for the reason given, and
+there **is** a genuinely degenerate face nobody stated: a height field with a zero-width `xRange`
+has good faces in data space and **8 of 8** zero normals after `unitOf`, because a zero extent maps
+to the axis's centre and collapses the surface to a line. That case arrives through the **projector**
+rather than through the input, so a caller cannot avoid it by validating their mesh and the gate
+cannot refuse it without refusing a legal document.
+
+**The old reason would be falsified by any change to a mesh format; the real one only by `unitOf`
+losing its centre rule.** Twenty minutes to measure, and the fourth instance of the instrument that
+asks where a claim was written down — here the answer was *a finding about something else*, which
+reads exactly like a citation until it is opened.
+
+---
+
+## F457 — a clamp on the wrong quantity, and a measurement whose interval neither document records ★★★★★
+
+§3c's shading terms are `ambient 0.2`, `diffuse 0.8 · max(0, n·l)`, `specular 0.4 · pow(r·v, 16)`,
+and one line below: *clamped to `[0, 1]` before the colour is resolved*. **The terms sum to 1.4**,
+so the clamp is not a guard — it is the third-largest term in the formula, and what it removes is
+almost all of the specular.
+
+**Measured at the specular's own maximum**, where the normal is the half-vector between the studio
+light and the view:
+
+```
+n·l 0.9376 · ambient+diffuse 0.9501 · +specular 1.3501 · intensity-clamped 1.0000
+the highlight is 0.0499 of 0.4000 — 12.5% survives
+viridis mid #21918c:  unlit-of-spec (32,142,137)  clamped (33,145,140)  unclamped (39,166,161)
+```
+
+Three parts in 255. **The term §3c argues is *the difference between a disc and a ball* was being
+deleted by the sentence three paragraphs down.**
+
+**And the obvious repair is refused by F455's own mechanism.** Clamping the *colour component*
+instead lets the intensity reach 1.4 and gives a real highlight — and a channel past 255 clips, and
+**a clipped channel rotates hue**:
+
+```
+                 field ratio 0.2–1.0      field ratio 0.2–1.4
+viridis               3.91x                     0.01x
+plasma                9.20x                     0.00x
+```
+
+F455 refused *hue for the field, lightness for the shading* because forcing `L` leaves the sRGB
+gamut and the clamp rotates hue. Scaling past 1 leaves the gamut the same way — so the mechanism
+F455 used to kill the two-channel scheme also kills the one-channel scheme the moment the intensity
+exceeds 1.
+
+**The finding under both is an interval nobody wrote down.** F455's ratios were measured over
+intensities **0.2–1.0**; the terms they were measured *for* run to **1.4**. Neither F455 nor §3c
+records a range — F455 says *21 field values × 11 intensities* and stops — so the number that
+decides whether the endorsement covers what ships is the one number absent from both. Re-running the
+sweep at 0.2–1.0 reproduces F455 exactly (viridis drift 0.0330, step 0.1292, 3.91×), which is what
+identified the parameter: **the claim is right and its domain was never stated.**
+
+**Fixed by rebalancing the terms to sum to 1** — `0.2 / 0.6 / 0.2`. The specular keeps its whole
+`0.2` rather than 12.5% of `0.4`, the shipped range becomes the measured range, and the clamp goes
+back to being a guard: it reaches 1 exactly under `light: "headlight"`, where the light and the view
+coincide, and exceeds it never. It stays, because three floating-point products do not sum to
+exactly 1 and the failure it guards is a colour component past 255 in a renderer whose entire output
+is colour. The diffuse range narrows 5:1 → 4:1, which is not visible at a terminator.
+
+**A figure is evidence, not a threshold** — and its evidence is only for the interval it was
+measured over. The reusable form: when a measurement endorses a mechanism, record the domain in the
+finding, because the design that consumes it will grow past the domain before anyone re-reads the
+probe.
