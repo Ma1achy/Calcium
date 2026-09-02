@@ -8234,6 +8234,19 @@ as a safety margin.
 **R5 — the fourth mesh is refused rather than deferred**, because *we could not find an OBJ* is a
 cost argument in fit-argument clothes and would be answered by the next URL.
 
+| 9 | *the visual check is unambiguous* × the picture **is** the colour on this rung | the teapot at 24-bit | **a stripped capture cannot judge it.** The half-block arm paints `▀` in every inked cell and puts both colours in the SGR, so a text frame carries one character class and the entire picture is in the escape codes. The readable statistic is the studio light's direction — the mean luminance up-and-right of the figure's centre against down-and-left — which is `plot-surface3d.test.ts`'s `litRatio` one carrier along |
+
+### 6k.1a · The catalogue takes none of them, and the coverage was checked rather than assumed
+
+**§7 already ruled it**: *a teapot in `docs/catalogue/` is fun and it is not what the catalogue is
+for — the catalogue shows what a form does for a reader, and a reader does not plot teapots.* What
+step 10 owed was to check that the 3D forms are covered without one, and they are: `scatter3d` has
+**twelve** catalogue variants at five capability sets — default, both colour arms, orthographic,
+axes at the origin, the full box, a trajectory, a path with no cloud, the wireframe — and the
+surface carrier is covered by a synthetic sphere across `shading: "smooth"`, `shading: "flat"`, an
+explicit `light3` and the cull. So the meshes are fixtures and the record they get is **golden
+frames**, which move when the renderer moves and are read by nobody looking for a form.
+
 ### 6k.2 · Residue
 
 **What this walk did not reach**: the raw scans. Every property the note reasoned from — random
@@ -9715,6 +9728,7 @@ Six tiers. No state machine — C12 is pure over the block.
 - **RM4** (I97, I95, §6k row 4): `closed: true` on the **bunny** drops more than a third of its faces and leaves the frame **byte-identical**, while on the **teapot** and **Suzanne** it changes the frame. The pair is the assertion: a cull row driven by the bunny alone passes against a cull that does nothing.
 - **RM5** (I97, §6k row 7): Suzanne under `shading: "flat"` and `shading: "smooth"` inks the **same cells** and carries **different colours** — the note's one surviving claim, and asserted as *same geometry, different shading* rather than as a count, so a mutation that moves both arms cannot satisfy it.
 - **RM6** (I97, §6k row 5): the bunny and a synthetic grid of the **same triangle count** at the same frame, compared by the samples each one's triangles win — **under half**, measured at 0.159. Deterministic, because `drawTri`'s callback fires post-depth-test and a millisecond figure is a machine's; the 1.56× cost stays in F478 with its protocol. The two numbers together are the row: the cost is higher and the output is smaller, so the unit is neither.
+- **RM7** (I97, C04 I79, §6k row 9): the teapot's frame is read **in colour** — the mean luminance of the inked cells above and right of the figure's centre against those below and left. **The stripped frame is the control and it cannot see it**: the same picture with SGR removed has one character class and no ratio to compute, which is the whole of why a half-block render needs a colour capture. The ratio is asserted against the studio light's direction rather than against a constant, so a light pointing the other way fails and a brighter light does not.
 - **LN1** (I93, C04 I78): the extent is over **both** carriers — a block with `lines3` only renders its polyline inside the box, asserted as *the inked cells lie within the frame the box draws*, and the same polyline with a cloud added at a wider extent **moves**. The second half is the row: an extent taken from `points3` alone still draws something in bounds, because `extentOf([])` is the unit cube.
 - **LN2** (I93): a segment spanning near to far under `colourBy: "depth"` carries **more than one** colour and its near end matches the near end of the ramp — compared against `continuousColour(map, 1)` rather than counted, because a count is satisfied by any two wrong colours. Under `colourBy: "series"` the same segment is **one** colour, and it is the cloud's second slot rather than its first.
 - **LN3** (I93): a polyline through a cloud's own points leaves **every** marker visible — the marker glyphs present at `1bit` with `lines3` set are the same set as without it. The row fails if lines draw first, and no bounds or ink-count assertion reaches it, because the line inks the cell either way.
