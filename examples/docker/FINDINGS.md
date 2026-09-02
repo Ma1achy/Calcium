@@ -22073,3 +22073,128 @@ that reason rather than an equality, and the mechanism is now in the section.
 not a proxy* — and a conserved total is the most convincing proxy there is, because it looks like
 it constrains two numbers when it constrains one.
 
+---
+
+## F482 — F431 was only ever asked in one direction ★★★★☆
+
+**F431 chose the half-block rung by measuring what braille wastes on a surface**: 6931 of 7254 lit
+dots interior, every one of them on, so 89–96% of the dot grid's extra samples carry nothing. The
+ruling was right and the question was asked once. **Nothing ever asked it at the other primitive**,
+and the seam for the answer was cut at step 2 and never called — `Rung = "half" | "braille"` and
+`sampleGrid(w, h, "braille")` have been in `project3.ts` since, with no caller in `src/`.
+
+Asked: **how much of what the half rung buys does an outline figure actually spend?** The rung's
+claim is two full colours a cell. Measured over the shipped `scatter3d` catalogue fixtures at 80
+columns, 24-bit, counting cells whose foreground and background differ:
+
+```
+                              half-block cells   two distinct colours
+lines-series                              107          6     5.6%
+trajectory                                113         21    18.6%
+default (a cloud)                          96         19    19.8%
+wireframe                                 103         32    31.1%
+a shaded surface   (the control)          112         70    62.5%
+```
+
+**69% to 94% of an outline figure's cells carry one colour.** The second channel is as unspent on a
+line as the dot grid's interior is on a surface — the same finding, the same size, the other way
+round.
+
+**The control is the row that makes the other four readable.** A parser that could not see
+backgrounds would report a low number everywhere and look exactly like this table; the surface's
+62.5% is what says the instrument sees both channels and the low numbers belong to the figures.
+
+**And the resolution it costs is a second number, not an impression.** Stepping the cube's twelve
+edges at both grids and measuring each drawn sample's perpendicular distance from its own line, in
+cells:
+
+```
+half     grid 80x28   samples 129   worst deviation 0.5000 cells   mean per edge 0.3485
+braille  grid 160x56  samples 240   worst deviation 0.2500 cells   mean per edge 0.1965
+```
+
+Exactly half, which is what a 2× grid in each axis has to give and is therefore also a check on the
+measurement rather than only a result.
+
+**So the arm is a trade and the word matters.** Twice the positional resolution, against the second
+colour and against a surface's shading — a surface in the dot grid sets every interior dot and
+draws as a solid silhouette. Naming it an upgrade would have produced the same code and a wrong
+default.
+
+**The class: a measurement that settles a question for one input is quoted as settling it for the
+type.** F431's sentence is about *a 3D form*; its evidence is about *a surface*. Nothing was
+misstated — the measurement simply was not run on the other half, and the half it was not run on is
+where the unbuilt arm lived.
+
+---
+
+## F483 — the load-bearing argument in a refusal was conditional, and nobody checked the condition ★★★★★
+
+C12 §3am refuses box-drawing joins on `scatter3d` with four arguments. Going to check them before
+building the arm, **one stands, one is the mechanism, one is circular and one is conditional on a
+premise the request removes**:
+
+```
+1  the note names `drawLine` and describes `strokePolyline`        STANDS — and now points at
+                                                                   the arm actually built
+2  a mask cell resolves after all strokes, so a strictly-nearer    THE MECHANISM — and it names
+   test refuses the second edge at the shared vertex a join needs   its own remedy, below
+3  `plotStyle: "line"` is not a member of this form                CIRCULAR — that is the
+                                                                   deferral, not a reason for it
+4  "the argument for the joins dies with the rung"                 CONDITIONAL — and the
+                                                                   condition has failed
+```
+
+**Argument 4 is the load-bearing one and it reads as the most decisive.** In full: *on the dot grid,
+braille and box-drawing were two full-capability choices a caller picked between, so box-drawing was
+a genuinely different picture rather than a coarser copy; here the glyph arm is what a terminal gets
+when it **cannot** do colour. It is the coarser copy.*
+
+**Every clause of that is true — of the glyph arm.** The glyph arm is `auto`'s floor, reached by
+degrading. It is false of an arm a caller names at 24-bit, which restores exactly the condition the
+paragraph says is gone: two full-capability choices, picked between. **The sentence refuses the
+route and reads as refusing the thing.**
+
+**This is MG24's shape and it is why the refusal survived being read carefully.** Review checks
+whether a justification is *true*, and this one is. What review does not ask is whether the true
+sentence constrains the decision it is attached to — the same question the mutation pass asks of a
+test, and the question that reached MG24's 276 members against 1055.
+
+**Argument 3 is the cheaper tell and it was there all along.** *The selector is not a member of this
+form* cites `STYLE_ARMS.scatter3d = []`, whose own comment reads *a braille arm joins this entry on
+the commit that builds one*. A refusal citing a deferral as its evidence is a deferral wearing a
+refusal's clothes, and the two are told apart by asking what would change the answer.
+
+**And the remedy was inside the refusal.** Argument 2 ends: *they need a second depth rule
+(equal-or-nearer for the mask, strictly-nearer for the colour) on one buffer.* That is a complete
+design, written down at the moment of refusing, and read for four steps as part of why not.
+
+**The habit that reaches this: when picking up a refusal, ask which of its arguments would change
+under the request in hand.** A refusal accumulates reasons and nobody re-reads the stack; the ones
+that are conditional read exactly like the ones that are not.
+
+---
+
+## F484 — a channel can be spent before the dispatch reaches it ★★★☆☆
+
+`markers3()` returns five shapes at three depth tiers. Giving `Point3Series.marker` a name to pick
+the column is the obvious half of the feature — and at the **far** tier there is nothing to pick
+between:
+
+```
+near   ● ◆ ▲ ■ ★     five shapes a reader can name
+mid    ○ ◇ △ □ ☆     five shapes a reader can name
+far    · ∙ • ˙ ‧     five glyphs a reader cannot tell apart at one cell
+```
+
+The far row is not a table of shapes. It is one dot drawn five slightly different ways, which is
+correct — at that size a shape is not a channel — and it means `marker` is honoured at two tiers of
+three and silently ignored at the third.
+
+**Stated rather than discovered, because the discovery is expensive and the statement is free.** A
+caller sets `marker: "square"`, sees squares near and dots far, and reports a bug. The behaviour is
+right; the missing thing is the sentence.
+
+**It is a limit of the alphabet and not of the dispatch**, which is the distinction that decides
+where it goes: the fix would be a bigger cell, and there isn't one. So it lives with the table in
+`glyphs.ts` and in C12 I99, and not in a `// TODO` beside the lookup.

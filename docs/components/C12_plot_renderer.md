@@ -7625,7 +7625,7 @@ than left as a row that passes by having no subject.
 is a camera nothing looks through and a projector nothing draws with; everything after it is
 improvement rather than proof.
 
-### The two arms, and the terminal picks
+### Four arms — one pair the terminal picks, three the caller can name
 
 ```
 halfBlockEligible(caps, false)     a colour raster: samples at width x 1 by height x 2 (I84),
@@ -7636,13 +7636,54 @@ otherwise                          one marker glyph per cell, with a unicode run
                                    the terminal has left
 ```
 
-**`STYLE_ARMS.scatter3d` is empty and that is a ruling.** Every other positional form lists the
-arms a caller may force, because `braille` against `line` is a taste — a dot grid against
-box-drawing strokes, both available at every capability that has either. These two arms are not:
-`halfBlockEligible` reads `unicode`, `ambiguousWidth` and `colourDepth`, so the choice belongs to
-the terminal and there is nothing left for the member to select. **Declaring an arm the renderer
-does not have is F207's class** — a member accepted and ignored — so the list stays empty and a
-braille arm joins it on the commit that builds one.
+**That pair is `auto`, and it stays the terminal's.** Neither of the two is a taste:
+`halfBlockEligible` reads `unicode`, `ambiguousWidth` and `colourDepth`, and forcing the colour
+raster past it draws `▀` at double the column the projection put it in — the geometric corruption
+the switch exists to prevent. **So there is no `"half"` member**, and `auto` is the only route to
+that rung.
+
+**`STYLE_ARMS.scatter3d` was `[]`, it is now three, and the retraction is measured rather than
+reconsidered.** The old ruling — *the choice belongs to the terminal and there is nothing left for
+the member to select* — is true of the pair above and answers a question no caller asks. The
+question a caller has is not *which of those two* but **what a line and a mark are made of**:
+
+```
+plotStyle: "braille"   points and lines into the 2x4 dot grid — width x 2 by height x 4 (I84).
+                       Floor: `unicode !== "ascii"`. `⣿` is width-stable at both width
+                       conventions, so `ambiguousWidth` does not bind — which is the reason
+                       `halfblock.ts` gives for why the braille arm has never met that problem
+plotStyle: "line"      box drawing at cell resolution, with real joins. No floor: `glyphForMask`
+                       degrades to `+ - |` rather than refusing
+plotStyle: "marker"    the marker table above the colour floor, and the shape is the caller's.
+                       No floor: the table has an ASCII rung
+```
+
+**The measurement is F431's own, asked at the primitive it was never asked at.** F431 chose this
+rung because a *surface* is 89–96% interior, so the dot grid stipples over a colour the cell was
+going to paint anyway. Ask the same question of an **outline** figure — how much of the rung's
+extra channel does it spend? — and the answer is symmetric:
+
+```
+                              half-block cells   carrying two distinct colours
+lines-series                              107          6     5.6%
+trajectory                                113         21    18.6%
+default (a cloud)                          96         19    19.8%
+wireframe                                 103         32    31.1%
+a shaded surface   (the control)          112         70    62.5%
+```
+
+**69–94% of an outline figure's cells carry one colour**, so the second channel — the whole of what
+this rung buys — is as unspent there as the dot grid's interior is on a surface. And what it costs
+is measurable: over the cube's twelve edges the worst deviation of a drawn sample from its own line
+is **0.5000 cells at the half rung against 0.2500 at braille**, mean per edge `0.3485` against
+`0.1965`. **The surface row is the control**, and it is what says the low numbers belong to the
+figures rather than to the instrument (F482).
+
+**So the braille arm is a trade and not an upgrade**, and naming it that way is what keeps it
+honest: twice the positional resolution in each axis, against the second colour and against a
+surface's shading. A surface rasterised into the dot grid sets every interior dot and draws as a
+**solid silhouette** — a legible picture, and not the stipple F431 refused, because the fill is
+solid rather than dithered.
 
 ### The tier, and the two arms mean different things by it
 
@@ -7721,7 +7762,7 @@ cells were written.
 | `HAS_CALLOUT` | `false` | a callout annotates the last reading at the right edge, and the rightmost sample here is a camera artefact |
 | `IS_MATRIX` | `false` | — |
 | `IS_FIELD_FORM` | `false` | — |
-| `STYLE_ARMS` | `[]` | the arms are a capability, not a taste (above) |
+| `STYLE_ARMS` | `["braille", "line", "marker"]` | `auto`'s pair is a capability; what a line is *made of* is a taste, and F431's measurement asked at the outline primitive is what says so (above). The entry was `[]` and the deferral it carried named its own condition |
 | `PLOT_FORM_MEMBERS` | `true` | mechanical |
 | `FORM_ROWS` | the renderer | — |
 | `HAS_VALUE_AXIS` | `false` | **a `Figure` holds one `value` and this form has three ranges** — F330's exact class, and `scatter`'s `true` is the wrong answer to copy |
@@ -8000,21 +8041,33 @@ construction** — which is exactly the cell where a join is needed. Box-drawing
 not inherited; they need a second depth rule (equal-or-nearer for the mask, strictly-nearer for
 the colour) on one buffer.
 
-**Three — the selector is not a member of this form.** *A wireframe with real box-drawing joins is
-what `plotStyle: "line"` gives you here*, and `STYLE_ARMS.scatter3d` is `[]` (I87): the arm is the
-terminal's, not the caller's. **Fifth instance of the residue the rung change left**, after §6's
-tier list.
+**Three — the selector was not a member of this form, and that is a consequence rather than a
+reason.** *A wireframe with real box-drawing joins is what `plotStyle: "line"` gives you here*, and
+`STYLE_ARMS.scatter3d` was `[]` — which is the deferral, not an argument for it. **Retracted**: the
+member exists (I87), and an entry citing its own emptiness is circular.
 
-**And the argument for the joins dies with the rung, which is the part worth keeping.** On the dot
-grid, braille and box-drawing were two full-capability choices a caller picked between, so
-box-drawing was *a genuinely different picture rather than a coarser copy* — the note's own words.
-Here the glyph arm is what a terminal gets when it **cannot** do colour. It is the coarser copy,
-and a claim can be exactly correct about the design it was written for and false about the one it
-was carried into (F433's own lesson).
+**And the argument that the joins die with the rung is conditional, and the condition has failed.**
+It read: *on the dot grid, braille and box-drawing were two full-capability choices a caller picked
+between, so box-drawing was a genuinely different picture rather than a coarser copy; here the glyph
+arm is what a terminal gets when it cannot do colour.* **Every clause is true of the glyph arm** —
+which is `auto`'s floor — and false of an arm a caller names at 24-bit, which restores exactly the
+condition the paragraph says is gone. The sentence refuses the *route* and reads as refusing the
+*thing*. **A correct sentence justifying the wrong decision**, which is MG24's shape and is why it
+survived being read carefully (F483).
 
-**So a line on the glyph arm is one directional glyph a sample** — `│` or `─` by dominant screen
-direction, which is what the box and the axis lines have drawn since step 4 and what the frame
-reads legibly at `1bit`, `ascii` and `wide`.
+**What survives is argument two, as the mechanism — and it names its own remedy, which is the half
+nobody acted on**: *a second depth rule, equal-or-nearer for the mask and strictly-nearer for the
+colour, on one buffer.* So `strokeSeg` reports the comparison's **outcome** rather than painting on
+a boolean; one stepping loop still serves all three of its callers, which is why it lives in
+`project3.ts` rather than in a renderer; and the mask takes an edge at a shared vertex where the
+colour does not. **Argument one stands as written** and is now load-bearing in the other direction:
+the note named `drawLine` while describing `strokePolyline`, and the arm built here is
+`strokePolyline`'s.
+
+**And on `auto`'s glyph arm a line is still one directional glyph a sample** — `│` or `─` by
+dominant screen direction, which is what the box and the axis lines have drawn since step 4 and what
+the frame reads legibly at `1bit`, `ascii` and `wide`. That arm does not change; `plotStyle: "line"`
+is a fourth thing beside it rather than a replacement for it.
 
 ---
 
@@ -9568,7 +9621,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I84** — **The sample grid is derived from the block and the rung, and the depth buffer is allocated per render.** `width × 1` by `height × 2` on the half-block rung and `width × 2` by `height × 4` on braille; `80 × 48` is the grid at the size the measurement ran in and **not a constant**, so every absolute figure in `docs/notes/CALCIUM_3D_DESIGN.md` is a measurement at 80×24 rather than a threshold. The depth buffer is `Float32Array(sampleWidth × sampleHeight)` **allocated per render**: I11 forbids state that survives a render and permits a local, and the distinction is load-bearing rather than pedantic — a module-level buffer is exactly the forbidden state *and* is the wrong size the first time a region changes. **The shading model is one sample carrying both readings, and whether they can be separated is an open measurement rather than a rule** (§3al, F436): the two-channel claim was a property of the dot grid's two carriers, it is retracted, and it is deliberately not stated as an invariant because its subject does not exist yet. **The depth test compares in the buffer's own precision, and until it did the tie rule was false as implemented** (F454): a `double` stored into a `Float32Array` is rounded, so a second writer handing over the *identical* value passed `z < d.z[i]` whenever that rounding went up — about half of all ties, decided by the last bits of a number nothing reads, and invisible to any assertion comparing the two depths because as doubles they are equal. `Math.fround` on both sides is the whole fix. Every rule phrased over *equal depth* — the draw order, the frame going in last, a wireframe over its own surface — inherits that coin flip, and a `Float32Array` beside a `double` comparison is the ordinary way to write a depth buffer rather than a slip.
 - **I85** — **A `plot` declares one block-level element exactly when it declares a camera.** Elements are what a reader can act on, and a plot with no camera affords nothing; one with a camera can be turned, which needs focus to be able to land on it. **The implementation is what found this and the spec did not**: C22 I71 requires the field and a writer to land together, and the writer runs off `focus.current` — which can only reach a kind declaring `elements`, and until now that was `table` alone (C26 §4a row 1). A binding that no focus can reach is `cursorPositions` in a different coat. **Gated on the member and not on the form**, which is also what makes the change invisible to every shipped frame: no block in the tree declares a camera, so no document gains a focus stop (→ C26 I8, C22 I71).
 - **I86** — **The frustum cull is on view `z` and happens before the divide; a zero extent maps to the centre.** Five degenerate cases, and **the first draws a plausible picture**: a sample behind the eye has a negative view `z`, the perspective divide sends it to a finite coordinate *inside* the frame mirrored through the origin, and nothing downstream can tell it from a real one — an assertion about bounds is satisfied by it, and so is a frame read. So the cull is on view `z` against a near plane of **0.01 view units** and it runs **before** the divide, which is the only point at which the information still exists; the orthographic arm takes the same cull, because a sample behind the reader is behind the reader whether or not there is a divide. **A `distance` of zero draws nothing** — the eye is on the target, everything is at or behind the near plane, and an empty picture is what standing inside the data looks like, which is why it is not a construction error. **A zero extent maps to the axis's centre** rather than to its minimum or to `NaN`: a degenerate axis has no spread, so a coplanar set draws as a line and a coincident set as a point, and the coplanar, collinear and coincident rows differ only in how many axes take the rule (§3al).
-- **I87** — **A 3D scatter has two arms, the terminal chooses between them, and `plotStyle` selects nothing.** Above `halfBlockEligible` the picture is a colour raster — samples at `width × 1` by `height × 2` (I84), `halfBlockRows` averaging the identity, and `HALF_BLOCK` carrying two colours a cell, which is the rung F431 measured. Below it the picture is one **marker glyph per cell**, with a unicode rung and an ASCII rung: every glyph in the table is `East_Asian_Width=Ambiguous`, so the wide arm is required rather than optional (→ A03 SS47, C02 I9). **`STYLE_ARMS` is empty for this form and that is a ruling rather than a gap.** Every other positional form lists arms a caller may force because `braille` against `line` is a taste available at any capability that has either; these two are selected by `unicode`, `ambiguousWidth` and `colourDepth`, so the choice is the terminal's and there is nothing left to select. Declaring an arm the renderer does not have is a member accepted and ignored (→ FINDINGS F207), so the list stays empty and a braille arm joins it on the commit that builds one (§3am).
+- **I87** — **A 3D scatter has four arms: `auto`'s pair, which the terminal chooses, and three the caller names.** `auto` is the colour raster above `halfBlockEligible` — samples at `width × 1` by `height × 2` (I84), `HALF_BLOCK` carrying two colours a cell, the rung F431 measured — and one **marker glyph per cell** below it, with a unicode rung and an ASCII rung because every glyph in the table is `East_Asian_Width=Ambiguous` (→ A03 SS47, C02 I9). **There is no `"half"` member**: forcing the raster past that switch draws `▀` at double the column the projection put it in, so `auto` is the only route to that rung and the capability question stays the terminal's. **What `STYLE_ARMS` carries is the other question** — not *which of those two* but what a line and a mark are made of — and it was `[]` on a ruling that answered the first. It now holds `braille` (`width × 2` by `height × 4`, floor `unicode !== "ascii"`, because `⣿` is width-stable at both width conventions and `ambiguousWidth` therefore does not bind), `line` (box drawing at cell resolution, no floor, since `glyphForMask` degrades to `+ - |` rather than refusing) and `marker` (the table above the colour floor with the shape the caller's, no floor, since the table has an ASCII rung). **The retraction is F431's own measurement asked at the primitive it was never asked at**: a surface is 89–96% interior, and an outline figure spends the second colour on **5.6%–31.1%** of its half-block cells against a shaded surface's **62.5%** — so the channel this rung buys is as unspent on a line as the dot grid's interior is on a surface — while the resolution it costs is a worst deviation of **0.5000 cells against 0.2500**, mean per edge `0.3485` against `0.1965`, over the cube's twelve edges (F482). Declaring an arm the renderer does not have is still F207's class, which is why the list moved on the commit that builds all three. **Each arm carries its own invariant and its own rows on the commit that builds it** — the deferral this entry replaces named its condition and watched nothing, and three forward references here would be the same shape one document along (→ I84).
 - **I88** — **Depth buckets into three tiers, and a tier is a sample count on one arm and a glyph on the other.** Continuous scaling has no spelling in a character grid and a reader cannot separate more than three sizes, so the ceiling is a decision; the bucketing is on view `z`, exactly as the density ramp buckets on value. **One table cannot serve both arms**: on the colour raster every cell is `HALF_BLOCK` and the picture is entirely in the two colours, so a tier is how many samples the point paints — `2×2` near, `1×2` mid, `1×1` far — while on the glyph arm it is which row of the marker table the glyph comes from. **The tier is the only depth channel the glyph arm has**, and the only one either arm has once `colourBy` is `"series"`, which is why it is not an ornament: below the colour floor a near point is bigger and a 3D scatter at one bit still reads as three-dimensional. **A near point at the frame's edge clips per sample** — `writeDepth` refuses an out-of-bounds coordinate, so the in-bounds quarter draws where dropping the point would delete data at the edge of every frame. The tier never sees a culled sample, because the cull runs first and a view `z` at or behind the eye is a number the projection has already declared meaningless (→ I86, C04 I76).
 - **I89** — **`colourBy` decides what colour means and whether there is a legend, from one rule.** Under `"series"` the block's identities are its `points3` labels, `identityOf` answers them, and `legendPlacement`'s count is non-zero, so the key is drawn; under `"depth"` and `"value"` `identityOf` answers nothing and a categorical legend naming a channel the picture does not use never appears. **Two rules would be a second place for them to disagree**, which is I81's mechanism avoided rather than repaired. **`SHARES_CELLS` is `true` and the legend is what makes that cell observable**: two series' samples land in one cell, the depth buffer keeps the nearer, and nothing in the picture says which series won — without a legend the record's entry would be a cell nobody could be wrong about (→ FINDINGS F330). **The value ramp's zero-span rule is the field family's own** — mid-ramp at a zero span (→ C04 I74) — and is not re-derived here; I86's centre rule is about the **position** extent. Both are called a zero extent and only one is about geometry (§3am).
 - **I90** — **Three signs are computed once and read twice: the box's far corner, and the axes' corner, which is not the same one.** In a world-aligned box the three dot products the design note asks for are three **sign tests** — `eye · x̂` is `eye.x`. The three back faces meet at `(−sx, −sy, −sz)`; the axes anchor at `(sx, sy, −sz)`, **near in x and y and far in z**. **The note's rule names the far corner and its reason forbids it** (F449's sibling, F448): measured at the default camera the far corner projects to screen `(0.500, 0.527)` — the centre of the figure — so axes drawn from it run *across* the data, which is what *the axes never occlude the data* exists to prevent; the silhouette corner projects to `(0.500, 0.888)`, the bottom vertex of the outline. **A rule and its reason can disagree and the reason is the half worth keeping**, which only drawing the thing can show. The F444 point survives as *one source of truth, two derived answers* rather than *one answer, two consumers*. **The z axis takes a side vertical edge** and a fixed one, so it does not swap sides mid-orbit for a fraction of a cell. **A zero component ties to the negative end**, because `Math.sign(0)` names no corner and a camera crossing the plane would otherwise make the axes jump twice. The frame is **depth-tested against the data**, which is *never occlude* read from the other side — and it is drawn **last**, which is a rule about ties rather than a reading convenience (F452). It drew first under a comment saying *order does not decide occlusion here*; order decides exactly the coincident case, and coincidence is structural, because `unitOf` normalises the **data's own extent** so the extreme samples lie on the box by construction and a wireframe of a bounding volume coincides with it entirely. Drawn first, the frame took every one of those cells and painted the reader's geometry in `tone.muted`. Nothing else moves — a frame edge genuinely in front of a sample still wins, which is what `box3: "full"` means — but the frame's write must clear the tier code as well as setting the mark, because `glyphRows` reads `glyph` before `mark` (→ I84, I86, C04 I77).
@@ -9670,7 +9723,7 @@ orientation — and belongs in the classification table as its own rows.
 85. **A plot is focusable exactly when it has a camera** (I85). An element is a thing a reader can act on, and a plot with no view to turn affords nothing — so the gate is the member rather than the form, which is also why no shipped document gains a focus stop. **Found by building the writer**, not by the walk: `orbitBlock` reads `focus.current`, focus reaches only a kind declaring `elements`, and `table` was the only one (→ C26 I8, C22 I71).
 84. **The sample grid is derived and the depth buffer is per render** (I84). `width × 1` by `height × 2` at the half-block rung, `× 2` by `× 4` at braille, and `80 × 48` is a measurement of that rule at 80×24 rather than a number to hardcode. The buffer is local because I11 forbids a survivor — and because a module-level one is the wrong size the first time a region changes, which is the failure a purity argument alone would not have predicted. **The shading is one sample carrying both readings**, the two-channel claim is retracted (F436), and its replacement is an open measurement at step 6 rather than an invariant with no subject.
 82. **A reader map counts names and a rendered comparison counts readers** (I82, C12 §3ak.48). Eleven members came back `svg=0` and it was read as *the arm does not read it*; `calendarUnit` and `startDate` had crossed since F322 through `drawnBlock` → `calendarRows`, and five blocks differing only in them draw **five distinct documents**. F355's member sweep shares the blind spot, reading the type against the files. The genuinely owed two cross as **what must not be decided twice** — the caption's words, and *whether* the rules cross — with the room and the arithmetic staying in each arm, and their fixtures went through the collision sweep **before** either member was touched (F322, F369, F370).
-87. **The two arms are a capability and not a taste, so the style member selects nothing** (I87). The colour raster above `halfBlockEligible` and the marker glyph below it are chosen by `unicode`, `ambiguousWidth` and `colourDepth` — where `braille` against `line` is a choice available at any capability that has either — so `STYLE_ARMS` is empty rather than inheriting `scatter`'s two. An arm listed and not built is a member accepted and ignored, which is the one thing F207 rules out (§3am, A03 SS47).
+87. **The pair is a capability, the three are a taste, and the member answers the second question** (I87). `auto` is the terminal's — the colour raster above `halfBlockEligible`, the marker glyph below it — and there is no `"half"` member, because forcing the raster past that switch is a geometric corruption rather than a preference. `STYLE_ARMS` was `[]` on a ruling that answered *which of those two*, which is not the question a caller has; it now carries `braille`, `line` and `marker`, each with its capability floor stated. **The retraction is a measurement rather than a reconsideration**: an outline figure spends the half rung's second colour on 5.6%–31.1% of its cells against a shaded surface's 62.5%, which is F431's own question asked at the other primitive (§3am, FINDINGS F482).
 88. **The tier is the depth channel, and it means a different thing in each arm** (I88). Three buckets on view `z`, because a grid cannot scale smoothly and a reader cannot read four sizes. On the raster a tier is a **sample count** and on the glyph arm a **table row** — one table cannot serve both, which is what reading the design note's glyph table onto the raster would have done. It is the only depth channel the glyph arm has and the only one either arm has under `colourBy: "series"`, so a scatter at one bit still reads as three-dimensional; and a near point at the edge clips per sample rather than being dropped whole (→ I86, C04 I76).
 89. **One rule decides what colour means and whether there is a key** (I89). `identityOf` answers `points3` labels under `colourBy: "series"` and nothing otherwise, so the legend's presence and its contents fall out together and cannot disagree — I81's mechanism avoided rather than repaired. `SHARES_CELLS` is `true` because the depth buffer keeps one of two samples in a cell, and the legend is what makes that entry observable rather than a cell nobody can be wrong about. The value ramp's zero span is the field family's rule and not I86's centre, which is about the position extent (→ C04 I74, FINDINGS F330).
 90. **The corner is three sign tests, and the back faces are the same three** (I90). A world-aligned box turns the design note's three dot products into three signs, which is the difference between a rule a reader can check and one they have to trust; the far corner and the three back faces are one computation with two consumers, because two derivations of one fact are F444's shape and it was measured one commit earlier. A zero component ties to the negative end so a camera crossing the plane does not make the axes jump twice (→ C04 I77).

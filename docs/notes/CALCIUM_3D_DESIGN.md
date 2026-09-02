@@ -792,19 +792,36 @@ surface is fine and intended.
 ## 6 · The style tiers
 
 ```
-plotStyle: "half"         `▀`, two full colours per cell — width × 1 by height × 2.
-                          THE DEFAULT, and the measurement is why (F431)
-plotStyle: "braille"      the dot grid — 2×4 per cell. NOT for surfaces: the interior
-                          samples are all lit and carry nothing. Points and lines,
-                          where the whole primitive IS its outline
+plotStyle: undefined      `auto` — the half-block raster above `halfBlockEligible`, the marker
+  (or "auto")             glyph below it. THE DEFAULT, and the measurement is why (F431)
+plotStyle: "braille"      the dot grid — 2×4 per cell. Points and lines, where the whole
+                          primitive IS its outline. A surface here is a solid silhouette
+                          rather than a shaded one, and that is the trade rather than a fault
 plotStyle: "line"         cell resolution with box drawing. Wireframes with real joins
-plotStyle: "ascii"        the ASCII arm, and the marker set's ASCII rung
+plotStyle: "marker"       the marker table above the colour floor, and the shape is the
+                          caller's rather than the series index's
 ```
+
+**Two of this list's four names were wrong and the shape of the list was right.** There is no
+`"half"` member: forcing the raster past `halfBlockEligible` draws `▀` at double the column the
+projection put it in, so that rung is reachable only through `auto` and the capability question
+stays the terminal's. And `"ascii"` is not a tier either — it is `auto`'s floor, arrived at by
+`unicode: "ascii"` rather than asked for. What the list was reaching for in that slot is
+`"marker"`: the same table, above the colour floor, with the shape chosen rather than assigned.
 
 **Braille is demoted rather than deleted, and the split is by primitive rather than by taste.** A
 scatter and a wireframe are outline all the way through — every dot they light is a boundary dot —
 so the dot grid's 4× sample count is entirely spent on signal. A *surface* is 89–96% interior, and
 there the dot grid is a stipple over a colour the cell was going to paint anyway.
+
+**And the measurement that says so was only ever run in one direction, which is why the arm sat
+unbuilt behind a seam that was already cut.** F431 asked what braille wastes on a surface. Asked at
+the other primitive — what does the half rung waste on an outline? — the answer is symmetric:
+**5.6% to 31.1% of an outline figure's half-block cells carry two distinct colours**, against a
+shaded surface's **62.5%**. The second colour is the whole of what this rung buys, and on a line it
+is unspent. What it costs is `0.5000` cells of worst deviation against braille's `0.2500`, mean per
+edge `0.3485` against `0.1965`, over the cube's twelve edges. So the braille arm is a **trade**:
+twice the positional resolution in each axis, against the second colour and against shading (F482).
 
 **And the capability ladder crosses it:**
 
