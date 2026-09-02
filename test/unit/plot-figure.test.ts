@@ -58,10 +58,12 @@ describe("FV — the shared axis, and a record with something to be wrong about"
       // the record that says which is which.
       //
       // **Both figures, because the exemption looks far larger than it is.**
-      // It covers **96 of 168** triples — 57.1% — and **94 of those 96 were
-      // already producing zero offenders**, measured by running this row with
-      // them included. So its reach today is two triples, and its cost is that
-      // 94 lose a check they were passing. Recorded rather than left as a
+      // It covered **96 of 168** triples — 57.1% — when it was written, and
+      // **94 of those 96 were already producing zero offenders**, measured by
+      // running this row with them included. So its reach was two triples and
+      // its cost the other ninety-four. It reads 100 now, because each new
+      // variant of a gutterless form enlarges the exemption without being
+      // asked — which is this figure's second job. Recorded rather than left as a
       // percentage a reader would have to derive.
       if (!HAS_Y_GUTTER[form as PlotForm]) {
         gutterless += Object.keys(variants as Record<string, unknown>).length * 2; // cells-ok — a frame count
@@ -102,7 +104,7 @@ describe("FV — the shared axis, and a record with something to be wrong about"
     expect(exempted, "numeric labels the figure named itself").toBeGreaterThan(0); // cells-ok — a label count
     // **Counted, not excluded** — a clause with no instances reads exactly like
     // one that is satisfied, and this one has 96.
-    expect(gutterless, "triples skipped for having no gutter to read").toBe(96); // cells-ok — a frame count
+    expect(gutterless, "triples skipped for having no gutter to read").toBe(100); // cells-ok — a frame count
     expect(offenders, "a form marked `false` drew a number on an axis").toEqual([]);
   });
 

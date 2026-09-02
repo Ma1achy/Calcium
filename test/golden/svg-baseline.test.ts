@@ -110,6 +110,8 @@ describe("SB — the SVG baseline (C12 §3ak.10, F275)", () => {
       "scatter3d-axes-origin.svg",
       "scatter3d-axis-styles.svg",
       "scatter3d-box-full.svg",
+      "scatter3d-braille-surface.svg",
+      "scatter3d-braille-wire.svg",
       "scatter3d-colour-series.svg",
       "scatter3d-colour-value.svg",
       "scatter3d-coplanar.svg",

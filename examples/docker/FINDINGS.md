@@ -22333,3 +22333,115 @@ a percentage a reader has to derive is a percentage a reader assumes.
 at.** The catalogue itself renders five sets; this row renders one. Nothing was wrong until a member
 made a degraded-only arm reachable at the set the row uses — at which point a four-step-old property
 of the form arrived looking like a new defect.
+
+---
+
+## F488 — a walk row headlined the opposite of the evidence it cited, in the same sentence ★★★☆☆
+
+§6m's row 2 asks what happens when the frame's literal glyph meets a braille cell. Its ruling:
+
+> **the frame keeps `mark[]` and wins its cell whole.** Both are one glyph per cell, so there is no
+> compositing question — a cell is `│` or it is `⣿`, and `glyphRows`' existing precedence (`glyph`
+> before `mark`, `mark` before blank) is the rule already written.
+
+**The parenthetical is correct and it says the opposite of the headline.** `glyph` is the *data's*
+channel and `mark` is the *frame's*; `glyph` before `mark` is **data before frame**. The row cited
+the right rule, quoted it accurately, and stated its conclusion backwards.
+
+**Writing the compose step is what found it**, because the code has to pick one. Both readings are
+implementable and only one agrees with I90 — *the axes never occlude the data*, which is the same
+precedence a third time.
+
+**Why it survived being written and read**: the headline and its evidence are eleven words apart,
+and the evidence is in parentheses. A reader checking the row against `glyphRows` finds `glyphRows`
+agrees — with the parenthetical. Nothing in the sentence is false; the two halves simply point
+opposite ways, and the eye takes the bolded one.
+
+**And the row had a real finding underneath the wrong headline**, which is why it should not have
+been deleted: every earlier arm has **one sample a cell**, so there was never an arbitration to
+make. The braille rung is the first where a cell holds eight samples and can carry both a frame
+mark and data dots — that is the interaction the row correctly identified, with the wrong ruling
+attached.
+
+**The class is F84's, one artefact along.** A correct statement attached to the wrong decision;
+review checks whether the statement is true and it is. Here the true statement was sitting *in the
+same sentence* as the decision it contradicts, which is the cheapest possible instance to catch and
+was still missed twice.
+
+---
+
+## F489 — a distinction that did not exist until there were three of something ★★★★☆
+
+Adding a third rung to `scatter3d` turned up **two latent defects and one new one**, all of the same
+shape: a variable that meant two things at once while the two things happened to be equal.
+
+**One — `grid.width` was the cell width and the sample width.** `frameOf` places a label's *row*
+from `rows` (cells) and its *column* from `grid.width` (samples). On the half-block rung
+`grid.width === w`; on the glyph arm a sample **is** a cell. So both existing arms made the two
+equal, and the asymmetry — row in cells, column in samples — sat in one function unremarked. The
+braille rung is `width × 2`, and the column, the width bound and the label collision key were all
+in the wrong unit at once. The frame came out with its labels scattered to both margins.
+
+**Two — `half ? undefined : densityGlyph(...)`.** The surface's second channel is *the glyph arm's*:
+the colour carries the field and a density glyph carries the shading, which only makes sense where a
+cell is one sample. Written as `!half` it fired on the braille rung too, so every surface sample
+wrote a density glyph, `brailleRows` read those as frame marks and withheld them from the dot grid.
+
+**The second one is the instructive one, because the picture it produced was plausible.** Not
+blank, not corrupt — a *stipple*, which is exactly what a reader half-expecting braille to stipple a
+surface would accept. What said otherwise was a histogram of which of the eight dot positions were
+actually set:
+
+```
+                r0c0  r1c0  r2c0  r3c0   r0c1  r1c1  r2c1  r3c1
+surface, before    61    74    76     3     33    76    67     0
+surface, after     60    60    61    59     60    60    61    59
+wireframe          26    27    22    26     22    27    17    16
+```
+
+**Three against seventy-six is not a coverage artefact.** The wireframe's row — even across all
+eight, because it is genuinely sparse — is the control that says the instrument reads the cell
+correctly and the surface's row is the surface's.
+
+**The shape to carry: a boolean that names one of two arms becomes a lie the moment there is a
+third, and it does not become a compile error.** `half` was `true` or `false`, and every `!half`
+meant *the glyph arm* while reading as *not the raster*. TypeScript cannot object; the sites are
+correct until the day they are not. The remedy taken is a named `Arm` union plus a second predicate
+`sub` for *paints a sub-cell sample*, so each site says which question it is asking — and the audit
+that found them was `grep "half\b"` over the file, eleven lines, done once.
+
+**And the instrument that found the second was reading the frame** — the first was reading it too,
+since scattered labels are visible at a glance. Neither would have failed an assertion about counts,
+and the stipple would have passed a golden frame for as long as it was regenerated with it.
+
+---
+
+## F490 — an extent assertion absorbs an area change, because a mark has a floor of one cell ★★★☆☆
+
+BR4 asserts that a marker's *apparent size* survives the change of rung — the braille tier table is
+the half-block one doubled in each axis, because a braille sample is half a sample across and half
+of it down. Its first draft measured the marker's **bounding box in cells** and bounded it between
+the half rung's box and one cell more.
+
+**The mutation pass killed it.** Replacing `BRAILLE_TIER` with `RASTER_TIER` — quartering every
+marker's area — changed the bounding box by nothing the tolerance could see, and BR4 passed.
+
+**Because a mark has a floor.** However few samples a tier asks for, the mark occupies **at least
+one cell**, and a mid-tier marker occupies about one cell either way. What the quartering actually
+destroys is the *sub-cell coverage*, and a bounding box measured in cells is exactly the quantity
+that cannot see it.
+
+**The assertion that bites is a full cell.** A near marker at the doubled table is `4 × 4` dots —
+one cell, all eight positions, `⣿` — and at the half rung's table it is `2 × 2`, which cannot fill a
+cell at any alignment. Measured over a depth-spread cloud: **8 full cells against 0**. And it needs
+its own control, that non-full cells also exist, or the row passes against a renderer that lights
+every dot of every cell it touches.
+
+**The class: when the property under test is an area, do not assert an extent.** They agree on
+every input where the thing is bigger than the floor, which is every input a fixture is likely to
+choose — and the disagreement is exactly the region a shrinking mutation moves into. The tolerance
+that makes an extent assertion survive lattice noise is the same tolerance that makes it blind.
+
+**And the row's own comment was already right about the mechanism** — it named the lattice straddle
+and set ±1 for it — which is what made the draft convincing. A correct reason for a tolerance is
+not a reason the tolerance leaves anything to measure.

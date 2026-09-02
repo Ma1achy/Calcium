@@ -334,6 +334,8 @@ describe("PR — the pair catalogue's partition, which is the counter restated (
       "scatter3d/axes-origin",
       "scatter3d/axis-styles",
       "scatter3d/box-full",
+      "scatter3d/braille-surface",
+      "scatter3d/braille-wire",
       "scatter3d/colour-series",
       "scatter3d/colour-value",
       "scatter3d/coplanar",

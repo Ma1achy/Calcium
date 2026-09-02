@@ -278,6 +278,30 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
         { label: "gamma", points: cluster3(0, 0.6, 0.6, 90) },
       ],
     },
+    // C12 I100 — the dot grid on the primitive it was measured for. A cube's
+    // twelve edges are boundary all the way through, which is F482's other
+    // half: the half rung's second colour is spent on 5.6% of an outline
+    // figure's cells, and what it costs is `0.5000` cells of deviation against
+    // `0.2500`.
+    "braille-wire": {
+      form: "scatter3d", height: 14, series: [], plotStyle: "braille",
+      lines3: cubeEdges3(0.8, 0.5),
+    },
+    // C12 I100, §6m row 1 — **a fill on the arm that was said not to serve
+    // one.** It is solid `⣿` in its nearest sample's shaded colour, at one
+    // colour a cell rather than two, and its silhouette is drawn at twice the
+    // resolution in each axis. The sheet is the record of that trade.
+    "braille-surface": {
+      form: "scatter3d", height: 14, series: [], plotStyle: "braille",
+      surfaces3: [{
+        heights: Array.from({ length: 21 }, (_r, r) =>
+          Array.from({ length: 21 }, (_c, c) => {
+            const x = (c / 20) * 4 - 2;
+            const y = (r / 20) * 4 - 2;
+            return Math.exp(-(x * x + y * y) / 2);
+          })),
+      }],
+    },
     // C12 I99 — the marker arm, where the whole glyph table becomes reachable
     // at a capability that would otherwise take the colour raster, and the
     // shape is the caller's rather than the series index's.

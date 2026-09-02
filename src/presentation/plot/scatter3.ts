@@ -19,6 +19,7 @@ import { HALF_BLOCK, HALF_BLOCK_LOWER, halfBlockEligible } from "../image/index.
 import { paint, slot, type Span } from "../blocks/paint.js";
 import { arrows3, glyphs, MARKER3_COLUMNS, markerColumn, markers3 } from "../blocks/glyphs.js";
 import { cells } from "../text.js";
+import { BRAILLE_DOTS, createGrid, foldBraille, setDot } from "./raster.js";
 import {
   axisLines,
   boxEdges,
@@ -324,6 +325,48 @@ const RASTER_TIER: readonly (readonly [number, number])[] = Object.freeze([
   [1, 1], // far
 ]);
 
+/**
+ * The same three blocks at the dot grid — **doubled in each axis, so apparent
+ * size is what survives the change of rung** (C12 I100).
+ *
+ * A braille sample is half a half-block sample across and half of it down, so
+ * carrying `RASTER_TIER` over unchanged would draw every marker at a quarter of
+ * the area it has on the rung beside this one — and the near tier, whose whole
+ * job is to be the biggest, would come out the size the *far* tier is today.
+ * The arm exists to draw a line more finely, not to shrink the points.
+ */
+const BRAILLE_TIER: readonly (readonly [number, number])[] = Object.freeze([
+  [4, 4], // near
+  [2, 4], // mid
+  [2, 2], // far
+]);
+
+/** Which rung this block draws at (C12 I87, I100, §3am). */
+type Arm = "half" | "braille" | "glyph";
+
+/**
+ * `auto` is the terminal's and a named arm is the caller's (C12 I87, §3am).
+ *
+ * **The floor is `unicode` alone and `ambiguousWidth` does not bind**, because
+ * `⣿` is one cell at both width conventions — which is the reason `halfblock.ts`
+ * gives for why the braille arm has never met the problem `▀` has.
+ *
+ * **Below its floor the named arm degrades rather than refusing.** `plotStyle:
+ * "line"` sets that precedent one family over — `lineDrawRows` falls to
+ * `+ - |` — and the reason is stronger here: a construction error for a
+ * *terminal's* capability would make one document valid on one machine and
+ * invalid on another, which C04 cannot express and should not (§6m row 6).
+ */
+function armOf(
+  block: Plot,
+  caps: RenderContext["capabilities"],
+): Arm {
+  const ps = block.plotStyle;
+  if (ps === "marker") return "glyph";
+  if (ps === "braille" && caps.unicode !== "ascii") return "braille";
+  return halfBlockEligible(caps, false) ? "half" : "glyph";
+}
+
 /** The frame's marks, by the segment's dominant screen direction. */
 function frameMark(
   pa: Projected,
@@ -350,11 +393,24 @@ function frameOf(
   block: Plot,
   scene: Scene,
   grid: Readonly<{ width: number; height: number }>,
-  rows: number,
+  /**
+   * The plot area in **cells**, which is what a label is placed in — and which
+   * is not `grid` (C12 I100, F489).
+   *
+   * **`rows` was already here and `w` was not, and the asymmetry is the
+   * defect.** A label's row was computed from `rows` and its column from
+   * `grid.width`, because on both existing arms `grid.width === w`: the
+   * half-block rung is `width × 1` across and the glyph arm is one sample a
+   * cell. The braille rung is the first that is `width × 2`, and there the
+   * column, the width bound and the collision key were all in sample units
+   * while the row was in cells.
+   */
+  area: Readonly<{ w: number; rows: number }>,
   depth: Depth,
   ctx: RenderContext,
   paint: (i: number, mark: string, ink?: ColourValue) => void,
 ): readonly Placed[] {
+  const { w: areaW, rows } = area;
   const placement = block.axes3 ?? "corner";
   const boxMode = block.box3 ?? "back";
   // **One computation, two consumers** (C12 I90, F444). The three back faces
@@ -438,8 +494,8 @@ function frameOf(
     // clearance, because the longer string was the one that overflowed. A label
     // that does not fit the frame at all is still refused; one that fits
     // somewhere is moved.
-    if (row < 0 || row >= rows || wide > grid.width) return; // cells-ok — a bound
-    const col = Math.max(0, Math.min(grid.width - wide, Math.round(pr.x * grid.width - wide / 2))); // cells-ok — a column index
+    if (row < 0 || row >= rows || wide > areaW) return; // cells-ok — a bound
+    const col = Math.max(0, Math.min(areaW - wide, Math.round(pr.x * areaW - wide / 2))); // cells-ok — a column index
     // **Drop the later**, `niceAxis`'s own rule: a label whose cells another
     // has already claimed is not drawn, and the order above is the priority.
     //
@@ -450,9 +506,9 @@ function frameOf(
     // reservation is the label **plus its gap**, which is the same rule the
     // y-gutter's own spacing has one dimension down.
     for (let i = -1; i <= wide; i += 1) { // cells-ok — a column offset
-      if (taken.has(row * grid.width + col + i)) return; // cells-ok — a cell offset
+      if (taken.has(row * areaW + col + i)) return; // cells-ok — a cell offset
     }
-    for (let i = -1; i <= wide; i += 1) taken.add(row * grid.width + col + i); // cells-ok — a cell offset
+    for (let i = -1; i <= wide; i += 1) taken.add(row * areaW + col + i); // cells-ok — a cell offset
     placed.push({ row, col, text, ...(ink === undefined ? {} : { ink }) });
   };
 
@@ -537,21 +593,28 @@ export function scatter3dArea(
   // twice as tall as it is wide (`CELL_ASPECT`), so a projection that ignored
   // it would draw a sphere as an ellipse — the one distortion a reader reads as
   // data.
-  // **`auto` is the terminal's and a named arm is the caller's** (C12 I87,
-  // §3am). `halfBlockEligible` reads `unicode`, `ambiguousWidth` and
-  // `colourDepth`, and there is no member that forces the raster past it —
-  // that would draw `▀` at double the column the projection put it in. What a
-  // caller can say is what a mark is *made of*, and `"marker"` says the glyph
-  // table, at any capability, because the table has an ASCII rung.
-  const half = block.plotStyle !== "marker" && halfBlockEligible(ctx.capabilities, false);
-  const grid = half ? sampleGrid(w, rows, "half") : { width: w, height: rows };
+  const arm = armOf(block, ctx.capabilities);
+  const half = arm === "half";
+  // **The two arms that paint a tier as a *block* rather than as a glyph**, and
+  // the distinction the code needs more often than the arm's name: a sample is
+  // sub-cell on both, so a marker is an area and a line is a run of samples.
+  const sub = arm !== "glyph";
+  const grid =
+    half ? sampleGrid(w, rows, "half")
+    : arm === "braille" ? sampleGrid(w, rows, "braille")
+    : { width: w, height: rows };
   // **The aspect is the sample's, and the two arms disagree about it.** A
   // terminal cell is `CELL_ASPECT` times taller than it is wide; a half-block
   // sample is half a cell tall, so it is square and the aspect is the plain
   // grid ratio. A glyph-arm sample is a whole cell, so the ratio is divided by
   // the cell's own. Getting this wrong draws a sphere as an ellipse, which is
   // the one distortion a reader reads as data.
-  const aspect = grid.width / (grid.height * (half ? 1 : CELL_ASPECT));
+  // **Both sub-cell samples are square and the glyph arm's is not.** A cell is
+  // `CELL_ASPECT` times taller than wide; a half-block sample is half a cell
+  // tall, and a braille sample is half a cell wide and a *quarter* tall — which
+  // is the same ratio again. So the correction is the arm's granularity rather
+  // than the rung's, and it is `sub` for that reason.
+  const aspect = grid.width / (grid.height * (sub ? 1 : CELL_ASPECT));
   const scene = drawnOf(block, ctx, aspect);
   const drawn = scene.drawn;
 
@@ -619,8 +682,8 @@ export function scatter3dArea(
     const fy = d.y * grid.height; // cells-ok — a sample coordinate
     const sx = Math.floor(fx); // cells-ok — a sample coordinate
     const sy = Math.floor(fy); // cells-ok — a sample coordinate
-    if (half) {
-      const [bw, bh] = RASTER_TIER[tier] as readonly [number, number];
+    if (sub) {
+      const [bw, bh] = (half ? RASTER_TIER : BRAILLE_TIER)[tier] as readonly [number, number];
       const x0 = Math.round(fx - bw / 2); // cells-ok — a sample coordinate
       const y0 = Math.round(fy - bh / 2); // cells-ok — a sample coordinate
       // **A near point at the frame's edge clips per sample** (C12 I88).
@@ -662,7 +725,11 @@ export function scatter3dArea(
     // refused with their mechanism in §3ao: a mask cell carries four bits
     // resolved after all strokes, and a strictly-nearer test refuses the
     // second edge at exactly the shared vertex a join needs.
-    const glyphMark = half ? undefined : frameMark(st.a, st.b, ctx);
+    // **A data path is dots on the braille arm and a glyph only below it.**
+    // The whole of what the arm buys is a line at twice the resolution in each
+    // axis, so writing a literal `│` here would spend it on the one primitive
+    // it was measured for (F482).
+    const glyphMark = sub ? undefined : frameMark(st.a, st.b, ctx);
     strokeSeg(st.a, st.b, grid, depth, (i, t, z) => {
       // **Interpolated per sample under the two ramp arms** (C12 I93). The
       // depth is here at every step, and one colour for a segment crossing the
@@ -722,7 +789,15 @@ export function scatter3dArea(
       // **The glyph arm's second channel** (§6h row 12): the colour carries the
       // field and the mark carries the shading, which is F436's retracted claim
       // holding on the arm that kept two carriers.
-      mark[i] = half ? undefined : densityGlyph(k, ctx.capabilities);
+      //
+      // **`sub` and not `!half`, and reading the frame is what said so** (C12
+      // I100, F489). This was `half ? undefined : …`, correct while *not half*
+      // meant *the glyph arm*. On the braille rung it wrote a density glyph at
+      // every surface sample, which `brailleRows` then read as a frame mark and
+      // withheld from the dot grid — measured, the bottom dot row of a shaded
+      // surface's cells was set **3 times against 76** for the rows above it,
+      // and the picture was a plausible stipple rather than an obvious fault.
+      mark[i] = sub ? undefined : densityGlyph(k, ctx.capabilities);
       glyph[i] = -1;
     });
   }
@@ -739,7 +814,7 @@ export function scatter3dArea(
   //
   // Nothing else moves: a frame edge genuinely in front of a sample still wins,
   // because that test is unchanged and is what `box3: "full"` means.
-  const labels = frameOf(block, scene, grid, rows, depth, ctx, (i, m, axisInk) => {
+  const labels = frameOf(block, scene, grid, { w, rows }, depth, ctx, (i, m, axisInk) => {
     // **The axis's own tone where it has one** (C12 I98). The box and the
     // untoned axes keep `frameInk`, which is what makes a single coloured axis
     // read as one axis rather than as a recoloured frame.
@@ -752,10 +827,14 @@ export function scatter3dArea(
     glyph[i] = -1;
   });
 
-  const composed = half
-    ? halfRows(ink, depth, grid.width, rows)
-    : glyphRows(ink, glyph, mark, grid.width, rows, ctx);
-  return overlay(composed, labels, frameInk, grid.width); // cells-ok — a cell width
+  const composed =
+    half ? halfRows(ink, depth, grid.width, rows)
+    : arm === "braille" ? brailleRows(ink, depth, mark, w, rows)
+    : glyphRows(ink, glyph, mark, w, rows, ctx);
+  // **`w` and not `grid.width`, which were the same number until this arm.**
+  // Both call sites read the sample grid where they meant the cell width, and
+  // both were right by coincidence on every rung that existed (F489).
+  return overlay(composed, labels, frameInk, w); // cells-ok — a cell width
 }
 
 /**
@@ -799,6 +878,101 @@ function halfRows(
       else if (!b) line.push(span(HALF_BLOCK, ink[ti]));
       else if (!t) line.push(span(HALF_BLOCK_LOWER, ink[bi]));
       else line.push(span(HALF_BLOCK, ink[ti], ink[bi]));
+    }
+    out.push(line);
+  }
+  return out;
+}
+
+/**
+ * The empty braille cell — `foldBraille`'s `0x2800 + mask` with no dots set.
+ *
+ * Named rather than written as a character, because a literal here is a mark the
+ * substitution table cannot reach (A03 SS47) — and named rather than inlined,
+ * because `0x2800` in a comparison reads as a magic number where this reads as
+ * the question being asked.
+ */
+const BRAILLE_BLANK = 0x2800;
+
+/**
+ * The dot grid, composed into cells — **one colour a cell, and the data owns it**
+ * (C12 I100, §6m rows 1 and 2).
+ *
+ * **Built through `raster.ts` rather than beside it.** `foldBraille` holds the
+ * dot-to-bit order, and a second copy of that order is a second place for the
+ * picture to come out transposed — which every count-based assertion would agree
+ * with, because a transpose preserves counts. One extra `Uint8Array` is the
+ * price of the order living in one file.
+ *
+ * **The data wins the cell and the frame draws where the data did not**, which
+ * is `glyphRows`' own precedence — `glyph` before `mark` — and *the axes never
+ * occlude the data* read from the other side (C12 I90). §6m row 2 headlined this
+ * the other way round while citing the precedence correctly beneath it, and the
+ * code is what settled it (F488).
+ *
+ * **A cell's colour is its nearest drawn sample's and never a mean** (C12 I100).
+ * The depth buffer is the authority on drawn-ness, which is `halfRows`' rule one
+ * function up; a mean of two clouds' colours is a third colour naming neither.
+ *
+ * **An empty cell is a space and not `⠀`.** U+2800 is a blank braille glyph, so
+ * a frame full of them measures right and reads as ink-less texture rather than
+ * as nothing — and every other sparse raster in this component emits a space.
+ */
+function brailleRows(
+  ink: readonly (ColourValue | undefined)[],
+  depth: Depth,
+  mark: readonly (string | undefined)[],
+  w: number,
+  rows: number,
+): readonly (readonly Span[])[] {
+  const dots = createGrid(w * BRAILLE_DOTS.x, rows * BRAILLE_DOTS.y); // cells-ok — a dot count
+  for (let y = 0; y < depth.height; y += 1) { // cells-ok — a sample index
+    for (let x = 0; x < depth.width; x += 1) { // cells-ok — a sample index
+      const i = y * depth.width + x; // cells-ok — a sample offset
+      // The frame's samples are not dots — they are a glyph the cell may take
+      // if no data reached it, so lighting them would draw the axis twice.
+      if (mark[i] === undefined && Number.isFinite(depth.z[i])) setDot(dots, x, y);
+    }
+  }
+  const folded = foldBraille(dots);
+  const out: Span[][] = [];
+  for (let r = 0; r < rows; r += 1) { // cells-ok — a row index
+    const glyphRow = [...(folded[r] ?? "")];
+    const line: Span[] = [];
+    for (let c = 0; c < w; c += 1) { // cells-ok — a column index
+      let nearest = Infinity;
+      let colour: ColourValue | undefined;
+      let framed: string | undefined;
+      let framedInk: ColourValue | undefined;
+      let framedAt = Infinity;
+      for (let dy = 0; dy < BRAILLE_DOTS.y; dy += 1) { // cells-ok — a dot index
+        for (let dx = 0; dx < BRAILLE_DOTS.x; dx += 1) { // cells-ok — a dot index
+          const x = c * BRAILLE_DOTS.x + dx; // cells-ok — a sample coordinate
+          const y = r * BRAILLE_DOTS.y + dy; // cells-ok — a sample coordinate
+          if (x >= depth.width || y >= depth.height) continue;
+          const i = y * depth.width + x; // cells-ok — a sample offset
+          const z = depth.z[i] as number;
+          if (!Number.isFinite(z)) continue;
+          const m = mark[i];
+          if (m !== undefined) {
+            if (z < framedAt) { framedAt = z; framed = m; framedInk = ink[i]; }
+            continue;
+          }
+          if (z < nearest) { nearest = z; colour = ink[i]; }
+        }
+      }
+      const glyph = glyphRow[c] ?? " ";
+      // **The code point and not the character** (A03 SS47). A literal blank
+      // braille glyph in framework text is a mark the substitution table cannot
+      // reach; `foldBraille` emits `0x2800 + mask`, so the empty cell is the
+      // mask being zero and that is what to say.
+      if (glyph.codePointAt(0) !== BRAILLE_BLANK) {
+        line.push(colour === undefined ? { text: glyph } : { text: glyph, style: { colour } });
+      } else if (framed !== undefined) {
+        line.push(framedInk === undefined ? { text: framed } : { text: framed, style: { colour: framedInk } });
+      } else {
+        line.push({ text: " " });
+      }
     }
     out.push(line);
   }

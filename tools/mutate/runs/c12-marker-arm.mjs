@@ -74,10 +74,14 @@ const results = await runPass({
       // **The member selects nothing**, which is C12 I87 as it read before this
       // commit: the arm is the terminal's and `plotStyle` is ignored. At 24-bit
       // the block draws the colour raster and the glyph table stays unreachable.
+      //
+      // **Re-anchored when the switch became `armOf`** (C12 I100): the arm is a
+      // named three-way now, so dropping the member's clause is one line inside
+      // that function rather than a change to a boolean.
       name: "the named arm falls back to the capability switch",
       file: SCATTER,
-      from: '  const half = block.plotStyle !== "marker" && halfBlockEligible(ctx.capabilities, false);',
-      to: "  const half = halfBlockEligible(ctx.capabilities, false);",
+      from: '  if (ps === "marker") return "glyph";',
+      to: '  if (false) return "glyph";',
       expect: "MK1",
     },
     {

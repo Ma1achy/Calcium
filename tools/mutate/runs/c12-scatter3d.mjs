@@ -65,8 +65,12 @@ const results = await runPass({
       // where `HALF_BLOCK` is not in the repertoire and the colour is gone.
       name: "the raster arm runs at every capability",
       file: P,
-      from: '  const half = block.plotStyle !== "marker" && halfBlockEligible(ctx.capabilities, false);',
-      to: "  const half = true as boolean;",
+      //
+      // **Re-anchored twice** — once when `plotStyle: "marker"` joined the
+      // switch (C12 I99) and again when it became `armOf` (C12 I100). The
+      // mutation is unchanged: every capability takes the raster.
+      from: '  return halfBlockEligible(caps, false) ? "half" : "glyph";',
+      to: '  return "half";',
       expect: "SC1",
     },
     {
@@ -147,13 +151,15 @@ const results = await runPass({
       // whole class this commit is about: a total record forces an answer and
       // cannot check it, so the wrong answer is the one next door.
       //
-      // **Re-anchored when the entry stopped being `[]`** (F482), and it still
-      // bites in both directions: the built arm becomes refused and two unbuilt
-      // ones become accepted, which is exactly the pair SC2 now asserts.
+      // **Re-anchored twice as the entry grew** (F482, C12 I99, I100), and it
+      // still bites in both directions: every built arm becomes refused and two
+      // arms this form does not have become accepted, which is exactly the pair
+      // SC2 asserts. The `to` cannot name a *built* arm, or half the row is
+      // satisfied by the mutant.
       name: "scatter3d takes scatter's style arms",
       file: T,
-      from: '  scatter3d: ["marker"],',
-      to: '  scatter3d: ["braille", "line"],',
+      from: '  scatter3d: ["braille", "marker"],',
+      to: '  scatter3d: ["line", "candlestick"],',
       expect: "SC2",
     },
     {

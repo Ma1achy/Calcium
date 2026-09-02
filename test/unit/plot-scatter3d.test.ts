@@ -99,18 +99,22 @@ describe("SC: the 3D scatter", () => {
     // **And the list holds only what draws.** An arm listed before it is built
     // is F207's member accepted and ignored, so `"braille"` and `"line"` are
     // still refused here and each joins on the commit that makes it draw.
-    for (const ps of ["braille", "line", "candlestick", "solid"] as const) {
+    for (const ps of ["line", "candlestick", "solid"] as const) {
       expect(
         errorsOf({ kind: "plot", id: "s", ...spec({ plotStyle: ps }) }).join(" "),
         `plotStyle: ${ps}`,
-      ).toMatch(/arms for marker/u);
+      ).toMatch(/arms for braille, marker/u);
     }
-    // **The built arm**, which is what stops the loop above passing against a
-    // form that refuses everything — the state this row used to assert.
-    expect(
-      errorsOf({ kind: "plot", id: "s", ...spec({ plotStyle: "marker" }) }),
-      "`marker` is built, so it is listed and accepted",
-    ).toEqual([]);
+    // **The built arms**, which are what stop the loop above passing against a
+    // form that refuses everything — the state this row used to assert. The
+    // list grows one entry per commit that makes an arm draw, so this pair is
+    // the row's real subject and the loop is its converse.
+    for (const ps of ["marker", "braille"] as const) {
+      expect(
+        errorsOf({ kind: "plot", id: "s", ...spec({ plotStyle: ps }) }),
+        `\`${ps}\` is built, so it is listed and accepted`,
+      ).toEqual([]);
+    }
     // **The converse**, so the refusal is not firing on everything: `"auto"` is
     // the unset value and is accepted on every form.
     expect(
