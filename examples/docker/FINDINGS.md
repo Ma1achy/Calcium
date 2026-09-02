@@ -21631,3 +21631,56 @@ the plots on screen, the memory of `animationIntervalOf`'s mutation was one line
 *does the effect walk too* was one grep. The row that now covers it is T4.17n, and it fails against
 the shipped `find` at every step of the arc.
 
+---
+
+## F471 — the same walk one file along, and the refusal it names is false rather than absent ★★★★☆
+
+F470 was scoped to `construct.ts` because that is where it was found. Grepping the tree for the
+same shape from the **other** direction — not *which effect resolves a focused block* but *who
+resolves a block id at all* — returns two more lines, both in `src/shell/patch-view.ts`:
+
+```
+patch-view.ts:86    const found = entry.doc.blocks.find((b: Block) => b.id === at.blockId);
+patch-view.ts:164   const found = entry.doc.blocks.find((b: Block) => b.id === blockId);
+```
+
+**Measured** — a `panel` holding one `patch`, opened by the patch's own id:
+
+```
+view.open(entry, "p1")  ->  "no block `p1` in this entry"
+```
+
+**The refusal is not a no-op, it is a false statement to the reader** — the block *is* in the
+entry, on screen, with the action's label drawn beside it. That is the direction that makes this
+worse than F470 rather than a copy of it: there a key was consumed and nothing happened, and here
+the framework asserts something the reader can see is untrue, in the one sentence they might have
+acted on.
+
+**Both sites, and only together.** `open` resolves the target; `live` re-reads the block behind
+**every motion**, and returns `dismiss("anchorEvicted")` when it cannot find it. So fixing `open`
+alone gives a view that opens and then closes itself on the first `j`, blaming an eviction that did
+not happen — the same false sentence one layer along, and a repair that would read as a partial
+success.
+
+**No enumeration reaches this one, which is why `tree.ts` did not.** That module exists because
+`scroll` was a defect in six places at once, and its remedy is a `Record` keyed by `ContainerBlock`
+so a new container kind fails to compile until it is listed. Every one of those six sites
+*enumerated* `panel | group`. This site enumerates nothing — **it does not recurse at all** — so
+the compiler has nothing to fail on and the header's own diagnosis (*the failure was enumeration*)
+is one word short of covering it. The general shape is **a walk that never grew a container case**,
+and `CONTAINERS` cannot see a caller that never asked.
+
+**The arrangement is the framework's own, twice over.** `b.live` builds a panel, and C23 I34
+replaces every refreshed part with a panel whose children are what the consumer rendered — so a
+live `git diff` part containing a patch block is not an exotic document, it is the documented output
+of the refresh path. Every fixture put the patch at the top level, which is what a hand-written
+fixture does, and `patch-view.test.ts`'s own control row — *the same id **does** resolve in the
+entry that owns it* — is the top-level case, so the control was as blind as the assertion.
+
+**The instrument was the one already written down: grep from the satisfier, not from the
+deferral.** F470's finding named `construct.ts` and stopped there because that is where the fix
+went. The class-closing question is not *did I fix the effects* but *what else resolves a block by
+id*, and it is one `grep` over `src/shell/` — twenty seconds, two lines, one probe to confirm. The
+repo's rule says close the class rather than the instance; the cost of not doing it here was that
+F470 read as closed while half its subject was still shipped.
+
