@@ -1086,8 +1086,7 @@ export function scanSections(file, src, options = {}) {
  * **`C12 I96` was the ninth and is struck here**, one commit after the spec that
  * ruled it — `GM1`–`GM9` name it.
  *
- * **`C12 I97` is the tenth**, taken on the real meshes' spec commit and struck on
- * the one that builds them — `RM1`–`RM6` name it. One entry again, and for §6j's
+ * **`C12 I97` was the tenth and is struck here** — `RM1`–`RM6` name it. One entry again, and for §6j's
  * reason: the step adds three files and a reader, so what it rules is what a
  * *fixture* must state rather than what the renderer must do. **One entry where the last
  * loan took four**, and the reason is the third variation on the same theme: this
@@ -1115,8 +1114,6 @@ const UNCITED_INVARIANTS = Object.freeze([
   "C24 I20", "C24 I22", "C24 I25", "C24 I26", "C24 I28", "C24 I6", "C24 I7", "C25 I10",
   "C25 I11", "C25 I14", "C25 I15", "C25 I16", "C25 I17", "C25 I19a", "C25 I20a", "C25 I20b",
   "C26 I1", "C26 I11", "C26 I15", "C26 I16", "C26 I17", "C26 I20", "C26 I8", "C26 I9",
-  // The tenth loan — struck on the commit that builds the real-mesh fixtures.
-  "C12 I97",
 ]);
 
 /**

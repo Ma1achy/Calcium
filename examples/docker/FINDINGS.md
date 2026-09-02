@@ -21936,8 +21936,21 @@ stanford bunny, 69,451 triangles      222.3 ms      1.56x
 
 **The count is equal and the cost is not**, because a subdivided grid's triangles are uniform and
 cover the frame once, while the bunny's 35,947 vertices pack ~30 triangles into every sample of a
-60 × 40 grid. What the budget is actually proportional to is **depth-tested samples**, and a
-triangle count is a proxy that holds only for meshes as regular as the one it was measured on.
+60 × 40 grid.
+
+**And the obvious replacement unit is wrong too, in the direction that surprises.** *The budget is
+proportional to depth-tested samples* was the first correction written here, and counting them
+inverts the answer: `drawTri`'s paint callback fires only for samples that **win** the depth test,
+and by that measure the bunny produces **0.159×** the grid's — a sixth — while costing 1.56× the
+time. It is a closed body whose far side is rejected everywhere and whose triangles are sub-pixel
+and overlapping.
+
+So the budget is proportional to **neither the triangle count nor the output**: the work is in the
+samples that *lose*, which is a quantity nothing in the pipeline exposes. **A count that is real,
+well-sourced and measures the wrong side of the operation** — the fourth shape, one step on from a
+metric whose unit moves with the axis. The row asserts the deterministic ratio and the millisecond
+figures stay here with their protocol, because a time-based assertion under contention is its own
+group in this ledger.
 
 **The same fixture-regularity error the geometry suite found, arriving in the performance model.**
 F474 found it in the camera and F475 in the mesh; here it is in the budget, and it is the one that
