@@ -1216,10 +1216,17 @@ export async function constructGraph(
    * `elementsIn` walks into `panel` and `group` — a container declaring no
    * elements of its own yields its children's — so focus can land on a block a
    * top-level `find` cannot reach. Every effect here used that `find`, so a
-   * table inside a `panel` could be focused and not paged, and a 3D plot inside
-   * one could be focused and not turned. **`b.live` builds a panel**, which is
-   * how a defect this shape stays invisible: the arrangement the framework
-   * itself produces is the one that fails.
+   * `scroll` inside a `panel` could be focused and not paged, and a 3D plot
+   * inside one could be focused and not turned. **`b.live` builds a panel**,
+   * which is how a defect this shape stays invisible: the arrangement the
+   * framework itself produces is the one that fails.
+   *
+   * **A `scroll` and not a table, which is what F470's own symptom said and it
+   * cannot witness anything** (F472). `ctx.scrollOffsets` has one reader in
+   * `src/` — `containers.ts` — so paging a non-container writes an offset
+   * nothing reads, at any depth: *focused and not paged* is as true of a flat
+   * table as of a nested one. The witness is a container inside a container
+   * (T4.59), and T4.60 holds the table case as a control.
    *
    * C04's `descendants` rather than a fourth walk, for `animationIntervalOf`'s
    * reason — two copies of a traversal are two places to add a container kind.

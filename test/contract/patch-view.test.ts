@@ -9,7 +9,7 @@
 // *sequence*, and each passes trivially when driven one step at a time.
 import { describe, expect, it } from "vitest";
 import { block } from "../../src/data/viewmodel/index.js";
-import type { Hunk, Patch, ViewDocument } from "../../src/data/viewmodel/index.js";
+import type { Block, Hunk, Patch, ViewDocument } from "../../src/data/viewmodel/index.js";
 import { createOverlayManager } from "../../src/viewport/overlay/index.js";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { createPatchView, PATCH_VIEW_ID } from "../../src/shell/patch-view.js";
@@ -39,7 +39,7 @@ const PATCH = (id: string): Patch =>
     collapsedAfter: 170,
   } as Patch);
 
-const docWith = (blocks: readonly Patch[]): ViewDocument => ({
+const docWith = (blocks: readonly Block[]): ViewDocument => ({
   schema: "tui.view/1",
   command: "diff",
   status: "ok",
@@ -103,6 +103,48 @@ describe("C22 §3 — the fullscreen patch view", () => {
     expect(placed?.top).toBe(0);
     expect(placed?.left).toBe(0);
     expect(placed?.truncated).toBe(false);
+  });
+
+  it("T3.60 (C23 I31): a patch inside a panel opens, and a motion still finds it", () => {
+    // **The arrangement the framework itself produces** (F471). `b.live` builds
+    // a panel and C23 I34 replaces every refreshed part with one, so a live
+    // `git diff` part holding a patch is the documented output of the refresh
+    // path — and every fixture in this file put the patch at the top level,
+    // which is what a hand-written fixture does.
+    //
+    // **Two assertions because there are two resolutions.** `open` finds the
+    // block once; `live` re-reads it behind every motion and dismisses the
+    // layer as `anchorEvicted` when it cannot. So a fix applied to `open` alone
+    // opens the view and closes it on the first keypress, blaming an eviction
+    // that did not happen — and the first assertion alone would call that a
+    // pass.
+    const h = harness();
+    const wrapped = block({
+      kind: "panel",
+      id: "wrap",
+      title: "diff",
+      children: [PATCH("p1")],
+    } as Block);
+    const entry = h.transcript.append(docWith([wrapped]));
+
+    expect(h.view.open(entry, "p1"), "a patch inside a panel resolves").toBeNull();
+    expect(h.overlays.top?.id).toBe(PATCH_VIEW_ID);
+
+    h.view.move("pageDown");
+    expect(h.overlays.top?.id, "and it survives a motion").toBe(PATCH_VIEW_ID);
+    h.view.pop();
+  });
+
+  it("T3.60 control: the same patch at the top level, which passes either way", () => {
+    // **The control says the row measures the nesting rather than the fixture.**
+    // It passes on both sides of the change; if it ever fails, `PATCH` or the
+    // harness moved and T3.60 above is reporting that instead.
+    const h = harness();
+    const entry = h.transcript.append(docWith([PATCH("p1")]));
+    expect(h.view.open(entry, "p1")).toBeNull();
+    h.view.move("pageDown");
+    expect(h.overlays.top?.id).toBe(PATCH_VIEW_ID);
+    h.view.pop();
   });
 
   it("T3.20 (C23 I31): a target in another entry is refused, and the control opens", () => {
