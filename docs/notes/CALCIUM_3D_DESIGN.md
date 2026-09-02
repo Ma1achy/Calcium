@@ -1026,7 +1026,41 @@ four times.
 10  golden frames at four capability sets, catalogue fixtures, the animated example
     — three meshes and not four, and two of the three reasons for them were wrong (C12 §6k)
 11  a colour per axis — `AxisSpec3.tone`, the one of three that is not built
+    — built (C12 §6l, I98)
+
+ALL ELEVEN ARE BUILT. What the arc measured about this document is below.
 ```
+
+## 13 · The arc, closed — and what it did to this document
+
+**Eleven steps, and the frame corrected the design at nearly every one.** Not a gate, not review:
+a picture drawn and looked at, a mutation run against a green suite, a claim followed back to the
+file that holds it. **F430 to F481 is fifty-two findings across the arc**, and the ones that changed
+what got built are these:
+
+| step | what this document said | what the frame said |
+|---|---|---|
+| 1 | the dot grid, dithered | **half blocks** (F431), and the dither refused rather than ported (F433) |
+| 2 | *the clipped remainder never reaches the screen at any distance* | it reaches it at one of six, and the stronger sentence forecloses the cheaper test (F451) |
+| 4 | the axes anchor at the far corner | the far corner projects to the figure's **centre**; the axis corner is a different one (F448) |
+| 6 | *the plane is edge-on, its normals undefined, the lighting divides by zero* | three of four clauses false: the normals are the plane's own, and the divide is the **rasteriser's** (F456). The clamp guarded the wrong quantity and was deleting 87.5% of the specular (F457). And the two-channel replacement is refused by the **gamut**, two steps before the reason given (F455) |
+| 7 | the wireframe needs a depth bias | swept, and the number does not exist — the edge is a property of the fill's own sample (F462, F463). The cull's direction is per face and the sphere is wound **inward** (F460, F461) |
+| 8 | 33 ms is the stream window, so 30fps is free | the reason names a window and the ticker takes `spinner`'s **100 ms** floor (F466). *Every cell changes* is false — 193 of 876 at π/256 (F468). The three candidate bottlenecks are **28%** of the frame (F469) |
+| 9 | *exactly half the faces survive* · *six distinct intensities under one light* | 21.88 / 38.54 / 45.49 / **53.13%**, and the excess is 42 faces a sign test cannot cull (F473). At `azimuth: π/4` two of a cube's three visible faces light **identically**, because the light is view-fixed — and that is the camera every fixture uses (F474) |
+| 10 | real meshes catch inconsistent winding and random degeneracies | **0 and 0**, in all three. What they have is **openness** — 1,036 / 223 / 42 boundary edges — which nothing named, and the bunny is **1.56×** a synthetic grid at the same triangle count (F475, F478). And every file is Y-up against a Z-up camera, which reads as a plausible solid either way (F476) |
+| 11 | — | the measurement F436 deferred to step 6 **ran**, and until `SF9` nothing checked it: five records, all prose (F480) |
+
+**The through-line is that a correct sentence is not a measured one**, and the instruments that
+caught these are ways of *looking* rather than things asserted — read the frame, run the mutation,
+ask where the claim is written down. Every row above is a sentence that read as correct until
+something drew it.
+
+**And two of the arc's findings are about the arc's own instruments**, which is the part worth
+keeping: a conservation assertion is satisfied by any redistribution (F481), and a fixture chosen
+for a property may not have it (F475). Both were found by the mutation pass and the walk turning on
+the work rather than on the subject.
+
+---
 
 **Step 11 is one member and the other two asks it arrived with are already shipped**, which is why
 it is one row rather than three. Checked against the tree rather than against this list:
