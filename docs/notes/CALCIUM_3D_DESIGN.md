@@ -193,14 +193,34 @@ always `▀` and the two samples in a cell become its foreground and background.
 1  frustum        drop primitives entirely behind the camera or outside the view volume.
                   BEFORE projection — a point behind the eye projects to a valid-looking
                   coordinate with a negative z, and that is the classic bug
-2  backface       for closed surfaces: dot(normal, view) < 0 → drop. Removes ~half the
-                  faces of a sphere and is what makes a solid look solid
+2  backface       for closed surfaces: dot(normal, centroid - eye) > 0 → drop, with the
+                  sign taken from the mesh's own signed volume. Removes 58% of a
+                  sphere's faces at distance 6 and 83% at 1.5, and is what makes
+                  a solid look solid
 3  depth test     per dot, as above
 ```
 
 **Backface culling is opt-in per surface** (`closed?: boolean`), because an open surface — a
 height field, a plane — has no inside and culling it drops half the picture depending on
 which way you orbit.
+
+**Two corrections this section carried until step 7 drew it** (F460, F461):
+
+- **`dot(normal, view)` with a constant `view` is the orthographic limit.** Under perspective
+  every face has its own direction to the eye, and the two answers disagree on **7.29%** of a
+  sphere's faces at distance 6 and **34.03%** at 1.5. The constant answers *48.18% visible* at
+  **every** distance, because a view-space `z` test cannot read the eye's position — while the
+  truth, `(1 − r/d)/2`, falls from 41.67% to 16.67%. *Removes ~half* is the same limit: it is
+  what the cull approaches as `d → ∞`.
+- **`closed` licenses a second power, and it is the one a reader will miss.** The obvious UV
+  sphere is wound **inward** — rings by segments in grid order measures a signed volume of
+  **−4.16** — so trusting the winding culls the front and draws the back, which two-sided
+  shading (§3c) then lights correctly. The picture is a plausible hollow shell and nothing in
+  it says otherwise. So `closed` enables culling *and* licenses orienting it from the mesh's
+  own signed volume, `Σ dot(a, cross(b, c)) / 6`. What it does **not** cover is locally
+  inconsistent winding, and the sensitivity there is inverted relative to the damage: a
+  half-reversed sphere cancels to `1e-15` and is refused, while one face in eight reversed
+  leaves a confident `−3.12` and gets about 32 faces wrong in silence.
 
 ### Two depth rules that need stating
 
@@ -209,9 +229,20 @@ buffer is *dots*, so writing every label cell's depth is expensive and wrong at 
 **Test the anchor, then draw unconditionally** — a label is annotation, not geometry, and a
 label hidden behind a surface is a label nobody can read.
 
-**A wireframe edge on a surface z-fights.** The edge and the face are at the same depth by
-construction. **Bias edges toward the camera by a small constant** — one number, stated in
-the spec rather than tuned until it looks right.
+**A wireframe edge on a surface does not z-fight, because it is not a separate primitive**
+(F462). This section used to say *the edge and the face are at the same depth by construction,
+so bias edges toward the camera by a small constant — one number, stated in the spec rather
+than tuned until it looks right.* **They are not at the same depth**: `strokeSeg` floors both
+coordinates and steps on the dominant screen axis where `fill` samples at `+0.5` centres, so an
+edge disagrees with its **own** face by a median `1.60e-2` and a maximum `4.31e-1` — against a
+sample row of `4.17e-2` on a figure spanning 2. Swept, no constant works: bias 0 draws 22.6% of
+edge samples, `1e-3` draws 27.6%, and the ceiling of 55.4% costs `3e-1`, which is 15% of the
+whole figure's depth.
+
+**The edge is the fill's own sample.** `w0` is twice the sub-triangle's area, so `w0 / |ab|` is
+the perpendicular distance to edge `ab` **in samples**, and a sample is on the edge below 0.7 of
+one. No second rasteriser, no bias, no z-fight constructible — and hidden-line removal is exact
+rather than approximate, because an edge sample is occluded exactly when its face's sample is.
 
 ---
 
@@ -322,8 +353,8 @@ type Surface3 = Readonly<{
 
   field?: readonly (readonly number[])[];   // colour source, INDEPENDENT of height
   shading?: "flat" | "smooth";               // face normals or vertex normals
-  closed?: boolean;                          // enables backface culling      — STEP 7
-  wireframe?: boolean | "over";              // edges only, or edges over the fill — STEP 7
+  closed?: boolean;                          // mesh arm only: culling, oriented from the volume
+  wireframe?: boolean | "over";              // edges only, or edges over the fill
 }>;
 ```
 
@@ -332,9 +363,16 @@ above had `heights` required, which makes every mesh caller supply a grid it doe
 refusal is `origin3`'s shape — a member that decides nothing on the arm it is given is refused
 rather than ignored.
 
-**`closed` and `wireframe` land at step 7 with the culling and the bias that read them**, not
-here. A member accepted and ignored tells the caller nothing, and an export nothing consumes is
-what the repo's own rule forbids.
+**`closed` and `wireframe` landed at step 7 with the culling that reads them** — the bias that
+was scheduled with them does not exist (F462). A member accepted and ignored tells the caller
+nothing, and an export nothing consumes is what the repo's own rule forbids, which is why they
+were not declared at step 6.
+
+**`closed` is refused on the height-field arm** (F463). The renderer cannot detect an open
+surface: this note's own premise — *an open surface's signed volume is exactly 0* — was measured
+on a flat quad, and a 9×9 Gaussian measures **0.1742**. The zero belongs to `unitOf`, which
+centres each axis on the extent so that every *planar* surface normalises onto a plane through
+the origin. So the arm decides it and the gate says so.
 
 **Two inputs, and whether they are two CHANNELS is now open — the rung change falsified the
 claim and this is the one residue that is not a stale noun.**
@@ -928,7 +966,7 @@ four times.
 4   the 3D axis layout, billboarded labels, the back-face box
 5   LINES — the CARRIER; the depth-tested stroke landed at step 4 (§3b)
 6   SURFACES — normals, lighting, the colour/shading separation
-7   backface culling, the wireframe-over-surface mode and its depth bias
+7   backface culling and the wireframe mode — the bias it was scheduled with does not exist
 8   auto-orbit and manual camera controls
 9   the test suite: sphere, cube, axis planes, tilted plane, the three equations
 10  golden frames at four capability sets, catalogue fixtures, the animated example

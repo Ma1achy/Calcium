@@ -21188,3 +21188,147 @@ grid, 24.0° at cubic column spacing, **49.2°** at quintic — and the ruling s
 reason, which is the disposition the mutation pass exists to force. **The reason as written named
 the single input on which its own two options are identical.**
 
+## F460 — the backface test the note names cannot see the camera's distance ★★★★☆
+
+The design note's culling table gives backface culling as `dot(normal, view) < 0` and *removes
+~half the faces of a sphere*. **Both halves are the orthographic limit rather than the rule.**
+
+`view` in a projection pipeline is not a constant. Under perspective every face has its own
+direction to the eye, and the two answers separate as the camera closes. Measured over a
+2304-face UV sphere:
+
+```
+distance   they disagree on   the constant says visible   the truth, (1 - r/d)/2
+   6            7.29%                  48.18%                     41.67%
+   3           15.63%                  48.18%                     33.33%
+   2           24.31%                  48.18%                     25.00%
+   1.5         34.03%                  48.18%                     16.67%
+```
+
+**The middle column is the finding and it is not the disagreement figure.** The constant test
+returns `48.18%` at *every* distance, because a view-space `z` test cannot read the eye's
+position at all — while the visible fraction falls by two thirds over the same range. A third of
+the faces are wrong at `distance: 1.5`, in a band around the silhouette, and the picture is a
+sphere with a bite out of one side that moves as you orbit.
+
+**And *~half* is the `d → ∞` limit.** The cull removes **58%** at distance 6 and **83%** at 1.5.
+By face count rather than by area it is 44.5% at distance 6, because a UV sphere's polar faces
+are slivers — which is why the ruling states the area figure and the test asserts the count.
+
+Fixed by taking the direction per face, from the centroid: `dot(n, centroid − eye)`.
+
+---
+
+## F461 — `closed` licenses two powers and a reader will see one ★★★★★
+
+**The obvious UV sphere is wound inward.** Rings of latitude by segments of longitude, two
+triangles a quad in grid order — the loop anyone writes — gives a signed volume of **−4.16**
+against the `+4.19` a unit sphere owes. Trusting that winding culls the **front** and draws the
+back.
+
+**And two-sided shading hides it.** §6h row 5 flips the normal toward the eye per sample, so the
+back hemisphere lights correctly and the frame is a plausible hollow shell rather than a bug.
+Nothing in the picture says which.
+
+**So `closed: true` does two things, and the second is the one to state.** It enables culling,
+and it *licenses the renderer to orient the cull from the mesh's own signed volume* rather than
+from the caller's winding — `Σ dot(a, cross(b, c)) / 6`, one pass. Measured: the natural and the
+reversed sphere then produce **byte-identical sample masks**, 566 of 1024 faces culled either
+way, where trusting the winding culls 400 and draws the other hemisphere.
+
+**What it does not license is locally inconsistent winding, and the sensitivity is inverted
+relative to the damage** — which is the part no one would guess:
+
+```
+consistent (either way)       volume -4.1590    culled 55.5%   correct
+half reversed by latitude     volume -1.2e-15   caught by the guard
+half reversed by longitude    volume -1.3e-16   caught by the guard
+every other face reversed     volume -1.3e-16   caught by the guard
+ONE FACE IN EIGHT reversed    volume -3.1192    culled 54.1%   ~32 faces wrong, silently
+```
+
+**The badly wound mesh is caught and the mildly wound one is not.** A systematically reversed
+half cancels the volume to floating-point zero, so `|V| < ε` refuses to cull and draws
+everything — the safe answer. A sparse inconsistency leaves a confident sign and a proportional
+number of faces wrong. That failure belongs in the spec rather than here, because it is a
+property of the ruling and not a defect in it.
+
+**ε is easy and unit space is why.** `unitOf` normalises the extent, so a closed mesh's volume is
+always a substantial fraction of the cube's 8 — a **thin closed slab measures 8.0000**, not
+something small. Fifteen orders separate `1e-15` from `3.1`.
+
+---
+
+## F462 — the depth bias the note specifies cannot exist, and the edge is not a primitive ★★★★★
+
+The design note: *a wireframe edge on a surface z-fights. The edge and the face are at the same
+depth by construction. Bias edges toward the camera by a small constant — one number, stated in
+the spec rather than tuned until it looks right.*
+
+**They are not at the same depth, because the two rasterisers do not sample the same points.**
+`strokeSeg` floors both coordinates and steps along the dominant screen axis; `fill` samples at
+cell centres, `+0.5`. Measured over a Gaussian's 472 shared samples, the edge's depth against its
+own face's:
+
+```
+median 1.60e-2 · p90 1.04e-1 · p99 3.97e-1 · max 4.31e-1
+a sample row of depth is 4.17e-2, and the whole figure spans 2
+```
+
+The worst cases are the grazing triangles — a face nearly edge-on covers two columns and spans a
+fifth of the figure in depth — and they are exactly the faces a wireframe has to draw.
+
+**Swept, the constant does not exist:**
+
+```
+bias (relative)      0     1e-6   1e-4   1e-3   3e-3   1e-2   3e-2   1e-1   3e-1
+edge samples drawn  22.6%  23.0%  23.7%  27.6%  34.6%  40.4%  42.4%  46.5%  55.4%
+```
+
+55.4% is the ceiling — the rest is genuine occlusion by the surface's own near side. So a bias of
+`1e-3` recovers **5 points of the 32.8 available**, and reaching the ceiling costs `3e-1`: 15% of
+the figure's entire depth range, which a wireframe would then punch through anything with.
+
+**The remedy is not a smaller number, it is that the edge is not a separate primitive.** A
+sample already knows its barycentric weights, and `w0` is twice the sub-triangle's area — so
+`w0 / |ab|` is the perpendicular distance to edge `ab` **in samples**. A sample is on the edge
+below 0.7 of one. The edge is then the fill's own write:
+
+- no second rasteriser, no bias, and **no z-fight is constructible** — the edge and the face are
+  one sample;
+- hidden-line removal is exact rather than approximate, because an edge sample is occluded
+  exactly when its face's sample is;
+- and the threshold is in screen samples, so it does not move with the mesh's density.
+
+**The alternative was costed before it was dropped.** An explicit edge list needs an
+**undirected** key, `min:max` — a shared edge appears twice with reversed orientation, so
+`graph.ts`'s directed `a:b` sees **384** edges where a 9×9 grid has 208, and **6649** where a
+sphere has 3353. Right for a digraph, wrong here. None of that is needed now.
+
+---
+
+## F463 — an open surface's signed volume is not zero, and the fixture that said so was planar ★★★★☆
+
+Carried into this step as a settled premise: *an open surface's signed volume is exactly 0, which
+is why the volume test is only available where `closed` is given.* It was measured — on a flat
+quad, which returned `0.000000`.
+
+**Measured on a surface that is not planar it is not zero.** A 9×9 Gaussian gives **0.1742** and a
+21×21 **0.1785**; the figure converges rather than vanishing, because the sum is the volume of the
+cone from the origin to the surface and only a surface through the origin cancels it.
+
+**And the zero is a property of unit space rather than of openness.** `unitOf` centres each axis
+on the extent, a planar patch's extent-centre lies on the patch, so *every* planar surface
+normalises onto a plane through the origin and measures exactly zero. Three of the six fixtures —
+flat quad at `z = 0`, flat quad at `z = 0.5`, a linear ramp — returned zero for that reason and
+read as corroboration.
+
+**What it changes:** the renderer cannot detect an open surface, so `closed` is **refused at the
+gate on the height-field arm** rather than guarded at runtime. The runtime guard survives for the
+case with no gate-checkable property — a mesh whose winding cancels its own volume (F461).
+
+**The mechanism is the reusable part.** The claim was not wrong when it was measured; it was
+measured on the one input shape where a different mechanism produces the same number, and then
+carried forward as a general property. *Ask where a settled claim is written down* reached it, and
+the answer was **a previous turn's probe** — the weakest form of record, which reads like one of
+the strongest because it arrives with a figure.
