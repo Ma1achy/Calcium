@@ -1469,6 +1469,7 @@ function checkPoints3(
   e: string[],
 ): void {
   const pts = b["points3"];
+  const lns = b["lines3"];
   const by = b["colourBy"];
   if (pts !== undefined && form !== "scatter3d") {
     e.push(
@@ -1476,10 +1477,21 @@ function checkPoints3(
         `point cloud, and three coordinates per sample mean nothing to any other form`,
     );
   }
-  if (form === "scatter3d" && pts === undefined) {
+  if (lns !== undefined && form !== "scatter3d") {
     e.push(
-      `${at}: form "scatter3d" has no "points3" (C04 I76) — a point cloud is what it ` +
-        `draws, and "series" carries one reading per position`,
+      `${at}: "lines3" on form "${String(form)}" (C04 I78) — only a scatter3d draws a path ` +
+        `through three-dimensional space, and there is no projection to draw it with`,
+    );
+  }
+  // **Neither carrier, not *no `points3`*** (C04 I78). A wireframe is edges with
+  // no cloud and a parametric curve is a path with no samples, so either member
+  // alone is a complete document. The refusal as first written read the cloud
+  // only, and nothing about the member would have shown it — it is the carrier
+  // rule meeting the *other* carrier, which is C12 §6g row 2.
+  if (form === "scatter3d" && pts === undefined && lns === undefined) {
+    e.push(
+      `${at}: form "scatter3d" has neither "points3" nor "lines3" (C04 I78) — a cloud or a ` +
+        `path is what it draws, and "series" carries one reading per position`,
     );
   }
   if (by !== undefined && form !== "scatter3d") {
@@ -1503,23 +1515,45 @@ function checkPoints3(
         `lines cross, and only "origin" draws a crossing`,
     );
   }
-  if (pts === undefined) return;
-  if (!Array.isArray(pts)) {
-    e.push(`${at}: "points3" must be an array of clouds`);
+  // **The walk covers both carriers, or the arm is enforced on half its input**
+  // (C04 I78, C12 §6g row 3). A `Line3`'s points are `Point3`s and
+  // `colourBy: "value"` reads them the same way, so a version that walked
+  // `points3` only would pass T3.53 and every row derived from it.
+  walkPoints3(pts, "points3", by, at, e);
+  walkPoints3(lns, "lines3", by, at, e);
+}
+
+/**
+ * Every point of one carrier — **and only the value arm reads the value**
+ * (C04 I76, C04 I78).
+ *
+ * A point missing a `value` still has a position, so under `colourBy: "value"`
+ * it would be drawn in *some* colour — dropping it silently is C12 I8's class
+ * and the ramp's floor is indistinguishable from a floor reading. Under the
+ * other two arms the field is not read and its absence is not a fault.
+ *
+ * **One function over two carriers** rather than the loop written twice, which
+ * is the shape a second carrier is supposed to force: two copies of a
+ * completeness rule are two places for it to stop agreeing.
+ */
+function walkPoints3(
+  carrier: unknown,
+  name: "points3" | "lines3",
+  by: unknown,
+  at: string,
+  e: string[],
+): void {
+  if (carrier === undefined) return;
+  if (!Array.isArray(carrier)) {
+    e.push(`${at}: "${name}" must be an array`);
     return;
   }
-  // **Every point walked, and only for the arm that reads the value** (C04 I76).
-  // A point missing a `value` still has a position, so under `colourBy:
-  // "value"` it would be drawn in *some* colour — dropping it silently is
-  // C12 I8's class and the ramp's floor is indistinguishable from a floor
-  // reading. Under the other two arms the field is not read and its absence is
-  // not a fault.
   let si = 0;
-  for (const cloud of pts as readonly Record<string, unknown>[]) {
-    const points = cloud?.["points"];
+  for (const group of carrier as readonly Record<string, unknown>[]) {
+    const points = group?.["points"];
     if (!Array.isArray(points)) {
-      e.push(`${at}: a "points3" cloud has no "points" array`);
-      si += 1; // cells-ok — a cloud index
+      e.push(`${at}: a "${name}" entry has no "points" array`);
+      si += 1; // cells-ok — a group index
       continue;
     }
     let pi = 0;
@@ -1527,7 +1561,7 @@ function checkPoints3(
       const finite = (v: unknown): boolean => typeof v === "number" && Number.isFinite(v);
       if (!finite(p?.["x"]) || !finite(p?.["y"]) || !finite(p?.["z"])) {
         e.push(
-          `${at}: points3[${String(si)}].points[${String(pi)}] is not a finite (x, y, z) ` +
+          `${at}: ${name}[${String(si)}].points[${String(pi)}] is not a finite (x, y, z) ` +
             `(C04 I76) — a gap is a position that produced no reading, and a cloud lists ` +
             `only the positions it has`,
         );
@@ -1535,7 +1569,7 @@ function checkPoints3(
       }
       if (by === "value" && !finite(p["value"])) {
         e.push(
-          `${at}: points3[${String(si)}].points[${String(pi)}] has no finite "value" and ` +
+          `${at}: ${name}[${String(si)}].points[${String(pi)}] has no finite "value" and ` +
             `"colourBy" is "value" (C04 I76) — the point still has a position, so it would ` +
             `be drawn in a colour nothing chose`,
         );
@@ -1543,7 +1577,7 @@ function checkPoints3(
       }
       pi += 1; // cells-ok — a point index
     }
-    si += 1; // cells-ok — a cloud index
+    si += 1; // cells-ok — a group index
   }
 }
 

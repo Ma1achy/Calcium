@@ -111,7 +111,10 @@ describe("SC: the 3D scatter", () => {
     const pts = [cloud(helix(8))];
     const cases: readonly [Record<string, unknown>, RegExp][] = [
       [{ form: "scatter", height: 4, series: [], points3: pts }, /"points3" on form "scatter"/u],
-      [{ form: "scatter3d", height: 4, series: [] }, /form "scatter3d" has no "points3"/u],
+      // **Widened to *neither carrier* by C04 I78** — a wireframe is edges with
+      // no cloud, so the refusal reads both members. `T2.4g` is where the
+      // lines-only converse lives.
+      [{ form: "scatter3d", height: 4, series: [] }, /form "scatter3d" has neither "points3" nor "lines3"/u],
       [{ form: "line", height: 4, series: [], colourBy: "depth" }, /"colourBy" on form "line"/u],
       [{ form: "scatter3d", height: 4, series: [], points3: pts, axes: true }, /"axes" on form "scatter3d"/u],
     ];

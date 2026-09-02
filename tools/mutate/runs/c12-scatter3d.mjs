@@ -127,8 +127,8 @@ const results = await runPass({
       // two-rules-in-two-places failure the single rule exists to prevent.
       name: "the cloud labels are identities under every colourBy",
       file: F,
-      from: '  if (cloud !== undefined && block.colourBy === "series") {',
-      to: "  if (cloud !== undefined) {",
+      from: '    if (block.colourBy !== "series") return [];',
+      to: "    if (false as boolean) return [];",
       expect: "SC6",
     },
     {

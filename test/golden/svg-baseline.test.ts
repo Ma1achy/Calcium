@@ -98,7 +98,8 @@ describe("SB — the SVG baseline (C12 §3ak.10, F275)", () => {
     //
     // **The refusal returned, and the equality is what said so on the day.**
     // `scatter3d` is `SVG_FAMILY: null` — no emitter here carries a projection
-    // (C12 §3am) — so its five variants are five placards. The placard check
+    // (C12 §3am) — so every variant of it is a placard, twelve of them now that
+    // the polyline carrier has landed (C04 I78). The placard check
     // below now has something to run over, which it did not while every form
     // drew, and it is asserted as the **exact set** rather than as a count: a
     // second form joining is a decision somebody makes here.
@@ -112,7 +113,10 @@ describe("SB — the SVG baseline (C12 §3ak.10, F275)", () => {
       "scatter3d-colour-value.svg",
       "scatter3d-coplanar.svg",
       "scatter3d-default.svg",
+      "scatter3d-lines-series.svg",
       "scatter3d-orthographic.svg",
+      "scatter3d-trajectory.svg",
+      "scatter3d-wireframe.svg",
     ]);
     const drawn = [...fresh.entries()].filter(([, v]) => v !== refusal).map(([k]) => k);
     expect(drawn.length, "and the drawn side is the rest of it").toBe(fresh.size - refusals.length);

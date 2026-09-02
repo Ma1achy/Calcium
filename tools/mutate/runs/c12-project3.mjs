@@ -118,8 +118,8 @@ const results = await runPass({
       // rasterisation order.
       name: "the depth test accepts an equal depth",
       file: P,
-      from: "  if (!(z < (d.z[i] as number))) return false;",
-      to: "  if (!(z <= (d.z[i] as number))) return false;",
+      from: "  if (!(q < (d.z[i] as number))) return false;",
+      to: "  if (!(q <= (d.z[i] as number))) return false;",
       expect: "PR8b",
     },
   ],

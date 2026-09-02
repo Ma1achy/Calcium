@@ -178,6 +178,17 @@ export const CATALOGUE: Readonly<Record<PlotForm, Entry>> = Object.freeze({
         return { x: Math.cos(t), y: Math.sin(t), z: (i / 119) * 2 - 1, value: t };
       }),
     }],
+    // **The path is the same samples, and that is the point of it being here**
+    // (C04 I78): a trajectory *through* a cloud is two primitives in one plot
+    // area, which is why a polyline is a carrier on this form and not a
+    // `line3d` of its own.
+    lines3: [{
+      label: "path",
+      points: Array.from({ length: 120 }, (_v, i) => {
+        const t = (i / 119) * Math.PI * 4;
+        return { x: Math.cos(t), y: Math.sin(t), z: (i / 119) * 2 - 1, value: t };
+      }),
+    }],
     ...x }) },
   sparkline: { says: "a shape, no furniture", at: (p, h, x) => plot("sparkline", Math.min(h, 1), {
     series: [s(wave(40, p, 5, 6, 10))], ...x }) },

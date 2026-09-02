@@ -325,7 +325,7 @@ describe("PR — the pair catalogue's partition, which is the counter restated (
     // row keeps its shape and gains the one fact the bound cannot carry: a
     // refusal reappearing fails here, named.
     // **And a refusal returned, which is what the equality was for** (C12
-    // §3am). `scatter3d` is `SVG_FAMILY: null`, so all five of its variants are
+    // §3am). `scatter3d` is `SVG_FAMILY: null`, so every one of its variants is
     // refused **by family** rather than by variant — the partition above is
     // what says which side they land on, and it says family, which is the
     // truth: no variant of the form draws and none could.
@@ -338,7 +338,10 @@ describe("PR — the pair catalogue's partition, which is the counter restated (
       "scatter3d/colour-value",
       "scatter3d/coplanar",
       "scatter3d/default",
+      "scatter3d/lines-series",
       "scatter3d/orthographic",
+      "scatter3d/trajectory",
+      "scatter3d/wireframe",
     ]);
     expect(part.family.sort(), "and every one of them is a family refusal").toEqual(allRefused);
     // **Not a magnitude** (F310). `> 50` was a number that had to be edited every

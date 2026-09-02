@@ -184,6 +184,30 @@ const helix3 = (n: number): { x: number; y: number; z: number; value: number }[]
     return { x: Math.cos(t), y: Math.sin(t), z: (i / (n - 1)) * 2 - 1, value: t }; // cells-ok — a point index
   });
 
+/**
+ * A wireframe cube — two closed rings and four uprights, **turned about z**.
+ *
+ * **The turn is what makes it a fixture rather than a coincidence.** Axis
+ * aligned, its eight corners normalise to exactly the reference box's, so every
+ * segment ties with a box edge and the picture says nothing about whether lines
+ * draw — it says which of two identical strokes won a tie. Turned, the bounding
+ * box is wider than the shape in x and y and the same in z, so the wireframe
+ * sits *inside* its own frame and touches it only top and bottom.
+ */
+const cubeEdges3 = (k: number, turn: number): { points: { x: number; y: number; z: number }[]; closed?: boolean }[] => {
+  const at = (i: number): { x: number; y: number } => {
+    const a = turn + (i * Math.PI) / 2 + Math.PI / 4; // cells-ok — a corner index
+    const r = k * Math.SQRT2;
+    return { x: r * Math.cos(a), y: r * Math.sin(a) };
+  };
+  const ring = (z: number) => ({
+    points: [0, 1, 2, 3].map((i) => ({ ...at(i), z })),
+    closed: true,
+  });
+  const upright = (i: number) => ({ points: [{ ...at(i), z: -k }, { ...at(i), z: k }] });
+  return [ring(-k), ring(k), upright(0), upright(1), upright(2), upright(3)];
+};
+
 const cluster3 = (cx: number, cy: number, cz: number, n: number) =>
   Array.from({ length: n }, (_v, i) => { // cells-ok — a point count
     const a = i * 2.399963; // cells-ok — a point index; the golden angle, so the lattice does not band
@@ -230,6 +254,27 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     "box-full": {
       form: "scatter3d", height: 14, series: [], box3: "full",
       points3: [{ label: "helix", points: helix3(160) }],
+    },
+    // C12 I93 — a trajectory **through** its own cloud, which is the row the
+    // draw order exists for: every marker survives the line drawn over it,
+    // because the two are at exactly equal depth and first-drawn wins.
+    trajectory: {
+      form: "scatter3d", height: 14, series: [],
+      points3: [{ label: "helix", points: helix3(40) }],
+      lines3: [{ label: "path", points: helix3(40) }],
+    },
+    // C04 I78 — **a path with no cloud**, which the form's refusal had to be
+    // widened to accept. The colour runs along each segment because the depth
+    // does.
+    wireframe: {
+      form: "scatter3d", height: 14, series: [], lines3: cubeEdges3(0.8, 0.5),
+    },
+    // C12 I93 — the categorical arm, where a line is one colour for its whole
+    // length and its slot continues the clouds' numbering.
+    "lines-series": {
+      form: "scatter3d", height: 14, series: [], colourBy: "series",
+      points3: [{ label: "cloud", points: cluster3(0, 0, 0, 60) }],
+      lines3: [{ label: "orbit", points: helix3(60), closed: true }],
     },
     // **The bare picture** — no frame at all, which is the render step 3 shipped
     // and the comparison every axis row is against.

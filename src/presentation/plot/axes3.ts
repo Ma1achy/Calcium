@@ -199,8 +199,15 @@ export function axisLines(
  *
  * `null` is *both endpoints behind*, which is the only case with nothing to
  * draw.
+ *
+ * **The two parameters come back with the pair** (C12 I93). A clip moves an
+ * endpoint, so any reading carried along the segment — a polyline's per-point
+ * `value` — has to be moved with it, and computing the same parameter a second
+ * time at the call site is F444's shape: one rule, two derivations. `ta` and
+ * `tb` are both measured from `a` toward `b`, so an unclipped segment is `0`
+ * and `1` and the caller's interpolation needs no special case.
  */
-export function clipProject(basis: Basis, seg: Seg3): readonly [Projected, Projected] | null {
+export function clipProject(basis: Basis, seg: Seg3): Clipped | null {
   const view = (p: Vec3): number =>
     (p.x - basis.eye.x) * basis.forward.x
     + (p.y - basis.eye.y) * basis.forward.y
@@ -217,18 +224,30 @@ export function clipProject(basis: Basis, seg: Seg3): readonly [Projected, Proje
   // get it past, and every segment this was written to save was dropped anyway.
   // The clip target is therefore the first depth the projector accepts.
   //
-  // **It was invisible for two independent reasons**, which is why no frame
-  // showed it: the clipped remainder never reaches the screen at any distance
-  // this camera model can produce (the eye always targets the origin), so a
-  // frame comparison agrees whether the segment is clipped, dropped, or clipped
-  // to a point that is then dropped.
+  // **It was invisible because the remainder is a sliver, not because it is
+  // never drawn** — and the first wording here said *never at any distance this
+  // camera model can produce*, which is a universal claim promoted from one
+  // sweep (F451). Measured over `CAMERA_DEFAULT` at six distances, the clipped
+  // remainder **does** reach the frame at `distance: 1.7` and at none of the
+  // other five. So a frame comparison agrees at five of six — enough to have
+  // hidden the defect, and not enough to say a frame row is impossible, which
+  // is what the stronger sentence would have told the next reader.
   const IN = NEAR * (1 + 1e-6);
-  const a = za <= NEAR ? lerp(seg.a, seg.b, (IN - za) / (zb - za)) : seg.a;
-  const b = zb <= NEAR ? lerp(seg.b, seg.a, (IN - zb) / (za - zb)) : seg.b;
+  const ta = za <= NEAR ? (IN - za) / (zb - za) : 0;
+  // **Measured from `a`, not from `b`.** The lerp below runs `b` toward `a`, so
+  // its own parameter is the complement — and a reading interpolated with the
+  // wrong end's parameter is a colour that is exactly backwards on precisely
+  // the segments nobody looks at.
+  const tb = zb <= NEAR ? 1 - (IN - zb) / (za - zb) : 1;
+  const a = za <= NEAR ? lerp(seg.a, seg.b, ta) : seg.a;
+  const b = zb <= NEAR ? lerp(seg.a, seg.b, tb) : seg.b;
   const pa = project(basis, a);
   const pb = project(basis, b);
-  return pa === null || pb === null ? null : [pa, pb];
+  return pa === null || pb === null ? null : { a: pa, b: pb, ta, tb };
 }
+
+/** A clipped, projected segment and where its ends sit along the original. */
+export type Clipped = Readonly<{ a: Projected; b: Projected; ta: number; tb: number }>;
 
 /** A tick: where it sits on the axis, where its mark ends, and what it says. */
 export type Tick3 = Readonly<{ on: Vec3; out: Vec3; text: string }>;

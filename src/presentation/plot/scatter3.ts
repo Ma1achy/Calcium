@@ -12,7 +12,7 @@
  * metre apart and one of a hundred points a kilometre apart both want three
  * tiers, and an absolute bucket gives the second one tier and no depth at all.
  */
-import type { Plot, Point3Series } from "../../data/viewmodel/index.js";
+import type { Plot, Point3, Tone } from "../../data/viewmodel/index.js";
 import type { RenderContext } from "../blocks/types.js";
 import type { ColourValue } from "../theme/types.js";
 import { HALF_BLOCK, HALF_BLOCK_LOWER, halfBlockEligible } from "../image/index.js";
@@ -24,6 +24,7 @@ import {
   boxEdges,
   clipProject,
   farCorner,
+  type Clipped,
   originOf,
   ticks3,
   type Axis3,
@@ -129,8 +130,39 @@ function ramped(v: number, lo: number, hi: number): number {
   return hi > lo ? (v - lo) / (hi - lo) : 0.5;
 }
 
-/** The samples, the frame they sit in, and the basis all three are projected through. */
-type Scene = Readonly<{ drawn: readonly Drawn[]; basis: Basis; lo: Vec3; hi: Vec3 }>;
+/**
+ * A projected polyline segment, with the readings at its **clipped** ends
+ * (C12 I93).
+ *
+ * `va` and `vb` are the `value` interpolated to wherever the near-plane clip
+ * left the endpoint, which is why `clipProject` hands its parameters back.
+ */
+type Stroke = Readonly<{
+  a: Projected;
+  b: Projected;
+  va: number | undefined;
+  vb: number | undefined;
+  series: number;
+}>;
+
+/**
+ * What a cloud and a path have in common, and all that colour and the legend
+ * read of either (C04 I78).
+ *
+ * **One index space, clouds first**, so a caller with one of each gets two
+ * palette slots — and the same numbering `identityOf` spells out in the legend.
+ */
+type Identity = Readonly<{ tone?: Tone; label?: string }>;
+
+/** The samples, the paths, the frame they sit in, and the basis for all of it. */
+type Scene = Readonly<{
+  drawn: readonly Drawn[];
+  strokes: readonly Stroke[];
+  identities: readonly Identity[];
+  basis: Basis;
+  lo: Vec3;
+  hi: Vec3;
+}>;
 
 /**
  * The samples the tier and the ramp are both keyed to, projected once.
@@ -141,8 +173,15 @@ type Scene = Readonly<{ drawn: readonly Drawn[]; basis: Basis; lo: Vec3; hi: Vec
  */
 function drawnOf(block: Plot, ctx: RenderContext, aspect: number): Scene {
   const clouds = block.points3 ?? [];
+  const paths = block.lines3 ?? [];
   const all: Vec3[] = [];
   for (const c of clouds) for (const p of c.points) all.push(p);
+  // **Both carriers, or the frame describes a different document** (C04 I78,
+  // C12 §6g row 1). Taking the extent from the clouds alone leaves a
+  // lines-only block normalising against `extentOf([])`'s unit cube: on
+  // screen, inside the box, and drawn to the wrong scale — which no bounds
+  // assertion and no ink comparison can see. That is T6.77.
+  for (const l of paths) for (const p of l.points) all.push(p);
   const extent = extentOf(all);
   // **The live camera wins and the block's is the fallback** (C04 I75, C12 I83).
   // `RenderContext` carries the one an orbit moves; the member says where the
@@ -161,20 +200,64 @@ function drawnOf(block: Plot, ctx: RenderContext, aspect: number): Scene {
     }
     si += 1; // cells-ok — a cloud index
   }
-  return { drawn: out, basis, lo: extent.min, hi: extent.max };
+  const strokes: Stroke[] = [];
+  for (const l of paths) {
+    const pts = l.points;
+    const n = pts.length; // cells-ok — a point count
+    // **A closing segment at three points or more** (C04 I78). At two it
+    // retraces the segment already drawn and at one it is zero-length, and the
+    // rule lives here rather than in the loop below so a reader can see which
+    // input it is about.
+    const last = l.closed === true && n >= 3 ? n : n - 1; // cells-ok — a segment count
+    for (let i = 0; i < last; i += 1) { // cells-ok — a segment index
+      const p0 = pts[i] as Point3;
+      const p1 = pts[(i + 1) % n] as Point3;
+      const c = clipProject(basis, { a: unitOf(p0, extent), b: unitOf(p1, extent) });
+      if (c === null) continue;
+      // **Interpolated to the clipped end and not to the original one.** The
+      // clip moved the endpoint, so a reading left at the vertex behind the
+      // eye is the colour of a point the reader cannot see.
+      const at = (t: number): number | undefined =>
+        p0.value === undefined || p1.value === undefined
+          ? p0.value ?? p1.value
+          : p0.value + (p1.value - p0.value) * t;
+      strokes.push({ a: c.a, b: c.b, va: at(c.ta), vb: at(c.tb), series: si });
+    }
+    si += 1; // cells-ok — a path index
+  }
+  return {
+    drawn: out,
+    strokes,
+    identities: [...clouds, ...paths],
+    basis,
+    lo: extent.min,
+    hi: extent.max,
+  };
 }
 
-/** The colour one sample is drawn in, on whichever channel `colourBy` names. */
+/**
+ * The colour one **sample** is drawn in, on whichever channel `colourBy` names.
+ *
+ * **The three readings rather than a `Drawn`** (C12 I93): a polyline's colour
+ * varies *along* a segment under `"depth"` and `"value"`, so the caller is a
+ * per-sample loop with an interpolated depth and an interpolated value and no
+ * point to hand over. Under `"series"` it is one colour for the whole line,
+ * because that channel is categorical and a line has one identity.
+ */
 function colourOf(
   block: Plot,
   ctx: RenderContext,
-  d: Drawn,
-  clouds: readonly Point3Series[],
+  reading: Readonly<{ depth: number; value: number | undefined; series: number }>,
+  identities: readonly Identity[],
   span: Readonly<{ nearD: number; farD: number; loV: number; hiV: number }>,
 ): ColourValue | undefined {
   const by = block.colourBy ?? "depth";
   if (by === "series") {
-    return slot(seriesRefOf(clouds[d.series], d.series), ctx.theme, ctx.capabilities).colour;
+    return slot(
+      seriesRefOf(identities[reading.series], reading.series),
+      ctx.theme,
+      ctx.capabilities,
+    ).colour;
   }
   const map = colormapFor(block);
   if (map === undefined) return undefined;
@@ -182,8 +265,8 @@ function colourOf(
   // bright and recession reads as falling away rather than as coming forward.
   const t =
     by === "value"
-      ? ramped(d.value ?? span.loV, span.loV, span.hiV)
-      : 1 - ramped(d.depth, span.nearD, span.farD);
+      ? ramped(reading.value ?? span.loV, span.loV, span.hiV)
+      : 1 - ramped(reading.depth, span.nearD, span.farD);
   return continuousColour(map, t, ctx.capabilities);
 }
 
@@ -204,13 +287,22 @@ const RASTER_TIER: readonly (readonly [number, number])[] = Object.freeze([
  * `writeDepth` refuses an out-of-bounds sample, so a line running off the frame
  * clips per sample exactly as a near point's block does (C12 I88) rather than
  * being dropped at the segment.
+ *
+ * **Floored, not rounded, and it is the same defect F445 fixed one function
+ * over** (F453). A rounded sample puts sample `i` over `[i − 0.5, i + 0.5)`
+ * where every other writer in this file puts it over `[i, i + 1)`: the glyph
+ * arm floors a point's coordinate and the raster arm's `round(fx − bw/2)` is
+ * `floor(fx)` at the unit tier. Mixing the two conventions offsets a line from
+ * its own vertices by up to a sample — so a trajectory drifts off the markers
+ * it passes through, and the tie the draw order depends on never happens
+ * because the two writers are never talking about the same cell.
  */
 function strokeSeg(
   pa: Projected,
   pb: Projected,
   grid: Readonly<{ width: number; height: number }>,
   depth: Depth,
-  paint: (i: number) => void,
+  paint: (i: number, t: number, z: number) => void,
 ): void {
   const x0 = pa.x * grid.width;
   const y0 = pa.y * grid.height;
@@ -219,10 +311,10 @@ function strokeSeg(
   const steps = Math.max(1, Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)))); // cells-ok — a sample count
   for (let i = 0; i <= steps; i += 1) { // cells-ok — a sample index
     const t = i / steps; // cells-ok — a sample index
-    const px = Math.round(x0 + (x1 - x0) * t); // cells-ok — a sample coordinate
-    const py = Math.round(y0 + (y1 - y0) * t); // cells-ok — a sample coordinate
+    const px = Math.floor(x0 + (x1 - x0) * t); // cells-ok — a sample coordinate
+    const py = Math.floor(y0 + (y1 - y0) * t); // cells-ok — a sample coordinate
     const z = pa.depth + (pb.depth - pa.depth) * t;
-    if (writeDepth(depth, px, py, z)) paint(py * grid.width + px); // cells-ok — a sample offset
+    if (writeDepth(depth, px, py, z)) paint(py * grid.width + px, t, z); // cells-ok — a sample offset
   }
 }
 
@@ -265,11 +357,11 @@ function frameOf(
   const corner = farCorner(scene.basis);
   const origin = originOf(block.origin3 ?? "auto", scene.lo, scene.hi);
 
-  const stroke = (seg: Seg3): readonly [Projected, Projected] | null => {
+  const stroke = (seg: Seg3): Clipped | null => {
     const p = clipProject(scene.basis, seg);
     if (p === null) return null;
-    const mark = frameMark(p[0], p[1], ctx);
-    strokeSeg(p[0], p[1], grid, depth, (i) => { paint(i, mark); });
+    const mark = frameMark(p.a, p.b, ctx);
+    strokeSeg(p.a, p.b, grid, depth, (i) => { paint(i, mark); });
     return p;
   };
 
@@ -294,7 +386,7 @@ function frameOf(
     const p = clipProject(scene.basis, line.seg);
     const extent = p === null
       ? 0
-      : Math.hypot((p[1].x - p[0].x) * grid.width, (p[1].y - p[0].y) * rows); // cells-ok — a cell extent
+      : Math.hypot((p.b.x - p.a.x) * grid.width, (p.b.y - p.a.y) * rows); // cells-ok — a cell extent
     return { line, p, extent };
   }).sort((a, b) => b.extent - a.extent);
 
@@ -354,16 +446,16 @@ function frameOf(
     // the stroke below runs whatever the extent is.
     const p = clipProject(scene.basis, line.seg);
     if (p !== null) {
-      const mark = frameMark(p[0], p[1], ctx);
-      strokeSeg(p[0], p[1], grid, depth, (i) => { paint(i, mark); });
+      const mark = frameMark(p.a, p.b, ctx);
+      strokeSeg(p.a, p.b, grid, depth, (i) => { paint(i, mark); });
     }
     if (extent < EDGE_ON) continue;
     const [lo, hi] = spanOf(scene.lo, line.axis);
     for (const t of ticks3(line.axis, line, lo, hi, spec, spec?.format ?? block.yFormat)) {
       const pt = clipProject(scene.basis, { a: t.on, b: t.out });
       if (pt !== null) {
-        const mark = frameMark(pt[0], pt[1], ctx);
-        strokeSeg(pt[0], pt[1], grid, depth, (i) => { paint(i, mark); });
+        const mark = frameMark(pt.a, pt.b, ctx);
+        strokeSeg(pt.a, pt.b, grid, depth, (i) => { paint(i, mark); });
       }
       // **Pushed along `outward`, not scaled from the origin.** The first draft
       // multiplied the whole position vector by 1.35, which moves a point near
@@ -385,8 +477,8 @@ function frameOf(
     // placement, because a caller who asks for it has asked for it.
     if (spec?.arrow === true && p !== null) {
       const a3 = arrows3(ctx.capabilities);
-      const dx = (p[1].x - p[0].x) * grid.width; // cells-ok — a cell extent
-      const dy = (p[1].y - p[0].y) * rows; // cells-ok — a cell extent
+      const dx = (p.b.x - p.a.x) * grid.width; // cells-ok — a cell extent
+      const dy = (p.b.y - p.a.y) * rows; // cells-ok — a cell extent
       const head = Math.abs(dy) > Math.abs(dx)
         ? (dy < 0 ? a3.up : a3.down)
         : (dx < 0 ? a3.left : a3.right);
@@ -441,13 +533,22 @@ export function scatter3dArea(
   let farD = -Infinity;
   let loV = Infinity;
   let hiV = -Infinity;
-  for (const d of drawn) {
-    nearD = Math.min(nearD, d.depth);
-    farD = Math.max(farD, d.depth);
-    if (d.value !== undefined) {
-      loV = Math.min(loV, d.value);
-      hiV = Math.max(hiV, d.value);
+  const reading = (depth: number, value: number | undefined): void => {
+    nearD = Math.min(nearD, depth);
+    farD = Math.max(farD, depth);
+    if (value !== undefined) {
+      loV = Math.min(loV, value);
+      hiV = Math.max(hiV, value);
     }
+  };
+  for (const d of drawn) reading(d.depth, d.value);
+  // **The ramps span both carriers** (C04 I78). A path outside the cloud's
+  // depth range would otherwise saturate at one end of the map, and the tier
+  // and the ramp would be keyed to different sets — two answers to *how far is
+  // far* in one figure.
+  for (const st of scene.strokes) {
+    reading(st.a.depth, st.va);
+    reading(st.b.depth, st.vb);
   }
   const span = { nearD, farD, loV, hiV };
 
@@ -466,18 +567,11 @@ export function scatter3dArea(
     grid.width * grid.height, // cells-ok — a sample count
   ).fill(undefined);
 
-  // **Drawn first, and the depth buffer is what puts it behind.** Order does not
-  // decide occlusion here — `writeDepth` is strictly nearer-wins — so the frame
-  // going in first is a reading convenience rather than a rule.
   const frameInk = slot("tone.muted", ctx.theme, ctx.capabilities).colour;
-  const labels = frameOf(block, scene, grid, rows, depth, ctx, (i, m) => {
-    ink[i] = frameInk;
-    mark[i] = m;
-  });
 
   for (const d of drawn) {
     const tier = tierOf(d.depth, nearD, farD);
-    const colour = colourOf(block, ctx, d, clouds, span);
+    const colour = colourOf(block, ctx, d, scene.identities, span);
     // **The exact position, not the floored one, and the block is centred on
     // it.** The first draft placed a `bw x bh` block at `floor(x) - (bw >> 1)`,
     // which for an even block is half a sample to the **left and up** at every
@@ -513,6 +607,58 @@ export function scatter3dArea(
       glyph[i] = tier * clouds.length + d.series; // cells-ok — a series index
     }
   }
+
+  // **The points are already in, and that is the rule rather than the
+  // layering** (C12 I93, §6g row 6). `writeDepth` is strictly nearer, so
+  // first-drawn wins a tie — and a trajectory's vertices sit at *exactly* its
+  // own cloud's depths. Stroke the paths first and every marker in the path is
+  // swallowed by the line through it, on a frame where nothing is occluded.
+  for (const st of scene.strokes) {
+    // **One glyph a sample on the marker arm**, `│` or `─` by dominant screen
+    // direction — the box's own mark since step 4. Box-drawing joins are
+    // refused with their mechanism in §3ao: a mask cell carries four bits
+    // resolved after all strokes, and a strictly-nearer test refuses the
+    // second edge at exactly the shared vertex a join needs.
+    const glyphMark = half ? undefined : frameMark(st.a, st.b, ctx);
+    strokeSeg(st.a, st.b, grid, depth, (i, t, z) => {
+      // **Interpolated per sample under the two ramp arms** (C12 I93). The
+      // depth is here at every step, and one colour for a segment crossing the
+      // figure contradicts the cue the whole form rests on.
+      const v =
+        st.va === undefined || st.vb === undefined
+          ? st.va ?? st.vb
+          : st.va + (st.vb - st.va) * t;
+      ink[i] = colourOf(block, ctx, { depth: z, value: v, series: st.series }, scene.identities, span);
+      // **A line writes a literal glyph and never a tier code** (C12 I93,
+      // §6g row 5). `glyph` packs `tier x clouds + series` and a line is
+      // neither, so a line index reaching it breaks the `% clouds` decode —
+      // the cell is cleared rather than encoded.
+      mark[i] = glyphMark;
+      glyph[i] = -1;
+    });
+  }
+
+  // **The frame goes in last, and it is a rule about ties rather than a reading
+  // convenience** (C12 I90, F452). It used to draw first under a comment saying
+  // *order does not decide occlusion here* — which is false, and false in
+  // exactly the case that matters: `writeDepth` is **strictly** nearer, so a
+  // tie goes to whoever drew first, and data sitting at the box's own depth is
+  // not a curiosity. The extent *is* the data's, so the extreme samples lie on
+  // the box by construction, and a wireframe of a bounding volume coincides
+  // with it entirely — drawn first, the frame took every one of those cells and
+  // painted the reader's own geometry in `tone.muted`.
+  //
+  // Nothing else moves: a frame edge genuinely in front of a sample still wins,
+  // because that test is unchanged and is what `box3: "full"` means.
+  const labels = frameOf(block, scene, grid, rows, depth, ctx, (i, m) => {
+    ink[i] = frameInk;
+    mark[i] = m;
+    // **And the tier code is cleared with it.** `glyphRows` reads `glyph`
+    // before `mark`, so a frame cell that won a marker's sample would draw the
+    // marker in the frame's colour — a defect the old order could not have,
+    // and the one thing reordering had to carry with it.
+    glyph[i] = -1;
+  });
 
   const composed = half
     ? halfRows(ink, depth, grid.width, rows)

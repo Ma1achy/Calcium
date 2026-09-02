@@ -418,6 +418,7 @@ function plot(
     vectors?: Plot["vectors"];
     /** A 3D scatter's cloud, and the channel colour spends (C04 I76, C12 I87). */
     points3?: Plot["points3"];
+    lines3?: Plot["lines3"];
     colourBy?: Plot["colourBy"];
     /** The 3D reference frame — four members and two decisions (C04 I77). */
     axes3?: Plot["axes3"];
@@ -521,7 +522,7 @@ function plot(
     yScale?: Plot["yScale"];
   },
 ): Plot {
-  const { quartiles, categories, segments, bands, graph, graphLayout, series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, vectors, points3, colourBy, camera, axes3, origin3, box3, axisStyle3, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, xTitle, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, treeLayout, matrixAnchor, legend, plotFrame, width, aspect, align, origin, axisCross, calendarUnit, startDate, layout, binning, offsets, totals, facets, emptyMessage, xScale, yScale } =
+  const { quartiles, categories, segments, bands, graph, graphLayout, series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, vectors, points3, lines3, colourBy, camera, axes3, origin3, box3, axisStyle3, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, xTitle, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, treeLayout, matrixAnchor, legend, plotFrame, width, aspect, align, origin, axisCross, calendarUnit, startDate, layout, binning, offsets, totals, facets, emptyMessage, xScale, yScale } =
     spec;
   // **The same refusal the validator makes** (C04 I50a). Two expressions of one
   // rule, which is this file's shape throughout: the constructor is where an
@@ -809,10 +810,18 @@ function plot(
           `cloud, and three coordinates per sample mean nothing to any other form`,
       );
     }
-    if (drawn === "scatter3d" && points3 === undefined) {
+    if (lines3 !== undefined && drawn !== "scatter3d") {
+      throw new Error(
+        `b.plot: "lines3" on form "${drawn}" (C04 I78) — only a scatter3d draws a path ` +
+          `through three-dimensional space, and there is no projection to draw it with`,
+      );
+    }
+    // **Neither carrier** (C04 I78). A wireframe is edges with no cloud and a
+    // parametric curve is a path with no samples, so either alone is complete.
+    if (drawn === "scatter3d" && points3 === undefined && lines3 === undefined) {
       throw new TypeError(
-        `b.plot: form "scatter3d" has no "points3" (C04 I76) — a point cloud is what it ` +
-          `draws, and "series" carries one reading per position`,
+        `b.plot: form "scatter3d" has neither "points3" nor "lines3" (C04 I78) — a cloud ` +
+          `or a path is what it draws, and "series" carries one reading per position`,
       );
     }
     if (colourBy !== undefined && drawn !== "scatter3d") {
@@ -871,6 +880,7 @@ function plot(
       ...(yCallout === undefined ? {} : { yCallout }),
       ...(vectors === undefined ? {} : { vectors }),
       ...(points3 === undefined ? {} : { points3 }),
+      ...(lines3 === undefined ? {} : { lines3 }),
       ...(colourBy === undefined ? {} : { colourBy }),
       ...(axes3 === undefined ? {} : { axes3 }),
       ...(origin3 === undefined ? {} : { origin3 }),

@@ -955,7 +955,7 @@ export function calloutOf(block: Plot): readonly (string | null)[] | null {
  * into named pieces, so the pieces are the identities.
  */
 export function identityOf(
-  block: Pick<Plot, "segments" | "series" | "points3" | "colourBy">,
+  block: Pick<Plot, "segments" | "series" | "points3" | "lines3" | "colourBy">,
 ): readonly string[] {
   // **The third carrier, and `colourBy` is the gate** (C12 I89, C04 I76). A 3D
   // scatter's identities are its clouds' labels — but only under
@@ -965,11 +965,23 @@ export function identityOf(
   // **One rule decides the legend's contents and its presence**, since
   // `legendPlacement`'s count reads this: two rules would be a second place for
   // them to disagree, which is I81's mechanism.
+  //
+  // **Both carriers, and one numbering across them** (C04 I78). A line's
+  // default name continues where the clouds stop, because the palette slot it
+  // draws in does — a legend that restarted at *series 1* would name two
+  // different colours with one string.
   const cloud = block.points3;
-  if (cloud !== undefined && block.colourBy === "series") {
-    return cloud.map((c, i) => c.label ?? `series ${String(i + 1)}`);
+  const paths = block.lines3;
+  if (cloud !== undefined || paths !== undefined) {
+    if (block.colourBy !== "series") return [];
+    const clouds = cloud ?? [];
+    return [
+      ...clouds.map((c, i) => c.label ?? `series ${String(i + 1)}`),
+      ...(paths ?? []).map(
+        (l, i) => l.label ?? `series ${String(clouds.length + i + 1)}`, // cells-ok — a cloud count
+      ),
+    ];
   }
-  if (cloud !== undefined) return [];
   const segs = block.segments;
   return segs !== undefined && segs.length > 0 // cells-ok — a segment count
     ? segs.map((sg) => sg.label)

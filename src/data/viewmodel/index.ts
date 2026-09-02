@@ -67,6 +67,7 @@ export type {
   Rule,
   Series,
   VectorSeries,
+  Line3,
   Point3,
   Point3Series,
   AxisSpec3,

@@ -628,6 +628,31 @@ export type Point3Series = Readonly<{
 }>;
 
 /**
+ * A path through the same space (C04 I78, C12 I93).
+ *
+ * **A carrier on the same form and not a `line3d`**, on §3r's test one
+ * dimension up: the axes, the projection, the camera, the reference frame, the
+ * depth buffer and both capability arms are unchanged, and only the primitive
+ * differs. **Composition is what forces it** rather than merely permitting it —
+ * a path through a loss landscape is a surface *and* a line in one plot area,
+ * and a `PlotForm` names exactly one renderer.
+ *
+ * **`closed` emits a closing segment at three points or more.** At two it
+ * retraces the segment already drawn and at one it is zero-length, and both are
+ * legal input — so the rule is in the contract rather than in the renderer.
+ *
+ * **`tone` and `label` share the clouds' index space, clouds first**, so a
+ * caller with one of each gets two palette slots and two legend rows.
+ */
+export type Line3 = Readonly<{
+  points: readonly Point3[];
+  /** Connect the last point to the first. Ignored below three points. */
+  closed?: boolean;
+  label?: string;
+  tone?: Tone;
+}>;
+
+/**
  * One axis of a 3D reference frame (C04 I77, C12 I92).
  *
  * **Per axis rather than per plot, because the axes genuinely differ** — a loss
@@ -1302,6 +1327,21 @@ export type Plot = Readonly<{
    * agreement nothing checks. `series` is empty on this form, as a quiver's is.
    */
   points3?: readonly Point3Series[];
+  /**
+   * The paths a `scatter3d` draws — trajectories, parametric curves, the edges
+   * of a wireframe (C04 I78, C12 I93).
+   *
+   * **The third carrier, and either one alone is a complete document**: a
+   * wireframe is edges with no cloud and a parametric curve is a path with no
+   * samples, so the form's refusal reads *neither carrier* rather than *no
+   * `points3`*.
+   *
+   * Every rule that reads the data reads both — the extent, the
+   * `colourBy: "value"` completeness walk, and the series index space. Three
+   * rules correctly written against one carrier were wrong the moment there
+   * were two, and none of the three is about this member.
+   */
+  lines3?: readonly Line3[];
   /**
    * Which reading colour carries on a 3D scatter (C04 I76, C12 I89).
    *

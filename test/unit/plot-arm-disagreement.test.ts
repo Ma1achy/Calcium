@@ -852,22 +852,24 @@ describe("AD — the two arms decide separately, and here is where", () => {
     const t = collisionsIn(new Map([...corpus].map(([k, f]) => [k, f.t])));
     const s = collisionsIn(new Map([...corpus].map(([k, f]) => [k, f.s])));
 
-    // **193, and the five are `scatter3d`'s** — one per variant, and the count
+    // **200, and the nine are `scatter3d`'s** — one per variant, and the count
     // moves with the catalogue rather than being pinned to a number nobody can
-    // re-derive.
-    expect(corpus.size, "variants in the corpus").toBe(197); // cells-ok — a variant count
-    // **186, five up on 181** — every one of `scatter3d`'s five variants draws a
-    // distinct frame, so none of them collides with another and none with each
-    // other. That is the sweep saying the variants are variants: `default` and
-    // `colour-value` differ only in *colour*, and this instrument compares the
-    // painted row rather than the stripped one, which is why they separate here
-    // and would not in a text corpus (SC11's point, from the other side).
-    expect(t.distinct, "distinct terminal frames").toBe(190); // cells-ok — a frame count
+    // re-derive. Twelve now: the polyline carrier brought `trajectory`,
+    // `wireframe` and `lines-series` (C04 I78).
+    expect(corpus.size, "variants in the corpus").toBe(200); // cells-ok — a variant count
+    // **193, three up on 190** — every one of `scatter3d`'s twelve variants
+    // draws a distinct frame, so none of them collides with another and none
+    // with each other. That is the sweep saying the variants are variants:
+    // `default` and `colour-value` differ only in *colour*, and this instrument
+    // compares the painted row rather than the stripped one, which is why they
+    // separate here and would not in a text corpus (SC11's point, from the
+    // other side).
+    expect(t.distinct, "distinct terminal frames").toBe(193); // cells-ok — a frame count
     // **134 -> 148**: the density family draws, so nineteen violin variants and
     // one ridgeline stop colliding in the single refusal group (F383).
-    // **153, one up on 152, and the one is a *collision*** — `scatter3d`'s five
-    // variants all return `null`, so they are one group here where they are five
-    // distinct frames in the terminal. The refusal group F383 emptied is back,
+    // **153, and the addition is a *collision*** — `scatter3d`'s variants all
+    // return `null`, so they are one group here where they are twelve distinct
+    // frames in the terminal, and three more of them changes nothing. The refusal group F383 emptied is back,
     // and the asymmetry is the point of this sweep: one arm's five pictures are
     // the other arm's one absence.
     expect(s.distinct, "distinct documents").toBe(153); // cells-ok — a frame count; the four axis variants join the one refusal group

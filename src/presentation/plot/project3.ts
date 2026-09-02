@@ -209,9 +209,18 @@ export function createDepth(width: number, height: number): Depth {
 /**
  * The depth test. `true` when this sample is nearer than what is there.
  *
- * **Strictly nearer**, so a tie is stable: two coplanar primitives at the same
- * depth draw in the order they are given rather than in the order they are
- * rasterised, and a wireframe over its own surface needs the bias the design
+ * **Strictly nearer, and the comparison is in the buffer's own precision**
+ * (F454). A tie is meant to be stable — two coplanar primitives at the same
+ * depth draw in the order they are given, which is what lets the frame go in
+ * last and lose its cells to data lying on the box. It was not: `z` is a
+ * `double` and `d.z` is a `Float32Array`, so storing a value rounds it, and a
+ * second writer handing over the **identical double** wins whenever that
+ * rounding went up. About half of all ties, chosen by the last bits of a
+ * number nobody looks at, and invisible to any assertion comparing the two
+ * depths — as doubles they are equal.
+ *
+ * `Math.fround` is the whole fix: compare what will be stored against what is
+ * stored. A wireframe over its own surface still needs the bias the design
  * names rather than a tie-break here.
  *
  * Out of bounds returns `false` rather than throwing — `setDot`'s rule one file
@@ -221,7 +230,8 @@ export function createDepth(width: number, height: number): Depth {
 export function writeDepth(d: Depth, x: number, y: number, z: number): boolean {
   if (x < 0 || y < 0 || x >= d.width || y >= d.height) return false;
   const i = y * d.width + x; // cells-ok — a sample offset
-  if (!(z < (d.z[i] as number))) return false;
-  d.z[i] = z;
+  const q = Math.fround(z);
+  if (!(q < (d.z[i] as number))) return false;
+  d.z[i] = q;
   return true;
 }

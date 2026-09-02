@@ -148,7 +148,7 @@ describe("AX: the 3D reference frame", () => {
       const z = axisLines("corner", basis, originOf("auto", { x: -1, y: -1, z: -1 }, { x: 1, y: 1, z: 1 }))
         .find((l) => l.axis === "z");
       const p = clipProject(basis, (z as NonNullable<typeof z>).seg);
-      return p === null ? 0 : Math.hypot((p[1].x - p[0].x) * 80, (p[1].y - p[0].y) * 16); // cells-ok
+      return p === null ? 0 : Math.hypot((p.b.x - p.a.x) * 80, (p.b.y - p.a.y) * 16); // cells-ok
     };
     // **Exactly zero without a divide.**
     expect(extentOfZ("orthographic"), "orthographic collapses it").toBeCloseTo(0, 6);
@@ -225,21 +225,21 @@ describe("AX: the 3D reference frame", () => {
         // has been moved to the near plane rather than the segment refused.
         expect(p, "a straddling segment survives").not.toBeNull();
         const kept = p as NonNullable<typeof p>;
-        expect(Number.isFinite(kept[0].x) && Number.isFinite(kept[1].x)).toBe(true);
+        expect(Number.isFinite(kept.a.x) && Number.isFinite(kept.b.x)).toBe(true);
         // **Just inside the plane and not on it** (F450): `project` culls on
         // `z <= NEAR`, so a clip landing exactly on it is refused by the
         // function the clip exists to satisfy.
-        expect(Math.min(kept[0].depth, kept[1].depth), "the near end is just inside the plane")
+        expect(Math.min(kept.a.depth, kept.b.depth), "the near end is just inside the plane")
           .toBeGreaterThan(0.01);
-        expect(Math.min(kept[0].depth, kept[1].depth), "and only just")
+        expect(Math.min(kept.a.depth, kept.b.depth), "and only just")
           .toBeLessThan(0.0100001);
         // **Sampled densely, because the visible part is a sliver.** Three
         // samples along the segment found none and 201 found one — the clipped
         // remainder enters the frame briefly and leaves, so a coarse sweep
         // measures its own step size.
         const on = Array.from({ length: 201 }, (_v, i) => i / 200).some((t) => { // cells-ok — a sample index
-          const x = kept[0].x + (kept[1].x - kept[0].x) * t;
-          const y = kept[0].y + (kept[1].y - kept[0].y) * t;
+          const x = kept.a.x + (kept.b.x - kept.a.x) * t;
+          const y = kept.a.y + (kept.b.y - kept.a.y) * t;
           return x >= 0 && x <= 1 && y >= 0 && y <= 1;
         });
         if (!on) offScreen += 1; // cells-ok — a segment count
