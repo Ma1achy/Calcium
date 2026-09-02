@@ -258,15 +258,43 @@ colourBy: "series"   the categorical palette — reads as identity
 bit still reads as three-dimensional because near points are bigger, and that is the honest
 degradation.
 
-### 3b · Lines — `strokePolyline` with a depth test
+### 3b · Lines — a depth-tested stroke, and the primitive was built at step 4
 
-**The existing function walks a path in the dot grid setting dots.** The only change is
-`write(x, y, z, …)` instead of an unconditional set, with `z` interpolated along the segment.
+> **This section was three claims about the tree and all three were wrong** — measured when
+> step 5 came to build it (C12 §3ao, I93). The corrected version is below; the original said
+> the change was `write(x, y, z, …)` in place of an unconditional set in `strokePolyline`,
+> that the box-drawing arm and `glyphForMask` came free with it, and that
+> `plotStyle: "line"` selected them.
 
-**Everything else is inherited**: the box-drawing arm at cell resolution, `glyphForMask`, the
-ASCII fallback. **A wireframe with real box-drawing joins is what `plotStyle: "line"` gives
-you here**, and it is a genuinely different picture from the braille one rather than a
-coarser copy.
+**The primitive already exists and it is `strokeSeg`** — projected segment, dominant screen
+axis, `z` interpolated, `writeDepth` per sample. It landed with the axis lines and the box at
+step 4, so the work this step schedules was done one step early as a means to something else.
+**What step 5 owes is the carrier**: `Line3` and `lines3`, and the three rules written against
+`points3` that a second carrier falsifies.
+
+**There are two line functions and this section named one while describing the other.**
+*Walks a path in the dot grid setting dots* is `drawLine` (`raster.ts`, Bresenham into a dot
+`Uint8Array`). `strokePolyline` (`linedraw.ts`) walks a **cell mask** setting **edge bits**,
+consumed by `glyphForMask`. Both are *the line function*; nothing above forced a choice.
+
+**So the substitution has nowhere to live.** A mask cell accumulates up to four bits from up
+to four segments and `glyphForMask` resolves it after all strokes — there is no `set` to
+replace, and a strictly-nearer test refuses the second edge at exactly the shared vertex a
+join needs. Joins want a second depth rule on one buffer, not a swapped call.
+
+**And `plotStyle` is not this form's selector**: `STYLE_ARMS.scatter3d` is `[]`, and the arm
+is `halfBlockEligible`'s — the terminal's, not the caller's. The fifth residue the rung change
+left, after §6's tier list.
+
+**The argument for the box-drawing arm dies with the rung, and that is the part worth
+keeping.** On the dot grid, braille and box drawing were two full-capability choices a caller
+picked between, which is what made box drawing *a genuinely different picture rather than a
+coarser copy*. Here the glyph arm is what a terminal gets when it **cannot** do colour. It is
+the coarser copy. A claim can be exactly right about the design it was written for and false
+about the one it was carried into — F433's own lesson, arriving a second time.
+
+**So a line on the glyph arm is one directional glyph a sample**, `│` or `─`, which is what
+the box and the axis lines have drawn since step 4.
 
 ```ts
 type Line3 = Readonly<{
@@ -732,7 +760,7 @@ reader does not plot teapots.
 ## 8 · What this reuses
 
 ```
-strokePolyline        lines, wireframes, axis lines — plus a depth test
+strokeSeg             lines, wireframes, axis lines — BUILT at step 4, not step 5 (§3b)
 glyphForMask          the box-drawing arm at cell resolution
 createGrid / setDot   the raster, plus the depth buffer beside it
 the continuous palette   colour by height, depth or field
@@ -744,6 +772,8 @@ RenderContext         the camera — the crosshair's SLOT, and not its wiring (�
 ```
 
 **Genuinely new: the rotation, the depth buffer, the lighting, the 3D axis layout.**
+**And `strokePolyline` is not on this list any more** — it was, and it walks a cell mask
+rather than a dot grid, so the row was reuse of a function that does something else (§3b).
 Everything else is a fold over what exists.
 
 ---
@@ -783,7 +813,7 @@ four times.
 2   projection + the depth buffer + frustum culling
 3   POINTS — the cheapest primitive and the most useful. A 3D scatter ships here
 4   the 3D axis layout, billboarded labels, the back-face box
-5   LINES — strokePolyline with a depth test. Wireframes
+5   LINES — the CARRIER; the depth-tested stroke landed at step 4 (§3b)
 6   SURFACES — normals, lighting, the colour/shading separation
 7   backface culling, the wireframe-over-surface mode and its depth bias
 8   auto-orbit and manual camera controls

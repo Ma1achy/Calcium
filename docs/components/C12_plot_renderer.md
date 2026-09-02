@@ -7976,6 +7976,78 @@ the answer is only an answer because it was asked.
 
 ---
 
+## 3ao. The polyline — the primitive that was already built, and three claims that were not
+
+**`strokeSeg` already does what the design note schedules for this step.** It walks a projected
+segment on the dominant screen axis, interpolates `z`, and calls `writeDepth` per sample — which
+is §3b's *`write(x, y, z, …)` instead of an unconditional set, with `z` interpolated along the
+segment*, verbatim. It landed one step earlier as the means to draw the axis lines and the box.
+**So what this step owes is the carrier, not the primitive** (C04 I78), and the note's three
+supporting claims are each measurably wrong about the tree they name.
+
+**One — two line functions, and the note names one while describing the other.** *The existing
+function walks a path in the dot grid setting dots* is `drawLine`'s behaviour (`raster.ts`:
+Bresenham over a `Uint8Array` of dots). `strokePolyline` (`linedraw.ts`) walks a **cell mask**
+setting **edge bits** — `mask[y][x] |= bit`, four bits a cell, in cell coordinates, consumed by
+`glyphForMask`. Both are *the line function*, nothing in the prose forces a choice, and that is
+F58's conflation shape rather than a mistake.
+
+**Two — the substitution has nowhere to live.** There is no `set` to replace: a mask cell
+accumulates up to four bits from up to four segments and `glyphForMask` resolves it **after** all
+strokes, so a per-bit depth test has no carrier and a per-cell one answers a different question.
+Worse, the test is strictly-nearer, so at a shared vertex the second edge is refused **by
+construction** — which is exactly the cell where a join is needed. Box-drawing joins are therefore
+not inherited; they need a second depth rule (equal-or-nearer for the mask, strictly-nearer for
+the colour) on one buffer.
+
+**Three — the selector is not a member of this form.** *A wireframe with real box-drawing joins is
+what `plotStyle: "line"` gives you here*, and `STYLE_ARMS.scatter3d` is `[]` (I87): the arm is the
+terminal's, not the caller's. **Fifth instance of the residue the rung change left**, after §6's
+tier list.
+
+**And the argument for the joins dies with the rung, which is the part worth keeping.** On the dot
+grid, braille and box-drawing were two full-capability choices a caller picked between, so
+box-drawing was *a genuinely different picture rather than a coarser copy* — the note's own words.
+Here the glyph arm is what a terminal gets when it **cannot** do colour. It is the coarser copy,
+and a claim can be exactly correct about the design it was written for and false about the one it
+was carried into (F433's own lesson).
+
+**So a line on the glyph arm is one directional glyph a sample** — `│` or `─` by dominant screen
+direction, which is what the box and the axis lines have drawn since step 4 and what the frame
+reads legibly at `1bit`, `ascii` and `wide`.
+
+---
+
+## 6g. The polyline walk — a table, and the three rows are about the *other* carrier
+
+**A table again**: nothing here is event-mediated. And the finding is that the interesting rows
+are not about `lines3` at all — they are rules written against `points3` that a second carrier
+falsifies, which is why indexing by the member would have found none of them.
+
+| # | the two rules | the input | ruling |
+|---|---|---|---|
+| 1 | the extent is the data's (I92) × a line has its own points | `lines3` set, `points3` empty | **the extent is over both carriers.** Otherwise `extentOf([])` returns the unit cube, the polyline draws unnormalised, and the frame is on-screen, in-bounds and describing a different document — T6.77 |
+| 2 | the form is refused with no `points3` (C04 I76) × a wireframe has no cloud | `lines3` only | the gate reads **neither carrier**. A parametric curve and a wireframe are complete documents with no samples |
+| 3 | `colourBy: "value"` walks every point (C04 I76) × a line's points are `Point3` | a line missing a `value` | the walk covers both carriers, or the arm is enforced on half its input — T3.55 |
+| 4 | the series index reads `clouds[i]` × a line has a `tone` and a `label` | one cloud, one line | **one index space, clouds first.** Two spaces give them one palette slot and the legend no way to separate them |
+| 5 | the glyph arm packs `tier × clouds + series` (I88) × row 4 | a line on the glyph arm | a line **must not** reach `glyph[]`, or the `% clouds.length` decode breaks. It takes the literal-glyph channel, whose distinction from `glyph[]` is *chosen glyph* versus *index into the marker table* — and the frame/data difference is carried by `ink[]`, which both writers already set |
+| 6 | first drawn wins a tie (I84) × a trajectory's vertices are its own cloud's points | a path through the cloud that made it | **points draw before lines.** Equal depth at every vertex, so lines-first swallows every marker in the path |
+| 7 | colour is the depth ramp × a segment spans near to far | `colourBy: "depth"` | **per sample, not per segment.** `strokeSeg` has `z` at every step, and one colour for a segment crossing the figure contradicts the cue the whole form rests on. Under `"series"` it is one colour, because that channel is categorical |
+| 8 | `clipProject` clips to the near plane (I91) × a polyline is a chain | one **interior** vertex behind the eye | it clips **twice**, once per adjacent segment, and the two ends land at different points on the near plane — a gap, which is what a line passing behind the reader looks like. Not a defect |
+| 9 | `closed` connects last to first × a polyline of one or two points | `closed: true` | a closing segment at **three or more**. At two it retraces; at one it is zero-length — T3.56 |
+| 10 | a zero extent maps to the centre (I86) × a line along that axis | coplanar input | inherited unchanged: the axis collapses and the line is drawn in the plane, which is the truth |
+
+**Rows 1, 2 and 3 are the walk's whole yield, and all three are the same shape**: a rule correctly
+written for one carrier, unchanged, and wrong the moment there are two. **None of them is
+reachable by asking what `lines3` needs** — the member's own rules (rows 4–9) are all decisions
+between two defensible answers, and the three that have a *wrong* answer are about `points3`.
+That is the classification table finding a structural interaction where the obvious index —
+what does the new field do — finds nothing.
+
+**And the throw's residue: there is none.** Every refusal is at the gate, before construction.
+
+---
+
 ## 3q. One value axis across the bands, and the record it never had
 
 **This section is written because three code comments cite it and it did not exist.** The
@@ -9248,6 +9320,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I90** — **Three signs are computed once and read twice: the box's far corner, and the axes' corner, which is not the same one.** In a world-aligned box the three dot products the design note asks for are three **sign tests** — `eye · x̂` is `eye.x`. The three back faces meet at `(−sx, −sy, −sz)`; the axes anchor at `(sx, sy, −sz)`, **near in x and y and far in z**. **The note's rule names the far corner and its reason forbids it** (F449's sibling, F448): measured at the default camera the far corner projects to screen `(0.500, 0.527)` — the centre of the figure — so axes drawn from it run *across* the data, which is what *the axes never occlude the data* exists to prevent; the silhouette corner projects to `(0.500, 0.888)`, the bottom vertex of the outline. **A rule and its reason can disagree and the reason is the half worth keeping**, which only drawing the thing can show. The F444 point survives as *one source of truth, two derived answers* rather than *one answer, two consumers*. **The z axis takes a side vertical edge** and a fixed one, so it does not swap sides mid-orbit for a fraction of a cell. **A zero component ties to the negative end**, because `Math.sign(0)` names no corner and a camera crossing the plane would otherwise make the axes jump twice. The frame is **depth-tested against the data**, which is *never occlude* read from the other side (→ I84, I86, C04 I77).
 - **I91** — **An edge-on axis keeps its line and loses its labels, and a segment behind the eye is clipped rather than dropped.** When an axis projects to near-zero length its ticks collapse to a point and its labels stack, so the labels are hidden and the **line stays**: an axis is information about orientation when its scale is unreadable, and a reader turning the camera needs to see which axis is coming round. It needs no separate priority clause — a zero extent has no labels to place and sorts last under *drop the later, order by projected extent*, which is `niceAxis`'s rule reused. **The exact degenerate is orthographic and not perspective** (F448): a line parallel to the view direction projects to a point only without a divide, and under perspective it keeps extent because its near end is nearer and therefore larger — 3.37 cells against 0.00, measured at 80×16. So the rule fires at zero under one projection and hands off to the collision rule under the other, which is the same statement about legibility at two ends of a scale. **The near-plane case is clipped and not dropped**, and to the first depth the projector *accepts* rather than to the plane itself: `project` culls on `z <= NEAR` inclusive, so a clip landing on the plane is refused by the function it exists to satisfy and drops every segment it was written to save (F450). **The reason first given for the rule was wrong and the rule is right.** *The frame vanishes as the camera approaches* is not what happens: the clipped remainder reaches the screen at one of six distances swept, because `basisOf` targets the origin and the divide throws the near region outside `[0,1]²`. A frame comparison therefore agrees whether a segment is clipped, dropped, or clipped-then-dropped — which is how the defect survived the row written to catch it, and why `AX6` asserts the clipped endpoint's **depth** rather than the frame's ink (→ I86, §3an).
 - **I92** — **Labels are billboarded, cell-resolution and drawn over; the box is the data's extent and the ticks are nice values inside it.** Always horizontal, moving with their anchor and nothing else, **inside the plot area** — a 3D form spends no `AXIS_GUTTER` because three labels move as the view turns and a fixed column can only name one of them (I83). A label is **text over a sub-cell raster**, so it wins the whole cell: half a cell of label is not a thing, and this is the one place in this component where the two resolutions meet. **Depth-tested at the anchor and drawn over**, because per-cell testing draws half a string, which reads as corruption rather than as occlusion — and it is what makes `axes3: "origin"` readable, since those lines cross inside the figure by construction. **A label reserves a blank on each side** (F449): overlap alone let `1` and `0.5` claim disjoint adjacent cells and the frame read `10.5`, one number that is neither of them, so the reservation is the label plus its gap. **An axis name sits at its midpoint** rather than past its positive end, where x's and y's collided with each other and with a shared tick and the frame read `xy1`. **Turning the axes on does not move the data**: `unitOf` normalises the data's own extent whether or not they draw, and a `niceAxis` tick outside that box is dropped rather than the box being grown to meet it — the alternative rescales the picture under a reader who only asked for a reference frame (→ I83, I86, C04 I77).
+- **I93** — **A polyline is stroked per sample with its depth, its colour varies along it, and the points draw first.** The primitive is `strokeSeg`, which **already existed**: it landed with the axis lines and the box one step earlier, so the design note's *`write(x, y, z, …)` instead of an unconditional set* was built before the step that schedules it, for another reason. **Colour is per sample under `"depth"` and `"value"` and per segment under `"series"`** — the ramp arms have a reading at every step and a segment crossing the figure in one colour contradicts the depth cue the form rests on, where the categorical arm has one reading for the whole line. **Points are drawn before lines**, and it is a rule about ties rather than about layering: `writeDepth` is strictly nearer so first-drawn wins, and a trajectory's vertices sit at *exactly* its own cloud's depths, so lines-first swallows every marker in the path. **On the glyph arm a line writes a literal glyph and never a tier code** — `glyph[]` packs `tier × clouds + series` and a line is neither, and a line index reaching it breaks the `% clouds.length` decode; the channel it takes is the one the frame uses, whose real distinction is *chosen glyph* versus *index into the marker table*, with `ink[]` carrying the frame/data difference. **There are no box-drawing joins and the note's claim that they are inherited is false in three measurable ways**: it describes `drawLine`'s dot grid while naming `strokePolyline`'s cell mask; a mask cell accumulates four bits resolved after all strokes, so a strictly-nearer test refuses the second edge at exactly the shared vertex a join needs; and `plotStyle: "line"`, the selector it names, is not a member of this form (I87). **The argument for them dies with the rung** — braille and box drawing were two full-capability choices on the dot grid, and here the glyph arm is what a terminal gets when it cannot do colour (→ I84, I86, I88, I91, C04 I78).
 
 
 ## 8. Commitments
@@ -9344,6 +9417,7 @@ orientation — and belongs in the classification table as its own rows.
 90. **The corner is three sign tests, and the back faces are the same three** (I90). A world-aligned box turns the design note's three dot products into three signs, which is the difference between a rule a reader can check and one they have to trust; the far corner and the three back faces are one computation with two consumers, because two derivations of one fact are F444's shape and it was measured one commit earlier. A zero component ties to the negative end so a camera crossing the plane does not make the axes jump twice (→ C04 I77).
 91. **An edge-on axis keeps its line, and a segment behind the eye is clipped** (I91). The first is F438's degenerate arriving as a feature — orientation survives when scale does not — and it needs no priority clause, because a zero extent sorts last under the collision rule already there. The second is the one that would have shipped: dropping a segment whose near end is behind the eye makes the reference frame vanish as the camera approaches, and the frame is legal (→ I86).
 92. **The labels are billboarded, they win their cell, and the box does not move the data** (I92). Three labels turn with the view, so no gutter is spent and they are drawn inside the area; text is cell-resolution over a sub-cell raster and takes the whole cell; and the box is the data's own extent with nice ticks clamped inside it, so a reader switching a reference frame on does not watch the picture rescale (→ I83, I86, C04 I77).
+93. **The line primitive was already built, and what this step owes is the carrier** (I93). `strokeSeg` interpolates `z` and depth-tests per sample, and it landed with the axis lines — so the scheduled work was done one step early for another reason, and the three claims the note made in support of it are each wrong about the function they name, the structure they assume, or the member they select on. Colour varies along a segment on the ramp arms because the depth is available at every step; the points draw first because a trajectory's vertices tie with its own cloud; and the box-drawing joins are refused with their mechanism rather than deferred with a condition (→ C04 I78, C12 I88).
 
 ---
 
@@ -9402,6 +9476,11 @@ Six tiers. No state machine — C12 is pure over the block.
 - **AX10** (C04 I77): `origin3` is refused on every `axes3` but `"origin"`, at **both** gates, each with its converse; and `axes3: "origin"` with no `origin3` is accepted, because the member has a default.
 - **AX11** (I92): `axisStyle3.x.show: false` removes the x line and its labels and **leaves the box's x edges**, asserted as both halves — the box is the reference frame and the axis is the scale, and a row asserting only the removal passes against a renderer that removed the box too.
 - **AX12** (I92): the labels are the same strings on **both arms** — the raster at 24-bit and the marker glyphs at `ascii` carry identical text, because the arm changes the marks and not the words.
+- **LN1** (I93, C04 I78): the extent is over **both** carriers — a block with `lines3` only renders its polyline inside the box, asserted as *the inked cells lie within the frame the box draws*, and the same polyline with a cloud added at a wider extent **moves**. The second half is the row: an extent taken from `points3` alone still draws something in bounds, because `extentOf([])` is the unit cube.
+- **LN2** (I93): a segment spanning near to far under `colourBy: "depth"` carries **more than one** colour and its near end matches the near end of the ramp — compared against `continuousColour(map, 1)` rather than counted, because a count is satisfied by any two wrong colours. Under `colourBy: "series"` the same segment is **one** colour, and it is the cloud's second slot rather than its first.
+- **LN3** (I93): a polyline through a cloud's own points leaves **every** marker visible — the marker glyphs present at `1bit` with `lines3` set are the same set as without it. The row fails if lines draw first, and no bounds or ink-count assertion reaches it, because the line inks the cell either way.
+- **LN4** (I93): on the glyph arm a line cell carries `│` or `─` by dominant screen direction and **never** a marker glyph, and the markers on the same frame still decode to the right tier and series — the row that fails if a line index reaches `glyph[]`.
+- **LN5** (I93, I91): a polyline with an **interior** vertex behind the eye draws **two** runs and not one, asserted on the count of maximal inked runs along the path. The gap is the near-plane clip firing twice, which is correct, and a row asserting *something is drawn* passes against a renderer that drops both segments and draws the frame.
 - **SC12** (I87, C12 I2): the form renders through the registry at every width in the sweep and `measure` equals the row count, over both arms. The generic contract, named here because a form composing its own rows outside `axed` is the shape that has broken I24 twice.
 - **CAM6** (I83, §3al): orbit pauses while the readout cursor is active. **Owed at step 8 and not written now** — the orbit does not exist, so the row would pass by having no subject, which is the vacuity this suite has recorded three times.
 - **YA1** (I47): `yAxis: "both"` renders the same tick values on both sides, from **one** `yLabels` call — asserted as equality of the two label sets rather than as each being correct, which is the half a per-side assertion cannot see.

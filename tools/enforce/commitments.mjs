@@ -1062,6 +1062,12 @@ export function scanSections(file, src, options = {}) {
  * 3D axis layout's spec commit and repaid on the one that built it. `AX1`–`AX14`
  * name all four.
  *
+ * **`C04 I78` and `C12 I93` are the seventh**, taken on the polyline's spec
+ * commit and repaid on the one that builds it — `LN1`–`LN5` name both. Two
+ * entries where the last two loans took four each, because this step rules a
+ * carrier rather than a renderer: most of what it says constrains rules that
+ * already have rows, and only the two new statements need new ones.
+ *
  * **Stated blind spot: the corpus is `.ts` only**, matching what `walk` collects,
  * so an invariant named solely by a `.mjs` fixture reads as uncited. Widening it
  * is not obviously right: `TOPICS["fixture"] = "C01"`, and the bare `I17` in
@@ -1072,7 +1078,8 @@ export function scanSections(file, src, options = {}) {
  */
 const UNCITED_INVARIANTS = Object.freeze([
   "C01 I15", "C01 I16", "C01 I17", "C03 I11", "C04 I18", "C04 I20", "C04 I21", "C04 I22", "C04 I24",
-  "C04 I32", "C04 I33", "C04 I66", "C05 I13", "C05 I14", "C06 I21", "C06 I22", "C06 I23",
+  "C04 I32", "C04 I33", "C04 I66", "C04 I78", "C05 I13", "C05 I14", "C06 I21", "C06 I22",
+  "C06 I23", "C12 I93",
   "C07 I16", "C07 I17", "C07 I21", "C08 I16", "C09 I15", "C09 I16", "C10 I18", "C10 I19",
   "C10 I20", "C11 I12", "C14 I11", "C14 I13", "C14 I15", "C14 I16", "C14 I19", "C14 I22",
   "C16 I1", "C16 I16", "C16 I19", "C17 I10", "C17 I14", "C18 I11", "C18 I13", "C18 I23",
