@@ -346,11 +346,40 @@ uniform colormap makes lightness monotonic in the value — that is what viridis
 multiplying it by a Lambertian intensity puts the field and the slope on the same perceptual
 axis by construction.
 
-**So: one channel until something separates them, and the candidate is named rather than
-ruled.** Hue and chroma for the field, lightness for the shading, which is what a 3D surface
-renderer with a colormap normally does. Whether it survives a terminal's quantisation is a
-**measurement**, and it belongs to step 6 beside the reference comparison — not to a sentence
-carried across a changed premise, which is how this one got here.
+**Measured at step 6, and the candidate is refused — for a reason two steps earlier than the one
+this paragraph expected** (F455). Hue and chroma for the field, lightness for the shading: it does
+not reach a terminal's quantisation, because **sRGB's gamut refuses it at 24 bits**. Holding
+`(a, b)` while sweeping OKLab `L` leaves the gamut at both ends, the clamp that brings it back
+rotates the hue, and the scheme designed to put the field *in* hue destroys hue on every map
+measured — minimum separation between adjacent field values **0.0000 rad on six of six**, against a
+drift under shading of up to 0.93 rad.
+
+**And half the separation it wanted is already there, on the maps that travel in hue.** Scaling a
+colour in linear light is exactly *hold chromaticity, change luminance*, so under one channel the
+field's hue barely moves as the shading does. Measured at 24-bit over 21 field values × 11
+intensities:
+
+```
+map        hue drift under shading   min hue step between fields    ratio
+viridis            0.0330                     0.1292                3.9x
+plasma             0.0168                     0.1231                7.3x
+inferno            0.1223                     0.0015                0.01x
+coolwarm           0.1179                     0.0016                0.01x
+magma              0.1522                     0.0005                0.00x
+gray               0.0000                     0.0000                 —
+```
+
+**So the honest statement is per map, not per rung**, and neither the old claim nor its
+replacement is shaped that way. **The field is recoverable from hue under shading exactly when the
+map travels in hue**, and three of the six shipped maps do not: magma and inferno run black →
+purple → orange → white with almost no hue step at the ends, coolwarm passes through a white
+midpoint where chroma is zero and hue is undefined, and `gray` has no chroma to carry anything.
+That is a property of the **caller's colormap** rather than of the terminal, so it is a documented
+consequence of `colormap` and not a branch in the renderer.
+
+**At 8-bit it collapses on every map** — hue drift 1.57–5.83 rad, minimum field step 0.0000
+everywhere — which is C10's rung rather than this form's, and is what `CUBE_LEVELS`' own comment
+already says: scaling a colour and requantising compresses the dark end harder than the light.
 
 #### Shading — and the dither that used to be here is gone
 

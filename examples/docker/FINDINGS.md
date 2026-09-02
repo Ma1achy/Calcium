@@ -20957,3 +20957,39 @@ equality that is a coin flip**, and every rule phrased over *equal depth* inheri
 same pair — a `Float32Array` and a `double` — is the ordinary way to write a depth buffer, so this
 is not a mistake so much as the default being wrong for any rule that reads a tie.
 
+
+---
+
+## F455 — the two-channel candidate is refused by the gamut, two steps before the reason it was given ★★★★★
+
+F436 retracted *colour and dither are two channels* and named a replacement to be **measured** at
+step 6: hue and chroma for the field, lightness for the shading, *whether it survives a terminal's
+quantisation*. Measured over 21 field values × 11 intensities on six shipped colormaps.
+
+**It does not reach quantisation.** Holding OKLab `(a, b)` while sweeping `L` leaves the sRGB
+gamut at both ends; the clamp that brings it back **rotates the hue** — by up to 0.93 rad — so the
+scheme designed to put the field *in* hue destroys hue at 24 bits, before any terminal is
+involved. Minimum hue separation between adjacent field values: **0.0000 on six maps of six.**
+
+**And half of what it wanted is already there.** Scaling in linear light is exactly *hold
+chromaticity, change luminance*, so under one channel the field's hue barely moves as the shading
+does — 0.0330 rad of drift on viridis against a 0.1292 rad step between adjacent fields, a ratio
+of 3.9×; 7.3× on plasma.
+
+**The finding is that the answer is per map and neither claim was shaped that way.** The field is
+recoverable from hue exactly when the map travels in hue, and three of the six do not: magma and
+inferno run black → purple → orange → white and have almost no hue step at the ends (0.0005 and
+0.0015 rad against 0.15 and 0.12 of drift — the ratio inverts to 0.00× and 0.01×), coolwarm passes
+through a white midpoint where chroma is zero and hue is undefined, and `gray` has no chroma at
+all. So it is a consequence of the **caller's** `colormap` rather than a rung of the terminal, and
+not a branch in the renderer.
+
+**What the first probe would have concluded, and why it was wrong.** Counting *distinct colours*
+and *pairs that collide* gave one channel 231/231 distinct with zero confusions at 24-bit — a clean
+win, and an answer to a different question. Two colours can differ and still leave a reader unable
+to say which reading moved. The measurement that bears on the claim is **recoverability**: does the
+field's signature survive the shading, and do two fields differ at one shading. Only the second
+probe asks it, and only the second finds the per-map split.
+
+**At 8-bit both collapse on every map** — hue drift 1.57–5.83 rad, minimum field step 0.0000
+everywhere — which is C10's rung and what `CUBE_LEVELS`' own comment already says.
