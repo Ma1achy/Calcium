@@ -288,6 +288,57 @@ describe("plot — the real meshes", () => {
     expect(ratio, "and not none of them").toBeGreaterThan(0.05);
   });
 
+  it("RM7 (C12 I97, C04 I79, §6k row 9): the teapot read in colour, and the stripped control cannot", () => {
+    // **The picture is the colour on this rung.** The half-block arm paints `▀`
+    // in every inked cell and puts both colours in the SGR, so a text frame
+    // carries one character class and everything else is in the escape codes.
+    const rows = shot(surfaceOf("teapot", { closed: true }), {
+      azimuth: Math.PI,
+      elevation: 0.2,
+      distance: 6,
+    });
+
+    // The control first: stripped, the frame has nothing to read.
+    const glyphs = new Set([...text(rows)].filter((c) => c !== " " && c !== "\n"));
+    expect(glyphs.size, "one character class, so a stripped capture is blind").toBeLessThanOrEqual(3);
+
+    // **The studio light's direction, read off the picture.** Up and to the
+    // right of the figure's own centre against down and to the left — the one
+    // statistic that says the shading is *right* rather than merely varied.
+    const lit: { r: number; c: number; l: number }[] = [];
+    rows.forEach((line, r) => {
+      let col = 0; // cells-ok — a column index
+      for (const run of runsOf(line)) {
+        for (const ch of [...run.text]) {
+          if (ch !== " ") {
+            const m = /rgb\((\d+),(\d+),(\d+)\)/u.exec(run.colour ?? "");
+            if (m !== null) {
+              lit.push({
+                r,
+                c: col,
+                l: 0.2126 * Number(m[1]) + 0.7152 * Number(m[2]) + 0.0722 * Number(m[3]),
+              });
+            }
+          }
+          col += 1; // cells-ok — a column index
+        }
+      }
+    });
+    expect(lit.length, "the frame carries colour at all").toBeGreaterThan(80);
+
+    const midR = lit.reduce((t, x) => t + x.r, 0) / lit.length;
+    const midC = lit.reduce((t, x) => t + x.c, 0) / lit.length;
+    const mean = (f: (x: { r: number; c: number }) => boolean): number => {
+      const set = lit.filter(f);
+      return set.reduce((t, x) => t + x.l, 0) / Math.max(1, set.length);
+    };
+    const upRight = mean((x) => x.r < midR && x.c > midC);
+    const downLeft = mean((x) => x.r > midR && x.c < midC);
+    // **Against the light's direction rather than a constant**: a light pointing
+    // the other way fails, and a brighter light does not.
+    expect(upRight / downLeft, "up and right is the lit side").toBeGreaterThan(1.2);
+  });
+
   it("RM1 control (C12 I97): the parser is what the digest is protecting", () => {
     // **A digest over text nobody parses correctly protects nothing.** The two
     // things a naive OBJ reader gets wrong silently are `v/vt/vn` triples and
