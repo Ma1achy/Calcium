@@ -21593,3 +21593,41 @@ The sample grid is not what the frame is spending on, so the axis that costs is 
 computation the camera does not move. The remedy is caller-owned scratch on `RenderContext`, which
 §11 already rules for the depth buffer for exactly this reason; it is recorded rather than taken,
 because C12 I11 makes the wrong version of it — a module-level cache — the tempting one.
+
+
+## F470 — the walk recursed and the effects did not, so a focused block inside a panel was unreachable ★★★★☆
+
+`elementsIn` walks into a container that declares no elements of its own — `panel` and `group`
+yield their children's, and the walk asks the *definition* rather than a list of kinds. So focus
+can land on a block that is not at the top level.
+
+**Every effect in `construct.ts` resolved that block with a top-level `find`:**
+
+```ts
+const entry = stores.transcript.entries.find((e) => e.id === entryId);
+const block = entry?.doc.blocks.find((b) => b.id === at.element?.blockId);
+if (block === undefined) return;
+```
+
+So a table inside a `panel` could be focused and not paged, and a 3D plot inside one could be
+focused and not turned — a key consumed, nothing drawn, and no error anywhere. `session.ts`'s own
+`blockById` walks `descendants` for the same question one file along, which is what made the two
+readable as agreeing.
+
+**`b.live` builds a panel**, and that is the whole of why this stayed invisible: the arrangement
+the framework itself produces is the failing one, and every fixture that exercised the effects put
+the block at the top level because that is what a hand-written fixture does. The spinner fixture
+carries the same lesson in the other direction — *with the block at the top level, removing the
+container walk from `animationIntervalOf` survived every row here*.
+
+**The class is the one already written down**: a recursion added on one side of a pair. The walk
+that decides *what can be focused* grew container support and the walk that decides *what a key
+does to it* did not, and neither half is wrong on its own. **The signal is that the fixed side's
+comment names the other side's symptom** — `animationIntervalOf`'s does, in a file the effects
+never import.
+
+**Found by writing the orbit's own gathering pass**, not by a test: `visibleRows` had to collect
+the plots on screen, the memory of `animationIntervalOf`'s mutation was one line above, and asking
+*does the effect walk too* was one grep. The row that now covers it is T4.17n, and it fails against
+the shipped `find` at every step of the arc.
+

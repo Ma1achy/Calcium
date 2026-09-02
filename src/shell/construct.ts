@@ -31,7 +31,8 @@ import type { NavElement } from "../presentation/blocks/index.js";
 import { initialRegionHeight } from "./frame.js";
 import { createManifestStore, parseManifest, withThemeNames } from "../data/manifest/index.js";
 import type { ManifestError } from "../data/manifest/index.js";
-import type { Result } from "../data/viewmodel/index.js";
+import { descendants } from "../data/viewmodel/index.js";
+import type { Block, Plot, Result } from "../data/viewmodel/index.js";
 import { createProcessRunner } from "../data/process/runner.js";
 import {
   createTransport,
@@ -46,6 +47,7 @@ import { plotDefinition } from "../presentation/plot/index.js";
 import { patchDefinition } from "../presentation/patch/index.js";
 import { loadTheme, type ThemeStore } from "../presentation/theme/index.js";
 import { createTranscriptStore } from "../viewport/transcript/index.js";
+import type { EntryId } from "../viewport/transcript/index.js";
 import { createViewport } from "../viewport/viewport/index.js";
 import { RenderCache } from "./render-cache.js";
 import { Cameras } from "./cameras.js";
@@ -147,6 +149,16 @@ async function readDocument(
  */
 const CHIP_LINES = 5;
 
+/**
+ * What one press of the dolly scales the eye distance by (C22 I75).
+ *
+ * **Multiplicative, so it cannot reach `distance: 0`** — the only value that
+ * draws nothing, measured. Twelve presses from `CAMERA_DEFAULT`'s 6 take the eye
+ * to 0.41 or to 87, and the reader is never on a blank frame with a control that
+ * still works.
+ */
+const DOLLY = 1.25;
+
 export const STEPS = Object.freeze([
   "capabilities",
   "registries",
@@ -241,6 +253,14 @@ export type Graph = Readonly<{
   pageBlock: (direction: 1 | -1) => void;
   /** C22 I71 — turn the focused plot camera. A no-op where there is none. */
   orbitBlock: (direction: 1 | -1) => void;
+  /** C22 I75 — tilt it. Unclamped, because the pole is unreachable (F467). */
+  tiltBlock: (direction: 1 | -1) => void;
+  /** C22 I75 — dolly it, multiplicatively, so `distance: 0` is unreachable. */
+  dollyBlock: (direction: 1 | -1) => void;
+  /** C22 I75 — restore the declared view, leaving the orbit alone. */
+  resetCamera: () => void;
+  /** C22 I72 — start or stop it turning. Off is the default and nothing declares it. */
+  toggleOrbit: () => void;
   /** Is the prompt answering keys under the top layer (I51, C19 I20)? */
   promptUnderMenu: () => boolean;
   /** Past the blink threshold since the last key (C22 I64). */
@@ -1190,15 +1210,39 @@ export async function constructGraph(
    * store is nudged and nothing touches `focus`. A focused element outside the
    * box is the legal state C26 I18 names, and the next `↓` steps from it.
    */
-  const pageBlock = (direction: 1 | -1): void => {
+  /**
+   * The block focus is inside, **resolved through the tree** (F470).
+   *
+   * `elementsIn` walks into `panel` and `group` — a container declaring no
+   * elements of its own yields its children's — so focus can land on a block a
+   * top-level `find` cannot reach. Every effect here used that `find`, so a
+   * table inside a `panel` could be focused and not paged, and a 3D plot inside
+   * one could be focused and not turned. **`b.live` builds a panel**, which is
+   * how a defect this shape stays invisible: the arrangement the framework
+   * itself produces is the one that fails.
+   *
+   * C04's `descendants` rather than a fourth walk, for `animationIntervalOf`'s
+   * reason — two copies of a traversal are two places to add a container kind.
+   */
+  const focusedBlock = (): Readonly<{ entryId: EntryId; block: Block }> | null => {
     const entryId = stores.transcript.liveId;
-    if (entryId === null) return;
+    if (entryId === null) return null;
     const at = focus.current;
-    if (at.at !== "liveBlock" || at.element === null) return;
-
+    if (at.at !== "liveBlock" || at.element === null) return null;
+    const wanted = at.element.blockId;
     const entry = stores.transcript.entries.find((e) => e.id === entryId);
-    const block = entry?.doc.blocks.find((b) => b.id === at.element?.blockId);
-    if (block === undefined) return;
+    if (entry === undefined) return null;
+    for (const top of entry.doc.blocks) {
+      if (top.id === wanted) return { entryId, block: top };
+      for (const child of descendants(top)) if (child.id === wanted) return { entryId, block: child };
+    }
+    return null;
+  };
+
+  const pageBlock = (direction: 1 | -1): void => {
+    const found = focusedBlock();
+    if (found === null) return;
+    const { entryId, block } = found;
 
     // One row of overlap, which is what lets a reader join two screens — and
     // a floor of one, so a box of a single row still moves.
@@ -1208,34 +1252,109 @@ export async function constructGraph(
   };
 
   /**
-   * Turn the focused plot's camera one step (C22 I71, C12 I83).
+   * The focused plot, or `null` (C22 I71, I75, C12 I83).
    *
-   * **`pageBlock`'s shape and one difference**: this reads the block's own
-   * declared `camera` and hands it to the store, because the baseline a key is
-   * normalised against is the view the block would be drawn from with no entry
-   * at all — and only the block knows that (`cameras.ts`'s header).
+   * **`pageBlock`'s shape and one difference**: the camera effects read the
+   * block's own declared `camera`, because the baseline a key is normalised
+   * against is the view the block would be drawn from with no entry at all —
+   * and only the block knows that (`cameras.ts`'s header).
    *
    * **A block that is not a plot, or a plot declaring no camera, is a no-op.**
-   * The binding is static and cannot see a block, so the gate is here; it is a
-   * key consumed and nothing drawn, which is the stated cost of landing the
-   * writer with the field rather than after the form.
+   * The bindings are static and cannot see a block, so the gate is here — and a
+   * plot with no `camera` declares no element either (C12 I85), so focus cannot
+   * reach one and the second half of the gate is belt over braces.
+   */
+  const focusedPlot = (): Readonly<{ entryId: EntryId; plot: Plot }> | null => {
+    const found = focusedBlock();
+    if (found === null) return null;
+    const { entryId, block } = found;
+    if (block.kind !== "plot") return null;
+    const plot = block as Plot;
+    return plot.camera === undefined ? null : { entryId, plot };
+  };
+
+  /**
+   * Turn the focused plot's camera one step (C22 I71, I75).
    *
-   * **Focus does not move**, exactly as paging does not (C26 I18).
+   * One sixteenth of a turn, which reads as a rotation rather than a jump at the
+   * sample counts this rung has. **Focus does not move**, exactly as paging does
+   * not (C26 I18).
    */
   const orbitBlock = (direction: 1 | -1): void => {
-    const entryId = stores.transcript.liveId;
-    if (entryId === null) return;
-    const at = focus.current;
-    if (at.at !== "liveBlock" || at.element === null) return;
+    const at = focusedPlot();
+    if (at === null) return;
+    stores.cameras.nudge(at.entryId, at.plot.id, at.plot.camera, {
+      azimuth: (direction * Math.PI) / 8,
+    });
+    scheduler.commit("input");
+  };
 
-    const entry = stores.transcript.entries.find((e) => e.id === entryId);
-    const block = entry?.doc.blocks.find((b) => b.id === at.element?.blockId);
-    if (block === undefined || block.kind !== "plot" || block.camera === undefined) return;
+  /**
+   * Tilt the focused plot's camera (C22 I75).
+   *
+   * **Finer than the turn and deliberately unclamped.** The useful elevation
+   * range is `π` where the azimuth's is `2π`, so a sixteenth of a half-turn is
+   * the same visual step; and the pole is unreachable, because `cos(π/2)` is
+   * `6.123e-17` and `basisOf`'s degenerate `right` vector cannot be produced —
+   * measured, elevation exactly `π/2` draws a plan view (F467). A camera past
+   * the pole is a view rather than a corruption, which is `cameras.ts`'s own
+   * ruling and the reason nothing here normalises.
+   */
+  const tiltBlock = (direction: 1 | -1): void => {
+    const at = focusedPlot();
+    if (at === null) return;
+    stores.cameras.nudge(at.entryId, at.plot.id, at.plot.camera, {
+      elevation: (direction * Math.PI) / 16,
+    });
+    scheduler.commit("input");
+  };
 
-    // One sixteenth of a turn, which is the step that reads as a rotation rather
-    // than a jump at the sample counts this rung has. The scheme is step 8's;
-    // this is the one writer the field needs to be observable at all.
-    stores.cameras.nudge(entryId, block.id, block.camera, { azimuth: (direction * Math.PI) / 8 });
+  /**
+   * Dolly the focused plot's camera, **multiplicatively** (C22 I75).
+   *
+   * **A scaling control cannot reach the one degenerate value.** `distance: 0`
+   * draws nothing and is the answer rather than a refusal (C12 §3al); measured,
+   * it is the *only* such value — `0.01` inks 1776 cells and `−6` inks the same
+   * 297 as `+6`, because a negative distance is the antipodal view. So the
+   * hazard is passing **through** a blank frame with a working control, and
+   * `× 1.25` never reaches zero from anywhere but zero.
+   *
+   * The store takes a delta and clamps nothing, so the step is computed here
+   * from the live value — `pageBlock`'s seam, where the effect knows the
+   * arithmetic and the store records what it is told.
+   */
+  const dollyBlock = (direction: 1 | -1): void => {
+    const at = focusedPlot();
+    if (at === null) return;
+    const now = stores.cameras.cameraFor(at.entryId, at.plot.id, at.plot.camera).distance;
+    const next = direction === 1 ? now / DOLLY : now * DOLLY;
+    stores.cameras.nudge(at.entryId, at.plot.id, at.plot.camera, { distance: next - now });
+    scheduler.commit("input");
+  };
+
+  /** Restore the focused plot's declared view, leaving the orbit alone (C22 I75). */
+  const resetCamera = (): void => {
+    const at = focusedPlot();
+    if (at === null) return;
+    stores.cameras.reset(at.entryId, at.plot.id, at.plot.camera);
+    scheduler.commit("input");
+  };
+
+  /**
+   * Start or stop the focused plot turning (C22 I72).
+   *
+   * **Off is the default and nothing declares otherwise**: a block cannot say
+   * that it orbits (C04 I75), and an orbiting 3D plot is a full-frame redraw for
+   * as long as it is on screen where a static one is a single cached render. So
+   * the reader turns it on, and this is the only thing that can.
+   */
+  const toggleOrbit = (): void => {
+    const at = focusedPlot();
+    if (at === null) return;
+    const on = !stores.cameras.orbiting(at.entryId, at.plot.id);
+    stores.cameras.setOrbit(at.entryId, at.plot.id, at.plot.camera, on);
+    // `input`, because a key caused it and the flag itself draws nothing — the
+    // frame it asks for is the one that arms the ticker (C22 I60a).
     scheduler.commit("input");
   };
 
@@ -1272,6 +1391,10 @@ export async function constructGraph(
     liveElements,
     pageBlock,
     orbitBlock,
+    tiltBlock,
+    dollyBlock,
+    resetCamera,
+    toggleOrbit,
     liveEntryId: () => stores.transcript.liveId,
     // C23 I16 — the dispatcher is C23's and is supplied, never built here.
     onAction: (action, from) => {
@@ -1614,6 +1737,10 @@ export async function constructGraph(
     liveElements,
     pageBlock,
     orbitBlock,
+    tiltBlock,
+    dollyBlock,
+    resetCamera,
+    toggleOrbit,
     capabilities: detection.capabilities,
     /**
      * C22 I6a — construction, then the session, then what the session contained.

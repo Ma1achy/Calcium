@@ -33,7 +33,7 @@ import { composeFrame } from "./render-frame.js";
 import { focusKey } from "./render-cache.js";
 import { reserveNeeded } from "./block-faults.js";
 import { descendants } from "../data/viewmodel/index.js";
-import type { Block } from "../data/viewmodel/index.js";
+import type { Block, Plot } from "../data/viewmodel/index.js";
 import { renderSequenceToLines } from "../presentation/render-lines.js";
 import { animationIntervalOf } from "../presentation/blocks/index.js";
 import type { FocusState } from "../presentation/blocks/index.js";
@@ -144,6 +144,45 @@ export function createTui<C extends TuiConfig>(
 /** One frozen empty array rather than a new one per paint (entry 23). */
 const EMPTY_SPANS: readonly CellSpan[] = Object.freeze([]);
 
+/**
+ * What the frame that just drew wants moved (C22 I73, I74).
+ *
+ * **Two populations and not one number.** The spinner's cadence comes from the
+ * blocks and the orbits come from the reader, and one timer cannot be a cadence
+ * for both — so the ticker takes the shorter interval and each animation reads
+ * its own elapsed time from it.
+ */
+type Animated = Readonly<{
+  spinnerMs: number | null;
+  orbits: readonly Readonly<{ entryId: string; blockId: string; declared: Plot["camera"] }>[];
+}>;
+
+const NOTHING_ANIMATES: Animated = Object.freeze({ spinnerMs: null, orbits: Object.freeze([]) });
+
+/**
+ * The orbit's cadence, and it is C03's two windows rather than two new numbers
+ * (C22 I73).
+ *
+ * 33 ms is `stream`'s window — *~30 frames/s, matching the A02 §7 budget* — and
+ * 100 ms is `spinner`'s, which is what the rotation falls back to where
+ * `synchronisedUpdate` is absent and a full-frame rewrite would tear. Naming
+ * them here rather than importing C03's table keeps L4 out of a constant L0
+ * tunes at construction; the *reason* is what binds them, and that is asserted.
+ */
+const ORBIT_MS = 33;
+const ORBIT_MS_TORN = 100;
+
+/**
+ * One revolution in twelve seconds, in radians per millisecond (C22 I74).
+ *
+ * **The number comes from the measurement rather than from taste.** At 30fps it
+ * is one degree a frame, between the `pi/256` and `pi/64` steps measured at 22%
+ * and 30% of a frame's cells changing; at the capped 10fps it is three degrees,
+ * just past `pi/64`. Both read as motion rather than as a jump, which is the
+ * property the figure has to have (F468).
+ */
+const ORBIT_RATE = (2 * Math.PI) / 12_000;
+
 class Session implements TuiInstance {
   #state: SessionState = "created";
   #graph: Graph | null = null;
@@ -183,13 +222,31 @@ class Session implements TuiInstance {
   #tick = 0;
 
   /**
-   * The cadence the last frame's visible blocks wanted, or `null` for none.
+   * What the last frame drew that wants to move (C22 I73, I74).
    *
    * Written by `visibleRows`, which is the only thing that sees which blocks are
    * on screen at this width after windowing. **A transcript with nothing
    * animating in it arms no timer at all** — the ticker is not a heartbeat.
+   *
+   * **Two populations rather than one number**, because one timer cannot be a
+   * cadence for two animations (I74). The spinner's cadence comes from the
+   * blocks; the orbits are the plots a reader has turned on, and each carries
+   * the declared camera its nudges are measured against — only the block knows
+   * that (`cameras.ts`'s header).
    */
-  #animationMs: number | null = null;
+  #animation: Animated = NOTHING_ANIMATES;
+
+  /**
+   * When the spinner's counter and the orbits' angles were last advanced (I74).
+   *
+   * **Both are stamps and neither is a count**, which is the whole of I74: a
+   * step per timer firing makes each animation's speed depend on the other's
+   * presence, in both directions. `null` means nothing is armed, so the first
+   * wake after a quiet period advances by the interval it was armed for rather
+   * than by however long the session was idle.
+   */
+  #tickAt: number | null = null;
+  #orbitAt: number | null = null;
 
   /** The armed tick, disposed and re-armed on every frame. */
   #spinner: Disposable | null = null;
@@ -461,7 +518,9 @@ class Session implements TuiInstance {
     // open — the same shape `refresh.dispose()` sets `stopped` first for.
     this.#spinner?.[Symbol.dispose]();
     this.#spinner = null;
-    this.#animationMs = null;
+    this.#animation = NOTHING_ANIMATES;
+    this.#tickAt = null;
+    this.#orbitAt = null;
     // **Here, not in `beforeRelease`** (C23 I12). The flag `beginStopping` sets
     // is read at the top of a tick and cannot see a `fetch` already in flight;
     // stopping the timers alongside it is what makes the promise hold. Same
@@ -661,15 +720,73 @@ class Session implements TuiInstance {
   #armSpinner(): void {
     this.#spinner?.[Symbol.dispose]();
     this.#spinner = null;
-    const ms = this.#animationMs;
-    if (ms === null) return;
-    this.#spinner = this.config.schedule(() => {
-      this.#tick += 1;
-      // Through the scheduler rather than straight to `#render`, so the 100 ms
-      // window coalesces a spinner behind a stream commit exactly as C03 §3
-      // says it should — a spinner briefly at 7.5 fps is what that trade buys.
-      this.#graph?.scheduler.commit("spinner");
-    }, ms);
+    const { spinnerMs, orbits } = this.#animation;
+    // **The capability chooses the orbit's cadence, and the same switch chooses
+    // its commit reason** (I73). A full-frame rewrite thirty times a second on a
+    // terminal without DECSET 2026 shows a horizontal seam every frame, and the
+    // tear is worse than the slower rotation.
+    const orbitMs =
+      orbits.length === 0
+        ? null
+        : this.#graph?.capabilities.synchronisedUpdate === true
+          ? ORBIT_MS
+          : ORBIT_MS_TORN;
+    const ms =
+      spinnerMs === null ? orbitMs : orbitMs === null ? spinnerMs : Math.min(spinnerMs, orbitMs);
+    if (ms === null) {
+      this.#tickAt = null;
+      this.#orbitAt = null;
+      return;
+    }
+    const now = this.config.clock();
+    this.#tickAt ??= now;
+    this.#orbitAt ??= now;
+    this.#spinner = this.config.schedule(() => void this.#animate(), ms);
+  }
+
+  /**
+   * One wake: advance whatever is moving, then ask for a frame (I73, I74).
+   *
+   * **The reason is the frame rate and the interval is not.** `commit("spinner")`
+   * draws at 10fps however fast this fires, because C03's 100 ms window is a
+   * floor under the ticker (I60a) — so a live orbit commits `stream`, whose
+   * rationale in C03 §3 is a rate ceiling and says nothing about the source.
+   * Everything else keeps `spinner`, and C03 §3's asymmetry is exactly this
+   * case: a stream commit under a pending spinner draws within its own 33 ms.
+   */
+  #animate(): void {
+    const graph = this.#graph;
+    if (graph === null) return;
+    const now = this.config.clock();
+    const { spinnerMs, orbits } = this.#animation;
+
+    // **The angle is `ω · Δt` and never `ω` per wake** (I74). The timer is armed
+    // at the fastest cadence anything on screen wants, so a step per wake turns
+    // the plot **25% fast** the moment an 80 ms spinner appears beside a capped
+    // 100 ms orbit — its speed decided by something it has nothing to do with.
+    // The counter below is the same defect pointing the other way.
+    if (orbits.length > 0) {
+      const since = now - (this.#orbitAt ?? now);
+      this.#orbitAt = now;
+      const azimuth = ORBIT_RATE * since;
+      for (const o of orbits) graph.cameras.nudge(o.entryId, o.blockId, o.declared, { azimuth });
+    }
+
+    // **Whole intervals, and the remainder is kept** (I74). A step per wake
+    // would spin the glyph **three times too fast** under a 33 ms orbit, which is
+    // the mirror of the clause above; flooring and *dropping* the remainder
+    // would lose a fraction of an interval on every wake and run it slow.
+    // Advancing the stamp by the steps consumed keeps it exact, and zero steps is
+    // a wake the spinner was not the reason for.
+    if (spinnerMs !== null) {
+      const steps = Math.floor((now - (this.#tickAt ?? now)) / spinnerMs);
+      if (steps > 0) {
+        this.#tick += steps;
+        this.#tickAt = (this.#tickAt ?? now) + steps * spinnerMs;
+      }
+    }
+
+    graph.scheduler.commit(orbits.length > 0 ? "stream" : "spinner");
   }
 
   #paintDeps(graph: Graph, frame: Composed): PaintDeps {
@@ -684,8 +801,8 @@ class Session implements TuiInstance {
       // `size()`. A closure that re-read it is exactly the two-width frame the
       // note names, arriving through the one seam that looks harmless.
       transcriptRows: () =>
-        visibleRows(graph, width, this.#tick, (ms) => {
-          this.#animationMs = ms;
+        visibleRows(graph, width, this.#tick, (animated) => {
+          this.#animation = animated;
         }),
       promptRows: () => graph.editor.layout(width, PROMPT_GUTTER),
       promptCursor: () => graph.editor.cursorCell(width, PROMPT_GUTTER),
@@ -884,13 +1001,19 @@ function visibleRows(
   graph: Graph,
   width: number,
   tick: number,
-  onAnimation: (intervalMs: number | null) => void,
+  onAnimation: (animated: Animated) => void,
 ): readonly string[] {
   const out: string[] = [];
   // **The cadence anything visible wants, reported once per frame.** The session
   // arms its ticker from this and disarms when it is `null`, so a transcript
   // with nothing animating in it schedules nothing at all (F227).
   let fastest: number | null = null;
+  // **The orbits the frame drew, gathered from the same windowed set** (C22
+  // I73). Not from the store and not from the document: an orbiting plot
+  // scrolled off screen must stop turning, for the reason a spinner scrolled off
+  // stops ticking (I60a) — and without this the timer another entry's spinner
+  // keeps alive would turn a camera nobody is looking at.
+  const orbits: { entryId: string; blockId: string; declared: Plot["camera"] }[] = [];
   for (const ve of graph.viewport.visible().entries) {
     const entry = graph.transcript.entries.find((e) => e.id === ve.id);
     if (entry === undefined) continue;
@@ -955,12 +1078,36 @@ function visibleRows(
     // **Baselines omitted rather than zeros**, which is where this differs from
     // the offsets one line up: a camera's absent state is the block's own
     // declared view, and `distance: 0` is degenerate rather than absent.
-    const orbits = graph.cameras.key(entry.id);
+    const orbitKey = graph.cameras.key(entry.id);
+
+    // **Containers are walked, and it is C04's `descendants` rather than a
+    // copy** (C22 I73). `animationIntervalOf` learned this from the mutation
+    // pass — a `steps` inside a `panel` is what `b.live` builds — and a plot
+    // inside a `group` is the same arrangement one kind along. A recursion added
+    // to the writer and not to the reader is the pair that reads as correct on
+    // both sides.
+    for (const blk of windowed.blocks) {
+      for (const b of [blk, ...descendants(blk)]) {
+        if (b.kind !== "plot") continue;
+        const plot = b as Plot;
+        // **No path in `src/` can produce a flag set on a plot with no camera** —
+        // the only writer runs off `focusedPlot()`, which requires the
+        // declaration — so this guard survives its own mutation. It is kept on
+        // the asymmetry rather than on the odds: one comparison per plot per
+        // frame against a permanent 30fps redraw of a document nobody is
+        // orbiting, which is what a held flag over a `settle` that dropped the
+        // member would leave. Measured 2026-09-02; `settle` is the symbol to
+        // grep when it becomes drivable.
+        if (plot.camera === undefined) continue;
+        if (!graph.cameras.orbiting(entry.id, plot.id)) continue;
+        orbits.push({ entryId: entry.id, blockId: plot.id, declared: plot.camera });
+      }
+    }
 
     const cadence = animationIntervalOf(windowed.blocks);
     if (cadence !== null && (fastest === null || cadence < fastest)) fastest = cadence;
     const animated = cadence === null ? "" : `\u0000${String(tick)}`;
-    const slot = `${key}\u0000${range}\u0000${offsets}\u0000${orbits}${animated}`;
+    const slot = `${key}\u0000${range}\u0000${offsets}\u0000${orbitKey}${animated}`;
     const held = graph.rendered.get(entry.id, entry.rev, width, slot, theme);
     // **Faults from here are this entry's** (I69). A `BlockFault` names a block
     // and ids are unique within a document and not across entries (C04 I14), so
@@ -1029,7 +1176,7 @@ function visibleRows(
     const rows = [...keptChrome, ...lines.slice(windowed.skipRows)];
     out.push(...rows.slice(0, ve.takeRows));
   }
-  onAnimation(fastest);
+  onAnimation(fastest === null && orbits.length === 0 ? NOTHING_ANIMATES : { spinnerMs: fastest, orbits });
   return out;
 }
 

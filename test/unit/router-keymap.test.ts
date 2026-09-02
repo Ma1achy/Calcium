@@ -337,6 +337,19 @@ describe("§6 — the default table (C17 I12)", () => {
       // and this table is what measured that rather than assuming it.
       "liveBlock [": ["["],
       "liveBlock ]": ["]"],
+      // **Step 8's five, and the shifted brackets are the reason this table is
+      // the check.** A terminal sends `{` as the byte `{` with no shift flag —
+      // the modifier is the layout's and never reaches the wire — so a binding
+      // written as `{name: "[", shift: true}` would resolve against an event
+      // nothing sends, which is Shift-Enter's defect on a printable. Measured
+      // here rather than assumed, exactly as `[` and `]` were.
+      "liveBlock {": ["{"],
+      "liveBlock }": ["}"],
+      "liveBlock +": ["+"],
+      "liveBlock =": ["="],
+      "liveBlock -": ["-"],
+      "liveBlock r": ["r"],
+      "liveBlock o": ["o"],
 
       // Copy mode's entry, at both targets it is bound to (C16 §5b). The key is
       // provisional — which key enters copy mode is the rebindable-keys row's

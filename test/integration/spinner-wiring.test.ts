@@ -90,7 +90,7 @@ describe("C22 §6c — the counter advances in a real session", () => {
     vi.useFakeTimers();
     try {
       const stdin = fakeStdin();
-      const { screen } = await buildSession({
+      const { screen, clock } = await buildSession({
         manifest: MANIFEST,
         localHandlers: HANDLERS,
         stdin: stdin as never,
@@ -100,6 +100,16 @@ describe("C22 §6c — the counter advances in a real session", () => {
       stdin.emit("/work\r");
       await vi.advanceTimersByTimeAsync(0);
       await settle();
+
+      // **The clock moves with the timers, and it has to** (C22 I74). The
+      // counter advances by whole intervals of *elapsed* time rather than once
+      // per firing, so one timer cannot be a cadence for two animations — and a
+      // harness whose timers run while its clock stands still is asserting a
+      // world where a wake is not time passing.
+      const step = async (ms: number): Promise<void> => {
+        clock.advance(ms);
+        await vi.advanceTimersByTimeAsync(ms);
+      };
 
       // **The spinner cell, not the row's first character.** With the block
       // inside a panel the first character is the border, and reading it gave
@@ -119,7 +129,7 @@ describe("C22 §6c — the counter advances in a real session", () => {
       // the row about the chain being wired rather than about the arithmetic of
       // two cadences.
       for (let i = 0; i < 29; i += 1) {
-        await vi.advanceTimersByTimeAsync(150);
+        await step(150);
         await settle();
         seen.push(cell());
       }
@@ -146,7 +156,7 @@ describe("C22 §6c — the counter advances in a real session", () => {
     vi.useFakeTimers();
     try {
       const stdin = fakeStdin();
-      const { screen } = await buildSession({
+      const { screen, clock } = await buildSession({
         manifest: MANIFEST,
         localHandlers: HANDLERS,
         stdin: stdin as never,
@@ -163,6 +173,8 @@ describe("C22 §6c — the counter advances in a real session", () => {
       // Past the ticker's 80 ms *and* C03's 100 ms window, so one tick has
       // certainly landed — 150 ms lands inside the first window and is where
       // this row first read as a cache hit rather than as a timing artefact.
+      // The injected clock moves with them (C22 I74) — see T4.35's `step`.
+      clock.advance(250);
       await vi.advanceTimersByTimeAsync(250);
       await settle();
       expect(rowOf(), "the held lines were not reused").not.toBe(before);

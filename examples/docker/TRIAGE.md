@@ -30,7 +30,7 @@ type change.
 | rank | mechanism | ids keyed | consumers | ⚠ | disposition |
 |---|---|---|---|---|---|
 | **1** | [The consumer cannot reach a fact the framework holds](#1) | 18 | **10 open** | ⚠ C07 · C24 | real Calcium work, with consumers |
-| **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 51 | **5 open** (9 closed) | ⚠ C04 · C23 | real Calcium work · **7 of 13 fixed** — and F165 is the first found by roadmap 48's residue rather than by a consumer reaching for something |
+| **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 52 | **5 open** (9 closed) | ⚠ C04 · C23 | real Calcium work · **7 of 13 fixed** — and F165 is the first found by roadmap 48's residue rather than by a consumer reaching for something |
 | **3** | [A block cannot express what the surface needs](#3) | 7 | **4 open** | ⚠ C04 | mixed — two absorbed |
 | **4** | [A change axis distinct from `Tone`](#4) | 4 | **4 open** | ⚠ C04 · C09 · C10 | real Calcium work · needs a ruling |
 | **5** | [The far side's shape is not the framework's contract](#5) | 10 | **2 open** | ⚠ C05 | mostly app-side · one shim |
@@ -108,7 +108,9 @@ view's** producer is defined by the region and has no other bound.
 ---
 
 <a id="2"></a>
-## 2 · A complete mechanism, unreachable from the other side of a seam — **10 open, 26 closed** ⚠
+## 2 · A complete mechanism, unreachable from the other side of a seam — **10 open, 27 closed** ⚠
+
+**F470** — `elementsIn` walks into a container that declares no elements of its own, so focus lands on a block inside a `panel` or a `group`; every effect in `construct.ts` resolved that block with a **top-level `find`**. A table inside a panel could be focused and not paged, and a 3D plot inside one focused and not turned — a key consumed, nothing drawn, no error. `session.ts`'s `blockById` walks `descendants` for the same question one file along, which is what made the two read as agreeing. **`b.live` builds a panel**, so the arrangement the framework itself produces is the failing one and every hand-written fixture put the block at the top level. The class is **a recursion added on one side of a pair**, and the signal is that the fixed side's comment names the other side's symptom — `animationIntervalOf`'s does, in a file the effects never import. Fixed with one shared resolver over C04's `descendants`; T4.17n covers it
 
 | | | |
 |---|---|---|

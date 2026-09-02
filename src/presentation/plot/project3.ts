@@ -157,10 +157,16 @@ export function basisOf(camera: Partial<Camera> | undefined, aspect: number): Ba
   // Looking at the origin. `z` is up, which is the convention the data uses:
   // a height field is `z = f(x, y)`.
   const forward = unit(sub({ x: 0, y: 0, z: 0 }, eye));
-  // **`up` is derived rather than given**, so a camera directly overhead has a
-  // degenerate right vector — `unit` returns it unchanged rather than `NaN`, and
-  // the figure collapses to a line, which is what looking straight down a pole
-  // gives you.
+  // **`up` is derived rather than given, and the pole is unreachable** (F467).
+  // A camera exactly overhead would give a zero `right` vector, and `unit`
+  // returns it unchanged rather than `NaN` — so the guard is real. What it
+  // guards against cannot be produced here: `cos(π/2)` is `6.123e-17`, so this
+  // cross product is tiny rather than zero and normalises to a perfectly good
+  // vector. Measured, `elevation: Math.PI / 2` draws a **plan view** — 289
+  // inked cells over 16 rows, 184 cells from the near-pole view — and not the
+  // line this comment used to promise. **The same number and the same mechanism
+  // as F464** one file along, and it is why the tilt control needs no clamp
+  // (C22 I75).
   const right = unit(cross(forward, { x: 0, y: 0, z: 1 }));
   const up = cross(right, forward);
   return {

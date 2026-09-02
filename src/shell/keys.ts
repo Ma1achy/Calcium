@@ -152,6 +152,25 @@ export type KeyDeps = Readonly<{
    */
   orbitBlock: (direction: 1 | -1) => void;
   /**
+   * Tilt the focused plot's camera one step (C22 I75).
+   *
+   * The elevation half of the same family, and unclamped for the reason
+   * `construct.ts` states: the pole is unreachable in floating point, so a
+   * camera past it is a view rather than a corruption.
+   */
+  tiltBlock: (direction: 1 | -1) => void;
+  /**
+   * Dolly the focused plot's camera one step, **multiplicatively** (C22 I75).
+   *
+   * The arithmetic is L4's for `pageBlock`'s reason: the step depends on where
+   * the camera is now, and the store takes a delta and clamps nothing.
+   */
+  dollyBlock: (direction: 1 | -1) => void;
+  /** Restore the focused plot's declared view, leaving the orbit alone (C22 I75). */
+  resetCamera: () => void;
+  /** Start or stop the focused plot turning (C22 I72). Off is the default. */
+  toggleOrbit: () => void;
+  /**
    * C23's dispatcher (C23 I16). Supplied, never constructed here — an action is
    * a submission by another route, and L4's routing component owns routes.
    */
@@ -766,6 +785,12 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // (C04 §3c cell 4).
     orbitLeft: () => void deps.orbitBlock(-1),
     orbitRight: () => void deps.orbitBlock(1),
+    tiltDown: () => void deps.tiltBlock(-1),
+    tiltUp: () => void deps.tiltBlock(1),
+    dollyIn: () => void deps.dollyBlock(1),
+    dollyOut: () => void deps.dollyBlock(-1),
+    cameraReset: () => void deps.resetCamera(),
+    orbitToggle: () => void deps.toggleOrbit(),
     blockPageDown: () => void deps.pageBlock(1),
     blockPageUp: () => void deps.pageBlock(-1),
     scrollTop: () => void deps.viewport.scrollToTop(),

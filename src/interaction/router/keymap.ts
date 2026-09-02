@@ -370,8 +370,27 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // and nothing drawn. That is the cost of binding before the form exists, and
   // it is smaller than the alternative: a field nothing can move is
   // `cursorPositions` (C12 §3s).
+  //
+  // **Step 8 completes the family and the arrows still do not survive** (C22
+  // I75, §6i.3). The design note's scheme is `← →` azimuth, `↑ ↓` elevation,
+  // `+ −` distance, `r` resets: `↑` and `↓` are `rowUp` and `rowDown` two rows
+  // up and the duplicate check refuses them, and `← →` fall through to the
+  // prompt — so the shifted brackets take the elevation, which keeps the sign
+  // convention of the key they are shifted from. `{` lowers and `}` raises,
+  // exactly as `[` turns one way and `]` the other.
+  //
+  // **`=` beside `+` because `+` is shifted on every layout this ships to**, and
+  // two keys for one action is not the duplicate the conflict rule refuses —
+  // that is one key at one target with two actions.
   { target: "liveBlock", key: { name: "[" }, action: "orbitLeft" },
   { target: "liveBlock", key: { name: "]" }, action: "orbitRight" },
+  { target: "liveBlock", key: { name: "{" }, action: "tiltDown" },
+  { target: "liveBlock", key: { name: "}" }, action: "tiltUp" },
+  { target: "liveBlock", key: { name: "+" }, action: "dollyIn" },
+  { target: "liveBlock", key: { name: "=" }, action: "dollyIn" },
+  { target: "liveBlock", key: { name: "-" }, action: "dollyOut" },
+  { target: "liveBlock", key: { name: "r" }, action: "cameraReset" },
+  { target: "liveBlock", key: { name: "o" }, action: "orbitToggle" },
   { target: "liveBlock", key: { name: "pagedown" }, action: "blockPageDown" },
   { target: "liveBlock", key: { name: "pageup" }, action: "blockPageUp" },
 ];

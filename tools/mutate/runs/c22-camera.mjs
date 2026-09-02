@@ -28,17 +28,31 @@
 // The first draft of this comment claimed T4.17g was the slot's only witness.
 // T4.17h is also one, and the difference between *stated* and *measured* is the
 // whole of why the table is here.
+//
+// **One mutation was tried and withdrawn, and it is recorded rather than
+// deleted.** Removing `if (plot.camera === undefined) continue;` from the
+// gathering loop survives every row, because the only writer of the orbit flag
+// runs off `focusedPlot()` and that requires the declaration — so no path in
+// `src/` can produce a flag set on a plot with no camera. The guard is kept on
+// the asymmetry rather than on the odds: it costs one comparison per plot per
+// frame, and the state it refuses is a permanent 30fps redraw of a document
+// nobody is orbiting. Reaching it needs a far-side document that **replaces a
+// block's `camera` while the flag is held**, which no harness here can drive —
+// so the condition is written where the guard is, and the symbol to grep when it
+// becomes drivable is `settle`.
 import { readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
 const CMD =
-  "npx vitest run test/contract/render-cache.test.ts test/integration/render-cache.test.ts";
+  "npx vitest run test/contract/render-cache.test.ts test/integration/render-cache.test.ts " +
+  "test/integration/orbit-wiring.test.ts";
 const CAMERAS = "src/shell/cameras.ts";
 const KEYMAP = "src/interaction/router/keymap.ts";
 const SESSION = "src/shell/session.ts";
 const PLOT = "src/presentation/plot/definition.ts";
+const CONSTRUCT = "src/shell/construct.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -120,9 +134,104 @@ const results = await runPass({
       // arrives with auto-orbit.
       name: "the slot drops the camera axis",
       file: SESSION,
-      from: "    const slot = `${key}\\u0000${range}\\u0000${offsets}\\u0000${orbits}${animated}`;",
+      from: "    const slot = `${key}\\u0000${range}\\u0000${offsets}\\u0000${orbitKey}${animated}`;",
       to: "    const slot = `${key}\\u0000${range}\\u0000${offsets}${animated}`;",
       expect: "T4.17g",
+    },
+
+    // --- step 8: the second writer, and the four rulings it took --------------
+    //
+    // **The slot's second witness arrives here.** The comment above says
+    // dropping the slot, emptying the key and removing the binding all produce
+    // one observable, and that a second writer is what would separate them. It
+    // is now separated: the orbit moves the camera with no key press, so a row
+    // that never types can only die to the key or to the slot.
+    {
+      // **The reason is the frame rate and the interval is not** (I73, F466).
+      // The interval stays at 33 ms; only the commit reason changes, and the
+      // rotation falls from ~15 renders per 990 ms to ~5.
+      name: "the orbit commits `spinner`, with the interval left at 33 ms",
+      file: SESSION,
+      from: '    graph.scheduler.commit(orbits.length > 0 ? "stream" : "spinner");',
+      to: '    graph.scheduler.commit("spinner");',
+      expect: "T4.17j",
+    },
+    {
+      // **The capability cap** (I73, AN5). Both arms of T4.17k exist so that a
+      // cap which always applies fails as loudly as one that never does.
+      name: "the cap ignores synchronisedUpdate and always takes the stream rate",
+      file: SESSION,
+      from: "          : ORBIT_MS_TORN;",
+      to: "          : ORBIT_MS;",
+      expect: "T4.17k",
+    },
+    {
+      // **A step per firing rather than per elapsed millisecond** (I74). One
+      // timer armed at the fastest cadence on screen cannot be a cadence for
+      // two animations, and this is the half that corrupts the orbit.
+      name: "the azimuth advances by a constant per wake",
+      file: SESSION,
+      from: "      const azimuth = ORBIT_RATE * since;",
+      to: "      const azimuth = ORBIT_RATE * 33;",
+      expect: "T1.29",
+    },
+    {
+      // **The mirror, and it corrupts the spinner instead** (I74). With the
+      // orbit arming the timer at 33 ms, a counter that steps once per firing
+      // spins the glyph three times too fast.
+      name: "the spinner counter advances once per wake",
+      file: SESSION,
+      from: "      const steps = Math.floor((now - (this.#tickAt ?? now)) / spinnerMs);",
+      to: "      const steps = 1;",
+      expect: "T4.17l",
+    },
+    {
+      // **The flag joins the key** (I72). A toggle that moves no camera moves no
+      // cell, so keying it misses on the frame a reader stops the rotation to
+      // look at.
+      name: "the orbit flag is a key axis",
+      file: CAMERAS,
+      from: "    const live = [...held].filter(([, h]) => !same(h.camera, h.baseline));",
+      to: "    const live = [...held].filter(([, h]) => !same(h.camera, h.baseline) || h.orbit);",
+      expect: "T4.17i",
+    },
+    {
+      // **The flag is ignored and every plot with a camera turns** (I72). Off is
+      // the default and nothing declares otherwise, so this is the mutation that
+      // says the default is real rather than merely written down.
+      name: "the orbit flag is ignored and every plot with a camera turns",
+      file: SESSION,
+      from: "        if (!graph.cameras.orbiting(entry.id, plot.id)) continue;",
+      to: "",
+      expect: "T4.17i",
+    },
+    {
+      // **The recursion, on the reader's side** (I75, F470). This is the shipped
+      // code the walk replaced, and the row that fails is the only fixture in
+      // the corpus that puts a focusable block inside a container.
+      name: "the focused block is resolved with a top-level find",
+      file: CONSTRUCT,
+      from: "      for (const child of descendants(top)) if (child.id === wanted) return { entryId, block: child };",
+      to: "",
+      expect: "T4.17n",
+    },
+    {
+      // **The dolly steps additively** (I75). Twelve presses from the default 6
+      // reach zero, which inks nothing — a blank frame with a working control.
+      name: "the dolly adds rather than scales",
+      file: CONSTRUCT,
+      from: "    const next = direction === 1 ? now / DOLLY : now * DOLLY;",
+      to: "    const next = direction === 1 ? now - 0.5 : now + 0.5;",
+      expect: "T1.30",
+    },
+    {
+      // **Reset folds the orbit into it** (I75). One key answering two questions
+      // — where the camera is, and whether it moves.
+      name: "reset also stops the orbit",
+      file: CAMERAS,
+      from: "    held.set(blockId, { baseline, camera: baseline, orbit: was.orbit });",
+      to: "    held.set(blockId, { baseline, camera: baseline, orbit: false });",
+      expect: "T1.30b",
     },
   ],
 });

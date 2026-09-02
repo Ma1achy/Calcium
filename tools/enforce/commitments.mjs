@@ -1068,9 +1068,17 @@ export function scanSections(file, src, options = {}) {
  * carrier rather than a renderer: most of what it says constrains rules that
  * already have rows, and only the two new statements needed new ones.
  *
- * **`C22 I72`–`I75` are the eighth**, taken on auto-orbit's spec commit and
- * repaid on the one that builds it — `T1.28`–`T1.30`, `T3.33`, `T3.34`,
- * `T4.38`–`T4.42` and `T6.83`–`T6.87` name all four. **Four entries where the
+ * **`C22 I60a` left the list on the same commit and was not part of the loan.**
+ * It had sat here since it was written — *the ticker is armed from what the frame
+ * drew, and C03's 100 ms window is a floor under it* — and the floor is exactly
+ * what step 8's `T4.17j` measures: 5 renders for a spinner alone against 15 with
+ * an orbit live, over the same 990 ms. An invariant can stop being uncited
+ * because something else needed the fact it states, which is the useful direction
+ * for this list to shrink in.
+ *
+ * **`C22 I72`–`I75` were the eighth**, taken on auto-orbit's spec commit and
+ * **struck here**, one commit later — `T1.28`–`T1.30b`, `T3.33`, `T3.34`,
+ * `T4.17i`–`T4.17n` and `T6.83`–`T6.88` name all four. **Four entries where the
  * polyline's took two**, and the reason is the same one stated there in reverse:
  * this step rules a *writer* rather than a carrier, so almost none of what it
  * says constrains a rule that already has a row.
@@ -1090,16 +1098,11 @@ const UNCITED_INVARIANTS = Object.freeze([
   "C10 I20", "C11 I12", "C14 I11", "C14 I13", "C14 I15", "C14 I16", "C14 I19", "C14 I22",
   "C16 I1", "C16 I16", "C16 I19", "C17 I10", "C17 I14", "C18 I11", "C18 I13", "C18 I23",
   "C18 I6", "C19 I12", "C20 I11", "C20 I25", "C21 I7", "C22 I16", "C22 I39", "C22 I4a",
-  "C22 I53", "C22 I57", "C22 I60a", "C23 I10", "C23 I13", "C23 I14", "C23 I23", "C23 I24",
+  "C22 I53", "C22 I57", "C23 I10", "C23 I13", "C23 I14", "C23 I23", "C23 I24",
   "C23 I41", "C24 I1", "C24 I10", "C24 I11", "C24 I13", "C24 I14", "C24 I16", "C24 I19",
   "C24 I20", "C24 I22", "C24 I25", "C24 I26", "C24 I28", "C24 I6", "C24 I7", "C25 I10",
   "C25 I11", "C25 I14", "C25 I15", "C25 I16", "C25 I17", "C25 I19a", "C25 I20a", "C25 I20b",
   "C26 I1", "C26 I11", "C26 I15", "C26 I16", "C26 I17", "C26 I20", "C26 I8", "C26 I9",
-  // **The eighth loan, repaid by the next commit.** Spec edits land alone and
-  // ahead of code, so an invariant is written one commit before the row naming
-  // it — and SP9 reads *test* files. Equality-compared, so leaving these here
-  // after the rows land fails the cleared check: the loan collects itself.
-  "C22 I72", "C22 I73", "C22 I74", "C22 I75",
 ]);
 
 /**

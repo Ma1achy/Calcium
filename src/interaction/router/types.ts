@@ -231,6 +231,12 @@ export type KeyAction =
   | "rowDown"
   | "orbitLeft"
   | "orbitRight"
+  | "tiltDown"
+  | "tiltUp"
+  | "dollyIn"
+  | "dollyOut"
+  | "cameraReset"
+  | "orbitToggle"
   | "blockPageDown"
   | "blockPageUp"
   // `enter` on a focused row, and the union's gap was the whole of F21: a row

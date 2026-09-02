@@ -40,8 +40,21 @@ const same = (a: Camera, b: Camera): boolean =>
   a.distance === b.distance &&
   a.projection === b.projection;
 
-/** One block's live view, and the view it would have with no entry here. */
-type Held = Readonly<{ camera: Camera; baseline: Camera }>;
+/**
+ * One block's live view, the view it would have with no entry here, and whether
+ * it is turning (C22 I72).
+ *
+ * **The orbit flag lives here rather than in a store of its own**, because a
+ * third store is a third callback for a future eviction path to reach two of and
+ * miss one — this file's own argument for joining `ScrollOffsets`' subscription,
+ * applied to itself.
+ *
+ * **And it is deliberately not in `key()`.** The key discriminates what is
+ * *drawn*; a toggle that moves no camera moves no cell, so keying the flag would
+ * miss on the frame a reader stops the rotation to look at (`focusKey`'s own
+ * warning).
+ */
+type Held = Readonly<{ camera: Camera; baseline: Camera; orbit: boolean }>;
 
 export class Cameras {
   readonly #byEntry = new Map<string, Map<string, Held>>();
@@ -78,9 +91,11 @@ export class Cameras {
   nudge(entryId: string, blockId: string, declared: Plot["camera"], delta: Partial<Camera>): void {
     const held = this.#byEntry.get(entryId) ?? new Map<string, Held>();
     const baseline = baselineOf(declared);
-    const from = held.get(blockId)?.camera ?? baseline;
+    const was = held.get(blockId);
+    const from = was?.camera ?? baseline;
     held.set(blockId, {
       baseline,
+      orbit: was?.orbit ?? false,
       camera: {
         azimuth: from.azimuth + (delta.azimuth ?? 0),
         elevation: from.elevation + (delta.elevation ?? 0),
@@ -117,6 +132,50 @@ export class Cameras {
       .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
       .map(([id, h]) => `${id}=${String(h.camera.azimuth)},${String(h.camera.elevation)},${String(h.camera.distance)},${h.camera.projection}`)
       .join(",");
+  }
+
+  /**
+   * The live camera of one block, for an effect that needs to *read* before it
+   * writes (C22 I75).
+   *
+   * `nudge` takes a delta, so a control whose step depends on where the camera
+   * is now — the multiplicative dolly is the one — cannot compute it without
+   * this. The alternative is a clamp inside the store, which this file's header
+   * refuses on the ground that a store fixed up on every write accumulates.
+   */
+  cameraFor(entryId: string, blockId: string, declared: Plot["camera"]): Camera {
+    return this.#byEntry.get(entryId)?.get(blockId)?.camera ?? baselineOf(declared);
+  }
+
+  /** Whether this block is turning (C22 I72). Absent is off, which is the default. */
+  orbiting(entryId: string, blockId: string): boolean {
+    return this.#byEntry.get(entryId)?.get(blockId)?.orbit ?? false;
+  }
+
+  /** Turn the orbit on or off, leaving the camera exactly where it is (C22 I72). */
+  setOrbit(entryId: string, blockId: string, declared: Plot["camera"], on: boolean): void {
+    const held = this.#byEntry.get(entryId) ?? new Map<string, Held>();
+    const was = held.get(blockId);
+    const baseline = baselineOf(declared);
+    held.set(blockId, { baseline, camera: was?.camera ?? baseline, orbit: on });
+    this.#byEntry.set(entryId, held);
+  }
+
+  /**
+   * Restore the block's declared view, **leaving the orbit alone** (C22 I75).
+   *
+   * `r` is about where the camera is and `o` is about whether it moves; folding
+   * them would make one key answer two questions. The entry is kept with its
+   * camera set to the baseline rather than deleted, so the flag survives — and
+   * `key()` filters a camera equal to its baseline, so the slot is the untouched
+   * one either way.
+   */
+  reset(entryId: string, blockId: string, declared: Plot["camera"]): void {
+    const held = this.#byEntry.get(entryId);
+    const was = held?.get(blockId);
+    if (held === undefined || was === undefined) return;
+    const baseline = baselineOf(declared);
+    held.set(blockId, { baseline, camera: baseline, orbit: was.orbit });
   }
 
   delete(entryId: string): void {

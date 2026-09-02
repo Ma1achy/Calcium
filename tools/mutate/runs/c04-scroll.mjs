@@ -96,8 +96,8 @@ const MUTATIONS = [
     // **Never re-anchor without running the pass** — a re-pointed anchor can sit
     // on a line that has changed meaning, which is the one thing this instrument
     // cannot see.
-    from: "\\u0000${offsets}\\u0000${orbits}${animated}`;",
-    to: "\\u0000${orbits}${animated}`;",
+    from: "\\u0000${offsets}\\u0000${orbitKey}${animated}`;",
+    to: "\\u0000${orbitKey}${animated}`;",
     expect: "T4.41",
   },
   {
