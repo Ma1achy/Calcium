@@ -121,7 +121,7 @@ const results = await runPass({
       // asked for a reference frame.
       name: "an axis name is placed at its positive end again",  // AX12 reads the strings on both arms
       file: S,
-      from: "    put(along(mid, line.outward, NAME_OUT), name);",
+      from: "    put(along(mid, line.outward, NAME_OUT), name, ink);",
       to: "    put(along(line.seg.b, line.outward, NAME_OUT), name);",
       expect: "AX12",
     },

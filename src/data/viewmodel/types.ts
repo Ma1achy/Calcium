@@ -787,6 +787,25 @@ export type AxisSpec3 = Readonly<{
    * `East_Asian_Width=Ambiguous`, so the ASCII rung is required (A03 SS47).
    */
   arrow?: boolean;
+  /**
+   * A colour for **this axis** — its line, its ticks and its label (C12 I98).
+   *
+   * **Per axis rather than per plot, and not a fourth member on the block.**
+   * `AxisSpec3` is already the per-axis record, so this is the same `tone` field
+   * `Point3Series`, `Line3` and `Surface3` each carry, resolved by the same
+   * `slot`.
+   *
+   * **The default is `tone.muted` for all three and that is a decision.** Three
+   * different colours by default would make the reference frame compete with
+   * the data it is a frame for, so the field is opt-in: a caller who colours one
+   * axis gets one coloured axis.
+   *
+   * **The box keeps its own colour**, because `box3` is its own member (I77) and
+   * its edges run parallel to axes — colouring them by direction would make
+   * `box3: "full"` a twelve-edge cage in three colours, which is the outcome the
+   * default exists to avoid.
+   */
+  tone?: Tone;
 }>;
 
 export type Series = Readonly<{

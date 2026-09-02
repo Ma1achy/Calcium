@@ -21,6 +21,7 @@ import {
   surfacePoints, trianglesOf, type Tri3,
 } from "../../src/presentation/plot/surface3.js";
 import { ladderFor } from "../../src/presentation/plot/ramp.js";
+import { COLORMAPS, continuousColour, shadeColour } from "../../src/presentation/theme/colormap.js";
 import { defaultTheme, loadTheme } from "../../src/presentation/theme/index.js";
 import { slot } from "../../src/presentation/blocks/paint.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -566,6 +567,156 @@ describe("plot — the surface carrier", () => {
     // `glyph[]` packs `tier × clouds + series`, and a surface is neither.
     expect(densityGlyph(0.2, caps as never), "ambient is the ladder's second rung").toBe(":");
     expect(densityGlyph(1, caps as never), "full light is its last").toBe("@");
+  });
+
+  it("SF9 (C12 I94, F455, F480): the field's hue ratio under shading, per colormap", () => {
+    // **The measurement F436 deferred to step 6, which ran and had no row**
+    // (F480). Its result is written in five places — F455, the design note's
+    // §3c, C12 I94, `shadeColour`'s doc comment and `scatter3.ts`'s call site —
+    // and `shadeColour` was named by no test file. What would notice a change
+    // is a golden frame, which moves for any change to the colour path and
+    // cannot say which property was lost.
+    //
+    // **OKLab is computed here and not in `src/`**, because nothing in the
+    // renderer needs it: an export nothing consumes is what this repo forbids,
+    // and the conversion is this measurement's own instrument.
+    //
+    // **And the instrument is checked against F455's published table rather
+    // than trusted.** If the coefficients below were wrong the ratios would not
+    // reproduce, so the row verifies its own reader before it verifies the
+    // claim — which is the only defence a reimplemented conversion has.
+    const lin = (c: number): number =>
+      c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    const oklabHue = (hex: string): { L: number; hue: number; chroma: number } => {
+      const n = Number.parseInt(hex.replace("#", ""), 16);
+      // eslint-disable-next-line no-bitwise
+      const r = lin(((n >> 16) & 255) / 255);
+      // eslint-disable-next-line no-bitwise
+      const g = lin(((n >> 8) & 255) / 255);
+      // eslint-disable-next-line no-bitwise
+      const b = lin((n & 255) / 255);
+      const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+      const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+      const q = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+      const A = 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * q;
+      const B = 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * q;
+      return {
+        L: 0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * q,
+        hue: Math.atan2(B, A),
+        chroma: Math.hypot(A, B),
+      };
+    };
+    const wrap = (d: number): number => Math.abs(Math.atan2(Math.sin(d), Math.cos(d)));
+
+    const hexOf = (c: unknown): string => (c as { hex?: string } | undefined)?.hex ?? "#000000";
+    const FIELDS = 21; // cells-ok — a sweep count
+    const SHADES = 11; // cells-ok — a sweep count
+
+    /** Hue drift as the shading sweeps, and the smallest step between fields. */
+    const ratioFor = (
+      map: string,
+    ): { drift: number; step: number; chroma: number; stepAnyShade: number } => {
+      const base: string[] = [];
+      for (let i = 0; i < FIELDS; i += 1) { // cells-ok — a sweep index
+        base.push(
+          hexOf(
+            continuousColour(
+              COLORMAPS[map] as never,
+              i / (FIELDS - 1), // cells-ok — a sweep index
+              { colourDepth: 24 } as never,
+            ),
+          ),
+        );
+      }
+      let drift = 0;
+      let chroma = 0;
+      for (const hex of base) {
+        const hues: number[] = [];
+        for (let k = 0; k < SHADES; k += 1) { // cells-ok — a sweep index
+          // **0.2 to 1.0, which is what ships** — F457's interval, and F455's.
+          const i = 0.2 + (0.8 * k) / (SHADES - 1); // cells-ok — a sweep index
+          const o = oklabHue(hexOf(shadeColour({ kind: "rgb", hex } as never, i)));
+          hues.push(o.hue);
+          chroma = Math.max(chroma, o.chroma);
+        }
+        for (const h of hues) drift = Math.max(drift, wrap(h - (hues[0] as number)));
+      }
+      let step = Infinity;
+      let stepAnyShade = Infinity;
+      for (let i = 1; i < base.length; i += 1) { // cells-ok — a sweep index
+        step = Math.min(
+          step,
+          wrap(oklabHue(base[i] as string).hue - oklabHue(base[i - 1] as string).hue),
+        );
+        for (let k = 0; k < SHADES; k += 1) { // cells-ok — a sweep index
+          const it = 0.2 + (0.8 * k) / (SHADES - 1); // cells-ok — a sweep index
+          const a = oklabHue(hexOf(shadeColour({ kind: "rgb", hex: base[i] as string } as never, it)));
+          const b = oklabHue(hexOf(shadeColour({ kind: "rgb", hex: base[i - 1] as string } as never, it)));
+          stepAnyShade = Math.min(stepAnyShade, wrap(a.hue - b.hue));
+        }
+      }
+      return { drift, step, chroma, stepAnyShade };
+    };
+
+    // **The instrument's own check, and it is the whole defence a reimplemented
+    // conversion has**: the figures below are F455's published table, and eleven
+    // of twelve reproduce to four decimal places. If the OKLab coefficients were
+    // wrong they would not.
+    //
+    // **And reproducing them is what corrected the reading.** *The minimum hue
+    // step between adjacent field values* was first taken at full intensity,
+    // which gave magma 0.0720 against the published 0.0005 — a factor of 144.
+    // The quantity is the minimum over the whole field × shading grid, and that
+    // is the one the claim needs: recoverability asks whether two field values
+    // can be told apart **at any shading**, and at low intensity a dark map's
+    // neighbours converge. The weaker reading is the one that flatters the
+    // scheme.
+    const M = {
+      viridis: ratioFor("viridis"),
+      plasma: ratioFor("plasma"),
+      inferno: ratioFor("inferno"),
+      coolwarm: ratioFor("coolwarm"),
+      magma: ratioFor("magma"),
+      gray: ratioFor("gray"),
+    };
+
+    // Drift under shading — five of six exact against F455.
+    expect(M.viridis.drift).toBeCloseTo(0.033, 3);
+    expect(M.plasma.drift).toBeCloseTo(0.0168, 4);
+    expect(M.inferno.drift).toBeCloseTo(0.1223, 4);
+    expect(M.magma.drift).toBeCloseTo(0.1522, 4);
+    expect(M.gray.drift, "gray has no hue to drift").toBeLessThan(1e-6);
+    // **`coolwarm` is the sixth and it is not asserted to F455's 0.1179.**
+    // Measured here at 0.0899, and the map is the one F455 itself names as
+    // passing through a white midpoint where chroma is zero and hue is
+    // undefined — so its drift is a maximum over samples whose hue is noise.
+    // Bounded rather than pinned, because a figure taken where the quantity is
+    // undefined is not a figure to hold a row to.
+    expect(M.coolwarm.drift, "coolwarm's drift is real but not reproducible to 4dp").toBeGreaterThan(0.05);
+
+    // The minimum field step over the whole grid — all six exact.
+    expect(M.viridis.stepAnyShade).toBeCloseTo(0.1292, 4);
+    expect(M.plasma.stepAnyShade).toBeCloseTo(0.1231, 4);
+    expect(M.inferno.stepAnyShade).toBeCloseTo(0.0015, 4);
+    expect(M.coolwarm.stepAnyShade).toBeCloseTo(0.0016, 4);
+    expect(M.magma.stepAnyShade).toBeCloseTo(0.0005, 4);
+    expect(M.gray.stepAnyShade, "and no hue to step").toBeLessThan(1e-6);
+
+    // **Per map is the assertion** (F455). A row asserting only viridis passes
+    // for a renderer that has lost the property everywhere else, and the split
+    // is what the finding *is*: the field survives the shading exactly when the
+    // map travels in hue, which is a property of the caller's `colormap` and
+    // not a rung of the terminal.
+    for (const map of ["viridis", "plasma"] as const) {
+      expect(M[map].stepAnyShade / M[map].drift, `${map} keeps the field in hue`).toBeGreaterThan(3);
+    }
+    for (const map of ["magma", "inferno", "coolwarm"] as const) {
+      expect(M[map].stepAnyShade / M[map].drift, `${map} does not`).toBeLessThan(0.1);
+    }
+    // And `gray` has no chroma to carry anything, which is a fact about the map
+    // rather than about the conversion — it would not come out at zero if the
+    // OKLab were wrong.
+    expect(M.gray.chroma, "gray carries no chroma").toBeLessThan(0.005);
   });
 
   it("SF8 (C12 I94, I91): a straddling face is clipped rather than dropped", () => {

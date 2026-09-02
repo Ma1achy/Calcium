@@ -12,7 +12,7 @@
  * metre apart and one of a hundred points a kilometre apart both want three
  * tiers, and an absolute bucket gives the second one tier and no depth at all.
  */
-import type { Plot, Point3, Tone } from "../../data/viewmodel/index.js";
+import type { AxisSpec3, Plot, Point3, Tone } from "../../data/viewmodel/index.js";
 import type { RenderContext } from "../blocks/types.js";
 import type { ColourValue } from "../theme/types.js";
 import { HALF_BLOCK, HALF_BLOCK_LOWER, halfBlockEligible } from "../image/index.js";
@@ -60,7 +60,14 @@ import {
 } from "./project3.js";
 
 /** A label placed in cells: billboarded, horizontal, and it wins its cells. */
-type Placed = Readonly<{ row: number; col: number; text: string }>;
+/**
+ * A label, and **its own colour when its axis has one** (C12 I98).
+ *
+ * The colour rides on the label rather than on the pass, because `overlay`
+ * takes one ink for every label it draws and a per-axis tone is the first
+ * property a label carries that the pass cannot.
+ */
+type Placed = Readonly<{ row: number; col: number; text: string; ink?: ColourValue }>;
 
 /** How short a projected axis has to be before its labels come off, in cells. */
 const EDGE_ON = 1;
@@ -332,7 +339,7 @@ function frameOf(
   rows: number,
   depth: Depth,
   ctx: RenderContext,
-  paint: (i: number, mark: string) => void,
+  paint: (i: number, mark: string, ink?: ColourValue) => void,
 ): readonly Placed[] {
   const placement = block.axes3 ?? "corner";
   const boxMode = block.box3 ?? "back";
@@ -342,13 +349,25 @@ function frameOf(
   const corner = farCorner(scene.basis);
   const origin = originOf(block.origin3 ?? "auto", scene.lo, scene.hi);
 
-  const stroke = (seg: Seg3): Clipped | null => {
+  const stroke = (seg: Seg3, ink?: ColourValue): Clipped | null => {
     const p = clipProject(scene.basis, seg);
     if (p === null) return null;
     const mark = frameMark(p.a, p.b, ctx);
-    strokeSeg(p.a, p.b, grid, depth, (i) => { paint(i, mark); });
+    strokeSeg(p.a, p.b, grid, depth, (i) => { paint(i, mark, ink); });
     return p;
   };
+
+  /**
+   * An axis's own colour, or `undefined` for the frame's (C12 I98, §6l row 1).
+   *
+   * **Not applied to `boxEdges` above**, and that is the ruling rather than an
+   * omission: a box edge runs parallel to an axis, so attributing it would give
+   * `box3: "full"` twelve edges in three colours.
+   */
+  const inkOf = (spec: AxisSpec3 | undefined): ColourValue | undefined =>
+    spec?.tone === undefined
+      ? undefined
+      : slot(`tone.${spec.tone}`, ctx.theme, ctx.capabilities).colour;
 
   for (const e of boxEdges(corner, boxMode)) stroke(e);
   if (placement === false) return [];
@@ -377,7 +396,7 @@ function frameOf(
 
   const taken = new Set<number>();
   const placed: Placed[] = [];
-  const put = (anchor: Vec3, text: string): void => {
+  const put = (anchor: Vec3, text: string, ink?: ColourValue): void => {
     if (text === "") return;
     const pr = project(scene.basis, anchor);
     if (pr === null) return;
@@ -420,19 +439,22 @@ function frameOf(
       if (taken.has(row * grid.width + col + i)) return; // cells-ok — a cell offset
     }
     for (let i = -1; i <= wide; i += 1) taken.add(row * grid.width + col + i); // cells-ok — a cell offset
-    placed.push({ row, col, text });
+    placed.push({ row, col, text, ...(ink === undefined ? {} : { ink }) });
   };
 
   for (const { line, extent } of measured) {
     const spec = style[line.axis];
     if (spec?.show === false) continue;
+    // **The axis's own colour, carried to its line, its ticks and its label**
+    // (C12 I98). One lookup per axis rather than per sample.
+    const ink = inkOf(spec);
     // **Keep the line, drop the labels** (C12 I91). The axis is still
     // information about orientation when its scale is unreadable, which is why
     // the stroke below runs whatever the extent is.
     const p = clipProject(scene.basis, line.seg);
     if (p !== null) {
       const mark = frameMark(p.a, p.b, ctx);
-      strokeSeg(p.a, p.b, grid, depth, (i) => { paint(i, mark); });
+      strokeSeg(p.a, p.b, grid, depth, (i) => { paint(i, mark, ink); });
     }
     if (extent < EDGE_ON) continue;
     const [lo, hi] = spanOf(scene.lo, line.axis);
@@ -440,7 +462,7 @@ function frameOf(
       const pt = clipProject(scene.basis, { a: t.on, b: t.out });
       if (pt !== null) {
         const mark = frameMark(pt.a, pt.b, ctx);
-        strokeSeg(pt.a, pt.b, grid, depth, (i) => { paint(i, mark); });
+        strokeSeg(pt.a, pt.b, grid, depth, (i) => { paint(i, mark, ink); });
       }
       // **Pushed along `outward`, not scaled from the origin.** The first draft
       // multiplied the whole position vector by 1.35, which moves a point near
@@ -448,7 +470,7 @@ function frameOf(
       // tick labels landed *inside* the box, over the data, and read as noise
       // rather than as a scale. The frame is what said so; no assertion about a
       // label's presence could have.
-      put(along(t.on, line.outward, TICK_OUT + LABEL_GAP), t.text);
+      put(along(t.on, line.outward, TICK_OUT + LABEL_GAP), t.text, ink);
     }
     // **The name sits at the axis's midpoint, pushed further out than its
     // ticks** — matplotlib's placement, and the frame is what argued for it.
@@ -474,11 +496,11 @@ function frameOf(
       const k = line.axis;
       const beyond = k === "x" ? { ...tip, x: tip.x * 1.18 }
         : k === "y" ? { ...tip, y: tip.y * 1.18 } : { ...tip, z: tip.z * 1.18 };
-      put(along(beyond, line.outward, TICK_OUT), head);
+      put(along(beyond, line.outward, TICK_OUT), head, ink);
     }
     const name = spec?.label ?? line.axis;
     const mid = { x: (line.seg.a.x + line.seg.b.x) / 2, y: (line.seg.a.y + line.seg.b.y) / 2, z: (line.seg.a.z + line.seg.b.z) / 2 };
-    put(along(mid, line.outward, NAME_OUT), name);
+    put(along(mid, line.outward, NAME_OUT), name, ink);
   }
   return placed;
 }
@@ -687,8 +709,11 @@ export function scatter3dArea(
   //
   // Nothing else moves: a frame edge genuinely in front of a sample still wins,
   // because that test is unchanged and is what `box3: "full"` means.
-  const labels = frameOf(block, scene, grid, rows, depth, ctx, (i, m) => {
-    ink[i] = frameInk;
+  const labels = frameOf(block, scene, grid, rows, depth, ctx, (i, m, axisInk) => {
+    // **The axis's own tone where it has one** (C12 I98). The box and the
+    // untoned axes keep `frameInk`, which is what makes a single coloured axis
+    // read as one axis rather than as a recoloured frame.
+    ink[i] = axisInk ?? frameInk;
     mark[i] = m;
     // **And the tier code is cleared with it.** `glyphRows` reads `glyph`
     // before `mark`, so a frame cell that won a marker's sample would draw the
@@ -811,12 +836,17 @@ function overlay(
     const line = rows[l.row];
     if (line === undefined) continue;
     const chars = [...l.text];
+    // **The label's own ink where its axis set one** (C12 I98, §6l row 2). This
+    // pass took one colour for every label, which is the one place in the frame
+    // where the colour is a property of the *pass* rather than of the thing
+    // drawn — so a per-axis tone is the first property it could not carry.
+    const own = l.ink ?? colour;
     for (let i = 0; i < chars.length; i += 1) { // cells-ok — a character index
       const c = l.col + i; // cells-ok — a column index
       if (c < 0 || c >= w) continue; // cells-ok — a column index
-      line[c] = colour === undefined
+      line[c] = own === undefined
         ? { text: chars[i] as string }
-        : { text: chars[i] as string, style: { colour } };
+        : { text: chars[i] as string, style: { colour: own } };
     }
   }
   return rows;

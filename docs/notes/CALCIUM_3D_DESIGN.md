@@ -429,6 +429,11 @@ magma              0.1522                     0.0005                0.00x
 gray               0.0000                     0.0000                 —
 ```
 
+**The step is the minimum over the whole field × shading grid** — not between adjacent values at
+full intensity, which is the weaker reading and the one that flatters the scheme (SF9). And
+`coolwarm`'s drift measures **0.0899** rather than the 0.1179 above, on the one map whose hue is
+undefined at its own midpoint; eleven of the twelve figures reproduce to four decimal places.
+
 **So the honest statement is per map, not per rung**, and neither the old claim nor its
 replacement is shaped that way. **The field is recoverable from hue under shading exactly when the
 map travels in hue**, and three of the six shipped maps do not: magma and inferno run black →
