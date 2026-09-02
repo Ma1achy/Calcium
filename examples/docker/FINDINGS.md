@@ -21631,6 +21631,11 @@ the plots on screen, the memory of `animationIntervalOf`'s mutation was one line
 *does the effect walk too* was one grep. The row that now covers it is T4.17n, and it fails against
 the shipped `find` at every step of the arc.
 
+**The first clause of the symptom above cannot witness this, and the arrangement it names was
+already fixtured — F472.** Left standing rather than rewritten, because a finding is a record; the
+correction is that the witness is a `scroll` inside a `panel` (T4.59) and the table half is a
+control (T4.60).
+
 ---
 
 ## F471 — the same walk one file along, and the refusal it names is false rather than absent ★★★★☆
@@ -21683,4 +21688,52 @@ went. The class-closing question is not *did I fix the effects* but *what else r
 id*, and it is one `grep` over `src/shell/` — twenty seconds, two lines, one probe to confirm. The
 repo's rule says close the class rather than the instance; the cost of not doing it here was that
 F470 read as closed while half its subject was still shipped.
+
+---
+
+## F472 — the example a finding names was already fixtured, and the half it added cannot witness anything ★★★★☆
+
+F470's symptom sentence: *a table inside a `panel` could be focused and not paged, and a 3D plot
+inside one focused and not turned.* Three things measured about it, each moving in a different
+direction.
+
+**1 · The arrangement is already in the corpus.** `test/contract/block-elements.test.ts` T2.21 —
+*a table inside a panel is reachable* — puts exactly that document in front of `elementsIn` and
+asserts three things about it. It was written for C26 §8b.5, which is where the sentence comes
+from: C26's claim is *cannot be focused, moved through, or activated*, and it is about **the
+walk**.
+
+**2 · And T2.21 cannot see F470, because it calls the side that was already fixed.** It invokes
+`registry.elementsIn` directly — the recursion's own half of the pair — while F470 lives in the
+effects that consume its answer. So the corpus holds the arrangement, tests it, passes, and covers
+nothing about the defect. *A test that calls the mechanism misses the wiring*, arriving in its
+sharpest form: a test that covers **the half that already recursed**.
+
+**3 · And the clause F470 added is vacuous.** *Focused and not paged* is true of a nested table and
+equally true of a flat one, because `ctx.scrollOffsets` has exactly one reader in `src/` —
+`containers.ts:231` — so paging any non-container writes an offset nothing reads. Measured, the
+frame after ↓ then PageDown:
+
+```
+scroll, top level     changes          table, top level     unchanged
+scroll, in a panel    changes          table, in a panel    unchanged
+```
+
+The nesting is the axis in the left column and not in the right. C26's sentence was about focus
+and is true; F470 carried it one clause further into paging, where it forbids nothing — **A03 §2's
+vacuity class arriving in a finding's own symptom**, which is the sentence a reader trusts most
+because it names a concrete document.
+
+**The witness is a container inside a container.** T4.59 pages a `scroll` inside a `panel` through
+a real session and fails against the shipped `find`, while T4.41's flat version passes beside it —
+which is what says the row measures the nesting rather than the fixture. T4.60 is the other half,
+asserting the table case is unchanged at **both** depths, so the vacuity is recorded as a row
+rather than as a paragraph.
+
+**None of this touches F470's class, fix or severity.** What it costs is the confidence the example
+bought: *no fixture does this* is false, the fixture that exists proves the opposite half, and the
+sentence's own second clause could never have failed. **A finding's symptom is checked by nothing**
+— the mutation pass checks tests, the frame read checks output, the audit checks code, and the
+sixth blind spot asks where a claim is written down. This one *was* written down, twice, in two
+documents that agree, and neither says which half does work.
 
