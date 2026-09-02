@@ -14,7 +14,7 @@
  * `ascii` is for terminals that cannot draw beyond it at all — a terminal that
  * has box drawing and no astral planes still gets `┌` and `✓`.
  */
-import type { Glyph } from "../../data/viewmodel/types.js";
+import type { Glyph, Marker3 } from "../../data/viewmodel/types.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { cells } from "../text.js";
 
@@ -562,6 +562,50 @@ export type Marker3Set = Readonly<{
   mid: readonly string[];
   far: readonly string[];
 }>;
+
+/**
+ * A shape name to its **column** in the table (C12 I99).
+ *
+ * **Here rather than in `types.ts`, and the split is the layer rule.** The
+ * union is schema — a document says `"square"` and C04 checks it — and *which
+ * character that is* is rendering data, which is this file's whole subject. So
+ * L0 owns the vocabulary and L1 owns the lookup, exactly as a colormap's name
+ * and its table are split.
+ *
+ * **Total over `Marker3` by `satisfies`**, so a sixth name cannot be added
+ * without deciding its column — the same forcing every table here relies on.
+ * The order is the order the rows are written in below, which is what makes the
+ * default — a series' own index — the shape that already drew.
+ */
+export const MARKER3_COLUMN = Object.freeze({
+  circle: 0, diamond: 1, triangle: 2, square: 3, star: 4,
+}) satisfies Record<Marker3, number>;
+
+/**
+ * How wide the marker table is — **derived from the map rather than written**
+ * (C12 I99).
+ *
+ * The renderer packs a tier and a column into one number and decodes it a
+ * layer later, so both halves need this figure. A literal `5` in two files is
+ * two places for it to drift the day a sixth shape is added; `MARKER3_COLUMN`
+ * is total over `Marker3` by `satisfies`, so its size is the answer and cannot
+ * disagree with the rows below.
+ */
+export const MARKER3_COLUMNS = Object.keys(MARKER3_COLUMN).length; // cells-ok — a table width
+
+/**
+ * Which column a cloud draws in — **its own name, or its index** (C12 I99).
+ *
+ * **The fallback is the index and not a constant**, which is the whole of why
+ * no committed frame moves: the shape within a tier has always been the series'
+ * position, so a caller who names nothing gets exactly what they had. The
+ * modulo is what a sixth cloud takes, unchanged from `glyphRows`' own decode.
+ */
+export function markerColumn(marker: Marker3 | undefined, series: number): number {
+  return marker === undefined
+    ? series % MARKER3_COLUMNS // cells-ok — a table width
+    : MARKER3_COLUMN[marker];
+}
 
 const MARKER3_UNICODE: Marker3Set = Object.freeze({
   near: Object.freeze(["\u25CF", "\u25C6", "\u25B2", "\u25A0", "\u2605"]),

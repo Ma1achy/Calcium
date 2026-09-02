@@ -89,16 +89,28 @@ describe("SC: the 3D scatter", () => {
     ).not.toBe(inked(frame(bare(), capsFor("ascii"), 80)));
   });
 
-  it("SC2 (C12 I87, C04 I59): every plotStyle is refused on this form, over the whole union", () => {
-    // **Over every member and not one**, because an empty `STYLE_ARMS` entry and
-    // a missing one produce different errors, and a row testing `"braille"`
-    // alone passes against a record that happens to list it.
+  it("SC2 (C12 I87, C04 I59): the arms this form has are accepted and the rest are refused", () => {
+    // **This asserted *every* `plotStyle` is refused, on an empty `STYLE_ARMS`
+    // entry.** That entry was a ruling about a question no caller asks — which
+    // of `auto`'s two capability arms — and it is retracted (§3am, F482). What
+    // survives is the shape of the row: over every member and not one, because
+    // a list with the wrong entry and a list with none produce different errors.
+    //
+    // **And the list holds only what draws.** An arm listed before it is built
+    // is F207's member accepted and ignored, so `"braille"` and `"line"` are
+    // still refused here and each joins on the commit that makes it draw.
     for (const ps of ["braille", "line", "candlestick", "solid"] as const) {
       expect(
         errorsOf({ kind: "plot", id: "s", ...spec({ plotStyle: ps }) }).join(" "),
         `plotStyle: ${ps}`,
-      ).toMatch(/no style arms/u);
+      ).toMatch(/arms for marker/u);
     }
+    // **The built arm**, which is what stops the loop above passing against a
+    // form that refuses everything — the state this row used to assert.
+    expect(
+      errorsOf({ kind: "plot", id: "s", ...spec({ plotStyle: "marker" }) }),
+      "`marker` is built, so it is listed and accepted",
+    ).toEqual([]);
     // **The converse**, so the refusal is not firing on everything: `"auto"` is
     // the unset value and is accepted on every form.
     expect(

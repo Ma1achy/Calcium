@@ -22,6 +22,7 @@ import { describe, expect, it } from "vitest";
 import type { Plot, PlotForm } from "../../src/data/viewmodel/index.js";
 import { block } from "../../src/data/viewmodel/index.js";
 import { HAS_VALUE_AXIS, RAMP_DEFAULT, identityOf, valueAxisOf } from "../../src/presentation/plot/figure.js";
+import { HAS_Y_GUTTER } from "../../src/data/viewmodel/types.js";
 import { drawnBlock } from "../../src/presentation/plot/derive.js";
 import { terminalDecisions } from "../support/arm-decisions.js";
 import { CATALOGUE_FORMS } from "../../tools/catalogue-forms.js";
@@ -39,8 +40,33 @@ describe("FV — the shared axis, and a record with something to be wrong about"
     const offenders: string[] = [];
     let checked = 0;
     let exempted = 0;
+    let gutterless = 0;
     for (const [form, variants] of Object.entries(CATALOGUE_FORMS)) {
       if (HAS_VALUE_AXIS[form as PlotForm]) continue;
+      // **The reader's `head` is a *gutter*, and a form without one has no
+      // gutter for it to be** (F487). `terminalDecisions` takes the text before
+      // a row's first box glyph as the y-axis label — true of a furnished axis,
+      // and false of a form that draws its scales inside the scene, where the
+      // "edge" it found is an axis line in the picture. `scatter3d` is that
+      // form: its billboarded ticks sit left of `│`, so they read as a gutter.
+      //
+      // **`HAS_VALUE_AXIS` and this row answer different questions**, which is
+      // the finding rather than the workaround. The record is about the
+      // `Figure` — one `value`, and a 3D scatter has three ranges — and this
+      // row is about a *frame*. For twelve forms the two coincide; for the one
+      // that draws its own axes in the scene they do not, and `HAS_Y_GUTTER` is
+      // the record that says which is which.
+      //
+      // **Both figures, because the exemption looks far larger than it is.**
+      // It covers **96 of 168** triples — 57.1% — and **94 of those 96 were
+      // already producing zero offenders**, measured by running this row with
+      // them included. So its reach today is two triples, and its cost is that
+      // 94 lose a check they were passing. Recorded rather than left as a
+      // percentage a reader would have to derive.
+      if (!HAS_Y_GUTTER[form as PlotForm]) {
+        gutterless += Object.keys(variants as Record<string, unknown>).length * 2; // cells-ok — a frame count
+        continue;
+      }
       for (const [variant, spec] of Object.entries(variants as Record<string, unknown>)) {
         for (const width of [40, 80]) {
           checked += 1;
@@ -74,6 +100,9 @@ describe("FV — the shared axis, and a record with something to be wrong about"
     // no instances reads exactly like one that is satisfied.
     expect(checked, "form-variant-width triples with no value axis").toBeGreaterThan(30); // cells-ok — a frame count
     expect(exempted, "numeric labels the figure named itself").toBeGreaterThan(0); // cells-ok — a label count
+    // **Counted, not excluded** — a clause with no instances reads exactly like
+    // one that is satisfied, and this one has 96.
+    expect(gutterless, "triples skipped for having no gutter to read").toBe(96); // cells-ok — a frame count
     expect(offenders, "a form marked `false` drew a number on an axis").toEqual([]);
   });
 

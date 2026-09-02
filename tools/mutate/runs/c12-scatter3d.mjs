@@ -65,7 +65,7 @@ const results = await runPass({
       // where `HALF_BLOCK` is not in the repertoire and the colour is gone.
       name: "the raster arm runs at every capability",
       file: P,
-      from: "  const half = halfBlockEligible(ctx.capabilities, false);",
+      from: '  const half = block.plotStyle !== "marker" && halfBlockEligible(ctx.capabilities, false);',
       to: "  const half = true as boolean;",
       expect: "SC1",
     },
@@ -96,7 +96,7 @@ const results = await runPass({
       // the whole picture gone.
       name: "the marker row is the series rather than the tier",
       file: P,
-      from: "      const tier = Math.floor(g / Math.max(1, clouds)); // cells-ok — a tier index",
+      from: "      const tier = Math.floor(g / MARKER3_COLUMNS); // cells-ok — a tier index",
       to: "      const tier = 0; // cells-ok — a tier index",
       expect: "SC4",
     },
@@ -146,9 +146,13 @@ const results = await runPass({
       // **`STYLE_ARMS` inherits the neighbour's** (C12 I87, F441), which is the
       // whole class this commit is about: a total record forces an answer and
       // cannot check it, so the wrong answer is the one next door.
+      //
+      // **Re-anchored when the entry stopped being `[]`** (F482), and it still
+      // bites in both directions: the built arm becomes refused and two unbuilt
+      // ones become accepted, which is exactly the pair SC2 now asserts.
       name: "scatter3d takes scatter's style arms",
       file: T,
-      from: "  scatter3d: [],",
+      from: '  scatter3d: ["marker"],',
       to: '  scatter3d: ["braille", "line"],',
       expect: "SC2",
     },

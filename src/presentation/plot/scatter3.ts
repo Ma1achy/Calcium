@@ -17,7 +17,7 @@ import type { RenderContext } from "../blocks/types.js";
 import type { ColourValue } from "../theme/types.js";
 import { HALF_BLOCK, HALF_BLOCK_LOWER, halfBlockEligible } from "../image/index.js";
 import { paint, slot, type Span } from "../blocks/paint.js";
-import { arrows3, glyphs, markers3 } from "../blocks/glyphs.js";
+import { arrows3, glyphs, MARKER3_COLUMNS, markerColumn, markers3 } from "../blocks/glyphs.js";
 import { cells } from "../text.js";
 import {
   axisLines,
@@ -116,6 +116,16 @@ type Drawn = Readonly<{
   y: number;
   depth: number;
   series: number;
+  /**
+   * The marker table's column — **resolved here, where the cloud is, and not
+   * in the compose step** (C12 I99).
+   *
+   * `glyphRows` is handed a packed integer and no clouds, so the only place
+   * that can see a series' `marker` is the loop that walks the series. Carrying
+   * the answer costs a number a sample; threading the cloud list down to the
+   * decode would put a data lookup two layers from the data.
+   */
+  column: number;
   value: number | undefined;
 }>;
 
@@ -220,7 +230,11 @@ function drawnOf(block: Plot, ctx: RenderContext, aspect: number): Scene {
       // Nothing downstream can tell a culled sample from a kept one, which is
       // exactly why the refusal is upstream of here.
       if (pr === null) continue;
-      out.push({ x: pr.x, y: pr.y, depth: pr.depth, series: si, value: p.value });
+      out.push({
+        x: pr.x, y: pr.y, depth: pr.depth, series: si,
+        column: markerColumn(c.marker, si),
+        value: p.value,
+      });
     }
     si += 1; // cells-ok — a cloud index
   }
@@ -523,7 +537,13 @@ export function scatter3dArea(
   // twice as tall as it is wide (`CELL_ASPECT`), so a projection that ignored
   // it would draw a sphere as an ellipse — the one distortion a reader reads as
   // data.
-  const half = halfBlockEligible(ctx.capabilities, false);
+  // **`auto` is the terminal's and a named arm is the caller's** (C12 I87,
+  // §3am). `halfBlockEligible` reads `unicode`, `ambiguousWidth` and
+  // `colourDepth`, and there is no member that forces the raster past it —
+  // that would draw `▀` at double the column the projection put it in. What a
+  // caller can say is what a mark is *made of*, and `"marker"` says the glyph
+  // table, at any capability, because the table has an ASCII rung.
+  const half = block.plotStyle !== "marker" && halfBlockEligible(ctx.capabilities, false);
   const grid = half ? sampleGrid(w, rows, "half") : { width: w, height: rows };
   // **The aspect is the sample's, and the two arms disagree about it.** A
   // terminal cell is `CELL_ASPECT` times taller than it is wide; a half-block
@@ -534,7 +554,6 @@ export function scatter3dArea(
   const aspect = grid.width / (grid.height * (half ? 1 : CELL_ASPECT));
   const scene = drawnOf(block, ctx, aspect);
   const drawn = scene.drawn;
-  const clouds = block.points3 ?? [];
 
   let nearD = Infinity;
   let farD = -Infinity;
@@ -621,7 +640,14 @@ export function scatter3dArea(
       const i = sy * grid.width + sx; // cells-ok — a sample offset
       ink[i] = colour;
       mark[i] = undefined;
-      glyph[i] = tier * clouds.length + d.series; // cells-ok — a series index
+      // **Packed against the table's width and not the cloud count** (C12
+      // I99). It was `tier * clouds.length + series`, decoded with `% clouds`
+      // — correct, and it made the encoding a function of the *document*: a
+      // block with six clouds and one with three packed the same tier into
+      // different integers. The column is now the table's own, so the packing
+      // is a property of the alphabet and the decode needs nothing from the
+      // block at all.
+      glyph[i] = tier * MARKER3_COLUMNS + d.column; // cells-ok — a table width
     }
   }
 
@@ -647,9 +673,13 @@ export function scatter3dArea(
           : st.va + (st.vb - st.va) * t;
       ink[i] = colourOf(block, ctx, { depth: z, value: v, series: st.series }, scene.identities, span);
       // **A line writes a literal glyph and never a tier code** (C12 I93,
-      // §6g row 5). `glyph` packs `tier x clouds + series` and a line is
-      // neither, so a line index reaching it breaks the `% clouds` decode —
-      // the cell is cleared rather than encoded.
+      // §6g row 5). `glyph` packs `tier x MARKER3_COLUMNS + column` and a line
+      // is neither, so a line index reaching it would decode as some cloud's
+      // shape at some depth — the cell is cleared rather than encoded.
+      //
+      // **The packing changed under this comment and the comment survived it**,
+      // which is why it names the constant now: it read `tier x clouds +
+      // series` and `% clouds`, a decode that no longer exists (C12 I99).
       mark[i] = glyphMark;
       glyph[i] = -1;
     });
@@ -724,7 +754,7 @@ export function scatter3dArea(
 
   const composed = half
     ? halfRows(ink, depth, grid.width, rows)
-    : glyphRows(ink, glyph, mark, grid.width, rows, clouds.length, ctx); // cells-ok — a cloud count
+    : glyphRows(ink, glyph, mark, grid.width, rows, ctx);
   return overlay(composed, labels, frameInk, grid.width); // cells-ok — a cell width
 }
 
@@ -775,14 +805,13 @@ function halfRows(
   return out;
 }
 
-/** The marker arm: one glyph a cell, the tier picking the row and the series the column. */
+/** The marker arm: one glyph a cell, the tier picking the row and `marker` the column. */
 function glyphRows(
   ink: readonly (ColourValue | undefined)[],
   glyph: readonly number[],
   mark: readonly (string | undefined)[],
   w: number,
   rows: number,
-  clouds: number,
   ctx: RenderContext,
 ): readonly (readonly Span[])[] {
   const marks = markers3(ctx.capabilities);
@@ -803,11 +832,14 @@ function glyphRows(
         );
         continue;
       }
-      const tier = Math.floor(g / Math.max(1, clouds)); // cells-ok — a tier index
-      const series = g % Math.max(1, clouds); // cells-ok — a series index
+      const tier = Math.floor(g / MARKER3_COLUMNS); // cells-ok — a tier index
+      const column = g % MARKER3_COLUMNS; // cells-ok — a table width
       const row = table[Math.min(TIERS - 1, tier)] as readonly string[];
       const colour = ink[i];
-      const text = row[series % row.length] ?? (row[0] as string); // cells-ok — a table length
+      // **The far row is five glyphs and one reading**, so a named shape is
+      // honoured here and invisible — `· ∙ • ˙ ‧` at one cell is a dot. A limit
+      // of the alphabet rather than of this lookup (C12 I99, F484).
+      const text = row[column] ?? (row[0] as string); // cells-ok — a table width
       line.push(colour === undefined ? { text } : { text, style: { colour } });
     }
     out.push(line);

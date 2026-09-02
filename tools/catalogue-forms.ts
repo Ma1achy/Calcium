@@ -278,6 +278,23 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
         { label: "gamma", points: cluster3(0, 0.6, 0.6, 90) },
       ],
     },
+    // C12 I99 — the marker arm, where the whole glyph table becomes reachable
+    // at a capability that would otherwise take the colour raster, and the
+    // shape is the caller's rather than the series index's.
+    // **The third cloud names nothing on purpose**, so one sheet carries the
+    // lookup and its fallback. The named two are `star` and `square` rather
+    // than the obvious `circle` and `triangle`: gamma's index is 2, which *is*
+    // triangle, and the first draft gave beta that name — two clouds drawing
+    // one shape, which reads as a renderer defect and is a fixture defect. Read
+    // off the frame rather than reasoned about (§6m).
+    marker: {
+      form: "scatter3d", height: 14, series: [], plotStyle: "marker", colourBy: "series",
+      points3: [
+        { label: "alpha", points: cluster3(-0.6, -0.5, 0.4, 40), marker: "star" },
+        { label: "beta", points: cluster3(0.6, 0.4, -0.5, 40), marker: "square" },
+        { label: "gamma", points: cluster3(0, 0.6, 0.6, 40) },
+      ],
+    },
     // C12 I86 — the projection with no divide. Parallel edges stay parallel.
     orthographic: {
       form: "scatter3d", height: 12, series: [], camera: { projection: "orthographic", distance: 4 },

@@ -22237,3 +22237,99 @@ ruling one commit old, corrected before any code assumed it. The instrument is *
 by hand before implementing it*, and what it caught is not an interaction between two rules but a
 **word** — which is why it turned up in the table's first row rather than in a cell where two rules
 overlap.
+
+---
+
+## F486 — a refusal was wrong about the shape of the table it described ★★★★☆
+
+`Point3Series` has had no `marker` since the type was written, with a reason attached:
+
+> **No `marker`**, where `Series` has one. It would be a second writer on the channel the depth
+> tier owns: on the glyph arm the mark **is** the depth reading (C12 I88), so a caller's shape and
+> the tier's shape are one cell with two claims on it.
+
+**The table is `3 × 5` and the two claims index different dimensions of it.**
+
+```
+        col 0   1   2   3   4        <- the series, and now the caller
+near      ●   ◆   ▲   ■   ★
+mid       ○   ◇   △   □   ☆          <- the tier
+far       ·   ∙   •   ˙   ‧
+```
+
+`glyphRows` reads `table[tier][column]`. Setting a shape moves along the row; the tier still picks
+the row. There is no cell with two claims on it, because the two things are not claims on the same
+axis at all.
+
+**It is not a slip about the code — it is a slip about a picture.** *The mark is the depth reading*
+is true, in the sense that a reader looking at one cell recovers depth from it. What does not
+follow is that the mark is *only* the depth reading, and the sentence slides from the first to the
+second in one clause. A reader checking it against I88 finds I88 agrees, because I88 is about the
+tier and says nothing about the column.
+
+**The test that says so had to be constructed rather than found.** MK1 through MK5 all pass against
+a renderer that packed the marker *over* the tier and threw the depth channel away — they assert
+that the shape is honoured, which is exactly what the wrong implementation does. Only MK6 fixes the
+column across a cloud and asserts the **row** still varies, and it is the row that reads as the
+least interesting of the six.
+
+**Same shape as F483, two files apart, on the same feature.** A refusal whose stated reason is
+checkable, never checked, and load-bearing for four steps. The difference is instructive: F483's
+argument was *true and conditional*; this one is *false and was always false*. Both survived
+because a reader checks whether a justification is coherent, and both of these are.
+
+**The habit stays the same and is now paying twice on one commit: when picking up a refusal, go and
+check its premise against the thing it names.** Twenty minutes each.
+
+---
+
+## F487 — a sweep pinned to one capability set is blind to an arm the corpus only reaches by degrading ★★★★☆
+
+Adding one catalogue variant — `scatter3d/marker`, the first that forces the glyph arm at full
+capability — turned FV1 red with two offenders:
+
+```
+scatter3d/marker@40: 0.5,0
+scatter3d/marker@80: 0.5,-0.5,-0.5,0,0.5
+```
+
+FV1 asserts *a form with no value axis never draws a numeric label it did not name*. `scatter3d`
+draws numeric axis labels and always has. **It has never been visible to this row**, and the reason
+is two mechanisms meeting:
+
+**One — the reader's gutter is *text before the first box glyph*.** On the half-block arm a 3D
+frame's axis lines are `▀`, not `│`, so no row has an edge, `first <= 0` returns early, and nothing
+is read. On the glyph arm the axis lines **are** `│` and `─`, so the billboarded tick sitting left
+of one reads as a y-gutter label.
+
+**Two — FV1 renders every variant at `FULL` only.** Every existing `scatter3d` variant takes the
+half-block arm there. The glyph arm was reachable only by degrading the terminal, which this row
+never does — so the form's twenty-two variants were checked forty-four times and the arm that would
+have shown the labels was rendered zero times.
+
+**The record and the row answer different questions, and that is the finding rather than the
+workaround.** `HAS_VALUE_AXIS[scatter3d]` is `false` for a stated and correct reason — *a `Figure`
+holds one `value` and this form has three ranges* — which is a fact about the **`Figure`
+structure**. FV1 reads it as a claim about the **rendered frame**. For twelve forms the two
+coincide. For the one form that draws its scales inside the scene they do not.
+
+**`HAS_Y_GUTTER` is the record that separates them**, and using it is a mechanism rather than a form
+list — which is what the row's own comment asks for. **But its size had to be measured before it
+could be taken:**
+
+```
+triples with no value axis                       168
+of those, also no y gutter                        96   57.1%
+of those 96, already producing zero offenders     94
+so the exemption's reach today                     2
+```
+
+**57.1% is what the exemption looks like and 2 is what it does** — because the other ninety-four
+were already silent, which was checkable by running the row with them in. The cost is real and is
+the ninety-four: they lose a check they were passing. Stated in the row, with both figures, because
+a percentage a reader has to derive is a percentage a reader assumes.
+
+**And the general shape: a corpus sweep inherits the blind spots of the capability set it renders
+at.** The catalogue itself renders five sets; this row renders one. Nothing was wrong until a member
+made a degraded-only arm reachable at the set the row uses — at which point a four-step-old property
+of the form arrived looking like a new defect.

@@ -613,18 +613,52 @@ export type Point3 = Readonly<{
 }>;
 
 /**
+ * The five marker shapes, by name (C04 I76, C12 I99).
+ *
+ * **Names and not glyphs, for `ColormapName`'s reason.** The *table* is
+ * rendering data — three rows of five characters, with a unicode arm and an
+ * ASCII arm — and belongs where the renderer is. Its *names* are schema: a
+ * document carries one and `validateBlock` checks it, so a closed union makes
+ * a wrong name a compile error and `MARKER3_MEMBERS` makes it a document error.
+ *
+ * **Closed, because an unknown name draws nothing.** That is the difference
+ * from `Tone`, which resolves through `slot` and answers `{}` — an untoned mark
+ * still draws. A marker name indexes a table, so an unknown one is `undefined`
+ * and the *sample disappears*: the same slip costs a tone its colour and a
+ * point its existence (F479, §6m row 7).
+ */
+export type Marker3 = "circle" | "diamond" | "triangle" | "square" | "star";
+
+export const MARKER3_MEMBERS = {
+  circle: true, diamond: true, triangle: true, square: true, star: true,
+} satisfies Record<Marker3, true>;
+
+/**
  * A named cloud (C04 I76).
  *
- * **No `marker`**, where `Series` has one. It would be a second writer on the
- * channel the depth tier owns: on the glyph arm the mark *is* the depth reading
- * (C12 I88), so a caller's shape and the tier's shape are one cell with two
- * claims on it. The shape within a tier is the series index, exactly as the
- * tone is.
+ * **`marker` is here now, and the sentence that refused it was wrong about the
+ * table it described** (F486). It read: *it would be a second writer on the
+ * channel the depth tier owns — on the glyph arm the mark **is** the depth
+ * reading (C12 I88), so a caller's shape and the tier's shape are one cell with
+ * two claims on it.* The marker table is `3 × 5`: **the tier picks the row and
+ * this picks the column**, which are different dimensions of one lookup, not
+ * two claims on one channel. Setting a shape moves along the row and leaves the
+ * depth reading exactly where it was.
+ *
+ * **The default is the series index**, which is what already drew — so a caller
+ * who sets nothing gets the frame they had, and no committed golden moves. A
+ * table of styles must contain the one that was already drawn (C09 §4).
+ *
+ * **And the shape is spent at the far tier**: `· ∙ • ˙ ‧` is one dot drawn five
+ * ways, so this is honoured at near and mid and is a dot at far. A limit of the
+ * alphabet rather than of the lookup, stated because the discovery is expensive
+ * and the sentence is free (F484, C12 I99).
  */
 export type Point3Series = Readonly<{
   points: readonly Point3[];
   label?: string;
   tone?: Tone;
+  marker?: Marker3;
 }>;
 
 /**
@@ -1320,7 +1354,7 @@ export type Plot = Readonly<{
    * whether the camera moves is L4's, exactly as whether a spinner turns is.
    */
   camera?: Partial<Camera>;
-  plotStyle?: "auto" | "braille" | "line" | "candlestick" | "solid";
+  plotStyle?: "auto" | "braille" | "line" | "candlestick" | "solid" | "marker";
   /**
    * Whether a shape's interior is drawn (C04 I59, C12 I43, §3w).
    *
@@ -2168,15 +2202,20 @@ export const IS_FIELD_FORM: Readonly<Record<PlotForm, boolean>> = Object.freeze(
 export type PlotStyleArm = NonNullable<Plot["plotStyle"]>;
 
 export const STYLE_ARMS: Readonly<Record<PlotForm, readonly PlotStyleArm[]>> = Object.freeze({
-  // **Empty, and it is a ruling rather than a gap** (C12 I87, §3am). Every
-  // other positional form lists arms a caller may force, because `braille`
-  // against `line` is a taste — both available at any capability that has
-  // either. `scatter3d`'s two arms are selected by `halfBlockEligible`, which
-  // reads `unicode`, `ambiguousWidth` and `colourDepth`, so the choice is the
-  // terminal's and there is nothing left for the member to select. Listing an
-  // arm the renderer does not have is F207's member accepted and ignored; a
-  // braille arm joins this entry on the commit that builds one.
-  scatter3d: [],
+  // **One entry, and the other two join it on the commits that build them**
+  // (C12 I87, §3am). This was `[]` on a ruling that answered *which of `auto`'s
+  // two arms* — a question no caller has, because `halfBlockEligible` reads
+  // `unicode`, `ambiguousWidth` and `colourDepth` and the answer is the
+  // terminal's. The question a caller does have is what a line and a mark are
+  // **made of**, and F482 is the measurement that reopened it: an outline
+  // figure spends the half rung's second colour on 5.6%–31.1% of its cells
+  // against a shaded surface's 62.5%.
+  //
+  // **It lists one because one is built.** Declaring an arm the renderer does
+  // not have is F207's member accepted and ignored, and that rule does not
+  // relax because the other two are scheduled — `"braille"` and `"line"` are
+  // added by the commits that make them draw.
+  scatter3d: ["marker"],
   // The positional family: braille dots or box-drawing strokes, and the two
   // curve forms that can carry candles.
   line: ["braille", "line", "candlestick"], step: ["braille", "line", "candlestick"],

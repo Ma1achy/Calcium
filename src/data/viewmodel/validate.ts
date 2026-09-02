@@ -33,6 +33,7 @@ import {
   ORIGIN_DEFAULT,
   IS_FIELD_FORM,
   IS_MATRIX,
+  MARKER3_MEMBERS,
   STYLE_ARMS,
   type OHLC,
   type Plot,
@@ -1791,6 +1792,22 @@ function walkPoints3(
       si += 1; // cells-ok — a group index
       continue;
     }
+    // **Checked here and not through `Tone`'s convention** (C04 I76, C12 I99,
+    // §6m row 7). An unknown tone resolves to no colour and the mark still
+    // draws; an unknown marker indexes past the table and the **sample
+    // disappears**, which is absence indistinguishable from failure. So this
+    // one is a document error rather than a silent nothing — and it is asked
+    // only of `points3`, because `Line3` has no shape to name.
+    const marker = group?.["marker"];
+    if (name === "points3" && marker !== undefined) {
+      if (typeof marker !== "string" || !(marker in MARKER3_MEMBERS)) {
+        e.push(
+          `${at}: ${name}[${String(si)}].marker is not a marker name (C04 I76) — ` +
+            `one of ${Object.keys(MARKER3_MEMBERS).join(", ")}, and an unknown one ` +
+            `would draw no mark at all rather than a default one`,
+        );
+      }
+    }
     let pi = 0;
     for (const p of points as readonly Record<string, unknown>[]) {
       const finite = (v: unknown): boolean => typeof v === "number" && Number.isFinite(v);
@@ -2158,7 +2175,7 @@ const PLOT_FORMS: ReadonlySet<string> = new Set(Object.keys(PLOT_FORM_MEMBERS));
 
 const PLOT_STYLE_MEMBERS = {
   auto: true, braille: true, line: true, candlestick: true,
-  solid: true,
+  solid: true, marker: true,
 } satisfies Record<NonNullable<Plot["plotStyle"]>, true>;
 const PLOT_STYLES: ReadonlySet<string> = new Set(Object.keys(PLOT_STYLE_MEMBERS));
 
