@@ -13860,6 +13860,79 @@ terminal did not change, and the gap between those two is the whole finding.
 
 ---
 
+## F449 — two labels that do not overlap and cannot be read ★★★★☆
+
+The 3D axes place tick labels with the collision rule every other axis here uses: **drop the
+later, ordered by extent**, where *collision* means the cells overlap. The frame read `10.5`.
+
+**It is `1` and `0.5` at adjacent columns.** Two disjoint claims, both legal, both drawn — and one
+token on screen that is neither of them. **Two labels touching are unreadable without
+overlapping**, and an occupancy set that reserves exactly the label's cells cannot say so.
+
+**Fixed** — the reservation is the label **plus a blank on each side**, which is the spacing the
+y-gutter already has one dimension down and which nobody had written as a rule because in a gutter
+it falls out of the layout.
+
+**And the axis names had the same defect one level up.** They were placed past each axis's positive
+end; x and y both run *to* the anchor corner, so both names and a shared tick landed on one cell
+and the frame read `xy1`. They sit at their **midpoints** now, which is the one point on an axis
+that no other axis shares — and it is matplotlib's placement, arrived at by drawing rather than by
+copying.
+
+**The instrument is the frame and nothing else could be.** Both defects are legal geometry, correct
+arithmetic, and a rendered row that every assertion about *is the label present* agrees with.
+
+---
+
+## F448 — a rule and its reason disagreeing, and the reason was the right half ★★★★★
+
+`docs/notes/CALCIUM_3D_DESIGN.md` §4: *which corner the axes draw at depends on the camera —
+compute which of the eight box corners is furthest from the camera and draw from there*, **so the
+axes never occlude the data.**
+
+**Implemented literally it draws them through the middle of the figure.** Measured at the default
+camera, over all eight vertices of the normalised cube:
+
+```
+corner        screen x, y      view depth
+(-1,-1,-1)    0.500, 0.527       7.72   <- furthest from the eye
+( 1, 1,-1)    0.500, 0.888       5.28   <- near in x and y, far in z
+```
+
+The far corner projects to **the exact centre**. Axes anchored there run outward across the data —
+which is precisely what the stated reason exists to prevent. The corner near in x and y and far in
+z projects to the **bottom vertex of the cube's outline**, and the two edges leaving it are the
+outline's lower left and right: where every 3D library a reader has seen puts x and y.
+
+**The rule is wrong and the reason is right**, and that is the shape worth naming. A justification
+that survives being read carefully (F84's class) is one thing; here the justification is *sound*
+and the rule attached to it does the opposite. Neither half is a mistake anyone would catch by
+reading — the note has been read many times — because they only disagree once something is drawn.
+
+**Both are still three sign tests, which is what keeps F444's point.** The far corner is `−sign` on
+each axis and the axis corner is `sign, sign, −sign`: one computation of three numbers, two
+readings that combine them differently. The earlier claim — *one computation, two consumers* — was
+right about the source and wrong about the answer, and the correction is smaller than the finding.
+
+**A second half, measured on the way.** The edge-on rule was specified against `elevation: π/2`,
+where the z axis was expected to project to nothing. It projects to **3.37 cells**: a line parallel
+to the view direction collapses to a point only *without* a perspective divide, because its near
+end is nearer and therefore larger. Under orthographic it is **0.00**.
+
+```
+                                  x       y       z
+perspective   top-down          9.41    9.41    3.37
+perspective   level, azimuth 0  2.66   16.67    8.34
+orthographic  top-down         25.30   25.30    0.00
+orthographic  level, azimuth 0  0.00   32.00   16.00
+```
+
+So the rule fires at zero under one projection and **hands off to the collision rule** under the
+other. Stating only the first would have left every perspective camera reading as a defect against
+its own spec.
+
+---
+
 ## F447 — the first target in `all` reads what the last one builds ★★★★★
 
 `make all` is `check enforce audit instruments test golden e2e`. `check` type-checks the
