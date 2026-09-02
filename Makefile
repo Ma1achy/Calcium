@@ -40,6 +40,17 @@ hooks:              ## point git at .githooks — pre-commit runs `make enforce`
 
 check:              ## type-check and lint, including the examples
 	npm run check
+	@# **The examples resolve `@fmx/calcium` to `dist/`, and `dist/` is built by
+	@# `e2e` — the LAST target in `all`** (F447). So on any commit that widens a
+	@# public type, this target type-checks the examples against the *previous*
+	@# commit's build and passes; the failure surfaces on the next run, attributed
+	@# to whatever landed in between. Measured: `scatter3d` joined `PlotForm`,
+	@# `make check` went green, `make e2e` rebuilt `dist/`, and the example's
+	@# `Record<PlotForm, Entry>` failed on the following commit's first check.
+	@# **A gate that reads a generated artefact has to generate it.** The cost is
+	@# one `tsc -p tsconfig.build.json`, which `e2e` pays again — the same work
+	@# once earlier, against correctness that was not there at all.
+	npm run build
 	@# **The examples have `check` scripts and nothing ran them** (F150). The
 	@# minimal example did not typecheck for as long as F58b's narrowing had
 	@# been landed: `ProducedMeta` honours three `meta` keys and it supplied ten.

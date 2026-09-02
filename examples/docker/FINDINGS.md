@@ -13860,6 +13860,40 @@ terminal did not change, and the gap between those two is the whole finding.
 
 ---
 
+## F447 — the first target in `all` reads what the last one builds ★★★★★
+
+`make all` is `check enforce audit instruments test golden e2e`. `check` type-checks the
+examples; the examples resolve `@fmx/calcium` to the package root, whose `types` point at
+`dist/`; and **`dist/` is built by `e2e`**, which runs last.
+
+**So on any commit that widens a public type, `check` reads the previous commit's build and
+passes.** Measured rather than reasoned: `scatter3d` joined `PlotForm` on the step-3 commit,
+`make check` went green at 22:5x, `make e2e` rebuilt `dist/` at 23:10, the commit landed at
+23:15 — and `examples/plots/src/catalogue.ts`'s `Record<PlotForm, Entry>` failed on the **next**
+commit's first check, with a 24th forced declaration nobody had counted.
+
+**The failure is attributed to whatever landed in between**, which is the expensive half. A
+missing record entry from one commit surfaces during another, and the reader's first move is to
+look at the change in front of them.
+
+**It is not a stale-cache problem, it is an ordering one.** Every other consumer of `src/` in this
+repository reads `src/` — the tests, the instruments, the enforcement scans — and the examples are
+the only population that reads the *build*, because that is what a consumer does and R01 R4.4's
+reuse claim is exactly that they should. The gate is right to check them against `dist/`; it was
+wrong to do it before anything wrote one.
+
+**Fixed** — `check` runs `npm run build` before the example loop. The cost is one
+`tsc -p tsconfig.build.json`, which `e2e` pays again: the same work once earlier, against a
+correctness that was not there at all.
+
+**And the 24th declaration is worth its own line.** F441 counted 23 in `src/` and 5 in
+`test/`/`tools/` by running `tsc --noEmit` at the root — which is the root workspace only. The
+examples are a separate `tsc` invocation, so the count was right about what it measured and
+silent about a population it never reached. **A number derived from one command describes that
+command.**
+
+---
+
 ## F446 — two survivors, and both rows counted where they had to identify ★★★★★
 
 The `scatter3d` pass ran ten mutations and **two survived**. Neither was about the code.

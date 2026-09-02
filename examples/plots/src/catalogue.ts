@@ -164,6 +164,21 @@ export const CATALOGUE: Readonly<Record<PlotForm, Entry>> = Object.freeze({
     axes: true, series: [s(wave(18, p, 3, 6, 14), "depth")], ...x }) },
   scatter: { says: "two readings per point", at: (p, h, x) => plot("scatter", h, {
     axes: true, series: [s(wave(40, p, 4, 10, 20), "samples")], ...x }) },
+  // **The camera turns with the phase**, which is the demo the member is for: a
+  // *producer* rebuilds the document each tick, so each block declares where its
+  // view starts and no block ever tracks a live camera (C04 I75). The cloud is a
+  // helix so a reader can check the rotation against a shape they can hold.
+  scatter3d: { says: "three coordinates, and a view that turns", at: (p, h, x) => plot("scatter3d", h, {
+    series: [],
+    camera: { azimuth: Math.PI / 4 + p * 0.35 },
+    points3: [{
+      label: "helix",
+      points: Array.from({ length: 120 }, (_v, i) => {
+        const t = (i / 119) * Math.PI * 4;
+        return { x: Math.cos(t), y: Math.sin(t), z: (i / 119) * 2 - 1, value: t };
+      }),
+    }],
+    ...x }) },
   sparkline: { says: "a shape, no furniture", at: (p, h, x) => plot("sparkline", Math.min(h, 1), {
     series: [s(wave(40, p, 5, 6, 10))], ...x }) },
   ecdf: { says: "the empirical distribution", at: (p, h, x) => plot("ecdf", h, {
