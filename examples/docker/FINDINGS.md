@@ -20994,6 +20994,17 @@ probe asks it, and only the second finds the per-map split.
 **At 8-bit both collapse on every map** — hue drift 1.57–5.83 rad, minimum field step 0.0000
 everywhere — which is C10's rung and what `CUBE_LEVELS`' own comment already says.
 
+**Reproduced by `SF9` (F480), and two things came back with it.** Eleven of the twelve figures
+above reproduce to four decimal places, which is what verifies a reimplemented OKLab. **The
+minimum field step is over the whole field × shading grid, not between adjacent values at full
+intensity** — the first reading of that sentence gave magma 0.0720 against 0.0005, a factor of
+144, and the grid is the quantity the claim needs: recoverability asks whether two field values
+can be told apart *at any shading*, and at low intensity a dark map's neighbours converge. **And
+`coolwarm`'s drift does not reproduce** — 0.0899 measured against 0.1179 here — on the one map
+this finding itself names as passing through a white midpoint where chroma is zero and hue is
+undefined. A maximum taken over samples whose hue is noise is not a figure to hold a row to, so
+SF9 bounds it rather than pinning it.
+
 ---
 
 ## F456 — the degenerate scheduled first is not degenerate, and the divide it names does not exist ★★★★★
@@ -22025,4 +22036,40 @@ same arithmetic F58 got wrong in the other direction.
 above 3×, magma and inferno and coolwarm below 0.1×, and `gray` at zero chroma — the per-map split
 being the finding, so a row that asserted only viridis would pass against a renderer that had lost
 the property everywhere else.
+
+---
+
+## F481 — a conservation assertion is satisfied by any redistribution ★★★★☆
+
+`AT1`'s first draft counted the frame's colours and asserted the strongest-looking thing available:
+**the muted count falls by exactly what the accent count gains.** Exact arithmetic, both directions,
+and it survived both mutations it was written to catch.
+
+```
+the axis tone never reaches the stroke      SURVIVED
+the box edges take the x axis's tone        SURVIVED
+```
+
+**Because conservation is not attribution.** Moving colour from one part of the frame to another
+satisfies the equation exactly — that is what the equation *says*. The first mutation left the
+ticks and the label carrying the tone, so accent cells still existed and still balanced; the second
+moved colour onto the box, and the sums balanced there too.
+
+**And the fixture could not have seen the second in any case**, which is the half worth separating:
+it set `box3: "none"`, so a mutation about box edges had no box to colour. An assertion that cannot
+be reached is not weak, it is absent — and the two failures look identical in a green run.
+
+**The repair is two arms, and neither is an equation.** Ticks off and no label, so every accent
+cell is the *line's* and dropping the ink leaves none; then the same block with `box3: "full"`, so
+a box edge taking a direction's tone puts twelve edges above the ceiling.
+
+**Fixing it turned up a rule the walk did not have.** With the box on, the accent count falls from
+**9 to 1** — the box draws first, `writeDepth` is strictly nearer, and a tie goes to whoever drew
+first (F452), so the box occludes the axis lines it coincides with. §6l's table had the depth rule
+against the *data* and not against the frame's own two parts. The row's assertion is a ceiling for
+that reason rather than an equality, and the mechanism is now in the section.
+
+**The class is one this ledger already has and this is its sharpest form.** *Assert the artefact,
+not a proxy* — and a conserved total is the most convincing proxy there is, because it looks like
+it constrains two numbers when it constrains one.
 
