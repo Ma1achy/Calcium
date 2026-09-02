@@ -130,9 +130,21 @@ camera?: Partial<Camera>;    // on Plot — the starting view, not the live one
 **Two control modes, and both are the frame scheduler doing what it already does:**
 
 ```
-auto-orbit     azimuth += δ per frame — the stream window is 33ms, so 30fps is free
-manual         ← → azimuth · ↑ ↓ elevation · + − distance · r resets
+auto-orbit     one revolution in 12 seconds, from ELAPSED TIME rather than per frame
+manual         [ ] azimuth · { } elevation · + − distance · r resets · o orbits
 ```
+
+**Both lines were corrected by building them** (C22 §6i, I73–I75, F466). *Per frame* makes an
+animation's speed depend on what else is on screen — the ticker is armed at the fastest cadence
+anything visible wants — and it fails in both directions at once: an orbit beside an 80 ms spinner
+turns 25% fast, and a 33 ms orbit spins that spinner three times too quickly. And *the stream
+window is 33ms* names a window the ticker has never used: `#armSpinner` raises `commit("spinner")`,
+whose window is **100 ms**, so the reason is the frame rate and the interval is not.
+
+**The arrows do not survive the keymap.** `↑` and `↓` at `liveBlock` are `rowUp` and `rowDown` and
+a duplicate is refused at construction; `←` and `→` fall through to the prompt, so claiming them
+takes two keys from every focused block for a feature one kind has. `[` and `]` were chosen on that
+argument when the writer landed, and the rest of the family follows them.
 
 **The render cache key gains the camera — and so does the shell, which is the half this
 sentence used to miss.** It read *the third instance of that story after the scroll offset and
@@ -967,7 +979,7 @@ four times.
 5   LINES — the CARRIER; the depth-tested stroke landed at step 4 (§3b)
 6   SURFACES — normals, lighting, the colour/shading separation
 7   backface culling and the wireframe mode — the bias it was scheduled with does not exist
-8   auto-orbit and manual camera controls
+8   auto-orbit and manual camera controls — and §11's two arguments did not survive it
 9   the test suite: sphere, cube, axis planes, tilted plane, the three equations
 10  golden frames at four capability sets, catalogue fixtures, the animated example
 11  a colour per axis — `AxisSpec3.tone`, the one of three that is not built
@@ -1033,15 +1045,14 @@ normal and divide-by-zero lighting** at step 6. First within its own step, both 
 
 ## 11 · Animation — and 3D breaks the assumption 2D rests on
 
-> **Both this section and §12 were costed on the dot grid and have not been re-run.** Every
-> per-frame figure below — the raster stage, the bytes to the terminal, the scaling rows — was
-> measured against 160×96 binary dots plus 80×24 colours. This rung writes **80×48 full-colour
-> samples**, a quarter of the sample count and a different last stage: no glyph is chosen, so the
-> ramp lookup leaves the loop and the bytes per cell change from one glyph plus one SGR to one
-> glyph plus two. **The shapes of the arguments hold and the numbers do not**, and the honest
-> reading is that they are re-measurable rather than approximately right — the first pass of the
-> dither measurement is the standing reminder that a number carried across a changed premise can
-> be exactly correct about the wrong thing (F433).
+> **Both this section and §12 were costed on the dot grid, and step 8 re-ran them.** Every figure
+> below is now measured on the half-block rung — 80×48 full-colour samples at 80×24 cells, load
+> 0.14–0.30 — and where the old reading survives it says so. **Two of the arguments did not
+> survive, and it was not the numbers that moved.** *One of those three stages is the bottleneck*
+> was wrong about all three (F469), and *every cell changes* was wrong by about a third (F468).
+> The standing reminder holds and points the other way: a number carried across a changed premise
+> can be exactly correct about the wrong thing (F433), and so can an argument that never had a
+> number at all.
 
 
 **The 2D animation story is measured and holds**: the render cache keys on `(rev, width,
@@ -1051,18 +1062,32 @@ sample rewrites a handful of rows.
 
 **None of that helps here, and the reason is structural.**
 
-### Output diffing saves nothing during an orbit
+### Output diffing saves less during an orbit, and *less* is not *nothing*
 
-**A camera change moves every projected vertex, so every cell changes.** The row-by-row diff
-compares two frames that differ everywhere and writes all of them. **The mechanism that makes
-2D animation cheap is exactly the mechanism that does nothing in 3D.**
+**This section used to read *a camera change moves every projected vertex, so every cell
+changes*.** The premise is true and the conclusion does not follow: most vertices move less than
+a sample, and most cells were blank to begin with. Measured cell against cell, row-aligned, over a
+40×40 surface at 80×24 — 876 cells, **302 of them inked** (F468):
 
-**So the budget is the per-frame RENDER cost, not the diff size** — which is the opposite of
-every other form and needs measuring rather than assuming.
+```
+step        rows differing     cells differing
+π/256           14 / 24          193 / 876   22.0%
+π/64            17 / 24          265 / 876   30.3%
+π/32            17 / 24          308 / 876   35.2%
+π/8             19 / 24          466 / 876   53.2%
+```
 
-**And the cache is a pure miss during orbit.** The key gains the camera (§1), so every frame
-is a new key. **That is correct and it means the cache contributes nothing while orbiting** —
-worth stating so nobody later reads a 100% miss rate as a defect.
+At the rate an orbit actually turns — 1° a frame at 30fps — the row diff writes about 14 rows of
+24 and skips 10. That is far less than 2D gets and it is not nothing.
+
+**So the budget is still the per-frame RENDER cost and not the diff size**, which is the part of
+the old argument that holds: 30% of rows saved does not change which side of 33 ms a frame falls.
+
+**And the cache is a pure miss during orbit — for a stronger reason than the key.** `RenderCache`
+holds **one slot per entry**: `set` overwrites, so a repeated key hits only when it is the
+*immediately previous* one. Normalising azimuth into `[0, 2π)` would therefore buy nothing, and an
+orbit cannot grow the cache either. **Worth stating so nobody later reads a 100% miss rate as a
+defect**, and worth stating with the right reason so nobody later tries to fix it by wrapping.
 
 ### The two update paths are different work
 
@@ -1076,29 +1101,46 @@ DATA changed, camera same     the same full pipeline — a surface is ONE object
 **Both are a full redraw.** There is no partial-update path in 3D and pretending otherwise
 would be the optimisation that produces a wrong picture.
 
-### The budget, measured rather than asserted
+### The budget, measured — and none of the three candidates is the cost
 
-**At 80×24**: 160×96 dots, 15,360 depth entries. A 40×40 height field is ~3,200 triangles.
-
-**Per triangle**: three vertex rotations (9 multiplies each), one cross product for the
-normal, one dot for the lighting, then rasterisation across however many dots it covers.
-
-**What to measure before designing around it:**
+**At 80×24 on this rung**: 80×48 samples, 3,840 depth entries. A 40×40 height field is 3,200
+triangles. **The three stages this section named as candidates are 28% of the frame between
+them** (F469):
 
 ```
-projection only        3,200 triangles, no rasterisation — is the matrix maths the cost?
-+ rasterisation        with the depth test — is the fill the cost?
-+ shading              normals and lighting — is the per-cell work the cost?
-the whole frame        and against the frame scheduler's 33ms stream window
+P1  projection only                        0.170 ms    1.3%
+P2  + rasterisation (INCLUDES the shading) 2.932 ms   22.6%
+P3  shade alone, at 1,916 paint calls      0.589 ms    4.5%
+P4  the whole frame                       12.969 ms
 ```
 
-**One of those three is the bottleneck and only the measurement says which.** The 69k-triangle
-bunny is the same test at twenty times the load, which is what separates *slow* from *does not
-scale*.
+**And P2 and P3 do not separate at any seam that ships.** `fill` builds the interpolated normal
+and calls `shade` inside the depth-tested branch, unconditionally — so §12's *P3 minus P2 is the
+shading* subtracts two rows that measure the same code. The 0.589 ms is `shade` timed on its own
+inputs at the measured call count: a proxy, and stated as one.
+
+**Where the frame actually goes:**
+
+```
+chrome only — the block with an empty surface list        3.216 ms   24.8%
+span composition and the rest of scatter3dArea            ~3.1  ms   ~24%
+rasterise + shade                                         2.932 ms   22.6%
+the 3D axes — axes3 default 13.265 against false 11.108   2.157 ms   16.6%
+trianglesOf — camera-independent, rebuilt every frame     1.265 ms    9.8%
+projection, surfacePoints, extentOf                       0.311 ms    2.4%
+paint — spans to strings, 5.340 against 5.284             0.056 ms    0.4%
+```
+
+**Scaling holds and is better than linear.** 3,200 → 69,192 triangles is 21.6× the geometry and
+**9.6×** the frame, 12.97 ms to 124.2 — because the block's own cost is fixed. **But at that size
+`trianglesOf` alone is 36.1 ms**, over the whole 33 ms budget for a computation the camera does not
+move, so a 69k mesh does not orbit at any rate the scheduler offers. The remedy is caller-owned
+scratch on `RenderContext`, which this section already rules for the depth buffer.
 
 **If a full-detail frame exceeds the budget, drop the FRAME RATE before the resolution.** A
 10fps orbit at full quality reads better than a 30fps orbit that is visibly coarser — and the
-resolution is the thing the reader is looking at.
+resolution is the thing the reader is looking at. **That is also the shape the capability cap
+takes**, one heading down.
 
 ### Synchronised update is not optional here
 
@@ -1110,10 +1152,17 @@ every frame on a terminal that does not support it.**
 frame rate lower** — the tear is worse than the slower rotation, and that is a ruling rather
 than a fallback.
 
+**And the cap is the commit reason, not a second number** (C22 I73, F466). A live orbit commits
+`stream` and everything else keeps `spinner`, whose 100 ms window is a floor under the ticker
+(C22 I60a) — so absent the capability the orbit ticks at 100 ms and commits `spinner`, which is
+10fps rather than 30 with nothing invented. One switch with two effects, and the capped rate is
+the one this section already calls acceptable at full quality.
+
 ### The depth buffer and purity
 
-**A `Float32Array(15360)` allocated per render is 60KB, thirty times a second — 1.8MB/s of
-allocation.** Trivial for the GC and it keeps the render a pure function.
+**A `Float32Array(3840)` allocated per render is 15KB, thirty times a second — 0.45MB/s of
+allocation.** The old figures were the dot grid's 160×96; this rung's sample grid is 80×48, a
+quarter of the entries. Trivial for the GC either way, and it keeps the render a pure function.
 
 **Do not reach for a module-level scratch buffer.** C12 I11 forbids it, and the measurement
 above will say whether the allocation is even visible in the profile. **If it turns out to
@@ -1124,7 +1173,9 @@ function pure and makes the ownership explicit, rather than hiding state in the 
 
 **A live 3D plot orbiting at 30fps is a continuous full-frame redraw for as long as it is on
 screen.** That is a real cost in a way a live line chart is not, and it should be a deliberate
-choice rather than a default.
+choice rather than a default. **It is now a number rather than an argument**: 12.97 ms a frame
+over 3,200 triangles, so 30fps is **39% of a core** for as long as the plot is on screen — and
+124 ms at 69,192, which no rate holds.
 
 **So auto-orbit defaults to OFF.** A static 3D plot is free — one render, cached, and the
 cache holds until the width or theme changes. **The reader turns rotation on when they want
@@ -1135,13 +1186,15 @@ it**, and that is the honest shape given what it costs.
 ```
 AN1   a static 3D plot renders once and hits the cache on the second render
 AN2   a camera change misses the cache — asserted, because it is meant to
-AN3   an orbit frame writes the full plot area, not a subset — the diff saves nothing,
-      and the test says so rather than someone discovering it
+AN3   an orbit step changes a MEASURED FRACTION of the frame's cells — compared row
+      against row and index against index, never by string position. The row records
+      the fraction; "every cell changes" is what it replaces (F468)
 AN4   plotHeight is identical across every camera position — C12 I1 unchanged
-AN5   with synchronisedUpdate absent, the orbit rate is capped
+AN5   with synchronisedUpdate absent, the orbit ticks at 100 ms and commits `spinner`;
+      present, 33 ms and `stream`. BOTH ARMS — a cap that always applies and one that
+      never does read the same from a passing suite
 AN6   the render is pure — same block, same camera, same context, identical bytes
-AN7   the budget rows: projection, rasterisation and shading timed separately at
-      3,200 and at 69,000 triangles
+AN7   the budget rows — and P2 and P3 do not separate, so the third is a proxy (F469)
 ```
 
 ---
@@ -1171,26 +1224,37 @@ isolation, on the same input, so the profile names a stage rather than a total.
 
 | row | measures | input |
 |---|---|---|
-| **P1** | rotation + projection only, no writes | 3,200 triangles |
-| **P2** | + rasterisation with the depth test | 3,200 triangles |
-| **P3** | + normals and lighting | 3,200 triangles |
-| **P4** | the whole frame, end to end | 3,200 triangles |
-| **P5** | P1–P4 again at 69,451 | the Stanford bunny |
-| **P6** | points only, no faces | 10,000 points |
-| **P7** | lines only | 5,000 segments |
+| row | measures | input | **measured** |
+|---|---|---|---|
+| **P1** | rotation + projection only, no writes | 3,200 triangles | **0.170 ms** |
+| **P2** | + rasterisation with the depth test | 3,200 triangles | **2.932 ms** |
+| **P3** | shading — a **proxy**, see below | 1,916 paint calls | **0.589 ms** |
+| **P4** | the whole frame, end to end | 3,200 triangles | **12.969 ms** |
+| **P5** | P1–P4 again at 69,192 | a 187×187 field | **4.5 / 54.9 / — / 124.2 ms** |
+| **P6** | points only, no faces | 10,000 points | **5.835 ms** |
+| **P7** | lines only | 5,000 segments | **3.375 ms** |
 
-**P4 minus P3 is the compositing cost**, P3 minus P2 the shading, P2 minus P1 the fill.
-**Three subtractions and the bottleneck names itself.**
+**The three subtractions do not work and that is a finding rather than a measurement problem**
+(F469). `fill` calls `shade` inside the depth-tested branch unconditionally, so P2 already
+contains P3 and no seam separates them; P3 above is `shade` timed on its own inputs at the
+measured call count. **And the bottleneck does not name itself, because it is none of the three**
+— P1, P2 and P3 are 28% of the frame between them and the rest is the block: chrome 3.216 ms,
+the 3D axes 2.157, `trianglesOf` 1.265, span composition ~3.1, and the paint from spans to
+strings **0.056**.
 
-**P5 is what separates *slow* from *does not scale*.** Twenty times the triangles: if the
-whole frame scales linearly the renderer is fine and the input is large; if it scales worse,
-something is per-triangle that should be per-frame.
+**P5 separates *slow* from *does not scale*, and it scales.** 21.6× the triangles costs 9.6× the
+frame. **What it exposes instead is `trianglesOf` at 36.1 ms of 124.2** — camera-independent, and
+recomputed identically on every orbit frame.
+
+**The bunny is not the fixture.** 69,192 triangles from a 187×187 height field, because the
+question is the triangle count and a mesh file would be a dependency with a licence.
 
 ### Allocation
 
 ```
-P8   the depth buffer — 60KB per render at 80×24. Assert it is allocated once per
-     render and not per triangle
+P8   the depth buffer — 15KB per render at 80×24 on this rung, not 60KB: the sample
+     grid is 80×48 rather than 160×96, a quarter of the entries. Assert it is
+     allocated once per render and not per triangle
 P9   sustained orbit — 300 frames at 30fps. Heap at frame 1 against frame 300.
      Flat is the pass; growth is a retained buffer and a purity violation
 P10  no module-level state — the grep C12 I11 already requires, as a row
@@ -1202,42 +1266,51 @@ tempting fix the design already refuses.
 ### Bytes to the terminal
 
 ```
-P11  a static 3D render — bytes written once
-P12  an orbit frame — bytes written per frame. EXPECTED to be the full plot area;
-     the row exists so the number is known rather than assumed
-P13  the same at colourDepth 1 — no SGR, so the floor
-P14  with synchronisedUpdate absent — assert the frame rate is capped
+P11  a static 3D render — bytes written once.       MEASURED 8,372 B over 24 rows
+P12  an orbit frame — cells changed per frame.      MEASURED 22.0%–53.2%, above
+P13  the same at colourDepth 1 — no SGR, the floor. MEASURED 1,073 B, so colour is 7.8x
+P14  with synchronisedUpdate absent — assert the reason is `spinner` and the interval
+     100 ms, and with it present that they are `stream` and 33. Both arms
 ```
 
-**P12 is not a regression test, it is a measurement.** The design already says the diff saves
-nothing during an orbit; **the row records what that costs in bytes** so a future change that
-makes it worse is visible.
+**P12 is not a regression test, it is a measurement — and it changed the claim it was written to
+record.** *The diff saves nothing during an orbit* is what this section used to say; the row says
+22% of cells at the rate an orbit turns and 53% at a jump (F468). The bytes are still the thing to
+watch, and now the fraction is too.
 
 ### Scaling, per axis
 
 ```
 P15  width      40 · 80 · 120 · 200 columns at a fixed mesh
-P16  mesh       100 · 1,000 · 10,000 · 69,451 triangles at a fixed width
+     MEASURED  10.104 · 10.646 · 12.375 · 12.736 ms   — 5x the width costs 1.26x
+P16  mesh      3,200 · 69,192 triangles at a fixed width
+     MEASURED  12.969 · 124.213 ms                    — 21.6x the mesh costs 9.6x
 P17  height     8 · 24 · 48 rows
+     MEASURED   6.144 · 11.062 · 18.958 ms            — 6x the rows costs 3.09x
 ```
 
-**Width and height scale the sample grid quadratically; mesh size scales the geometry
-linearly.** The sample grid is `width × 1` by `height × 2` here, so a row that fixes one and
-varies the other is varying a quarter of what it varied on the dot grid. If the measured curves disagree with that, the loop structure is wrong and the
-row says which one.
+**The prediction was *width and height scale the sample grid quadratically* and the curves
+disagree**, which is what this row was for. Neither axis is quadratic and width is nearly flat,
+because the sample grid is not what the frame is spending on (F469): **the axis that costs is the
+one that adds rows**, not the one that adds samples. The loop structure is not wrong; the model
+of where the time goes was.
 
 ### The comparison rows
 
 ```
 P18  a 3D scatter against the 2D scatter, same point count — the cost of the
      third dimension, stated as a multiple
+     MEASURED  2.485 against 2.402 ms at 2,000 points — 1.03x
 P19  a surface against a heatmap of the same grid — the cost of shading over
      colouring
+     MEASURED  11.183 against 15.044 ms at 40x40 — 0.74x, the surface is CHEAPER
 ```
 
-**These are the rows that answer *is 3D worth it* in numbers rather than in argument.** If a
-3D scatter is 40× a 2D one, that is a finding about the design; if it is 3×, it is fine and
-nobody needs to wonder.
+**These are the rows that answer *is 3D worth it* in numbers rather than in argument**, and the
+answer is that the third dimension is free. *If a 3D scatter is 40× a 2D one, that is a finding
+about the design; if it is 3×, it is fine and nobody needs to wonder* — it is **1.03×**, and a
+surface is cheaper than a heatmap of the same grid. Both for the same reason: the frame's cost is
+mostly the block, and both forms pay it.
 
 ### Degradation under budget
 
@@ -1247,6 +1320,13 @@ P20  a mesh that exceeds 33 ms — assert the frame rate drops and the RESOLUTIO
 P21  the cap is announced, not silent — a reader who is getting 10fps should be
      able to find out why
 ```
+
+**Neither row has a subject yet, and saying so is the disposition** (C22 §6i.4). A cap *chosen
+under load* presupposes something that sheds load, and nothing does; the capability cap in C22 I73
+is taken once from `synchronisedUpdate` and not per frame, and it is announced by nothing — which
+is right, because a reader on a terminal without DECSET 2026 has nothing to do about it. **A row
+written now would pass by having no subject**, which is A03 §2's vacuity class, so these wait for
+the mechanism rather than for the will.
 
 ### How the rows run
 

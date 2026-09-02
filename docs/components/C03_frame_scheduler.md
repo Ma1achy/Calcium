@@ -66,7 +66,7 @@ function createFrameScheduler(opts: {
 | `completion` | 0 ms | The user is waiting on a result they asked for |
 | `resize` | **16 ms, fixed**, plus implicit `invalidate()` | Dimensions changed; a diff against the old frame is meaningless — hence the invalidate, which is set **eagerly at commit** and not at flush (I7, I15). The window is not tunable: unlike `stream` and `spinner`, whose window makes a frame *stale*, this one makes it *wrong*, so a config may not lengthen it (I15) |
 | `stream` | 33 ms | ~30 frames/s ceiling, matching the A02 §7 budget. Configurable down to 16 ms, but terminals generally benefit from fewer, larger writes — the default is the conservative end deliberately |
-| `spinner` | 100 ms | Animation only; a faster tick conveys nothing |
+| `spinner` | 100 ms | Animation only; a faster tick conveys nothing. **True of a glyph cycle and false of a rotation** — a 3D plot under an orbit is a continuous full-frame redraw where a faster tick conveys smoother motion, so it commits `stream` instead and this window is a **floor** under anything that does not (C22 I60a, C22 I73, F466) |
 
 **And for the life of the project no producer raised it.** `commit("spinner")` appeared in six
 of this component's own test files and nowhere in `src/` — the reason declared, the window
@@ -93,6 +93,13 @@ about this defect.
 **Immediate reasons cannot be made coalesced.** `windows` may tune `stream` and `spinner` only; supplying a window for `input` or `completion` is rejected at construction, because a config file must not be able to introduce input lag (I2) — and for `resize`, because its window is fixed for a different reason (I15).
 
 **Both rejections used to cite I2 and I2 names two reasons.** Its text is *`input` and `completion` commits are never delayed by any amount*; three places in this document cited it for `resize` as well, and the roadmap quoted it back as *"input, completion and resize are never delayed"* — a quotation of a sentence that does not exist. `make enforce` resolves 12 742 invariant references and cannot see it: it checks that a citation names an invariant which exists, never that the invariant says the cited thing (SP9's stated blind spot). The two reasons are genuinely different — input lag is about *latency the user causes*, a resize window is about *a frame that is wrong rather than stale* — so they are two invariants and not one widened (F423).
+
+**A reason names a window and not a source, which is what lets an orbit take `stream`.** Nothing
+downstream reads the reason: `commit` uses it to pick a window and to set contamination for
+`resize`, and that is the whole of its reach. So a producer whose frames need a 30fps ceiling
+commits `stream` whether or not anything is streaming, and a producer that would gain nothing from
+one keeps `spinner` — which is C22 I73's switch and the reason the orbit needed no sixth member
+here (F466).
 
 **Windows are throughput ceilings, not deadlines.** `stream`'s 33 ms exists to cap streaming at ~30 fps; `spinner`'s 100 ms is an animation cadence. They encode different kinds of requirement, so the shortest ceiling governs: a pending timer is re-armed when a commit arrives whose window is **strictly shorter**, and left alone otherwise.
 

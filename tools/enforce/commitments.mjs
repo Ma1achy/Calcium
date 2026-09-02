@@ -1068,6 +1068,13 @@ export function scanSections(file, src, options = {}) {
  * carrier rather than a renderer: most of what it says constrains rules that
  * already have rows, and only the two new statements needed new ones.
  *
+ * **`C22 I72`–`I75` are the eighth**, taken on auto-orbit's spec commit and
+ * repaid on the one that builds it — `T1.28`–`T1.30`, `T3.33`, `T3.34`,
+ * `T4.38`–`T4.42` and `T6.83`–`T6.87` name all four. **Four entries where the
+ * polyline's took two**, and the reason is the same one stated there in reverse:
+ * this step rules a *writer* rather than a carrier, so almost none of what it
+ * says constrains a rule that already has a row.
+ *
  * **Stated blind spot: the corpus is `.ts` only**, matching what `walk` collects,
  * so an invariant named solely by a `.mjs` fixture reads as uncited. Widening it
  * is not obviously right: `TOPICS["fixture"] = "C01"`, and the bare `I17` in
@@ -1088,6 +1095,11 @@ const UNCITED_INVARIANTS = Object.freeze([
   "C24 I20", "C24 I22", "C24 I25", "C24 I26", "C24 I28", "C24 I6", "C24 I7", "C25 I10",
   "C25 I11", "C25 I14", "C25 I15", "C25 I16", "C25 I17", "C25 I19a", "C25 I20a", "C25 I20b",
   "C26 I1", "C26 I11", "C26 I15", "C26 I16", "C26 I17", "C26 I20", "C26 I8", "C26 I9",
+  // **The eighth loan, repaid by the next commit.** Spec edits land alone and
+  // ahead of code, so an invariant is written one commit before the row naming
+  // it — and SP9 reads *test* files. Equality-compared, so leaving these here
+  // after the rows land fails the cleared check: the loan collects itself.
+  "C22 I72", "C22 I73", "C22 I74", "C22 I75",
 ]);
 
 /**

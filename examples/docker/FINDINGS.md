@@ -21424,3 +21424,172 @@ mutation immediately.
 **The general form is the one worth keeping**: a constant expressed in units of X is not tested by
 counting Xs, because a count scales with the fixture and the constant does not. Ask what the
 constant is a *ratio* of, and assert that.
+
+
+## F466 — the commit reason is the frame rate, and the note's 33 ms names a window nothing uses ★★★★☆
+
+`CALCIUM_3D_DESIGN.md` §1 costs auto-orbit as free: *azimuth += δ per frame — the stream window is
+33 ms, so 30fps is free*. §12 repeats it — *33 ms, the FrameScheduler's stream window — the real
+target for orbit* — and it is the number every other row in that section is measured against.
+
+**The ticker has never used that window.** `session.ts`'s `#armSpinner` schedules at the cadence
+the frame reported and then raises `commit("spinner")`, whose window is **100 ms**. C22 I60a
+already records the consequence for the spinner — *C03's 100 ms window is a floor under it: the
+braille default declares 80 ms and is observed at 100* — and nobody carried it across to the orbit,
+because the two sentences are in different documents about different animations.
+
+```
+tick fires at 33 ms  →  commit("spinner")  →  a 100 ms timer  →  one frame
+tick fires at 33 ms  →  commit("spinner")  →  not strictly shorter, timer left alone
+tick fires at 33 ms  →  commit("spinner")  →  same
+```
+
+**Two of every three advances are never drawn.** The rotation's *speed* is unchanged — δ per tick
+at 30 ticks a second — and the frame rate is 10, so the reader sees 3δ jumps at 10fps rather than
+δ at 30. The arithmetic runs and the picture does not improve.
+
+**So the reason is the cap and the interval is not**, which is the useful half. `stream`'s
+rationale in C03 §3 is *~30 frames/s ceiling* — a rate, saying nothing about what produced the
+frame — and `spinner`'s is *animation only; a faster tick conveys nothing*, which is a claim about
+a ten-frame glyph cycle and false of a continuous rotation. A live orbit commits `stream`.
+
+**And it makes §11's other ruling implementable without inventing a number.** *With
+`synchronisedUpdate` absent, cap the orbit rate* had no figure attached. It is the same switch:
+absent, the orbit ticks at 100 ms and commits `spinner`, which is 10fps — the rate §11 already
+calls acceptable when it rules *drop the frame rate before the resolution*.
+
+**The mutation that says this is the finding**: changing the *interval* alone fails nothing,
+because the window governs; changing the *reason* moves the frame rate by 3×. A row asserting the
+armed interval would have passed against a 10fps orbit for ever.
+
+
+## F467 — a guard for a case its own arithmetic cannot produce, and it is F464's figure again ★★★☆☆
+
+`basisOf` derives the camera's `right` vector as `unit(cross(forward, ẑ))` and explains the
+degenerate case:
+
+> **`up` is derived rather than given**, so a camera directly overhead has a degenerate right
+> vector — `unit` returns it unchanged rather than `NaN`, and the figure collapses to a line, which
+> is what looking straight down a pole gives you.
+
+**The guard is real and the consequence cannot happen.** `cos(π/2)` is `6.123e-17`, so at
+`elevation: Math.PI / 2` the eye is at `(6·6.1e-17·cos a, 6·6.1e-17·sin a, 6)`, `forward` is
+`(−6.1e-17·cos a, −6.1e-17·sin a, −1)` after normalisation, and `cross(forward, ẑ)` is tiny rather
+than zero — which `unit` normalises to a perfectly good unit vector. Measured over a 20×20 surface
+at 80×24:
+
+```
+elevation π/2 − 0.01     291 inked cells, 16 rows
+elevation π/2            289 inked cells, 16 rows      a plan view, not a line
+the two frames differ by 184 cells                     two valid pictures, no discontinuity
+```
+
+**This is the same number and the same mechanism as F464** — there, a lexicographic tie-break was
+written for `raw.z === 0` and changed nothing because the plane seen edge-on gives `6.123e-17`.
+One function along, the same `cos(π/2)` makes a *documented* degeneracy unreachable.
+
+**Where it costs something is the control.** Step 8's elevation keys step by a fixed angle, and
+an even divisor of `π` lands on the pole exactly — so the comment argues for a clamp, the clamp
+would be a branch nothing can enter, and the row testing it would construct a state the tree
+cannot reach. Measuring first removed a mechanism instead of adding one.
+
+**A guard is not the same claim as its rationale**, and review reads them as one: the guard is
+correct and worth keeping, because `unit`'s contract is what makes the arithmetic safe. What was
+wrong is the sentence about what the reader would see, and only the frame could say so.
+
+
+## F468 — *every cell changes* under an orbit, measured, is about a third ★★★☆☆
+
+§11's argument for 3D breaking 2D's animation story is stated twice:
+
+> **A camera change moves every projected vertex, so every cell changes.** The row-by-row diff
+> compares two frames that differ everywhere and writes all of them. **The mechanism that makes 2D
+> animation cheap is exactly the mechanism that does nothing in 3D.**
+
+Measured on a 40×40 surface at 80×24 — 876 cells, 302 of them inked — comparing **row against row
+and index against index**, never by string position:
+
+```
+step        rows differing     cells differing
+π/256           14 / 24          193 / 876   22.0%
+π/64            17 / 24          265 / 876   30.3%
+π/32            17 / 24          308 / 876   35.2%
+π/8             19 / 24          466 / 876   53.2%
+```
+
+**The first premise is true and the conclusion does not follow.** Every projected vertex does move.
+Most of them move less than a sample, and most cells were blank to begin with — 574 of 876 — so a
+cell only changes where the silhouette or a shading boundary crosses it.
+
+**At the rate an orbit actually turns**, one revolution in 12 seconds at 30fps is 1° a frame,
+between the first two rows: the diff writes about 14 of 24 rows and skips 10. That is not the
+saving 2D gets, and it is not nothing.
+
+**The claim to keep is the one about the cache**, which is exact and stronger than the reason §11
+gives for it: `RenderCache` holds **one slot per entry**, so a repeated key hits only when it is
+the immediately previous one — normalising azimuth would buy nothing, and an orbit cannot grow the
+cache either.
+
+**The instrument is the finding's other half.** A first pass compared the two frames by character
+position and reported 71% of characters differing, because one changed cell shifts every SGR after
+it. The cell-wise number is a third of that.
+
+
+## F469 — the three candidate bottlenecks are 28% of the frame between them ★★★★☆
+
+§11 names the measurement to take before designing around it, and lists the candidates:
+
+```
+projection only        3,200 triangles, no rasterisation — is the matrix maths the cost?
++ rasterisation        with the depth test — is the fill the cost?
++ shading              normals and lighting — is the per-cell work the cost?
+```
+
+> **One of those three is the bottleneck and only the measurement says which.**
+
+**None of them is.** At 3,200 triangles, 80×24, load 0.14–0.30:
+
+```
+P1  projection only                        0.170 ms    1.3%
+P2  + rasterisation (INCLUDES the shading) 2.932 ms   22.6%
+P3  shade alone, at 1,916 paint calls      0.589 ms    4.5%
+P4  the whole frame                       12.969 ms
+```
+
+**And P2 and P3 are not separable at any seam that ships.** `fill` builds the interpolated normal
+and calls `shade` inside the depth-tested branch, unconditionally — so §12's *P3 minus P2 is the
+shading* is a subtraction between two rows that measure the same code. The 0.589 ms above is
+`shade` timed on its own inputs at the measured call count, which is a proxy and is stated as one.
+
+**Where the 13 ms goes:**
+
+```
+chrome only — the block with an empty surface list        3.216 ms   24.8%
+trianglesOf — camera-independent, rebuilt every frame     1.265 ms    9.8%
+the 3D axes — axes3 default 13.265 against false 11.108   2.157 ms   16.6%
+rasterise + shade                                         2.932 ms   22.6%
+projection, surfacePoints, extentOf                       0.311 ms    2.4%
+span composition and the rest                             ~3.1  ms   ~24%
+paint — spans to strings, 5.340 against 5.284             0.056 ms    0.4%
+```
+
+**Three consequences, and each answers a question §11 or §12 asked in the wrong place.**
+
+*Is 3D worth it?* P18 asks for the cost of the third dimension as a multiple and wonders whether
+it is 40×. **It is 1.03×** — a 2,000-point 3D scatter is 2.485 ms against the 2D scatter's 2.402.
+P19's surface against a heatmap of the same grid is **0.74×**: the surface is *cheaper*. Both
+because the frame's cost is mostly the block, not the geometry.
+
+*Does it scale?* From 3,200 to 69,192 triangles — 21.6× — the frame goes 12.97 ms to 124.2 ms,
+**9.6×**. Sublinear, for the same reason.
+
+*Which axis is quadratic?* §12 says *width and height scale the sample grid quadratically*.
+Measured, width 40 → 200 is **1.26×** (10.1 → 12.7 ms) and height 8 → 48 is **3.09×** (6.1 → 19.0).
+The sample grid is not what the frame is spending on, so the axis that costs is the one that adds
+**rows**, not the one that adds samples.
+
+**And the one number that matters for the mesh sizes 3D is actually for**: at 69,192 triangles
+`trianglesOf` alone is **36.1 ms of 124.2** — over the whole 33 ms budget on its own, for a
+computation the camera does not move. The remedy is caller-owned scratch on `RenderContext`, which
+§11 already rules for the depth buffer for exactly this reason; it is recorded rather than taken,
+because C12 I11 makes the wrong version of it — a module-level cache — the tempting one.
