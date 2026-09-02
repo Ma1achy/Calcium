@@ -1083,6 +1083,13 @@ export function scanSections(file, src, options = {}) {
  * this step rules a *writer* rather than a carrier, so almost none of what it
  * says constrains a rule that already has a row.
  *
+ * **`C12 I96` is the ninth**, taken on the geometry suite's spec commit and struck
+ * on the one that builds it — `GM1`–`GM9` name it. **One entry where the last
+ * loan took four**, and the reason is the third variation on the same theme: this
+ * step adds no mechanism at all. It is a suite, so almost everything §6j rules
+ * constrains a rule that already has rows, and the single new statement is about
+ * what a *figure* means rather than about what the renderer does.
+ *
  * **Stated blind spot: the corpus is `.ts` only**, matching what `walk` collects,
  * so an invariant named solely by a `.mjs` fixture reads as uncited. Widening it
  * is not obviously right: `TOPICS["fixture"] = "C01"`, and the bare `I17` in
@@ -1103,6 +1110,8 @@ const UNCITED_INVARIANTS = Object.freeze([
   "C24 I20", "C24 I22", "C24 I25", "C24 I26", "C24 I28", "C24 I6", "C24 I7", "C25 I10",
   "C25 I11", "C25 I14", "C25 I15", "C25 I16", "C25 I17", "C25 I19a", "C25 I20a", "C25 I20b",
   "C26 I1", "C26 I11", "C26 I15", "C26 I16", "C26 I17", "C26 I20", "C26 I8", "C26 I9",
+  // The ninth loan — struck on the commit that builds the geometry suite.
+  "C12 I96",
 ]);
 
 /**

@@ -848,11 +848,16 @@ them is a threshold. A triangle count that is comfortable at 80×24 is four time
 
 ```
 SPHERE            normals vary smoothly — catches shading discontinuities, and
-                  backface culling (exactly half the faces should survive)
+                  backface culling. NOT half: 21.88% of faces survive at
+                  distance 1.5, 38.54% at 3, 45.49% at 6 and 53.13% at 100,
+                  and the figure exceeding half at the orthographic limit is
+                  42 polar faces that cannot be culled at all  (F473)
 
 CUBE              flat faces, hard edges — catches z-fighting at the seams and
-                  normal calculation on a degenerate quad. Also: the six faces
-                  should be six distinct intensities under one light
+                  normal calculation on a degenerate quad. NOT six distinct
+                  intensities: three faces are visible corner-on, and at the
+                  standard azimuth π/4 two of the three light IDENTICALLY,
+                  because the studio light is fixed in view space  (F474)
 
 AXIS PLANES       x=0, y=0, z=0 — THE EDGE-ON CASE. A plane projects to a LINE
                   and its faces keep their area, their normals and their
@@ -862,7 +867,11 @@ AXIS PLANES       x=0, y=0, z=0 — THE EDGE-ON CASE. A plane projects to a LINE
 TILTED PLANE      the general case, and where BANDING shows. On the dot grid the
                   suspect was the Bayer matrix; on this rung there is no matrix,
                   so a band is the colour quantisation and the row reads the
-                  `colourDepth` it ran at
+                  `colourDepth` it ran at — measured 84 / 13 / 1 distinct
+                  colours at 24-bit, 8-bit and `ascii`. AND THE SLOPE IS A
+                  DECISION: `unitOf` normalises each axis independently, so
+                  z = 0.3x + 0.15y comes to lie nearly along the view direction
+                  and inks 25 cells against a flat plane's 59  (C12 §6j row 7)
 
 z = sin(x)·cos(y) a known egg-carton — verifiable by eye, and the standard
                   surface-plot demo everywhere
@@ -873,6 +882,14 @@ z = x² − y²       a saddle — catches the case where the surface passes thr
 a Gaussian        smooth, single peak — the cleanest test of the colour/shading
                   separation, because height and field can be set independently
 ```
+
+**And the walk before the fixtures found six more of these** — C12 §6j, run when the suite was
+scheduled rather than after it was written. Every one is a clause of this section that the shape it
+names cannot support: two are corrected above, and the others are that a fraction-visible figure
+names its denominator, that a constant `field` is not a constant frame, that `ascii` and `1bit` are
+one rung for colour and two for glyph, and that the interior holes in the saddle and the egg-carton
+are the silhouette rather than cracks — which only the flat plane's and the Gaussian's **zero** at
+four grid resolutions establishes.
 
 **The edge-on plane is the one that will break things, and not in the place this said.**
 Measured (F456): the faces have area `0.125`, the normals are the plane's own `(1, 0, 0)`, and
@@ -981,6 +998,7 @@ four times.
 7   backface culling and the wireframe mode — the bias it was scheduled with does not exist
 8   auto-orbit and manual camera controls — and §11's two arguments did not survive it
 9   the test suite: sphere, cube, axis planes, tilted plane, the three equations
+    — and six of §7's clauses do not survive the shape they name (C12 §6j)
 10  golden frames at four capability sets, catalogue fixtures, the animated example
 11  a colour per axis — `AxisSpec3.tone`, the one of three that is not built
 ```

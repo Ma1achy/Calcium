@@ -21737,3 +21737,86 @@ sentence's own second clause could never have failed. **A finding's symptom is c
 sixth blind spot asks where a claim is written down. This one *was* written down, twice, in two
 documents that agree, and neither says which half does work.
 
+---
+
+## F473 — a degenerate face cannot be culled, and the figure that says *exactly half* is the one it inflates ★★★★☆
+
+The design note's §7 schedules a sphere for backface culling with the clause *exactly half the
+faces should survive*. Measured on `sphere(24, 12)` — 576 faces, `closed: true` — at four
+distances:
+
+```
+distance   1.5      3        6        100
+kept       126      222      262      306
+fraction   21.88%   38.54%   45.49%   53.13%
+```
+
+**False at every one**, and in two directions at once. Perspective shows *less* than half, which is
+F460's finding arriving where the note asserted a constant; and the figure at the orthographic
+limit is **over** half, which nothing in the note or in C12 predicts.
+
+**The excess is faces that cannot be culled.** `backfaceCulled` is a sign test on a dot product,
+and a face with a zero normal fails **both** signs — so it survives however the camera is placed.
+A UV sphere's poles produce exactly that: **42 of 576** faces have `fn` of length below `1e-12`,
+and all 42 are kept at every distance. Over the faces the cull can actually decide the figure is
+**49.4%**, which is the *exactly half* the note wanted, arriving only once the denominator is
+named.
+
+**And the consequence is arithmetic rather than visual, which is the half worth writing down.**
+Rendering the sphere with those 42 faces and without them gives **byte-identical** frames — 78
+inked cells each, zero characters different, at the corner camera and again pole-on. They are
+zero-area, so F456's stroke path has nothing to stroke and the rasteriser has no sample to write.
+So this is not a defect to repair: the remedy is a length test per face per frame, in the loop §11
+measures at **1.265 ms for 3,200 triangles**, buying the removal of cells that do not exist.
+
+**What it is, is a statistic that means something other than what it says.** *Fraction visible*
+reads as a property of the cull and is a property of the tessellation, and the direction of the
+error is the one that hides a real cull defect: a cull that had **stopped working** on 8% of faces
+would report about 53% here too. So the figure is asserted over the decidable faces and the
+degenerate count is asserted beside it, which is GM4.
+
+**Found by the walk, before the fixture existed** — the row was going to assert *about half*, and
+the number came out at 53.13% on the first run. A suite written from the note's sentence would have
+asserted `> 45%` and passed for two reasons at once.
+
+---
+
+## F474 — every 3D fixture in the corpus uses the one camera where two of the axes cannot be told apart ★★★★☆
+
+`azimuth: π/4, elevation: π/6` is the corner camera. `CAMERA_DEFAULT` is at it, the catalogue is at
+it, and SF, WF, LN and AX rows reach for it because it is the view that shows three faces of a box.
+**It is also the plane in which the `x` and `y` axes exchange**, and two measurements say what that
+costs.
+
+**A cube's three visible faces do not have three intensities there.** The studio light lives in
+**view** space (C04 I79), so a face's shading depends on its angle to the eye — and at `π/4` the
+`+x` and `+y` faces are mirror images about the view direction. Flat-shaded, colour held constant,
+luminance clustered at a tenth of the range:
+
+```
+azimuth   π/4      0.5            0.9      1.2
+clusters  2        3              2        3
+centres   74,123   89,114,131     73,123   72,115,131
+```
+
+Two clusters of **47 and 89 cells** — one face, and then two faces sharing an intensity. The design
+note's *the six faces should be six distinct intensities under one light* is not merely optimistic
+about how many are visible; **at the camera the corpus uses it is false for three of them**, and it
+is false because of the light's frame of reference rather than because of the shading.
+
+**And a mesh and its own `x`/`y` transpose ink the same number of cells.** An asymmetric patch and
+the same patch with `x` and `y` swapped both ink **22** cells at `π/4`; at azimuth 0.3 they ink 23
+and 26. The frames differ in every case — so a row comparing *frames* is safe and a row comparing
+*counts* is blind, exactly at the camera a fixture is most likely to choose.
+
+**Neither of these is a defect and both are traps for the suite that was about to be written.** The
+first would have produced a row asserting three intensities that fails against correct code; the
+second a row asserting a cell count that passes against a renderer with its horizontal axes
+transposed. **The rule they share is that a figure measured at a symmetric camera is a figure about
+the symmetry** — so the geometry rows take an asymmetric azimuth, and the one row that must use
+`π/4` compares the frame.
+
+**The instrument is *a probe at the extremes runs once*, pointed at a camera rather than at an
+input.** The convenient view is the symmetric one for the same reason it is convenient: it is the
+one where the three axes are arranged most regularly with respect to the eye.
+
