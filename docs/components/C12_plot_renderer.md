@@ -7680,10 +7680,15 @@ is **0.5000 cells at the half rung against 0.2500 at braille**, mean per edge `0
 figures rather than to the instrument (F482).
 
 **So the braille arm is a trade and not an upgrade**, and naming it that way is what keeps it
-honest: twice the positional resolution in each axis, against the second colour and against a
-surface's shading. A surface rasterised into the dot grid sets every interior dot and draws as a
-**solid silhouette** — a legible picture, and not the stipple F431 refused, because the fill is
-solid rather than dithered.
+honest: twice the positional resolution in each axis, against the second colour a cell carries.
+
+**And the second half of that sentence used to read *and against a surface's shading*, which the
+walk corrected** (§6m.1, F485). A surface in the dot grid sets every interior dot, `foldBraille`
+answers `⣿` — a **full block** — and the cell takes its nearest sample's shaded colour. So it is
+neither a silhouette nor unshaded: it is shaded at **one colour per cell instead of two**, and the
+fraction that loses information is the 62.5% in the table above. The word was wrong in the
+direction that flatters the arm, and a wrong word implies a wrong repair — *shading gone* invites
+refusing the combination, where the picture is merely coarser in one axis.
 
 ### The tier, and the two arms mean different things by it
 
@@ -9519,6 +9524,79 @@ keeps having; the interaction is four-way now — declared height, mode, categor
 orientation — and belongs in the classification table as its own rows.
 
 ---
+
+---
+
+## 6m. The arms walk, part one — a table, because most of it holds at rest
+
+**Both artefacts, and taking one would have taken the trace.** A depth rule that changes what a tie
+means looks like a state machine and invites a sequence trace, which is §6n. But the arms are a
+**member**: which one is in force, what carrier the block holds and what the terminal can draw are
+all true before anything happens, and two of them meet because of what the *block* says. That is
+C19's lesson used rather than restated — a component with state and structure needs both, and
+taking the trace alone because the state machine is the obvious thing is how the structural half
+goes unexamined.
+
+Indexed by rule interaction. A row governed by one rule restates that rule and finds nothing.
+
+| # | the two rules | the input | ruling |
+|---|---|---|---|
+| 1 | `plotStyle: "braille"` is for outlines (I87) × a surface fills its interior (I94) | `"braille"` with `surfaces3` and no `wireframe` | **it fills, and the cost is not the one the ruling named** — see 6m.1. Every interior sample sets a dot, `foldBraille` answers `⣿`, and the cell takes its nearest sample's *shaded* colour. So the picture is a full-cell colour raster, not a silhouette and not a stipple: what it loses is the second colour, and **62.5% of a shaded surface's cells carry two distinct colours**, so that is the fraction that loses information. Refusing the combination would be worse — a legal document drawing nothing — and the caller who wants the arm's actual subject sets `wireframe` |
+| 2 | the frame writes a **literal glyph** per cell into `mark[]` (I90) × a braille cell is also a glyph | `"braille"` with `axes3: "corner"` | **the frame keeps `mark[]` and wins its cell whole.** Both are one glyph per cell, so there is no compositing question — a cell is `│` or it is `⣿`, and `glyphRows`' existing precedence (`glyph` before `mark`, `mark` before blank) is the rule already written. What changes is that the frame's channel is now read on *three* arms rather than one, which is why it is a parameter of the compose step rather than a branch inside it |
+| 3 | `plotStyle: "line"` × `plotFill: "solid"` is refused (C04 I59) | both set | **already a construction error, and inherited rather than restated.** C04 refuses `"solid"` with `"line"` on the ground that a box-drawing outline has no interior alphabet; that is true of this form for exactly the same reason. **The joint landing in the right place is the finding** — a rule written for the 2D curve family covers a 3D arm nobody had thought about, which is what says `plotStyle` is the right member rather than a new one |
+| 4 | `plotStyle: "marker"` × `colourBy: "depth"` (I89) × the tier is a depth channel (I88) | `"marker"`, default `colourBy` | **depth is encoded twice and that is correct.** `auto`'s raster already does it — block size *and* ramp — so this is not new, and the redundancy is what makes the figure survive the colour rungs: at `1bit` the ramp is gone and the tier is the whole reading (I88's own argument) |
+| 5 | `Point3Series.marker` names identity × `colourBy: "series"` names identity | `"marker"`, five clouds, `colourBy: "series"` | **two channels for one reading, and it is the arm's reason for existing.** Shape survives `colourDepth: 1` where colour does not, so a caller who sets both gets a figure that degrades to a readable one instead of to a monochrome smear |
+| 6 | `braille`'s floor is `unicode !== "ascii"` (I87) × `STYLE_ARMS` accepts the member at the gate | `"braille"` at `unicode: "ascii"` | **it degrades to `auto`, it does not refuse.** `plotStyle: "line"` already sets the precedent one family over — `lineDrawRows` falls to `+ - |` rather than refusing — and a construction error for a *terminal's* capability would make a document valid on one machine and invalid on another, which C04 cannot express and should not |
+| 7 | an unknown `marker` name × `Tone` is unvalidated anywhere (F479) | `marker: "hexagon"` from an adapter | **validated, and the difference from F479 is the ruling.** A tone resolves through `slot`, which answers `{}` — the mark draws, uncoloured. A marker name indexes a **table**, so an unknown one is `undefined` and the sample draws *nothing*: the same input that costs a tone its colour costs a marker its point. Absence indistinguishable from failure is C04's own class, so this one goes in `PLOT_STYLE_MEMBERS`' neighbour rather than inheriting F479's convention |
+| 8 | the marker table's far row × `marker` names a column | `marker: "square"`, points at every depth | **honoured at near and mid, a dot at far** — `· ∙ • ˙ ‧` is one glyph to a reader, so the shape channel is spent before the dispatch reaches it. A limit of the alphabet rather than of the lookup, which is why it is written with the table and not as a `// TODO` beside it (F484) |
+
+### 6m.1 · The ruling this table corrected, one commit after it landed
+
+**The arms' record says a surface at the braille rung is a *solid silhouette* with *the shading
+gone*. That is wrong in the direction that flatters the arm.**
+
+Walked by hand: every interior sample sets a dot, so `foldBraille` returns `⣿` — and `⣿` is a
+**full block**. The cell then takes its nearest drawn sample's colour, which is the shaded colour
+`shadeColour` computed. So the surface is not a silhouette and it is not unshaded; it is **shaded at
+one colour per cell instead of two**, which is a full-cell colour raster at the same horizontal
+resolution and half the vertical.
+
+**And the cost has a number already measured.** F482 counted, on a shaded surface, **70 of 112
+half-block cells carrying two distinct colours — 62.5%**. That is exactly the fraction that loses
+information when the second colour goes, and it is the figure the ruling should have carried
+instead of a word.
+
+**The correction matters because the wrong word implies a wrong repair.** *Shading gone* invites a
+refusal — reject `"braille"` with `surfaces3`, or fall back — and both are wrong: the picture is
+legible, it is simply coarser in one axis, and the arm's actual subject is the wireframe the caller
+reaches for next. **A trade described in the wrong currency is still a trade**, and this is the
+walk doing the job the schedule gives it (F485).
+
+---
+
+## 6n. The arms walk, part two — a trace, because the mask's depth rule is event-mediated
+
+**§3am's remedy is a second depth rule and a second rule about ties is a rule about order.** Every
+row here is a sequence: something was written into the buffer, then something else asked.
+
+| # | the sequence | what the two rules say | ruling |
+|---|---|---|---|
+| 1 | edge A stroked, edge B stroked, sharing a vertex | the mask needs both bits at that cell × `writeDepth` is **strictly** nearer (F454) | **the shared vertex is the whole reason for the rule.** B arrives at exactly A's depth, `q < d.z[i]` is false, and B's bit is refused at precisely the cell where the join lives — so a wireframe of a cube draws twelve segments and no corners. Equal-or-nearer for the **mask**; strictly-nearer for the **colour** |
+| 2 | points drawn, then a trajectory through their own depths (F452, I93) | points draw first so first-drawn wins × the mask is now equal-or-nearer | **the marker keeps its colour and the line adds its bits.** The colour rule is unchanged, so F452's ruling stands exactly as written; what the line gains is a direction in a cell it could not previously touch. **This is the row that says the two rules must be separable per call** rather than one relaxed test — a single equal-or-nearer test would hand the cell's *colour* to the line and undo the ordering the trajectory case exists for |
+| 3 | a surface filled, then its own wireframe edge (I95) | the edge **is** the fill's own sample × the mask writes on equal | **nothing changes, and checking that is the point.** I95 removed the second rasteriser: the edge is identified inside the fill by `w0 / \|ab\|`, so there is no second write to be tested. The mask arm inherits that and does not reintroduce a bias — the z-fight F462 swept for cannot be constructed here for the same reason it could not be there |
+| 4 | data drawn, then the frame drawn **last** (F452, I90) | the frame loses coincident cells to the data × the mask writes on equal | **the frame contributes bits and never colour, and it is safe because a coincidence is a collinearity.** `unitOf` normalises the data's own extent, so a box edge coincident with data is the *same line*: both contribute the same bits and the glyph does not move. Where they genuinely cross at equal depth the cell resolves to `┼`, which is what a crossing is. **The row was written expecting to have to weaken the rule and did not** — the reason F452 could have been reversed here is that the frame draws last, and the reason it is not is that the mask is direction and the colour is identity |
+| 5 | a segment leaves the frame mid-stroke | `writeDepth` refuses out of bounds and returns `false` (I93) × the mask's `link` also bounds-checks | **two bounds checks, one convention, and they agree.** `strokePolyline`'s `inside` and `writeDepth`'s range test both drop the sample rather than the segment, so a line running off the frame clips per sample on every arm. Stated because the outcome would be identical if they disagreed on a boundary cell, and nothing would show it |
+| 6 | the near-plane clip splits a segment, then both halves stroke | the clip is carried through (I95) × the mask accumulates | **the introduced vertex is a shared vertex**, so row 1's rule is what stops the clip growing a visible joint. Without equal-or-nearer, a face entering the camera would draw a seam at a vertex the caller never supplied — which is I95's own sentence arriving in a second rasteriser |
+
+### 6n.1 · Residue
+
+**What the throw leaves behind: nothing new.** The only refusal these arms add is row 7 of §6m's
+table, an unknown `marker` name, and it fires at the gate before any buffer is allocated. The
+capability floor does not throw at all — it degrades — so there is no half-drawn frame to leave.
+
+**What neither artefact reaches**: whether the pictures are *good*. Both tables index rules against
+rules, and the question *does a braille wireframe read better than a half-block one* is answered by
+looking at a frame, in colour, which is scheduled rather than asserted.
 
 ---
 

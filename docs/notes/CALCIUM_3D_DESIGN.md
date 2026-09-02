@@ -795,8 +795,9 @@ surface is fine and intended.
 plotStyle: undefined      `auto` — the half-block raster above `halfBlockEligible`, the marker
   (or "auto")             glyph below it. THE DEFAULT, and the measurement is why (F431)
 plotStyle: "braille"      the dot grid — 2×4 per cell. Points and lines, where the whole
-                          primitive IS its outline. A surface here is a solid silhouette
-                          rather than a shaded one, and that is the trade rather than a fault
+                          primitive IS its outline. A surface here still shades — every
+                          interior dot sets, so the cell is `⣿` in its nearest sample's
+                          colour — but at one colour a cell rather than two (F485)
 plotStyle: "line"         cell resolution with box drawing. Wireframes with real joins
 plotStyle: "marker"       the marker table above the colour floor, and the shape is the
                           caller's rather than the series index's

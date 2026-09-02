@@ -22198,3 +22198,42 @@ right; the missing thing is the sentence.
 **It is a limit of the alphabet and not of the dispatch**, which is the distinction that decides
 where it goes: the fix would be a bigger cell, and there isn't one. So it lives with the table in
 `glyphs.ts` and in C12 I99, and not in a `// TODO` beside the lookup.
+
+---
+
+## F485 — a trade described in the wrong currency, and the wrong word implies the wrong repair ★★★☆☆
+
+The commit that retracted `STYLE_ARMS.scatter3d = []` described the braille arm's cost as *the
+shading is gone* and its picture as a **solid silhouette**. **Walked by hand one commit later, both
+words are wrong**, and wrong in the direction that flatters the arm.
+
+Every interior sample of a filled surface sets a dot. `foldBraille` answers `⣿`, which is a **full
+block**, and the cell takes its nearest drawn sample's colour — the colour `shadeColour` already
+computed. So the surface is shaded, at the same horizontal resolution and half the vertical:
+
+```
+half rung     2 colour samples a cell   —  the shading is per half-cell
+braille rung  1 colour sample  a cell   —  the shading is per cell, and the glyph is ⣿
+```
+
+**The real cost had already been measured and was sitting in the same commit.** F482 counted 70 of
+112 cells on a shaded surface carrying two distinct colours: **62.5%**. That is exactly the
+fraction that loses information when the second colour goes, and it is what the ruling should have
+carried instead of an adjective.
+
+**The reason it matters is the repair it implies.** *Shading gone* reads as a reason to refuse the
+combination — reject `"braille"` with `surfaces3`, or silently fall back — and both are wrong. The
+picture is legible; it is coarser in one axis. Refusing would have made a legal document draw
+nothing, which is the class C04 exists to prevent.
+
+**And the ruling was not careless — it was reasoned from the right premise to the wrong
+conclusion.** F431's *the interior samples are all lit and carry nothing* is true of the **braille
+channel**, which is binary. It stops being true the moment the cell also carries a colour, and the
+half-block ruling is what put a colour there. A sentence about one channel, applied to a cell that
+has two.
+
+**This is the walk doing the job the schedule gives it**, and the cheapest instance so far: a
+ruling one commit old, corrected before any code assumed it. The instrument is *walk the component
+by hand before implementing it*, and what it caught is not an interaction between two rules but a
+**word** — which is why it turned up in the table's first row rather than in a cell where two rules
+overlap.
