@@ -48,6 +48,22 @@ const spec = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
   form: "scatter3d", height: 10, series: [], points3: [cloud(helix(160), "helix")], ...over,
 });
 
+/**
+ * The same block with **no reference frame**, for the rows whose subject is the
+ * data.
+ *
+ * **Step 4 turned `axes3` and `box3` on by default and every row here could
+ * suddenly see furniture.** SC1 asserted the raster arm's alphabet is exactly
+ * `▀▄`, SC4 that the raster arm has fewer than three distinct glyphs, SC8 that a
+ * zero value span draws one colour — all true of the *cloud* and none of them
+ * true of a frame with labels in it. The rows about the arm, the tier and the
+ * ramp say which picture they mean rather than inheriting whatever the default
+ * happens to be; the rows about composition (`SC11`, `SC12`) keep the default,
+ * because the composite is their subject.
+ */
+const bare = (over: Record<string, unknown> = {}): Record<string, unknown> =>
+  spec({ axes3: false, box3: "none", ...over });
+
 const inked = (rows: readonly string[]): string =>
   rows.map((r) => strip(r)).join("").replace(/ /gu, "");
 
@@ -56,11 +72,11 @@ const HEIGHT = plotHeight({ form: "scatter3d", height: 10 } as never);
 describe("SC: the 3D scatter", () => {
   it("SC1 (C12 I87): the arm is the terminal's, and the two arms disagree in the frame", () => {
     for (const name of ["24bit", "8bit"]) {
-      const ink = inked(frame(spec(), capsFor(name), 80));
+      const ink = inked(frame(bare(), capsFor(name), 80));
       expect([...new Set(ink)].sort().join(""), `${name} draws the colour raster`).toBe("▀▄");
     }
     for (const name of ["4bit", "ascii"]) {
-      const ink = inked(frame(spec(), capsFor(name), 80));
+      const ink = inked(frame(bare(), capsFor(name), 80));
       expect(ink, `${name} draws marker glyphs`).not.toMatch(/[▀▄]/u);
       expect(ink.length, `${name} draws something`).toBeGreaterThan(0); // cells-ok — a glyph count
     }
@@ -68,9 +84,9 @@ describe("SC: the 3D scatter", () => {
     // it every assertion above is satisfied by a renderer with one arm that
     // happens to use the glyph the branch would have chosen.
     expect(
-      inked(frame(spec(), capsFor("24bit"), 80)),
+      inked(frame(bare(), capsFor("24bit"), 80)),
       "the two arms draw different pictures",
-    ).not.toBe(inked(frame(spec(), capsFor("ascii"), 80)));
+    ).not.toBe(inked(frame(bare(), capsFor("ascii"), 80)));
   });
 
   it("SC2 (C12 I87, C04 I59): every plotStyle is refused on this form, over the whole union", () => {
@@ -115,24 +131,24 @@ describe("SC: the 3D scatter", () => {
 
   it("SC3 (C12 I88): three tiers, and a tier is a sample count on one arm and a glyph on the other", () => {
     // The glyph arm: three distinct marks over a cloud spanning the depth range.
-    const marks = new Set(inked(frame(spec(), capsFor("ascii"), 80)));
+    const marks = new Set(inked(frame(bare(), capsFor("ascii"), 80)));
     expect(marks.size, "three tiers, three glyph rows").toBeGreaterThanOrEqual(3); // cells-ok — a tier count
     // The raster arm: a tier is how many samples a point paints, so a nearer
     // cloud inks strictly more cells than one pushed away from the eye.
-    const near = inked(frame(spec({ camera: { distance: 4 } }), capsFor("24bit"), 80)).length; // cells-ok
-    const far = inked(frame(spec({ camera: { distance: 20 } }), capsFor("24bit"), 80)).length; // cells-ok
+    const near = inked(frame(bare({ camera: { distance: 4 } }), capsFor("24bit"), 80)).length; // cells-ok
+    const far = inked(frame(bare({ camera: { distance: 20 } }), capsFor("24bit"), 80)).length; // cells-ok
     expect(near, "a nearer cloud paints more samples").toBeGreaterThan(far);
   });
 
   it("SC4 (C12 I88): at one bit the tier is the whole picture, and it still reads as 3D", () => {
-    const mono = inked(frame(spec(), capsFor("1bit"), 80));
+    const mono = inked(frame(bare(), capsFor("1bit"), 80));
     // Three distinct marks with no colour at all — the honest degradation.
     expect(new Set(mono).size, "all three tiers present at one bit").toBeGreaterThanOrEqual(3); // cells-ok
     // **The control**: at 24-bit the same block is the raster arm, whose marks
     // are two glyphs and whose depth is in the colour. Without it the row above
     // passes against a renderer that has only the glyph arm.
     expect(
-      new Set(inked(frame(spec(), capsFor("24bit"), 80))).size,
+      new Set(inked(frame(bare(), capsFor("24bit"), 80))).size,
       "the raster arm has two glyphs, not three",
     ).toBeLessThan(3); // cells-ok — a glyph count
   });
@@ -243,7 +259,7 @@ describe("SC: the 3D scatter", () => {
     // picks it, so the count says nothing about **which** and the rule this row
     // exists for is which.
     const flat = helix(60).map((p) => ({ ...p, value: 7 }));
-    const rows = frame(spec({ colourBy: "value", points3: [cloud(flat)] }), capsFor("24bit"), 80);
+    const rows = frame(bare({ colourBy: "value", points3: [cloud(flat)] }), capsFor("24bit"), 80);
     const cs = new Set(
       rows.flatMap((r) => runsOf(r)).filter((x) => /[▀▄]/u.test(x.text)).map((x) => x.colour),
     );
@@ -265,13 +281,13 @@ describe("SC: the 3D scatter", () => {
     // **And the other zero, which is a different question** (C12 I86): a
     // coplanar cloud takes the axis's centre and draws a plane, not one colour.
     const plane = frame(
-      spec({ points3: [cloud(helix(60).map((p) => ({ ...p, z: 0.25 })))] }), capsFor("24bit"), 80,
+      bare({ points3: [cloud(helix(60).map((p) => ({ ...p, z: 0.25 })))] }), capsFor("24bit"), 80,
     );
     expect(inked(plane).length, "the coplanar cloud still draws").toBeGreaterThan(0); // cells-ok
   });
 
   it("SC9 (C12 I86, I24): every sample culled draws a blank block of the declared height", () => {
-    const rows = frame(spec({ camera: { distance: 0 } }), capsFor("24bit"), 80);
+    const rows = frame(bare({ camera: { distance: 0 } }), capsFor("24bit"), 80);
     expect(rows.length, "the declared height, not zero rows").toBe(HEIGHT);
     expect(inked(rows), "and nothing in it").toBe("");
   });
@@ -295,7 +311,7 @@ describe("SC: the 3D scatter", () => {
   });
 
   it("SC11 (C12 I87, I88): the frame read in colour — a stripped capture cannot judge this arm", () => {
-    const runs = frame(spec(), capsFor("24bit"), 80)
+    const runs = frame(bare(), capsFor("24bit"), 80)
       .flatMap((r) => runsOf(r))
       .filter((x) => /[▀▄]/u.test(x.text));
     expect(runs.length, "the raster arm emits coloured runs").toBeGreaterThan(0); // cells-ok
@@ -308,7 +324,7 @@ describe("SC: the 3D scatter", () => {
     // does not vary draws one colour, and its stripped frame is a legal picture
     // too — so the number above is reading the ramp and not the glyph.
     const flatDepth = frame(
-      spec({
+      bare({
         camera: { azimuth: 0, elevation: 0, distance: 6 },
         points3: [cloud([
           { x: 0, y: -1, z: -1 }, { x: 0, y: 1, z: 1 }, { x: 0, y: -1, z: 1 }, { x: 0, y: 1, z: -1 },

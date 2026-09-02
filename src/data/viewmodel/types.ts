@@ -627,6 +627,42 @@ export type Point3Series = Readonly<{
   tone?: Tone;
 }>;
 
+/**
+ * One axis of a 3D reference frame (C04 I77, C12 I92).
+ *
+ * **Per axis rather than per plot, because the axes genuinely differ** — a loss
+ * landscape wants log z with linear x and y, a time-indexed cloud wants a time
+ * axis on x. It is `xScale`/`yScale`'s own argument one dimension up.
+ *
+ * **`show: false` is not `axes3: false`.** A height field over a regular grid
+ * often wants z labelled and x and y not: the grid *is* the x/y reference and
+ * the labels are noise.
+ *
+ * **There is no `scale`, and it is an omission with a reason rather than a
+ * deferral.** The design note asks for a per-axis `ScaleType` and is right that
+ * one scale for three axes is the wrong shape; it is not here because nothing
+ * would read it — the log transform is threaded through `positionalForm`'s
+ * machinery and this form composes its own rows, so the member would be
+ * accepted and ignored. It arrives with the code that transforms an axis.
+ */
+export type AxisSpec3 = Readonly<{
+  label?: string;
+  show?: boolean;
+  /** `false`, or a maximum count handed to `niceAxis`. */
+  ticks?: boolean | number;
+  format?: Plot["yFormat"];
+  /** Pinned rather than derived from the data. */
+  range?: readonly [number, number];
+  /**
+   * An arrowhead at the positive end.
+   *
+   * **It exists because `axes3: "origin"` needs it**: an axis extending both
+   * ways from a crossing has to say which end is positive. The glyphs are all
+   * `East_Asian_Width=Ambiguous`, so the ASCII rung is required (A03 SS47).
+   */
+  arrow?: boolean;
+}>;
+
 export type Series = Readonly<{
   /**
    * The readings, oldest first. **`null` is a gap** — a position that produced
@@ -1281,6 +1317,46 @@ export type Plot = Readonly<{
    * naming a channel the picture does not use never appears.
    */
   colourBy?: "depth" | "value" | "series";
+  /**
+   * Where the three axis **lines** are drawn (C04 I77, C12 I90).
+   *
+   * `"corner"` runs them along the box edges meeting the corner furthest from
+   * the eye, so they never occlude the data; `"origin"` crosses them at the
+   * data's origin and extends both ways; `"centre"` crosses at the box's
+   * midpoint, for when zero is out of range but a frame still helps.
+   *
+   * **Not the same decision as `origin3`**, and conflating them is how a plot
+   * ends up unable to show a signed field: axes at the corner put the reference
+   * frame nowhere near the thing it references.
+   */
+  axes3?: "corner" | "origin" | "centre" | false;
+  /**
+   * Where coordinate zero **sits** in the box (C04 I77).
+   *
+   * `"auto"` is the data's own minimum unless the range crosses zero, in which
+   * case zero — a range of `[2, 8]` puts the origin at the corner because zero
+   * is not interesting, and `[-3, 5]` puts it at zero because it is.
+   *
+   * **Read by `axes3: "origin"` and by nothing else**, so it is refused on the
+   * other three: it decides nothing there, and a member accepted and ignored
+   * tells the caller nothing (FINDINGS F207).
+   */
+  origin3?: "auto" | "min" | "centre" | Readonly<{ x: number; y: number; z: number }>;
+  /**
+   * The wireframe reference frame (C04 I77, C12 I90).
+   *
+   * `"back"` draws only the three faces furthest from the camera, so the box
+   * never occludes the data and the reader still gets the frame — **the same
+   * three signs the far corner is computed from**, read rather than derived
+   * again.
+   *
+   * **`box3` and not `box`**, because `plotBox` already means a compact box
+   * plot's interquartile run (C04 I56) and two members one letter apart meaning
+   * unrelated things is a defect waiting for a reader in a hurry.
+   */
+  box3?: "none" | "back" | "full";
+  /** Per-axis styling for a 3D form (C04 I77). */
+  axisStyle3?: Readonly<{ x?: AxisSpec3; y?: AxisSpec3; z?: AxisSpec3 }>;
   /**
    * Where a matrix puts a row shorter than its width (C12 §3o).
    *

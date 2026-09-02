@@ -1421,9 +1421,13 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   // their names are shared with other owners, which is MG24's own stated blind
   // spot — so the rule reaches three of the seven fields and the record is one
   // thing either way.
-  "Basis.eye": "read by project() in the same module — the same reason, and the field the whole frame is anchored on",
-  "Basis.forward": "read by project() in the same module; Basis is exported because basisOf returns it, and a renderer branching on the view frame would re-decide what project already has",
-  "Basis.orthographic": "the same — project() picks the arm, and a second reader of this field would be a second place the projection is chosen",
+  // **Two of the three left on the axis commit, and the third's reason held.**
+  // \`axes3.ts\` reads \`basis.eye\` — the three signs the whole reference frame is
+  // derived from — and \`basis.forward\`, to find where a segment crosses the near
+  // plane. \`orthographic\` stayed: \`project\` picks the arm and a second reader of
+  // that field would be a second place the projection is chosen, which is the
+  // reason the entry was written with rather than a date.
+  "Basis.orthographic": "project() picks the arm, and a second reader of this field would be a second place the projection is chosen",
 
   // --- published ahead of the value that makes it readable ------------------
   //

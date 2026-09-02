@@ -1058,11 +1058,9 @@ export function scanSections(file, src, options = {}) {
  * what a one-commit loan is. They were plain rather than conditional — the
  * paragraph above is why — and `SC1`–`SC12` name all four.
  *
- * **`C04 I77`, `C12 I90`, `C12 I91` and `C12 I92` are the sixth**, and the same
- * shape: the 3D axis layout's four members, the corner and its back faces, the
- * edge-on rule with the near-plane clip, and the billboarded labels. `AX1`–`AX12`
- * are written in C12 and reference members no file declares, so no `.ts` row can
- * name them until the code lands on the next commit.
+ * **`C04 I77`, `C12 I90`, `C12 I91` and `C12 I92` were the sixth**, taken on the
+ * 3D axis layout's spec commit and repaid on the one that built it. `AX1`–`AX14`
+ * name all four.
  *
  * **Stated blind spot: the corpus is `.ts` only**, matching what `walk` collects,
  * so an invariant named solely by a `.mjs` fixture reads as uncited. Widening it
@@ -1074,12 +1072,12 @@ export function scanSections(file, src, options = {}) {
  */
 const UNCITED_INVARIANTS = Object.freeze([
   "C01 I15", "C01 I16", "C01 I17", "C03 I11", "C04 I18", "C04 I20", "C04 I21", "C04 I22", "C04 I24",
-  "C04 I32", "C04 I33", "C04 I66", "C04 I77", "C05 I13", "C05 I14", "C06 I21", "C06 I22", "C06 I23",
+  "C04 I32", "C04 I33", "C04 I66", "C05 I13", "C05 I14", "C06 I21", "C06 I22", "C06 I23",
   "C07 I16", "C07 I17", "C07 I21", "C08 I16", "C09 I15", "C09 I16", "C10 I18", "C10 I19",
   "C10 I20", "C11 I12", "C14 I11", "C14 I13", "C14 I15", "C14 I16", "C14 I19", "C14 I22",
   "C16 I1", "C16 I16", "C16 I19", "C17 I10", "C17 I14", "C18 I11", "C18 I13", "C18 I23",
   "C18 I6", "C19 I12", "C20 I11", "C20 I25", "C21 I7", "C22 I16", "C22 I39", "C22 I4a",
-  "C12 I90", "C12 I91", "C12 I92", "C22 I53", "C22 I57", "C22 I60a", "C23 I10", "C23 I13", "C23 I14", "C23 I23", "C23 I24",
+  "C22 I53", "C22 I57", "C22 I60a", "C23 I10", "C23 I13", "C23 I14", "C23 I23", "C23 I24",
   "C23 I41", "C24 I1", "C24 I10", "C24 I11", "C24 I13", "C24 I14", "C24 I16", "C24 I19",
   "C24 I20", "C24 I22", "C24 I25", "C24 I26", "C24 I28", "C24 I6", "C24 I7", "C25 I10",
   "C25 I11", "C25 I14", "C25 I15", "C25 I16", "C25 I17", "C25 I19a", "C25 I20a", "C25 I20b",

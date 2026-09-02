@@ -576,6 +576,32 @@ const MARKER3_ASCII: Marker3Set = Object.freeze({
 });
 
 /**
+ * An axis's arrowhead, by the direction it points on **screen** (C12 I92).
+ *
+ * **Four cardinals rather than eight**, because a projected axis's direction is
+ * continuous and a reader cannot tell `↗` from `→` at one cell — the same
+ * argument the depth tier makes about size, one channel over.
+ *
+ * `narrowOnly` and the ASCII rung are required rather than optional: `→ ← ↑ ↓`
+ * are all `East_Asian_Width=Ambiguous`, so a terminal declaring `wide` would
+ * draw the head at twice the column the projection put it in (A03 SS47).
+ */
+export type ArrowSet = Readonly<{ right: string; left: string; up: string; down: string }>;
+
+const ARROW_UNICODE: ArrowSet = Object.freeze({
+  right: "\u2192", left: "\u2190", up: "\u2191", down: "\u2193",
+});
+const ARROW_ASCII: ArrowSet = Object.freeze({ right: ">", left: "<", up: "^", down: "v" });
+
+/** The arrowheads for this terminal, on `markers3`' own two-arm rule. */
+export function arrows3(
+  caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+): ArrowSet {
+  if (caps.unicode === "ascii") return ARROW_ASCII;
+  return caps.ambiguousWidth === "wide" ? ARROW_ASCII : ARROW_UNICODE;
+}
+
+/**
  * The marker table for this terminal (C12 I88).
  *
  * Two arms rather than a refusal, which is `spinnerFrames`' rule above and for

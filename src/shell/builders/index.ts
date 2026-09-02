@@ -419,6 +419,11 @@ function plot(
     /** A 3D scatter's cloud, and the channel colour spends (C04 I76, C12 I87). */
     points3?: Plot["points3"];
     colourBy?: Plot["colourBy"];
+    /** The 3D reference frame — four members and two decisions (C04 I77). */
+    axes3?: Plot["axes3"];
+    origin3?: Plot["origin3"];
+    box3?: Plot["box3"];
+    axisStyle3?: Plot["axisStyle3"];
     /**
      * Where the view starts (C04 I75).
      *
@@ -516,7 +521,7 @@ function plot(
     yScale?: Plot["yScale"];
   },
 ): Plot {
-  const { quartiles, categories, segments, bands, graph, graphLayout, series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, vectors, points3, colourBy, camera, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, xTitle, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, treeLayout, matrixAnchor, legend, plotFrame, width, aspect, align, origin, axisCross, calendarUnit, startDate, layout, binning, offsets, totals, facets, emptyMessage, xScale, yScale } =
+  const { quartiles, categories, segments, bands, graph, graphLayout, series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, vectors, points3, colourBy, camera, axes3, origin3, box3, axisStyle3, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, xTitle, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, treeLayout, matrixAnchor, legend, plotFrame, width, aspect, align, origin, axisCross, calendarUnit, startDate, layout, binning, offsets, totals, facets, emptyMessage, xScale, yScale } =
     spec;
   // **The same refusal the validator makes** (C04 I50a). Two expressions of one
   // rule, which is this file's shape throughout: the constructor is where an
@@ -822,6 +827,15 @@ function plot(
           `are drawn inside the area, so there is no gutter and no bottom rule to switch on`,
       );
     }
+    // **`origin3` is read by `axes3: "origin"` and by nothing else** (C04 I77),
+    // so it is refused where it decides nothing — `yCallout` needing
+    // `yAxis: "right"` is the same shape one dimension down.
+    if (origin3 !== undefined && (axes3 ?? "corner") !== "origin") {
+      throw new TypeError(
+        `b.plot: "origin3" with "axes3" of "${String(axes3 ?? "corner")}" (C04 I77) — it says ` +
+          `where the axis lines cross, and only "origin" draws a crossing`,
+      );
+    }
     if (levels !== undefined && drawn !== "contour") {
       throw new TypeError(
         `b.plot: "levels" on form "${drawn}" (C04 I61) — only a contour draws iso-lines, ` +
@@ -858,6 +872,10 @@ function plot(
       ...(vectors === undefined ? {} : { vectors }),
       ...(points3 === undefined ? {} : { points3 }),
       ...(colourBy === undefined ? {} : { colourBy }),
+      ...(axes3 === undefined ? {} : { axes3 }),
+      ...(origin3 === undefined ? {} : { origin3 }),
+      ...(box3 === undefined ? {} : { box3 }),
+      ...(axisStyle3 === undefined ? {} : { axisStyle3 }),
       ...(camera === undefined ? {} : { camera }),
       ...(levels === undefined ? {} : { levels }),
       ...(layers === undefined ? {} : { layers }),

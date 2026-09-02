@@ -220,6 +220,34 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
       form: "scatter3d", height: 12, series: [], camera: { projection: "orthographic", distance: 4 },
       points3: [{ label: "helix", points: helix3(160) }],
     },
+    // C12 I90 — the crossing placement, which is what a signed field needs and
+    // what axes at the corner cannot give it.
+    "axes-origin": {
+      form: "scatter3d", height: 14, series: [], axes3: "origin", origin3: "auto",
+      points3: [{ label: "helix", points: helix3(160) }],
+    },
+    // C12 I90 — all twelve edges, against the default's nine.
+    "box-full": {
+      form: "scatter3d", height: 14, series: [], box3: "full",
+      points3: [{ label: "helix", points: helix3(160) }],
+    },
+    // **The bare picture** — no frame at all, which is the render step 3 shipped
+    // and the comparison every axis row is against.
+    "axes-none": {
+      form: "scatter3d", height: 14, series: [], axes3: false, box3: "none",
+      points3: [{ label: "helix", points: helix3(160) }],
+    },
+    // C04 I77 — named axes, one hidden, and an arrowhead on the one that keeps
+    // its scale. `show: false` takes the axis and leaves the box.
+    "axis-styles": {
+      form: "scatter3d", height: 14, series: [],
+      axisStyle3: {
+        x: { label: "east", arrow: true },
+        y: { label: "north", ticks: 3 },
+        z: { label: "up", show: false },
+      },
+      points3: [{ label: "helix", points: helix3(160) }],
+    },
     // **C12 I86's degenerate, in the catalogue rather than only in a unit row.**
     // A coplanar cloud has a zero extent on one axis, every sample takes that
     // axis's centre, and the picture is a plane — which is a frame a reader can

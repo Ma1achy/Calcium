@@ -17,7 +17,18 @@ import type { RenderContext } from "../blocks/types.js";
 import type { ColourValue } from "../theme/types.js";
 import { HALF_BLOCK, HALF_BLOCK_LOWER, halfBlockEligible } from "../image/index.js";
 import { paint, slot, type Span } from "../blocks/paint.js";
-import { markers3 } from "../blocks/glyphs.js";
+import { arrows3, glyphs, markers3 } from "../blocks/glyphs.js";
+import { cells } from "../text.js";
+import {
+  axisLines,
+  boxEdges,
+  clipProject,
+  farCorner,
+  originOf,
+  ticks3,
+  type Axis3,
+  type Seg3,
+} from "./axes3.js";
 import { continuousColour } from "../theme/colormap.js";
 import { colormapFor } from "./heatmap.js";
 import { CELL_ASPECT } from "./aspect.js";
@@ -31,9 +42,55 @@ import {
   sampleGrid,
   unitOf,
   writeDepth,
+  type Basis,
   type Depth,
+  type Projected,
   type Vec3,
 } from "./project3.js";
+
+/** A label placed in cells: billboarded, horizontal, and it wins its cells. */
+type Placed = Readonly<{ row: number; col: number; text: string }>;
+
+/** How short a projected axis has to be before its labels come off, in cells. */
+const EDGE_ON = 1;
+
+/**
+ * How far a label sits beyond its tick, in normalised units.
+ *
+ * `TICK_OUT` matches `axes3`'s own tick length and `LABEL_GAP` is the blank
+ * between the mark and the text — the same two-part spacing the 2-D gutter has,
+ * where `AXIS_GUTTER` is the gap and the label column is the text.
+ */
+const TICK_OUT = 0.07;
+const LABEL_GAP = 0.13;
+/**
+ * How far outside its ticks an axis name sits.
+ *
+ * **Measured, and there is a window rather than a floor.** Too close and the
+ * name collides with the nearest tick label plus its gap; too far and its
+ * anchor leaves the frame, where the clamp pushes it back onto its neighbours.
+ * Swept over the default camera at 80 cells, three axes, at two name lengths:
+ *
+ * ```
+ * NAME_OUT    5-character names drawn    2-character
+ *   0.42            0 of 3                  0 of 3
+ *   0.55            0 of 3                  3 of 3
+ *   0.70            3 of 3                  3 of 3     <- taken
+ *   0.85            1 of 3                  1 of 3
+ * ```
+ *
+ * **The 0.42 row is the one that reads as a bug and is not.** A one-character
+ * name fits where a five-character one does not, so `x`, `y` and `z` all drew
+ * and `ALPHA` drew nowhere — a label rule that works exactly until somebody
+ * names an axis.
+ */
+const NAME_OUT = 0.7;
+
+/** A point pushed along a direction. */
+const along = (p: Vec3, d: Vec3, k: number): Vec3 =>
+  ({ x: p.x + d.x * k, y: p.y + d.y * k, z: p.z + d.z * k });
+
+
 
 /** A sample that survived the cull, with everything the raster needs about it. */
 type Drawn = Readonly<{
@@ -72,8 +129,17 @@ function ramped(v: number, lo: number, hi: number): number {
   return hi > lo ? (v - lo) / (hi - lo) : 0.5;
 }
 
-/** The samples the tier and the ramp are both keyed to, projected once. */
-function drawnOf(block: Plot, ctx: RenderContext, aspect: number): readonly Drawn[] {
+/** The samples, the frame they sit in, and the basis all three are projected through. */
+type Scene = Readonly<{ drawn: readonly Drawn[]; basis: Basis; lo: Vec3; hi: Vec3 }>;
+
+/**
+ * The samples the tier and the ramp are both keyed to, projected once.
+ *
+ * **The extent comes back with them**, because the reference frame is the
+ * *data's* extent (C12 I92) and computing it twice would be two answers to one
+ * question the moment a filter appeared between them.
+ */
+function drawnOf(block: Plot, ctx: RenderContext, aspect: number): Scene {
   const clouds = block.points3 ?? [];
   const all: Vec3[] = [];
   for (const c of clouds) for (const p of c.points) all.push(p);
@@ -95,7 +161,7 @@ function drawnOf(block: Plot, ctx: RenderContext, aspect: number): readonly Draw
     }
     si += 1; // cells-ok — a cloud index
   }
-  return out;
+  return { drawn: out, basis, lo: extent.min, hi: extent.max };
 }
 
 /** The colour one sample is drawn in, on whichever channel `colourBy` names. */
@@ -129,6 +195,218 @@ const RASTER_TIER: readonly (readonly [number, number])[] = Object.freeze([
 ]);
 
 /**
+ * A projected segment into the sample grid, depth-tested (C12 I90).
+ *
+ * **Stepped on the dominant screen axis**, so a shallow line inks one sample
+ * per column and a steep one per row — the ordinary rule, and the reason a
+ * segment never leaves gaps at either slope.
+ *
+ * `writeDepth` refuses an out-of-bounds sample, so a line running off the frame
+ * clips per sample exactly as a near point's block does (C12 I88) rather than
+ * being dropped at the segment.
+ */
+function strokeSeg(
+  pa: Projected,
+  pb: Projected,
+  grid: Readonly<{ width: number; height: number }>,
+  depth: Depth,
+  paint: (i: number) => void,
+): void {
+  const x0 = pa.x * grid.width;
+  const y0 = pa.y * grid.height;
+  const x1 = pb.x * grid.width;
+  const y1 = pb.y * grid.height;
+  const steps = Math.max(1, Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)))); // cells-ok — a sample count
+  for (let i = 0; i <= steps; i += 1) { // cells-ok — a sample index
+    const t = i / steps; // cells-ok — a sample index
+    const px = Math.round(x0 + (x1 - x0) * t); // cells-ok — a sample coordinate
+    const py = Math.round(y0 + (y1 - y0) * t); // cells-ok — a sample coordinate
+    const z = pa.depth + (pb.depth - pa.depth) * t;
+    if (writeDepth(depth, px, py, z)) paint(py * grid.width + px); // cells-ok — a sample offset
+  }
+}
+
+/** The frame's marks, by the segment's dominant screen direction. */
+function frameMark(
+  pa: Projected,
+  pb: Projected,
+  ctx: RenderContext,
+): string {
+  const g = glyphs(ctx.capabilities);
+  return Math.abs(pb.y - pa.y) > Math.abs(pb.x - pa.x) ? g.vertical : g.horizontal;
+}
+
+/**
+ * The reference frame — the box, the three axis lines, their ticks and their
+ * labels (C12 I90, I91, I92).
+ *
+ * **Drawn into the same depth buffer as the data**, which is what *the axes
+ * never occlude the data* means read from the other side: the frame sits at the
+ * back and a sample in front of it wins the cell.
+ *
+ * Labels come back rather than being drawn here, because they are **cell**
+ * resolution over a sub-cell raster and the cells do not exist until the raster
+ * is composed.
+ */
+function frameOf(
+  block: Plot,
+  scene: Scene,
+  grid: Readonly<{ width: number; height: number }>,
+  rows: number,
+  depth: Depth,
+  ctx: RenderContext,
+  paint: (i: number, mark: string) => void,
+): readonly Placed[] {
+  const placement = block.axes3 ?? "corner";
+  const boxMode = block.box3 ?? "back";
+  // **One computation, two consumers** (C12 I90, F444). The three back faces
+  // meet at this corner by construction, so `boxEdges` reads it rather than
+  // deriving the same three signs.
+  const corner = farCorner(scene.basis);
+  const origin = originOf(block.origin3 ?? "auto", scene.lo, scene.hi);
+
+  const stroke = (seg: Seg3): readonly [Projected, Projected] | null => {
+    const p = clipProject(scene.basis, seg);
+    if (p === null) return null;
+    const mark = frameMark(p[0], p[1], ctx);
+    strokeSeg(p[0], p[1], grid, depth, (i) => { paint(i, mark); });
+    return p;
+  };
+
+  for (const e of boxEdges(corner, boxMode)) stroke(e);
+  if (placement === false) return [];
+
+  const style = block.axisStyle3 ?? {};
+  const lines = axisLines(placement, scene.basis, origin);
+  const spanOf = (v: Vec3, k: Axis3): readonly [number, number] => {
+    const spec = style[k];
+    if (spec?.range !== undefined) return spec.range;
+    const lo = k === "x" ? scene.lo.x : k === "y" ? scene.lo.y : scene.lo.z;
+    const hi = k === "x" ? scene.hi.x : k === "y" ? scene.hi.y : scene.hi.z;
+    void v;
+    return [lo, hi];
+  };
+
+  // **Ordered by projected extent, descending** — the collision rule's own
+  // priority, and the reason an edge-on axis needs no clause of its own: a zero
+  // extent sorts last and has no labels to place (C12 I91).
+  const measured = lines.map((line) => {
+    const p = clipProject(scene.basis, line.seg);
+    const extent = p === null
+      ? 0
+      : Math.hypot((p[1].x - p[0].x) * grid.width, (p[1].y - p[0].y) * rows); // cells-ok — a cell extent
+    return { line, p, extent };
+  }).sort((a, b) => b.extent - a.extent);
+
+  const taken = new Set<number>();
+  const placed: Placed[] = [];
+  const put = (anchor: Vec3, text: string): void => {
+    if (text === "") return;
+    const pr = project(scene.basis, anchor);
+    if (pr === null) return;
+    // **Depth-tested at the anchor and drawn over** (C12 I92). A string is not a
+    // sample: testing every cell would draw half a label, which reads as
+    // corruption rather than as occlusion. One test, at the point the label
+    // names — so a label behind the cloud is not drawn, and one in front is
+    // drawn whole.
+    //
+    // **This is what makes `axes3: "origin"` readable.** Its lines cross inside
+    // the figure by construction, so its labels sit where the data is; without
+    // the test they printed over the helix and the frame read as noise.
+    const ax = Math.floor(pr.x * grid.width); // cells-ok — a sample coordinate
+    const ay = Math.floor(pr.y * grid.height); // cells-ok — a sample coordinate
+    if (ax >= 0 && ay >= 0 && ax < grid.width && ay < grid.height) { // cells-ok — a bound
+      const held = depth.z[ay * grid.width + ax] as number; // cells-ok — a sample offset
+      if (held < pr.depth - 1e-6) return;
+    }
+    const row = Math.round(pr.y * rows - 0.5); // cells-ok — a row index
+    const wide = cells(text, ctx.capabilities.ambiguousWidth); // cells-ok — a label width
+    // **Clamped into the frame rather than dropped at its edge.** The first
+    // draft refused a label whose centred position ran past a margin, which is
+    // a *cosmetic* reason to lose a reading — and it fell hardest on the long
+    // names it was least able to spare: `x` drew and `ALPHA` never did, at any
+    // clearance, because the longer string was the one that overflowed. A label
+    // that does not fit the frame at all is still refused; one that fits
+    // somewhere is moved.
+    if (row < 0 || row >= rows || wide > grid.width) return; // cells-ok — a bound
+    const col = Math.max(0, Math.min(grid.width - wide, Math.round(pr.x * grid.width - wide / 2))); // cells-ok — a column index
+    // **Drop the later**, `niceAxis`'s own rule: a label whose cells another
+    // has already claimed is not drawn, and the order above is the priority.
+    //
+    // **A blank is claimed on each side, and the frame is why.** Overlap alone
+    // let two labels abut: `1` and `0.5` at adjacent columns claimed disjoint
+    // cells, both drew, and the frame read `10.5` — one number that is neither
+    // of them. Two labels touching are unreadable without overlapping, so the
+    // reservation is the label **plus its gap**, which is the same rule the
+    // y-gutter's own spacing has one dimension down.
+    for (let i = -1; i <= wide; i += 1) { // cells-ok — a column offset
+      if (taken.has(row * grid.width + col + i)) return; // cells-ok — a cell offset
+    }
+    for (let i = -1; i <= wide; i += 1) taken.add(row * grid.width + col + i); // cells-ok — a cell offset
+    placed.push({ row, col, text });
+  };
+
+  for (const { line, extent } of measured) {
+    const spec = style[line.axis];
+    if (spec?.show === false) continue;
+    // **Keep the line, drop the labels** (C12 I91). The axis is still
+    // information about orientation when its scale is unreadable, which is why
+    // the stroke below runs whatever the extent is.
+    const p = clipProject(scene.basis, line.seg);
+    if (p !== null) {
+      const mark = frameMark(p[0], p[1], ctx);
+      strokeSeg(p[0], p[1], grid, depth, (i) => { paint(i, mark); });
+    }
+    if (extent < EDGE_ON) continue;
+    const [lo, hi] = spanOf(scene.lo, line.axis);
+    for (const t of ticks3(line.axis, line, lo, hi, spec, spec?.format ?? block.yFormat)) {
+      const pt = clipProject(scene.basis, { a: t.on, b: t.out });
+      if (pt !== null) {
+        const mark = frameMark(pt[0], pt[1], ctx);
+        strokeSeg(pt[0], pt[1], grid, depth, (i) => { paint(i, mark); });
+      }
+      // **Pushed along `outward`, not scaled from the origin.** The first draft
+      // multiplied the whole position vector by 1.35, which moves a point near
+      // the origin barely at all and one near the corner a long way — so the
+      // tick labels landed *inside* the box, over the data, and read as noise
+      // rather than as a scale. The frame is what said so; no assertion about a
+      // label's presence could have.
+      put(along(t.on, line.outward, TICK_OUT + LABEL_GAP), t.text);
+    }
+    // **The name sits at the axis's midpoint, pushed further out than its
+    // ticks** — matplotlib's placement, and the frame is what argued for it.
+    // Past the positive end it collided: x and y both run *to* the anchor
+    // corner, so both names and a shared tick landed on one cell and the frame
+    // read `xy1`. The midpoint is the one point on an axis that no other axis
+    // shares.
+    // **The arrowhead, by the axis's direction on screen** (C04 I77). It exists
+    // because `axes3: "origin"` extends both ways from a crossing and a reader
+    // has to know which end is positive — but it is honoured at every
+    // placement, because a caller who asks for it has asked for it.
+    if (spec?.arrow === true && p !== null) {
+      const a3 = arrows3(ctx.capabilities);
+      const dx = (p[1].x - p[0].x) * grid.width; // cells-ok — a cell extent
+      const dy = (p[1].y - p[0].y) * rows; // cells-ok — a cell extent
+      const head = Math.abs(dy) > Math.abs(dx)
+        ? (dy < 0 ? a3.up : a3.down)
+        : (dx < 0 ? a3.left : a3.right);
+      // **Past the positive end along the axis**, not at it: the positive ends
+      // of x and y are the anchor corner itself, where both their last ticks
+      // land, so a head placed there loses the collision every time.
+      const tip = { ...line.seg.b };
+      const k = line.axis;
+      const beyond = k === "x" ? { ...tip, x: tip.x * 1.18 }
+        : k === "y" ? { ...tip, y: tip.y * 1.18 } : { ...tip, z: tip.z * 1.18 };
+      put(along(beyond, line.outward, TICK_OUT), head);
+    }
+    const name = spec?.label ?? line.axis;
+    const mid = { x: (line.seg.a.x + line.seg.b.x) / 2, y: (line.seg.a.y + line.seg.b.y) / 2, z: (line.seg.a.z + line.seg.b.z) / 2 };
+    put(along(mid, line.outward, NAME_OUT), name);
+  }
+  return placed;
+}
+
+/**
  * The two arms, and everything above this line is shared between them.
  *
  * `reserved` is what the legend has already taken, so the raster is laid out at
@@ -155,7 +433,8 @@ export function scatter3dArea(
   // the cell's own. Getting this wrong draws a sphere as an ellipse, which is
   // the one distortion a reader reads as data.
   const aspect = grid.width / (grid.height * (half ? 1 : CELL_ASPECT));
-  const drawn = drawnOf(block, ctx, aspect);
+  const scene = drawnOf(block, ctx, aspect);
+  const drawn = scene.drawn;
   const clouds = block.points3 ?? [];
 
   let nearD = Infinity;
@@ -179,6 +458,22 @@ export function scatter3dArea(
     grid.width * grid.height, // cells-ok — a sample count
   ).fill(undefined);
   const glyph: number[] = new Array<number>(grid.width * grid.height).fill(-1); // cells-ok — a sample count
+  // **The frame's own mark, parallel to the tier code** (C12 I90). A frame cell
+  // is not a tier and not a series, so encoding it into `glyph`'s arithmetic
+  // would make one number mean two things — which is `SHARES_CELLS`' own lesson
+  // in a different array.
+  const mark: (string | undefined)[] = new Array<string | undefined>(
+    grid.width * grid.height, // cells-ok — a sample count
+  ).fill(undefined);
+
+  // **Drawn first, and the depth buffer is what puts it behind.** Order does not
+  // decide occlusion here — `writeDepth` is strictly nearer-wins — so the frame
+  // going in first is a reading convenience rather than a rule.
+  const frameInk = slot("tone.muted", ctx.theme, ctx.capabilities).colour;
+  const labels = frameOf(block, scene, grid, rows, depth, ctx, (i, m) => {
+    ink[i] = frameInk;
+    mark[i] = m;
+  });
 
   for (const d of drawn) {
     const tier = tierOf(d.depth, nearD, farD);
@@ -205,19 +500,24 @@ export function scatter3dArea(
         for (let ox = 0; ox < bw; ox += 1) { // cells-ok — a sample offset
           const px = x0 + ox; // cells-ok — a sample coordinate
           const py = y0 + oy; // cells-ok — a sample coordinate
-          if (writeDepth(depth, px, py, d.depth)) ink[py * grid.width + px] = colour; // cells-ok — a sample offset
+          if (writeDepth(depth, px, py, d.depth)) { // cells-ok — a sample offset
+            ink[py * grid.width + px] = colour; // cells-ok — a sample offset
+            mark[py * grid.width + px] = undefined; // cells-ok — a sample offset
+          }
         }
       }
     } else if (writeDepth(depth, sx, sy, d.depth)) {
       const i = sy * grid.width + sx; // cells-ok — a sample offset
       ink[i] = colour;
+      mark[i] = undefined;
       glyph[i] = tier * clouds.length + d.series; // cells-ok — a series index
     }
   }
 
-  return half
+  const composed = half
     ? halfRows(ink, depth, grid.width, rows)
-    : glyphRows(ink, glyph, grid.width, rows, clouds.length, ctx); // cells-ok — a cloud count
+    : glyphRows(ink, glyph, mark, grid.width, rows, clouds.length, ctx); // cells-ok — a cloud count
+  return overlay(composed, labels, frameInk, grid.width); // cells-ok — a cell width
 }
 
 /**
@@ -271,6 +571,7 @@ function halfRows(
 function glyphRows(
   ink: readonly (ColourValue | undefined)[],
   glyph: readonly number[],
+  mark: readonly (string | undefined)[],
   w: number,
   rows: number,
   clouds: number,
@@ -283,9 +584,15 @@ function glyphRows(
     const line: Span[] = [];
     for (let c = 0; c < w; c += 1) { // cells-ok — a column index
       const i = r * w + c; // cells-ok — a sample offset
+      const framed = mark[i];
       const g = glyph[i] ?? -1;
       if (g < 0) {
-        line.push({ text: " " });
+        const colour = ink[i];
+        line.push(
+          framed === undefined ? { text: " " }
+          : colour === undefined ? { text: framed }
+          : { text: framed, style: { colour } },
+        );
         continue;
       }
       const tier = Math.floor(g / Math.max(1, clouds)); // cells-ok — a tier index
@@ -298,6 +605,38 @@ function glyphRows(
     out.push(line);
   }
   return out;
+}
+
+/**
+ * The labels, over the composed cells (C12 I92).
+ *
+ * **Text wins the whole cell**, which is the one place in this component where
+ * the two resolutions meet: a label is cell-resolution and the raster is
+ * sub-cell, so half a cell of label is not a thing. The spans are rebuilt
+ * rather than patched, because a `Span` carries text *and* style and splicing
+ * into the middle of one would leave two halves claiming one style.
+ */
+function overlay(
+  composed: readonly (readonly Span[])[],
+  labels: readonly Placed[],
+  colour: ColourValue | undefined,
+  w: number,
+): readonly (readonly Span[])[] {
+  if (labels.length === 0) return composed; // cells-ok — a label count
+  const rows = composed.map((line) => [...line]);
+  for (const l of labels) {
+    const line = rows[l.row];
+    if (line === undefined) continue;
+    const chars = [...l.text];
+    for (let i = 0; i < chars.length; i += 1) { // cells-ok — a character index
+      const c = l.col + i; // cells-ok — a column index
+      if (c < 0 || c >= w) continue; // cells-ok — a column index
+      line[c] = colour === undefined
+        ? { text: chars[i] as string }
+        : { text: chars[i] as string, style: { colour } };
+    }
+  }
+  return rows;
 }
 
 /** The rows, painted. `FORM_ROWS` takes strings and the legend is composed by the caller. */

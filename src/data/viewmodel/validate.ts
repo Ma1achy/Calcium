@@ -1494,6 +1494,15 @@ function checkPoints3(
         `are drawn inside the area, so there is no gutter and no bottom rule to switch on`,
     );
   }
+  // **`origin3` is read by `axes3: "origin"` and by nothing else** (C04 I77).
+  const o3 = b["origin3"];
+  const a3 = b["axes3"] ?? "corner";
+  if (o3 !== undefined && a3 !== "origin") {
+    e.push(
+      `${at}: "origin3" with "axes3" of "${String(a3)}" (C04 I77) — it says where the axis ` +
+        `lines cross, and only "origin" draws a crossing`,
+    );
+  }
   if (pts === undefined) return;
   if (!Array.isArray(pts)) {
     e.push(`${at}: "points3" must be an array of clouds`);

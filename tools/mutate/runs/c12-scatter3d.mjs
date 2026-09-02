@@ -107,8 +107,8 @@ const results = await runPass({
       // the picture is wrong, which is why a row about the buffer cannot see it.
       name: "the last sample wins the cell, not the nearest",
       file: P,
-      from: "          if (writeDepth(depth, px, py, d.depth)) ink[py * grid.width + px] = colour; // cells-ok — a sample offset",
-      to: "          ink[py * grid.width + px] = colour; // cells-ok — a sample offset",
+      from: "          if (writeDepth(depth, px, py, d.depth)) { // cells-ok — a sample offset",
+      to: "          if (true as boolean) { // cells-ok — a sample offset",
       expect: "SC7",
     },
     {

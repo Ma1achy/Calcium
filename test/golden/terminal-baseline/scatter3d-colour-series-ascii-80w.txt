@@ -1,13 +1,13 @@
 ── scatter3d · colour-series · ascii · 80w
                                                                          # alpha
                                                                          / beta
-                                                                         \ gamma
-                                  ooo$$$$
-                                  .o$$$$$$
-                                  ..$$$$$
-
-                                xxxxx
-                                #####
-                                xxx#x
-
-
+                                   ---                                   \ gamma
+                             -----ooo$$$$---
+                         0.5-     .o$$$$$$  -
+                            -     ..$$$$$   |
+                       z   0--      |      |
+                          -0.5  xxxxx||||  |
+                           -0.5|#####    |||
+                              |0xxx#x   -0.5
+                                0.5| 0.5
+                             y      |     x

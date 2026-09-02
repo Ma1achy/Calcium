@@ -104,8 +104,15 @@ describe("SB — the SVG baseline (C12 §3ak.10, F275)", () => {
     // second form joining is a decision somebody makes here.
     const refusals = [...fresh.entries()].filter(([, v]) => v === refusal).map(([k]) => k);
     expect([...refusals].sort(), "the refused frames, by name").toEqual([
-      "scatter3d-colour-series.svg", "scatter3d-colour-value.svg", "scatter3d-coplanar.svg",
-      "scatter3d-default.svg", "scatter3d-orthographic.svg",
+      "scatter3d-axes-none.svg",
+      "scatter3d-axes-origin.svg",
+      "scatter3d-axis-styles.svg",
+      "scatter3d-box-full.svg",
+      "scatter3d-colour-series.svg",
+      "scatter3d-colour-value.svg",
+      "scatter3d-coplanar.svg",
+      "scatter3d-default.svg",
+      "scatter3d-orthographic.svg",
     ]);
     const drawn = [...fresh.entries()].filter(([, v]) => v !== refusal).map(([k]) => k);
     expect(drawn.length, "and the drawn side is the rest of it").toBe(fresh.size - refusals.length);

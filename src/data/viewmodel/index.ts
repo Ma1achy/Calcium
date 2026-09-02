@@ -69,6 +69,7 @@ export type {
   VectorSeries,
   Point3,
   Point3Series,
+  AxisSpec3,
   Steps,
   Table,
   TableRow,

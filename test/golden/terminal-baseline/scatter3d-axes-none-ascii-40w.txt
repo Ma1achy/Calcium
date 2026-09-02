@@ -1,0 +1,15 @@
+── scatter3d · axes-none · ascii · 40w
+
+
+
+
+             @@oo.......o
+              @          oo
+              .........  @@
+             o@        @@@
+              @@@@@@@@@@ o
+                         o
+               oo    @@oo
+                ooo@@@
+
+

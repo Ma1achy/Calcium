@@ -793,7 +793,7 @@ describe("U — the seam, asserted from both arms", () => {
     // drawable at this rung and `truncate` reserves both its cells since F292,
     // so its width is a cost and not a defect. `~` is the *repertoire* fallback,
     // which is a different question (§3ak.24).
-    expect(frames, "catalogue variants rendered at the wide rung").toBe(193); // cells-ok — a frame count
+    expect(frames, "catalogue variants rendered at the wide rung").toBe(197); // cells-ok — a frame count
     expect([...seen.keys()].sort(), "two-cell characters still emitted").toEqual(["…"]);
   });
 

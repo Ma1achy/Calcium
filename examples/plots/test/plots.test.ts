@@ -71,7 +71,7 @@ describe("the plot demo", () => {
     // *argument* rather than a key: a source pattern measuring a shape the code
     // stopped having, which is the same defect as aiming a row at a path.
     expect(all, "the figures must go through the published builder").toMatch(/\bb\.plot\s*\(/);
-    expect(Object.keys(CATALOGUE), "every form the union declares").toHaveLength(46);
+    expect(Object.keys(CATALOGUE), "every form the union declares").toHaveLength(47);
     expect(all, "a figure reached past the builder to `block({ … })`").not.toMatch(
       /\bblock\s*\(\s*\{/,
     );
@@ -80,13 +80,13 @@ describe("the plot demo", () => {
     );
   });
 
-  it("every form the type declares has an entry, and all 46 now build (C24 I30)", () => {
+  it("every form the type declares has an entry, and all 47 now build (C24 I30)", () => {
     // **The count is 46 and not 42**, which is the point of the entry shape. A
     // catalogue that omits what it cannot construct reports complete — F313's
     // contact sheet and F350's corpus, both. Four were entries naming the field
     // the published builder did not declare, and `b.plot` declares all eight now
     // (F335, C24 §4b) — so the honest assertion flipped rather than went away.
-    expect(FORMS).toHaveLength(46);
+    expect(FORMS).toHaveLength(47);
     expect([...refusals()].sort(), "nothing the union declares is unbuildable").toEqual([]);
 
     // **Built, not merely typed.** `b.plot` throws for a document the validator
@@ -105,7 +105,7 @@ describe("the plot demo", () => {
       }
     }
     expect(threw).toEqual([]);
-    expect(built).toBe(46);
+    expect(built).toBe(47);
   });
 
   it("T-eight (C24 I30, F335): the eight `b.plot` omitted are all on it now", () => {
@@ -260,9 +260,12 @@ describe("the plot demo", () => {
     // `yScale`, `emptyMessage`. A builder taking a member and a consumer naming
     // one are different claims, and `publicSurfaceUseSignal` counts the second.
     expect(everyVariant().length, "rungs beyond the defaults").toBe(60);
-    // **46 + 60, where it was 42 + 53** — the four that could not be built now
-    // are, which is the count moving because the surface did (C24 I30).
-    expect(FORMS.length - refusals().length + everyVariant().length, "figures /all draws").toBe(106);
+    // **47 + 60, where it was 46 + 60** — `scatter3d` is the forty-seventh form
+    // and it arrives buildable, which is what a builder gaining the members with
+    // the form looks like from here. It adds **no rung**: its variants are the
+    // reference frame's, and `everyVariant` counts members `b.plot` gained that
+    // the forms do not exercise (C24 I30).
+    expect(FORMS.length - refusals().length + everyVariant().length, "figures /all draws").toBe(107);
   });
 });
 

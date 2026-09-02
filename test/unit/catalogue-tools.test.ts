@@ -330,8 +330,15 @@ describe("PR — the pair catalogue's partition, which is the counter restated (
     // what says which side they land on, and it says family, which is the
     // truth: no variant of the form draws and none could.
     expect(allRefused, "the refused frames, by name").toEqual([
-      "scatter3d/colour-series", "scatter3d/colour-value", "scatter3d/coplanar",
-      "scatter3d/default", "scatter3d/orthographic",
+      "scatter3d/axes-none",
+      "scatter3d/axes-origin",
+      "scatter3d/axis-styles",
+      "scatter3d/box-full",
+      "scatter3d/colour-series",
+      "scatter3d/colour-value",
+      "scatter3d/coplanar",
+      "scatter3d/default",
+      "scatter3d/orthographic",
     ]);
     expect(part.family.sort(), "and every one of them is a family refusal").toEqual(allRefused);
     // **Not a magnitude** (F310). `> 50` was a number that had to be edited every
