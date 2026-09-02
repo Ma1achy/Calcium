@@ -13860,6 +13860,64 @@ terminal did not change, and the gap between those two is the whole finding.
 
 ---
 
+## F450 — a clip that lands on the plane it is clipping to, and two guards whose subject the fix removed ★★★★★
+
+Three guards went into the 3D reference frame. **One had never worked, one no longer has a
+subject, and one never had one** — and the assertions written for all three agreed.
+
+**The clip landed exactly on the cull plane.** `clipProject` moves an endpoint behind the eye to
+the near plane; `project` culls on `z <= NEAR`, **inclusive**. So the clipped point was refused by
+the very function the clip exists to satisfy, and every segment it was written to save was dropped
+anyway. Fixed by clipping to the first depth the projector accepts.
+
+**It was invisible for two independent reasons, which is why nothing showed it.** The first draft
+of `AX6` compared inked cells with the frame on and off at a close `distance` and passed either
+way — because the clipped remainder is thrown outside `[0,1]²` by the divide at five of the six
+distances swept, `basisOf` always targeting the origin. So a frame comparison agrees whether a
+segment is clipped, dropped, or clipped to a point that is then dropped.
+
+**And the negative I recorded was measured against the broken path.** Before the fix I measured
+*straddling segments whose remainder is on screen* and got **0 at every distance**, and wrote that
+into the spec as *the clip is insurance for a camera model that does not exist yet*. Re-measured
+with a working clip: **1 of 3 at `distance: 1.7`**. A probe run against a function that returns
+`null` measures the `null`.
+
+```
+distance   straddling   remainder visible
+   1.7          3              1
+   1.5          3              0
+   1.2          3              0
+   1.0          3              0
+   0.5          9              0
+```
+
+**The label gap no longer reproduces its own defect.** F449's `10.5` was real and the fix is right,
+and swept over 24 azimuths with the gap removed **no two labels abut** — because three unrelated
+changes on the same commit (the name clearance, the frame-edge clamp, the near-plane clip) moved
+the labels apart. The guard stays on the asymmetry CLAUDE.md names: two cells of reservation
+against a frame that reads one number where there are two. Both figures and the date are in the
+run file.
+
+**The anchor depth test fires on no fixture measured, and its reason is a property rather than an
+accident.** The label anchors are pushed *outward* from their axis — toward the reader — so
+nothing is in front of them by construction. The guard is still right and still cheap; it simply
+has no subject until something anchors a label inside the data.
+
+**And its assertion was measuring something else entirely.** `AX8`'s first draft compared the frame
+against the same block with an **empty** cloud, expecting the difference to be labels the data
+hides. The difference is three, and it stays three with the guard removed: `extentOf([])` answers
+the unit cube while the helix's own extent is `±0.9995`, so the two blocks get different `niceAxis`
+ticks and the row was measuring **tick clamping**.
+
+**The reusable part is about what a guard's test is allowed to be.** All three assertions were
+about a *consequence* — ink present, labels fewer, a run no longer than four characters — and a
+consequence is reachable by other mechanisms. The two rows that survive assert the **mechanism**:
+the clipped endpoint's depth is just inside the plane, and the arrowhead differs between two
+cameras. A guard whose only test is a consequence is a guard the next change can silence without
+failing anything.
+
+---
+
 ## F449 — two labels that do not overlap and cannot be read ★★★★☆
 
 The 3D axes place tick labels with the collision rule every other axis here uses: **drop the
