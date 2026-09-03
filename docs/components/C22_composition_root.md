@@ -885,14 +885,17 @@ None of the three is where the defect is, and none of them can be measured into 
 ```
                    read by                    written by              in a key
 scrollOffsets      containers                 construct.ts's nudge    yes
-cursorPositions    plot/definition.ts         NOTHING in src/         no
+cursorPositions    plot/definition.ts         NOTHING in src/         no   ← as it was
+cursorPositions    plot/definition.ts         construct.ts's cursorBlock   yes  ← I76
 ```
 
-**`cursorPositions` is in no key because nothing can change it** (C12 §3s — *a complete
+**`cursorPositions` was in no key because nothing could change it** (C12 §3s — *a complete
 mechanism with nothing on the other side, the shape MG24 exists for*). So a camera field added
-to the context without a writer would be correct, complete, keyed or unkeyed indistinguishably,
-and **its first observable behaviour would arrive with whatever built the orbit** — which is the
-day a reader reports a hang.
+to the context without a writer would have been correct, complete, keyed or unkeyed
+indistinguishably, and **its first observable behaviour would arrive with whatever built the
+orbit** — which is the day a reader reports a hang. **The counter-example has since been closed
+by I76**, on the same rule it was cited for: `CursorPositions` in `shell/cursor-positions.ts`,
+`←`/`→` at `liveBlock`, and the seventh axis landed together.
 
 **The pair is the invariant, not the axis** (I71). Either `RenderContext` gains the camera *and*
 something in `src/` can move it, or neither lands. This is I60's own ruling one component along:
@@ -1589,21 +1592,22 @@ re-measures rather than cites.
 
 **The arrows do not survive, and the keymap had already ruled half of it.** The note's scheme is
 `← →` azimuth, `↑ ↓` elevation, `+ −` distance, `r` resets. `↑` and `↓` at `liveBlock` are
-`rowUp` and `rowDown`, and the keymap refuses a duplicate at construction; `←` and `→` are free
-there but fall through to the prompt today, so claiming them takes two keys from **every** focused
-block for a feature one kind has — which is the argument `[` and `]` were chosen on when the
+`rowUp` and `rowDown`, and the keymap refuses a duplicate at construction; `←` and `→` were unbound
+there — dropped, not passed to the prompt, which C16 I28 measured — and are now the horizontal
+pair (I76), so claiming them would take two keys from **every** focused block for a feature one
+kind has — which is the argument `[` and `]` were chosen on when the
 writer landed. So the family is `[` `]` azimuth, `{` `}` elevation, `+` `−` distance, `r` reset,
 `o` orbit; every one of them is a printable the decoder names by its character, and none is bound
 at `liveBlock` today.
 
 ### 6i.4 — what the rulings leave behind
 
-- **The readout cursor's exclusion is still not buildable.** C12 §3al rules that orbit and the
-  cursor are mutually exclusive and says it is *not testable until the orbit exists (step 8)*.
-  The orbit now exists and it is still not testable, because the other half does not: nothing in
-  `src/` writes `cursorPositions`. A branch guarding on an active cursor is a branch nothing can
-  enter, and a row asserting it constructs a state the tree cannot reach. **The blocker as a
-  symbol, so it is grepped rather than watched: a writer for `cursorPositions`.**
+- **The readout cursor's exclusion is now buildable, and it is C12's to build.** C12 §3al rules
+  that orbit and the cursor are mutually exclusive and said it was *not testable until the orbit
+  exists (step 8)*; the orbit landed and it was still not testable, because nothing in `src/`
+  wrote `cursorPositions`. **I76 is that writer** — `CursorPositions`, `←`/`→` at `liveBlock`,
+  the seventh axis — so the state §3al's branch guards can now be constructed from a keyboard,
+  and the exclusion is a C12 edit with a subject rather than a grep. Recorded as owed there.
 - **One advance in copy mode** (trace row 3). The tick that lands after `suspend()` moves the
   camera and draws nothing, so a reader stepping back and returning finds the plot one step on.
   Bounded at exactly one, because nothing re-arms until a frame renders.
@@ -1858,7 +1862,8 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I72** — **Auto-orbit is view state held beside the camera, it is off until a reader turns it on, and it is not in the render key.** A block cannot declare that it orbits (C04 I75), so *which plot is turning* is L4's exactly as *whether a spinner turns* is (I60) — and it lives in `Cameras` rather than in a store of its own, because a third store is a third callback for a future eviction path to reach two of and miss one (§6i table row 11). **Off is the default and it is a cost ruling**: a static 3D plot is one render held until the width or the theme moves, and an orbiting one is a full-frame redraw for as long as it is on screen — measured at **12.97 ms a frame** over 3,200 triangles at 80×24, so 30fps is 39% of a core, and at 69,192 triangles a frame costs 124 ms and no rate the scheduler offers can hold it. **The flag is not a key axis**, because the key discriminates what is *drawn*: a toggle that moves no camera moves no cell, and keying it would miss on the frame a reader stops the rotation to look at (`focusKey`'s warning, §6c). The corollary is that a fact about the session cannot be announced inside an entry's cached lines, which is where §12's P21 would have to go and does not (→ C12 I85, C04 I75).
 - **I73** — **The orbit advances the windowed set, and one switch chooses both its cadence and its commit reason.** The ticker is armed from what the frame drew after windowing (I60a) and the advance obeys the same set rather than the timer's firing — otherwise an unrelated spinner turns a camera nobody is looking at, and fifty settled entries each holding an orbiting plot advance fifty cameras a tick while one is on screen (§6i table row 2). **The commit reason is the frame rate.** `commit("spinner")` draws at 10fps however fast the timer fires, because C03's 100 ms window is a floor under the ticker (I60a) — so the design note's *the stream window is 33 ms, so 30fps is free* names a window this component has never used. A live orbit commits **`stream`**, whose rationale in C03 §3 is a rate ceiling and says nothing about the source; everything else keeps `spinner`, whose rationale — *a faster tick conveys nothing* — is true of a ten-frame glyph cycle and false of a rotation. **`synchronisedUpdate` throws the same switch**: absent, the orbit ticks at 100 ms and commits `spinner`, which is a full-frame rewrite at 10fps instead of 30 on a terminal that would tear thirty times a second. One switch, two effects, and no constant invented — the capped rate is the one §11 already calls acceptable at full quality (→ C03 I3, C02).
 - **I74** — **The spinner's counter and the orbit's angle are both functions of elapsed time, and the shared timer is a wake-up rather than a cadence.** One timer armed at the fastest cadence on screen cannot serve two animations, and it fails in both directions: an orbit at 100 ms beside an 80 ms spinner turns **25% fast**, and an orbit at 33 ms beside the same spinner advances `ctx.tick` **three times too often** so the glyph spins at 30fps. Both are one cause — a step per firing rather than a step per interval — so the azimuth is `ω · Δt` and the counter advances only when the spinner's own interval has passed. The clock is `config.clock`, which `session.ts` is the one file SS1 allows to name. **`ω` is one revolution in 12 seconds**: at 30fps that is 1° a frame, between the `π/256` and `π/64` steps measured at 22% and 30% of cells changing, and at the capped 10fps it is 3°, just past `π/64` — so both rates read as motion rather than as a jump, and the number comes from the measurement rather than from taste (→ I60a).
-- **I75** — **The manual scheme is the bracket family; the distance control is multiplicative and the elevation control has no clamp.** The design note's `← → ↑ ↓ + − r` does not survive the keymap: `↑` and `↓` at `liveBlock` are `rowUp` and `rowDown` and a duplicate is refused at construction, and `←` `→` fall through to the prompt, so claiming them takes two keys from **every** focused block for a feature one kind has — the argument `[` and `]` were already chosen on (I71). So `[` `]` turn, `{` `}` tilt, `+` `−` dolly, `r` restores the block's declared view and `o` toggles the orbit. **Distance scales rather than steps**, because a multiplicative control cannot reach the one degenerate value: measured, `distance: 0` inks nothing and is the only such value — `0.01` inks 1776 cells, `−1` inks 1742, and `−6` inks the same 297 as `+6` because it is the antipodal view. The hazard is passing *through* a blank frame, not landing on a wrong one. **Elevation needs no clamp**, because the pole is unreachable: `cos(π/2)` is `6.123e-17`, so `cross(forward, ẑ)` is tiny rather than zero and elevation exactly `π/2` draws a plan view of 289 inked cells — F464's figure and F464's mechanism, one function along, and `basisOf`'s comment claiming the figure collapses to a line describes a case its own arithmetic cannot produce (F467). The store still clamps nothing and normalises nothing; the effect computes the step and the store records it, which is `pageBlock`'s seam (→ C12 I85, C26 I2).
+- **I75** — **The manual scheme is the bracket family; the distance control is multiplicative and the elevation control has no clamp.** The design note's `← → ↑ ↓ + − r` does not survive the keymap: `↑` and `↓` at `liveBlock` are `rowUp` and `rowDown` and a duplicate is refused at construction, and `←` `→` were unbound at `liveBlock` (dropped, not passed to the prompt — C16 I28 measured it: `dispatch` runs the target's handlers and then `global`, never `prompt`) and are now the horizontal pair (I76), so claiming them would take two keys from **every** focused block for a feature one kind has — the argument `[` and `]` were already chosen on (I71). So `[` `]` turn, `{` `}` tilt, `+` `−` dolly, `r` restores the block's declared view and `o` toggles the orbit. **Distance scales rather than steps**, because a multiplicative control cannot reach the one degenerate value: measured, `distance: 0` inks nothing and is the only such value — `0.01` inks 1776 cells, `−1` inks 1742, and `−6` inks the same 297 as `+6` because it is the antipodal view. The hazard is passing *through* a blank frame, not landing on a wrong one. **Elevation needs no clamp**, because the pole is unreachable: `cos(π/2)` is `6.123e-17`, so `cross(forward, ẑ)` is tiny rather than zero and elevation exactly `π/2` draws a plan view of 289 inked cells — F464's figure and F464's mechanism, one function along, and `basisOf`'s comment claiming the figure collapses to a line describes a case its own arithmetic cannot produce (F467). The store still clamps nothing and normalises nothing; the effect computes the step and the store records it, which is `pageBlock`'s seam (→ C12 I85, C26 I2).
+- **I76** — **The crosshair is view state in `CursorPositions`, its writer is the `←`/`→` pair at `liveBlock`, and it is the render key's seventh axis — landed together, on I71's own rule.** `RenderContext.cursorPositions` was I71's counter-example: read in one place (C12's `positionalForm`), written by nothing in `src/`, in no key — correct and unobservable, for as long as the plot-interaction suite supplied the field itself. The store is `Cameras`' shape keyed `(entryId, blockId)`, dropped on `rendered`'s subscription with the other two, threaded into the context by `visibleRows`. **The value is an index into the data, not a column** (C12 I37), so a resize keeps the cursor on its sample; **absent is not zero** — no entry is no crosshair and `0` is the first sample — so unlike `ScrollOffsets` the key omits nothing. **The ceiling is the sample count and the effect holds it**, not the store: `cursorBlock` clamps to `[0, n)` and the store records, which is `dollyBlock`'s seam (I75); a first `→` lands on the first sample and a first `←` on the last. **The writer gates on C12's `cursorable`** (C12 I85) — the predicate `elements()` declares the focus stop on — so a form that draws no crosshair stores no cursor; the residue this sentence used to name (*a cursor set on a form that draws none is stored and unread*) closed when the writer asked the renderer the question the renderer answers, rather than keeping a second list of forms here, which is the two-copies hazard (→ C12 §3s, I37; C16 I28).
 
 
 ## 11. Commitments
@@ -1929,6 +1934,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 43. **Auto-orbit is L4 state, off by default, and out of the render key** (I72). A block cannot declare that it orbits, so the flag is view state beside the camera and in the store the camera already uses; it is off because an orbiting plot is a full-frame redraw for as long as it is on screen and a static one is free, and it is out of the key because the key discriminates what is drawn (→ C04 I75).
 44. **The orbit advances what the frame drew, and its commit reason is its frame rate** (I73). A live orbit commits `stream` and everything else keeps `spinner`, whose 100 ms window is a floor the note's 33 ms target never met; `synchronisedUpdate` throws the same switch, so an absent capability caps the rotation at 10fps rather than tearing at 30 (→ C03 I3).
 45. **Both animations are functions of elapsed time** (I74). One timer at the fastest cadence on screen cannot be a cadence for two, and a step per firing makes each animation's speed depend on the other's presence — in both directions.
+47. **The crosshair has a writer, a store and a key axis, landed together** (I76). `cursorPositions` stops being the counter-example I71 was written against; `←`/`→` at `liveBlock` move it, `CursorPositions` holds it beside the offsets and the cameras, and the seventh axis keys it — zero included, because absent and zero draw differently (→ C12 §3s).
 46. **The manual camera scheme is the bracket family, the dolly is multiplicative and the tilt is unclamped** (I75). The arrows collide with row navigation and with the prompt; scaling the distance cannot reach the only degenerate value; the pole is unreachable in floating point, and the comment that says otherwise is corrected. **And the block a key acts on is resolved through the tree**, because `elementsIn` walks into a container and every effect here used a top-level `find` — F470, found by the orbit's own gathering pass rather than by a test (→ C26 I2).
 
 41. **A frame that cannot hold what it was given complains rather than dies** (I70, F230). The per-entry trim was reconciling two components' answers in silence and taking the next block with it; it reports through the sink that already exists for a block giving way, and it does not refuse — the region check one level up can refuse only because nothing can reach it.
@@ -2213,6 +2219,11 @@ PTY harness.
 - **T6.43** (I58): keying on `(entryId, rev)` alone — C14's key minus width, which is the key F90 proposed → T4.17's width case fails, and a resize redraws the transcript at the old wrapping.
 - **T6.44** (I59): deleting T4.19 → nothing fails, and that is the point of the row: it is the only executable statement that this stage leaves the first frame alone.
 - **T6.81** (I71): dropping the camera from the slot string → **T4.17e** fails and **T4.17f** passes. T4.17g fails too, which is why it is not the row this cites: the mutation that removes the key must be separable from the one that removes the writer, or the two are one assertion wearing two names.
+- **T1.31, T3.35** (I76): `CursorPositions` keeps zero in its key and answers an empty record for an entry nothing aimed; `delete` takes one entry and `clear` all.
+- **T4.17h–j** (I76): the **writer alone** — `→` from nowhere lands on the first sample, `←` from nowhere on the last, both clamp at the ends, a table is a no-op, and two plots in one document hold different indices (equal ones would pass a store keyed on the entry alone).
+- **T4.17p** (I76): the **pair, through a frame** — `→` puts `train: 10` on the readout row, a second `→` replaces it with `train: 20`, `←` brings `10` back. Read from the screen, because the key axis is what makes the second frame differ from the first.
+- **T4.18f** (I76): `clear` empties the store through the same subscription that drops the rendered rows.
+- **T6.89** (I76): the writer removed → T4.17h–j and T4.17p fail **and `plot-interaction` still passes**, which is the measured reason nothing noticed for as long as it did — that suite injects `cursorPositions` itself. The key axis removed → T4.17p alone fails, on a frame served from before the cursor moved.
 - **T6.82** (I71): removing the binding that nudges the store → **T4.17f** fails and **T4.17e** passes. The mirror of T6.81, and the pair of rows is the check that the pair of mutations is not asserting one thing. **A field with a key axis and no writer is `cursorPositions`** — correct, complete and unobservable — so the row that fails here is the one that says somebody can move it.
 - **T6.45** (I58): removing the `clear` arm from the subscription → T4.18b fails. **It did not fail the row this replaced**, which asserted a render count: the mutation was applied, the suite stayed green, and the survivor is what said the assertion was about the wrong thing.
 - **T6.38** (I55): handing C03 the same callback for `render` and `repaint` — which is what the tree did before this — → T4.14 fails, and a `SIGWINCH`, a `SIGCONT`, a handoff and a theme change all diff against a screen nobody knows. The mutation is a deletion of two lines and it restores a state in which C03's entire invalidation mechanism, and the comment in `frame-scheduler.ts` reasoning about it, reach nothing.
@@ -2606,7 +2617,7 @@ shape that produced this finding four times: `/drift` **predicted** the empty fr
 `/config` **reached it independently**, which means two authors who had both read the
 convention still shipped it. A helper makes that three authors and an unused function — and
 `usageBlocks` is the measured case of a complete mechanism nobody was obliged to call
-(F92, and entry 21 is still waiting on it).
+(F92 — CLOSED: `usageBlocks` is called from `src/shell/documents.ts`, and entry 21 is no longer waiting on it; this said otherwise until 2026-09-03).
 
 **What a convention can be enforced by and a helper cannot.** The obligation belongs where the
 emptiness is *decidable*: a block computed from two sources is empty exactly when they agree,

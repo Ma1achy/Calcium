@@ -243,7 +243,7 @@ So I14, I15 and I16 are **specified and unbuilt**, and the record matters more t
 
 A `Patch` carries hunks and a path. It does not carry the file — the unchanged lines are not in the block — so a whole-file view means either the block carries the file content or the view fetches it, and both are data decisions rather than rendering ones.
 
-**Decided: fullscreen is every hunk, uncollapsed, scrollable.** What `less` gives you on a `git diff`. It needs no data the block does not already have, which is what makes it specifiable now and buildable when L2 lands.
+**Decided: fullscreen is every hunk, uncollapsed, scrollable.** What `less` gives you on a `git diff`. It needs no data the block does not already have, which is what made it specifiable before L2 existed — and it is built: `src/shell/patch-view.ts`, bound in `src/shell/keys.ts` (this said *buildable when L2 lands* until 2026-09-03).
 
 A C15 pushed view, the third after S12 and S13, so the conventions come free: `esc` pops, arrows and `PgUp`/`PgDn` scroll, `g`/`G` seek. The diff-specific pair is **`n` and `p`, next and previous hunk** — the one motion a diff has that a list does not.
 
@@ -616,7 +616,7 @@ Six tiers. No state machine, so no transition table (A02 §7).
 | **Word-level highlighting within a changed line** | Deferred. It is where diff viewers earn their keep and also where they get slow — an intra-line diff is a second diff algorithm running per changed line. The block shape does not foreclose it: a `spans` field on a line would be additive |
 | Expanding a collapsed region | C23 dispatches it; expansion patches the document (C11 T4.7's mechanism) |
 | Syntax highlighting of the whole file | `code`, C09 |
-| The fullscreen view's implementation | C15, when L2 lands. §3b specifies it so that it is not designed twice |
+| The fullscreen view's implementation | C15 and L4 — built as `src/shell/patch-view.ts` (C22 I41). §3b specified it so that it was not designed twice; this row said *when L2 lands* until 2026-09-03 |
 | A whole-file view with diff decoration | The editor, and it is the same component as the fullscreen view with more data (§3b) |
 
 ### Open

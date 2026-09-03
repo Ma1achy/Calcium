@@ -199,7 +199,7 @@ Guessing which field of an arbitrary envelope is "the" identifier is not knowabl
 
 ## 3a. Action dispatch
 
-C09's `RenderContext.onAction` is supplied by C23. Nothing else may supply it — an action is a submission by another route, and routing submissions is what this component does.
+The action dispatcher — `pipeline.onAction`, the function C16's `rowActivate` reaches through `KeyDeps.onAction` (I37) — is supplied by C23. Nothing else may supply it — an action is a submission by another route, and routing submissions is what this component does. **It is not a member of C09's `RenderContext`**: that listing carried an `onAction` for the life of the project that no renderer read and no product call site supplied (C09 §2, F85's shape), and this clause used to name it as the thing C23 supplies. A block library dispatching its own actions would be L1 causing effects in L2 and L4 at once, which is the reason the clause exists; the field it named was never the mechanism, and the mechanism is the one named here.
 
 | Action | Effect |
 |---|---|
@@ -225,7 +225,13 @@ The mechanism differs from the pop's, because a pop has nothing to say and a ref
 
 Both refusals patch the source entry, exactly as every other refusal here does.
 
-An action from a **frozen** entry is refused (A01 D5, C13 §2): frozen entries hold stale data and firing `↑ promote` from one is the footgun that rule exists to prevent. Actions from a frozen-but-streaming entry are refused for the same reason — it is not focusable, so an action on it can only have arrived by mistake.
+An action from a **frozen** entry is refused (A01 D5, C13 §2): frozen entries hold stale data and firing `↑ promote` from one is the footgun that rule exists to prevent. Actions from a frozen-but-streaming entry are refused for the same reason.
+
+**Reachable from a keyboard since C26 §4g, which is when the ruling was first pressed and had to be finished.** A settled row can be focused, `⏎` arrives here with the settled entry as its origin, and two planned surfaces want something from exactly this path: a notebook's *re-run this cell* (`docs/notes/PRISM_NOTEBOOKS_IDEA.md` — *C23's route, triggered from a settled entry*) and an agent harness's *retry that tool call*. **Neither wants an action.** Both want the entry's **recorded command** re-submitted, and that is the distinction the ruling turns on:
+
+- **All five kinds stay refused, `fill` included.** `exec` and `expand` act on rows that may no longer exist; `open` and `view` name targets the settled document chose; and `fill`'s command was composed against those same rows — a reader reading a stale identifier before running it is not the protection A01 D8 was for. D5 stands whole rather than gaining a per-kind exception, because the thing the consumers need is not one of the five.
+- **What fires from a frozen entry is `rerunEntry`** (→ C16 I29): `⇧⏎`/`⌥⏎` on the focused entry submits `doc.command` through §2's normal path, indistinguishable from typing it — the guard applies, history records it, a new entry is live and the old one stays as it was. It fires against the **command text and never the document's data**, which is the one thing a settled entry holds that is not stale. It works on the live entry too, where it is *run the latest again*.
+- **The refusal names the command.** *`promote` is from a frozen entry — its data is stale. Re-run `/ps` for a live copy.* Named by command rather than by key, because a key spelt in a notice is a second keymap that drifts under rebinding (C16 I19); the reader can type it, and the binding does the same. An entry with no command gets the first sentence alone.
 
 ---
 
@@ -852,9 +858,9 @@ Per submission.
 - **I13** — Every cross-layer effect in §4 is sequenced here; no component causes its own.
 - **I14** — Local handlers are the only place several stores are reached at once, and only through C23.
 - **I15** — The displayed command and the spawned argv correspond exactly (D24). **The displayed command is now displayed** — C22 I33 draws it above each entry — which is what makes this invariant constrain anything: it was written about a `doc.command` no render path read, so it forbade nothing while reading as though it forbade the drift it names. The two forms stay distinct on purpose: the transcript shows `/ps --search=… --open-mr` as typed, and `meta.argv` carries `widget ps --search=… --open-mr --json` for `/debug`. D24's one-token mapping is the correspondence between them. **One entry carries one displayed command, from the first patch to the settle** — the streaming route passed the raw typed line while step 5 passed the resolved argv, so the transcript changed what it said a command was mid-stream, with no event to explain it. `$_` is resolved in both, because the resolved form is what ran.
-- **I16** — C23 is the sole supplier of `onAction`.
+- **I16** — C23 is the sole supplier of the action dispatcher: `pipeline.onAction`, reached by C16 through `KeyDeps.onAction` (I37), is constructed here and nowhere else, and no component below L4 dispatches an action. **The member this used to name — C09's `RenderContext.onAction` — no longer exists** (C09 §2): every real frame rendered against a no-op default, so the clause was exclusive about a field nothing read while the working route ran beside it.
 - **I17** — `open` actions go through the injected opener with an `http`/`https` scheme check, never through a shell.
-- **I18** — Actions originating from a frozen entry are refused, and **the refusal patches the source entry rather than appending**. An append would freeze the block the action came from, refusing the next action for a different reason and clearing the selection A01 D7 preserves — C23 §4's pop row, one section over.
+- **I18** — Actions originating from a frozen entry are refused, and **the refusal patches the source entry rather than appending**. An append would freeze the block the action came from, refusing the next action for a different reason and clearing the selection A01 D7 preserves — C23 §4's pop row, one section over. **All five kinds, and the notice names the entry's recorded command; the one thing that fires from a frozen entry is a re-run of that command through §2's submit** (`rerunEntry`, → C16 I29) — which is not an action, fires against the command text and never the document's data, and is what both named consumers (a notebook's re-run, an agent harness's retry) actually need. Reachable from a keyboard since C26 §4g, which is when the ruling had to be finished.
 - **I19** — Stall detection, part refresh and the identity notice are C23's — the first two on C22's injected clock, the third on C22's signal. No adapter, view, layer or entry reads a clock, and no component but C23 appends.
 - **I20** — Refresh offsets are assigned so no two declared parts fire in the same tick.
 - **I21** — A failing refresh is contained to its declared part, backs off to a 5-minute cap, and resets on success. **Two failures do not retry at all**: a `render` that throws is deterministic, so retrying burns cycles and flickers (A02 §7 rule 2), and a part declaring no interval is one-shot, so re-attempting it is a surprise the user did not ask for (rule 3). Both are decided from the declaration rather than from the failure, which is what makes them answerable at the moment one arrives. And a patch refused with `"unknown"` or `"settled"` is not a failure in this sense — the host is gone, so the part is released rather than backed off.
@@ -912,9 +918,9 @@ Per submission.
 13. `/help` renders from the manifest and C16's keymap, so help cannot drift from behaviour (I26).
 14. The displayed command equals the spawned command (I15).
 15. Submissions are refused once C22 sets `session.stopping` (I12).
-16. C23 supplies `onAction`; `exec` re-enters the normal submission path (I16).
+16. C23 supplies the action dispatcher `pipeline.onAction`, and nothing below L4 dispatches one; `exec` re-enters the normal submission path (I16).
 17. `open` is scheme-checked and never shelled (I17).
-18. Actions from frozen entries are refused, by a patch to the source entry rather than an append (I18).
+18. Actions from frozen entries are refused — every kind — by a patch to the source entry that names its recorded command; a re-run of that command is the one thing that fires from a frozen entry, through §2's submit (I18, → C16 I29).
 19. Anything periodic is C23's, on the injected clock, and so is the identity notice C22 signals; nothing below L4 reads time and nothing but C23 appends (I19).
 20. A stream silent for 120 s gets a muted stall notice, never an error (I25).
 21. View refreshes are staggered by offset and fail in isolation (I20, I21).

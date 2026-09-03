@@ -94,7 +94,7 @@ Both are exposed as `AsyncIterable<string>` over a **streaming UTF-8 decoder**. 
 
 Each stream is bounded at 8 MiB by default. Beyond that, C21 stops buffering, sets `overflowed` on the handle, and continues draining so the child is not blocked on a full pipe — a child stuck on write is worse than truncated output, because it never exits and never reports.
 
-**The mark is a field, not a sentinel in the stream.** A marker chunk would be indistinguishable from content a child actually emitted — C06 would read it as a line of NDJSON and report it as malformed — and it would put a fact *about* the channel inside the channel. `overflowed` travels to C06 as `RawResult.overflowed`, reported and never interpreted; whether it reaches the document, and under which name, is C07 §4's open question.
+**The mark is a field, not a sentinel in the stream.** A marker chunk would be indistinguishable from content a child actually emitted — C06 would read it as a line of NDJSON and report it as malformed — and it would put a fact *about* the channel inside the channel. `overflowed` travels to C06 as `RawResult.overflowed`, reported and never interpreted; C07 §4 rules that it reaches the document as a `notice` block and never as `meta.truncated` (C07 I22).
 
 ---
 

@@ -39,6 +39,14 @@ type InputEvent =
   | Readonly<{ kind: "mouse"; row: number; col: number; button: string; press: boolean }>;
 ```
 
+**`CSI Z` is `⇧tab`, and it was discarded until a binding needed it** (C26 §4g row c, I17). Every
+terminal sends backtab as `ESC [ Z` — the shift is in the final letter, not in a parameter — so
+it is a row of its own in the decoder rather than an entry in the letter table, whose finals
+carry no modifier. Only the bare form: `CSI 999 Z` is malformed and stays discarded (T3.13),
+which the first version of the row got wrong and the existing test caught. Found the way the
+other three were, by T2.13 walking the keymap through the decoder — the fourth instance of the
+class, and the first found before the row shipped.
+
 **A paste is one event, not N key events.** Bracketed paste wraps content in `CSI 200~` … `CSI 201~`; C16 buffers between the markers and emits a single `paste`. Ten thousand characters arriving as ten thousand key events would each trigger a completion recompute and a frame commit, which is a hang rather than a slowdown.
 
 Where `bracketedPaste` is unavailable (C02 §4), C16 falls back to a timing heuristic: more than 8 characters within 30 ms with no intervening escape is treated as a paste, and a notice is committed on first use so the user knows the behaviour is approximate. The machine is enumerated in §7 and its one qualification to I6 is stated there.
@@ -143,6 +151,8 @@ type StoredFocus =
 ```
 
 It is a focus *location*, not a bit — when focus is in the live block, which row holds it is part of the same fact and has no separate owner. C09's `FocusState` is derived from this plus C13's `liveId`. `↓` from the prompt moves focus into the live block's rows; `Esc` returns it.
+
+**The location now names its entry as well** (C26 I21, §4g): the `liveBlock` arm carries `entryId` beside the element address, because focus can be in a settled entry and three readers that each derived the entry from `liveId` were three copies of one constant. C09's `FocusState` is derived from this plus `focusedEntryId()` in L4, which answers the stored entry while it exists and the live one when it does not (C26 I22). The target keeps its name; *live* in `liveBlock` is historical.
 
 **`↓` is one binding with two effects, in order** (I22). The prompt's `↓` is
 `historyNext`, and this section's sentence says the same key enters the live
@@ -552,9 +562,35 @@ They target `global`, which is the first built-in use of that target and is what
 
 The set is closed for **built-in** bindings only. A `BlockKeymap`'s action is a surface's string dispatched through C23's block-action route (C23 §3a), and it is open by design — the surface supplies both halves.
 
-**Surfaces contribute bindings through the block.** A surface is not a component and cannot register a handler, so an adapter may attach a `BlockKeymap` to the block it produces. C16 merges it into the `liveBlock` target **while that block is live**, and withdraws it when the block freezes — so `s` sorts a `/ps` table and does nothing once a newer entry arrives.
+**Three more `liveBlock` families, and each is a ruling made elsewhere landing as rows here.**
 
-**Conflict detection at startup**: two bindings for the same `(target, key)` is a construction error, not a last-wins. A block keymap colliding with a global binding is the same error, raised when the block is committed rather than at startup — the global always wins, and a silent shadow would be worse than a loud refusal.
+| Key | Action | | Key | Action |
+|---|---|---|---|---|
+| `⇧tab` | `entryPrev` | | `tab` | `entryNext` |
+| `←` | `cursorLeft` | | `→` | `cursorRight` |
+| `⇧⏎`, `⌥⏎` | `rerunEntry` | | | |
+
+**`tab`/`⇧tab` move focus between entries** (C26 I21, §4g): the only two keys that change which
+entry focus is in, landing on the target entry's first element. `tab` was free at this target —
+the prompt's is `complete` and the overlay's is `menuNext`, one key at three targets resolved by
+the ladder — and `⇧tab`'s wire form is §2's `CSI Z`.
+
+**`←`/`→` are the horizontal pair** (I28, C22 I76, C12 §3s). The vertical pair steps elements
+and the horizontal one had no subject; the record said both *fell through to the prompt*, and
+they did not — dispatch runs the target's handlers and then `global`, neither binds an arrow,
+and both were dropped. That claim was carried through two rulings (C22 I71 chose `[` `]` on it)
+and measured by nothing until a row wanted the keys. The first consumer is the plot's crosshair
+and the second a table's column cursor (C26 §11), which is why the pair is a built-in rather than
+one kind's key; on a kind with no horizontal interior it is a no-op, the camera family's
+precedent.
+
+**`⇧⏎`/`⌥⏎` re-run the focused entry's recorded command** (I29, C23 I18): the prompt's own
+newline pair at the other target, meaning *run*, which is the notebook convention. Both wire
+forms are already pressed through the decoder for the prompt's rows.
+
+**Surfaces contribute bindings through the block.** A surface is not a component and cannot register a handler, so an adapter may attach a `BlockKeymap` to the block it produces. C16 merges it **while that block is live**, and withdraws it when the block freezes — so `s` sorts a `/ps` table and does nothing once a newer entry arrives.
+
+**A colliding block key is placed, not refused** (I27). Two bindings for the same `(target, key)` in the *default* table is a construction error, not a last-wins. A block keymap's key that `global` or `liveBlock` already binds used to be the same error, raised at commit — *the global always wins, and a silent shadow would be worse than a loud refusal* — and its first consumer would have tripped it on every key it has: the widget design (`docs/notes/CALCIUM_WIDGETS_DESIGN.md` §keys) binds `↑` `↓` `PgUp` `PgDn` `Esc`, all five built-ins here, and C12 §3s's cursor keys are the arrows. C26 §4f had already found what the mode is for — *the keys `mergeBlock` refuses* — so the ruling is the placement that section implies: **a colliding key lands at `interaction`**, the one rung where the built-ins are out of scope, and fires once the reader has entered the block (C26 I14); **a free key lands at `liveBlock`** and works from the first `↓` (A01 D4). Neither half is shadowed and nothing is silent — `/help` lists both at their targets (I19) — and the one refusal that survives is the same key twice inside one block keymap, which is the block's own author contradicting themselves. **`interaction` gains its first bindings by this route and by no other**: a framework row there would shadow a block's, which is §5a row A4.
 
 ---
 
@@ -634,6 +670,10 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 - **I25** — **A layer that must be answered gets its keys before the ladder does.** When the top layer carries an answer callback, rung 4 offers it every key — accelerators, `Enter`, `Esc` and `⌃c` — and consumes what it takes, **before both of the rung's existing clauses** — and it is two clauses rather than one, which the mutation pass had to establish because the first wording said "before the `⌃c` clause" and a reordering satisfied it. They fail differently: the `isCtrlC` bail-out returns false for every key that is not `⌃c`, so an accelerator, `Enter`, `Esc` and an arrow are **dropped**; the `!top.dismissable` clause returns *consumed, and nothing happens* (I8), so `⌃c` **hangs** — the key vanishes and the handler awaiting it waits forever. One ordering, two defects, and a wording naming only the second reads as satisfied while the first is live. **The rung was written when no layer could be answered, so "nothing happens" was the whole truth; a question makes it a hang.** `Esc` and `⌃c` are routed rather than special-cased here, because what they mean is the question's business — C23 I36 resolves both with the default choice — and a router that knew that would hold half of a rule whose other half lives two layers away. The callback is read from the top layer only, never searched down the stack, for C15 `pop()`'s reason: a question raised over a completion menu must not be answered by the menu.
 - **I26** — **`enter` is bound on `liveBlock`, and `rowActivate` is in `KeyAction`.** I22 gave the target entry and exit and three bindings — `escape`, `down`, `up` — which is a cursor with nothing to press. The effect is C23's (C23 I37); what C16 owns is that the key resolves from the table like every other, so `/help` renders it and a consumer can rebind it. **The union's gap was the whole of F21 from this side**: an action with no `KeyAction` cannot be bound, and a binding that does not exist reads exactly like one that is unused. It is the same key `overlay` accepts a menu item with, which is the consistency a reader has already learnt before reaching a row.
 
+- **I27** — **A block key that collides with a `global` or `liveBlock` built-in is merged at `interaction`; a free key is merged at `liveBlock`; the same key twice in one block keymap is a construction error.** The throw this replaces was correct about the hazard — a silent shadow — and wrong about the remedy, because its first consumer needs exactly the keys it refused: widgets bind the arrows, paging and `Esc` (§6). Placement at `interaction` is the mode's purpose made mechanical (C26 §4f): the built-ins are out of scope there by `FOCUS_ORDER`, so nothing is shadowed and `/help` lists both halves at their targets. Withdrawal on freeze takes both.
+- **I28** — **`←` and `→` at `liveBlock` are the horizontal pair, and they are built-ins.** They resolve to `cursorLeft`/`cursorRight`; the effect moves a focused plot's crosshair (C22 I76) and is a no-op on a kind with no horizontal interior. They were dropped at this target, not passed to the prompt as two rulings said — and a claim about where a key goes is settled by `dispatch`'s three steps, which never include `prompt` from `liveBlock`.
+- **I29** — **`⇧⏎` and `⌥⏎` at `liveBlock` re-run the focused entry's recorded command through C23 §2's submit, and nothing else fires from a frozen entry** (→ C23 I18). Not an action kind: the five kinds fire against a document's data, which a frozen entry's is stale; the command text is not. An entry with an empty command is a silent no-op and declares no element to be focused on anyway.
+
 **And a question outranks rungs 1 and 2, which is the one place newest-first is not enough on its own.** A local verb awaiting `ctx.ask` is `inFlight` for the whole time its question is on screen, so `⌃c` was taken by the cancel rung and the question never saw it — two rungs with a claim, and the older one higher. Ruling A's own argument decides it: `Esc` and `⌃c` collapse *because* declining and cancelling produce the same outcome, and when two paths produce the same outcome the one that leaves a record is the one to keep. Cancellation discards the entry; declining settles one saying nothing changed. **Found by a frame-read and reachable by nothing else** — the container was untouched and the layer was gone, which is everything a test asserts, and the frame showed that the submitted line had disappeared. The suite agreed throughout, because every harness reported `inFlight: null` and that is the one arrangement where both readings agree.
 
 ---
@@ -665,6 +705,10 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 22. Step 3 is skipped when the top layer must be answered **or covers the region**; the two are different properties and neither implies the other, and coverage is read from the layer's box rather than from its kind (I8).
 24. A top layer that must be answered receives every key at rung 4 before **both** of the rung's existing clauses, and a question outranks the cancel rungs above it — so `Esc` and `⌃c` reach the question rather than being dropped, consumed into silence, or cancelling the verb that asked. The callback comes from the top layer only (I25).
 23. Every focus target that takes ordinary keys has bindings, with `copyMode` exempted by name because its only key is the ladder's. `pushedView` gets `n`/`p`, `g`/`G`, paging and `Esc`, and its `Esc` is the view's own dismissal rather than §5's cancellation rung (I24).
+25. A colliding block key is placed at `interaction` and a free one at `liveBlock`; only a key bound twice in one block keymap is refused (I27).
+26. `←`/`→` at `liveBlock` are built-ins for the horizontal axis, the crosshair first (I28).
+27. `⇧⏎`/`⌥⏎` at `liveBlock` re-run the focused entry's recorded command, and that is the whole of what fires from a frozen entry (I29, → C23 I18).
+28. `CSI Z` decodes as `⇧tab`, bare form only (I17, §2).
 
 ---
 
@@ -805,6 +849,12 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T6.9e** (I17): dropping bit 8 from `modifiersOf`'s `meta` → T1.3e fails, and `⌥⇧←` arrives as `⇧←` on every terminal that sends Option as Meta — a **live** binding rather than a dead one, which is why no row above the decoder fails with it.
 
 ---
+
+- **T2.4b–e** (I27): a key `global` binds lands at `interaction` and the global is untouched; `up` from the real table lands at `interaction` while `rowUp` keeps `liveBlock` and a free key lands at `liveBlock`; the same key twice in one block keymap throws and leaves nothing behind; withdrawal takes both halves. **T2.4c is the fabricated collision**, on `defaultKeymap` itself.
+- **T2.13** (I17, §2): `liveBlock s+tab` has the wire form `CSI Z`, and `liveBlock left/right/s+enter/m+enter` the prompt's. Router-decode **T3.13** is the control: `CSI 999 Z` stays discarded.
+- **T4.17h** (I28): the horizontal pair moves a focused plot's cursor, clamped to its samples; **T4.17i** (I28): a table is a no-op and a first `←` lands at the far end (→ C22 I76).
+- **T4.61** (I29): `⌥⏎` re-runs the **focused** entry's command, not the live one's; **T4.61b** (I29): `⇧⏎` is the same; **T4.61c** (I29): at the prompt both insert a newline and run nothing. **T1.17b** (→ C23 I18): `⏎` on a settled row is refused with the command named.
+- **T6.x** (I27): restoring the throw → T2.4b and T2.4c fail. (I29): reading `liveId` in `rerunEntry` → T4.61 fails, because it submits `/more` where `/rows` was focused. (I28): the writer removed → C22's T4.17h–j and T4.17p fail and `plot-interaction` passes.
 
 ## 11. Out of scope
 

@@ -76,6 +76,8 @@ export type { CommandPolicy, Classification, ParseResult };
 export type { BlockDefinition, Measure, MeasureFn, RenderContext, BlockKeymap };
 export type { TerminalCapabilities };   // what `TuiConfig.capabilities` overrides — C22 I49
 export type { TransportRouter, VerbTransport, Invocation };
+export type { TransportDeps, Fixture, FixtureHandler };   // what the constructors below take — MG29 named all three
+export { createTransport, createFixtureTransport, createEmulatedTransport, createRouter };   // C06 §2 — `TuiConfig.transport` is a `TransportRouter` and until these nothing on the entry produced one
 export type { WorldDriver };
 
 // utilities a custom block kind needs
@@ -356,8 +358,9 @@ one:
   actually needed to say about its horizontal axis — that it counts ticks and how
   many returned nothing. A surface whose axis is a sentence has to put it in a
   block beside the plot whatever this field does.
-- **`emptyMessage` has no consumer**: no surface yet renders a plot that can be
-  empty. It is one line away the day one does.
+- **`emptyMessage` is exposed** — `b.plot` declares and forwards it since 6c61593d
+  (2026-08-30), and the table below says why. This bullet said *has no consumer* until 2026-09-03;
+  what is still true is that no test constructs `b.plot({ emptyMessage })`.
 
 **`b.kv` narrows rather than discarding.** `KeyValue` rows are
 `{ label; value: string; tone? }` — no glyph, no spark — so a `CellInput`

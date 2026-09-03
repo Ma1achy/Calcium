@@ -582,6 +582,15 @@ the scope in which the framework's own `liveBlock` bindings are out of scope, an
 only construct in the design that could hand `↓` or `⏎` to a block. That purpose is narrower
 than §2's *sends keys to the thing focused* and it is the one the tree can actually express.
 
+**And the throw has since become the placement this paragraph implies** (C16 I27). `mergeBlock`
+no longer refuses a colliding key: it binds it at `interaction`, and a free key at `liveBlock`.
+The two named consumers forced the ruling before either existed — the widget design binds `↑`
+`↓` `PgUp` `PgDn` `Esc`, and the plot's cursor keys are the arrows — so the first adapter to
+attach a keymap would have met the throw on every key it had. The condition §8b.8 named is
+therefore answered by a mechanism rather than reported by an error, and `⏎`'s second effect is
+still not committed: the mode has a *route* now and still no *inhabitant*, since `BlockKeymap`
+has no producer in `src/` (T2.6a still holds).
+
 ### The disposition, and it is not a deferral
 
 - **D4 stands.** Non-colliding block keys belong to `liveBlock`, reached by `↓`. Shipped and
@@ -598,6 +607,80 @@ than §2's *sends keys to the thing focused* and it is the one the tree can actu
   require the mode has never been raised — the purpose is real, expressible, and uninhabited.
   Recorded that way rather than as *the mode has no purpose*, because the two disagree about
   what happens the first time an adapter wants `⏎`.
+
+---
+
+## 4g. Block-to-block focus — the ceiling lifts, walked by hand
+
+**The measurement first.** `elementsIn` had exactly one caller, `liveElements` in
+`src/shell/construct.ts`, and it read `stores.transcript.liveId`. `focusFor` in `session.ts`
+answered `null` for every entry but the live one, and `focusedBlock` read `liveId` again. So
+no element outside the live entry could be focused, and the three places that would have had
+to agree about *which entry* were all agreeing on the same constant — which is why the address
+model never carried the entry: it had no second value to distinguish from. §11 recorded the
+cost as a number on the screen (*⋯ 12 above · 368 below*), and C04 §3c cell 6 ruled around it
+(*a settled scroll keeps its offset and cannot be moved*). That ruling was a consequence of the
+ceiling, not of anything about a scroll, and it is withdrawn with it (→ C04 I48).
+
+**The stored location gains the entry, and the address does not.** `StoredFocus`'s `liveBlock`
+arm carries `entryId` beside `element`; `ElementAddress` stays `(blockId, elementId)`. The
+scope stack is `entry → block → row → cell` (§3, I1), so the entry is the outer scope the
+element sits in rather than a third half of the element's own name — and `element: null`,
+*in the block on no element yet*, needs an entry to be in, which an address cannot carry. The
+`anchor` shares the entry by construction: `extendRow` moves within one entry's list, so a
+selection cannot straddle two.
+
+**The target keeps its name.** `liveBlock` is now *a transcript block* rather than *the live
+one*, and renaming it would touch every binding, every handler registration and every test
+for a word. The name is recorded as historical here rather than corrected in the tree.
+
+### The classification table — structural, at rest
+
+| # | the two rules that meet | ruling |
+|---|---|---|
+| **a** | *the sequence is the entry's* (I19) meets *focus can be in any entry* | **The sequence stays the entry's.** `↓`/`↑` step within the focused entry; a block's edge is not a boundary and an entry's edge is. One flat list over the whole transcript was the alternative and it puts the prompt nowhere: `↓` from the prompt would enter at the **oldest** entry's first element, or the live entry's head would need two neighbours — the prompt (I22) and the settled entry above — and one key would mean two things at one target, which is §4b's shape |
+| **b** | *the prompt neighbours the head* (I19) meets *a settled entry has a head too* | **Only the live entry's head neighbours the prompt.** `↑` at a settled entry's first element **stops**; `Esc` is the way out from every entry, as §4c already says it is for the tail. The neighbour rule is unchanged and asymmetric neighbours are still what it is over |
+| **c** | *entries are the outer scope* meets *no key moves between scopes* | **`tab` and `⇧tab` move between entries** — `⇧tab` to the previous (older, above) entry's first element, `tab` to the next (newer). An entry with no elements is skipped, because entering it would be I22's third clause inverted: a block with nothing focusable is not entered. At the live entry `tab` stops; at the oldest entry with elements `⇧tab` stops. Both keys were free at `liveBlock`, and `⇧tab`'s wire form `CSI Z` was not decoded — added, and pressed through the decoder (→ C16 §2, I17) |
+| **d** | *interaction is the block's own keys* (§4f, A01 D4) meets *D4 withdraws them on freeze* | **Interaction is reachable only in the live entry.** `activeTarget` answers `interaction` when the stored entry **is** the live one; a settled entry with `mode: "interact"` stored answers `liveBlock`. The gate used to be *is there a live entry*, which was the same test while focus could only be in the live one, and is narrower now |
+| **e** | *`⏎` dispatches the element's `activate`* (I14) meets *an action from a frozen entry is refused* (C23 I18) | **The refusal is reached for the first time from a keyboard**, and the ruling in C23 I18 is what it says. `rowActivate`'s origin is the **focused** entry, never `liveId` — with the old origin a settled row's action would have fired against the live entry's document, which is the wrong-entry defect §8b.6 was about one level up |
+| **f** | *the render key carries focus* (C22 I58) meets *focus is now per entry* | Nothing changes: `focusFor(graph, entryId)` already answers per entry and `focusKey` keys on what it returns. The row is here because it was the one to check — a settled entry gaining a highlight is a new cell in a cache that never had one, and it is invalidated by the same axis the live entry's always was |
+
+### The sequence trace — event-mediated
+
+| # | what happens in between | ruling |
+|---|---|---|
+| **1** | focus is in a **settled** entry and a command is **submitted** | C16 I2: `resetFocus()` from C23's submit row, focus to the prompt. Unchanged, and now it is the only path by which the live entry changing moves focus |
+| **2** | focus is in the live entry and a **notice is appended** (a refusal with no origin, the state-directory warning, a stall) | **Focus stays on its element, which is now in a settled entry.** Before this section the notice became the live entry, `liveElements()` answered `[]` for it, and the reader was left in `liveBlock` with nothing highlighted: `↓` did nothing, `↑` and `Esc` left. A dead state that read as *focus is in the block*, reachable from any notice. The entry on the location is what makes the element survive |
+| **3** | the focused entry is **evicted** (C13's cap; §8a trace 1 said this becomes reachable here, and it has) | **Resolution falls to the live entry's first element.** `focusedEntryId()` answers the stored entry while it exists and the live one when it does not; nothing about the evicted entry's position survives — its neighbours cannot be named without it — so this is the block-went clause of I10 one scope up: *falls to the start of what is there*. Display and keys go through the same pull, so the highlight and the next arrow agree. Not a subscription: the eviction callback drops render state, and C16 I11 keeps focus a pull |
+| **4** | a **pushed view** opens and pops while focus is in a settled entry | `activeTarget` answers `pushedView` while the view is up and `liveBlock` after; the stored location is untouched by either, exactly as T1.3g asserts for the live entry. Nothing here is per entry |
+| **5** | **`tab`** from a settled entry while an entry between it and the live one has no elements | The empty entry is skipped (table row c); focus lands on the next entry that has one. Without the skip, `tab` would enter a notice and every arrow would be a no-op there |
+| **6** | `⇧tab` while a **selection** is open | The move collapses it and lands in navigation — `focusRow`'s rule (I20): a move is a move, whatever key made it |
+
+### The two checks neither artefact indexes
+
+**Does the ruling name an operation that exists?** *`⇧tab` moves to the previous entry* needs
+the decoder to produce `{name: "tab", shift: true}`, and it did not: `CSI Z` was outside
+`CSI_LETTER_KEYS`. The operation is added rather than assumed, and T2.13's decoder walk is what
+would have refused the row otherwise (C16 I17). *Resolution falls to the live entry* needs a
+pull that knows whether the stored entry exists — `focusedEntryId()` in `construct.ts`, which
+is the one place the transcript, the store and the registry meet.
+
+**What does a refusal leave behind?** `⏎` on a settled row reaches C23 I18's refusal, which
+**patches the source entry** — so the refused entry's `rev` moves, the render cache misses on
+it, and focus stays on the row. Had the refusal appended, the entry the reader was in would
+have stayed settled and a new live notice would have taken `liveId`; trace row 2 says focus
+would survive that too, which is the second reason the widening is safe.
+
+### The rulings
+
+- I21 (§8) — the focused entry is part of the stored location, `tab`/`⇧tab` move between
+  entries, and the sequence stays the entry's.
+- I22 (§8) — resolution honours the entry while it exists and falls to the live one when it
+  does not.
+- **I2's gate narrows**: interaction is reachable in the live entry only (table row d).
+- **C04 §3c cell 6 and C04 I48's clause are withdrawn**, and roadmap 46's *permanently until
+  block-to-block focus lands* has landed — both recorded in `SCRATCH` requests rather than
+  edited here, because neither file is this section's.
 
 ---
 
@@ -797,7 +880,10 @@ notice here.
 - **I1** — The scope stack is at most four deep, and a level exists only where §5's
   declaration reports an element at it.
 - **I2** — Interaction mode is a focus target, so C16 §5's ladder derives from `FOCUS_ORDER`
-  and holds no order of its own (§2).
+  and holds no order of its own (§2). **And it is reachable in the live entry only** (§4g row d): the
+  stored location names an entry, and `activeTarget` answers `interaction` when that entry is
+  the live one — A01 D4 withdraws a block's keys on freeze, so a settled entry has nothing to
+  interact with.
 - **I3** — `elements` is pure in `(block, width)`. Focus is not a parameter, so a
   focus-dependent geometry is unrepresentable rather than forbidden.
 - **I4** — Every element's rows lie within `[0, measure(block, width))` and its columns within
@@ -866,7 +952,8 @@ notice here.
   since focus there is the view and not an element; *the window follows* has no subject until
   a kind declares both `window` and `elements`, which none does (§4a).
 - **I19** — **A boundary is a neighbour question, and the sequence is the entry's** (§4c). The
-  live entry's elements are one flat list across its blocks, so a block's edge is not a
+  **focused** entry's elements are one flat list across its blocks (§4g row a — it was *the live
+  entry's* while only the live entry could hold focus), so a block's edge is not a
   boundary; only the sequence's ends are. At an end a movement key **moves to the neighbouring
   scope if there is one and stops if there is not** — the prompt neighbours the head, nothing
   is beyond the tail — which is one symmetric rule over asymmetric neighbours rather than a
@@ -883,6 +970,18 @@ notice here.
   point of saying so** — interaction mode has no bindings (§8b.8), so nothing observable
   distinguishes the two answers, and the moment it has bindings this is the rule rather than a
   question reopened with a shipped surface.
+- **I21** — **The focused entry is part of the stored location, and `tab`/`⇧tab` are the only
+  keys that change it** (§4g). `StoredFocus`'s `liveBlock` arm carries `entryId`; `↓`/`↑`,
+  `⇧↓`/`⇧↑`, `⏎` and `y` all act within that entry and never leave it; `⇧tab` moves to the
+  previous entry that declares an element and `tab` to the next, landing on its first element
+  in navigation with no selection. An entry with no elements is skipped, the ends stop, and the
+  prompt is reached by `Esc` from any entry and by `↑` from the **live** entry's head alone (I22
+  → C16). A move between entries is a move, so I20's rule applies to it unchanged.
+- **I22** — **Resolution honours the stored entry while it exists and falls to the live entry
+  when it does not** (§4g trace 3). One pull, `focusedEntryId()`, answers for the render side
+  and the key side, so an evicted entry's highlight and its next arrow land in the same place.
+  The fall is to the live entry's **first** element — I10's block-went clause one scope up —
+  because nothing about an evicted entry's position survives to name a nearer neighbour.
 
 ---
 
@@ -1202,7 +1301,7 @@ is the shape a spec commit should have.
 
 1. The scope stack is `entry → block → row → cell`, at most four deep (I1).
 2. Navigation and interaction are modes, and interaction is a focus target (I2).
-3. `⏎` dispatches the focused element's `activate` and is silent otherwise; `Esc` leaves interaction, then leaves the scope (I14). **`⏎`'s second effect — entering interaction — is not committed**, and §4f names the condition rather than leaving it as *the mode has no bindings*: **until a block needs a key `liveBlock` or `global` already binds**, which `mergeBlock`'s throw reports the first time it happens (§8b.8, §4f). It arrives with that producer, as one binding with two effects in order (→ C16 I22).
+3. `⏎` dispatches the focused element's `activate` and is silent otherwise; `Esc` leaves interaction, then leaves the scope (I14). **`⏎`'s second effect — entering interaction — is not committed**, and §4f names the condition rather than leaving it as *the mode has no bindings*: **until a block needs a key `liveBlock` or `global` already binds** — which `mergeBlock` now answers by placing that key at `interaction` rather than by throwing (→ C16 I27, §4f), so the condition is met by mechanism and what is still missing is a producer of `BlockKeymap` in `src/` (§8b.8). It arrives with that producer, as one binding with two effects in order (→ C16 I22).
 4. `ArrowPolicy` and `EscapePolicy` resolve global → kind → per-node override, and an override for a level the kind does not report is a construction error (I15).
 5. `BlockDefinition.elements` is optional, pure in `(block, width)`, and is the single source for both keyboard and pointer (I3, I8).
 6. Element lists satisfy containment, reading order, per-level disjointness and stability (I4, I5, I6) — checked generically by a conformance sweep, as `window`'s equality is.
@@ -1214,6 +1313,8 @@ is the shape a spec commit should have.
 12. Movement keys move focus and the window follows; paging keys move the window and not focus; a focused element outside the window is legal and the next movement key steps from it (I18, I7). The default is read off which of `elements` and `window` a kind declares, and it **stands alone**: the override this once offered needed an `ArrowPolicy` value that does not exist (§4d), so it is withdrawn rather than left as a sentence.
 13. **A boundary is a neighbour question and the sequence is the entry's** — a block's edge is not an end, an end moves to its neighbouring scope or stops, and `ArrowPolicy`'s **edge values are not adopted** because no per-kind value can name a property of the entry's sequence (I19, §4c).
 14. **A fall-forward lands in navigation** — restoration moves focus to a different element, and a mode belongs to the element it was entered on (I20, I10). Vacuous until interaction mode has bindings, and stated now because it is cheap to rule and expensive to reopen.
+15. **Focus reaches every entry, not only the live one** — the stored location carries the entry, `tab`/`⇧tab` move between entries and the sequence stays the entry's (I21, §4g).
+16. **An evicted entry's focus falls to the live entry**, through the one pull the render side and the key side share (I22, §4g).
 
 **The four-kind validation of §4 is not here, and SP1 is why.** *If it is none of those, it
 is a § detail rather than a commitment* — it is a step the implementation takes, and no
@@ -1275,6 +1376,21 @@ Named against the invariants; the tiers are the six.
 - **T6.x** (I11) — turning the pull into a subscription → the half-applied-store row fails.
 - **T6.x** (I2) — moving the mode out of `FOCUS_ORDER` into a pre-dispatch flag → the ladder
   ordering row fails.
+- **T3.x** (I21, §4g) — two entries each holding a table: `⇧tab` from the live entry's row lands
+  on the settled entry's first row, **and the frame highlights it** — read from the screen, not
+  the store, because `focusFor` answered `null` for every settled entry and a store assertion
+  passes with the ceiling intact. `↑` there stops; `Esc` leaves; `⏎` there reaches C23 I18's
+  refusal, patched into the **settled** entry.
+- **T3.x** (I21, §4g trace 2) — a notice appended while focus is in the live entry: the highlight
+  stays on the same row of what is now a settled entry, and `↓` still steps.
+- **T3.x** (I22, §4g trace 3) — a stored entry that no longer exists resolves to the live entry's
+  first element, on both the render side and the key side. **The state is constructed rather than
+  driven**: C13's cap is 100,000 blocks and `construct.ts` threads no smaller one, so a real
+  eviction through the graph is unreachable from a test, and the state eviction leaves — a stored
+  id absent from `entries` — is what is built.
+- **T6.x** (I21) — `focusedEntryId()` answering `liveId` unconditionally, which is the ceiling
+  restored → the `⇧tab` row fails. `rowActivate` taking `liveId` as the origin → the refusal
+  row fails, because the action fires against the wrong entry and is not refused at all.
 
 **The mutation pass is scheduled, not optional.** Every module mutated on landing; a mutation
 that fails nothing indicts the tests or the prose, and §5's vacuity note is the sentence most
@@ -1289,17 +1405,16 @@ listed so the Order list can point here instead of carrying a duplicate:
 
 - **10** question / menu primitive — `ctx.ask` exists with `choices`
   (`shell/local/registry.ts:59`); the in-transcript menu block is an interactive element.
-- **15** text selection, copy and semantic copy — `copyMode` is a focus target with **zero**
-  bindings and no producer (`enterCopyMode` is defined nowhere in `src/`). Semantic copy is
-  *copy the focused element*, which needs §5 and nothing else.
+- **15** text selection, copy and semantic copy — BUILT. `copyMode` has a producer
+  (`enterCopyMode` in `src/shell/session.ts`) and two bindings (`⌥v` at `prompt` and
+  `liveBlock`, `src/interaction/router/keymap.ts`). This bullet said *zero bindings and no
+  producer* until 2026-09-03. Semantic copy is *copy the focused element*, which needs §5 and nothing else.
 - **16** one popup — the confirm and the completion menu are two mechanisms today; whichever
   survives is an interaction-mode consumer.
-- block-to-block movement · column and cell movement · the focusable-block concept · clickable
-  rows and links — §3 and §5. **Block-to-block movement now has a visible symptom, which it
-  did not when this list was written**: only the live entry holds focus, so a `scroll` in a
-  settled entry cannot be aimed, and C04 I49 makes it *say* how much is unreachable — *⋯ 12
-  above · 368 below*. A deferral whose cost is a number on the screen is one that gets
-  revisited, where a deferral with no symptom is one nobody can point at (C04 §3c cell 6).
+- ~~block-to-block movement~~ **built, §4g** — the symptom this bullet used to carry (*⋯ 12
+  above · 368 below* on a settled `scroll` nothing could aim) was what got it revisited, which
+  is the argument the bullet made for itself. Column and cell movement · the focusable-block
+  concept · clickable rows and links — §3 and §5, still here.
 - `pushedView`'s nine flat bindings — §2 and trace 6.
 
 ## 12. Out of scope

@@ -168,6 +168,58 @@ C13's granular `Change` (I12) is what makes this incremental. A bare "something 
 
 ---
 
+### 4a. One block's rows on the render path — bounded, with a residue
+
+**Ruled 2026-09-03, measured first.** D40 caps *blocks per document* (C13 §4); nothing capped
+*rows in one block*, and the transcript's render path — `session.ts` calling
+`registry.windowSequence(entry.doc.blocks, width, from, to)` — pays for every kind that
+declares no `window` (C09 I25) by painting the whole block and dropping rows. Measured
+against `dist/`, one block, a 40-row window at width 100:
+
+| kind | lines | `windowSequence` keeps | paint |
+|---|---|---|---|
+| `code` | 2 000 | 2 000 of 2 000 | 1 406 ms |
+| `code` | 20 000 | 20 000 of 20 000 | 11 360 ms |
+| `raw` | 2 000 | 2 000 of 2 000 | 941 ms |
+| `raw` | 20 000 | 20 000 of 20 000 | 6 880 ms |
+| `logs` | 2 000 | 40 of 2 000 | 21 ms |
+| `logs` | 20 000 | 40 of 20 000 | 30 ms |
+
+`measure` is cheap at every size (≤ 12 ms) and so is the window arithmetic; the cost is the
+paint, and it is linear in the block rather than in the region. A 2 000-line `code` result —
+a `--json` inspection of a long list, a file shown whole — costs seventy times the frame budget
+**on every frame** the entry is on screen, and roadmap 46 rules that the app may not wrap it in
+a `scroll` in the transcript. So the bound has to come from the seam that already exists.
+
+**The ruling: every kind whose rows are its lines declares a `window`, and the render path
+draws at most the region's rows of any block plus its residue.** Four kinds do — `logs`,
+`patch`, `table`, `keyValue` — and two do not: `code` and `raw`. Neither needs a new block
+kind or a registry-side cap; each gains a `window` of the shape `logs` already has, with one
+pin (I23).
+
+**The pin is what makes `code` different from `logs`, and it is the rule interaction to
+write down.** A `code` block's tokens can span lines — a block comment is one token across
+four — so a slice that carried only the sliced *text* would re-tokenise from its first line
+and draw a comment's tail as code. The same class as `table`'s `presorted`: the slice must
+pin what the whole block derived. The window therefore keeps `text` whole (the same string,
+no copy) and sets a `lineRange: [first, last]` the renderer and `measure` both honour, so
+tokenisation runs over the whole text and only the rows in range are produced. `lineRange` is
+view state and arrives from no far side (C04 I67), exactly as `presorted` does. `raw` has no
+tokens and needs no pin; its window slices lines. **Units are source lines, not rows**: a
+wrapped line is one unit, so a window never opens in the middle of a wrapped line, and the
+residue is paid in `skipRows`/`dropRows` as C09 I26 requires.
+
+**What this does not do.** It does not cap what an adapter may put in one block — a
+2 000-line `code` block is still 2 000 rows to scroll through, which is roadmap 46's
+territory — and it does not touch the first measure of a new entry, which is a property of
+`codeRows` and already cheap. It bounds the paint, which is the whole of what lagged.
+
+**Owner.** The definitions live in `presentation/blocks/kinds/code.ts` and `simple.ts` (C09);
+this section states the bound the viewport relies on, and C09 I25 and C09 I26's rows check the
+windows generically once they exist. Until they do, I23 is **false for `code` and `raw`**,
+and it is written down here as a target rather than left implied, so a reader of this spec
+does not infer that the transcript is bounded when the measurement above says it is not.
+
 ## 5. Resize
 
 Width changes invalidate every cached height, because wrapping changes. Height changes do not.
@@ -254,6 +306,7 @@ Copy mode remembers whether it was following, so leaving it resumes the tail rat
 - **I20** — **Chrome that occupies rows enters the height; chrome that occupies columns does not.** I18's live gutter is the second kind, and that is *why* it may stay out of every measurement — not because it is chrome. The command line each entry is drawn with is the first kind: it is not a block, so it is never adapter output and never counts toward C13's cap, but it takes a row and may wrap, so an entry's height is `chromeRows(entry, width) + measureSequence(entry.doc.blocks, width)`. `chromeRows` is injected beside `measureSequence` and defaults to none, so C14 still knows nothing about what the chrome says. **Composing the two in different places is the whole hazard**: the composer draws `chrome ++ blocks` and the index measures `blocks`, and a viewport that is arithmetically self-consistent then describes a document it is not showing.
 - **I21** — `resize` to the size already held is a no-op: nothing is captured, nothing is restored, and **no `Change` is emitted**. The emit is the load-bearing half — a change reports that the view moved, and a view that did not move must not report one, whatever the caller intended by the call. C01 delivers a `SIGWINCH` whenever the size *may* have changed and holds no previous size to compare against, so this component is the first one that can tell.
 - **I22** — The height handed to `resize` is the **transcript region's**, not the terminal's. C14 holds no geometry above itself and cannot derive one from the other — the difference includes the prompt, whose height varies with what is typed — so the caller composing the frame owns the value (C22 I34). The failure is silent in both directions: too tall and `#maxTop()` leaves the document's last rows unreachable by any key, while the surplus rows `visible()` selects are discarded by the paint, so no count downstream is ever surprised. I10 holds throughout, because it compares the viewport with itself.
+- **I23** — **The render path draws at most the region's rows of any one block, plus a residue.** Every kind whose rows are its lines declares a `window` (C09 I25) — `logs`, `patch`, `table`, `keyValue` today; `code` and `raw` owed (§4a) — and a window that must pin what the whole block derived carries the pin as view state (`presorted`, `lineRange`). Kinds that are atomic by ruling (`plot`, C12 I1; `scroll`, C04 §3c) are the stated exceptions and are bounded by their own height. A frame's paint cost is then linear in the region, not in the document, which is the property D40 was mistaken for providing.
 
 ---
 
@@ -280,6 +333,7 @@ Copy mode remembers whether it was following, so leaving it resumes the tail rat
 19. Row-occupying chrome is measured and column-occupying chrome is not; the command line is the first and the live gutter is the second (I20, I18).
 20. A resize to the size already held does nothing and emits nothing (I21).
 21. The height `resize` is given is the transcript region's, and the caller that composed the frame owns it (I22).
+22. One block's rows on the render path are bounded by the region plus a residue, through the window seam and not through a cap on content (I23, §4a).
 
 ---
 
@@ -308,6 +362,7 @@ Fake heights, no rendering.
 - **T1.15**: copy mode entered from inside a pushed view → keys route to copy mode, not the view.
 - **T1.16** (I18): exactly one visible entry reports `live: true`, and it is C13's `liveId`; a transcript with no live entry reports none.
 - **T1.17** (I18): measured heights are identical with and without the **live gutter** — it costs no rows. *Not the eviction marker, which is an ordinary entry and costs exactly the rows it measures (I13, C13 I14). Two different things were called "the marker" in one spec, and only the citation distinguished them.*
+- **T1.18** (I23): a 2 000-line `code` block and a 2 000-line `raw` block, windowed at `[0, 40)` through `windowSequence` → each windowed block measures at most `40 + skipRows + dropRows`, and the painted rows are the same forty the whole rendering would have put there (C09 I25). A block comment opening above the window and closing inside it → the rows inside are still drawn in the comment slot (the `lineRange` pin).
 
 ### Tier 2 — contract / interface
 
@@ -349,6 +404,7 @@ Fake heights, no rendering.
 - **T3.16**: yank of rows containing tone spans and gutter markers → clipboard receives plain text only.
 - **T3.17**: 100,000 entries, scroll from top to bottom by page → every query within budget, no leak.
 - **T3.18**: a streaming entry patched a thousand times → the cache holds one live key for it, not a thousand.
+- **T3.19** (I23): a window opening in the middle of a wrapped source line → the whole line is kept and the surplus is charged to `skipRows`; a window of one row over a block whose every line wraps to three → one unit, `skipRows + dropRows === 2`.
 
 ### Tier 4 — integration
 
@@ -393,6 +449,7 @@ Fake heights, no rendering.
 - **T6.19** (§5 step 6): removing the `followTail` branch from `resize` → T3.12c fails and the tail drifts off the bottom of the screen. `#afterContent` has the same two-branch shape ten lines away, which is what makes the omission read as a completed step.
 - **T6.17** (I21): removing the unchanged-size guard → T3.12b fails, and every frame L4 composes emits a `Change` back at L4, because L4 now hands the region's height over per frame (C22 I34).
 - **T6.18** (I22): handing `resize` the terminal's height instead of the region's → C04 T5.1 fails at the foot of the document, and `paint`'s transcript region refuses the over-long selection instead of silently keeping its first rows. **Neither half of that existed when the defect did**: the paint truncated and the drift test was deferred, so the last three rows of every tall entry were unreachable and nothing in six tiers could say so.
+- **T6.21** (I23): removing `code`'s `window`, or dropping the `lineRange` pin so the slice re-tokenises from its first line → T1.18 fails on the row count in the first case and on the comment slot in the second; the frame is byte-identical for every block that has no multi-line token, which is why the pin's row is the comment one.
 - **T6.16** (I1): summing `measure(b, w)` instead of calling `measureSequence` → T2.9 fails, and every entry with a `gapBefore` is short by one row per gap. The most likely single defect in this component, because the summation is what a reader writes.
 
 ---
