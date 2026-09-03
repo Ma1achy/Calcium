@@ -120,6 +120,7 @@ C11's columns. F50 stays in the remainder.
 | 43 | images (kitty) | ★ — carries audit F-B (`imageProtocol`), which **stands at HEAD** |
 | 44 | session resume | ★ |
 | — | video · 3D · embedded editor · matplotlib | ★ deliberately not doing |
+| | *correction 2026-09-03, this document being pinned:* **3D left this row** — F435 retracted the refusal and `plot3d` is a built form (`src/presentation/plot/`). The row above is kept as written; the cell is wrong at HEAD and this line says so | |
 
 **36 of 51 entries close nothing, and 32 of those are fine** — they are features that were
 never about a finding, which is what a roadmap is mostly for. The four ⚠ rows are the result.

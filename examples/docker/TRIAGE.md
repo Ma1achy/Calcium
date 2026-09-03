@@ -30,20 +30,20 @@ type change.
 | rank | mechanism | ids keyed | consumers | ⚠ | disposition |
 |---|---|---|---|---|---|
 | **1** | [The consumer cannot reach a fact the framework holds](#1) | 20 | **11 open** | ⚠ C07 · C24 | real Calcium work, with consumers |
-| **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 53 | **5 open** (9 closed) | ⚠ C04 · C23 | real Calcium work · **7 of 13 fixed** — and F165 is the first found by roadmap 48's residue rather than by a consumer reaching for something |
+| **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 66 | **5 open** (9 closed) | ⚠ C04 · C23 | real Calcium work · **7 of 13 fixed** — and F165 is the first found by roadmap 48's residue rather than by a consumer reaching for something |
 | **3** | [A block cannot express what the surface needs](#3) | 7 | **4 open** | ⚠ C04 | mixed — two absorbed |
 | **4** | [A change axis distinct from `Tone`](#4) | 4 | **4 open** | ⚠ C04 · C09 · C10 | real Calcium work · needs a ruling |
 | **5** | [The far side's shape is not the framework's contract](#5) | 10 | **2 open** | ⚠ C05 | mostly app-side · one shim |
 | **6** | [Rendered from data that has since moved](#6) | 2 | **2 open** | ⚠ C04 | real Calcium work |
-| **7** | [An artefact describes the world rather than being checked against it](#7) | 68 | **20** | — | artefact discipline — **no code**, and F164 is the first found by an instrument's *population* step rather than by a reader; **F210 is the first where the artefact is a component's own spec and the thing it contradicts is a shipped frame**, and **F233 the first where what it contradicts is a *fix*** — four present-tense statements of a repaired defect, in the two components the repair did not touch |
-| **8** | [Absence indistinguishable from failure](#8) | 24 | **7 open** (7 closed) | partly | real Calcium work · **7 of 10 fixed** — F151 is the class F35 closed in the half an app-side test cannot reach, and **F167 is the class arriving in a *value*: a validator agreeing twice about two different documents** |
-| **9** | [**The instrument was wrong**](#9) | 58 | **17** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
-| **10** | [**A claim carried without a record**](#10) | 43 | **11** | — | **new at F80** · method — six findings disproved, and **F166 unblocked an entry while F168 found what the same row was silent about**; F184 is the first where the unrecorded claim was a *rule* rather than a fact, governing thirty forms from a parameter's doc comment |
-| **11** | [A gate that passes without checking](#11) | 179 | **16** | — | 9 closed · **7 open** — four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
+| **7** | [An artefact describes the world rather than being checked against it](#7) | 78 | **20** | — | artefact discipline — **no code**, and F164 is the first found by an instrument's *population* step rather than by a reader; **F210 is the first where the artefact is a component's own spec and the thing it contradicts is a shipped frame**, and **F233 the first where what it contradicts is a *fix*** — four present-tense statements of a repaired defect, in the two components the repair did not touch |
+| **8** | [Absence indistinguishable from failure](#8) | 27 | **7 open** (7 closed) | partly | real Calcium work · **7 of 10 fixed** — F151 is the class F35 closed in the half an app-side test cannot reach, and **F167 is the class arriving in a *value*: a validator agreeing twice about two different documents** |
+| **9** | [**The instrument was wrong**](#9) | 64 | **17** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
+| **10** | [**A claim carried without a record**](#10) | 47 | **11** | — | **new at F80** · method — six findings disproved, and **F166 unblocked an entry while F168 found what the same row was silent about**; F184 is the first where the unrecorded claim was a *rule* rather than a fact, governing thirty forms from a parameter's doc comment |
+| **11** | [A gate that passes without checking](#11) | 186 | **16** | — | 9 closed · **7 open** — four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
 | **12** | [**A time-based assertion under contention**](#12) | 4 | **3** | — | **new at F80** · Calcium's own suite |
 | **13** | [Text the framework emits](#13) | 6 | **4** | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
-| **14** | [A constant, a channel or a rule that outlived its configuration](#14) | 13 | **13 open** | ⚠ C12 | **new at F492** · real Calcium work — every member reads as deliberate, which is why review found none of them |
-| — | [Singles](#singles) | 24 | 1 each | — | see each · **F176 is the one to read twice**: the instrument had the evidence in a committed snapshot and the reading step was skipped |
+| **14** | [A constant, a channel or a rule that outlived its configuration](#14) | 17 | **13 open** | ⚠ C12 | **new at F492** · real Calcium work — every member reads as deliberate, which is why review found none of them |
+| — | [Singles](#singles) | 32 | 1 each | — | see each · **F176 is the one to read twice**: the instrument had the evidence in a committed snapshot and the reading step was skipped |
 
 **Four groups are new since F55** — 9, 10, 12, and F81's arrival in 4. Group 9 is the one
 that changes the picture, and it is the only group whose subject is the apparatus rather
@@ -113,7 +113,33 @@ view's** producer is defined by the region and has no other bound.
 ---
 
 <a id="2"></a>
-## 2 · A complete mechanism, unreachable from the other side of a seam — **10 open, 28 closed** ⚠
+## 2 · A complete mechanism, unreachable from the other side of a seam — **13 open, 38 closed** ⚠
+
+**F538** — three readers of `liveId` were three copies of one constant — `liveElements`, `focusedBlock`, `focusFor` — so the stored location had no entry to carry and nothing outside the live entry could be focused. One pull, `focusedEntryId()`, and the entry on `StoredFocus`'s `liveBlock` arm (C26 I21, I22). **Fixed**
+
+**F539** — a notice appended over the live entry left focus at `liveBlock` with `liveElements()` answering `[]`: `↓` did nothing, `↑` and `Esc` left. Reachable from every notice path and asserted by no row, because every row entered the block and then did something to it. **Fixed**, T3.42
+
+**F541** — `CSI Z` was discarded as well-formed-but-unknown, so the `⇧tab` row would have named a key nothing sends — C16 I17's fourth instance and the first found before the row shipped. The first fix admitted `CSI 999 Z` and router-decode T3.13 caught it in the same run. **Fixed**, bare form only
+
+**F542** — `mergeBlock`'s throw would have refused its first consumer on every key it has; C16 I27 routes colliding keys to `interaction` and free keys to `liveBlock`, both listed by `/help`. **Ruled**, and the mode still has no producer in `src/` — a route is not an inhabitant
+
+**F543** — C23 I18's refusal was reachable from nothing a reader could press — the only route in was a test calling the dispatcher directly. §4g's `⏎` on a settled row is the first keyboard route, and pressing it forced the ruling to finish: every kind refused, the notice naming the command, `rerunEntry` firing it through submit. **Fixed**, T3.41, T1.17b
+
+**F544** — `rowActivate` with `liveId` as origin fires a settled row's action against the live entry — a `fill` lands in the prompt, an `expand` walks the wrong document. The origin is `focusedEntryId()`; the mutation restoring `liveId` puts `pick 1` in the prompt. **Fixed**
+
+**F545** — a move after eviction resolved against the live entry and wrote the evicted id back — highlight on one entry, store on a ghost, I10 violated by the keystroke that should have repaired it. Every move carries the resolved entry now. **Fixed**, T3.43
+
+**F546** — `cursorPositions` had eleven green rows and no writer in `src/`, because `plot-interaction` injected the field itself; with the writer removed every `cursor-positions` row fails and those eleven pass. C22 I71 — the field and its writer land together. **Fixed**
+
+**F547** — a plot declares an element only with a camera (C12 I85), so the crosshair's first reachable subject is a 2D plot wearing `camera: {}`; a `cursorable` predicate exists on the barrel and `construct.ts` does not import it yet, so a cursor on a non-positional form is stored and unread — C22 I76's residue. **OPEN**
+
+**F532** — `RenderContext.onAction` was a required member no renderer ever read; every frame rendered against a no-op while the working route ran beside it as `KeyDeps.onAction` → `pipeline.onAction`. Removed; C09 §2 and C23 §3a/I16 name the real route. **Fixed**
+
+**F533** — `MetaSpec.resultId` was a shell-side writer for a producer-owned field, with zero writes across `compose`'s three callers. Deleted. **Fixed**
+
+**F535** — `TuiConfig.transport` took a `TransportRouter` the entry could not produce — no constructor for any of C06's three arms, and no `createRouter`. All four exported; T2.11 is the consumer, and its first failure was the busy-latch wrapper answering for the arm. **Fixed**
+
+**F528** — `Annotation.whiskers.points[].x` is read by neither arm: the terminal spreads by index and the SVG crossing agrees rather than rules. **OPEN**, I109's stated blind spot
 
 **F470** — `elementsIn` walks into a container that declares no elements of its own, so focus lands on a block inside a `panel` or a `group`; every effect in `construct.ts` resolved that block with a **top-level `find`**. A table inside a panel could be focused and not paged, and a 3D plot inside one focused and not turned — a key consumed, nothing drawn, no error. `session.ts`'s `blockById` walks `descendants` for the same question one file along, which is what made the two read as agreeing. **`b.live` builds a panel**, so the arrangement the framework itself produces is the failing one and every hand-written fixture put the block at the top level. The class is **a recursion added on one side of a pair**, and the signal is that the fixed side's comment names the other side's symptom — `animationIntervalOf`'s does, in a file the effects never import. Fixed with one shared resolver over C04's `descendants`; T4.17n covers it
 
@@ -324,7 +350,27 @@ badly and *"the banner overflows when you resize"* argues for itself immediately
 ---
 
 <a id="7"></a>
-## 7 · An artefact describes the world rather than being checked against it
+## 7 · An artefact describes the world rather than being checked against it — **ten more at F512–F559, nine of them corrected in place; F537 open**
+
+**F512** — `putBlock` exists on `DocumentView`, not on C13, so `AGENT_TUI_STEP0.md`'s *`putBlock` then `settle`* named a real method on the wrong component — a grep for the symbol succeeds and the sentence is still wrong, which is harder than a name in no file. Corrected to `append`/`patch`/`settle`
+
+**F513** — the design's width table called `◻ ◼ ⋅` narrow and said `▐ ░` build a bar *at no cost*; `glyphs.ts` measures every one of them ambiguous. The checkbox decision rested on the claim and is re-owed. Corrected at four sites
+
+**F514** — roadmap row 17 counted two `window` implementers where the tree has four, and row 7 of the same table already reasoned about the third; two rows of one table disagreed and nothing compared them. Lanes A and F reached it independently. Corrected
+
+**F515** — one chrome row counted four, five, six, five, six and seven across the roadmap and the design note — each true when written, none retired by the next. Reconciled into roadmap entry 29 with the other sites pointing there
+
+**F516** — F435's retraction of the 3D refusal reached the roadmap and none of the prior-art note's five sites, the gap plan, or a *zero occurrences* count that measures 48. A reader opening the note first restores the refusal. Corrected everywhere, dated
+
+**F517** — the SVG completion note said nineteen forms refused; `SVG_FAMILY` has one `null`. The note wrote its own expiry condition and nothing ran it. Recounted
+
+**F518** — the mermaid theming note scheduled an afternoon for three questions `beautiful-mermaid`'s `.d.ts` answers without running anything — there is no cell→node map, and there are eight theme roles the note never saw. Re-scoped
+
+**F519** — the reader report's `b` count (30 against 39 exported keys) and the dataframe note's form count (35 against 47) were both stale; neither moves a verdict, both are the kind that gets copied forward. Recorded with the measured numbers
+
+**F537** — C04 says three times that `Point3Series` has no `marker`, one commit after 1274eb27 gave it one with C12 I99 and a validator arm — and the validator's refusal for an unknown marker name cites C04 I76, which denies the member exists. **OPEN**, requested of C04's owner
+
+**F559** — A03's commitments carried two `15b.` entries; the second is 15c. Nothing cites either by number
 
 **F480** — F436 retracted *colour and dither are two channels* and named the replacement as a **measurement for step 6**. Asked where it landed: **it ran** — F455, 21 field values × 11 intensities on six colormaps — and its result is written in **five** places: F455, the design note's §3c, C12 I94, `shadeColour`'s doc comment and `scatter3.ts`'s call site. **And nothing asserts any of it.** `shadeColour` is named by no test file. What would notice a change is a golden frame, which moves for *any* change to the colour path and tells a reader the picture moved rather than that the hue ratio collapsed — *a snapshot records, it does not check*. **The inverse of the sixth blind spot**: that one asks where a claim is written down and finds nothing, this one finds five, all prose. Five records of an unchecked measurement are one unchecked measurement, and the count reads as coverage. Closed by a row that asserts the ratio **per map** — viridis and plasma above 3×, magma, inferno and coolwarm below 0.1× — because the per-map split is the finding. **Closed by SF9**, which reproduces eleven of F455's twelve figures to four decimal places — and reproducing them corrected the reading: the step is the minimum over the whole field × shading grid, where the first reading gave magma 0.0720 against 0.0005
 
@@ -442,7 +488,13 @@ answer is a frame-read that cannot be wrong. **Read the ladder before choosing t
 | **F128** | three specs disagreed with the code they specify, all in one direction |
 
 
-## 8 · Absence indistinguishable from failure — **11 open, 7 closed**
+## 8 · Absence indistinguishable from failure — **12 open, 9 closed**
+
+**F522** — an all-zero waffle drew three swatches and three names with no reading, and the pie called the identical list `No data.` — two answers to *what is a zero total* inside one family. The waffle reads `0%`; the follow-through ruled a zero total *every segment at nought, never an empty list* (C12 §3ak.26 finding 5), so the pie draws its rim. **Fixed**
+
+**F556** — every completion source failure was dropped silently in the product — `onSourceError` supplied by every test and by nothing in `src/`, C19 T3.6 asserted against an array the test built. `createSourceErrorSink()` lands in `engine.ts`; the `construct.ts` wiring is requested, and both halves sit on the equality lists until it lands. **Built, wiring owed**
+
+**F561** — an overflowed child on the adapter route produced a document with no record of the cut, and the shell route recorded it under `meta.truncated`, which nothing draws — two routes, two opposite defects under one sentence that guarded a third place. A `notice` in `finish` (C07 I22), the id suffixed until free; the stream route landed after. **Fixed**, three of three
 
 **F424** — C09 I25's `window` seam is built, composed and wired at `session.ts:921`, and **two kinds of five declare one**: `patch` and `logs` do, `code`, `table` and `keyValue` do not. Declining is silent by design — `windowSequence` keeps a non-declaring kind whole and pays for it out of `skipRows` — so the only symptom is a number: **914 ms to paint forty rows of a 50 000-row `code` block against 0.65 ms for the same `logs`**, 1 400×, with every assertion passing and the frame correct. Wants a **named list compared by equality** rather than an assertion, because which kinds divide is a judgement (the plot never will, C12 I1). **The survey was wrong twice before it was right** — a glob of `blocks/kinds/` missed `patch`'s definition in `presentation/patch/`, and a rebuilt fixture measured 1 row for three kinds; the reliable question is asked of the registry, not the tree.
 
@@ -514,7 +566,19 @@ and the claim has to be one the producer can support.*
 | **F319** | **a bin that is not drawn and not named** | C12 I8 is *a series that cannot be given a row is named in a legend, never dropped silently*, and `categoricalForm` opens with `const labels = cats.slice(0, areaRows);`. The sibling branch honours the rule in twenty lines with a comment saying **a series dropped in silence is the failure this branch exists to avoid**; categories get the slice. **Three of 45 row-bearing variants in the corpus are short and all three are histograms** — `default` and `scott` lose one bin of nine, `freedman-diaconis` **three of eleven, 39 of 200 samples, the whole right tail** — and the frame reads as a clean unimodal distribution that has ended. **The rule was written about the subject that had the defect**, and a histogram's rows are bins a *strategy* chose rather than categories an author wrote, so the count is not a number anybody could check against the height. Invisible to all three gates: the 1810 terminal frames are byte-identical because it has always done this, the matrix is unchanged in every cell across a change that replaced 240 bars with 18, and `plotAreaRows` is the terminal's so the second arm never had a limit to hit. **Found by reading the frames F317 moved** — the remedy producing the finding the original could not. **Fixed** — I8 widened to name a *row*, the notice spent from the declared height before the drawing, 30 of 1810 baseline frames moved and 0 of 181 SVG |
 
 
-## 9 · The instrument was wrong · new at F80
+## 9 · The instrument was wrong · new at F80 · **six more from the residue pass, two of them the brief's own grep**
+
+**F520** — three gate collisions from labels that look like citations — audit rows `I1`–`I11` read by SP3 as invariants, a `structured.ts:217` resolved as a file, the word *landed* inside an OPEN entry tripping `BUILT_CLAIM`. All three are the gates working; relabelled `IM-n`, full paths, *closed that question*
+
+**F531** — three `MEASURED` cells opened by the new fixtures are the reader's, not an arm's — `heatmap.keyReadings` under `yAxis: "both"`, a legend residue read as a segment name, a radar's bottom row read left to right against the SVG's angular order. Named on their rows rather than absorbed into the count
+
+**F536** — MG29 matched an exported name against `export function <name>(` in every file and reported C16's internal `createRouter` for C06's — F510's homonym on the subject side. Three of its five firings were the rule earning its place. Resolved through the `from` path to the declaring module, with a fabricated violation and a control. **Fixed**
+
+**F548** — MG24's shorthand blindness reached three new `KeyDeps` members supplied by shorthand and consumed in one file; the camera family passes only because the same names exist on `Graph`. The locals are named for what they do and passed explicitly. **Fixed**
+
+**F550** — the brief said *there is no stall detection — zero hits*; `grep -rni stall src/` returns 15, `refresh.ts` carries `STALL_MS` and the re-arming notice, C23 §3b/I25 and a mutation run exist. A case-sensitive grep on one file. Lane A had rewritten the design note to match the brief; Lane E measured it back. Nothing built
+
+**F558** — `Scan.scope` is declared `string` and three rows carry arrays; widening it broke three tests outside `tools/` that call `startsWith(scan.scope)`. Left narrow with the reason in the `.d.mts`
 
 **F433** — the ordered dither, measured before porting rather than after. Not rung against rung: **dither against `colourDepth`**, because C02 answers 1 / 4 / 8 / 24 and the rung is the same at all four. Block-mean error improves 1.09× at 24-bit, 1.43× at 8, **3.51× at 4** and 7.84× at 1. **The first two metrics were correct and useless** — per-sample MAE and a neighbour-jump count both measure what a dither deliberately sacrifices, and both said it was worse at every depth. Then the block metric disagreed with the picture: at 4-bit the plain quantisation *reads* more cleanly, because a 4×4 Bayer cell is 1/20 of an 80-wide raster and the rung's scarce axis is space. **Ruled: not ported.** At 24-bit it buys nothing; where it helps it belongs to whatever quantises a colour and helps every raster equally.
 
@@ -642,7 +706,15 @@ were all legitimate ESCs in escape-sequence tests. The reusable part: **a search
 is evidence only if the search could have returned something**, and this is the first instrument
 here about whether the reading happened at all.
 
-## 10 · A claim carried without a record — **31: eight findings disproved, twenty claims caught before anything was built on them, one rule that governed thirty forms, one reasoned claim that five documents inherited, and one recorded budget that did not reproduce against its own controls** · new at F80
+## 10 · A claim carried without a record — **35: nine findings disproved, four deferral premises false when written, twenty claims caught before anything was built on them, one rule that governed thirty forms, one reasoned claim that five documents inherited, and one recorded budget that did not reproduce against its own controls** · new at F80
+
+**F534** — 2-D `Series.marker` was attributed to 1274eb27 without a `git log`; it was 127f19b1's, accepted by both gates and drawn by none. Deleted from `Series`, `SeriesOpts` and the spread; golden 403 tests identical. **Fixed**
+
+**F540** — `keymap.ts`, C22 I75 and commitment 46 all say `←`/`→` fall through to the prompt at `liveBlock`; `dispatch` has no prompt step from there and both keys were dropped — carried through two rulings, measured by nothing until a binding wanted them. **Fixed**
+
+**F551** — SS50's three allowances were said to be dead because the files spell `ambiguous` zero times; for a negative-lookahead rule that is the condition under which they are live. All three measured live by SS53, one firing line each
+
+**F564** — four e2e rows deferred on premises false when written — *nothing pushes a view layer*, *the subscription rung is unruled*, *nothing can ask for depth 1* — each answered by a mechanism already in the tree. All four live, each killed by disabling its mechanism against a rebuilt `dist/`; `ps-watch` added because the view had been opening on the corpus's own refusal. **Fixed**
 
 **F507** — F469's performance rows do not reproduce, and **the controls are what make that a finding rather than a slower box**: `P1` (projection) and `trianglesOf` touch no sample grid and come back at 0.9× and 1.1×, so the host is not the difference. `P2` (raster) is 2.6–3.3× and the whole frame 3.5–4.6× — 12.969 ms measured at **44.9**, 124.2 at **572.6** — because F498 multiplied the sample grid by eight and no budget was re-taken. **The ruling the numbers were taken for gets stronger and its reason gets weaker**: auto-orbit is off on *39% of a core*, and one frame is now past the 33 ms window on its own. `tools/bench/` holds four benches and none is 3D, so §12 has been a written tier with budgets phrased as assertions and nothing asserting them — which is how a budget goes stale in the direction nobody checks
 
@@ -758,7 +830,21 @@ through a menu in as many words — as the reason the implementation writes ever
 
 
 **F491** — C12 §3am's refusal of box-drawing joins rests on one *mechanism* among four arguments: a strictly-nearer test refuses the second edge **by construction** at exactly the cell a join needs. **Every clause is true and the consequence is a tenth of what the wording implies.** Built both ways on a cube's twelve edges: **36 corners and 8 tees against 29 and 5** — seven corners and three tees, not a figure coming apart at every vertex. And three fixtures built to make it categorical are *identical* under both rules. The reason is the arm's corner routing, needed for a different problem, which produces corner glyphs from a **single** stroke — so a corner is not evidence of two edges meeting, and the row that counted corners survived its own mutation. **The class: a refusal states a mechanism and a consequence, and only the mechanism is checkable from the armchair.** Both were carried as one claim for four steps; *refused by construction* is a statement about a code path and reads as one about a picture
-## 11 · A gate that passes without checking — **112: 63 closed, 49 open**
+## 11 · A gate that passes without checking — **119: 69 closed, 50 open**
+
+**F552** — SS53's first run over 36 allow entries found five dead — one for the whole life of its rule, one the brief did not name — and its first draft measured with a comment-strip that deletes the marker a negative lookahead reads. `lineFires` is one function now. Removed, `why` rewritten; the coverage rows carry the one-file-per-directory residue
+
+**F553** — MG2 had a row and no rule for the whole life of the suite, under a `PENDING_RULES` entry reading *nothing — implementable today*. Implemented; the tree had one cycle, `shell/paint.ts` ↔ `shell/composite.ts`, since broken, so `ACKNOWLEDGED_CYCLES` is empty by equality. **Fixed**
+
+**F554** — `PENDING_RULES`' string arm skipped SS18 while C10 and twenty components landed; a string beginning with a component id is now read as a `waitsOn` and fails when built. SS18 implemented over adapters, fixtures and shell, clean. **Fixed**
+
+**F555** — TD1–TD6 had a test and no gate — `index.mjs` never imported `todo-expiry.mjs`, and the unit tier is not on the pre-commit path. Wired; the unit file asserts the call sites by reading `index.mjs`, since calling the functions is what could not see the gap. **Fixed**
+
+**F557** — SS54's seeding, writing premises as symbols, found two claims wrong in the record: `DEPENDENCIES.md` names `node:readline` as the alternative in use (zero occurrences; C06 splits on `indexOf`) and C12 I71 names `contourFigure`, which exists only in comments. The `typescript-eslint` decision is owed and unowned
+
+**F562** — no test constructed the last resort — C07 §11 cites T3.7 and `grep 'last-resort' test/` returned nothing. T1.21 reaches it through `finish`'s own second validation and is the first row to assert `meta.adapter === "last-resort"`. **Fixed**
+
+**F563** — the floor-suppression branch had one witness, `logs`, whose window carries nothing — so the kind with the most to lose, `table`, had never been drawn floored. T1.22 constructs both siblings and reads both frames. **Fixed**
 
 **F510** — MG25 refuses *an export nothing consumes* and its declaration regex reads `export function|async function|class`, so `type`, `interface` and `const` are outside its subject — **661 declarations covered, 754 not**, and MG25's own logic over the uncovered arms finds **ten** unconsumed exports it cannot see. **F84's shape exactly**, one rule along. A second gap stacks with it and is independent: the consumer count is occurrences of the **bare name across all of `src/`**, so two unrelated declarations of one name excuse each other — measured on `Rung`, which F498 left dead in `project3.ts` and whose homonym in `definition.ts` carries the count past `uses > 1`. **The allow-list is not the weak part**: `UNCONSUMED_FUNCTIONS` is equality-gated and its one live entry is exactly what the shipped arm reports, which is the control saying this scan measures the rule and not something else
 
@@ -1091,12 +1177,20 @@ already made — folding it in is cheaper than making a second one.
 ---
 
 <a id="14"></a>
-## 14 · A constant, a channel or a rule that outlived its configuration — **13** · new at F492
+## 14 · A constant, a channel or a rule that outlived its configuration — **17** · new at F492
 
 **The mechanism, in one sentence: a decision that was correct for every configuration that
 existed, kept after another one arrived.** Not a mistake at the time and not a mistake anyone
 made later — the thing it depended on moved, and nothing watches a dependency that was never
 written as one. Every member reads as deliberate, which is why none was found by review.
+
+**F521** — `waffleGrid` rounded each segment independently against `pos < 100` — the identity at `scale === 1`, which was the corpus's only waffle for a year. `50/50/1` lost its sliver and `1/1/1` drew a hundredth square the legend did not name, in both arms, from one shared function the table had correctly ruled *shared*. Largest-remainder with the earlier segment winning a tie, C12 I108; 22 baselines. **Fixed**
+
+**F523** — `annotationMarks` opened `if (a.kind !== "line") return []` under a comment reading *this arm does not draw annotations*, false from the day `line` crossed; `band`, `confidence` and `whiskers` never reached the SVG, and the sweep blamed `fill` for a mark that was not there. C12 I109; six baselines. **Fixed**
+
+**F525** — the violin's IQR box sits on `layer: "annotation"` for its width, not its meaning — the layer is what escapes `SLOT_SHARE` — and painting claims translucent behind the data made it vanish into its density. Told apart by `seriesIndex`, which no claim carries; nineteen baselines. **Fixed**, with the honest fix — a rect that declines the inset without borrowing a layer — owed
+
+**F529** — `yScale: "symlog"` and `"time"` reached their tick algorithms for the first time and moved no sample — a scale that selects ticks without placing samples is a scale in name. Ruled by the follow-through as C04 I81: the range carries the scale and both arms place through it. **Fixed**
 
 **F506** — F498 merged the two sample grids into one and removed `sampleGrid`'s rung parameter; **`80 × 48` went on being the recorded grid in five places afterwards** — the comment heading the function whose parameter went away, C12 §3al's table, I84, commitment 84, the `PR7`/`CAM4` rows, and every performance budget in the 3D design note. It returns `160 × 192`: **30,720 samples against the recorded 3,840, eight times**, and a 120 KB depth buffer recorded as 15. **The implementation and its test were both corrected and none of the prose was** — `PR7`'s body asserts the new rule and explains why, while the spec entry naming that row still says its control is *that the two arms disagree*, a control that cannot be constructed because there is one arm. **`PR7` and `CAM4` are the same row under two ids** and `CAM4` is in no test file, which is where the correction stopped: the duplicate is not merely redundant, it is the copy that stays wrong. This is F498's own ruling — *when the thing a derived constant compensates for goes away, the compensation is the defect* — pointed at the documents, by the finding that named the mechanism and did not sweep for it
 
@@ -1145,6 +1239,14 @@ written as one. Every member reads as deliberate, which is why none was found by
 
 | | verdict |
 |---|---|
+| **F566** | the residue pass in numbers — two of three motivating claims disproven, 72 record corrections, ~250 frames, five enforcement rules, and the substrate items; cites every entry above by number |
+| **F565** | one block's paint is linear in the block — 2 000 lines of `code` 1 406 ms, 20 000 lines 11 360 ms, `logs` 30 ms — and the roadmap's 83 ms was a different method, so both are recorded side by side in C14 §4a. I23 is written as a target false for `code` and `raw` today; T2.22 pins the set so the window cannot land silently |
+| **F524** | three defects in the first draft of the annotation crossing, each found by reading a frame — the dash was the layer's and had to be the mark's, a closed dashed interior outlined the ceiling, and *behind* means *first* in an arm that paints in order. **Fixed** |
+| **F526** | `radarAsciiRows` wrote its residue over the last shown category and under-counted by one; `segmentLegend`, one function up, reserves the row first. **Fixed** |
+| **F527** | the pie legend's residue was truncated by the entries it stood in for — `⋯ 5 m…` — and the disagreement reader took the `m` for a segment's name. **Fixed** |
+| **F530** | five fixture notes from the frames — a heatmap key showing the whole ramp over a zero span, `near-clip` a wall by construction, `bar/constant` unable to reach the zero-span arm, the radar's circle grid needing the line style, the constant surface colouring through its own ramp. Recorded in the fixtures |
+| **F549** | two test ids collided with rows already in C22, twice, caught by SP7 each time; *next letter after the last one I read* is wrong in a spec another lane is appending to |
+| **F560** | `mosaic.test.ts` names nine tests `MG1`…`MG9`, homonyms of the module-graph family; `MS1`…`MS9` requested |
 | **F511** | **The GPU ceiling is under half the frame, and the raster is not what costs.** The orbit frame after the cache: bunny raster 55.9 ms = 46%, suzanne raster 1.9 ms = 15%, and the rest is string work the GPU cannot touch. A GPU that did the raster in zero saves 46% of the bunny and 15% of suzanne; a warm `worker_threads` pool round-trips in 0.049 ms but the rasteriser is a project, clip, barycentric, shade pipeline that no flat buffer can carry. **The cheaper path is decimation** — 3.1× fewer faces for 2.2× speed and 6.4% of inked cells moved — and it is a picture decision, not an engineering one |
 | **F508** | `drawnOf` collects a block's triangles with `tris.push(...trianglesOf(…))`, and **a spread is an argument list**: 100,000 elements is fine, 125,000 throws `RangeError: Maximum call stack size exceeded`. C12 I11's shape is that the renderer answers rather than refuses — its own §3230 row reads *I11 says the renderer never throws* — and this throws from an expression that reads as a concatenation. Never fired because the largest mesh in the tree is 69,451 faces, under half the ceiling; `parseObj` fans quads, so a 63k-quad model is not. **A stack overflow rather than a bounds error**, so nothing between it and the frame can name a mesh size. A loop is the whole fix |
 | **F8** | omitting `env` stops the shell opening rather than degrading it — **real, small**: the spec says it degrades and it does not |
@@ -1255,6 +1357,8 @@ six. **A count that disagrees with its own row reads as authority and is the che
 error to make** — which is also F65's finding, one document out. Deriving the list rather than
 transcribing it is the pattern for any future inventory here; deriving it does not make it a
 partition.
+
+**The residue pass's 55 entries (F512–F566) were keyed in one move each**, on F434's rule: the row goes in the group and the same group's column moves by one, so the column sums to 570 because each of eight groups gained exactly what it keyed — 13, 10, 3, 6, 4, 7, 4 and 8 — and not because errors cancelled. Measured before the merge at 515 = 515 and after at 570 = 570, from SP6's own counters.
 
 **F87, F88 and F89 are filed and not yet grouped above** — they arrived from the step-3a
 partition, which is `CALCIUM_GAP_PLAN.md`. Regrouping is 3b's, with the roadmap rewrite.

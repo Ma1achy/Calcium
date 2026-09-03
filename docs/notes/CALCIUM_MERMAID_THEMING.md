@@ -100,5 +100,32 @@ that way unless this is worth more than the risk.
 ```
 
 **Three questions, one afternoon, and they decide whether this is a design or a refusal.**
+
+### Answered 2026-09-03 — from `node_modules/beautiful-mermaid/dist/index.d.ts`, nothing run
+
+**1 · Yes and no.** `parseMermaid(text): MermaidGraph` (`index.d.ts:191`) exposes the structure —
+nodes, edges, subgraphs, `classDefs`. But `renderMermaidASCII(text, options): string` (`:267`)
+returns a bare string and `PositionedGraph` (`:228-248`) is pixel geometry for the SVG path.
+**There is no cell→node map**, so the design above — colour a cell by which node it belongs to —
+is refused by the API rather than by a ruling.
+
+**2 · An injection point this note did not consider.** `ColorMode` (`:216`) is
+`'none' | 'ansi16' | 'ansi256' | 'truecolor' | 'html'`, plus `'auto'` on the option (`:237`). It
+colours **by role, not by node**: `AsciiRenderOptions.theme?: Partial<AsciiTheme>` (`:238`) takes
+eight roles — `fg border line arrow accent bg corner junction` (`:197-213`). §1's sentence *colorMode
+having a value other than none suggests it knows which cells are which* was wrong: it knows which
+**roles** the cells are.
+
+**3 · Into the parse only.** `classDefs` (`:6`), `classAssignments` (`:8`), `nodeStyles` (`:9`),
+`linkStyles` (`:11`) and `PositionedNode.inlineStyle` live on `MermaidGraph`/`PositionedGraph`;
+nothing carries them onto the ASCII path.
+
+**So the design is re-scoped rather than refused: role → palette slot.** Eight `AsciiTheme` roles
+map onto C10 tones — `fg` → text, `border`/`corner`/`junction` → frame, `line`/`arrow` → muted or
+accent, `accent` → the primary series slot, `bg` → none — and `src/presentation/mermaid.ts` passes
+`theme` and a `colorMode` chosen from `caps.colour` instead of `"none"`. About 80 lines across
+C09/C10, the SGR the library emits parsed back into cells the way any coloured text is. Still
+planned; `test/contract/mermaid.test.ts` exists and there are no catalogue frames for a coloured
+diagram, so the first frame is the first measurement.
 Do not design it before running them — the last four dependency decisions in this project
 were settled by measurement and reversed when they were not.

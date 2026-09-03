@@ -21,12 +21,10 @@ seconds of a turn before anything else arrives.** Every drawing here was made ag
 as an aside.
 
 **The question primitive is built.** `ctx.ask()` takes a choice list, resolves a promise, and
-entry 16 generalised it: `AskOptions` carries `placement`, `dismissable` and `onSelect`, with
-`resolve(text)` for free-text answers. **The sketch's highest-value gap — A3 — is now *use it*
+entry 16 generalised it — **but not into the shape this sentence used to claim.** Measured 2026-09-03: `AskOptions` (`src/shell/local/registry.ts:32-52`) carries `question`, `detail`, `choices` and `placement` only; `onSelect` occurs nowhere in `src/`; `dismissable` is a `Layer` field (`viewport/overlay/types.ts:51`) that the registry's own comment says is *deliberately absent* from `ask`; and `ask` resolves a choice key, so there is no `resolve(text)` and a free-text answer is still owed. **The sketch's highest-value gap — A3 — is now *use it*
 rather than *find it*.**
 
-**Markdown is still absent.** It is roadmap #11, confirmed OPEN, and it is the only hard gate
-left. A6 waits on it; A1 renders prose as `raw` until it lands.
+**Markdown is half built.** Measured 2026-09-03: `markdownBlocks` (`src/data/viewmodel/markdown.ts`), exported from the barrel and reachable as `b.markdown` (`src/shell/builders/index.ts`), with `test/contract/markdown.test.ts` — roadmap #11 is PART, the block half landed and inline emphasis is entry 50. A6 can render prose as blocks today; only inline spans stay literal.
 
 **And `b.live`'s `stream` arm was removed, not filled.** F78 deleted it — *a declared option
 with no implementation is the disease; two throws guarding the choice was the symptom.* So the
@@ -285,7 +283,7 @@ are the claim.
 | **markdown** | agent output is markdown; today it is `raw` | **#11, the only hard gate** |
 | **a thinking treatment** | reasoning is neither prose nor a tool result. Muted? Collapsible? Its own kind? **A real design question with a real source** | not on the roadmap |
 | auto-collapse by age | old tool calls at full height forever, or evicted — nothing between | in the nits |
-| scrollable containers | a long tool result inside a conversation | #46, blocked on C26 |
+| scrollable containers | a long tool result inside a conversation | #46, **BUILT** — `Scroll` kind, `src/shell/scroll-offsets.ts` (measured 2026-09-03; this row said *blocked on C26*) |
 
 **The thinking treatment is the one worth designing rather than deferring.** It has a
 mechanism now — `reasoning` is a first-class stream part with its own parser — and no block
@@ -620,7 +618,7 @@ actually is.
 ## 10 · Commands
 
 **Slash verbs are the framework's shape and prose is the exception** — which is the
-prefix-*out* question (#27): a shell sends an unrecognised line to `sh`; an agent harness
+prefix-*out* question (#32 — this used to say #27, which is syntax highlighting): a shell sends an unrecognised line to `sh`; an agent harness
 sends it to the model. **That inversion is the one thing the manifest cannot express today**,
 and it is this example's first framework finding rather than a surprise.
 
@@ -684,8 +682,7 @@ re-dispatches it — which is `/retry` at a smaller scope and the same mechanism
 docker-tui built for `/drift` renders two model answers side by side with no new work.**
 
 **And the paste chip.** A pasted file becomes `[#1 parse.ts · 184L]` in the prompt and reaches
-the model as content rather than as a wall of text. **Designed, unbuilt** — nits §5, and this
-is its most natural consumer.
+the model as content rather than as a wall of text. **The prompt half is built** — `CHIP_LINES` in `src/shell/construct.ts` turns a paste of five or more lines into `[#n pasted · N lines]`; roadmap 30 is PART because the transcript half is not (measured 2026-09-03; this said *designed, unbuilt*) — and this is its most natural consumer.
 
 ---
 
@@ -971,8 +968,7 @@ one-line summary or a diff.
 A paste chip's peek shows three lines of a 47-line JSON blob; `⏎` opens it in C17's editor in
 a pushed view. **Same shape: the popup shows what fits, and an action reaches the rest.**
 
-**Entry 46 — scrollable containers — is the general answer** and it is blocked on C26. Until
-it lands, *open it somewhere with room* is the escape, and it is a better one than scrolling
+**Entry 46 — scrollable containers — is the general answer** and it is BUILT (measured 2026-09-03; this said *blocked on C26*). Where it is not wired, *open it somewhere with room* is the escape, and it is a better one than scrolling
 a popup would be: **a reader approving a change wants the whole diff, not four rows of it at
 a time.**
 
@@ -1034,13 +1030,11 @@ is drawn with `▌`:
 
 ```
 ▌ █ ▀ ▄ ▒ ▓ │ ┃ ▁▂▃▄▅▆▇     EA=Ambiguous — two cells in a CJK locale
-▐ ░                          narrow
+▐ ░                          ALSO Ambiguous — this row used to say narrow; see below
 ```
 
 **So the gradient bar doubles in width wherever ambiguous is treated as wide**, and the
-right-alignment the README promises breaks. **`▐` (right half block) is narrow and `▌` is
-not**, which is an inconsistency in Unicode's own table rather than anything either project
-did — but it means the bar can be built from `▐` and `░` at no cost.
+right-alignment the README promises breaks. **This section used to say `▐` is narrow and `▌` is not.** Measured 2026-09-03 against `src/presentation/blocks/glyphs.ts:685-690`: `▐ ░ ▬ ▪ ▫ ▮ ▯ ▰ ▱ ◼ ◻` are `East_Asian_Width=Ambiguous` every one, and **`braille` is the only width-stable unicode bar style** — so a bar built from `▐` and `░` doubles exactly where this paragraph said it would not, and the `narrowOnly` flag on those styles is what the renderer does about it.
 
 **This is the class this project has now found a dozen times**: a correct narrower claim
 standing in for a broader one, where only the broader one is what the code needs.
@@ -1420,9 +1414,9 @@ entry goes with it; the activity region stays.
 ### The checkbox glyphs, and the obvious pair is the unsafe one
 
 ```
-◻  U+25FB  WHITE MEDIUM SQUARE   narrow    pending
-◼  U+25FC  BLACK MEDIUM SQUARE   narrow    done
-⋅  U+22C5  DOT OPERATOR          narrow    did not happen
+◻  U+25FB  WHITE MEDIUM SQUARE   AMBIGUOUS pending      ← this column said narrow
+◼  U+25FC  BLACK MEDIUM SQUARE   AMBIGUOUS done
+⋅  U+22C5  DOT OPERATOR          AMBIGUOUS did not happen
 ✻                                narrow    in progress — the spinner, in the box position
 ```
 
@@ -1436,8 +1430,7 @@ next — both mean *this did not get done* — and **the reason is in the transc
 where a reason belongs. A second glyph would split a distinction the reader cannot act on
 differently.
 
-**`·` is ambiguous width**; `⋅` (dot operator) is the narrow one, which is the same trap the
-full ramp hit.
+**`·` is ambiguous width — and so is `⋅`.** This paragraph used to call the dot operator the narrow one. Measured 2026-09-03: `src/presentation/blocks/glyphs.ts:400-402` records U+22C5, U+2218 and U+25E6 as `East_Asian_Width=Ambiguous`, *exactly like the character they were chosen to replace*, and `glyphs.ts:685` measures `◼ ◻` the same. **The width claim in the table above is wrong in all three rows**, so the checkbox-glyph decision has to be re-taken with the terminal's `ambiguousWidth` in hand rather than assumed — which is the same trap the full ramp hit.
 
 **Filled against outline, not a tick in a box.** `☑` puts a small check inside a frame, and at
 terminal font sizes that is a fine distinction where **`◼` against `◻` is unmissable** — the
@@ -1627,10 +1620,18 @@ a runtime one, if the tools are the manifest.
 partial stays with a notice.* **The transcript keeps what arrived** because losing it removes
 the only record of what the model was doing.
 
-**A stall is C23 §3b's**, and the mechanism exists — the driver fires a notice when a stream
-goes quiet past a threshold. **The local-model case is the one worth tuning**: a 4-bit 30B
-model on a warm cache can be quiet for ten seconds legitimately, so the threshold is the far
-side's rather than the framework's.
+**A stall is C23 §3b's, and the mechanism exists** (C23 I25): the driver patches a muted notice
+onto a stream that has been quiet past a threshold, and replaces it with a record of the gap when
+output resumes — never removes it, because `ViewPatch` has no delete. `src/shell/refresh.ts`
+holds it (`STALL_MS`, a per-entry watched map, a re-arming tick, `resolveStall`), `execution.ts`
+wires `watch`/`sawPatch`/`settled`, and `tools/mutate/runs/c23-refresh.mjs` mutates it. **This
+paragraph said the opposite for a few hours on 2026-09-03**, on a measurement that does not
+reproduce — `grep -rni stall src/` returns fifteen hits — and the correction is recorded in
+`docs/notes/CALCIUM_NOTE_AUDIT.md` §1f. **The one real residue is the threshold**: `STALL_MS` is a
+constant of the framework's, not a setting of the far side's. **The local-model case is the one
+worth tuning**: a 4-bit 30B model on a warm cache can be quiet for ten seconds legitimately, so
+the threshold should be the far side's rather than the framework's — a roadmap item, not a
+missing mechanism.
 
 **And the budget exhausting must say so**, which is §16's whole argument for `calls n/max` on
 screen. **The turn ends with a notice naming the budget**, not with silence that reads as a
@@ -1766,12 +1767,11 @@ check**, and it belongs to whoever builds A5.
 **The activity region is variable-height and the footer is three lines.** Neither fits, and
 **the activity region is the claimant a fixed row cannot satisfy at all.**
 
-**So roadmap #28 — the chrome row budget — is this design's blocker**, and the option it wants
+**So roadmap #29 — the chrome row budget — is this design's blocker** (this said #28, which is prompt cursor-following and BUILT), and the option it wants
 is **chrome-as-blocks**: multi-row falls out, `b.row` gives horizontal layout, and both regions
 become chrome the app supplies rather than regions the framework grows.
 
-**Seven features now want that decision.** This is the one that most wants the room, and it is
-the only one that cannot be satisfied by winning the argument about a single row.
+**The claimants are counted once, in roadmap 29, and not here.** This paragraph said seven where §16 said six and the roadmap said four, five and six in three places; reconciled 2026-09-03 to **four roadmap consumers plus this design's two regions** — see roadmap 29. The activity region is the one that most wants the room, and it is the only one that cannot be satisfied by winning the argument about a single row.
 
 ---
 
@@ -1782,7 +1782,7 @@ rulings, the tools are the manifest, the errors are ruled, and the empty state i
 
 **The two open things are named rather than hidden:**
 
-- **the chrome seam** — Calcium's, roadmap #28, and it gates A7 and A8
+- **the chrome seam** — Calcium's, roadmap #29 (not #28), and it gates A7 and A8
 - **compaction mid-turn** — a design question with no ruling, belonging to A5
 
 **And the drawings owe what every drawing in this project has owed**: every field name, every

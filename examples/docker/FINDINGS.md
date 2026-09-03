@@ -22988,6 +22988,39 @@ the reader gets the wrong rotation and no way to find the right one.
 driver holding `deps.clock()` computes `now - part.startedAt` forty lines away for the elapsed
 counter. The remedy is not a clock on the context — it is the demo not having an orbit of its own.
 
+## F510 — MG25 sees functions and classes, and a homonym is a consumer ★★★★☆
+
+MG25 refuses *an export nothing consumes*. Its declaration regex is
+
+```js
+/^export (?:function\*? |async function |class )([A-Za-z_$][\w$]*)/gm
+```
+
+so `export type`, `export interface` and `export const` are outside its subject. **This is F84's
+shape exactly** — MG24 scoped to `export interface` on a sentence that was true and not the one the
+rule needed — and the measurement is the same kind: **661 declarations covered, 754 not**, and
+running MG25's own logic over the uncovered arms finds **ten** unconsumed exports it cannot see —
+three types and seven consts.
+
+**The second gap is independent and stacks with the first.** The consumer count is occurrences of
+the **bare name across all of `src/`**, so two unrelated declarations of one name mutually excuse
+each other. Measured on `Rung`:
+
+```
+src/presentation/plot/definition.ts   "box1" | "box3" | …    declared, used once   2
+src/presentation/plot/project3.ts     "half" | "braille"     declared, used never  1
+                                                                            total  3
+```
+
+`project3.ts`'s `Rung` is what F498 left behind when `sampleGrid` lost its rung parameter — dead on
+the day of that landing — and it is invisible twice over: the regex does not reach a type, and if
+it did, the homonym in `definition.ts` would carry the count past `uses > 1`.
+
+**The allow-list's equality gate is not the weak part and it is worth saying so.**
+`UNCONSUMED_FUNCTIONS` is compared by equality and its one live entry, `plotAreaWidth`, is exactly
+what the shipped arm reports — which is the control that says this scan is measuring the rule
+rather than something else. The rule is right about everything it can see.
+
 ## F511 — the GPU ceiling is under half the frame, and the raster is not what costs ★★★★★
 
 Three measurements, run after the geometry cache (F469), and each settles one question.
@@ -23041,35 +23074,1005 @@ rather than taken.
 spent where a GPU reaches, so the next optimisation is about the work that scales with samples
 (the cell fold and the compose) rather than with triangles.
 
-## F510 — MG25 sees functions and classes, and a homonym is a consumer ★★★★☆
+---
 
-MG25 refuses *an export nothing consumes*. Its declaration regex is
+## F512 — `putBlock` exists, in the wrong component for the sentence that cites it ★★☆☆☆
 
-```js
-/^export (?:function\*? |async function |class )([A-Za-z_$][\w$]*)/gm
+*2026-09-03 · Lane A, the record, at 86d3b191.*
+
+The brief said *no `putBlock` anywhere; the verb is `append`*. Half right. `putBlock` is
+`DocumentView.putBlock(blockId, next): boolean` at `src/shell/document-view.ts:107,316` — the
+pushed view's total block replace, with `execution.ts:1847` and `router/focus.ts:103` as readers.
+It is not a C13 verb: `TranscriptStore` has `append`/`patch`/`settle` (`viewport/transcript/types.ts:
+110,128,142`). So `AGENT_TUI_STEP0.md:68`'s *"C13's live-entry lifecycle exactly — `putBlock` then
+`settle`"* names a real method on a different component, which is harder to catch than a name in no
+file: a grep for the symbol succeeds. Corrected in place to `append`/`patch`/`settle` with the
+homonym named. **A reading that said "nowhere" would have been falsified by the first grep and then
+believed less than it deserved.**
+
+---
+
+## F513 — The design's own width table is wrong in all three rows, and a fourth row two sections up ★★★☆☆
+
+*2026-09-03 · Lane A, the record, at 86d3b191.*
+
+`AGENT_TUI_DESIGN.md:1423-1425` calls `◻ ◼ ⋅` narrow; `:1440` says `⋅` is *the narrow one*;
+`:1036-1037` and `:1041-1043` say `▐ ░` are narrow and the bar can be built from them *at no cost*.
+`src/presentation/blocks/glyphs.ts:685-690` measures `▐ ░ ▬ ▪ ▫ ▮ ▯ ▰ ▱ ◼ ◻` all
+`East_Asian_Width=Ambiguous`, and `:400-402` measures `⋅ ∘ ◦` the same — *"exactly like the character
+they were chosen to replace"*. The design's checkbox-glyph decision rests entirely on the width
+claim (*the obvious pair is the unsafe one*), so the decision has to be re-taken, not just the table
+corrected. The brief listed the checkbox rows; the `▐ ░` row was found by reading the section around
+them. Corrected in place, four sites, with the citation.
+
+---
+
+## F514 — Roadmap row 17 was wrong three ways, and row 7 already knew ★★★☆☆
+
+*2026-09-03 · Lane A, the record, at 86d3b191.*
+
+`CALCIUM_ROADMAP.md:4334` said *two implementers, not four. `keyValue` and `code` declare none*.
+Measured: `window` is declared by `keyValue` (`kinds/structured.ts:125`), `logs` (`:217`), `patch`
+(`patch/definition.ts:213`) and `table` (`table/definition.ts:157`) — four; only `code` declares
+none. Row 7 in the same table reasons about `table`'s `window`. Two rows of one table disagreed and
+nothing compared them. `CALCIUM_DATAFRAME_IDEA.md` had it right. Corrected.
+
+**Lane F reached the same row independently**, from the other direction — while constructing the floored-table witness — and recorded it as the same shape as its four e2e deferrals. Its measurement, verbatim:
+
+PART 17's status row counted two; the tree has four (`keyValue`, `logs`, `patch`, `table`).
+Recorded because it is the same shape as the e2e
+deferrals: a true sentence about the tree, never re-read, that reads as a smaller job than
+the one remaining and a larger one than the one done.
+
+---
+
+## F515 — Four documents, four counts, for one chrome row ★★☆☆☆
+
+*2026-09-03 · Lane A, the record, at 86d3b191.*
+
+`CALCIUM_ROADMAP.md:2499` *four*, `:3565` *FIVE*, `:3580` *SIX*, `:3592` *FIVE, not six*;
+`AGENT_TUI_DESIGN.md:1290` *six*, `:1773` *seven*. At HEAD: 33 rules the queued count not owed and
+the fourth check dropped the mode indicator, so **four roadmap consumers** (35, 37, 46, 15's row
+count) **plus the design's two regions** (A7, A8). Reconciled into entry 29 alone; the other three
+sites now point there. The repetition was the defect: each count was true when written and none was
+retired when the next was.
+
+---
+
+## F516 — The 3D refusal was retracted in the roadmap and in no note ★★☆☆☆
+
+*2026-09-03 · Lane A, the record, at 86d3b191.*
+
+F435 retracted it. `CALCIUM_PLOT_PRIOR_ART.md` still says *refused* at `:166`, `:251`, `:375`,
+`:765`, `:950`; `CALCIUM_GAP_PLAN.md:122` lists 3D under *deliberately not doing*; `:4377` of the
+roadmap said the 3D symbols occur zero times in `src/presentation/plot/` (they occur 48 times across
+six files). A retraction that reaches one document leaves every other citation of the refusal
+standing, and a reader who opens the note first restores the refusal. Corrected at every site, dated.
+
+---
+
+## F517 — The SVG arm refuses one form, and the completion note says nineteen ★☆☆☆☆
+
+*2026-09-03 · Lane A, the record, at 86d3b191.*
+
+`SVG_FAMILY` (`svg.ts:183`) has 47 keys and exactly one `null` — `plot3d`. `horizonFigure` and
+`contourFigure` both exist, which is the symbol `CALCIUM_SVG_COMPLETION.md:147-190` said to grep.
+The note wrote its own expiry condition correctly and nothing ran it. Recounted in place.
+
+---
+
+## F518 — Mermaid theming's three questions were answerable from a `.d.ts` ★★☆☆☆
+
+*2026-09-03 · Lane A, the record, at 86d3b191.*
+
+`CALCIUM_MERMAID_THEMING.md:97-99` scheduled an afternoon. `node_modules/beautiful-mermaid/dist/
+index.d.ts` answers all three without running anything: `renderMermaidASCII` returns a bare
+`string` (`:267`) so there is no cell→node map and the note's cell→tone design is refused by the API;
+`AsciiRenderOptions.theme?: Partial<AsciiTheme>` (`:238`) exposes eight *roles* the note never saw;
+`classDefs` survive into `parseMermaid` only. The note's `:39` *colorMode … suggests it knows which
+cells are which* was wrong — it knows which roles. Re-scoped in place to role→palette-slot, ~80 lines.
+
+---
+
+## F519 — The reader report's `b` count and forms count were both stale ★☆☆☆☆
+
+*2026-09-03 · Lane A, the record, at 86d3b191.*
+
+Report 2 said `b` has 30 members; `dist/index.js` exports 39 keys (nine are `id`/`ok`/`warn`/…
+helpers). `CALCIUM_DATAFRAME_IDEA.md:52` says 35 forms; `PLOT_FORM_MEMBERS` has 47. Neither changes a
+verdict; both are the kind of figure that gets copied forward. Recorded with the measured numbers.
+
+---
+
+## F520 — Gate collisions from labels that look like citations ★☆☆☆☆
+
+*2026-09-03 · Lane A, the record, at 86d3b191.*
+
+The audit's image rows were labelled `I1`–`I11` and SP3 read them as bare invariant citations;
+roadmap row 17's second `structured.ts:217` was resolved as a file that does not exist; and the word
+*landed* inside an OPEN entry tripped `BUILT_CLAIM` (`roadmap-status.mjs:346`). All three are the
+gates working. Relabelled `IM-n`, full paths, *closed that question*.
+
+---
+
+## F521 — The waffle's shared allocation dropped a segment, in both arms at once ★★★★★
+
+*2026-09-03 · Lane B, the plot renderer, at 86d3b191.*
+
+`waffleGrid` rounded each segment independently and filled greedily against `pos < 100`. Measured
+on the two fixtures F305 named:
+
+```
+over-100   50/50/1  →  50 / 50 / 0    the legend reads  █ Sliver 1%  beside a mosaic of two colours
+under-100  1/1/1    →  33 / 33 / 33   the hundredth square drawn as surface.border, a ground the legend does not name
+default    65/25/10 →  65 / 25 / 10   scale === 1, Math.round is the identity — the corpus's only waffle for a year
 ```
 
-so `export type`, `export interface` and `export const` are outside its subject. **This is F84's
-shape exactly** — MG24 scoped to `export interface` on a sentence that was true and not the one the
-rule needed — and the measurement is the same kind: **661 declarations covered, 754 not**, and
-running MG25's own logic over the uncovered arms finds **ten** unconsumed exports it cannot see —
-three types and seven consts.
+Both baselines were committed and both had been read. **Row 7 of §3ak.26's table ruled the
+assignment *shared* and was right; sharing was not the question** — the shared function was wrong
+and so both arms drew the same wrong mosaic. No invariant governed the allocation; the only record
+was the table quoting `Math.round`.
 
-**The second gap is independent and stacks with the first.** The consumer count is occurrences of
-the **bare name across all of `src/`**, so two unrelated declarations of one name mutually excuse
-each other. Measured on `Rung`:
+Ruled as **C12 I108**: largest-remainder (Hamilton) allocation, floors first, the leftover squares
+one each to the largest remainders, **the earlier segment winning a tie** — stated because it is the
+one decision the arithmetic leaves open (`1/1/1` is `34/33/33`, and a rule left to iteration order
+moves frames the day the segments are sorted). Twenty-two baselines moved (`under-100`/`over-100`
+× ten terminal + two SVG); `default` did not. SVG `over-100` fills went 51/51/1 → 51/50/2 counting
+one legend swatch each — squares 50/50/0 → 50/49/1. `test/unit/plot-waffle.test.ts` WA1–WA3, with
+the pre-I108 allocation reimplemented as the control.
+
+---
+
+## F522 — The all-zero waffle named three shares the mosaic did not draw, and the pie calls the same list no data ★★★★☆
+
+*2026-09-03 · Lane B, the plot renderer, at 86d3b191.*
+
+The `scale = 0` arm of `waffleGrid` had never been reached by a frame (coverage sweep 5). Reading
+the first frame that reached it — `waffle/all-zero`, three segments at 0 — found **both arms**
+drawing three swatches in three palette colours and three names with **no reading at all**, beside
+a hundred empty squares. `sharesOf` returns nothing for a zero total, so `proportionDecisions`
+never gave the slot a `value`. A zero segment among non-zero ones already reads `0%` with a swatch
+and no ink, so the all-zero waffle now reads the same; one line in `proportionDecisions`.
+
+**The pie treats the identical list as no data**: terminal `No data.`, SVG refused (`sharesOf` is
+empty, so no arcs, so an empty figure). Two answers to *what is a zero total* inside one family.
+Not ruled here — the waffle has a mosaic to draw and the pie has no disc — but it is a family
+disagreement the record should hold. C12 §3ak.26 Findings 3 and 7 carry the paragraph.
+
+**The follow-through pass took the ruling the lane declined**, after Lane B's request for one: a zero total is *every segment at nought, never an empty list* — `sharesOf` no longer answers `[]` for it — so the pie draws its rim with no wedge and a `0%` legend in both arms, agreeing in every cell (C12 §3ak.26 finding 5, `pie/all-zero` at both widths). Two passes reached the same list: the lane found the waffle's half by reading the first frame through the `scale = 0` arm, the follow-through found the pie's by writing the rule where `sharesOf` lives.
+
+---
+
+## F523 — The SVG arm dropped three of the four annotation kinds, and a guard read as a ruling ★★★★★
+
+*2026-09-03 · Lane B, the plot renderer, at 86d3b191.*
+
+`annotationMarks` opened `if (a.kind !== "line") return []`. `band`, `confidence` and `whiskers`
+never reached the second arm; the terminal draws all four through `annotate.ts`. Measured:
 
 ```
-src/presentation/plot/definition.ts   "box1" | "box3" | …    declared, used once   2
-src/presentation/plot/project3.ts     "half" | "braille"     declared, used never  1
-                                                                            total  3
+line block, with and without a band       byte-identical SVG
+line/confidence · line/confidence-unfilled one document — recorded by the sweep as a collision on annotations.fill
+line/annotation-label                      the budget line drawn, the legend row naming it filtered out
 ```
 
-`project3.ts`'s `Rung` is what F498 left behind when `sampleGrid` lost its rung parameter — dead on
-the day of that landing — and it is invisible twice over: the regex does not reach a type, and if
-it did, the homonym in `definition.ts` would carry the count past `uses > 1`.
+**Nothing in C12 §3e ruled the three terminal-only.** Its "named and not built" table omits them;
+the paragraph after it says they *arrived with a renderer and without a ruling*, which was true of
+the terminal and did not notice the SVG. The sweep's row blamed `fill` when the whole kind was
+missing — a member cannot be read against a mark that is not there. And the legend filter
+`role !== "annotation"` sat under a comment reading *this arm does not draw annotations* (F259),
+false from the day `line` crossed, outliving its reason unread.
 
-**The allow-list's equality gate is not the weak part and it is worth saying so.**
-`UNCONSUMED_FUNCTIONS` is compared by equality and its one live entry, `plotAreaWidth`, is exactly
-what the shipped arm reports — which is the control that says this scan is measuring the rule
-rather than something else. The rule is right about everything it can see.
+Ruled as **C12 I109**: all four cross as marks the type already had — no new kind. `line` a dashed
+polyline; `band` a shaded rect plus a dashed edge per in-range edge; `confidence` a shaded closed
+polyline (where `fill` is on) plus dashed upper and lower edges broken at out-of-range samples;
+`whiskers` one undashed vertical per point. Six SVG baselines moved (`line-annotated`,
+`line-annotation-label`, `line-confidence`, `line-confidence-unfilled`, `line-whiskers`, and
+`autocorrelation-default` by draw order alone). `test/unit/plot-annotation-arms.test.ts` AC1–AC3;
+the `confidence` pair leaves the collision list in `plot-arm-disagreement.test.ts`; G8f in
+`plot-svg-path.test.ts` — written to fail the day annotations landed — now asserts the drawing.
+
+---
+
+## F524 — Three defects in the first draft of the crossing, each found by reading a frame ★★★★☆
+
+*2026-09-03 · Lane B, the plot renderer, at 86d3b191.*
+
+None was visible to an assertion about mark counts.
+
+- **The dash was the layer's and had to be the mark's.** `svg.ts` dashed every annotation-layer
+  polyline — right while a reference line was the only one that reached it, and a whisker is one
+  short vertical that a dash breaks into dots. `Mark.polyline.dashed` now says which strokes are
+  claims; a whisker is not one.
+- **An interior drawn as one closed dashed path outlined the ceiling.** `line-confidence.svg`'s
+  upper edge is above the range for its last four samples; the closed path's stroke ran along
+  `y = 12.8` for them — a dashed line saying *the edge is here* about a place it is not, the
+  clamped-threshold lie §3e was written against, arriving on a region. The interior is now
+  `stroke="none"` and the edges are separate marks, broken where the terminal's `confidenceRows`
+  drops a sample.
+- **Behind the data means *first* in an arm that paints in order.** The terminal resolves layers
+  first-non-blank with annotations appended last, so *last* means *behind*; the SVG paints in
+  order, so *last* meant *on top*, and a shaded band after the series would have covered the curve
+  it exists to be read against. Claims are now partitioned first — which is what found the next
+  finding.
+
+---
+
+## F525 — The violin's IQR box is on the annotation layer for its width, not its meaning ★★★★☆
+
+*2026-09-03 · Lane B, the plot renderer, at 86d3b191.*
+
+Partitioning annotation-layer marks first, and shading their rects, moved **nineteen violin
+baselines**: `violinFigure` puts its IQR box on `layer: "annotation"` — its own comment says
+*`annotation` is what buys the exact width*, because the layer is what escapes `SLOT_SHARE` — and
+drawn behind its density and translucent, the box vanished into the body it sits on.
+
+**A datum wearing a claim's layer.** The box carries a `seriesIndex`, which no claim about the data
+does, so `svg.ts` tells the two apart by that: `claim(d) = layer === "annotation" && seriesIndex ===
+undefined`. The predicate is the count of the exemption rather than its exclusion, and AC3 asserts
+the box stays opaque and after its density. The honest fix is a way for a placed rect to decline the
+slot inset without borrowing a layer — `SLOT_SHARE` is `svg.ts`'s own, so the figure cannot
+pre-compensate without the constant leaking upward. Owed; recorded in §3e.
+
+---
+
+## F526 — The radar's ASCII table overwrote its last row with the residue and under-counted by one ★★★★☆
+
+*2026-09-03 · Lane B, the plot renderer, at 86d3b191.*
+
+`radarAsciiRows` took `shown = min(n, h − 1)` and wrote `⋯ N more` at `rows[h − 1]` — the last
+*shown* category's own row. First frame to overflow (`radar/table-overflow`, twelve categories in
+ten rows):
+
+```
+before   Speed … Armour   (8 rows read)   ~ 3 more     — Reach drawn, then overwritten; 4 not shown, 3 counted
+after    Speed … Armour   (8 rows)        ~ 4 more
+```
+
+`segmentLegend`, one function up, reserves the residue row before counting; this one did not.
+Fixed in `circle.ts` — two lines — because the fixture that reached the rule showed it wrong, and
+the rule is the residue's whole purpose.
+
+---
+
+## F527 — The pie legend's residue was truncated by the entries it stood in for ★★★☆☆
+
+*2026-09-03 · Lane B, the plot renderer, at 86d3b191.*
+
+`segmentLegend` sized its column from the entries — a one-letter label and a two-digit share make
+six cells — and then wrote `⋯ 5 more` (eight cells) through `truncate(more, width)`: the first
+overflowing pie read `⋯ 5 m…`, and `plot-arm-disagreement`'s reader took the `m` for a segment's
+name (`pie.identityLabels` opened at 2/12 on it). The residue now counts toward the width, bounded
+by the same budget the entries were. Fixed in `circle.ts`; the ASCII arm (`pieAsciiRows`) truncates
+to the whole width and did not have the defect.
+
+---
+
+## F528 — A whisker's `x` is read by neither arm ★★★☆☆
+
+*2026-09-03 · Lane B, the plot renderer, at 86d3b191.*
+
+`Annotation.whiskers.points` carries `{ x, y, err }`; `whiskersRows` spreads the points evenly by
+**index** and never reads `x`, and the SVG arm now agrees rather than rules — a second arm honouring
+`x` would be a new disagreement introduced by a crossing. The member is dead in both arms and the
+ruling on it is owed. Recorded as I109's stated blind spot.
+
+---
+
+## F529 — `yScale: "symlog"` and `"time"` change which ticks are chosen and nothing else ★★★☆☆
+
+*2026-09-03 · Lane B, the plot renderer, at 86d3b191.*
+
+`line/symlog` and `line/time` reached `niceSymlogAxis` and `niceTimeAxis` for the first time, and
+the frames read as **linear**: the symlog curve is the same sine as `default`'s, its `-100` label
+sits five rows of nine below `1000` — the linear position — and the time axis labels `259145`,
+`172800`, `10` with no time format, the top and bottom being the data's ends rather than round
+boundaries. `yScale` reaches `valueAxisOf` and the tick algorithm; nothing maps a sample's row
+through it. Both fixtures are committed as the record of that: the frames are what the members do
+today, and the finding is that a scale which selects ticks without moving samples is a scale in
+name. Not fixed — a symlog row mapping is a C04/C12 ruling about the coordinate both arms share.
+
+**Ruled by the follow-through pass** as C04 I81 (§3al): a `ScaleType` is a transform on the shared coordinate and the range carries it — `PinnedRange.scale`, read by `normalisedOf`, attached by `axisFor` — so a tick and the sample it names are placed by one function in both arms. `log` had the same defect on y and no fixture; `line/log` is the fixture now. `time` stays seconds with duration labels unless a format is declared.
+
+---
+
+## F530 — Fixture defects, recorded from the frames ★★☆☆☆
+
+*2026-09-03 · Lane B, the plot renderer, at 86d3b191.*
+
+- **A heatmap key over a zero span shows the whole ramp between equal ends.** `heatmap/constant` at
+  ASCII reads `3 .:-=+*#@ 3` — eight glyphs of ladder between 3 and 3, of which the field uses one.
+  The mid-ramp rule (C12 I89) is right; the key beside it says the field spans the ladder.
+- **`near-clip` is a wall by construction.** A camera inside the normalised extent sees the surface
+  wall to wall — sphere at `distance: 0.7`, Gaussian at 0.5–0.8, all of them. The clip is exercised
+  (12 one-kept and 18 two-kept faces per frame, measured with a temporary marker) and the frame has
+  no spikes or holes, which is the failure the clip prevents; it is uninformative to the eye and no
+  camera inside the extent is otherwise. Kept, and said so in the fixture.
+- **`bar/constant` cannot reach the zero-span arm.** A bar's range runs from `baselineOf(min)`, zero
+  for non-negative data, so equal positive values span `0…v`; only a bar chart whose every value is
+  the baseline reaches `categorical.ts`' arm. The fixture is `bar/all-zero` for that reason.
+- **`radar/circle-grid` needs the line style.** `triangle-circle` already asked for a circular grid
+  and reached `frameRows`' arc; the sampled ring at `circle.ts:737` is `radarQuadFigure`'s, which
+  only `plotStyle: "line"` draws, and no fixture combined the two.
+- **`plot3d/constant-surface` colours through the surface's own ramp**, not `scatter3.ts`' `ramped`;
+  `constant-value` (a value-coloured cloud at one value) is what reaches the latter. Both kept.
+
+---
+
+## F531 — Three record cells opened by the new fixtures are the reader's, not an arm's ★★☆☆☆
+
+*2026-09-03 · Lane B, the plot renderer, at 86d3b191.*
+
+`plot-arm-disagreement`'s `MEASURED` record moved on six forms. Three cells changed from `agree`:
+
+| cell | what it is |
+|---|---|
+| `heatmap.keyReadings` 1/16 | `both-axes-narrow` at 80: the frame carries `-1 … 1` under both label columns and the terminal reader returns nothing — a reader limit under `yAxis: "both"` |
+| `pie.identityLabels` 2/12 | the legend's residue read as a name; `⋯ 5 m…` before the fix above, `more` after it |
+| `radar.identityLabels` 2/12 | both arms name all twelve spokes; the terminal's bottom row `Armour  Luck  Stealth` read left to right against the SVG's angular order |
+
+Named on their rows in the test rather than absorbed into the count, so the next reader does not
+re-derive them.
+
+---
+
+## F532 — `RenderContext.onAction` was a required member no renderer ever read ★★★☆☆
+
+*2026-09-03 · Lane C, the seams, at 86d3b191.*
+
+| | |
+|---|---|
+| **Surface** | every render context built in the tree |
+| **Reached for** | the seam an action fires through |
+| **Verdict** | F85's shape — a required field every caller had to invent a stub for |
+
+`src/presentation/blocks/types.ts` declared `onAction: (action: Action) => void` as required.
+Measured: no file under `src/presentation/blocks/kinds/` mentions `Action`; the only writers were
+the two no-op defaults in `render-lines.ts` (`options.onAction ?? (() => undefined)`), fed by an
+optional `RenderOptions.onAction` that both product call sites — `shell/paint.ts`, `shell/composite.ts`
+— omitted. So every real frame rendered against the no-op, and the two tests that supplied a value
+supplied `() => undefined`.
+
+**The working route never touched the context.** `KeyDeps.onAction` (`keys.ts`, `rowActivate`) →
+`pipeline.onAction` (`construct.ts`), C23 I37: *C16 owns the binding and C23 owns the dispatch*.
+F21 recorded the gap — *no keystroke reaches the dispatcher* — and its closure was the
+`enter → rowActivate` route, which is what made the context member's emptiness permanent rather
+than pending. C23 §3a and I16 were supplier-exclusivity clauses about a field nothing read, while
+the mechanism they were protecting ran beside it under a different name.
+
+Removed from `RenderContext` rather than added to `RenderContextInput`'s `Omit` (F85's shape does
+not apply — nothing overwrote it). Specs first: C09 §2 loses the line and gains a paragraph; C23
+§3a, I16 and commitment 16 now name `pipeline.onAction` / `KeyDeps.onAction`. One comment outside
+this lane still names the old member (`src/shell/types.ts:181`) — requested.
+
+---
+
+## F533 — `MetaSpec.resultId` was a shell-side writer for a producer-owned field, with zero writes ★★☆☆☆
+
+*2026-09-03 · Lane C, the seams, at 86d3b191.*
+
+`src/shell/documents.ts` `MetaSpec.resultId?: string`, passed through by `meta()`. Sole `meta()`
+caller is `compose()`; `compose`'s three callers (`execution.ts` ×2, `local/handlers.ts`) never
+pass it. `DocumentMeta.resultId` is `ProducerOwned` (C04 §2) and written by the adapter registry
+(C07 I13); the legitimate shell-side passthrough is `completeLocal`, which does not use `MetaSpec`.
+A field that *can* be supplied and never is reads as a route that exists. Deleted with a dated
+doc comment on `MetaSpec`. No spec mentions `MetaSpec`.
+
+---
+
+## F534 — 2-D `Series.marker` — accepted by both gates, drawn by none, and attributed to the wrong commit ★★★☆☆
+
+*2026-09-03 · Lane C, the seams, at 86d3b191.*
+
+| | |
+|---|---|
+| **Surface** | `b.line(values, { marker: "star" })` and every 2-D form's `Series` |
+| **Verdict** | F207's *member accepted and ignored*, on the public door |
+
+`Series.marker?: string` was the only undocumented member of `Series`. The brief attributed it to
+1274eb27 (the `Point3Series.marker` arm). **Measured, it is not**: `git log -S'marker?: string'`
+puts it in **127f19b1** — *34 plot forms, the violin fixed, and the figure builder* — the same
+commit that gave `makeSeries` its `...(opts?.marker !== undefined ? { marker } : {})` spread and
+`SeriesOpts.marker`. 1274eb27's addition was `marker?: Marker3` on `Point3Series`. A claim about
+provenance carried into a plan without a `git log` is the *ask where it is written down* class;
+twenty seconds to check, and the fix is the same either way.
+
+The only `.marker` reader in `src/` is `scatter3.ts` on `Point3Series`; `validateBlock` checks
+`marker` only under `points3`. No 2-D form has a glyph channel a marker name could index. So the
+builder option compiled, validated and drew nothing. Deleted from `Series`, `SeriesOpts` and the
+spread; C04's `Series` listing and I76 record that the 2-D series carries no marker. No test
+constructed a 2-D series with `marker`. Golden suite: 12 files / 403 tests before and after,
+identical.
+
+---
+
+## F535 — `TuiConfig.transport` took a type the runtime entry could not produce, and `createRouter` was the missing one that mattered ★★★★☆
+
+*2026-09-03 · Lane C, the seams, at 86d3b191.*
+
+| | |
+|---|---|
+| **Surface** | `TuiConfig.transport?: TransportRouter` |
+| **Reached for** | an app selecting the emulator (C06 §1's stated purpose for that mode) |
+| **Verdict** | C24 I2's `BlockRegistry` shape — a type a consumer can name and cannot construct |
+
+`src/index.ts` exported the types `Invocation`, `TransportRouter`, `VerbTransport` and **no
+function that produces any of them**. C06 §2 publishes a three-arm `TransportDeps` union and
+four constructors; one arm had a reachable constructor — the shell's own `subprocess` default in
+`construct.ts`, the only `createTransport` caller in the tree. The brief asked for
+`createFixtureTransport` and `createEmulatedTransport` (and to decide on `createTransport`).
+**`createRouter` was also absent**, and it is the one `TuiConfig.transport` actually needs: an app
+can hold a `VerbTransport` and still has nothing on the entry that turns it into a `TransportRouter`.
+All four are exported now; `createTransport` on C06 §1's argument (an app's entry point reading its
+own `*_TRANSPORT` variable — C06 I18 — wants the factory; a test wants the arm).
+`createSubprocessTransport` stays off — the shell builds it from `TuiConfig.binary`.
+
+Consumer, per CLAUDE.md: `test/contract/transport.test.ts` T2.11 constructs every arm through the
+entry, through the factory *and* the arm constructor, asserts the three arms answer distinguishably,
+streams one, and routes through a public `createRouter`. First run failed on
+`expect(router.for("ps")).toBe(direct.fixture)` — `for` returns the busy-latch wrapper (I13) — so the
+routing is asserted from what each verb answers. That failure is the row responding to its subject.
+
+---
+
+## F536 — MG29 named the three parameter types on the first run, then fired on a homonym ★★★☆☆
+
+*2026-09-03 · Lane C, the seams, at 86d3b191.*
+
+Adding the four functions alone made `make enforce` report **MG29 ×5**. Three were correct and
+are the rule earning its place: `createFixtureTransport(Fixture)`, `createEmulatedTransport(FixtureHandler)`,
+`createTransport(TransportDeps)` — three functions that resolve and cannot be called (C24 I29).
+Published; `RawResult`/`RawPatch` were already on the entry through C07's block (tsc caught the
+duplicate, TS2300 ×4, before anything else did).
+
+**The other two are a false positive of F510's shape, on the subject side.** MG29 collects exported
+function *names* from `src/index.ts` and then matches `export function <name>(` in **every** file.
+`createRouter` is declared twice — C06's `data/transport/router.ts` and C16's
+`interaction/router/router.ts` (`FocusStore`, `Keymap`; InputRouter is one of C24 §3's eleven and
+is not on the entry). The rule reports C16's. `test/unit/enforce-rules.test.ts`'s MG29 control
+(`expect(checkExportedArguments(files)).toEqual([])`) is red for the same reason. The ruling here
+is to keep the spec's name — C06 §2 says `createRouter`, and a name chosen to dodge a scanner's
+homonym blindness is the *correct sentence justifying the wrong decision* class — and to ask the
+rule to resolve an export through its `from` path to the declaring module. Requested of Lane E;
+the alias `createRouter as createTransportRouter` is the one-line alternative if the rule fix does
+not land in this pass. MG29 has no exemption list, which is why this cannot be answered in a row.
+
+**Actioned by Lane E in the same pass.** `checkExportedArguments` now resolves each `export { name } from "<path>"` on `src/index.ts` through the path and any barrel to the declaring module and reads the signature there alone. Fabricated: a same-named `createTransport(deps: NeverPublished)` appended to `paint.ts` does not fire; control: the same interior type on the declaring module's signature does. The alias was not needed.
+
+---
+
+## F537 — C04 is stale about `Point3Series.marker`, one commit behind C12 ★★★☆☆
+
+*2026-09-03 · Lane C, the seams, at 86d3b191.*
+
+1274eb27 added `marker?: Marker3` to `Point3Series`, C12 I99, `MARKER3_MEMBERS`, and a validator
+arm — and changed **C12 and not C04**. C04 still says, three times, that the 3-D series has no
+marker: the `Point3Series` listing at `:907-911` lacks the member; the §points3 prose at `:927-931`
+says *"No `label` on the point and no `marker` on the series … a second claim on the glyph the
+depth tier already owns"* — the exact reason 1274eb27's message refutes; and I76's *"No per-point
+`label` and no per-series `marker`"* is the same sentence as an invariant. C04 I76 is what
+`validate.ts:1805` cites in its refusal message for an unknown marker name, so the validator's
+error text points a reader at an invariant that denies the member exists. Not touched here — this
+lane's C04 remit is the 2-D sentence only — and requested of the C04 owner. Note the sentence I
+appended to I76 sits directly after the stale clause and reads correctly against the tree, not
+against the clause before it.
+
+---
+
+## F538 — Three readers of `liveId` were three copies of one constant, and that is why the address never carried the entry ★★★☆☆
+
+*2026-09-03 · Lane D, navigation, at 86d3b191.*
+
+`liveElements`, `focusedBlock` (both `construct.ts`) and `focusFor` (`session.ts`) each read
+`stores.transcript.liveId` to decide which entry focus was in. They agreed because the value was
+a constant, not because they shared a source — §8b.4's three-walks shape one release later, on
+the entry axis instead of the element axis. So the stored location had no entry to carry: there
+was never a second value to distinguish from. The remedy is one pull (`focusedEntryId()`) and
+the entry on `StoredFocus`'s `liveBlock` arm (C26 I21, I22). Found by grepping `liveId` from the
+brief's symbol rather than from the address type, which is the direction the deferral habit
+says to grep in.
+
+---
+
+## F539 — A notice appended over the live entry left focus in a dead state that read as *focus is in the block* ★★★☆☆
+
+*2026-09-03 · Lane D, navigation, at 86d3b191.*
+
+Before §4g, any non-submit append — the state-directory warning, a stall notice, a refusal with
+no origin — became the live entry, `liveElements()` answered `[]` for it, and the reader was left
+at target `liveBlock` with nothing highlighted: `↓` did nothing, `↑` and `Esc` left. Reachable
+from every notice path and asserted by no row, because every row entered the block *and then*
+did something to it. With the entry on the location the element survives (T3.42). Found by the
+sequence trace's row 2, which asks what an append that is not a submit does — C16 I2 only ever
+answered for the submit.
+
+---
+
+## F540 — `←`/`→` at `liveBlock` did not fall through to the prompt, whatever two rulings said ★★☆☆☆
+
+*2026-09-03 · Lane D, navigation, at 86d3b191.*
+
+`keymap.ts`'s camera comment and C22 I75/commitment 46 both say the arrows *fall through to the
+prompt* at `liveBlock`, and `[` `]` were chosen on it. `dispatch` runs the target's handlers and
+then `global`; there is no `prompt` step from `liveBlock`, so both keys were **dropped**. The
+claim was carried through two rulings and measured by nothing until a binding wanted the keys.
+Wrong in the direction that made the decision look costly: claiming the arrows took nothing from
+anyone. Found by reading `router.ts`'s `dispatch` before writing a row that assumed the
+fall-through. C22 I75 is outside this lane's sections — request 7.
+
+---
+
+## F541 — `CSI Z` was discarded, so the `⇧tab` row would have named a key nothing sends ★★☆☆☆
+
+*2026-09-03 · Lane D, navigation, at 86d3b191.*
+
+Backtab's universal wire form was outside `CSI_LETTER_KEYS` (whose finals carry no modifier) and
+was discarded as well-formed-but-unknown. The fourth instance of C16 I17's class and the first
+found before the row shipped: T2.13 walks the keymap through the decoder, and the row failed
+on arrival. **The first fix was wrong the other way** — `final === "Z"` alone turned `CSI 999 Z`
+into a keystroke, and router-decode T3.13 (malformed sequences are discarded) caught it within
+the same run. Bare form only.
+
+---
+
+## F542 — `mergeBlock`'s throw would have refused its first consumer on every key it has ★★★☆☆
+
+*2026-09-03 · Lane D, navigation, at 86d3b191.*
+
+The widget design binds `↑` `↓` `PgUp` `PgDn` `Esc`, all `liveBlock`/`global` built-ins, and the
+plot's cursor keys are the arrows. The refusal was correct about the hazard (a silent shadow)
+and wrong about the remedy; C26 §4f had already found the mode's purpose — *the keys
+`mergeBlock` refuses* — without taking the step that turns the purpose into a placement. Ruled
+as C16 I27: colliding keys merge at `interaction`, free keys at `liveBlock`, both listed by
+`/help`. The mode now has a route and still no inhabitant (`BlockKeymap` has no producer in
+`src/`; T2.6a holds) — recorded rather than inverted, because a route is not a producer.
+
+---
+
+## F543 — The refusal C23 I18 describes was reachable from nothing a reader could press ★★☆☆☆
+
+*2026-09-03 · Lane D, navigation, at 86d3b191.*
+
+`isFrozen` had one route in: `pipeline.onAction` from a keystroke, whose origin was always
+`liveId`. So a frozen origin could only arrive from a test calling the dispatcher directly, and
+the two consumers that wanted something from a settled entry were arguing with a rule nobody
+had ever pressed. §4g's `⏎` on a settled row is the first keyboard route to it (T3.41, T1.17b),
+and pressing it is what forced the ruling to be finished: every kind stays refused, the notice
+names the recorded command, and `rerunEntry` fires that command through §2's submit — not an
+action, and not the document's data.
+
+---
+
+## F544 — `rowActivate` with `liveId` as the origin would not have been refused at all ★★★☆☆
+
+*2026-09-03 · Lane D, navigation, at 86d3b191.*
+
+With the ceiling lifted and the origin left as `liveId`, `⏎` on a settled row fires the
+settled row's action **against the live entry**: `isFrozen(liveId)` is false, so a `fill` lands
+in the prompt and an `expand` walks the live document for a row id from the settled one. The
+wrong-entry defect §8b.6 found for elements, one scope up, and invisible to every row that had
+one entry. The origin is `focusedEntryId()` (§4g row e); the mutation that restores `liveId`
+kills T3.41 by putting `pick 1` in the prompt.
+
+---
+
+## F545 — A move after eviction that kept the stored entry would have left the store pointing at nothing ★★☆☆☆
+
+*2026-09-03 · Lane D, navigation, at 86d3b191.*
+
+First draft: `focusRow(element)` kept `stored.entryId`, and `tab`/`⇧tab` had a separate
+`focusEntry`. T3.43 found that a `↓` from an evicted position resolved against the live entry
+(correct) and wrote the evicted id back (wrong): highlight on the live entry, store on a ghost,
+and the next keystroke resolving from the fallback again — I10's *repaired by the next
+keystroke* violated by the keystroke that should have repaired it. Every move now carries the
+resolved entry (`focusRow(entryId, element)`), and the entry move is the same call — one rule
+for the anchor and the mode rather than two that agree.
+
+---
+
+## F546 — `plot-interaction` passed for as long as it did because it supplied the field itself ★★☆☆☆
+
+*2026-09-03 · Lane D, navigation, at 86d3b191.*
+
+Eleven rows exercise `cursorPositions` by injecting it into the render context, so a field with
+no writer in `src/` had a green suite. Measured on landing: with the writer removed, all
+`cursor-positions` graph rows fail and `plot-interaction`'s eleven pass — the exact figure that
+explains why nothing noticed. A test that supplies a value is a test that never asks who
+produces it; the C22 I71 rule (*the field and its writer land together*) is the remedy and it
+was written against this field.
+
+---
+
+## F547 — A plot declares an element only with a camera, so the crosshair's first reachable subject is a 2D plot wearing `camera: {}` ★☆☆☆☆
+
+*2026-09-03 · Lane D, navigation, at 86d3b191.*
+
+C12 I85 gates the element on the camera because the camera was the only thing a reader could
+do to a plot. The cursor is the second, so I85's premise is gone; C04 accepts `camera: {}` on a
+`line` and `positionalForm` ignores it, which is the constructible route the frame test takes
+today (T4.17p). Request 4 widens I85 and exports a `cursorable` predicate so the writer can gate
+on the form instead of on `kind === "plot"`; until then a cursor on a non-positional form is
+stored and unread — F472's shape, named as the residue in C22 I76.
+
+---
+
+## F548 — MG24's shorthand blindness reached three new deps, and the fix is the honest one ★☆☆☆☆
+
+*2026-09-03 · Lane D, navigation, at 86d3b191.*
+
+`neighbourEntry`, `cursorBlock`, `rerunEntry` on `KeyDeps` were supplied by shorthand in
+`construct.ts` and consumed only inside `keys.ts`, so MG24 read them as unconsumed; the camera
+family passes because the same names exist on `Graph` (the loose `name:` match F105 records).
+Rather than widen `Graph`, the locals are named for what they do (`neighbourOf`, `moveCursor`,
+`rerunFocused`) and passed explicitly — which is what the arm was written for: *a `*Deps` record
+built inline at a call site*.
+
+---
+
+## F549 — Two test ids collided with rows already in C22, twice ★☆☆☆☆
+
+*2026-09-03 · Lane D, navigation, at 86d3b191.*
+
+`T4.17k`/`T6.83` and then `T4.17m`/`T6.84` were both already declared in C22 (orbit rows).
+SP7 caught each in turn. The numbering habit *next letter after the last one I read* is wrong
+in a spec another lane is also appending to; the ids landed at `T4.17p`/`T6.89` after grepping
+the whole file for the free range.
+
+---
+
+## F550 — the brief's stall-detection premise was false: the mechanism exists, is wired, is specced and has a mutation run ★★★★☆
+
+*2026-09-03 · Lane E, the enforcement suite, at 86d3b191.*
+
+The brief said *there is no stall detection — zero hits for `stall|quiet|silen` in `src/`* and
+asked for it to be ruled in C23 §3b and built. Measured: `grep -rni stall src/` returns 15 hits.
+`src/shell/refresh.ts` carries `STALL_MS = 120_000`, a per-entry `watched` map (`last`,
+`stalled`, `stalledAt`, `hasNotice`), a **re-arming** `STALL_MS / 4` tick that appends a muted
+`notice` (`glyph: "continuation"`, `no output for Nm`) and `resolveStall` replacing it with
+`resumed after Nm` — C23 §8a A4's *replaced, never removed* exactly. Wired from
+`execution.ts:1120 refresh.watch(pendingId)`, `:1408 refresh.sawPatch(id)`, `:1377/:1189
+refresh.settled(…)`. Spec: C23 §3b, I25, T1.30, T1.37, T6.30. Mutation run:
+`tools/mutate/runs/c23-refresh.mjs` (ten stale anchors — `KNOWN_STALE` — so it has not been run
+since its subject moved, which is a real debt and a different one).
+
+**How the premise was wrong**: the brief's grep was probably case-sensitive or run on
+`execution.ts` alone — `DEFAULT_TIMEOUT_MS` being `0` for streams is true and is the *invocation*
+timeout, not the stall timer, which lives one file over. Nothing was built for this item. Lane A's
+request #6 has since edited `AGENT_TUI_DESIGN.md:1630` to say the notice *does not exist*; the
+original sentence was true and Lane E has asked for it back, citing C23 I25 (laneE-requests.md).
+The one open question is real and small: `STALL_MS` is a constant, not a per-far-side threshold.
+
+**Two lanes met on one sentence from opposite directions.** Lane A, correcting the design note against the brief, rewrote `AGENT_TUI_DESIGN.md:1630` to say the mechanism *does not exist*; Lane E, asked to build it, measured that it does. Both edits were made in good faith from the same unmeasured premise, and the restored sentence cites C23 I25.
+
+---
+
+## F551 — SS50's three allowances were said to be dead, and the reason given is the condition under which they are live ★★★☆☆
+
+*2026-09-03 · Lane E, the enforcement suite, at 86d3b191.*
+
+The brief: *SS50 allow-lists three files … the three files contain `ambiguous` zero times*, offered
+as evidence the entries are dead. SS50's pattern is `cells\((?!.*ambiguous)(?!.*narrow-ok)` — it
+fires on a `cells(` call that does **not** name the convention. A file that spells `ambiguous`
+zero times and calls `cells(` is therefore exactly a file exercising the exemption. Measured with
+SS53: all three match (`menu.ts`, `layers.ts`, `fallback.ts`, one firing line each). The claim
+conflated "does not contain the word" with "the permission is unused"; for a negative-lookahead
+rule the two are opposites. Whether the *reason* — "until those signatures move (roadmap 51)" —
+has expired is a question about the reason, and SS54's blind spot says why no rule answers it.
+
+---
+
+## F552 — five dead allow-list entries, one for the whole life of its rule, and a fifth the brief did not name ★★★★☆
+
+*2026-09-03 · Lane E, the enforcement suite, at 86d3b191.*
+
+SS53 (`allowListCoverage`/`checkAllowLists`, `source-scans.mjs`) on its first run over 36 allow
+entries: **5 dead**. SS10 `capabilities.ts` (the file names `process.env` in a comment saying it
+does *not* read it — the scan skips comment forms, so the permission had never been used); SS19
+`four-bit.ts` (holds indices as bare numbers the pattern cannot see); SS21 `theme/` (0 of 10
+files); SS22 `types.ts` (`SLOT_KINDS` is quoted one per line and the three-in-a-row arm never
+matched it); and **SS46 `shell/types.ts`**, comment-only, which the brief did not list. All five
+removed, each with its `why` rewritten; A03 rows updated.
+
+**The measurement had to be the scan's own.** A first draft blanked comments with SS47's
+`codeOnly` and reported SS23 matching 3 of 10 `theme/` files where the scan reports 2 — the
+blanked form deletes the `// cells-ok` marker a negative lookahead reads, turning an excused line
+into a match. `lineFires` is now one function shared by `checkSourceScans` and SS53.
+
+**Blind spot, with the residue**: a directory allow is one entry and one live file carries it.
+Today: `SS20 theme/ 1/10`, `SS20 patch/ 1/7`, `SS23 theme/ 2/10`, `SS40 parser/ 6/8`. Reported by
+the coverage rows, not gated.
+
+---
+
+## F553 — MG2 had a row and no rule for the whole life of the suite, and the tree has one cycle ★★★★☆
+
+*2026-09-03 · Lane E, the enforcement suite, at 86d3b191.*
+
+A02 §1: *never upward, never cyclically within a layer*. MG1 was the first half from day one; the
+second was three named pairs (MG13, MG18, MG22) and a `PENDING_RULES` entry reading *nothing —
+implementable today*, which is a blocker nothing can expire. Implemented (Tarjan over the value
+edges MG1 walks, module granularity, same-layer only). **One real cycle**, in L4:
+`shell/paint.ts:38` imports `composite`; `shell/composite.ts:42` imports `FrameError, exact` from
+`paint.ts`. Acknowledged in `ACKNOWLEDGED_CYCLES` by equality; breaking it is requested of the
+shell owner (a leaf module for the error and the measure).
+
+**Type-only edges close a second cycle** — `shell/state.ts <-> shell/types.ts` — which erases at
+build and is not reported, consistent with MG1 (F127). Recorded so nobody rediscovers it.
+
+MG2 is called from `index.mjs` separately rather than inside `checkModuleGraph`, because its
+equality arm on a fabricated two-file tree reports the real acknowledged cycle as gone — which
+broke seven MG1/MG3 fire-tests on the first attempt.
+
+**The cycle was broken before this record was merged**: `shell/composite.ts` no longer imports from `paint.ts`, and `ACKNOWLEDGED_CYCLES` is empty — so the equality arm is live over nothing, which is the state it should be in.
+
+---
+
+## F554 — `PENDING_RULES`' string arm hid a built blocker for twenty components ★★★★☆
+
+*2026-09-03 · Lane E, the enforcement suite, at 86d3b191.*
+
+`if (typeof entry === "string") continue;` skipped `SS18: "C10 — needs the block-producing module
+list"` while C10 was built and twenty more components landed. A string beginning with a component
+id is now read as a `waitsOn` in the wrong shape and fails when built. SS18 implemented: scope
+`src/data/adapters/`, `src/data/fixtures/`, `src/shell/` — the third population beside SS16's
+types and SS17's renderers — measured clean (the only hex literals outside are two in
+`plot/field.ts`, a renderer, SS17's territory). SS12's fold rewritten to start with the word.
+
+---
+
+## F555 — TD1–TD6 had a test and no gate ★★★☆☆
+
+*2026-09-03 · Lane E, the enforcement suite, at 86d3b191.*
+
+`index.mjs` never imported `todo-expiry.mjs`; the family's only runner was the unit tier, which
+the pre-commit path does not execute. Wired: TD0's equality against `ACKNOWLEDGED_BACKLOG` in both
+directions, `checkSourceMap`, `checkSurfaceDeferrals`, spliced into the gated list. The unit file
+now asserts the call sites by reading `index.mjs` rather than calling the functions — calling them
+is what every other row did and what could not see the gap. A03 §8 table and commitment 13 say TD.
+
+---
+
+## F556 — every completion source failure is dropped silently in the product ★★★★☆
+
+*2026-09-03 · Lane E, the enforcement suite, at 86d3b191.*
+
+`EngineOptions.onSourceError` is supplied by every test (`test/edge/completion.test.ts:50`,
+`:71`, `test/revert/completion.test.ts:118`) and by nothing in `src/`; `construct.ts:534` passes
+`{ now, recency }`. C19 T3.6's *the failure is logged once* was asserted against an array the test
+supplied. Built: `createSourceErrorSink()` in `engine.ts` — one line per failing source with a
+count and the first message (`BlockFaultLog`'s shape, C22 I6a). C19 §3, I6, T3.6 amended. Unit
+rows in `test/unit/completion.test.ts`. **The wiring is `construct.ts`'s and is written out in
+laneE-requests.md** (two edits, plus the `c23-faults` anchor caveat). Until it lands:
+`UNCONSUMED_MEMBERS` carries both halves of the seam and `UNCONSUMED_FUNCTIONS` carries the sink,
+each saying so; both equality arms fire the day it lands and the three entries go.
+`SourceErrorSink.messages` is invisible to MG24 by name collision with `BlockFaultLog.messages`
+(F105's class) — noted, not excused.
+
+---
+
+## F557 — the refusal register's seeding found two claims that were wrong in the record ★★★☆☆
+
+*2026-09-03 · Lane E, the enforcement suite, at 86d3b191.*
+
+SS54 (`tools/enforce/refusals.mjs`, 17 rows: 8 `absent`, 6 `present`, 3 `unverifiable`). Writing
+premises as symbols forced two checks the prose never got:
+
+- **`DEPENDENCIES.md` § Not installed, NDJSON**: the *Instead* column says `node:readline`.
+  `src/` has zero occurrences; C06 splits on `indexOf("\n")` in `transport/ndjson.ts:107`. The
+  refusal holds and its stated alternative is not the one in use.
+- **C12 I71** names `contourFigure` and `horizonFigure` as the signature the invariant is
+  observable through. The tree has `contourSegments` and `horizonFigure`; `contourFigure` exists
+  only in comments (`figure.ts:1671, 1883`, `svg.ts:354, 1972`) as a deferral symbol. Half the
+  sentence names a function that does not exist. Not Lane E's spec to fix.
+
+Also: `codec.ts:204` exports `DECODE_JPEG_IS_NOT_BUILT = "decodeJpeg"` so the deferral can be
+grepped — a string literal the comment-strip keeps — so the register watches `decodeJpeg(`, the
+call form. A matcher that sees one encoding reports absence when the value changes form; the entry
+records which form it watches.
+
+The `typescript-eslint` row says *decide after C23 lands*; C23 has landed. R11 watches
+`package.json` for the package, which is what notices if the decision is taken; the decision itself
+is owed and unowned.
+
+---
+
+## F558 — `Scan.scope` is declared `string` and three rows carry arrays; three tests outside `tools/` depend on the lie ★★☆☆☆
+
+*2026-09-03 · Lane E, the enforcement suite, at 86d3b191.*
+
+`source-scans.d.mts` declares `scope: string`; SS24, SS40 and now SS18 use the array form
+`scopesOf` accepts. Widening the type broke `test/contract/manifest.test.ts:445`,
+`test/contract/view-model.test.ts:288` and `test/revert/capabilities.test.ts:29`, each calling
+`startsWith(scan.scope)` on a single-scope row. Left narrow with the reason in the `.d.mts`; the
+three tests should narrow their own reads.
+
+---
+
+## F559 — A03 commitments carried two `15b.` entries ★☆☆☆☆
+
+*2026-09-03 · Lane E, the enforcement suite, at 86d3b191.*
+
+`docs/architecture/A03_enforcement_suite.md` numbered both *No rule id appears twice* and *A
+deferral names a component id* as 15b. The second is now 15c. Nothing cites either by number.
+
+---
+
+## F560 — `test/unit/mosaic.test.ts` names nine tests `MG1`…`MG9`, homonyms of the module-graph family ★★☆☆☆
+
+*2026-09-03 · Lane E, the enforcement suite, at 86d3b191.*
+
+Not only `MG2` as the brief said — `:62` through `:243`, all nine. Nothing mechanical reads them
+as rule ids; `grep MG2` now returns a mosaic gate beside an enforcement rule. Rename requested
+(`MS1`…`MS9`); the file is not Lane E's.
+
+---
+
+## F561 — the temptation C07 §4 warned against shipped, and the route it warned about was the wrong one ★★★☆☆
+
+*2026-09-03 · Lane F, the adapter routes, at 86d3b191.*
+
+C07 §4 said *"the temptation is to `||` the two together in `authoritativeMeta`"* and then
+recorded `RawResult.overflowed`'s fate as *not yet made*. `authoritativeMeta` never did it.
+`src/shell/execution.ts:673` did — `truncated: child.overflowed` on C23's `shell` route,
+which builds its document without the registry and so passed under the sentence that
+guarded the registry. And the registry itself never read `raw.overflowed` at all: on the
+adapter route, the route C07 owns, an overflowed child produced a document with no record
+of the cut anywhere.
+
+**Two routes, two opposite defects, one open question.** One recorded the cut under the
+wrong name; the other did not record it. Neither was visible, because — measured at HEAD —
+`meta.truncated` is drawn by nothing in `shell/` or `viewport/`. The fallback pairs it with
+its own *"Showing the first N rows"* notice, and the notice is the only thing a reader sees.
+
+**Ruled (b)**: a `notice` block, appended in `finish` (the funnel every route ends in, C07
+I5) and on the `shell` route through the same helper (`src/data/adapters/overflow.ts`);
+`meta.truncated` untouched. C07 §4, I22, commitment 24, T1.21, T6.14; C21 §4 and C06's
+`overflowed` sentence updated to cite the ruling. Not (a): F58b — a second undrawn `meta`
+field is a record with no reader. Not (c): the remedies differ and a reader given one flag
+for two causes runs the command again to learn which.
+
+**The walk found the id collision before the code did.** A far side may already use the id
+`overflowed`; C04 I14 makes a duplicate a validation failure; a failure in `finish` becomes
+the last-resort document — so a fixed id would have replaced a whole result with *"Could not
+render this result"* precisely when the far side had been loudest. Suffixed until free; T1.21's
+second row.
+
+**Mutation**: `truncated: child.overflowed` restored and `withOverflowNotice(…, false)` in
+`finish` → T1.21 (both rows) and C23 T3.20 fail. 3 of 3.
+
+**Left open, by partition**: the stream route. `subprocess.ts:234` sets `overflowed` on the
+end-of-stream `RawResult` and nothing in the streaming path reads it — Lane E's region;
+requested. C07 §4 says "every route" and today it is two of three.
+
+**The stream route landed after the lane closed**: `execution.ts` appends `overflowNotice(held.map((b) => b.id))` at the end of a stream, so C07 §4's *every route* is three of three.
+
+---
+
+## F562 — no test constructs the last resort ★★☆☆☆
+
+*2026-09-03 · Lane F, the adapter routes, at 86d3b191.*
+
+C07 §11 lists T3.7 (*the adapter threw and the fallback threw*) and `grep -rn 'last-resort\|ADAPT_FAILED' test/` returns nothing. The path exists, is cited, and had never been
+reached. T1.21 reaches it through the funnel's own refusal: an identity document is validated
+on the way in and again in `finish` with `from: "farSide"`, and view state (`minHeight`)
+arriving from out there fails only the second check (C04 I67). The row is the first to assert
+`meta.adapter === "last-resort"`.
+
+---
+
+## F563 — the floor-suppression branch had one witness, and it was the kind without pins ★★☆☆☆
+
+*2026-09-03 · Lane F, the adapter routes, at 86d3b191.*
+
+`registry.ts:421` keeps a floored block whole; the only test through it used `logs`, whose
+window carries nothing. `table`'s window sets `presorted` and `actionBar` — so the un-windowed
+shape is exactly the one where a slice would re-sort, and nothing had drawn it. T1.22 in
+`test/unit/table.test.ts` constructs both siblings and reads both frames: the sliced one
+shows rows 2–4 with no header and `presorted: true`; the floored one shows the whole table
+with the header and four blank rows of floor under it. Mutation — dropping the `floorOf` guard
+→ T1.22 and C09 T3.52 both fail.
+
+---
+
+## F564 — four e2e rows deferred on premises that were false when written down ★★★☆☆
+
+*2026-09-03 · Lane F, the adapter routes, at 86d3b191.*
+
+| row | the deferral said | what was true at HEAD |
+|---|---|---|
+| C15 T5.3, T5.5 | *nothing in the tree pushes a `kind: "view"` layer; the ruling is open in C22 §13* | C22 §13a is the ruling; `document-view.ts:264` pushes the layer; `construct.ts:1616` registers `pushedView`; the fixture manifest declares `ps --watch` and `tail --screen` as view flags |
+| C06 T5.3 | *awaiting a ruling on where a subscription sits in the ladder* | C16 §5 ruled it — below the layer rungs, above the prompt rungs, newest first — and `router.ts:256` built `cancelNewestStream()` |
+| C10 T5.3 | *nothing else can ask for depth 1* | `TuiConfig.capabilities` (C22 I49), validated by C02's `oneOf(1, 4, 8, 24)`, accepts it |
+
+All four are live rows now. Each was killed by disabling its mechanism against a rebuilt
+`dist/` and restored: `pushedView` handler → returns `false` (T5.5 fails, T5.3 stays green as
+the control); `cancelNewestStream: () => false` (T5.3 fails on the pid still alive);
+`detectCapabilities(config.env)` without the override (T5.3 fails on `38;5;241` in the SGRs);
+`if (asView)` made unreachable (overlay T5.3 fails on the transcript still showing). 4 of 4.
+
+**Two findings on the way.** The confirm half of C15 T5.3's original title is not
+constructible: the only confirm is the exit confirm, and C16 §5 puts *a pushed view → pop
+it* above *prompt empty → arm the exit confirm*, so Ctrl-C over a view never reaches it. The
+row says so and asserts the half a session can show. And the fixture corpus had no `ps --watch`
+entry, so the view opened on the corpus's own *"no fixture"* refusal — which pushed and popped
+exactly like a document and would have proved nothing about one. `ps-watch` added.
+
+**And the headers.** `overlay.test.ts:1` said *Entirely deferred, and that is the honest
+state* over a file with three live rows; `theme.test.ts:1` said every row *waits on the
+renderer*; `process.test.ts:8` said *C22 does not exist*. Another lane edited all three while
+this lane held them; the final wording is Lane F's.
+
+---
+
+## F565 — one block's paint is linear in the block, and the two measurements of it disagree by 40× ★★☆☆☆
+
+*2026-09-03 · Lane F, the adapter routes, at 86d3b191.*
+
+Roadmap PART 17's 2026-09-01 table says a 5 000-line `code` block costs 83 ms to paint 40
+rows. Lane F's probe against `dist/`, one block, 40-row window at width 100, painting what
+`windowSequence` returns through `renderSequenceToLines`:
+
+| kind | lines | keeps | paint |
+|---|---|---|---|
+| `code` | 2 000 | 2 000 | 1 406 ms |
+| `code` | 20 000 | 20 000 | 11 360 ms |
+| `raw` | 2 000 | 2 000 | 941 ms |
+| `raw` | 20 000 | 20 000 | 6 880 ms |
+| `logs` | 2 000 | 40 | 21 ms |
+| `logs` | 20 000 | 40 | 30 ms |
+
+Both are real and the method differs — one painted forty rows, this paints the sequence the
+window returns, which for a windowless kind is the whole block — so the figures are recorded
+side by side in C14 §4a rather than one overwriting the other. The conclusion is the same at
+either scale: `measure` and the window arithmetic are cheap (≤ 12 ms), the paint is what
+lags, and it is linear in the block.
+
+**Ruled in C14 §4a / I23**: every kind whose rows are its lines declares a `window`; `code`
+and `raw` are owed one, and I23 is written as a target that is false for both today. The
+`code` window needs a pin — tokens span lines, so a slice carrying only its text re-tokenises
+from its first line and draws a comment's tail as code; keep `text` whole and set a
+`lineRange` view-state field the way `table` sets `presorted`. Owner is C09's lane;
+requested with the symbol. `test/contract/block-window.test.ts` T2.22 pins the set as it
+stands so the request cannot land silently — it fails the day `code` or `raw` gains a window.
+
+---
+
+## F566 — the residue pass, in numbers ★★★☆☆
+
+*2026-09-03 · the merge, over six lanes, a reconciliation and a follow-through.*
+
+**Measured**: five coverage sweeps and four note-reads. **Two of the three motivating claims
+were disproven by the first grep** — *there is no stall detection* (F550, fifteen hits and a
+mutation run) and *SS50's three allowances are dead* (F551, all three live) — and the third
+was half right (F512: the symbol exists, on the wrong component). Six lanes, in parallel,
+against one tree.
+
+**The record**: 72 replacements in 36 files (F512–F520, F537,
+F559), of which five were the same count stated differently in four documents (F515) and
+one was a retraction that reached one document of seven (F516).
+
+**The corpus**: 22 fixtures from Lane B and 4 from the follow-through, ~250 committed frames;
+the waffle (F521, 22 baselines), the annotation crossing (F523, six), the scale
+ruling (F529), the fixture notes (F530) and the reader's own cells (F531).
+
+**The suite**: five enforcement rules that did not exist at 86d3b191 — SS53 (F552, five
+dead entries on its first run), SS54 (F557, two wrong claims on seeding), MG2
+(F553, one cycle, since broken), SS18 (F554, hidden by a string arm for twenty
+components) and TD1–TD6 inside `enforce` (F555). One rule corrected: MG29's homonym
+(F536).
+
+**The substrate**: the `liveElements` ceiling lifted (F538, F539, F545);
+a second `elements` implementer, the plot, gated by the camera (F547); the
+`cursorPositions` writer (F546); the `mergeBlock` policy (F542); the
+rerun ruling (F543, F544); four transport constructors on the entry
+(F535); a required render-context member removed (F532).
+
+**Live defects fixed**: the waffle partition (F521); four annotation kinds crossing to
+the SVG arm (F523, F524, F525); the symlog/log/time mapping (F529);
+the overflow notice on three routes (F561); the paint/composite cycle (F553); two
+residue rows (F526, F527); four e2e deferrals restored (F564); a silent
+completion-source failure given a sink (F556).
+
+**Left open, named**: `Point3Series.marker` in C04 (F537); a whisker's `x` read by
+neither arm (F528); the `cursorable` gate (F547); the `code`/`raw` window
+(F565); the violin's borrowed layer (F525).

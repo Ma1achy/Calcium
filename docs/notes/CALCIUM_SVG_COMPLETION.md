@@ -94,6 +94,9 @@ legend, so a unit square through `projected` is an ellipse and a waffle's hundre
 times in twelve variant·width cells**, so deleting it moves no frame — and the same is true of the
 waffle's rounding, whose one fixture sums to exactly 100. Each ruling arrives with the fixture that
 lets it be contradicted, or it is a claim a green corpus agrees with by never asking.
+**Both fixtures now exist** (2026-09-03): `pie/merged` and `waffle/under-100`, `waffle/over-100` in
+`tools/catalogue-forms.ts` — and `over-100` did what a fixture is for and exposed a defect in the
+rounding, which is being fixed alongside this note.
 
 ### 7 · Hierarchy — `treemap · flame · icicle · tree · graph`
 
@@ -144,11 +147,14 @@ smallmultiples   contains does
 
 ---
 
-### The three forms four families do not reach — `contour · quiver · horizon`
+### The three forms four families do not reach — `contour · quiver · horizon` — **and all three are now reached**
 
 **The count above is wrong as a bound, and the correction is the reason this section exists.**
-*Four new families, and the count is what makes this bounded rather than open* — but nineteen
-forms are refused and families 5–8 name **sixteen**. `contour`, `quiver` and `horizon` appear
+*Four new families, and the count is what makes this bounded rather than open* — but when this was
+written nineteen forms were refused and families 5–8 named **sixteen**. **Re-counted 2026-09-03 from
+`SVG_FAMILY` in `src/presentation/plot/svg.ts`: 47 keys, one `null` — `plot3d` — so the arm refuses
+ONE form, and `horizonFigure` (`svg.ts`, `figure.ts`) and `contourFigure` both exist, which was the
+symbol this section said to grep.** What follows is the record of why the three were separate. `contour`, `quiver` and `horizon` appear
 nowhere in this document, so landing all four families finishes the campaign with the arm still
 refusing three forms and a plan saying it does not.
 

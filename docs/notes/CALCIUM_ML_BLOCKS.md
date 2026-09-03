@@ -145,7 +145,10 @@ container ring is the multi-device version.
 
 **A DAG: this model came from that checkpoint, from that dataset version, from that config.**
 
-**It is graph layout, so it is the Mermaid question** — and unlike Sankey, a lineage graph is
+**It is graph layout, and that is no longer the Mermaid question** — Calcium has a `graph`
+`PlotForm` with its own layered router (`src/presentation/plot/graph.ts`) and a `tree` form, so
+the blocker this section named is gone (2026-09-03); what lineage still lacks is its own vocabulary.
+As written: it is graph layout, so it is the Mermaid question — and unlike Sankey, a lineage graph is
 usually a *tree* or close to one, which is the tractable case. **Worth measuring whether
 `beautiful-mermaid` can be handed a generated graph** rather than authored source, because
 that would make this free.
@@ -175,5 +178,6 @@ both** and that is the thing to notice before either is scheduled.
 
 **§3 is a widening of `progress`.**
 
-**§5's lineage is blocked on graph layout**, and cost is blocked on nothing at all — **which
+**§5's lineage was blocked on graph layout and is not now** — the `graph` form ships (2026-09-03) and
+what remains is the lineage vocabulary — and cost is blocked on nothing at all — **which
 makes it the cheapest useful thing on this entire list.**

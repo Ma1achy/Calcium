@@ -101,7 +101,8 @@ terminal size.
 world  →  view      one 3×3 rotation from (azimuth, elevation), then translate by distance
 view   →  clip      frustum cull: drop what is behind the camera or outside the view
 clip   →  NDC       perspective divide (x/z, y/z), or drop z entirely for orthographic
-NDC    →  samples   scale to the sample grid — width × 1 by height × 2, the cell's own
+NDC    →  samples   scale to the sample grid — width × 2 by height × AREA_ROWS (this row
+                    said × 1 by × 2; `sampleGrid` in `project3.ts` and §above agree, 2026-09-03), the cell's own
                     1.051 : 1 and not a correction the rung avoids
 sample →  raster    depth-tested writes into the buffer
 raster →  paint     a cell is `▀` with two colours: the upper sample as foreground, the
