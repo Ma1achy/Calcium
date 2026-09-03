@@ -281,7 +281,7 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
 
   it("T1.14: Ctrl-C in the live block returns focus to the prompt, keeping the buffer", () => {
     const { router, focus, calls } = harness({ promptHasText: () => true });
-    focus.enterLiveBlock(addr("r3"));
+    focus.enterLiveBlock("e1", addr("r3"));
 
     expect(router.dispatch(ctrlC)).toBe(true);
     expect(focus.current).toEqual({ at: "prompt" });
@@ -362,7 +362,7 @@ describe("C16 §7 — the arming machine observes before dispatch", () => {
 describe("C16 §4 — mouse routes by position", () => {
   it("T1.3c, T1.3d (I3): a click resolves by position, not by focus", () => {
     const { router, layer, focus } = harness();
-    focus.enterLiveBlock(addr("r0"));
+    focus.enterLiveBlock("e1", addr("r0"));
 
     router.dispatch(click(3));
     expect(router.lastStages, "row 3 of the region is row 2 of the transcript").toContain(
@@ -462,7 +462,7 @@ describe("C16 — the dispatch trace, run against the implementation", () => {
     step("down (menu open)", key("down"));
     layer.top = null;
     step("down (menu gone)", key("down"));
-    focus.enterLiveBlock(addr("r1"));
+    focus.enterLiveBlock("e1", addr("r1"));
     step("s (block keymap)", key("s"));
     step("ctrl-c (live block)", ctrlC);
     step("click row 2", click(3));
@@ -541,12 +541,13 @@ describe("C26 §8b.8 — interaction mode is vacuous, and this is the row that s
     // prompt and is left only by cancellation — which is why the ruling refuses
     // to enter it, rather than the reader discovering it.
     const { router, focus } = harness();
-    focus.enterLiveBlock(addr("r1"));
+    focus.enterLiveBlock("e1", addr("r1"));
     focus.setMode("interact");
 
     expect(router.dispatch(ctrlC), "⌃c leaves interaction").toBe(true);
     expect(focus.current, "and stays on the row, per the two-level shape").toEqual({
       at: "liveBlock",
+      entryId: "e1",
       element: addr("r1"),
       anchor: null,
       mode: "navigate",

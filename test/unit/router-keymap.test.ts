@@ -86,28 +86,67 @@ describe("C16 §6 — precedence, not merely presence", () => {
   });
 });
 
-describe("C16 §6 — two checks, two moments", () => {
-  it("a block colliding with a global is refused at commit time, not at startup", () => {
-    // The two paths are separate deliberately: this one runs per committed block
-    // over adapter-produced data while a session is live, and can only run then
-    // because the block does not exist until it is committed. A single check
-    // covering both would have to run at this later moment, letting a duplicate
-    // in the default keymap reach a user's session first.
+describe("C16 §6 — a colliding block key is placed, not refused (I27)", () => {
+  it("T2.4b (I27): a key `global` binds lands at `interaction`, and the global is not shadowed", () => {
+    // **The policy this replaces threw here**, and its first consumer would have
+    // tripped it on every key it has — the widget design binds `↑` `↓` `PgUp`
+    // `PgDn` `Esc`, all built-ins. The mode C26 §4f describes is for exactly
+    // these keys: `interaction` is the one rung where the built-ins are out of
+    // scope, so the key is bound there and fires once the reader has entered
+    // the block, while the global keeps its slot untouched.
     const map = createKeymap([bind("global", "s", "themeSwitch")]);
-    expect(map.resolve("global", k("s"))?.action, "construction was fine").toBe("themeSwitch");
+    map.mergeBlock([{ key: { name: "s" }, action: "sort" }]);
 
-    expect(() => map.mergeBlock([{ key: { name: "s" }, action: "sort" }])).toThrow(KeymapError);
-    expect(map.resolve("liveBlock", k("s")), "and nothing was shadowed").toBeNull();
+    expect(map.resolve("global", k("s"))?.action, "the global is untouched").toBe("themeSwitch");
+    expect(map.resolve("liveBlock", k("s")), "nothing lands at liveBlock for a colliding key").toBeNull();
+    expect(map.resolve("interaction", k("s"))?.action, "the block's key is in interaction").toBe("sort");
   });
 
-  it("the global wins loudly rather than being silently shadowed", () => {
-    const map = createKeymap([bind("global", "q", "quit")]);
-    try {
-      map.mergeBlock([{ key: { name: "q" }, action: "blockQuit" }]);
-      expect.unreachable("the collision must be refused");
-    } catch (e) {
-      expect(String((e as Error).message)).toContain("quit");
-    }
+  it("T2.4c (I27): a key `liveBlock` binds lands at `interaction` too, and a free key at `liveBlock`", () => {
+    // **The fabricated collision, on the real table.** `up` is `rowUp` at
+    // `liveBlock`; a block binding it must not take the arrow away from
+    // navigation, and must still be able to have it once the reader is inside.
+    // `x` is free, so it works from the first `↓` (A01 D4) — the two halves of
+    // one block keymap landing at two targets is the ruling, not an accident.
+    const map = createKeymap(defaultKeymap);
+    map.mergeBlock([
+      { key: { name: "up" }, action: "sliderUp" },
+      { key: { name: "x" }, action: "toggle" },
+    ]);
+
+    expect(map.resolve("liveBlock", k("up"))?.action, "navigation keeps the arrow").toBe("rowUp");
+    expect(map.resolve("interaction", k("up"))?.action, "the block has it inside").toBe("sliderUp");
+    expect(map.resolve("liveBlock", k("x"))?.action, "a free key needs no mode").toBe("toggle");
+    expect(map.resolve("interaction", k("x")), "and is not duplicated inside").toBeNull();
+
+    // `/help` lists both, at their targets — nothing silent (I19).
+    const listed = map.entries().filter((b) => b.action === "sliderUp" || b.action === "toggle");
+    expect(listed.map((b) => `${b.target}:${b.action}`).sort()).toEqual(["interaction:sliderUp", "liveBlock:toggle"]);
+  });
+
+  it("T2.4d (I10, I27): the same key twice inside one block keymap is still a construction error", () => {
+    // The refusal that survives: the block's author wrote both and neither can
+    // win. It is raised at commit, because the block does not exist until then.
+    const map = createKeymap([]);
+    expect(() =>
+      map.mergeBlock([
+        { key: { name: "s" }, action: "sortA" },
+        { key: { name: "s" }, action: "sortB" },
+      ]),
+    ).toThrow(KeymapError);
+    expect(map.resolve("liveBlock", k("s")), "and a refused merge leaves nothing behind").toBeNull();
+  });
+
+  it("T2.4e (I27): withdrawal takes both halves", () => {
+    const map = createKeymap([bind("global", "s", "themeSwitch")]);
+    const withdraw = map.mergeBlock([
+      { key: { name: "s" }, action: "sort" },
+      { key: { name: "f" }, action: "filter" },
+    ]);
+    withdraw();
+    expect(map.resolve("interaction", k("s")), "the colliding half is gone").toBeNull();
+    expect(map.resolve("liveBlock", k("f")), "and the free half").toBeNull();
+    expect(map.resolve("global", k("s"))?.action, "the base survives").toBe("themeSwitch");
   });
 });
 
@@ -403,6 +442,22 @@ describe("§6 — the default table (C17 I12)", () => {
       // same byte `overlay enter` resolves — which is the argument for the key:
       // a reader who has accepted a menu item has already learnt it.
       "liveBlock enter": ["\r"],
+
+      // Between entries (C26 I21, §4g). **`⇧tab` is the row this table refused
+      // on arrival**: `CSI Z` is what every terminal sends for backtab and the
+      // decoder discarded it as well-formed-but-unknown, so the binding named a
+      // key nothing produced — the fourth instance of I17's class and the first
+      // found before the row shipped rather than after. The bare form only; a
+      // parameterised `Z` stays malformed (router-decode T3.13).
+      "liveBlock tab": ["\t"],
+      "liveBlock s+tab": ["\u001b[Z"],
+      // The horizontal pair (C22 I76). The same two wire forms the prompt's
+      // `left`/`right` carry, at the target where they used to be dropped.
+      "liveBlock left": ["\u001b[D", "\u001bOD"],
+      "liveBlock right": ["\u001b[C", "\u001bOC"],
+      // Re-run (C23 I18): the prompt's newline pair, at the other target.
+      "liveBlock s+enter": ["\u001b[13;2u", "\u001b[27;2;13~"],
+      "liveBlock m+enter": ["\u001b\r"],
     };
 
     const keymap = createKeymap(defaultKeymap);

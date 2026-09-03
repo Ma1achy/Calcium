@@ -11,7 +11,8 @@
 import { describe, expect, it } from "vitest";
 
 import { compose, heightsSum, type Composed } from "../../src/shell/frame.js";
-import { exact, FrameError, paint, type PaintDeps } from "../../src/shell/paint.js";
+import { paint, type PaintDeps } from "../../src/shell/paint.js";
+import { exact, FrameError } from "../../src/shell/frame-error.js";
 import { displayCells } from "../../src/presentation/text.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LIGHT_THEME, measurable } from "../support/render.js";

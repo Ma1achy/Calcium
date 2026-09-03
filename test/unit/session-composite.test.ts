@@ -14,7 +14,8 @@ import { describe, expect, it } from "vitest";
 
 import { compose, type Composed } from "../../src/shell/frame.js";
 import { composeFrame, type FrameResult } from "../../src/shell/render-frame.js";
-import { cursorFor, FrameError, paint, type PaintDeps } from "../../src/shell/paint.js";
+import { cursorFor, paint, type PaintDeps } from "../../src/shell/paint.js";
+import { FrameError } from "../../src/shell/frame-error.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { createOverlayManager, type Placed } from "../../src/viewport/overlay/index.js";
 import { displayCells } from "../../src/presentation/text.js";

@@ -178,11 +178,14 @@ export interface Pipeline {
    */
   register(verb: string, handler: LocalHandler): void;
   /**
-   * C09's `RenderContext.onAction` (C23 §3a, I16).
+   * The action dispatcher (C23 §3a, I16) — what `⏎` on a focused element and a
+   * pointer hit reach through `shell/keys.ts`.
    *
    * **Nothing else may supply it.** An action is a submission by another route,
    * and routing submissions is what C23 does — a block library dispatching its
-   * own would be L1 causing effects in L2 and L4 at once.
+   * own would be L1 causing effects in L2 and L4 at once. It used to be named
+   * here as *C09's `RenderContext.onAction`*, a context field no renderer ever
+   * called; the field is gone and the route was always this one.
    */
   onAction(action: Action, from?: EntryId | null): void;
   /**

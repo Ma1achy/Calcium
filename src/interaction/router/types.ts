@@ -109,6 +109,23 @@ export type StoredFocus =
    */
   | Readonly<{
       at: "liveBlock";
+      /**
+       * The entry focus is in (C26 I21, §4g).
+       *
+       * **On the location and not on the address**, because the entry is the
+       * outer scope the element sits in (C26 §3, `entry → block → row → cell`)
+       * rather than a third half of the element's name — and `element: null`,
+       * *in the block on no element yet*, needs an entry to be in, which an
+       * address cannot carry. The `anchor` shares this entry by construction:
+       * a selection is extended within one entry's list and cannot straddle two.
+       *
+       * Until this member existed every reader of focus read `liveId` instead,
+       * and the three places that would have had to agree about *which entry*
+       * all agreed on the same constant — which is why the address never
+       * carried one. The target keeps its name: `liveBlock` is now *a transcript
+       * block*, and the word is historical.
+       */
+      entryId: string;
       /** `null` — in the block, on no element yet. */
       element: ElementAddress | null;
       /**
@@ -229,6 +246,35 @@ export type KeyAction =
   | "focusPrompt"
   | "rowUp"
   | "rowDown"
+  // --- between entries (C26 I21, §4g) ----------------------------------------
+  //
+  // **The only two keys that change which entry focus is in.** `↑`/`↓` step
+  // within the focused entry and its edge stops them (C26 I19); these step the
+  // outer scope, landing on the target entry's first element. `tab` was free at
+  // `liveBlock` and `⇧tab`'s wire form `CSI Z` was not decoded until this row
+  // needed it — added rather than assumed, because T2.13 walks every row here
+  // through the real decoder (I17).
+  | "entryPrev"
+  | "entryNext"
+  // --- the horizontal pair (C12 §3s, C22 I76) --------------------------------
+  //
+  // `←`/`→` at `liveBlock`. The vertical pair steps elements and the horizontal
+  // one had no subject: both fell through to nothing, because `liveBlock`'s
+  // handler resolves the table and step 3 binds no arrow. A focused plot moves
+  // its crosshair; a kind with no horizontal interior is a no-op, which is the
+  // camera family's precedent (C22 I75) and the cost of binding before every
+  // consumer exists. A table's column cursor is the second consumer (C26 §11).
+  | "cursorLeft"
+  | "cursorRight"
+  // --- re-run the focused entry (C23 I18) ------------------------------------
+  //
+  // **Not an action kind.** The five `Action` kinds fire against a document's
+  // data and are refused from a frozen entry (A01 D5); this fires the entry's
+  // **recorded command** through C23 §2's submit, which is the one thing a
+  // settled entry holds that is not stale. Both consumers C23 I18 names — a
+  // notebook's *re-run this cell* and an agent harness's *retry that tool call*
+  // — are this key on a settled entry.
+  | "rerunEntry"
   | "orbitLeft"
   | "orbitRight"
   | "tiltDown"

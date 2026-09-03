@@ -314,6 +314,16 @@ describe("C22 §3 step 11 — the effect table", () => {
         { blockId: "b1", element: navElement("row-1", 1) },
       ],
       liveEntryId: () => null,
+      // The focused entry is the live one throughout this suite (C26 I21): no
+      // row here moves between entries, so the two lists are one list.
+      focusedElements: () => [
+        { blockId: "b1", element: navElement("row-0", 0) },
+        { blockId: "b1", element: navElement("row-1", 1) },
+      ],
+      focusedEntryId: () => null,
+      neighbourEntry: () => null,
+      cursorBlock: () => undefined,
+      rerunEntry: () => undefined,
       onAction: () => undefined,
       schedule: (fn: () => void) => {
         fn();
@@ -712,6 +722,11 @@ describe("C22 §3 step 12 — the read loop", () => {
       focus: createFocusStore(),
       liveElements: () => [],
       liveEntryId: () => null,
+      focusedElements: () => [],
+      focusedEntryId: () => null,
+      neighbourEntry: () => null,
+      cursorBlock: () => undefined,
+      rerunEntry: () => undefined,
       onAction: () => undefined,
       schedule: (fn: () => void) => {
         fn();
@@ -836,6 +851,16 @@ describe("C26 §8b.6/§8b.7 — focus is an address, through the key effects", (
         { blockId: "b", element: navElement("r2", 3) },
       ],
       liveEntryId: () => "e1",
+      focusedEntryId: () => "e1",
+      focusedElements: () => [
+        { blockId: "a", element: navElement("r1", 0, { kind: "fill", label: "a/r1", command: "a/r1" }) },
+        { blockId: "a", element: navElement("r2", 1) },
+        { blockId: "b", element: navElement("r1", 2, { kind: "fill", label: "b/r1", command: "b/r1" }) },
+        { blockId: "b", element: navElement("r2", 3) },
+      ],
+      neighbourEntry: () => null,
+      cursorBlock: () => undefined,
+      rerunEntry: () => undefined,
       onAction: (action: Action) => void fired.push(action),
       schedule: (fn: () => void) => {
         fn();
@@ -854,6 +879,7 @@ describe("C26 §8b.6/§8b.7 — focus is an address, through the key effects", (
     effects.table["rowDown"]?.();
     expect(focus.current, "the third element, in the second block").toEqual({
       at: "liveBlock",
+      entryId: "e1",
       element: { blockId: "b", elementId: "r1" },
       anchor: null,
       mode: "navigate",
@@ -865,6 +891,7 @@ describe("C26 §8b.6/§8b.7 — focus is an address, through the key effects", (
     effects.table["rowDown"]?.();
     expect(focus.current, "forward, not back to the first block").toEqual({
       at: "liveBlock",
+      entryId: "e1",
       element: { blockId: "b", elementId: "r2" },
       anchor: null,
       mode: "navigate",
@@ -873,7 +900,7 @@ describe("C26 §8b.6/§8b.7 — focus is an address, through the key effects", (
 
   it("T1.16 (C26 I10): ⏎ fires the focused element's action, not the first id match", () => {
     const { effects, focus, fired } = collidingEffects();
-    focus.enterLiveBlock({ blockId: "b", elementId: "r1" });
+    focus.enterLiveBlock("e1", { blockId: "b", elementId: "r1" });
 
     effects.table["rowActivate"]?.();
     expect(fired, "the second block's action, which is the focused one").toEqual([
@@ -888,16 +915,17 @@ describe("C26 §8b.6/§8b.7 — focus is an address, through the key effects", (
     // forward before the edge is tested, so the two agree.
     const { effects, focus } = collidingEffects();
 
-    focus.enterLiveBlock({ blockId: "b", elementId: "gone" });
+    focus.enterLiveBlock("e1", { blockId: "b", elementId: "gone" });
     effects.table["rowUp"]?.();
     expect(focus.current, "fell forward into block b, then stepped up").toEqual({
       at: "liveBlock",
+      entryId: "e1",
       element: { blockId: "a", elementId: "r2" },
       anchor: null,
       mode: "navigate",
     });
 
-    focus.enterLiveBlock({ blockId: "a", elementId: "r1" });
+    focus.enterLiveBlock("e1", { blockId: "a", elementId: "r1" });
     effects.table["rowUp"]?.();
     expect(focus.current, "and a real first element does leave").toEqual({ at: "prompt" });
   });
@@ -911,16 +939,17 @@ describe("C26 §8b.6/§8b.7 — focus is an address, through the key effects", (
 
     // The head. `↑` at the entry's first element leaves to its neighbouring
     // scope — the prompt is what is beyond that end.
-    focus.enterLiveBlock({ blockId: "a", elementId: "r1" });
+    focus.enterLiveBlock("e1", { blockId: "a", elementId: "r1" });
     effects.table["rowUp"]?.();
     expect(focus.current, "the head has a neighbour").toEqual({ at: "prompt" });
 
     // The tail. Nothing is beyond it, so `↓` stops — and this is a *stop*
     // rather than a trap, because `Esc` is bound at this target.
-    focus.enterLiveBlock({ blockId: "b", elementId: "r2" });
+    focus.enterLiveBlock("e1", { blockId: "b", elementId: "r2" });
     effects.table["rowDown"]?.();
     expect(focus.current, "the tail has none, so focus does not move").toEqual({
       at: "liveBlock",
+      entryId: "e1",
       element: { blockId: "b", elementId: "r2" },
       anchor: null,
       mode: "navigate",
@@ -931,7 +960,7 @@ describe("C26 §8b.6/§8b.7 — focus is an address, through the key effects", (
     // ruling is about which cells are ends and a row about the ends that never
     // looks at a non-end passes for an implementation where every block edge is
     // one.
-    focus.enterLiveBlock({ blockId: "a", elementId: "r2" });
+    focus.enterLiveBlock("e1", { blockId: "a", elementId: "r2" });
     effects.table["rowDown"]?.();
     expect(focus.current, "steps into the next block").toMatchObject({
       element: { blockId: "b", elementId: "r1" },
@@ -973,6 +1002,15 @@ describe("C26 §5c — the transcript's selection and semantic copy", () => {
         { blockId: "a", element: navElement("r3", 2, undefined, "db\t2\trunning") },
       ],
       liveEntryId: () => "e1",
+      focusedEntryId: () => "e1",
+      focusedElements: () => [
+        { blockId: "a", element: navElement("r1", 0, undefined, "web\t3\trunning") },
+        { blockId: "a", element: navElement("r2", 1, undefined, "api\t1\tstopped") },
+        { blockId: "a", element: navElement("r3", 2, undefined, "db\t2\trunning") },
+      ],
+      neighbourEntry: () => null,
+      cursorBlock: () => undefined,
+      rerunEntry: () => undefined,
       onAction: () => undefined,
       schedule: (fn: () => void) => {
         fn();
@@ -1005,6 +1043,7 @@ describe("C26 §5c — the transcript's selection and semantic copy", () => {
     // the anchor is right on the first keystroke and wrong on the second.
     expect(focus.current).toEqual({
       at: "liveBlock",
+      entryId: "e1",
       element: { blockId: "a", elementId: "r3" },
       anchor: { blockId: "a", elementId: "r1" },
       mode: "navigate",
@@ -1023,6 +1062,7 @@ describe("C26 §5c — the transcript's selection and semantic copy", () => {
 
     expect(focus.current, "the anchor is gone").toEqual({
       at: "liveBlock",
+      entryId: "e1",
       element: { blockId: "a", elementId: "r3" },
       anchor: null,
       mode: "navigate",

@@ -132,8 +132,8 @@ describe("C16 integration", () => {
 
   it("T4.5 (with C13): focus enters the live block and an append returns it", () => {
     const { store, router, focus } = world();
-    store.append(rowsDoc(3, "a"));
-    focus.enterLiveBlock(addr("r1"));
+    const first = store.append(rowsDoc(3, "a"));
+    focus.enterLiveBlock(first, addr("r1"));
     expect(router.target).toBe("liveBlock");
 
     // One `append()` — which C13 reports as more than one change. Nothing here
@@ -158,7 +158,7 @@ describe("C16 integration", () => {
     expect(entries.find((e) => e.id === first)?.streaming, "still streaming").toBe(true);
     expect(entries.find((e) => e.id === first)?.live, "and frozen all the same").toBe(false);
 
-    focus.enterLiveBlock(addr("r0"));
+    focus.enterLiveBlock(store.liveId as string, addr("r0"));
     expect(router.target).toBe("liveBlock");
     // The focusable block is whichever C13 says is live — never the frozen one,
     // whether or not it is still receiving patches.

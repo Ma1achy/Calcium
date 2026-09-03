@@ -13,7 +13,7 @@ import type { Glyph, Notice, Pills, Progress, Raw, Rule, Tip } from "../../../da
 import { cells, stripControl, truncate, wrapCells } from "../../text.js";
 import { barStyle, glyphFor, glyphCells, glyphs } from "../glyphs.js";
 import { clampSpans, fit, pad, paint, rows, tone, type Span } from "../paint.js";
-import type { BlockDefinition, RenderContext } from "../types.js";
+import type { BlockDefinition, NavElement, RenderContext } from "../types.js";
 
 /** Chips in a `pills` row are separated by two spaces — one is too close to read. */
 const CHIP_GAP = 2;
@@ -294,11 +294,77 @@ function chipRows(
   return out;
 }
 
+/**
+ * One element per chip (C26 §5) — **the second kind to declare `elements`, so
+ * the seam is exercised by something its author did not write.**
+ *
+ * **Why pills, of the kinds that could have gone second.** A chip carries an
+ * optional `action`, and filter pills are the one place C04 §3 permits `exec`
+ * (A01 D8) — so this is the kind whose elements have something for `⏎` to do,
+ * where `keyValue` and `steps` would be places to stand and nothing more. The
+ * seam is only tested by a consumer that uses both halves of it.
+ *
+ * **`level: "cell"`, because chips are the items of one logical row** (C04
+ * I20) and two of them share a row on screen. There is no row-level element
+ * above them — C26 I1 says a level exists only where a declaration reports one
+ * — and the keyboard walks the flat list in reading order, so `↓` steps chip to
+ * chip across the wrap. Per-level disjointness (C26 I6) is what two chips on
+ * one line have to satisfy, and their columns are disjoint by construction:
+ * `chipRows` places them `CHIP_GAP` apart.
+ *
+ * **The id is the index, not the label.** Chips carry no id, two chips may share
+ * a label (the renderer's `byLabel` map already collapses them), and C26 I6
+ * needs uniqueness within the declaration. The cost is that a chip inserted
+ * ahead of the focused one moves focus to a neighbour on refresh — recorded
+ * rather than solved, because a label-keyed id would be *wrong* rather than
+ * *approximate* on a duplicate.
+ *
+ * **`copy` is the label from the data** (C26 I17), not the painted text: the
+ * two are the same characters today, and the row `clampSpans` truncates at a
+ * narrow width is the one where they part.
+ *
+ * The geometry is `chipRows`'s own — the same call `measure` and `render` make,
+ * at the default ambiguous width `measure` uses — so a chip is where the row it
+ * was measured into says it is. A lone chip wider than the terminal is clamped
+ * to the width for containment (C26 I4), as its paint is.
+ */
+function pillsElements(block: Pills, width: number): readonly NavElement[] {
+  const w = normaliseWidth(width);
+  const out: NavElement[] = [];
+  let index = 0; // cells-ok — a chip counter, not a width
+  chipRows(block, w).forEach((line, row) => {
+    let col = 0;
+    for (const text of line) {
+      const chip = block.chips[index];
+      // `chipRows` measured the line under the default convention, so the
+      // element is where the row it was measured into says it is (C02 I9).
+      const cw = cells(text, "narrow"); // narrow-ok — `chipRows`' own default, so the geometry matches the measure
+      const from = Math.min(col, w);
+      const action = chip?.action;
+      out.push(
+        Object.freeze({
+          id: `chip-${String(index)}`,
+          level: "cell" as const,
+          rows: Object.freeze({ from: row, to: row + 1 }),
+          cols: Object.freeze({ from, to: Math.max(from, Math.min(w, col + cw)) }),
+          ...(action === undefined ? {} : { activate: action }),
+          copy: text,
+        }),
+      );
+      col += cw + CHIP_GAP; // cells-ok
+      index += 1;
+    }
+  });
+  return Object.freeze(out);
+}
+
 export const pillsDefinition: BlockDefinition<Pills> = {
   kind: "pills",
 
   measure: (block: Pills, width: number): number =>
     atLeastOne(chipRows(block, width).length), // cells-ok
+
+  elements: pillsElements,
 
   render(block: Pills, ctx: RenderContext): ReactElement {
     const byLabel = new Map(block.chips.map((chip) => [stripControl(chip.label), chip]));

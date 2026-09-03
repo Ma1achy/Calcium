@@ -1081,6 +1081,13 @@ function visibleRows(
     // the offsets one line up: a camera's absent state is the block's own
     // declared view, and `distance: 0` is degenerate rather than absent.
     const orbitKey = graph.cameras.key(entry.id);
+    // **The seventh axis, and the one whose absence the sixth was written
+    // against** (C22 I76, C12 §3s). `cursorPositions` was the counter-example
+    // I71 cited — read in one place, written by nothing, in no key. It has a
+    // writer now, so a crosshair moved and a frame served from before it moved
+    // would read as a key that does nothing; every index is in the key, because
+    // absent is *no crosshair* and zero is *the first sample*.
+    const cursorKey = graph.cursorPositions.key(entry.id);
 
     // **Containers are walked, and it is C04's `descendants` rather than a
     // copy** (C22 I73). `animationIntervalOf` learned this from the mutation
@@ -1109,7 +1116,7 @@ function visibleRows(
     const cadence = animationIntervalOf(windowed.blocks);
     if (cadence !== null && (fastest === null || cadence < fastest)) fastest = cadence;
     const animated = cadence === null ? "" : `\u0000${String(tick)}`;
-    const slot = `${key}\u0000${range}\u0000${offsets}\u0000${orbitKey}${animated}`;
+    const slot = `${key}\u0000${range}\u0000${offsets}\u0000${orbitKey}\u0000${cursorKey}${animated}`;
     const held = graph.rendered.get(entry.id, entry.rev, width, slot, theme);
     // **Faults from here are this entry's** (I69). A `BlockFault` names a block
     // and ids are unique within a document and not across entries (C04 I14), so
@@ -1138,10 +1145,16 @@ function visibleRows(
           tick,
           scrollOffsets: graph.scrollOffsets.forEntry(entry.id),
           // **The field and its writer landed together** (C22 I71). A camera on
-          // `RenderContext` that nothing could move would be `cursorPositions`
-          // again — read in one place, written by nothing in `src/`, correct and
-          // unobservable at once (C12 §3s).
+          // `RenderContext` that nothing could move would have been what
+          // `cursorPositions` was until C22 I76 — read in one place, written by
+          // nothing in `src/`, correct and unobservable at once (C12 §3s).
           cameras: graph.cameras.forEntry(entry.id),
+          // **And the field the comment above named as the counter-example, now
+          // with its writer** (C22 I76, C12 §3s). `cursorBlock` in `construct.ts`
+          // sets it from `←`/`→`, the store joins the eviction callback, and
+          // `cursorKey` above is its axis — the three halves I71 said land
+          // together or not at all.
+          cursorPositions: graph.cursorPositions.forEntry(entry.id),
           // **The field and its writer land together, again** (C12 I107, §6o
           // row 9). One store per session and no key of its own here: the
           // scratch is keyed on the caller's arrays inside C12, which is what
@@ -1202,10 +1215,11 @@ function visibleRows(
 function focusFor(graph: Graph, entryId: string): FocusState | null {
   const stored = graph.focus.current;
   if (stored.at !== "liveBlock") return null;
-  if (graph.transcript.liveId !== entryId) return null;
-
-  const entry = graph.transcript.entries.find((e) => e.id === entryId);
-  if (entry === undefined) return null;
+  // **The focused entry, through the pull the key side reads** (C26 I22, §4g).
+  // This line was `graph.transcript.liveId !== entryId`, and it was the render
+  // side of the ceiling: whatever the store said, no settled entry ever drew a
+  // highlight, so a location in one was invisible as well as unreachable.
+  if (graph.focusedEntryId() !== entryId) return null;
 
   // **The third of the three walks, and the one in another component** (C26
   // §8b.4). This tested `block.kind === "table"` and asked C11 directly, exactly
@@ -1222,7 +1236,7 @@ function focusFor(graph: Graph, entryId: string): FocusState | null {
   // `resolveFocus` is the same function the key effects use, which is what makes
   // *what is highlighted* and *where the next arrow goes* one answer rather than
   // two that agree — and it writes nothing, because this runs per frame.
-  const elements = graph.liveElements();
+  const elements = graph.focusedElements();
   const i = resolveFocus(stored.element, elements);
   const found = i === null ? undefined : elements[i];
   if (found === undefined) return null;

@@ -43,7 +43,7 @@ import type { ProcessRunner } from "../data/process/types.js";
 import { createBlockRegistry, type BlockDefinition } from "../presentation/blocks/index.js";
 import { BlockFaultLog } from "./block-faults.js";
 import { tableDefinition } from "../presentation/table/index.js";
-import { plotDefinition } from "../presentation/plot/index.js";
+import { cursorable, plotDefinition } from "../presentation/plot/index.js";
 import { patchDefinition } from "../presentation/patch/index.js";
 import { loadTheme, type ThemeStore } from "../presentation/theme/index.js";
 import { createTranscriptStore } from "../viewport/transcript/index.js";
@@ -51,11 +51,17 @@ import type { EntryId } from "../viewport/transcript/index.js";
 import { createViewport } from "../viewport/viewport/index.js";
 import { RenderCache } from "./render-cache.js";
 import { Cameras } from "./cameras.js";
+import { CursorPositions } from "./cursor-positions.js";
 import { RenderScratchStore } from "./render-scratch.js";
 import { ScrollOffsets } from "./scroll-offsets.js";
 import { createOverlayManager } from "../viewport/overlay/index.js";
 import { createEditor } from "../interaction/editor/index.js";
-import { createEngine, frameworkSources, MENU_ID } from "../interaction/completion/index.js";
+import {
+  createEngine,
+  createSourceErrorSink,
+  frameworkSources,
+  MENU_ID,
+} from "../interaction/completion/index.js";
 import { createFocusStore } from "../interaction/router/focus.js";
 import { createKeymap, defaultKeymap, keyText } from "../interaction/router/keymap.js";
 import { createRouter, type RouterDeps } from "../interaction/router/router.js";
@@ -250,6 +256,20 @@ export type Graph = Readonly<{
    * comment warning about the second could not see it.
    */
   liveElements: () => readonly Readonly<{ blockId: string; element: NavElement }>[];
+  /**
+   * The entry focus is in, or `null` at the prompt (C26 I22, §4g).
+   *
+   * **The one pull the render side and the key side share.** `focusFor` in
+   * `session.ts` and every effect in `keys.ts` ask this rather than `liveId`,
+   * which is what lifted the ceiling: three readers each read `liveId` and
+   * agreed on the same constant, so no element outside the live entry could be
+   * focused at all. Answers the stored entry while it exists and the live one
+   * when it does not — an evicted entry's highlight and its next arrow land in
+   * the same place because both came through here.
+   */
+  focusedEntryId: () => EntryId | null;
+  /** The focused entry's elements, from the same walk as `liveElements` (C26 I21). */
+  focusedElements: () => readonly Readonly<{ blockId: string; element: NavElement }>[];
   /** C04 I48 — page the focused container, in rows, focus unmoved (C26 I18). */
   pageBlock: (direction: 1 | -1) => void;
   /** C22 I71 — turn the focused plot camera. A no-op where there is none. */
@@ -313,6 +333,8 @@ export type Graph = Readonly<{
   rendered: RenderCache;
   scrollOffsets: ScrollOffsets;
   cameras: Cameras;
+  /** C22 I76 — the crosshair of each plot, keyed like the two above and dropped with them. */
+  cursorPositions: CursorPositions;
   /**
    * Caller-owned render scratch (C12 I107). One per session, keyed on the
    * caller's own arrays, so nothing evicts it and nothing subscribes.
@@ -531,7 +553,17 @@ export async function constructGraph(
     // text all name the set the session actually holds.
     manifest.load(withThemeNames(parsed.value, Object.keys(config.theme)));
 
-    const completion = createEngine({ now: config.clock, recency: recencyOf });
+    // **The product's source-error sink** (C19 T3.6, C22 §8 step 3). Every
+    // test supplied `onSourceError` and nothing in `src/` did, so a failing
+    // completion source was dropped in silence for the life of the engine —
+    // I6 held and *logged once* had nowhere to log. One deduplicated line per
+    // failing source, drained with the other diagnostics below.
+    const completionFaults = createSourceErrorSink();
+    const completion = createEngine({
+      now: config.clock,
+      recency: recencyOf,
+      onSourceError: completionFaults.onSourceError,
+    });
     // **The framework's six first, then the app's** (I3b). §2 called
     // manifest-derived completion a working default and nothing built it, so
     // `Tab` produced no candidates in any real session while every C19 tier
@@ -545,7 +577,7 @@ export async function constructGraph(
     }
     for (const source of config.completionSources) completion.register(source);
 
-    return { blocks, adapters, manifest, completion, blockFaults };
+    return { blocks, adapters, manifest, completion, blockFaults, completionFaults };
   })().catch((cause: unknown) => {
     throw cause instanceof ConstructionError ? cause : new ConstructionError("registries", cause);
   });
@@ -623,6 +655,11 @@ export async function constructGraph(
     // above gives about the offsets: a third callback would be a third place for
     // an eviction path to reach two and miss one (C22 I71).
     const cameras = new Cameras();
+    // **The crosshair joins it too, and it is the writer C12 §3s waited for**
+    // (C22 I76). `RenderContext.cursorPositions` was read in one place and
+    // written by nothing in `src/` — the counter-example I71 cited when the
+    // camera landed. Same key shape, same subscription, same reason.
+    const cursorPositions = new CursorPositions();
     // **This one does not join the subscription, and the difference is the
     // point** (C12 I107, §6o.1). The two stores above are keyed by entry id and
     // must be told when an entry goes; this is keyed on the caller's own
@@ -637,11 +674,13 @@ export async function constructGraph(
           rendered.delete(id);
           scrollOffsets.delete(id);
           cameras.delete(id);
+          cursorPositions.delete(id);
         }
       } else if (change.kind === "clear") {
         rendered.clear();
         scrollOffsets.clear();
         cameras.clear();
+        cursorPositions.clear();
       }
     });
 
@@ -879,6 +918,7 @@ export async function constructGraph(
       rendered,
       scrollOffsets,
       cameras,
+      cursorPositions,
       scratch,
       overlays,
       history,
@@ -1205,12 +1245,71 @@ export async function constructGraph(
    * measured and drawn at. A second width here would put the elements somewhere
    * the frame is not.
    */
-  const liveElements = (): readonly Readonly<{ blockId: string; element: NavElement }>[] => {
-    const id = stores.transcript.liveId;
+  const elementsOf = (
+    id: EntryId | null,
+  ): readonly Readonly<{ blockId: string; element: NavElement }>[] => {
     if (id === null) return [];
     const entry = stores.transcript.entries.find((e) => e.id === id);
     if (entry === undefined) return [];
     return built.blocks.elementsIn(entry.doc.blocks, deps.frame.overlayRegion().width);
+  };
+  /** The live entry's — what `↓` from the prompt enters (C16 I22). */
+  const liveElements = (): readonly Readonly<{ blockId: string; element: NavElement }>[] =>
+    elementsOf(stores.transcript.liveId);
+
+  /**
+   * The entry focus is in (C26 I22, §4g).
+   *
+   * **This pull is the whole of the widening.** `liveElements`, `focusedBlock`
+   * and `session.ts`'s `focusFor` each read `stores.transcript.liveId`, so no
+   * element outside the live entry could be focused and every reader agreed —
+   * three copies of one constant, which is the shape §8b.4 found for the element
+   * walk one release earlier. Now the stored location names the entry and this
+   * is the one place that resolves it.
+   *
+   * **The stored entry while it exists, the live one when it does not** (C26
+   * I22). An evicted entry's position does not survive it — its neighbours
+   * cannot be named without it — so the fall is to the live entry's first
+   * element, which is I10's block-went clause one scope up. A pull rather than
+   * an arm in the eviction callback below, because focus is C16's state and C16
+   * I11 keeps it a pull; the callback drops render state and nothing else.
+   */
+  const focusedEntryId = (): EntryId | null => {
+    const at = focus.current;
+    if (at.at !== "liveBlock") return null;
+    if (stores.transcript.entries.some((e) => e.id === at.entryId)) return at.entryId;
+    return stores.transcript.liveId;
+  };
+  const focusedElements = (): readonly Readonly<{ blockId: string; element: NavElement }>[] =>
+    elementsOf(focusedEntryId());
+
+  /**
+   * The nearest entry in `direction` that declares an element, and its first
+   * one (C26 I21, §4g row c and trace 5).
+   *
+   * `-1` is older — up the screen, `⇧tab` — and `1` is newer. An entry with
+   * nothing focusable is stepped over rather than entered, which is C16 I22's
+   * third clause applied to the outer scope: entering a notice would leave
+   * every arrow a no-op there. `null` at either end, and the effect stops.
+   *
+   * Counted from the live entry when the stored one is gone, so `tab` after an
+   * eviction walks from where resolution says focus is (C26 I22).
+   */
+  const neighbourOf = (
+    direction: 1 | -1,
+  ): Readonly<{ entryId: EntryId; first: Readonly<{ blockId: string; element: NavElement }> }> | null => {
+    const from = focusedEntryId();
+    if (from === null) return null;
+    const entries = stores.transcript.entries;
+    let i = entries.findIndex((e) => e.id === from);
+    if (i === -1) return null;
+    for (i += direction; i >= 0 && i < entries.length; i += direction) {
+      const candidate = entries[i];
+      if (candidate === undefined) continue;
+      const first = elementsOf(candidate.id)[0];
+      if (first !== undefined) return { entryId: candidate.id, first };
+    }
+    return null;
   };
 
   /**
@@ -1247,7 +1346,11 @@ export async function constructGraph(
    * reason — two copies of a traversal are two places to add a container kind.
    */
   const focusedBlock = (): Readonly<{ entryId: EntryId; block: Block }> | null => {
-    const entryId = stores.transcript.liveId;
+    // **The focused entry, not the live one** (C26 I22). Reading `liveId` here
+    // was the third of the three readers §4g names, and with it a `scroll` in a
+    // settled entry could be focused and would page the live entry's block of
+    // the same id — or nothing.
+    const entryId = focusedEntryId();
     if (entryId === null) return null;
     const at = focus.current;
     if (at.at !== "liveBlock" || at.element === null) return null;
@@ -1380,6 +1483,62 @@ export async function constructGraph(
     scheduler.commit("input");
   };
 
+  /**
+   * Move the focused plot's crosshair one sample (C22 I76, C12 §3s, I37).
+   *
+   * **The index is into the data**, so the ceiling is the longest series and
+   * this is where it is known — the store records what it is told and clamps
+   * nothing, which is `dollyBlock`'s seam. A first `→` lands on the first
+   * sample and a first `←` on the last, so the cursor appears at the edge the
+   * reader is moving away from rather than in the middle of nowhere.
+   *
+   * **A no-op on anything but a plot with samples**, resolved here for the
+   * camera family's reason: the binding is static and cannot see a block. What
+   * this does not gate on is the plot's *form* — whether the form draws a
+   * crosshair is C12's knowledge (`positionalForm` is the one reader) and a
+   * second list of forms here would be the two-copies hazard. A cursor set on a
+   * form that ignores it is stored and unread, and that residue is named in
+   * C22 §6c rather than absorbed.
+   */
+  const moveCursor = (direction: 1 | -1): void => {
+    const found = focusedBlock();
+    if (found === null || found.block.kind !== "plot") return;
+    const plot = found.block as Plot;
+    // **The renderer's predicate, not a second list** (C12 I85, I76). `kind ===
+    // "plot" && n > 0` stored a cursor on forms that draw none; `cursorable` is
+    // what `elements()` gates the focus stop on, so the block that can be
+    // focused and the block that accepts a cursor are one predicate.
+    if (!cursorable(plot)) return;
+    const n = plot.series.reduce((most, sr) => Math.max(most, sr.values.length), 0); // cells-ok — a sample count
+    const was = stores.cursorPositions.get(found.entryId, plot.id);
+    const from = was ?? (direction === 1 ? -1 : n);
+    const next = Math.min(n - 1, Math.max(0, from + direction));
+    stores.cursorPositions.set(found.entryId, plot.id, next);
+    scheduler.commit("input");
+  };
+
+  /**
+   * Re-run the focused entry's **recorded command** (C23 I18, C16 §6).
+   *
+   * **Not an action, and the distinction is the ruling.** The five `Action`
+   * kinds fire against a document's data and are refused from a frozen entry
+   * because that data is stale (A01 D5); `doc.command` is the one thing a
+   * settled entry holds that is not — it is what was typed, and typing it again
+   * is what a reader does by hand today. So this goes through C23 §2's submit,
+   * indistinguishable from the prompt: the guard applies, history records it,
+   * and the new entry is live where the old one stays as it was.
+   *
+   * A command of `""` — a notice, the eviction marker — has nothing to run and
+   * is a silent no-op; neither declares an element, so neither can be focused.
+   */
+  const rerunFocused = (): void => {
+    const id = focusedEntryId();
+    if (id === null) return;
+    const entry = stores.transcript.entries.find((e) => e.id === id);
+    if (entry === undefined || entry.doc.command === "") return;
+    pipeline?.submit(entry.doc.command);
+  };
+
   const keys = createKeyEffects({
     editor: stores.editor,
     completion: built.completion,
@@ -1411,6 +1570,14 @@ export async function constructGraph(
     // second's stated reason (cheap on arrows, expensive on `enter`) was
     // falsified by this very walk: both call `liveElements()`.
     liveElements,
+    // **The focused entry's, which is no longer always the live one** (C26
+    // I21, §4g). `liveElements` stays for the one key that enters from the
+    // prompt; everything that moves, activates or copies asks these two.
+    focusedElements,
+    focusedEntryId,
+    neighbourEntry: neighbourOf,
+    cursorBlock: moveCursor,
+    rerunEntry: rerunFocused,
     pageBlock,
     orbitBlock,
     tiltBlock,
@@ -1757,6 +1924,8 @@ export async function constructGraph(
      */
     cursorIdle: () => config.clock() - lastInputAt >= CURSOR_BLINK_MS,
     liveElements,
+    focusedEntryId,
+    focusedElements,
     pageBlock,
     orbitBlock,
     tiltBlock,
@@ -1779,7 +1948,11 @@ export async function constructGraph(
      * renderer had nowhere to report and reported nowhere — for the life of the
      * registry, and with T3.14's own row saying `logged` the whole time.
      *
-     * The four are kept contiguous deliberately. `c23-faults` mutates this list
+     * **A fifth, C19's**: the completion source-error sink (T3.6). It was
+     * supplied by every test and by nothing in the product, so a failing source
+     * was dropped silently until `construct` passed the sink.
+     *
+     * The five are kept contiguous deliberately. `c23-faults` mutates this list
      * by removing members, and a comment between two of them makes an anchor
      * that spans the list unmatchable — which is how a mutation quietly becomes
      * a different mutation (F219).
@@ -1790,6 +1963,7 @@ export async function constructGraph(
         ...stores.history.warnings,
         ...built.blockFaults.messages,
         ...pipeline.faults,
+        ...built.completionFaults.messages,
       ]),
     blocks: built.blocks,
     blockFaults: built.blockFaults,

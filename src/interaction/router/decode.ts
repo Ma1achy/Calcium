@@ -377,6 +377,19 @@ export function createDecoder(options: DecoderOptions): Decoder {
       return out.push(key(name, sequence, mods)), consumed;
     }
 
+    // **`CSI Z` is `⇧tab`, and it was discarded as well-formed-but-unknown
+    // until a binding needed it** (C26 §4g row c, I17). Every terminal sends
+    // backtab this way and none sends a `CSI 1;2` form for it — the shift is in
+    // the final letter rather than in a parameter — so it is a row of its own
+    // rather than an entry in the letter table, whose finals carry no modifier.
+    // Found the way the other three were: T2.13 walks the keymap through this
+    // decoder, and the `⇧tab` row would have failed on arrival.
+    //
+    // **The bare form only.** `CSI 999 Z` is malformed and stays discarded
+    // (T3.13) — the first version of this line took any `Z` final and turned a
+    // malformed sequence into a keystroke, which the existing row caught.
+    if (final === "Z" && body === "") return out.push(key("tab", sequence, { shift: true })), consumed;
+
     const name = CSI_LETTER_KEYS[final];
     if (name === undefined) return consumed;
     return out.push(key(name, sequence, mods)), consumed;

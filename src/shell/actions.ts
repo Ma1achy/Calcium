@@ -17,8 +17,15 @@
  *
  * **An action from a frozen entry is refused** (C23 I18, A01 D5, C13 §2). Frozen
  * entries hold stale data, and firing `↑ promote` from one is the footgun that
- * rule exists to prevent. Frozen-but-streaming is refused for the same reason:
- * it is not focusable, so an action on it can only have arrived by mistake.
+ * rule exists to prevent. Frozen-but-streaming is refused for the same reason.
+ *
+ * **Reachable from a keyboard since C26 §4g**, which is when the ruling was
+ * first pressed: a settled row can be focused and `⏎` arrives here with the
+ * settled entry as its origin. All five kinds stay refused — the two consumers
+ * that wanted something from a settled entry (a notebook's *re-run this cell*,
+ * an agent harness's *retry that tool call*) wanted its **recorded command**,
+ * which is not one of the five and is not stale; `rerunEntry` in `keys.ts` is
+ * that route, and the notice below names the command so the reader has it.
  */
 
 import type { Action } from "../data/viewmodel/index.js";
@@ -74,7 +81,17 @@ export function createActionDispatcher(deps: ActionDeps) {
     // C23 I18 — before the switch, because every kind is refused and putting the
     // check inside each arm is three places to forget it.
     if (isFrozen(deps.transcript, from)) {
-      deps.refuse(from, `\`${action.label}\` is from a frozen entry — its data is stale`);
+      // **Every kind, including the one that only fills the prompt** (C23 I18).
+      // `fill`'s command was composed against rows that may no longer exist,
+      // and reading a stale identifier before running it is not the protection
+      // A01 D8 meant. What a settled entry holds that is *not* stale is its
+      // recorded command, so the notice names it: a reader can type it, and
+      // `⇧⏎`/`⌥⏎` on the entry does the same through C23 §2 (`rerunEntry`).
+      // Named by command rather than by key, because a key named in a notice
+      // is a second keymap that drifts under rebinding (C16 I19's argument).
+      const command = deps.transcript.entries.find((e) => e.id === from)?.doc.command ?? "";
+      const hint = command === "" ? "" : ` Re-run \`${command}\` for a live copy.`;
+      deps.refuse(from, `\`${action.label}\` is from a frozen entry — its data is stale.${hint}`);
       return;
     }
 

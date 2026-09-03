@@ -129,8 +129,43 @@ export type KeyDeps = Readonly<{
    * its own.
    */
   liveElements: () => readonly PlacedNavElement[];
-  /** The entry those elements belong to, for an action's origin (C23 I37). */
+  /** The live entry's id, for `↓`'s entry from the prompt (C16 I22). */
   liveEntryId: () => EntryId | null;
+  /**
+   * The focused entry's elements, and the entry they belong to (C26 I21, I22).
+   *
+   * **Not `liveElements`, and the split is the ceiling lifting** (C26 §4g).
+   * Every effect that moves, activates or copies used the live entry's list,
+   * so a row in a settled entry could not be reached at all; now the location
+   * names an entry and these two answer for it. `focusedEntryId` is also an
+   * action's origin (C23 I37) — with `liveId` there a settled row's action
+   * would fire against the live entry's document, which is §8b.6's wrong-entry
+   * defect one scope up, and it would not be refused at all.
+   */
+  focusedElements: () => readonly PlacedNavElement[];
+  focusedEntryId: () => EntryId | null;
+  /**
+   * The nearest entry with an element in `direction`, or `null` at the end
+   * (C26 I21). `-1` is older and `1` newer; L4 walks the transcript because
+   * this file knows neither its order nor the registry.
+   */
+  neighbourEntry: (
+    direction: 1 | -1,
+  ) => Readonly<{ entryId: EntryId; first: PlacedNavElement }> | null;
+  /**
+   * Move the focused plot's crosshair one sample (C22 I76, C12 §3s).
+   *
+   * A seam for `pageBlock`'s reason: the ceiling is the sample count and only
+   * L4 holds the block. A no-op where the focused block is not a plot.
+   */
+  cursorBlock: (direction: 1 | -1) => void;
+  /**
+   * Re-run the focused entry's recorded command through C23 §2 (C23 I18).
+   *
+   * **Not `onAction`**, deliberately: an action fires against a document's data
+   * and a frozen entry's is stale; this fires the command text, which is not.
+   */
+  rerunEntry: () => void;
   /**
    * Page the focused container's own window by `direction` (C04 I48, C26 I18).
    *
@@ -655,8 +690,27 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       // `liveBlock`, every key would resolve against a target with no bindings,
       // and they would all be dropped.
       const first = elements[0];
-      if (first === undefined) return;
-      deps.focus.enterLiveBlock(addressOf(first));
+      const live = deps.liveEntryId();
+      if (first === undefined || live === null) return;
+      deps.focus.enterLiveBlock(live, addressOf(first));
+    },
+
+    // --- between entries (C26 I21, §4g) ------------------------------------
+    //
+    // **The only two keys that change which entry focus is in.** The arrows
+    // step within the focused entry and stop at its edge (C26 I19); these step
+    // the outer scope and land on the target's first element. It is the same
+    // `focusRow` with a different entry, so the anchor drops and the mode is
+    // navigation (C26 I20) — one rule, not a second one for a different key.
+    entryPrev: () => {
+      const to = deps.neighbourEntry(-1);
+      if (to === null) return;
+      deps.focus.focusRow(to.entryId, addressOf(to.first));
+    },
+    entryNext: () => {
+      const to = deps.neighbourEntry(1);
+      if (to === null) return;
+      deps.focus.focusRow(to.entryId, addressOf(to.first));
     },
 
     // --- the way back, and between rows (C16 I22) ------------------------
@@ -674,7 +728,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // ordinary ones wiped it.
     focusPrompt: () => void deps.focus.toPrompt(),
     rowDown: () => {
-      const elements = deps.liveElements();
+      const elements = deps.focusedElements();
       const current = deps.focus.current;
       if (current.at !== "liveBlock") return;
       // **`resolveFocus`, not `indexOf`** (C26 I10, §8b.7). The old line was
@@ -687,7 +741,11 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       const i = resolveFocus(current.element, elements);
       if (i === null) return;
       const next = elements[i + 1];
-      if (next !== undefined) deps.focus.focusRow(addressOf(next));
+      // **The resolved entry, not the stored one** (C26 I22): after an eviction
+      // the two differ, and writing the stored one back would leave the store
+      // pointing at nothing while the frame highlights the live entry.
+      const entry = deps.focusedEntryId();
+      if (next !== undefined && entry !== null) deps.focus.focusRow(entry, addressOf(next));
     },
     /**
      * **F21's whole subject: the route from a keystroke to `actions.ts`.**
@@ -710,18 +768,22 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       // Resolved rather than looked up by id (C26 I10). The old form took the
       // bare row id into a second walk that matched the *first* block carrying
       // it, so `⏎` on the second table's `r1` fired the first table's action.
-      const elements = deps.liveElements();
+      const elements = deps.focusedElements();
       const i = resolveFocus(current.element, elements);
       if (i === null) return;
       // `activate` is the element's own, declared by the kind (C26 §5), rather
       // than a row shape this layer would otherwise have to know.
       const action = elements[i]?.element.activate;
-      const from = deps.liveEntryId();
+      // **The focused entry, which is the origin C23 I18 reads** (C26 §4g row
+      // e). A settled row's action arrives here for the first time, and it is
+      // refused there — with `liveId` as the origin it would have fired against
+      // the live entry's document instead and been refused by nothing.
+      const from = deps.focusedEntryId();
       if (action === undefined || from === null) return;
       deps.onAction(action, from);
     },
     rowUp: () => {
-      const elements = deps.liveElements();
+      const elements = deps.focusedElements();
       const current = deps.focus.current;
       if (current.at !== "liveBlock") return;
       const i = resolveFocus(current.element, elements);
@@ -736,11 +798,18 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       // stepping out, and it is the second of the two call sites C26 §8b.2 found
       // wired to C16 I2's append transition.
       if (i === null || i === 0) {
-        deps.focus.toPrompt();
+        // **Only the live entry's head neighbours the prompt** (C26 I21, §4g
+        // row b). At a settled entry's first element `↑` stops, and `Esc` is the
+        // way out from every entry — the neighbour rule unchanged, over
+        // neighbours that are still asymmetric. `null` — nothing to stand on —
+        // leaves regardless, because there is no element to stop at.
+        if (i === null || deps.focusedEntryId() === deps.liveEntryId()) deps.focus.toPrompt();
         return;
       }
       const previous = elements[i - 1];
-      deps.focus.focusRow(previous === undefined ? null : addressOf(previous));
+      const entry = deps.focusedEntryId();
+      if (entry === null) return;
+      deps.focus.focusRow(entry, previous === undefined ? null : addressOf(previous));
     },
     // --- C17 -----------------------------------------------------------
     //
@@ -791,6 +860,15 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     dollyOut: () => void deps.dollyBlock(-1),
     cameraReset: () => void deps.resetCamera(),
     orbitToggle: () => void deps.toggleOrbit(),
+    // **The horizontal pair, and the first writer of `cursorPositions`** (C22
+    // I76, C12 §3s). The vertical pair steps elements; this moves the focused
+    // plot's crosshair and is a no-op on a kind with no horizontal interior.
+    cursorLeft: () => void deps.cursorBlock(-1),
+    cursorRight: () => void deps.cursorBlock(1),
+    // **Re-run the focused entry, through the prompt's own route** (C23 I18).
+    // Not an action: the five kinds are refused from a frozen entry because a
+    // document's data is stale, and the recorded command is not.
+    rerunEntry: () => void deps.rerunEntry(),
     blockPageDown: () => void deps.pageBlock(1),
     blockPageUp: () => void deps.pageBlock(-1),
     scrollTop: () => void deps.viewport.scrollToTop(),
@@ -865,16 +943,17 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // list and the resolver are the ones the unshifted motions use, so a word
     // this pair disagreed about could not exist.
     extendRowDown: () => {
-      const elements = deps.liveElements();
+      const elements = deps.focusedElements();
       const current = deps.focus.current;
       if (current.at !== "liveBlock") return;
       const i = resolveFocus(current.element, elements);
       if (i === null) return;
       const next = elements[i + 1];
-      if (next !== undefined) deps.focus.extendRow(addressOf(next));
+      const entry = deps.focusedEntryId();
+      if (next !== undefined && entry !== null) deps.focus.extendRow(entry, addressOf(next));
     },
     extendRowUp: () => {
-      const elements = deps.liveElements();
+      const elements = deps.focusedElements();
       const current = deps.focus.current;
       if (current.at !== "liveBlock") return;
       const i = resolveFocus(current.element, elements);
@@ -884,7 +963,8 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       // the selection with it and leave nothing to copy.
       if (i === null || i === 0) return;
       const prev = elements[i - 1];
-      if (prev !== undefined) deps.focus.extendRow(addressOf(prev));
+      const entry = deps.focusedEntryId();
+      if (prev !== undefined && entry !== null) deps.focus.extendRow(entry, addressOf(prev));
     },
 
     /**
@@ -904,7 +984,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
      * blank line — it is a place to stand, not empty data.
      */
     copyElement: () => {
-      const elements = deps.liveElements();
+      const elements = deps.focusedElements();
       const current = deps.focus.current;
       if (current.at !== "liveBlock") return;
       const head = resolveFocus(current.element, elements);

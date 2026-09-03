@@ -75,7 +75,18 @@ export function activeTarget(deps: FocusInputs): FocusTarget {
   // freezing is a mode exit nobody signals (C26 §8a trace, the live-block
   // freeze), and answering `interaction` for an entry that is no longer live
   // would hand every key to a block the reader cannot act on.
-  if (deps.stored.at === "liveBlock" && deps.stored.mode === "interact" && deps.liveEntry !== null) {
+  //
+  // **And gated on the focused entry being the live one, not on a live entry
+  // existing** (C26 §4g row d). The two tests were the same while focus could
+  // only be in the live entry; now a settled entry can hold focus with the mode
+  // stored, and A01 D4 has withdrawn its block's keys, so there is nothing to
+  // interact with there.
+  if (
+    deps.stored.at === "liveBlock" &&
+    deps.stored.mode === "interact" &&
+    deps.liveEntry !== null &&
+    deps.stored.entryId === deps.liveEntry.id
+  ) {
     return "interaction";
   }
   if (deps.stored.at === "prompt") return "prompt";
@@ -166,8 +177,12 @@ export interface FocusStore {
   readonly current: StoredFocus;
   /** Called by L4 on append. The whole of I2. */
   reset(): void;
-  /** `↓` from the prompt. `null` means "the block, no element yet". */
-  enterLiveBlock(element: ElementAddress | null): void;
+  /**
+   * `↓` from the prompt, into `entryId` — the live entry, from that key. `null`
+   * means "the block, no element yet".
+   */
+  enterLiveBlock(entryId: string, element: ElementAddress | null): void;
+
   /**
    * **The reader stepped out**, and it is not `reset()` (C26 I13).
    *
@@ -183,10 +198,25 @@ export interface FocusStore {
    * C26 §8b.2.
    */
   toPrompt(): void;
-  /** Movement between elements; a no-op at the prompt. Collapses a selection. */
-  focusRow(element: ElementAddress | null): void;
-  /** The same movement with the anchor held (C26 §5c). */
-  extendRow(element: ElementAddress | null): void;
+  /**
+   * Movement to an element in `entryId`; a no-op at the prompt. Collapses a
+   * selection.
+   *
+   * **The entry comes in with every move, and it is the resolved one** (C26
+   * I22). `focusedEntryId()` answers the live entry when the stored one was
+   * evicted, so a move that kept `stored.entryId` would leave the store pointing
+   * at an entry that no longer exists while the highlight sat on the live one —
+   * the half-repaired store I10 says the next keystroke must not leave. `tab`
+   * and `⇧tab` are this call with a different entry (C26 I21): a move is a move,
+   * and one rule drops the anchor and the mode for both.
+   */
+  focusRow(entryId: string, element: ElementAddress | null): void;
+  /**
+   * The same movement with the anchor held (C26 §5c) — **unless the entry
+   * changed**, in which case the anchor belonged to an entry that is gone and
+   * is dropped. Extension never crosses an entry by key; this arm is eviction's.
+   */
+  extendRow(entryId: string, element: ElementAddress | null): void;
   /**
    * Enter or leave interaction mode on the focused row (C26 I2, I14).
    *
@@ -209,15 +239,15 @@ export function createFocusStore(): FocusStore {
     reset() {
       stored = AT_PROMPT;
     },
-    enterLiveBlock(element) {
+    enterLiveBlock(entryId, element) {
       // Entry is always into navigation. Landing in interaction would give the
       // block every key before the reader has seen where focus went.
-      stored = Object.freeze({ at: "liveBlock", element, anchor: null, mode: "navigate" });
+      stored = Object.freeze({ at: "liveBlock", entryId, element, anchor: null, mode: "navigate" });
     },
     toPrompt() {
       stored = AT_PROMPT;
     },
-    focusRow(element) {
+    focusRow(entryId, element) {
       // Deliberately a no-op at the prompt rather than a way in. Entering the
       // live block is `↓`'s decision and belongs to one call, or a row focus
       // arriving from a stale handler would move focus without a keystroke.
@@ -230,7 +260,7 @@ export function createFocusStore(): FocusStore {
       // **And it collapses the selection** (C26 §5c), which is C17 I21's rule
       // one level up: an unshifted motion drops the region, so the model stays
       // invisible until someone holds Shift.
-      stored = Object.freeze({ at: "liveBlock", element, anchor: null, mode: "navigate" });
+      stored = Object.freeze({ at: "liveBlock", entryId, element, anchor: null, mode: "navigate" });
     },
 
     /**
@@ -243,12 +273,14 @@ export function createFocusStore(): FocusStore {
      *
      * A no-op at the prompt, for `focusRow`'s reason.
      */
-    extendRow(element) {
+    extendRow(entryId, element) {
       if (stored.at !== "liveBlock") return;
+      const same = entryId === stored.entryId;
       stored = Object.freeze({
         at: "liveBlock",
+        entryId,
         element,
-        anchor: stored.anchor ?? stored.element,
+        anchor: same ? (stored.anchor ?? stored.element) : null,
         mode: "navigate",
       });
     },
@@ -256,6 +288,7 @@ export function createFocusStore(): FocusStore {
       if (stored.at !== "liveBlock") return;
       stored = Object.freeze({
         at: "liveBlock",
+        entryId: stored.entryId,
         element: stored.element,
         anchor: stored.anchor,
         mode,

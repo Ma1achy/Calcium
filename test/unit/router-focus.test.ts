@@ -30,11 +30,11 @@ describe("C16 §3 — activeTarget", () => {
     expect(at({ overlayTop: { kind: "overlay" } })).toBe("overlay");
     expect(at({ copyMode: true })).toBe("copyMode");
     expect(at({ overlayTop: { kind: "view" } })).toBe("pushedView");
-    expect(at({ stored: { at: "liveBlock", element: addr("r1"), anchor: null, mode: "interact" } })).toBe("interaction");
+    expect(at({ stored: { at: "liveBlock", entryId: "e1", element: addr("r1"), anchor: null, mode: "interact" } })).toBe("interaction");
     expect(at()).toBe("prompt");
-    expect(at({ stored: { at: "liveBlock", element: addr("r1"), anchor: null, mode: "navigate" } })).toBe("liveBlock");
+    expect(at({ stored: { at: "liveBlock", entryId: "e1", element: addr("r1"), anchor: null, mode: "navigate" } })).toBe("liveBlock");
     expect(
-      at({ stored: { at: "liveBlock", element: null, anchor: null, mode: "navigate" }, liveEntry: null }),
+      at({ stored: { at: "liveBlock", entryId: "e1", element: null, anchor: null, mode: "navigate" }, liveEntry: null }),
     ).toBe("global");
   });
 
@@ -42,7 +42,7 @@ describe("C16 §3 — activeTarget", () => {
     // **The rung's position, asserted as a comparison rather than as a slot.**
     // Its index in FOCUS_ORDER is what gives C16 §5 a rung, so a change here is
     // a change to the ladder — and the ladder has no list of its own to catch it.
-    const interacting = { at: "liveBlock", element: addr("r1"), anchor: null, mode: "interact" } as const;
+    const interacting = { at: "liveBlock", entryId: "e1", element: addr("r1"), anchor: null, mode: "interact" } as const;
     expect(at({ stored: interacting }), "over the prompt").toBe("interaction");
     expect(
       at({ stored: interacting, overlayTop: { kind: "overlay" } }),
@@ -61,12 +61,13 @@ describe("C16 §3 — activeTarget", () => {
     // next `↓` mean something different depending on how the reader arrived,
     // and the block would keep taking keys on a row nobody chose to enter.
     const store = createFocusStore();
-    store.enterLiveBlock(addr("r1"));
+    store.enterLiveBlock("e1", addr("r1"));
     store.setMode("interact");
-    expect(store.current).toEqual({ at: "liveBlock", element: addr("r1"), anchor: null, mode: "interact" });
-    store.focusRow(addr("r2"));
+    expect(store.current).toEqual({ at: "liveBlock", entryId: "e1", element: addr("r1"), anchor: null, mode: "interact" });
+    store.focusRow("e1", addr("r2"));
     expect(store.current, "the mode does not travel").toEqual({
       at: "liveBlock",
+      entryId: "e1",
       element: addr("r2"),
       anchor: null,
       mode: "navigate",
@@ -79,8 +80,8 @@ describe("C16 §3 — activeTarget", () => {
     // `focusRow`'s reason: a mode arriving from a stale handler would change
     // what every keystroke means with no keystroke behind it.
     const store = createFocusStore();
-    store.enterLiveBlock(addr("r1"));
-    expect(store.current).toEqual({ at: "liveBlock", element: addr("r1"), anchor: null, mode: "navigate" });
+    store.enterLiveBlock("e1", addr("r1"));
+    expect(store.current).toEqual({ at: "liveBlock", entryId: "e1", element: addr("r1"), anchor: null, mode: "navigate" });
     store.toPrompt();
     store.setMode("interact");
     expect(store.current, "no way in through setMode").toEqual({ at: "prompt" });
@@ -93,7 +94,7 @@ describe("C16 §3 — activeTarget", () => {
     // on and the prompt would stop receiving them. The gate is `liveEntry`, and
     // it is the same gate the `liveBlock` row already had.
     expect(
-      at({ stored: { at: "liveBlock", element: addr("r1"), anchor: null, mode: "interact" }, liveEntry: null }),
+      at({ stored: { at: "liveBlock", entryId: "e1", element: addr("r1"), anchor: null, mode: "interact" }, liveEntry: null }),
     ).toBe("global");
   });
 
@@ -125,12 +126,13 @@ describe("C16 §3 — activeTarget", () => {
   it("T2.2 (I15): pure and total — same inputs, same answer, no I/O", () => {
     const inputs: FocusInputs = {
       ...base,
-      stored: { at: "liveBlock", element: addr("r9"), anchor: null, mode: "navigate" },
+      stored: { at: "liveBlock", entryId: "e1", element: addr("r9"), anchor: null, mode: "navigate" },
     };
     const first = activeTarget(inputs);
     for (let i = 0; i < 1000; i += 1) expect(activeTarget(inputs)).toBe(first);
     expect(inputs.stored, "the input is not mutated").toEqual({
       at: "liveBlock",
+      entryId: "e1",
       element: addr("r9"),
       anchor: null,
       mode: "navigate",
@@ -150,10 +152,10 @@ describe("C16 §3 — activeTarget", () => {
       at({ overlayTop: { kind: "overlay" } }),
       at({ copyMode: true }),
       at({ overlayTop: { kind: "view" } }),
-      at({ stored: { at: "liveBlock", element: addr("r1"), anchor: null, mode: "interact" } }),
+      at({ stored: { at: "liveBlock", entryId: "e1", element: addr("r1"), anchor: null, mode: "interact" } }),
       at(),
-      at({ stored: { at: "liveBlock", element: addr("r1"), anchor: null, mode: "navigate" } }),
-      at({ stored: { at: "liveBlock", element: null, anchor: null, mode: "navigate" }, liveEntry: null }),
+      at({ stored: { at: "liveBlock", entryId: "e1", element: addr("r1"), anchor: null, mode: "navigate" } }),
+      at({ stored: { at: "liveBlock", entryId: "e1", element: null, anchor: null, mode: "navigate" }, liveEntry: null }),
     ]);
     expect([...FOCUS_ORDER].sort()).toEqual([...reached].sort());
     expect(FOCUS_ORDER[0], "overlay is highest").toBe("overlay");
@@ -173,8 +175,8 @@ describe("C16 §3 — activeTarget", () => {
 describe("C16 §3 — the stored location", () => {
   it("T1.3b (I2): reset returns focus to the prompt and drops the row", () => {
     const focus = createFocusStore();
-    focus.enterLiveBlock(addr("r3"));
-    expect(focus.current).toEqual({ at: "liveBlock", element: addr("r3"), anchor: null, mode: "navigate" });
+    focus.enterLiveBlock("e1", addr("r3"));
+    expect(focus.current).toEqual({ at: "liveBlock", entryId: "e1", element: addr("r3"), anchor: null, mode: "navigate" });
 
     focus.reset();
     expect(focus.current).toEqual({ at: "prompt" });
@@ -186,28 +188,28 @@ describe("C16 §3 — the stored location", () => {
     // subscription here to fire — the store holds no reference to a transcript
     // at all, which is the structural half of the same claim.
     const focus = createFocusStore();
-    focus.enterLiveBlock(addr("r3"));
+    focus.enterLiveBlock("e1", addr("r3"));
     expect(Object.keys(focus).some((k) => k.includes("subscribe"))).toBe(false);
-    expect(focus.current, "unchanged without reset()").toEqual({ at: "liveBlock", element: addr("r3"), anchor: null, mode: "navigate" });
+    expect(focus.current, "unchanged without reset()").toEqual({ at: "liveBlock", entryId: "e1", element: addr("r3"), anchor: null, mode: "navigate" });
   });
 
   it("a push does not clear it, and neither does a pop (A01 D7)", () => {
     // The store has no notion of a layer, which is exactly why this holds: only
     // reset() moves it, and a pop appends nothing to call reset() from.
     const focus = createFocusStore();
-    focus.enterLiveBlock(addr("r7"));
+    focus.enterLiveBlock("e1", addr("r7"));
     // …a view is pushed and popped elsewhere in the system…
-    expect(focus.current).toEqual({ at: "liveBlock", element: addr("r7"), anchor: null, mode: "navigate" });
+    expect(focus.current).toEqual({ at: "liveBlock", entryId: "e1", element: addr("r7"), anchor: null, mode: "navigate" });
   });
 
   it("focusRow moves the row inside the live block and is a no-op at the prompt", () => {
     const focus = createFocusStore();
-    focus.focusRow(addr("r2"));
+    focus.focusRow("e1", addr("r2"));
     expect(focus.current, "not a way into the live block").toEqual({ at: "prompt" });
 
-    focus.enterLiveBlock(null);
-    focus.focusRow(addr("r2"));
-    expect(focus.current).toEqual({ at: "liveBlock", element: addr("r2"), anchor: null, mode: "navigate" });
+    focus.enterLiveBlock("e1", null);
+    focus.focusRow("e1", addr("r2"));
+    expect(focus.current).toEqual({ at: "liveBlock", entryId: "e1", element: addr("r2"), anchor: null, mode: "navigate" });
   });
 
   it("T1.3h (C26 I10): an address resolves on both halves, not on the element id", () => {
@@ -288,7 +290,7 @@ describe("C16 §3 — the stored location", () => {
 
   it("the stored value is frozen, so a consumer cannot move focus by mutation", () => {
     const focus = createFocusStore();
-    focus.enterLiveBlock(addr("r1"));
+    focus.enterLiveBlock("e1", addr("r1"));
     expect(Object.isFrozen(focus.current)).toBe(true);
   });
 });
