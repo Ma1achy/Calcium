@@ -35,7 +35,7 @@ export function componentOf(file) {
  * the vacuity suite can assert every one of them has been shown to fire; a rule
  * added here without a fabricated violation fails A03 commitment 14.
  */
-export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG14", "MG15", "MG16", "MG17", "MG18", "MG19", "MG20", "MG21", "MG22", "MG23", "MG24", "MG25", "MG26", "MG27", "MG28", "MG29"];
+export const MODULE_GRAPH_RULES = ["MG1", "MG2", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG14", "MG15", "MG16", "MG17", "MG18", "MG19", "MG20", "MG21", "MG22", "MG23", "MG24", "MG25", "MG26", "MG27", "MG28", "MG29"];
 
 /**
  * MG6 is a **third kind of rule**, and saying so is the point of this comment.
@@ -1121,7 +1121,144 @@ function checkCrossHalfTypes(files, readFile) {
   return violations;
 }
 
+// --- MG2 — no cycle within a layer ------------------------------------------
+//
+// **Inventoried since A03 was written and implemented by nothing until now.**
+// A02 §1's sentence is *never upward, never cyclically within a layer*; MG1 is
+// the first half and this is the second, and for the whole life of the project
+// the second was carried by three named pairs — MG13, MG18, MG22 — each written
+// on the day someone noticed one edge that would close a cycle. Those rows stay:
+// they fire on the edge, one commit before the cycle exists, and this fires on
+// the cycle. CLAUDE.md's *acyclicity is MG1 + MG22* was the honest description of
+// the tree and not of the rule.
+//
+// **Module granularity, value imports only** — the same edges MG1 walks, so the
+// two halves of the sentence read one graph. A type-only edge erases at build
+// and closes no runtime cycle; MG3 counts them and says why it differs.
+//
+// **One real cycle on the first run, in L4**: `shell/paint.ts` imports
+// `composite` from `composite.ts`, which imports `FrameError` and `exact` back
+// from `paint.ts`. Both files are C22's and it works because ESM hoists — which
+// is the shape A02 §1 forbids because it works until the day an initialiser is
+// read before it runs. Acknowledged below rather than exempted: the list is
+// compared by **equality**, so breaking the cycle fails here until the entry is
+// removed, and a second cycle fails on the commit that closes it.
+//
+// **Stated blind spot: a cycle through a barrel is one edge short of visible.**
+// `resolve` follows `./x.js` to `x.ts` and `./dir/index.js` to the barrel; a
+// file importing its own component's barrel, which re-exports it, is a cycle
+// this reports — and correctly, because ESM sees it too. What it cannot see is a
+// cycle closed by a dynamic `import()`, which neither `IMPORT` nor `BARE`
+// matches; none exist in `src/` today and one arriving is a decision worth a
+// row of its own.
+
+/**
+ * Cycles known and not yet broken, keyed by their sorted members joined with ` <-> `.
+ *
+ * **`src/shell/composite.ts <-> src/shell/paint.ts` was here and is gone** —
+ * the one cycle MG2 found on the day it was implemented, broken the same day by
+ * `src/shell/frame-error.ts`, the leaf module its entry named as the fix. The
+ * equality arm is what removed it.
+ */
+export const ACKNOWLEDGED_CYCLES = Object.freeze({});
+
+/** Strongly connected components of the intra-layer value-import graph, Tarjan's walk. */
+export function layerCycles(files, readFile = (f) => readFileSync(f, "utf8")) {
+  const normalised = files.map((f) => f.replaceAll("\\", "/"));
+  const byBare = new Map(normalised.map((f) => [bare(f), f]));
+  const edges = new Map();
+  for (const file of normalised) {
+    const from = layerOf(file);
+    if (!from) continue;
+    const targets = new Set();
+    for (const spec of importsOf(file, readFile)) {
+      const resolved = resolve(file, spec);
+      if (!resolved) continue;
+      const target = byBare.get(bare(resolved)) ?? byBare.get(`${bare(resolved)}/index`);
+      if (target === undefined || target === file) continue;
+      const to = layerOf(target);
+      if (!to || to.prefix !== from.prefix) continue;
+      targets.add(target);
+    }
+    edges.set(file, [...targets]);
+  }
+
+  const index = new Map();
+  const low = new Map();
+  const onStack = new Set();
+  const stack = [];
+  const cycles = [];
+  let counter = 0;
+  const connect = (v) => {
+    index.set(v, counter);
+    low.set(v, counter);
+    counter += 1;
+    stack.push(v);
+    onStack.add(v);
+    for (const w of edges.get(v) ?? []) {
+      if (!index.has(w)) {
+        connect(w);
+        low.set(v, Math.min(low.get(v), low.get(w)));
+      } else if (onStack.has(w)) {
+        low.set(v, Math.min(low.get(v), index.get(w)));
+      }
+    }
+    if (low.get(v) === index.get(v)) {
+      const members = [];
+      let w;
+      do {
+        w = stack.pop();
+        onStack.delete(w);
+        members.push(w);
+      } while (w !== v);
+      if (members.length > 1) cycles.push(members.sort());
+    }
+  };
+  for (const v of edges.keys()) if (!index.has(v)) connect(v);
+  return cycles.map((members) => members.join(" <-> ")).sort();
+}
+
+export function checkLayerCycles(
+  files,
+  readFile = (f) => readFileSync(f, "utf8"),
+  acknowledged = ACKNOWLEDGED_CYCLES,
+) {
+  const violations = [];
+  const found = new Set(layerCycles(files, readFile));
+  for (const cycle of found) {
+    if (acknowledged[cycle] !== undefined) continue;
+    violations.push({
+      rule: "MG2",
+      file: cycle.split(" <-> ")[0],
+      message:
+        `imports CYCLICALLY within ${layerOf(cycle.split(" <-> ")[0])?.label ?? "a layer"}: ` +
+        `${cycle}. A02 §1 — never cyclically within a layer. Break it with a leaf module, ` +
+        `or acknowledge it in ACKNOWLEDGED_CYCLES with a reason`,
+      spec: "A02 §1",
+    });
+  }
+  // The equality arm. A cycle that has been broken leaves an entry excusing
+  // nothing, and a list nobody prunes is one nobody reads.
+  for (const cycle of Object.keys(acknowledged)) {
+    if (found.has(cycle)) continue;
+    violations.push({
+      rule: "MG2",
+      file: "tools/enforce/module-graph.mjs",
+      message:
+        `ACKNOWLEDGED_CYCLES names \`${cycle}\`, which is no longer a cycle — broken, renamed ` +
+        `or gone. Remove the entry; the list is compared by equality on purpose`,
+      spec: "A02 §1",
+    });
+  }
+  return violations;
+}
+
 export function checkModuleGraph(files, readFile = (f) => readFileSync(f, "utf8")) {
+  // MG2 is **not** folded in here, and the reason is its equality arm: run on a
+  // fabricated two-file tree — which is what every MG1 and MG3 fire-test hands
+  // this function — the arm would report the real acknowledged cycle as gone.
+  // `checkOneStorePerComponent` and `checkFunctionConsumers` are separate calls
+  // from `index.mjs` for the same reason, and MG2 joins them.
   const violations = [
     ...checkModeOwnership(files, readFile),
     ...checkCrossHalfTypes(files, readFile),
@@ -1779,7 +1916,10 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   "VerbRatio.recorded": "C08 — provenance tally, asserted in test. **Three siblings are dead: F99**",
   "VerbRatio.flagged": "C08 — as `recorded`",
   "CompletionResult.superseded": "C19 — the token-of-validity outcome; asserted at three tiers and never branched on by a component, which is C19 I13's whole point",
-  "EngineOptions.onSourceError": "C19 — the injected error sink; supplied by tests and defaulted in the engine",
+  // **`EngineOptions.onSourceError` and `SourceErrorSink.onSourceError` were
+  // here and are gone** — both halves of one seam, unwired in the product until
+  // `construct.ts` passed `createSourceErrorSink().onSourceError` (2026-09-03);
+  // the equality arm removed them the day it did.
   // **`Graph.log` was here and is gone** — the equality arm removed it the day
   // it stopped being unconsumed.
   "Identity.user": "C22 — the identity record's fields, asserted by the identity tests. `SessionSnapshot` carries it and no component destructures it",
@@ -2459,6 +2599,15 @@ export function publicSurfaceUseSignal(
  * - **One level of reachability.** A type published as a member of a published
  *   type counts; a member of a member does not, which under-reports rather than
  *   over-reports.
+ * - **A homonym on the subject side, closed.** The rule once matched
+ *   `export function <name>(` in *every* file under `src/`, so publishing C06's
+ *   `createRouter` reported C16's internal `createRouter` — two rows on
+ *   `router/router.ts` for types that were never on the entry (F510's class,
+ *   one side over). It now resolves each `export { name } from "<path>"` on the
+ *   entry through that path and the barrels it names to the declaring module,
+ *   and reads the signature there alone. What remains: a name published from
+ *   two declaring modules is read in both, which is the right answer for a
+ *   genuine double publication and would be a defect of its own.
  */
 export function checkExportedArguments(files, readFile = (f) => readFileSync(f, "utf8")) {
   const violations = [];
@@ -2493,23 +2642,59 @@ export function checkExportedArguments(files, readFile = (f) => readFileSync(f, 
     }
   }
 
-  // Every exported function's parameter types, from the module that declares it.
-  const exportedFns = new Set();
-  for (const m of src.matchAll(/export\s*\{([^}]*)\}\s*from/g)) {
+  // Every exported function's parameter types, **from the module that declares
+  // it** — resolved through the entry's re-export path and any barrel it names,
+  // rather than matched by name across the tree.
+  const byBare = new Map([...sources.keys()].map((f) => [bare(f), f]));
+  const moduleOf = (from, spec) => {
+    const target = resolve(from, spec);
+    if (target === null) return undefined;
+    return byBare.get(bare(target)) ?? byBare.get(`${bare(target)}/index`);
+  };
+  /** `declaring.get(publishedName)` → the set of files whose `export function` it is. */
+  const declaring = new Map();
+  const follow = (file, localName, publishedName, depth) => {
+    const text = sources.get(file);
+    if (text === undefined || depth > 6) return;
+    if (new RegExp(`export\\s+(?:async\\s+)?function\\*?\\s+${localName}\\s*\\(`).test(text)) {
+      if (!declaring.has(publishedName)) declaring.set(publishedName, new Set());
+      declaring.get(publishedName).add(file);
+      return;
+    }
+    for (const m of text.matchAll(/export\s*\{([^}]*)\}\s*from\s*["']([^"']+)["']/g)) {
+      for (const part of m[1].split(",")) {
+        const [inner, outer = inner] = part.trim().replace(/^type\s+/, "").split(/\s+as\s+/).map((x) => x.trim());
+        if (outer !== localName) continue;
+        const next = moduleOf(file, m[2]);
+        if (next !== undefined) follow(next, inner, publishedName, depth + 1);
+      }
+    }
+    for (const m of text.matchAll(/export\s*\*\s*from\s*["']([^"']+)["']/g)) {
+      const next = moduleOf(file, m[1]);
+      if (next !== undefined) follow(next, localName, publishedName, depth + 1);
+    }
+  };
+  for (const m of src.matchAll(/export\s*\{([^}]*)\}\s*from\s*["']([^"']+)["']/g)) {
+    const from = moduleOf(entry, m[2]);
+    if (from === undefined) continue;
     for (const part of m[1].split(",")) {
       const t = part.trim();
-      if (t.startsWith("type ")) continue;
-      const n = t.split(/\s+as\s+/).pop()?.trim();
-      if (n !== undefined && /^[a-z]/.test(n)) exportedFns.add(n);
+      if (t === "" || t.startsWith("type ")) continue;
+      const [inner, outer = inner] = t.split(/\s+as\s+/).map((x) => x.trim());
+      if (/^[a-z]/.test(outer)) follow(from, inner, outer, 0);
     }
   }
+  const declaringFiles = new Set([...declaring.values()].flatMap((set) => [...set]));
+  const publishedFrom = (file) =>
+    new Set([...declaring].filter(([, set]) => set.has(file)).map(([name]) => name));
 
   const BUILTIN = /^(string|number|boolean|void|unknown|never|any|Promise|Array|Readonly|Partial|Record|Map|Set|URL|Error|Date|RegExp|NodeJS|Buffer|Uint8Array)$/;
   for (const [file, text] of sources) {
-    if (file === entry) continue;
-    for (const m of text.matchAll(/export\s+function\s+(\w+)\s*\(([^)]*)\)/g)) {
+    if (file === entry || !declaringFiles.has(file)) continue;
+    const names = publishedFrom(file);
+    for (const m of text.matchAll(/export\s+(?:async\s+)?function\s+(\w+)\s*\(([^)]*)\)/g)) {
       const [, name, params] = m;
-      if (!exportedFns.has(name)) continue;
+      if (!names.has(name)) continue;
       for (const p of params.split(",")) {
         // **The default value is not the parameter's type**, and taking it was
         // this rule's first defect: `layout: SvgLayout = SVG_DEFAULT_LAYOUT`
@@ -2626,6 +2811,9 @@ export function checkExportedArguments(files, readFile = (f) => readFileSync(f, 
 
 /** Functions whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_FUNCTIONS = Object.freeze({
+  // **`createSourceErrorSink` was here and is gone** — wired by `construct.ts`
+  // on 2026-09-03 (C19 T3.6's *logged once* given a place to log to, drained by
+  // C22 §8 step 3), and the equality arm removed the entry the day it was.
   // **\`sampleGrid\`, \`unitOf\`, \`basisOf\`, \`createDepth\` and \`writeDepth\` were
   // here and are gone**, released by \`plot3d\` exactly as their reasons said.
   // Five entries, one symbol, one commit — and the equality arm is what turned

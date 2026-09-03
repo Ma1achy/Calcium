@@ -98,8 +98,10 @@ const results = await runPass({
       // anything and reads as a test that has gone weak.
       name: "the lower half block is the upper one",
       file: P,
-      from: "        if (above === undefined) { line.push(span(QUADRANT[12] as string, below)); continue; }",
-      to: "        if (above === undefined) { line.push(span(QUADRANT[3] as string, below)); continue; }",
+      // Re-anchored 2026-09-03: the table is `linedraw.ts`'s `QUADRANTS` now
+      // (C12 I104), same sixteen strings in the same bit order.
+      from: "        if (above === undefined) { line.push(span(QUADRANTS[12] as string, below)); continue; }",
+      to: "        if (above === undefined) { line.push(span(QUADRANTS[3] as string, below)); continue; }",
       expect: "SC1",
     },
     {

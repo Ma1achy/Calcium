@@ -150,8 +150,10 @@ const results = runPass({
     {
       name: "the pie's wedges occlude instead of unioning",
       file: DEFN,
-      from: '      ref: categoryRef(pl.segmentIndex),\n      kind: "surface" as const,',
-      to: '      ref: categoryRef(pl.segmentIndex),\n      kind: (pl.segmentIndex % 2 === 0 ? "surface" : "context") as "surface" | "context",',
+      // Re-anchored 2026-09-03: the `ref:` line gained the pie border's arm
+      // (`segmentIndex < 0`); the wedge kind beneath it is the statement mutated.
+      from: '      ref: pl.segmentIndex < 0 ? ("surface.border" as ColourRef) : categoryRef(pl.segmentIndex),\n      kind: "surface" as const,',
+      to: '      ref: pl.segmentIndex < 0 ? ("surface.border" as ColourRef) : categoryRef(pl.segmentIndex),\n      kind: (pl.segmentIndex % 2 === 0 ? "surface" : "context") as "surface" | "context",',
       expect: "LM1",
     },
   ],

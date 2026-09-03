@@ -6,6 +6,7 @@ import { checkFindings, checkTriageInventory } from "./findings.mjs";
 import {
   checkExportedArguments,
   checkFunctionConsumers,
+  checkLayerCycles,
   checkModuleGraph,
   checkOneStorePerComponent,
   checkSeamConsumers,
@@ -13,8 +14,17 @@ import {
   nameExactnessSignal,
   publicSurfaceUseSignal,
 } from "./module-graph.mjs";
-import { checkSourceScans, checkMarks, checkControlBytes } from "./source-scans.mjs";
+import { checkSourceScans, checkMarks, checkControlBytes, checkAllowLists } from "./source-scans.mjs";
 import { checkDependencies, checkPhantomImports } from "./dependencies.mjs";
+import { checkRefusals, REFUSALS, unverifiableRefusals } from "./refusals.mjs";
+import {
+  ACKNOWLEDGED_BACKLOG,
+  backlogKey,
+  checkSourceMap,
+  checkSurfaceDeferrals,
+  checkTodoExpiry,
+  collectTodos,
+} from "./todo-expiry.mjs";
 import {
   checkCommitments,
   checkOrdering,
@@ -84,8 +94,42 @@ const sectionTargets = new Set(
 // the evidence and the count is what a reader watches move.
 const coverage = checkInvariantCoverage(specs, walk("test"));
 
+// TD1–TD6 — the deferral rules, **in the gate for the first time.** For their
+// whole life the only runner was `test/unit/todo-expiry.test.ts`, which the
+// pre-commit path never executes, so a deferral whose blocker had landed was
+// caught by whoever next ran the unit tier and by nothing on the way to a
+// commit. A03 §8 says MG and SS run pre-commit *because their violations become
+// load-bearing*; a deferral that has outlived its blocker is exactly that — the
+// defect it hides is depended upon while the row says *waits on*.
+//
+// **TD0's equality, reproduced rather than imported**: the acknowledged backlog
+// is compared by equality in both directions, so a new expiry fails because it
+// is not in the list and a resolved one fails because it still is. The test's
+// own fixtures are excluded for the test's stated reason — they are `it.todo`
+// calls in source text, indistinguishable to `collectTodos` from real ones.
+const todos = collectTodos("test").filter((e) => !e.file.endsWith("todo-expiry.test.ts"));
+const expiry = checkTodoExpiry(todos);
+const expiryKeys = new Set(expiry.map(backlogKey));
+const acknowledged = new Set(ACKNOWLEDGED_BACKLOG);
+const deferralViolations = [
+  ...expiry.filter((v) => !acknowledged.has(backlogKey(v))),
+  ...[...acknowledged].filter((k) => !expiryKeys.has(k)).map((k) => ({
+    rule: "TD0",
+    file: "tools/enforce/todo-expiry.mjs",
+    message:
+      `ACKNOWLEDGED_BACKLOG names \`${k}\`, which no longer expires — the deferral was written ` +
+      `or restated. Remove the entry; the list is compared by equality on purpose`,
+    spec: "A03 §9a · A03 commitment 16",
+  })),
+  ...checkSourceMap(),
+  ...checkSurfaceDeferrals(todos),
+];
+
 const violations = [
   ...checkModuleGraph(files),
+  // MG2 — no cycle within a layer, the second half of A02 §1's sentence; its own
+  // call for the equality arm's sake (see `checkModuleGraph`).
+  ...checkLayerCycles(files),
   // MG23 — one store per component above L0. SS29 folded here: as a source
   // scan its only in-scope file would have been its own exception.
   ...checkOneStorePerComponent(files),
@@ -94,6 +138,15 @@ const violations = [
   // MG29 — a published function whose parameter type is interior (C24 I29, §8c).
   ...checkExportedArguments(files),
   ...checkSourceScans(files),
+  // SS53 — every allow-list entry above is exercised by the file it names. Five
+  // entries across four rules were dead on the first run, each with a `why`
+  // that still read as current; an exemption nothing exercises cannot be told
+  // from one that has expired.
+  ...checkAllowLists(files),
+  // SS54 — the refusal register. A refusal whose premise is *X does not exist*
+  // names X, and this asserts it still does not; judgements are counted below.
+  ...checkRefusals(),
+  ...deferralViolations,
   // SS52 — the control-character class over the tree the *tools* read, which is
   // wider than the one `SCANS` walks. `files` is `walk("src")`, so widening
   // SS43's scope string alone would have changed nothing; and putting `test/`
@@ -133,6 +186,7 @@ const violations = [
 ];
 
 const RED = "\x1b[31m", DIM = "\x1b[2m", GREEN = "\x1b[32m", RESET = "\x1b[0m";
+const REFUSAL_COUNT = REFUSALS.length;
 
 // Computed only for the summary line — it gates nothing, and computing it beside
 // the violations would invite someone to push it into the list. F94.
@@ -171,7 +225,13 @@ if (violations.length === 0) {
       `  ${DIM}public surface by use · ${surface.candidates.length}/${surface.members} ` +
       `published members named by neither example — ${surface.concentrated.join(", ")}; ` +
       `${surface.ambiguous} of ${surface.cleared} clearings are ambiguous and none can list, ` +
-      `${surface.testOnly} named only in an example's tests (roadmap 48, reported not gated)${RESET}` +
+      `${surface.testOnly} named only in an example's tests (roadmap 48, reported not gated)${RESET}\n` +
+      // SS54's judgements. A register that holds only gated rows is one nobody
+      // put a taste refusal into; one that holds mostly judgements is a list of
+      // opinions with a rule's name. The number is what a reader watches.
+      `  ${DIM}refusal register · ${String(unverifiableRefusals().length)} of ` +
+      `${String(REFUSAL_COUNT)} refusals rest on a judgement and are not gated; ` +
+      `the rest resolve against the tree (SS54, reported not gated)${RESET}` +
       // The residue itself, behind a flag. A summary line is what a gate can
       // afford and a read needs the names — and printing them unasked would put
       // ninety lines of *not a violation* above every clean run, which is how a

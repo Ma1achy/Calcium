@@ -140,9 +140,18 @@ describe("C10 contract", () => {
   it("T2.5 (I13): no ANSI index outside the curated map, and SS19 fires", () => {
     const rule = SCANS.find((s) => s.id === "SS19");
     expect(rule, "SS19 is gone from the scan table").toBeDefined();
-    expect(rule?.allow).toEqual(["src/presentation/theme/four-bit.ts"]);
+    // **No exception.** `four-bit.ts` was allowed by name and never matched —
+    // its indices are bare numbers, a form the pattern cannot see — so SS53
+    // removed the entry; a file that spells an SGR in `theme/` fires whoever it is.
+    expect(rule?.allow).toEqual([]);
 
     expect(checkSourceScans(sourceFiles()).filter((v) => v.rule === "SS19")).toEqual([]);
+    // And SS19 fires: a raw SGR in the one file that used to be exempt.
+    const fabricated = checkSourceScans(
+      ["src/presentation/theme/four-bit.ts"],
+      () => 'const red = "\u001b[31m";\n',
+    ).filter((v) => v.rule === "SS19");
+    expect(fabricated.map((v) => v.file)).toEqual(["src/presentation/theme/four-bit.ts:1"]);
   });
 
   it("T2.6 (I12): theme/ reads no environment", () => {

@@ -88,8 +88,10 @@ const results = runPass({
       // rather than the picture.
       name: "the shared coordinate divides by a zero span again",
       file: SHARED,
-      from: "  const t = span === 0 ? 0.5 : (v - range.min) / span;",
-      to: "  const t = (v - range.min) / span;",
+      // Re-anchored 2026-09-03: the coordinate maps through the range's scale
+      // (C04 I81), so `v - range.min` became `scaled(v, range) - lo`.
+      from: "  const t = span === 0 ? 0.5 : (scaled(v, range) - lo) / span;",
+      to: "  const t = (scaled(v, range) - lo) / span;",
       expect: "G9",
     },
     {
@@ -100,8 +102,9 @@ const results = runPass({
       // rather than a bug.
       name: "a constant field is drawn at the floor rather than mid-ramp",
       file: SHARED,
-      from: "  const t = span === 0 ? 0.5 : (v - range.min) / span;",
-      to: "  const t = span === 0 ? 0 : (v - range.min) / span;",
+      // Re-anchored 2026-09-03, as above.
+      from: "  const t = span === 0 ? 0.5 : (scaled(v, range) - lo) / span;",
+      to: "  const t = span === 0 ? 0 : (scaled(v, range) - lo) / span;",
       expect: "G9",
     },
     {

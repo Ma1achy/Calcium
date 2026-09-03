@@ -39,7 +39,7 @@ import { renderSequenceToLines } from "../presentation/render-lines.js";
 import type { RenderScratch } from "../presentation/blocks/types.js";
 import { sliceCells } from "../presentation/text.js";
 import { SGR_RESET } from "../terminal/escapes.js";
-import { FrameError, exact } from "./paint.js";
+import { FrameError, exact } from "./frame-error.js";
 import type { Placed } from "../viewport/overlay/index.js";
 import type { BlockRegistry } from "../presentation/blocks/index.js";
 import type { ResolvedTheme } from "../presentation/theme/index.js";

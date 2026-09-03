@@ -31,11 +31,12 @@
 
 import { renderSequenceToLines } from "../presentation/render-lines.js";
 import type { RenderScratch } from "../presentation/blocks/types.js";
-import { cells, fitStyled, hardWrapCells, sliceCells } from "../presentation/text.js";
+import { cells, hardWrapCells, sliceCells } from "../presentation/text.js";
 import { background, paint as paintSpans, tone } from "../presentation/blocks/paint.js";
 import { SGR_RESET, sgr, toTerminalDefault } from "../terminal/escapes.js";
 import { promptFor, PROMPT_GUTTER } from "./config.js";
 import { composite } from "./composite.js";
+import { exact, FrameError } from "./frame-error.js";
 import { gutterMatchesPrompt, heightsSum, type Composed } from "./frame.js";
 import type { Block } from "../data/viewmodel/index.js";
 import type { Placed } from "../viewport/overlay/index.js";
@@ -146,35 +147,9 @@ function spinnerGlyph(caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWid
   return spinnerFrames(caps)[0] ?? "";
 }
 
-export class FrameError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "FrameError";
-  }
-}
-
-/**
- * Pad or truncate to exactly `width` **display** cells.
- *
- * **Both directions matter and only one is obvious.** A short line leaves the
- * previous frame's cells showing at the end of the row, which reads as
- * corruption; a long one wraps, which *is* corruption.
- *
- * **`displayCells`, not `cells`, and the difference was a live defect.** These
- * lines come from Ink and carry SGR. `stripControl` drops the ESC byte and
- * keeps `[38;5;241m`, which is printable text — so `cells()` measured every
- * themed chrome row eleven cells too wide per colour change, padded to 80
- * counted-with-escapes, and left a visible row of about 38 with the previous
- * frame showing across the rest. Truncating with it would have been worse: the
- * cut lands inside an escape and the colour bleeds down every row below.
- *
- * Delegated to C09 rather than solved here — that is where display width is
- * decided, and a second answer is C09 I1's divergence in the place that moves
- * the whole frame.
- */
-export function exact(text: string, width: number): string {
-  return fitStyled(text, width, SGR_RESET);
-}
+// `FrameError` and `exact` live in `frame-error.ts` (A03 MG2): `composite.ts`
+// needs both and this file needs `composite`, and the cycle that made was the
+// one MG2 found on the day it was implemented.
 
 /**
  * `n` rows of `blocks`, rendered at `width` and squared off.

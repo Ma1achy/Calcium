@@ -25,8 +25,11 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  ACKNOWLEDGED_CYCLES,
+  checkLayerCycles,
   checkModuleGraph,
   checkOneStorePerComponent,
+  layerCycles,
   modeOwnersAreReal,
   MODULE_GRAPH_RULES,
   checkExportedArguments,
@@ -36,12 +39,23 @@ import {
   publicSurfaceUseSignal,
 } from "../../tools/enforce/module-graph.mjs";
 import {
+  allowListCoverage,
+  checkAllowLists,
   checkControlBytes,
   checkMarks,
   checkSourceScans,
   RAMP_VOCABULARIES,
   SCANS,
 } from "../../tools/enforce/source-scans.mjs";
+import type { Scan } from "../../tools/enforce/source-scans.d.mts";
+import {
+  checkRefusals,
+  corpusOf,
+  REFUSALS,
+  resolveRefusals,
+  unverifiableRefusals,
+} from "../../tools/enforce/refusals.mjs";
+import type { Refusal } from "../../tools/enforce/refusals.d.mts";
 import { checkDependencies, DEPENDENCY_RULES } from "../../tools/enforce/dependencies.mjs";
 import { SPEC_RULES } from "../../tools/enforce/commitments.mjs";
 import { COMPONENT_SOURCES, defaultIsImplemented } from "../../tools/enforce/todo-expiry.mjs";
@@ -562,6 +576,14 @@ const FABRICATED: readonly Fabrication[] = [
     source: 'import { writeFileSync } from "node:fs";',
   },
   {
+    // SS18, pending on C10 for the whole life of C10 and built the day the
+    // pending entry was made checkable: a builder embedding a colour value
+    // where a block should name a palette slot (C10 I14).
+    rule: "SS18",
+    file: "src/shell/builders/index.ts",
+    source: 'const tone = { kind: "rgb", hex: "#ff0000" };',
+  },
+  {
     // MG13, and this fabrication is the one-line fix the C15 spec pass rejected
     // — copied from it rather than invented, per A03 commitment 14a. I10 asked
     // C15 to dismiss an overlay whose anchor row had been evicted, and the only
@@ -603,7 +625,7 @@ const scanIds = SCANS.map((s) => s.id);
  * list: a rule invisible to `implemented` is a rule the fabrication check does not
  * demand a violation for, which is A03 §2 arriving in the mechanism against it.
  */
-const STANDALONE_SCANS = ["SS47", "SS52"];
+const STANDALONE_SCANS = ["SS47", "SS52", "SS53", "SS54"];
 
 const implemented = [
   ...scanIds,
@@ -653,6 +675,16 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       // them is the negative arm, which the shared shape has no place for
       // either (F236).
       "SS52",
+      // SS53 likewise: its subject is a *scan table's* allow-list against the
+      // files the table names, so the fabrication supplies a table and a file
+      // rather than one line. Its own rows below.
+      "SS53",
+      // SS54 likewise: the register is the subject, and the fabrication is a
+      // register row whose `absent` symbol exists. Its own rows below.
+      "SS54",
+      // MG2 likewise: a cycle is two files by definition, and `FABRICATED` is
+      // one file's text. Its own rows below.
+      "MG2",
       // MG27 likewise: its subject is two whole files read together — a block
       // type and the builder that constructs it — so the shared `FABRICATED`
       // shape, which is one file's text, cannot express it.
@@ -1387,6 +1419,34 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     // The tree as it stands: the four types published, nothing owed.
     expect(checkExportedArguments(files)).toEqual([]);
 
+    // **The homonym on the subject side** (Lane C's request, F510's class).
+    // Publishing C06's `createRouter` made the rule read C16's internal
+    // `createRouter` — never on the entry — and report its `FocusStore` and
+    // `Keymap`. The rule now resolves the entry's re-export to the declaring
+    // module; a same-named export with an interior parameter type anywhere
+    // *else* is not the published function and must not fire.
+    const homonym = (f: string): string => {
+      const src = readFileSync(f, "utf8");
+      return f.endsWith("src/shell/paint.ts")
+        ? `${src}\nexport function createTransport(deps: NeverPublished): void { void deps; }\n`
+        : src;
+    };
+    expect(checkExportedArguments(files, homonym), "a homonym is not the subject").toEqual([]);
+    // And the control: the same signature in a file that *is* the declaring
+    // module of a published function fires on the interior type.
+    const declaringModule = files.find((f) => /^export function createTransport\(/mu.test(readFileSync(f, "utf8")));
+    expect(declaringModule, "createTransport's declaring module is found").toBeDefined();
+    const interior = (f: string): string => {
+      const src = readFileSync(f, "utf8");
+      return f === declaringModule
+        ? src.replace(/^export function createTransport\(/mu, "export function createTransport(extra: NeverPublished, ")
+        : src;
+    };
+    expect(
+      checkExportedArguments(files, interior).map((v) => v.message.match(/type `(\w+)`/)?.[1]),
+      "the declaring module's own signature is read",
+    ).toEqual(["NeverPublished"]);
+
     // **Fabricated violation.** Un-publish `AmbiguousWidth` and the two
     // functions C24 commitment 12 publishes *because a custom block kind cannot
     // be written without them* go uncallable in their second parameter.
@@ -1790,8 +1850,18 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
       "anything SS1 misses. The fourth instance of the fold, and the third whose " +
       "blocking component turned out to be the proof it could not fire: C19's " +
       "arrival is what made it visible",
-    SS12: "C10 — folded into SS11's scope for now",
-    SS18: "C10 — needs the block-producing module list",
+    // **Rewritten, because the old text began `C10 —`, which is a blocker
+    // phrased as a string.** The check below reads a leading component id as a
+    // `waitsOn` somebody wrote in the wrong shape, and C10 is built — so the
+    // entry either implements or says why it never will. It never will: SS11
+    // bans `process.env` across `src/presentation/` and `theme/` is inside it.
+    SS12: "folded into SS11's scope — SS11 bans `process.env` across all of src/presentation/, and theme/ is inside it, so a rule scoped to theme/ could never fire on anything SS11 misses",
+
+    // **SS18 was here as `"C10 — needs the block-producing module list"`, and
+    // C10 had been built for twenty components.** The string form put it out of
+    // reach of the `waitsOn` check for exactly as long, which is what the
+    // leading-id check below now closes. Implemented: the list is the three
+    // directories that construct blocks (`source-scans.mjs`).
 
     // **SS29 is gone, folded into MG23.** It waited on C23, C23 landed, and the
     // rule did not survive being written: as a source scan over `src/shell/` its
@@ -1808,11 +1878,10 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
     // rule was off while it was on. They are gone; `implemented` covers all
     // three modules.
 
-    // MG2 is the one genuinely unimplemented rule in the family: no cycle within
-    // a layer. Nothing blocks it — it is implementable against the tree today —
-    // and it is listed here rather than quietly omitted because that is the
-    // difference between a rule not yet built and a rule nobody remembers.
-    MG2: "nothing — implementable today, and the general form of MG13/MG18",
+    // **MG2 was here as "nothing — implementable today", for the whole life of
+    // the suite.** A pending entry with no blocker is one nothing can expire,
+    // and nothing did until a lane asked. Implemented in `module-graph.mjs`:
+    // one real cycle on the first run, acknowledged by equality.
 
     // The rest of the MG family was here, waiting on the components whose
     // directories they scope to. MG18 was the last of them and it went with
@@ -1943,12 +2012,23 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
     //
     // On its first run it found MG14 and SS6 — one rule to build and one to
     // fold, both stranded by the same commit two components back.
+    //
+    // **And the string arm, which skipped every string for its whole life.**
+    // `SS18: "C10 — needs the block-producing module list"` is a blocker with a
+    // component id in it, written as prose, and the `continue` below walked past
+    // it while C10 was built and twenty more components landed. A string that
+    // *begins* with a component id is a `waitsOn` someone wrote in the wrong
+    // shape, and it is read as one: built means fail. A fold names what it
+    // folds into and starts with the word, so the two shapes do not collide.
     const landed: string[] = [];
+    const sources: Record<string, string> = COMPONENT_SOURCES;
     for (const [id, entry] of Object.entries(PENDING_RULES)) {
-      if (typeof entry === "string") continue;
-      const path = COMPONENT_SOURCES[entry.waitsOn];
+      const waitsOn =
+        typeof entry === "string" ? (/^(C\d\d)\b/.exec(entry)?.[1] ?? null) : entry.waitsOn;
+      if (waitsOn === null) continue;
+      const path = sources[waitsOn];
       if (path !== undefined && defaultIsImplemented(path)) {
-        landed.push(`${id} waits on ${entry.waitsOn}, which is built (${path})`);
+        landed.push(`${id} waits on ${waitsOn}, which is built (${path})`);
       }
     }
 
@@ -2078,6 +2158,190 @@ const walk = (dir: string, out: string[] = []): string[] => {
   }
   return out;
 };
+
+describe("SS53 — an allow-list entry nothing exercises is a dead exemption", () => {
+  // **Five dead entries across four rules on the first run** — SS10's
+  // `capabilities.ts` (a comment-only `process.env`), SS19's `four-bit.ts`,
+  // SS21's `theme/`, SS22's `types.ts`, SS46's `shell/types.ts` — each with a
+  // `why` that still read as current. An exemption whose file never matches has
+  // never exercised the permission and cannot be told from one that expired.
+  const table = (allow: readonly string[]): readonly Scan[] => [
+    { id: "SSX", spec: "A03 §4", pattern: /forbidden\(/, scope: "src/x/", allow, why: "a fabrication" },
+  ];
+
+  it("SS53 fires: the allowed file matches only in a comment — SS10's exact case", () => {
+    const read = (): string => "// the rule is about forbidden(), and this file does not call it\nconst a = 1;\n";
+    const fired = checkAllowLists(["src/x/allowed.ts"], read, table(["src/x/allowed.ts"]));
+    expect(fired.map((v) => v.rule)).toEqual(["SS53"]);
+    expect(fired[0]?.message).toContain("0 of 1");
+    expect(fired[0]?.message).toContain("SSX");
+  });
+
+  it("SS53 fires: the allowed path is under no file the scan walks", () => {
+    const fired = checkAllowLists(["src/x/other.ts"], () => "forbidden();", table(["src/x/moved.ts"]));
+    expect(fired.map((v) => v.rule)).toEqual(["SS53"]);
+    expect(fired[0]?.message).toContain("names nothing the scan walks");
+  });
+
+  it("SS53 does not fire when the allowed file exercises its allowance, once, in code", () => {
+    const read = (f: string): string => (f.endsWith("allowed.ts") ? "forbidden();\n" : "const b = 2;\n");
+    // A directory allow with one live file of two: passes, and the coverage row
+    // says 1 of 2 — the blind spot, visible rather than gated.
+    const files = ["src/x/dir/allowed.ts", "src/x/dir/idle.ts"];
+    expect(checkAllowLists(files, read, table(["src/x/dir/"]))).toEqual([]);
+    const [row] = allowListCoverage(files, read, table(["src/x/dir/"]));
+    expect(row).toMatchObject({ rule: "SSX", allow: "src/x/dir/", files: 2, matching: 1 });
+  });
+
+  it("SS53 reads a match the way the scan does: a trailing marker comment still counts", () => {
+    // `lineFires` is shared with `checkSourceScans`, so a `// cells-ok` marker
+    // read through a negative lookahead is honoured here too. Measured when the
+    // rule was built: blanking comments first reported three `theme/` files
+    // matching SS23 where the scan reports two.
+    const marked: readonly Scan[] = [
+      { id: "SSY", spec: "A03 §4", pattern: /\.length(?!.*\/\/ *cells-ok)/, scope: "src/y/", allow: ["src/y/a.ts"], why: "" },
+    ];
+    expect(checkAllowLists(["src/y/a.ts"], () => "const n = s.length; // cells-ok\n", marked))
+      .toHaveLength(1); // cells-ok — a violation count: the marker excuses the line, so the allowance is unexercised
+    expect(checkAllowLists(["src/y/a.ts"], () => "const n = s.length;\n", marked)).toEqual([]);
+  });
+
+  it("SS53: the real allow-lists are all exercised, and there are some to examine", () => {
+    // **The control.** A rule that fires on a fabricated table and examines no
+    // real row is reporting on nothing; the row count is asserted so the
+    // real-corpus half cannot be vacuous.
+    const files = srcFiles();
+    const rows = allowListCoverage(files);
+    expect(rows.length, "allow entries examined").toBeGreaterThan(20); // cells-ok — a row count
+    expect(rows.filter((r) => r.matching === 0).map((r) => `${r.rule} ${r.allow}`)).toEqual([]);
+    expect(checkAllowLists(files)).toEqual([]);
+  });
+});
+
+describe("MG2 — no cycle within a layer", () => {
+  // The second half of A02 §1's sentence, inventoried since A03 was written and
+  // carried by three named pairs (MG13, MG18, MG22) until now. Module
+  // granularity, value imports only — the edges MG1 walks.
+  const cyclic = (f: string): string =>
+    f.endsWith("a.ts") ? 'import { b } from "./b.js";\nexport const a = 1;\n'
+      : 'import { a } from "./a.js";\nexport const b = 2;\n';
+  const files = ["src/presentation/plot/a.ts", "src/presentation/plot/b.ts"];
+
+  it("MG2 fires: two L1 modules import each other", () => {
+    // Its own call rather than `checkModuleGraph`, because the equality arm
+    // would also report the real acknowledged cycle as gone from a two-file
+    // tree — which is why `index.mjs` calls it separately too.
+    const fired = checkLayerCycles(files, cyclic, {});
+    expect(fired.map((v) => v.rule)).toEqual(["MG2"]);
+    expect(fired[0]?.message).toContain("src/presentation/plot/a.ts <-> src/presentation/plot/b.ts");
+    expect(fired[0]?.message).toContain("L1 presentation");
+    // And through the default list — empty since `shell/frame-error.ts` broke
+    // the one real cycle — the same tree says the fabricated cycle and nothing
+    // else; the equality arm's own fire is the row below, with a list handed in.
+    const messages = checkLayerCycles(files, cyclic).map((v) => v.message);
+    expect(messages.filter((m) => m.includes("imports CYCLICALLY"))).toHaveLength(1);
+    expect(messages.some((m) => m.includes("no longer a cycle"))).toBe(false);
+  });
+
+  it("MG2 does not fire on a type-only edge, which erases at build (MG1's ruling, F127)", () => {
+    const typed = (f: string): string =>
+      f.endsWith("a.ts") ? 'import type { B } from "./b.js";\nexport type A = B;\n'
+        : 'import { A } from "./a.js";\nexport type B = A;\n';
+    expect(layerCycles(files, typed)).toEqual([]);
+  });
+
+  it("MG2 does not fire across layers — that edge is MG1's", () => {
+    const across = ["src/presentation/plot/a.ts", "src/viewport/b.ts"];
+    const read = (f: string): string =>
+      f.endsWith("a.ts") ? 'import { b } from "../../viewport/b.js";\n'
+        : 'import { a } from "../presentation/plot/a.js";\n';
+    expect(layerCycles(across, read)).toEqual([]);
+    expect(checkLayerCycles(across, read, {})).toEqual([]);
+    expect(checkModuleGraph(across, read).some((v) => v.rule === "MG1"), "MG1 owns it").toBe(true);
+  });
+
+  it("MG2's equality arm: an acknowledged cycle that has been broken is a violation", () => {
+    const acyclic = (): string => "export const x = 1;\n";
+    const fired = checkLayerCycles(files, acyclic, { "src/a.ts <-> src/b.ts": "a reason" });
+    expect(fired.map((v) => v.rule)).toEqual(["MG2"]);
+    expect(fired[0]?.message).toContain("no longer a cycle");
+  });
+
+  it("MG2: the real tree's cycles are exactly the acknowledged ones", () => {
+    // **Equality, both directions, and both sides are empty.** One real cycle
+    // on the first run — `shell/composite.ts <-> shell/paint.ts` — was
+    // acknowledged rather than exempted, then broken with the leaf module
+    // `shell/frame-error.ts`, and the equality arm is what removed its entry.
+    // Zero is the assertion: a new cycle fails the first line, a stale entry
+    // the second. The arm's fire on a subject is the fabricated row above.
+    const real = layerCycles(srcFiles());
+    expect(real).toEqual([]);
+    expect(Object.keys(ACKNOWLEDGED_CYCLES)).toEqual([]);
+    expect(checkLayerCycles(srcFiles())).toEqual([]);
+    // **And the wiring**: `checkModuleGraph` deliberately does not run MG2, so
+    // the gate has to call it by name. Read from the runner, not assumed.
+    const runner = readFileSync("tools/enforce/index.mjs", "utf8");
+    expect(runner).toMatch(/\.\.\.checkLayerCycles\(files\),/);
+  });
+});
+
+describe("SS54 — the refusal register resolves its premises against the tree", () => {
+  const entry = (id: string, premise: Refusal["premise"]): Refusal =>
+    ({ id, where: "a fabrication", premise, why: "" });
+
+  it("SS54 fires: a refusal whose `absent` symbol exists", () => {
+    const fired = checkRefusals([entry("RX", { absent: "shiftInward" })], "export function shiftInward() {}", "{}");
+    expect(fired.map((v) => v.rule)).toEqual(["SS54"]);
+    expect(fired[0]?.message).toContain("does not exist, and it does");
+  });
+
+  it("SS54 fires: a refusal whose `present` mechanism is gone", () => {
+    const fired = checkRefusals([entry("RX", { present: "Intl.Segmenter" })], "const s = 1;", "{}");
+    expect(fired.map((v) => v.rule)).toEqual(["SS54"]);
+    expect(fired[0]?.message).toContain("exists, and it is gone");
+  });
+
+  it("SS54 fires on package.json for a package premise, and not on src/", () => {
+    const rows = [entry("RX", { absent: "chalk", in: "package.json" })];
+    expect(checkRefusals(rows, 'import chalk from "chalk";', "{}")).toEqual([]);
+    expect(checkRefusals(rows, "", '{ "dependencies": { "chalk": "5" } }')).toHaveLength(1); // cells-ok — a violation count
+  });
+
+  it("SS54 never gates a judgement, and counts it", () => {
+    const rows = [entry("RX", { unverifiable: "a novelty" }), entry("RY", { absent: "nothingHere" })];
+    expect(checkRefusals(rows, "", "{}")).toEqual([]);
+    expect(unverifiableRefusals(rows)).toEqual(["RX"]);
+    expect(resolveRefusals(rows, "", "{}").map((r) => r.holds)).toEqual([null, true]);
+  });
+
+  it("SS54 strips comments, keeps string literals, and bounds a symbol at identifier edges", () => {
+    // `codec.ts` carries `"decodeJpeg"` as a string so the deferral can be
+    // grepped; the entry watches the call form. A comment saying the symbol
+    // does not count; a longer identifier containing it does not either.
+    const corpus = corpusOf(["a.ts"], () => '// decodeJpeg(\nconst mark = "decodeJpeg";\nconst decodeJpegLater = 1;\n');
+    expect(checkRefusals([entry("RX", { absent: "decodeJpeg(" })], corpus, "{}")).toEqual([]);
+    expect(checkRefusals([entry("RY", { absent: "decodeJpeg" })], corpus, "{}"), "the literal counts").toHaveLength(1); // cells-ok — a violation count
+    expect(checkRefusals([entry("RZ", { present: "function isWide(" })], "function isWide(cp) {}", "{}")).toEqual([]);
+  });
+
+  it("SS54 fires on a duplicated id", () => {
+    const fired = checkRefusals([entry("RX", { absent: "q" }), entry("RX", { absent: "r" })], "", "{}");
+    expect(fired.map((v) => v.message)).toEqual([expect.stringContaining("appears twice")]);
+  });
+
+  it("SS54: the real register holds, and examines premises of both gated kinds", () => {
+    // **The control.** Every gated row resolves; at least one is `absent`, at
+    // least one `present`, at least one a counted judgement — so the real run
+    // cannot be a register of one shape passing by construction.
+    const rows = resolveRefusals();
+    expect(rows.filter((r) => r.holds === false).map((r) => r.id)).toEqual([]);
+    expect(rows.some((r) => r.kind === "absent"), "an absent premise examined").toBe(true);
+    expect(rows.some((r) => r.kind === "present"), "a present premise examined").toBe(true);
+    expect(unverifiableRefusals().length, "judgements counted").toBeGreaterThan(0); // cells-ok — a count
+    expect(unverifiableRefusals().length, "and not the majority").toBeLessThan(REFUSALS.length / 2); // cells-ok — a count
+    expect(checkRefusals()).toEqual([]);
+  });
+});
 
 describe("SS52 — a NUL makes a file invisible to every search", () => {
   // **The rule exists because it produced a false conclusion, not because a byte

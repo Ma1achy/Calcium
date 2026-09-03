@@ -9,6 +9,19 @@ export declare function checkModuleGraph(
 
 export declare const MODULE_GRAPH_RULES: readonly string[];
 
+/** MG2 — cycles known and not yet broken, `a <-> b` keys with a reason each; compared by equality. */
+export declare const ACKNOWLEDGED_CYCLES: Readonly<Record<string, string>>;
+/** MG2 — every intra-layer value-import cycle in `files`, as sorted ` <-> `-joined member lists. */
+export declare function layerCycles(
+  files: readonly string[],
+  readFile?: (file: string) => string,
+): string[];
+export declare function checkLayerCycles(
+  files: readonly string[],
+  readFile?: (file: string) => string,
+  acknowledged?: Readonly<Record<string, string>>,
+): Violation[];
+
 /**
  * Which `MODE_OWNERS` rows name an export `escapes.ts` actually has. A row for
  * an absent name cannot fire — the third way a rule comes to have nothing to be

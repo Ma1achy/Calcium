@@ -140,7 +140,31 @@ const KNOWN_STALE = {
   // coverage from the summary line.
   "c10-categorical.mjs": 1,
   "c26-elements.mjs": 1,
-  "c26-focus-target.mjs": 1,
+
+  // **Five runs moved under C26 §4g and C22 I76 on 2026-09-03, none of them
+  // run that day.** `c04-scroll` and `c22-camera` anchor on the render slot,
+  // which gained a seventh axis (`cursorKey`); `c26-address` on `keys.ts`'s
+  // `↑`/`↓` rows, which now consult the focused entry; `c26-focus-target` and
+  // `c26-semantic-copy` on `focus.ts`'s stored shape, which gained `entryId`.
+  // Each is a one-token repair, and listed rather than repaired for the reason
+  // at the head of this list: the repair belongs to whoever runs the pass.
+  "c04-scroll.mjs": 1,
+  "c22-camera.mjs": 1,
+  "c26-address.mjs": 3,
+  "c26-focus-target.mjs": 2,
+  "c26-semantic-copy.mjs": 2,
+
+  // **The statement is gone, not moved** (C04 I81, 2026-09-03). "a log domain
+  // is spaced linearly" mutated `xPositionOf`'s own log arm — `if (!isLog || …)
+  // return linear;` — and that arm no longer exists: the function is one call
+  // to `normalisedOf` through a range that carries its scale. The equivalent
+  // mutation is dropping `scale` from that range, which is a different line
+  // with a different shape, so it is listed rather than guessed at; the repair
+  // belongs to whoever runs the pass. Four sibling drifts from the same session
+  // (`c12-layer-merge`, `c12-plot3d`, `c12-shared-geometry` ×2, `c22-camera`'s
+  // `elements` guard) were re-anchored instead, each onto the same statement
+  // one token wider.
+  "c12-x-axis.mjs": 1,
 };
 
 /**

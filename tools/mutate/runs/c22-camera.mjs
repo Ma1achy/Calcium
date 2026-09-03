@@ -113,8 +113,10 @@ const results = await runPass({
       // that made the writer unreachable while every reference existed.
       name: "a plot declares no elements, as it did before C12 I85",
       file: PLOT,
-      from: "  if (block.camera === undefined) return NO_ELEMENTS;",
-      to: "  return NO_ELEMENTS;\n  if (block.camera === undefined) return NO_ELEMENTS;",
+      // Re-anchored 2026-09-03: the guard gained `cursorable` (C12 I85); the
+      // mutation still returns before either clause is asked.
+      from: "  if (block.camera === undefined && !cursorable(block)) return NO_ELEMENTS;",
+      to: "  return NO_ELEMENTS;\n  if (block.camera === undefined && !cursorable(block)) return NO_ELEMENTS;",
       expect: "T4.17f",
     },
     {

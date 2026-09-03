@@ -101,27 +101,30 @@ describe("roadmap-status — the Order column's verifier", () => {
   });
 
   it("RS2: a claim naming the wrong file fails, and names the identifier", () => {
-    // The measured case, replayed as it actually stood: one cited file, and the
-    // wrong one. `logs` occurs 0 times in `simple.ts` and 8 in `structured.ts`.
-    // A file-exists check passes here — both files are real — so this is the row
-    // that distinguishes the two checks.
+    // The measured case's shape, on the row that still has it: one cited file,
+    // and the wrong one. It was row 17's `logs`, until that row grew to four
+    // implementers citing three files — every one of which holds `logs` or is
+    // cited beside one that does, so RS2c's limit masks any single repointing.
+    // Row 18 cites `refresh.ts` alone for `Source` and `folds`; `folds` occurs
+    // 0 times in `render-cache.ts`. A file-exists check passes here — both files
+    // are real — so this is the row that distinguishes the two checks.
     const r = run(
       mutate(
-        "`logs` — `src/presentation/blocks/kinds/structured.ts:123` — **and** `patch` — " +
-          "`src/presentation/patch/definition.ts:211` — declare",
-        "`logs` — `src/presentation/blocks/kinds/simple.ts:1` — declares",
+        "| 18 | BUILT | `src/shell/refresh.ts` — `Source`, the `folds` memo",
+        "| 18 | BUILT | `src/shell/render-cache.ts` — `Source`, the `folds` memo",
       ),
     );
     expect(r.ok, "a wrong-file citation must fail").toBe(false);
-    expect(r.out).toContain("entry 17");
-    expect(r.out).toMatch(/`logs` appears in none of/u);
+    expect(r.out).toContain("entry 18");
+    expect(r.out).toMatch(/`folds` appears in none of/u);
   });
 
   it("RS2c: a sibling citation masks a wrong one — the limit, asserted", () => {
     // **The fixture found this rather than the tool's comment predicting it.**
     // An identifier resolves against any file its cell cites, so repointing row
-    // 17's `logs` at `simple.ts` while the `patch` citation stands beside it
-    // PASSES: `logs` occurs once in the patch definition.
+    // 17's `logs` at `simple.ts` while its siblings stand beside it PASSES:
+    // `keyValue`'s citation is the same `structured.ts`, and `logs` occurs once
+    // in the patch definition besides.
     //
     // Asserted rather than described, because an unrecorded limit reads as
     // strength — and because the day the shape is tightened, this row is what
@@ -130,8 +133,8 @@ describe("roadmap-status — the Order column's verifier", () => {
     // fails every correct multi-file row.
     const masked = run(
       mutate(
-        "`src/presentation/blocks/kinds/structured.ts:123`",
-        "`src/presentation/blocks/kinds/simple.ts:1`",
+        "`logs` (`src/presentation/blocks/kinds/structured.ts:217`)",
+        "`logs` (`src/presentation/blocks/kinds/simple.ts:1`)",
       ),
     );
     expect(masked.ok, "the known limit: a two-file row hides a wrong citation").toBe(true);

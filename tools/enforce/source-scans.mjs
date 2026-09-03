@@ -31,10 +31,16 @@ export const SCANS = [
   // `process.env[k]`. No file in src/ has business reading the environment —
   // C22 reads config through an injected filesystem — so the broad rule has no
   // false positives and, unlike the narrow one, no false negatives.
+  //
+  // **No exception, and there was one for the whole life of the rule.**
+  // `capabilities.ts` was allowed by name, and the file names `process.env`
+  // only in a comment saying it does *not* read it — C02 takes the injected
+  // record. SS53 found the entry had never been exercised, and its own `why`
+  // already said so.
   { id: "SS10", spec: "C02 T2.5 · C02 T6.2",
     pattern: /process\.env/,
-    scope: "src/", allow: ["src/terminal/capabilities.ts"],
-    why: "only C02 reads the environment, and it reads the injected record" },
+    scope: "src/", allow: [],
+    why: "no file under src/ reads the environment — C02 takes the injected record and C22 supplies it" },
 
   { id: "SS11", spec: "C09 T2.7 · C10 T2.6",
     pattern: /process\.env/,
@@ -181,6 +187,22 @@ export const SCANS = [
     scope: "src/presentation/blocks/", allow: [],
     why: "renderers resolve tones; they do not carry colours" },
 
+  // **SS18, pending on C10 for the whole life of C10.** Its entry said *needs
+  // the block-producing module list*, and the list is the directories that
+  // construct `Block` values for a transcript: the adapters, the fixtures that
+  // stand in for them, and everything under `src/shell/` — builders, local
+  // handlers, the refresh driver, the startup notices. SS16 covers the view
+  // model's own types and SS17 the renderers; this is the third population,
+  // the one that *writes* blocks, and it had no scan. Measured clean on landing.
+  //
+  // Stated blind spot: a hex colour built by string concatenation or reached
+  // through a variable passes, as SS17's does. The shape someone actually
+  // writes is the literal.
+  { id: "SS18", spec: "C10 I14 · C10 T2.9",
+    pattern: /#[0-9a-fA-F]{3,8}\b/,
+    scope: ["src/data/adapters/", "src/data/fixtures/", "src/shell/"], allow: [],
+    why: "a block names a palette slot and never embeds a colour value (C10 I14) — the modules that construct blocks carry no hex literal" },
+
   // C10 I13. The rule scopes to the *directory* with one named exception, not
   // to `tokens-*.ts`: a narrowed scope reads as tighter and is looser, because
   // it stops seeing a new token file the day someone adds one — SS26's failure
@@ -221,10 +243,16 @@ export const SCANS = [
     scope: "src/", allow: ["src/terminal/lifecycle.ts"],
     why: "the terminal's dimensions are read in lifecycle.ts and handed down; width is the axis that wraps" },
 
+  // `four-bit.ts` was allowed by name as "the one file that holds indices", and
+  // it does hold them — as bare numbers (`"tone.default": 15`), a form this
+  // pattern cannot see: it wants an `ansi:` key, a `38;5;` sequence or an SGR
+  // string. So the allowance was never load-bearing (SS53) and it is gone; the
+  // day the pattern learns the bare form is the day the exemption is argued
+  // for, with the reason beside it.
   { id: "SS19", spec: "C10 I13 · C10 T2.5",
     pattern: /\b(?:38|48);5;\d|\bansi(?:16|256)?\s*[:=]\s*\d|\[\d{1,2}m/,
-    scope: "src/presentation/theme/", allow: ["src/presentation/theme/four-bit.ts"],
-    why: "tokens are 24-bit hex; the curated 4-bit map is the one file that holds indices" },
+    scope: "src/presentation/theme/", allow: [],
+    why: "tokens are 24-bit hex; no theme file spells an ANSI index or a raw SGR" },
 
   // **The pattern was correct about a syntax nobody writes**, and that is its own
   // vacuity class (A03 §2). It required a word character after `syntax.`, and
@@ -248,9 +276,14 @@ export const SCANS = [
     allow: ["src/presentation/theme/", "src/presentation/blocks/kinds/code.ts", "src/presentation/patch/"],
     why: "`syntax` is consumed by code and patch rendering only; the list is closed at two" },
 
+  // `theme/` was allowed as "where the art is declared", and none of its ten
+  // files spells a `spectrum` reference in either form this matches — the art
+  // is declared through the palette record, not by name. Never exercised
+  // (SS53), so the rule has no exceptions and a future `spectrum.` in the theme
+  // directory is a decision rather than a default.
   { id: "SS21", spec: "C10 I16 · C10 T2.8",
     pattern: /["'`]spectrum\.\w|palettes\s*\.\s*spectrum/,
-    scope: "src/", allow: ["src/presentation/theme/"],
+    scope: "src/", allow: [],
     why: "`spectrum` is decorative and restricted to declared art" },
 
   // --- structural ----------------------------------------------------------
@@ -596,12 +629,16 @@ export const SCANS = [
   // array literal is a verb or enum list. `"--"` alone is not matched — the
   // prefix test in `context.ts` is a question about syntax, not a flag name.
   //
-  // `types.ts` is allowed by name: `SLOT_KINDS` is C19's own closed union,
-  // enumerated so T2.7 can be exhaustive over it, and it is not manifest data.
-  // The alternative is a rule that cannot see a list added to any other file.
+  // `types.ts` was allowed by name for `SLOT_KINDS`, C19's own closed union —
+  // and the union is spelled in camelCase (`flagValue`), which the list arm's
+  // `[a-z][\w -]*` does match, so the allowance looked necessary and was not:
+  // the arm wants three consecutive quoted lower-case words and the list is
+  // longer, quoted per line. Never exercised (SS53). If `SLOT_KINDS` is ever
+  // reformatted onto one line this fires, and that is the moment to decide
+  // rather than a permission granted in advance.
   { id: "SS22", spec: "C19 I4 · C19 T2.6 · C19 T4.1",
     pattern: /"--[a-z][\w-]*"|\[\s*"[a-z][\w -]*"\s*,\s*"[a-z][\w -]*"\s*,\s*"[a-z][\w -]*"/,
-    scope: "src/interaction/completion/", allow: ["src/interaction/completion/types.ts"],
+    scope: "src/interaction/completion/", allow: [],
     why: "every candidate is a projection of the manifest (I4): a literal verb, flag or enum list here is how completion drifts from the far side, and it is correct on the day it is written" },
 
   // **C20 owns a `flush` that has nothing to do with a frame**, and the
@@ -792,11 +829,13 @@ export const SCANS = [
   { id: "SS46", spec: "C23 §3a · C23 I22",
     pattern: /origin:\s*"refresh"/,
     scope: "src/",
+    // `src/shell/types.ts` was here and is gone: it names `origin: "refresh"`
+    // in a doc comment only, which the scan skips, so the entry was never
+    // exercised (SS53).
     allow: [
       "src/viewport/transcript/cap.ts",
       "src/shell/construct.ts",
       "src/shell/execution.ts",
-      "src/shell/types.ts",
     ],
     why: "`origin: \"refresh\"` is provenance — a system notice with no user behind it (C23 §3a). A fifth site is either a new one of those or the word drifting" },
 
@@ -1083,6 +1122,115 @@ function scopesOf(scan) {
   return Array.isArray(scan.scope) ? scan.scope : [scan.scope];
 }
 
+/**
+ * Whether one source line is a violation of one scan — **the** definition, used
+ * by `checkSourceScans` and by SS53 alike so the two cannot disagree about what
+ * a match is.
+ *
+ * Comments are prose about the rule, not violations of it. A line comment was
+ * already skipped; a block comment's continuation was not, so documenting
+ * `frames[tick % frames.length]` in a doc comment fired SS23 — the rule
+ * reporting a sentence that explains it.
+ *
+ * Only the comment *forms* are skipped, never a line with code on it:
+ * `const w = s.length; // why` still fires, which is the case that matters.
+ * **And the trailing comment is kept on the line deliberately**: SS23 and SS50
+ * read their `// cells-ok` and `// narrow-ok` markers through a negative
+ * lookahead, so blanking comments first (as `codeOnly` does for SS47) would
+ * turn every marked line into a violation. Measured while SS53 was built: the
+ * blanked form reported three `theme/` files matching SS23 where this reports
+ * two, and the third was a marked line.
+ */
+function lineFires(scan, line) {
+  const start = line.trimStart();
+  if (start.startsWith("//") || start.startsWith("*") || start.startsWith("/*")) return false;
+  return scan.pattern.test(line);
+}
+
+/**
+ * SS53 — every allow-list entry is exercised by the file it names.
+ *
+ * An `allow` entry says *this file may match the pattern*. A file that never
+ * matches has never exercised the permission, so the exemption cannot be told
+ * from a dead one — and it outlives its reason unread, which is the failure
+ * every equality-compared list in this directory exists to prevent
+ * (`UNCONSUMED_MEMBERS`, `MARK_EXEMPTIONS`, `ACKNOWLEDGED_BACKLOG`). The allow
+ * lists were the last exemption lists with no such arm.
+ *
+ * **Five dead entries on the first run, across four rules.** SS10 allowed
+ * `capabilities.ts` for `process.env`, which the file names only in a comment
+ * explaining that it does *not* read it — a match in prose is exactly what
+ * `checkSourceScans` skips, so the permission had never been used. SS19's
+ * `four-bit.ts`, SS21's `theme/` (ten files) and SS22's `types.ts` matched
+ * nothing at all, in code or prose; SS46's `shell/types.ts` matched in a
+ * comment. Each `why` still read as current.
+ *
+ * **The measurement is the scan's own**: a file exercises its allowance iff
+ * `checkSourceScans` would have reported it without the entry, so this shares
+ * `lineFires` rather than re-deciding what a match is. That is why the
+ * comment-only cases count as dead here — the scan would not have fired on
+ * them either.
+ *
+ * **Stated blind spot: a directory allow is one entry, and one live file
+ * carries it.** SS20 allows `theme/` and one of its ten files matches; SS23
+ * allows the same directory and two do. Nine files in each hold a permission
+ * they do not use, and this passes both, because the entry is the directory
+ * and the directory is exercised. `allowListCoverage` returns the per-file
+ * count so the residue is visible; gating on it would demand a file-level
+ * allow-list for every directory, which trades one unread list for ten.
+ */
+export function allowListCoverage(
+  files,
+  readFile = (f) => readFileSync(f, "utf8"),
+  scans = SCANS,
+) {
+  const rows = [];
+  const cache = new Map();
+  const read = (f) => {
+    const hit = cache.get(f);
+    if (hit !== undefined) return hit;
+    const src = readFile(f);
+    cache.set(f, src);
+    return src;
+  };
+  for (const scan of scans) {
+    const scopes = scopesOf(scan);
+    for (const allow of scan.allow) {
+      const under = files
+        .map((f) => f.replaceAll("\\", "/"))
+        .filter((f) => scopes.some((s) => f.startsWith(s)) && (f === allow || f.startsWith(allow)));
+      const matching = under.filter((f) => read(f).split("\n").some((line) => lineFires(scan, line)));
+      rows.push({ rule: scan.id, allow, spec: scan.spec, files: under.length, matching: matching.length });
+    }
+  }
+  return rows;
+}
+
+export function checkAllowLists(
+  files,
+  readFile = (f) => readFileSync(f, "utf8"),
+  scans = SCANS,
+) {
+  const violations = [];
+  for (const row of allowListCoverage(files, readFile, scans)) {
+    if (row.matching > 0) continue;
+    violations.push({
+      rule: "SS53",
+      file: "tools/enforce/source-scans.mjs",
+      message:
+        row.files === 0
+          ? `${row.rule} allows \`${row.allow}\`, and no file in its scope is under that path — ` +
+            `the entry names nothing the scan walks. Remove it, or fix the path`
+          : `${row.rule} allows \`${row.allow}\`, and ${String(row.matching)} of ${String(row.files)} ` +
+            `file(s) under it match the rule's pattern outside a comment — the exemption has never ` +
+            `been exercised and cannot be told from a dead one. Remove the entry, or the reason ` +
+            `stops being one anybody checks`,
+      spec: `A03 §4 SS53 · ${row.spec}`,
+    });
+  }
+  return violations;
+}
+
 export function checkSourceScans(files, readFile = (f) => readFileSync(f, "utf8")) {
   const violations = [];
 
@@ -1117,17 +1265,7 @@ export function checkSourceScans(files, readFile = (f) => readFileSync(f, "utf8"
       if (scan.allow.some((a) => f === a || f.startsWith(a))) continue;
       const src = read(file);
       src.split("\n").forEach((line, i) => {
-        // Comments are prose about the rule, not violations of it. A line
-        // comment was already skipped; a block comment's continuation was not,
-        // so documenting `frames[tick % frames.length]` in a doc comment fired
-        // SS23 — the rule reporting a sentence that explains it.
-        //
-        // Only the comment *forms* are skipped, never a line with code on it:
-        // `const w = s.length; // why` still fires, which is the case that
-        // matters.
-        const start = line.trimStart();
-        if (start.startsWith("//") || start.startsWith("*") || start.startsWith("/*")) return;
-        if (scan.pattern.test(line)) {
+        if (lineFires(scan, line)) {
           violations.push({
             rule: scan.id, file: `${file}:${i + 1}`,
             message: `${scan.why} — found: ${line.trim().slice(0, 70)}`,
