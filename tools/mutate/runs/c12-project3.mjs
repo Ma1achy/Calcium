@@ -94,8 +94,11 @@ const results = await runPass({
       // figures invite: 80 x 48 is a measurement at 80x24 cells.
       name: "the sample grid is the measurement's own figure",
       file: P,
-      from: "    ? { width: w, height: h * 2 } // cells-ok — two samples a cell, down",
-      to: "    ? { width: 80, height: 48 } // cells-ok — two samples a cell, down",
+      // **Re-anchored when the rung parameter went** (F498). One grid serves
+      // the fill, the outline and the marks, so the mutation that says *the grid
+      // is a constant rather than a measurement* is now the constant itself.
+      from: "  return { width: w * 2, height: h * AREA_ROWS }; // cells-ok — 2 across, AREA_ROWS down",
+      to: "  return { width: 80, height: 48 }; // cells-ok — 2 across, AREA_ROWS down",
       expect: "PR7",
     },
     {
@@ -121,6 +124,29 @@ const results = await runPass({
       from: "  if (!(q < (d.z[i] as number))) return false;",
       to: "  if (!(q <= (d.z[i] as number))) return false;",
       expect: "PR8b",
+    },
+    {
+      // **The arm as it shipped: no scale at all** (C12 I106, F503). This is the
+      // survivor the suite had no row for — it passes every containment
+      // assertion, because it is outside the plot by the same amount at every
+      // distance, and PR9b is the row that asks whether `distance` reaches it.
+      name: "the orthographic arm divides by nothing",
+      file: P,
+      from: "  const divisor = basis.orthographic ? basis.distance : z;",
+      to: "  const divisor = basis.orthographic ? basis.f : z;",
+      expect: "PR9b",
+    },
+    {
+      // **The two arms collapsed into one.** Dividing by the sample's own depth
+      // on both is a perfectly good perspective renderer that has quietly
+      // stopped honouring `projection` — and PR9's *divergence* half is the only
+      // thing that can see it, since agreeing at the target plane is what a
+      // correct pair does.
+      name: "the orthographic arm divides by the sample's own depth",
+      file: P,
+      from: "  const divisor = basis.orthographic ? basis.distance : z;",
+      to: "  const divisor = z;",
+      expect: "PR9",
     },
   ],
 });

@@ -1036,7 +1036,7 @@ export function scanSections(file, src, options = {}) {
  * **`C12 I84` was taken as a *conditional* loan and the condition was wrong.**
  * It was listed on the reasoning that its subject is a renderer — *the sample
  * grid is `width × 1` by `height × 2` and the depth buffer is allocated per
- * render, and nothing rasterises into a sample grid yet* — with `scatter3d`
+ * render, and nothing rasterises into a sample grid yet* — with `plot3d`
  * named as the symbol that would release it. **One commit later `PR7` and `PR8`
  * cite it**: a grid is testable without anything drawing into it, and a buffer's
  * allocation is testable by allocating two. `C12 I86` rode in on the same
@@ -1054,7 +1054,7 @@ export function scanSections(file, src, options = {}) {
  * the grid.
  *
  * **`C04 I76`, `C12 I87`, `C12 I88` and `C12 I89` were the fifth**, taken on the
- * spec commit that rules `scatter3d` and **repaid on the next one**, which is
+ * spec commit that rules `plot3d` and **repaid on the next one**, which is
  * what a one-commit loan is. They were plain rather than conditional — the
  * paragraph above is why — and `SC1`–`SC12` name all four.
  *

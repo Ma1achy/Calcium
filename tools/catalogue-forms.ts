@@ -260,18 +260,18 @@ const cluster3 = (cx: number, cy: number, cz: number, n: number) =>
   });
 
 export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.freeze({
-  scatter3d: {
+  plot3d: {
     // C12 I87 — the colour raster above `halfBlockEligible`, the marker glyphs
     // below it, and the same block draws both.
-    default: { form: "scatter3d", height: 12, series: [], points3: [{ label: "helix", points: helix3(160) }] },
+    default: { form: "plot3d", height: 12, series: [], points3: [{ label: "helix", points: helix3(160) }] },
     // C12 I89 — the ramp over `value`, which is not the depth.
     "colour-value": {
-      form: "scatter3d", height: 12, series: [], colourBy: "value",
+      form: "plot3d", height: 12, series: [], colourBy: "value",
       points3: [{ label: "helix", points: helix3(160) }],
     },
     // C12 I89 — the categorical palette, and the legend that falls out of it.
     "colour-series": {
-      form: "scatter3d", height: 12, series: [], colourBy: "series",
+      form: "plot3d", height: 12, series: [], colourBy: "series",
       points3: [
         { label: "alpha", points: cluster3(-0.5, -0.4, 0.3, 90) },
         { label: "beta", points: cluster3(0.6, 0.3, -0.4, 90) },
@@ -283,7 +283,7 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     // arguments of which one was circular and one conditional on a premise a
     // caller naming the arm at 24-bit removes (F483).
     "line-wire": {
-      form: "scatter3d", height: 14, series: [], plotStyle: "line",
+      form: "plot3d", height: 14, series: [], plotStyle: "line",
       lines3: cubeEdges3(0.9, 0.5),
     },
     // C12 I100 — the dot grid on the primitive it was measured for. A cube's
@@ -292,7 +292,7 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     // figure's cells, and what it costs is `0.5000` cells of deviation against
     // `0.2500`.
     "braille-wire": {
-      form: "scatter3d", height: 14, series: [], plotStyle: "braille",
+      form: "plot3d", height: 14, series: [], plotStyle: "braille",
       lines3: cubeEdges3(0.8, 0.5),
     },
     // C12 I100, §6m row 1 — **a fill on the arm that was said not to serve
@@ -300,7 +300,7 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     // colour a cell rather than two, and its silhouette is drawn at twice the
     // resolution in each axis. The sheet is the record of that trade.
     "braille-surface": {
-      form: "scatter3d", height: 14, series: [], plotStyle: "braille",
+      form: "plot3d", height: 14, series: [], plotStyle: "braille",
       surfaces3: [{
         heights: Array.from({ length: 21 }, (_r, r) =>
           Array.from({ length: 21 }, (_c, c) => {
@@ -320,7 +320,7 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     // one shape, which reads as a renderer defect and is a fixture defect. Read
     // off the frame rather than reasoned about (§6m).
     marker: {
-      form: "scatter3d", height: 14, series: [], plotStyle: "marker", colourBy: "series",
+      form: "plot3d", height: 14, series: [], plotStyle: "marker", colourBy: "series",
       points3: [
         { label: "alpha", points: cluster3(-0.6, -0.5, 0.4, 40), marker: "star" },
         { label: "beta", points: cluster3(0.6, 0.4, -0.5, 40), marker: "square" },
@@ -329,25 +329,25 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     },
     // C12 I86 — the projection with no divide. Parallel edges stay parallel.
     orthographic: {
-      form: "scatter3d", height: 12, series: [], camera: { projection: "orthographic", distance: 4 },
+      form: "plot3d", height: 12, series: [], camera: { projection: "orthographic", distance: 4 },
       points3: [{ label: "helix", points: helix3(160) }],
     },
     // C12 I90 — the crossing placement, which is what a signed field needs and
     // what axes at the corner cannot give it.
     "axes-origin": {
-      form: "scatter3d", height: 14, series: [], axes3: "origin", origin3: "auto",
+      form: "plot3d", height: 14, series: [], axes3: "origin", origin3: "auto",
       points3: [{ label: "helix", points: helix3(160) }],
     },
     // C12 I90 — all twelve edges, against the default's nine.
     "box-full": {
-      form: "scatter3d", height: 14, series: [], box3: "full",
+      form: "plot3d", height: 14, series: [], box3: "full",
       points3: [{ label: "helix", points: helix3(160) }],
     },
     // C12 I93 — a trajectory **through** its own cloud, which is the row the
     // draw order exists for: every marker survives the line drawn over it,
     // because the two are at exactly equal depth and first-drawn wins.
     trajectory: {
-      form: "scatter3d", height: 14, series: [],
+      form: "plot3d", height: 14, series: [],
       points3: [{ label: "helix", points: helix3(40) }],
       lines3: [{ label: "path", points: helix3(40) }],
     },
@@ -355,12 +355,12 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     // widened to accept. The colour runs along each segment because the depth
     // does.
     wireframe: {
-      form: "scatter3d", height: 14, series: [], lines3: cubeEdges3(0.8, 0.5),
+      form: "plot3d", height: 14, series: [], lines3: cubeEdges3(0.8, 0.5),
     },
     // C12 I93 — the categorical arm, where a line is one colour for its whole
     // length and its slot continues the clouds' numbering.
     "lines-series": {
-      form: "scatter3d", height: 14, series: [], colourBy: "series",
+      form: "plot3d", height: 14, series: [], colourBy: "series",
       points3: [{ label: "cloud", points: cluster3(0, 0, 0, 60) }],
       lines3: [{ label: "orbit", points: helix3(60), closed: true }],
     },
@@ -368,7 +368,7 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     // measured for: a shaded surface is 89–96% interior, so the picture is
     // entirely in the lighting (F431).
     surface: {
-      form: "scatter3d", height: 14, series: [], colormap: "viridis",
+      form: "plot3d", height: 14, series: [], colormap: "viridis",
       surfaces3: [{
         heights: field3(28, (x, y) => Math.exp(-(x * x + y * y))),
         xRange: [-2, 2], yRange: [-2, 2],
@@ -378,7 +378,7 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     // coloured by a ramp that shares nothing with its geometry, which is what
     // the two members being independent buys.
     "surface-field": {
-      form: "scatter3d", height: 14, series: [], colourBy: "value", colormap: "magma",
+      form: "plot3d", height: 14, series: [], colourBy: "value", colormap: "magma",
       surfaces3: [{
         heights: field3(28, (x, y) => Math.exp(-(x * x + y * y))),
         field: field3(28, (x, y) => x * y),
@@ -388,7 +388,7 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     // C12 I94 — a saddle, where the surface passes through itself in projection
     // and the depth buffer is doing the work rather than the draw order.
     saddle: {
-      form: "scatter3d", height: 14, series: [], colormap: "coolwarm",
+      form: "plot3d", height: 14, series: [], colormap: "coolwarm",
       surfaces3: [{
         heights: field3(28, (x, y) => (x * x - y * y) / 4),
         xRange: [-2, 2], yRange: [-2, 2],
@@ -397,17 +397,17 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     // C12 I94 — **the mesh arm and the shading member**, which only a sphere
     // shows: face normals give a geodesic dome and vertex normals a ball.
     "surface-smooth": {
-      form: "scatter3d", height: 14, series: [], colormap: "viridis",
+      form: "plot3d", height: 14, series: [], colormap: "viridis",
       surfaces3: [{ ...sphere3(28, 20), shading: "smooth" }],
     },
     "surface-flat": {
-      form: "scatter3d", height: 14, series: [], colormap: "viridis",
+      form: "plot3d", height: 14, series: [], colormap: "viridis",
       surfaces3: [{ ...sphere3(14, 10), shading: "flat" }],
     },
     // C12 I94 — the light, which is the member `studio` exists to make
     // unnecessary: a world-fixed light has a dead angle and this is it.
     "surface-light": {
-      form: "scatter3d", height: 14, series: [], colormap: "viridis",
+      form: "plot3d", height: 14, series: [], colormap: "viridis",
       light3: { azimuth: 2.4, elevation: -0.3 },
       surfaces3: [{ ...sphere3(28, 20) }],
     },
@@ -415,7 +415,7 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     // composition that forces a carrier rather than a form: two primitives in
     // one plot area, and the marks keep their cells because they draw first.
     "surface-path": {
-      form: "scatter3d", height: 14, series: [], colormap: "viridis",
+      form: "plot3d", height: 14, series: [], colormap: "viridis",
       surfaces3: [{
         heights: field3(24, (x, y) => Math.exp(-(x * x + y * y))),
         xRange: [-2, 2], yRange: [-2, 2],
@@ -433,7 +433,7 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     // six samples a cell to read, and a 28 × 28 grid at a catalogue width
     // leaves 1% interior — the wireframe *is* the surface.
     "surface-wire": {
-      form: "scatter3d", height: 14, series: [], colormap: "viridis",
+      form: "plot3d", height: 14, series: [], colormap: "viridis",
       surfaces3: [{
         heights: field3(9, (x, y) => Math.exp(-(x * x + y * y))),
         xRange: [-2, 2], yRange: [-2, 2], wireframe: "over",
@@ -444,7 +444,7 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     // fold is hidden: hidden-line rather than see-through, because a committed
     // frame cannot be orbited.
     "surface-cage": {
-      form: "scatter3d", height: 14, series: [], colormap: "viridis",
+      form: "plot3d", height: 14, series: [], colormap: "viridis",
       surfaces3: [{
         heights: field3(9, (x, y) => Math.exp(-(x * x + y * y))),
         xRange: [-2, 2], yRange: [-2, 2], wireframe: true,
@@ -461,13 +461,13 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     // **The bare picture** — no frame at all, which is the render step 3 shipped
     // and the comparison every axis row is against.
     "axes-none": {
-      form: "scatter3d", height: 14, series: [], axes3: false, box3: "none",
+      form: "plot3d", height: 14, series: [], axes3: false, box3: "none",
       points3: [{ label: "helix", points: helix3(160) }],
     },
     // C04 I77 — named axes, one hidden, and an arrowhead on the one that keeps
     // its scale. `show: false` takes the axis and leaves the box.
     "axis-styles": {
-      form: "scatter3d", height: 14, series: [],
+      form: "plot3d", height: 14, series: [],
       axisStyle3: {
         x: { label: "east", arrow: true },
         y: { label: "north", ticks: 3 },
@@ -480,7 +480,7 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     // axis's centre, and the picture is a plane — which is a frame a reader can
     // check and an assertion about a number is not.
     coplanar: {
-      form: "scatter3d", height: 10, series: [],
+      form: "plot3d", height: 10, series: [],
       points3: [{ label: "plane", points: helix3(120).map((p) => ({ ...p, z: 0.25 })) }],
     },
   },

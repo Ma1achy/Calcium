@@ -43,8 +43,13 @@ const results = await runPass({
     file: SCATTER,
     // The arm keeps its name and takes the half rung's grid, so every figure is
     // rasterised at a quarter of the samples and folded into braille anyway.
-    from: '    : arm === "braille" ? sampleGrid(w, rows, "braille")',
-    to: '    : arm === "braille" ? sampleGrid(w, rows, "half")',
+    // **Re-anchored when the two rungs stopped having two grids** (F498). The
+    // control was *braille rasterises at the half rung's grid*, which needed a
+    // `rung` argument to say; there is one grid now, so the control that empties
+    // this arm is the grid collapsing to one sample a cell — which is what the
+    // dot rung exists not to be.
+    from: "    sub ? sampleGrid(w, rows)",
+    to: "    sub ? { width: w, height: rows }",
     why: "BR2 asserts all four dot rows are reachable and BR4 measures the marker's box; a run where halving the grid survives is reading neither",
   },
   mutations: [
@@ -56,8 +61,12 @@ const results = await runPass({
       // for marks.
       name: "the dot grid reuses the half rung's marker tiers",
       file: SCATTER,
-      from: "      const [bw, bh] = (half ? RASTER_TIER : BRAILLE_TIER)[tier] as readonly [number, number];",
-      to: "      const [bw, bh] = RASTER_TIER[tier] as readonly [number, number];",
+      // **Re-anchored when the two tier tables became one** (F498). They
+      // differed only to compensate for two sampling grids; with one grid the
+      // compensation was the defect, so the mutation that expresses the old
+      // fault is the marker drawn at half its size rather than a table swap.
+      from: "      const [bw, bh] = MARKER_TIER[tier] as readonly [number, number];",
+      to: "      const [bw, bh] = [(MARKER_TIER[tier] as readonly number[])[0]! / 2, (MARKER_TIER[tier] as readonly number[])[1]! / 2] as readonly [number, number];",
       expect: "BR4",
     },
     {
@@ -80,8 +89,18 @@ const results = await runPass({
       // is §6m row 2 inverted.
       name: "the frame's samples light the dot grid as well",
       file: SCATTER,
-      from: "      if (mark[i] === undefined && Number.isFinite(depth.z[i])) setDot(dots, x, y);",
-      to: "      if (Number.isFinite(depth.z[i])) setDot(dots, x, y);",
+      // **Re-anchored when the compose split its two grids** (F499). `dots`
+      // decides whether a cell is the data's and `whole` is what that cell
+      // draws, so the frame's exclusion lives on the first of them — and
+      // lighting it there is still the axis drawn twice.
+      // **The `else` comes with it, and leaving it behind is why this row read
+      // `NO SUMMARY` rather than `SURVIVED`.** Dropping the guard alone leaves a
+      // dangling `else`, so the file does not parse, vitest emits nothing the
+      // harness can read, and the pass goes blind — which is not a survivor and
+      // not a kill. **A mutation must leave the file compiling**, or it tests the
+      // parser rather than the rule.
+      from: "      if (mark[i] === undefined) setDot(dots, x, dy); // cells-ok — a dot coordinate\n      else taken.push([x, dy]); // cells-ok — a dot coordinate",
+      to: "      setDot(dots, x, dy); // cells-ok — a dot coordinate\n      if (mark[i] !== undefined) taken.push([x, dy]); // cells-ok — a dot coordinate",
       expect: "BR1",
     },
     {

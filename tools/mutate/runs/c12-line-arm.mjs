@@ -41,8 +41,10 @@ const results = await runPass({
     // No bits are ever set, so the mask is empty and every cell falls through to
     // the frame's channel. The arm still selects, still degrades, still refuses
     // nothing — and draws no line at all.
-    from: "    bits[cy * w + cx] = (bits[cy * w + cx] ?? 0) | b; // cells-ok — a cell offset",
-    to: "    bits[cy * w + cx] = 0; // cells-ok — a cell offset",
+    // **Re-anchored when the mask writer took its target as a parameter**, so
+    // the frame's own mask and the caller's are written by one function.
+    from: "    target[cy * w + cx] = (target[cy * w + cx] ?? 0) | b; // cells-ok — a cell offset",
+    to: "    target[cy * w + cx] = 0; // cells-ok — a cell offset",
     why: "every row reads glyphs out of the mask; a run where setting no bits at all survives is reading nothing",
   },
   mutations: [
@@ -87,8 +89,12 @@ const results = await runPass({
       // compares against its own alternative.
       name: "`plotCorners` is ignored and the alphabet is always rounded",
       file: SCATTER,
-      from: '    : glyphRows(ink, glyph, mark, masked ? bits : undefined, w, rows, ctx, block.plotCorners ?? "rounded");',
-      to: '    : glyphRows(ink, glyph, mark, masked ? bits : undefined, w, rows, ctx, "rounded");',
+      // **Re-anchored when the reference frame took its own structure** (F500).
+      // The corner style used to be threaded to `glyphRows` as an argument; it
+      // is a field of the frame now, so the mutation reads at the call that
+      // resolves the mask rather than at the compose's signature.
+      from: "          const drawn = glyphForMask(edges, frame.corners, ctx.capabilities);",
+      to: '          const drawn = glyphForMask(edges, "rounded", ctx.capabilities);',
       expect: "LN4",
     },
     {
@@ -108,8 +114,11 @@ const results = await runPass({
       // widened for (F293).
       name: "the mask alphabet ignores the terminal",
       file: SCATTER,
-      from: "        const drawn = edges !== 0 ? glyphForMask(edges, corners, ctx.capabilities) : framed;",
-      to: "        const drawn = edges !== 0 ? glyphForMask(edges, corners) : framed;",
+      // **Re-anchored with the row above**, and the two share a line because the
+      // frame now carries the corner style: one mutation drops the caller's
+      // choice, the other drops the terminal's.
+      from: "        if (edges !== 0) {",
+      to: "        if (edges !== 0 && ctx.capabilities.unicode !== \"ascii\") {",
       expect: "LN3",
     },
   ],

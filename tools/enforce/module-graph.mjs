@@ -638,7 +638,7 @@ export const BUILDER_OMISSIONS = Object.freeze({
     "would assert a column its own labels do not justify. `window` is the one writer",
 
   // **`plot.camera` was here and is gone**, on the commit that built
-  // `scatter3d`. Its reason was sharper than *not yet built* — a plot declaring
+  // `plot3d`. Its reason was sharper than *not yet built* — a plot declaring
   // a camera becomes focusable (C12 I85), so exposing it earlier handed callers
   // a focus stop and no way to draw anything — and the form is what made it
   // safe. `points3` and `colourBy` landed on `b.plot` beside it rather than
@@ -1406,9 +1406,9 @@ export function checkOneStorePerComponent(files, readFile = (f) => readFileSync(
 /** Members whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_MEMBERS = Object.freeze({
   // **Three \`Basis\` members and five \`project3\` functions left here at once**,
-  // on the commit that built \`scatter3d\` — one loan, one symbol, one release,
+  // on the commit that built \`plot3d\` — one loan, one symbol, one release,
   // which is what the equality arm makes possible and a membership check would
-  // not. The entries said *until scatter3d* and \`scatter3d\` arrived.
+  // not. The entries said *until plot3d* and \`plot3d\` arrived.
   //
   // **Two of the eight did not leave, and their reason is a different one.**
   // \`Basis.forward\` and \`Basis.orthographic\` are read by \`project\` in the same
@@ -1906,7 +1906,6 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   "VerbRatio.authored": "**F99** — as `derived`",
   "VerbRatio.ratio": "**F99** — as `derived`, and it is the computed one",
   "EngineOptions.cache": "**F99** — an injectable cache nothing injects; C19 constructs its own",
-  "Grid.dots": "**F99** — C12's raster grid payload, written by nothing that reads it",
   "Failure.actual":
     "**F99** — the measured value beside `expected`, which *is* read. A failure report " +
     "naming what was expected and not what happened is the half that makes it actionable",
@@ -2628,7 +2627,7 @@ export function checkExportedArguments(files, readFile = (f) => readFileSync(f, 
 /** Functions whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_FUNCTIONS = Object.freeze({
   // **\`sampleGrid\`, \`unitOf\`, \`basisOf\`, \`createDepth\` and \`writeDepth\` were
-  // here and are gone**, released by \`scatter3d\` exactly as their reasons said.
+  // here and are gone**, released by \`plot3d\` exactly as their reasons said.
   // Five entries, one symbol, one commit — and the equality arm is what turned
   // *the day it arrives* into a rule rather than a promise.
 

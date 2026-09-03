@@ -61,8 +61,8 @@ const results = await runPass({
       // is a complete document and this rejects it.
       name: "the form is refused unless it has points3",
       file: V,
-      from: '  if (form === "scatter3d" && CARRIERS_3D.every((k) => b[k] === undefined)) {',
-      to: '  if (form === "scatter3d" && pts === undefined) {',
+      from: '  if (form === "plot3d" && CARRIERS_3D.every((k) => b[k] === undefined)) {',
+      to: '  if (form === "plot3d" && pts === undefined) {',
       expect: "T2.4g",
     },
     {

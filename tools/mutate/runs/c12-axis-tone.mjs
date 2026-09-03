@@ -52,11 +52,12 @@ const results = await runPass({
       name: "the axis tone never reaches the stroke",
       file: SCATTER,
       //
-      // **Re-anchored when `strokeSeg` took the tie rule as a required
-      // argument** (C12 I101): the axis line writes a colour, so it passes
-      // `false` — and the mutation is unchanged, the ink never arriving.
-      from: "      strokeSeg(p.a, p.b, grid, depth, (i) => { paint(i, mark, ink); }, false);",
-      to: "      strokeSeg(p.a, p.b, grid, depth, (i) => { paint(i, mark); }, false);",
+      // **Re-anchored twice** — once when `strokeSeg` took the tie rule as a
+      // required argument (C12 I101), and again when the callback took the
+      // sample's own coordinates so the mask arm could link a diagonal's corner
+      // cell. The mutation is unchanged through both: the ink never arriving.
+      from: "        paint(i, mark, ink, px, py, from, nearer);",
+      to: "        paint(i, mark, undefined, px, py, from, nearer);",
       expect: "AT1",
     },
     {

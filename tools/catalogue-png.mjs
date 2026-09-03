@@ -330,6 +330,47 @@ export function ansiToSvg(ansi) {
         if (!textRun) return;
         [...textRun].forEach((ch, i) => {
           const x = PAD + (textStart + i) * CELL_W;
+          // **Braille is drawn as geometry and everything else as text, and
+          // that split is a measurement rather than a preference.**
+          //
+          // `fc-list ":charset=2800"` in this container returns DejaVu Sans,
+          // DejaVu Serif and their condensed faces — and **not DejaVu Sans
+          // Mono**, the family this stylesheet asks for. Box drawing, the block
+          // elements, the quadrants and the marker glyphs all resolve in the
+          // mono face; braille alone falls through to a **proportional** font,
+          // whose dots are small and widely spaced. Every braille frame this
+          // instrument has ever produced showed that fallback's design, and a
+          // reader — including the one writing this — read it as the renderer
+          // drawing a dotted line.
+          //
+          // A braille cell **is** a 2×4 coverage mask, so drawing it as eight
+          // rects is not a guess about a font: it is the character's own
+          // definition, and it is what a terminal with real braille coverage
+          // shows. The rest stays text, because a shape is the font's business
+          // and this container has a face for all of it.
+          const cp = ch.codePointAt(0) ?? 0;
+          if (cp >= 0x2800 && cp <= 0x28ff) {
+            const mask = cp - 0x2800;
+            const dw = CELL_W / 2;
+            const dh = CELL_H / 4;
+            // Dot 1,2,3 down the left column, 4,5,6 down the right, 7 and 8 the
+            // fourth row — the historic six-dot cell extended downward, which is
+            // why the low bits are not the top row.
+            const BITS = [[0x01, 0x08], [0x02, 0x10], [0x04, 0x20], [0x40, 0x80]];
+            for (let dy = 0; dy < 4; dy += 1) {
+              for (let dx = 0; dx < 2; dx += 1) {
+                if ((mask & BITS[dy][dx]) === 0) continue;
+                const rx = x + dx * dw + dw * 0.12;
+                const ry = PAD + row * CELL_H + dy * dh + dh * 0.12;
+                parts.push(
+                  `<rect x="${rx.toFixed(2)}" y="${ry.toFixed(2)}" ` +
+                  `width="${(dw * 0.76).toFixed(2)}" height="${(dh * 0.76).toFixed(2)}" ` +
+                  `fill="${span.colour}"/>`,
+                );
+              }
+            }
+            return;
+          }
           const weight = span.bold === true ? ' font-weight="bold"' : "";
           parts.push(`<text x="${x.toFixed(1)}" y="${y}" fill="${span.colour}"${weight}>${escapeXml(ch)}</text>`);
         });

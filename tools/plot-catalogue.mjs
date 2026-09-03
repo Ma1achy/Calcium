@@ -13,6 +13,7 @@ import { createBlockRegistry } from "../src/presentation/blocks/index.js";
 import { plotDefinition } from "../src/presentation/plot/index.js";
 import { renderToLines } from "../src/presentation/render-lines.js";
 import { defaultTheme, loadTheme } from "../src/presentation/theme/index.js";
+import { slot } from "../src/presentation/blocks/paint.js";
 import { block } from "../src/data/viewmodel/index.js";
 import { CATALOGUE_FORMS } from "./catalogue-forms.js";
 
@@ -55,6 +56,28 @@ const registry = createBlockRegistry({});
 registry.register(plotDefinition);
 
 export const FORMS = CATALOGUE_FORMS;
+
+/**
+ * The plot's own ground, as `[r, g, b]` — resolved from the same theme the
+ * frames are drawn with (F501).
+ *
+ * **A frame carries this colour as a *foreground*, and a reader cannot see it.**
+ * Unicode's block elements fill from the bottom, so a cell whose covered mass
+ * sits at the top is drawn as its complement with the two colours exchanged —
+ * and the exchange needs an ink for the empty part. Left unset the terminal
+ * paints it in the default foreground, which streaked a Gaussian's base white.
+ * So the ground goes in explicitly, painting exactly what was already there.
+ *
+ * Exported because two test files were counting it as a distinct colour and
+ * reading a third face on a two-faced cube. **Resolved rather than written
+ * down**, so a theme change moves the frames and this together.
+ */
+export function groundRgb(caps) {
+  const c = slot("surface.bg", theme, caps).colour;
+  if (c === undefined || c.kind !== "rgb") return null;
+  const v = Number.parseInt(c.hex.replace("#", ""), 16);
+  return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
+}
 
 export function stripSgr(s) {
   return s.replace(/\x1b\[[0-9;]*m/g, "");
