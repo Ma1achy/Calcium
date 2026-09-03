@@ -65,19 +65,28 @@ wrong decision, which review cannot catch because the sentence is true.
 
 ## The sample grid — a rule, and the numbers here are measurements of it
 
-**`80×48` is not a constant and must not be read as one.** It is the sample grid at the size the
-measurement ran in — 80×24 cells — and the rung gives two vertical samples per cell:
+**`160×192` is not a constant and must not be read as one.** It is the sample grid at the size
+the measurement ran in — 80×24 cells — and there is **one grid**, not one per rung:
 
 ```
                  across            down          at 80×24      at 120×30
-braille          cells × 2         cells × 4     160 × 96      240 × 120
-half blocks      cells × 1         cells × 2      80 × 48      120 ×  60
+every rung       cells × 2         cells × 8     160 × 192     240 × 240
 ```
 
-**So it is `width × 1` by `height × 2`**, and nothing about 3D is hardcoded to a viewport. The
-projection scales to the sample grid, the sample grid to the block, and the block to whatever the
-region gives it — **the same chain every other form already uses**, and the one `imageCells` and
-every raster in C12 use.
+**So it is `width × 2` by `height × AREA_ROWS`**, and nothing about 3D is hardcoded to a viewport.
+The projection scales to the sample grid, the sample grid to the block, and the block to whatever
+the region gives it — **the same chain every other form already uses**, and the one `imageCells`
+and every raster in C12 use.
+
+**It was two grids and the rung chose between them** — `width × 1` by `height × 2` for half
+blocks, `× 2` by `× 4` for braille — until the silhouette alphabet took the half rung onto the dot
+grid (F498). `sampleGrid` lost its rung parameter with that landing, and a figure written to
+compensate for a distinction the renderer no longer has is a defect rather than a stale number.
+
+**Every absolute figure taken before that landing is eight times too small, and this section was
+one of them** (F506). The table said `80 × 48` where the code returns `160 × 192`, in the document
+a reader trusts for the rule — and §11 and §12 are costed on it throughout, which is why the
+correction there is a re-measurement rather than an arithmetic fix. Measured 2026-09-03.
 
 **Every absolute figure in this document is a measurement at 80×24 and none of them is a
 threshold.** 7254 dots, 6931 interior, 673×384, the triangle counts in §7 — all of them scale with
@@ -325,7 +334,7 @@ to four segments and `glyphForMask` resolves it after all strokes — there is n
 replace, and a strictly-nearer test refuses the second edge at exactly the shared vertex a
 join needs. Joins want a second depth rule on one buffer, not a swapped call.
 
-**And `plotStyle` is not this form's selector**: `STYLE_ARMS.scatter3d` is `[]`, and the arm
+**And `plotStyle` is not this form's selector**: `STYLE_ARMS.plot3d` is `[]`, and the arm
 is `halfBlockEligible`'s — the terminal's, not the caller's. The fifth residue the rung change
 left, after §6's tier list.
 
@@ -1112,7 +1121,7 @@ is what building it was for:
   (C12 I88).
 - **§6's tier list conflates a caller's choice with a capability rung.** `plotStyle: "half"` and
   `"ascii"` are not members of `plotStyle` and should not be: `halfBlockEligible` reads `unicode`,
-  `ambiguousWidth` and `colourDepth`, so the arm is the terminal's. `STYLE_ARMS.scatter3d` is
+  `ambiguousWidth` and `colourDepth`, so the arm is the terminal's. `STYLE_ARMS.plot3d` is
   empty, and that is a ruling (C12 I87).
 - **The rung needed a glyph it did not have.** A photograph inks every cell so the image arm needs
   only `HALF_BLOCK`; a scatter is mostly empty, and a cell inked only below needs `▄`. Found by
@@ -1140,8 +1149,16 @@ normal and divide-by-zero lighting** at step 6. First within its own step, both 
 
 ## 11 · Animation — and 3D breaks the assumption 2D rests on
 
+> **Every figure below was taken against a grid that no longer exists** (F506). Step 8 re-ran
+> this section on the half-block rung's `80×48`; F498 then merged that rung onto the dot grid and
+> the same 80×24 cells now sample `160×192` — **eight times the entries**. The re-measurement is
+> at the end of §12, and it is a re-measurement rather than a scaling because the excess is not
+> proportional. What survives unchanged is the *shape* of the finding: none of the three named
+> candidates is the bottleneck, and the stage that is one is still the stage the camera does not
+> move.
+>
 > **Both this section and §12 were costed on the dot grid, and step 8 re-ran them.** Every figure
-> below is now measured on the half-block rung — 80×48 full-colour samples at 80×24 cells, load
+> below is measured on the half-block rung — 80×48 full-colour samples at 80×24 cells, load
 > 0.14–0.30 — and where the old reading survives it says so. **Two of the arguments did not
 > survive, and it was not the numbers that moved.** *One of those three stages is the bottleneck*
 > was wrong about all three (F469), and *every cell changes* was wrong by about a third (F468).
@@ -1198,8 +1215,8 @@ would be the optimisation that produces a wrong picture.
 
 ### The budget, measured — and none of the three candidates is the cost
 
-**At 80×24 on this rung**: 80×48 samples, 3,840 depth entries. A 40×40 height field is 3,200
-triangles. **The three stages this section named as candidates are 28% of the frame between
+**At 80×24 on this rung**: 80×48 samples, 3,840 depth entries — **which is now 160×192 and
+30,720** (F498, F506). A 40×40 height field is 3,200 triangles. **The three stages this section named as candidates are 28% of the frame between
 them** (F469):
 
 ```
@@ -1218,7 +1235,7 @@ inputs at the measured call count: a proxy, and stated as one.
 
 ```
 chrome only — the block with an empty surface list        3.216 ms   24.8%
-span composition and the rest of scatter3dArea            ~3.1  ms   ~24%
+span composition and the rest of plot3dArea            ~3.1  ms   ~24%
 rasterise + shade                                         2.932 ms   22.6%
 the 3D axes — axes3 default 13.265 against false 11.108   2.157 ms   16.6%
 trianglesOf — camera-independent, rebuilt every frame     1.265 ms    9.8%
@@ -1255,9 +1272,17 @@ the one this section already calls acceptable at full quality.
 
 ### The depth buffer and purity
 
-**A `Float32Array(3840)` allocated per render is 15KB, thirty times a second — 0.45MB/s of
-allocation.** The old figures were the dot grid's 160×96; this rung's sample grid is 80×48, a
-quarter of the entries. Trivial for the GC either way, and it keeps the render a pure function.
+**A `Float32Array(30720)` allocated per render is 120 KB, thirty times a second — 3.7 MB/s of
+allocation** at 80×24, and 225 KB / 6.9 MB/s at 120×30. Measured 2026-09-03.
+
+**The sentence this replaces is the measured case for re-reading a comparison when its subject
+moves** (F506). It read *the old figures were the dot grid's 160×96; this rung's sample grid is
+80×48, a quarter of the entries* — an argument whose whole force is that the new grid is
+**smaller**. F498 merged the two rungs onto the dot grid at eight sample rows, so the grid is now
+`160×192`: **twice the dot grid it was being congratulated for undercutting, and eight times the
+figure the sentence quotes.** Still trivial for the GC at 3.7 MB/s, and the conclusion holds — but
+it holds for a different reason than the one written down, and *a quarter of the entries* is the
+kind of clause a reader carries forward as settled.
 
 **Do not reach for a module-level scratch buffer.** C12 I11 forbids it, and the measurement
 above will say whether the allocation is even visible in the profile. **If it turns out to
@@ -1347,9 +1372,10 @@ question is the triangle count and a mesh file would be a dependency with a lice
 ### Allocation
 
 ```
-P8   the depth buffer — 15KB per render at 80×24 on this rung, not 60KB: the sample
-     grid is 80×48 rather than 160×96, a quarter of the entries. Assert it is
-     allocated once per render and not per triangle
+P8   the depth buffer — 120KB per render at 80×24: the sample grid is 160×192,
+     which is the dot grid's columns at AREA_ROWS rows and NOT a quarter of
+     anything (F498, F506). Assert it is allocated once per render and not per
+     triangle — the count is what moved, and the row's subject did not
 P9   sustained orbit — 300 frames at 30fps. Heap at frame 1 against frame 300.
      Flat is the pass; growth is a retained buffer and a purity violation
 P10  no module-level state — the grep C12 I11 already requires, as a row
@@ -1436,3 +1462,40 @@ had to learn that three times.
 
 **And the budgets are assertions, not observations.** `expect(ms).toBeLessThan(33)` fails
 loudly and gets investigated. A row that merely prints a number is a row nobody reads.
+
+### Re-measured 2026-09-03, against a grid eight times the one above (F506)
+
+**Every figure in §11 and §12 was taken before F498 merged the two rungs onto the dot grid.**
+`sampleGrid(80, 24)` returned `80 × 48` and returns `160 × 192`. These rows are the same inputs
+at HEAD, each in **its own process** — nine rows in one process makes the allocating ones pay for
+their neighbours' garbage, and `trianglesOf` reads 2× its isolated cost that way — best of 21
+after 8 warm-ups, on 11 cores.
+
+```
+row                        3,200 tris            69,192 tris
+                         now      was  ratio    now      was  ratio
+chrome only (control)   4.50    3.216   1.4x   3.69        —      —
+P1  projection          0.149   0.170   0.9x   2.78      4.5   0.6x
+P2  raster + shade      9.70    2.932   3.3x  144.7     54.9   2.6x
+    trianglesOf         2.88    1.265   2.3x   40.4     36.1   1.1x
+P4/P5 whole frame      44.9    12.969   3.5x  572.6    124.2   4.6x
+```
+
+**Two grid-independent rows are the control and they agree.** `P1` touches no grid and
+reproduces at 0.9× and 0.6×; `trianglesOf` touches no grid and reproduces at 1.1× at the size
+where it dominates. **So this host is not slower**, and the *chrome only* row — 1.4× — is the
+weaker control precisely because it does rasterise the axes.
+
+**The stage that moved is the one the grid multiplies**, and the whole frame moved further than
+it: 4.6× against the raster's 2.6×, because the per-sample paint, the fold to cells and the glyph
+choice all scale with samples too. At 69,192 triangles the raster with a no-op paint is **144.7 ms
+of 572.6 — a quarter of the frame** — and the other three quarters are string and table work.
+
+**What this costs the ruling above.** §11 turned auto-orbit off on *12.97 ms a frame … 39% of a
+core*. The same figure is **44.9 ms**, which is over the 33 ms window on its own: 30fps is not
+available at 3,200 triangles, let alone 69,192. **The ruling gets stronger and its reason gets
+weaker** — off is still right, and the number that justified it was never re-taken.
+
+**And the budgets are still not a target.** `tools/bench/` holds four benches and none of them is
+3D; §12 has been a written tier since it was drafted. A budget nobody runs is a budget that goes
+stale in exactly this way, which is the argument for the target rather than for another table.

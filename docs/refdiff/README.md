@@ -55,7 +55,7 @@ adding one means adding a reference renderer beside it.
 | dumbbell | 64x16 | 9.7% | — *fewer than two bands — ours 1, theirs 1* |
 | ecdf | 64x16 | 9.4% | — *fewer than two bands — ours 1, theirs 2* |
 | bubble | 64x16 | 9.0% | — *fewer than two bands — ours 1, theirs 1* |
-| scatter3d | 64x16 | 7.8% | — *fewer than two bands — ours 0, theirs 0* |
+| plot3d | 64x16 | 7.8% | — *fewer than two bands — ours 0, theirs 0* |
 | scatter | 64x16 | 4.5% | — *fewer than two bands — ours 1, theirs 2* |
 | step | 64x16 | 4.0% | — *fewer than two bands — ours 1, theirs 1* |
 | dotplot | 64x16 | 1.9% | — *fewer than two bands — ours 1, theirs 1* |

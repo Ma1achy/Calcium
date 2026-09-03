@@ -13998,7 +13998,7 @@ examples; the examples resolve `@fmx/calcium` to the package root, whose `types`
 `dist/`; and **`dist/` is built by `e2e`**, which runs last.
 
 **So on any commit that widens a public type, `check` reads the previous commit's build and
-passes.** Measured rather than reasoned: `scatter3d` joined `PlotForm` on the step-3 commit,
+passes.** Measured rather than reasoned: `plot3d` joined `PlotForm` on the step-3 commit,
 `make check` went green at 22:5x, `make e2e` rebuilt `dist/` at 23:10, the commit landed at
 23:15 — and `examples/plots/src/catalogue.ts`'s `Record<PlotForm, Entry>` failed on the **next**
 commit's first check, with a 24th forced declaration nobody had counted.
@@ -14027,7 +14027,7 @@ command.**
 
 ## F446 — two survivors, and both rows counted where they had to identify ★★★★★
 
-The `scatter3d` pass ran ten mutations and **two survived**. Neither was about the code.
+The `plot3d` pass ran ten mutations and **two survived**. Neither was about the code.
 
 ```
 SURVIVED   SC7   the last sample wins the cell, not the nearest
@@ -14082,7 +14082,7 @@ vacuity class, so the row was **removed** rather than shipped green.
 arithmetic, to a bounding box, to a stripped frame and to a golden frame that was recorded after
 the defect existed. What sees it is an *independent renderer of the same geometry* — and that is
 the argument for the reference comparison being a gate rather than a curiosity. The mutation is
-recorded in `c12-scatter3d.mjs` as one that kills nothing, with the reason, rather than left out.
+recorded in `c12-plot3d.mjs` as one that kills nothing, with the reason, rather than left out.
 
 ---
 
@@ -14104,7 +14104,7 @@ return segs !== undefined && segs.length > 0 ? segs.map(...) : block.series.map(
 it has none* — and they agree on every form, byte for byte, because there were exactly two carriers
 and both clauses enumerate them.
 
-**A third carrier is what separates them.** `scatter3d` holds its identities in `points3`, and only
+**A third carrier is what separates them.** `plot3d` holds its identities in `points3`, and only
 under `colourBy: "series"` — so `identityOf` learned a third arm and the copy in `legendPlacement`
 could not, because nothing about it was wrong. The result would have been a legend that is **present
 and empty**: `count` reads `series.length`, which is `0` on this form, so no key is drawn at all —
@@ -14180,14 +14180,14 @@ nothing, here it is a correct-looking defect that no capability set in the corpu
 
 ## F441 — twenty-three questions, and the neighbouring form is the wrong answer to seven ★★★★☆
 
-Adding `scatter3d` to `PlotForm` produced **23 compile errors in `src/`** and 5 more in `test/` and
+Adding `plot3d` to `PlotForm` produced **23 compile errors in `src/`** and 5 more in `test/` and
 `tools/` — every total `Record<PlotForm, …>` demanding a cell. The plan estimated ~19; the measured
 number is what it is, and the count is not the point.
 
 **The point is that `scatter` answers seven of them wrongly.** A 3D scatter is a scatter in name and
 in nothing a record asks about:
 
-| record | `scatter` | `scatter3d` | why the copy would be wrong |
+| record | `scatter` | `plot3d` | why the copy would be wrong |
 |---|---|---|---|
 | `HAS_VALUE_AXIS` | `true` | `false` | a `Figure` holds **one** `value` and this form has three ranges — F330's exact class |
 | `ORIGIN_DEFAULT` | `"bottom-left"` | `null` | the corner moves under an orbit |
@@ -14204,7 +14204,7 @@ as deliberate. This adds twenty-three at once, and the mechanism only works if e
 on its own reason: a `Record` forces an answer and cannot check it.
 
 **The one to watch is `HAS_VALUE_AXIS`.** It is `true` on every neighbour, it is checked by a
-cross-record row (`FV1c`) that only forbids `ramp && valueAxis`, and `RAMP_DEFAULT.scatter3d` is
+cross-record row (`FV1c`) that only forbids `ramp && valueAxis`, and `RAMP_DEFAULT.plot3d` is
 `"viridis"` — so the wrong answer would have been caught here by luck rather than by design. The
 right answer has a reason F330 already wrote down one form over.
 
@@ -20874,7 +20874,7 @@ falsification — arriving in the artefact that records a finding rather than in
 
 ## F452 — the frame drew first under a comment saying the order did not matter ★★★★☆
 
-`scatter3dArea` drew the reference frame before the data, with this beside it:
+`plot3dArea` drew the reference frame before the data, with this beside it:
 
 > Order does not decide occlusion here — `writeDepth` is strictly nearer-wins — so the frame going
 > in first is a reading convenience rather than a rule.
@@ -22084,7 +22084,7 @@ and the seam for the answer was cut at step 2 and never called — `Rung = "half
 `sampleGrid(w, h, "braille")` have been in `project3.ts` since, with no caller in `src/`.
 
 Asked: **how much of what the half rung buys does an outline figure actually spend?** The rung's
-claim is two full colours a cell. Measured over the shipped `scatter3d` catalogue fixtures at 80
+claim is two full colours a cell. Measured over the shipped `plot3d` catalogue fixtures at 80
 columns, 24-bit, counting cells whose foreground and background differ:
 
 ```
@@ -22130,7 +22130,7 @@ where the unbuilt arm lived.
 
 ## F483 — the load-bearing argument in a refusal was conditional, and nobody checked the condition ★★★★★
 
-C12 §3am refuses box-drawing joins on `scatter3d` with four arguments. Going to check them before
+C12 §3am refuses box-drawing joins on `plot3d` with four arguments. Going to check them before
 building the arm, **one stands, one is the mechanism, one is circular and one is conditional on a
 premise the request removes**:
 
@@ -22161,7 +22161,7 @@ sentence constrains the decision it is attached to — the same question the mut
 test, and the question that reached MG24's 276 members against 1055.
 
 **Argument 3 is the cheaper tell and it was there all along.** *The selector is not a member of this
-form* cites `STYLE_ARMS.scatter3d = []`, whose own comment reads *a braille arm joins this entry on
+form* cites `STYLE_ARMS.plot3d = []`, whose own comment reads *a braille arm joins this entry on
 the commit that builds one*. A refusal citing a deferral as its evidence is a deferral wearing a
 refusal's clothes, and the two are told apart by asking what would change the answer.
 
@@ -22203,7 +22203,7 @@ where it goes: the fix would be a bigger cell, and there isn't one. So it lives 
 
 ## F485 — a trade described in the wrong currency, and the wrong word implies the wrong repair ★★★☆☆
 
-The commit that retracted `STYLE_ARMS.scatter3d = []` described the braille arm's cost as *the
+The commit that retracted `STYLE_ARMS.plot3d = []` described the braille arm's cost as *the
 shading is gone* and its picture as a **solid silhouette**. **Walked by hand one commit later, both
 words are wrong**, and wrong in the direction that flatters the arm.
 
@@ -22285,15 +22285,15 @@ check its premise against the thing it names.** Twenty minutes each.
 
 ## F487 — a sweep pinned to one capability set is blind to an arm the corpus only reaches by degrading ★★★★☆
 
-Adding one catalogue variant — `scatter3d/marker`, the first that forces the glyph arm at full
+Adding one catalogue variant — `plot3d/marker`, the first that forces the glyph arm at full
 capability — turned FV1 red with two offenders:
 
 ```
-scatter3d/marker@40: 0.5,0
-scatter3d/marker@80: 0.5,-0.5,-0.5,0,0.5
+plot3d/marker@40: 0.5,0
+plot3d/marker@80: 0.5,-0.5,-0.5,0,0.5
 ```
 
-FV1 asserts *a form with no value axis never draws a numeric label it did not name*. `scatter3d`
+FV1 asserts *a form with no value axis never draws a numeric label it did not name*. `plot3d`
 draws numeric axis labels and always has. **It has never been visible to this row**, and the reason
 is two mechanisms meeting:
 
@@ -22302,13 +22302,13 @@ frame's axis lines are `▀`, not `│`, so no row has an edge, `first <= 0` ret
 is read. On the glyph arm the axis lines **are** `│` and `─`, so the billboarded tick sitting left
 of one reads as a y-gutter label.
 
-**Two — FV1 renders every variant at `FULL` only.** Every existing `scatter3d` variant takes the
+**Two — FV1 renders every variant at `FULL` only.** Every existing `plot3d` variant takes the
 half-block arm there. The glyph arm was reachable only by degrading the terminal, which this row
 never does — so the form's twenty-two variants were checked forty-four times and the arm that would
 have shown the labels was rendered zero times.
 
 **The record and the row answer different questions, and that is the finding rather than the
-workaround.** `HAS_VALUE_AXIS[scatter3d]` is `false` for a stated and correct reason — *a `Figure`
+workaround.** `HAS_VALUE_AXIS[plot3d]` is `false` for a stated and correct reason — *a `Figure`
 holds one `value` and this form has three ranges* — which is a fact about the **`Figure`
 structure**. FV1 reads it as a claim about the **rendered frame**. For twelve forms the two
 coincide. For the one form that draws its scales inside the scene they do not.
@@ -22372,7 +22372,7 @@ was still missed twice.
 
 ## F489 — a distinction that did not exist until there were three of something ★★★★☆
 
-Adding a third rung to `scatter3d` turned up **two latent defects and one new one**, and a fourth
+Adding a third rung to `plot3d` turned up **two latent defects and one new one**, and a fourth
 rung turned up a third — all of the same shape: a variable that meant two things at once while the two things happened to be equal.
 
 **One — `grid.width` was the cell width and the sample width.** `frameOf` places a label's *row*
@@ -22502,3 +22502,574 @@ from the armchair.** Both were carried for four steps as one claim. The mechanis
 with the code exactly; the consequence was an order of magnitude out, and nothing in the sentence
 distinguished them — *refused by construction* is a statement about a code path and reads as a
 statement about a picture.
+
+## F492 — a per-cell colour choice is locally optimal and globally noisy ★★★★☆
+
+The area raster tried choosing, per cell, the quadrant mask that best split its four sub-cells into
+two colours. Every cell took the split with the smallest error against its own samples, and every
+cell was right.
+
+The frame was corduroy. A gradient running across the figure puts neighbouring cells at nearly equal
+error between a horizontal split and a vertical one, so the winner alternates on noise, and the eye
+reads a field of vertical seams that no cell contains.
+
+**A raster is read as a field, and no per-cell rule can see one.** The remedy is not a better score
+but a decision that cannot alternate: a full cell keeps `▀` — one split, chosen once, for every
+interior cell in the figure. Consistency beats per-cell accuracy wherever the output is looked at
+rather than measured.
+
+Three instances now, and they are the same sentence: this, F494's serration, and F496's staircase.
+
+## F493 — a shared edge cracks at `-1e-13`, and doubling the grid made it visible ★★★☆☆
+
+Adjacent triangles from one quad share an edge. The barycentric fill takes a sample when all three
+weights are non-negative, so a sample exactly on the shared edge has a zero weight in both triangles
+— and floating point makes one of them `-1e-13`, so **neither** claims it.
+
+At four sample rows a cell the dropped samples were sub-cell and invisible. At eight they lined up
+along every quad boundary and the surface came out cross-hatched with gaps.
+
+The fix is a tolerance proportional to the triangle's own area, `|area| · 1e-6`, rather than an
+absolute epsilon — a fixed one is wrong at both ends of the size range a mesh spans.
+
+**What is instructive is the delay.** The defect was present and correct-looking for the whole life
+of the two-triangle fill; nothing about the change that exposed it went near the rasteriser. A
+latent numerical fault is found by the change that raises resolution, not by the change that
+introduces it.
+
+## F494 — a triangle serrates because silhouette smoothness is a run property ★★★★☆
+
+`◢◣◤◥` were added so a diagonal silhouette could have a true hypotenuse instead of a staircase, and
+chosen per cell by scoring the four against the cell's own 2×4 coverage, with the quadrant mask as
+the floor so a triangle drew only where it fit strictly better.
+
+It serrated. A triangle's edge is at exactly 45° and the surface's is not, so along a run the score
+picks `◢` here, a quadrant there, `◣` two cells on — each locally the better fit, and the sequence
+reads as noise because **neighbouring cells disagree about the angle**.
+
+F492's sentence again, and the second reason the alphabet was wrong anyway: a cell is twice as tall
+as it is wide, so a half-cell triangle's hypotenuse is one row per column, and the edges that offend
+most are three times shallower than that. The triangles were removed and the reasoning kept in
+prose, because the next reader will have the same idea.
+
+## F495 — an aspect constant was true at one grid and a lie at the next ★★★★☆
+
+The projection's aspect correction read `sub ? 1 : CELL_ASPECT` — *a sample is square on the sub-cell
+arms*. True while the grid was 2×4: half a cell across by a quarter of a 2:1 cell down is square.
+The silhouette alphabet took the area grid to 2×8, the sample became 2:1, and the constant became
+false while continuing to read as deliberate.
+
+The whole figure squashed. **Both the surface and the box squashed with it**, because they are drawn
+from one basis — but they round differently, so their edges stopped meeting, and the visible symptom
+was *the surface does not reach the braille bounds* rather than *the projection is wrong*.
+
+A disagreement between two things drawn from one basis cannot be a rasterisation artefact. That is
+the diagnostic, and it points at the basis in one step.
+
+Derived now — `CELL_ASPECT · sx / sy` from the grid's own dimensions — which yields 2 on the glyph
+arm, 1 at 2×4 and 0.5 at 2×8 from one expression. Third instance of F489's class in one file, and
+the remedy is the same each time: divide the thing it describes rather than name a number.
+
+## F496 — nine levels put the boundary in the right place and cannot make it a line ★★★★★
+
+The silhouette was drawn from a classifier: eighths where the two sample columns agreed to within
+one, the left blocks where one column was nearly full, the quadrant mask for everything between.
+
+Measured on a Gaussian it drew **three** eighths and twelve quadrants. A silhouette sloping half a
+row per column puts about four samples between its columns, so the eighths gate never fired and
+every edge cell fell to a half-cell staircase — the finer alphabet was unreachable in exactly the
+place it was built for.
+
+Making the eighths the default lifted it to 19 with levels spread across 2–8, and **the picture
+barely changed**, which is the finding. A block element splits a cell with **one horizontal line**,
+so a run of them moves the boundary once per cell: tread one cell, riser whatever the edge falls in
+that cell. On a dome's lower silhouette that is a third of a cell, and a stair whose tread and riser
+are comparable is the most stair-like thing there is.
+
+**The ceiling is arithmetic, not tuning.** The box beside it is smooth because braille carries eight
+positions in a cell where a block carries one — it draws a *line* where a block draws a *band*. Four
+iterations were spent tuning the quantisation before that was stated, and the frame said it at twice
+the sampling: still a staircase, so the levels were never the constraint.
+
+## F497 — an exclusion paid for a glyph the branch below never draws ★★★★★
+
+`brailleRows` keeps the reference frame's samples out of the dot grid so the axis is not drawn twice
+— once as dots and once as its own glyph. But that glyph is only drawn in a cell **with no data
+dots**, so in a cell that has some, the exclusion buys nothing and costs the data.
+
+A z axis standing in front of a dome is one sample column of every cell for the figure's whole
+height. Black stripe, peak to base. **Every cell of it a correct `⢸`** — the cells lit, the colours
+right, the extent unchanged, the glyphs valid braille. No count-based assertion sees it.
+
+**A correct sentence attached to the wrong decision**, which is MG24's class in a comment rather than
+a rule: *lighting them would draw the axis twice* is true, and holds only in the branch the cell is
+not taking. Review checks whether a justification is true, and this one is.
+
+Two wrong repairs before the right one, and each named the axis the rule needed:
+
+- *Any cell with data draws at full density.* Right for the stripe, wrong for a tick crossing a
+  fringe cell — there the frame's samples are a **line**, and drawing them as data painted the box's
+  edge in the surface's colour, detached from the body, wherever a tick met the silhouette.
+- *Fill where the cell would have been full.* **Circular**: it judges the data's footprint using the
+  frame's own samples. Along the front corner the box edge runs *on* the silhouette, so the fringe
+  cells came out full and the taper `⠙⢿⣿⣿⡿⠋` drew as the block `⠙⣿⣿⣿⣿⠋` — too fat one row up and too
+  thin at the tip, from one circularity at both ends.
+
+The rule that holds: **a frame sample is a hole where the data holds both sides of it, and the
+frame's own line where it does not.** Data either side is interior; data on one side is a silhouette
+the box runs along; data on neither is a tick in open ground. Tested in dot coordinates rather than
+within the cell, because an axis is a column and its neighbours are in the cells next door.
+
+**And the instrument that settled it in one command: render the same figure with `box3: "none"` and
+diff.** It turned *the corner looks broken* into an exact eight-character difference. Reach for it
+first whenever the frame and the data disagree.
+
+## F498 — a tier table compensated for a difference that had gone away ★★★★☆
+
+`RASTER_TIER` and `BRAILLE_TIER` held the same three markers at two scales, the second written as
+*doubled in each axis* against the first, because the half rung sampled `w × rows·2` and the dot
+rung `w·2 × rows·4`. Correct, and correct only while the two grids differed.
+
+The silhouette alphabet took the half rung onto the dot grid. One grid, two tables — so the
+compensation became the defect: near drawing what mid should on one arm and half its height on the
+other, with `BR4` measuring one cell against two.
+
+**When the thing a derived constant compensates for goes away, the compensation is the defect.** One
+table now, heights dividing `AREA_ROWS`.
+
+Two more from the same landing, both about a channel with more than one owner:
+
+- **Points and surfaces shared `kind = AREA`.** A point quantised to eighths does not merely shrink;
+  its apparent size starts depending on where in the cell it falls, so the same point drifts between
+  a half block and a two-eighth sliver as the camera turns — which is the wobble the tier table
+  exists to prevent. `MARK` is its own kind, and `nearestOf` takes a **set**, because a point in
+  front of a surface owns only the samples it won and asking for `MARK` alone punches the fill out
+  around every near point.
+- **`brailleRows` wrote sample row `y` into dot row `y`.** An identity while the two agreed, a
+  doubling once the grid went to eight rows a cell: top half at twice its height, bottom half past
+  the end of the grid. `setDot` refuses an out-of-range dot rather than throwing, so the arm went on
+  rendering a stippled sliver and nothing between there and the frame could say.
+
+## F499 — two questions sharing one grid ★★★☆☆
+
+The braille compose asked *is this cell the data's?* and *what does it draw?* of the same dot grid.
+They are different questions: the first must exclude the frame's samples and the second must not.
+Two grids now — `dots` decides, `whole` draws — and F497 is what the confusion cost.
+
+## F500 — a shared channel hides which of its consumers a change is about ★★★★★
+
+One array carried both a surface's density glyph and the reference frame's stroke, and the local
+that read it was called `framed`. Giving the frame its own structure therefore looked like it was
+taking out everything the array held, so the argument to `glyphRows` was **replaced** rather than
+joined.
+
+A surface on the ASCII rung writes its glyph there, `glyphRows` no longer looked, and the figure came
+out **empty**. Not degraded, not coarse — blank, with `SF7` reading `expected 0 to be greater than 1`.
+
+**The name had already picked the wrong consumer.** A channel with two owners wants two names, or the
+next person to split it will split it in favour of whichever one the identifier mentions.
+
+## F501 — the ground is a foreground, and it is the signal that the data moved ★★★★★
+
+Unicode's block elements fill upward from the floor, so a cell whose covered mass sits at the **top**
+must be drawn as its complement with the two colours exchanged — and the exchange needs an ink for
+the empty part, or the terminal paints it in the default foreground. That streaked a Gaussian's base
+white before the ground was passed in.
+
+So the plot's ground appears in a frame as a *run colour* while painting exactly what was already
+behind it. Two rows counted it as data and read a third face on a two-faced cube and a third hue on a
+one-hue field.
+
+**The first repair was to filter it out, and it was wrong.** The numbers barely moved and a third row
+got worse, which is the signal: the ground is not noise. A cell at a shape's **top** edge holds its
+mass low and reports `fg = data`; a cell at the **bottom** edge holds it high and reports
+`fg = ground, bg = data`. A reader taking foregrounds alone sees a figure **lit from above** that is
+nothing of the kind — which is why a *headlight*, whose entire claim is that it has no direction,
+measured 1.24.
+
+`parseLine` has carried `background` all along. **The frame was right and the reading was half of it**
+— a matcher that sees one encoding reports absence when the value changes form, and here the value
+changed channel.
+
+**And a fixture that had stopped having its property.** `SF3` asks that smooth shading carry more
+distinct colours than flat, on `sphere(10, 8)` — 160 faces over 72 cells, so flat already gives every
+cell a colour of its own and smooth has nothing to add. Both arms measured **72**, and the row read
+as a claim about shading while asserting the size of the frame. It passed for years because the old
+rung sampled one point a half-cell and collisions were frequent; at eight sample rows they stopped.
+
+Measured, faces/cells → smooth v flat: `(10,8)` 160/72 → 72 v 72 · `(8,6)` 96/64 → 63 v 64 ·
+`(6,5)` 60/75 → 75 v 72 · `(5,4)` 40/62 → 62 v 60 · `(4,3)` 24/62 → **60 v 29**. Only the coarsest
+separates, and it separates *structurally* — flat cannot exceed the count of visible faces.
+
+## F502 — three rows whose premises moved, and one ruling falsified by a font ★★★★☆
+
+Three rows failed on claims that had been true and were not:
+
+- **`AX13` asserted `→←↑↓` on the raster arm and `><^v` on ASCII**, because the arrow table had two
+  rows. It has one. Unicode's arrows are a **text** glyph — baseline-set, with side bearings — so a
+  head meant to terminate a stroke floats off the end of it. The row now asserts the opposite and is
+  stronger for it: *the rungs agree exactly*, which a table that grew a second row would fail rather
+  than pass by matching whichever pattern it was handed.
+- **`RM4` asserted that culling a third of the bunny leaves the frame identical.** It leaves **3
+  cells of 234** moved. The silhouette is where a closed mesh's front and back faces meet
+  tangentially, so their projected extents are equal only in the limit; at finite sampling one
+  reaches a sample further, and the eighth ladder made visible what two sample rows quantised away.
+  One of the three is a cell *disappearing*, which sampling does not explain — **the Stanford bunny
+  is not watertight**, and `closed: true` is a claim the caller makes rather than one the mesh keeps.
+  Stated as a fraction now, because 3 of 234 is the row's actual point.
+- **`RM7` asserted one character class**, true of a raster that drew `▀` in every inked cell. A
+  stripped teapot now carries **9** glyphs over 204 cells, every one a block element saying how much
+  of its cell the surface covers and none of them saying how brightly it is lit. The control is
+  restated in the terms it always meant.
+
+**And `PC5`, which is the one worth keeping.** F204 found braille modelled as eight circles at a
+guessed radius — out by 2.4× in area for the tool's whole life — and ruled that the model go and the
+glyph emit a `<text>` *exactly as a box-drawing glyph does*. The second half assumed a fact nobody
+had measured:
+
+```
+fc-list ":charset=2502"  →  DejaVu Sans Mono, among others
+fc-list ":charset=2800"  →  DejaVu Sans, DejaVu Serif — and no mono face
+```
+
+Box drawing, the block elements, the quadrants and the markers all resolve in the family the
+stylesheet asks for. **Braille alone falls through to a proportional font**, whose dots are small and
+widely spaced. Every braille frame the instrument produced after F204 showed that fallback's design,
+and a reader — including the one who wrote the ruling — read it as the renderer drawing a thin dotted
+line.
+
+**F204 was right about the defect and wrong about the remedy.** What survives both is geometry that
+is not a guess: a braille cell *is* a 2×4 coverage mask, and eight rects on the cell's own halves and
+quarters is the character's definition rather than an estimate of a typeface — which is the property
+F204 wanted and could not get from a radius.
+
+## F503 — a projection with no scale, licensed by a comment in a type ★★★★★
+
+`plot3d/orthographic` draws its box off the top and the bottom of the plot and loses its `x` and
+`y` labels entirely. The cause is that the orthographic arm divides by nothing:
+
+```ts
+const sx = basis.orthographic ? x / basis.aspect : (x * basis.f) / basis.aspect / z;
+const sy = basis.orthographic ? y                : (y * basis.f) / z;
+```
+
+**No value of any member frames it.** The unit cube's eight corners, at `azimuth: π/4,
+elevation: 0.3`:
+
+```
+proj          dist      min y      max y   fits?
+perspective      4     0.1462     1.1075     NO
+perspective      6     0.2465     0.8618    yes
+perspective     10     0.3382     0.7000    yes
+perspective     20     0.4150     0.5944    yes
+orthographic     4    -0.1866     1.1866     NO
+orthographic     6    -0.1866     1.1866     NO
+orthographic    10    -0.1866     1.1866     NO
+orthographic    20    -0.1866     1.1866     NO
+```
+
+Four cameras, one answer, 37% of the figure outside the plot. The perspective arm behaves the way a
+reader expects — move back and more fits — and the orthographic arm has no such control at all.
+
+**The claim licensing it was one line and had no source.** C04 §3's `Camera`:
+
+```typescript
+projection: "perspective" | "orthographic"; // `distance` is ignored by the second
+```
+
+Grepping `docs/`, `src/` and `test/` for that claim returns **exactly that line**. No invariant, no
+argument, no row. And C12 I86, in a document that cites C04 §3 by name, contradicts it: *a
+`distance` of zero draws nothing … the orthographic arm takes the same cull*, which is `distance`
+having an effect. Measured:
+
+```
+proj          dist    screen x    screen y      depth
+orthographic     4    0.429289    0.428337     2.7714
+orthographic     6    0.429289    0.428337     4.7714
+orthographic    10    0.429289    0.428337     8.7714
+orthographic    20    0.429289    0.428337    18.7714
+```
+
+**True about the scale and false about the member**, and the gap between those is the whole defect.
+`distance` reaches the eye, the near-plane cull and the depth order; only the scale was missing, and
+a sentence that named the member rather than the scale made the absence read as a decision.
+
+**The remedy is an equality rather than a bound.** Both arms fold one focal length; the perspective
+arm divides by the sample's own depth and the orthographic arm by the distance to the target, so at
+`z = distance` the two expressions are *the same expression*. A row can assert that two projections
+agree, which no containment assertion can — every wrong scale that happens to fit is inside a bound,
+and this arm's own containment held on the golden frames for as long as it shipped.
+
+**Sixth blind spot, fourth disproof.** The instrument that asks where a claim is written down has now
+disproved four and produced four. This one is the cheapest instance yet: one grep, one line, and the
+contradiction was in a document that already cited the source.
+
+## F504 — the phase is a field of an object a rung replaces wholesale ★★★★☆
+
+`/live plot3d teapot` draws a still. So do `suzanne`, `bunny` and `orthographic`; the other
+thirteen rungs orbit.
+
+The catalogue spreads a rung's override last, which is the rule that lets a rung replace a field
+rather than only add to it:
+
+```ts
+at: (p, h, x) => plot("plot3d", h, { camera: { azimuth: Math.PI / 4 + p * 0.35 }, …, ...x })
+```
+
+**The rule is right and its granularity is wrong.** `camera` is the one override that is an *object*
+whose fields are independent statements — C04 I75 says so and made the member `Partial<Camera>` for
+exactly that reason — so a rung naming an `elevation` and a `distance` silently discards the
+`azimuth` the phase lives in. Every rung that says anything about the camera stops animating, and
+each of the four says something different: three set an azimuth as a measured framing choice, and
+the fourth sets only `projection` and `distance`.
+
+**A shallow spread is correct for sixteen members and wrong for one**, which is why no reader
+catches it: the line is the same line for all seventeen, and `{ ...x }` is what the other sixteen
+need. The type cannot say so either — `Partial<Camera>` spread over `Partial<Camera>` typechecks.
+
+**It reads as deliberate on three of the four.** The teapot's azimuth carries a comment recording
+the measurement that chose it, so a reader seeing the teapot hold still concludes the fixed camera
+is the point. The fourth is the one that gives it away: `orthographic` sets no azimuth at all and
+still does not turn, which no reading of the captions explains.
+
+The fix is to merge the phase into the rung's camera rather than beside it — the rung's azimuth
+becomes where the orbit *starts*, which is what a measured framing choice was always for.
+
+**The suite drove `liveFor(form)` and no rung, which is the whole of why it hid.** `T-doc4` renders
+every live part's own frame and validates it, over every command — and it builds each document with
+`liveFor(f)`, so the seventeen rungs had no row between them. `T-doc8` drives each rung's part
+through `liveParts` for three ticks and names the set that does not move; against the original shape
+it reports `['suzanne', 'teapot', 'bunny', 'orthographic']`, which is the finding as an assertion.
+
+**Driven through `liveParts` and not by calling `entry.at` twice**, because what broke is the wiring
+rather than the mechanism: the generator was always a function of the phase, and a row calling it
+directly passes on the day nothing calls it that way.
+
+## F505 — a type the public surface uses and does not export ★★★
+
+`@fmx/calcium` exports `Plot`. It does not export `Camera`, which `Plot.camera` is a
+`Partial<` of. A consumer writing anything typed over a camera — a helper, a control, an orbit —
+reaches it by indexing the block:
+
+```ts
+type PlotCamera = NonNullable<Plot["camera"]>;
+```
+
+That compiles and says the wrong thing. The type is about a **view**, and naming it through the
+block that carries it makes it read as a property of plots — which is the one thing C04 I75 is at
+pains to deny, since the live camera is view state and reaches the renderer through
+`RenderContext` rather than through the block.
+
+**Found by writing the consumer, which is the only way it could be.** Every internal caller imports
+`Camera` from `data/viewmodel` directly, so the gap is invisible from inside the package: the
+symbol exists, resolves, and is used in nine files. It is only missing from the one surface a
+consumer can see.
+
+**Not fixed here.** Adding an export is a C24 change and wants its own row — MG25 refuses an export
+nothing consumes, and the consumer that would justify it is the workaround above.
+
+
+## F506 — a figure outlives the distinction it was derived from, in five places ★★★★☆
+
+F498 merged the two sample grids into one and removed `sampleGrid`'s rung parameter. **`80 × 48`
+went on being the recorded grid afterwards**, in:
+
+```
+src/presentation/plot/project3.ts   the comment heading the function whose parameter went away
+C12 §3al                            the rule's own table, both rungs, both figures
+C12 I84 · commitment 84             `width × 1` by `height × 2` … `× 2` by `× 4`
+C12 PR7 · CAM4                      the row, twice, and its control
+CALCIUM_3D_DESIGN §11 · §12         every performance budget, costed on 3,840 depth entries
+```
+
+`sampleGrid(80, 24)` returns `160 × 192` — **30,720 samples against the recorded 3,840, eight
+times.** The depth buffer is 120 KB and not 15.
+
+**The implementation and its test were both corrected and none of the prose was.** `PR7`'s body
+asserts `w × 2` by `h × AREA_ROWS` and its comment explains why the rung is gone; the spec entry
+naming that row still says the control is *that the two arms disagree*, which is a control that
+cannot be constructed — there is one arm. **A row whose stated control is unreachable reads as
+stronger than the row that ships**, and nothing compares the two.
+
+**`PR7` and `CAM4` are the same row under two ids**, same invariant, same claim, same control, and
+`CAM4` appears in no test file. That is where the correction stopped: a reader fixing one entry has
+no reason to look for its twin, so the duplicate is not merely redundant — **it is the copy that
+stays wrong.**
+
+**And this is F498's own ruling pointed at the documents.** F498 says *when the thing a derived
+constant compensates for goes away, the compensation is the defect*, about two tier tables in
+`glyphs.ts`. The same landing left five prose derivations of the same removed distinction, and the
+finding that named the mechanism did not sweep for it.
+
+## F507 — a budget nobody runs goes stale in the direction that matters ★★★★☆
+
+F469's performance rows do not reproduce. Same inputs, HEAD, each row in **its own process** —
+nine in one process makes the allocating rows pay for their neighbours' garbage, and `trianglesOf`
+reads 2× its isolated cost that way — best of 21 after 8 warm-ups:
+
+```
+row                        3,200 tris            69,192 tris
+                         now      was  ratio    now      was  ratio
+chrome only (control)   4.50    3.216   1.4x   3.69        —      —
+P1  projection          0.149   0.170   0.9x   2.78      4.5   0.6x
+P2  raster + shade      9.70    2.932   3.3x  144.7     54.9   2.6x
+    trianglesOf         2.88    1.265   2.3x   40.4     36.1   1.1x
+P4/P5 whole frame      44.9    12.969   3.5x  572.6    124.2   4.6x
+```
+
+**The controls are the two rows the grid does not enter**, and they agree: `P1` reproduces at 0.9×
+and 0.6×, `trianglesOf` at 1.1× where it dominates. **So the host is not slower** — which is the
+question that has to be settled before any of the rest is a finding, and *chrome only* is the
+weaker control precisely because it rasterises the axes.
+
+**The stage that moved is the one the grid multiplies** (F506), and the whole frame moved further
+than it — 4.6× against the raster's 2.6× — because the per-sample paint, the fold to cells and the
+glyph choice scale with samples too.
+
+**What it costs the ruling it was taken for.** §11 turned auto-orbit off on *12.97 ms a frame, 39%
+of a core at 30fps*. That frame is **44.9 ms**, past the 33 ms window on its own. The ruling is
+**more** right than when it was made and the number behind it was never re-taken — which is the
+shape to watch for, because a conclusion that survives is a conclusion nobody re-checks.
+
+**`tools/bench/` holds four benches and none of them is 3D.** §12 has been a written tier since it
+was drafted, with budgets phrased as assertions and nothing asserting them. A budget nobody runs is
+a budget that goes stale exactly this way, and the remedy is the target rather than another table.
+
+## F508 — a spread into `push` caps the mesh size, and the renderer never throws ★★★★☆
+
+`drawnOf` collects a block's triangles with
+
+```ts
+tris.push(...trianglesOf(sf, extent, si));
+```
+
+**A spread is an argument list.** Measured on this Node: 100,000 elements is fine and 125,000
+throws `RangeError: Maximum call stack size exceeded`. C12 I11's whole shape is that the renderer
+answers rather than refuses — I11's own §3230 row reads *I11 says the renderer never throws* — and
+this one throws, from an expression that reads as a concatenation.
+
+**The bunny is 69,451 faces and clears it**, which is why it has never fired: the largest mesh in
+the tree is under half the ceiling. A 63k-quad model fanned to triangles is not, and `parseObj`
+fans quads by design.
+
+**The failure is a stack overflow rather than a bounds error**, so nothing between it and the
+frame can name a mesh size. A loop is the whole fix and it costs nothing.
+
+## F509 — the demo reimplements an orbit the framework delta-times correctly ★★★★☆
+
+`examples/plots` turns its 3D figures by advancing a **tick counter**:
+
+```ts
+fetch: () => Promise.resolve((phase += 1)),        // commands.ts
+azimuth: (base.azimuth ?? 0) + phase * 0.35        // catalogue.ts
+```
+
+The tick period is `every` + fetch + render, because `settleSource` sets `dueAt` from the clock
+**after** the render resolves. So the angular rate is a function of how expensive the frame is:
+
+```
+most rungs   200 ms + ~5 ms    1.71 rad/s    a turn in  3.7 s
+bunny        600 ms + 365 ms   0.36 rad/s    a turn in 17.4 s
+the framework's own              0.52 rad/s    a turn in 12.0 s
+```
+
+**C22 I74 already rules on exactly this, one layer down, and states the defect it avoids**:
+`ORBIT_RATE * since` with the stamp advanced per wake, *"a step per wake turns the plot 25% fast
+the moment an 80 ms spinner appears beside a capped 100 ms orbit — its speed decided by something
+it has nothing to do with."* The demo's speed is decided by its own render cost, which is the same
+sentence with a different subject.
+
+**And the controls ship unmentioned.** `o` toggles the orbit, `[` `]` turn it, `{` `}` tilt, `+`
+`-` dolly, on any focused plot that declares a camera. The demo's captions name none of them, so
+the reader gets the wrong rotation and no way to find the right one.
+
+**A live part cannot fix this itself**, which is worth stating so nobody adds the wrong field:
+`ProducerContext` carries `width`, `height`, `capabilities` and `measure` and no clock, while the
+driver holding `deps.clock()` computes `now - part.startedAt` forty lines away for the elapsed
+counter. The remedy is not a clock on the context — it is the demo not having an orbit of its own.
+
+## F511 — the GPU ceiling is under half the frame, and the raster is not what costs ★★★★★
+
+Three measurements, run after the geometry cache (F469), and each settles one question.
+
+**1 — Amdahl, exactly.** The orbit frame after the cache, decomposed:
+
+```
+bunny orbit frame (cached)      121.0 ms
+  raster + shade (no-op paint)   55.9 ms  = 46% of frame
+  everything else                65.1 ms  = 54% of frame
+
+suzanne orbit frame (cached)     12.8 ms
+  raster + shade                  1.9 ms  = 15% of frame
+  everything else                10.9 ms  = 85% of frame
+```
+
+**A GPU that did the raster in zero milliseconds saves 46% of the bunny and 15% of suzanne.**
+The other 54% and 85% are cell folding, glyph selection, SGR emission — string work that cannot
+leave the CPU. **On forty of the catalogue's forty-two 3D figures the raster is under 6 ms**, and
+a readback round trip comparable to that makes the GPU slower on every one of them.
+
+**2 — Worker round trip, warm pool at the depth buffer's size.** 0.049 ms median over 46,080
+floats. The overhead is negligible. What is not is the rasteriser itself: it projects, clips at
+the near plane, walks barycentrics, interpolates smooth normals, shades per sample, and produces
+typed objects (`Shaded`, edge flags, `kind` per cell) that no flat-buffer protocol can carry
+without a second serialisation step. A band-parallel worker pool would need the entire
+`drawTri`/`fill`/`strokeThin` pipeline in the worker, reading from a `SharedArrayBuffer` of
+pre-built triangles — **bit-identical by construction**, since bands do not interact and the
+depth test's tie-break is draw order within a band, but a project-sized refactor for 46% of the
+one figure that exceeds the budget.
+
+**3 — Determinism, which does not need a probe because the raster is CPU either way.** The
+golden tier compares bytes across 2,130 terminal-baseline frames plus the vitest snapshots, and
+the CPU raster is already bit-exact across runs (PR10's control asserts this). A GPU raster would
+need the determinism measured per vendor, and the float intermediates would differ — forking the
+golden tier per device, which is a cost nobody else in the tree pays.
+
+**The ruling, stated as a shape and not as a conclusion.** GPU acceleration is not worth adding
+for a component whose raster is 15% of the frame it is inside. **The one figure that exceeds the
+budget is the bunny at 69,451 faces**, and the cache already took it from 319 ms to 121 ms — of
+which 65 ms is string work the GPU cannot touch, 56 ms is rasterisation, and the raster
+is sublinear in face count because most faces are sub-sample and `writeDepth` refuses them in one
+comparison. A band-parallel `worker_threads` pool is bit-identical and needs no native dependency,
+but it is a refactor of the whole `drawTri` pipeline for the tail of one form. **The cheaper
+path is decimation** — measured at 3.1× fewer faces for 2.2× speed and 6.4% of inked cells
+moved — and it is a picture decision rather than an engineering one, which is why it is recorded
+rather than taken.
+
+**What this does not say is that 3D is fast enough.** The bunny at 121 ms is four frames at
+30fps, and the raster alone exceeds the 33 ms budget. What it says is that the budget is not
+spent where a GPU reaches, so the next optimisation is about the work that scales with samples
+(the cell fold and the compose) rather than with triangles.
+
+## F510 — MG25 sees functions and classes, and a homonym is a consumer ★★★★☆
+
+MG25 refuses *an export nothing consumes*. Its declaration regex is
+
+```js
+/^export (?:function\*? |async function |class )([A-Za-z_$][\w$]*)/gm
+```
+
+so `export type`, `export interface` and `export const` are outside its subject. **This is F84's
+shape exactly** — MG24 scoped to `export interface` on a sentence that was true and not the one the
+rule needed — and the measurement is the same kind: **661 declarations covered, 754 not**, and
+running MG25's own logic over the uncovered arms finds **ten** unconsumed exports it cannot see —
+three types and seven consts.
+
+**The second gap is independent and stacks with the first.** The consumer count is occurrences of
+the **bare name across all of `src/`**, so two unrelated declarations of one name mutually excuse
+each other. Measured on `Rung`:
+
+```
+src/presentation/plot/definition.ts   "box1" | "box3" | …    declared, used once   2
+src/presentation/plot/project3.ts     "half" | "braille"     declared, used never  1
+                                                                            total  3
+```
+
+`project3.ts`'s `Rung` is what F498 left behind when `sampleGrid` lost its rung parameter — dead on
+the day of that landing — and it is invisible twice over: the regex does not reach a type, and if
+it did, the homonym in `definition.ts` would carry the count past `uses > 1`.
+
+**The allow-list's equality gate is not the weak part and it is worth saying so.**
+`UNCONSUMED_FUNCTIONS` is compared by equality and its one live entry, `plotAreaWidth`, is exactly
+what the shipped arm reports — which is the control that says this scan is measuring the rule
+rather than something else. The rule is right about everything it can see.
