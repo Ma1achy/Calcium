@@ -258,8 +258,16 @@ describe("C12 tier 6 — fail-on-revert", () => {
     // nicing takes `{0, 30}` to `{0, 40}` and writes `40` beside it.
     expect(top.split("┤")[0]?.trim()).toBe("30");
     // And the scale still travels, which is what the earlier revert was about.
+    // **Through the placement as well as the ticks** (C04 I81): `axisFor` hands
+    // the gutter a range carrying `scale: "log"`, so `rowOf` places `50` at
+    // `round(8 · (1 − log10(50) / 3))` = row 3. This used to assert `200`, which
+    // is where *linear* placement of log ticks left a label standing — F189's
+    // own defect read as the expected value; `50` sat on the bottom row then,
+    // colliding with `1`, and was dropped.
     const range = { min: 1, max: 1000 };
-    expect(gutter(range, 9, undefined, {}, "log").map((l) => l.text)).toContain("200");
+    const log = gutter(range, 9, undefined, {}, "log");
+    expect(log.map((l) => l.text)).toContain("50");
+    expect(log.find((l) => l.text === "50")?.row).toBe(3);
     expect(gutter(range, 9, undefined, {}).map((l) => l.text)).toContain("750");
   });
 

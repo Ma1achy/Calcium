@@ -360,7 +360,13 @@ describe("U — the seam, asserted from both arms", () => {
       gutterFamilies += 1;
       if (fig.identity.some((i) => i !== "" && texts.has(i))) identityDrawn += 1;
     }
-    expect(drawn, "drawn SVG documents").toBe(178); // cells-ok — a document count
+    // **178 → 193**: fifteen fixtures for spec-stated rules no frame reached
+    // (`waffle/all-zero`, and the fourteen that draw here of the twenty-one
+    // that landed with it — the seven `plot3d` ones are refused by family).
+    // **193 → 196**: `line/log` (C04 I81), `line/whiskers-placed` (C04 I52) and
+    // `pie/all-zero` (C12 I108 finding 5) — the last drawn where a zero total
+    // was a refusal.
+    expect(drawn, "drawn SVG documents").toBe(196); // cells-ok — a document count
     // **152 → 178, and both halves are attributable** (F383). The corpus has
     // **19 violin and 1 ridgeline** variants — the 20 the density family
     // brought — and F383 recovered a further **6** variants of four other
@@ -390,11 +396,14 @@ describe("U — the seam, asserted from both arms", () => {
     // count that reaches. **The artefact is a swatch beside the text**, which
     // `arm-decisions.ts` already asks for by shape after F307, and asking it here
     // would re-derive the figure D13 closed against. Recorded, not narrowed.
-    expect(legendDrawn, "documents drawing a legend label — D13").toBe(46); // cells-ok — a document count
+    // **46 → 53**: the legend names annotations now (C12 I109) — `annotation-label`
+    // and its kin — and the fixtures for unreached rules bring legends of their own.
+    expect(legendDrawn, "documents drawing a legend label — D13").toBe(53); // cells-ok — a document count
     // 44 → 46: two of the twenty density variants carry more than one series
     // into shared cells, which is what `SHARES_CELLS` auto-enables a legend for.
     // The other eighteen are single-series and gain none (F383).
-    expect(gutterFamilies, "documents in the families the terminal gutters").toBe(173); // cells-ok — a document count
+    // 173 → 188: the fifteen drawing fixtures for unreached rules.
+    expect(gutterFamilies, "documents in the families the terminal gutters").toBe(191); // cells-ok — a document count; 188 + `line/log`, `line/whiskers-placed`, `pie/all-zero`
     // **149 → 173, which is +24 and not +20** (F383). The 20 density variants,
     // plus **four** of the six variants F383 recovered: those four are `origin`
     // values on `line`, a guttered family, while the other two are `flame` and
@@ -418,7 +427,8 @@ describe("U — the seam, asserted from both arms", () => {
     // terminal draws too. So the eight proportion documents that name their
     // segments are invisible here, and the limit is stated rather than left as a
     // number that looks like a gap.
-    expect(identityDrawn, "documents drawing an identity string — D10").toBe(81); // cells-ok — a document count
+    // 81 → 89: the drawing fixtures for unreached rules that carry identities.
+    expect(identityDrawn, "documents drawing an identity string — D10").toBe(89); // cells-ok — a document count
     // **60 → 81, and 20 of the 21 are the density family** — 19 violin and 1
     // ridgeline, counted per form rather than inferred from the total (F383).
     // Both forms are `ROW_IS_AN_IDENTITY` without a position axis, so each band
@@ -547,11 +557,14 @@ describe("U — the seam, asserted from both arms", () => {
       for (const s of shortfall(spec, family as WalkedFamily)) short.push(`${bucket}/${variant} ${s}`);
     }
     expect(short).toEqual([]);
-    expect(checked, "variants walking a figure").toBe(178); // cells-ok — a variant count
+    expect(checked, "variants walking a figure").toBe(196); // cells-ok — a variant count; 178 + the fifteen drawing fixtures for unreached rules + `line/log`, `line/whiskers-placed`, `pie/all-zero`
     // 158 → 178: the 20 density variants — 19 violin, 1 ridgeline (F383).
     // The bucket that lies, pinned. If a second one appears, the emitter key is
     // the first thing to check — this is the count F290 rests on.
-    expect(lying, "variants whose spec.form differs from their catalogue bucket").toBe(1); // cells-ok — a variant count
+    // **Two, and both are the same lie**: `line/whiskers` and `line/whiskers-placed`
+    // are scatters filed under `line` beside the annotation fixtures they belong
+    // with (C04 I52). A third with a different reason is the one to check.
+    expect(lying, "variants whose spec.form differs from their catalogue bucket").toBe(2); // cells-ok — a variant count
   });
 
   it("U4 (C12 I62, §3ak): the figure carries no resolved colour, so a theme cannot move it", () => {
@@ -565,7 +578,7 @@ describe("U — the seam, asserted from both arms", () => {
       const json = JSON.stringify(EMITTER[family as WalkedFamily](blockOf(spec)));
       expect(json, `${bucket}/${variant} carries a resolved colour`).not.toMatch(/#[0-9a-f]{6}/iu);
     }
-    expect(checked, "figures checked for a resolved colour").toBe(178); // cells-ok — a variant count
+    expect(checked, "figures checked for a resolved colour").toBe(196); // cells-ok — a variant count; 178 + the fifteen drawing fixtures for unreached rules + `line/log`, `line/whiskers-placed`, `pie/all-zero`
     // 158 → 178: the same 20, and the density figure names `surface.bgDeep`
     // and `tone.default` as **refs** rather than resolving them, which is what
     // this row is for — a second arm that wrote a hex here would fail it (F389).
@@ -793,7 +806,7 @@ describe("U — the seam, asserted from both arms", () => {
     // drawable at this rung and `truncate` reserves both its cells since F292,
     // so its width is a cost and not a defect. `~` is the *repertoire* fallback,
     // which is a different question (§3ak.24).
-    expect(frames, "catalogue variants rendered at the wide rung").toBe(213); // cells-ok — a frame count
+    expect(frames, "catalogue variants rendered at the wide rung").toBe(238); // cells-ok — a frame count; 213 + twenty-two fixtures for unreached rules + `line/log`, `line/whiskers-placed`, `pie/all-zero`
     expect([...seen.keys()].sort(), "two-cell characters still emitted").toEqual(["…"]);
   });
 
@@ -905,7 +918,7 @@ describe("U — the seam, asserted from both arms", () => {
     // **The corpus this was measured over**, so a green run says how much it
     // swept — and so the day a variant stops emitting a point mark, the row that
     // licenses a shared character notices.
-    expect(withPoints, "catalogue variants emitting a point mark").toBe(38); // cells-ok — a variant count
+    expect(withPoints, "catalogue variants emitting a point mark").toBe(39); // cells-ok — a variant count; 38 + `line/whiskers-placed`, a scatter
     // **19 → 38, and the added 19 are exactly the violins** (F384). A violin
     // emits a `median` point and a `mean` point over its body; the single
     // `ridgeline` variant emits neither, because overlapping curves put each

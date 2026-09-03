@@ -17,14 +17,14 @@ import type { RenderContext } from "../blocks/types.js";
 import type { ColourValue } from "../theme/types.js";
 // **`HALF_BLOCK` is gone from this file and that is the finding, not the
 // tidy-up** (C12 I104). `▀` was the area raster; it is now one of sixteen
-// quadrant masks and `QUADRANT[3]` is the same character, reached by the
+// quadrant masks and `QUADRANTS[3]` is the same character, reached by the
 // same cell whenever a top-against-bottom split is the best one. The import
 // went unused because the constant was subsumed rather than replaced.
 import { halfBlockEligible } from "../image/index.js";
 import { paint, slot, type Span } from "../blocks/paint.js";
 import { arrows3, glyphs, MARKER3_COLUMNS, markerColumn, markers3 } from "../blocks/glyphs.js";
 import { cells } from "../text.js";
-import { glyphForMask, LINE_DOWN, LINE_LEFT, LINE_RIGHT, LINE_UP } from "./linedraw.js";
+import { glyphForMask, LINE_DOWN, LINE_LEFT, LINE_RIGHT, LINE_UP, QUADRANTS } from "./linedraw.js";
 import { BRAILLE_DOTS, createGrid, foldBraille, setDot } from "./raster.js";
 import {
   axisLines,
@@ -1370,10 +1370,8 @@ function areaGlyph(
  * `East_Asian_Width=Ambiguous` arm, same `colourDepth >= 8` floor — the
  * alphabet costs nothing the incumbent did not already cost.
  */
-const QUADRANT: readonly string[] = Object.freeze([
-  " ", "\u2598", "\u259D", "\u2580", "\u2596", "\u258C", "\u259E", "\u259B",
-  "\u2597", "\u259A", "\u2590", "\u259C", "\u2584", "\u2599", "\u259F", "\u2588",
-]);
+// The table itself is `linedraw.ts`'s `QUADRANTS` — the same sixteen strings in
+// the same bit order, held once (C12 I104).
 
 /**
  * **The triangles were tried and they are not here** (C12 I104, F494).
@@ -1570,9 +1568,9 @@ function mixedRows(
         const below = markBottom > 0 || left + right > 0 ? // cells-ok — a sample count
           nearestOf(x0, yMid, x1, yBot, AREA, MARK) : undefined;
         if (above === undefined && below === undefined) { line.push({ text: " " }); continue; }
-        if (below === undefined) { line.push(span(QUADRANT[3] as string, above)); continue; }
-        if (above === undefined) { line.push(span(QUADRANT[12] as string, below)); continue; }
-        line.push(span(QUADRANT[3] as string, above, below));
+        if (below === undefined) { line.push(span(QUADRANTS[3] as string, above)); continue; }
+        if (above === undefined) { line.push(span(QUADRANTS[12] as string, below)); continue; }
+        line.push(span(QUADRANTS[3] as string, above, below));
         continue;
       }
       if (left + right === 0) { line.push({ text: " " }); continue; } // cells-ok — a sample count
@@ -1582,7 +1580,7 @@ function mixedRows(
       // tiles into one where a vertical split reads as corduroy.
       if (left + right === AREA_ROWS * BRAILLE_DOTS.x) { // cells-ok — a sample count
         line.push(span(
-          QUADRANT[3] ?? " ",
+          QUADRANTS[3] ?? " ",
           nearestOf(x0, yTop, x1, yMid, AREA),
           nearestOf(x0, yMid, x1, yBot, AREA),
         ));

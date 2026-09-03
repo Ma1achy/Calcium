@@ -303,7 +303,13 @@ export const QUAD_TR = 2;
 export const QUAD_BL = 4;
 export const QUAD_BR = 8;
 
-const QUADRANTS: readonly string[] = Object.freeze([
+/**
+ * The sixteen quadrant glyphs by mask — **one table, read by the line arm here
+ * and by the silhouette raster in `scatter3.ts`** (C12 I104). The second held
+ * its own copy of the same sixteen strings; two tables that must agree are one
+ * table, and the bit order (`QUAD_TL` … `QUAD_BR` above) is the whole contract.
+ */
+export const QUADRANTS: readonly string[] = Object.freeze([
   " ", "\u2598", "\u259d", "\u2580", "\u2596", "\u258c", "\u259e", "\u259b",
   "\u2597", "\u259a", "\u2590", "\u259c", "\u2584", "\u2599", "\u259f", "\u2588",
 ]);

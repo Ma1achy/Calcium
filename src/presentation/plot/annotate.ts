@@ -19,6 +19,7 @@
  * fill would compete with the curve for the cells the curve is drawn in.
  */
 import type { Annotation } from "../../data/viewmodel/index.js";
+import { normalisedOf } from "../../data/viewmodel/range.js";
 import type { Range } from "./scale.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { BRAILLE_DOTS, createGrid, foldBraille, setDot } from "./raster.js";
@@ -77,6 +78,12 @@ export function annotationRows(
   areaRows: number,
   caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
   facing: Facing,
+  /**
+   * The abscissa's domain, for the one kind that has an `x` (C04 I52, I109).
+   * `null` when the plot has none — fewer than two samples and no declared
+   * `xMin`/`xMax` — and the whiskers then spread evenly by index.
+   */
+  xDomain: Range | null = null,
 ): readonly string[] {
   const w = Math.max(1, Math.floor(areaWidth));
   const h = Math.max(1, Math.floor(areaRows));
@@ -85,7 +92,7 @@ export function annotationRows(
     return confidenceRows(annotation, range, w, h, caps, facing);
   }
   if (annotation.kind === "whiskers") {
-    return whiskersRows(annotation.points, range, w, h, caps, facing);
+    return whiskersRows(annotation.points, range, w, h, caps, facing, xDomain);
   }
 
   const edges = edgesOf(annotation).filter((v) => drawn(v, range));
@@ -300,6 +307,28 @@ function confidenceRows(
   return fill === null ? edges : overlay(edges, fill, w);
 }
 
+/**
+ * Where a whisker sits across the area, as a fraction — **its own `x` on the
+ * abscissa's domain, or its index where the plot has no domain** (C04 I52).
+ *
+ * The domain is `xMin..xMax` when declared and `0..n−1` otherwise, which is the
+ * lattice the samples are placed on, so a whisker at `x: i` lands on sample
+ * *i*'s column in both alphabets. The facing mirrors the fraction as it mirrors
+ * the samples (§3ac).
+ */
+function whiskerAt(
+  points: readonly Readonly<{ x: number }>[],
+  i: number,
+  xDomain: Range | null,
+  facing: Facing,
+): number {
+  const n = points.length; // cells-ok — a point count
+  const t = xDomain === null
+    ? (n <= 1 ? 0.5 : i / (n - 1)) // cells-ok — a point index
+    : normalisedOf(points[i]!.x, xDomain, false);
+  return facing.x === "left" ? 1 - t : t;
+}
+
 function whiskersRows(
   points: readonly Readonly<{ x: number; y: number; err: number }>[],
   range: Range,
@@ -307,14 +336,14 @@ function whiskersRows(
   h: number,
   caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
   facing: Facing,
+  xDomain: Range | null,
 ): readonly string[] {
   if (caps.unicode === "ascii") {
     const grid: string[][] = Array.from({ length: h }, () => new Array(w).fill(" "));
     const n = points.length; // cells-ok — a point count
     for (let i = 0; i < n; i++) {
       const p = points[i]!;
-      const at = facing.x === "left" ? n - 1 - i : i; // cells-ok — a point index
-      const col = n <= 1 ? Math.floor(w / 2) : Math.round((at / (n - 1)) * (w - 1));
+      const col = Math.round(whiskerAt(points, i, xDomain, facing) * (w - 1));
       if (col < 0 || col >= w) continue;
       const yTop = rowOf(p.y + p.err, range, h, facing);
       const yBot = rowOf(p.y - p.err, range, h, facing);
@@ -330,10 +359,7 @@ function whiskersRows(
   const grid = createGrid(w * BRAILLE_DOTS.x, h * BRAILLE_DOTS.y);
   for (let i = 0; i < points.length; i++) { // cells-ok — a point count
     const p = points[i]!;
-    const at = facing.x === "left" ? points.length - 1 - i : i; // cells-ok — a point index
-    const dotCol = points.length <= 1 // cells-ok — a point count
-      ? Math.floor(grid.dotWidth / 2)
-      : Math.round((at / (points.length - 1)) * (grid.dotWidth - 1)); // cells-ok — a point count
+    const dotCol = Math.round(whiskerAt(points, i, xDomain, facing) * (grid.dotWidth - 1));
     if (dotCol < 0 || dotCol >= grid.dotWidth) continue;
     const yTop = rowOf(p.y + p.err, range, grid.dotHeight, facing);
     const yBot = rowOf(p.y - p.err, range, grid.dotHeight, facing);

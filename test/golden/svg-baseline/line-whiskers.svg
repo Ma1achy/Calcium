@@ -15,6 +15,18 @@
 <text x="378.182" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">8</text>
 <text x="450.327" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">10</text>
 <text x="486.4" y="300" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">11</text>
+<path d="M89.6 260.48 L89.6 223.787" fill="none" stroke="#7faecf" stroke-width="1"/>
+<path d="M125.673 242.172 L125.673 196.305" fill="none" stroke="#7faecf" stroke-width="1"/>
+<path d="M161.745 224.092 L161.745 169.052" fill="none" stroke="#7faecf" stroke-width="1"/>
+<path d="M197.818 206.467 L197.818 142.254" fill="none" stroke="#7faecf" stroke-width="1"/>
+<path d="M233.891 189.52 L233.891 116.133" fill="none" stroke="#7faecf" stroke-width="1"/>
+<path d="M269.964 173.465 L269.964 90.905" fill="none" stroke="#7faecf" stroke-width="1"/>
+<path d="M306.036 158.509 L306.036 66.775" fill="none" stroke="#7faecf" stroke-width="1"/>
+<path d="M342.109 144.846 L342.109 43.939" fill="none" stroke="#7faecf" stroke-width="1"/>
+<path d="M378.182 132.66 L378.182 22.58" fill="none" stroke="#7faecf" stroke-width="1"/>
+<path d="M414.255 122.117 L414.255 12.8" fill="none" stroke="#7faecf" stroke-width="1"/>
+<path d="M450.327 113.369 L450.327 12.8" fill="none" stroke="#7faecf" stroke-width="1"/>
+<path d="M486.4 106.55 L486.4 12.8" fill="none" stroke="#7faecf" stroke-width="1"/>
 <circle cx="89.6" cy="242.133" r="3" fill="#e69f00"/>
 <circle cx="125.673" cy="219.238" r="3" fill="#e69f00"/>
 <circle cx="161.745" cy="196.572" r="3" fill="#e69f00"/>

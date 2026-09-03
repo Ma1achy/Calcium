@@ -283,11 +283,20 @@ export function segmentLegend(
   if (spare < 1) return NO_SEGMENT_LEGEND;
 
   const labelW = Math.min(natural, spare);
-  const width = swatchW + 1 + labelW + (valueW > 0 ? valueW + 1 : 0);
   const gap = " ".repeat(LEGEND_GAP);
 
   const shown = count <= rows ? count : Math.max(0, rows - 1);
   const dropped = count - shown;
+  // **The residue counts toward the column's width**, or it is truncated by
+  // the entries it stands in for. A legend of one-letter labels and two-digit
+  // shares is six cells wide, and `⋯ 5 more` is eight: the first overflowing
+  // pie read `⋯ 5 m…`, and the arm-disagreement reader took the `m` for a
+  // segment's name. Bounded by the budget the entries were bounded by.
+  const more = dropped > 0 ? `${glyphs(caps).residue} ${String(dropped)} more` : "";
+  const width = Math.min(
+    budget,
+    Math.max(swatchW + 1 + labelW + (valueW > 0 ? valueW + 1 : 0), cells(more, ambiguous)),
+  );
   const top = Math.max(0, Math.floor((rows - shown - (dropped > 0 ? 1 : 0)) / 2));
 
   const lines: (readonly MarkedText[])[] = Array.from({ length: rows }, () => []);
@@ -301,7 +310,6 @@ export function segmentLegend(
     ];
   }
   if (dropped > 0) {
-    const more = `${glyphs(caps).residue} ${String(dropped)} more`;
     lines[top + shown] = [{ text: `${gap}${truncate(more, width, caps)}`, index: -1 }];
   }
   return { width, lines };
@@ -309,6 +317,7 @@ export function segmentLegend(
 
 // --- the pie ----------------------------------------------------------------
 
+/** One wedge's rows; `segmentIndex` is `-1` for the rim a zero total draws (§3ak.26 finding 5). */
 export type PieLayer = Readonly<{ glyphRows: readonly string[]; segmentIndex: number }>;
 
 /**
@@ -351,6 +360,11 @@ function minSegmentFraction(radius: number): number {
  * ruling contradictable (F305).
  */
 function mergeShares(shares: readonly Share[], radius: number, count: number): readonly Share[] {
+  // **A zero total merges nothing** (C12 I108, §3ak.26 finding 5): every share
+  // is below the threshold and none of them is a slice too thin to draw — the
+  // legend names each at `0%` and the disc is a rim. Folding them into `other`
+  // would give an `other 0%` row for a list that never had an other.
+  if (shares.every((sh) => sh.fraction === 0)) return shares;
   const minFrac = minSegmentFraction(radius);
   const visible: Share[] = [];
   let otherFrac = 0;
@@ -449,6 +463,18 @@ export function pieRender(
   const disc = discAt(leftPad + (discCells - 1) / 2, discWidth, h, radius);
 
   const layers: PieLayer[] = [];
+  // **A zero total is a rim with no wedge** (§3ak.26 finding 5) — the disc's
+  // outline in the furniture tone, `segmentIndex: -1`, beside the legend of
+  // `0%`s. A wedge of zero span would draw its two radii as a spoke.
+  if (slices.every((s) => s.fraction === 0)) {
+    const grid = createGrid(disc.dotWidth, disc.dotHeight);
+    arcDots(grid, disc, 1, START_ANGLE, START_ANGLE + TAU);
+    return {
+      layers: [{ glyphRows: foldBraille(grid), segmentIndex: -1 }],
+      legend: withLegend ? legend.lines : Array.from({ length: h }, () => []),
+      discWidth,
+    };
+  }
   let angle = START_ANGLE;
   for (const s of slices) {
     const grid = createGrid(disc.dotWidth, disc.dotHeight);
@@ -962,7 +988,14 @@ export function radarAsciiRows(
   }
   rows[0] = header;
 
-  const shown = Math.min(n, Math.max(0, h - 1));
+  // **The residue row is reserved before the categories are counted**, which
+  // is `segmentLegend`'s rule one function up and was not this one's: `shown`
+  // was `min(n, h − 1)` and the residue was written at `rows[h − 1]`, the last
+  // *shown* category's own row — so twelve categories in ten rows drew nine,
+  // overwrote the ninth with `⋯ 3 more`, and eight were left reading beside a
+  // count that was one short. Read from the first frame that overflowed.
+  const overflow = n > h - 1; // cells-ok — a row count
+  const shown = overflow ? Math.max(0, h - 2) : n; // cells-ok — a row count
   for (let i = 0; i < shown; i += 1) {
     const pieces: MarkedText[] = [
       { text: `${pad(truncate(categories[i] ?? "", labelW, caps), labelW, ambiguous)} `, index: -1 },

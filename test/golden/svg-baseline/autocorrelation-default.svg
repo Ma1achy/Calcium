@@ -9,6 +9,8 @@
 <text x="288" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">0.0</text>
 <text x="387.2" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">0.5</text>
 <text x="486.4" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">1.0</text>
+<path d="M343.552 12.8 L343.552 288" fill="none" stroke="#626262" stroke-width="1" stroke-dasharray="4 3"/>
+<path d="M232.448 12.8 L232.448 288" fill="none" stroke="#626262" stroke-width="1" stroke-dasharray="4 3"/>
 <path d="M288 12.8 L288 288" fill="none" stroke="#2c2c2c" stroke-width="2"/>
 <rect x="288" y="18.916" width="198.4" height="18.347" fill="#e69f00"/>
 <rect x="288" y="49.493" width="142.848" height="18.347" fill="#e69f00"/>
@@ -19,6 +21,4 @@
 <rect x="246.336" y="202.382" width="41.664" height="18.347" fill="#e69f00"/>
 <rect x="288" y="232.96" width="7.936" height="18.347" fill="#e69f00"/>
 <rect x="288" y="263.538" width="37.696" height="18.347" fill="#e69f00"/>
-<path d="M343.552 12.8 L343.552 288" fill="none" stroke="#626262" stroke-width="1" stroke-dasharray="4 3"/>
-<path d="M232.448 12.8 L232.448 288" fill="none" stroke="#626262" stroke-width="1" stroke-dasharray="4 3"/>
 </svg>

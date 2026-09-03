@@ -171,11 +171,28 @@ describe("S9: the labels follow the scale, not just the range (C12 I15, C12 I22)
   // passed while a log plot was labelled `750 · 500 · 250`.
   const range = { min: 1, max: 1000 };
 
-  it("a log axis is labelled at powers of the base", () => {
-    const text = gutter(range, 9, undefined, pin, "log").map((l) => l.text);
-    // 200 is `2 × 10²` — a log subdivision. 750 is what dividing the *span* gives.
-    expect(text).toContain("200");
+  it("a log axis is labelled at powers of the base, on log rows", () => {
+    const labels = gutter(range, 9, undefined, pin, "log");
+    const text = labels.map((l) => l.text);
+    // Every label is `{1, 2, 5} × 10^k` — a log subdivision. 750 is what
+    // dividing the *span* gives, and it is not one.
+    for (const t of text) expect([1, 2, 5]).toContain(Number(t) / 10 ** Math.floor(Math.log10(Number(t))));
     expect(text).not.toContain("750");
+    // **And the row follows the scale** (C04 I81). This row once expected `200`
+    // in the gutter, which it was — at the *linear* row, where log ticks spread
+    // out; on log rows they crowd towards the top and the gap rule keeps `50`
+    // instead. An interior label sits at its log row and not its linear one.
+    const interior = labels.filter((l) => l.row !== 0 && l.row !== 8);
+    expect(interior.length).toBeGreaterThan(0); // cells-ok — a label count
+    for (const { row, text: t } of interior) {
+      const v = Number(t);
+      const logRow = Math.round((1 - Math.log10(v) / 3) * 8);
+      const linearRow = Math.round((1 - (v - 1) / 999) * 8);
+      expect(row, `${t} at its log row`).toBe(logRow);
+      expect(row, `${t} not at its linear row`).not.toBe(linearRow);
+    }
+    // Mutation: `axisFor` not attaching the scale to the range → `50` returns
+    // to row 8's neighbourhood and the log-row assertions fail.
   });
 
   it("and the same range without a scale is still divided linearly", () => {
@@ -195,10 +212,16 @@ describe("S9: the labels follow the scale, not just the range (C12 I15, C12 I22)
   });
 
   it("log2 subdivides in twos and time in round intervals", () => {
-    expect(gutter({ min: 1, max: 64 }, 9, undefined, pin, "log2").map((l) => l.text))
-      .toContain("32");
-    expect(gutter({ min: 0, max: 3600 }, 9, undefined, pin, "time").map((l) => l.text))
-      .toContain("1800");
+    // Powers of two, and `16` is the interior label that survives on log rows —
+    // `32` sits a row below `64` there and the gap rule drops it.
+    const twos = gutter({ min: 1, max: 64 }, 9, undefined, pin, "log2").map((l) => l.text);
+    for (const t of twos) expect(Math.log2(Number(t)) % 1, `${t} is a power of two`).toBe(0);
+    expect(twos).toContain("16");
+    // A `time` tick reads as a duration where no format is declared (C04 I81):
+    // the half-hour tick is `30m`, not `1800`.
+    const time = gutter({ min: 0, max: 3600 }, 9, undefined, pin, "time").map((l) => l.text);
+    expect(time).toContain("30m");
+    expect(time).not.toContain("1800");
   });
 });
 

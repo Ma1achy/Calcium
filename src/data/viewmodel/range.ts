@@ -16,7 +16,53 @@
  */
 
 /** A resolved range. Empty when `min === max` — a constant, not an error. */
-export type PinnedRange = Readonly<{ min: number; max: number }>;
+import type { ScaleType } from "./types.js";
+
+/**
+ * The bounds a value is placed against — **and the scale it is placed through**
+ * (C04 I81, §3al).
+ *
+ * `scale` rides on the range rather than being threaded beside it, because the
+ * range is the one object every consumer of the shared coordinate already holds:
+ * the terminal's `rowOf`, the SVG's tick placement, the annotations, the
+ * candles and the bands each take `axis.range`, so an axis that carries its
+ * scale reaches all of them without a second parameter to drop. Absent is
+ * linear. A range built from a literal `{ min, max }` is linear by
+ * construction, which is what a stacked band or a colour field wants.
+ */
+export type PinnedRange = Readonly<{ min: number; max: number; scale?: ScaleType }>;
+
+/**
+ * A value through its range's scale — **the transform the shared coordinate
+ * applies** (C04 I81, §3al).
+ *
+ * - `linear`, `time` and absent are the identity. A `time` axis is seconds on a
+ *   linear scale; what the scale changes is the tick *choice* and the label,
+ *   neither of which is a coordinate.
+ * - The log family maps through `ln` — the base cancels in a ratio of spans, so
+ *   `log`, `log2`, `ln` and `{ log: b }` place a value identically and differ
+ *   only in the ticks `niceLogAxis` chooses. Defined where the **whole range is
+ *   positive** and the identity otherwise, which is the condition `niceLogAxis`
+ *   falls back on: an axis that could not choose log ticks does not place its
+ *   samples on a lattice it never labelled. A non-positive value under a
+ *   positive range takes the smallest positive double and clamps to the floor.
+ * - `symlog` is `sign(v) · log10(1 + |v|)`: linear within a unit of zero and
+ *   logarithmic beyond, the threshold `niceSymlogAxis` picks its ticks against.
+ *   It is odd about zero, so a range straddling zero keeps zero where the ticks
+ *   put it.
+ *
+ * **Ticks and samples go through this one function**, in both arms: a label is
+ * placed by `normalisedOf(tick, axis.range)` and the sample beneath it by
+ * `normalisedOf(v, axis.range)`, so the two cannot disagree about where `-100`
+ * is — which they did while the scale chose ticks and moved nothing (F189).
+ */
+export function scaled(v: number, range: PinnedRange): number {
+  const scale = range.scale;
+  if (scale === undefined || scale === "linear" || scale === "time") return v;
+  if (scale === "symlog") return Math.sign(v) * Math.log10(1 + Math.abs(v));
+  if (!(range.min > 0 && range.max > 0)) return v;
+  return Math.log(Math.max(v, Number.MIN_VALUE));
+}
 
 /** What a caller may pin. Independently optional, which is the family's rule. */
 export type RangePin = Readonly<{ yMin?: number; yMax?: number }>;
@@ -123,7 +169,12 @@ export function sharedRange(fields: readonly (readonly (readonly number[])[])[])
  * renderer's — so L0 holding it would contradict the ruling that put it there.
  */
 export function normalisedOf(v: number, range: PinnedRange, invert: boolean): number {
-  const span = range.max - range.min;
+  // **Through the scale first** (C04 I81). The bounds and the value take the
+  // same transform, so a linear range is the arithmetic that stood here and a
+  // log or symlog range is the same arithmetic on transformed numbers.
+  const lo = scaled(range.min, range);
+  const hi = scaled(range.max, range);
+  const span = hi - lo;
   // **Mid-ramp at a zero span** (C04 §3ak). `pinnedRange` already collapses a
   // constant field to `{v, v}` because `{v, v+1}` *puts a field that never
   // varied at the bottom of the scale, which says all minimum about data that
@@ -143,7 +194,7 @@ export function normalisedOf(v: number, range: PinnedRange, invert: boolean): nu
   // **A renderer's degenerate *rounding* is still its own** (C12 §3aj hazard 1):
   // `rowOf` guards before it calls here, because `Math.floor(0.5 · last)` and
   // `Math.round(0.5 · last)` differ at every even height.
-  const t = span === 0 ? 0.5 : (v - range.min) / span;
+  const t = span === 0 ? 0.5 : (scaled(v, range) - lo) / span;
   const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
   return invert ? 1 - clamped : clamped;
 }

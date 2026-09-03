@@ -30,7 +30,7 @@ import { columnsForAspect } from "./aspect.js";
 import {
   calloutOf,
   baselineOf, categoricalDecisions, frameOf, gutterOf, positionalDecisions,
-  proportionDecisions, sharesOf, valueAxisOf, WAFFLE_ROWS,
+  positionDomainOf, proportionDecisions, sharesOf, valueAxisOf, WAFFLE_ROWS,
 } from "./figure.js";
 import { treeArea } from "./tree.js";
 import { graphArea } from "./graph.js";
@@ -1208,7 +1208,7 @@ function overlaidRows(
     // *over* the candles) and the annotations must lose it (C04 I52).
     ...under,
     ...(block.annotations ?? []).map((a) => ({
-      glyphRows: annotationRows(a, range, layout.areaWidth, layout.areaRows, ctx.capabilities, facing),
+      glyphRows: annotationRows(a, range, layout.areaWidth, layout.areaRows, ctx.capabilities, facing, positionDomainOf(block)?.range ?? null),
       ref: `tone.${a.tone ?? "muted"}` as ColourRef,
       // An annotation is a reference drawn behind the data (C04 I52), so the
       // series occludes it rather than sharing a cell with it.
@@ -2932,7 +2932,8 @@ const FORM_ROWS: Readonly<
     if (pie.layers.length === 0) return emptyRows(block, layout, ctx); // cells-ok — a layer count
     const fills: readonly Layer[] = pie.layers.map((pl) => ({
       glyphRows: pl.glyphRows,
-      ref: categoryRef(pl.segmentIndex),
+      // The rim a zero total draws is furniture, not a segment (§3ak.26 finding 5).
+      ref: pl.segmentIndex < 0 ? ("surface.border" as ColourRef) : categoryRef(pl.segmentIndex),
       kind: "surface" as const,
     }));
     // **No muted outline layer, and its absence is the finding.** `mergedRow`
@@ -3088,13 +3089,37 @@ const render = (block: Plot, ctx: RenderContext): ReactElement => {
 };
 
 /**
- * One block-level element, and **only when the block declares a camera** (I85).
+ * **Whether a plot can take a cursor** (I85, §3s): a positional form with at
+ * least one sample and a frame to mark it on.
  *
- * **An element is what a reader can act on.** A plot with no camera affords
- * nothing — there is no view to turn — and `table` already declares elements
- * only where it has rows. Gating on the member rather than on the form is also
- * what makes this invisible: no block in the tree declares a camera, so no
- * document gains a focus stop and no shipped frame moves.
+ * The forms are the ones `positionalForm` serves — the only place
+ * `cursorPositions` is read — and the two conditions are the ones that function
+ * gates the crosshair on: `frameOf(block) !== "none"`, because the mark on the
+ * bottom rule is half of I37 and a frameless plot has no rule; and samples,
+ * because without them the form draws *No data.* and there is no index to
+ * hold. **Exported for L4's writer** (C22 I76): `moveCursor` gating on `kind ===
+ * "plot"` alone stored a cursor on forms that draw none, and the residue closes
+ * only when the writer asks the renderer the question the renderer answers.
+ */
+export function cursorable(block: Plot): boolean {
+  return CURSORABLE_FORMS.has(block.form) && frameOf(block) !== "none" && hasSamples(block.series);
+}
+
+const CURSORABLE_FORMS: ReadonlySet<Plot["form"]> = new Set<Plot["form"]>([
+  "line", "scatter", "step", "ecdf", "slope", "bubble", "density",
+]);
+
+/**
+ * One block-level element, **when the block declares a camera or can take a
+ * cursor** (I85).
+ *
+ * **An element is what a reader can act on.** A plot with no camera and no
+ * cursor affords nothing — there is no view to turn and no sample to point at —
+ * and `table` already declares elements only where it has rows. The first
+ * ruling gated on the camera alone, and that was true about what a reader could
+ * do to a plot until `cursorPositions` had a writer (C22 I76); a 2D positional
+ * plot with data can now take a crosshair, so it declares the stop the
+ * crosshair's keys need.
  *
  * **The implementation is what found the ruling.** C22 I71 requires the camera
  * field and a writer to land together; the writer reads `focus.current`, focus
@@ -3108,7 +3133,7 @@ const render = (block: Plot, ctx: RenderContext): ReactElement => {
  * edge was ruled.
  */
 function elements(block: Plot, width: number, measureChild: MeasureFn): readonly NavElement[] {
-  if (block.camera === undefined) return NO_ELEMENTS;
+  if (block.camera === undefined && !cursorable(block)) return NO_ELEMENTS;
   return [
     Object.freeze({
       id: block.id,

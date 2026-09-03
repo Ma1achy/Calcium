@@ -483,6 +483,54 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
       form: "plot3d", height: 10, series: [],
       points3: [{ label: "plane", points: helix3(120).map((p) => ({ ...p, z: 0.25 })) }],
     },
+    // **Mid-ramp at a zero span, on the third carrier** (C12 I89, I86). A flat
+    // surface has one height, so its colour ramp has no span; `scatter3.ts`'
+    // `ramped` answers 0.5 and the whole sheet is one mid-ramp colour. And its
+    // *position* extent is zero on `z`, which is I86's centre rule — the two are
+    // both called a zero extent and only one is about geometry.
+    "constant-surface": {
+      form: "plot3d", height: 12, series: [], colormap: "viridis",
+      surfaces3: [{ heights: field3(12, () => 0.5), xRange: [-2, 2], yRange: [-2, 2] }],
+    },
+    // The point cloud's own reading of the same rule: `colourBy: "value"` over
+    // values that never vary, so `scatter3.ts`' `ramped` answers 0.5 for every
+    // point and the cloud is one mid-ramp colour rather than the ramp's floor.
+    "constant-value": {
+      form: "plot3d", height: 12, series: [], colourBy: "value",
+      points3: [{ label: "helix", points: helix3(160).map((p) => ({ ...p, value: 0.5 })) }],
+    },
+    // **A triangle straddling the near plane** (C12 §6i row 10). The eye sits
+    // inside the sphere's bounding extent, so faces with one or two vertices
+    // behind the camera are cut rather than dropped — `clipNear`'s one- and
+    // two-kept arms, which no catalogue camera reached (F450, F451).
+    "near-clip": {
+      form: "plot3d", height: 14, series: [], colormap: "viridis",
+      camera: { distance: 0.7, azimuth: 0.6, elevation: 0.25 },
+      surfaces3: [{ ...sphere3(14, 10) }],
+    },
+    // **The three `origin3` modes `axes-origin` does not take** (C12 I92,
+    // `originOf`): `auto` puts the rules at zero where the range straddles it;
+    // these put them at the centre, at the minimum corner, and at a declared
+    // point in data units.
+    "origin-centre": {
+      form: "plot3d", height: 14, series: [], axes3: "origin", origin3: "centre",
+      points3: [{ label: "helix", points: helix3(160) }],
+    },
+    "origin-min": {
+      form: "plot3d", height: 14, series: [], axes3: "origin", origin3: "min",
+      points3: [{ label: "helix", points: helix3(160) }],
+    },
+    "origin-explicit": {
+      form: "plot3d", height: 14, series: [], axes3: "origin", origin3: { x: 0.5, y: -0.5, z: 0.2 },
+      points3: [{ label: "helix", points: helix3(160) }],
+    },
+    // **`light3: "headlight"`** (C12 I94) — the light rides the camera, so the
+    // face toward the eye is the brightest wherever the camera goes. The
+    // `surface-light` variant takes the explicit angle; nothing took this rung.
+    headlight: {
+      form: "plot3d", height: 14, series: [], colormap: "viridis", light3: "headlight",
+      surfaces3: [{ ...sphere3(28, 20) }],
+    },
   },
   line: {
     // C12 §3g — all four placements, and the default that turns itself on.
@@ -691,6 +739,19 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
         tone: "info",
       }],
     },
+    // **A whisker sits at its own `x`** (C04 I52, C12 I109). `whiskers` above
+    // puts `x: i` on every sample, which is the index lattice the old
+    // spread-by-index placement also produced — so that frame cannot show the
+    // member is read. Three whiskers at `2 · 3 · 9` of twelve can: spread by
+    // index they would sit at the ends and the middle.
+    "whiskers-placed": {
+      form: "scatter", height: 8, axes: true, series: [s(sin(12), "obs")],
+      annotations: [{
+        kind: "whiskers",
+        points: [2, 3, 9].map((x) => ({ x, y: sin(12)[x]!, err: 12 })),
+        tone: "info",
+      }],
+    },
     "multi-series": {
       form: "line", height: 8, axes: true,
       series: [s(sin50, "alpha"), s(sin50.map((v) => 100 - v), "beta"), s(sin(50, 0.2), "gamma")],
@@ -735,6 +796,61 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
       form: "line", height: 11, axes: true, plotStyle: "candlestick", cursor: 9,
       ohlc: candles(24),
       series: [s(movingAverage(candles(24).map((b) => b.close), 3), "ma3")],
+    },
+    // **The crosshair flips with the data** (C12 §3ac B1/B2). Under a
+    // right-anchored origin the samples run leftward, and a crosshair that did
+    // not flip would sit at the mirror sample with a readout naming a value the
+    // reader is not looking at — the frame plausible and the number wrong. The
+    // two fixtures above draw the default facing only.
+    "cursor-flipped": {
+      form: "line", height: 9, axes: true, cursor: 32, origin: "bottom-right",
+      series: [s(sin50, "alpha"), s(sin(50, 0.2), "gamma")],
+    },
+    "cursor-candles-flipped": {
+      form: "line", height: 11, axes: true, plotStyle: "candlestick", cursor: 9, origin: "bottom-right",
+      ohlc: candles(24),
+      series: [s(movingAverage(candles(24).map((b) => b.close), 3), "ma3")],
+    },
+    // **The right label column goes before the left** (C12 I47, §6c.2). Wide
+    // readings on both sides: at 80 both columns fit, at 40 the right one is
+    // dropped whole and the frame lands on the left-only rung — the one this
+    // ladder is named for and no width in the corpus reached.
+    // A number label is never wide enough to force the rung — `formatNumber`
+    // goes exponential before it reaches sixteen cells — so the right column's
+    // width comes from a callout, which is the case a dashboard actually has.
+    "both-axes-narrow": {
+      form: "line", height: 8, axes: true, legend: false, yAxis: "both", yCallout: "both",
+      series: [s(sin50, "eu-west-1-primary-p99-latency")],
+    },
+    // **`yFormat: "bytes"` and `"duration"`** (C04 I41) — the two readouts
+    // `axes.ts` formats and no fixture asked for. Bytes climb the 1024 ladder
+    // into `GB`; seconds fold into `h` and `m`.
+    bytes: {
+      form: "line", height: 8, axes: true, yFormat: "bytes",
+      series: [s(sin50.map((v) => v * 52_428_800), "rss")],
+    },
+    duration: {
+      form: "line", height: 8, axes: true, yFormat: "duration",
+      series: [s(sin50.map((v) => v * 96), "p99")],
+    },
+    // **`yScale: "log"`, `"symlog"` and `"time"`** — the tick pickers were
+    // exported and called by no frame, and until C04 I81 the scale chose ticks
+    // and moved no sample (F189). `log` is the exponential of the sine, so the
+    // sine the other line variants draw is the picture that says the transform
+    // reached the samples, with `100` mid-way between `10` and `999`; symlog needs
+    // data across zero with a linear band at ±1 and decades beyond it; time
+    // needs seconds spanning a day or so, so the ticks land on hours.
+    log: {
+      form: "line", height: 10, axes: true, yScale: "log",
+      series: [s(sin50.map((v) => 10 ** (1 + v / 50)), "decades")],
+    },
+    symlog: {
+      form: "line", height: 10, axes: true, yScale: "symlog",
+      series: [s(sin50.map((v) => (v - 50) * 20), "signed")],
+    },
+    time: {
+      form: "line", height: 8, axes: true, yScale: "time",
+      series: [s(sin50.map((v) => v * 2_592), "elapsed")],
     },
     // **`width`, `aspect` and `align` landed with no frame at all** — three of
     // the eleven `Plot` members no catalogue variant sets, and the three this
@@ -824,6 +940,22 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
       form: "heatmap", height: 5, axes: true, colormap: "viridis",
       matrixAnchor: "left", xLabels: ["epoch 0", "epoch 10", "now"],
       series: matrix(5, 20),
+    },
+    // **Mid-ramp at a zero span** (C04 I74, C12 I89) — every reading the same,
+    // so the ramp has no span to place it on and `heatmap.ts` answers the
+    // middle glyph. No fixture had a constant field; `matrix` always varies.
+    constant: {
+      form: "heatmap", height: 5, axes: true,
+      series: Array.from({ length: 5 }, (_r, r) => s(Array.from({ length: 20 }, () => 3), `row ${String(r)}`)),
+    },
+    // **The right label column goes before the left one shrinks** (C12 I47,
+    // §6c.2) — `yAxis: "both"` with names the narrow width cannot afford twice.
+    // At 80 both columns fit; at 40 the right one is dropped whole and the left
+    // one keeps its names, which is the rung no frame reached.
+    "both-axes-narrow": {
+      form: "heatmap", height: 5, axes: true, yAxis: "both", colormap: "viridis",
+      series: ["eu-west-1-primary-db", "eu-west-1-replica-db", "us-east-1-primary-db", "us-east-1-replica-db", "ap-south-1-primary-db"]
+        .map((label, r) => s(Array.from({ length: 20 }, (_c, c) => Math.sin((r + c) * 0.3)), label)),
     },
   },
   contour: {
@@ -921,6 +1053,15 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
       series: [s([84, 89, 183, 184, 227, 280, 840, 2968])],
     },
     empty: { form: "bar", height: 3, axes: true, categories: ["x"], series: [{ values: [] }] },
+    // **A zero span, and equal values do not produce one** (C04 I74, C12 I89).
+    // A bar's range runs from `baselineOf(min)` — zero for non-negative data —
+    // so `[7, 7, 7, 7]` spans 0…7 and never reaches `categorical.ts`' zero-span
+    // arm; only a bar chart whose every value *is* the baseline does. Vertical,
+    // so `barColumn`'s arm is the one drawn; `barRow`'s is the horizontal twin.
+    "all-zero": {
+      form: "bar", height: 6, axes: true, orientation: "vertical",
+      categories: ["mon", "tue", "wed", "thu"], series: [s([0, 0, 0, 0])],
+    },
   },
   histogram: {
 
@@ -1113,6 +1254,17 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     "over-100": {
       form: "waffle", series: [],
       segments: [{ label: "Half", value: 50 }, { label: "Half again", value: 50 }, { label: "Sliver", value: 1 }],
+    },
+    // **The `scale = 0` arm, which no frame had reached** (C12 I108). Every
+    // other waffle has a sum to divide by; this one has shares of nothing, so
+    // every square is unowned and the legend reads `0%` beside each name. The
+    // one case where `-1` in the grid is the ruling rather than a rounding
+    // residue — and the frame that showed the legend carrying names and
+    // swatches with no reading, because `sharesOf` returns nothing for a zero
+    // total and the slot never got a `value`.
+    "all-zero": {
+      form: "waffle", series: [],
+      segments: [{ label: "None", value: 0 }, { label: "Nil", value: 0 }, { label: "Zero", value: 0 }],
     },
   },
   flame: {
@@ -1416,6 +1568,13 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
         s(Array.from({ length: 60 }, (_, i) => 14 + Math.cos(i * 0.11) * 9), "worker"),
         s(Array.from({ length: 60 }, (_, i) => 9 + Math.sin(i * 0.27 + 1) * 6), "cron"),
       ],
+    },
+    // **`stackRange`'s zero-span arm** (C04 I74): every band is flat at zero,
+    // so `min === max` and the range is widened to `{0, 1}` rather than divided
+    // by nothing. No fixture had a stack that summed to nothing anywhere.
+    "all-zero": {
+      form: "stackedarea", height: 8, axes: true,
+      series: [s(Array.from({ length: 30 }, () => 0), "api"), s(Array.from({ length: 30 }, () => 0), "worker")],
     },
   },
   streamgraph: {
@@ -1805,6 +1964,13 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
     },
     // Same argument as the radar's — `narrow-20` below keeps the small case.
     "default-40": { form: "pie", height: 18, series: [], segments: [...PIE_SEGMENTS] },
+    // **A zero total is a drawn figure** (C12 I108, §3ak.26 finding 5): a rim
+    // with no wedge beside a legend naming every segment at `0%`, in both forms
+    // and both arms. The waffle's `all-zero` is the same list one form over.
+    "all-zero": {
+      form: "pie", height: 10, series: [],
+      segments: [{ label: "None", value: 0 }, { label: "Nil", value: 0 }, { label: "Zero", value: 0 }],
+    },
     "narrow-20": { form: "pie", height: 5, series: [], segments: [...PIE_SEGMENTS] },
     "many-segments": {
       form: "pie", height: 10, series: [],
@@ -1834,6 +2000,14 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
         { label: "A", value: 50 }, { label: "B", value: 25 }, { label: "C", value: 15 },
         { label: "D", value: 8 }, { label: "E", value: 1 }, { label: "F", value: 1 },
       ],
+    },
+    // **The legend's `⋯ N more` residue** — twelve entries in eight rows, so
+    // seven are shown and the last row counts the rest. Every value is well
+    // above the merge threshold, so what overflows is the *legend* and not the
+    // disc (`many-segments` has ten in ten rows and shows them all).
+    "legend-overflow": {
+      form: "pie", height: 8, series: [],
+      segments: ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"].map((label, i) => ({ label, value: 12 - (i % 3) })),
     },
   },
   radar: {
@@ -1866,6 +2040,22 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
       form: "radar", height: 16, plotGrid: "circle",
       categories: ["Speed", "Power", "Range"],
       series: [s([80, 60, 90], "alpha"), s([50, 85, 45], "beta")],
+    },
+    // **The ASCII table's `⋯ N more`** — below the glyph floor a radar is a
+    // readings table with a header row, so twelve categories in ten rows show
+    // nine and count three. Only the ASCII arm has a table to overflow.
+    "table-overflow": {
+      form: "radar", height: 10,
+      categories: ["Speed", "Power", "Range", "Defence", "HP", "Stealth", "Luck", "Armour", "Reach", "Wit", "Grit", "Poise"],
+      series: [s([80, 60, 90, 40, 70, 55, 65, 45, 75, 50, 85, 60], "alpha"), s([50, 85, 45, 75, 55, 70, 40, 90, 60, 65, 45, 80], "beta")],
+    },
+    // **A circular grid on the default figure** (C12 I45). `triangle-circle`
+    // asks for it at the default style, whose rings are `frameRows`' arcs; the
+    // sampled ring in `radarQuadFigure` is the **line** style's, and no fixture
+    // combined the two.
+    "circle-grid": {
+      form: "radar", height: 18, plotGrid: "circle", plotStyle: "line", categories: ["Speed", "Power", "Range", "Defence", "HP"],
+      series: [s([80, 60, 90, 40, 70], "alpha"), s([50, 85, 45, 75, 55], "beta")],
     },
   },
   horizon: {

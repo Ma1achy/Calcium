@@ -881,7 +881,17 @@ export type Series = Readonly<{
   pointLabels?: readonly (string | null)[];
   label?: string;
   tone?: Tone;
-  marker?: string;
+  /*
+   * **No `marker`** (C04 I76's last clause). An undocumented `marker?: string`
+   * sat here from the figure builder's first commit (127f19b1) with no reader:
+   * the only `.marker` reader in `src/` is `scatter3.ts` on `Point3Series`,
+   * whose depth tier gives a marker name a glyph column to index (C12 I99), and
+   * `validateBlock` checks `marker` only under `points3`. No 2-D form has that
+   * channel, so `b.line(values, { marker: "star" })` compiled, validated and
+   * drew nothing — F207's member accepted and ignored. Narrowed on F85's
+   * argument: supplying one fails to compile rather than failing to matter.
+   * 2026-09-03.
+   */
 }>;
 
 /**
@@ -1077,7 +1087,18 @@ export type Annotation =
        */
       fill?: boolean;
     }>
-  | Readonly<{ kind: "whiskers"; points: readonly Readonly<{ x: number; y: number; err: number }>[]; tone?: Tone }>;
+  | Readonly<{
+      kind: "whiskers";
+      /**
+       * `x` is where the whisker sits: a value on the abscissa's domain —
+       * `xMin..xMax` when declared, the sample index otherwise — placed through
+       * the shared coordinate in both arms (C04 I52, C12 I109). `y ± err` is
+       * the bar. A plot with no domain (fewer than two samples and none
+       * declared) spreads the points evenly by index.
+       */
+      points: readonly Readonly<{ x: number; y: number; err: number }>[];
+      tone?: Tone;
+    }>;
 
 export type Plot = Readonly<{
   kind: "plot";
@@ -2255,6 +2276,14 @@ export const STYLE_ARMS: Readonly<Record<PlotForm, readonly PlotStyleArm[]>> = O
   smallmultiples: [], pairplot: [],
 });
 
+/**
+ * A transform on the shared coordinate (C04 I81, §3al): `linear` and `time`
+ * are the identity; the log family (`log`, `log2`, `ln`, `{ log: base }`) is
+ * `ln` on a positive range; `symlog` is `sign(v) · log10(1 + |v|)` with a unit
+ * threshold. `time` is seconds, with round-interval ticks and duration labels
+ * unless a format is declared. The range carries it (`PinnedRange.scale`), so
+ * samples and ticks move through one function in both arms.
+ */
 export type ScaleType = "linear" | "log" | "log2" | "ln" | "symlog" | "time" | { log: number };
 
 export type QuartileSummary = Readonly<{

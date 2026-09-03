@@ -428,7 +428,7 @@ export function yLabels(
   // from the *span* before, which is the same number divided by the tick count —
   // right when there were three labels and wrong the moment there are five, and
   // wrong in the direction that drops a digit two adjacent ticks differ by.
-  const at = (v: number): string => formatValue(v, format, placesFor(axis));
+  const at = (v: number): string => formatValue(v, scaleFormat(format, axis.range.scale), placesFor(axis));
 
   if (h === 1) return [{ row: 0, text: at(axis.range.max) }];
 
@@ -509,7 +509,22 @@ function stepDecimals(step: number): number {
  * One derivation, read by both.
  */
 export function tickLabels(axis: Axis, format: Plot["yFormat"]): readonly string[] {
-  return axis.ticks.map((v) => formatValue(v, format, placesFor(axis)));
+  return axis.ticks.map((v) => formatValue(v, scaleFormat(format, axis.range.scale), placesFor(axis)));
+}
+
+/**
+ * The format an axis's labels take — **the block's, or a duration where a
+ * `time` scale has none** (C04 I81).
+ *
+ * A `time` axis is seconds on a linear scale, and `niceTimeAxis` chooses its
+ * ticks at round intervals — minutes, hours, days. A label reading `172800`
+ * beside a tick chosen *because* it is two days is the scale doing half its job;
+ * the ladder A01 A.3's messages use (`2m 10s`, `48h`) is the other half. A
+ * declared `yFormat`/`xFormat` still wins, so a caller who wants raw seconds
+ * says `"number"` rather than losing the option.
+ */
+function scaleFormat(format: Plot["yFormat"], scale: ScaleType | undefined): Plot["yFormat"] {
+  return format ?? (scale === "time" ? "duration" : undefined);
 }
 
 /**
@@ -688,34 +703,21 @@ const X_LABEL_PITCH = 8;
 /**
  * Where a value sits along the x domain, as a fraction (C12 I41, §3d.1).
  *
- * **The x axis transforms where the y axis cannot, and the asymmetry is real
- * rather than an inconsistency.** A y value *is* the datum, so placing it under
- * a log scale needs the rasteriser to plot `log(v)` — which this component does
- * not do, and `yScale: "log"` therefore picks log ticks and draws them at linear
- * rows (F189). An x sample is placed by its **index**, evenly, and the domain is
- * what declares which value that index carries: under `xMin: 1, xMax: 1000,
- * xScale: "log"`, sample *i* of *n* holds `1000 ^ (i / (n − 1))` and already
- * sits at `i / (n − 1)` of the width. Placing a tick at `log(v) / log(max/min)`
- * is what makes the label agree with the sample beneath it.
- *
- * **`symlog` falls back to linear, and that is stated rather than silent.** Its
- * transform is piecewise — linear inside a threshold and logarithmic outside —
- * and the threshold is not on the scale value, so there is nothing here to read
- * it from. `niceSymlogAxis` still chooses the tick *values*; only their spacing
- * is linear, which is wrong near the origin and is the one arm of this function
- * that does not agree with its samples.
+ * **The shared coordinate, through the domain's scale** (C04 I81, §3ak). An x
+ * sample is placed by its **index**, evenly, and the domain declares which value
+ * that index carries: under `xMin: 1, xMax: 1000, xScale: "log"`, sample *i* of
+ * *n* holds `1000 ^ (i / (n − 1))` and already sits at `i / (n − 1)` of the
+ * width, so a tick placed at `log(v) / log(max / min)` is the one that agrees
+ * with the sample beneath it. That arithmetic used to live here, for the log
+ * family alone, with `symlog` falling back to linear spacing under a comment
+ * saying so; it is `scaled` in L0 now, which is the same function the y axis
+ * places its samples and ticks through — so this is one call and the abscissa
+ * has no arm that disagrees with its samples.
  */
 function xPositionOf(value: number, range: Range, scale?: ScaleType): number {
-  // **The shared coordinate** (C04 §3ak). This read `span <= 0 ? 0`, which puts
-  // every tick of a constant range at the axis's left edge; mid-ramp is the
-  // family's answer and the one C04's table gives.
-  const linear = normalisedOf(value, { min: range.min, max: range.max }, false);
-  const isLog = scale === "log" || scale === "log2" || scale === "ln"
-    || (typeof scale === "object" && "log" in scale);
-  if (!isLog || range.min <= 0 || range.max <= 0) return linear;
-  const lo = Math.log(range.min);
-  const hi = Math.log(range.max);
-  return hi === lo ? 0 : (Math.log(Math.max(value, Number.MIN_VALUE)) - lo) / (hi - lo);
+  const applied = scale ?? range.scale;
+  const through: Range = applied === undefined ? range : { min: range.min, max: range.max, scale: applied };
+  return normalisedOf(value, through, false);
 }
 
 /**
@@ -745,11 +747,10 @@ export type PositionDomain = Readonly<{
 export type PositionAxis = Axis & Readonly<{
   labels: readonly string[];
   /**
-   * Where each tick sits, normalised and **unflipped** — `xPositionOf`, which is
-   * scale-aware where `normalisedOf` is not. An arm that placed a log tick with
-   * `normalisedOf` would draw the label at the linear position and the sample
-   * beneath it at the log one, which is the half of F189 the abscissa does not
-   * have.
+   * Where each tick sits, normalised and **unflipped** — `xPositionOf`, above
+   * the seam so the position crosses rather than the scale being applied twice.
+   * `normalisedOf` has been scale-aware since C04 I81; what this member still
+   * settles is that both arms read one number rather than each computing it.
    */
   at: readonly number[];
   /** Where 0 sits, or `null` unless the domain *strictly* straddles it (§3ad A4). */
@@ -770,7 +771,7 @@ export function positionAxisAt(pos: PositionDomain, maxTicks: number): PositionA
   const straddles = axis.range.min < 0 && axis.range.max > 0;
   return {
     ...axis,
-    labels: axis.ticks.map((v) => formatValue(v, pos.format, decimals)),
+    labels: axis.ticks.map((v) => formatValue(v, scaleFormat(pos.format, pos.scale), decimals)),
     at: axis.ticks.map((v) => xPositionOf(v, axis.range, pos.scale)),
     zeroAt: straddles ? xPositionOf(0, axis.range, pos.scale) : null,
   };
@@ -938,7 +939,9 @@ export function niceLogAxis(
 /**
  * Symlog axis: linear near zero, logarithmic outside.
  *
- * The linear threshold defaults to 1.
+ * The linear threshold is 1 — the same unit `scaled` in L0 places samples and
+ * ticks against (`sign(v) · log10(1 + |v|)`), so a tick chosen here lands where
+ * the transform puts the value it names.
  */
 export function niceSymlogAxis(
   range: Range,
@@ -1017,9 +1020,28 @@ export function niceTimeAxis(
 }
 
 /**
- * Dispatch to the appropriate axis algorithm for a scale type.
+ * Dispatch to the appropriate axis algorithm for a scale type — **and hand the
+ * scale to the range the axis is placed against** (C04 I81).
+ *
+ * Every consumer of the shared coordinate holds `axis.range` and nothing else
+ * about the scale: the terminal's `rowOf`, the SVG's tick placement, the
+ * annotations, the candles, the bands. Attaching the scale here is what makes a
+ * `log` or `symlog` axis move its samples and its ticks together in both arms,
+ * with no consumer changed — F189's defect was a scale that chose ticks and
+ * reached no coordinate.
  */
 export function axisFor(
+  range: Range,
+  maxTicks: number,
+  pin: Pick<Plot, "yMin" | "yMax">,
+  scale?: ScaleType,
+): Axis {
+  const axis = pickAxis(range, maxTicks, pin, scale);
+  if (scale === undefined || scale === "linear") return axis;
+  return { ...axis, range: { ...axis.range, scale } };
+}
+
+function pickAxis(
   range: Range,
   maxTicks: number,
   pin: Pick<Plot, "yMin" | "yMax">,

@@ -754,7 +754,24 @@ function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out:
   // What must not be asked twice is what the text says — that is `figure.callout`.
   const ends = new Map<number, readonly [number, number]>();
 
-  for (const d of figure.marks) {
+  // **Behind the data, and the layer order is the ruling** (C12 §3e, I109).
+  // The terminal resolves layers first-non-blank with annotations appended last,
+  // so a reference line never hides the sample it is compared against. This arm
+  // paints in order, so *last* means *on top* — the opposite — and a filled band
+  // drawn after the series would cover the curve it exists to be read against.
+  // A stable partition, so nothing else moves.
+  //
+  // **A claim about the data has no series, and that is how the one exemption
+  // is told apart.** `violinFigure` puts its IQR box on `layer: "annotation"`
+  // *for the width* — the layer is what escapes `SLOT_SHARE` — and carries a
+  // `seriesIndex`, which no annotation does. Drawn behind the density and
+  // shaded, the box vanished into the body it sits on: nineteen violin
+  // baselines moved under a change to annotations. The box is a datum wearing
+  // an annotation's layer, recorded as such; this predicate is the count of
+  // that exemption rather than its exclusion.
+  const claim = (d: Drawn): boolean => d.layer === "annotation" && d.seriesIndex === undefined;
+  const ordered = [...figure.marks.filter(claim), ...figure.marks.filter((d) => !claim(d))];
+  for (const d of ordered) {
     const ink = inkFor(d);
     if (ink === undefined) continue;
     const m = d.mark;
@@ -777,20 +794,32 @@ function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out:
         if (colour === undefined || colour.kind !== "rgb") continue;
         stroke = colour.hex;
       }
-      // **Dashed, for `annotate.ts`' own reason**: a reference line is a claim
-      // *about* the ordinate drawn beside the data, and a solid rule crossing
-      // five series reads as a sixth. The terminal draws `┄` and the legend
-      // swatch it already shares says the same thing (C04 I52).
+      // **Dashed where the mark says so, for `annotate.ts`' own reason**: a
+      // reference line is a claim *about* the ordinate drawn beside the data,
+      // and a solid rule crossing five series reads as a sixth. The terminal
+      // draws `┄` and the legend swatch it already shares says the same thing
+      // (C04 I52). **It was every annotation-layer polyline**, which was right
+      // while `line` was the only kind that reached here and wrong the day a
+      // whisker did — a dash breaks a one-sample vertical into dots (I109).
       // **A filled region reads as a quantity and a stroked one as a boundary**
       // (§3ak.33). A stacked band is the first; every curve this arm drew before
       // it is the second, and `fill` is what says which. The stroke stays on a
       // filled band so its own edge is visible against its neighbour, which is
       // the terminal's `markOf` glyph doing the same job one alphabet along.
+      // **An annotation's fill is translucent** — the terminal's `░` is a shade,
+      // not a block, and a region drawn behind the data still has gridlines to
+      // show through it.
+      // **And a claim's interior has no stroke of its own** — its edges are
+      // marks beside it, present where the terminal inks them and absent where
+      // it drops them, so no outline runs along the ceiling saying *the edge is
+      // here* about a sample that is above it.
+      const shade = claim(d) && m.fill === true;
+      const fillOpacity = m.fill === true ? ` fill-opacity="${shade ? "0.2" : "0.85"}"` : "";
       out.push(
         `<path d="${path}${m.closed === true ? " Z" : ""}" ` +
-          `fill="${m.fill === true ? stroke : "none"}"${m.fill === true ? ' fill-opacity="0.85"' : ""} ` +
-          `stroke="${stroke}" ` +
-          `stroke-width="${annotation ? "1" : "2"}"${annotation ? ' stroke-dasharray="4 3"' : ""}/>`,
+          `fill="${m.fill === true ? stroke : "none"}"${fillOpacity} ` +
+          `stroke="${shade ? "none" : stroke}" ` +
+          `stroke-width="${annotation ? "1" : "2"}"${m.dashed === true ? ' stroke-dasharray="4 3"' : ""}/>`,
       );
       continue;
     }
@@ -950,6 +979,16 @@ function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out:
       const w = Math.max(0.5, Math.abs(b[0] - a[0]) - inset * 2);
       const h = Math.max(0.5, Math.abs(b[1] - a[1]) - inset * 2);
       let fill = ink;
+      // **A band's interior is a shade and not a block** (C12 I109, §3e). The
+      // terminal fills a region with `░` behind the curve; here the same claim
+      // is a translucent rect with no stroke of its own — its edges are the two
+      // dashed polylines `annotationMarks` emits beside it, present exactly where
+      // the terminal's are, so an edge outside the scale is not drawn along the
+      // plot's boundary as if the limit were there.
+      if (claim(d)) {
+        out.push(`<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" fill="${ink}" fill-opacity="0.2"/>`);
+        continue;
+      }
       // **`fill: false` is an outline with the datum showing through**, which is
       // a boxplot's body: the box is a *range* the whiskers pass behind, so a
       // solid fill would hide them and a bare outline would not read as a body.
@@ -2095,18 +2134,15 @@ export function plotToSvg(
     const originY = place === "above" ? box.top - step * legend.slots.length : place === "below" // cells-ok — a legend entry count
       ? box.bottom + SVG_FONT_SIZE * 2
       : box.top + SVG_FONT_SIZE;
-    // **This arm does not draw annotations, so its legend must not name one**
-    // (F259). `legendSlots` composes the terminal's list — candles, series, then
-    // the annotations, which are claims *about* the data — and this path drops
-    // annotations rather than refusing, because the picture it leaves is a
-    // correct curve with a claim missing from beside it. Naming the claim in the
-    // legend puts it back as a lie: `G8f` caught exactly that.
-    //
-    // **A per-arm filter of a shared list is not a second decision.** The figure
-    // says what the legend contains; each arm names what it drew, and the gap is
-    // the annotation disagreement already on the record rather than a new one.
-    const shown = legend.slots.filter((sl) => sl.role !== "annotation");
-    for (const [i, slot] of shown.entries()) {
+    // **This arm draws every annotation kind, so its legend names them** (C12
+    // I109, §3e). It filtered `role !== "annotation"` under a comment saying
+    // *this arm does not draw annotations* (F259) — true when it was written,
+    // false from the day `line` crossed, and the filter outlived its reason
+    // unread: a `line/annotation-label` document drew the budget line and
+    // omitted the legend row that named it. `legendSlots` composes one list —
+    // candles, series, then the annotations, which are claims *about* the data
+    // — and both arms now draw all of it.
+    for (const [i, slot] of legend.slots.entries()) {
       const ink = inkOf(slot.ref, theme);
       if (ink === undefined) continue;
       const x = sideways ? originX : originX + i * (SVG_FONT_SIZE * 8);

@@ -317,6 +317,16 @@ export type Mark =
        * the legend names (I49).
        */
       value?: number;
+      /**
+       * **A stroke that is a claim about the data rather than the data** — broken,
+       * so the shape carries the distinction at every colour depth (C12 I109,
+       * §3e). Set on an annotation's edges: a reference line, a band's two
+       * edges, a confidence region's outline. A whisker is *not* dashed — it is
+       * one short vertical at one sample and a dash would break it into dots —
+       * which is why this is a member of the mark and not a property of the
+       * `annotation` layer, where the second arm first read it.
+       */
+      dashed?: boolean;
     }>
   | Readonly<{
       kind: "rect";
@@ -814,7 +824,10 @@ export function positionDomainOf(block: Plot): PositionDomain | null {
   const min = block.xMin ?? 0;
   const max = block.xMax ?? n - 1;
   if (!(max > min)) return null;
-  return { range: { min, max }, scale: block.xScale, format: block.xFormat };
+  // **The range carries its scale** (C04 I81), so a consumer placing a value
+  // on the abscissa — a tick, or a whisker's `x` — holds one object.
+  const range: Range = block.xScale === undefined ? { min, max } : { min, max, scale: block.xScale };
+  return { range, scale: block.xScale, format: block.xFormat };
 }
 
 export function positionAxisOf(block: Pick<Plot, "axes" | "form" | "xLabels">): boolean {
@@ -1104,33 +1117,146 @@ function orientationOf(block: Pick<Plot, "orientation">): "horizontal" | "vertic
 }
 
 /**
- * A reference line's mark — **the annotation mechanism, not a form's machinery**
- * (C04 I52, §3e).
+ * An annotation's marks — **the annotation mechanism, not a form's machinery**
+ * (C04 I52, §3e), and **all four kinds cross** (C12 I109).
  *
  * A reference line is a claim *about* the ordinate drawn beside the data, and it
  * is the same mechanism an autocorrelation plot's significance bounds use, which
  * is what §3ak.6 measured rather than assumed before refusing that form. Shared
  * across the families for that reason: a second copy would be a second answer to
  * *where does a reference line sit*, and the arms already had two.
+ *
+ * **This opened `if (a.kind !== "line") return []`, and nothing said so.** The
+ * terminal draws `band`, `confidence` and `whiskers` through `annotate.ts`; the
+ * second arm drew none of them, and a `line` block with and without a `band`
+ * rendered byte-identical SVG. §3e's own tables never ruled the three
+ * terminal-only — they *arrived with a renderer and without a ruling* — so the
+ * gap was an omission wearing a guard's shape. Each kind becomes a mark the type
+ * already had:
+ *
+ * | kind | mark | the terminal's rule it inherits |
+ * |---|---|---|
+ * | `line` | a dashed full-width `polyline` | an out-of-range value is **dropped, never clamped** |
+ * | `band` | a filled `rect` for the interior, plus a dashed edge per **in-range** edge | the interior clamps where the edge is dropped |
+ * | `confidence` | a closed filled `polyline` for the interior where `fill` is on (the default), plus dashed upper and lower edges **broken at out-of-range samples** | `confidenceRows`: the fill clamps, an edge sample off the scale is not inked |
+ * | `whiskers` | one two-point `polyline` per point, **not** dashed | placed at its own `x` on the abscissa's domain, as `whiskersRows` places it |
+ *
+ * **An interior has no stroke of its own.** The first draft drew a confidence
+ * region as one closed dashed path, and reading `line-confidence.svg` found the
+ * outline running along the ceiling for the four samples whose upper edge was
+ * above it — a dashed line saying *the edge is here* about a place it is not,
+ * which is the clamped-threshold lie §3e was written against. So the edges are
+ * marks of their own, present exactly where the terminal inks them.
+ *
+ * **A whisker's `x` is where it sits** (C04 I52, I109). It was read by neither
+ * arm — `whiskersRows` spread the points evenly by index and this arm agreed —
+ * and the ruling is that `x` is a value on the abscissa's domain
+ * (`positionDomainOf`: `xMin..xMax` when declared, the sample index otherwise),
+ * placed through the shared coordinate in both arms. The catalogue's
+ * `line/whiskers` puts `x: i` on twelve samples, which is the index lattice, so
+ * that frame did not move; `whiskers-placed` puts three at `2 · 3 · 9` and is
+ * the fixture that shows the member is read. With no domain — fewer than two
+ * samples and none declared — the index spread stands.
  */
 function annotationMarks(
-  block: Pick<Plot, "annotations">,
+  block: Plot,
   range: Range,
   // **A significance bound is one number and two claims** (§3ak.14). `lagRow`
   // draws every bound at `±|b|` — a correlation of `-0.4` is as significant as
   // one of `+0.4`, so a band drawn on one side only says the opposite. The
   // caller that needs it says so, rather than every annotation acquiring a
-  // mirror it has no meaning for.
+  // mirror it has no meaning for. **Lines only**: a band or a region already
+  // has two edges, and mirroring one would be a second claim nobody made.
   mirror = false,
 ): readonly Drawn[] {
-  return (block.annotations ?? []).flatMap((a) => {
-    if (a.kind !== "line") return [];
+  const layer = "annotation" as const;
+  const y = (v: number): number => normalisedOf(v, range, false);
+  // `annotate.ts`' `drawn`: on the scale at all, with a flat range admitting everything.
+  const inRange = (v: number): boolean =>
+    Number.isFinite(v) && (range.max === range.min || (v >= range.min && v <= range.max));
+  const edge = (v: number, ref: ColourRef): Drawn => ({
+    mark: { kind: "polyline", points: [[0, y(v)], [1, y(v)]], dashed: true },
+    layer,
+    ref,
+  });
+  return (block.annotations ?? []).flatMap((a): readonly Drawn[] => {
     const ref: ColourRef = a.tone === undefined ? "tone.muted" : `tone.${a.tone}`;
-    const values = mirror ? [Math.abs(a.value), -Math.abs(a.value)] : [a.value];
-    return values.map((v) => {
-      const y = normalisedOf(v, range, false);
-      return { mark: { kind: "polyline" as const, points: [[0, y], [1, y]] as readonly Pt[] }, layer: "annotation" as const, ref };
-    });
+    switch (a.kind) {
+      case "line": {
+        const values = mirror ? [Math.abs(a.value), -Math.abs(a.value)] : [a.value];
+        return values.filter(inRange).map((v) => edge(v, ref));
+      }
+      case "band": {
+        const lo = Math.min(a.from, a.to);
+        const hi = Math.max(a.from, a.to);
+        if (!Number.isFinite(lo) || !Number.isFinite(hi)) return [];
+        // A band wholly outside the scale says nothing, like a dropped edge.
+        if (range.max !== range.min && (hi < range.min || lo > range.max)) return [];
+        const interior: Drawn = {
+          mark: { kind: "rect", x: 0, y: y(lo), w: 1, h: y(hi) - y(lo), fill: true },
+          layer,
+          ref,
+        };
+        return [interior, ...[lo, hi].filter(inRange).map((v) => edge(v, ref))];
+      }
+      case "confidence": {
+        const n = Math.min(a.upper.length, a.lower.length); // cells-ok — a sample count
+        if (n === 0) return [];
+        const span = Math.max(1, n - 1); // cells-ok — a sample count
+        const at = (i: number): number => (n === 1 ? 0.5 : i / span);
+        const finite = (v: number | undefined): v is number => v !== undefined && Number.isFinite(v);
+        // The interior: every finite pair, clamped by `normalisedOf` — the fill
+        // reaches the ceiling where the edge does not (§3e).
+        const upper: Pt[] = [];
+        const lower: Pt[] = [];
+        for (let i = 0; i < n; i += 1) { // cells-ok — a sample index
+          const u = a.upper[i];
+          const l = a.lower[i];
+          if (!finite(u) || !finite(l)) continue;
+          upper.push([at(i), y(u)]);
+          lower.push([at(i), y(l)]);
+        }
+        if (upper.length === 0) return []; // cells-ok — a sample count
+        const out: Drawn[] = [];
+        if (a.fill ?? true) {
+          const points: readonly Pt[] = [...upper, ...[...lower].reverse()];
+          out.push({ mark: { kind: "polyline", points, closed: true, fill: true }, layer, ref });
+        }
+        // The edges: runs of in-range samples, each run its own dashed polyline,
+        // so a sample off the scale breaks the edge rather than pinning it to
+        // the boundary. A run of one is a point and is dropped, as a lone dot in
+        // a dashed column would be.
+        const runs = (values: readonly number[]): readonly Pt[][] => {
+          const acc: Pt[][] = [];
+          let run: Pt[] = [];
+          for (let i = 0; i < n; i += 1) { // cells-ok — a sample index
+            const v = values[i];
+            if (finite(v) && inRange(v)) run.push([at(i), y(v)]);
+            else { if (run.length > 1) acc.push(run); run = []; } // cells-ok — a run length
+          }
+          if (run.length > 1) acc.push(run); // cells-ok — a run length
+          return acc;
+        };
+        for (const pts of [...runs(a.upper), ...runs(a.lower)]) {
+          out.push({ mark: { kind: "polyline", points: pts, dashed: true }, layer, ref });
+        }
+        return out;
+      }
+      case "whiskers": {
+        const n = a.points.length; // cells-ok — a point count
+        const domain = positionDomainOf(block)?.range ?? null;
+        return a.points.flatMap((p, i): readonly Drawn[] => {
+          const lo = p.y - p.err;
+          const hi = p.y + p.err;
+          if (!Number.isFinite(lo) || !Number.isFinite(hi)) return [];
+          if (range.max !== range.min && (hi < range.min || lo > range.max)) return [];
+          const x = domain === null
+            ? (n <= 1 ? 0.5 : i / (n - 1)) // cells-ok — a point index
+            : normalisedOf(p.x, domain, false);
+          return [{ mark: { kind: "polyline", points: [[x, y(lo)], [x, y(hi)]] }, layer, ref }];
+        });
+      }
+    }
   });
 }
 
@@ -3326,10 +3452,17 @@ export type Share = Readonly<{ label: string; fraction: number; index: number }>
 
 export function sharesOf(segments: readonly Segment[]): readonly Share[] {
   const total = segments.reduce((a, sg) => a + Math.max(0, sg.value), 0);
-  if (!(total > 0)) return [];
+  // **A zero total is every segment at nought, never an empty list** (C12 I108,
+  // §3ak.26 finding 5). `[]` here made the pie answer an all-zero list with
+  // *No data.* in one arm and a refusal in the other while the waffle beside it
+  // drew a hundred unowned squares and a legend of `0%`s — two answers to one
+  // question, from one function. A figure with nothing in it is drawn (I79): the
+  // legend names every segment at `0%`, the waffle owns no square, the pie
+  // draws a rim with no wedge. A refusal is for a list with no segments at all,
+  // and that is `hasDatum`'s question, not this one's.
   return segments.map((sg, i) => ({
     label: sg.label,
-    fraction: Math.max(0, sg.value) / total,
+    fraction: total > 0 ? Math.max(0, sg.value) / total : 0,
     index: i, // cells-ok — a segment index
   }));
 }
@@ -3351,23 +3484,54 @@ export const WAFFLE_ROWS = 10;
 const WAFFLE_SQUARES = WAFFLE_ROWS * WAFFLE_ROWS;
 
 /**
- * Which segment owns each of the hundred squares, row-major — or `-1`.
+ * How many of the hundred squares each segment owns — **a largest-remainder
+ * partition, so the counts always sum to a hundred** (C12 I108).
  *
- * **The rounding is shared and it does not always sum**, which the catalogue
- * cannot say: its one fixture is `65/25/10`, summing to exactly a hundred, so
- * `scale` is 1 and `Math.round` is the identity function. `1/1/1` rounds to
- * 33/33/33 and leaves a square empty; `50/50/1` asks for 101 and the guard drops
- * the last one — **a segment holding a share of the whole and receiving no
- * square at all** (F305).
+ * Each segment takes the floor of its quota; the squares left over go one each
+ * to the largest fractional parts, **the earlier segment winning a tie** — the
+ * one decision the arithmetic leaves open, named so `1/1/1` is `34/33/33` today
+ * and the day the segments are sorted. A negative value is a share of nothing,
+ * clamped to zero as `sharesOf` clamps it; a list summing to zero owns no square.
+ *
+ * **What it replaces was shared and wrong in both arms at once** (F305):
+ * `Math.round` per segment, filled greedily against `pos < 100`, gave `50/50/1`
+ * fifty, fifty and *nothing* — the legend read `Sliver 1%` beside a mosaic with
+ * no square of that colour — and gave `1/1/1` thirty-three each with the
+ * hundredth square drawn as furniture. The catalogue's one fixture summed to
+ * exactly a hundred, where `Math.round` is the identity function, so no frame
+ * could say so until the two that fail differently were added.
+ */
+function waffleCounts(segments: readonly Segment[]): readonly number[] {
+  const values = segments.map((sg) => Math.max(0, sg.value));
+  const sum = values.reduce((a, v) => a + v, 0);
+  if (!(sum > 0)) return values.map(() => 0);
+  const quotas = values.map((v) => (v * WAFFLE_SQUARES) / sum);
+  const counts = quotas.map((q) => Math.floor(q));
+  let left = WAFFLE_SQUARES - counts.reduce((a, c) => a + c, 0); // cells-ok — a square count
+  // Stable sort: equal remainders keep index order, so the earlier segment wins.
+  const byRemainder = quotas
+    .map((q, i) => ({ i, r: q - Math.floor(q) })) // cells-ok — a segment index
+    .sort((a, b) => b.r - a.r);
+  for (const { i } of byRemainder) {
+    if (left <= 0) break;
+    counts[i] = (counts[i] ?? 0) + 1;
+    left -= 1;
+  }
+  return counts;
+}
+
+/**
+ * Which segment owns each of the hundred squares, row-major — or `-1`, which
+ * only an all-zero list produces (C12 I108).
+ *
+ * Both arms call this: `waffle.ts` lays the owners into cells and
+ * `proportionFigure` into rects, so a change to the allocation moves both.
  */
 export function waffleGrid(segments: readonly Segment[]): readonly number[] {
-  const sum = segments.reduce((a, sg) => a + sg.value, 0);
-  const scale = sum > 0 ? WAFFLE_SQUARES / sum : 0;
   const grid = new Array<number>(WAFFLE_SQUARES).fill(-1);
   let pos = 0;
-  segments.forEach((sg, idx) => {
-    const count = Math.round(sg.value * scale);
-    for (let i = 0; i < count && pos < WAFFLE_SQUARES; i += 1) grid[pos++] = idx; // cells-ok — a square index
+  waffleCounts(segments).forEach((count, idx) => {
+    for (let i = 0; i < count; i += 1) grid[pos++] = idx; // cells-ok — a square index
   });
   return grid;
 }
@@ -3439,8 +3603,14 @@ export function proportionDecisions(block: Plot): Omit<Figure, "marks"> {
         : {
             ...base,
             slots: base.slots.map((sl) => {
-              const share = sl.seriesIndex === undefined ? undefined : shares[sl.seriesIndex];
-              return share === undefined ? sl : { ...sl, value: percentOf(share.fraction) };
+              if (sl.seriesIndex === undefined) return sl;
+              // **A share of nothing reads `0%`** (I108). `sharesOf` returns no
+              // shares for a zero total, and the slot then carried a name and a
+              // swatch with no reading — three colours in the legend and none
+              // of them in the mosaic. A zero segment among non-zero ones
+              // already reads `0%`; the all-zero waffle reads the same.
+              const share = shares[sl.seriesIndex];
+              return { ...sl, value: percentOf(share?.fraction ?? 0) };
             }),
           },
     isotropic: true,
@@ -3466,10 +3636,22 @@ export function proportionFigure(block: Plot): Figure {
 
   if (block.form === "pie") {
     let from = 0;
-    for (const sh of sharesOf(block.segments ?? [])) {
+    const shares = sharesOf(block.segments ?? []);
+    for (const sh of shares) {
       const to = from + sh.fraction;
-      marks.push({ mark: { kind: "arc", from, to, radius: 1, fill: true }, layer: "series", seriesIndex: sh.index });
+      // **A zero share is no wedge** — a zero-span arc is a mark the arm would
+      // skip, and U3 counts marks against elements drawn.
+      if (sh.fraction > 0) {
+        marks.push({ mark: { kind: "arc", from, to, radius: 1, fill: true }, layer: "series", seriesIndex: sh.index });
+      }
       from = to;
+    }
+    // **A zero total draws its rim** (§3ak.26 finding 5): no wedge was emitted
+    // above, and a figure with no marks is I64's refusal.
+    // The rim is the radar's outer ring — an unfilled full turn on the
+    // furniture layer — beside the legend that reads `0%` for each segment.
+    if (shares.length > 0 && from === 0) { // cells-ok — a segment count
+      marks.push({ mark: { kind: "arc", from: 0, to: 1, radius: 1, fill: false }, layer: "furniture", ref: "surface.border" });
     }
     return { ...decisions, marks };
   }

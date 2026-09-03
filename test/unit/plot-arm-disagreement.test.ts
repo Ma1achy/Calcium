@@ -150,7 +150,14 @@ const MEASURED = {
   // matrix had ever seen.
   // **The three `origin` variants draw now** (F383), so the denominator moves
   // from 90 to 96 and the arm has no refused variant left anywhere.
-  "line": { silent: "0/96", "numericLabels": "61/96", "identityLabels": "22/96", "border": "4/96", "interiorRules": "12/96", "legend": "10/96", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  // **96 → 110 with seven fixtures for rules no frame reached** — the two
+  // flipped cursors, `both-axes-narrow`, `bytes`, `duration`, `symlog` and
+  // `time`. Every column that moved moved by the terminal reader's known
+  // limits (the callout column, the flipped x-row, the axis format).
+  // **110 → 114 with `line/log` and `line/whiskers-placed`** (C04 I81, I52) —
+  // two cells each; both carry the bucket's standing `numericLabels`
+  // disposition and the second its `identityLabels` one.
+  "line": { silent: "0/114", "numericLabels": "79/114", "identityLabels": "30/114", "border": "8/114", "interiorRules": "16/114", "legend": "14/114", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "sparkline": { silent: "0/8", "numericLabels": "agree", "identityLabels": "2/8", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "scatter": { silent: "0/12", "numericLabels": "5/12", "identityLabels": "2/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "step": { silent: "0/6", "numericLabels": "1/6", "identityLabels": "2/6", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
@@ -158,7 +165,13 @@ const MEASURED = {
   // **The `origin` variant draws now** (F383): `projected` already read
   // `figure.facing`, so the refusal guard above it was stale — all four origins
   // come out as four distinct documents, correctly flipped.
-  "heatmap": { silent: "0/12", "numericLabels": "agree", "identityLabels": "10/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "4/12" },
+  // **12 → 16 with `heatmap/constant` and `heatmap/both-axes-narrow`.**
+  // `keyReadings` opens at one cell — `both-axes-narrow` at 80, where the
+  // frame carries `-1 … 1` under both label columns and the terminal reader
+  // returns nothing: a reader limit under `yAxis: "both"`, not an arm's. The
+  // `identityLabels` cell it adds is the notice `3 older not shown` read as
+  // three names at 40, the same reader on the same rung.
+  "heatmap": { silent: "0/16", "numericLabels": "agree", "identityLabels": "11/16", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "1/16", "notice": "5/16" },
   // **The residue's two, drawn** (§3ak.29). `identityLabels` closed with F326 —
   // both readers ask the shape now — and `ramp` is F316's open column on the
   // family that has always had one. `numericLabels` is the terminal reader's
@@ -170,7 +183,9 @@ const MEASURED = {
   // a repair.
   "contour": { silent: "0/18", "numericLabels": "18/18", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "quiver": { silent: "0/12", "numericLabels": "12/12", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
-  "bar": { silent: "0/14", "numericLabels": "10/14", "identityLabels": "4/14", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  // **14 → 16 with `bar/all-zero`** — the zero-span arm (C12 I89); both cells
+  // it adds to `numericLabels` are the reader's known limit on a bar's axis.
+  "bar": { silent: "0/16", "numericLabels": "12/16", "identityLabels": "4/16", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "histogram": { silent: "0/12", "numericLabels": "12/12", "identityLabels": "10/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "6/12" },
   "boxplot": { silent: "0/12", "numericLabels": "10/12", "identityLabels": "1/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "forest": { silent: "0/4", "numericLabels": "4/4", "identityLabels": "agree", "border": "agree", "interiorRules": "2/4", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
@@ -179,7 +194,7 @@ const MEASURED = {
   "dumbbell": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "lollipop": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "dotplot": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
-  "waffle": { silent: "0/6", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "waffle": { silent: "0/8", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   // **`flame` and `icicle` stop being silent** (F383). Their `default` variants
   // are `categories + series` with no `hierarchy`, and `tilesFigure` needs one —
   // so this arm drew nothing for a block the terminal draws as plain bars. The
@@ -213,7 +228,9 @@ const MEASURED = {
   "graph": { silent: "0/4", "numericLabels": "agree", "identityLabels": "4/4", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "2/4" },
   "tree": { silent: "0/12", "numericLabels": "agree", "identityLabels": "8/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "6/12" },
   "treemap": { silent: "0/2", "numericLabels": "agree", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
-  "stackedarea": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  // **2 → 4 with `stackedarea/all-zero`**: the widened `{0, 1}` range, and the
+  // two arms agree on its numerals at one width of two.
+  "stackedarea": { silent: "0/4", "numericLabels": "3/4", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "streamgraph": { silent: "0/6", "numericLabels": "6/6", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   // **The matrix family's eighth, and the only one that needed a derivation to
   // get here** (§3ak.32). `ramp` is F316's column; `notice` is F318's legitimate
@@ -276,10 +293,19 @@ const MEASURED = {
   // as a whole row or past a frame edge — and these three draw no border and
   // put the key beside the figure. Five cells on four *other* forms closed
   // with it, every one of them narrowing.
-  "pie": { silent: "0/10", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "2/10", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  // **10 → 12 with `pie/legend-overflow`**: twelve entries in eight rows, so
+  // the terminal shows seven and `⋯ 5 more` where this arm has no row budget
+  // and names all twelve — a resolution fact in `legend`, and the residue's
+  // `more` read as a name in `identityLabels`, which is the reader's.
+  // **12 → 14 with `pie/all-zero`** (C12 I108 finding 5): a rim and a `0%` legend, agreeing in every cell.
+  "pie": { silent: "0/14", "numericLabels": "agree", "identityLabels": "2/14", "border": "agree", "interiorRules": "agree", "legend": "2/14", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   // **Every cell agrees, including the value axis** — `radarCeiling` became
   // `valueAxisOf` and both arms normalise against the same ceiling (F304).
-  "radar": { silent: "0/8", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  // **8 → 12 with `radar/table-overflow` and `radar/circle-grid`**: twelve
+  // spokes, and both arms name all twelve: the two cells are the bottom row
+  // `Armour   Luck  Stealth` read left to right against this arm's angular
+  // order, which puts `Stealth` before `Luck`. A reader-order fact.
+  "radar": { silent: "0/12", "numericLabels": "agree", "identityLabels": "2/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   // **The residue's third, drawn** (§3ak.29). Both open cells have **one** cause
   // and it is F316's: the second arm draws no ramp key. `ramp` is that directly —
   // 8 of 10, because `terminalRamp` wants three adjacent swatches and a two-band
@@ -475,7 +501,10 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // **Both counters, because the second is the exception and it must not
     // grow.** `horizon/bands-2` is the only pair where neither arm draws, and it
     // is the reader's floor rather than a missing key.
-    expect(bothDrew, "pairs where both arms draw a key").toBe(37); // cells-ok — a pair count
+    // **39**: `heatmap/constant` and `heatmap/both-axes-narrow` are two more
+    // matrices, and a matrix draws a key in both arms (C12 I108's lane, the
+    // fixtures for rules no frame reached).
+    expect(bothDrew, "pairs where both arms draw a key").toBe(39); // cells-ok — a pair count
     // **Two since the empty figure landed** (F363, C12 I79). `heatmap/empty` was
     // a refusal here and is a document now, so it joins the comparison — and an
     // empty matrix has no readings for a key to be about, in either arm.
@@ -600,8 +629,14 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // (F386). It was `2/2` — both arms drawing both row names and disagreeing
     // about which named which, because one stacks from the floor and the other
     // laid the same curves out from the top. One reversed list, one closed cell.
-    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(53); // cells-ok — a cell count
-    expect(closed, "cells where they already agree — the work it must not undo").toBe(269); // cells-ok — a cell count
+    // **56 — three cells opened by fixtures for rules no frame reached**:
+    // `heatmap.keyReadings` (a reader limit under `yAxis: "both"`),
+    // `pie.identityLabels` (the legend's `⋯ 5 more` read as a name) and
+    // `radar.identityLabels` (a bottom row read against angular order). None is
+    // an arm's decision; each is named on its row above.
+    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(56); // cells-ok — a cell count
+    // 269 → 266: the three cells named above moved from agree to open.
+    expect(closed, "cells where they already agree — the work it must not undo").toBe(266); // cells-ok — a cell count
     // 268 → 269, the other side of the same cell (F386): one disagreement
     // became one agreement, so the two counters move opposite by one and the
     // total is unchanged. That relation is what AD4 is for.
@@ -868,7 +903,16 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // that is a measurement rather than an omission**: a culled frame is
     // byte-identical to its unculled one in all four modes, so the variant
     // would have collided here and this sweep would have reported it (F461).
-    expect(corpus.size, "variants in the corpus").toBe(213); // cells-ok — a variant count
+    // **214 with `waffle/all-zero`** (C12 I108) — the `scale = 0` arm of the
+    // shared allocation, which no frame had reached; not a `plot3d` variant, so
+    // the twenty-five above stands.
+    // **235**: twenty-one fixtures for spec-stated rules no frame reached —
+    // seven of them `plot3d`'s (`constant-surface`, `constant-value`,
+    // `near-clip`, `headlight` and the three `origin3` modes), so thirty-two
+    // refusals now, all by family.
+    // **238**: `line/log` (C04 I81), `line/whiskers-placed` (C04 I52) and
+    // `pie/all-zero` (C12 I108 finding 5).
+    expect(corpus.size, "variants in the corpus").toBe(238); // cells-ok — a variant count
     // **206, thirteen up on 193** — every one of `plot3d`'s twenty-five variants
     // draws a distinct frame, so none of them collides with another and none
     // with each other. **The marker arm separating is not free**: it draws the
@@ -888,7 +932,12 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // compares the painted row rather than the stripped one, which is why they
     // separate here and would not in a text corpus (SC11's point, from the
     // other side).
-    expect(t.distinct, "distinct terminal frames").toBe(206); // cells-ok — a frame count
+    // **207 with `waffle/all-zero`** (C12 I108): a mosaic of empty squares and
+    // a legend reading `0%`, distinct from every other frame in the corpus.
+    // **228**: the twenty-one fixtures for unreached rules are each a distinct
+    // frame — none collides with the variant it was cut from, which is the
+    // response `test/support/README.md` asks a fixture to show.
+    expect(t.distinct, "distinct terminal frames").toBe(231); // cells-ok — a frame count; 228 + `line/log`, `line/whiskers-placed`, `pie/all-zero`
     // **134 -> 148**: the density family draws, so nineteen violin variants and
     // one ridgeline stop colliding in the single refusal group (F383).
     // **153, and the addition is a *collision*** — `plot3d`'s variants all
@@ -896,7 +945,12 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // distinct frames in the terminal, and four more of them change nothing. The refusal group F383 emptied is back,
     // and the asymmetry is the point of this sweep: one arm's five pictures are
     // the other arm's one absence.
-    expect(s.distinct, "distinct documents").toBe(153); // cells-ok — a frame count; the four axis variants join the one refusal group
+    // **155**: `waffle/all-zero` is one more, and `line/confidence` beside
+    // `line/confidence-unfilled` is the other — two documents where the dropped
+    // `confidence` kind drew one (C12 I108, I109).
+    // **169**: fourteen of the twenty-one draw here; the seven `plot3d` ones
+    // join the one refusal document.
+    expect(s.distinct, "distinct documents").toBe(172); // cells-ok — a frame count; the four axis variants join the one refusal group + `line/log`, `line/whiskers-placed`, `pie/all-zero`
 
     // **The terminal's four are F350's**, and asserting them keeps that finding
     // alive: three are variants whose names state a claim their block does not
@@ -974,7 +1028,12 @@ describe("AD — the two arms decide separately, and here is where", () => {
       ["histogram/default", "histogram/scott"],
       ["horizon/bands-3", "horizon/folded-1x3"],
       ["line/candlestick-overlay", "line/cursor-candles"],
-      ["line/confidence", "line/confidence-unfilled"],
+      // **`line/confidence` · `line/confidence-unfilled` is gone from this
+      // list** (C12 I109). It was recorded as a collision on `annotations.fill`
+      // and the member was never the cause: `annotationMarks` dropped the whole
+      // `confidence` kind, so the two blocks reached this arm as one. All four
+      // annotation kinds cross now, `fill` is read, and the pair draws two
+      // documents — a region with dashed edges against the edges alone.
       ["line/legend-right", "line/multi-series"],
       ["slope/default", "slope/six-readings"],
       ["tree/default", "tree/overflow-top-down"],

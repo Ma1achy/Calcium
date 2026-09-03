@@ -10,7 +10,15 @@
  * Nothing else. The grid, the Bresenham walker, the scaling core and the strip
  * arithmetic are internal; the block shapes are C04's.
  */
-export { plotDefinition } from "./definition.js";
+export { plotDefinition, cursorable } from "./definition.js";
+/**
+ * **`cursorable` is published for L4's cursor writer** (C12 I85, C22 I76).
+ * `moveCursor` must ask *can this block take a cursor* with the renderer's own
+ * answer — the forms `positionalForm` serves, with samples and a frame — or it
+ * stores an index nothing reads. The predicate is the one `elements()` gates on,
+ * so the block that gains a focus stop and the block that accepts a cursor are
+ * the same block by construction.
+ */
 export { sparkline } from "./sparkline.js";
 export { valueBar } from "./bar.js";
 /**

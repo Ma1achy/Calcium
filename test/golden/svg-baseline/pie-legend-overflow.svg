@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
+<rect width="100%" height="100%" fill="#141414"/>
+<rect x="498.4" y="15.2" width="9.6" height="9.6" fill="#e69f00"/>
+<text x="512" y="24.8" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">A 9%</text>
+<rect x="498.4" y="34.4" width="9.6" height="9.6" fill="#56b4e9"/>
+<text x="512" y="44" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">B 8%</text>
+<rect x="498.4" y="53.6" width="9.6" height="9.6" fill="#3cbf9a"/>
+<text x="512" y="63.2" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">C 8%</text>
+<rect x="498.4" y="72.8" width="9.6" height="9.6" fill="#f0e442"/>
+<text x="512" y="82.4" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">D 9%</text>
+<rect x="498.4" y="92" width="9.6" height="9.6" fill="#8fa8ff"/>
+<text x="512" y="101.6" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">E 8%</text>
+<rect x="498.4" y="111.2" width="9.6" height="9.6" fill="#f07a3c"/>
+<text x="512" y="120.8" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">F 8%</text>
+<rect x="498.4" y="130.4" width="9.6" height="9.6" fill="#e4a3c4"/>
+<text x="512" y="140" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">G 9%</text>
+<rect x="498.4" y="149.6" width="9.6" height="9.6" fill="#cfcfcf"/>
+<text x="512" y="159.2" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">H 8%</text>
+<rect x="498.4" y="168.8" width="9.6" height="9.6" fill="#e69f00"/>
+<text x="512" y="178.4" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">I 8%</text>
+<rect x="498.4" y="188" width="9.6" height="9.6" fill="#56b4e9"/>
+<text x="512" y="197.6" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">J 9%</text>
+<rect x="498.4" y="207.2" width="9.6" height="9.6" fill="#3cbf9a"/>
+<text x="512" y="216.8" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">K 8%</text>
+<rect x="498.4" y="226.4" width="9.6" height="9.6" fill="#f0e442"/>
+<text x="512" y="236" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">L 8%</text>
+<path d="M288 150.4 L288 12.8 A137.6 137.6 0 0 1 362.392 34.644 Z" fill="#e69f00"/>
+<path d="M288 150.4 L362.392 34.644 A137.6 137.6 0 0 1 410.304 87.348 Z" fill="#56b4e9"/>
+<path d="M288 150.4 L410.304 87.348 A137.6 137.6 0 0 1 425.6 150.4 Z" fill="#3cbf9a"/>
+<path d="M288 150.4 L425.6 150.4 A137.6 137.6 0 0 1 403.756 224.792 Z" fill="#f0e442"/>
+<path d="M288 150.4 L403.756 224.792 A137.6 137.6 0 0 1 351.052 272.704 Z" fill="#8fa8ff"/>
+<path d="M288 150.4 L351.052 272.704 A137.6 137.6 0 0 1 288 288 Z" fill="#f07a3c"/>
+<path d="M288 150.4 L288 288 A137.6 137.6 0 0 1 213.608 266.156 Z" fill="#e4a3c4"/>
+<path d="M288 150.4 L213.608 266.156 A137.6 137.6 0 0 1 165.696 213.452 Z" fill="#cfcfcf"/>
+<path d="M288 150.4 L165.696 213.452 A137.6 137.6 0 0 1 150.4 150.4 Z" fill="#e69f00"/>
+<path d="M288 150.4 L150.4 150.4 A137.6 137.6 0 0 1 172.244 76.008 Z" fill="#56b4e9"/>
+<path d="M288 150.4 L172.244 76.008 A137.6 137.6 0 0 1 224.948 28.096 Z" fill="#3cbf9a"/>
+<path d="M288 150.4 L224.948 28.096 A137.6 137.6 0 0 1 288 12.8 Z" fill="#f0e442"/>
+</svg>

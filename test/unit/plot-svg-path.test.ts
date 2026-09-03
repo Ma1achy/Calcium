@@ -1140,14 +1140,16 @@ describe("G9 — an empty figure is a state, not a refusal", () => {
     expect(shapedSvg, "a datum this arm can now draw is drawn").not.toBe("");
     expect(shapedSvg, "and is not reported as empty").not.toContain("No data.");
 
-    // **And `emptyMessage` cannot have a reader while that is true**, which is
+    // **`emptyMessage` needs a reader, and this row is where it gets one**, which is
     // why the corpus gained `line/empty-message` beside `line/empty`: a pair
     // differing in one field is what a collision needs to name a member (C12 I75).
-    // **C12 I79's message, and `vmBlock` and not `b.plot`, which is F335 arriving in a row that needs
-    // it**: the published builder declares 48 of `Plot`'s 58 members and
-    // `emptyMessage` is one of the eight it does not, so a block built through
-    // it loses the field silently and this row would have compared two
-    // defaults.
+    // **C12 I79's message, through `vmBlock`.** This comment used to say `b.plot`
+    // does not declare `emptyMessage` — *one of the eight it does not* — and that
+    // has been false since 6c61593d (2026-08-30; re-read 2026-09-03): `b.plot` declares and
+    // forwards it (`src/shell/builders/index.ts`). The row keeps `vmBlock` because it
+    // is testing the SVG arm's reader, not the builder; the builder-side row —
+    // `b.plot({ emptyMessage })` reaching the block — is
+    // `test/contract/builders.test.ts` T4.2a.
     const messaged = vmBlock({
       kind: "plot", id: "m", form: "line", height: 5, axes: true, series: [{ values: [] }],
       emptyMessage: "Waiting for the first epoch",
@@ -1299,18 +1301,15 @@ describe("G8 — a claimed form whose datum this path cannot read", () => {
     expect(firstY(drawn[1] ?? ""), "bottom-left puts the low sample low").toBeGreaterThan(firstY(drawn[0] ?? ""));
   });
 
-  it("G8f: an annotation is DROPPED, and that is recorded rather than refused", () => {
-    // **The third axis, and the line falls differently here.** A reference line
-    // at 5 labelled `target` reaches the renderer and nothing draws it — the
-    // six `<line>` elements in the output are gridlines. Measured, like the
-    // other two.
-    //
-    // **It is not refused, because the picture it leaves is true.** A dropped
-    // `ohlc` leaves a chart of the wrong thing and a flipped ordinate leaves one
-    // upside down; a missing annotation leaves a correct curve with a claim
-    // absent from beside it. **Refuse a false figure, record an incomplete
-    // one** — and this row is the record, so the day annotations land it fails
-    // and says what changed.
+  it("G8f: an annotation is DRAWN and named — F259's residue, closed (C12 I109)", () => {
+    // **This row was written to fail the day annotations landed, and it did.**
+    // It read *a reference line at 5 labelled `target` reaches the renderer and
+    // nothing draws it*, and asserted the label's absence as F259's record —
+    // *refuse a false figure, record an incomplete one*. The line crossed
+    // first, and the legend row naming it stayed filtered out under a comment
+    // that said this arm drew no annotations; I109 crosses the other three
+    // kinds and removes the filter, so the record becomes the drawing: a dashed
+    // rule at 5, and `target` beside its swatch.
     const annotated = b.plot({
       id: "a", form: "line", height: 6,
       series: [{ label: "s", values: [1, 9] }],
@@ -1318,7 +1317,8 @@ describe("G8 — a claimed form whose datum this path cannot read", () => {
     });
     const svg = plotToSvg(annotated, THEME);
     expect(svg, "the curve still renders").not.toBeNull();
-    expect((svg ?? "").includes("target"), "and the annotation is not in it — F259's residue").toBe(false);
+    expect((svg ?? "").includes("target"), "and the annotation is named in the legend").toBe(true);
+    expect((svg ?? "").includes('stroke-dasharray="4 3"'), "and drawn, dashed, as a claim about the ordinate").toBe(true);
   });
 
   it("G8d: and a form that does draw is untouched by any clause", () => {

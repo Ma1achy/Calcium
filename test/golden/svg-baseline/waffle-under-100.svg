@@ -39,7 +39,7 @@
 <rect x="151.4" y="96.36" width="25.52" height="25.52" fill="#e69f00" stroke="#141414" stroke-width="1"/>
 <rect x="178.92" y="96.36" width="25.52" height="25.52" fill="#e69f00" stroke="#141414" stroke-width="1"/>
 <rect x="206.44" y="96.36" width="25.52" height="25.52" fill="#e69f00" stroke="#141414" stroke-width="1"/>
-<rect x="233.96" y="96.36" width="25.52" height="25.52" fill="#56b4e9" stroke="#141414" stroke-width="1"/>
+<rect x="233.96" y="96.36" width="25.52" height="25.52" fill="#e69f00" stroke="#141414" stroke-width="1"/>
 <rect x="261.48" y="96.36" width="25.52" height="25.52" fill="#56b4e9" stroke="#141414" stroke-width="1"/>
 <rect x="289" y="96.36" width="25.52" height="25.52" fill="#56b4e9" stroke="#141414" stroke-width="1"/>
 <rect x="316.52" y="96.36" width="25.52" height="25.52" fill="#56b4e9" stroke="#141414" stroke-width="1"/>
@@ -72,7 +72,7 @@
 <rect x="233.96" y="178.92" width="25.52" height="25.52" fill="#56b4e9" stroke="#141414" stroke-width="1"/>
 <rect x="261.48" y="178.92" width="25.52" height="25.52" fill="#56b4e9" stroke="#141414" stroke-width="1"/>
 <rect x="289" y="178.92" width="25.52" height="25.52" fill="#56b4e9" stroke="#141414" stroke-width="1"/>
-<rect x="316.52" y="178.92" width="25.52" height="25.52" fill="#3cbf9a" stroke="#141414" stroke-width="1"/>
+<rect x="316.52" y="178.92" width="25.52" height="25.52" fill="#56b4e9" stroke="#141414" stroke-width="1"/>
 <rect x="344.04" y="178.92" width="25.52" height="25.52" fill="#3cbf9a" stroke="#141414" stroke-width="1"/>
 <rect x="371.56" y="178.92" width="25.52" height="25.52" fill="#3cbf9a" stroke="#141414" stroke-width="1"/>
 <rect x="399.08" y="178.92" width="25.52" height="25.52" fill="#3cbf9a" stroke="#141414" stroke-width="1"/>
@@ -105,5 +105,5 @@
 <rect x="316.52" y="261.48" width="25.52" height="25.52" fill="#3cbf9a" stroke="#141414" stroke-width="1"/>
 <rect x="344.04" y="261.48" width="25.52" height="25.52" fill="#3cbf9a" stroke="#141414" stroke-width="1"/>
 <rect x="371.56" y="261.48" width="25.52" height="25.52" fill="#3cbf9a" stroke="#141414" stroke-width="1"/>
-<rect x="399.08" y="261.48" width="25.52" height="25.52" fill="#2c2c2c" stroke="#141414" stroke-width="1"/>
+<rect x="399.08" y="261.48" width="25.52" height="25.52" fill="#3cbf9a" stroke="#141414" stroke-width="1"/>
 </svg>

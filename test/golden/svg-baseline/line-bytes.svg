@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
+<rect width="100%" height="100%" fill="#141414"/>
+<line x1="89.6" y1="12.8" x2="89.6" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="89.6" y1="288" x2="486.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="486.4" y1="12.8" x2="486.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="89.6" y1="12.8" x2="486.4" y2="12.8" stroke="#2c2c2c" stroke-width="1"/>
+<text x="83.6" y="292" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">0 B</text>
+<text x="83.6" y="200.267" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">2.3 GB</text>
+<text x="83.6" y="108.533" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">4.7 GB</text>
+<text x="83.6" y="16.8" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">7 GB</text>
+<text x="89.6" y="300" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">0</text>
+<text x="170.58" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">10</text>
+<text x="251.559" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">20</text>
+<text x="332.539" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">30</text>
+<text x="413.518" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">40</text>
+<text x="486.4" y="300" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">49</text>
+<path d="M89.6 191.811 L97.698 182.208 L105.796 172.701 L113.894 163.385 L121.992 154.353 L130.09 145.695 L138.188 137.498 L146.286 129.844 L154.384 122.809 L162.482 116.463 L170.58 110.87 L178.678 106.086 L186.776 102.158 L194.873 99.127 L202.971 97.021 L211.069 95.862 L219.167 95.662 L227.265 96.423 L235.363 98.137 L243.461 100.787 L251.559 104.346 L259.657 108.779 L267.755 114.042 L275.853 120.082 L283.951 126.838 L292.049 134.244 L300.147 142.225 L308.245 150.701 L316.343 159.588 L324.441 168.797 L332.539 178.236 L340.637 187.811 L348.735 197.426 L356.833 206.984 L364.931 216.391 L373.029 225.552 L381.127 234.376 L389.224 242.775 L397.322 250.665 L405.42 257.966 L413.518 264.607 L421.616 270.52 L429.714 275.647 L437.812 279.936 L445.91 283.345 L454.008 285.839 L462.106 287.393 L470.204 287.993 L478.302 287.631 L486.4 286.312" fill="none" stroke="#e69f00" stroke-width="2"/>
+</svg>
