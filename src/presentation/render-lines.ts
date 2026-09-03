@@ -38,7 +38,6 @@ export type RenderOptions = Readonly<{
   capabilities: TerminalCapabilities;
   tick?: number;
   focus?: RenderContext["focus"];
-  onAction?: RenderContext["onAction"];
   /** Per-container scroll offsets, in rows (C04 I48). Absent is none. */
   scrollOffsets?: RenderContext["scrollOffsets"];
   /** Per-plot cursor positions, in sample indices. Absent is no cursor. */
@@ -78,7 +77,6 @@ export function renderToLines(
     ...(options.cameras === undefined ? {} : { cameras: options.cameras }),
     ...(options.scratch === undefined ? {} : { scratch: options.scratch }),
     tick: options.tick ?? 0,
-    onAction: options.onAction ?? (() => undefined),
   };
 
   // Counted against a sentinel row rather than by splitting the output.
@@ -129,7 +127,6 @@ export function renderSequenceToLines(
     ...(options.cameras === undefined ? {} : { cameras: options.cameras }),
     ...(options.scratch === undefined ? {} : { scratch: options.scratch }),
     tick: options.tick ?? 0,
-    onAction: options.onAction ?? (() => undefined),
   };
 
   const painted = renderToString(

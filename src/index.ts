@@ -365,9 +365,50 @@ export type { Measure, MeasureFn } from "./data/viewmodel/index.js";
 export type { BlockKeymap } from "./interaction/router/types.js";
 
 export type {
+  Fixture,
+  FixtureHandler,
   Invocation,
+  TransportDeps,
   TransportRouter,
   VerbTransport,
+} from "./data/transport/index.js";
+
+/**
+ * C06 §2's constructors, so an app can build what `TuiConfig.transport` takes.
+ *
+ * **Three types and no function that produces one.** `TuiConfig.transport` is
+ * a `TransportRouter`; the block above exported the interface and nothing that
+ * constructs it, so a consumer could name the type and could not obtain the
+ * value — C24 I2's `BlockRegistry` shape on this seam. C06 §2 publishes a
+ * three-arm `TransportDeps` union and one arm had a reachable constructor: the
+ * shell's own `subprocess` default in `construct.ts`, the only `createTransport`
+ * caller in the tree. An app wanting the emulator — C06 §1's stated purpose for
+ * that mode — had no door.
+ *
+ * `createTransport` is exported with the two arm constructors rather than
+ * instead of them: C06 §1 says one factory taking one mode value is how a verb
+ * migrates without anything else branching on mode, and an app's entry point
+ * that reads its own `*_TRANSPORT` variable (C06 I18) wants the factory, while
+ * a test constructing one arm wants the arm. `createSubprocessTransport` stays
+ * off the entry — the shell builds it from `TuiConfig.binary`, and an app
+ * building a second would be a second reader of the runner and the clock.
+ * The first consumer outside `src/` is `test/contract/transport.test.ts`'s
+ * public-surface row, which constructs every arm through the entry.
+ *
+ * **Three types came with them, and MG29 named every one.** `Fixture`,
+ * `FixtureHandler` and `TransportDeps` are the parameter types of the three
+ * constructors, and publishing a function whose argument type is interior is
+ * C24 I29's silent failure — the rule fired on the first run with the functions
+ * alone. What a `FixtureHandler` returns — `RawResult`, `RawPatch` — was
+ * already on the entry through the adapters block above. `Fixture` was already
+ * on `@fmx/calcium/fixtures`; it is here because the runtime entry may not
+ * import that one (C24 I8), and the type is C06's.
+ */
+export {
+  createEmulatedTransport,
+  createFixtureTransport,
+  createRouter,
+  createTransport,
 } from "./data/transport/index.js";
 
 /**

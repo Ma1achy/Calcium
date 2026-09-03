@@ -532,6 +532,22 @@ describe("C24 §4 — the rulings that are not mechanical", () => {
     expect(kit().measure(nested, 60)).toBeGreaterThan(0);
   });
 
+  it("T4.2a (C12 I79, C24 §4): b.plot passes emptyMessage through, and the empty figure says it", () => {
+    // **The builder-side reader `plot-svg-path.test.ts` said was owed.** `b.plot`
+    // has declared and forwarded `emptyMessage` since 6c61593d, and until this
+    // row every test of the message reached the block through `vmBlock`, so the
+    // public door was the one path nothing constructed.
+    const p = b.plot({ id: "p", series: [{ values: [] }], height: 5, emptyMessage: "Waiting for the first epoch" });
+    expect(p.emptyMessage).toBe("Waiting for the first epoch");
+    expect(validateBlock(p).ok).toBe(true);
+    expect(kit().renderToLines(p, 60).map(visible).join("\n")).toContain("Waiting for the first epoch");
+
+    // The control — no message, and the default sentence rather than nothing.
+    const bare = b.plot({ id: "q", series: [{ values: [] }], height: 5 });
+    expect(bare.emptyMessage).toBeUndefined();
+    expect(kit().renderToLines(bare, 60).map(visible).join("\n")).not.toContain("Waiting for the first epoch");
+  });
+
   it("T3.1: b.table with zero columns is valid and renders its empty message", () => {
     const t = b.table({ columns: [], rows: [], emptyMessage: "no containers" });
     expect(validateBlock(t).ok).toBe(true);

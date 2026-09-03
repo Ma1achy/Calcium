@@ -36,6 +36,16 @@ export function blockId(prefix: string): string {
   return `${prefix}-${String(n)}`;
 }
 
+/**
+ * **No `resultId`.** `DocumentMeta.resultId` is producer-owned (C04 §2, C07
+ * I13): the adapter registry writes it on the subprocess route and
+ * `completeLocal` below passes a handler's through on the local route. This
+ * spec's only caller is `compose`, whose three callers — `execution.ts` twice
+ * and `local/handlers.ts` — never passed one, so the member was a shell-side
+ * writer for a producer-side field with zero writes. Narrowed on F85's
+ * argument rather than documented: a field that can be supplied and never is
+ * reads as a route that exists. 2026-09-03.
+ */
 export type MetaSpec = Readonly<{
   origin: Origin;
   verb?: string | null;
@@ -43,7 +53,6 @@ export type MetaSpec = Readonly<{
   exitCode?: number;
   durationMs?: number;
   truncated?: boolean;
-  resultId?: string;
   argv?: readonly string[];
   stderr?: string;
   transport?: Transport;
@@ -60,7 +69,6 @@ export function meta(spec: MetaSpec): ViewDocument["meta"] {
     exitCode: spec.exitCode ?? 0,
     durationMs: spec.durationMs ?? 0,
     truncated: spec.truncated ?? false,
-    ...(spec.resultId === undefined ? {} : { resultId: spec.resultId }),
     argv: spec.argv ?? [],
     stderr: spec.stderr ?? "",
     transport: spec.transport ?? "local",

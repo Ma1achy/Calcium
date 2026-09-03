@@ -1,7 +1,7 @@
 // C06 tier 4 — integration. What transport is *for*: a manifest deciding
 // whether a verb is spawned at all, and a result that C07 can adapt.
 //
-// Most of this tier waits on components that do not exist, and says which. What
+// Most of this tier waited on components that did not exist, and says which (all built at 2026-09-03). What
 // does not wait is C05: `local` and `streams` are manifest facts, they are read
 // by whoever calls the transport, and both are testable today.
 import { mkdtempSync, readFileSync } from "node:fs";

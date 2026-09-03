@@ -49,7 +49,7 @@ describe("C09 §6 — the registry's transition table", () => {
         createBlockRegistry({ defaults: true }),
         block({ kind: "code", id: "code-r", language: lang, text }),
         40,
-        { theme: DARK_THEME, capabilities: FULL_CAPS, focus: null, tick: 0, onAction: () => undefined },
+        { theme: DARK_THEME, capabilities: FULL_CAPS, focus: null, tick: 0 },
       ).length;
     expect(rendered("madeuplang")).toBe(rendered("json"));
   });
@@ -116,7 +116,6 @@ describe("C09 §6 — the registry's transition table", () => {
       capabilities: FULL_CAPS,
       focus: null,
       tick: 0,
-      onAction: () => undefined,
     };
     expect(ctx).not.toHaveProperty("renderChild");
 

@@ -23,7 +23,6 @@ function makeSeries(values: readonly (number | null)[], opts?: SeriesOpts): Seri
     values,
     ...(opts?.label !== undefined ? { label: opts.label } : {}),
     ...(opts?.tone !== undefined ? { tone: opts.tone } : {}),
-    ...(opts?.marker !== undefined ? { marker: opts.marker } : {}),
   };
 }
 
@@ -52,10 +51,14 @@ type FigureOpts = {
   plotCorners?: Plot["plotCorners"];
 };
 
+// **No `marker`.** `Series` has no such member (C04 I76): no 2-D renderer has a
+// glyph channel for one, so the option this carried was accepted by every gate
+// and drawn by none (F207). Narrowed with the type it forwarded to, F85's
+// argument — a builder option with no reader is the public door to a field
+// nothing reads.
 type SeriesOpts = {
   label?: string;
   tone?: Series["tone"];
-  marker?: string;
 };
 
 export class FigureBuilder {

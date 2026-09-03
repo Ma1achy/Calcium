@@ -105,6 +105,13 @@ export type RenderContext = Readonly<{
    * (C23 I47).
    */
   scrollOffsets?: Readonly<Record<string, number>>;
+  /**
+   * The cursor's index into the data, per plot block id (C12 I37).
+   *
+   * **Written by L4's `CursorPositions`** (`shell/cursor-positions.ts`, C22
+   * I76) from `←`/`→` on a focused plot (C16 I28); read by C12, which draws
+   * the crosshair and owns nothing about who moves it. Absent is no crosshair.
+   */
   cursorPositions?: Readonly<Record<string, number>>;
   /**
    * The live camera of each 3D plot, by block id (C12 I83, C22 I71).
@@ -117,12 +124,12 @@ export type RenderContext = Readonly<{
    *
    * **Absent is the block's own** `camera`, completed from `CAMERA_DEFAULT`.
    *
-   * **This field is not `cursorPositions`, and the difference is the only thing
-   * that makes it worth having.** That one is read here and written by nothing in
-   * `src/` — a complete mechanism with nothing on the other side (C12 §3s). This
-   * arrives with `Cameras` in `shell/`, a binding that moves it and the render
-   * key's sixth axis, because a context field with no writer is correct,
-   * complete and unobservable at once.
+   * **This field arrived with its writer, and `cursorPositions` is why.** That
+   * one was read here and written by nothing in `src/` — a complete mechanism
+   * with nothing on the other side (C12 §3s) — until C22 I76 gave it a writer
+   * (`shell/cursor-positions.ts`). This arrives with `Cameras` in `shell/`, a
+   * binding that moves it and the render key's sixth axis, because a context
+   * field with no writer is correct, complete and unobservable at once.
    */
   cameras?: Readonly<Record<string, Camera>>;
   /**
@@ -147,9 +154,10 @@ export type RenderContext = Readonly<{
    * edge from `blocks/` into `plot/` where the reverse already exists.
    *
    * **Absent is a miss, and a field with no writer is unobservable** (§3s):
-   * `cursorPositions` one field up is read here and written by nothing in
-   * `src/`, which is correct, complete and inert at once. The L4 writer lands
-   * with this or neither does.
+   * `cursorPositions` two fields up was that counter-example — read here and
+   * written by nothing in `src/`, correct, complete and inert at once — until
+   * C22 I76 gave it a writer (`shell/cursor-positions.ts`). The L4 writer for
+   * this lands with it or neither does.
    */
   scratch?: RenderScratch;
   focus: FocusState | null;
@@ -160,7 +168,17 @@ export type RenderContext = Readonly<{
    * never geometry.
    */
   tick: number;
-  onAction: (action: Action) => void;
+  /*
+   * **No `onAction`.** A required `(action: Action) => void` sat here for the
+   * life of the project, and the measurement is F85's shape: no renderer under
+   * `kinds/` read it, the only writers were two no-op defaults in
+   * `render-lines.ts`, and both product call sites (`shell/paint.ts`,
+   * `shell/composite.ts`) omitted it. The route an action takes is
+   * `KeyDeps.onAction → pipeline.onAction` (C23 I37); the context was never on
+   * it. A required member with no reader is a value every caller must invent
+   * (F58b), so it is removed rather than made optional — supplying one now fails
+   * to compile rather than failing to matter (C09 §2, C23 §3a). 2026-09-03.
+   */
   measureChild: MeasureFn;
   renderChild: (block: Block, width: number) => ReactElement;
 }>;
