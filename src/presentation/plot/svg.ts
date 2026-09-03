@@ -373,7 +373,7 @@ export const SVG_FAMILY = {
   // figure carries projected, normalised `point` marks and neither arm
   // computes a basis. That is §3ak's finding applied before the second arm
   // exists rather than 73 cells after.
-  scatter3d: null,
+  plot3d: null,
 } satisfies Record<PlotForm, SvgFamily | null>;
 
 /** The family, or `null` where the form carries geometry this path does not. */

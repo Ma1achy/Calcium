@@ -12,10 +12,15 @@
  * metre apart and one of a hundred points a kilometre apart both want three
  * tiers, and an absolute bucket gives the second one tier and no depth at all.
  */
-import type { AxisSpec3, Plot, Point3, Tone } from "../../data/viewmodel/index.js";
+import type { AxisSpec3, Plot, Point3, Surface3, Tone } from "../../data/viewmodel/index.js";
 import type { RenderContext } from "../blocks/types.js";
 import type { ColourValue } from "../theme/types.js";
-import { HALF_BLOCK, HALF_BLOCK_LOWER, halfBlockEligible } from "../image/index.js";
+// **`HALF_BLOCK` is gone from this file and that is the finding, not the
+// tidy-up** (C12 I104). `▀` was the area raster; it is now one of sixteen
+// quadrant masks and `QUADRANT[3]` is the same character, reached by the
+// same cell whenever a top-against-bottom split is the best one. The import
+// went unused because the constant was subsumed rather than replaced.
+import { halfBlockEligible } from "../image/index.js";
 import { paint, slot, type Span } from "../blocks/paint.js";
 import { arrows3, glyphs, MARKER3_COLUMNS, markerColumn, markers3 } from "../blocks/glyphs.js";
 import { cells } from "../text.js";
@@ -47,6 +52,7 @@ import {
 import { plotAreaRows } from "./height.js";
 import { seriesRefOf } from "./marks.js";
 import {
+  AREA_ROWS,
   basisOf,
   createDepth,
   equalDepth,
@@ -58,6 +64,7 @@ import {
   writeDepth,
   type Basis,
   type Depth,
+  type Extent3,
   type Projected,
   type Vec3,
 } from "./project3.js";
@@ -202,6 +209,96 @@ type Scene = Readonly<{
  * *data's* extent (C12 I92) and computing it twice would be two answers to one
  * question the moment a filter appeared between them.
  */
+/**
+ * What a held slot carries beside its triangles (C12 I107, §6o).
+ *
+ * **The object carriers are checked by identity and the scalars go in the key**,
+ * which is the split that makes one string enough. `block()` deep-freezes — the
+ * caller's own array, in place, mutation throwing — so identity is a proxy for
+ * content; `xRange` and `yRange` are pairs of numbers rather than payloads, so
+ * their *values* go in the key and two structurally equal fresh arrays hit
+ * rather than missing.
+ */
+type HeldGeometry = Readonly<{ from: readonly unknown[]; tris: readonly Tri3[] }>;
+
+/** Every object `trianglesOf` reads, in a fixed order, for the identity check. */
+const carriersOf = (sf: Surface3): readonly unknown[] =>
+  [sf.vertices, sf.faces, sf.heights, sf.field];
+
+/**
+ * Everything else it reads: the scalars, the ranges' values, the extent and the
+ * series index (C12 I107).
+ *
+ * **The extent is here and it is the row nothing else would find** (§6o row 1).
+ * It is taken over *every* carrier in the block, so a point cloud gaining a
+ * point moves this surface's triangles while the surface does not change — and
+ * a key without it draws the figure at the wrong scale, inside the box, with
+ * every arithmetic assertion passing.
+ *
+ * **`series` is here for the same kind of reason** (§6o row 6): it is written
+ * into every `Tri3` and read by `colourOf`, so a slot shared between two
+ * surfaces colours the second as the first. It is the argument a key written
+ * from the signature's first two parameters leaves out.
+ */
+function geometryKey(sf: Surface3, e: Extent3, series: number): string {
+  const r = (v: readonly [number, number] | undefined): string =>
+    v === undefined ? "" : `${String(v[0])},${String(v[1])}`;
+  return [
+    String(series),
+    sf.shading ?? "",
+    String(sf.wireframe ?? ""),
+    sf.closed === true ? "1" : "",
+    r(sf.xRange),
+    r(sf.yRange),
+    String(e.min.x), String(e.min.y), String(e.min.z),
+    String(e.max.x), String(e.max.y), String(e.max.z),
+  ].join("\u0000");
+}
+
+/**
+ * `trianglesOf` through the caller's scratch (C12 I107, §6o, FINDINGS F469).
+ *
+ * **None of `trianglesOf`'s three arguments is the camera**, so an orbit rebuilds
+ * an identical answer every frame: measured at 69,451 faces, **194 ms of a
+ * 319 ms frame**. F469 named this remedy — caller-owned scratch on
+ * `RenderContext` — and recorded it rather than taking it, because C12 I11 makes
+ * the wrong version of it the tempting one.
+ *
+ * **The owner is a carrier and never the `Surface3`** (§6o row 2). C23 I34 hands
+ * a live part a *new* block every tick, so a surface built fresh around a cached
+ * mesh is a new wrapper holding the same two arrays; keyed on the wrapper this
+ * misses every tick and buys nothing on the path that renders most often.
+ *
+ * **The slot is written after the build and never before** (§6o row 8). A
+ * refusal mid-build would otherwise leave an entry for a surface that produced
+ * no triangles — wrong the moment another surface reused the same carrier — and
+ * the ordering outlives whichever refusal exists at the time.
+ *
+ * **Absent scratch is a miss and nothing else.** The frame is identical and the
+ * cost is what it was; a cache whose absence changes a picture is not a cache,
+ * and PR10's control asserts exactly that before it asserts anything else.
+ */
+function trianglesFor(
+  sf: Surface3,
+  extent: Extent3,
+  series: number,
+  ctx: RenderContext,
+): readonly Tri3[] {
+  const scratch = ctx.scratch;
+  if (scratch === undefined) return trianglesOf(sf, extent, series);
+  const owner = (sf.faces ?? sf.heights ?? sf.vertices ?? sf) as object;
+  const key = geometryKey(sf, extent, series);
+  const from = carriersOf(sf);
+  const held = scratch.get(owner, key) as HeldGeometry | undefined;
+  if (held !== undefined && held.from.length === from.length // cells-ok — a carrier count
+    && held.from.every((v, i) => v === from[i])) {
+    return held.tris;
+  }
+  const tris = trianglesOf(sf, extent, series);
+  scratch.set(owner, key, { from, tris } satisfies HeldGeometry);
+  return tris;
+}
+
 function drawnOf(block: Plot, ctx: RenderContext, aspect: number): Scene {
   const clouds = block.points3 ?? [];
   const paths = block.lines3 ?? [];
@@ -271,7 +368,14 @@ function drawnOf(block: Plot, ctx: RenderContext, aspect: number): Scene {
   // renderer with the surface alone.
   const tris: Tri3[] = [];
   for (const sf of skins) {
-    tris.push(...trianglesOf(sf, extent, si));
+    // **A loop and never `push(...built)`** (F508). A spread is an argument
+    // list: 100,000 elements is fine and 125,000 throws `RangeError: Maximum
+    // call stack size exceeded`, from an expression that reads as a
+    // concatenation. C12 I11's shape is that the renderer answers rather than
+    // refuses, and the largest mesh in the tree is 69,451 faces — under half
+    // the ceiling, which is why it never fired. `parseObj` fans quads, so a
+    // 63k-quad model is over it.
+    for (const t of trianglesFor(sf, extent, si, ctx)) tris.push(t);
     si += 1; // cells-ok — a surface index
   }
   return {
@@ -320,27 +424,30 @@ function colourOf(
   return continuousColour(map, t, ctx.capabilities);
 }
 
-/** The block a tier paints on the colour raster: samples across, samples down. */
-const RASTER_TIER: readonly (readonly [number, number])[] = Object.freeze([
-  [2, 2], // near
-  [1, 2], // mid
-  [1, 1], // far
-]);
-
 /**
- * The same three blocks at the dot grid — **doubled in each axis, so apparent
- * size is what survives the change of rung** (C12 I100).
+ * The block a tier paints, in samples across and samples down — **one table,
+ * because there is now one grid** (F498).
  *
- * A braille sample is half a half-block sample across and half of it down, so
- * carrying `RASTER_TIER` over unchanged would draw every marker at a quarter of
- * the area it has on the rung beside this one — and the near tier, whose whole
- * job is to be the biggest, would come out the size the *far* tier is today.
- * The arm exists to draw a line more finely, not to shrink the points.
+ * There were two, and the difference between them was never about markers. At
+ * the time, the half rung sampled `w × rows·2` and the dot rung `w·2 × rows·4`,
+ * so the same apparent size needed two sets of numbers and the second was
+ * written as *"doubled in each axis"* against the first. Correct, and correct
+ * only while the two grids differed.
+ *
+ * When the silhouette alphabet took the half rung onto the dot grid the two
+ * became one grid, and the doubling that had been compensation turned into a
+ * marker drawn at twice the size on one arm and half on the other — near
+ * drawing what mid should, and `BR4` measuring one cell against two. **The rule
+ * a derived constant follows: when the thing it compensates for goes away, the
+ * compensation is the defect.** Third instance of F489 in this file.
+ *
+ * The heights divide `AREA_ROWS` rather than naming a number, so the table
+ * cannot go stale the next time the grid changes without a compile error.
  */
-const BRAILLE_TIER: readonly (readonly [number, number])[] = Object.freeze([
-  [4, 4], // near
-  [2, 4], // mid
-  [2, 2], // far
+const MARKER_TIER: readonly (readonly [number, number])[] = Object.freeze([
+  [4, AREA_ROWS], // near — two cells across, one down
+  [2, AREA_ROWS], // mid — one cell each way
+  [2, AREA_ROWS / 2], // far — one cell across, half a cell down
 ]);
 
 /** Which rung this block draws at (C12 I87, I100, §3am). */
@@ -414,7 +521,16 @@ function frameOf(
   area: Readonly<{ w: number; rows: number }>,
   depth: Depth,
   ctx: RenderContext,
-  paint: (i: number, mark: string, ink?: ColourValue) => void,
+  /**
+    * `px`/`py` are the sample's own coordinates and `from` is the previous
+    * painted sample of the same stroke, or `null` at its start — everything a
+    * **mask** needs, because a direction belongs to the step rather than to the
+    * cell (C12 I102).
+    */
+  paint: (
+    i: number, mark: string, ink: ColourValue | undefined,
+    px: number, py: number, from: readonly [number, number] | null, nearer: boolean,
+  ) => void,
 ): readonly Placed[] {
   const { w: areaW, rows } = area;
   const placement = block.axes3 ?? "corner";
@@ -429,11 +545,18 @@ function frameOf(
     const p = clipProject(scene.basis, seg);
     if (p === null) return null;
     const mark = frameMark(p.a, p.b, ctx);
-    // **`false`: the frame writes a colour and a colour has one question**
-    // (C12 I101). It draws last and loses a tie to the data by construction —
-    // F452's ruling — so painting on equal here would take back every cell the
-    // reordering exists to give away.
-    strokeSeg(p.a, p.b, grid, depth, (i) => { paint(i, mark, ink); }, false);
+    // **`true`, and it is the mask's rule rather than the colour's** (C12 I102,
+    // §3am). The frame is one connected figure — a box edge meets an axis line,
+    // an axis line meets its own ticks — and every one of those meetings is two
+    // strokes arriving at one cell at the same depth. Painted only on strictly
+    // nearer, the second is refused and the frame draws as a scatter of stubs,
+    // which is what it did. The **colour** rule is unchanged: `paint` is told
+    // which it was and gives the cell away on a tie, so F452's ordering stands.
+    let from: readonly [number, number] | null = null;
+    strokeSeg(p.a, p.b, grid, depth, (i, _t, _z, nearer, px, py) => {
+      paint(i, mark, ink, px, py, from, nearer);
+      from = [px, py];
+    }, true);
     return p;
   };
 
@@ -534,7 +657,11 @@ function frameOf(
     const p = clipProject(scene.basis, line.seg);
     if (p !== null) {
       const mark = frameMark(p.a, p.b, ctx);
-      strokeSeg(p.a, p.b, grid, depth, (i) => { paint(i, mark, ink); }, false);
+      let from: readonly [number, number] | null = null;
+      strokeSeg(p.a, p.b, grid, depth, (i, _t, _z, nearer, px, py) => {
+        paint(i, mark, ink, px, py, from, nearer);
+        from = [px, py];
+      }, true);
     }
     if (extent < EDGE_ON) continue;
     const [lo, hi] = spanOf(scene.lo, line.axis);
@@ -542,7 +669,11 @@ function frameOf(
       const pt = clipProject(scene.basis, { a: t.on, b: t.out });
       if (pt !== null) {
         const mark = frameMark(pt.a, pt.b, ctx);
-        strokeSeg(pt.a, pt.b, grid, depth, (i) => { paint(i, mark, ink); }, false);
+        let tickFrom: readonly [number, number] | null = null;
+        strokeSeg(pt.a, pt.b, grid, depth, (i, _t, _z, nearer, px, py) => {
+          paint(i, mark, ink, px, py, tickFrom, nearer);
+          tickFrom = [px, py];
+        }, true);
       }
       // **Pushed along `outward`, not scaled from the origin.** The first draft
       // multiplied the whole position vector by 1.35, which moves a point near
@@ -592,7 +723,7 @@ function frameOf(
  * the width that is left — `axed`'s rule, which this form reaches by composing
  * its own rows rather than by calling it.
  */
-export function scatter3dArea(
+export function plot3dArea(
   block: Plot,
   areaWidth: number,
   ctx: RenderContext,
@@ -618,9 +749,24 @@ export function scatter3dArea(
   // of them the frame. The members have to be listed, because *not the other
   // one* stops being a definition at three.
   const sub = half || arm === "braille";
+  // **`auto` rasterises at the *dot* grid and composes at both** (C12 I103).
+  // A half-block sample is exactly four braille samples, so one buffer at the
+  // finer resolution serves a surface and a line at once — and the choice of
+  // rung stops being a property of the block and becomes a property of the
+  // **primitive**, which is what F431 measured and never applied: a line is
+  // outline all the way through and a surface is 89–96% interior.
+  // **`width × 2` by `height × 8`, and the eight is the alphabet's** (C12
+  // I105). A cell's silhouette is drawn from the block elements, which offer
+  // **nine** levels along an axis — `▁▂▃▄▅▆▇█` and their colour-swapped
+  // reflections — and a grid that samples four can only ever quantise to
+  // quarters. The alphabet and the sampling have to agree or the finer glyphs
+  // are decoration.
+  //
+  // Braille folds row pairs back to its own `2 × 4`, so a line is unchanged: a
+  // diagonal lights one sample a row at either resolution and folds to the same
+  // four dot rows.
   const grid =
-    half ? sampleGrid(w, rows, "half")
-    : arm === "braille" ? sampleGrid(w, rows, "braille")
+    sub ? sampleGrid(w, rows)
     : { width: w, height: rows };
   // **The aspect is the sample's, and the two arms disagree about it.** A
   // terminal cell is `CELL_ASPECT` times taller than it is wide; a half-block
@@ -628,12 +774,24 @@ export function scatter3dArea(
   // grid ratio. A glyph-arm sample is a whole cell, so the ratio is divided by
   // the cell's own. Getting this wrong draws a sphere as an ellipse, which is
   // the one distortion a reader reads as data.
-  // **Both sub-cell samples are square and the glyph arm's is not.** A cell is
-  // `CELL_ASPECT` times taller than wide; a half-block sample is half a cell
-  // tall, and a braille sample is half a cell wide and a *quarter* tall — which
-  // is the same ratio again. So the correction is the arm's granularity rather
-  // than the rung's, and it is `sub` for that reason.
-  const aspect = grid.width / (grid.height * (sub ? 1 : CELL_ASPECT));
+  // **Derived from the grid, not from the arm** (C12 I105, F495).
+  //
+  // This read `sub ? 1 : CELL_ASPECT` — a sample is square on the sub-cell arms
+  // and a whole cell on the glyph arm — and both halves were true while the
+  // sub-cell grid was `2 × 4`: half a cell wide by a quarter of `CELL_ASPECT`
+  // tall is square. **Taking the area grid to `2 × 8` made the sample `2 : 1`
+  // and the constant a lie**, so the projection squashed and the surface stopped
+  // meeting the box drawn around it. Found by someone noticing the Gaussian's
+  // lower edges did not line up with its own bounds — the two are drawn from one
+  // basis, so a disagreement between them can only be the basis.
+  //
+  // Stated as arithmetic instead: a sample is `1 / sx` of a cell across and
+  // `CELL_ASPECT / sy` down, so its own ratio is `CELL_ASPECT · sx / sy`. That
+  // gives `2` on the glyph arm, `1` at `2 × 4` and `0.5` at `2 × 8` — every arm
+  // this file has had, from one expression that cannot go stale.
+  const sx = grid.width / w; // cells-ok — samples across a cell
+  const sy = grid.height / rows; // cells-ok — samples down a cell
+  const aspect = grid.width / (grid.height * ((CELL_ASPECT * sx) / sy));
   const scene = drawnOf(block, ctx, aspect);
   const drawn = scene.drawn;
 
@@ -695,6 +853,41 @@ export function scatter3dArea(
    * every arm because the cost is one `Array` of the cell count and the branch
    * that would avoid it is a second place to be wrong about which arm is live.
    */
+  /**
+   * Which **kind** of primitive owns each sample (C12 I103).
+   *
+   * `0` nothing · `1` an area — a marker's block or a surface's fill, which
+   * compose as half blocks · `2` an outline — a polyline, a wireframe edge or
+   * the reference frame, which compose as dots.
+   *
+   * **A parallel array rather than a flag folded into `ink`**, for `mark`'s own
+   * reason two arrays along: a colour and an owner are different things, and one
+   * value meaning both is the mistake `glyph` and `mark` were split to avoid.
+   */
+  /**
+   * **A point is not a silhouette, and that is why there are three kinds**
+   * (F498).
+   *
+   * `AREA` is a surface's fill — a *region*, whose edge is a boundary between
+   * two things and wants the nine-level alphabet so the boundary lands where the
+   * geometry put it. `MARK` is a point's own block — a *mark*, whose job is to
+   * be seen and to be the size its tier says. Quantising a mark's coverage to
+   * eighths shrinks it, and worse, makes its apparent size depend on where in
+   * the cell it happens to fall: the same point drifts between a full half-block
+   * and a two-eighth sliver as the camera turns, which is precisely the wobble
+   * the tier table exists to prevent.
+   *
+   * They shared `AREA` because until the silhouette alphabet existed nothing
+   * downstream could tell them apart — one kind was enough while one rule
+   * served both. **An invariant is vacuous until its subject exists**, and the
+   * day the subject arrived the sharing became a defect with no assertion
+   * against it.
+   */
+  const AREA = 1;
+  const OUTLINE = 2;
+  const MARK = 3;
+  const kind = new Uint8Array(grid.width * grid.height); // cells-ok — a sample count
+
   const bits: number[] = new Array<number>(w * rows).fill(0); // cells-ok — a cell count
 
   /**
@@ -711,16 +904,44 @@ export function scatter3dArea(
    * must not do: it would draw a wireframe edge in front of a surface that owns
    * the cell.
    */
-  const at = (cx: number, cy: number, b: number): void => {
+  /**
+   * The frame's own mask and its colour, a cell each (C12 I102).
+   *
+   * **Separate from the data's `bits`**, because the two answer different
+   * questions in one cell: the data's mask is the caller's wireframe and the
+   * frame's is the reference frame, and a cell holding both must draw the data
+   * — `glyphRows`' precedence, and *the axes never occlude the data* (I90).
+   * Merging them would make that decision unmakeable.
+   */
+  const frameBits: number[] = new Array<number>(w * rows).fill(0); // cells-ok — a cell count
+  const frameInkAt: (ColourValue | undefined)[] =
+    new Array<ColourValue | undefined>(w * rows).fill(undefined); // cells-ok — a cell count
+
+  const at = (target: number[], cx: number, cy: number, b: number): void => {
     if (cx < 0 || cy < 0 || cx >= w || cy >= rows) return; // cells-ok — a bound
-    bits[cy * w + cx] = (bits[cy * w + cx] ?? 0) | b; // cells-ok — a cell offset
+    target[cy * w + cx] = (target[cy * w + cx] ?? 0) | b; // cells-ok — a cell offset
   };
   /** One axis-aligned move: the edge it leaves by and the edge it arrives at. */
-  const step = (ax: number, ay: number, bx: number, by: number): void => {
-    if (bx > ax) { at(ax, ay, LINE_RIGHT); at(bx, by, LINE_LEFT); }
-    else if (bx < ax) { at(ax, ay, LINE_LEFT); at(bx, by, LINE_RIGHT); }
-    else if (by > ay) { at(ax, ay, LINE_DOWN); at(bx, by, LINE_UP); }
-    else if (by < ay) { at(ax, ay, LINE_UP); at(bx, by, LINE_DOWN); }
+  const stepInto = (target: number[], ax: number, ay: number, bx: number, by: number): void => {
+    if (bx > ax) { at(target, ax, ay, LINE_RIGHT); at(target, bx, by, LINE_LEFT); }
+    else if (bx < ax) { at(target, ax, ay, LINE_LEFT); at(target, bx, by, LINE_RIGHT); }
+    else if (by > ay) { at(target, ax, ay, LINE_DOWN); at(target, bx, by, LINE_UP); }
+    else if (by < ay) { at(target, ax, ay, LINE_UP); at(target, bx, by, LINE_DOWN); }
+  };
+  const step = (ax: number, ay: number, bx: number, by: number): void =>
+    { stepInto(bits, ax, ay, bx, by); };
+  /**
+   * The frame's link — **no depth test, because `strokeSeg` already ran one**.
+   * The data's `link` tests the corner it routes through; here the two cells
+   * are both samples the frame won, so the corner between them is only reached
+   * when the two differ on both axes, and it takes the same horizontal-first
+   * decomposition for the same reason: a diagonal claiming both axes in both
+   * cells draws a staircase of `┼`.
+   */
+  const linkInto = (target: number[], fx: number, fy: number, cx: number, cy: number): void => {
+    if (fx === cx && fy === cy) return;
+    if (fx !== cx && fy !== cy) { stepInto(target, fx, fy, cx, fy); stepInto(target, cx, fy, cx, cy); }
+    else stepInto(target, fx, fy, cx, cy);
   };
   /**
    * Link two cells a step apart, **through the corner when the step is
@@ -777,7 +998,7 @@ export function scatter3dArea(
     const sx = Math.floor(fx); // cells-ok — a sample coordinate
     const sy = Math.floor(fy); // cells-ok — a sample coordinate
     if (sub) {
-      const [bw, bh] = (half ? RASTER_TIER : BRAILLE_TIER)[tier] as readonly [number, number];
+      const [bw, bh] = MARKER_TIER[tier] as readonly [number, number];
       const x0 = Math.round(fx - bw / 2); // cells-ok — a sample coordinate
       const y0 = Math.round(fy - bh / 2); // cells-ok — a sample coordinate
       // **A near point at the frame's edge clips per sample** (C12 I88).
@@ -790,6 +1011,7 @@ export function scatter3dArea(
           if (writeDepth(depth, px, py, d.depth)) { // cells-ok — a sample offset
             ink[py * grid.width + px] = colour; // cells-ok — a sample offset
             mark[py * grid.width + px] = undefined; // cells-ok — a sample offset
+            kind[py * grid.width + px] = MARK; // cells-ok — a sample offset
           }
         }
       }
@@ -864,6 +1086,7 @@ export function scatter3dArea(
       // series` and `% clouds`, a decode that no longer exists (C12 I99).
       mark[i] = glyphMark;
       glyph[i] = -1;
+      kind[i] = OUTLINE;
     }, masked);
   }
 
@@ -901,6 +1124,11 @@ export function scatter3dArea(
       // the intensity arrives already clamped, because the ratio that makes the
       // field recoverable from hue holds over `[0, 1]` and nowhere else.
       ink[i] = base === undefined ? undefined : shadeColour(base, k);
+      // **A wireframe edge is an outline and a fill is an area**, on the same
+      // surface and often in the same cell (C12 I103). `sm.edge` is the fill's
+      // own sample rather than a second stroke (I95), so the distinction costs
+      // nothing here and is what lets a cage draw in dots over a shaded face.
+      kind[i] = sm.edge ? OUTLINE : AREA;
       // **The glyph arm's second channel** (§6h row 12): the colour carries the
       // field and the mark carries the shading, which is F436's retracted claim
       // holding on the arm that kept two carriers.
@@ -929,12 +1157,37 @@ export function scatter3dArea(
   //
   // Nothing else moves: a frame edge genuinely in front of a sample still wins,
   // because that test is unchanged and is what `box3: "full"` means.
-  const labels = frameOf(block, scene, grid, { w, rows }, depth, ctx, (i, m, axisInk) => {
+  // **The frame is cell resolution on every arm, so its mask is too** (C12
+  // I102). `link` works in cells and the frame's samples are the grid's, so the
+  // conversion is here — one division rather than a second mask at each rung.
+  const cellOf = (px: number, py: number): readonly [number, number] =>
+    [Math.floor((px * w) / grid.width), Math.floor((py * rows) / grid.height)]; // cells-ok — a cell coordinate
+  const labels = frameOf(block, scene, grid, { w, rows }, depth, ctx, (i, m, axisInk, px, py, from, nearer) => {
+    // **A tie with the data is still the data's** (C12 I102, F452). The frame
+    // paints on equal-or-nearer so that its *own* meetings join — a box edge
+    // against an axis line, an axis line against its own tick, every one of
+    // them two strokes arriving at one cell at one depth. It must not take a
+    // cell tied with a *carrier*, which is what drawing last is for, and the
+    // owner of the sample already sitting there is exactly what `mark` records.
+    if (!nearer && mark[i] === undefined) return;
+    // **The mask carries the frame now, on every arm** (C12 I102). One
+    // directional glyph a cell cannot draw a diagonal: a projected box edge
+    // stepped `─` at successive rows and read as a dashed staircase, and a tick
+    // meeting its axis wrote over the axis instead of joining it. Both are the
+    // same defect and the mask answers both — `┬ ┴ ├ ┤` fall out of the four
+    // bits rather than being cases.
+    const [cx, cy] = cellOf(px, py);
+    if (from !== null) {
+      const [fx, fy] = cellOf(from[0], from[1]);
+      linkInto(frameBits, fx, fy, cx, cy);
+    }
     // **The axis's own tone where it has one** (C12 I98). The box and the
     // untoned axes keep `frameInk`, which is what makes a single coloured axis
     // read as one axis rather than as a recoloured frame.
     ink[i] = axisInk ?? frameInk;
+    frameInkAt[cy * w + cx] = axisInk ?? frameInk; // cells-ok — a cell offset
     mark[i] = m;
+    kind[i] = OUTLINE;
     // **And the tier code is cleared with it.** `glyphRows` reads `glyph`
     // before `mark`, so a frame cell that won a marker's sample would draw the
     // marker in the frame's colour — a defect the old order could not have,
@@ -942,10 +1195,21 @@ export function scatter3dArea(
     glyph[i] = -1;
   });
 
+  /**
+   * The frame, as the compose steps see it — **one glyph a cell, resolved from
+   * four bits** (C12 I102). Every arm takes the same object, because the frame
+   * is furniture and furniture is cell resolution on all of them: its labels
+   * already were, and its lines had no reason not to be.
+   */
+  const frame = {
+    bits: frameBits,
+    ink: frameInkAt,
+    corners: block.plotCorners ?? "rounded",
+  } as const;
   const composed =
-    half ? halfRows(ink, depth, grid.width, rows)
-    : arm === "braille" ? brailleRows(ink, depth, mark, w, rows)
-    : glyphRows(ink, glyph, mark, masked ? bits : undefined, w, rows, ctx, block.plotCorners ?? "rounded");
+    half ? mixedRows(ink, depth, kind, w, rows, ctx)
+    : arm === "braille" ? brailleRows(ink, depth, mark, frame, w, rows, ctx)
+    : glyphRows(ink, glyph, mark, frame, masked ? bits : undefined, w, rows, ctx);
   // **`w` and not `grid.width`, which were the same number until this arm.**
   // Both call sites read the sample grid where they meant the cell width, and
   // both were right by coincidence on every rung that existed (F489).
@@ -961,43 +1225,412 @@ export function scatter3dArea(
  * below cannot be `HALF_BLOCK` with no foreground, because the terminal paints
  * the top half in whatever the current foreground is.
  */
-function halfRows(
+/**
+ * The lower blocks, `0/8` to `8/8` — nine levels of a horizontal edge (C12 I105).
+ *
+ * **Swapping the colours reflects the family**, which is why there is no upper
+ * set to declare: to fill the top `k/8`, draw `LOWER[8 - k]` with the
+ * foreground and background exchanged. Unicode has `▀` and `▔` upward and
+ * nothing between them, and it does not need to.
+ */
+const LOWER: readonly string[] = Object.freeze([
+  " ", "\u2581", "\u2582", "\u2583", "\u2584", "\u2585", "\u2586", "\u2587", "\u2588",
+]);
+
+/** The left blocks, `0/8` to `8/8` — the same nine levels for a vertical edge. */
+const LEFT: readonly string[] = Object.freeze([
+  " ", "\u258F", "\u258E", "\u258D", "\u258C", "\u258B", "\u258A", "\u2589", "\u2588",
+]);
+
+/**
+ * A silhouette cell's glyph, from the **direction of its edge and the fraction
+ * it covers** (C12 I105).
+ *
+ * **The jaggedness was quantisation, not shape.** A shallow edge crossing a run
+ * of cells covers 0.40 of one, 0.45 of the next, 0.55 of the third — and an
+ * alphabet with two levels rounds those to nothing, nothing, half, so the run
+ * flips back and forth and reads as serration. Nine levels put each cell within
+ * a sixteenth of the truth, and the flipping stops because the rounding error
+ * stops being comparable to the step.
+ *
+ * **One family for the whole run, and that is the ruling** (F496). The first
+ * draft classified each cell — eighths where the two columns agreed to within
+ * one sample, the left blocks where one column was nearly full, the quadrant
+ * mask for everything between. Measured on a Gaussian it drew **three** eighths
+ * and a hundred and five full cells: a silhouette sloping half a row per column
+ * puts about four samples between its two columns, so the eighths gate never
+ * fired and every edge cell fell to a quadrant. That is a **half**-cell
+ * staircase standing in for a ninth-cell one, and it is the whole of what the
+ * edges were doing wrong.
+ *
+ * The repair is not a better classifier. **A silhouette is read as a line, and
+ * no per-cell rule can see one** — the same finding as F492's corduroy and
+ * F494's serration, arriving a third time. Two families alternating cell to cell
+ * read as noise even where each cell is individually the closer fit, because the
+ * eye integrates the run and the two families quantise on different ladders.
+ *
+ * So: **`round(total / 2)` is the mean height of the boundary across the cell**,
+ * which makes the drawn area equal to the covered area. Area-preserving is what
+ * reconstructs the line: the integral is right in every cell, so the boundary
+ * tracks the truth to within a sixteenth and a straight edge draws as a
+ * monotone ramp rather than a stair. The only cell this cannot describe is one
+ * whose boundary never crosses a side wall — a genuinely vertical edge — and
+ * that is the single case taken out first.
+ *
+ * **The two columns are asymmetric on purpose.** A cell is twice as tall as it
+ * is wide, so eight rows and two columns is close to square sampling — and the
+ * edges that offend most are the shallow ones, which is exactly where the extra
+ * rows go.
+ */
+function areaGlyph(
+  cols: readonly [number, number],
+  rowsCovered: readonly number[],
+  near: ColourValue | undefined,
+  behind: ColourValue | undefined,
+  /**
+   * The plot's own ground — **what the *uncovered* part of a swapped cell is
+   * painted in** (C12 I105).
+   *
+   * Unicode's block elements run one way: `▁▂▃▄▅▆▇` fill from the **bottom**,
+   * and upward there is `▀` and `▔` and nothing between. So a cell whose covered
+   * mass sits at the *top* is drawn as its complement with the two colours
+   * exchanged — and the exchange needs a colour for the empty half. Left
+   * undefined it inherits the terminal's foreground, which is how a Gaussian's
+   * base came out streaked with **white**: the whole lower silhouette is
+   * top-mass cells, and every one of them painted its empty half in the default
+   * ink. Read off the frame; no assertion about coverage could have said it.
+   */
+  ground: ColourValue | undefined,
+): Readonly<{ text: string; fg: ColourValue | undefined; bg: ColourValue | undefined }> {
+  const [left, right] = cols;
+  const total = left + right; // cells-ok — a sample count
+  if (total === 0) return { text: " ", fg: undefined, bg: undefined };
+
+  // **The vertical edge, taken out first because it is the one exception** — and
+  // decided by comparing the two spreads rather than by a threshold, because a
+  // threshold is what put the eighths out of reach in the first place.
+  //
+  // A boundary is describable along the axis it varies *least* in. Across the
+  // cell it varies by `|left - right|` of `AREA_ROWS`; down the cell it varies by
+  // the spread of the row widths, of `BRAILLE_DOTS.x`. Normalise both to the
+  // cell and take the smaller: a shallow edge holds its height and draws in the
+  // eighths, a vertical one holds its *x* and draws as `▌`, and neither reading
+  // is a threshold anyone has to tune. A tie goes to the eighths, which is the
+  // finer ladder.
+  //
+  // Two columns of sampling give the halves and nothing finer, which is honest:
+  // `▏▎▍` describe positions this grid cannot resolve, and drawing one would be
+  // inventing precision. The eighths of `LEFT` are there for the day the
+  // horizontal sampling is worth raising — and F496 says what that costs, since
+  // the braille outlines fold out of the same buffer and a shallow line at four
+  // samples a row folds to two lit dots where it should light one.
+  let widest = 0;
+  let narrowest: number = BRAILLE_DOTS.x; // cells-ok — a sample count
+  for (let r = 0; r < AREA_ROWS; r += 1) { // cells-ok — a sample index
+    const wRow = rowsCovered[r] ?? 0; // cells-ok — a sample count
+    if (wRow > widest) widest = wRow; // cells-ok — a sample count
+    if (wRow < narrowest) narrowest = wRow; // cells-ok — a sample count
+  }
+  const acrossCell = Math.abs(left - right) * BRAILLE_DOTS.x; // cells-ok — a sample count
+  const downCell = (widest - narrowest) * AREA_ROWS; // cells-ok — a sample count
+  if (acrossCell > downCell) { // cells-ok — a sample count
+    return left > right
+      ? { text: LEFT[BRAILLE_DOTS.x * 2] as string, fg: near, bg: behind } // cells-ok — a sample count
+      : { text: LEFT[BRAILLE_DOTS.x * 2] as string, fg: behind ?? ground, bg: near }; // cells-ok — a sample count
+  }
+
+  // **Everything else is the mean height, in the eighths.** No second family and
+  // no arbitration: whatever this costs a single cell, it is paid consistently
+  // along the run, and consistency is what the eye reads as a straight edge.
+  const level = Math.round(total / 2); // cells-ok — a sample count
+  if (level <= 0) return { text: " ", fg: undefined, bg: undefined };
+  if (level >= AREA_ROWS) return { text: LOWER[AREA_ROWS] as string, fg: near, bg: behind };
+  // Which end the covered mass sits at — the same count, read from the rows.
+  let lowHalf = 0;
+  for (let r = AREA_ROWS / 2; r < AREA_ROWS; r += 1) lowHalf += rowsCovered[r] ?? 0; // cells-ok — a sample count
+  const atBottom = lowHalf * 2 >= total; // cells-ok — a sample count
+  return atBottom
+    ? { text: LOWER[level] as string, fg: near, bg: behind }
+    : { text: LOWER[AREA_ROWS - level] as string, fg: behind ?? ground, bg: near };
+}
+
+/**
+ * The sixteen 2×2 masks, by which sub-cells the **foreground** covers.
+ *
+ * Bit 1 upper-left, 2 upper-right, 4 lower-left, 8 lower-right — `linedraw.ts`'
+ * `quadrantGlyph` order, read rather than re-derived, because a second copy of a
+ * bit order is a second place for a picture to come out transposed and every
+ * count-based assertion agrees with a transpose.
+ *
+ * **`▀` is `0b0011` and that is the whole argument for this table.** The
+ * half-block raster is not an alternative to the quadrant one, it is a *member*
+ * of it: where the best two-colour split of a cell is top-against-bottom this
+ * picks `▀` and the frame does not move, and where the split runs diagonally it
+ * picks `▚` or `▙` and a silhouette stops being a staircase. Same block, same
+ * `East_Asian_Width=Ambiguous` arm, same `colourDepth >= 8` floor — the
+ * alphabet costs nothing the incumbent did not already cost.
+ */
+const QUADRANT: readonly string[] = Object.freeze([
+  " ", "\u2598", "\u259D", "\u2580", "\u2596", "\u258C", "\u259E", "\u259B",
+  "\u2597", "\u259A", "\u2590", "\u259C", "\u2584", "\u2599", "\u259F", "\u2588",
+]);
+
+/**
+ * **The triangles were tried and they are not here** (C12 I104, F494).
+ *
+ * `◢ ◣ ◤ ◥` give a true hypotenuse where a quadrant mask can only step, they
+ * are BMP, and the mono face covers all four — every capability argument was in
+ * their favour. Scored against the surface's own 2×4 coverage with the staircase
+ * as the floor, a triangle was drawn only where it fitted strictly better, so it
+ * could not lose area to its neighbours.
+ *
+ * **It still came out serrated, and the reason is not per-cell.** A silhouette's
+ * smoothness is a property of a *run* of cells: a staircase is read as a line
+ * because every step is the same, and one triangle inside that run cuts a corner
+ * the eye was using to follow it. Measured on a Gaussian dome, four cells of a
+ * 168-cell figure took a triangle — enough to chip the edge in four places and
+ * nowhere near enough to change its character.
+ *
+ * **The fix would be a run-length decision and not a bigger table**, which is a
+ * different algorithm: fit a line across several cells, then distribute the
+ * glyphs along it. Recorded here rather than deleted silently, because the next
+ * reader will have the same idea and the capability arguments will still all be
+ * in its favour.
+ */
+
+
+/**
+ * The default rung — **dots for what is outline, half blocks for what is
+ * interior, in one cell** (C12 I103).
+ *
+ * **This is F431's measurement applied per primitive, which is what it was
+ * always about and never how it was used.** That finding chose the half block
+ * because a *surface* is 89–96% interior, so the dot grid stipples over a colour
+ * the cell was going to paint anyway; F482 asked the same question at the other
+ * primitive and found an outline figure spends the half rung's second colour on
+ * 5.6%–31.1% of its cells. Both are true and neither is about a *block*: the
+ * answer differs by what is being drawn, and a `plotStyle` that picks one rung
+ * for a whole figure was answering a question nobody has.
+ *
+ * **One buffer, because a half-block sample is exactly four braille samples.**
+ * Everything rasterises at `width × 2` by `height × 4`; a surface's colour for
+ * the upper half block is the nearest of its **eight** upper samples and the
+ * lower half its eight lower ones, which is the same averaging `halfBlockRows`
+ * does one component over.
+ *
+ * **A cell holding both draws the outline over the area.** The dots take the
+ * glyph and the line's colour; the surface's colour becomes the **background**,
+ * so a wireframe over a shaded face reads as a cage in front of it rather than
+ * as a hole in it. One of the two half-block colours is lost in that cell, which
+ * is the whole of what the mixing costs and is why it is stated here rather than
+ * left to be discovered.
+ */
+function mixedRows(
   ink: readonly (ColourValue | undefined)[],
   depth: Depth,
+  kind: Uint8Array,
   w: number,
   rows: number,
+  ctx: RenderContext,
 ): readonly (readonly Span[])[] {
-  // **Drawn-ness is the depth buffer's and never the colour's.** The first
-  // draft read `ink[i] === undefined` as *not drawn*, and `continuousColour`
-  // returns `undefined` below its own floor — so a sample with no colour
-  // available would have read as a sample with nothing in it. It is
-  // unreachable today because `halfBlockEligible` requires `colourDepth >= 8`
-  // and `CONTINUOUS_FLOOR` is 8, which is **two independent thresholds that
-  // happen to agree**: either moving alone turns a drawn point into a blank.
-  const drawn = (i: number): boolean => Number.isFinite(depth.z[i]); // cells-ok — a sample offset
+  // The plot's ground, for the cells whose glyph is drawn inverted.
+  const ground = slot("surface.bg", ctx.theme, ctx.capabilities).colour;
+  const AREA = 1;
+  const OUTLINE = 2;
+  const MARK = 3;
+  // **Braille folds the eight rows back to its own four** (C12 I105). The area
+  // alphabet needs eight levels a cell and braille has four dot rows; one grid
+  // serves both because a line lights the same dot rows either way — a diagonal
+  // takes one sample a row at both resolutions and folds to the same four.
+  const fold = AREA_ROWS / BRAILLE_DOTS.y; // cells-ok — a sample count
+  const dots = createGrid(w * BRAILLE_DOTS.x, rows * BRAILLE_DOTS.y); // cells-ok — a dot count
+  for (let y = 0; y < depth.height; y += 1) { // cells-ok — a sample index
+    for (let x = 0; x < depth.width; x += 1) { // cells-ok — a sample index
+      if (kind[y * depth.width + x] === OUTLINE) { // cells-ok — a sample offset
+        setDot(dots, x, Math.floor(y / fold)); // cells-ok — a sample coordinate
+      }
+    }
+  }
+  const folded = foldBraille(dots);
+
   const span = (glyph: string, colour: ColourValue | undefined, bg?: ColourValue): Span =>
     colour === undefined && bg === undefined
       ? { text: glyph }
       : bg === undefined
         ? { text: glyph, style: colour === undefined ? {} : { colour } }
         : { text: glyph, style: colour === undefined ? { background: bg } : { colour, background: bg } };
+
+  /** The nearest sample of a kind in a rectangle of the grid, by colour. */
+  /**
+   * The nearest drawn sample's colour in a rectangle, among the kinds asked for.
+   *
+   * **A set rather than one kind** (F498): a cell can hold a point standing in
+   * front of a surface, and the half-block rule that draws marks has to colour
+   * each half from whatever won those samples — asking for `MARK` alone would
+   * leave the surface behind it black.
+   */
+  const nearestOf = (
+    x0: number, y0: number, x1: number, y1: number, ...wants: readonly number[]
+  ): ColourValue | undefined => {
+    let best = Infinity;
+    let out: ColourValue | undefined;
+    let found = false;
+    for (let y = y0; y < y1; y += 1) { // cells-ok — a sample index
+      for (let x = x0; x < x1; x += 1) { // cells-ok — a sample index
+        if (x >= depth.width || y >= depth.height) continue;
+        const i = y * depth.width + x; // cells-ok — a sample offset
+        if (!wants.includes(kind[i] as number)) continue;
+        const z = depth.z[i] as number;
+        if (!Number.isFinite(z) || z >= best) continue;
+        best = z;
+        out = ink[i];
+        found = true;
+      }
+    }
+    return found ? out : undefined;
+  };
+
   const out: Span[][] = [];
   for (let r = 0; r < rows; r += 1) { // cells-ok — a row index
+    const glyphRow = [...(folded[r] ?? "")];
     const line: Span[] = [];
     for (let c = 0; c < w; c += 1) { // cells-ok — a column index
-      const ti = r * 2 * w + c; // cells-ok — a sample offset
-      const bi = (r * 2 + 1) * w + c; // cells-ok — a sample offset
-      const t = drawn(ti);
-      const b = drawn(bi);
-      if (!t && !b) line.push({ text: " " });
-      else if (!b) line.push(span(HALF_BLOCK, ink[ti]));
-      else if (!t) line.push(span(HALF_BLOCK_LOWER, ink[bi]));
-      else line.push(span(HALF_BLOCK, ink[ti], ink[bi]));
+      const x0 = c * BRAILLE_DOTS.x; // cells-ok — a sample coordinate
+      const x1 = x0 + BRAILLE_DOTS.x; // cells-ok — a sample coordinate
+      const yTop = r * AREA_ROWS; // cells-ok — a sample coordinate
+      const yMid = yTop + AREA_ROWS / 2; // cells-ok — a sample coordinate
+      const yBot = yTop + AREA_ROWS; // cells-ok — a sample coordinate
+
+      // **Counted before anything is decided** (F497). The count used to be
+      // taken *after* the outline branch, which is what let a cell holding one
+      // covered sample of sixteen be painted entirely in the fill colour.
+      const xMid = x0 + BRAILLE_DOTS.x / 2; // cells-ok — a sample coordinate
+      const perRow: number[] = [];
+      let left = 0;
+      let right = 0;
+      let markTop = 0;
+      let markBottom = 0;
+      for (let dy = 0; dy < AREA_ROWS; dy += 1) { // cells-ok — a sample index
+        let inRow = 0;
+        for (let dx = 0; dx < BRAILLE_DOTS.x; dx += 1) { // cells-ok — a sample index
+          const sx = x0 + dx; // cells-ok — a sample coordinate
+          const sy = yTop + dy; // cells-ok — a sample coordinate
+          if (sx >= depth.width || sy >= depth.height) continue;
+          const k = kind[sy * depth.width + sx]; // cells-ok — a sample offset
+          if (k === MARK) { // cells-ok — a sample count
+            if (dy * 2 < AREA_ROWS) markTop += 1; else markBottom += 1; // cells-ok — a sample count
+            continue;
+          }
+          if (k !== AREA) continue;
+          inRow += 1; // cells-ok — a sample count
+          if (sx < xMid) left += 1; else right += 1; // cells-ok — a sample count
+        }
+        perRow.push(inRow);
+      }
+      const marks = markTop + markBottom; // cells-ok — a sample count
+      // **An outline wins the cell, and the fill only backs it if it owns the
+      // cell** (F497).
+      //
+      // This is where the eighths were being skipped, and the frame said so
+      // before any rule did: the box's braille runs *along* the dome's lower
+      // silhouette, so a run of edge cells took this branch while their
+      // neighbours took the eighths, and the two draw incompatible pictures —
+      // one puts the boundary at a ninth of a cell, the other has no boundary at
+      // all. Out-of-place jaggedness, in exactly the spots where a line crosses
+      // an edge.
+      //
+      // A cell carries one background, so the choice is binary and the honest
+      // rule is **majority**: the fill backs the dots when it owns at least half
+      // the cell, and otherwise the ground does. That puts the worst case at
+      // half a cell instead of a whole one, and — more to the point — it stops a
+      // single covered sample from advertising a full cell of surface.
+      const glyph = glyphRow[c] ?? " ";
+      if (glyph.codePointAt(0) !== BRAILLE_BLANK && glyph !== " ") {
+        const owns = (left + right + marks) * 2 >= AREA_ROWS * BRAILLE_DOTS.x; // cells-ok — a sample count
+        line.push(span(
+          glyph,
+          nearestOf(x0, yTop, x1, yBot, OUTLINE),
+          owns ? nearestOf(x0, yTop, x1, yBot, AREA, MARK) : undefined,
+        ));
+        continue;
+      }
+
+      // **A mark keeps the half block** (F498). Its size is the tier's ruling
+      // and not the cell's arithmetic, so it is drawn from which *halves* it
+      // reaches — the rule this file used before the silhouette alphabet, kept
+      // for the primitive that alphabet was never about.
+      //
+      // Both colours come from `AREA` as well as `MARK`, because a point in
+      // front of a surface owns only the samples it won and the rest of the
+      // cell is still surface. Asking for `MARK` alone would punch the fill out
+      // around every near point.
+      if (marks > 0) { // cells-ok — a sample count
+        const above = markTop > 0 || left + right > 0 ? // cells-ok — a sample count
+          nearestOf(x0, yTop, x1, yMid, AREA, MARK) : undefined;
+        const below = markBottom > 0 || left + right > 0 ? // cells-ok — a sample count
+          nearestOf(x0, yMid, x1, yBot, AREA, MARK) : undefined;
+        if (above === undefined && below === undefined) { line.push({ text: " " }); continue; }
+        if (below === undefined) { line.push(span(QUADRANT[3] as string, above)); continue; }
+        if (above === undefined) { line.push(span(QUADRANT[12] as string, below)); continue; }
+        line.push(span(QUADRANT[3] as string, above, below));
+        continue;
+      }
+      if (left + right === 0) { line.push({ text: " " }); continue; } // cells-ok — a sample count
+
+      // **A full cell is a gradient and keeps the half block**, which is the
+      // ruling F492 settled: a raster is read as a field, and a horizontal split
+      // tiles into one where a vertical split reads as corduroy.
+      if (left + right === AREA_ROWS * BRAILLE_DOTS.x) { // cells-ok — a sample count
+        line.push(span(
+          QUADRANT[3] ?? " ",
+          nearestOf(x0, yTop, x1, yMid, AREA),
+          nearestOf(x0, yMid, x1, yBot, AREA),
+        ));
+        continue;
+      }
+
+      // **The background is what is behind, not the terminal's** (C12 I105).
+      // A silhouette cell used to leave it unset, so a nearer surface partly
+      // covering a cell dropped whatever was behind it and punched a hole —
+      // which is the overlap case, and it is the same defect as the gaps. The
+      // depth buffer already holds the answer: the nearest thing among the
+      // samples the front object did not take.
+      const q = areaGlyph(
+        [left, right],
+        perRow,
+        nearestOf(x0, yTop, x1, yBot, AREA),
+        nearestOf(x0, yTop, x1, yBot, OUTLINE),
+        ground,
+      );
+      line.push(q.text === " " ? { text: " " } : span(q.text, q.fg, q.bg));
     }
     out.push(line);
   }
   return out;
 }
+
+/**
+ * The reference frame as a **mask**, one glyph a cell (C12 I102).
+ *
+ * **Furniture is cell resolution on every arm**, which its labels already were
+ * and its lines had no reason not to be. What it replaces is one directional
+ * glyph a sample — `│` or `─` by dominant screen direction — which cannot draw
+ * a diagonal: a projected box edge stepped `─` at successive rows and read as a
+ * dashed staircase, and a tick meeting its axis overwrote the axis instead of
+ * joining it. `┬ ┴ ├ ┤ ┼` fall out of the four bits rather than being cases.
+ */
+type Frame = Readonly<{
+  bits: readonly number[];
+  ink: readonly (ColourValue | undefined)[];
+  corners: "rounded" | "sharp";
+}>;
+
+/** The frame's glyph for a cell, or `undefined` where it drew nothing. */
+function frameGlyph(frame: Frame, i: number, ctx: RenderContext): string | undefined {
+  const m = frame.bits[i] ?? 0; // cells-ok — a cell offset
+  return m === 0 ? undefined : glyphForMask(m, frame.corners, ctx.capabilities);
+}
+
 
 /**
  * The empty braille cell — `foldBraille`'s `0x2800 + mask` with no dots set.
@@ -1008,6 +1641,7 @@ function halfRows(
  * the question being asked.
  */
 const BRAILLE_BLANK = 0x2800;
+
 
 /**
  * The dot grid, composed into cells — **one colour a cell, and the data owns it**
@@ -1037,54 +1671,129 @@ function brailleRows(
   ink: readonly (ColourValue | undefined)[],
   depth: Depth,
   mark: readonly (string | undefined)[],
+  frame: Frame,
   w: number,
   rows: number,
+  ctx: RenderContext,
 ): readonly (readonly Span[])[] {
+  // **The sample grid is eight rows a cell and braille has four** (F498). This
+  // loop wrote sample row `y` into dot row `y`, which was an identity while the
+  // two agreed and became a **doubling** the moment the silhouette alphabet took
+  // the grid to `AREA_ROWS`: the top half of the figure drawn at twice its
+  // height, the bottom half past the end of the grid and silently dropped.
+  //
+  // `setDot` refuses an out-of-range dot rather than throwing, so the arm went
+  // on rendering — a tall stippled sliver where the figure had been, and no
+  // assertion between here and the frame that could tell. **The same fold
+  // `mixedRows` applies**, read from the same two constants, because a second
+  // spelling of a fold is a second place for the two to drift.
+  const fold = AREA_ROWS / BRAILLE_DOTS.y; // cells-ok — a sample count
+  // **A frame sample is a hole where the data surrounds it, and the frame's own
+  // line where it does not** (F499).
+  //
+  // The frame's samples are kept out of the dot grid so the axis is not drawn
+  // twice — once as dots here and once as its own glyph. But that glyph is only
+  // drawn in a cell **with no data dots**, so in a cell that has some, the
+  // exclusion pays for a glyph nothing will draw: a z axis standing in front of
+  // a dome is one sample column of every cell for the figure's whole height, and
+  // took a black stripe out of it from peak to base. Every cell of that stripe a
+  // correct `⢸`, every colour right, the extent unchanged — **no count-based
+  // assertion sees it**, and only the picture is wrong.
+  //
+  // Two wrong repairs before this one, and each named the axis this rule needs:
+  //
+  // - *Any cell with data draws at full density.* Right for the stripe, wrong
+  //   for a tick crossing a fringe cell — there the frame's samples are a line,
+  //   and drawing them as data painted the box's edge green, detached from the
+  //   body, at every place a tick met the silhouette.
+  // - *Fill where the cell would have been full.* Circular: it judges the data's
+  //   footprint using the frame's own samples. Along the dome's front corner the
+  //   box edge runs **on** the silhouette, so the fringe cells came out full and
+  //   the taper `⠙⢿⣿⣿⡿⠋` was drawn as the block `⠙⣿⣿⣿⣿⠋`, while the last row —
+  //   never full — kept losing its dots.
+  //
+  // What separates all three is neither a count nor a cell: it is whether the
+  // data is on **both sides** of the sample. A hole has data either side of it;
+  // a silhouette's edge has data on one; a tick in open ground has none. Tested
+  // in dot coordinates rather than within the cell, because the axis is a column
+  // and its neighbours are in the cells next door.
   const dots = createGrid(w * BRAILLE_DOTS.x, rows * BRAILLE_DOTS.y); // cells-ok — a dot count
+  const whole = createGrid(w * BRAILLE_DOTS.x, rows * BRAILLE_DOTS.y); // cells-ok — a dot count
+  const taken: [number, number][] = [];
   for (let y = 0; y < depth.height; y += 1) { // cells-ok — a sample index
     for (let x = 0; x < depth.width; x += 1) { // cells-ok — a sample index
       const i = y * depth.width + x; // cells-ok — a sample offset
-      // The frame's samples are not dots — they are a glyph the cell may take
-      // if no data reached it, so lighting them would draw the axis twice.
-      if (mark[i] === undefined && Number.isFinite(depth.z[i])) setDot(dots, x, y);
+      // **The frame's samples are not dots** — it draws one glyph a cell out of
+      // its own mask, so lighting them would draw the axis twice. **Excluded per
+      // sample and not per cell**: a cell the frame reached may still hold the
+      // data's dots, and dropping all eight because one belongs to the frame
+      // takes a bite out of the figure at every axis crossing.
+      if (!Number.isFinite(depth.z[i])) continue;
+      const dy = Math.floor(y / fold); // cells-ok — a dot coordinate
+      setDot(whole, x, dy); // cells-ok — a dot coordinate
+      if (mark[i] === undefined) setDot(dots, x, dy); // cells-ok — a dot coordinate
+      else taken.push([x, dy]); // cells-ok — a dot coordinate
     }
   }
+  // **The hole fill**, over the dots the frame took: a dot goes back only where
+  // the data holds both sides of it. `whole` starts as the union and is reduced
+  // to the data plus its interior holes.
+  const lit = (g: typeof dots, x: number, y: number): boolean =>
+    x >= 0 && y >= 0 && x < g.dotWidth && y < g.dotHeight && g.dots[y * g.dotWidth + x] === 1;
+  for (const [x, y] of taken) {
+    const across = lit(dots, x - 1, y) && lit(dots, x + 1, y); // cells-ok — a dot coordinate
+    const down = lit(dots, x, y - 1) && lit(dots, x, y + 1); // cells-ok — a dot coordinate
+    if (!across && !down) whole.dots[y * whole.dotWidth + x] = 0; // cells-ok — a dot offset
+  }
   const folded = foldBraille(dots);
+  const drawn = foldBraille(whole);
   const out: Span[][] = [];
   for (let r = 0; r < rows; r += 1) { // cells-ok — a row index
     const glyphRow = [...(folded[r] ?? "")];
+    const drawnRow = [...(drawn[r] ?? "")];
     const line: Span[] = [];
     for (let c = 0; c < w; c += 1) { // cells-ok — a column index
+      const cell = r * w + c; // cells-ok — a cell offset
       let nearest = Infinity;
       let colour: ColourValue | undefined;
-      let framed: string | undefined;
-      let framedInk: ColourValue | undefined;
-      let framedAt = Infinity;
-      for (let dy = 0; dy < BRAILLE_DOTS.y; dy += 1) { // cells-ok — a dot index
-        for (let dx = 0; dx < BRAILLE_DOTS.x; dx += 1) { // cells-ok — a dot index
+      // **Every sample row the cell owns, not every dot row.** The colour and
+      // the dots come from the same buffer, so this loop has to walk the cell in
+      // the grid's units — `AREA_ROWS` down, `BRAILLE_DOTS.x` across — or the
+      // cell takes its colour from the top eighth of itself.
+      for (let dy = 0; dy < AREA_ROWS; dy += 1) { // cells-ok — a sample index
+        for (let dx = 0; dx < BRAILLE_DOTS.x; dx += 1) { // cells-ok — a sample index
           const x = c * BRAILLE_DOTS.x + dx; // cells-ok — a sample coordinate
-          const y = r * BRAILLE_DOTS.y + dy; // cells-ok — a sample coordinate
+          const y = r * AREA_ROWS + dy; // cells-ok — a sample coordinate
           if (x >= depth.width || y >= depth.height) continue;
           const i = y * depth.width + x; // cells-ok — a sample offset
           const z = depth.z[i] as number;
-          if (!Number.isFinite(z)) continue;
-          const m = mark[i];
-          if (m !== undefined) {
-            if (z < framedAt) { framedAt = z; framed = m; framedInk = ink[i]; }
-            continue;
-          }
+          if (!Number.isFinite(z) || mark[i] !== undefined) continue;
           if (z < nearest) { nearest = z; colour = ink[i]; }
         }
       }
       const glyph = glyphRow[c] ?? " ";
+      const framed = frameGlyph(frame, cell, ctx);
       // **The code point and not the character** (A03 SS47). A literal blank
       // braille glyph in framework text is a mark the substitution table cannot
       // reach; `foldBraille` emits `0x2800 + mask`, so the empty cell is the
       // mask being zero and that is what to say.
       if (glyph.codePointAt(0) !== BRAILLE_BLANK) {
-        line.push(colour === undefined ? { text: glyph } : { text: glyph, style: { colour } });
+        // **Fill the hole; do not adopt the line** (F499).
+        //
+        // The first cut said *any data at all draws at full density*, which is
+        // right for a full cell with a column punched out of it and wrong for a
+        // fringe cell with an axis crossing it — there the frame's samples are a
+        // **line**, and drawing them as data paints the box's edge in the
+        // surface's colour: speckle along the skirt and stray dots detached from
+        // the body, at every place a tick meets the silhouette.
+        //
+        // `drawn` is the data plus the holes the frame punched in it, so the
+        // cell draws its own footprint and nothing the frame owns.
+        const solid = drawnRow[c] ?? glyph;
+        line.push(colour === undefined ? { text: solid } : { text: solid, style: { colour } });
       } else if (framed !== undefined) {
-        line.push(framedInk === undefined ? { text: framed } : { text: framed, style: { colour: framedInk } });
+        const fi = frame.ink[cell]; // cells-ok — a cell offset
+        line.push(fi === undefined ? { text: framed } : { text: framed, style: { colour: fi } });
       } else {
         line.push({ text: " " });
       }
@@ -1098,7 +1807,25 @@ function brailleRows(
 function glyphRows(
   ink: readonly (ColourValue | undefined)[],
   glyph: readonly number[],
+  /**
+   * The **data's** second channel — a surface's density glyph, on the arm that
+   * has no colour to shade with (§6h row 12, F500).
+   *
+   * This parameter was lost when the reference frame was given its own
+   * structure. Before that, one array carried both the data's density glyph and
+   * the frame's stroke, and the local that read it was called `framed` — so
+   * pulling the frame out looked like it was pulling out everything the array
+   * held, and the argument was replaced rather than joined. **A shared channel
+   * hides which of its consumers a change is about**, and the name had already
+   * picked the wrong one.
+   *
+   * The cost was total and silent: a surface on the ASCII rung wrote its glyph
+   * here, `glyphRows` no longer looked, and the figure came out **empty** — not
+   * degraded, not coarse, blank. `SF7` says `expected 0 to be greater than 1`
+   * and that is the whole of it.
+   */
   mark: readonly (string | undefined)[],
+  frame: Frame,
   /**
    * The mask, on the arm that has one — **and `undefined` rather than an array
    * of zeroes**, so *this arm does not use a mask* and *this cell has no edges*
@@ -1108,7 +1835,6 @@ function glyphRows(
   w: number,
   rows: number,
   ctx: RenderContext,
-  corners: "rounded" | "sharp",
 ): readonly (readonly Span[])[] {
   const marks = markers3(ctx.capabilities);
   const table = [marks.near, marks.mid, marks.far] as const;
@@ -1117,20 +1843,34 @@ function glyphRows(
     const line: Span[] = [];
     for (let c = 0; c < w; c += 1) { // cells-ok — a column index
       const i = r * w + c; // cells-ok — a sample offset
-      const framed = mark[i];
       const g = glyph[i] ?? -1;
       if (g < 0) {
-        const colour = ink[i];
-        // **Data, then the mask, then the frame** — `glyphRows`' own precedence
-        // extended by one rung (C12 I101, F488). A marker outranks a line
-        // through it for F452's reason, and a caller's wireframe outranks the
-        // frame's own stroke for I90's: the axes never occlude the data.
+        // **Data, then the data's mask, then the frame's** — `glyphRows`' own
+        // precedence extended by one rung (C12 I101, I102, F488). A marker
+        // outranks a line through it for F452's reason, and a caller's
+        // wireframe outranks the reference frame for I90's: the axes never
+        // occlude the data.
         const edges = bits?.[i] ?? 0;
-        const drawn = edges !== 0 ? glyphForMask(edges, corners, ctx.capabilities) : framed;
+        if (edges !== 0) {
+          const colour = ink[i];
+          const drawn = glyphForMask(edges, frame.corners, ctx.capabilities);
+          line.push(colour === undefined ? { text: drawn } : { text: drawn, style: { colour } });
+          continue;
+        }
+        // **A surface's density glyph is data and outranks the frame** — the
+        // rung the precedence gained, in the place the old shared array put it.
+        const shaded = mark[i];
+        if (shaded !== undefined) {
+          const colour = ink[i];
+          line.push(colour === undefined ? { text: shaded } : { text: shaded, style: { colour } });
+          continue;
+        }
+        const framed = frameGlyph(frame, i, ctx);
+        const fi = frame.ink[i]; // cells-ok — a cell offset
         line.push(
-          drawn === undefined ? { text: " " }
-          : colour === undefined ? { text: drawn }
-          : { text: drawn, style: { colour } },
+          framed === undefined ? { text: " " }
+          : fi === undefined ? { text: framed }
+          : { text: framed, style: { colour: fi } },
         );
         continue;
       }
@@ -1187,10 +1927,10 @@ function overlay(
 }
 
 /** The rows, painted. `FORM_ROWS` takes strings and the legend is composed by the caller. */
-export function scatter3dRows(
+export function plot3dRows(
   block: Plot,
   areaWidth: number,
   ctx: RenderContext,
 ): readonly string[] {
-  return scatter3dArea(block, areaWidth, ctx).map((line) => paint(line));
+  return plot3dArea(block, areaWidth, ctx).map((line) => paint(line));
 }

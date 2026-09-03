@@ -74,6 +74,20 @@ export type FocusState = Readonly<{
  * registry passes itself for both, so a container composes children whose kind
  * it does not know without importing the registry (I7).
  */
+/**
+ * A caller-owned store for derived work, keyed on an object the caller holds.
+ *
+ * Structural on purpose: the implementation is L4's and this layer only needs
+ * to name the two calls. See `RenderContext.scratch` for what it is for and why
+ * a renderer writing to it does not violate C12 I11.
+ */
+export type RenderScratch = Readonly<{
+  /** What is held for `owner`, or `undefined` if the slot is empty or holds another `key`. */
+  get: (owner: object, key: string) => unknown;
+  /** Overwrite `owner`'s one slot. Never called before the value exists (C12 §6o row 8). */
+  set: (owner: object, key: string, value: unknown) => void;
+}>;
+
 export type RenderContext = Readonly<{
   width: number;
   theme: ResolvedTheme;
@@ -111,6 +125,33 @@ export type RenderContext = Readonly<{
    * complete and unobservable at once.
    */
   cameras?: Readonly<Record<string, Camera>>;
+  /**
+   * Caller-owned scratch for work a renderer would otherwise repeat (C12 I107).
+   *
+   * **An input, which is what keeps I11 satisfied.** C12 I11 forbids state that
+   * *survives* a render and permits a local; the distinction it draws is
+   * ownership, not lifetime. A renderer that writes here keeps nothing — the
+   * store is the caller's, arriving the way `cameras` does — while a
+   * module-level `WeakMap` is exactly the forbidden thing and is the tempting
+   * version of this.
+   *
+   * **Keyed on an object the caller already holds**, so eviction is the garbage
+   * collector's and nothing subscribes. `owner` is the payload a renderer's
+   * result is derived from — C12 passes a surface's `faces` array — and `key`
+   * discriminates everything else the derivation reads. **One slot per owner**:
+   * `HeightCache`'s rule and its reason, since read as a composite key this
+   * describes a table with one slot per revision.
+   *
+   * **`unknown` because this layer cannot know what a renderer stores**, and
+   * the alternative — importing C12's `Tri3` into C09's context type — is an
+   * edge from `blocks/` into `plot/` where the reverse already exists.
+   *
+   * **Absent is a miss, and a field with no writer is unobservable** (§3s):
+   * `cursorPositions` one field up is read here and written by nothing in
+   * `src/`, which is correct, complete and inert at once. The L4 writer lands
+   * with this or neither does.
+   */
+  scratch?: RenderScratch;
   focus: FocusState | null;
   /**
    * A monotonic counter, incremented by C03's spinner commit. A renderer

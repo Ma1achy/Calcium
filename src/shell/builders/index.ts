@@ -433,7 +433,7 @@ function plot(
      * **Held back until a form could use it**, and the reason was sharper than
      * *not yet built*: a plot declaring a camera becomes focusable (C12 I85), so
      * exposing it earlier handed callers a way to add a focus stop to a 2D plot
-     * and no way to draw anything. `scatter3d` is what released it.
+     * and no way to draw anything. `plot3d` is what released it.
      */
     camera?: Plot["camera"];
     levels?: Plot["levels"];
@@ -806,25 +806,25 @@ function plot(
     // for a finite `value` is the validator's alone, exactly as `vectors`'
     // rectangularity is — a statement about members belongs at both gates and a
     // walk over the data belongs at the one that reports rather than throws.
-    if (points3 !== undefined && drawn !== "scatter3d") {
+    if (points3 !== undefined && drawn !== "plot3d") {
       throw new TypeError(
-        `b.plot: "points3" on form "${drawn}" (C04 I76) — only a scatter3d draws a point ` +
+        `b.plot: "points3" on form "${drawn}" (C04 I76) — only a plot3d draws a point ` +
           `cloud, and three coordinates per sample mean nothing to any other form`,
       );
     }
-    if (lines3 !== undefined && drawn !== "scatter3d") {
+    if (lines3 !== undefined && drawn !== "plot3d") {
       throw new Error(
-        `b.plot: "lines3" on form "${drawn}" (C04 I78) — only a scatter3d draws a path ` +
+        `b.plot: "lines3" on form "${drawn}" (C04 I78) — only a plot3d draws a path ` +
           `through three-dimensional space, and there is no projection to draw it with`,
       );
     }
-    if (surfaces3 !== undefined && drawn !== "scatter3d") {
+    if (surfaces3 !== undefined && drawn !== "plot3d") {
       throw new Error(
-        `b.plot: "surfaces3" on form "${drawn}" (C04 I79) — only a scatter3d shades a ` +
+        `b.plot: "surfaces3" on form "${drawn}" (C04 I79) — only a plot3d shades a ` +
           `surface, and there is no projection, no depth buffer and no light to shade it with`,
       );
     }
-    if (light3 !== undefined && drawn !== "scatter3d") {
+    if (light3 !== undefined && drawn !== "plot3d") {
       throw new Error(
         `b.plot: "light3" on form "${drawn}" (C04 I79) — it says where the light is, and ` +
           `only a shaded surface reads one`,
@@ -850,24 +850,24 @@ function plot(
     // validator reads `CARRIERS_3D`; this gate is the same rule at the other
     // side, and the two messages name the same list.
     if (
-      drawn === "scatter3d" && points3 === undefined && lines3 === undefined
+      drawn === "plot3d" && points3 === undefined && lines3 === undefined
       && surfaces3 === undefined
     ) {
       throw new TypeError(
-        `b.plot: form "scatter3d" has none of "points3", "lines3", "surfaces3" (C04 I79) — ` +
+        `b.plot: form "plot3d" has none of "points3", "lines3", "surfaces3" (C04 I79) — ` +
           `a cloud, a path or a surface is what it draws, and "series" carries one reading ` +
           `per position`,
       );
     }
-    if (colourBy !== undefined && drawn !== "scatter3d") {
+    if (colourBy !== undefined && drawn !== "plot3d") {
       throw new TypeError(
         `b.plot: "colourBy" on form "${drawn}" (C04 I76) — it names which of three readings ` +
           `colour carries, and no other form has three competing for it`,
       );
     }
-    if (drawn === "scatter3d" && axes === true) {
+    if (drawn === "plot3d" && axes === true) {
       throw new TypeError(
-        `b.plot: "axes" on form "scatter3d" (C04 I76) — three axes turn with the camera and ` +
+        `b.plot: "axes" on form "plot3d" (C04 I76) — three axes turn with the camera and ` +
           `are drawn inside the area, so there is no gutter and no bottom rule to switch on`,
       );
     }

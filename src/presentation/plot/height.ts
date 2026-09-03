@@ -100,7 +100,7 @@ const heightOrOne = (plot: PlotGeometry): number => Math.max(1, Math.floor(plot.
 const AREA_ROWS: Readonly<Record<PlotForm, (plot: PlotGeometry) => number>> = {
   sparkline: () => 1,
   // The declared rows are the sample grid's halves (C12 I84).
-  scatter3d: heightOrOne,
+  plot3d: heightOrOne,
   waffle: () => 10,
   contour: heightOrOne, quiver: heightOrOne,
   line: heightOrOne,
@@ -145,7 +145,7 @@ const FURNITURE_ROWS: Readonly<Record<PlotForm, (plot: PlotGeometry) => number>>
   // (C04 I76) and its three axis names are billboarded in the scene rather
   // than written under it. A horizontal legend still costs its row, and that
   // is `legendRows`' term, added centrally.
-  scatter3d: () => 0,
+  plot3d: () => 0,
   waffle: () => 0,
   line: axedFurniture,
   heatmap: () => AXIS_ROWS,

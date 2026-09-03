@@ -1464,7 +1464,7 @@ function plotFieldErrors(
  * step number, so a grep for `axesAt3` is what expires this clause.
  */
 /**
- * The carriers a `scatter3d` draws, as **one list two rules read** (C04 I79).
+ * The carriers a `plot3d` draws, as **one list two rules read** (C04 I79).
  *
  * **The class rather than the instance.** The gate's *neither carrier* refusal
  * and `colourBy: "value"`'s completeness walk are both over this set, and each
@@ -1485,15 +1485,15 @@ function checkPoints3(
   const lns = b["lines3"];
   const sfs = b["surfaces3"];
   const by = b["colourBy"];
-  if (pts !== undefined && form !== "scatter3d") {
+  if (pts !== undefined && form !== "plot3d") {
     e.push(
-      `${at}: "points3" on form "${String(form)}" (C04 I76) — only a scatter3d draws a ` +
+      `${at}: "points3" on form "${String(form)}" (C04 I76) — only a plot3d draws a ` +
         `point cloud, and three coordinates per sample mean nothing to any other form`,
     );
   }
-  if (lns !== undefined && form !== "scatter3d") {
+  if (lns !== undefined && form !== "plot3d") {
     e.push(
-      `${at}: "lines3" on form "${String(form)}" (C04 I78) — only a scatter3d draws a path ` +
+      `${at}: "lines3" on form "${String(form)}" (C04 I78) — only a plot3d draws a path ` +
         `through three-dimensional space, and there is no projection to draw it with`,
     );
   }
@@ -1502,13 +1502,13 @@ function checkPoints3(
   // alone is a complete document. The refusal as first written read the cloud
   // only, and nothing about the member would have shown it — it is the carrier
   // rule meeting the *other* carrier, which is C12 §6g row 2.
-  if (sfs !== undefined && form !== "scatter3d") {
+  if (sfs !== undefined && form !== "plot3d") {
     e.push(
-      `${at}: "surfaces3" on form "${String(form)}" (C04 I79) — only a scatter3d shades a ` +
+      `${at}: "surfaces3" on form "${String(form)}" (C04 I79) — only a plot3d shades a ` +
         `surface, and there is no projection, no depth buffer and no light to shade it with`,
     );
   }
-  if (b["light3"] !== undefined && form !== "scatter3d") {
+  if (b["light3"] !== undefined && form !== "plot3d") {
     e.push(
       `${at}: "light3" on form "${String(form)}" (C04 I79) — it says where the light is, and ` +
         `only a shaded surface reads one`,
@@ -1518,22 +1518,22 @@ function checkPoints3(
   // A wireframe has no cloud, a parametric curve has no samples, and a loss
   // landscape has neither — so the refusal is *no carrier at all*, and the list
   // it reads is the one the completeness walk below reads.
-  if (form === "scatter3d" && CARRIERS_3D.every((k) => b[k] === undefined)) {
+  if (form === "plot3d" && CARRIERS_3D.every((k) => b[k] === undefined)) {
     e.push(
-      `${at}: form "scatter3d" has none of ${CARRIERS_3D.map((k) => `"${k}"`).join(", ")} ` +
+      `${at}: form "plot3d" has none of ${CARRIERS_3D.map((k) => `"${k}"`).join(", ")} ` +
         `(C04 I79) — a cloud, a path or a surface is what it draws, and "series" carries one ` +
         `reading per position`,
     );
   }
-  if (by !== undefined && form !== "scatter3d") {
+  if (by !== undefined && form !== "plot3d") {
     e.push(
       `${at}: "colourBy" on form "${String(form)}" (C04 I76) — it names which of three ` +
         `readings colour carries, and no other form has three competing for it`,
     );
   }
-  if (form === "scatter3d" && b["axes"] === true) {
+  if (form === "plot3d" && b["axes"] === true) {
     e.push(
-      `${at}: "axes" on form "scatter3d" (C04 I76) — three axes turn with the camera and ` +
+      `${at}: "axes" on form "plot3d" (C04 I76) — three axes turn with the camera and ` +
         `are drawn inside the area, so there is no gutter and no bottom rule to switch on`,
     );
   }
@@ -2169,7 +2169,7 @@ const PLOT_FORM_MEMBERS = {
   pie: true, radar: true,
   horizon: true,
   contour: true, quiver: true,
-  scatter3d: true,
+  plot3d: true,
 } satisfies Record<PlotForm, true>;
 const PLOT_FORMS: ReadonlySet<string> = new Set(Object.keys(PLOT_FORM_MEMBERS));
 

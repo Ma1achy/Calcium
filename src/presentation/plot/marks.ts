@@ -239,7 +239,7 @@ export function markOf(index: number, caps: Caps, always = false): string {
 export const HAS_POSITION_AXIS: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   // **The abscissa is a projected x, not a sample index** (C12 I87). Two
   // samples adjacent in the array land wherever the camera puts them.
-  scatter3d: false,
+  plot3d: false,
   // Sample index across the area — one column per position (C12 I41).
   line: true, scatter: true, step: true, ecdf: true, density: true,
   slope: true, bubble: true, stackedarea: true, streamgraph: true,
@@ -269,7 +269,7 @@ export const ROW_IS_AN_IDENTITY: Readonly<Record<PlotForm, boolean>> = Object.fr
   // **A `Point3Series` is a thing the caller named** (C04 I76). Whether colour
   // *carries* that identity is `colourBy`'s decision and a different question —
   // this record asks whether a row is a thing at all.
-  scatter3d: true,
+  plot3d: true,
   // **The two the renderer cuts.** `binValues` makes the bins and the lags are
   // offsets into one series — neither is anything the caller named.
   histogram: false, autocorrelation: false,
@@ -308,7 +308,7 @@ export const SHARES_CELLS: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   // in one cell and the nearer wins it, so nothing in the picture says which
   // series the cell belongs to — which is what makes the legend load-bearing
   // rather than polite, and what makes this entry observable at all.
-  scatter3d: true,
+  plot3d: true,
   // The geometric family: segments and polygons in one figure, no gutter at all.
   pie: true, radar: true, waffle: true,
   // Layers inside one bar, and one row per category — the row is labelled and

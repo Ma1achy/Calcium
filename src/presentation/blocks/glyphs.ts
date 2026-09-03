@@ -632,17 +632,31 @@ const MARKER3_ASCII: Marker3Set = Object.freeze({
  */
 export type ArrowSet = Readonly<{ right: string; left: string; up: string; down: string }>;
 
-const ARROW_UNICODE: ArrowSet = Object.freeze({
-  right: "\u2192", left: "\u2190", up: "\u2191", down: "\u2193",
-});
 const ARROW_ASCII: ArrowSet = Object.freeze({ right: ">", left: "<", up: "^", down: "v" });
 
-/** The arrowheads for this terminal, on `markers3`' own two-arm rule. */
+/**
+ * The arrowheads, **one set at every rung** (C12 I92).
+ *
+ * **Two arms became one, and removing an arm is the point.** `→ ← ↑ ↓` are
+ * `East_Asian_Width=Ambiguous`, so a terminal declaring `wide` already drew
+ * `> < ^ v` — the split existed to avoid a head at twice the column the
+ * projection put it in. Keeping the chevrons everywhere costs one alphabet at
+ * `narrow` and buys a mark that cannot move the picture on any terminal.
+ *
+ * **And it is the reason the solid triangles are refused.** `▲ ▼ ◀ ▶` read as
+ * arrowheads and are Ambiguous too, so they would need the arm back — and `▲`
+ * is already the marker table's third column, so an axis head and a data point
+ * would be the same glyph in one figure. A chevron is nothing else's mark.
+ *
+ * The set this chose against was `U+2192 U+2190 U+2191 U+2193`, and it is named
+ * by code point here rather than kept as a dead constant — an export nothing
+ * consumes is the thing this repository refuses, and a comment that names the
+ * rejected alternative carries the same information without one.
+ */
 export function arrows3(
-  caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+  _caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
 ): ArrowSet {
-  if (caps.unicode === "ascii") return ARROW_ASCII;
-  return caps.ambiguousWidth === "wide" ? ARROW_ASCII : ARROW_UNICODE;
+  return ARROW_ASCII;
 }
 
 /**

@@ -615,7 +615,28 @@ function fill(
       const w0 = ((b.x - a.x) * (cy - a.y) - (cx - a.x) * (b.y - a.y)) * sign;
       const w1 = ((c.x - b.x) * (cy - b.y) - (cx - b.x) * (c.y - b.y)) * sign;
       const w2 = ((a.x - c.x) * (cy - c.y) - (cx - c.x) * (a.y - c.y)) * sign;
-      if (w0 < 0 || w1 < 0 || w2 < 0) continue;
+      // **A shared edge is claimed by both triangles or by neither, and
+      // floating point decides which** (C12 I104, F493).
+      //
+      // The test was `w < 0`, which accepts a sample exactly *on* an edge — so
+      // two triangles sharing one both take it, and the depth test settles it.
+      // That is right in exact arithmetic. In floating point the two compute the
+      // same edge from **different operands**, so a sample on it can evaluate to
+      // `-1e-13` for both and be dropped by both: a **crack**, one sample wide,
+      // along every shared edge in the mesh.
+      //
+      // **It was invisible until the grid doubled.** At `width × 1` the cracks
+      // fell between samples; at `width × 2` there are four times as many
+      // chances to land on one, and they surfaced as half-cell holes punched
+      // into a solid surface — which reads as a rendering fault and is a
+      // sampling one. Found by looking at a magnified frame, not by any
+      // assertion about coverage.
+      //
+      // The epsilon is relative to the triangle's own area so it scales with the
+      // mesh, and it errs toward double coverage, which `writeDepth` already
+      // resolves.
+      const eps = Math.abs(area) * 1e-6;
+      if (w0 < -eps || w1 < -eps || w2 < -eps) continue;
       const m = Math.abs(area);
       const [ua, ub, uc] = [w1 / m, w2 / m, w0 / m];
       // **Depth interpolates linearly across the screen triangle**, which is not

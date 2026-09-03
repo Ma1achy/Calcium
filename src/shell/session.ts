@@ -795,6 +795,8 @@ class Session implements TuiInstance {
       registry: graph.blocks,
       theme: graph.theme.current,
       capabilities: graph.capabilities,
+      // **The layer host, and it is the one `/live` draws into** (C12 I107).
+      scratch: graph.scratch,
       // C14 selected these at this width; the paint pads them and never
       // re-measures (C09 I1 — one implementation, or the two answers drift).
       // **Both take the frame's width from the frame**, not from a fresh
@@ -1140,6 +1142,13 @@ function visibleRows(
           // again — read in one place, written by nothing in `src/`, correct and
           // unobservable at once (C12 §3s).
           cameras: graph.cameras.forEntry(entry.id),
+          // **The field and its writer land together, again** (C12 I107, §6o
+          // row 9). One store per session and no key of its own here: the
+          // scratch is keyed on the caller's arrays inside C12, which is what
+          // lets an orbit reuse a mesh's triangles while `rendered` misses on
+          // the very same frame. The two caches disagree by construction and
+          // both are right — the picture moved and the geometry did not.
+          scratch: graph.scratch,
         }),
       );
     if (held === undefined) {

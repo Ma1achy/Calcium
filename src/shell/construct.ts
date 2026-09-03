@@ -51,6 +51,7 @@ import type { EntryId } from "../viewport/transcript/index.js";
 import { createViewport } from "../viewport/viewport/index.js";
 import { RenderCache } from "./render-cache.js";
 import { Cameras } from "./cameras.js";
+import { RenderScratchStore } from "./render-scratch.js";
 import { ScrollOffsets } from "./scroll-offsets.js";
 import { createOverlayManager } from "../viewport/overlay/index.js";
 import { createEditor } from "../interaction/editor/index.js";
@@ -312,6 +313,11 @@ export type Graph = Readonly<{
   rendered: RenderCache;
   scrollOffsets: ScrollOffsets;
   cameras: Cameras;
+  /**
+   * Caller-owned render scratch (C12 I107). One per session, keyed on the
+   * caller's own arrays, so nothing evicts it and nothing subscribes.
+   */
+  scratch: RenderScratchStore;
   overlays: ReturnType<typeof createOverlayManager>;
   history: Awaited<ReturnType<typeof openHistory>>;
   editor: ReturnType<typeof createEditor>;
@@ -617,6 +623,14 @@ export async function constructGraph(
     // above gives about the offsets: a third callback would be a third place for
     // an eviction path to reach two and miss one (C22 I71).
     const cameras = new Cameras();
+    // **This one does not join the subscription, and the difference is the
+    // point** (C12 I107, §6o.1). The two stores above are keyed by entry id and
+    // must be told when an entry goes; this is keyed on the caller's own
+    // `faces` or `heights` array in a `WeakMap`, so the slot dies with the
+    // document that held the mesh. Adding it to the callback would be a third
+    // place for a future eviction path to reach two of — which is exactly the
+    // argument the comment above makes, applied by *not* doing it.
+    const scratch = new RenderScratchStore();
     transcript.subscribe((change) => {
       if (change.kind === "evict") {
         for (const id of change.ids) {
@@ -865,6 +879,7 @@ export async function constructGraph(
       rendered,
       scrollOffsets,
       cameras,
+      scratch,
       overlays,
       history,
       editor,

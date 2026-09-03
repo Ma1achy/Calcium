@@ -190,7 +190,7 @@ export const HAS_VALUE_AXIS = {
   // has three ranges — x, y and z — so no true one exists. The neighbouring
   // form is `true` and answering from it is exactly how the five silent cells
   // above were written.
-  scatter3d: false,
+  plot3d: false,
 } as const satisfies Readonly<Record<PlotForm, boolean>>;
 
 /** A normalised point — both axes on `[0, 1]`, origin at the value axis's floor. */
@@ -665,7 +665,7 @@ export const RAMP_DEFAULT: Readonly<Record<PlotForm, ColormapName | null>> = Obj
   // **Depth reads as recession and a perceptual ramp is what says so**
   // (C12 I89). Read through `rampOf` by the renderer under both `colourBy:
   // "depth"` and `"value"`, so the entry is consumed rather than decorative.
-  scatter3d: "viridis",
+  plot3d: "viridis",
   heatmap: "viridis",
   contour: "viridis",
   // Magnitude reads as *more*, and a perceptual ramp is what says so.

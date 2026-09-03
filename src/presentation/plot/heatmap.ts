@@ -62,7 +62,7 @@ type MatrixLayout = NonNullable<Plot["matrixAnchor"]>;
 const MATRIX_LAYOUT: Readonly<Record<PlotForm, MatrixLayout | null>> = Object.freeze({
   // `null` is *not a matrix*, which is a different answer from a matrix with
   // no preference — the distinction this record's own comment is about.
-  scatter3d: null,
+  plot3d: null,
   // **Every matrix stretches by default, including the feeds** — the reported
   // defect was a heatmap's blank fringe, and *the column a reading occupies must
   // not move* is a real argument that loses to it. A live feed wanting the

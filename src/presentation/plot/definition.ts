@@ -66,7 +66,7 @@ import { ROW_IS_AN_IDENTITY, markOf, partSeparator, refOf as slotOf, seriesRefOf
 import { strips, tiles } from "./hierarchy.js";
 import { sparkline } from "./sparkline.js";
 import { bubbleRows, scatterRows, stepRows } from "./scatter.js";
-import { scatter3dRows } from "./scatter3.js";
+import { plot3dRows } from "./scatter3.js";
 import { quartileRange } from "../../data/viewmodel/distribution.js";
 import { boxplotBand, boxplotColumn, bulletRow, forestRow, dumbbellRow, lagRow, timelineRow } from "./glyph-row.js";
 import { barColumn, barRow, lollipopRow, dotplotRow, stackedBarRow, funnelRow, ganttRow, waterfallRow, type BandRow } from "./categorical.js";
@@ -2259,13 +2259,13 @@ const FORM_ROWS: Readonly<
    * rows exactly as `axed` does it.
    *
    * **`composeRows` reconciles the count rather than the call site agreeing by
-   * convention** (I24), which is what `FURNITURE_ROWS.scatter3d` returning 0
+   * convention** (I24), which is what `FURNITURE_ROWS.plot3d` returning 0
    * and `legendRows` adding its own term rely on.
    */
-  scatter3d: (block, width, ctx) => {
+  plot3d: (block, width, ctx) => {
     const placement = legendPlacement(block, ctx.capabilities);
     const reserved = reservedFor(block, width, ctx);
-    const area = scatter3dRows(block, Math.max(1, width - reserved), ctx); // cells-ok — a cell width
+    const area = plot3dRows(block, Math.max(1, width - reserved), ctx); // cells-ok — a cell width
     const entries = placement === null ? [] : legendEntries(block, ctx);
     const amb = ctx.capabilities.ambiguousWidth;
     const body =

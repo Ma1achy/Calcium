@@ -990,7 +990,7 @@ export type PlotForm =
   | "smallmultiples" | "pairplot"
   | "pie" | "radar"
   | "horizon"
-  | "scatter3d";
+  | "plot3d";
 
 /**
  * A claim about the ordinate, drawn beside the data (C12 §3e, I52).
@@ -1473,7 +1473,7 @@ export type Plot = Readonly<{
    */
   vectors?: readonly VectorSeries[];
   /**
-   * The point cloud a `scatter3d` draws (C04 I76, C12 I87).
+   * The point cloud a `plot3d` draws (C04 I76, C12 I87).
    *
    * Required on that form and refused on every other, which is `vectors`'
    * shape one dimension along: a `Series` is one reading per position and a 3D
@@ -1482,7 +1482,7 @@ export type Plot = Readonly<{
    */
   points3?: readonly Point3Series[];
   /**
-   * The paths a `scatter3d` draws — trajectories, parametric curves, the edges
+   * The paths a `plot3d` draws — trajectories, parametric curves, the edges
    * of a wireframe (C04 I78, C12 I93).
    *
    * **The third carrier, and either one alone is a complete document**: a
@@ -1497,7 +1497,7 @@ export type Plot = Readonly<{
    */
   lines3?: readonly Line3[];
   /**
-   * The shaded surfaces a `scatter3d` draws — loss landscapes, response
+   * The shaded surfaces a `plot3d` draws — loss landscapes, response
    * surfaces, any `z = f(x, y)`, and explicit meshes (C04 I79, C12 I94).
    *
    * **The fourth carrier, and any one alone is a complete document.** The
@@ -1783,7 +1783,7 @@ export const ORIGIN_DEFAULT: Readonly<Record<PlotForm, Origin | null>> = Object.
   // way the axes run, and a projected cloud's answer is a function of the
   // camera — true at one azimuth and wrong a keypress later. A fixed entry
   // would be a claim about a picture that turns.
-  scatter3d: null,
+  plot3d: null,
 
   // Matrix — the direction is `columnMap` and `matrixRows`' loop, and a row
   // index grows downward, so the first datum is already in the top-left corner.
@@ -1845,7 +1845,7 @@ export const HONOURS_AXIS_CROSS: Readonly<Record<PlotForm, boolean>> = Object.fr
 
   // **`overlaidRows` does not compose this area** — the form rasterises its
   // own, so there is no layered row for a reference rule to merge behind.
-  scatter3d: false,
+  plot3d: false,
 
   // Matrix — a corner, and no zero to cross at.
   heatmap: false, calendar: false, correlation: false, confusion: false,
@@ -1913,7 +1913,7 @@ export const HAS_Y_GUTTER: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   // gutter is a fixed column beside a picture whose vertical axis is wherever
   // the camera put it, so a scale there names a direction the frame does not
   // have.
-  scatter3d: false,
+  plot3d: false,
   // A scale in the gutter, one label per labelled row.
   line: true, scatter: true, step: true, ecdf: true, density: true,
   slope: true, bubble: true, stackedarea: true, streamgraph: true,
@@ -2002,7 +2002,7 @@ export const HAS_DETAIL_RUNGS: Readonly<Record<PlotForm, boolean>> = Object.free
   // The two distribution ladders §3i is written about.
   boxplot: true, violin: true,
   // No `RUNGS` entry, and C12 T2.10 asserts the pair rather than trusting it.
-  scatter3d: false,
+  plot3d: false,
   // Everything else. A form joining this list needs a `RUNGS` entry with it, or
   // the refusal stops firing and nothing starts drawing.
   line: false, sparkline: false, heatmap: false, scatter: false, step: false,
@@ -2071,7 +2071,7 @@ export const HIERARCHY_ROLE: Readonly<Record<PlotForm, "magnitude" | "structure"
   // belongs to (C04 I69).
   graph: null,
   // Everything else draws a series, a matrix or a field.
-  scatter3d: null,
+  plot3d: null,
   line: null, sparkline: null, heatmap: null, scatter: null, step: null,
   ecdf: null, bar: null, histogram: null, forest: null, dumbbell: null,
   lollipop: null, dotplot: null, waffle: null, boxplot: null, violin: null,
@@ -2089,7 +2089,7 @@ export const HAS_X_TITLE: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   // under a projected cloud would name the abscissa and say nothing about the
   // other two, and there is no reason it should be x — which is worse than no
   // caption. The axis names are billboarded in the scene, with the axes.
-  scatter3d: false,
+  plot3d: false,
   // Composed by `axed`, `axedWithCursor` or `categoricalColumnForm` — the
   // positional family and the categorical one.
   line: true, scatter: true, step: true, ecdf: true,
@@ -2113,7 +2113,7 @@ export const HAS_X_TITLE: Readonly<Record<PlotForm, boolean>> = Object.freeze({
 export const HAS_CALLOUT: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   // A callout annotates the **last** reading at the right edge, and a cloud's
   // rightmost sample is a camera artefact rather than a last anything.
-  scatter3d: false,
+  plot3d: false,
   // Everything `positionalForm` renders, including the two that derive a block
   // first — an ECDF's last value is its own last reading, and a density's is the
   // estimate at the right edge, which is what the figure draws in both cases.
@@ -2169,7 +2169,7 @@ export const IS_MATRIX: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   // `axes: false` would take the row labels *and* the level legend, and the
   // legend is the only thing that says which line is which level (C12 I49).
   contour: true,
-  line: false, sparkline: false, scatter: false, step: false, ecdf: false, scatter3d: false,
+  line: false, sparkline: false, scatter: false, step: false, ecdf: false, plot3d: false,
   density: false, bar: false, histogram: false, boxplot: false, violin: false,
   ridgeline: false, forest: false, dumbbell: false, lollipop: false,
   dotplot: false, waffle: false, flame: false, icicle: false, treemap: false, tree: false, graph: false,
@@ -2183,7 +2183,7 @@ export const IS_FIELD_FORM: Readonly<Record<PlotForm, boolean>> = Object.freeze(
   contour: true, quiver: true,
   // `layers` orders a field against what is drawn over it; a cloud is the one
   // thing drawn and there is no second to order.
-  scatter3d: false,
+  plot3d: false,
   // Every other matrix form paints its cells and draws nothing over them. They
   // are *fields* in the survey's sense and not in this one: `layers` on a
   // `spectrogram` has no second thing to order.
@@ -2215,7 +2215,7 @@ export const STYLE_ARMS: Readonly<Record<PlotForm, readonly PlotStyleArm[]>> = O
   // not have is F207's member accepted and ignored, and that rule does not
   // relax because the other two are scheduled — `"braille"` and `"line"` are
   // added by the commits that make them draw.
-  scatter3d: ["braille", "line", "marker"],
+  plot3d: ["braille", "line", "marker"],
   // The positional family: braille dots or box-drawing strokes, and the two
   // curve forms that can carry candles.
   line: ["braille", "line", "candlestick"], step: ["braille", "line", "candlestick"],

@@ -45,6 +45,12 @@ export type RenderOptions = Readonly<{
   cursorPositions?: RenderContext["cursorPositions"];
   /** Per-plot live cameras (C12 I83). Absent is each block's own. */
   cameras?: RenderContext["cameras"];
+  /**
+   * Caller-owned scratch (C12 I107). Absent is a miss on every lookup, which is
+   * the same frame at the same cost — a cache whose absence changes a picture
+   * is not a cache, and PR10's control asserts exactly that.
+   */
+  scratch?: RenderContext["scratch"];
 }>;
 
 /**
@@ -70,6 +76,7 @@ export function renderToLines(
     ...(options.scrollOffsets === undefined ? {} : { scrollOffsets: options.scrollOffsets }),
     ...(options.cursorPositions === undefined ? {} : { cursorPositions: options.cursorPositions }),
     ...(options.cameras === undefined ? {} : { cameras: options.cameras }),
+    ...(options.scratch === undefined ? {} : { scratch: options.scratch }),
     tick: options.tick ?? 0,
     onAction: options.onAction ?? (() => undefined),
   };
@@ -120,6 +127,7 @@ export function renderSequenceToLines(
     ...(options.scrollOffsets === undefined ? {} : { scrollOffsets: options.scrollOffsets }),
     ...(options.cursorPositions === undefined ? {} : { cursorPositions: options.cursorPositions }),
     ...(options.cameras === undefined ? {} : { cameras: options.cameras }),
+    ...(options.scratch === undefined ? {} : { scratch: options.scratch }),
     tick: options.tick ?? 0,
     onAction: options.onAction ?? (() => undefined),
   };

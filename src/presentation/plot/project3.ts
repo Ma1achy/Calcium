@@ -37,29 +37,41 @@ export type Vec3 = Readonly<{ x: number; y: number; z: number }>;
 export const NEAR = 0.01;
 
 /**
- * Which rung a figure is rasterised at, and therefore how many samples a cell
- * holds (C12 I84).
+ * Sample rows a cell holds on the sub-cell arms — **the block alphabet's nine
+ * levels** (C12 I105).
  *
- * **Half blocks for a surface and braille for an outline** — a scatter and a
- * wireframe are boundary all the way through, so the dot grid's four times the
- * samples are all signal; a shaded surface is 89–96% interior, where the dot
- * grid stipples over a colour the cell was going to paint anyway (F431).
+ * A silhouette cell is drawn from `▁▂▃▄▅▆▇█` and their colour-swapped
+ * reflections, which offer nine positions along an axis; a grid sampling four
+ * can only quantise to quarters, so the alphabet and the sampling have to agree
+ * or the finer glyphs are decoration. Braille folds row pairs back to its own
+ * four, and a line is unchanged by the fold because a diagonal takes one sample
+ * a row at either resolution.
  */
-export type Rung = "half" | "braille";
+export const AREA_ROWS = 8;
 
 /**
- * The sample grid a block of `width × height` **cells** projects into (C12 I84).
+ * The sample grid a block of `width × height` **cells** projects into (C12 I84,
+ * I104).
  *
- * **`80 × 48` is a measurement of this rule at 80×24 cells and not a constant.**
+ * **`160 × 192` is a measurement of this rule at 80×24 cells and not a constant.**
+ * It read `80 × 48` from F498 until F506 — the figure the *removed* rung
+ * returned — in the comment heading the function whose parameter went away.
  * The projection scales to the grid, the grid to the block, and the block to
  * whatever region it is given — the chain every raster in this component uses.
+ *
+ * **The rung parameter is gone, and its absence is the finding** (F498). It
+ * returned `w × h·2` for half blocks and `w·2 × h·4` for braille, because those
+ * were two rasters with two resolutions. The silhouette alphabet took the half
+ * rung onto the dot grid: one grid serves the fill, the outline and the marks,
+ * a single depth test resolves all three, and `kind` says which primitive owns
+ * a sample. A function still parameterised by rung would be describing a
+ * distinction the renderer no longer has — and every constant written to
+ * compensate for that distinction was a defect the day it went away.
  */
-export function sampleGrid(width: number, height: number, rung: Rung): Readonly<{ width: number; height: number }> {
+export function sampleGrid(width: number, height: number): Readonly<{ width: number; height: number }> {
   const w = Math.max(1, Math.floor(width)); // cells-ok — a cell count
   const h = Math.max(1, Math.floor(height)); // cells-ok — a cell count
-  return rung === "half"
-    ? { width: w, height: h * 2 } // cells-ok — two samples a cell, down
-    : { width: w * 2, height: h * 4 }; // cells-ok — 2×4 dots a cell
+  return { width: w * 2, height: h * AREA_ROWS }; // cells-ok — 2 across, AREA_ROWS down
 }
 
 /** A point set's per-axis bounds. */
@@ -107,6 +119,12 @@ export type Basis = Readonly<{
   /** `1 / tan(fov / 2)`, folded once rather than per sample. */
   f: number;
   aspect: number;
+  /**
+   * The distance to the target, **which is the orthographic arm's divisor**
+   * (C12 I106). Carried on the basis rather than re-read from the camera so
+   * that `project` takes one argument and stays a pure function of it.
+   */
+  distance: number;
   orthographic: boolean;
 }>;
 
@@ -176,6 +194,7 @@ export function basisOf(camera: Partial<Camera> | undefined, aspect: number): Ba
     forward,
     f: 1 / Math.tan((FOV * Math.PI) / 360),
     aspect,
+    distance: c.distance,
     orthographic: c.projection === "orthographic",
   };
 }
@@ -217,11 +236,23 @@ export function project(basis: Basis, p: Vec3): Projected | null {
   if (z <= NEAR) return null;
   const x = dot(d, basis.right);
   const y = dot(d, basis.up);
-  // The orthographic arm keeps the view coordinates and drops the divide; the
-  // depth is the same number either way, which is what lets one buffer serve
-  // both.
-  const sx = basis.orthographic ? x / basis.aspect : (x * basis.f) / basis.aspect / z;
-  const sy = basis.orthographic ? y : (y * basis.f) / z;
+  // **The orthographic arm drops the divide and keeps the scale** (C12 I106,
+  // F503). Both arms fold the same `f`; the perspective arm divides by the
+  // sample's own view depth and this one by the distance to the target — so at
+  // `z === distance` the two are the *same expression*, and the arms are a
+  // statement about what happens either side of the target plane rather than
+  // two unrelated mappings. The depth is untouched either way, which is what
+  // lets one buffer serve both.
+  //
+  // **It divided by nothing.** A projection with no scale has no framing
+  // control at all: the unit cube measured `-0.187 … 1.187` at distance 4, 6,
+  // 10 and 20 — four cameras, one answer, 37% of the figure off the plot. The
+  // licence was a comment in C04's `Camera` type saying `distance` is ignored
+  // here, which was true about the scale, false about the member, and
+  // contradicted by I86's `distance: 0` ruling one document away.
+  const divisor = basis.orthographic ? basis.distance : z;
+  const sx = (x * basis.f) / basis.aspect / divisor;
+  const sy = (y * basis.f) / divisor;
   return { x: sx * 0.5 + 0.5, y: 0.5 - sy * 0.5, depth: z };
 }
 

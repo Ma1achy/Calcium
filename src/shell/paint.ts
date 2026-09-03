@@ -30,6 +30,7 @@
  */
 
 import { renderSequenceToLines } from "../presentation/render-lines.js";
+import type { RenderScratch } from "../presentation/blocks/types.js";
 import { cells, fitStyled, hardWrapCells, sliceCells } from "../presentation/text.js";
 import { background, paint as paintSpans, tone } from "../presentation/blocks/paint.js";
 import { SGR_RESET, sgr, toTerminalDefault } from "../terminal/escapes.js";
@@ -65,6 +66,8 @@ export type PaintDeps = Readonly<{
   overlays: () => readonly Placed[];
   /** C17's cursor as a cell in the prompt's own layout (C17 §2). */
   promptCursor: () => Cell;
+  /** The session's render scratch (C12 I107), for a 3D plot inside a layer. */
+  scratch?: RenderScratch;
   /**
    * The selection's cells, in the prompt's own layout (entry 23, C17 I21).
    *
@@ -587,6 +590,7 @@ export function paint(frame: Composed, deps: PaintDeps): readonly string[] {
       capabilities: deps.capabilities,
       regionTop: frame.region.top,
       region: frame.overlayRegion,
+      ...(deps.scratch === undefined ? {} : { scratch: deps.scratch }),
     },
   );
 
