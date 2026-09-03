@@ -32,6 +32,13 @@ import { manifest } from "../src/manifest.ts";
 const run = promisify(execFile);
 const here = (p: string): string => new URL(p, import.meta.url).pathname;
 
+/** What `T-doc8` reads off a live part — `LivePart.spec`'s three relevant members. */
+type LiveSpec = Readonly<{
+  every: number;
+  fetch: () => Promise<unknown>;
+  render: (v: unknown, ctx: ReturnType<typeof producerContext>) => Block;
+}>;
+
 describe("the plot demo", () => {
   it("the far side emits the five datasets", async () => {
     // A fixture must be shown to respond before it is asserted against.
@@ -255,13 +262,17 @@ describe("the plot demo", () => {
     expect(checked, "and every declared rung was checked").toBe(everyVariant().length);
     // **The count, by equality** — so a rung appearing or vanishing is a failure
     // that names itself rather than a number nobody reads.
-    // **65, where it was 60** — seven rungs for the five members `b.plot` gained
-    // that the four new *forms* did not exercise (`layout` ×3, `binning` ×2,
-    // `yScale`, `emptyMessage`), and five more for `scatter3d`'s style arms. A
-    // builder taking a member and a consumer naming one are different claims,
-    // and `publicSurfaceUseSignal` counts the second.
-    expect(everyVariant().length, "rungs beyond the defaults").toBe(65);
-    // **47 + 65, where it was 47 + 60** — `scatter3d` is the forty-seventh form
+    // **76, where it was 65** — eleven rungs for the half of `plot3d` the
+    // catalogue had no entry for at all. Five style arms were reachable and the
+    // *surface* was not: `surfaces3`, `wireframe`, `shading`, `closed`, `box3`,
+    // `axes3`, `axisStyle3` and `camera.projection` are members `b.plot` takes
+    // and no consumer named, which is exactly the count
+    // `publicSurfaceUseSignal` reports. Three of them draw real meshes —
+    // Suzanne, the teapot and the Stanford bunny — parsed by the example's own
+    // OBJ reader, because a second consumer written from the published surface
+    // is an instrument and the framework's fixtures are not one.
+    expect(everyVariant().length, "rungs beyond the defaults").toBe(76);
+    // **47 + 65, where it was 47 + 60** — `plot3d` is the forty-seventh form
     // and it arrives buildable, which is what a builder gaining the members with
     // the form looks like from here.
     //
@@ -272,7 +283,7 @@ describe("the plot demo", () => {
     // the forms do not exercise. Three arms later the member selects three
     // things, and a caller naming one is exactly the second claim this count is
     // about (C24 I30, C12 I99 · I100 · I101).
-    expect(FORMS.length - refusals().length + everyVariant().length, "figures /all draws").toBe(112);
+    expect(FORMS.length - refusals().length + everyVariant().length, "figures /all draws").toBe(123);
   });
 });
 
@@ -517,5 +528,53 @@ describe("every command composes a document the transcript would accept", () => 
       [...said.values()].map((t) => /svg · ([^"]+)/u.exec(t)?.[1] ?? ""),
     );
     expect(captions.size, "each arm must caption itself differently").toBe(ARMS.length);
+  }, 120_000);
+
+  it("T-doc8 (F504, F509): the data-dependent rungs advance and the static ones are still", async () => {
+    // **F504 was that every rung drew stills because the camera phase was
+    // discarded. F509 removes the camera phase entirely**: the framework's own
+    // orbit is delta-timed and bound to `o`, so the demo should not reimplment
+    // it. Only the base entry's helix passes the phase into its data — every
+    // rung whose `spec` overrides carry static geometry (meshes, height fields,
+    // furniture) is correctly still between ticks, and the orbit is the reader's.
+    //
+    // **Driven through `liveParts` rather than by calling `entry.at` twice**,
+    // because the phase reaching the figure is the wiring and not the
+    // mechanism: a row that calls the generator directly passes on the day
+    // nothing calls it that way.
+    const ctx = producerContext();
+    const advancing: string[] = [];
+    const still: string[] = [];
+    const names = Object.keys(variantsOf("plot3d"));
+    expect(names.length, "the form has rungs to animate").toBeGreaterThan(10);
+    for (const rung of [undefined, ...names]) {
+      const doc = as(`live plot3d ${rung ?? ""}`, liveFor("plot3d", rung));
+      const parts = liveParts(doc);
+      expect(parts, `${String(rung)} declares one live part`).toHaveLength(1);
+      const spec = (parts[0] as { spec: LiveSpec }).spec;
+      const frames: string[] = [];
+      for (let i = 0; i < 3; i += 1) {
+        frames.push(JSON.stringify(spec.render(await spec.fetch(), ctx)));
+      }
+      if (frames[0] !== frames[1] && frames[1] !== frames[2]) advancing.push(rung ?? "(default)");
+      else still.push(rung ?? "(default)");
+    }
+    // **Every rung is correctly still between ticks** (F509). The data is
+    // static — the helix is constant, the meshes are vendored, the height
+    // fields are generated at phase 0 — and the camera is the reader's. A rung
+    // that advances between ticks would be reimplmenting the orbit the
+    // framework delta-times and binds to `o`.
+    expect(advancing, "all plot3d rungs are still between data ticks — the orbit is the reader's").toEqual([]);
+
+    // **The bunny is 365 ms a frame against a 200 ms default**, so it names its
+    // own tick rather than being asked for a frame it cannot deliver. Asserted
+    // as an inequality against the default, because the number is a measurement
+    // and the ruling is that it must exceed the tick it would otherwise get.
+    const tickOf = (rung?: string): number => {
+      const parts = liveParts(as("live", liveFor("plot3d", rung)));
+      return (parts[0] as { spec: LiveSpec }).spec.every;
+    };
+    expect(tickOf(), "the default rung takes the default tick").toBe(200);
+    expect(tickOf("bunny"), "and the bunny asks for longer").toBeGreaterThan(tickOf());
   }, 120_000);
 });

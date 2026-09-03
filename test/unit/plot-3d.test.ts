@@ -8,12 +8,16 @@
 // implementation written test-last would ship.
 import { describe, expect, it } from "vitest";
 
-import { CAMERA_DEFAULT } from "../../src/data/viewmodel/index.js";
+import { block, CAMERA_DEFAULT, type Plot } from "../../src/data/viewmodel/index.js";
+import { plotDefinition } from "../../src/presentation/plot/definition.js";
+import type { RenderScratch } from "../../src/presentation/blocks/types.js";
+import { measurable } from "../support/render.js";
 import {
   basisOf,
   createDepth,
   extentOf,
   project,
+  AREA_ROWS,
   sampleGrid,
   unitOf,
   writeDepth,
@@ -187,10 +191,24 @@ describe("C12 I84 — the sample grid and the depth buffer", () => {
     // and not a constant.** The control is that the two rungs disagree: a
     // function returning a fixed pair satisfies either arm alone.
     for (const [w, h] of [[80, 24], [120, 30], [40, 8], [80, 30], [120, 24], [40, 24]] as const) {
-      expect(sampleGrid(w, h, "half"), `half at ${String(w)}x${String(h)}`).toEqual({ width: w, height: h * 2 });
-      expect(sampleGrid(w, h, "braille"), `braille at ${String(w)}x${String(h)}`).toEqual({ width: w * 2, height: h * 4 });
+      // **One grid, and its absence of a rung is the assertion** (F498). This
+      // row asserted `w × h·2` for half blocks against `w·2 × h·4` for braille,
+      // because those were two rasters at two resolutions. The silhouette
+      // alphabet took the half rung onto the dot grid — one buffer, one depth
+      // test, `kind` naming which primitive owns a sample — so a grid that still
+      // varied by rung would be describing a distinction the renderer no longer
+      // has, and every constant written to compensate for it was a defect the
+      // day it went away.
+      expect(sampleGrid(w, h), `the sub-cell grid at ${String(w)}x${String(h)}`)
+        .toEqual({ width: w * 2, height: h * AREA_ROWS });
     }
-    expect(sampleGrid(80, 24, "half"), "the measurement's own figure").toEqual({ width: 80, height: 48 });
+    // **The measurement's own figure, restated at the grid it now returns.**
+    // 80×24 cells was `80 × 48` when a cell held two samples down; it is
+    // `160 × 192` at two across and `AREA_ROWS` down, and the point of the row
+    // is unchanged — the number is a measurement of the rule at one size and
+    // not a constant anything may assume.
+    expect(sampleGrid(80, 24), "the measurement's own figure")
+      .toEqual({ width: 160, height: 24 * AREA_ROWS });
   });
 
   it("PR8 (C12 I84, C12 I11): the depth buffer is allocated per render, not reused", () => {
@@ -234,5 +252,205 @@ describe("C12 I84 — the sample grid and the depth buffer", () => {
     // rasteriser with the check in the wrong place.
     expect(writeDepth(d, -1, 0, 0), "left of the grid").toBe(false);
     expect(writeDepth(d, 0, 2, 0), "below it").toBe(false);
+  });
+
+  it("PR9 (C12 I106, F503): the two arms agree exactly at the target plane and diverge either side", () => {
+    // **An equality, not a bound.** Every wrong scale that happens to fit is
+    // inside a bound, and this arm's own containment held on the golden frames
+    // for as long as it shipped with no scale at all.
+    const camera = { azimuth: Math.PI / 4, elevation: 0.3, distance: 6 };
+    const persp = basisOf({ ...camera, projection: "perspective" }, 1);
+    const ortho = basisOf({ ...camera, projection: "orthographic" }, 1);
+
+    // A point *on* the target plane: its view depth is exactly `distance`,
+    // which is the one place the two divisors are the same number.
+    //
+    // **Displaced inside the plane, and the first draft was not.** A point on
+    // the view axis has a zero `up` and a zero `right` component, so both arms
+    // answer `0.5` whatever either divides by — the row passed against the
+    // scale-free arm it was written to kill. A test must construct the state it
+    // claims, and the convenient point is the one where every scale agrees.
+    const onPlane: Vec3 = {
+      x: persp.eye.x + persp.forward.x * camera.distance + persp.up.x * 0.8 + persp.right.x * 0.5,
+      y: persp.eye.y + persp.forward.y * camera.distance + persp.up.y * 0.8 + persp.right.y * 0.5,
+      z: persp.eye.z + persp.forward.z * camera.distance + persp.up.z * 0.8 + persp.right.z * 0.5,
+    };
+    const a = project(persp, onPlane);
+    const b = project(ortho, onPlane);
+    expect(a, "the target plane is in front of the eye").not.toBeNull();
+    expect(b).not.toBeNull();
+    expect((a as Projected).depth, "and its depth is the distance").toBeCloseTo(camera.distance, 6);
+    expect((b as Projected).x, "x agrees at the plane").toBeCloseTo((a as Projected).x, 12);
+    expect((b as Projected).y, "y agrees at the plane").toBeCloseTo((a as Projected).y, 12);
+
+    // Either side of it they must not agree, or the arms are one arm.
+    for (const k of [0.5, 2]) {
+      const off: Vec3 = {
+        x: persp.eye.x + persp.forward.x * camera.distance * k + persp.up.x * 0.6,
+        y: persp.eye.y + persp.forward.y * camera.distance * k + persp.up.y * 0.6,
+        z: persp.eye.z + persp.forward.z * camera.distance * k + persp.up.z * 0.6,
+      };
+      const pa = project(persp, off);
+      const pb = project(ortho, off);
+      expect(pa).not.toBeNull();
+      expect(pb).not.toBeNull();
+      expect(
+        Math.abs((pa as Projected).y - (pb as Projected).y),
+        `off the plane at ${String(k)}x the arms separate`,
+      ).toBeGreaterThan(1e-3);
+      expect(
+        (pa as Projected).y !== 0.5 && (pb as Projected).y !== 0.5,
+        "and neither sits on the view axis, where any two scales agree",
+      ).toBe(true);
+    }
+  });
+
+  it("PR9b (C12 I106, F503): `distance` frames the orthographic arm, and the cube fits", () => {
+    // **The half that shipped broken.** The survivor this kills is a projection
+    // that ignores `distance`, and it passed every containment assertion the
+    // suite had, because it was out of bounds by the same amount every time.
+    const corners: Vec3[] = [-1, 1].flatMap((x) =>
+      [-1, 1].flatMap((y) => [-1, 1].map((z) => ({ x, y, z }))));
+    const spanAt = (distance: number): number => {
+      const basis = basisOf({ azimuth: Math.PI / 4, elevation: 0.3, distance, projection: "orthographic" }, 1);
+      const ys = corners.map((c) => project(basis, c)).filter((p): p is Projected => p !== null).map((p) => p.y);
+      return Math.max(...ys) - Math.min(...ys);
+    };
+    const near = spanAt(4);
+    const far = spanAt(20);
+    expect(near, "moving back shrinks the figure").toBeGreaterThan(far);
+    // Measured `-0.187 … 1.187` — span 1.373 — at every distance before the fix.
+    expect(far, "and at 20 the cube is comfortably inside the plot").toBeLessThan(0.5);
+    expect(spanAt(4) / spanAt(8), "the scale is exactly reciprocal in distance").toBeCloseTo(2, 9);
+  });
+});
+
+describe("C12 I107 — the geometry scratch", () => {
+  /**
+   * A `RenderScratch` that counts, because **the build count is what the row is
+   * about and elapsed time is not** — a timing assertion is what F507 is about.
+   * `set` is called exactly once per build, so `writes` *is* the number of times
+   * `trianglesOf` ran.
+   *
+   * One slot per owner, which is the implementation the invariant names and the
+   * cheapest thing that can be wrong in the right direction: a store keeping
+   * every key would pass every row here and leak.
+   */
+  const counting = (): RenderScratch & { writes: () => number; reads: () => number } => {
+    const held = new WeakMap<object, { key: string; value: unknown }>();
+    let writes = 0;
+    let reads = 0;
+    return {
+      get: (owner, key) => {
+        reads += 1;
+        const slot = held.get(owner);
+        return slot !== undefined && slot.key === key ? slot.value : undefined;
+      },
+      set: (owner, key, value) => {
+        writes += 1;
+        held.set(owner, { key, value });
+      },
+      writes: () => writes,
+      reads: () => reads,
+    };
+  };
+
+  /** The bunny is not needed and a 9x9 grid is: the row counts builds, not milliseconds. */
+  const MESH = Object.freeze({
+    vertices: Array.from({ length: 81 }, (_v, i) => ({ // cells-ok — a vertex count
+      x: ((i % 9) / 4) - 1, // cells-ok — a vertex index
+      y: (Math.floor(i / 9) / 4) - 1, // cells-ok — a vertex index
+      z: Math.sin((i % 9) / 2) * Math.cos(Math.floor(i / 9) / 2), // cells-ok — a vertex index
+    })),
+    faces: Array.from({ length: 64 }, (_v, k) => { // cells-ok — a cell count
+      const r = Math.floor(k / 8); // cells-ok — a cell index
+      const c = k % 8; // cells-ok — a cell index
+      const a = r * 9 + c; // cells-ok — a vertex offset
+      return [a, a + 1, a + 9] as [number, number, number];
+    }),
+  });
+
+  const plot = (over: Record<string, unknown> = {}): Plot =>
+    block({
+      kind: "plot",
+      id: "pr10",
+      form: "plot3d",
+      height: 12,
+      series: [],
+      axes3: false,
+      box3: "none",
+      colormap: "viridis",
+      camera: { azimuth: Math.PI / 4, elevation: 0.3, distance: 6 },
+      surfaces3: [{ vertices: MESH.vertices, faces: MESH.faces, closed: true }],
+      ...over,
+    } as unknown as Plot);
+
+  const kit = (scratch?: RenderScratch) =>
+    measurable({
+      definitions: [plotDefinition],
+      ...(scratch === undefined ? {} : { scratch }),
+    });
+
+  it("PR10 (C12 I107): the camera moves, the triangles are built once, and the frame is unchanged", () => {
+    // **The control comes first and it is the row's real claim**: a cache whose
+    // absence changes a picture is not a cache. Both cameras are rendered with
+    // and without the scratch and the bytes must agree, or nothing below means
+    // anything.
+    const here = plot();
+    const there = plot({ camera: { azimuth: Math.PI / 4 + 0.4, elevation: 0.3, distance: 6 } });
+    const bare = kit();
+    const coldHere = bare.renderToLines(here, 60);
+    const coldThere = bare.renderToLines(there, 60);
+    expect(coldHere, "the two cameras draw different pictures").not.toEqual(coldThere);
+
+    const s = counting();
+    const warm = kit(s);
+    expect(warm.renderToLines(here, 60), "the scratch changes no byte").toEqual(coldHere);
+    expect(warm.renderToLines(there, 60), "at either camera").toEqual(coldThere);
+
+    // **The assertion the whole entry exists for** (§6o row 5). Two cameras,
+    // one build — the carriers did not move and the camera is not one of
+    // `trianglesOf`'s arguments.
+    expect(s.writes(), "two cameras, one build").toBe(1);
+  });
+
+  it("PR10b (C12 I107): a new surface around the same arrays hits, and a moved extent misses", () => {
+    const s = counting();
+    const warm = kit(s);
+    warm.renderToLines(plot(), 60);
+    expect(s.writes(), "the first render builds").toBe(1);
+
+    // **The live path** (§6o row 2). C23 I34 replaces a part's block every tick,
+    // so the surface is a new wrapper around the same two arrays. Keyed on the
+    // wrapper this misses and the cache buys nothing where it renders most.
+    warm.renderToLines(plot(), 60);
+    expect(s.writes(), "a fresh Surface3 around the same carriers still hits").toBe(1);
+
+    // **The row nothing else would find** (§6o row 1). The extent is taken over
+    // every carrier, so a cloud beside the surface moves the surface's own
+    // triangles. Keyed on the surface alone this hits and draws the figure at
+    // the wrong scale, inside the box, with every arithmetic assertion passing.
+    warm.renderToLines(plot({ points3: [{ points: [{ x: 9, y: 9, z: 9 }] }] }), 60);
+    expect(s.writes(), "a cloud gaining a point moves the extent, so it misses").toBe(2);
+  });
+
+  it("PR10c (C12 I107): two surfaces in one block do not share a slot", () => {
+    // **`series` is in the key** (§6o row 6). It is written into every `Tri3`
+    // and read by `colourOf`, so a shared slot colours the second surface as the
+    // first — and the two carriers are distinct objects here, which is what
+    // makes this a test of the key rather than of the WeakMap.
+    const second = {
+      vertices: MESH.vertices.map((v) => ({ ...v, z: v.z + 0.5 })),
+      faces: MESH.faces.map((f) => [...f] as [number, number, number]),
+    };
+    const s = counting();
+    kit(s).renderToLines(
+      plot({ surfaces3: [
+        { vertices: MESH.vertices, faces: MESH.faces, closed: true },
+        { vertices: second.vertices, faces: second.faces, closed: true },
+      ] }),
+      60,
+    );
+    expect(s.writes(), "one slot each").toBe(2);
   });
 });

@@ -3,7 +3,7 @@
  *
  * **The record they get instead of a catalogue entry.** §7 rules that a teapot
  * in `docs/catalogue/` is not what the catalogue is for, and the 3D forms are
- * covered without one — twelve `scatter3d` variants at five capability sets,
+ * covered without one — twelve `plot3d` variants at five capability sets,
  * plus a synthetic sphere across both shading arms, an explicit light and the
  * cull. So these frames exist to move when the renderer moves, and to be read
  * when they do.
@@ -57,7 +57,7 @@ describe("golden frames — the real meshes", () => {
         const b = block({
           kind: "plot",
           id: name,
-          form: "scatter3d",
+          form: "plot3d",
           height: HEIGHT,
           series: [],
           axes3: false,

@@ -77,7 +77,9 @@ const tui = createTui({
 
     live: ((argv, ctx) => {
       const form = formIn(argv);
-      return doc(ctx.command, form === null ? [unknown(argv[0] ?? "")] : liveFor(form));
+      // **A second word names a rung** — `/live plot3d teapot`. The form
+      // resolves first, so an unknown one still reports as an unknown form.
+      return doc(ctx.command, form === null ? [unknown(argv[0] ?? "")] : liveFor(form, argv[1]));
     }) satisfies LocalHandler,
 
     compare: (async (argv, ctx) => {

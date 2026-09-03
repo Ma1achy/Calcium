@@ -15,6 +15,7 @@
 import { b } from "@fmx/calcium";
 import type { Block, Plot, Series } from "@fmx/calcium";
 import { CORES, STAGES, WIDTHS, budget, field, magnitudes, summaries, wave } from "./data.ts";
+import { mesh } from "./meshes.ts";
 
 export type PlotForm = Plot["form"];
 
@@ -44,6 +45,14 @@ export type Variant = Readonly<{
   spec: PlotOverride;
   /** Where the rung is chosen by room rather than by a field. */
   height?: number;
+  /**
+   * The live tick, in ms, where the default one is faster than the rung can
+   * draw. **A figure that misses its own tick stutters**, and the honest remedy
+   * is a tick it can keep rather than a caption apologising for one it cannot:
+   * measured at this width, one bunny frame is 365 ms median against `b.live`'s
+   * 200. Absent on every other rung, because every other rung is under 100.
+   */
+  every?: number;
 }>;
 
 export type Entry = Readonly<{
@@ -77,6 +86,15 @@ const s = (values: readonly number[], label?: string, tone?: Series["tone"]): Se
 
 const rows = (n: number, phase: number, cols = 16): Series[] =>
   field(n, cols, phase).map((v, i) => s(v, CORES[i] ?? `row ${String(i + 1)}`));
+
+/**
+ * `Camera` reached through the block that carries it, **because the published
+ * surface does not name it** (F505). `@fmx/calcium` exports `Plot` and not
+ * `Camera`, so a consumer writing anything typed over a camera — a helper, a
+ * control, an orbit — has to index the block to get at it. Indexing works and
+ * says the wrong thing: this is a type about a *view*, not about a plot.
+ */
+type PlotCamera = NonNullable<Plot["camera"]>;
 
 /**
  * Every form's own extras, on top of `form`, `height` and an id.
@@ -164,13 +182,16 @@ export const CATALOGUE: Readonly<Record<PlotForm, Entry>> = Object.freeze({
     axes: true, series: [s(wave(18, p, 3, 6, 14), "depth")], ...x }) },
   scatter: { says: "two readings per point", at: (p, h, x) => plot("scatter", h, {
     axes: true, series: [s(wave(40, p, 4, 10, 20), "samples")], ...x }) },
-  // **The camera turns with the phase**, which is the demo the member is for: a
-  // *producer* rebuilds the document each tick, so each block declares where its
-  // view starts and no block ever tracks a live camera (C04 I75). The cloud is a
-  // helix so a reader can check the rotation against a shape they can hold.
-  scatter3d: { says: "three coordinates, and a view that turns", at: (p, h, x) => plot("scatter3d", h, {
+  // **The camera is the block's and the orbit is the framework's** (F509).
+  // The demo used to advance the azimuth by 0.35 per tick — a fixed angular
+  // step whose rate was a function of how expensive the frame was, running at
+  // 1.71 rad/s on most rungs and 0.36 on the bunny, against the framework's
+  // own delta-timed 0.52. C22 I74 names that defect and solves it one layer
+  // down: `ORBIT_RATE * since`, with the stamp advanced per wake. So the
+  // declared camera is now where the view **starts**, and `o` turns it — at
+  // one revolution in twelve seconds whatever the frame costs.
+  plot3d: { says: "three coordinates — press o to orbit", at: (_p, h, x) => plot("plot3d", h, {
     series: [],
-    camera: { azimuth: Math.PI / 4 + p * 0.35 },
     points3: [{
       label: "helix",
       points: Array.from({ length: 120 }, (_v, i) => {
@@ -213,7 +234,17 @@ export const CATALOGUE: Readonly<Record<PlotForm, Entry>> = Object.freeze({
       wireframe: true as const,
     }],
     light3: "studio" as const,
-    ...x }) },
+    ...x,
+    // **The camera is the block's, and the spread preserves it** (F504, F509).
+    // F504 was that `...x` replaced the whole object; that was fixed by putting
+    // `cameraAt(phase, rung.camera)` after the spread. F509 removes the phase
+    // entirely: the framework's orbit is correct, delta-timed and bound to `o`,
+    // so a producer that rolls its own is reimplementing it and getting the
+    // rate wrong. The rung's camera is now the framing the view starts from
+    // rather than the only one it ever reaches — and the merge is still needed,
+    // because `...x` still replaces an object.
+    camera: { azimuth: Math.PI / 4, ...(x?.camera ?? {}) },
+  }) },
   sparkline: { says: "a shape, no furniture", at: (p, h, x) => plot("sparkline", Math.min(h, 1), {
     series: [s(wave(40, p, 5, 6, 10))], ...x }) },
   ecdf: { says: "the empirical distribution", at: (p, h, x) => plot("ecdf", h, {
@@ -444,7 +475,7 @@ const VARIANTS = {
   // `/all` and `/form` draw them beneath the default, which is the terminal's
   // own choice — so one page carries the capability arm and the three a caller
   // can ask for, at the size they are actually read at rather than as a tile.
-  scatter3d: {
+  plot3d: {
     "marker": {
       says: "the glyph table above the colour floor — shape is identity, size is depth",
       spec: { plotStyle: "marker" },
@@ -477,6 +508,146 @@ const VARIANTS = {
     "line-sharp": {
       says: "the same arm, square corners",
       spec: { plotStyle: "line", plotCorners: "sharp" },
+    },
+    // --- the surface arm ---------------------------------------------------
+    //
+    // **`surfaces3` is the half of this form the catalogue had no rung for**,
+    // and it is the half the silhouette alphabet is about. The base entry above
+    // draws a cloud with a cage through it; nothing here showed a *shaded* face
+    // at all, so every ruling about how a partial cell is drawn was reachable
+    // only from a spec file.
+    //
+    // `field` is the heatmap's own generator, so the surface breathes under
+    // `/live` for nothing — and the same numbers drawn two ways is a comparison
+    // a reader can make without leaving the page.
+    "surface": {
+      says: "a shaded face — nine levels a cell along its silhouette",
+      height: 20,
+      spec: {
+        points3: [], lines3: [],
+        surfaces3: [{ label: "field", heights: field(24, 24, 0), xRange: [-1, 1] as [number, number], yRange: [-1, 1] as [number, number] }],
+      },
+    },
+    // **The overlap case, which is the one the depth rules exist for** (C12
+    // I90). A cloud in front of a face is where a partial cell has to take its
+    // background from *what is behind it* rather than from the terminal — get
+    // that wrong and every silhouette cell punches a hole in the surface.
+    "surface-over-cloud": {
+      says: "a cloud in front of a face — the cell behind a silhouette is the surface, not the terminal",
+      height: 20,
+      spec: { surfaces3: [{ label: "field", heights: field(18, 18, 0), xRange: [-1, 1] as [number, number], yRange: [-1, 1] as [number, number] }] },
+    },
+    // **Hidden-line without a second rasteriser** (C12 I95): the edge is the
+    // fill's own sample, so nothing z-fights and the cage is exact.
+    "wireframe": {
+      says: "the cage alone, hidden-line from the fill's own sample",
+      height: 20,
+      spec: {
+        points3: [], lines3: [],
+        surfaces3: [{ label: "field", heights: field(14, 14, 0), wireframe: true, xRange: [-1, 1] as [number, number], yRange: [-1, 1] as [number, number] }],
+      },
+    },
+    "wireframe-over": {
+      says: "and over the shaded face, at half its intensity",
+      height: 20,
+      spec: {
+        points3: [], lines3: [],
+        surfaces3: [{ label: "field", heights: field(14, 14, 0), wireframe: "over", xRange: [-1, 1] as [number, number], yRange: [-1, 1] as [number, number] }],
+      },
+    },
+
+    // --- real meshes -------------------------------------------------------
+    //
+    // **Vendored under `assets/meshes/` and parsed by `src/meshes.ts`**, which
+    // is a consumer writing its own OBJ reader against the published surface —
+    // `surfaces3` takes vertices and faces and has no opinion about files.
+    //
+    // **`closed: true` culls back faces**, and on a mesh that is watertight it
+    // changes nothing a reader can see, which is what makes it the right member
+    // to name here: the claim is about cost, not about the picture.
+    //
+    // Measured at this width, five frames each after a warm parse: **suzanne 36
+    // ms · teapot 60 ms · bunny 365 ms** (median). `b.live`'s default tick is
+    // 200 ms, so two of the three orbit on it and the bunny names its own — a
+    // figure that cannot keep its tick stutters, and the honest remedy is a tick
+    // it can keep rather than a still under a caption saying it does not turn.
+    "suzanne": {
+      says: "968 faces — smooth shading over a real model",
+      height: 20,
+      spec: {
+        points3: [], lines3: [], colourBy: "depth", colormap: "magma",
+        camera: { azimuth: Math.PI / 4, elevation: 0.35, distance: 6 },
+        surfaces3: [{ label: "suzanne", ...mesh("suzanne"), closed: true, shading: "smooth" }],
+      },
+    },
+    "teapot": {
+      says: "6,320 faces — the spout and the handle are the reading",
+      height: 20,
+      spec: {
+        points3: [], lines3: [], colourBy: "depth", colormap: "viridis",
+        // **The azimuth is a measurement.** Read as silhouettes, the teapot is a
+        // featureless drum from most angles; at `π/2` the handle stands clear of
+        // the body — `### #########` — which is the one view that says what the
+        // model is.
+        camera: { azimuth: Math.PI / 2, elevation: 0.3, distance: 6 },
+        surfaces3: [{ label: "teapot", ...mesh("teapot"), closed: true, shading: "smooth" }],
+      },
+    },
+    "bunny": {
+      says: "69,451 faces — 365 ms a frame, so it turns on its own tick",
+      height: 22,
+      every: 600,
+      spec: {
+        points3: [], lines3: [], colourBy: "depth", colormap: "coolwarm",
+        // **Read as a picture, not as a number.** At the framework fixtures'
+        // own azimuth the bunny is a rounded mass with its ears edge-on and
+        // reads as a boulder; at `2.2` the ears sweep clear of the head and it
+        // is unmistakable. Same mesh, same rotation — the camera was the whole
+        // of it, and no count of inked cells or interior holes distinguishes
+        // the two.
+        camera: { azimuth: 2.2, elevation: 0.25, distance: 5 },
+        surfaces3: [{ label: "bunny", ...mesh("bunny"), closed: true, shading: "smooth" }],
+      },
+    },
+
+    // --- the furniture -----------------------------------------------------
+    //
+    // **Three members with no rung between them until now** — the box, the
+    // axes and their heads — and each is a member `b.plot` takes that no
+    // consumer named, which is the count `publicSurfaceUseSignal` reports.
+    "box-back": {
+      says: "the far edges only, so the near ones do not cross the figure",
+      height: 18,
+      spec: { box3: "back" },
+    },
+    "axes-origin": {
+      says: "three rules through the origin rather than a box",
+      height: 18,
+      spec: { box3: "none", axes3: "origin", origin3: "auto" },
+    },
+    "arrows": {
+      says: "chevron heads, and each axis its own tone",
+      height: 18,
+      spec: {
+        box3: "none",
+        axisStyle3: {
+          x: { arrow: true, tone: "accent" },
+          y: { arrow: true, tone: "info" },
+          z: { arrow: true, tone: "warn" },
+        },
+      },
+    },
+    // **No `distance` here, and that is F503 landing.** The rung carried
+    // `distance: 4` from when the orthographic arm divided by nothing: no
+    // distance framed it, so the number was chosen against a projection that
+    // ignored it and the figure ran off the top and the bottom of the plot. The
+    // arm now takes its scale from the distance to the target, so the default
+    // frames this exactly as it frames the entry above — which is what makes
+    // the two comparable, and comparing them is the whole of the rung.
+    "orthographic": {
+      says: "no divide by depth — parallel edges stay parallel",
+      height: 18,
+      spec: { camera: { projection: "orthographic" } },
     },
   },
   boxplot: {

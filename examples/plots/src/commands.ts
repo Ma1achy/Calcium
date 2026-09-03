@@ -253,21 +253,59 @@ export function formFull(form: PlotForm): readonly Block[] {
  * generator serves both, so an animated figure cannot show something its
  * static frame does not.
  */
-export function liveFor(form: PlotForm): readonly Block[] {
+export function liveFor(form: PlotForm, rung?: string): readonly Block[] {
   const entry = CATALOGUE[form];
   if ("refused" in entry.at(0, 8)) {
     return [b.notice("warn", `${form} cannot be built, so it cannot be animated`)];
   }
+  // **A rung can be animated too, and until now none could.** `/live` drew the
+  // default entry and nothing else, so every variant in the catalogue was a
+  // still — which is the wrong way round for `plot3d`, where the member being
+  // demonstrated is a *surface* and the thing that shows it is the camera
+  // moving. A reader could see the teapot and could not turn it.
+  //
+  // The name is checked against the table rather than trusted, because a typo
+  // silently animating the default is the same class as a caption promising a
+  // figure the spec does not draw.
+  const rungs = variantsOf(form);
+  const variant = rung === undefined ? undefined : rungs[rung];
+  if (rung !== undefined && variant === undefined) {
+    const names = Object.keys(rungs);
+    return [b.notice(
+      "error",
+      names.length === 0
+        ? `${form} has no rungs — /live ${form} draws it`
+        : `no rung "${rung}" on ${form} — ${names.join(", ")}`,
+    )];
+  }
   let phase = 0;
+  const height = variant?.height ?? 14;
   return [
-    caption(`${form} · ${entry.says} · advancing`),
+    caption(
+      variant === undefined
+        ? `${form} · ${entry.says} · o to orbit · [ ] { } + - to steer`
+        : `${form}/${String(rung)} · ${variant.says} · o to orbit · [ ] { } + - to steer`,
+    ),
     b.live({
-      id: `live-${form}`,
-      title: form,
-      every: 200,
+      id: `live-${form}${rung === undefined ? "" : `-${rung}`}`,
+      title: rung === undefined ? form : `${form}/${rung}`,
+      // **The tick drives the *data*, not the camera** (F509). The demo used to
+      // advance the azimuth per tick, at a rate that was a function of how
+      // expensive the frame was; the framework's own orbit is delta-timed, bound
+      // to `o`, and available on every focused plot. So the phase counter
+      // survives — a live part's whole point is data that changes — and the
+      // rotation is the reader's.
+      //
+      // **A rung may name its own tick** and almost none do. The bunny is 365 ms
+      // a frame against this 200, so the default would ask it for a frame it
+      // cannot deliver and the figure would stutter rather than turn.
+      every: variant?.every ?? 200,
       fetch: () => Promise.resolve((phase += 1)),
       render: (v) => {
-        const drawn = entry.at(typeof v === "number" ? v : 0, 14);
+        const at = typeof v === "number" ? v : 0;
+        const drawn = variant === undefined
+          ? entry.at(at, height)
+          : entry.at(at, height, { ...variant.spec, id: `live-${form}-${String(rung)}-fig` });
         return "refused" in drawn ? b.notice("warn", drawn.refused) : drawn;
       },
     }),

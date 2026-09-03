@@ -97,7 +97,7 @@ describe("SB — the SVG baseline (C12 §3ak.10, F275)", () => {
     // refusal is the thing this row exists to catch.
     //
     // **The refusal returned, and the equality is what said so on the day.**
-    // `scatter3d` is `SVG_FAMILY: null` — no emitter here carries a projection
+    // `plot3d` is `SVG_FAMILY: null` — no emitter here carries a projection
     // (C12 §3am) — so every variant of it is a placard, twenty-one of them now
     // that the polyline carrier, the surface and the wireframe have landed
     // (C04 I78, I79, I80). The placard check
@@ -106,31 +106,31 @@ describe("SB — the SVG baseline (C12 §3ak.10, F275)", () => {
     // second form joining is a decision somebody makes here.
     const refusals = [...fresh.entries()].filter(([, v]) => v === refusal).map(([k]) => k);
     expect([...refusals].sort(), "the refused frames, by name").toEqual([
-      "scatter3d-axes-none.svg",
-      "scatter3d-axes-origin.svg",
-      "scatter3d-axis-styles.svg",
-      "scatter3d-box-full.svg",
-      "scatter3d-braille-surface.svg",
-      "scatter3d-braille-wire.svg",
-      "scatter3d-colour-series.svg",
-      "scatter3d-colour-value.svg",
-      "scatter3d-coplanar.svg",
-      "scatter3d-default.svg",
-      "scatter3d-line-wire.svg",
-      "scatter3d-lines-series.svg",
-      "scatter3d-marker.svg",
-      "scatter3d-orthographic.svg",
-      "scatter3d-saddle.svg",
-      "scatter3d-surface-cage.svg",
-      "scatter3d-surface-field.svg",
-      "scatter3d-surface-flat.svg",
-      "scatter3d-surface-light.svg",
-      "scatter3d-surface-path.svg",
-      "scatter3d-surface-smooth.svg",
-      "scatter3d-surface-wire.svg",
-      "scatter3d-surface.svg",
-      "scatter3d-trajectory.svg",
-      "scatter3d-wireframe.svg",
+      "plot3d-axes-none.svg",
+      "plot3d-axes-origin.svg",
+      "plot3d-axis-styles.svg",
+      "plot3d-box-full.svg",
+      "plot3d-braille-surface.svg",
+      "plot3d-braille-wire.svg",
+      "plot3d-colour-series.svg",
+      "plot3d-colour-value.svg",
+      "plot3d-coplanar.svg",
+      "plot3d-default.svg",
+      "plot3d-line-wire.svg",
+      "plot3d-lines-series.svg",
+      "plot3d-marker.svg",
+      "plot3d-orthographic.svg",
+      "plot3d-saddle.svg",
+      "plot3d-surface-cage.svg",
+      "plot3d-surface-field.svg",
+      "plot3d-surface-flat.svg",
+      "plot3d-surface-light.svg",
+      "plot3d-surface-path.svg",
+      "plot3d-surface-smooth.svg",
+      "plot3d-surface-wire.svg",
+      "plot3d-surface.svg",
+      "plot3d-trajectory.svg",
+      "plot3d-wireframe.svg",
     ]);
     const drawn = [...fresh.entries()].filter(([, v]) => v !== refusal).map(([k]) => k);
     expect(drawn.length, "and the drawn side is the rest of it").toBe(fresh.size - refusals.length);

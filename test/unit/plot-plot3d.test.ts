@@ -1,5 +1,5 @@
 /**
- * SC1–SC12 — `scatter3d`, the form step 3 ships (C12 I87, I88, I89, §3am).
+ * SC1–SC12 — `plot3d`, the form step 3 ships (C12 I87, I88, I89, §3am).
  *
  * **The rows are indexed by the walk's table, not by the inputs.** §6e's twelve
  * cells are where two rules meet; a row governed by one rule restates that rule
@@ -45,7 +45,7 @@ const helix = (n: number): Point3[] =>
   });
 
 const spec = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
-  form: "scatter3d", height: 10, series: [], points3: [cloud(helix(160), "helix")], ...over,
+  form: "plot3d", height: 10, series: [], points3: [cloud(helix(160), "helix")], ...over,
 });
 
 /**
@@ -67,7 +67,7 @@ const bare = (over: Record<string, unknown> = {}): Record<string, unknown> =>
 const inked = (rows: readonly string[]): string =>
   rows.map((r) => strip(r)).join("").replace(/ /gu, "");
 
-const HEIGHT = plotHeight({ form: "scatter3d", height: 10 } as never);
+const HEIGHT = plotHeight({ form: "plot3d", height: 10 } as never);
 
 describe("SC: the 3D scatter", () => {
   it("SC1 (C12 I87): the arm is the terminal's, and the two arms disagree in the frame", () => {
@@ -131,9 +131,9 @@ describe("SC: the 3D scatter", () => {
       // edges with no cloud and a loss landscape has neither, so the refusal
       // reads the carrier *set*. `T2.4g` and `T2.4h` are where the converses
       // live, one per carrier.
-      [{ form: "scatter3d", height: 4, series: [] }, /form "scatter3d" has none of "points3", "lines3", "surfaces3"/u],
+      [{ form: "plot3d", height: 4, series: [] }, /form "plot3d" has none of "points3", "lines3", "surfaces3"/u],
       [{ form: "line", height: 4, series: [], colourBy: "depth" }, /"colourBy" on form "line"/u],
-      [{ form: "scatter3d", height: 4, series: [], points3: pts, axes: true }, /"axes" on form "scatter3d"/u],
+      [{ form: "plot3d", height: 4, series: [], points3: pts, axes: true }, /"axes" on form "plot3d"/u],
     ];
     for (const [bad, message] of cases) {
       expect(errorsOf({ kind: "plot", id: "s", ...bad }).join(" "), String(message)).toMatch(message);
@@ -144,8 +144,8 @@ describe("SC: the 3D scatter", () => {
       expect(() => b.plot(bad as never), String(message)).toThrow(message);
     }
     // The converses: each member in its legal position is accepted.
-    expect(errorsOf({ kind: "plot", id: "s", form: "scatter3d", height: 4, series: [], points3: pts, colourBy: "series" })).toEqual([]);
-    expect(() => b.plot({ form: "scatter3d", height: 4, series: [], points3: pts } as never)).not.toThrow();
+    expect(errorsOf({ kind: "plot", id: "s", form: "plot3d", height: 4, series: [], points3: pts, colourBy: "series" })).toEqual([]);
+    expect(() => b.plot({ form: "plot3d", height: 4, series: [], points3: pts } as never)).not.toThrow();
     expect(() => b.plot({ form: "scatter", height: 4, series: [{ values: [1, 2] }] } as never)).not.toThrow();
   });
 

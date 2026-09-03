@@ -138,6 +138,13 @@ export function measurable(
     definitions?: readonly BlockDefinition<never>[];
     focus?: RenderOptions["focus"];
     cursorPositions?: RenderOptions["cursorPositions"];
+    /** Per-plot live cameras (C12 I83), so a row can move one without rebuilding the block. */
+    cameras?: RenderOptions["cameras"];
+    /**
+     * Caller-owned scratch (C12 I107). A row that supplies a counting one reads
+     * the **build count** off it, which is what PR10 asserts instead of a time.
+     */
+    scratch?: RenderOptions["scratch"];
     /**
      * What a swallowed containment does here (C09 I29). `LOUD` by default —
      * pass `QUIET` where the throw is the subject rather than a surprise.
@@ -171,6 +178,8 @@ export function measurable(
     tick: options.tick ?? 0,
     ...(options.focus === undefined ? {} : { focus: options.focus }),
     ...(options.cursorPositions === undefined ? {} : { cursorPositions: options.cursorPositions }),
+    ...(options.cameras === undefined ? {} : { cameras: options.cameras }),
+    ...(options.scratch === undefined ? {} : { scratch: options.scratch }),
   };
 
   return {
