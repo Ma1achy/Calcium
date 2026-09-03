@@ -47,7 +47,7 @@ describe("FV — the shared axis, and a record with something to be wrong about"
       // gutter for it to be** (F487). `terminalDecisions` takes the text before
       // a row's first box glyph as the y-axis label — true of a furnished axis,
       // and false of a form that draws its scales inside the scene, where the
-      // "edge" it found is an axis line in the picture. `scatter3d` is that
+      // "edge" it found is an axis line in the picture. `plot3d` is that
       // form: its billboarded ticks sit left of `│`, so they read as a gutter.
       //
       // **`HAS_VALUE_AXIS` and this row answer different questions**, which is
@@ -132,7 +132,7 @@ describe("FV — the shared axis, and a record with something to be wrong about"
     // same.** Eleven forms have a ramp; if that ever reaches zero the row above
     // is vacuous and says so here first.
     const ramped = (Object.keys(RAMP_DEFAULT) as PlotForm[]).filter((f) => RAMP_DEFAULT[f] !== null);
-    // **12, and the twelfth is `scatter3d`** — depth and value both go on a
+    // **12, and the twelfth is `plot3d`** — depth and value both go on a
     // ramp there, which is why its `HAS_VALUE_AXIS` is `false` and why copying
     // `scatter`'s `true` would have been caught by this row's *other* half
     // rather than by design (F441).

@@ -3191,7 +3191,7 @@ it("OR11 (§3ac B1, B2): the crosshair's column follows the facing, curve and ca
     const refused = (Object.keys(ORIGIN_DEFAULT) as PlotForm[]).filter(
       (f) => ORIGIN_DEFAULT[f] === null,
     );
-    expect(refused.length).toBe(32); // cells-ok — a form count; 31 before `scatter3d`
+    expect(refused.length).toBe(32); // cells-ok — a form count; 31 before `plot3d`
     // **A form with a required member needs it here, or this row asserts about
     // a different refusal.** `tree` is the first: without a `hierarchy` the
     // constructor complains about that instead, and the row would pass on a

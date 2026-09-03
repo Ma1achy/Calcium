@@ -67,7 +67,7 @@ const SPARSE: readonly Point3[] = [
 ];
 
 const spec = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
-  form: "scatter3d",
+  form: "plot3d",
   height: 16,
   series: [],
   // **`box3: "none"` and a sparse cloud**, so the frame's cells are the axes'

@@ -35,8 +35,8 @@ export const ONE_PER_FORM: Readonly<Record<PlotForm, Plot>> = Object.freeze({
       { values: [2, 2, 3, 3], label: "c" },
     ],
   }),
-  scatter3d: block({
-    kind: "plot", id: "form-scatter3d", form: "scatter3d", height: 6,
+  plot3d: block({
+    kind: "plot", id: "form-plot3d", form: "plot3d", height: 6,
     series: [],
     points3: [
       { label: "a", points: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 1, z: 1 }, { x: -1, y: 1, z: 0 }] },

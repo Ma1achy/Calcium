@@ -549,20 +549,49 @@ describe("catalogue-png — the parser that failed silently", () => {
     expect(ys[1]! - ys[0]!).toBeLessThanOrEqual(1.143 * size);
   });
 
-  it("PC5: a braille glyph goes through the font, on the same path as any other", () => {
-    // **This row asserted a dot map, and the dot map is gone** (F204). Braille
-    // was the one glyph class this file *modelled* rather than rendered — eight
-    // circles from a bitmask, at a radius nothing could check without measuring
-    // the font, and it was out by 2.4× in area for the tool's whole life. The
-    // claim now is that no such model exists: a braille cell emits a `<text>`
-    // at its own column, exactly as a box-drawing glyph does.
+  it("PC5: a braille cell is drawn from its own mask, because the mono face has none", () => {
+    // **F204 was right about the defect and wrong about the remedy, and the
+    // font is what says so** (F502).
+    //
+    // It found braille modelled as eight circles at a guessed radius, out by
+    // 2.4× in area for the tool's whole life, and ruled that the model go and
+    // the glyph emit a `<text>` *exactly as a box-drawing glyph does*. The
+    // second half assumed a fact nobody had measured. Measured:
+    //
+    //     fc-list ":charset=2502" → DejaVu Sans Mono, among others
+    //     fc-list ":charset=2800" → DejaVu Sans, DejaVu Serif — and **no mono face**
+    //
+    // Box drawing, the block elements, the quadrants and the markers all resolve
+    // in the family this stylesheet asks for. Braille alone falls through to a
+    // **proportional** font, whose dots are small and widely spaced. So every
+    // braille frame the instrument has produced since showed that fallback's
+    // design, and a reader — including the one who wrote the ruling — read it as
+    // the renderer drawing a thin dotted line.
+    //
+    // **The remedy that survives both findings is geometry that is not a
+    // guess.** A braille cell *is* a 2×4 coverage mask; eight rects laid on the
+    // cell's own halves and quarters is the character's definition rather than
+    // an estimate of a font's design, which is the property F204 actually
+    // wanted and could not get from a radius.
     const svg = (ansiToSvg as (l: string) => string)("\u001b[38;2;255;0;0m⣿⠁\u001b[0m");
-    expect(svg).not.toContain("<circle");
-    for (const ch of ["⣿", "⠁"]) expect(svg).toContain(`>${ch}</text>`);
-    // At its own column, which is the property the per-glyph path exists for.
-    const xs = [...svg.matchAll(/<text x="([\d.]+)"[^>]*>[⣿⠁]<\/text>/gu)].map((m) => Number(m[1]));
-    expect(xs.length).toBe(2); // cells-ok — a glyph count
-    expect(xs[1]! - xs[0]!).toBeCloseTo(8.41, 1);
+    expect(svg, "no radius, which is the finding that stands").not.toContain("<circle");
+    expect(svg, "and no text, which is the half that did not").not.toContain(">⣿</text>");
+
+    // **Eight dots and one**, read off the two masks rather than counted loosely
+    // — `⣿` is every dot and `⠁` is the first alone.
+    const rects = [...svg.matchAll(/<rect x="([\d.]+)" y="([\d.]+)"/gu)]
+      .map((m) => [Number(m[1]), Number(m[2])] as const);
+    expect(rects.length, "eight dots and one").toBe(9); // cells-ok — a dot count
+
+    // **Derived from the cell, which is the whole claim.** The two glyphs sit a
+    // cell apart and the dots divide that cell in halves across and quarters
+    // down; nothing here is a measurement of a typeface.
+    const xs = [...new Set(rects.map(([x]) => x))].sort((a, b) => a - b);
+    expect(xs.length, "two dot columns in the full cell and one in the sparse").toBe(3); // cells-ok — a column count
+    expect(xs[1]! - xs[0]!, "half a cell between the dot columns").toBeCloseTo(8.41 / 2, 1);
+    expect(xs[2]! - xs[0]!, "and a whole cell between the glyphs").toBeCloseTo(8.41, 1);
+    const ys = [...new Set(rects.map(([, y]) => y))].sort((a, b) => a - b);
+    expect(ys.length, "four dot rows").toBe(4); // cells-ok — a row count
   });
 
   it("PC10 (F227): bold survives to the SVG, and it is all a one-bit frame has", () => {

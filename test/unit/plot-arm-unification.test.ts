@@ -675,7 +675,7 @@ describe("U — the seam, asserted from both arms", () => {
     // *this rung does not reach this form* and it can mean *this form does not
     // answer this rung*.
     //
-    // **`scatter3d` contributed one cell to each edge and all four are
+    // **`plot3d` contributed one cell to each edge and all four are
     // different**, which is the record earning its keep on the first form added
     // after it was written:
     //
@@ -1188,20 +1188,20 @@ describe("U — the seam, asserted from both arms", () => {
     // computes no density* — and F383 gave both density forms an emitter, which
     // left the interaction *does a composition refuse when a child does* with no
     // constructible witness. The equality below was written to wake the row up
-    // the day one returned, and `scatter3d` is that day: `SVG_FAMILY` is `null`
+    // the day one returned, and `plot3d` is that day: `SVG_FAMILY` is `null`
     // for it because no emitter here carries a projection (C12 §3am).
     //
     // **Asserted as the exact set rather than as non-empty**, so a second
     // refusal arriving is a decision somebody makes here rather than a fixture
     // silently changing meaning.
     const refused = (Object.keys(SVG_FAMILY) as PlotForm[]).filter((f) => SVG_FAMILY[f] === null);
-    expect(refused, "exactly one form is refused, and it is this row's child").toEqual(["scatter3d"]);
+    expect(refused, "exactly one form is refused, and it is this row's child").toEqual(["plot3d"]);
     expect(plotToSvg(kid("violin", "v"), DARK_THEME), "the old subject draws now").not.toBeNull();
 
-    // **The refused child, built** — a `scatter3d` takes `points3` and refuses
+    // **The refused child, built** — a `plot3d` takes `points3` and refuses
     // `axes`, so it cannot come from `kid`.
     const refusedKid = block({
-      kind: "plot", id: "r", form: "scatter3d", height: 6, series: [],
+      kind: "plot", id: "r", form: "plot3d", height: 6, series: [],
       points3: [{ label: "r", points: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 1, z: 1 }] }],
     } as Plot);
     expect(plotToSvg(refusedKid, DARK_THEME), "and it is genuinely refused alone").toBeNull();

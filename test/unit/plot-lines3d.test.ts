@@ -88,7 +88,7 @@ const slotRgb = (ref: string): string => rgb(slot(ref as never, theme, capsFor("
 
 /** No reference frame, so the rows about the data say which picture they mean. */
 const bare = (over: Record<string, unknown>): Record<string, unknown> => ({
-  form: "scatter3d", height: 10, series: [], axes3: false, box3: "none", ...over,
+  form: "plot3d", height: 10, series: [], axes3: false, box3: "none", ...over,
 });
 
 describe("plot — the polyline carrier", () => {
@@ -107,14 +107,14 @@ describe("plot — the polyline carrier", () => {
     // wireframe, which is a complete document. **The message names the carrier
     // set** since C04 I79 — the third carrier is where the pair of hand-widened
     // names became one constant, and `T2.4h` is where that is the row.
-    expect(errorsOf({ kind: "plot", id: "s", form: "scatter3d", height: 4, series: [] }).join(" "))
+    expect(errorsOf({ kind: "plot", id: "s", form: "plot3d", height: 4, series: [] }).join(" "))
       .toMatch(/has none of "points3", "lines3", "surfaces3"/u);
-    expect(() => b.plot({ form: "scatter3d", height: 4, series: [] } as never))
+    expect(() => b.plot({ form: "plot3d", height: 4, series: [] } as never))
       .toThrow(/has none of "points3", "lines3", "surfaces3"/u);
     for (const good of [
-      { form: "scatter3d", height: 4, series: [], lines3: path },
-      { form: "scatter3d", height: 4, series: [], points3: pts },
-      { form: "scatter3d", height: 4, series: [], points3: pts, lines3: path },
+      { form: "plot3d", height: 4, series: [], lines3: path },
+      { form: "plot3d", height: 4, series: [], points3: pts },
+      { form: "plot3d", height: 4, series: [], points3: pts, lines3: path },
     ]) {
       expect(errorsOf({ kind: "plot", id: "s", ...good }), JSON.stringify(good)).toEqual([]);
       expect(() => b.plot(good as never), JSON.stringify(good)).not.toThrow();
@@ -124,7 +124,7 @@ describe("plot — the polyline carrier", () => {
   it("T3.55 (C04 I78): the `colourBy: \"value\"` walk reaches the other carrier", () => {
     const withValue = [{ x: 0, y: 0, z: 0, value: 1 }, { x: 1, y: 1, z: 1, value: 2 }];
     const missing = [{ x: 0, y: 0, z: 0, value: 1 }, { x: 1, y: 1, z: 1 }];
-    const base = { kind: "plot", id: "s", form: "scatter3d", height: 4, series: [], colourBy: "value" };
+    const base = { kind: "plot", id: "s", form: "plot3d", height: 4, series: [], colourBy: "value" };
     // **The control first**: the same block with the reading supplied must be
     // accepted, or this row passes against a validator that refuses the arm.
     expect(errorsOf({ ...base, lines3: [{ points: withValue }] })).toEqual([]);
@@ -276,7 +276,7 @@ describe("plot — the polyline carrier", () => {
     for (const x of [-1, 1]) for (const y of [-1, 1]) for (const z of [-1, 1]) corners.push({ x, y, z });
     const edge = [seg({ x: -1, y: -1, z: -1 }, { x: -1, y: -1, z: 1 })];
     const shot = (withPath: boolean): { text: string; colour: string | null }[] => cellsOf(frame(
-      { form: "scatter3d", height: 12, series: [], box3: "full", axes3: false,
+      { form: "plot3d", height: 12, series: [], box3: "full", axes3: false,
         colourBy: "series", points3: [{ points: corners }],
         ...(withPath ? { lines3: edge } : {}) },
       capsFor("24bit"), 80,

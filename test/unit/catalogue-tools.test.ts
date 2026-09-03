@@ -255,9 +255,9 @@ describe("PC — the phase catalogue's two claims", () => {
     // the claim — exhaustive and disjoint, above — and this is the one value the
     // shrinking set can no longer shrink past.
     // **And the shrinking set grew, which is the day the equality was written
-    // for.** `scatter3d` carries geometry this path does not compute (C12
+    // for.** `plot3d` carries geometry this path does not compute (C12
     // §3am), so the refusal it names is a decision rather than a gap.
-    expect(refused, "the refused forms, derived from SVG_FAMILY").toEqual(["scatter3d"]);
+    expect(refused, "the refused forms, derived from SVG_FAMILY").toEqual(["plot3d"]);
     expect(claimed.length, "and the claimed side is the rest of it").toBe(forms.length - 1);
   });
 
@@ -325,36 +325,36 @@ describe("PR — the pair catalogue's partition, which is the counter restated (
     // row keeps its shape and gains the one fact the bound cannot carry: a
     // refusal reappearing fails here, named.
     // **And a refusal returned, which is what the equality was for** (C12
-    // §3am). `scatter3d` is `SVG_FAMILY: null`, so every one of its variants is
+    // §3am). `plot3d` is `SVG_FAMILY: null`, so every one of its variants is
     // refused **by family** rather than by variant — the partition above is
     // what says which side they land on, and it says family, which is the
     // truth: no variant of the form draws and none could.
     expect(allRefused, "the refused frames, by name").toEqual([
-      "scatter3d/axes-none",
-      "scatter3d/axes-origin",
-      "scatter3d/axis-styles",
-      "scatter3d/box-full",
-      "scatter3d/braille-surface",
-      "scatter3d/braille-wire",
-      "scatter3d/colour-series",
-      "scatter3d/colour-value",
-      "scatter3d/coplanar",
-      "scatter3d/default",
-      "scatter3d/line-wire",
-      "scatter3d/lines-series",
-      "scatter3d/marker",
-      "scatter3d/orthographic",
-      "scatter3d/saddle",
-      "scatter3d/surface",
-      "scatter3d/surface-cage",
-      "scatter3d/surface-field",
-      "scatter3d/surface-flat",
-      "scatter3d/surface-light",
-      "scatter3d/surface-path",
-      "scatter3d/surface-smooth",
-      "scatter3d/surface-wire",
-      "scatter3d/trajectory",
-      "scatter3d/wireframe",
+      "plot3d/axes-none",
+      "plot3d/axes-origin",
+      "plot3d/axis-styles",
+      "plot3d/box-full",
+      "plot3d/braille-surface",
+      "plot3d/braille-wire",
+      "plot3d/colour-series",
+      "plot3d/colour-value",
+      "plot3d/coplanar",
+      "plot3d/default",
+      "plot3d/line-wire",
+      "plot3d/lines-series",
+      "plot3d/marker",
+      "plot3d/orthographic",
+      "plot3d/saddle",
+      "plot3d/surface",
+      "plot3d/surface-cage",
+      "plot3d/surface-field",
+      "plot3d/surface-flat",
+      "plot3d/surface-light",
+      "plot3d/surface-path",
+      "plot3d/surface-smooth",
+      "plot3d/surface-wire",
+      "plot3d/trajectory",
+      "plot3d/wireframe",
     ]);
     expect(part.family.sort(), "and every one of them is a family refusal").toEqual(allRefused);
     // **Not a magnitude** (F310). `> 50` was a number that had to be edited every
@@ -442,13 +442,13 @@ describe("PR — the pair catalogue's partition, which is the counter restated (
     // corpus. Asserted by equality so the row wakes up if one returns; `pick`'s
     // own placard arm keeps its unit coverage in PR6.
     // **And one returned, so `pick`'s fallback has a witness in the corpus
-    // again.** `scatter3d` is refused in every variant, which is the state this
+    // again.** `plot3d` is refused in every variant, which is the state this
     // row was written against and lost when F383 gave the density family an
     // emitter. `pick` must still return a variant — a placard is a frame — and
     // the assertion is that it does rather than throwing or returning nothing.
     const allDead = Object.keys(map).filter((f) => Object.values(map[f]!).every(Boolean));
-    expect(allDead, "the forms refused in every variant").toEqual(["scatter3d"]);
-    expect(map["scatter3d"]?.[pick("scatter3d")], "and pick still names one of them").toBe(true);
+    expect(allDead, "the forms refused in every variant").toEqual(["plot3d"]);
+    expect(map["plot3d"]?.[pick("plot3d")], "and pick still names one of them").toBe(true);
   });
 
   it("PR7 (F315): the terminal scale is constant, so tiles compare with each other too", () => {

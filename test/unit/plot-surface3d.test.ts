@@ -26,7 +26,7 @@ import { defaultTheme, loadTheme } from "../../src/presentation/theme/index.js";
 import { slot } from "../../src/presentation/blocks/paint.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-expect-error — a `.mjs` instrument with no declarations, like its siblings.
-import { CAPS, frameFor, stripSgr } from "../../tools/plot-catalogue.mjs";
+import { CAPS, frameFor, groundRgb, stripSgr } from "../../tools/plot-catalogue.mjs";
 import { parseLine } from "../../tools/catalogue-png.mjs";
 
 const CAP = CAPS as readonly { name: string; caps: Record<string, unknown> }[];
@@ -34,7 +34,8 @@ const capsFor = (name: string): Record<string, unknown> =>
   CAP.find((c) => c.name === name)?.caps ?? {};
 const frame = frameFor as (s: unknown, c: unknown, w: number, id?: string) => readonly string[];
 const strip = stripSgr as (s: string) => string;
-const runsOf = parseLine as (l: string) => readonly { text: string; colour: string | null }[];
+const runsOf = parseLine as (l: string) =>
+  readonly { text: string; colour: string | null; background: string | null }[];
 
 const errorsOf = (blk: unknown): readonly string[] => {
   const v = validateBlock(blk) as { ok: boolean; error?: readonly string[] };
@@ -54,10 +55,51 @@ const rgb = (v: unknown): string => {
 const slotRgb = (ref: string): string => rgb(slot(ref as never, theme, capsFor("24bit") as never).colour);
 
 /** Every inked cell of a frame, with its colour. */
+/**
+ * **The plot's ground is a foreground now, and it is not a colour** (F501).
+ *
+ * Unicode's block elements fill from the bottom, so a cell whose covered mass
+ * sits at the *top* is drawn as its complement with the two colours exchanged,
+ * and the exchange needs an ink for the empty part — left unset the terminal
+ * paints it in the default foreground, which streaked a Gaussian's base white.
+ * The ground therefore appears as a run colour while painting exactly what was
+ * behind it, so a reader cannot see it and a row counting shades must not
+ * either.
+ *
+ * **Resolved from the theme rather than written down**, so a palette change
+ * moves the frames and this together; on a rung with no RGB nothing is filtered.
+ */
+const GROUND = groundRgb(capsFor("24bit")) as readonly [number, number, number] | null;
+const isGround = (c: string | null): boolean => {
+  const m = /rgb\((\d+),(\d+),(\d+)\)/u.exec(c ?? "");
+  return m !== null && GROUND !== null
+    && Number(m[1]) === GROUND[0] && Number(m[2]) === GROUND[1] && Number(m[3]) === GROUND[2];
+};
+
+/**
+ * The **data's** colour in a run — the foreground, or the background where the
+ * cell is drawn inverted (F501).
+ *
+ * The ground is not noise to be filtered out: it is the **signal that the data
+ * moved to the other channel**. A cell at a shape's *top* edge holds its mass
+ * at the bottom of the cell and draws `fg = data`; a cell at the *bottom* edge
+ * holds it at the top, and since the block elements only fill upward from the
+ * floor it must be drawn as the complement with the two colours exchanged. So
+ * one edge reports the data as a foreground and the opposite edge reports the
+ * ground, and a reader taking foregrounds alone sees a figure **lit from
+ * above** that is nothing of the kind — `SF3a`'s headlight, whose whole claim is
+ * that it has no direction, measured `1.24`.
+ *
+ * The frame is right and the reading was half of it. `parseLine` has carried
+ * `background` all along.
+ */
+const inkOf = (run: { colour: string | null; background: string | null }): string | null =>
+  isGround(run.colour) ? run.background : run.colour;
+
 const cellsOf = (rows: readonly string[]): { text: string; colour: string | null }[] => {
   const out: { text: string; colour: string | null }[] = [];
   for (const line of rows) {
-    for (const run of runsOf(line)) for (const ch of [...run.text]) out.push({ text: ch, colour: run.colour });
+    for (const run of runsOf(line)) for (const ch of [...run.text]) out.push({ text: ch, colour: inkOf(run) });
   }
   return out.filter((c) => c.text !== " ");
 };
@@ -82,7 +124,7 @@ const litRatio = (rows: readonly string[]): number => {
     let c = 0; // cells-ok — a column index
     for (const run of runsOf(line)) {
       for (const ch of [...run.text]) {
-        if (ch !== " ") cells.push({ r, c, l: lumOf(run.colour) });
+        if (ch !== " ") cells.push({ r, c, l: lumOf(inkOf(run)) });
         c += 1; // cells-ok — a column index
       }
     }
@@ -103,7 +145,7 @@ const inked = (rows: readonly string[]): number =>
 
 /** No reference frame, so a row about the data says which picture it means. */
 const bare = (over: Record<string, unknown>): Record<string, unknown> => ({
-  form: "scatter3d", height: 12, series: [], axes3: false, box3: "none", colormap: "viridis", ...over,
+  form: "plot3d", height: 12, series: [], axes3: false, box3: "none", colormap: "viridis", ...over,
 });
 
 type Mesh = {
@@ -227,14 +269,14 @@ describe("plot — the surface carrier", () => {
     // instance). A loss landscape has no cloud and no path, and the gate that
     // reads a widened pair of names rather than the carrier *set* refuses it.
     for (const good of [
-      { form: "scatter3d", height: 4, series: [], surfaces3: sf },
-      { form: "scatter3d", height: 4, series: [], surfaces3: sf, light3: "headlight" },
+      { form: "plot3d", height: 4, series: [], surfaces3: sf },
+      { form: "plot3d", height: 4, series: [], surfaces3: sf, light3: "headlight" },
     ]) {
       expect(errorsOf({ kind: "plot", id: "s", ...good }), JSON.stringify(good)).toEqual([]);
       expect(() => b.plot(good as never), JSON.stringify(good)).not.toThrow();
     }
     // And the set's own refusal names all three.
-    expect(errorsOf({ kind: "plot", id: "s", form: "scatter3d", height: 4, series: [] }).join(" "))
+    expect(errorsOf({ kind: "plot", id: "s", form: "plot3d", height: 4, series: [] }).join(" "))
       .toMatch(/has none of "points3", "lines3", "surfaces3"/u);
   });
 
@@ -242,7 +284,7 @@ describe("plot — the surface carrier", () => {
     const grid = { heights: [[0, 1], [1, 0]], xRange: [0, 1], yRange: [0, 1] };
     const mesh = { vertices: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }, { x: 0, y: 1, z: 0 }], faces: [[0, 1, 2]] };
     const at = (s: unknown): string =>
-      errorsOf({ kind: "plot", id: "s", form: "scatter3d", height: 4, series: [], surfaces3: [s] }).join(" ");
+      errorsOf({ kind: "plot", id: "s", form: "plot3d", height: 4, series: [], surfaces3: [s] }).join(" ");
     expect(at({ ...grid, ...mesh })).toMatch(/has both "heights" and "vertices"/u);
     expect(at({ label: "empty" })).toMatch(/has neither "heights" nor "vertices"/u);
     expect(at({ vertices: mesh.vertices })).toMatch(/has "vertices" and no "faces"/u);
@@ -257,7 +299,7 @@ describe("plot — the surface carrier", () => {
   });
 
   it("T3.58 (C04 I79): the `colourBy: \"value\"` walk reaches the third carrier", () => {
-    const base = { kind: "plot", id: "s", form: "scatter3d", height: 4, series: [], colourBy: "value" };
+    const base = { kind: "plot", id: "s", form: "plot3d", height: 4, series: [], colourBy: "value" };
     const grid = { heights: [[0, 1], [1, 0]], xRange: [0, 1], yRange: [0, 1] };
     // The controls first, or this row passes against a validator refusing the arm.
     expect(errorsOf({ ...base, surfaces3: [{ ...grid, field: [[1, 2], [3, 4]] }] })).toEqual([]);
@@ -348,7 +390,23 @@ describe("plot — the surface carrier", () => {
   });
 
   it("SF3 (C12 I94): flat and smooth differ on a sphere and agree on a planar quad", () => {
-    const ball = sphere(10, 8);
+    // **A coarse ball, because the row needs faces *fewer* than cells** (F501).
+    //
+    // `sphere(10, 8)` is 160 faces and the frame is 72 cells, so flat shading
+    // already gives every cell a colour of its own and there is nothing left for
+    // smooth to add: both arms measured **72**, and the row read as a claim
+    // about shading while asserting the size of the frame. It passed for years
+    // because the half rung sampled one point a half-cell and the collisions
+    // were frequent; at eight sample rows a cell the nearest-sample pick has
+    // more to choose from, the collisions stopped, and the ceiling arrived.
+    //
+    // Measured across five sizes, faces against cells against the two counts:
+    // `(10,8)` 160/72 → 72 v 72 · `(8,6)` 96/64 → 63 v 64 · `(6,5)` 60/75 →
+    // 75 v 72 · `(5,4)` 40/62 → 62 v 60 · `(4,3)` 24/62 → **60 v 29**. Only the
+    // last separates, and it separates *structurally* — flat cannot exceed the
+    // count of visible faces, so the margin is a property of the fixture rather
+    // than of how the samples happened to land.
+    const ball = sphere(4, 3);
     const shades = (s: Record<string, unknown>): Set<string> => {
       const rows = frame(bare({ surfaces3: [s], height: 14 }), capsFor("24bit"), 50, "sf3");
       return new Set(cellsOf(rows).map((c) => c.colour ?? ""));
@@ -536,7 +594,7 @@ describe("plot — the surface carrier", () => {
     const muted = slotRgb("tone.muted");
     const boxed = (over: Record<string, unknown>): number =>
       cellsOf(frame({
-        form: "scatter3d", height: 12, series: [], box3: "full", axes3: false, colormap: "viridis",
+        form: "plot3d", height: 12, series: [], box3: "full", axes3: false, colormap: "viridis",
         points3: [{ points: [
           { x: -1, y: -1, z: -1 }, { x: 1, y: 1, z: 1 }, { x: -1, y: 1, z: -1 }, { x: 1, y: -1, z: 1 },
         ] }],
@@ -550,7 +608,7 @@ describe("plot — the surface carrier", () => {
     ).toBeLessThan(alone);
   });
 
-  it("SF7 (C12 I94, I88): below the half-block arm a surface takes density glyphs", () => {
+  it("SF7 (C12 I94, I88, I102): below the half-block arm a surface takes density glyphs", () => {
     const caps = capsFor("ascii");
     const ladder = new Set([...ladderFor("density", caps as never).steps]);
     expect([...ladder].join(""), "the ASCII ladder, read rather than restated").toBe(".:-=+*#@");
@@ -931,9 +989,9 @@ describe("plot — the surface carrier", () => {
       faces: [[0, 1, 2]],
     };
     const at = (sf: unknown): string =>
-      errorsOf({ kind: "plot", id: "s", form: "scatter3d", height: 4, series: [], surfaces3: [sf] }).join(" ");
+      errorsOf({ kind: "plot", id: "s", form: "plot3d", height: 4, series: [], surfaces3: [sf] }).join(" ");
     expect(at({ ...grid, closed: true })).toMatch(/"closed" on a height field/u);
-    expect(() => b.plot({ form: "scatter3d", height: 4, series: [], surfaces3: [{ ...grid, closed: true }] } as never))
+    expect(() => b.plot({ form: "plot3d", height: 4, series: [], surfaces3: [{ ...grid, closed: true }] } as never))
       .toThrow(/"closed" on a height field/u);
     // **The three accepts are the row**, not decoration: a refusal copied from
     // one member onto the other reads exactly like a rule, and the two arrived

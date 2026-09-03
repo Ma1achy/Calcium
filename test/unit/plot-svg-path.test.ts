@@ -1964,13 +1964,13 @@ describe("G7 — the partition itself", () => {
     // refusal returns, and the equality above is what stops that day being
     // silent. G7b carries the positive half — a claimed form puts ink on the
     // page — over all 46.
-    // **And a refusal came back.** `scatter3d` is `null` because no emitter here
+    // **And a refusal came back.** `plot3d` is `null` because no emitter here
     // carries a projection: routed through `scatter` it would draw the x and y
     // of a 3D cloud as a flat one and report as supported, which is the
     // plausible wrong figure F259 refuses (C12 §3am). **The loop below is no
     // longer over the empty set**, which is what this equality was written to
     // make happen rather than to prevent.
-    expect(refused, "exactly one form is refused, and it says why in SVG_FAMILY").toEqual(["scatter3d"]);
+    expect(refused, "exactly one form is refused, and it says why in SVG_FAMILY").toEqual(["plot3d"]);
     // **Every one, not the first six.** A sample is the same blind spot one
     // level down from the one G8 is about: it tests the rule against the forms
     // you already had in mind.

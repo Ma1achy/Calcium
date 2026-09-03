@@ -26,7 +26,7 @@ import {
 } from "../../src/presentation/plot/surface3.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-expect-error — a `.mjs` instrument with no declarations, like its siblings.
-import { CAPS, frameFor, stripSgr } from "../../tools/plot-catalogue.mjs";
+import { CAPS, frameFor, groundRgb, stripSgr } from "../../tools/plot-catalogue.mjs";
 import { parseLine } from "../../tools/catalogue-png.mjs";
 
 const CAP = CAPS as readonly { name: string; caps: Record<string, unknown> }[];
@@ -49,18 +49,41 @@ const colsTouched = (rows: readonly string[]): number => {
 };
 const text = (rows: readonly string[]): string => rows.map(strip).join("\n");
 
-/** Every distinct colour over the inked cells. */
+const rgbOf = (c: string | null): readonly [number, number, number] | null => {
+  const m = /rgb\((\d+),(\d+),(\d+)\)/u.exec(c ?? "");
+  return m === null ? null : [Number(m[1]), Number(m[2]), Number(m[3])];
+};
+
+/**
+ * **The plot's ground is a foreground now, and it is not a colour** (F501).
+ *
+ * Unicode's block elements fill from the bottom, so a cell whose covered mass
+ * sits at the *top* is drawn as its complement with the two colours exchanged —
+ * and the exchange needs an ink for the empty part, or the terminal paints it in
+ * the default foreground. The ground therefore appears as a run colour while
+ * painting exactly what was already behind it, so a reader cannot see it and a
+ * count of colours must not either.
+ *
+ * Every row below that counts colours is asking about the **data's**, and the
+ * two that broke were reading a third face on a two-faced cube and a third hue
+ * on a one-hue field. **Resolved from the theme rather than written down**, so
+ * a palette change moves the frames and this together; on a rung with no RGB,
+ * `rgbOf` is `null` and nothing is filtered.
+ */
+const GROUND = groundRgb(capsFor("24bit")) as readonly [number, number, number] | null;
+const isGround = (c: string | null): boolean => {
+  const v = rgbOf(c);
+  return v !== null && GROUND !== null
+    && v[0] === GROUND[0] && v[1] === GROUND[1] && v[2] === GROUND[2];
+};
+
+/** Every distinct colour over the inked cells, the ground aside. */
 const colours = (rows: readonly string[]): readonly string[] => {
   const set = new Set<string>();
   for (const line of rows)
     for (const run of runsOf(line))
-      for (const ch of [...run.text]) if (ch !== " ") set.add(run.colour ?? "none");
+      for (const ch of [...run.text]) if (ch !== " " && !isGround(run.colour)) set.add(run.colour ?? "none");
   return [...set];
-};
-
-const rgbOf = (c: string | null): readonly [number, number, number] | null => {
-  const m = /rgb\((\d+),(\d+),(\d+)\)/u.exec(c ?? "");
-  return m === null ? null : [Number(m[1]), Number(m[2]), Number(m[3])];
 };
 const lumOf = (c: string | null): number => {
   const v = rgbOf(c);
@@ -78,7 +101,7 @@ const clusters = (rows: readonly string[]): readonly number[] => {
   const ls: number[] = [];
   for (const line of rows)
     for (const run of runsOf(line))
-      for (const ch of [...run.text]) if (ch !== " ") ls.push(lumOf(run.colour));
+      for (const ch of [...run.text]) if (ch !== " " && !isGround(run.colour)) ls.push(lumOf(run.colour));
   ls.sort((a, b) => a - b);
   const span = (ls[ls.length - 1] ?? 0) - (ls[0] ?? 0);
   const out: number[][] = [];
@@ -104,7 +127,7 @@ const holes = (rows: readonly string[]): number => {
 };
 
 const bare = (over: Record<string, unknown>): Record<string, unknown> => ({
-  form: "scatter3d",
+  form: "plot3d",
   height: 14,
   series: [],
   axes3: false,

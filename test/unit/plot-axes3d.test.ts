@@ -38,7 +38,7 @@ const helix = (n: number): Point3[] =>
   });
 
 const spec = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
-  form: "scatter3d", height: 16, series: [],
+  form: "plot3d", height: 16, series: [],
   points3: [{ label: "helix", points: helix(160) }], ...over,
 });
 
@@ -258,7 +258,7 @@ describe("AX: the 3D reference frame", () => {
   });
 
   it("AX7 (C12 I92, C12 I1): the frame costs no row and no gutter", () => {
-    const base = plotHeight({ form: "scatter3d", height: 16 } as never);
+    const base = plotHeight({ form: "plot3d", height: 16 } as never);
     for (const axes3 of ["corner", "origin", "centre", false] as const) {
       for (const box3 of ["none", "back", "full"] as const) {
         const over = axes3 === "origin" ? { axes3, box3, origin3: "auto" } : { axes3, box3 };
@@ -349,21 +349,42 @@ describe("AX: the 3D reference frame", () => {
     expect(ticksOf(glyph), "the same tick strings on both arms").toEqual(ticksOf(raster));
   });
 
-  it("AX13 (C04 I77): `arrow` draws a head, and the ASCII rung is a different glyph", () => {
+  it("AX13 (C04 I77): `arrow` draws a head, and the rung does not change it", () => {
+    // **The chevrons are the head at every rung, and the row is stronger for
+    // it** (F502).
+    //
+    // This asserted `→←↑↓` on the raster arm and `><^v` on ASCII, because the
+    // table had two rows. It has one: `arrows3()` returns the ASCII set
+    // throughout. Unicode's arrows are a **text** glyph — they sit on the
+    // baseline with side bearings, so a head meant to terminate a stroke floats
+    // off the end of it, and the two rungs drew visibly different figures for no
+    // reason a reader could act on.
+    //
+    // So the claim that was *the rungs differ* becomes *the rungs agree
+    // exactly*, which is a sharper thing to be wrong about: a table that grew a
+    // second row again would fail here rather than pass by matching whichever
+    // pattern it was given.
+    const HEADS = "><^v";
     const headsAt = (azimuth: number, cap = "24bit"): string => {
       const t = text(frame(spec({ camera: { azimuth }, axisStyle3: { x: { arrow: true } } }), capsFor(cap), 80));
-      return [...new Set([...t].filter((ch) => "→←↑↓><^v".includes(ch)))].join("");
+      return [...new Set([...t].filter((ch) => `→←↑↓${HEADS}`.includes(ch)))].join("");
     };
-    expect(headsAt(Math.PI / 2), "a head appears").toMatch(/[→←↑↓]/u);
-    expect(text(frame(spec(), capsFor("24bit"), 80)), "and only when asked for").not.toMatch(/[→←↑↓]/u);
+    expect(headsAt(Math.PI / 2), "a head appears").toMatch(/[><^v]/u);
+    expect(text(frame(spec(), capsFor("24bit"), 80)), "and only when asked for")
+      .not.toMatch(/[→←↑↓]/u);
     // **The direction is identified, not the presence.** A head that is always
-    // `→` satisfies *a head appears* and says the wrong thing about half the
+    // `>` satisfies *a head appears* and says the wrong thing about half the
     // orbit; two cameras that point x opposite ways must not agree.
     expect(headsAt(Math.PI / 2), "east and west are different heads")
       .not.toBe(headsAt((3 * Math.PI) / 2));
-    const ascii = text(frame(spec({ camera: { azimuth: Math.PI / 2 }, axisStyle3: { x: { arrow: true } } }), capsFor("ascii"), 80));
-    expect(ascii, "the ASCII rung is required, not optional").not.toMatch(/[→←↑↓]/u);
-    expect(ascii).toMatch(/[><^v]/u);
+    // **And no arrow survives anywhere**, which is the retraction stated as an
+    // assertion rather than as a deletion.
+    for (const cap of ["24bit", "8bit", "ascii", "wide", "1bit"]) {
+      expect(headsAt(Math.PI / 2, cap), `${cap} draws a chevron`).toMatch(/[><^v]/u);
+      expect(headsAt(Math.PI / 2, cap), `${cap} draws no arrow`).not.toMatch(/[→←↑↓]/u);
+    }
+    expect(headsAt(Math.PI / 2, "ascii"), "the rungs agree exactly")
+      .toBe(headsAt(Math.PI / 2, "24bit"));
   });
 
   it("AX14 (C04 I77): `box3` and `axes3` are independent members", () => {

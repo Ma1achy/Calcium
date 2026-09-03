@@ -127,10 +127,10 @@ type Record_ = "refused" | Claimed;
  * described. `line` at 16 of 86 is the `ohlc` and non-default-`origin` variants.
  */
 const MEASURED = {
-  // **`SVG_FAMILY.scatter3d` is `null` and the reason is ruled** (C12 §3am):
+  // **`SVG_FAMILY.plot3d` is `null` and the reason is ruled** (C12 §3am):
   // no emitter carries a projection, and routed through `scatter` it would
   // draw the x and y of a 3D cloud as a flat one and report as supported.
-  scatter3d: "refused",
+  plot3d: "refused",
   // **`line.interiorRules` went 68/70 to 70/70 when the SVG's axis became the
   // figure's — a disagreement WIDENING, and the record says so rather than
   // rounding it toward the story.** The tick count is `ticksFor(areaRows)` now
@@ -586,7 +586,7 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // **46, and the last two are the density family** (F383). This was 44 for as
     // long as `violin` and `ridgeline` were `null` in `SVG_FAMILY`.
     expect(claimed.length, "forms the SVG arm claims").toBe(46); // cells-ok — a form count
-    // **One refused again, and it is `scatter3d`** — the count went to zero
+    // **One refused again, and it is `plot3d`** — the count went to zero
     // when F383 gave the density family an emitter, and a form whose geometry
     // this path cannot compute brought it back (C12 §3am). The refusal is what
     // `U11` needed to wake up.
@@ -852,7 +852,7 @@ describe("AD — the two arms decide separately, and here is where", () => {
     const t = collisionsIn(new Map([...corpus].map(([k, f]) => [k, f.t])));
     const s = collisionsIn(new Map([...corpus].map(([k, f]) => [k, f.s])));
 
-    // **213, and twenty-five are `scatter3d`'s** — one per variant, and the count
+    // **213, and twenty-five are `plot3d`'s** — one per variant, and the count
     // moves with the catalogue rather than being pinned to a number nobody can
     // re-derive. Twelve after the polyline carrier brought `trajectory`,
     // `wireframe` and `lines-series` (C04 I78); nineteen after the surface
@@ -869,7 +869,7 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // byte-identical to its unculled one in all four modes, so the variant
     // would have collided here and this sweep would have reported it (F461).
     expect(corpus.size, "variants in the corpus").toBe(213); // cells-ok — a variant count
-    // **206, thirteen up on 193** — every one of `scatter3d`'s twenty-five variants
+    // **206, thirteen up on 193** — every one of `plot3d`'s twenty-five variants
     // draws a distinct frame, so none of them collides with another and none
     // with each other. **The marker arm separating is not free**: it draws the
     // same cloud as `colour-series` in the same colours and differs only in the
@@ -891,7 +891,7 @@ describe("AD — the two arms decide separately, and here is where", () => {
     expect(t.distinct, "distinct terminal frames").toBe(206); // cells-ok — a frame count
     // **134 -> 148**: the density family draws, so nineteen violin variants and
     // one ridgeline stop colliding in the single refusal group (F383).
-    // **153, and the addition is a *collision*** — `scatter3d`'s variants all
+    // **153, and the addition is a *collision*** — `plot3d`'s variants all
     // return `null`, so they are one group here where they are twenty-two
     // distinct frames in the terminal, and four more of them change nothing. The refusal group F383 emptied is back,
     // and the asymmetry is the point of this sweep: one arm's five pictures are
@@ -923,7 +923,7 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // members no frame-based instrument reaches rather than with the cheap ones.
     expect(s.groups, "documents drawn from more than one block").toEqual([
       // **Ordered by size then by first member, with the largest dropped** —
-      // `collisionsIn`'s own rule. **The dropped one is now `scatter3d`'s nine**,
+      // `collisionsIn`'s own rule. **The dropped one is now `plot3d`'s nine**,
       // because the axis variants took its refusal group past the seven empty
       // documents — so the empties, which used to be the dropped group, are
       // visible here for the first time. They are the legitimate collision

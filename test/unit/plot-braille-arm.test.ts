@@ -99,7 +99,7 @@ const dome = (n: number): readonly (readonly number[])[] =>
     }));
 
 const spec = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
-  form: "scatter3d",
+  form: "plot3d",
   height: 14,
   series: [],
   colormap: "viridis",
@@ -116,7 +116,7 @@ const errorsOf = (b: Record<string, unknown>): readonly string[] => {
 };
 
 describe("plot — the braille arm", () => {
-  it("BR1 (C12 I100, I87): the member reaches the dot grid where the terminal would not", () => {
+  it("BR1 (C12 I100, I87, I103): the member reaches the dot grid where the terminal would not", () => {
     const auto = shot();
     const dots = shot({ plotStyle: "braille" });
 

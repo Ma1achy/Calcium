@@ -461,7 +461,7 @@ describe("C22 §6i — what the frame does under an orbit", () => {
   const at = (az: number): readonly string[] =>
     frame(
       {
-        form: "scatter3d",
+        form: "plot3d",
         height: 24,
         surfaces3: [{ heights: bowl, tone: "accent" }],
         camera: { azimuth: az },
@@ -506,7 +506,7 @@ describe("C22 §6i — what the frame does under an orbit", () => {
     const view = (elevation: number): readonly string[] =>
       frame(
         {
-          form: "scatter3d",
+          form: "plot3d",
           height: 24,
           surfaces3: [{ heights: bowl, tone: "accent" }],
           camera: { elevation },

@@ -61,7 +61,7 @@ const holes = (rows: readonly string[]): number => {
 };
 
 const bare = (over: Record<string, unknown>): Record<string, unknown> => ({
-  form: "scatter3d",
+  form: "plot3d",
   height: 24,
   series: [],
   axes3: false,
@@ -196,7 +196,7 @@ describe("plot — the real meshes", () => {
     }
   });
 
-  it("RM4 (C12 I97, I95, §6k row 4): the cull cannot be witnessed by the closed-looking mesh", () => {
+  it("RM4 (C12 I97, I95, I105, §6k row 4): the cull cannot be witnessed by the closed-looking mesh", () => {
     // **The pair is the assertion.** On the bunny `closed: true` drops more than
     // a third of the faces and the frame does not move — every culled face was
     // behind one that draws, so the depth test would have rejected it anyway. A
@@ -207,9 +207,29 @@ describe("plot — the real meshes", () => {
     const ts = trisOf(bunny);
     const culled = ts.filter((t) => backfaceCulled(t, basis)).length;
     expect(culled / ts.length, "a third of the bunny is culled").toBeGreaterThan(0.33);
-    expect(text(shot(bunny)), "and the frame does not move").toBe(
-      text(shot(surfaceOf("stanford-bunny"))),
-    );
+    // **Three cells of 234, and the three are the finding** (F502).
+    //
+    // This asserted the frames were *identical*, which held while a cell carried
+    // two sample rows and stopped holding at eight: the silhouette is where a
+    // closed mesh's front and back faces meet tangentially, so their projected
+    // extents are equal only in the limit and at finite sampling one of them
+    // reaches a sample further. Culling it moves that cell by an eighth. The
+    // ladder made a difference visible that the old alphabet quantised away.
+    //
+    // One of the three is a cell *disappearing*, which no amount of sampling
+    // explains — a back face was the only thing covering it. The Stanford bunny
+    // is **not watertight**; it has holes in the base, and `closed: true` is a
+    // claim the caller makes rather than one the mesh keeps.
+    //
+    // The row's point is untouched and is why it is stated as a fraction: 3 of
+    // 234 is not a witness. A cull that did nothing at all would also pass here,
+    // which is what the open meshes below are for.
+    const before = [...text(shot(surfaceOf("stanford-bunny")))];
+    const after = [...text(shot(bunny))];
+    const moved = after.filter((ch, i) => ch !== before[i]).length; // cells-ok — a cell count
+    const inkedBefore = before.filter((ch) => ch !== " " && ch !== "\n").length; // cells-ok — a cell count
+    expect(after.length, "the frames are the same size").toBe(before.length); // cells-ok — a cell count
+    expect(moved / inkedBefore, "and the frame barely moves").toBeLessThan(0.05);
 
     // **The open meshes are where it shows**, which is what the fixture has to
     // be: the interior surface visible through the spout and the eye sockets.
@@ -288,7 +308,7 @@ describe("plot — the real meshes", () => {
     expect(ratio, "and not none of them").toBeGreaterThan(0.05);
   });
 
-  it("RM7 (C12 I97, C04 I79, §6k row 9): the teapot read in colour, and the stripped control cannot", () => {
+  it("RM7 (C12 I97, I104, C04 I79, §6k row 9): the teapot read in colour, and the stripped control cannot", () => {
     // **The picture is the colour on this rung.** The half-block arm paints `▀`
     // in every inked cell and puts both colours in the SGR, so a text frame
     // carries one character class and everything else is in the escape codes.
@@ -298,9 +318,25 @@ describe("plot — the real meshes", () => {
       distance: 6,
     });
 
-    // The control first: stripped, the frame has nothing to read.
+    // **The control first: stripped, the frame carries shape and no shading**
+    // (F502).
+    //
+    // This said *one character class*, which was true of a raster that drew `▀`
+    // in every inked cell. The silhouette alphabet gives a partial cell nine
+    // levels, so a stripped teapot now carries **9** glyphs over 204 cells —
+    // and every one of them is a block element saying how much of its cell the
+    // surface covers. Not one of them says how brightly it is lit.
+    //
+    // So the control is restated in the terms that were always meant: the
+    // glyphs are a small closed alphabet describing *coverage*, and a reader
+    // holding them cannot tell the lit side from the dark one. The colour
+    // assertions below are where the picture is.
+    const BLOCKS = "▀▁▂▃▄▅▆▇█▌▐▖▗▘▝▚▞▙▟▛▜";
     const glyphs = new Set([...text(rows)].filter((c) => c !== " " && c !== "\n"));
-    expect(glyphs.size, "one character class, so a stripped capture is blind").toBeLessThanOrEqual(3);
+    const inkedCells = [...text(rows)].filter((c) => c !== " " && c !== "\n").length; // cells-ok — a cell count
+    for (const g of glyphs) expect(BLOCKS.includes(g), `${g} is a block element`).toBe(true);
+    expect(glyphs.size * 10, "a closed alphabet, not a per-cell reading")
+      .toBeLessThan(inkedCells); // cells-ok — a cell count
 
     // **The studio light's direction, read off the picture.** Up and to the
     // right of the figure's own centre against down and to the left — the one

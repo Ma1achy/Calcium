@@ -42,7 +42,7 @@ const deep = (n: number, x: number): readonly Point3[] =>
   Array.from({ length: n }, (_v, i) => ({ x, y: (i / (n - 1)) * 2 - 1, z: (i / (n - 1)) * 2 - 1 }));
 
 const spec = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
-  form: "scatter3d",
+  form: "plot3d",
   height: 14,
   series: [],
   box3: "none",
@@ -56,7 +56,7 @@ const shot = (over: Record<string, unknown> = {}, cap = "24bit"): readonly strin
   frame(spec(over), capsFor(cap), 60, "mk");
 
 const errorsOf = (b: Record<string, unknown>): readonly string[] => {
-  // `error`, not `errors` — the key is the one `plot-scatter3d.test.ts` reads,
+  // `error`, not `errors` — the key is the one `plot-plot3d.test.ts` reads,
   // and a helper guessing the plural returns `[]` for every refusal.
   const r = validateBlock(b as never) as { ok: boolean; error?: readonly string[] };
   return r.ok ? [] : (r.error ?? ["refused with no message"]);

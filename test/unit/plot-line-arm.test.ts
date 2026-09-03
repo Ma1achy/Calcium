@@ -74,7 +74,7 @@ const cubeEdges = (r: number): readonly { label: string; points: readonly Point3
 };
 
 const spec = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
-  form: "scatter3d",
+  form: "plot3d",
   height: 14,
   series: [],
   colormap: "viridis",
@@ -96,8 +96,24 @@ describe("plot — the box-drawing arm", () => {
   it("LN1 (C12 I101, I87): the member reaches box drawing where the terminal would not", () => {
     const auto = shot();
     const masked = shot({ plotStyle: "line" });
-    expect(text(auto), "auto takes the half-block rung at 24-bit").toMatch(/[▀▄]/u);
-    expect(text(masked), "and the named arm takes none of it").not.toMatch(/[▀▄]/u);
+    // **`auto` draws a line in braille, and this fixture is only lines** (F498).
+    //
+    // The row used to assert `▀▄` here, which was true while the auto arm
+    // rasterised everything into the colour grid. The mixed rung changed what
+    // `auto` *means*: a line is an outline and outlines compose as dots, so a
+    // figure made of twelve cube edges and nothing else has no half-block in it
+    // and should not. The half-block rung is still what a **surface** takes —
+    // `plot-braille-arm.test.ts` BR1 holds that end, on a fixture that has area
+    // in it.
+    //
+    // So the control is restated rather than dropped, and it is stronger for it:
+    // each arm draws its own alphabet and **none of the other's**, which is two
+    // assertions where the old pair was one. A renderer with a single arm fails
+    // both directions.
+    expect(text(auto), "auto draws its lines as dots at 24-bit").toMatch(/[\u2801-\u28ff]/u);
+    expect(countOf(auto, JOINS + STRAIGHTS), "and takes no box drawing")
+      .toBe(0); // cells-ok — a cell count
+    expect(text(masked), "the named arm takes no dots").not.toMatch(/[\u2801-\u28ff]/u);
     expect(countOf(masked, JOINS + STRAIGHTS), "it draws box drawing instead")
       .toBeGreaterThan(0); // cells-ok — a cell count
     expect(text(masked), "the two arms draw different pictures").not.toBe(text(auto));
