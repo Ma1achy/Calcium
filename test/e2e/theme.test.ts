@@ -1,5 +1,7 @@
-// C10 tier 5 — e2e. Every one of these needs a rendered frame, so every one of
-// them waits on the renderer that produces it.
+// C10 tier 5 — e2e. Every one of these needs a rendered frame, and every one of
+// them has one: the union rows render through the registry, and the session
+// rows drive `node test/support/fixture.mjs session` through a real PTY. The
+// header read *waits on the renderer that produces it* until 2026-09-03.
 import { describe, expect, it } from "vitest";
 import { ALL_KINDS, ONE_PER_KIND } from "../support/blocks.js";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LIGHT_THEME, measurable, visible } from "../support/render.js";
@@ -144,26 +146,51 @@ describe("C10 e2e", () => {
     }
   }, 40_000);
 
-  it.todo(
-    // **The row cannot be written, and the reason is a finding about the
-    // framework rather than about the row.** A session at depth 1 does not
-    // exist: `TERM=dumb` (or absent) is the *only* trigger for `colourDepth: 1`
-    // (C02 §3), and the same condition sets `usable: false`, so C01 refuses to
-    // acquire — "alternate screen unsupported — the shell cannot open". Every
-    // terminal that can host a session is therefore at least 4-bit.
-    //
-    // *The property*: at depth 1 no kind emits a colour and every kind still
-    // renders distinctly. *Where it is asserted*: T5.1a above, over the whole
-    // block union at depth 1, and C10's own tier-2 rows.
-    //
-    // *What it leaves open*: a terminal that supports the alternate screen and
-    // whose user wants no colour — `NO_COLOR`, or a `-mono` TERM — has no way
-    // to ask for depth 1, because the only route to it is the one that also
-    // makes a session impossible. That is a capability decision rather than a
-    // test, and it is recorded here because this row is where it surfaced.
-    "T5.3: a real session under TERM=dumb emits no colour at all — unwritable, and not deferred on a component: `dumb` is the only trigger for depth 1 and it also fails C01's alternate-screen gate, so a 1-bit session cannot exist. The property is T5.1a; the gap is that nothing else can ask for depth 1",
-  );
+  // **The deferral was right about detection and wrong about the session.**
+  // `TERM=dumb` is the only *detected* route to depth 1 and it fails C01's
+  // alternate-screen gate, so a 1-bit session cannot be reached through the
+  // environment — that half stands. What it missed is that detection is not the
+  // only producer: `TuiConfig.capabilities` is C22 I49's override, validated by
+  // C02 (`colourDepth: oneOf(1, 4, 8, 24)`), and it exists precisely for the
+  // terminal that can host a session and whose user wants no colour. The
+  // fixture hands it `FORCE_DEPTH`, the variable its `caps` mode already read.
+  it("T5.3 (C22 I49, C02 I4, C10 I2): a session forced to depth 1 emits no colour at all — and the same session detected does", async () => {
+    const colour = (params: readonly string[]): string[] =>
+      params.filter((p) => /^(3[0-7]|9[0-7]|4[0-7]|10[0-7]|38;.*|48;.*)$/.test(p));
 
+    const mono = interactivePty("node test/support/fixture.mjs session", {
+      cols: 100,
+      rows: 24,
+      env: { TERM: "xterm-256color", FORCE_DEPTH: "1" },
+    });
+    try {
+      await mono.waitFor(/❯/, 15_000);
+      // Toned content on the screen, not only the header: a table whose cells
+      // carry `ok`/`error` tones is the kind that would emit colour if any did.
+      mono.type("/ps --mine\r");
+      await mono.waitFor(/a3f9b21/, 15_000);
+      const emitted = sgrs(mono.output);
+      expect(emitted.length, "the session styles at all — dim and reset are still SGRs").toBeGreaterThan(0);
+      expect(colour(emitted), "no colour parameter at depth 1").toEqual([]);
+      // Distinct without colour: the table still reads.
+      expect(mono.frame.join("\n")).toContain("failed");
+    } finally {
+      mono.kill();
+    }
+
+    // **The control — the same terminal, detected.** Without the override the
+    // same frames carry colour, so the absence above is the override's doing
+    // and not a session that emitted nothing.
+    const detected = session("xterm-256color");
+    try {
+      await detected.waitFor(/❯/, 15_000);
+      detected.type("/ps --mine\r");
+      await detected.waitFor(/a3f9b21/, 15_000);
+      expect(colour(sgrs(detected.output)).length, "the detected session is coloured").toBeGreaterThan(0);
+    } finally {
+      detected.kill();
+    }
+  }, 60_000);
 
   it("T5.4: /theme toggled fifty times mid-session leaves no half-themed frame", async () => {
     const pty = session("xterm-256color");

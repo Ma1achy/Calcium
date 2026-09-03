@@ -2,7 +2,7 @@
 //
 // **Three of these were deferred on C14 and `todo-expiry` expired them when it
 // landed**, which is the notification nobody would otherwise send. What is left
-// waits on C16 and on L4 — assertions about focus and about `/clear`, neither of
+// waited on C16 and on L4 — both built at 2026-09-03 — assertions about focus and about `/clear`, neither of
 // which has a component yet.
 import { describe, expect, it } from "vitest";
 import { pipelineHarness, settled } from "../support/execution.js";

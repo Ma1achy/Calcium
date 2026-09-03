@@ -1269,6 +1269,77 @@ describe("C23 tier 3 — edges", () => {
     expect(quiet?.blocks[0]).toMatchObject({ kind: "raw", text: "" });
   });
 
+  it("T3.20 (C07 I22): a shell child that overflowed produces a notice, and not meta.truncated", async () => {
+    // **The line this replaces was `truncated: child.overflowed`** — written
+    // while C07 §4 read *not yet made*, and it recorded a cut stream as a capped
+    // fallback document. Nothing drew either field, so the only reader was the
+    // one asserting here.
+    const h = harness({
+      spawnShell: () => ({
+        stdout: (async function* () { yield "the first 8 MiB"; })(),
+        stderr: (async function* () { /* nothing */ })(),
+        exited: Promise.resolve({ code: 0, signal: null }),
+        overflowed: true,
+      }),
+    });
+    h.pipeline.submit("yes");
+    await settled();
+
+    const doc = h.transcript.entries[0]?.doc;
+    expect(doc?.status, "the command succeeded; the cut is not a failure").toBe("ok");
+    expect(doc?.meta.truncated, "the cut is not recorded as the fallback's row cap").toBe(false);
+    const notices = (doc?.blocks ?? []).filter((b) => b.kind === "notice");
+    expect(notices, "one notice, after the raw block").toHaveLength(1);
+    expect(doc?.blocks[0]?.kind).toBe("raw");
+    expect(notices[0]).toMatchObject({ tone: "warn", glyph: "warn" });
+    expect((notices[0] as { text: string }).text).toContain("Output was cut");
+
+    // The control — the default fake does not overflow, and T3.18 already
+    // asserts that route is one raw block; here the same fact from this side.
+    const ok = harness();
+    ok.pipeline.submit("echo hi");
+    await settled();
+    expect(ok.transcript.entries[0]?.doc.blocks.filter((b) => b.kind === "notice")).toHaveLength(0);
+  });
+
+  it("T3.20a (C07 I22): a stream that overflowed carries the notice when it settles", async () => {
+    // **The third route, and the one nothing read.** `subprocess.ts` sets
+    // `overflowed` on the end-of-stream `RawResult`; the registry's `finish`
+    // never sees a stream's result and the `shell` route is a different path,
+    // so a stream that dropped patches settled looking complete. The notice is
+    // appended before `settle`, after every block the stream produced.
+    const h = harness({
+      stream: async function* () {
+        yield { kind: "data", value: { line: "one" } } as RawPatch;
+        yield { kind: "end", result: result({ exitCode: 0, overflowed: true }) } as RawPatch;
+      },
+      adaptPatch: () => ({ op: "append", block: block({ kind: "raw", id: "l", text: "x" }) }),
+    });
+    h.pipeline.submit("/tail");
+    await settled();
+
+    const doc = h.transcript.entries[0]?.doc;
+    expect(h.transcript.entries[0]?.streaming, "settled").toBe(false);
+    const notices = (doc?.blocks ?? []).filter((b) => b.kind === "notice");
+    expect(notices, "one notice, after the streamed block").toHaveLength(1);
+    expect(doc?.blocks.at(-1)?.kind).toBe("notice");
+    expect(notices[0]).toMatchObject({ tone: "warn", glyph: "warn" });
+    expect((notices[0] as { text: string }).text).toContain("Output was cut");
+
+    // The control — the same stream with `overflowed: false` carries no notice,
+    // so the row can tell the flag from a notice this route appends regardless.
+    const ok = harness({
+      stream: async function* () {
+        yield { kind: "data", value: { line: "one" } } as RawPatch;
+        yield { kind: "end", result: result({ exitCode: 0, overflowed: false }) } as RawPatch;
+      },
+      adaptPatch: () => ({ op: "append", block: block({ kind: "raw", id: "l", text: "x" }) }),
+    });
+    ok.pipeline.submit("/tail");
+    await settled();
+    expect(ok.transcript.entries[0]?.doc.blocks.filter((b) => b.kind === "notice")).toHaveLength(0);
+  });
+
   it("T3.16 (I5): a shell route holds the guard exactly as an app verb does", async () => {
     // `sleep 30` delegated to the shell is a foreground command, and no shell
     // lets you type another over it. Scoping the guard to app verbs is the

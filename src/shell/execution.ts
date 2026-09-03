@@ -34,6 +34,7 @@ import { createActionDispatcher } from "./actions.js";
 import { createRefreshDriver } from "./refresh.js";
 import { DOCUMENT_VIEW_ID } from "./document-view.js";
 import type { ProducerContext } from "../data/adapters/types.js";
+import { overflowNotice, withOverflowNotice } from "../data/adapters/overflow.js";
 import { isViewInvocation } from "../data/manifest/index.js";
 import type { ValidationResult } from "../data/manifest/index.js";
 import { liveDeclarations } from "./builders/live.js";
@@ -644,19 +645,27 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
           // sentence, and a raw block appears only when it has content — an
           // empty one is a blank row the reader has to account for, and on
           // this route both streams are routinely empty.
-          blocks: failed
-            ? [
-                block({
-                  kind: "notice",
-                  id: blockId("shell-failed"),
-                  tone: "error",
-                  glyph: "error",
-                  text: message,
-                }),
-                ...(out === "" ? [] : [block({ kind: "raw", id: blockId("raw"), text: out })]),
-                ...(err === "" ? [] : [block({ kind: "raw", id: blockId("raw-err"), text: err })]),
-              ]
-            : [block({ kind: "raw", id: blockId("raw"), text: out })],
+          // **An overflowed child is a notice, not `meta.truncated`** (C07 §4,
+          // I22). This route does not pass through the registry's funnel, so it
+          // appends the same block itself; the line it replaces was
+          // `truncated: child.overflowed`, written while C07 §4 read *not yet
+          // made*, and it made one field mean two things that nothing drew.
+          blocks: withOverflowNotice(
+            failed
+              ? [
+                  block({
+                    kind: "notice",
+                    id: blockId("shell-failed"),
+                    tone: "error",
+                    glyph: "error",
+                    text: message,
+                  }),
+                  ...(out === "" ? [] : [block({ kind: "raw", id: blockId("raw"), text: out })]),
+                  ...(err === "" ? [] : [block({ kind: "raw", id: blockId("raw-err"), text: err })]),
+                ]
+              : [block({ kind: "raw", id: blockId("raw"), text: out })],
+            child.overflowed,
+          ),
           ...(failed
             ? {
                 error: {
@@ -670,7 +679,6 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
             exitCode: exit.code ?? 1,
             transport: "subprocess",
             argv: [command],
-            truncated: child.overflowed,
           },
         }),
         settle,
@@ -1372,6 +1380,19 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     try {
       for await (const patch of patches) {
         if (patch.kind === "end") {
+          // **An overflowed stream is a notice here too** (C07 §4, I22). The
+          // registry appends it in `finish` and the `shell` route appends it
+          // itself, and this route passed through neither: `subprocess.ts` set
+          // `overflowed` on the end-of-stream `RawResult` and nothing read it,
+          // so a stream that dropped patches settled looking complete. Before
+          // `settle`, because a settled entry refuses the patch.
+          if (patch.result.overflowed) {
+            const held = deps.transcript.entries.find((e) => e.id === id)?.doc.blocks ?? [];
+            deps.transcript.patch(id, {
+              op: "append",
+              block: overflowNotice(held.map((b) => b.id)),
+            });
+          }
           // C23 I8 — settlement flushes at `"completion"`. §8a A4: settling
           // clears the stall state, so a notice does not outlive its condition.
           refresh.settled(id);

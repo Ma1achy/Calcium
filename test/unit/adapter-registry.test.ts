@@ -627,3 +627,72 @@ describe("§6 — streaming", () => {
     expect(registry.adaptPatch({ kind: "malformed", line: "y" }, { ...stream(), seq: 0 })).toBeNull();
   });
 });
+
+describe("I22 (T1.21) — an overflowed result is a notice, never meta.truncated", () => {
+  const cut = (doc: { blocks: readonly { kind: string; id: string; text?: string }[] }) =>
+    doc.blocks.filter((b) => b.kind === "notice" && (b.text ?? "").startsWith("Output was cut"));
+
+  it("T1.21 (I22): the fallback route, the identity route and the last resort each carry one notice", () => {
+    const registry = createAdapterRegistry();
+
+    // The fallback route — an object on stdout, no adapter registered.
+    const fallback = registry.adapt(raw({ overflowed: true }), CTX);
+    valid(fallback);
+    expect(cut(fallback), "the fallback route").toHaveLength(1);
+    expect(fallback.blocks.at(-1)?.kind, "appended last, after what the route produced").toBe("notice");
+    expect(fallback.meta.truncated, "the cut is not recorded as a capped fallback").toBe(false);
+    expect(fallback.meta.adapter, "and the route was the fallback, not the last resort").not.toBe("last-resort");
+
+    // The identity route — a complete `tui.view/1` document on stdout.
+    const identity = {
+      schema: "tui.view/1",
+      command: "ps",
+      status: "ok",
+      blocks: [{ kind: "raw", id: "far", text: "from the far side" }],
+      meta: { verb: "ps", adapter: "far", exitCode: 0, durationMs: 1, truncated: false, argv: [], stderr: "", transport: "subprocess", origin: "user" },
+    };
+    const viaIdentity = registry.adapt(raw({ stdout: identity, overflowed: true }), CTX);
+    valid(viaIdentity);
+    expect(viaIdentity.meta.adapter, "the identity route was taken").toBe("far");
+    expect(cut(viaIdentity), "the identity route").toHaveLength(1);
+    expect(viaIdentity.meta.truncated).toBe(false);
+
+    // **The last resort, reached through the funnel's own refusal** (C04 I67):
+    // an identity document is validated on the way in and again in `finish`
+    // with `from: "farSide"`, and view state arriving from out there fails the
+    // second check only. No other test in this file constructs the last resort.
+    const withViewState = {
+      ...identity,
+      blocks: [{ kind: "raw", id: "far", text: "x", minHeight: 3 }],
+    };
+    const lastResort = registry.adapt(raw({ stdout: withViewState, overflowed: true }), CTX);
+    valid(lastResort);
+    expect(lastResort.meta.adapter, "the last resort was reached").toBe("last-resort");
+    expect(cut(lastResort), "and it carries the notice too").toHaveLength(1);
+
+    // **The control — the same three routes with nothing overflowed carry none.**
+    for (const r of [raw(), raw({ stdout: identity }), raw({ stdout: withViewState })]) {
+      const doc = registry.adapt(r, CTX);
+      valid(doc);
+      expect(cut(doc), `no overflow → no notice (${doc.meta.adapter})`).toHaveLength(0);
+    }
+  });
+
+  it("T1.21 (I22, C04 I14): the notice's id yields to a far side that already used it", () => {
+    const registry = createAdapterRegistry();
+    const identity = {
+      schema: "tui.view/1",
+      command: "ps",
+      status: "ok",
+      blocks: [{ kind: "raw", id: "overflowed", text: "a block that took the id" }],
+      meta: { verb: "ps", adapter: "far", exitCode: 0, durationMs: 1, truncated: false, argv: [], stderr: "", transport: "subprocess", origin: "user" },
+    };
+    const doc = registry.adapt(raw({ stdout: identity, overflowed: true }), CTX);
+    valid(doc);
+    // A fixed id would have failed validation in `finish`, and the whole result
+    // would have become "Could not render this result".
+    expect(doc.meta.adapter, "not the last resort").toBe("far");
+    expect(doc.blocks.map((b) => b.id)).toEqual(["overflowed", "overflowed-2"]);
+    expect(cut(doc)).toHaveLength(1);
+  });
+});

@@ -311,4 +311,24 @@ describe("C09 §2a — a block reduced to a valid smaller block", () => {
     const plot = { kind: "plot", id: "p", series: [], height: 8 } as unknown as Block;
     expect(r.window(plot, 80, 0, 1), "no window for a plot").toBeUndefined();
   });
+
+  it("T2.22 (C14 I23, C14 §4a): the kinds that window are named, and `code` and `raw` are owed one", () => {
+    // **A deferral that expires by itself.** C14 I23 says every kind whose rows
+    // are its lines declares a `window`, and C14 §4a measures that two do not:
+    // painting a 40-row window of a 2 000-line `code` block costs 1 406 ms
+    // against 21 ms for `logs`, because `windowSequence` keeps a windowless kind
+    // whole. This row pins the set *as it stands*, so the day `code` or `raw`
+    // gains a `window` it fails here and is rewritten as C14 T1.18 — the
+    // measurement half — rather than the request landing unnoticed. The
+    // negative half is the one to distrust (F-class: a negative claim passes
+    // hardest the day it becomes false), which is why it is a row and not a
+    // comment.
+    const r = measurable();
+    const windows = (kind: string): boolean => r.registry.get(kind)?.window !== undefined;
+    expect(["logs", "keyValue"].map(windows), "the C09 kinds that window today").toEqual([true, true]);
+    expect(windows("code"), "code is owed a window (C14 §4a) — when this fails, write C14 T1.18").toBe(false);
+    expect(windows("raw"), "raw is owed a window (C14 §4a) — when this fails, write C14 T1.18").toBe(false);
+    // The control that the probe reaches a definition at all.
+    expect(r.registry.get("code"), "code is registered").toBeDefined();
+  });
 });

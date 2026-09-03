@@ -1,7 +1,7 @@
 // C01 tier 4 — integration. Real components, still no real terminal.
 //
 // C02 and C03 exist, so T4.1, T4.2, T4.3 and T4.7 run against real components.
-// What remains names its blocker in a greppable form: `grep "waits on L4"`
+// What remains names its blocker in a greppable form: `grep "waits on L4"` — and L4 is built (2026-09-03)
 // finds everything the shell landing would unblock. That is how C03's three
 // were found the day it landed, and C21's nine the day the runner did — the
 // grep is the manual half; `tools/enforce/todo-expiry.mjs` is the half that

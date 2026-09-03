@@ -1,6 +1,6 @@
 // C10 tier 4 — integration.
 //
-// C09 landed, so the three that waited on a renderer are written. What\n// remains waits on L4. Each deferral
+// C09 landed, so the three that waited on a renderer are written. What\n// remained waited on L4, which is built at 2026-09-03. Each deferral
 // names its blocker in the greppable form, so `tools/enforce/todo-expiry.mjs`
 // fails the day the blocker lands rather than the day someone remembers.
 import { describe, expect, it } from "vitest";

@@ -128,8 +128,8 @@ switch (mode) {
   // real PTY. The environment is the input: each test sets TERM, LANG or TMUX
   // and asserts on what reached the terminal.
   //
-  // The frame is composed here rather than by the shell, because C22 does not
-  // exist. That is a real limitation and it bounds what these tests prove: they
+  // The frame is composed here rather than by the shell — a choice kept after C22
+  // was built (2026-09-03; this said *because C22 does not exist*). It still bounds what these tests prove: they
   // assert that a detected record reaches the renderer and changes its output,
   // not that the application wires it that way. The wiring is C22's own T4.5.
 
@@ -797,6 +797,35 @@ switch (mode) {
             },
           ]),
         },
+        {
+          // **The view verb** (C22 §13a, C15 T5.3/T5.5). `--watch` is declared
+          // `view: true` in the manifest, so the shell pushes a `kind: "view"`
+          // layer before the transport runs; this is what fills it. A miss here
+          // filled the view with the corpus's own refusal, which opened and
+          // popped exactly like a document and proved nothing about one.
+          id: "ps-watch",
+          verb: "ps",
+          argv: ["ps", "--watch"],
+          provenance: "authored",
+          capturedAt: null,
+          cliVersion: null,
+          note: "the far side is not the subject of these rows",
+          result: raw(["ps", "--watch"], [
+            { kind: "notice", id: "ps-watching", tone: "info", text: "watching 2 processes" },
+            {
+              kind: "table",
+              id: "ps-watch-table",
+              columns: [
+                { key: "uuid", label: "uuid", align: "left", priority: 10, minWidth: 8, sortable: false },
+                { key: "status", label: "status", align: "left", priority: 5, minWidth: 6, sortable: false },
+              ],
+              rows: [
+                { id: "a3f9b21", cells: { uuid: { text: "a3f9b21" }, status: { text: "running" } } },
+                { id: "7c2d4e1", cells: { uuid: { text: "7c2d4e1" }, status: { text: "failed" } } },
+              ],
+            },
+          ]),
+        },
     ];
 
     const transport = createRouter({ default: createFixtureTransport(corpus) });
@@ -856,6 +885,13 @@ switch (mode) {
       theme: defaultTheme,
       ...(transportFor === undefined ? {} : { transport: transportFor }),
       env: process.env,
+      // **C22 I49's producer, driven from outside** (C10 T5.3). `TERM=dumb` is
+      // the only detected route to depth 1 and it also fails C01's gate, so a
+      // 1-bit *session* exists only through the override — the same variable
+      // the `caps` mode above already reads.
+      ...(process.env["FORCE_DEPTH"] === undefined
+        ? {}
+        : { capabilities: { colourDepth: Number(process.env["FORCE_DEPTH"]) } }),
       stateDir: mkdtempSync(join(tmpdir(), "calcium-session-")),
       // **The manifest's two app-local verbs** (C22 I3a). C23 I27 refuses a
       // manifest verb marked `local` with no handler, and this is the route

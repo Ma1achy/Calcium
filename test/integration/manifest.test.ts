@@ -1,7 +1,8 @@
 // C05 tier 4 — integration. What the manifest is *for*: everything above it
 // deriving its behaviour from data rather than from hardcoded knowledge.
 //
-// Most of this tier waits on components that do not exist yet, and says which.
+// Most of this tier waited on components that did not exist yet, and says which; those
+// components are built at 2026-09-03, so each named wait is now owed.
 // T4.6 does not: C04 is built, so the claim that a validation failure renders
 // as an ordinary error document is testable today — and a deferral naming a
 // component that exists is exactly what `tools/enforce/todo-expiry.mjs` fails.

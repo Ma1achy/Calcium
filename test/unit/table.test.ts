@@ -534,6 +534,50 @@ describe("C11 §5a — the window", () => {
     );
   });
 
+  it("T1.22 (C09 I33, C04 I68, C11 I20): a floored table is kept whole; its un-floored sibling is sliced with its pins", () => {
+    // **No test had constructed a floored table.** The registry's floor branch
+    // (`windowable = floorOf(block) > 0 ? undefined : …`) was exercised by a
+    // `logs` block alone, and `table` is the kind whose window carries pins —
+    // `presorted` and `actionBar` — so the un-windowed shape is the one where a
+    // slice would have re-sorted. Both siblings here, so the pair shows the
+    // branch is live rather than restating one arm of it.
+    const kit = measurable({ definitions: [tableDefinition] });
+    const table = psTable({ rows: 6 });
+    const own = kit.measure(table, 40); // header + six rows
+    expect(own).toBe(7);
+    const tall: Table = { ...table, minHeight: own + 4 };
+    expect(kit.measure(tall, 40), "the floor pads (C09 I33)").toBe(own + 4);
+
+    // **The un-floored sibling is windowed, and the window pins what it derived.**
+    const plain = kit.registry.windowSequence([table], 40, 2, 5);
+    const piece = plain.blocks[0] as Table;
+    expect(piece, "a new block, not the original").not.toBe(table);
+    expect(piece.presorted, "the slice's order is pinned (C11 I19)").toBe(true);
+    expect(piece.showHeader, "the window opens below the header").toBe(false);
+    expect(piece.rows.map((r) => r.id), "rows at offsets 2, 3 and 4 — the header is row 0").toEqual(["r2", "r3", "r4"]);
+    expect(kit.measure(piece, 40) - plain.skipRows, "and the window is exactly the three rows asked for").toBe(3);
+    // Read the frame: three body rows, no header, in display order.
+    const sliced = kit.renderToLines(piece, 40).map((l) => visible(l));
+    expect(sliced).toHaveLength(3);
+    expect(sliced.map((l) => /[0-9a-f]{7}/.exec(l)?.[0]), "uuids of rows 2–4").toEqual(["7c2d4e1", "2e8a04c", "f410d99"]);
+
+    // **The floored sibling is the block itself, paid out of slack** (C04 I68).
+    const kept = kit.registry.windowSequence([tall], 40, 2, 5);
+    expect(kept.blocks[0], "the floored block is the block").toBe(tall);
+    expect(kept.skipRows, "the rows above the window are slack").toBe(2);
+    expect((kept.blocks[0] as Table).presorted, "so it carries no pin it never needed").toBeUndefined();
+
+    // Read the frame: the whole table, header first, then four blank rows of
+    // floor — which is what "kept whole" costs, and C09 I33 says padding is all of it.
+    const whole = kit.renderToLines(tall, 40).map((l) => visible(l));
+    expect(whole).toHaveLength(own + 4);
+    expect(whole[0], "the header is drawn").toMatch(/uuid/i);
+    expect(whole.slice(1, own).map((l) => /[0-9a-f]{7}/.exec(l)?.[0]), "every row, in the block's order").toEqual([
+      "a3f9b21", "7c2d4e1", "2e8a04c", "f410d99", "b1c7e34", "a3f9b21",
+    ]);
+    expect(whole.slice(own).every((l) => l.trim() === ""), "the floor is blank rows under the table").toBe(true);
+  });
+
   it("T1.21 (I18): the bar's presence is pinned, in both directions", () => {
     const block = barred();
     const total = registry.measure(block, 40);

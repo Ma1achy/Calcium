@@ -2,7 +2,7 @@
 //
 // C01 and C02 exist, so the three seams C03 shares with them are driven by real
 // objects: a real capability record, a real lifecycle, and C01's own `writer`
-// as the injected `write`. The rest name their blocker in a greppable form.
+// as the injected `write`. The rest name their blocker in a greppable form; every named blocker is built at 2026-09-03.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildSession } from "../support/session.js";
 import { pipelineHarness, settled } from "../support/execution.js";
