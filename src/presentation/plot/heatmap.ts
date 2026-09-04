@@ -548,7 +548,7 @@ function matrixFurniture(
   // is gated there too: this drew `50          50 ·` on a constant field, a mark
   // announcing a list with nothing after it, and it took the second arm
   // reproducing the construction to read it off the frame (F340).
-  const levelText = levelCaption(block, range, ctx.capabilities);
+  const levelText = levelCaption(block, range, partSeparator(ctx.capabilities));
   const rungs: readonly (readonly Span[])[] = [
     [muteds(`${lo} `), ...bar(), muteds(` ${hi}${levelText}${clause}`)],
     [muteds(`${lo} `), ...bar(), muteds(` ${hi}${levelText}`)],

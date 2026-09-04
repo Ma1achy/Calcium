@@ -957,7 +957,9 @@ const results = runPass({
       // mutation is arm-local or it is testing something else.
       name: "THE LEVELS: the key names the two readings it runs between and not the ones its lines are",
       file: SVG,
-      from: "      const levels = levelCaption(block, extent, SVG_CAPS);",
+      // Re-anchored 2026-09-04: the caption takes the separator, not the caps —
+      // the image arm has no width convention to hand it (G4, F665).
+      from: "      const levels = levelCaption(block, extent, IMAGE_SEPARATOR);",
       to: '      const levels = "";',
       expect: "AD1",
     },

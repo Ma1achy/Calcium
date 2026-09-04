@@ -28,7 +28,7 @@ import type { ColourRef } from "../theme/index.js";
 
 type Caps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth" | "colourDepth">;
 /** Choosing the ladder needs the alphabet; choosing *within* it needs the depth. */
-type Alphabet = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">;
+export type Alphabet = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">;
 
 /**
  * The categorical palette's slots, in order (C10, roadmap 51).
@@ -159,10 +159,34 @@ const ASCII_MARKS: readonly string[] = Object.freeze([
  * counted where the blind spot is declared.
  *
  * Spaced, so `+2 more - a - b` reads as a list rather than as arithmetic.
+ *
+ * **It takes the whole alphabet because `·` is Ambiguous** (F665, U6f). U+00B7 is
+ * two cells under the wide convention, so a separator chosen on `unicode` alone
+ * put five plot sites one cell over their measurement on a wide terminal — and it
+ * was invisible while `cells()` under-counted Latin-1, which is the shape of F292
+ * four functions along: a mark measured by a function that cannot see the
+ * capability the mark's width depends on. `categoryMarks` twelve lines below
+ * already took the whole record and already substituted at that rung.
+ *
+ * **The wide arm is the ASCII form**, not a third literal: the hyphen is Neutral
+ * and one cell under both conventions, it is already in this function, and a new
+ * mark would owe SS47 a justification for a distinction no reader of a wide
+ * terminal can see.
  */
-export function partSeparator(caps: Pick<TerminalCapabilities, "unicode">): string {
-  return caps.unicode === "ascii" ? " - " : " \u00b7 ";
+export function partSeparator(caps: Alphabet): string {
+  return caps.unicode === "ascii" || caps.ambiguousWidth === "wide" ? " - " : " \u00b7 ";
 }
+
+/**
+ * The same separator for the arm that has no cell grid (C12 §3aj hazard 4, G4).
+ *
+ * An SVG measures in user units, so no width convention applies and `·` is
+ * simply the mark. It is resolved **here** rather than in `svg.ts` because that
+ * file may not name a terminal fact — G4 scans it for `ambiguousWidth` and
+ * `TerminalCapabilities` precisely so the image path cannot acquire one, and a
+ * capability record passed in to be ignored is how it would.
+ */
+export const IMAGE_SEPARATOR: string = partSeparator({ unicode: "full", ambiguousWidth: "narrow" });
 
 export function categoryMarks(caps: Alphabet): readonly string[] {
   if (caps.unicode === "ascii") return ASCII_MARKS;

@@ -20,6 +20,7 @@ import type { Facing } from "../../src/presentation/plot/scale.js";
 import { plotToSvg, svgFamilyOf, SVG_DEFAULT_LAYOUT } from "../../src/presentation/plot/svg.js";
 import { violinColumn, violinRows } from "../../src/presentation/plot/kde.js";
 import { gutterOf, levelCaption, positionAxisOf, valueLabelsOf } from "../../src/presentation/plot/figure.js";
+import { partSeparator } from "../../src/presentation/plot/marks.js";
 import { FULL_CAPS } from "../support/render.js";
 import { b } from "../../src/shell/builders/index.js";
 import { DARK_THEME } from "../support/render.js";
@@ -189,26 +190,34 @@ describe("G — the shared layer, and the rounding that stays behind", () => {
 
     // **Gated on the layer, not on the form.** Both arms asked `form ===
     // "contour"`, so a quiver *drawing iso-lines* named none of them.
-    expect(levelCaption({ form: "contour", series: field } as never, full, FULL_CAPS),
+    expect(levelCaption({ form: "contour", series: field } as never, full, partSeparator(FULL_CAPS)),
       "a contour names its levels").toBe(" \u00b7 20 40 60 80");
     expect(levelCaption({ form: "quiver", series: field, layers: ["field", "contour", "quiver"] } as never,
-      full, FULL_CAPS), "and so does anything that draws them").toBe(" \u00b7 20 40 60 80");
-    expect(levelCaption({ form: "quiver", series: field, layers: ["field", "quiver"] } as never, full, FULL_CAPS),
+      full, partSeparator(FULL_CAPS)), "and so does anything that draws them").toBe(" \u00b7 20 40 60 80");
+    expect(levelCaption({ form: "quiver", series: field, layers: ["field", "quiver"] } as never, full, partSeparator(FULL_CAPS)),
       "a form with no contour layer names nothing").toBe("");
     // A matrix asks `niceAxis` for the same ticks and draws no line at all, so
     // the gate is what keeps 250 terminal frames from growing levels they have
     // no lines for — which is exactly what happened when it was dropped.
-    expect(levelCaption({ form: "heatmap", series: field } as never, full, FULL_CAPS),
+    expect(levelCaption({ form: "heatmap", series: field } as never, full, partSeparator(FULL_CAPS)),
       "and a matrix has the ticks without the lines").toBe("");
 
     // **The separator is a promise about what follows.** A constant field has no
     // interior ticks, and this drew `50          50 \u00b7` on every rung.
-    expect(levelCaption({ form: "contour", series: field } as never, { min: 50, max: 50 }, FULL_CAPS),
+    expect(levelCaption({ form: "contour", series: field } as never, { min: 50, max: 50 }, partSeparator(FULL_CAPS)),
       "an empty list draws no mark announcing it").toBe("");
 
-    // The mark is the arm's, and it descends (C12 I72).
-    expect(levelCaption({ form: "contour", series: field } as never, full, { unicode: "ascii" } as never),
-      "and which mark separates them is a capability").toBe(" - 20 40 60 80");
+    // The mark is the arm's, and it descends (C12 I72). **The caption now takes
+    // the separator rather than the capability** — `·` is Ambiguous, so the mark
+    // depends on `ambiguousWidth` as well as on `unicode` (F665), and the image
+    // arm has neither (G4). So the resolution happens at the two call sites and
+    // this row asserts both answers of the function that makes it.
+    expect(levelCaption({ form: "contour", series: field } as never, full, partSeparator({ unicode: "ascii", ambiguousWidth: "narrow" })),
+      "the ascii arm's mark").toBe(" - 20 40 60 80");
+    expect(levelCaption({ form: "contour", series: field } as never, full, partSeparator({ unicode: "full", ambiguousWidth: "wide" })),
+      "and the wide arm takes it too, because `\u00b7` is two cells there").toBe(" - 20 40 60 80");
+    expect(levelCaption({ form: "contour", series: field } as never, full, partSeparator({ unicode: "full", ambiguousWidth: "narrow" })),
+      "only the narrow unicode arm keeps the dot").toBe(" \u00b7 20 40 60 80");
   });
 
   it("G1e (C12 I67, §3ak.40): `axes` reaches all three resolvers it gates, and the matrix is the override", () => {

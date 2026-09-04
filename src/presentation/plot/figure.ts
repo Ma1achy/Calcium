@@ -27,8 +27,6 @@ import { LINE_DOWN, LINE_LEFT, LINE_RIGHT, LINE_UP } from "./linedraw.js";
 import { candlesOf } from "./candles.js";
 import { ganttBars, stackBands, stackRange, waterfallBars } from "./stack.js";
 import { plotAreaRows } from "./height.js";
-import { partSeparator } from "./marks.js";
-import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { HAS_POSITION_AXIS, ROW_IS_AN_IDENTITY, refOf, seriesRefOf } from "./marks.js";
 import { densitySeries } from "./derive.js";
 import { facingOf, seriesRange, FACING_DEFAULT, FACING_MATRIX, type Facing, type Range } from "./scale.js";
@@ -1819,12 +1817,12 @@ export function contourLevels(block: Plot, range: Range): readonly number[] {
 export function levelCaption(
   block: Plot,
   range: Range,
-  caps: Pick<TerminalCapabilities, "unicode">,
+  separator: string,
 ): string {
   if (!layersOf(block).includes("contour")) return "";
   const levels = contourLevels(block, range);
   if (levels.length === 0) return ""; // cells-ok — a level count
-  return `${partSeparator(caps)}${levels.map((v) => formatValue(v, block.yFormat)).join(" ")}`;
+  return `${separator}${levels.map((v) => formatValue(v, block.yFormat)).join(" ")}`;
 }
 
 /**

@@ -272,7 +272,7 @@ climb +
  fall +                                 
  late +                                 
        -60 ticks                     now
-0          100 · 27 older not shown
+0          100 - 27 older not shown
 ── table · table-value-bar
 NAME      CPU               
 api       ⣿⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄ 4.2%

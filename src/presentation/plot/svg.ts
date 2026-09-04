@@ -42,7 +42,7 @@ import { normalisedOf } from "../../data/viewmodel/range.js";
 import { COLORMAPS, continuousColour } from "../theme/colormap.js";
 import { resolve } from "../theme/resolve.js";
 import type { ColourRef, ResolvedTheme } from "../theme/types.js";
-import { HAS_POSITION_AXIS, ROW_IS_AN_IDENTITY, SHARES_CELLS, refOf, seriesRefOf } from "./marks.js";
+import { HAS_POSITION_AXIS, IMAGE_SEPARATOR, ROW_IS_AN_IDENTITY, SHARES_CELLS, refOf, seriesRefOf } from "./marks.js";
 import {
   hasDatum,
   barFigure,
@@ -2111,7 +2111,7 @@ export function plotToSvg(
       // bound because it has one row and this trails it because it has one row's
       // worth of room — and as one element rather than two, no placement can
       // collide with a bound however wide the bound is.
-      const levels = levelCaption(block, extent, SVG_CAPS);
+      const levels = levelCaption(block, extent, IMAGE_SEPARATOR);
       // **A horizon's swatch is `horizonBandT`'s and not a linear ramp** (F341).
       // This drew `i / (bands − 1)` — a plausible progression that is the
       // terminal's answer only for a sequential map and an unsigned series. A

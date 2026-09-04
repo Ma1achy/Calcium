@@ -2,4 +2,4 @@
                             root
                       +------+------+
                     render layout parse
-[38;2;212;179;90m+5 more · curve · raster · paint · measure · wrap[39m
+[38;2;212;179;90m+5 more - curve - raster - paint - measure - wrap[39m

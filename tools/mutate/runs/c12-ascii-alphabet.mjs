@@ -79,7 +79,9 @@ const MUTATIONS = [
     // contract — two instruments, two subjects.
     name: "the legend separator is `·` on every terminal",
     file: MARKS,
-    from: "  return caps.unicode === \"ascii\" ? \" - \" : \" \\u00b7 \";",
+    // Re-anchored 2026-09-04: the wide arm takes the ASCII form too, because
+    // `·` is two cells under that convention (F665, U6f).
+    from: "  return caps.unicode === \"ascii\" || caps.ambiguousWidth === \"wide\" ? \" - \" : \" \\u00b7 \";",
     to: "  return \" \\u00b7 \";",
     expect: "AA1",
   },
@@ -126,8 +128,10 @@ const results = runPass({
   run,
   control: {
     file: MARKS,
-    from: "export function partSeparator(caps: Pick<TerminalCapabilities, \"unicode\">): string {",
-    to: "export function partSeparator(_caps: Pick<TerminalCapabilities, \"unicode\">): string {\n  return \"\\u00b7\\u00b7\";\n  // eslint-disable-next-line no-unreachable",
+    // Re-anchored 2026-09-04: the parameter is the whole alphabet now, because
+    // `\u00b7` is Ambiguous and the separator depends on `ambiguousWidth` (F665, U6f).
+    from: "export function partSeparator(caps: Alphabet): string {",
+    to: "export function partSeparator(_caps: Alphabet): string {\n  return \"\\u00b7\\u00b7\";\n  // eslint-disable-next-line no-unreachable",
     why:
       "every legend, level list and overflow clause in the corpus takes this string, so a run " +
       "that cannot see a separator changed cannot see any row below it",
