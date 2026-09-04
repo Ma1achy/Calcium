@@ -216,9 +216,27 @@ territory — and it does not touch the first measure of a new entry, which is a
 
 **Owner.** The definitions live in `presentation/blocks/kinds/code.ts` and `simple.ts` (C09);
 this section states the bound the viewport relies on, and C09 I25 and C09 I26's rows check the
-windows generically once they exist. Until they do, I23 is **false for `code` and `raw`**,
-and it is written down here as a target rather than left implied, so a reader of this spec
-does not infer that the transcript is bounded when the measurement above says it is not.
+windows generically. **Both landed on the day this was written**, and I23 is true for every kind
+whose rows are its lines. Measured again with the same probe against `dist/`, on a quieter
+machine than the table above (its `logs` row re-measured 14 ms here against 21 ms there, so the
+before/after pairs are read on one machine):
+
+| kind | lines | `windowSequence` keeps | paint, before | first paint, after | steady-state paint, after |
+|---|---|---|---|---|---|
+| `code` | 2 000 | 40 of 2 000 (was 2 000) | 934 ms → 2 000 rows | 146 ms → 40 rows | **34 ms** |
+| `code` | 20 000 | 40 of 20 000 (was 20 000) | 7 624 ms → 20 000 rows | 773 ms → 40 rows | **38 ms** |
+| `raw` | 2 000 | 40 of 2 000 (was 2 000) | 578 ms → 2 000 rows | 19 ms → 40 rows | **7 ms** |
+| `raw` | 20 000 | 40 of 20 000 (was 20 000) | 5 814 ms → 20 000 rows | 17 ms → 40 rows | **12 ms** |
+| `logs` | 20 000 | 40 of 20 000 | 14 ms | 14 ms | 19 ms |
+
+**Two columns after, because `code` pays once.** The first paint of a `code` block tokenises the
+whole text — the pin keeps it whole, so the memo key is the same string on every frame after — and
+that cost is the block's, paid on entry and never on scroll; `tokenLines`' cut is memoised on the
+token array for the same reason (measured: 64 ms steady-state at 20 000 lines before it was, 38
+after). What remains linear in the document is a control-strip and a split over the text per
+frame, ~20 ms at 20 000 lines, which is the residue the heading names. **T1.18 asserts the rows
+produced rather than the milliseconds** — a CPU-fraction assertion measures the host, and the row
+count is the property the paint is linear in; the figures here are the record.
 
 ## 5. Resize
 
@@ -306,7 +324,7 @@ Copy mode remembers whether it was following, so leaving it resumes the tail rat
 - **I20** — **Chrome that occupies rows enters the height; chrome that occupies columns does not.** I18's live gutter is the second kind, and that is *why* it may stay out of every measurement — not because it is chrome. The command line each entry is drawn with is the first kind: it is not a block, so it is never adapter output and never counts toward C13's cap, but it takes a row and may wrap, so an entry's height is `chromeRows(entry, width) + measureSequence(entry.doc.blocks, width)`. `chromeRows` is injected beside `measureSequence` and defaults to none, so C14 still knows nothing about what the chrome says. **Composing the two in different places is the whole hazard**: the composer draws `chrome ++ blocks` and the index measures `blocks`, and a viewport that is arithmetically self-consistent then describes a document it is not showing.
 - **I21** — `resize` to the size already held is a no-op: nothing is captured, nothing is restored, and **no `Change` is emitted**. The emit is the load-bearing half — a change reports that the view moved, and a view that did not move must not report one, whatever the caller intended by the call. C01 delivers a `SIGWINCH` whenever the size *may* have changed and holds no previous size to compare against, so this component is the first one that can tell.
 - **I22** — The height handed to `resize` is the **transcript region's**, not the terminal's. C14 holds no geometry above itself and cannot derive one from the other — the difference includes the prompt, whose height varies with what is typed — so the caller composing the frame owns the value (C22 I34). The failure is silent in both directions: too tall and `#maxTop()` leaves the document's last rows unreachable by any key, while the surplus rows `visible()` selects are discarded by the paint, so no count downstream is ever surprised. I10 holds throughout, because it compares the viewport with itself.
-- **I23** — **The render path draws at most the region's rows of any one block, plus a residue.** Every kind whose rows are its lines declares a `window` (C09 I25) — `logs`, `patch`, `table`, `keyValue` today; `code` and `raw` owed (§4a) — and a window that must pin what the whole block derived carries the pin as view state (`presorted`, `lineRange`). Kinds that are atomic by ruling (`plot`, C12 I1; `scroll`, C04 §3c) are the stated exceptions and are bounded by their own height. A frame's paint cost is then linear in the region, not in the document, which is the property D40 was mistaken for providing.
+- **I23** — **The render path draws at most the region's rows of any one block, plus a residue.** Every kind whose rows are its lines declares a `window` (C09 I25) — `logs`, `patch`, `table`, `keyValue`, and `code` and `raw` since §4a landed — and a window that must pin what the whole block derived carries the pin as view state (`presorted`, `lineRange`). Kinds that are atomic by ruling (`plot`, C12 I1; `scroll`, C04 §3c) are the stated exceptions and are bounded by their own height. A frame's paint cost is then linear in the region, not in the document, which is the property D40 was mistaken for providing.
 
 ---
 

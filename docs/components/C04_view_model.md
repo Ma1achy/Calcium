@@ -102,7 +102,9 @@ type Events   = Readonly<{ kind: "events"; id: string;
 type Progress = Readonly<{ kind: "progress"; id: string; label: string;
                            current: number; total: number }> & Gap;
 type Code     = Readonly<{ kind: "code"; id: string; language: string; text: string;
-                           wrap?: boolean }> & Gap;   // default false — truncate
+                           wrap?: boolean;             // default false — truncate
+                           lineRange?: readonly [number, number] }> & Gap;
+                           // view state: source lines `[from, to)` a window keeps (§3d, I82)
 type Comparison = Readonly<{ kind: "comparison"; id: string;
                            rows: readonly Readonly<{ field: string; a: string; b: string;
                              comparison?: "same" | "better" | "worse" | "changed" }>[] }> & Gap;
@@ -222,7 +224,7 @@ type BarSpec = Readonly<{
 | `events` | ts, type, message | events |
 | `plot` | series, axis labels, `line \| sparkline` | `sparkline` → 1; `line` → declared `height`, or `height + 2` with `axes: true` (C12 §3) |
 | `progress` | label, current, total | 1 |
-| `code` | language, text, `wrap` | lines when truncating; `Σ ceil(len / w)` when wrapping |
+| `code` | language, text, `wrap`; `lineRange` (view state, §3d) | lines when truncating; `Σ ceil(len / w)` when wrapping — over the lines in `lineRange` when a window set one |
 | `comparison` | field / a / b rows | rows + header |
 | `patch` | path, language, hunks, optional `layout` | 1 header + `Σ` over hunks of (1 hunk header + lines + 1 per collapsed region) |
 | `pills` | chips with actions | `ceil(totalWidth / w)` — one logical row that may wrap |
@@ -1558,6 +1560,14 @@ registry.measure(b, w) = max(definition.measure(b, w, measureChild), b.minHeight
 
 `minHeight` is not data. Nothing on the far side knows a renderer threw, and an adapter that set the field would be declaring a layout it has no standing to declare. **Only `op: "reserve"` may write it**, and `validateDocument` refuses it on an inbound document — which is the half F231 found missing from `expanded`, whose op is unforgeable and whose field was never validated.
 
+### `lineRange` — the third member, and the writer is a window rather than an op
+
+`Code.lineRange?: readonly [number, number]` names the **source lines `[from, to)`** a `code` block draws, and it is written by exactly one thing: `code`'s `window` (C09 I25, C14 §4a). It is view state on `presorted`'s argument rather than `minHeight`'s — the writer is a definition's window and not a shell op, so nothing sets it through `ViewPatch` — and it is refused on an inbound document on the same rule as the other two: a far side that set it would be declaring which lines of its own block a reader is looking at.
+
+**The field exists because a slice of `text` is a different parse.** `code`'s tokens span lines — a block comment is one token across four — so a window that carried only the sliced text would re-tokenise from its first line and draw a comment's tail as live code, with every row count correct (C09 I25a, F426). So a window keeps `text` whole, **the same string reference**, and sets the range; `measure` counts only the lines in range and `render` tokenises the whole text and produces only the rows in range. **Units are source lines, not rows**: a wrapped line is one unit, a window never opens inside one, and the surplus is charged to `skipRows`/`dropRows` (C09 I26). `raw` has no tokens and its window slices `text`; it carries no field.
+
+**Absolute, and therefore composable.** The two numbers index the block's own lines, so a window of a window narrows the range rather than re-basing it, and a renderer holding a windowed block indexes `tokenLines` by the same line number the whole block would. A range outside the block is clamped rather than refused, because the one writer is inside the framework and the field never arrives from outside it.
+
 ### A floor survives only while the block is untouched
 
 Four operations produce a new block from an old one, and **none of them carries the floor**:
@@ -2189,6 +2199,105 @@ y-log arm has a frame: `100` mid-way between `10` and `999`, and the curve is th
 line variants draw, because the data is `10^(1 + v/50)`. `line/x-log` did not move — the
 arithmetic `xPositionOf` held is the one `scaled` holds.
 
+## 3am. Spans — a styled run inside a text member, addressed by offset
+
+Nothing in the vocabulary styles a run *inside* text: tone attaches to a block, a `Cell`, a
+`keyValue` row, an `events` row or a pill, and never to a word (roadmap 50). Four consumers
+want exactly that and the same mechanism serves all four — markdown's inline emphasis
+(roadmap 11, `markdown.ts` *the day spans exist*), the first writer of `Style.italic`
+(roadmap 50, MG24's `SgrStyle.italic` row), C25 I10's word-level highlight (*a `spans` field
+on a line would be additive*), and ML-1's per-token value (`CALCIUM_ML_BLOCKS.md` §1). The
+design, the measurements and both walk artefacts are in `docs/notes/CALCIUM_SPANS_DESIGN.md`;
+this section is the contract.
+
+```typescript
+/**
+ * A styled run inside the text member it sits beside (I83–I88).
+ *
+ * `from`/`to` are UTF-16 code-unit offsets into that member — the unit `Token`,
+ * `sliceTokens`, `truncateParts.kept.length` and `codeRows.start` already use,
+ * and the one JSON can carry without a second index. Half-open: `[from, to)`.
+ */
+type TextSpan = Readonly<{
+  from:       number;   // integer, 0 ≤ from
+  to:         number;   // integer, from < to ≤ text.length
+  bold?:      boolean;
+  italic?:    boolean;
+  underline?: boolean;
+}>;
+
+// The members that carry one in the first pass — the four the markdown translator
+// emits text into. Each is `spans?: readonly TextSpan[]`, sorted by `from`,
+// non-overlapping, and decorating the `text` (or `label`) beside it.
+type Raw    = Readonly<{ kind: "raw";    id: string; text: string; spans?: readonly TextSpan[] }> & Gap & Floor;
+type Notice = Readonly<{ …; text: string; spans?: readonly TextSpan[] }> & Gap & Floor;
+type Rule   = Readonly<{ …; label: string; spans?: readonly TextSpan[]; meta?: string }> & Gap & Floor;
+type Cell   = Readonly<{ text: string; spans?: readonly TextSpan[]; tone?; glyph?; spark?; bar? }>;
+```
+
+**A parallel member and not a union, and the count is the argument.** `text: string |
+readonly Run[]` would reach every reader; measured across `src/`, the readers of the view
+model's text members are **17 sites in 11 files** (`simple.ts` ×3, `code.ts` ×2, `table/`
+×4, `patch/definition.ts` ×5, `containers.ts` copy, `builders/index.ts`, `art.ts`) and the
+writers are **57 block literals** (`kind: "raw"` 19, `"notice"` 32, `"tip"` 6) plus every
+table adapter. A parallel `spans?` keeps all 17 readers and all 57 writers valid unchanged,
+and — the property that decides it — **a span carries no text**, so the measurer's input is
+the same string it was: §5's *independent of theme* clause holds by construction rather than
+by two sides agreeing (I83). The union was also measured against the four consumers and
+expresses nothing the parallel form cannot: a run list is what the renderer *builds* from
+`(text, spans)`, and it already exists as C09's `Span` (`paint.ts:23`) — which is also why
+the view-model type is `TextSpan`, since `Span` is already two things in `presentation/`.
+
+**The unit is the code unit, and what the gate refuses is what the gate can see.** Offsets
+are UTF-16 code units (I84). `graphemes()` is L1's and `validate.ts` is L0's, so the gate
+cannot ask where a cluster ends; it refuses the malformations it can decide — a non-integer,
+a negative, `from ≥ to`, `to` past the text, an unsorted or overlapping pair, and a boundary
+between the two halves of a surrogate pair, which is the one cluster-interior a code-unit
+walk can see. A boundary inside a grapheme cluster that is not a surrogate split — a base
+plus combining mark, a ZWJ family — is **snapped outward by the renderer**, `from` back to the
+cluster's start and `to` on to its end (→ C09), because painting SGR between a base and its mark changes what the terminal
+composes, and a changed composition is a changed width. Snapping preserves the width; the
+run boundary moves by one cluster and nothing measured moves.
+
+**Three attributes and nothing else** (I85). A span may say `bold`, `italic` or `underline`.
+Not `tone`: a run-level tone would collapse at 1-bit onto the same `bold`/`dim` the span's
+own attributes use (C10 §3), and its one consumer — structured diff — is ruled onto
+`underline` by C25 I10 already. Not a colour: a block names a palette slot and C10 resolves
+it, and a span that named one would be the first place in the vocabulary a colour travels
+with text. Not `dim`, which is the 1-bit de-emphasis carrier; not `inverse`, which swaps
+both colour channels (C10 §4a). Not `value`: ML-1's channel has no scheduled consumer, and
+a member nothing reads is narrowed away rather than documented (F85, I76). Each of the three
+absent ones is a deferral with its symbol in `CALCIUM_SPANS_DESIGN.md` §7, and the day one
+has a consumer it is a member here, not a second span type.
+
+**Geometry is untouched at every stage** (I86). `measure` never reads `spans`: a span cannot
+add a row, and the golden sweep asserts the same height with and without. A span across a
+wrap point continues onto the next row — a bold word broken mid-word is bold on both rows —
+and the wrapper carries it by **source offset, not by row-text arithmetic**: `wrapCells`
+drops the break space (`"the quick brown fox jumps"` at 10 wraps to rows summing to 18 units
+of a 19-unit source), so a span sliced by prefix sums of row lengths drifts one unit per
+break. Every row is an exact contiguous slice of the source from a known start, which is the
+property `codeRows` and `sliceTokens` already rest on, and prose wrapping gains the same
+`start` (→ C09). A span straddling a truncation is clipped to `truncateParts.kept`, and the
+marker is never inside a span. A cluster the wrapper substitutes with `?` (C09 I19) keeps the
+span, since the substitution is one cell and the span's source offsets are unchanged.
+
+**A span travels with its text and stops at the copy buffer** (I87). Every `ViewPatch` arm
+that writes text writes a whole `Block` (`replace`) or a whole `Cell` (`merge`), so there is
+no op that can change `text` and leave `spans` behind — the deltas-read-as-state class is
+closed by the type rather than by a rule. Copy takes `text` (`copyTextOf`, C11's `copy`);
+spans are appearance and appearance is not copied, exactly as tone is not. A `TextSpan` is
+plain data and round-trips through JSON unchanged (§5a). It shares a name and nothing else
+with C17's `CellSpan`, which is a *result* in display cells over the editor's rows — a
+homonym, and the note says so.
+
+**Who writes one.** The markdown translator (roadmap 11's inline half) and any far-side
+adapter — a span is document data and the gate refuses a malformed one exactly as it refuses
+a malformed `Cell.spark`. **Who may not carry one**: `code`, whose syntax tokens are already a
+run stream over the same text, and two streams over one string is the collision this section
+exists to prevent (I88). `tip`, `keyValue`, `logs`, `events`, `steps`, `pills`, `comparison`
+and `Hunk.lines` have no writer today and are deferred with symbols rather than widened.
+
 
 ## 4. Patches
 
@@ -2200,7 +2309,7 @@ A `viewState: true` flag on `replace` was the smaller change and is the worse on
 
 **And the guarantee holds at the op and leaked at the field, for as long as this paragraph stood alone** (F231). Every sentence above is true about `replace`, and the conclusion a reader draws from it — *so this is unforgeable* — is about the **op**. `expanded` is where the op lands, and `validate.ts` did not contain the word: measured, an inbound document carrying `expanded: true` validated and the table measured **3 against 2**, so the far side set view state and was charged a real row for it. Nobody copying the argument would have noticed, because the argument is correct.
 
-**So a named op carries an obligation as well as a guarantee: the field it writes is refused on the way in.** `validateDocument` rejects `expanded` and `minHeight` on an inbound document, and the two are one rule rather than two — a set that grows whenever an op is added, which is what makes it a check over the kind rather than a line per field.
+**So a named op carries an obligation as well as a guarantee: the field it writes is refused on the way in.** `validateDocument` rejects `expanded` and `minHeight` on an inbound document, and the two are one rule rather than two — a set that grows whenever an op is added, which is what makes it a check over the kind rather than a line per field. **`lineRange` is the third entry in the set and its writer is not an op** (§3d, I82): a `window` is the one writer, and the refusal is the same line in the same list.
 
 ```typescript
 type ViewPatch =
@@ -2506,6 +2615,13 @@ persisted document rests on.
 - **I79** — **A surface is a fourth carrier, its two input arms are exclusive, and the light belongs to the block.** `surfaces3` joins `points3` and `lines3` on I78's argument unchanged — only the primitive differs, and a path through a loss landscape needs two carriers in one plot area. **Two arms and exactly one per surface**: `heights` with `xRange`/`yRange` is a height field, `vertices` with `faces` is an explicit mesh, and both, neither, or `faces` without `vertices` are refused on `origin3`'s rule that a member deciding nothing tells the caller nothing. **The field is per arm rather than per surface** — a grid parallel to `heights`, or the `value` already on each `Point3` — because a grid indexed by a vertex number is not a thing. `shading` defaults to `"smooth"`, since a sphere with face normals reads as a geodesic dome. **`light3` is the block's**: two surfaces lit differently is not one figure, and it defaults to `"studio"`, which has no dead angle. **The gate reads the carrier set and not a member**, which is where §6g row 2's class is closed rather than instanced — one constant that the refusal and `colourBy: "value"`'s completeness walk both read, so a fifth carrier is one line and not two places to disagree. **And the degenerate face is the projector's rather than the caller's** (F456): an edge-on plane keeps its area, its normals and its lighting, while a collapsed axis **whose surface is also constant along it** leaves 8 of 8 faces with the zero vector — 0 of 8 when the height varies along the axis that collapsed, which is the measured condition and not the one first written — a legal document the gate must accept and the renderer draws at ambient (→ C12 I94, C12 I86, C12 I93).
 - **I80** — **`closed` and `wireframe` are per arm, and the first is refused where the renderer cannot check it.** `closed?: boolean` enables backface culling and is accepted **only on the mesh arm**: an open surface's signed volume is not zero — a 9×9 Gaussian measures `0.1742` and a 21×21 `0.1785` — and the zero the opposite premise rested on belongs to `unitOf` centring a *planar* patch on its own extent, so the renderer has nothing to detect openness with and the gate has to carry it (F463). **It also licenses a correction the caller does not ask for**, which is stated here because a member's contract is where a reader looks for it: the renderer orients the cull from the mesh's own signed volume rather than from the winding, because the obvious UV sphere is wound inward at **−4.16** and two-sided shading draws the resulting inside-out picture convincingly (F461, C12 I95). **What that does not promise is a correct picture from an inconsistently wound mesh** — a systematically half-reversed one cancels to `1e-15` and is drawn uncalled, while one face in eight reversed leaves a confident sign and about 32 faces wrong in silence. `wireframe?: boolean | "over"` is accepted on **both** arms, because it is about the edges the input already has and a height field has the most structured ones; `true` paints the edges and nothing else while still occluding what is behind, and `"over"` paints the fill and the edges. **The two members are refused and accepted on different arms and neither implies the other**, which is the bundled-row mistake with a member in place of a blocker (→ C12 I95, C12 I94).
 - **I81** — **A `ScaleType` is a transform on the shared coordinate, and the range carries the scale — so a tick and the sample it names are placed by one function, in both arms.** `PinnedRange.scale` is what `normalisedOf` reads; `axisFor` attaches it to the range it returns, and every consumer holding `axis.range` places through it with no second parameter to drop. `linear` and `time` are the identity; the log family is `ln` where the whole range is positive and the identity otherwise, the condition `niceLogAxis` falls back on; `symlog` is `sign(v) · log10(1 + |v|)`, odd about zero, with the unit threshold `niceSymlogAxis` picks against. **`time` is seconds**: round-interval ticks, and labels that read as durations unless a `yFormat`/`xFormat` is declared — an epoch origin is not ruled (§3al). **Measured before the rule**: `symlog` and `time` chose ticks and moved no sample, `log` did the same on y and had no fixture, and the abscissa alone placed a log tick on its lattice (C12 F189, §3al) (→ C12 I41, C12 §3d, §3ak).
+- **I82** — **`lineRange` is view state written only by `code`'s `window`, refused on an inbound document, and honoured by both halves of the definition.** The window keeps `text` whole — the same string, no copy — and sets the source-line range `[from, to)`; `measure` counts the lines in range and `render` tokenises the whole text and produces only those rows, so a block comment opening above the window still colours the rows inside it (C09 I25a, F426). Units are source lines and never rows, so a window never opens inside a wrapped line and the surplus is `skipRows`/`dropRows` (C09 I26). It is the third member of I67's refused set and the first whose writer is a definition rather than an op; `raw` windows by slicing `text` and carries no field (§3d, C14 §4a, C14 I23).
+- **I83** — **A span is a parallel decoration and never a second carrier of text.** `spans?: readonly TextSpan[]` sits beside `text` (or `label`) and addresses it by offset; the member's string is unchanged and every existing reader of it stays valid. A span carries no characters, so the measurer's input is the string it always was — §5's *independent of theme* clause holds by construction and no kind's `measure` reads `spans` (→ C09 I1, C09 I8). The union form `text: string | readonly Run[]` was measured against 17 readers and 57 writers and refused on that count; the run list is what a renderer *builds* and is C09's `Span`, not this type's (§3am).
+- **I84** — **Offsets are UTF-16 code units, half-open, and the gate refuses every malformation it can decide.** `from` and `to` are integers with `0 ≤ from < to ≤ text.length`; the array is sorted by `from` and no two spans overlap; a boundary between the halves of a surrogate pair is refused. Each fault is one error naming the span's index. What the gate cannot see — a boundary inside a grapheme cluster that is not a surrogate split — is snapped outward by the renderer — `from` to the cluster's start, `to` to its end — which preserves the width (→ C09). The unit is the one `Token`, `sliceTokens`, `truncateParts.kept.length` and `codeRows.start` already use, so the row-slicing mechanism is shared rather than reimplemented.
+- **I85** — **A span carries exactly three attributes — `bold`, `italic`, `underline` — set by the renderer from the span and never resolved from a palette slot.** No `tone`: it would collapse at 1-bit onto the attributes the span itself uses and its one consumer is ruled onto `underline` (C25 I10). No colour, no `dim`, no `inverse`, no `value` — each a deferral with a symbol, and each admitted only by a consumer appearing (F85's narrower type). At 1-bit a span's `bold` on a block whose tone already collapses to bold is **absorbed and not compensated**: no fallback onto `underline`, which is spoken for, and no return to literal markers, which the view model cannot decide because it never sees a capability (→ C10 I33).
+- **I86** — **A span changes no geometry at any stage: it continues across a wrap, clips to the kept text at a cut, and follows a substituted cluster.** A wrapped span is carried by source offset — every wrapped row is an exact contiguous slice of the source from a known `start`, and `wrapCells` drops break spaces, so prefix sums of row lengths drift one unit per break and are the wrong arithmetic. A truncated span is clipped to `truncateParts.kept`; the marker and its padding are never inside a span. A cluster the wrapper replaces with `?` keeps its span. `measure` is the same number with and without `spans` at every width (→ C09 I1, I19).
+- **I87** — **A span travels with its text through every patch and stops at the copy buffer.** `replace` carries a whole `Block` and `merge` a whole `Cell`, so no `ViewPatch` arm can write `text` without its `spans`; a patch that widened to a text-only arm would reopen the class this closes. Copy takes `text` and drops `spans`, as it drops tone. A `TextSpan` is plain data and survives `JSON.parse(JSON.stringify(d))` (§5a). C17's `CellSpan` is a result in display cells over the editor's rows and shares a name only.
+- **I88** — **Four members carry spans in the first pass and `code` is refused one.** `Raw.text`, `Notice.text`, `Rule.label` and `Cell.text` — the four the markdown translator emits text into. A `code` block with `spans` is refused at the gate: its syntax tokens are a run stream over the same text, and two streams over one string is the collision the mechanism exists to prevent. Every other text member is deferred with its symbol (`CALCIUM_SPANS_DESIGN.md` §7) and admitted by a writer appearing, never by symmetry.
 
 ## 7. Commitments
 
@@ -2592,6 +2708,10 @@ persisted document rests on.
 79. **The culling switch is refused on the arm that cannot be checked, and it licenses more than it says** (I80). `closed` is a mesh-arm member because an open surface's signed volume is not zero and the renderer therefore cannot detect one — the claim that it is was measured on a planar fixture, where `unitOf` produces the zero for an unrelated reason. And it licenses the renderer to orient the cull from the mesh rather than from the caller's winding, which is a second power the note's one-line description does not carry: the obvious sphere is wound inward and two-sided shading makes the wrong answer look deliberate. `wireframe` is accepted on both arms, since edges are structure and a grid has the most of it (→ C12 I95, FINDINGS F461 · F463).
 77. **A polyline is a carrier and not a form, and three rules written for one carrier were wrong for two** (I78). §3r's test says a form that changes only the mark is a style; composition says it must be one form, because a path through a surface is two primitives in one area and a `PlotForm` is one renderer. The three that broke are the gate's refusal, the extent and the completeness walk — none of them about the member, all of them about the carrier — and F441's forcing count argues the *other* way here, since a second 3D form would answer all 24 declarations identically (→ C12 I93).
 75. **Three coordinates get a carrier, and the channel colour spends is named rather than guessed** (I76). `series` holds one reading per position and a 3D sample holds three, which is I61's ruling at two numbers per cell one dimension along — so `points3` is a new carrier and `series` is empty, as a quiver's is. A record rather than a tuple because the fourth reading is optional; no per-point label and no per-series marker because neither has a channel free. `colourBy` defaults to `"depth"`, and `"value"` with a point that has none is refused rather than drawn in a colour the data does not justify — the one refusal here that a single member cannot express, and the one the validator owns alone, on the split `vectors` already made between a rule about members and a walk over data (→ C12 I87, C12 I88, C12 I89).80. **A scale reaches the samples and not only the ticks** (I81). `PinnedRange` carries its `ScaleType`, `normalisedOf` maps through it, and `axisFor` hands the scale to the range both arms already hold — so `log`, `symlog` and the abscissa's lattice are one transform in L0 rather than one on x, none on y and a fallback comment. `time` stays linear in seconds and gets duration labels where no format is declared (§3al).
+81. **A span is a parallel, offset-addressed decoration and the text member is untouched** (I83, I84). Measured before ruled: 17 readers and 57 writers stay valid, the measurer's input is unchanged by construction, and the unit is the code unit every existing slicing helper already uses. What the L0 gate cannot decide — a cluster boundary — is snapped outward by the renderer so the width never moves (§3am).
+82. **Three attributes, set from the span and never from a slot** (I85). `bold`, `italic`, `underline`; no tone, colour, `dim`, `inverse` or `value`, each deferred with a symbol. The 1-bit absorption of a bold span on an emphasised block is accepted and asserted, not compensated, and the view model never decides a fallback because it never sees a capability (→ C10 I33).
+83. **Geometry is untouched across wrap, cut and substitution, and the wrapper carries spans by source offset** (I86). `wrapCells` drops break spaces, so a span sliced by row-length prefix sums drifts; every row is an exact slice from a known start and that is the arithmetic (→ C09).
+84. **A span travels with its text, stops at copy, and is refused on `code`** (I87, I88). No patch arm writes text without spans because none writes less than a block or a cell; copy drops appearance; `code` already has a run stream over its text.
 
 ---
 
@@ -2624,6 +2744,10 @@ Six tiers. No state machine, so no transition table.
 - **T1.20** (I42): a weight of `0`, a negative, a non-finite, and a list whose length does not match the children — each refused at construction with a named error. **Four values in one row**, because the field's whole risk is a number that reads as meaningful and means two things.
 - **T1.21** (I66): `status` with an empty `message` and with `height: 0` are refused at construction, each naming its field; a valid one round-trips every optional member.
 - **T1.22** (I66): the three optional numbers survive a `ViewDocument` round-trip and **none of them is present on a block the registry built for a thrown renderer** — the error path knows the height and nothing else, so a defaulted `attempt` would be a number nobody measured.
+- **T1.23** (I84): a `notice` whose `spans` are sorted, non-overlapping, integer and in range validates clean, and the same document with `spans` absent validates clean — the accept half, so T1.24's refusals are not a validator that refuses everything.
+- **T1.24** (I84): each malformation is refused with **one error naming the span's index** — a non-integer `from`, a negative `from`, `from === to`, `from > to`, `to` past `text.length`, two spans out of `from` order, two spans that overlap by one unit, a boundary between the two halves of a surrogate pair, and an unknown attribute — nine documents, nine errors, and a tenth carrying all nine faults reports nine.
+- **T1.25** (I83): for every width in the golden sweep, `measure` of a `raw`, a `notice`, a `rule` and a one-column `table` is the **same number** with `spans` and with the same block stripped of them — the assertion is on the pair, so a measurer that started reading `spans` fails here before any frame does.
+- **T1.26** (I87): a document carrying spans on all four members satisfies §5a's round trip: `validateDocument(JSON.parse(JSON.stringify(d)))` is valid and structurally equal.
 
 ### Tier 2 — contract / interface
 
@@ -2650,6 +2774,10 @@ The generic suite. **These run against every registered block kind, including ap
 - **T2.19** (I46, §5a): the fabricated failures, which is what makes T2.18 worth running — a plot series carrying `NaN`, one carrying `Infinity`, and a `Cell.spark` carrying a string are each **refused by the validator**, and the first two were accepted before *and after* a round trip that silently rewrote them to `null`.
 - **T2.29** (I64) — `HG1`–`HG4`: the six shapes F221 measured are refused at **both** gates, each by the fault it names — a node that is not an object, one with no `label`, one with no `value` on a magnitude form, a negative magnitude, `NaN`, and a `children` that is not an array. **The message names the path to the node** (`hierarchy.children[0].children[0].value`) rather than the block, because a tree is malformed in one place; the walk stops at the first fault for the same reason. **The 256 bound is asserted on both sides** and on a **cyclic** object graph, which a builder call can hand over and a document cannot — that being what the bound is for rather than any depth anybody's data has. And the constructor's message is asserted to be the validator's, which is what *one walk read by both gates* means: a one-line predicate written twice can be compared by eye and a recursive walk cannot.
 - **T2.30** (I64) — `HG2`, `HG5`: `hierarchy` on a form that reads none is refused at both gates, with the count asserted at **41 of 44** so the row cannot pass against a record that is `null` everywhere; the three that read one accept it; **absent is accepted on all forty-four**, which is the row that records why the field went unchecked. **And the record is asserted against the frames, not against a restatement of itself**: every form is rendered twice, with and without a hierarchy, and the set that moves must be exactly the three. Rendered directly, which is the third path — a fixture reaches the renderer without passing either gate (C12 I2).
+- **T2.31** (I85) — **the first frame in which `Style.italic` is written by a renderer.** A `notice` with `text: "a b c"` and `spans: [{from: 2, to: 3, italic: true}]` paints `b` inside an SGR whose parameters include `3` and closes the run with a reset before ` c`; the same span with `bold` gives `1`, with `underline` `4`, with all three `1;3;4` in that order. The row is the one that removes `SgrStyle.italic` from `UNCONSUMED_MEMBERS`, and it asserts the bytes rather than the field.
+- **T2.32** (I88): a `code` block carrying `spans` is refused at the gate with an error naming the member; a `raw` block carrying the same array is accepted.
+- **T2.33** (§3am, roadmap 11): `markdownBlocks("a **bold** and *em* and _em_ and `code` word")` yields one `raw` whose `text` is `"a bold and em and em and `code` word"` — the markers gone — with three spans at the offsets of `bold`, `em` and `em` carrying `bold`, `italic`, `italic`, and **the backticks retained** (the inline-code deferral, symbol `TextSpan.tone`). The row replaces T2.44 (*inline emphasis is kept, character for character*), which was the reversible form this is the reversal of.
+- **T2.34** (§3am): the same translation on a list item and on a blockquote lands the spans on the `notice`, on a heading on the `rule`'s `label`, and on a pipe-table cell on the `Cell` — the four members of I88 — and on a fenced block **does not** run: `**` inside a fence is seven characters.
 
 ### Tier 3 — edge cases
 
@@ -2690,11 +2818,18 @@ The generic suite. **These run against every registered block kind, including ap
 - **T3.53** (I76): `colourBy: "value"` with **one** point of one series missing its `value` is refused, and the message names the series and the index. **Its control is the same block with that point's `value` supplied**, which must be accepted — without it the row passes against a validator that refuses `colourBy: "value"` outright. The other two `colourBy` values are accepted on the same incomplete data, because the missing reading is only a fault for the arm that spends colour on it.
 - **T3.57** (I79): the four arm refusals — `heights` **and** `vertices`, neither, `faces` without `vertices`, and a `field` whose shape does not match `heights` — each refused at both gates, each with its own message. **The control is a surface with only `heights` and one with only `vertices`/`faces`, both accepted**, because a rule that refuses everything reads identically to one that refuses correctly.
 - **T3.59** (I80): `closed: true` on the **height-field** arm is refused at both gates, and on the **mesh** arm accepted; `wireframe` is accepted on **both**. The three asserted together, because a refusal copied from one member to the other reads exactly like a rule and the two arrived in the same commit.
+- **T3.61** (I82): `validateDocument` refuses `lineRange` on a `code` block from the far side and accepts it without the flag — the third member of T3.49's set, asserted beside the other two so the set is checked as a set. And `code`'s window sets it on the same `text` reference: `windowed.text === block.text`, with `measure` of the windowed block equal to the lines in range.
 - **T3.60** (I80): `closed` with **neither** arm resolved — the document already refused by T3.57 — is refused with **T3.57's message** and not a second one about `closed`, so the arm refusal stays the first thing a caller reads.
 - **T3.58** (I79): `colourBy: "value"` with one **height-field cell** missing a finite `field` entry, and one **mesh vertex** missing its `value`, are each refused and the message names the surface and the index. **The row's subject is the carrier constant**: a walk that enumerates `points3` and `lines3` by hand passes T3.53 and T3.55 and reaches neither of these.
 - **T3.55** (I78): `colourBy: "value"` with one point of one **line** missing its `value` is refused and the message names the line and the index — the same walk as T3.53 over the other carrier, with the same control. **Its subject is the walk's reach and not its logic**: a validator checking `points3` only passes T3.53 and every row derived from it.
 - **T3.56** (I78): `closed: true` on a polyline of **one** point and of **two** draws exactly what the open path draws, and on **three** draws strictly more. **The clause has two halves and only one is observable**, which the mutation pass is what said: dropping to `n >= 1` inks a zero-length segment's single sample where the open path draws nothing and the row fails, but dropping to `n >= 2` kills nothing *and cannot* — a retraced segment walks the identical samples, since `floor(x0 + (x1 − x0)t)` under reversal is the same number. So the two-point half buys a redundant stroke and no picture, and is kept for the contract rather than for the frame.
 - **T3.54** (I76): a `Point3Series` with an empty `points` array is **accepted** and draws nothing, where the form with no `points3` at all is refused. An empty cloud is a document that has said what it holds; a missing one has not.
+- **T3.62** (I86): a `notice` whose bold span covers `brown fox` in `"the quick brown fox jumps"` at width 10 wraps to `the quick` · `brown fox` · `jumps` and the bold run is exactly `brown fox` on the second row — the assertion is on the second row's bytes, where a prefix-sum slicer is one unit off because the dropped break space belongs to no row.
+- **T3.63** (I86): a `raw` line whose span covers the last four characters at a width that cuts inside the span paints the kept characters styled and the marker **unstyled**; with `truncateFrom: "start"` on a `Cell`, the tail's span is kept and clipped at the head.
+- **T3.64** (I84): a span whose `to` falls between the base and the combining mark of `é` (decomposed) snaps to the cluster's end — the painted row composes the same glyph, and `cells()` of the painted row's text equals `cells()` of the plain text; the same for a boundary inside a ZWJ family emoji.
+- **T3.65** (I86): a `notice` at width 1 whose span covers a CJK glyph the wrapper substitutes with `?` paints `?` inside the span's SGR, and the row is one cell.
+- **T3.66** (I84): spans on a `Cell` are offsets into `text`, not into the glyph-prefixed body — a cell with `glyph: "ok"` and a span at `[0, 3)` styles the first three characters of `text`, not the glyph and a space.
+- **T3.67** (I85) — **the accepted loss, asserted so a change is visible.** At 1-bit an `ok` notice (emphasised → bold) with a bold span paints a frame byte-identical to the same block without the span; at 8-bit the two differ. A row that starts failing is a compensation that has been added, and the ruling says there is none.
 
 ### Tier 4 — integration
 
@@ -2745,12 +2880,18 @@ The generic suite. **These run against every registered block kind, including ap
 - **T6.28** (I46): checking that a numeric array *is* an array without checking its elements — the state that shipped → T2.19 fails on `Cell.spark`.
 - **T6.29** (I64): eleven mutations in `c04-hierarchy.mjs`, all caught — each clause of the walk dropped in turn (→ `HG1`), the bound removed (→ `HG3`), the form refusal removed (→ `HG2`), and the path replaced by the block's (→ `HG1`). **The eleventh is the one HG5 exists for**: the treemap stopping reading its own hierarchy → `HG5` fails and nothing else does, because a record mutated in `types.ts` is invisible to a row that reads frames and is caught by `HG2` instead. The two rows are not one row. *The guard it mutates appears twice in `definition.ts` verbatim, so the anchor is the function it sits in — F219's class, one commit after it was filed.*
 - **T6.78** (I79): removing `"surfaces3"` from the carrier constant — the entry a reader adds a member without touching — → **T2.4h fails on the accept half and T3.58 fails on both**. The row is named because the block still type-checks, still renders its surface, and is refused by the gate as a document with no data.
+- **T6.80** (I82): `validateDocument` accepting `lineRange` inbound → T3.61 fails on its refusal half; the window copying `text.slice(…)` into the slice rather than pinning the range → C14 T1.18 fails on the comment slot, and nothing about row counts moves.
 - **T6.79** (I80): accepting `closed` on the height-field arm — one clause deleted from the arm walk — → **T3.59 fails on its refusal half**. The row is named because the block type-checks, renders, and draws a *plausible* surface: the underside of every fold is culled and the frame reads as a thinner mesh rather than as a defect.
 - **T6.77** (I78): narrowing the extent to `points3` alone — the one-line change a reader makes when adding a carrier and thinking about members — → **LN1 fails**. The row is named because the block still validates, still renders, and draws the polyline against `extentOf([])`'s unit cube, so it is on-screen, in-bounds and describing a different document than the one it holds.
 - **T6.76** (I77): making `axes` an alias for `axes3: "corner"` on this form — accepting the boolean and mapping it — → **T2.4e fails**, and the row is named because the change reads as a kindness to callers. `axes` buys a gutter, a rule and a label row on forty-six forms and none of the three exists here, so the alias would put one member's name on two unrelated contracts.
 - **T6.75** (I76): removing the completeness check behind `colourBy: "value"` — the clause that walks every point for a finite `value` — → **T3.53 fails**. The row is named because the field is optional and the type still compiles: the check is the only thing between an optional member and a point drawn in a colour nothing chose.
 - **T6.30** (I75): giving `Plot` an `orbit` member and letting a block declare that it animates → nothing in this component fails, and that is the row. **The refusal is checked one component up** (C09 I8 — `measure` never receives `tick`), so the mutation is recorded here with the file that would catch it named, rather than left reading as covered by a rule that does not reach it.
 - **T6.16** (§4b): freezing inside C24's `b` as well as in the constructor → T1.18 fails on the spy count.
+- **T6.81** (I83): making a measurer read `spans` — a `notice` that adds a row per span, say — → T1.25 fails on the pair, at the first width.
+- **T6.82** (I84): dropping the overlap check from the gate → T1.24's overlap document validates and the row fails on its count; dropping the surrogate check → the surrogate document validates and the row fails.
+- **T6.83** (I86): slicing wrapped spans by prefix sums of row lengths instead of by source `start` → T3.62 fails on the second row, one unit early, and T1.25 still passes — which is why T3.62 asserts bytes.
+- **T6.84** (I85): mapping `**` to a palette slot instead of to `bold` → T2.31 emits a colour parameter where `1` is asserted, and T3.67's 1-bit pair is no longer identical.
+- **T6.85** (§3am): reverting the translator to literal markers → T2.33 fails on `text`; adding a text-only `ViewPatch` arm → T1.26 still passes and **nothing fails**, which is the row that says the closure in I87 is by type and the day the union widens this row wants a test.
 
 ---
 

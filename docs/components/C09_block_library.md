@@ -252,7 +252,7 @@ Each is a `measure`/`render` pair. The measurement column restates C04 §3 as an
 | `events` | events | Timestamp, type, message on one row; message truncated |
 | `plot` | delegated to C12 | Registered by C12 |
 | `progress` | 1 | Label, bar, percentage; bar takes the residual width. **The bar is bounded by its cells and the number is not** — see below |
-| `code` | lines, or wrapped lines when `wrap` | Syntax highlighting via the **`syntax` palette** (C10 §2), not tones — eight roles do not fit ten semantic slots. Truncates by default; wraps when `wrap: true` |
+| `code` | lines, or wrapped lines when `wrap`; **the lines in `lineRange`** when a window set one | Syntax highlighting via the **`syntax` palette** (C10 §2), not tones — eight roles do not fit ten semantic slots. Truncates by default; wraps when `wrap: true`. **Windows by source line with `text` kept whole and `lineRange` pinned** (I25a, C04 I82) |
 | `comparison` | rows + 1 | Field, a, b, comparator; three equal columns |
 | `pills` | `ceil(totalCells / w)` | One logical row that may wrap |
 | `tip` | `ceil(cells(text) / w)` | Dim, with fill actions |
@@ -260,7 +260,7 @@ Each is a `measure`/`render` pair. The measurement column restates C04 §3 as an
 | `scroll` | `height`, plus one residue row when the content overflows | A bounded box: `height` rows of content, and the marker is chrome the container adds on top (C04 I47, C04 I49). **Declares `elements` at block level and no `window`** — a region whose height is declared cannot measure less without becoming a different box |
 | `mosaic` | `height`, exactly | A declared grid of absolutely positioned cells (C04 I71). **Not a bounded box in `scroll`'s sense**: every cell bounds its own child, so I1 holds through an over-tall child rather than diverging (I35) |
 | `group` | sum or max of children | `column` sums children measured at `w`; `row` takes the max of children measured at `floor((w - gaps) / n)`, one cell of gutter between each pair (C04 §3) |
-| `raw` | lines | Pre-formatted, emitted as-is with control characters stripped |
+| `raw` | lines | Pre-formatted, emitted as-is with control characters stripped. **Windows by line**, with no pin — nothing is derived from lines outside the slice (I25) |
 
 **Every measure in this table is floored at 1** for a block that is present (C04 I17). `ceil(cells("") / w)` is 0, and an empty `notice` still renders as a row; the floor is a rule over the table rather than a clause in three of its entries. The one legitimate zero is a container with no children, which is the absence of content rather than empty content.
 
@@ -1142,6 +1142,54 @@ It is substituted by a one-cell `?` (I19). Three answers were available and two 
 
 **How narrow this has to be, measured rather than assumed.** A cluster is at most 2 cells, so the substitution needs a usable width of exactly 1. Three of the four ways to reach it are degenerate — a 2-column terminal, a `notice` with a glyph at width 3, `panel` nesting at 2 columns a level. The fourth is not: a `row` group hands each child `floor((w − (n−1)) / n)`, floored to 1, which is 1 whenever `w ≤ 2n − 1` — sixty children at 120 columns, twenty at 40. **The boundary is child count, not terminal width.** No in-tree adapter builds a row group today, so it is latent rather than live; it is reachable through C24's public `group(direction, children)` at an ordinary terminal size as soon as an app builds one from a data list, which is R01 R4.4's reuse claim. Recorded with the figures so nobody restores the drop on the grounds that it only fires at width 1.
 
+### Runs — a span's offsets against the wrap, the cut and the cluster
+
+A `TextSpan` (C04 §3am) addresses a text member by UTF-16 code-unit offset, and this is the
+renderer's half of that contract: four mechanisms, each an existing function given the one
+property a span needs from it, and none of them a second arithmetic over the same string.
+
+**Wrapping carries a source offset, and `wrapCells` is its projection.** `wrapCellsParts(text,
+width)` returns `{ text, start }[]`, where every row is an exact contiguous slice of the source
+beginning at `start`; `wrapCells` is `wrapCellsParts(stripControl(text), …)` with the starts
+dropped, so the two cannot disagree about rows. The offset exists because the rows do **not**
+concatenate to the source — a break drops the space it broke at, and `"the quick brown fox
+jumps"` at 10 gives rows summing to 18 units of 19 — so a consumer slicing spans by prefix sums
+of row lengths is one unit early at the second row and at every row after it (C04 I86). `runsOf`
+cuts the text into runs by the offsets and strips control characters *per run*, in that order,
+because `stripControl` deletes and would move every offset after the character; `wrapRuns`
+applies the unplaceable-cluster substitution before wrapping (`placeableClusters`), so the rows
+are exact slices of what the wrapper was given and a substituted cluster keeps its span (I19).
+
+**A boundary inside a cluster snaps outward, at both ends.** The gate refuses a surrogate split
+and can see no other cluster interior (C04 I84), so `clusterEnds(text)` — the ascending code-unit
+offsets at which clusters end, empty for printable ASCII where every index is a boundary — is
+what the renderer consults: a `from` inside a cluster moves **back to the cluster's start**, a
+`to` inside one moves **on to its end**. Outward rather than inward, because a span that named
+part of a cluster meant the cluster; and width-preserving by construction, because the cluster
+is painted whole and `cells()` measures it as one either way. Painting SGR between a base and
+its combining mark, or between the members of a ZWJ sequence, changes what the terminal
+composes, and a changed composition is a changed width — the failure I1 cannot see. A span whose
+two boundaries meet after snapping is dropped rather than emitted empty.
+
+**Runs are painted coalesced by style reference, so a row with no span is byte-identical to the
+row it was.** `withSpan(style, attrs)` spreads at most `bold`, `italic` and `underline` onto the
+block's resolved tone and returns `style` *itself* when there is nothing to add; `paintRuns`
+merges adjacent runs whose style is the same reference, so an unspanned row paints as the single
+span it always was and a spanned one breaks into exactly the pieces its attributes require. That
+is what let the mechanism land without moving a golden frame: a `paint` that closed and reopened
+the same style between two plain pieces would draw the same picture in different bytes, and the
+golden gate's no-move is the evidence that it does not.
+
+**The truncation marker is measured, and it had not been.** `truncateParts` returns `{ kept,
+prefix, suffix, start }` — the exact kept slice, the marker and its padding at whichever end
+`from` names, and `kept`'s code-unit offset into the source, `0` from the end and `length −
+kept.length` from the start — so a caller slices its spans against `kept` and paints the marker
+in the block's tone and never inside a span (C04 I86). It reserved `limit − 1` cells for the
+marker where `truncate` measured the cluster: at `ambiguousWidth: "wide"` the ellipsis is two
+cells, so `kept + suffix` came to `limit + 1` — F292's shape, a row one cell wider than it was
+measured, one function along from where F292 found it. Both now read `clusterCells(marker)`,
+which is the drift a shared helper exists to prevent (I9).
+
 ---
 
 ## 5a. A line that already carries SGR
@@ -1212,15 +1260,17 @@ forty rows of a 50 000-row block costs **0.65 ms** for the kind that declares a 
 | `patch` | the gutter, via `numberWidth` | **windows**, with the width **pinned** (C25 I21a) |
 | `keyValue` | the key column, via `widest` | **windows**, with the width **pinned** — the same argument one kind over |
 | `table` | **two things, and only one was recorded.** `planColumns` reads the column definitions and the width, never the rows (F134) — so the *column* layout is safe. But `hasActionBar` is `rows.some(r => r.actions)`, and it costs **two rows** of height | **not yet** — four interactions, below |
-| `code` | **the parse** | **cannot** — see below |
+| `code` | **the parse** | **windows**, with the **text kept whole** and `lineRange` pinned (C14 §4a, C04 I82) — see below for why a *sliced* text cannot |
 | `plot` | the whole series | atomic, permanently (C12 I1) |
 
 **`widest` and `numberWidth` are the same problem and `tokenise` is not**, which is the ruling this
 walk exists to make. A width can travel with a window: the block says what its parent measured and
 the renderer prefers that over deriving. **A parse cannot travel**, because it is not a number
-attached to the block — it is a function of every character before the slice.
+attached to the block — it is a function of every character before the slice. **What can travel is
+the text the parse is a function of**, and that is the ruling C14 §4a added: the window carries the
+whole `text` and a line range, so nothing is re-derived from a slice because there is no slice.
 
-### Why `code` is refused, measured
+### Why a sliced `code` text is refused, measured — and what the window carries instead
 
 `tokenise` runs over the whole text. Slicing lines out changes what they *are*:
 
@@ -1237,9 +1287,15 @@ wrong**, and no geometric assertion can see it. Containment is not correctness.
 
 **The fix is not a wider slice.** A comment can open at line 1 of a 50 000-line file, so any bounded
 context is a guess; carrying the lexical continuation means a field on `Code` holding a highlighter's
-internal mode, which is a public type carrying another library's state. Until that is ruled, `code`
-stays atomic and its cost is answered by the *other* half of roadmap 17 — a per-block cap with a
-visible marker, which needs no lexical context at all.
+internal mode, which is a public type carrying another library's state. **The fix is no slice**
+(C14 §4a, ruled 2026-09-03): the window keeps `text` whole — the same string, so the tokeniser's memo
+hits on every frame — and sets `lineRange: [from, to)` in source lines (C04 I82). `render` tokenises
+the whole text, as it always did, and produces only the rows in range; `measure` counts only those
+lines. The pin is two integers rather than a mode, and the parse is identical to the whole block's
+by construction rather than by context. Units are source lines, so a window never opens inside a
+wrapped line and the surplus is `skipRows`/`dropRows` (I26). Measured on the pass that built it: a
+40-row window of a 2 000-line `code` block paints **40 rows** where it painted 2 000, and a
+comment opening above the window keeps its slot on the rows inside (C14 T1.18).
 
 ### What `table` owes — two fields, one parameter and a residual
 
@@ -1334,7 +1390,7 @@ next frame. MG27 is what keeps a producer from writing one (`BUILDER_OMISSIONS`)
 - **I23** — **A grammar can be registered after construction, and registering one invalidates the memo.** §4a promised that an unregistered language is readable now and highlighted *whenever someone registers it*; the constructor shipped with a fixed pair and no registration path, so the promise had no mechanism (F93). The invalidation is half the invariant rather than an implementation note: `tokenise` caches the plain-text fallback under the same key, so registration without it leaves every block already rendered flat until an unrelated cap eviction. **Measurement is unaffected by both**, which is what makes registration safe at any time — tokens change appearance and never line count (I8, T2.13).
 - **I24** — **A grammar in the default set has its emitted classes mapped, or the omission has a reason.** Shipping a grammar whose classes `SLOTS` does not carry is indistinguishable from not shipping it — measured: `markdown` emitted four runs and coloured none. Three classes are unmapped deliberately: `hljs-params` is ordinary identifiers, `hljs-strong` and `hljs-emphasis` are appearance rather than a rôle, and **`hljs-addition` / `hljs-deletion` are a change axis, which C04's ruling says is a marker and never a tone** (F30, F81).
 - **I25** — **A kind that divides declares `window`, and a window is a valid block of the same kind plus a residual offset.** `window(b, w, from, to)` returns `{ block, skipRows }`; the caller renders `block` and drops `skipRows` leading rows, and what remains is exactly what the full rendering would have put at rows `[from, to)`. The offset is not a convenience — it is what makes an indivisible unit (C25 I19) and a sticky header (C25 I18) expressible without inventing a row C14 never measured, which is drift three components from its cause. **A window is a block and never a list of rows**, because `Block[]` is what both consumers hold and a slice of rendered output would be a second height codepath.
-- **I25a** — **A kind whose layout is derived from its rows pins that layout into the window; a kind whose *parse* is cannot be windowed at all.** `patch` pins `numberWidth` and `keyValue` pins `keyWidth`, because a window whose slice happens to hold shorter values would draw a narrower column and every row would shift sideways as the reader scrolls — measured at 14 cells against 3 for `keyValue`, and 4 against 1 for `patch` (C25 I21a). **`code` is refused on the other half of the same sentence**: `tokenise` is a function of every character before the slice, so a window is a different *parse* rather than a narrower column — lines inside a block comment come back as live code, and `measure` never tokenises, so I26 holds while the rendering is wrong (F426). A width travels with a window; a parse does not.
+- **I25a** — **A kind whose layout is derived from its rows pins that layout into the window; a kind whose *parse* is pins the whole text and a line range, because a parse cannot be sliced.** `patch` pins `numberWidth` and `keyValue` pins `keyWidth`, because a window whose slice happens to hold shorter values would draw a narrower column and every row would shift sideways as the reader scrolls — measured at 14 cells against 3 for `keyValue`, and 4 against 1 for `patch` (C25 I21a). **`code` was refused on the other half of the same sentence, and the refusal was about slicing the text rather than about windowing**: `tokenise` is a function of every character before the slice, so a window carrying only the sliced text is a different *parse* rather than a narrower column — lines inside a block comment come back as live code, and `measure` never tokenises, so I26 holds while the rendering is wrong (F426). A width travels with a window; a parse does not. **So the text travels instead** (C14 §4a, C04 I82): `code`'s window keeps `text` whole — the same string reference — and pins the source-line range `[from, to)` in `lineRange`; `measure` and `render` both honour it, tokenisation runs over the whole text, and only the rows in range are produced. The pin is a range rather than a highlighter's mode, which is what the earlier refusal could not find a field for.
 - **I26** — **`measure(window(b, w, from, to, measureChild).block, w) − skipRows − dropRows === to − from`, checked generically over every kind that declares `window`.** The form without the residuals is the one the seam invites and it is false for any window that costs slack. **Both terms, because slack falls at both ends**: `skipRows` is leading only, and `table` is the first kind whose last unit can hang past `to` (F428). The consumer has always dropped the trailing rows — `session.ts` writes `rows.slice(0, ve.takeRows)` — so `dropRows` names an operation the seam already relied on and could not state. Relaxing the identity to `≥` was the other option and it is the worse one: containment is satisfied by every wrong answer inside the bounds. Enforced by `measurement-conformance.ts` rather than per kind, so an application's own arm is held to it — without that a consumer's window is silently short and the frame describes a document nobody holds. It is I1's rule over a window rather than over a block.
 - **I26a** — **`window` receives `measureChild`, on `elements`' argument and for the same quantity.** A kind whose unit boundaries depend on a child's height cannot compute them from `(block, width)` alone — a table row's offset is `header + Σ(1 + detailHeight(row))` — and a window that guessed would slice at the wrong row while I26's arithmetic still balanced. Supplied by the registry, so a kind cannot reach for its own (A02 Seam 1).
 - **I27** — **A kind that does not divide has no `window` member, and that is how atomicity is expressed.** `plot` is the case and it is permanent: C12 I1 makes height a function of the block alone, so reducing the series changes nothing and reducing `height` rescales the curve. An absent member cannot be deleted by a later edit; a branch returning the block unchanged can, and reads as an oversight either way.
@@ -1393,9 +1449,10 @@ next frame. MG27 is what keeps a producer from writing one (`BUILDER_OMISSIONS`)
 35. **The glyph axis is a ladder of three and its top rung is gated on the block as well as the terminal** (I37). A half block spends a cell on two full colours where braille spends it on eight dots, so a photograph arrives as a photograph and a diagram is better served one rung down — and the ladder takes the richest rung the terminal honours rather than asking the content. `▀` is ambiguous-width where braille is not, which is why the hazard is new at exactly this rung; and a block carrying an `overlay` skips it, because both colour channels are already the picture (→ C02 I9, C10 I31, A03 SS50).
 36. **An image that cannot be decoded says which refusal it is** (I38). The decoder computes a reason for every rejection and the block discarded all of them, so *a corrupt file* and *a format phase 1 does not read* arrived as the same `alt`. It draws the `status` box the rest of the framework draws, at `error`, with `alt` kept beneath as the caption — and the fault is scoped to **this** decoder, not to the picture (→ C04 I73, C09 §8b G7).
 
-37. **A kind whose layout is derived from its rows pins that layout into its window, and a kind whose parse is cannot be windowed** (I25a). `patch` pins `numberWidth`, `keyValue` pins `keyWidth`, and both are one sentence: a window says what its *parent* measured rather than deriving it from the slice, or every row shifts sideways as the reader scrolls. `code` is refused on the same sentence's other half — `tokenise` reads every character before the slice, so a window is a different parse and lines inside a block comment render as live code, invisible to I26 because `measure` never tokenises (→ C25 I21a, C12 I1, FINDINGS F426).
+37. **A kind whose layout is derived from its rows pins that layout into its window, and a kind whose parse is pins the whole text and a range** (I25a). `patch` pins `numberWidth`, `keyValue` pins `keyWidth`, and both are one sentence: a window says what its *parent* measured rather than deriving it from the slice, or every row shifts sideways as the reader scrolls. `code` cannot pin a parse — `tokenise` reads every character before the slice, so a *sliced* text is a different parse and lines inside a block comment render as live code, invisible to I26 because `measure` never tokenises — so its window keeps `text` whole and pins `lineRange` instead, and the parse is the whole block's by construction (→ C25 I21a, C12 I1, C04 I82, C14 §4a, FINDINGS F426).
 38. **The window's residual is a pair, and `window` is handed `measureChild`** (I26, I26a). Slack falls at both ends: `skipRows` is leading only, and `table` is the first kind whose last unit can hang past `to`. The consumer has been dropping trailing rows on every frame — `session.ts` writes `rows.slice(0, ve.takeRows)` — so `dropRows` states an operation the seam already depended on, rather than granting a new one; and the identity keeps its equality, because relaxing it to `≥` would pass every wrong answer inside the bounds (→ FINDINGS F428).
 39. **A kind pins a *presence* as readily as a width, and `table` pins two things and re-sorts nothing** (C11 I18, I19, I20). The action bar exists or does not, so a window moves it in **both** directions; the display order is not idempotent under slicing, because `kindOf` reads the values present and a slice can re-classify its own column. Neither field is a producer's, on `numberWidth`'s argument (→ C11 §5a, C25 I21a, FINDINGS F429).
+40. **A span's offsets meet the wrap, the cut and the cluster through the functions that already own them, and each gains one property rather than a sibling** (I1, I9, I19). Rows carry a source `start` and `wrapCells` projects them; a boundary inside a cluster snaps outward at both ends and the width does not move; runs coalesce by style reference so an unspanned row's bytes are unchanged; and `truncateParts` measures its marker as `truncate` does, which closed a one-cell overshoot at `ambiguousWidth: "wide"` (§5, → C04 §3am, C04 I84, C04 I86, C10 I33).
 
 ---
 
@@ -1529,6 +1586,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T1.16** (I20, §5a): `sliceCells` over a line carrying SGR — the window measures exactly `to − from` cells by `displayCells`, the escapes in the skipped prefix are re-emitted at its head, and a cut that lands mid-escape is impossible because the escape is copied whole. The failure is not a wrong width: it is `[38;5` reaching the terminal as text with the SGR never terminated, so the colour bleeds down every row below.
 - **T1.16b** (I20): a double-width cluster straddling either boundary is dropped and its cell blanked, in both directions — the window is still exactly `to − from` cells and never `to − from ± 1`. Asserted at the left edge as well as the right, because the two are different code paths and only the right one resembles `truncate`.
 - **T1.16c** (I20): the composition law over a styled line, for every split point — `sliceCells(t, 0, a)` and `sliceCells(t, a, b)` measure `b` together. A property over the splits rather than three chosen ones, because the case that breaks it is whichever `a` lands inside a cluster and no chosen `a` is that one by construction.
+- **T1.17** (I9, I19, C04 I84, C04 I86): the four mechanisms of §5's *Runs* — `wrapCellsParts`'s rows are exact source slices from `start` with the break space in no row, and equal `wrapCells`'s; `runsOf` concatenates to `stripControl(text)` with a control character inside a span; a boundary inside a ZWJ family snaps outward and a span that collapses onto one boundary is dropped; `truncateParts` reports `start` from either end and, at `ambiguousWidth: "wide"`, `kept` plus a two-cell marker fits the limit. **Covered today by `test/unit/spans.test.ts` §*C09 — runs*, whose rows cite C04 I84 and C04 I86 and carry no C09 number** — the number is owed to those rows, not to a second file.
 
 ### Tier 2 — contract / interface
 
@@ -1551,6 +1609,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.16** (§3): over the adversarial corpus — CJK, ZWJ sequences, variation selectors, combining marks — `cells(s)` equals the width Ink lays `s` out at. The one number two implementations compute, held to agreement rather than assumed into it.
 - **T2.17** (I4, §3): a source scan finds no `color=` or `backgroundColor=` prop in `src/presentation/` (A03 SS37), and no import from `src/terminal/` beyond `escapes.js` and type-only capability imports.
 - **T2.20** (I26): the row property has a subject — a window of the **right size and the wrong rows**. T2.15 shortens a window and `window-height` fires; this reverses the content and keeps the count, and `window-rows` fires while `window-height` does not. That is the shape of every real failure at this seam: a different parse (F426), a slice in declaration order, a comparator re-derived from the slice (F429).
+- **T2.22** (I25, I26, C14 I23): `code` and `raw` declare `window`, and the I26 identity and the row-for-row comparison hold over both at every offset — a `code` block with a block comment spanning lines, a wrapped one whose every line is three rows, a `raw` block with a trailing newline and blank lines. The row that pinned *code and raw do not window* is rewritten as this one on the day it expired (C14 §4a).
 - **T2.21** (I26a): `tableDefinition.window` handed the registry's measurer and handed a stub returning 1 cuts in different places — `dropRows` of 2 against 1 for the same range. Asserting the signature would pass against a window that accepted the parameter and ignored it, which is how `table` came to be unwindowable for want of one (F428).
 - **T2.18** (I17, C04 I25): a sequence measures `Σ` its blocks plus one row per `gapBefore`, and renders exactly that many; a `row` group ignores the field.
 - **T2.10**: golden frames for every kind at four widths in both themes and both unicode modes.
@@ -1605,6 +1664,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.10a** (I34, I11): **golden frames for the contained failure**, three messages × three widths × three variants, both frames of the two-frame path. **There were none**, through three commits about this path: nothing in `test/golden/` rendered a definition that throws, so golden passed each time on the absence of a subject rather than the absence of a change. Frame 1 is recorded too, because F230's ruling makes the short box a specified state rather than a transient.
 - **T3.48** (I31): `status` declares no `window`, and `windowSequence` keeps it whole and pays for it out of `skipRows` — `plot`'s and `scroll`'s case, and the same assertion.
 
+- **T3.65** (I19, C04 I86): the bytes rows for the same mechanisms — a span across a wrap, a span straddling a cut with the marker outside it in both directions, a boundary inside a cluster, a substituted cluster at width 1 — are C04 T3.62–T3.65 in `test/edge/spans.test.ts`, asserted on the painted row and never on a count, because every height assertion passes for a span sliced one unit early. C09's number is owed to them on T1.17's terms.
+
 ### Tier 4 — integration
 
 - **T4.1** (with C11, C12): `table` and `plot` register through the public mechanism and satisfy the T2 suite identically to built-ins.
@@ -1651,6 +1712,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.23** (I30): deciding ownership from the member's declaration rather than from what resolution returned → T3.37 fails, and a `scroll` whose `elements` throws takes its whole subtree out of the focus walk with nothing said.
 - **T6.24** (I31): letting the width ladder drop a row instead of reassigning it → T3.40 fails, and a narrow `status` block is shorter than `measure` committed. **The row count moving with the width is I1's divergence reintroduced through the path built to prevent it.**
 - **T6.25** (I31): labelling the height ladder's top rung `≥ 5` → T3.39 fails at exactly five rows. **The rung as it was first written**: two borders, two blanks and a tag row is six, and the figure was specified at five for as long as it existed on paper — caught by drawing it rather than by any assertion, which is why this row exists at all.
+- **T6.77** (I9, C04 I86): restoring `limit − 1` in `truncateParts` → T1.17's wide arm fails, `kept + suffix` at `limit + 1`; slicing wrapped spans by prefix sums of row lengths → C04 T3.62 fails on the second row, one unit early, and C04 T6.83 shows the reverted arithmetic beside the ruled one; `paintRuns` closing and reopening the same style between two plain pieces → every golden frame moves while drawing the same picture, which is the gate's no-move read as a row rather than as luck.
 - **T6.26** (I32): excluding `error` from animating → T3.43 fails, and `retrying` — which is `error` plus a line — loses its spinner. A per-state branch is the exception the composition immediately needs.
 
 ---

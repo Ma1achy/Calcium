@@ -626,8 +626,30 @@ like.
 **A log axis picks differently again** — decade boundaries, or `1 2 5 10 20 50`. Linear ticks on
 a log axis are unreadable rather than merely ugly.
 
-Neither has a consumer in the tree, and each would be a second `niceAxis` rather than an argument
-to this one. Named so the next reader knows they were weighed.
+**Both are built, and the paragraph above is kept as the reason they were separate algorithms.**
+*Neither has a consumer in the tree, and each would be a second `niceAxis`* was true when written
+and is false at HEAD (corrected 2026-09-03): `niceLogAxis`, `niceSymlogAxis` and `niceTimeAxis`
+are in `src/presentation/plot/axes.ts`, `axisFor` chooses among them, and C04 I81 carries the
+scale on `PinnedRange` so a tick and the sample it names go through one transform (§3ak, §3al).
+They are second algorithms beside `niceAxis` rather than arguments to it, which is what this
+section predicted; what it did not predict was the consumer arriving.
+
+**Sankey — named 2026-09-03, and it is not a fold over `graph`.** The refusal it carried in
+`docs/notes/CALCIUM_PLOT_PRIOR_ART.md` and the roadmap — *edge routing, the Mermaid problem, wants
+a real layout engine* — expired twice: `graph` ships a layered router (§3ai,
+`src/presentation/plot/graph.ts`, 511 lines) and `elkjs` is in the tree under `beautiful-mermaid`.
+Measured against `graph` rather than re-refused on the stale reason. Passes 1–5 transfer as
+`graphLayers` — cycle removal, deduplication, layering, dummy nodes, ordering — and nothing after
+them does: `GraphEdge` is `{ from, to }` with no weight (C04); a `graph` node is a one-row label
+and a sankey node is a bar whose extent is its flow; a `graph` edge is a one-cell line in the
+box-drawing mask and a sankey edge is a ribbon whose width is its weight — a **fill**, which is
+`halfBlockRows`'s territory and not `paint`'s; and `graph` layers top-down at `rows × 2 − 1` rows
+where a sankey layers left-to-right, because its bars need the vertical extent. So a sankey is
+`graphLayers` plus a new placement and a new drawing — a new form, `sankeyArea`, over the shared
+layering, not an option on `graph` — and the carrier change is a weighted edge on C04's `Graph`.
+**Not built because nothing consumes it**: no weighted edge set exists in `src/` or the examples.
+SS54 R20 and R21 watch it — `sankeyArea(` absent, `graphLayers` present — so this paragraph
+cannot outlive its premise the way the one it replaces did.
 
 ## 3e. Annotations — one feature, and the one that shares a name and not a mechanism
 
