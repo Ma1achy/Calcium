@@ -1310,6 +1310,27 @@ The alternative — inline code keeping its colour inside a focused row — make
 things, and focus is the one time a row must read as one. Attributes and a `value` survive focus,
 because neither is a claim about the foreground.
 
+**A row that fills exactly and is followed by a space breaks at that space, and the break space is
+in no row** (C04 I86). The overflow check fires on the space — a row is exactly full when a
+one-cell space does not fit — and the break-point search then looked *backwards* for a space
+inside the row, so the last word moved down though the row it left fitted: `"aa bb cc dd"` at 5
+gave `aa` / `bb` / `cc dd` where `aa bb` / `cc dd` fits twice exactly (F591). The overflowing
+space **is** the break, whether or not the row has an earlier break point; the arm that ruled the
+no-break-point half of this (`"abcdef gh"` at 6 began the next row with the space, F590) is that
+same rule with the search's answer ignored, and is one arm rather than two. **Two guards, and each
+is another rule already stated meeting this one.** A row *already ending* in a space is at its
+second space or later, where the break was the first one and the surplus is the next row's
+content — `"abc   def"` at 5 keeps `" def"`, so the arm asks that the row not end in a space. And
+a break falling **strictly inside an atom is not a break** (C04 I90), which is `breakPoint`'s own
+test applied at this position: an atom too wide for any row is cut at a cluster boundary as an
+unbroken token is, and a cluster-boundary cut drops nothing, so `"aaa bbb ccc"` at 7 valued whole
+is `aaa bbb` / `" ccc"` and not `ccc` — the space is content inside the value, and swallowing it
+is a break inside the atom wearing a break space's clothes (F593). The general property the two
+findings instance is that **no row could have taken the first word of the next row**, and it is
+swept over a corpus at every width from 1 to 40 rather than pinned at the two strings that found
+it (T3.10b2): a row breaking early is invisible to a per-row width assertion, because a short row
+fits.
+
 **A valued run is a wrap unit, and the wrapper learns one property rather than gaining a sibling**
 (C04 I90). `wrapCellsParts(text, width, ambiguous, atoms)` takes an optional list of `[from, to)`
 code-unit intervals into the text it is given, and never places a break **strictly inside** one:
@@ -1325,8 +1346,10 @@ them; `wrapCells` passes none, so every caller that is not a run caller is uncha
 spans), proseWidth)` for both — the file's own *one layout function for the pair* rule, applied to
 the one wrapping text member. The height is therefore the same with and without every span member
 except `value`, and differs with `value` exactly when a valued run would otherwise straddle a row:
-measured, `"aa bb cc dd"` at 5 is three rows plain and three with `bb cc` valued (the plain
-wrapper already broke there, see the finding below), `"x(abcde)yz"` at 6 is two rows plain and
+measured, `"aa bb cc dd"` at 5 is **two** rows plain (`aa bb` / `cc dd`, both exactly full) and
+three with `bb cc` valued, since the atom cannot straddle the break the plain wrapper takes —
+before F591 the plain answer was also three and the example showed nothing, which is what a
+fixture that does not respond to the thing under test looks like; `"x(abcde)yz"` at 6 is two rows plain and
 **three** with `abcde` valued, and `"The cat sat on the mat ."` at 12 with a value per token is
 two rows either way, because prose already breaks at the spaces between tokens. **A single-word
 valued token never changes the count** unless the row around it has no space at all — the
@@ -1747,7 +1770,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T1.16c** (I20): the composition law over a styled line, for every split point — `sliceCells(t, 0, a)` and `sliceCells(t, a, b)` measure `b` together. A property over the splits rather than three chosen ones, because the case that breaks it is whichever `a` lands inside a cluster and no chosen `a` is that one by construction.
 - **T1.17** (I9, I19, C04 I84, C04 I86): the four mechanisms of §5's *Runs* — `wrapCellsParts`'s rows are exact source slices from `start` with the break space in no row, and equal `wrapCells`'s; `runsOf` concatenates to `stripControl(text)` with a control character inside a span; a boundary inside a ZWJ family snaps outward and a span that collapses onto one boundary is dropped; `truncateParts` reports `start` from either end and, at `ambiguousWidth: "wide"`, `kept` plus a two-cell marker fits the limit. **Covered today by `test/unit/spans.test.ts` §*C09 — runs*, whose rows cite C04 I84 and C04 I86 and carry no C09 number** — the number is owed to those rows, not to a second file.
 
-- **T1.19** (I9, C04 I89, C04 I90): the tone-and-value half of §5's *Runs* — `runsOf` copies `tone` and `value` onto the run and `sliceRuns`, `runLines` and `wrapRuns` carry them; `wrapCellsParts` with an atom never breaks strictly inside it — a space inside the atom is skipped, a full row with no outside break point breaks at the atom's start when something precedes it, and an atom wider than the row is broken as text; `wrapRuns` derives the atoms from `value` alone, so a bold run is not one. Asserted on the row texts and starts, beside the plain wrapper's answer for the same string.
+- **T1.19** (I9, C04 I89, C04 I90): the tone-and-value half of §5's *Runs* — `runsOf` copies `tone` and `value` onto the run and `sliceRuns`, `runLines` and `wrapRuns` carry them; `wrapCellsParts` with an atom never breaks strictly inside it — a space inside the atom is skipped, a full row with no outside break point breaks at the atom's start when something precedes it, and an atom wider than the row is broken as text **and drops nothing**, since a cluster-boundary cut is not a break space (`"aaa bbb ccc"` at 7 valued whole is `aaa bbb` / `" ccc"`, F593); a row that fills exactly and is followed by a space breaks **at that space** whether or not it has an earlier break point (F590, F591), and the plain answer for `"aa bb cc dd"` at 5 is two rows where the valued one is three; `wrapRuns` derives the atoms from `value` alone, so a bold run is not one. Asserted on the row texts and starts, beside the plain wrapper's answer for the same string.
 
 ### Tier 2 — contract / interface
 
@@ -1804,6 +1827,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T3.8**: width 1 → every kind returns ≥1 and renders something.
 - **T3.9**: width 0 → treated as 1; no division by zero, no infinite loop.
 - **T3.10**: text exactly `w`, `w-1`, `w+1` cells → 1, 1, 2 rows for wrapped kinds.
+- **T3.10b2** (C04 I86, §5): the sweep — over fourteen strings at every width from 1 to 40, **no row could have taken the first word of the next row**, counted only where the join is legitimate (the rows are separated by exactly one source space, the next opens on content rather than whitespace, and its first word is whole rather than the head of a cut token). This is the property F590 and F591 are each one instance of, and it is a sweep rather than two pinned strings because **a row that breaks early is invisible to T3.10b**: a short row fits. Measured before the arm: 161 violating joins over 102 of the 560 pairs; after, 0. The same sweep carries the two properties the arm must not move — **no row overflows** (T3.10b over 560 pairs rather than 4) and **every row is an exact slice from its `start`** (C04 I86, on the ASCII members, since a substituted cluster is deliberately not a slice).
 - **T3.11**: `panel` at width 2 → children measured at 0, clamped to 1; no negative width reaches a child.
 - **T3.12**: `group` nested five deep → correct total, no stack overflow.
 - **T3.31** (I23): tokenise a `dockerfile` block before registering the grammar — one run, no slot — then register it and tokenise the same text again. The second call is highlighted. **The memo is the subject**: without the invalidation the second call returns the first's answer, and every assertion about `registerGrammar` existing still passes. The control is that `measure` returns the same row count across both, or the invariant's other half is untested.

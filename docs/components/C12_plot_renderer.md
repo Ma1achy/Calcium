@@ -8673,6 +8673,7 @@ governed by one rule restates it and is not here.
 | **K12** | the notice row · the budget | something dropped or reversed | the row is spent **before** the drawing is chosen — `graphArea`'s ruling and `treeArea`'s before it (§3ah.4) |
 | **K13** | one bit · bar against ribbon | no colour to separate them | the **glyph** does (§3ap.2, I17): `█` against `▒`, `▀`/`▄` for a half either way. The `dim` alternative was drawn and rejected on this row |
 | **K14** | `ambiguousWidth: "wide"` · the block family | every glyph doubles | the ASCII set, `barStyle`'s rule — one function, so the wide frame *is* the ASCII frame |
+| **K15** | a label is placed **outside** the bar (K3, the references' shape) · a ribbon begins **at** the bar's edge | the region a label is placed into is the region a ribbon is filled into | **the two are the same region, so placement cannot solve readability** — a node with an outgoing flow has ribbon immediately right of it, one in the last layer has ribbon immediately left of it, and there is no node in the corpus with neither. So the SVG label needs an ink and a ground of its own: **`tone.default` with a `surface.bgDeep` halo** (I112, §3ap.7). The terminal arm answers the same cell by *substituting* — a label cell is `{ text: ch }` with no `ref` and no background, so the ribbon glyph is gone where the letter is |
 
 ### 3ap.5 — §8a-bis, the placement trace
 
@@ -8691,6 +8692,83 @@ The arm-disagreement table's row, measured over the six variants at both widths:
 `identityLabels 5/12`, `notice 2/12`, every other column `agree`. Both open cells are the nodes
 family's own shape — the terminal drops labels and nodes against a budget the SVG does not have
 (F318), and the reader files a notice's names as identity — and `graph` carries the same two.
+
+### 3ap.7 — the node label's ink and its ground, measured (I112)
+
+**Read from a picture, not asserted.** All six `sankey-*.svg` baselines rendered to PNG at
+1280 px and looked at: the node labels are `tone.muted` painted straight onto the ribbon fill,
+and on the default fixture they are all but gone. **No variant is fine**, and §3ap.4 K15 says
+why — the label is already in the references' place, outside the bar, and outside the bar *is*
+the ribbon. Placement had nothing left to give.
+
+**The figure, before.** Every label's backdrop taken from the raster with the `<text>` elements
+stripped, sampled over the glyph box, worst pixel kept, and the C10 ratio computed against the
+label's own ink. **33 labels across the six variants:**
+
+| | worst | best | floor it is measured against |
+|---|---|---|---|
+| dark (`#626262` on the ribbons) | **1.02** (`src-04`) | 1.41 (`src-12`) | `muted`'s own 2.5 — and body text's 4.5 |
+| light (`#94959c` on the ribbons) | **1.02** (`src-05`) | 1.25 (`src-04`, `src-12`) | as above |
+
+Not one label on either variant clears even the recessive floor, and the median is 1.05.
+
+**The two references, and they do not answer the same way** (the §3ap.1 rule again — a
+reference's default is its taste, so read what it *does*):
+
+| reference | what it does about the label's ground | what it settles here |
+|---|---|---|
+| **d3-sankey**, the energy figure | **nothing.** Black ink on white paper, links at low opacity; the label reads because the paper is light and the fill is pale, not because anything was decided | that d3's answer **does not transfer**. Its placement was already taken (K3), and its readability came from its page. A near-black ground with the source's slot at `fill-opacity 0.5` has no pale region to put a label on |
+| **plotly `go.Sankey`** | `textfont: fontAttrs({ autoShadowDflt: true })` — the node label's font shadow defaults to `"auto"`, documented as *places minimal shadow **and applies contrast text font color*** | the ruling. Plotly cannot assume a light link either, so it does **both** halves: a minimal shadow behind the glyph and an ink chosen for contrast. Two of the three candidates, together, and shipped as a default rather than an option |
+
+**The ruling: `tone.default` with a halo in `surface.bgDeep`.**
+
+- **The ink moves off `tone.muted`.** A node label *names the datum*; it is not axis furniture,
+  which is `LABEL`'s reason and does not reach here. `tone.muted`'s floor is 2.5 because it is
+  *deliberately recessive*, and a recessive slot cannot carry the only text that says which flow
+  is which.
+- **The halo is the SVG spelling of what the terminal already does.** A label cell in
+  `sankeyArea` is `{ text: ch }` — no `ref`, no `background` — so the ribbon glyph is *replaced*
+  and the letter sits on the page. An SVG cannot substitute a region, so it paints one:
+  `stroke="<bgDeep>" stroke-width="3" stroke-linejoin="round" paint-order="stroke"`, three
+  quarters of which is `SVG_FONT_SIZE / 4`. **Both arms now put the same thing behind the
+  glyph**, in the two media's own terms, which is the whole of §3ap.3's claim applied to ink.
+- **`sankeyLayout` does not move.** The ruling is the painter's; every number the shared
+  geometry returns is unchanged, and the terminal baselines are byte-identical.
+
+**The figure, after — and measured rather than argued from `paint-order`.** *By construction*
+would have been the wrong thing to write down, so the backdrop is taken **under the ink**: render
+the figure twice, once as it ships and once with the labels' `fill` set to `none`, and every
+pixel that changed is a pixel the ink painted; the backdrop at exactly those pixels is read off
+the second render. Worst pixel per figure, over 193 to 2 308 ink pixels each:
+
+| figure | before (dark, `#626262`) | after (dark, `#d4d4d4`) | after (light, `#383a42`) |
+|---|---|---|---|
+| `default` · `chain` · `loss` · `cycle` · `long-labels` | **1.04**, a ribbon | **12.43**, the page ground | **9.25**, the page ground |
+| `crowded` | **1.04**, a ribbon | **9.51** | **7.59** |
+
+The floor is 4.5 and the worst cell in the table is 7.59. **`crowded` is the one figure whose
+backdrop is not exactly the ground**, and the reason is worth keeping: its labels sit close
+enough that one halo meets the antialiased edge of the next, so the worst pixel is a blend. It
+is not a case the ruling has to answer — 9.51 and 7.59 are three times the floor either way —
+but it is the reason the row is a table and not a single number.
+
+**And the halo alone would not have been enough**, which is why the ink is half the ruling and
+not a preference beside it: `tone.muted` *on the halo* measures **3.02** on dark and **2.44** on
+light — the light one under `muted`'s own 2.5 floor, on a surface C10 §4 does not check.
+
+**A note owed to C10, and it is not this component's to fix.** `surface.bgDeep` is excluded from
+`textSurfaces` on the stated grounds that it carries no text — *"if a surface ever paints text on
+it, that surface is wrong or the exclusion is"*. This arm paints every one of its labels on it.
+The ruling above clears 4.5 on both variants so nothing here is unreadable, but the exclusion is
+now false, and no theme loaded in future is checked against the surface this figure's text lands
+on.
+
+**What was checked rather than assumed**: `paint-order` is not universally implemented, and a
+renderer that drops it paints the stroke *over* the fill — every label becomes a
+ground-coloured blob, and a byte-compare golden cannot see it. Rendered through the same
+librsvg the catalogue uses, against the two-element `fill="none"` stroke idiom as a control:
+identical. The fallback, if a consumer's renderer ever drops the attribute, is that idiom —
+the same text twice, stroke first — and it costs one extra element per label.
 
 ## 3q. One value axis across the bands, and the record it never had
 
@@ -10116,6 +10194,7 @@ would have to be re-run rather than extended.
 
 - **I110** — **A sankey is `graph`'s layering plus one placement that both arms draw from, and a node's extent is its flow.** `sankeyLayout` is pure — no `cells()`, no capabilities — and takes its height, gap and minimum as numbers, so the terminal calls it in half-rows with `quantum: true` and the SVG in pixels without; every bar, slice and ribbon end in either arm is that one function's answer (§3ap.3). **The scale is one number, the tightest layer's `(height − gaps) / Σflow`**, so a unit of flow is the same height in every layer and a ribbon leaves a bar at the width it arrives with; **a slice is never below one unit** and **a bar is the larger of its two sides**, the shorter leaving bare bar below its last slice — a loss, drawn (K6). **Slices are ordered by the far end's centre after placement** (K2, S4), and the relaxation separates without reordering (K10). **A deduplicated edge sums the weights it stands for** through `graphLayers`'s `origins` (K1); **a dummy is ribbon in its declared source's slot and counts in its layer's height** (K4); **a reversed edge is drawn forward, counted, and keeps its declared source's colour** (K7). **The terminal's budget loop is its own**: the notice row is spent first, the gap falls one row → a half-row → none, then the least-flow node goes and the notice names it (K5, K12); the SVG drops nothing (§3aj.6). **A label that does not fit is dropped and never truncated**, written from the outside in so the inner one goes first, and nothing is said of it in the notice (K3, K8, §3n). A node's colour is its declaration index through `refOf` (→ I1, I11, I58, C04 I92, §3d, §3ai.4 G1, G4, G5, §3n).
 - **I111** — **The bar and the ribbon are two glyphs at every depth, the ribbon's interior is the shade, and one function resolves the family for both width conventions.** `█` for a bar, `▒` for a ribbon's interior, `▀`/`▄` for a half either owns; `# = -` at ASCII, and the same three at `ambiguousWidth: "wide"` because every member of the block family is `East_Asian_Width=Ambiguous` — `barStyle`'s rule, in `sankeyAlphabet` (§3ap.2). **The shade rather than `dim` is I17's ruling and not taste**: an attribute is dropped at one bit and by any terminal that ignores SGR, and the frame it leaves is one block of `█` with letters in it; the shade is a shape, so the one-bit frame is the 24-bit frame with its colours removed — and it is, literally, the half-opacity fill the references draw. **Two owners in one cell put the lower one in the background**, `image.ts`'s half-block precedent and C10 I21's one widening (`wash`), never text on a tone; the slots cross as `categorical.cN` refs and are resolved in `definition.ts` at the terminal's depth. The SVG's ribbon is two cubic Béziers at `fill-opacity 0.5` in the declared source's slot (→ I4, I6, I17, C02 I9, C09 I22, C10 I21, C12 I29, A03 SS47).
+- **I112** — **A sankey's SVG node label is `tone.default` on a `surface.bgDeep` halo, and the halo is the terminal's cell substitution written in the other medium.** The label is already in the references' place — right of the bar, left of it on the last layer — and §3ap.4 K15 is the cell that place cannot answer: a ribbon begins at the bar's edge, so *outside the bar* and *on the ribbon* are one region, and no node in the corpus has bare ground beside it. Measured before the ruling, over 33 labels and both shipped variants: **1.02 at worst and 1.41 at best**, against `tone.muted`'s own recessive floor of 2.5 and body text's 4.5. The ink moves because a node label names the datum rather than the axis, and the halo goes behind it because the terminal's label cell is `{ text: ch }` with no `ref` and no background — the ribbon glyph is *replaced* there, and an SVG paints the region it cannot substitute (`stroke` in `bgDeep` at `SVG_FONT_SIZE / 4`, `paint-order="stroke"`). **After, measured under the ink rather than argued from `paint-order`** — the backdrop taken from a second render with the label's `fill` set to `none`, at exactly the pixels the ink changed: **12.43 on dark and 9.25 on light** for five of the six figures, and **9.51 / 7.59** on `crowded`, where one label's halo meets the next one's antialiased edge. Worst cell 7.59 against a floor of 4.5. **Both halves are load-bearing** — the halo alone leaves `muted` at 3.02 and 2.44, the light figure under its own floor. `sankeyLayout` does not move and the terminal frames are byte-identical: this is the second painter's ink, not the shared geometry's (→ I110, I111, C10 I32, §3ap.4 K15, §3ap.7).
 
 ## 8. Commitments
 
@@ -10232,6 +10311,7 @@ would have to be re-run rather than extended.
 ---
 
 110. **A sankey is a placement and a drawing over `graph`'s layering, and both arms draw from one geometry** (I110). `graphLayers` gained `origins` and nothing else; the scale is one number, a bar is the larger of its sides, a dummy is a ribbon, a reversed edge keeps its declared source's colour, and the budget loop — notice row first, gap ladder, least-flow drop — is the terminal's alone (§3ap.3, §3ap.4).
+112. **The SVG node label gets an ink and a ground of its own, because placement had already been spent** (I112). Six frames read as pictures and 33 labels measured at 1.02–1.41 against floors of 2.5 and 4.5; d3 does nothing about it and its readability does not transfer, plotly's default does both halves, and the terminal was already substituting the cell. `tone.default` on a `bgDeep` halo, 12.43 and 9.25, and `surface.bgDeep` is now a surface C10 §4 excludes and this arm paints text on (§3ap.4 K15, §3ap.7).
 111. **The ribbon's interior is the shade, chosen on the one-bit frame rather than the 24-bit one** (I111). Both candidates were drawn; the one that carried bar-against-ribbon in an attribute lost it where attributes are dropped, and the one that carries it in the glyph is also the half-opacity fill the references draw (§3ap.2).
 
 ## 9. Tests
@@ -10509,6 +10589,7 @@ Six tiers. No state machine — C12 is pure over the block.
 - **SK6** (I110 K5, I8): `crowded` keeps the eight largest sources at gap 0 and says `+4 more` with the four smallest by name, in a frame of exactly the declared height.
 - **SK7** (I111): the 24-bit frame's non-label glyphs are `█ ▒ ▀ ▄`, the ASCII frame's are `# = -`, the wide frame **is** the ASCII frame, the one-bit unicode frame keeps `█` and `▒` distinct, and a two-owner cell carries a background SGR at 24-bit.
 - **SK8** (I110, §3ap.3): the SVG draws one `<rect>` per declared node and one path per segment at `fill-opacity="0.5"`, the last layer's label `text-anchor="end"`, and the rect heights of `x` and `y` in the ratio `7 : 4` — continuous, because that arm has no quantum.
+- **SK11** (I112, §3ap.7): every `<text>` a sankey's SVG emits for a node carries the **`tone.default`** hex and a `stroke` in **`surface.bgDeep`** with `paint-order="stroke"` — asserted over all six variants and on **both** shipped theme variants, so the row is about the slots rather than about two hex literals. Paired with the ratio itself: `ratio(fill, stroke)` per label is at or above `DEFAULT_FLOOR`, which is the promise, and the two hex values are only how it is kept. The reversed notice is excluded by name — it is `tone.warn` on bare ground and is not a node label.
 - **SK9** (I110 K10, I11): two renders are byte-identical, and every layer's bars keep the ordering pass's order top to bottom after relaxation.
 - **SK10** (C04 I69, I92): the builder admits `graph` on `sankey` as the validator does. Runs the day `b.plot`'s guard is widened; until then it is a `todo` that names the file — a deferral whose condition is the code itself, so it cannot stay deferred once met.
 
@@ -10645,6 +10726,9 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T6.79** (I110, K1): the weight read from the first origin only → **SK3's second half fails**: `a→b 2` and `b→a 3` draw a ribbon of 2, correct in every count but the one that carries the data.
 - **T6.80** (I110, K4): the dummy drawn as a bar → **SK4 fails** — a node the graph does not have, in the right colour at the right rows.
 - **T6.81** (I110, K3): the fit test removed so a label is written wherever its bar is → **SK5 fails**: `rate-limiter` runs under `upstream-service` at 40 columns. Labels written inner-first instead → **SK5 fails the other way**, keeping the middle name and losing the sink's.
+- **T6.87** (I112, §3ap.7): the label's ink put back to `LABEL` — the axis furniture's `tone.muted` — → **SK11 fails**, on the slot row and on the ratio row, the light variant at 2.44 and under `muted`'s own floor.
+- **T6.88** (I112, §3ap.7): the halo dropped, the ink left at `tone.default` → **SK11 fails** on the `stroke`/`paint-order` half. This is the mutation that says the halo is load-bearing rather than decorative: without it the backdrop is the ribbon again and the ratio row has nothing to resolve against.
+- **T6.89** (I112, §3ap.7): `paint-order="stroke"` dropped and the `stroke` kept → **SK11 fails on 12 rows and not on 24**, and the ratio row does not move. That asymmetry is the whole reason `paint-order` is a separate assertion: the stroke is then painted *over* the fill, every label becomes a ground-coloured blob, and a rule that reads the two hex attributes is satisfied by exactly the document that hides it. Measured — 24 rows for the ink, 24 for the halo, **12** for this.
 - **T6.82** (I110, K5): the sacrifice order reversed → **SK6 fails** — the largest sources go and the notice names `src-12`.
 - **T6.83** (I111, K13): the ribbon interior returned to `█` → **SK7 fails at one bit**, and the 24-bit frame still reads correctly in colour, which is why the row is asserted where it is. The two-owner background dropped → **SK7's SGR assertion fails**.
 - **T6.84** (I110, K7): the colour taken from the drawn source rather than the declared one → **SK3 fails**: the reversed ribbon arrives in `a`'s slot.
