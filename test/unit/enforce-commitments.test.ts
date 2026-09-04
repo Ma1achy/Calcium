@@ -37,6 +37,9 @@ import {
   checkInvariantCoverage,
   tableColumn,
   testRowsOf,
+  mnemonicRowsOf,
+  checkMnemonicRowIds,
+  SPEC_RULES,
 } from "../../tools/enforce/commitments.mjs";
 
 /**
@@ -613,6 +616,184 @@ describe("A03 SP7 — a test row's number is unique within its spec", () => {
     const read = at(source, FILE);
     expect(testRowsOf(FILE, read)).toEqual(["T1.1", "T1.1"]);
     expect(checkTestRowIds([FILE], read)[0]?.message).toContain("declares T1.1 twice");
+  });
+});
+
+describe("A03 SP10 — a mnemonic test-row label is unique within its spec", () => {
+  const FILE = "docs/components/C99_x.md";
+
+  /** A tier list in the corpus's exact form. Parses first, then judges. */
+  function rows(ids: readonly string[]): readonly [string[], ReturnType<typeof checkMnemonicRowIds>] {
+    const source = ["# C99 — fabricated", "", "### Tier 1", "", ...ids.map((id) => `- **${id}**: text.`), ""].join(
+      "\n",
+    );
+    const read = at(source, FILE);
+    return [mnemonicRowsOf(FILE, read), checkMnemonicRowIds([FILE], read)];
+  }
+
+  it("SP10: the real corpus, and it is a corpus", () => {
+    // The vacuity half, and this rule needs it more sharply than SP7 does:
+    // twenty-three of twenty-six specs declare **no** mnemonic rows at all, so
+    // a parser that stopped matching would skip every file and report the same
+    // green line. The count is what a reader watches, not the verdict.
+    const files = specFiles();
+    expect(files.length).toBe(26);
+
+    const declaring = files.filter((f) => mnemonicRowsOf(f).length > 0);
+    expect(declaring.map((f) => (f.split("/").pop() ?? "").slice(0, 3)), "C09, C12 and C22 name rows by mnemonic").toEqual([
+      "C09",
+      "C12",
+      "C22",
+    ]);
+
+    const total = files.reduce((n, f) => n + mnemonicRowsOf(f).length, 0);
+    expect(total, "183 mnemonic rows at the last count; the parser must still see them").toBeGreaterThan(150);
+
+    // The control for the fabrication below: the tree as it stands is clean.
+    expect(checkMnemonicRowIds(files), "run `make enforce` for the detail").toEqual([]);
+  });
+
+  it("SP10: fires on F635's own shape, in the file it happened in", () => {
+    // **The fabricated violation over the real corpus rather than a fixture.**
+    // C12 §9 held two rows both called `SK10`; the second was renamed to `SK11`
+    // by hand and `make enforce` was green either way. This puts it back — in a
+    // scratch copy read through the injected reader, never on disk — and the
+    // rule must find it in the document it actually happened in.
+    const target = "docs/components/C12_plot_renderer.md";
+    const original = readFileSync(target, "utf8");
+    expect(original, "the anchor the replacement below depends on").toContain("- **SK11** ");
+    const mutated = original.replace("- **SK11** ", "- **SK10** ");
+    expect(mutated, "a fabrication that changed nothing is not a fabrication").not.toBe(original);
+
+    const violations = checkMnemonicRowIds(specFiles(), (f) => (f === target ? mutated : readFileSync(f, "utf8")));
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.rule).toBe("SP10");
+    expect(violations[0]?.file).toBe(target);
+    expect(violations[0]?.message).toContain("C12 declares SK10 twice");
+  });
+
+  it("SP10: distinct labels pass, families and letter variants included", () => {
+    // A letter suffix says *variant of the row above* — SP2's ruling, which SP7
+    // inherited — so `SC2b` beside `SC2` is two rows and not a collision.
+    const [parsed, clean] = rows(["SK1", "SC2", "SC2b", "HZ10", "CAM3"]);
+    expect(parsed, "the fabrication does not parse to what it looks like").toEqual([
+      "SK1",
+      "SC2",
+      "SC2b",
+      "HZ10",
+      "CAM3",
+    ]);
+    expect(clean).toEqual([]);
+  });
+
+  it("SP10: every duplicate is named, not only the first", () => {
+    // SP7's row, and it is here because the guard it tests is now **shared**:
+    // `duplicatesIn` is one implementation for both rules, so dropping the
+    // `already listed` clause has to fail on this side too. Three occurrences
+    // and not two — with pairs alone the two readings agree.
+    const [, violations] = rows(["SK1", "SK1", "HZ2", "HZ2", "SK1"]);
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.message).toContain("SK1, HZ2");
+    expect(violations[0]?.message, "named once, however many times it recurs").not.toContain("SK1, HZ2, SK1");
+  });
+
+  it("SP10: one label in two specs is legitimate, and that is the stated scope", () => {
+    // **The blind spot, asserted rather than described, against the corpus's
+    // own instance.** `IF8` is declared in C09 §9 and again in C22 §9, about two
+    // different things: a mnemonic means something inside the component that
+    // draws it, so `IF` in one spec and `IF` in another are different subjects.
+    // A corpus-wide comparison would gate this and be switched off.
+    const declared = specFiles().filter((f) => mnemonicRowsOf(f).includes("IF8"));
+    expect(declared.map((f) => (f.split("/").pop() ?? "").slice(0, 3)), "the reuse is real today").toEqual([
+      "C09",
+      "C22",
+    ]);
+    expect(checkMnemonicRowIds(declared), "and it is not a violation").toEqual([]);
+  });
+
+  it("SP10: an invariant declaration is not a row, and SP2 keeps it", () => {
+    // `[A-Z]{2,}` and not `[A-Z]+`. A single leading capital is what an
+    // invariant looks like, and matching those would put every invariant list
+    // under this rule — reporting a duplicate SP2 already owns, in a family it
+    // does not belong to, twice for one defect.
+    const source = ["# C99 — fabricated", "", "- **I39** — an invariant.", "- **I39** — and again.", ""].join("\n");
+    const read = at(source, FILE);
+    expect(mnemonicRowsOf(FILE, read)).toEqual([]);
+    expect(checkMnemonicRowIds([FILE], read)).toEqual([]);
+  });
+
+  it("SP10: the two families partition the corpus, so no row is counted twice", () => {
+    // The structural interaction between SP7 and SP10: one anchor, two callers.
+    // A label claimed by both would be one defect reported twice, and one
+    // claimed by neither is the gap the pair exists to close.
+    for (const file of specFiles()) {
+      const numbered = new Set(testRowsOf(file));
+      const mnemonic = mnemonicRowsOf(file);
+      expect(mnemonic.filter((id) => numbered.has(id)), `${file} has a row in both families`).toEqual([]);
+    }
+  });
+
+  it("SP10: the gate calls it, and so does every other SP rule", () => {
+    // **The mutation pass asked for this row and nothing in the suite answered.**
+    // Deleting `...checkMnemonicRowIds(specs)` from `tools/enforce/index.mjs`
+    // failed **nothing**: every fire-test above calls the checker directly, so a
+    // rule that is implemented, inventoried, fabricated against and never
+    // invoked by `make enforce` passes the whole family. Measured on SP7 as
+    // well — unwiring it fails nothing either — so this closes the class rather
+    // than the instance it was found on.
+    //
+    // **Stated limit**: it proves the gate *calls* the checker, not that it
+    // gates on the result. SP8 deliberately reports without gating, so demanding
+    // the spread into `violations` would be wrong for one of the ten.
+    const carriers: Record<string, string> = {
+      SP1: "checkCommitments",
+      SP2: "checkOrdering",
+      SP3: "checkReferences",
+      SP4: "checkSeamFour",
+      SP5: "checkFindings",
+      SP6: "checkTriageInventory",
+      SP7: "checkTestRowIds",
+      SP8: "checkSectionReferences",
+      SP9: "checkInvariantCoverage",
+      SP10: "checkMnemonicRowIds",
+    };
+
+    // Equality, so a rule added to `SPEC_RULES` without a carrier fails here
+    // rather than being invisible to the loop below.
+    expect([...SPEC_RULES].sort()).toEqual(Object.keys(carriers).sort());
+
+    const runner = readFileSync("tools/enforce/index.mjs", "utf8");
+    for (const [rule, fn] of Object.entries(carriers)) {
+      expect(runner, `${rule}: the gate never calls ${fn}`).toMatch(new RegExp(`\\b${fn}\\(`));
+    }
+  });
+
+  it("SP10: a label named mid-sentence is a citation, not a declaration", () => {
+    // The anchor, in the shape the corpus actually writes: a fail-on-revert row
+    // naming the row it breaks. Shared with SP7 rather than reimplemented, so
+    // this is the same clause tested from the second side.
+    const source = [
+      "# C99 — fabricated",
+      "",
+      "- **SK10**: text.",
+      "- **SK11**: reverting the guard - **SK10** fails, and nothing else does.",
+      "",
+    ].join("\n");
+    const read = at(source, FILE);
+    expect(mnemonicRowsOf(FILE, read), "the mid-line id is a reference").toEqual(["SK10", "SK11"]);
+    expect(checkMnemonicRowIds([FILE], read)).toEqual([]);
+  });
+
+  it("SP10: an indented label is still a row", () => {
+    // The under-matching direction, which is the one that goes quiet: a tier
+    // written as a nested list would be skipped entirely and the rule would
+    // report compliance exactly like a satisfied one.
+    const source = ["# C99 — fabricated", "", "  - **SK10**: text.", "  - **SK10**: text again.", ""].join("\n");
+    const read = at(source, FILE);
+    expect(mnemonicRowsOf(FILE, read)).toEqual(["SK10", "SK10"]);
+    expect(checkMnemonicRowIds([FILE], read)[0]?.message).toContain("declares SK10 twice");
   });
 });
 

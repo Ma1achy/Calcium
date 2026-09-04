@@ -496,19 +496,68 @@ export function checkOrdering(files, readFile = (f) => readFileSync(f, "utf8")) 
  * measured 2026-08-13. So this keeps its shape on asymmetry rather than on odds
  * — a rule that stops seeing a section costs a silent gap, and the check costs
  * a character class.
+ *
+ * **The second alternative is SP10's, and it shares the anchor deliberately.** A
+ * mnemonic row — `- **SK10**`, `- **HZ4**` — is declared in exactly the form a
+ * numbered one is, so a second pattern would be a second copy of every clause
+ * above: the leading-whitespace ruling, the mid-line ruling, and the `- ` that
+ * separates a declaration from a citation. A reimplemented rule keeps its
+ * birthday clauses, and this is the birthday. The two families are split by
+ * `rowIdsOf`'s callers, not by two readers of one corpus.
+ *
+ * `[A-Z]{2,}` and not `[A-Z]+`: a single leading capital is what an invariant
+ * declaration looks like (`- **I39**`), and matching those would put every
+ * invariant list under a rule SP2 already owns, in a family it does not belong
+ * to.
  */
-const TEST_ROW = /^[ \t]*- \*\*(T\d+\.(?:\d+[a-z]?|x))\*\*/gm;
+const TEST_ROW = /^[ \t]*- \*\*(T\d+\.(?:\d+[a-z]?|x)|[A-Z]{2,}\d+[a-z]?)\*\*/gm;
 
-/** Every test row id a spec declares, in document order, `x` rows excluded. */
-export function testRowsOf(file, readFile = (f) => readFileSync(f, "utf8")) {
+/** Every row id of either family a spec declares, in document order. */
+function rowIdsOf(file, readFile) {
   const ids = [];
   const src = readFile(file);
   TEST_ROW.lastIndex = 0;
   let m;
-  while ((m = TEST_ROW.exec(src))) {
-    if (!m[1].endsWith(".x")) ids.push(m[1]);
-  }
+  while ((m = TEST_ROW.exec(src))) ids.push(m[1]);
   return ids;
+}
+
+/** A numbered row: the tier-and-number family SP7 governs. */
+const NUMBERED = /^T\d+\./;
+
+/** Every test row id a spec declares, in document order, `x` rows excluded. */
+export function testRowsOf(file, readFile = (f) => readFileSync(f, "utf8")) {
+  return rowIdsOf(file, readFile).filter((id) => NUMBERED.test(id) && !id.endsWith(".x"));
+}
+
+/**
+ * SP10 — every mnemonic row label a spec declares, in document order.
+ *
+ * The complement of `testRowsOf` over one read, so the two families partition
+ * the rows rather than overlapping: a label reported by both rules would be one
+ * defect counted twice, and a label reported by neither is the gap this pair
+ * exists to close.
+ */
+export function mnemonicRowsOf(file, readFile = (f) => readFileSync(f, "utf8")) {
+  return rowIdsOf(file, readFile).filter((id) => !NUMBERED.test(id));
+}
+
+/**
+ * The ids that occur more than once, each named once however many times it
+ * recurs, in first-collision order.
+ *
+ * One implementation for SP7 and SP10 for the reason `sectionLines` is one: the
+ * `already listed` guard is the clause a third occurrence tests and a second
+ * copy would eventually lose it.
+ */
+function duplicatesIn(ids) {
+  const seen = new Set();
+  const duplicated = [];
+  for (const id of ids) {
+    if (seen.has(id) && !duplicated.includes(id)) duplicated.push(id);
+    seen.add(id);
+  }
+  return duplicated;
 }
 
 /**
@@ -529,12 +578,7 @@ export function checkTestRowIds(files, readFile = (f) => readFileSync(f, "utf8")
     // size before asserting it is clean.
     if (ids.length === 0) continue;
 
-    const seen = new Set();
-    const duplicated = [];
-    for (const id of ids) {
-      if (seen.has(id) && !duplicated.includes(id)) duplicated.push(id);
-      seen.add(id);
-    }
+    const duplicated = duplicatesIn(ids);
     if (duplicated.length === 0) continue;
 
     violations.push({
@@ -547,6 +591,83 @@ export function checkTestRowIds(files, readFile = (f) => readFileSync(f, "utf8")
         `to whichever row a reader finds first, and every fail-on-revert row that ` +
         `names it names both — the number has stopped locating anything while ` +
         `nothing is missing and nothing dangles.`,
+    });
+  }
+
+  return violations;
+}
+
+// --- SP10 — a mnemonic test-row label is unique within its spec -------------
+//
+// **SP7's argument for the other half of the rows, and it was the half nobody
+// checked** (F635). A tier does not have to number its rows: C12's §9 names them
+// by mnemonic — `SK` for sankey, `HZ` for horizon, `PR` for projection — and 183
+// of the corpus's rows are declared that way across three specs. SP7 cannot see
+// one of them, because `T\d+\.` is the whole of what it matches.
+//
+// The measured instance: C12 §9 held **two** rows both called `SK10`, and
+// `make enforce` reported *338 files · 26 specs · 15 728 invariant references
+// resolved · no violations* with both in the file. It was caught by reading a
+// grep. A fail-on-revert row saying *`T6.87` → `SK10` fails* then resolves
+// against whichever of the two a reader meets first, and **neither reading is
+// wrong** — which is A03 §2's failure arriving at the citation rather than at
+// the rule, exactly as SP7 describes it.
+//
+// **This is the definition side of a rule that was already exact in the other
+// direction.** SP3 catches a bare `I112` in a run file; SP5 catches an `Fnn`
+// that resolves to nothing. Both prove a *citation* has a target. Nothing proved
+// the target was one target.
+//
+// **Stated blind spot: the scope is one document, and that is the ruling rather
+// than a limitation to be fixed.** `IF8` is declared in C09 §9 and again in C22
+// §9 today, about two different things, and both are correct: a mnemonic is a
+// two-or-three letter mark that means something inside the component that draws
+// it, so `SK` in C12 and `SK` in another spec are different subjects. A
+// corpus-wide comparison would gate legitimate reuse and be turned off. The cost
+// is real and named: a citation writing `SK10` with no spec in front of it is
+// ambiguous *across* documents and this rule cannot say so — SP3's qualified-
+// reference habit is what closes that, and only for invariants.
+//
+// **Second blind spot: the rule matches a shape, not a section.** Any bolded,
+// dashed list item whose label is two-or-more capitals then digits is read as a
+// row declaration wherever it sits in the document. Measured 2026-09-04: all 183
+// matches in `docs/components/` are test rows and all 183 are inside a Tests
+// section, so the shape is exact today and would stop being so the day a spec
+// writes a glossary in that form.
+//
+// **And there is no placeholder arm.** SP7 exempts `Tn.x` because a spec under
+// construction writes one; the mnemonic families have no such convention and the
+// corpus carries zero `- **SKx**`-shaped rows, so an exemption would be a clause
+// with nothing to be wrong about — A03 §2's own vacuity class, installed in the
+// rule against it.
+
+/**
+ * SP10, one violation per spec, in `checkTestRowIds`' shape and for its reasons.
+ */
+export function checkMnemonicRowIds(files, readFile = (f) => readFileSync(f, "utf8")) {
+  const violations = [];
+
+  for (const file of files) {
+    const ids = mnemonicRowsOf(file, readFile);
+    // SP7's vacuity arm. Most specs number every row and declare none of these,
+    // so *no labels* is the common case here rather than the suspicious one —
+    // and the fire-test asserts the corpus size before asserting it is clean.
+    if (ids.length === 0) continue;
+
+    const duplicated = duplicatesIn(ids);
+    if (duplicated.length === 0) continue;
+
+    violations.push({
+      rule: "SP10",
+      file,
+      spec: "A03 §2 · A03 §7a",
+      message:
+        `${(file.split("/").pop() ?? "").slice(0, 3)} declares ` +
+        `${duplicated.join(", ")} twice. A fail-on-revert row or a test name citing ` +
+        `one of these resolves to whichever row a reader meets first and neither ` +
+        `reading is wrong — the label has stopped locating a row while nothing is ` +
+        `missing and nothing dangles (F635). Rename the later one to the next free ` +
+        `number of its own family; a letter suffix says *variant of the row above*.`,
     });
   }
 
@@ -1610,4 +1731,4 @@ export function checkReferences(
 // was green throughout, because the rule *was* implemented and running; the only
 // thing that could see the gap was the suite, and the suite is not what was run.
 // That is A03 §2's own subject reaching the list that enforces it.
-export const SPEC_RULES = ["SP1", "SP2", "SP3", "SP4", "SP5", "SP6", "SP7", "SP8", "SP9"];
+export const SPEC_RULES = ["SP1", "SP2", "SP3", "SP4", "SP5", "SP6", "SP7", "SP8", "SP9", "SP10"];

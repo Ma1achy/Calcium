@@ -29,6 +29,7 @@ import {
   checkCommitments,
   checkOrdering,
   checkTestRowIds,
+  checkMnemonicRowIds,
   checkReferences,
   checkSectionReferences,
   checkSeamFour,
@@ -168,6 +169,12 @@ const violations = [
   // one of them resolves, which for eleven hundred references nothing did.
   ...checkOrdering(specs),
   ...checkTestRowIds(specs),
+  // SP10 — the same question for the rows a spec names by mnemonic rather than
+  // by number, which SP7's `T\d+\.` cannot see. C12 §9 held two rows both
+  // called `SK10` and `make enforce` was green with both in the file: the
+  // citation side of this was already exact and the definition side had no rule
+  // at all (F635).
+  ...checkMnemonicRowIds(specs),
   // SP4 — Seam 4 and its owners agree, both directions. The only artefact
   // several components write to and none owns, wrong at every one that touched
   // it, because every row exists twice and nothing compared the copies.

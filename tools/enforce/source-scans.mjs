@@ -735,13 +735,23 @@ export const SCANS = [
   // the rule silently, which is the failure this scan exists to prevent, arriving
   // through the scan itself. So: literal, and the cost is one word per token.
   //
+  // **The token list is restated here and that is a known cost** (lane M, M3):
+  // `Glyph` gained `quote` and `nested` and this rule reported both as defects,
+  // because the alternation is a second copy of the union with no mechanism
+  // holding the two together. It is the reimplemented-rule shape — both copies
+  // read as correct, and the one that goes stale is the one nothing asserts
+  // against. The scans are a flat table of regexes with no import of `src/`, so
+  // deriving the list from `GLYPH_TOKENS` is a change to the table's shape
+  // rather than to this row; recorded so the next token's author knows to come
+  // here rather than diagnosing a false violation.
+  //
   // The pattern matches a glyph position whose literal is *not* a token, so
   // `glyph: "error"` passes and `glyph: "✗"` does not. Scoped to `src/`: the
   // one file that holds the characters writes them as table rows rather than in
   // a glyph position, so it needs no exemption — and an exemption nobody needs
   // is a door left open.
   { id: "SS39", spec: "C04 I6 · C09 §4",
-    pattern: /\bglyph\s*:\s*["'`](?!(?:ok|warn|error|info|pending|working|running|queued|cancelled|expand|collapse|live|bullet|continuation)["'`])/,
+    pattern: /\bglyph\s*:\s*["'`](?!(?:ok|warn|error|info|pending|working|running|queued|cancelled|expand|collapse|live|bullet|quote|nested|continuation)["'`])/,
     scope: "src/", allow: [],
     why: "a block names a glyph slot; C09 §4 owns both renderings and the 1:1 width rule" },
 
