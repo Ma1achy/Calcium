@@ -24388,3 +24388,771 @@ residue handed to entry 11 (F583).
 
 **The arithmetic**: 21 entries, F567–F587, keyed in one move each — group 2 gains one, 7 one,
 9 two, 10 four, 11 three, 14 one, Singles nine — and SP6 reads 591 = 591.
+
+---
+
+## F588 — C04 T2.36's own measurement example cannot fail ★★☆☆☆
+
+*2026-09-04 · Lane T, spans — tone, value and the atom wrap, at 53107246+lanes (2026-09-04).*
+
+**Expected** (C04 §9, T2.36 as written): *`measure` at width 12 of `"alpha beta gamma"` with `gamma`
+valued is one row more than without, because the token wrapped whole.*
+
+**Measured**: `wrapCells("alpha beta gamma", 12)` is already `["alpha beta", "gamma"]` — the plain
+wrapper breaks at the space before `gamma`, so valuing `gamma` moves nothing and both measures are 2.
+A single-word valued token **never** changes the row count in prose, because prose already breaks at
+the spaces on either side of it; the count moves only where the row around the token has **no break
+point** — `"x(abcde)yz"` at 6 is `x(abcd` / `e)yz` plain and `x(` / `abcde)` / `yz` valued (2 → 3) — or
+where the valued span itself contains a space (`"aa bb cc dd"` at 8 with `bb cc` valued: same count,
+different rows). The row's example is the *finding's own example checked by nothing* class: the
+sentence names a mechanism and the input it names does not exercise it. Corrected input in
+`laneT-requests.md` R2; the measured pair is C04 T2.36 (unit) and C09 T3.66.
+
+**Where**: `docs/components/C04_view_model.md` line 2814; `test/unit/spans.test.ts` (`C04 T2.36`).
+
+---
+
+## F589 — the gate accepts `colormap` on a `rule` ★★☆☆☆
+
+*2026-09-04 · Lane T, spans — tone, value and the atom wrap, at 53107246+lanes (2026-09-04).*
+
+**Expected** (C04 I90, `Rule` type): `colormap` is `Raw`'s and `Notice`'s; a `rule` has nowhere to put
+one and the validator refuses members a kind does not carry.
+
+**Measured**: `validateBlock({ kind: "rule", id: "h", label: "x", colormap: "viridis" })` → `ok: true`,
+and the value survives on the block. `checkColormapName` is called for `raw` and `notice` only
+(`validate.ts` 802, 1203) and `rule` is never asked. F207's *accepted and ignored*, at the gate as well
+as at the builder — the builder half is closed here (`TextOpts` split, `test/contract/text-opts.test.ts`),
+the gate half is C04's and is requested (R1).
+
+**Where**: `src/data/viewmodel/validate.ts`; probe `validateBlock` on a rule.
+
+---
+
+## F590 — a full row followed by a space began the next row with the space ★★★☆☆
+
+*2026-09-04 · Lane T, spans — tone, value and the atom wrap, at 53107246+lanes (2026-09-04).*
+
+**Expected** (C09 §5, *the break space is in no row*; T1.17's pinned `"ab  cd"` at 4 → `ab` / `cd`).
+
+**Measured**: `wrapCells("abcdef gh", 6)` → `["abcdef", " gh"]` before this lane; the no-break-point
+arm pushed the full row and then appended the space to the next one. Reachable before in prose only
+when a token exactly filled the row; reachable in the ordinary case once a valued atom fills a row
+(`"aa bb cc dd"` at 5 with `bb cc` valued → `aa` / `bb cc` / `" dd"`). Fixed in `wrapCellsParts` with one
+arm — a space overflowing a row with no break point *is* the break — measured after: `["abcdef", "gh"]`
+and `aa` / `bb cc` / `dd`. The pinned cases are unchanged (`"abc   def"` at 5 keeps `" def"` because
+there a break point exists and the extra spaces are content). **Golden exposure**: any wrapped `notice`
+or `tip` whose row is exactly full and followed by a space would change — see the report's goldens
+section for what the suite said.
+
+**Where**: `src/presentation/text.ts` `wrapCellsParts`; C09 T1.19.
+
+---
+
+## F591 — the wrapper breaks one word early when a row is exactly full (not fixed) ★★☆☆☆
+
+*2026-09-04 · Lane T, spans — tone, value and the atom wrap, at 53107246+lanes (2026-09-04).*
+
+**Expected**: `"aa bb cc dd"` at 5 → `aa bb` / `cc dd` (both rows fit exactly).
+
+**Measured**: `["aa", "bb", "cc dd"]`. The overflow check fires on the *space* after a full row, and
+the break-point search then takes the last space *inside* the full row rather than treating the
+overflowing space as the break — so `bb` is pushed to the next row though `aa bb` fits. Same shape as
+F590 but on the branch that *has* a break point; not fixed here because it changes the row set of every
+paragraph with an exactly-full row and the golden files are shared. One line in the same place as
+F590's arm; recorded rather than ruled.
+
+**Where**: `src/presentation/text.ts` `wrapCellsParts`, the `at !== null` branch.
+
+---
+
+## F592 — `RunContext.capabilities` could be narrower than it is ★☆☆☆☆
+
+*2026-09-04 · Lane T, spans — tone, value and the atom wrap, at 53107246+lanes (2026-09-04).*
+
+**Expected**: the painter reads `colourDepth` only (`resolveTone`, `continuousColour` both take
+`Pick<TerminalCapabilities, "colourDepth">`).
+
+**Measured**: `paint.tone()` already takes the full record, so `RunContext` takes the full record for
+consistency and every caller holds one. A test that wants a depth builds `{ ...FULL_CAPS, colourDepth }`.
+Noted so the day a caller has only a depth, the narrowing is known to be free.
+
+**Where**: `src/presentation/blocks/paint.ts` `RunContext`.
+
+---
+
+## F593 — another lane's files were failing `tsc` while this lane ran ★☆☆☆☆
+
+*2026-09-04 · Lane T, spans — tone, value and the atom wrap, at 53107246+lanes (2026-09-04).*
+
+**Measured**: `npx tsc --noEmit -p .` reported parse errors in `test/edge/image-frames.test.ts` (line
+440) and missing exports in `test/{unit,revert}/block-cap.test.ts` (`Windowed`) during this lane's
+pass. None are this lane's files; this lane's files typecheck with those filtered out. Recorded so the
+lead knows the tsc verdict in this report is filtered, not clean.
+
+---
+
+## F594 — The patch goldens cannot see the writer ★★★☆☆
+
+*2026-09-04 · Lane P, the intra-line diff, at 53107246+lanes (2026-09-04).*
+
+**Expected** (brief item 5): the patch states in `test/golden` would move wherever a fixture pairs a
+changed line, because the writer now underlines the changed word.
+
+**Measured**: zero goldens moved, and none can. `test/golden/patch.test.ts` builds every case with
+`patchOf` / `hunkOf` (`test/support/blocks.ts:556–601`), which construct the block through
+`block()` and never through `b.patch`; the writer lives in `b.patch`. `grep -rn "b\.patch("` over
+`test/` and `src/` finds one caller (`test/contract/builders.test.ts:140`, a context-only hunk), and
+`src/data/fixtures` carries no patch. So the 16 patch goldens × 4 widths × 2 themes × 2 modes are all
+blind to I10 — the one C25 feature whose whole output is an SGR attribute inside a golden row is
+recorded by no golden.
+
+**Where**: `test/golden/patch.test.ts` CASES; `test/support/blocks.ts:583` (`patchOf`). Request R2
+asks for one golden case built through `b.patch` — the lead regenerates once.
+
+---
+
+## F595 — Three groupings of one pairing existed; two are now one, the third is owed ★★☆☆☆
+
+*2026-09-04 · Lane P, the intra-line diff, at 53107246+lanes (2026-09-04).*
+
+**Expected**: the brief said "same pairing rule, or share it — do not write a second pairing". The
+renderer's `runsOf` in `patch/definition.ts` was the one to share.
+
+**Measured**: there were already **two** independent groupings before this lane wrote a third —
+`definition.ts`'s `runsOf` (draws split rows) and `window.ts`'s `unitsOf` (walks run boundaries for
+window units, and `rowSlice` pairs the *n*th remove with the *n*th add implicitly). The lane
+replaced `runsOf` with C04's `changedRuns` (`src/data/viewmodel/intraline.ts`) and the writer reads
+the same function, so the diff and the drawing agree by construction. `unitsOf` still walks its own
+boundaries. It agrees today — T3.19 asserts a row-wise window carries the same underline on the same
+word — and it is the shape SS30 exists for: a second copy that agrees today and diverges where it is
+least visible.
+
+**Where**: `src/presentation/patch/window.ts:47` (`unitsOf`), `:400` (`rowSlice`). Owed with the
+symbol: `unitsOf` → `changedRuns`.
+
+---
+
+## F596 — A writer that re-emits a run reorders the document (found before the code compiled) ★★★☆☆
+
+*2026-09-04 · Lane P, the intra-line diff, at 53107246+lanes (2026-09-04).*
+
+**Expected**: within a `ChangedRun`, emitting the diffed removes then the diffed adds reproduces the
+hunk — a run's removes precede its adds.
+
+**Measured**: false. A run is *maximal consecutive changed lines* and `-a +b -c +d` is one run with
+`removes = [a, c]`, `adds = [b, d]`; removes-then-adds yields `-a -c +b +d`, a different document in
+unified layout and a different `Hunk` for the gate. The first draft of `intralineLines` did exactly
+this and was caught on re-reading `changedRuns`'s contract before `tsc` ran. The landed writer maps
+over `lines` with a `Map<Line, Line>` of replacements, so it cannot reorder; T1.14 pins document
+order on an interleaved run.
+
+**Where**: `src/data/viewmodel/intraline.ts` `intralineLines`; `test/unit/patch-intraline.test.ts`
+T1.14 "interleaved removes and adds keep the document's order". The instrument was the walk's R3×R6
+cell (spans are per pair × pairs are positional within a run whose sides interleave).
+
+---
+
+## F597 — The unrelated-pair ruling has a precedent, and the precedent's number is taste ★★☆☆☆
+
+*2026-09-04 · Lane P, the intra-line diff, at 53107246+lanes (2026-09-04).*
+
+**Expected**: the brief asked only for the whitespace ruling. Reading the frame of `-foo bar` /
+`+baz qux` showed every token underlined on both sides with the space between them not — a fragmented
+restatement of the line background.
+
+**Measured**: delta (`dandavison/delta`) has this rule as `max-line-distance`, default 0.6; git's
+`--color-words` has none. The lane rules the boundary at **zero shared non-whitespace tokens**: it is
+the one point where the underline is provably vacuous (every cell of both lines would carry it), and
+any threshold above it is a preference no measurement here settles ("a measurement does not settle
+what to draw"). Recorded in C25 I10 with the precedent named so a later reader can move it
+deliberately.
+
+**Where**: `docs/components/C25_patch_renderer.md` I10; `intraline.ts` `intralineSpans` (`related`).
+
+---
+
+## F598 — A window fixture that asserted nothing ★★☆☆☆
+
+*2026-09-04 · Lane P, the intra-line diff, at 53107246+lanes (2026-09-04).*
+
+**Expected**: `windowPatch(whole, 80, offset 2, height 3)` on a four-line hunk shows the first
+context line and the removed line, so the third row is underlined.
+
+**Measured**: at height 3 the window is the path header, the sticky hunk header (I18, paid for from
+the budget) and one body row — the context line. The row asserted `[[], [], ["b0"]]` and received
+`[[], [], []]`; the fixture did not construct the state it claimed. Height 4 does. The landed row
+asserts the visible frame text as well as the underline so the next reader sees what the window holds.
+
+**Where**: `test/edge/patch-intraline.test.ts` T3.19 (`windowPatch`). Not a code defect; an instance
+of "a test must construct the state it claims", recorded because it is the second time in this lane
+that the window's sticky-header accounting surprised a fixture (the first is C25 T1.21's own history).
+
+---
+
+## F599 — `textSpans` slices tokens by the stripped length over tokens of the raw text (pre-existing) ★☆☆☆☆
+
+*2026-09-04 · Lane P, the intra-line diff, at 53107246+lanes (2026-09-04).*
+
+**Expected**: `sliceTokens(tokenise(text), 0, kept.length)` cuts the token stream at the visible cut.
+
+**Measured**: `truncateParts` computes `kept` over `stripControl(text)` while `tokenise` runs over
+`text`, so each control character before the cut shifts the token slice one code unit short of the
+row. Tabs and newlines are not control here (`src/data/text.ts:36`), so the case is a real C0/C1
+byte in a diff line — rare, and pre-existing. The span path this lane added is immune by
+construction: `runsOf` strips per run after cutting by offset (its own documented order of
+operations), and the merge walks the runs' lengths, not the raw text's.
+
+**Where**: `src/presentation/patch/lines.ts` `textSpans`. Low priority; noted rather than fixed
+because the fix belongs with C09's `sliceTokens` contract and not in a patch-only path.
+
+---
+
+## F600 — The shared tree carried other lanes' breakage through this lane's gates ★☆☆☆☆
+
+*2026-09-04 · Lane P, the intra-line diff, at 53107246+lanes (2026-09-04).*
+
+**Expected**: `make check`, `make enforce` and `npm test` green at the end of the lane.
+
+**Measured**: `make check` failed on `test/contract/spans.test.ts:47` (`paintRuns` gained a third
+parameter in `src/presentation/blocks/paint.ts`, modified by another lane, and its test was not yet
+updated); `make enforce` reported 39 violations of which **2** were this lane's (SS30: a second
+function named `tokenise`; SP9: `C25 I10` now cited and still on the exemption list) and 37 were
+other lanes' (SP3 × 30 on `C22 I77` / `C09 I90` / `C24 I93` citations, SS47 × 4 on sankey glyphs,
+SS54 × 2 on refusals R18/R20, SP9 on C14 I24–I26). Both of this lane's are fixed below; the rest are
+outside its files. The figure to keep: a lane's own gate reads red for reasons that are not its own,
+and the only way to attribute is to grep the report for the lane's paths.
+
+**After the two fixes** (`lanes2/laneP-enforce2.log`): 59 violations, 0 on this lane's paths or
+invariants — SS30 and the `C25 I10` SP9 entry are gone; the count grew by 20 between the two runs
+(SP3 30 → 52, plus MG25 on `runs.ts`'s `atomsOf`) with no edit from this lane in between, which is
+the other lanes landing. `tsc --noEmit` reports errors in `test/edge/image-frames.test.ts`,
+`test/unit/block-cap.test.ts`, `test/revert/block-cap.test.ts` and none in this lane's files.
+`test/unit/mutate-anchors.test.ts` MA4 fails on `c14-cap`, `c22-camera`, `c22-cursor`,
+`deferred-height` and `spans` runs; `c25-intraline.mjs`'s anchors all resolve (it is absent from the
+problem list, and the run count went 127 → 129 with it counted).
+
+**Where**: `lanes2/laneP-enforce.log` (before), `lanes2/laneP-enforce2.log` (after).
+
+---
+
+## F601 — The cap does not bound `measure`, and the sentence that motivated it named the wrong cost ★★★☆☆
+
+*2026-09-04 · Lane K, the block cap, at 53107246+lanes (2026-09-04).*
+
+- **Expected** (CALCIUM_ROADMAP.md ~1447, *And a bound, because a fix is not a guarantee*): "Even
+  windowed, `measure` still walks the whole block once to know its height — and a 50,000-row table
+  has to be measured before C14 can place it. So bound it."
+- **Measured** (probe against `dist/`, width 100, before anything was built): whole-block `measure`
+  at 50 000 rows — `table` 0.6 ms, `logs` 0.2 ms, `raw` 20.5 ms, `code` 17.7 ms. The two that cost
+  anything are one split of the text. And a cap **cannot** bound it: the marker must say *of 50,000
+  rows*, and knowing the total is the whole of what `measure` does. The registry's `#form` measures
+  the whole block first, by necessity, and then windows it.
+- **Where**: C14 §4b records the table and the correction; `registry.ts` `#form`'s comment names it.
+- **What the cap does bound**: the rows a reader is handed (scroll length), and the paint of every
+  path that has no window — a `panel`'s children, a pushed view's content, the conformance suite's
+  whole render — at ~0.25 ms a row.
+
+---
+
+## F602 — Paint is linear with no knee, so no figure picks the default ★★☆☆☆
+
+*2026-09-04 · Lane K, the block cap, at 53107246+lanes (2026-09-04).*
+
+- **Expected** (brief): "measure what `measure` costs at 2 000 / 20 000 / 50 000 rows … and pick
+  the number the figures support."
+- **Measured**: first paint of `window [0, N)` for N = 500 / 1 000 / 2 000 / 5 000 — `logs`
+  163 / 323 / 566 / 1 478 ms; `raw` 157 / 238 / 454 / 1 122; `table` 131 / 210 / 400 / 940; `code`
+  (steady) 196 / 343 / 699 / 1 568. ~0.25 ms a row for every kind, kind-independent within ±30%,
+  and linear — halving the cap halves the cost at every size.
+- **Ruling**: 2 000, as a reading-length policy (fifty screens of forty) pinned to `MAX_ROWS`'s
+  existing figure for the fallback adapter, so the tree has one number rather than two. Recorded as
+  a policy in C14 §4b and in `DEFAULT_MAX_BLOCK_ROWS`'s comment, so nobody later reads the table as
+  having chosen it.
+
+---
+
+## F603 — `code`'s first paint tokenises the whole text whatever the window, and the cap inherits it ★★☆☆☆
+
+*2026-09-04 · Lane K, the block cap, at 53107246+lanes (2026-09-04).*
+
+- **Expected**: capping a `code` block at 2 000 rows bounds its first paint.
+- **Measured**: `window [0, 500)` of a 50 000-line `code` block — **1 696 ms** first paint, 196 ms
+  steady. The window keeps `text` whole for the `lineRange` pin (C14 §4a, C09 I25a), so `tokenise`
+  runs over 50 000 lines to draw 500. The cap through the window seam is the same call, so a capped
+  50 000-line `code` block pays the whole parse once per entry.
+- **Where the fix is, and why it is not built here**: at `from === 0` the pin is unnecessary —
+  nothing precedes the slice — so `code`'s window could cut its text when it opens at the first line
+  and tokenise only what it keeps. That is `kinds/code.ts` (C09), not the registry, and not this
+  lane's file. Recorded in C14 §4b and C09 §2b as owed to `code.ts`; see requests R3.
+
+---
+
+## F604 — `MARKER_ID` is not exported from `viewport/transcript/index.ts`, and an import of it is `undefined` rather than an error ★★☆☆☆
+
+*2026-09-04 · Lane K, the block cap, at 53107246+lanes (2026-09-04).*
+
+- **Expected**: `import { MARKER_ID } from ".../transcript/index.js"` fails to resolve.
+- **Measured**: vitest ran the file; the imported name was `undefined`, and the assertion
+  `expect(entries[0]?.id).toBe(MARKER_ID)` failed reading *expected "transcript:evicted" to be
+  undefined* — the store was right and the test's constant was nothing. `tsc` would have caught it;
+  vitest's transform does not. The test imports from `cap.ts` directly.
+- **Where**: `src/viewport/transcript/index.ts` exports `SESSION_BLOCK_CAP, countBlocks` and not
+  `MARKER_ID`/`isMarker`. Not changed — nothing in `src/` consumes them from the index — but a
+  test that names D40's marker has to deep-import, which is the shape C14 T3.22 now has.
+
+---
+
+## F605 — D40's marker costs a block, so an overflow of one evicts two ★☆☆☆☆
+
+*2026-09-04 · Lane K, the block cap, at 53107246+lanes (2026-09-04).*
+
+- **Expected** (writing T3.22): a store with `cap: 2` holding three one-block entries evicts one.
+- **Measured**: it evicted two — `sweep` loops `while (live + marker() > cap)` and the marker
+  counts one block once anything has been dropped, so the second eviction pays for the marker. C13
+  §5 says so ("The marker is rebuilt *before* the final count because it carries a block of its
+  own") and the fixture had not read it. Fixture corrected to `cap: 4` with two disposable entries.
+- **Where**: `src/viewport/transcript/cap.ts:136`. No defect; recorded because the first reading of
+  the rule was wrong in a way a test would have baked in.
+
+---
+
+## F606 — The anchor sweep's `expect` is a literal lookup, and the runs' convention is one row per `expect` ★☆☆☆☆
+
+*2026-09-04 · Lane K, the block cap, at 53107246+lanes (2026-09-04).*
+
+- **Expected**: `expect: "T1.20, T6.22"` names two rows.
+- **Measured**: `tools/mutate/anchors.mjs` checks `corpus.includes(e)` for the whole string, and no
+  existing run puts two rows in one `expect`. Eight of eleven expectations in `c14-cap.mjs` read as
+  unreachable until each named one row (the others moved to a comment beside it).
+- **Where**: `tools/mutate/anchors.mjs:356–361`. Not a defect — a convention nothing states.
+
+---
+
+## F607 — The `#form` for a capped block calls the definition's `measure` twice per registry call ★☆☆☆☆
+
+*2026-09-04 · Lane K, the block cap, at 53107246+lanes (2026-09-04).*
+
+- **Expected**: the cap costs one window per capped block.
+- **Measured** (by reading, not timed): `#form` measures the whole block (for `total`), windows it,
+  and measures the window (for `shown`); `render` then calls `#measured` (one `#form`) and `#form`
+  again. For an uncapped block the cost is one extra `definition.measure` per `render`, which
+  `render` already paid for I11. For a capped block it is two extra whole measures plus two windows
+  per render. Bounded by F601's figures — ≤ 21 ms at 50 000 rows — and the shell caches rendered
+  lines per entry (C22 I58), so it is not per frame. Recorded so a profile that finds it knows it
+  was accepted rather than missed.
+
+---
+
+## F608 — Running a hand mutation in parallel with a `dist` build compiled the mutation ★☆☆☆☆
+
+*2026-09-04 · Lane K, the block cap, at 53107246+lanes (2026-09-04).*
+
+- **Expected**: a background `npm run build` and a foreground mutate→test→restore are independent.
+- **Measured**: the build started in the same turn as the mutation; `dist/` was rebuilt again after
+  the restore before any probe read it. Nothing wrong shipped, and the frames were read from the
+  second build. The rule already in memory — never edit `src` while a mutation pass runs — has a
+  converse: never start anything that reads `src` while a hand mutation is live.
+
+---
+
+## F609 — Two C11 rows measure a block through the registry and mean the definition — found only by the whole suite ★★☆☆☆
+
+*2026-09-04 · Lane K, the block cap, at 53107246+lanes (2026-09-04).*
+
+- **Expected**: the cap changes nothing a test outside `test/**/block-cap*` asserts, since no test
+  fixture in the tree holds a block over 2 000 rows (grep found none).
+- **Measured** (`npm test`, whole): `test/edge/table.test.ts` T3.9 (a 500-row table, every row
+  expanded — 3 001 rows) and T3.16 (10 000 rows) measure through `measurable()`'s registry and now
+  read `2 006` and `2 001`. The grep missed them because the size is a `psTable({ rows: 500 })`
+  argument, not an array length. Both rows are about `tableDefinition.measure`'s arithmetic and take
+  the registry as a convenience — the seam-level shape *a test that calls the mechanism misses the
+  wiring*, inverted: a test that calls the wiring when it meant the mechanism.
+- **Where**: `test/edge/table.test.ts:148,256`; request R6 gives the exact edit. Everything else in
+  the 24 failures of the whole run is other lanes' in-progress work (plot arms, sankey, roadmap
+  status, enforce corpora, baseline counts 2 440 vs 2 380 committed).
+
+---
+
+## F610 — The builder's I69 guard was not widened with the type — two gates disagree ★★★☆☆
+
+*2026-09-04 · Lane G, sankey, at 53107246+lanes (2026-09-04).*
+
+**Expected.** C04 I92 says `sankey` takes `graph` on `graph`'s own rule, *at both gates*
+(I69's phrase); T2.38 covers the validator.
+**Measured.** `validateDocument` admits `{ form: "sankey", graph }`; `b.plot` on the same block
+throws `"graph" is set on form "sankey" (C04 I69) — only a graph reads it`. The guard reads
+`drawn !== "graph"` and nobody re-read it when the member gained a second reader.
+**Where.** `src/shell/builders/index.ts` ~645; request G-R1. `plot-svg-path.test.ts`'s `blockFor`
+carries a self-expiring fallback and `plot-sankey.test.ts` `SK10` is a `todo` that runs the day the
+guard is widened. **The shape**: a type gained a second consumer and the second gate was a string
+comparison against the first consumer's name — the same class as C04 I77's *accepted and ignored*,
+one gate over, and invisible to T2.38 because that row asks one gate.
+
+---
+
+## F611 — Nine count assertions in eight files were stale from the union edit, and read as "the throw" ★☆☆☆☆
+
+*2026-09-04 · Lane G, sankey, at 53107246+lanes (2026-09-04).*
+
+**Expected.** The 24 red rows at base were all `SANKEY_IS_NOT_BUILT`.
+**Measured.** After the renderer landed, nine rows stayed red on **counts** pinned one form or
+six variants short: `plot-detail-scope` 45, `plot-hierarchy-gate` 43, `plot-mutations` 32 and
+40, `plot-tree` 46, `plot-figure` 122, `plot-arm-unification` 47 and 238, `plot-arm-disagreement`
+46/368/46/56/266/238/231/172 and `U6b`'s per-edge tally. Each is a *fixture responds* counter — the
+right kind of assertion — and each was moved with a comment naming `sankey` as the cause, so the
+next form's lane finds the trail. **The lesson**: a form added to the union fails to compile until
+every total record has a row (good), and then fails nine counters that each restate the record's
+size; the counters are the deliberate cost of *count an exemption, do not exclude it*, and adding a
+form owes a sweep of them that no compile error names.
+
+---
+
+## F612 — The only terminal sankey found is a flow table, and that settled the numerals ★★☆☆☆
+
+*2026-09-04 · Lane G, sankey, at 53107246+lanes (2026-09-04).*
+
+**Expected.** A terminal reference implementation to compare the layout against.
+**Measured.** `mermaid-ascii`'s `pkg/sankey/renderer.go` (the one terminal implementation the
+search turned up) draws **one line per flow** — `Source ████ ──> Target (100)` — with the bar's
+*length* the value, `maxBarWidth = 40`, `#` at ASCII, and no node placement at all. Not a layout
+to compare against, but it answered a question the desktop references leave to hover: whether to
+print the value. **Ruled no** — the ribbon's width is the reading and a numeral beside every bar is
+the table that renderer draws instead of a figure. Recorded in §3ap.1 so the decision has a
+source rather than a taste.
+
+---
+
+## F613 — Two ribbon interiors drawn, and the one-bit frame chose ★★☆☆☆
+
+*2026-09-04 · Lane G, sankey, at 53107246+lanes (2026-09-04).*
+
+**Expected.** The brief's *reduced intensity or `dim`* — a colour-side answer.
+**Measured.** Variant A (`█` + `dim`) and variant B (`▒`) rendered on the default fixture. With
+colour stripped, A is one block of `█` with letters in it — the bar column is indistinguishable
+from the fill, because `dim` is an attribute and the distinction lived nowhere else. B is two
+shapes at every depth, and at 24-bit the medium shade in the source's slot reads as the
+half-opacity ribbon d3 and plotly draw. **I17 decided it, not taste**; SK7 asserts the one-bit
+unicode frame **equals** the 24-bit frame with its SGR removed, which is the form of the claim
+that can fail.
+
+---
+
+## F614 — A row the table did not have: two bars in one row carry one label ★★☆☆☆
+
+*2026-09-04 · Lane G, sankey, at 53107246+lanes (2026-09-04).*
+
+**Expected.** §3ap.4's table, written before the code, had K3 (labels × width) and K5 (bars × a
+small height) as separate rows.
+**Measured.** `crowded` at gap 0 stacks two one-half-row bars per row, both centring on the same
+row; the second label collides with the first and is dropped, so `src-05 · 07 · 09 · 11` are named
+and their neighbours are drawn unnamed. Correct under K3's rule applied vertically — and **found by
+reading the frame, not by the table**, which is where it now sits as K8. A row governed by two
+rules the table already had, in a cell neither row's author was looking at.
+
+---
+
+## F615 — `▀ ▄ █ ▒` are all Ambiguous, so the wide frame *is* the ASCII frame — asserted as equality ★☆☆☆☆
+
+*2026-09-04 · Lane G, sankey, at 53107246+lanes (2026-09-04).*
+
+**Expected.** A wide arm of the block family.
+**Measured.** Every member of the block-element range is `East_Asian_Width=Ambiguous`, as
+`barStyle` already records for `█ ░`; there is no width-stable half-block. `sankeyAlphabet`
+therefore has two arms, not three, and SK7 asserts the wide frame **equals** the ASCII frame rather
+than *contains no wide glyph* — an equality, because an absence assertion is satisfied by an empty
+frame.
+
+---
+
+## F616 — A golden read at collection time makes a whole file red for one missing frame ★☆☆☆☆
+
+*2026-09-04 · Lane G, sankey, at 53107246+lanes (2026-09-04).*
+
+**Expected.** `test/unit/catalogue-tools.test.ts` to report the rows the new variants affect.
+**Measured.** It opens `test/golden/svg-baseline/sankey-default.svg` inside a `describe` body, so
+the `ENOENT` is a **file-level** failure: every row in the file — the digest rows, the sheet
+geometry, the pair partition — reads red until the lead regenerates the baselines, and none of
+them is about the sankey. A read that belongs in a `beforeAll` or a row. Not this lane's file;
+named so the lead reads the red correctly.
+
+---
+
+## F617 — Reference tooling on the host: matplotlib is broken and the container has none ★☆☆☆☆
+
+*2026-09-04 · Lane G, sankey, at 53107246+lanes (2026-09-04).*
+
+**Expected.** Render a plotly/matplotlib sankey locally for the comparison.
+**Measured.** Host `import matplotlib` fails on the NumPy 2 ABI (`_ARRAY_API not found`); plotly
+imports but `kaleido` is absent so nothing renders; the container has no python plotting stack.
+The reference picture used was d3-sankey's committed `energy.png`, read as an image; plotly and
+Mermaid were read from their documentation. `tools/refdiff/reference.py` gains a `SKIPPED` row for
+`sankey` (matplotlib's `Sankey` is a single-node flow diagram, not a layered one), and
+`refdiff.test.ts` `RD5`'s recorded set gains the form.
+
+---
+
+## F618 — Other lanes' in-progress state seen from this one (not this lane's, for the lead) ★☆☆☆☆
+
+*2026-09-04 · Lane G, sankey, at 53107246+lanes (2026-09-04).*
+
+- `npx tsc --noEmit -p .` fails on `src/shell/session.ts:39` / `test/edge/image-frames.test.ts:30`
+  (`framesOf` not exported from `image.js`) and earlier on `test/contract/spans.test.ts:47`
+  (arity) — lanes V and T mid-edit. This lane's files typecheck.
+- `MA4` (mutation anchors): 38 missing across `c22-camera`, `c22-cursor`, `deferred-height`,
+  `spans`; none in `c12-graph.mjs`, whose three anchors were kept intact through the `origins`
+  edit by keeping the `for … continue` shape.
+- `make enforce`: SP1/SP3 rows citing `C22 I77` from C09 and `image.ts`/`types.ts` — lane V's.
+  SS47 on `sankey.ts` was this lane's and is closed with a `MARK_EXEMPTIONS` row; SS54 R20 expired
+  as designed and is removed.
+
+---
+
+## F619 — "The gate is done" was true of the type and false of the validator ★★★★☆
+
+*2026-09-04 · Lane V, GIF frames, at 53107246+lanes (2026-09-04).*
+
+- **Expected:** COMMON.md says the base commit holds *the types and the gate* for I93; C04 I93 and
+  the `Image.data` comment say *PNG or GIF bytes*.
+- **Measured:** `src/data/viewmodel/validate.ts` line ~1246 still refuses any `data` not starting
+  with the PNG signature, with a message reading *phase 1 reads PNG only*. C13's store validates on
+  every `append`, so **no GIF document can enter a session** — a decoder, a store and a wake with
+  no route in. Found by the first session-level row, which was refused before it could render.
+- **Where:** `validate.ts` `KIND_CHECKS.image`; request R-V1 in `laneV-requests.md` with the exact
+  edit; `test/edge/image-frames.test.ts` gates T4.17o/T4.17q on `validateDocument` and carries a row
+  asserting the refusal that disappears when the gate lands (an it.todo that expires).
+- **Class:** *a claim repeated across steps acquires the authority of a ruling* — the brief carried
+  *the gate is done* from the base commit's message; the gate half of I93's row (T2.39 in
+  `owed-gate.test.ts`) tests measure of a PNG under a different digest and never hands the validator a
+  GIF, so the suite was green with the gate closed.
+
+---
+
+## F620 — The roadmap priced a design nobody would build, and the figure it named was never taken ★★★☆☆
+
+*2026-09-04 · Lane V, GIF frames, at 53107246+lanes (2026-09-04).*
+
+- **Expected:** the 2026-09-03 re-ruling: *the kitty arm retransmits at a stable id, so on that
+  rung every tick is an image upload*.
+- **Measured (2026-09-04, `transmitRgba` on real GIF frames):** a per-tick retransmission would be
+  **75 bytes/tick** for an 8x8 and **29,662 bytes/tick** for a 320x240 gradient — **297 KB/s at
+  10 fps**. kitty's animation protocol uploads **once**: 189 bytes for the two-frame 8x8, **116,509
+  bytes** for four 320x240 frames, and zero per tick thereafter; the session arms no wake on that
+  arm. The GIF's own bytes as base64 are 153,525 for the same file, so the raw-RGBA upload is
+  *smaller* than the file.
+- **Where:** `src/presentation/image/kitty.ts` `transmitAnimation` header; C09 §4c and I39; roadmap
+  bullet (moved from *Fights the architecture* to *Already shipped*).
+- **Class:** *a measurement does not settle what to draw* inverted — here the design was settled
+  without the measurement, and the measurement chose a third option the refusal did not list. The
+  alternative the brief offered (*frame 0 on kitty*) turned out to be the chosen design's own
+  degradation path, so it is not a second option but the first one's failure mode.
+
+---
+
+## F621 — I wrote the measurement into a comment before taking it ★★★☆☆
+
+*2026-09-04 · Lane V, GIF frames, at 53107246+lanes (2026-09-04).*
+
+- **Expected:** nothing — this is a finding about the lane's own process.
+- **Measured:** the first draft of `transmitAnimation`'s header said *3.2 KB a tick for an 8x8 and
+  41 KB a tick for a 320x240, 410 KB/s* — figures typed as placeholders for a probe not yet run.
+  The probe said 75 B, 29,662 B and 297 KB/s. Every one of the three was wrong by 1.4x–43x, and
+  the comment read exactly like a measured one. Replaced with the measured figures and the date.
+- **Where:** `kitty.ts`, the `transmitAnimation` header, now dated 2026-09-04.
+- **Class:** a fabricated figure with a decimal point is indistinguishable from a real one in
+  review. The rule that would have caught it: a number in a comment carries the date it was taken.
+
+---
+
+## F622 — A real fixture, wrongly copied, fails exactly like a fabricated one ★★☆☆☆
+
+*2026-09-04 · Lane V, GIF frames, at 53107246+lanes (2026-09-04).*
+
+- **Expected:** four `sharp`-generated GIF blobs pasted into the test from the generator's output.
+- **Measured:** fixture D carried one extra `A` at offset 1207 of 1300 characters; the decoder
+  refused it as *LZW minimum code size 0* (the base64 frame shift moved every byte after the
+  offset). A script comparing each constant against the generator's JSON found it in one pass; the
+  eye had not.
+- **Where:** `test/edge/image-frames.test.ts` header records it.
+- **Class:** *an instrument written before its subject* — the fixture was real and the copy was
+  the instrument. The comparison to a second decoder (IF2, against `sharp`'s pages) is what makes
+  a corrupted fixture fail loudly rather than pass on the wrong picture.
+
+---
+
+## F623 — The wake row's arithmetic was wrong, twice, and the store was right both times ★★☆☆☆
+
+*2026-09-04 · Lane V, GIF frames, at 53107246+lanes (2026-09-04).*
+
+- **Expected (first draft):** with delays 100/200, the frame at 990 ms is 1.
+- **Measured:** it is 0 — frame 0 occupies [900, 1000). The row's own comment listed the boundaries
+  (100, 300, 400, 600, 700, 900) correctly and then drew the wrong conclusion from them.
+- **Expected (second draft):** a GIF beside an 80 ms spinner shows frame 1 at 100 ms.
+- **Measured:** it shows frame 1 at **179 ms**, and it took three drafts to get the trace right:
+  the `stream` commit flushes 33 ms after the wake (80 → 113), and `#armSpinner` runs from that
+  *render*, not from the wake, so the store's wake (due 20, floored to 33) lands at 146 and its
+  frame renders at 179. Without synchronised update the floor is 100 and the change is drawn later
+  still. None of it is a defect — the floor is I73's cap arriving for a GIF and the re-arm-from-
+  render is §6i trace row 1's *the loop is the existing one* — but none of it was written down, and
+  the row now pins `synchronisedUpdate: true`, lists the wake/render chain, and C22 §6j rows 2 and 9
+  carry it.
+- **Where:** `test/edge/image-frames.test.ts` T4.17o/T4.17q; C22 §6j rows 2 and 9.
+- **Class:** *a test's assertions, not its comment* — the comment was right and the assertion
+  wrong; and *what is on screen when it reports* — a frame boundary and the frame's appearance on
+  screen are one window apart, which no store-level row can see.
+
+---
+
+## F624 — The refusal path at kitty is a still, and no seam can fix it ★★☆☆☆
+
+*2026-09-04 · Lane V, GIF frames, at 53107246+lanes (2026-09-04).*
+
+- **Expected:** every rasterising arm animates.
+- **Measured (by the walk, C22 §6j row 7 / C09 §8b G11):** a GIF wider than 297 cells at `kitty`
+  has its placement refused (G3) and falls to the half block — a rasterising arm — but the shell
+  decided not to gather it by *capability* while the block fell through by *width*, and nothing
+  carries the block's choice back to the shell. The result is a still at frame 0. Recorded rather
+  than repaired: the picture is 298+ cells wide, where a still was already the honest answer.
+- **Where:** C09 §8b G11; C22 §6j table row 7 and §6j.4.
+
+---
+
+## F625 — `decodePng`'s consumer count dropped to tests, and MG25 did not mind ★☆☆☆☆
+
+*2026-09-04 · Lane V, GIF frames, at 53107246+lanes (2026-09-04).*
+
+- **Expected:** switching `image.ts` and `transmit-image.ts` to `decodeImage` leaves `decodePng`
+  exported and consumed only by `codec.ts` itself and by tests.
+- **Measured:** `make enforce` is green — MG25 counts occurrences with comments stripped and
+  `decodeImage` calls `decodePng` one screen below, so the free function has a consumer. Recorded
+  because the export now exists for tests and the front door, and a later reader may take the
+  barrel's `decodePng` for a seam.
+- **Where:** `src/presentation/image/index.ts`.
+
+---
+
+## F626 — Files touched outside the brief's ownership list, each with why ★☆☆☆☆
+
+*2026-09-04 · Lane V, GIF frames, at 53107246+lanes (2026-09-04).*
+
+- `src/shell/construct.ts` (the `Frames` store created, joined to the eviction subscription, on
+  `Graph`) — the brief said *the binding* is mine and the binding is here; no lane owns it.
+- `src/presentation/blocks/types.ts` (`RenderContext.frames`) and `src/presentation/render-lines.ts`
+  (threads it) — the renderer cannot read view state without a field; no lane owns them.
+- `src/shell/transmit-image.ts` — the kitty ruling has no other home; a GIF under `f=100` draws
+  nothing, so this was required for correctness, not only for the ruling.
+- `src/shell/builders/index.ts` `b.image`'s signature check only — lanes T and P own other
+  builders in the file; the edit is three lines, asserted.
+- `test/unit/image-halfblock.test.ts` — **not** edited: HB8 reads *eight-byte signature* from the
+  refusal, so the front door's wording was chosen to keep that substring.
+
+---
+
+## F627 — `git checkout <path>` is a restore from the index, and the lanes share one working tree ★★☆☆☆
+
+*2026-09-04 · Lane V, GIF frames, at 53107246+lanes (2026-09-04).*
+
+- **Expected:** patching `validate.ts` locally to measure the wake rows and restoring it with
+  `git checkout src/data/viewmodel/validate.ts` touches nothing but my own patch.
+- **Measured:** the working tree is shared by five lanes. After my last checkout, `validate.ts`
+  showed as modified with another lane's `rule`/`colormap` gate (C04 I90) — so their edit landed
+  after my checkout and survived; had it landed *between* my patch and my checkout it would have
+  been wiped without a trace, because `checkout <path>` restores the index and not "my change".
+  Four checkouts were run; none is known to have destroyed anything, and that is luck rather than
+  a property of the method. The right form is a reverse edit with an asserted anchor (which is what
+  the hand mutations of `gif.ts` and `frames.ts` — **untracked**, so `git checkout` refused them —
+  had to use anyway; one mutation in `frames.ts` was live for one tool call after its checkout
+  "restore" failed, and was caught by the file's own re-read).
+- **Where:** this lane's process; no repository file. Recorded so the lead knows the four
+  checkout times were 01:5x–02:1x and can check `validate.ts` against lane T's intent.
+- **Class:** *commit before measuring a revert* and *a killed task is not a stopped pass*: a
+  restore that reports success has restored *something*, and on a shared tree the something can be
+  someone else's work.
+
+---
+
+## F628 — the gate for I93 was declared done and was not ★★★☆☆
+
+*2026-09-04 · the lead, at 53107246+lanes (2026-09-04).*
+
+The base commit's brief (`lanes2/COMMON.md`) said *the types and the gate* for C04 I89–I93 were done,
+and told every lane not to touch `types.ts`, `validate.ts` or `owed-gate.test.ts`. **The type was
+done and the gate was not**: the image arm of `validate.ts` still refused any `data` not opening with
+the PNG signature, under a message reading *phase 1 reads PNG only*, while I93 and the `Image.data`
+comment said *PNG or GIF bytes*. C13 validates on every `append`, so no GIF document could enter a
+session — a decoder, a store and a wake with no route in.
+
+**Who found it, and why it was that lane.** Lane V (F619) reached it because its session-level
+rows could not run: the first `validateDocument` of a GIF fixture was refused before anything could
+render. No other lane hands the validator a GIF, and the gate half of I93's own row — T2.39 in
+`owed-gate.test.ts` — measures a PNG under a different digest and never hands it one either, so the
+suite that *declared* the gate done was green with the gate closed.
+
+**The class is the sixth blind spot in its purest form**: a claim carried from a commit message into a
+brief and from the brief into five lanes' premises, each restatement reading as the ruling, with no
+file holding the measurement. The base commit was one commit; its message described two halves and
+one had landed. The lane's `it.todo` that expires when the gate lands is the right shape — a deferral
+that watches its own condition — and the gate now reads PNG-or-GIF as a signature check
+(`validate.ts` `KIND_CHECKS.image`). **Fixed** in this pass; the finding is that the brief was
+believed rather than measured, by the lead and by four of five lanes.
+
+---
+
+## F629 — the seven owed items, in numbers ★★★☆☆
+
+*2026-09-04 · the merge, over five lanes, at 53107246+lanes (2026-09-04).*
+
+F587 closed the owed three and the types-and-gate commit (53107246) opened the remaining seven —
+C04 I89–I93 with their renderers, five lanes on one tree. This entry is their figures; each cites
+the entry that carries the measurement.
+
+**Windows and the cap** (F601–F609). The roadmap's sentence *a 50 000-row table has to be
+measured before C14 can place it, so bound it* was measured first: whole-block `measure` of 50 000
+rows is **0.6 ms** for `table`, 0.2 for `logs`, 20.5 for `raw`, 17.7 for `code` — and a cap cannot
+bound it, because *of 50,000 rows* is the whole of what `measure` computes (F601). What the cap
+bounds is paint, at **~0.25 ms a row, linear with no knee** for every kind within ±30%
+(F602), so no figure picks the default; **2 000 is a policy** — fifty screens of forty — pinned
+to `MAX_ROWS`'s existing number (F602). A capped 50 000-line `code` block still tokenises the
+whole text on entry, 1 696 ms first paint against 196 steady, owed to `code.ts` (F603).
+
+**Spans** (F588–F593). Tone **replaces** rather than layers; a value paints a
+**background** through the block's `colormap`; a valued span wraps as an **atom**. Two wrapper
+findings, one fixed: a full row followed by a space began the next row with the space, reachable in
+prose only when a token exactly filled the row and in the ordinary case once a valued atom does —
+**fixed in `wrapCellsParts`** with one arm, and 2 380 committed frames compared, 0 moved
+(F590). The second — the wrapper breaks one word early when a row is exactly full — is
+**recorded and not fixed**, because it moves every paragraph with an exactly-full row and the
+goldens are shared (F591). T2.36's own example could not fail and was rewritten (F588);
+the gate accepted `colormap` on a `rule` and now refuses it (F589).
+
+**Intraline** (F594–F600). C04's `changedRuns` is the one pairing and the renderer reads
+it; **LCS capped at 200 tokens a side**, whitespace a token of its own, and an unrelated pair —
+**zero shared non-whitespace tokens** — draws no underline at all, the boundary chosen because it is
+the one point where the underline is provably vacuous; delta's `max-line-distance` 0.6 is the
+precedent and is taste (F597). **No golden ran through `b.patch` until this pass**: sixteen
+cases × four widths × two themes × two modes were all built through `block()` and blind to the
+writer (F594). One defect found before the code compiled — a writer that re-emits a run
+reorders an interleaved hunk (F596) — and one fixture that asserted nothing at height 3
+(F598).
+
+**Sankey** (F610–F618). Scale **14 / 11** across the arms; the arm-disagreement row
+reads **silent 0 / 12, `identityLabels` 5 / 12, notice 2 / 12**. **60 new terminal frames and 6 new
+SVGs** — the first form added since the arm unification, and it failed nine count assertions in
+eight files that each restate the record's size, the deliberate cost of *count an exemption, do not
+exclude it* (F611). The ribbon interior is **`▒`, chosen on the 1-bit frame**: with colour
+stripped, `█` + `dim` is one block with letters in it, and I17 decided it rather than taste
+(F613). The builder's I69 guard was a string comparison against `graph` and refused the
+sankey the validator admitted — two gates disagreeing (F610, fixed). Every block element is
+`East_Asian_Width=Ambiguous`, so the wide arm *is* the ASCII arm, asserted as equality (F615).
+
+**GIF** (F619–F627). The decoder agrees with `sharp` on **8 frames, 0 pixels differing**
+(F622's second decoder). The roadmap's *every tick is an image upload* at kitty was priced
+without a measurement: a per-tick retransmit would be **29 662 B/tick at 320×240**, 297 KB/s at 10
+fps; kitty's **animation protocol uploads 116 509 B once and 0 B/tick**, smaller than the GIF's own
+153 525 base64 bytes, and the session arms no wake on that arm (F620). The wake: a still PNG
+**0 renders in 990 ms**, a 100/200 ms GIF **6 renders** and not thirty, frames `1 0 1 0 1 0`
+(F623). Size: **299 + 133 + ~110 lines** — decoder, frame store, binding — against F573's
+~350 estimate. The gate that let none of it into a session is F619 and F628.
+
+**The arithmetic**: 42 entries, F588–F629, keyed in one move each — group 2 gains one,
+7 one, 9 five, 10 three, 11 six, 14 one, Singles twenty-five — and SP6 reads 633 = 633.
