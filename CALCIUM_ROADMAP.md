@@ -3064,7 +3064,7 @@ PART  1  PHASE 1                   producer context · change axis · builder au
          surfaces                  ↑ the second consumer. (This said *b.live's stream arm's
                                    first*; the arm was deleted — F78, 2026-09-03 — see
                                    `src/shell/builders/types.ts`.)
-      3  the ML package            tensors, heatmaps. TWO CORRECTIONS, 2026-08-15, and the
+PART  3  the ML package            tensors, heatmaps. TWO CORRECTIONS, 2026-08-15, and the
                                    first removes this entry's gate. *Built with prism-tui as
                                    the consumer* says who validates the design, not who has to
                                    exist first — and the stronger reading is false in the tree
@@ -4370,7 +4370,7 @@ THE SETS LANDED 2026-08-15 AND 51 IS
                                    and the band itself is a SPINNER's — a counter and a
                                    two-frame toggle are other categories, which is why one band
                                    over all three reported three false rows. T2.70–T2.75
-      52 3D PLOTS                  RETRACTED FROM *deliberately not doing*, and the refusal
+BUILT 52 3D PLOTS                  RETRACTED FROM *deliberately not doing*, and the refusal
                                    was a fit argument asserted rather than measured (F431).
                                    HALF-BLOCK RUNG: `▀`, two full colours a cell. The sample
                                    grid is `width × 1` by `height × 2` — 80×48 at 80×24 cells,
@@ -4417,7 +4417,8 @@ what landed**.
 | # | status | evidence in the tree | residue |
 |---|---|---|---|
 | 0 | BUILT | `examples/docker/README.md` (F157), the media (F158), `.github/workflows/ci.yml` `fast`/`proof` (F150, F154, F156) | — |
-| 3 | PART | **three of the entry's four names are built** — `heatmap` (`src/presentation/plot/heatmap.ts`), `confusion`, `correlation` all in `PLOT_FORM_MEMBERS`; the planning pass this entry said was *the real blocker* exists as `docs/notes/CALCIUM_PLOT_SYSTEM_PLAN.md` (2026-09-03) | **`tensor`**: zero hits in `src/`. Design at `docs/notes/CALCIUM_ENTRY3_KICKOFF.md` — one slice as a heatmap, plus a header |
+| 52 | BUILT | **the field, the cache-key axis and one binding landed together, which is the condition the entry set** — `cameras` on the render context (`src/presentation/blocks/types.ts:134`), the store `Cameras` with its `key` (`src/shell/cameras.ts:59`), `nudge` bound to the orbit keys (`src/shell/construct.ts:1426`), `plot3d` a validated form (`src/data/viewmodel/validate.ts:1657`), `azimuth` and `elevation` the projection's own angles (`src/presentation/plot/project3.ts:171`) and `halfBlockRows` the rung (`src/presentation/plot/scatter3.ts`). Re-measured 2026-09-04 | the dither is still not ported and is worth nothing at this rung (F433); the fit argument the refusal rested on was asserted rather than measured (F431) and stays retracted |
+| 3 | PART | **three of the entry's four names are built** — `heatmap` (`src/presentation/plot/heatmap.ts`), `confusion`, `correlation` all in `PLOT_FORM_MEMBERS` (`src/data/viewmodel/validate.ts:2328`); the planning pass this entry said was *the real blocker* exists as `docs/notes/CALCIUM_PLOT_SYSTEM_PLAN.md` (2026-09-03) | **Gate**: `tensor` occurs zero times in `src/` — re-measured 2026-09-04, still zero, and red the day the ML half starts. Design at `docs/notes/CALCIUM_ENTRY3_KICKOFF.md` — one slice as a heatmap, plus a header |
 | 1 | PART | **1.2 change axis** built: `change?: "unchanged" \| "changed" \| "added" \| "removed"`, `src/data/viewmodel/types.ts:2553` | 1.1, 1.3, 1.4 not checked in this pass |
 | 5 | PART | **CI from the tarball** built: `.github/workflows/ci.yml` `proof` job + `make regime`. **0.x** said: `README.md:472` | error messages: F151 fixed, **F152 and F153 open**. The outside-reader test is **owed and unrunnable from inside the repository** (R01 R4.4) |
 | 7 | PART | **specified as C26, and three stages built.** `ElementAddress` — `interaction/router/types.ts:84` — and one shared resolver, `resolveFocus` — `interaction/router/focus.ts:122` — so focus holds an address and render and keys answer from the same place. Stage 1 made `interaction` a focus target, stage 2 gave blocks `elements`, stage 3 the address; the ⏎ ruling followed. `docs/components/C26_navigation.md` | **§4's policy resolution and the modes.** `ArrowPolicy` and `EscapePolicy` are absent from `src/` — withdrawn under MG24 because `NavElement.arrow` and `.escape` had no reader, **re-checked against the widened rule (F159) and the withdrawal holds**, so §4 is still a design question — **but the check it owed first has been run, and it refuses the vocabulary**: `docs/components/C26_navigation.md` §4a, four kinds against the tree, **zero fit and for two different reasons**. `table` needs *escape up, stop down* and every `ArrowPolicy` value names an axis rather than a direction; `logs`, `patch` and a scroller never step an element, so the edge question does not arise. The discrimination the vocabulary was for is already carried by which of `elements` and `window` a kind declares, and the cell that was left open — a kind declaring both — is **ruled in §4b**: elements are the unit of movement and the window is a consequence, so the cell dissolves without a field (C26 I18, commitment 12, I7 gains the content of the agreement). §4's resolution shape (global → kind → per-node) is untouched and is now what a kind wanting `↓` to scroll uses. **What §4 still owes is the boundary**, which is a different question from the interior: `table` escapes up and stops down, and no vocabulary in the tree names a direction |
@@ -4462,15 +4463,109 @@ what landed**.
 | 49 | OPEN | none, and that is the finding: **no file under `test/golden/` imports from `src/shell/`**, so nothing there reaches `paint.ts`. `test/golden/README.md` says *frames*. F163 | the whole entry — a golden frame category does not exist |
 | 43 | PART | `imageProtocol: "none" \| "iterm2" \| "kitty" \| "sixel"` detected — `src/terminal/capabilities.ts:19`; **and the renderer** — `src/presentation/blocks/kinds/image.ts`, `src/presentation/image/` (six files: codec, dither, halfblock, kitty, overlay, index), `src/shell/transmit-image.ts`, eight `test/unit/image-*.test.ts` (this cell said *no renderer*; re-measured 2026-09-03) | `sixel` detected and not emitted, correctly; the sample-grid kind and an image inside a `Cell` — see `docs/notes/CALCIUM_NOTE_AUDIT.md` §7 |
 
-**Checked and confirmed OPEN**, which is evidence rather than an absence of it. **Second sweep, 2026-08-13** — the symbols these entries name are absent from `src/`: **29** (and `chromeRows` in `src/viewport/viewport/types.ts:80` is C14's per-entry chrome, **not** this row's header/footer budget — it reads as coverage and is not) · **37**. **48** joins them measured rather than
-grepped, 2026-08-13: `nameExactnessSignal` reports 382 of 1171 members exact, and the
-public-surface variant this entry proposes measures 101 of 320 — no better, so the entry
-is open with its first candidate already refused. **Re-read twice on 2026-08-15: 388 of 1219, then 389 of 1220** after roadmap 51 added `ambiguousWidth` — one member, one exact, so the ratio is unchanged at 31.9%. **A base that moves with every landing and a ratio that does not is the entry's actual subject**: the blind spot is proportional, not absolute, and a figure re-read three times without moving is worth more than the first reading was. So the
-base moved with the tree and the ratio did not (32.6% → 31.8%). The variant's own figure is
-**not** re-measured here, because it is a proposal rather than a shipped signal and re-running
-it is the entry's work rather than a sweep's — said so, because a refreshed number beside a
-stale one reads as though both were taken. · **26**, **32** — the symbols the entries name are
-absent  · **49** joins them the day it is filed, measured rather than assumed: `test/golden/` holds **five** test files — four when this was written, and `fallback-docker.test.ts` since — and **not one imports from `src/shell/`**. Re-measured 2026-08-15 after roadmap 51: still five and still none, so a capability field, a palette and sixteen spinner sets all landed without a golden frame seeing one — which is the entry's claim demonstrating itself rather than being restated, so nothing in that category reaches `paint.ts` — and its README calls the snapshots frames (F163). · **3** joins them on 2026-08-15 by ceasing to be uncheckable rather than by being swept: its gate was `prism-tui` and the gate is not one, so what remains is greppable from here and was measured — `docs/notes/CALCIUM_PLOT_PRIOR_ART.md` is in the tree and lists the chart types. **This paragraph said `tensor` and `heatmap` occur zero times in `src/`; re-measured 2026-09-03, `heatmap` is a built form (`src/presentation/plot/heatmap.ts`) and `tensor` is still zero** — so 3 is PART in the table above, with the tensor half as its residue, rather than open. · **52** joins them on the day it is written, measured rather than assumed: **this said `camera`, `azimuth`, `elevation` and `halfBlockRows` occur zero times in `src/presentation/plot/` — re-measured 2026-09-03, they occur 33, 7, 7 and 1 times (whole-word, six files: `project3.ts`, `axes3.ts`, `scatter3.ts`, `surface3.ts`, `definition.ts`, `marks.ts`) and `plot3d` is a form.** The entry was open because it had just been un-refused; it is now the built 3D arm, and the sentence that said otherwise is the negative-claim class `roadmap-status.mjs` cannot reach.
+**Checked and confirmed OPEN**, which is evidence rather than an absence of it. **The blanket
+sentence went 2026-09-04.** It read *the symbols these entries name are absent from `src/`* and it
+covered 26, 32 and 37, none of which had been grepped — F435's class exactly: a blanket claim
+expires unnoticed because there is nothing in it that can go red. Every clause below now carries a
+measurement, a date, and — where a symbol can carry the entry at all — a `**Gate**` that
+`roadmap-status.mjs` resolves against the tree and fails when the symbol appears. Where no symbol
+can, the clause says so and is counted rather than dropped.
+**29** — the distinction holds at HEAD, re-checked 2026-09-04: `chromeRows` in
+`src/viewport/viewport/types.ts:80` is C14's per-entry chrome and **not** this row's header/footer
+budget, the citation still resolves at line 80, and it reads as coverage and is not. The satisfier
+side has not moved either — `setMode` still has exactly one caller in `src/`
+(`src/interaction/router/router.ts:237`), it still passes `"navigate"`, and `"interact"` is set
+nowhere, so 33's *IT NEEDS NOTHING OF 29* stands. **F161's question, put to the count, and the
+count does not survive it**: the row names FOUR roadmap consumers and they do **not** share a
+shape. 35, 37 and 15 each want a row in the frame's chrome; 46 is a scrollbar at *container* scope
+and wants no chrome row at all. Three of one shape and one mis-filed, which is a weaker argument
+than four and a truer one. The framework half is one row each by construction and that is
+greppable: `TuiConfig.chrome` is exactly `{ header, footer }` (`src/shell/types.ts:432`), supplied
+by `makeDefaultChrome` (`src/shell/chrome.ts`), footer empty by default.
+**37** — **Unverifiable by a symbol**, ruled 2026-09-04, and this entry is what the grep-reach
+signal exists to report: it names a feature and no name. The refusal register's ruling applies
+verbatim — *a negative-existence premise gets a row and a gate; a taste premise is marked
+unverifiable and is not gated* — and 37 is both at once. *Should the prompt be bracketed* is
+taste; *is it bracketed* is negative-existence and **no single symbol carries it**. A separator is
+a row the shell composes, and every candidate name measured — `separatorRow`, `regionSeparator`,
+`divider`, all zero in `src/` — is one this session would be inventing. Inventing it is F161's
+cost precisely: a symbol, a count and a date are what a ruling looks like from outside, and all
+three can be present with nothing behind them. What was measured instead is the satisfier side,
+and both halves of the entry's own correction hold: `ThemeTokens.background` is
+`"terminal" | "surface"` (`src/presentation/theme/types.ts:137`), so 39's correction landed and a
+theme may declare a fill — and `"terminal"` stays legitimate, so a separator still cannot depend
+on one. The blocker is 29's budget, not a ruling.
+**48** — re-read a sixth time, 2026-09-04, and the figure is `nameExactnessSignal`'s own:
+566 of 1759 members exact, 32.2%. The four readings before it were 382/1171 (32.6%), 388/1219,
+389/1220 (31.9%). **The composition reading the entry asked for is taken on the increment, which
+is the half that was free**: the base moved 1220 → 1759 and the exact count 389 → 566, so the 539
+members that arrived are 32.8% exact against a standing 32.2% — new members carry the ratio rather
+than diluting it, and *the blind spot is proportional* is now measured on the margin as well as on
+the whole. **What that still does not answer**, and the entry's note is right to ask for it, is
+whether members moved *out* of exactness while others moved in — `AskOptions.placement` is the one
+instance anybody has: 1177 → 1179 members, 382 → 381 exact. Reaching it needs the set and not the
+total, which is one added field on `nameExactnessSignal`'s return in
+`tools/enforce/module-graph.mjs` plus a worktree at the 2026-08-15 commit to diff against — cheap,
+not free, and named here rather than done because the signal is not this document's to change.
+The by-use signal beside it also moved: 114 of 433 published members named by neither example
+(86 of 325 when the entry was written), 170 of 302 clearings ambiguous and none able to list, and
+17 named only in an example's *tests*, which is a third category the earlier reading had no row
+for.
+**26** — **Unverifiable by a symbol**, ruled 2026-09-04, **and the entry's own recorded symbol has
+the wrong sign.** The body ends *Symbol: `documentView.open`*, and `documentView.open` is called
+at `src/shell/execution.ts:1099` — present, on the one path that pushes a view. An entry carrying
+a symbol that exists satisfies the grep-reach count above, which counts backticks and cannot count
+signs; that is the count's blind spot, found by resolving the first symbol it certified. The live
+claim measures instead, and it is a *relationship between two call sites*: the only settlement a
+view ever writes is `deps.transcript.settle(settle.into, noticeDoc(line, `${verb} opened a view`
+…))` at `src/shell/execution.ts:983`, guarded by `settle.into !== null` — so a **deferred**
+invocation leaves a record because roadmap 33 gave it an entry before it ran, and a directly
+submitted one leaves none. The direct push is `pushView` (`src/shell/actions.ts:141`) and it
+appends nothing; both pop sites — `viewPop` (`src/shell/keys.ts:900`) and `cancelThis`
+(`src/shell/execution.ts:895`) — patch nothing, and the second says so in its own comment. No
+single name can be absent for that: `append on push, patch on pop` is a pair of missing calls, not
+a missing symbol, and `DocumentViewDeps` names no transcript at all — `transcript` occurs once in
+`src/shell/document-view.ts` and the once is a comment, which is why the gate arm strips comments
+before it resolves anything.
+**32** — the retraction reached the body and **not** this clause, which is F86/F89/F92's own
+mechanism landing on the sentence that cites them. F89 retracted *CommandPolicy is exported and
+unreachable — a config field*: `CommandPolicy` is exported (`src/index.ts:278`) and reachable,
+`TuiConfig.commandPolicy` (`src/shell/types.ts:430`) threading through `src/shell/config.ts:108`
+to `src/shell/execution.ts:174`, so an app supplies its own prefix today. Confirmed at HEAD
+2026-09-04. **The surviving half is the whole entry**: prefix-*out* — prose by default, verbs by
+exception — is inexpressible, because `prefixPolicy("")` makes every token a verb
+(`src/interaction/parser/policy.ts:33`), and what it needs is a ruling about where the default
+route lives rather than a field. **Gate**: `defaultRoute` occurs zero times in `src/` — measured
+2026-09-04, and red the day the name appears, whichever way the ruling goes.
+**49** — re-measured 2026-09-04 and **the count claim was stale in the direction that flatters the
+tree**: `test/golden/` holds **twelve** test files, not five, and **two** import from `src/shell/`
+— `continuation.test.ts` (`commandRows`, `noticeDoc`, `PROMPT_GUTTER`) and `patch.test.ts` (`b`,
+a builder rather than paint). A grep for `shell/` says three; `containment.test.ts`'s hit is the
+string `shell/session.ts` inside a stack-trace fixture, which is the encoding trap this document
+has met before and the reason the figure is imports and not matches. **The gap is unmoved at one
+of eight**: chrome rows are covered and the background base, the prompt window, the elision
+markers, the selection wash, the height arithmetic, the cursor sequences and the write-as-a-diff
+are not — so seven golden files were added without a frame among them, which is the entry
+demonstrating itself a second time rather than being restated. F163.
+
+**3 left this list on 2026-09-04, and the record was disagreeing with itself in three places.**
+The evidence table said `| 3 | PART |`, the Order column said nothing — which means OPEN — and this
+paragraph both listed 3 as confirmed-OPEN and said in its own prose that *3 is PART in the table
+above … rather than open*. **`roadmap-status.mjs` agreed with all three**, because its
+two-records-of-one-fact check (F667) iterated the *marked* rows and a blank column is not one. The
+column now says PART, the arm now iterates the table and reads a blank column as OPEN, and the
+entry's residue carries a gate rather than a sentence: `tensor` occurs zero times in `src/`,
+re-measured 2026-09-04. The sentence this paragraph used to carry — *`tensor` and `heatmap` occur
+zero times in `src/`* — is kept above in the record of its own correction, and it is the second of
+the two instances that argued for the gate arm at all.
+
+**52 left this list on 2026-09-04**, by being built rather than by being re-read, and its clause is
+the measured case the gate arm was written from. It said `camera`, `azimuth`, `elevation` and
+`halfBlockRows` occur zero times in `src/presentation/plot/`; they occur 33, 7, 7 and 1. The entry
+set its own condition — *the field, the cache-key axis and one binding land together or none does*
+— and all three landed: `RenderContext.cameras` (`src/presentation/blocks/types.ts:134`),
+`Cameras.key` (`src/shell/cameras.ts:126`) and the orbit bindings (`src/shell/construct.ts:1426`).
+BUILT in the column and in the table as of 2026-09-04.
 
 **33 left this list on 2026-08-15**, and its evidence expired the moment the code landed —
 *no queue of any kind in `src/shell/`, the word does not appear* is now false by construction.
