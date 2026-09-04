@@ -18,8 +18,15 @@ import { fsIo, report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
 const SANKEY = "src/presentation/plot/sankey.ts";
+const SVG = "src/presentation/plot/svg.ts";
 
-const FILES = "test/unit/plot-sankey.test.ts test/golden/plot-forms.test.ts";
+// **The third file is the SVG painter's, and it widens what can kill a row.**
+// The geometry mutations above are all in `sankey.ts`, and SK11's last row
+// counts `text-anchor="end"` — so a geometry mutation that moved a label could
+// now die there rather than in `plot-sankey.test.ts`. That is the row doing its
+// job (§3ap.4 K15's other half is *the placement did not move*), but it means an
+// `expect` above naming SK1–SK9 should be read as *at least* that row.
+const FILES = "test/unit/plot-sankey.test.ts test/golden/plot-forms.test.ts test/unit/plot-svg-path.test.ts";
 
 const { read, write } = fsIo(ROOT);
 const run = () => {
@@ -141,6 +148,45 @@ const results = runPass({
       from: "    js.sort((p, q) => centreOf(bar(laid.edges[p]![1])) - centreOf(bar(laid.edges[q]![1])) || byId(p, q));",
       to: "    js.sort(byId);",
       expect: "SK1",
+    },
+    {
+      // **K15, the ink — the label put back to the axis furniture's slot**
+      // (C12 I112, §3ap.7). This is the defect as it shipped: `tone.muted` painted
+      // straight onto the ribbon, measured at 1.02–1.41 over 33 labels and both
+      // shipped variants, against `muted`'s own recessive floor of 2.5. Every
+      // geometry assertion is green under it, and so is every terminal frame —
+      // the only thing that changes is whether a reader can see which flow is
+      // which. Run by hand on landing: **24 rows**, both themes, both halves.
+      name: "the node label takes the axis furniture's tone.muted",
+      file: SVG,
+      from: "  const labelInk = inkOf(NODE_LABEL, theme) ?? ink;",
+      to: "  const labelInk = inkOf(LABEL, theme) ?? ink;",
+      expect: "SK11",
+    },
+    {
+      // **K15, the ground — the halo dropped and the ink left alone** (C12 I112).
+      // The row that says the halo is load-bearing rather than decorative: with
+      // `tone.default` and no halo the backdrop is the ribbon again, at 4.29 on
+      // dark and 4.17 on light — over the floor by a whisker on one variant and
+      // under any margin worth promising. Run by hand: **24 rows**.
+      name: "the node label is drawn with no halo behind it",
+      file: SVG,
+      from: '      : ` stroke="${ground}" stroke-width="${n(HALO)}" stroke-linejoin="round" paint-order="stroke"`;',
+      to: '      : "";',
+      expect: "SK11",
+    },
+    {
+      // **K15, the order — `paint-order` dropped and the stroke kept** (C12 I112,
+      // T6.89). The subtle one: the stroke is then painted *over* the fill and
+      // every label is a ground-coloured blob, while both hex attributes are
+      // exactly where a rule reading them expects. Run by hand: **12 rows and
+      // not 24** — the ratio half of SK11 is blind to it, which is why the
+      // paint-order assertion is separate from the two colour ones.
+      name: "the halo is painted over the fill instead of under it",
+      file: SVG,
+      from: ' stroke-linejoin="round" paint-order="stroke"`;',
+      to: ' stroke-linejoin="round"`;',
+      expect: "SK11",
     },
   ],
 });

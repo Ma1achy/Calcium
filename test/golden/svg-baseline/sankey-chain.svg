@@ -5,11 +5,11 @@
 <path d="M357.248 12.8 C480.576 12.8 480.576 14.4 603.904 14.4 L603.904 228.16 C480.576 228.16 480.576 226.56 357.248 226.56 Z" fill="#56b4e9" fill-opacity="0.5"/>
 <path d="M357.248 234.56 C480.576 234.56 480.576 228.16 603.904 228.16 L603.904 281.6 C480.576 281.6 480.576 288 357.248 288 Z" fill="#3cbf9a" fill-opacity="0.5"/>
 <rect x="89.6" y="14.4" width="10.496" height="267.2" fill="#e69f00" stroke="#141414" stroke-width="1"/>
-<text x="106.096" y="152" font-size="12" font-family="monospace" fill="#626262">in</text>
+<text x="106.096" y="152" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#141414" stroke-width="3" stroke-linejoin="round" paint-order="stroke">in</text>
 <rect x="346.752" y="12.8" width="10.496" height="213.76" fill="#56b4e9" stroke="#141414" stroke-width="1"/>
-<text x="363.248" y="123.68" font-size="12" font-family="monospace" fill="#626262">cache</text>
+<text x="363.248" y="123.68" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#141414" stroke-width="3" stroke-linejoin="round" paint-order="stroke">cache</text>
 <rect x="346.752" y="234.56" width="10.496" height="53.44" fill="#3cbf9a" stroke="#141414" stroke-width="1"/>
-<text x="363.248" y="265.28" font-size="12" font-family="monospace" fill="#626262">miss</text>
+<text x="363.248" y="265.28" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#141414" stroke-width="3" stroke-linejoin="round" paint-order="stroke">miss</text>
 <rect x="603.904" y="14.4" width="10.496" height="267.2" fill="#f0e442" stroke="#141414" stroke-width="1"/>
-<text x="597.904" y="152" font-size="12" font-family="monospace" fill="#626262" text-anchor="end">out</text>
+<text x="597.904" y="152" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#141414" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="end">out</text>
 </svg>

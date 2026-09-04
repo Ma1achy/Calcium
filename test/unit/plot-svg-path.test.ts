@@ -34,7 +34,9 @@ import {
 } from "../../src/presentation/plot/figure.js";
 import { drawnBlock } from "../../src/presentation/plot/derive.js";
 import { resolve } from "../../src/presentation/theme/index.js";
-import { DARK_THEME as THEME } from "../support/render.js";
+import { DARK_THEME as THEME, DARK_THEME, LIGHT_THEME } from "../support/render.js";
+import { CATALOGUE_FORMS } from "../../tools/catalogue-forms.js";
+import { DEFAULT_FLOOR, ratio, type ColourRef, type ResolvedTheme } from "../../src/presentation/theme/index.js";
 import { b } from "../../src/shell/builders/index.js";
 import { ONE_PER_FORM } from "../support/plot-forms.js";
 import type { Plot, PlotForm } from "../../src/data/viewmodel/index.js";
@@ -2050,5 +2052,94 @@ describe("G7 — the partition itself", () => {
       const ink = (svg ?? "").split("\n").filter((l) => /^<(path|rect x|circle)/u.test(l));
       expect(ink.length, `${form} puts ink on the page rather than furniture alone`).toBeGreaterThan(0);
     }
+  });
+});
+
+/**
+ * **SK11 (C12 I112, §3ap.7)** — the sankey node label's ink and its ground.
+ *
+ * **The row is about the two slots and about the ratio, and it needs both.**
+ * Asserting the hex alone is a test of two literals: it would go green on a
+ * theme whose `tone.default` had drifted onto the ribbons. Asserting the ratio
+ * alone is a test that passes on `tone.dim` with no halo on the light variant
+ * by a whisker, which is not the ruling. So the slots say *what was decided*
+ * and the ratio says *what was promised*, and a mutation that keeps one loses
+ * the other.
+ *
+ * **Both shipped variants**, because the defect that produced this section was
+ * measured on both and the light one is the tighter of the two — `tone.muted`
+ * on the page's own ground measures 2.44 there, under its own floor.
+ *
+ * The reversed notice is excluded by name: it is `tone.warn` on bare ground
+ * below the box and is not a node label (§3ap.7).
+ */
+describe("SK11 — the sankey node label reads against what it is drawn on (C12 I112)", () => {
+  const VARIANTS = Object.keys(CATALOGUE_FORMS.sankey);
+
+  const sankeySvg = (variant: string, theme: ResolvedTheme): string => {
+    const spec = CATALOGUE_FORMS.sankey[variant as keyof typeof CATALOGUE_FORMS.sankey] as Record<string, unknown>;
+    const { cursor, ...rest } = spec;
+    void cursor;
+    const svg = plotToSvg({ kind: "plot", id: "sk11", ...rest } as unknown as Plot, theme);
+    expect(svg, `${variant} draws`).not.toBeNull();
+    return svg ?? "";
+  };
+
+  /** Every node label, as `{ fill, stroke, paintOrder }`. The notice is not one. */
+  const labelsOf = (svg: string): { fill: string; stroke: string | null; paintOrder: string | null; text: string }[] =>
+    [...svg.matchAll(/<text\b([^>]*)>([^<]*)<\/text>/gu)]
+      .filter((m) => !/\breversed$/u.test(m[2] ?? ""))
+      .map((m) => ({
+        fill: /fill="(#[0-9a-f]{6})"/u.exec(m[1] ?? "")?.[1] ?? "",
+        stroke: /stroke="(#[0-9a-f]{6})"/u.exec(m[1] ?? "")?.[1] ?? null,
+        paintOrder: /paint-order="([a-z ]+)"/u.exec(m[1] ?? "")?.[1] ?? null,
+        text: m[2] ?? "",
+      }));
+
+  describe.each([["dark", DARK_THEME], ["light", LIGHT_THEME]] as const)("%s", (name, theme) => {
+    // **The slots, resolved — never a hex literal in a test.** `rgbOf` is the
+    // helper that exists because a test naming a colour is a third source of
+    // truth; this is the same rule one conversion further, because the arm
+    // writes hex into the document.
+    const hexOf = (ref: ColourRef): string =>
+      `#${rgbOf(ref, theme).map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+    const ink = hexOf("tone.default");
+    const ground = hexOf("surface.bgDeep");
+
+    it.each(VARIANTS)("%s — every node label is tone.default over a bgDeep halo", (variant) => {
+      const labels = labelsOf(sankeySvg(variant, theme));
+      expect(labels.length, `${name}/${variant} names at least one node`).toBeGreaterThan(0);
+      for (const l of labels) {
+        expect(l.fill, `${name}/${variant} · ${l.text} is tone.default, not the furniture's tone.muted`).toBe(ink);
+        expect(l.stroke, `${name}/${variant} · ${l.text} carries a halo`).toBe(ground);
+        // **`paint-order` and not merely a stroke.** Without it the stroke is
+        // painted *over* the fill and the label is a ground-coloured blob — a
+        // defect a byte-compare golden cannot see, which is why it is a
+        // separate assertion rather than part of the one above.
+        expect(l.paintOrder, `${name}/${variant} · ${l.text}'s halo is under the fill`).toBe("stroke");
+      }
+    });
+
+    it.each(VARIANTS)("%s — and the ratio the halo buys clears C10's floor", (variant) => {
+      for (const l of labelsOf(sankeySvg(variant, theme))) {
+        // The promise, not the pair of literals that keeps it: whatever the
+        // ink and the halo are, the reader gets body text's floor. Measured on
+        // the raster at 12.43 (dark) and 9.25 (light), worst pixel 7.59 on
+        // `crowded` where two halos meet (§3ap.7).
+        expect(
+          ratio(l.fill, l.stroke ?? l.fill),
+          `${name}/${variant} · ${l.text} at ${ratio(l.fill, l.stroke ?? l.fill).toFixed(2)}`,
+        ).toBeGreaterThanOrEqual(DEFAULT_FLOOR);
+      }
+    });
+  });
+
+  it("the placement is unchanged, so this is the painter's ruling and not the geometry's", () => {
+    // **§3ap.4 K15's other half.** The ink moved because placement could not
+    // move: `sankeyLayout` is shared with the terminal, and the last layer's
+    // label still anchors at its end. A ruling that had quietly shifted a
+    // label would show up here rather than in a golden nobody re-reads.
+    const svg = sankeySvg("default", DARK_THEME);
+    expect(svg.match(/text-anchor="end"/gu)?.length, "the last layer's labels still flip").toBe(2);
   });
 });

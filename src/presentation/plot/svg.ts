@@ -557,6 +557,40 @@ const RULE: ColourRef = "surface.border";
 const LABEL: ColourRef = "tone.muted";
 
 /**
+ * A sankey node's label ink, and it is **not** `LABEL` (C12 I112, §3ap.7).
+ *
+ * `LABEL` is axis furniture and `tone.muted`'s 2.5 floor is the price of being
+ * deliberately recessive. A node label is not furniture — it is the only text
+ * that says which flow is which — and it lands on the ribbon rather than on the
+ * page, because §3ap.4 K15's cell is that *outside the bar* and *on the ribbon*
+ * are one region. Measured on the six baselines before the ruling: **1.02 at
+ * worst, 1.41 at best**, over 33 labels and both shipped variants.
+ *
+ * With the halo below, `tone.default` on `surface.bgDeep` measures **12.43** on
+ * dark and **9.25** on light against a floor of 4.5. Keeping `tone.muted` and
+ * adding only the halo measures 3.02 and **2.44** — the light figure under
+ * `muted`'s own floor — which is why the ink is half the ruling.
+ */
+const NODE_LABEL: ColourRef = "tone.default";
+
+/**
+ * The halo's width — the terminal's cell substitution, in the other medium.
+ *
+ * `sankeyArea` writes a label cell as `{ text: ch }` with no `ref` and no
+ * background, so the ribbon glyph is *replaced* where the letter is. An SVG
+ * cannot substitute a region, so it paints one: a `bgDeep` stroke under the
+ * fill, which puts the page's ground behind every glyph whatever it was drawn
+ * over. Plotly's `go.Sankey` reaches the same answer from the same constraint —
+ * its `textfont` defaults to `shadow: "auto"`, *minimal shadow and a contrast
+ * text colour* — while d3's energy figure does nothing, because a white paper
+ * under pale links needs nothing (§3ap.7).
+ *
+ * A quarter of the type, so the rim scales with the glyph rather than being a
+ * pixel count that stops working if `SVG_FONT_SIZE` ever moves.
+ */
+const HALO = SVG_FONT_SIZE / 4;
+
+/**
  * A slot's ink as a hex string, or `undefined` where the theme has no such slot.
  *
  * **`undefined` rather than a default**, which is `marks`' own handling of a
@@ -1300,7 +1334,11 @@ function nodeMarks(
  * interior is the shade glyph rather than the solid block (§3ap.2). A bar is a
  * rect in its own node's slot; a dummy draws nothing. Labels sit right of a bar
  * and left of one in the last layer, in the arm's own font units, never
- * measured (§3aj hazard 4). The reversed-edge notice is `graph`'s, verbatim.
+ * measured (§3aj hazard 4) — **and that placement is d3's and does not make
+ * them readable**, because the ribbon begins at the bar's edge, so `NODE_LABEL`
+ * and `HALO` are what does (I112, §3ap.4 K15, §3ap.7). The reversed-edge notice
+ * is `graph`'s, verbatim, and is not a node label: it keeps `tone.warn` on the
+ * page's own ground below the box, where it measures fine.
  */
 function sankeyMarks(
   g: Graph,
@@ -1316,6 +1354,11 @@ function sankeyMarks(
   const k = lay.layers.length; // cells-ok — a layer count
   if (k === 0) return out;
   const nodeW = Math.max(4, Math.min(12, w * 0.02));
+  const labelInk = inkOf(NODE_LABEL, theme) ?? ink;
+  const halo =
+    ground === undefined
+      ? ""
+      : ` stroke="${ground}" stroke-width="${n(HALO)}" stroke-linejoin="round" paint-order="stroke"`;
   const xOf = (l: number): number => box.left + (k <= 1 ? 0 : (l * (w - nodeW)) / (k - 1)); // cells-ok — a layer index
   const declared = g.nodes.length; // cells-ok — a node count
 
@@ -1349,10 +1392,21 @@ function sankeyMarks(
     if (label === "") continue;
     const last = b.layer === k - 1 && k > 1; // cells-ok — a layer count
     const tx = last ? x - LABEL_GAP : x + nodeW + LABEL_GAP;
+    // **The ink and the ground behind it** (I112, §3ap.7). `ink` — the caller's
+    // `LABEL` — is the fallback and not the choice: a theme with no
+    // `tone.default` still gets a label rather than a hole, which is `inkOf`'s
+    // own rule about a missing slot one function up.
+    //
+    // `paint-order="stroke"` puts the stroke *under* the fill. It was checked
+    // rather than assumed — a renderer that drops the attribute paints the
+    // stroke over the fill and every label becomes a ground-coloured blob that
+    // a byte-compare golden cannot see. Rendered through librsvg against the
+    // two-element `fill="none"` idiom as a control: identical, and that idiom
+    // is the fallback if a consumer's renderer ever disagrees.
     out.push(
       `<text x="${n(tx)}" y="${n(box.top + (b.y0 + b.y1) / 2 + SVG_FONT_SIZE / 3)}" ` +
-        `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${ink}"` +
-        `${last ? ' text-anchor="end"' : ""}>${escape(label)}</text>`,
+        `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${labelInk}"` +
+        `${halo}${last ? ' text-anchor="end"' : ""}>${escape(label)}</text>`,
     );
   }
 

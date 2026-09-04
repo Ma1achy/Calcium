@@ -13,29 +13,29 @@
 <path d="M100.096 224.8 C352 224.8 352 203.467 603.904 203.467 L603.904 229.867 C352 229.867 352 251.2 100.096 251.2 Z" fill="#3cbf9a" fill-opacity="0.5"/>
 <path d="M100.096 259.2 C352 259.2 352 229.867 603.904 229.867 L603.904 258.667 C352 258.667 352 288 100.096 288 Z" fill="#f0e442" fill-opacity="0.5"/>
 <rect x="89.6" y="12.8" width="10.496" height="2.4" fill="#e69f00" stroke="#141414" stroke-width="1"/>
-<text x="106.096" y="18" font-size="12" font-family="monospace" fill="#626262">src-01</text>
+<text x="106.096" y="18" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#141414" stroke-width="3" stroke-linejoin="round" paint-order="stroke">src-01</text>
 <rect x="89.6" y="23.2" width="10.496" height="4.8" fill="#56b4e9" stroke="#141414" stroke-width="1"/>
-<text x="106.096" y="29.6" font-size="12" font-family="monospace" fill="#626262">src-02</text>
+<text x="106.096" y="29.6" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#141414" stroke-width="3" stroke-linejoin="round" paint-order="stroke">src-02</text>
 <rect x="89.6" y="36" width="10.496" height="7.2" fill="#3cbf9a" stroke="#141414" stroke-width="1"/>
-<text x="106.096" y="43.6" font-size="12" font-family="monospace" fill="#626262">src-03</text>
+<text x="106.096" y="43.6" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#141414" stroke-width="3" stroke-linejoin="round" paint-order="stroke">src-03</text>
 <rect x="89.6" y="51.2" width="10.496" height="9.6" fill="#f0e442" stroke="#141414" stroke-width="1"/>
-<text x="106.096" y="60" font-size="12" font-family="monospace" fill="#626262">src-04</text>
+<text x="106.096" y="60" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#141414" stroke-width="3" stroke-linejoin="round" paint-order="stroke">src-04</text>
 <rect x="89.6" y="68.8" width="10.496" height="12" fill="#8fa8ff" stroke="#141414" stroke-width="1"/>
-<text x="106.096" y="78.8" font-size="12" font-family="monospace" fill="#626262">src-05</text>
+<text x="106.096" y="78.8" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#141414" stroke-width="3" stroke-linejoin="round" paint-order="stroke">src-05</text>
 <rect x="89.6" y="88.8" width="10.496" height="14.4" fill="#f07a3c" stroke="#141414" stroke-width="1"/>
-<text x="106.096" y="100" font-size="12" font-family="monospace" fill="#626262">src-06</text>
+<text x="106.096" y="100" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#141414" stroke-width="3" stroke-linejoin="round" paint-order="stroke">src-06</text>
 <rect x="89.6" y="111.2" width="10.496" height="16.8" fill="#e4a3c4" stroke="#141414" stroke-width="1"/>
-<text x="106.096" y="123.6" font-size="12" font-family="monospace" fill="#626262">src-07</text>
+<text x="106.096" y="123.6" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#141414" stroke-width="3" stroke-linejoin="round" paint-order="stroke">src-07</text>
 <rect x="89.6" y="136" width="10.496" height="19.2" fill="#cfcfcf" stroke="#141414" stroke-width="1"/>
-<text x="106.096" y="149.6" font-size="12" font-family="monospace" fill="#626262">src-08</text>
+<text x="106.096" y="149.6" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#141414" stroke-width="3" stroke-linejoin="round" paint-order="stroke">src-08</text>
 <rect x="89.6" y="163.2" width="10.496" height="21.6" fill="#e69f00" stroke="#141414" stroke-width="1"/>
-<text x="106.096" y="178" font-size="12" font-family="monospace" fill="#626262">src-09</text>
+<text x="106.096" y="178" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#141414" stroke-width="3" stroke-linejoin="round" paint-order="stroke">src-09</text>
 <rect x="89.6" y="192.8" width="10.496" height="24" fill="#56b4e9" stroke="#141414" stroke-width="1"/>
-<text x="106.096" y="208.8" font-size="12" font-family="monospace" fill="#626262">src-10</text>
+<text x="106.096" y="208.8" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#141414" stroke-width="3" stroke-linejoin="round" paint-order="stroke">src-10</text>
 <rect x="89.6" y="224.8" width="10.496" height="26.4" fill="#3cbf9a" stroke="#141414" stroke-width="1"/>
-<text x="106.096" y="242" font-size="12" font-family="monospace" fill="#626262">src-11</text>
+<text x="106.096" y="242" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#141414" stroke-width="3" stroke-linejoin="round" paint-order="stroke">src-11</text>
 <rect x="89.6" y="259.2" width="10.496" height="28.8" fill="#f0e442" stroke="#141414" stroke-width="1"/>
-<text x="106.096" y="277.6" font-size="12" font-family="monospace" fill="#626262">src-12</text>
+<text x="106.096" y="277.6" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#141414" stroke-width="3" stroke-linejoin="round" paint-order="stroke">src-12</text>
 <rect x="603.904" y="71.467" width="10.496" height="187.2" fill="#8fa8ff" stroke="#141414" stroke-width="1"/>
-<text x="597.904" y="169.067" font-size="12" font-family="monospace" fill="#626262" text-anchor="end">sink</text>
+<text x="597.904" y="169.067" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#141414" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="end">sink</text>
 </svg>
