@@ -24076,3 +24076,315 @@ completion-source failure given a sink (F556).
 **Left open, named**: `Point3Series.marker` in C04 (F537); a whisker's `x` read by
 neither arm (F528); the `cursorable` gate (F547); the `code`/`raw` window
 (F565); the violin's borrowed layer (F525).
+
+---
+
+## F567 — The refusal was about slicing the text, and the ruling that lifted it needed no new mechanism ★★★☆☆
+
+*2026-09-03 · Lane W, the `code`/`raw` windows, at 86d3b191+7 (b8b0e9f4).*
+
+C09 §6b refused `code` a window on a correct measurement (F426: a sliced text is a different parse)
+and then reasoned about the wrong remedy — *"carrying the lexical continuation means a field on
+`Code` holding a highlighter's internal mode"* — which is a choice between two bad options (a wider
+slice, a library's state on a public type) with the third missing: **do not slice.** The window
+hands back the same `text` reference and two integers; `render` tokenises what it always
+tokenised. Nothing about the tokeniser, the memo or the slot map changed. The prose in §6b now says
+this; I25a's headline no longer says *cannot be windowed at all*.
+
+---
+
+## F568 — A single-paint probe conflates block entry with the frame ★★★☆☆
+
+*2026-09-03 · Lane W, the `code`/`raw` windows, at 86d3b191+7 (b8b0e9f4).*
+
+Lane F's probe measures one `renderSequenceToLines` per block. After the window that paint was
+146 ms (2 000 lines) and 773 ms (20 000) — bounded in rows, not obviously in time — and the second
+paint 34 / 64 ms. The first is the whole text tokenised once, paid on entry and never on scroll
+because the pin keeps the memo key identical. The second was still linear in the document: the
+per-line cut (`tokenLines`) re-ran over every token each frame. Memoised on the token array
+(`WeakMap`): 20 000-line steady state 64 → 38 ms. What is still linear is `stripControl` /
+`expandTabs` / `split` over the whole text per frame (~20 ms at 20 000 lines) — recorded in
+C14 §4a as the residue, not hidden. Assert rows, report milliseconds — the test does the former.
+
+---
+
+## F569 — The golden gate could not have moved, and the instruction assumed it could ★☆☆☆☆
+
+*2026-09-03 · Lane W, the `code`/`raw` windows, at 86d3b191+7 (b8b0e9f4).*
+
+`test/golden/blocks.test.ts` renders `ONE_PER_KIND` whole through `renderToLines`; nothing there
+goes through `windowSequence`, and the one `code` fixture is two lines. 403 golden rows pass
+unchanged and that is a fact about the fixtures, not evidence about the windows. The frame-reads
+that do see the window are T1.18's comment-slot row and T2.22's control (a sliced text draws the
+same characters in a different slot), both compared against the whole rendering byte for byte.
+
+---
+
+## F570 — Two rows called T3.19 in C14 ★☆☆☆☆
+
+*2026-09-03 · Lane W, the `code`/`raw` windows, at 86d3b191+7 (b8b0e9f4).*
+
+`test/edge/viewport.test.ts` already carried a row named `T3.19: the rows the range selects are
+the rows C09 draws, at every offset` which the spec does not list; Lane F's spec row T3.19 (I23)
+took the same number. The I23 row is implemented beside it as `T3.19 (I23)`. Somebody who owns
+the C14 test numbering should give the older one a number the spec knows about.
+
+---
+
+## F571 — Before-figures differ by machine and both are real ★☆☆☆☆
+
+*2026-09-03 · Lane W, the `code`/`raw` windows, at 86d3b191+7 (b8b0e9f4).*
+
+Lane F: 1 406 ms for 2 000 `code` lines. This machine, same probe, same `dist/`: 934 ms. `logs`
+at 40 rows: 21 ms there, 14 ms here. The C14 §4a table now carries both, with the before/after
+pairs read on one machine.
+
+---
+
+## F572 — SP2 caught an invariant added in a sensible place and the wrong order ★☆☆☆☆
+
+*2026-09-03 · Lane W, the `code`/`raw` windows, at 86d3b191+7 (b8b0e9f4).*
+
+I82 was inserted beside I67/I68 (its subject) and Lane S had numbered their spans invariants from
+I83, so the file had `… I67 I82 I68 … I81 I83 …`. Moved to document order. Not a defect in
+either lane; recorded because the fix touched a line adjacent to Lane S's block.
+
+---
+
+## F573 — Video / GIF was refused on an architecture that had already changed ★★★☆☆
+
+*2026-09-03 · Lane R, the expired refusals, at 86d3b191+7 (b8b0e9f4).*
+
+`CALCIUM_ROADMAP.md` *Fights the architecture*: *a frame scheduler built around one frame per input
+batch*. False at HEAD: C03 §3 commits `stream` at 33 ms and the orbit is a continuous full-frame
+redraw on it (`ORBIT_RATE`, `src/shell/session.ts`; C22 I74; F509). The cost half — *90% for 5%* —
+was never measured. Measured: `omggif` 1.0.10 is 38.5 KB, 0 deps, MIT, last published 2022-06-22
+(`npm view`); `gif` has 0 hits in `src/`; `Image.data` is one PNG and `decodePng` the only codec;
+the kitty arm retransmits per frame (`a=T` replaces). Re-ruled as a **cost refusal** — a codec, a
+`frames` carrier, a frame index on the orbit's wake, ~350 lines — against zero consumers. The
+ratio is dropped. R18 `absent: decodeGif(`, R19 `present: ORBIT_RATE`. Row added to
+`DEPENDENCIES.md` *deliberately NOT* so the package refusal has the figures beside it.
+
+---
+
+## F574 — Sankey's refusal cited a problem the tree had solved, and it is not a fold ★★★☆☆
+
+*2026-09-03 · Lane R, the expired refusals, at 86d3b191+7 (b8b0e9f4).*
+
+*Edge routing, the Mermaid problem, wants a real layout engine* — `graph` ships a layered router
+(`src/presentation/plot/graph.ts`, 511 lines) and `elkjs` is in the tree. Measured against
+`graph`: `graphLayers` (passes 1–5) transfers; `GraphEdge` is `{ from, to }` with no weight; a
+node is a one-row label where a sankey node is a bar sized by flow; an edge is a mask bit where a
+ribbon is a fill (`halfBlockRows`'s territory, not `paint`'s); `graph` lays top-down at
+`rows × 2 − 1` where a sankey lays left-to-right. Ruled in C12 §3d: **a new form, `sankeyArea`,
+over the shared layering, refused on no consumer** (no weighted edge set exists). Pointers added
+to the roadmap's `hard` row and `CALCIUM_PLOT_PRIOR_ART.md:254`. R20 `absent: sankeyArea(`, R21
+`present: graphLayers`.
+
+---
+
+## F575 — typescript-eslint: 87 was the wrong number, 0 is the right one, and it cannot install ★★★★☆
+
+*2026-09-03 · Lane R, the expired refusals, at 86d3b191+7 (b8b0e9f4).*
+
+`DEPENDENCIES.md` said *87 packages … decide after C23 lands*; the trigger passed four times.
+Measured in the container:
+
+| figure | value |
+|---|---|
+| `typescript-eslint@latest` | 8.69.0, 96.8 KB unpacked, MIT, published 2026-08-31 |
+| packages into an **empty** directory (with eslint 10.8.0 + typescript 5.9.3) | 87 — the old figure, and it counts `eslint` and 74 packages already here |
+| lockfile-only delta on **this** tree (`--legacy-peer-deps`) | **13** (271 → 281) |
+| plain `npm install --package-lock-only` | **`ERESOLVE`** — peer `typescript >=4.8.4 <6.1.0` against the tree's 7.0.2 |
+| `recommendedTypeChecked` over `src/` (333 files) | 106 findings, 0 defects, 42 files |
+| `strictTypeChecked` | 700, of which 223 `no-non-null-assertion` |
+| `no-floating-promises` — the rule with the measured catch | **0** |
+
+The 106: 62 `no-unnecessary-type-assertion`, 12 `no-unused-vars` (all `_`-prefixed, which
+`tsconfig.json` already ignores), 8 `no-base-to-string` (`String(unknown)` in validator error
+text), 8 `unbound-method` (a method passed as a property and bound on the next line), 5
+`prefer-const`, 6 `no-unsafe-*` (`new Array(n).fill(" ")` as `any[]`; one JSON `any`), 3
+`require-await`, 2 unused-directive notes. **Refused on 106 findings of which 0 are real, and on
+a peer range that excludes the compiler in use.** Reopen conditions written: the range reaching
+7.x, or a floating promise reaching `src/`. R11's `why` rewritten; R11b `present:
+"typescript": "7.` in `package.json`, blind spot stated (the range is the package's, not ours).
+`eslint.config.js` header carries the figures. Ad hoc run left nothing in the tree (temp config
+at `/workspace/.laneR-tse.config.mjs` created and removed inside the run; `git status` clean of
+it).
+
+**The 87 is the instrument's shape, not the package's**: counting an install into an empty
+directory measures eslint's own subtree. The row had carried it through four re-readings.
+
+---
+
+## F576 — the eight refused spinner sets are all legal at the narrow tier, and three rows undercounted ★★☆☆☆
+
+*2026-09-03 · Lane R, the expired refusals, at 86d3b191+7 (b8b0e9f4).*
+
+`CALCIUM_SPINNERS.md:141-155` refused eight sets on `EA=Ambiguous`; roadmap 51 made ambiguous
+width a capability and `SPINNER_SETS` a `narrowOnly` tier, and only `growVertical` had crossed.
+Measured every frame of all eight plus `pulse` through `cells()` on both conventions
+(`laneR-spinner-probe.mjs` against `dist/`): every frame 1 narrow / 2 wide, none in T2.71's
+emoji set; `pulse` is 1 / 1. Seven sets added as `narrowOnly` (`growHorizontal` 12-frame
+ping-pong at 120, `noise` 100, `boxBounce2` 120, `triangle` 120, `circleHalves` 120, `pipe` 100,
+`arrow` 100) and `pulse` at 120 without the tier. `triangle` and `circleHalves` are 50 ms in
+`cli-spinners`, below T2.72's per-frame floor for a short set. **`noise`, `boxBounce2` and
+`circleHalves` each named a subset of frames as ambiguous and every frame is** — a table right
+about the verdict and wrong about the count. T2.70–T2.75 green over the widened table; mutation
+(`pipe` offered on the wide arm) → T2.70 fails, restored by writing the captured text back.
+
+---
+
+## F577 — *nothing currently is* reversible was false about the editor ★★☆☆☆
+
+*2026-09-03 · Lane R, the expired refusals, at 86d3b191+7 (b8b0e9f4).*
+
+`CALCIUM_ROADMAP.md` *Rewind*: *every mutation is reversible, and nothing currently is*.
+`src/interaction/editor/undo.ts` — two stacks, structural coalescing, `UNDO_LIMIT = 200` (C17
+§6, I11). Narrowed to **transcript** mutations, which have no inverse: `evict` (C13 §5),
+`ViewPatch`'s six ops with no delete (`append replace merge status expand reserve`), `settle`
+freezing (C23 I9). R22 `present: UNDO_LIMIT`.
+
+---
+
+## F578 — C12 §3d still said the log and time axes had no consumer ★★☆☆☆
+
+*2026-09-03 · Lane R, the expired refusals, at 86d3b191+7 (b8b0e9f4).*
+
+`niceLogAxis` (`axes.ts:903`), `niceSymlogAxis` (`:946`), `niceTimeAxis` (`:994`) exist and C04
+I81 threads the scale through `PinnedRange`. The follow-through pass had corrected the
+classification table (`:608`) and not the *Named and not built* paragraph twenty lines below —
+the same document, two states. Corrected with the symbols; the paragraph is kept as the
+prediction it was (two algorithms, not arguments), which came true.
+
+---
+
+## F579 — closed by the record pass, verified at HEAD, listed and not touched ★☆☆☆☆
+
+*2026-09-03 · Lane R, the expired refusals, at 86d3b191+7 (b8b0e9f4).*
+
+- Mermaid theming: `CALCIUM_MERMAID_THEMING.md:123` *re-scoped rather than refused: role →
+  palette slot*; `AsciiTheme` at `node_modules/beautiful-mermaid/dist/index.d.ts:197`, 0 hits in
+  `src/`. Registered as **owed** — R23 `absent: AsciiTheme`, R24 `present: beautiful-mermaid`
+  (package.json is the register's only form for *in node_modules*; stated in the row).
+- 3D retraction sites: `CALCIUM_PLOT_PRIOR_ART.md:252, :382, :773, :959` all carry the F435
+  correction.
+- SVG horizon: `CALCIUM_SVG_COMPLETION.md:150-157` recounted — one form (`plot3d`), not nineteen;
+  `horizonFigure` exists.
+- The plot-form refusal ledger: `:773-774` and `:959-964` corrected; only sankey remained, and
+  F574 rules it.
+- Italic: the spans arc (Lane S). Not touched.
+- Nothing else in `CALCIUM_NOTE_AUDIT.md`'s closing list is a refusal with an expired premise:
+  B17 and the popup `none` arm are code refusals still true; *no cell→node map* is the API's
+  (`renderMermaidASCII` returns a string). The audit's `pulse` owed line updated to BUILT.
+
+---
+
+## F580 — Ink re-encodes SGR, so a span's bytes are asserted where Ink emits them and the attribute order where `paint()` makes it ★★☆☆☆
+
+*2026-09-04 · Lane S, spans, at 86d3b191+7 (b8b0e9f4).*
+
+`renderToString` does not pass a styled run's SGR through: it emits **one escape per attribute, closed in reverse, with colour as its own pair** — so a run painted as `1;3;4;38;…` leaves Ink as a nest of single-attribute opens and closes. A frame row asserting `paint()`'s merged form against a rendered frame would fail on every span, and a row asserting Ink's form against `paint()` would fail the same way from the other side.
+
+The rows are split by where the bytes are made: the frame rows (`test/edge/spans.test.ts`) assert **Ink's** form — the header of that file says *the bytes are Ink's* — and the `1;3;4` order claim (bold, italic, underline, then colour, C10) is asserted at `paint()` in `test/contract/spans.test.ts`, which is where the order is decided. **A claim asserted one layer below where it is made is asserted against a re-encoding**, and the re-encoding is the thing that varies.
+
+---
+
+## F581 — The states golden strips SGR, so a span is invisible to it — it holds geometry only ★★☆☆☆
+
+*2026-09-04 · Lane S, spans, at 86d3b191+7 (b8b0e9f4).*
+
+`test/golden/__snapshots__/states.test.ts.snap` is written from frames with the escapes stripped (`test/support/states.ts`), so **no span can move a states golden**: bold, italic and underline change bytes and no cells. The golden holds geometry — that a span does not change a width, a wrap or a row count — and that is the whole of what it holds. **No golden frame moved when spans landed, and that is the gate's blind spot rather than evidence about the spans**; the bytes live in the edge rows (F580), which is F569's shape on the other window — a green gate reporting on a thing it cannot see.
+
+---
+
+## F582 — `runsOf`'s first snap went upward and collapsed any span starting inside a leading cluster ★★★☆☆
+
+*2026-09-04 · Lane S, spans, at 86d3b191+7 (b8b0e9f4).*
+
+The first draft of `runsOf` (`src/presentation/runs.ts`) snapped a boundary that fell inside a grapheme cluster **upward** — both `from` and `to` to the cluster's end — so a span whose `from` landed inside the text's leading cluster collapsed to zero width and was dropped, silently, with the width unchanged. Caught by **T3.64 (C04 I84)** before it shipped: *a boundary inside a cluster snaps outward to the cluster's edges, and the width does not move*. **Outward** landed — `from` to the cluster's start, `to` to the cluster's end — so a span can widen by a cluster and never vanish. The row existed because the design walk (`docs/notes/CALCIUM_SPANS_DESIGN.md` §4) had a cell for *boundary meets cluster*, and the first implementation was the fabricated violation for it.
+
+---
+
+## F583 — The markdown `DELIMITER` regex accepts one column, so `|---|` reads as a table ★☆☆☆☆
+
+*2026-09-04 · Lane S, spans, at 86d3b191+7 (b8b0e9f4).*
+
+`src/data/viewmodel/markdown.ts`'s `DELIMITER` (`:165`) requires one `|`-terminated cell followed by a bare one, so a single-column delimiter row `|---|` matches and the line above it — any line containing a `|` — is parsed as a table header. Found while the inline pass walked the markdown source with spans in it; **not the spans arc's**, it is entry 11's residue (the markdown parser) and is recorded here so the next reader of `DELIMITER` has it. Not changed.
+
+---
+
+## F584 — The hand-run mutation driver reported every mutation survived, including a killed control ★★★☆☆
+
+*2026-09-04 · Lane S, spans, at 86d3b191+7 (b8b0e9f4).*
+
+The first run of `hand-mutate.py` over `tools/mutate/runs/spans.mjs` reported **every mutation *survived, no rows*** — including the control whose row was known to fail. Two instruments-before-subject defects in the driver: vitest's failure lines carry **colour codes**, so the row-id match never fired against `\x1b[31m✗\x1b[0m T3.64`; and the run file's anchors are **single-quoted** JS strings, which the driver's literal parser read as no anchor at all, so *no rows* was true of an anchor it had never applied. **A driver that reports *survived* for its own control has measured nothing** — the control is what makes that legible, and without it the report reads as a suite that catches nothing. Both fixed (`ANSI` stripped before matching; `STR` accepts both quote forms); rerun, every anchor kills its row.
+
+---
+
+## F585 — `truncateParts`'s marker read `limit − 1` where `truncate` measured the cluster — F292's second instance, one function along ★★☆☆☆
+
+*2026-09-04 · Lane S, spans, at 86d3b191+7 (b8b0e9f4).*
+
+F292 fixed `truncate` to measure the marker it appends through `clusterCells(marker, caps.ambiguousWidth)`. `truncateParts` (`src/presentation/text.ts:467`), which the spans pass reached because a span has to survive a truncation, still reserved `limit - 1` for the same `…` — the birthday clause of the reimplemented rule, one function along, at exactly one rung (`ambiguousWidth: "wide"`). Now measured through the same helper. **A fix that lands in one function of a pair leaves the pair disagreeing at the rung the fix was for**; the second function had no `wide` corpus, which is why F292's 29 rows never reached it.
+
+---
+
+## F586 — MG24's equality arm fired on `SgrStyle.underline` as well when the italic writer landed, and the row's reason was wrong about which member it was waiting for ★★☆☆☆
+
+*2026-09-04 · Lane S, spans, at 86d3b191+7 (b8b0e9f4).*
+
+The equality list in `tools/enforce/module-graph.mjs` carried `SgrStyle.italic` as *nothing sets it yet*; when the spans pass wrote the italic writer, MG24 fired for the removal — as it should — **and for `SgrStyle.underline`**, which nothing had ever written either. The row's *nothing sets it yet* was true of both members, but its reason implied only italic was waiting; underline sat in the list under a sentence written about its neighbour. Both rows removed with the writers; the list is by equality so the second firing was the rule doing its job. The mechanism the row excused — a style member declared, resolved by C10 and written by nothing — is group 2's shape: complete on one side of a seam, unreachable from the other.
+
+---
+
+## F587 — the owed three, in numbers ★★★☆☆
+
+*2026-09-04 · the merge, over three lanes, at 86d3b191+7 (b8b0e9f4).*
+
+F566 left three items open and named: the `code`/`raw` window (F565), the refusal register's
+owed decisions (F557), and italic (F433's spans). All three landed on one tree in one pass;
+this entry is their figures, and each cites the entry that carries the measurement.
+
+**The windows** (F567–F572). No new mechanism — the ruling was *do not slice* (F567):
+the window hands back the same `text` reference and two integers, and the tokeniser, the memo
+and the slot map are untouched. Before/after on one machine, 40-row window, C14 §4a:
+
+| kind | lines | before | steady-state after |
+|---|---|---|---|
+| `code` | 2 000 | 934 ms | **34 ms** |
+| `code` | 20 000 | 7 624 ms | **38 ms** |
+| `raw` | 2 000 | 578 ms | **7 ms** |
+| `raw` | 20 000 | 5 814 ms | **12 ms** |
+
+The first paint of a `code` block still tokenises the whole text once (146 / 773 ms), paid on
+entry and never on scroll; the residue that is still linear (~20 ms at 20 000 lines) is named in
+§4a rather than hidden (F568). The golden gate could not have moved and did not
+(F569); the two before-figures are both real and both recorded (F571).
+
+**The refusals** (F573–F579), each re-ruled once in the document that holds it and
+registered in SS54 (R11b, R18–R24). `typescript-eslint` is **13 packages, not 87** — the 87
+counted an install into an empty directory — refused on **0 defects in 106 findings** over 333
+files and on a peer range (`<6.1.0`) that excludes the TypeScript 7.0.2 in use (F575). The
+GIF decoder is 38.5 KB and 0 deps, refused on the **frame carrier's** cost, ~350 lines against
+zero consumers, and the *one frame per input batch* premise was false since C03's `stream`
+(F573). Sankey is **a new form, `sankeyArea`**, over `graph`'s layering — not a fold; refused
+on no weighted edge set (F574). **Eight spinner sets plus `pulse`** to the narrow tier,
+every frame measured 1 narrow / 2 wide, three rows having undercounted their own ambiguous
+frames (F576). Rewind narrowed to **transcript mutations**, the editor having had two
+undo stacks and `UNDO_LIMIT = 200` all along (F577). One paragraph of C12 §3d corrected
+twenty lines below the table the follow-through had already fixed (F578); the rest of the
+audit's closing list verified at HEAD and not touched (F579).
+
+**The spans** (F580–F586). `TextSpan` on the view model — bold, italic, underline —
+four block kinds carrying it, and a markdown inline pass writing it. **259 files, 4 945 rows
+green; no golden frame moved**, which is the gate's blind spot and not the spans' evidence
+(F581); the bytes are asserted where Ink makes them and the attribute order where
+`paint()` makes it (F580). MG24 fired on italic **and underline** when the writer landed
+(F586). Two defects found before shipping — the upward snap (F582, T3.64) and
+F292's second instance in `truncateParts` (F585) — and one in the instrument: the
+hand-run mutation driver reported its own killed control as survived (F584). One
+residue handed to entry 11 (F583).
+
+**The arithmetic**: 21 entries, F567–F587, keyed in one move each — group 2 gains one, 7 one,
+9 two, 10 four, 11 three, 14 one, Singles nine — and SP6 reads 591 = 591.

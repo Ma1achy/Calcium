@@ -30,20 +30,20 @@ type change.
 | rank | mechanism | ids keyed | consumers | ⚠ | disposition |
 |---|---|---|---|---|---|
 | **1** | [The consumer cannot reach a fact the framework holds](#1) | 20 | **11 open** | ⚠ C07 · C24 | real Calcium work, with consumers |
-| **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 66 | **5 open** (9 closed) | ⚠ C04 · C23 | real Calcium work · **7 of 13 fixed** — and F165 is the first found by roadmap 48's residue rather than by a consumer reaching for something |
+| **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 67 | **5 open** (9 closed) | ⚠ C04 · C23 | real Calcium work · **7 of 13 fixed** — and F165 is the first found by roadmap 48's residue rather than by a consumer reaching for something |
 | **3** | [A block cannot express what the surface needs](#3) | 7 | **4 open** | ⚠ C04 | mixed — two absorbed |
 | **4** | [A change axis distinct from `Tone`](#4) | 4 | **4 open** | ⚠ C04 · C09 · C10 | real Calcium work · needs a ruling |
 | **5** | [The far side's shape is not the framework's contract](#5) | 10 | **2 open** | ⚠ C05 | mostly app-side · one shim |
 | **6** | [Rendered from data that has since moved](#6) | 2 | **2 open** | ⚠ C04 | real Calcium work |
-| **7** | [An artefact describes the world rather than being checked against it](#7) | 78 | **20** | — | artefact discipline — **no code**, and F164 is the first found by an instrument's *population* step rather than by a reader; **F210 is the first where the artefact is a component's own spec and the thing it contradicts is a shipped frame**, and **F233 the first where what it contradicts is a *fix*** — four present-tense statements of a repaired defect, in the two components the repair did not touch |
+| **7** | [An artefact describes the world rather than being checked against it](#7) | 79 | **20** | — | artefact discipline — **no code**, and F164 is the first found by an instrument's *population* step rather than by a reader; **F210 is the first where the artefact is a component's own spec and the thing it contradicts is a shipped frame**, and **F233 the first where what it contradicts is a *fix*** — four present-tense statements of a repaired defect, in the two components the repair did not touch |
 | **8** | [Absence indistinguishable from failure](#8) | 27 | **7 open** (7 closed) | partly | real Calcium work · **7 of 10 fixed** — F151 is the class F35 closed in the half an app-side test cannot reach, and **F167 is the class arriving in a *value*: a validator agreeing twice about two different documents** |
-| **9** | [**The instrument was wrong**](#9) | 64 | **17** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
-| **10** | [**A claim carried without a record**](#10) | 47 | **11** | — | **new at F80** · method — six findings disproved, and **F166 unblocked an entry while F168 found what the same row was silent about**; F184 is the first where the unrecorded claim was a *rule* rather than a fact, governing thirty forms from a parameter's doc comment |
-| **11** | [A gate that passes without checking](#11) | 186 | **16** | — | 9 closed · **7 open** — four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
+| **9** | [**The instrument was wrong**](#9) | 66 | **17** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
+| **10** | [**A claim carried without a record**](#10) | 51 | **11** | — | **new at F80** · method — six findings disproved, and **F166 unblocked an entry while F168 found what the same row was silent about**; F184 is the first where the unrecorded claim was a *rule* rather than a fact, governing thirty forms from a parameter's doc comment |
+| **11** | [A gate that passes without checking](#11) | 189 | **16** | — | 9 closed · **7 open** — four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
 | **12** | [**A time-based assertion under contention**](#12) | 4 | **3** | — | **new at F80** · Calcium's own suite |
 | **13** | [Text the framework emits](#13) | 6 | **4** | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
-| **14** | [A constant, a channel or a rule that outlived its configuration](#14) | 17 | **13 open** | ⚠ C12 | **new at F492** · real Calcium work — every member reads as deliberate, which is why review found none of them |
-| — | [Singles](#singles) | 32 | 1 each | — | see each · **F176 is the one to read twice**: the instrument had the evidence in a committed snapshot and the reading step was skipped |
+| **14** | [A constant, a channel or a rule that outlived its configuration](#14) | 18 | **13 open** | ⚠ C12 | **new at F492** · real Calcium work — every member reads as deliberate, which is why review found none of them |
+| — | [Singles](#singles) | 41 | 1 each | — | see each · **F176 is the one to read twice**: the instrument had the evidence in a committed snapshot and the reading step was skipped |
 
 **Four groups are new since F55** — 9, 10, 12, and F81's arrival in 4. Group 9 is the one
 that changes the picture, and it is the only group whose subject is the apparatus rather
@@ -113,7 +113,9 @@ view's** producer is defined by the region and has no other bound.
 ---
 
 <a id="2"></a>
-## 2 · A complete mechanism, unreachable from the other side of a seam — **13 open, 38 closed** ⚠
+## 2 · A complete mechanism, unreachable from the other side of a seam — **13 open, 39 closed** ⚠
+
+**F586** — `SgrStyle.underline` sat on MG24's equality list under a reason written about `italic` — *nothing sets it yet* was true of both, and only one was named as waiting. The list is by equality, so writing the italic writer fired the rule on both, which is the rule working. A style member C10 resolves and nothing writes is this group's shape. **Fixed**, with the writers
 
 **F538** — three readers of `liveId` were three copies of one constant — `liveElements`, `focusedBlock`, `focusFor` — so the stored location had no entry to carry and nothing outside the live entry could be focused. One pull, `focusedEntryId()`, and the entry on `StoredFocus`'s `liveBlock` arm (C26 I21, I22). **Fixed**
 
@@ -350,7 +352,9 @@ badly and *"the banner overflows when you resize"* argues for itself immediately
 ---
 
 <a id="7"></a>
-## 7 · An artefact describes the world rather than being checked against it — **ten more at F512–F559, nine of them corrected in place; F537 open**
+## 7 · An artefact describes the world rather than being checked against it — **eleven more at F512–F578, ten of them corrected in place; F537 open**
+
+**F578** — C12 §3d's *Named and not built* paragraph still said the log and time axes had no consumer, twenty lines below the classification table the follow-through had corrected — one document, two states. `niceLogAxis`, `niceSymlogAxis`, `niceTimeAxis` exist and C04 I81 threads the scale. Corrected with the symbols; the paragraph kept as the prediction it was
 
 **F512** — `putBlock` exists on `DocumentView`, not on C13, so `AGENT_TUI_STEP0.md`'s *`putBlock` then `settle`* named a real method on the wrong component — a grep for the symbol succeeds and the sentence is still wrong, which is harder than a name in no file. Corrected to `append`/`patch`/`settle`
 
@@ -566,7 +570,11 @@ and the claim has to be one the producer can support.*
 | **F319** | **a bin that is not drawn and not named** | C12 I8 is *a series that cannot be given a row is named in a legend, never dropped silently*, and `categoricalForm` opens with `const labels = cats.slice(0, areaRows);`. The sibling branch honours the rule in twenty lines with a comment saying **a series dropped in silence is the failure this branch exists to avoid**; categories get the slice. **Three of 45 row-bearing variants in the corpus are short and all three are histograms** — `default` and `scott` lose one bin of nine, `freedman-diaconis` **three of eleven, 39 of 200 samples, the whole right tail** — and the frame reads as a clean unimodal distribution that has ended. **The rule was written about the subject that had the defect**, and a histogram's rows are bins a *strategy* chose rather than categories an author wrote, so the count is not a number anybody could check against the height. Invisible to all three gates: the 1810 terminal frames are byte-identical because it has always done this, the matrix is unchanged in every cell across a change that replaced 240 bars with 18, and `plotAreaRows` is the terminal's so the second arm never had a limit to hit. **Found by reading the frames F317 moved** — the remedy producing the finding the original could not. **Fixed** — I8 widened to name a *row*, the notice spent from the declared height before the drawing, 30 of 1810 baseline frames moved and 0 of 181 SVG |
 
 
-## 9 · The instrument was wrong · new at F80 · **six more from the residue pass, two of them the brief's own grep**
+## 9 · The instrument was wrong · new at F80 · **six more from the residue pass, two of them the brief's own grep · two from the owed three, both reporting before they had a subject**
+
+**F568** — Lane F's single-paint probe measured one `renderSequenceToLines` per block and reported block entry as the frame — 146 / 773 ms after the window, bounded in rows and not obviously in time. The second paint was the number, and it was still linear in the document through `tokenLines` until memoised on the token array: 64 → 38 ms at 20 000 lines. The residue still linear (~20 ms) is recorded in C14 §4a. Assert rows, report milliseconds
+
+**F584** — the hand-run mutation driver reported every mutation *survived, no rows* — including the control whose row was known to fail — because vitest's failures carry colour codes and the run file's anchors are single-quoted. Instrument before subject, and the killed control is what made it legible. **Fixed**; rerun, every anchor kills its row
 
 **F520** — three gate collisions from labels that look like citations — audit rows `I1`–`I11` read by SP3 as invariants, a `structured.ts:217` resolved as a file, the word *landed* inside an OPEN entry tripping `BUILT_CLAIM`. All three are the gates working; relabelled `IM-n`, full paths, *closed that question*
 
@@ -706,7 +714,15 @@ were all legitimate ESCs in escape-sequence tests. The reusable part: **a search
 is evidence only if the search could have returned something**, and this is the first instrument
 here about whether the reading happened at all.
 
-## 10 · A claim carried without a record — **35: nine findings disproved, four deferral premises false when written, twenty claims caught before anything was built on them, one rule that governed thirty forms, one reasoned claim that five documents inherited, and one recorded budget that did not reproduce against its own controls** · new at F80
+## 10 · A claim carried without a record — **39: nine findings disproved, four refusal premises expired unread (F573–F575, F577), four deferral premises false when written, twenty claims caught before anything was built on them, one rule that governed thirty forms, one reasoned claim that five documents inherited, and one recorded budget that did not reproduce against its own controls** · new at F80
+
+**F573** — the GIF refusal rested on *a frame scheduler built around one frame per input batch*, false since C03 §3's `stream` at 33 ms and the orbit's continuous redraw, and on a *90% for 5%* ratio never measured. Measured: `omggif` 38.5 KB, 0 deps; the cost is the `frames` carrier and a frame index on the orbit's wake, ~350 lines. Re-ruled as a cost refusal against zero consumers; R18/R19 registered
+
+**F574** — sankey's refusal cited *edge routing wants a real layout engine* after `graph` shipped a layered router and `elkjs` was in the tree. Measured against `graph`: the layering transfers, nothing else does — no edge weight, a node is a row not a bar, a ribbon is a fill not a mask bit, the axis is the other way. Ruled in C12 §3d as a new form, `sankeyArea`, refused on no consumer; R20/R21
+
+**F575** — `DEPENDENCIES.md`'s *87 packages* counted an install into an empty directory — eslint's own subtree and 74 packages already here; the lockfile delta on this tree is **13**. The row carried it through four re-readings and a trigger that passed four times. Re-refused on the measured grounds: 106 findings and 0 defects over 333 files, and a peer range `<6.1.0` that `ERESOLVE`s against the tree's TypeScript 7.0.2 — the peer-range half is group 14's shape and is not counted there. R11 rewritten, R11b registered, reopen conditions written
+
+**F577** — *every mutation is reversible, and nothing currently is* — the editor has had two undo stacks, structural coalescing and `UNDO_LIMIT = 200` since C17 §6. Narrowed to transcript mutations, which have no inverse: `evict`, `ViewPatch`'s six ops with no delete, `settle` freezing. R22
 
 **F534** — 2-D `Series.marker` was attributed to 1274eb27 without a `git log`; it was 127f19b1's, accepted by both gates and drawn by none. Deleted from `Series`, `SeriesOpts` and the spread; golden 403 tests identical. **Fixed**
 
@@ -830,7 +846,13 @@ through a menu in as many words — as the reason the implementation writes ever
 
 
 **F491** — C12 §3am's refusal of box-drawing joins rests on one *mechanism* among four arguments: a strictly-nearer test refuses the second edge **by construction** at exactly the cell a join needs. **Every clause is true and the consequence is a tenth of what the wording implies.** Built both ways on a cube's twelve edges: **36 corners and 8 tees against 29 and 5** — seven corners and three tees, not a figure coming apart at every vertex. And three fixtures built to make it categorical are *identical* under both rules. The reason is the arm's corner routing, needed for a different problem, which produces corner glyphs from a **single** stroke — so a corner is not evidence of two edges meeting, and the row that counted corners survived its own mutation. **The class: a refusal states a mechanism and a consequence, and only the mechanism is checkable from the armchair.** Both were carried as one claim for four steps; *refused by construction* is a statement about a code path and reads as one about a picture
-## 11 · A gate that passes without checking — **119: 69 closed, 50 open**
+## 11 · A gate that passes without checking — **122: 72 closed, 50 open**
+
+**F569** — 403 golden rows passed unchanged through the `code`/`raw` window because `test/golden/blocks.test.ts` renders `ONE_PER_KIND` whole and the one `code` fixture is two lines — a fact about the fixtures, not evidence about the windows, and the instruction assumed the gate could have moved. The frame-reads that see the window are T1.18 and T2.22, byte for byte against the whole rendering
+
+**F581** — the states golden strips SGR before it records, so a span cannot move it: it holds geometry and only geometry, and *no golden frame moved* when spans landed is the gate's blind spot. The bytes are asserted in the edge rows, in Ink's form, and the attribute order at `paint()` (F580)
+
+**F585** — `truncateParts` reserved `limit - 1` for the `…` that `truncate` had learned to measure — F292's second instance one function along, at the same single rung, unreached because the second function had no `wide` corpus. Now measured through `clusterCells`. **Fixed**
 
 **F552** — SS53's first run over 36 allow entries found five dead — one for the whole life of its rule, one the brief did not name — and its first draft measured with a comment-strip that deletes the marker a negative lookahead reads. `lineFires` is one function now. Removed, `why` rewritten; the coverage rows carry the one-file-per-directory residue
 
@@ -1177,12 +1199,14 @@ already made — folding it in is cheaper than making a second one.
 ---
 
 <a id="14"></a>
-## 14 · A constant, a channel or a rule that outlived its configuration — **17** · new at F492
+## 14 · A constant, a channel or a rule that outlived its configuration — **18** · new at F492
 
 **The mechanism, in one sentence: a decision that was correct for every configuration that
 existed, kept after another one arrived.** Not a mistake at the time and not a mistake anyone
 made later — the thing it depended on moved, and nothing watches a dependency that was never
 written as one. Every member reads as deliberate, which is why none was found by review.
+
+**F576** — eight spinner sets were refused on `EA=Ambiguous` before roadmap 51 made ambiguous width a capability and gave `SPINNER_SETS` a `narrowOnly` tier; only `growVertical` had crossed. Every frame of all eight measured 1 narrow / 2 wide, and three rows had named a subset of frames as ambiguous where every frame is. Seven sets plus `pulse` added; T2.70–T2.75 green, mutation kills T2.70. **Fixed**. (`typescript-eslint`'s peer range, F575, is the same shape — a refusal that outlived the compiler it was written against — and is keyed in group 10 with its count)
 
 **F521** — `waffleGrid` rounded each segment independently against `pos < 100` — the identity at `scale === 1`, which was the corpus's only waffle for a year. `50/50/1` lost its sliver and `1/1/1` drew a hundredth square the legend did not name, in both arms, from one shared function the table had correctly ruled *shared*. Largest-remainder with the earlier segment winning a tie, C12 I108; 22 baselines. **Fixed**
 
@@ -1239,6 +1263,15 @@ written as one. Every member reads as deliberate, which is why none was found by
 
 | | verdict |
 |---|---|
+| **F587** | the owed three in numbers — the `code`/`raw` window 934 → 34 ms and 7 624 → 38 ms, five refusals re-ruled once each, spans over 259 files with no golden moved; cites every entry F567–F586 by number |
+| **F567** | C09 §6b refused `code` a window on a correct measurement and reasoned about the wrong remedy — a wider slice or a highlighter's state on a public type — with the third option missing: *do not slice*. The window is the same `text` reference and two integers; nothing about the tokeniser, the memo or the slot map changed. **Fixed** |
+| **F570** | two rows called T3.19 in C14 — an older edge row the spec never listed and Lane F's I23 row took the same number; implemented beside it as `T3.19 (I23)`. The older one wants a number the spec knows about |
+| **F571** | the before-figures differ by machine and both are real — 1 406 ms there, 934 ms here for the same 2 000 `code` lines, `logs` 21 against 14 — so C14 §4a carries both and reads every before/after pair on one machine |
+| **F572** | SP2 caught I82 inserted beside its subject (I67/I68) while Lane S had numbered from I83, so the file read `… I67 I82 I68 … I81 I83 …`. Moved to document order; not a defect in either lane |
+| **F579** | the audit's closing list verified at HEAD and not touched — mermaid theming registered as owed (R23/R24), the four 3D retraction sites and the SVG horizon confirmed corrected, B17 and the popup `none` arm still true refusals |
+| **F580** | Ink re-encodes SGR — one escape per attribute, closed in reverse, colour as its own pair — so the frame rows assert Ink's form and the `1;3;4` order claim is asserted at `paint()`, where it is made |
+| **F582** | `runsOf`'s first snap went upward and collapsed any span starting inside a leading cluster; T3.64 (C04 I84) caught it before it shipped and outward — `from` to the cluster's start, `to` to its end — landed. **Fixed** before shipping |
+| **F583** | the markdown `DELIMITER` regex accepts one column, so `\|---\|` reads as a table. Entry 11's residue, not the spans arc's; recorded, not changed |
 | **F566** | the residue pass in numbers — two of three motivating claims disproven, 72 record corrections, ~250 frames, five enforcement rules, and the substrate items; cites every entry above by number |
 | **F565** | one block's paint is linear in the block — 2 000 lines of `code` 1 406 ms, 20 000 lines 11 360 ms, `logs` 30 ms — and the roadmap's 83 ms was a different method, so both are recorded side by side in C14 §4a. I23 is written as a target false for `code` and `raw` today; T2.22 pins the set so the window cannot land silently |
 | **F524** | three defects in the first draft of the annotation crossing, each found by reading a frame — the dash was the layer's and had to be the mark's, a closed dashed interior outlined the ceiling, and *behind* means *first* in an arm that paints in order. **Fixed** |
@@ -1359,6 +1392,8 @@ transcribing it is the pattern for any future inventory here; deriving it does n
 partition.
 
 **The residue pass's 55 entries (F512–F566) were keyed in one move each**, on F434's rule: the row goes in the group and the same group's column moves by one, so the column sums to 570 because each of eight groups gained exactly what it keyed — 13, 10, 3, 6, 4, 7, 4 and 8 — and not because errors cancelled. Measured before the merge at 515 = 515 and after at 570 = 570, from SP6's own counters.
+
+**The owed three's 21 entries (F567–F587) were keyed the same way**, one move each: group 2 gained one (F586), 7 one (F578), 9 two (F568, F584), 10 four (F573, F574, F575, F577), 11 three (F569, F581, F585), 14 one (F576) and Singles nine — 1 + 1 + 2 + 4 + 3 + 1 + 9 = 21. F575 has group 14's shape as well as group 10's and is **mentioned** in 14 without bold, so it is keyed once and the column moves once; F434's failure mode is exactly the row bolded in both. Measured before at 570 = 570 and after at 591 = 591, from SP6's own counters.
 
 **F87, F88 and F89 are filed and not yet grouped above** — they arrived from the step-3a
 partition, which is `CALCIUM_GAP_PLAN.md`. Regrouping is 3b's, with the roadmap rewrite.

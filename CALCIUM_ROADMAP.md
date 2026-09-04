@@ -1426,7 +1426,7 @@ logs    50 000       0.00             0.65           40 of 50 000
 `lines.length` arithmetic, where `code` must wrap-measure every line — so the remaining cost
 splits into a `window` and a `measure` and the second is not free for every kind.
 
-**So the work is three windows, not a mechanism**: `code`, `table`, `keyValue`. `windowPatch`
+**So the work is three windows, not a mechanism**: `code`, `table`, `keyValue` — **all three landed** (`table` 2026-08, `keyValue` at `structured.ts:125`, `code` with `raw` on 2026-09-04 under C14 §4a; `lineRange` is `code`'s pin). `windowPatch`
 proved the pattern and `windowRows` is the pattern *in `BlockDefinition.window`'s own shape* —
 its doc reasons the `skipRows` accounting through C25 I18 and I19 and states why the pushed
 view and the transcript need two functions rather than one parameter. That is the template the
@@ -2929,8 +2929,15 @@ progress work wants for elapsed time.
 The transcript is already a store with a cap and eviction; persisting it is C20's shape one
 level up. Tractable.
 
-**Rewind / undo / redo is a different project** — it means every mutation is reversible, and
-nothing currently is. Split these; do not let the second block the first.
+**Rewind / undo / redo is a different project** — it means every **transcript** mutation is
+reversible, and none is. *Every mutation … and nothing currently is* was this sentence until
+2026-09-03, and it was false at HEAD: the editor's mutations are reversible —
+`src/interaction/editor/undo.ts`, two stacks, structural coalescing, `UNDO_LIMIT = 200` (C17 §6,
+I11). What has no inverse is the transcript: C13 is append-only with eviction (`op: "evict"`,
+C13 §5), `ViewPatch` has `append`, `replace`, `merge`, `status`, `expand` and `reserve` and no
+delete (C04, C25), and `settle` freezes an entry (C23 I9). Rewind is those three reversed, which
+is the same reversal of C13's shape that arc 7 (cell ordering) needs. Split these; do not let
+the second block the first. SS54 R22 holds the narrowed premise: `UNDO_LIMIT` present.
 
 ### Auto-update
 
@@ -2951,6 +2958,9 @@ By how much each fights the character grid:
 easy       bar · histogram · line (exists) · sparkline (exists) · HEATMAP
 medium     candlestick · pie (circle approximation, looks rough)
 hard       sankey (edge routing — the same problem as Mermaid layout) · 3D
+           ← sankey RE-RULED 2026-09-03: the edge-routing premise expired twice (`graph`
+             ships a layered router, `elkjs` is in the tree) and it is NOT a fold over
+             `graph` — C12 §3d, *Sankey*. A new form over `graphLayers`, no consumer
 ```
 
 **3D was the `no` row, on *perspective in a character grid is a novelty, not a tool* — and
@@ -3001,9 +3011,25 @@ an ML platform's TUI.
 
 ## Fights the architecture — deliberately not doing
 
-- **Video / GIF.** Redrawing a rectangle at 15 fps inside a frame scheduler built around
-  *one frame per input batch* fights the architecture at its root. **A GIF's first frame as
-  an image, with a note, gets 90% of the value for 5% of the work.**
+- **Video / GIF.** **Refused on the wrong premise, and re-ruled 2026-09-03 on the right one.**
+  The reason this row carried — *a frame scheduler built around one frame per input batch* — is
+  false at HEAD: C03 commits a `stream` rung with a 33 ms window (`docs/components/C03_frame_scheduler.md`
+  §3, C22 §6f row 4), and a 3D plot under an orbit is already a continuous full-frame redraw on
+  it — `ORBIT_RATE` in `src/shell/session.ts`, delta-timed from the session clock (C22 I74, F509).
+  A 15 fps GIF sits under a 30 fps ceiling the framework already pays for, so *fights the
+  architecture* was never the reason. **What it costs, measured**: (1) a decoder — `Image.data`
+  is PNG bytes and `decodePng` (`src/presentation/image/codec.ts`) is the only codec, `gif` has
+  0 hits in `src/`; a pure-JS decoder is `omggif` 1.0.10 at 38.5 KB unpacked, 0 dependencies,
+  MIT, last published 2022-06-22 (`npm view`, 2026-09-03), or ~200 lines of LZW written here;
+  (2) a carrier — `Image` holds one raster, so a GIF is a `frames` field or a new kind plus a
+  frame index by elapsed time on the orbit's own wake, ~150 lines in `session.ts`'s shape; (3) a
+  cost the orbit does not have — the kitty arm **retransmits** at a stable id (`a=T` replaces,
+  `src/presentation/image/kitty.ts`), so on that rung every tick is an image upload where the
+  orbit's tick is a text frame. **And no consumer**: nothing in `src/`, docker-tui or
+  `examples/plots` carries a second raster. So this is a **cost refusal** — a codec and ~350
+  lines against zero consumers — and it says so; the first frame as an image with a note stands
+  as the alternative, without the *90% for 5%* ratio, which was never measured. SS54 R18 and R19
+  watch it: `decodeGif(` absent from `src/`, `ORBIT_RATE` present.
 - **An embedded text editor.** `/tty vim` already hands the terminal over, vim runs, you
   come back — the handoff is built and correct. An embedded editor is a much larger thing
   for less.
@@ -3297,7 +3323,20 @@ PART  11 markdown                  translates to existing blocks. CHECKED 2026-0
                                    RENDERED rather than literal. Then the view-model change goes
                                    first and the mapping follows it, in that order — the reverse
                                    builds a translator against a vocabulary that cannot express
-                                   its output
+                                   its output.
+                                   THE INLINE HALF LANDED 2026-09-04, WITH 50: `inline` in
+                                   `src/data/viewmodel/markdown.ts` — `**` → bold, `*` and `_`
+                                   → italic, as `TextSpan`s over the marker-stripped text, on
+                                   paragraphs, list items, quotes, headings and pipe cells and
+                                   never inside a fence; a backtick run is literal and an
+                                   unpaired marker is text. T2.33 and T2.34 replace T2.44.
+                                   STILL PART, AND THE RESIDUE IS NAMED: (i) a one-column
+                                   pipe table is not a table — `DELIMITER` needs two cells, so
+                                   `| h |` over `|---|` stays a paragraph; found by the code
+                                   phase's T2.34 fixture and this entry's to fix, not 50's;
+                                   (ii) inline code has no tone until `TextSpan.tone`;
+                                   (iii) heading levels, the quote gutter and the nesting cap,
+                                   as before
 BUILT 12 OUTPUT DIFFING          ★★ the whole frame is written every keystroke — ~10,000 cells
                                    to change one. Anticipated in a comment, never built.
                                    Smallest fix, biggest effect, invalidation already exists
@@ -4107,7 +4146,7 @@ BUILT 46 SCROLLABLE CONTAINERS     a container scrolls IF IT IS FOCUSABLE and it
                                    write-as-a-diff. IT ALSO WENT THE WAY THE ENTRY PREDICTS —
                                    the frame was written because a mark's PLACEMENT was wrong
                                    in a way every block-indexed assertion passed
-PART  50 INLINE EMPHASIS          span-level styling, which the vocabulary has NO
+BUILT 50 INLINE EMPHASIS          span-level styling, which the vocabulary has NO
          (span-level styling)      REPRESENTATION FOR at any depth: tone attaches to a block,
                                    a Cell, a keyValue row, an events row or a pill and never
                                    to a run inside text. FILED AND NOT IMPLEMENTED — it is a
@@ -4141,7 +4180,22 @@ PART  50 INLINE EMPHASIS          span-level styling, which the vocabulary has N
                                    again: THE TRIGGER IS A CONSUMER APPEARING, both entries name
                                    their blocker as a symbol, and a grep is what answers it. Any
                                    further round that re-checks these two is spending the
-                                   satisfier-side habit where nothing can have moved
+                                   satisfier-side habit where nothing can have moved.
+                                   BUILT 2026-09-04, AND THE ORDER WAS KEPT — spans first,
+                                   then 11's translator. `TextSpan` — `{from, to, bold?,
+                                   italic?, underline?}`, UTF-16 code units, half-open — in
+                                   `src/data/viewmodel/types.ts` on `Raw`, `Notice`, `Rule`
+                                   and `Cell`, refused to `code` (C04 §3am, I83–I88);
+                                   `checkSpans` at the gate; `src/presentation/runs.ts`
+                                   (`runsOf`, `sliceRuns`, `wrapRuns`) and `paintRuns` in
+                                   `src/presentation/blocks/paint.ts`, coalesced by style
+                                   reference so no golden frame moved (C09 §5). The first
+                                   frame that writes SGR 3 is C04 T2.31, and MG24's
+                                   `SgrStyle.italic` row is gone. Design and both walks in
+                                   `docs/notes/CALCIUM_SPANS_DESIGN.md`. DEFERRED WITH
+                                   SYMBOLS, and neither is this entry's: a span tone as
+                                   `TextSpan.tone` (inline code's, 11's residue) and a span
+                                   value as `TextSpan.value` (ML-1's)
 BUILT 51 MOTION AND MEASURE SETS ★  spinners · bar styles · A CATEGORICAL PALETTE — and one
                                    finding underneath all three. THE PALETTE IS THE
                                    FREEZE-RELEVANT HALF: *n distinct things, no order, no
@@ -4359,7 +4413,7 @@ what landed**.
 | 12 | BUILT | `src/shell/render-frame.ts:153` `body()` — `previous()`, per-row `cursorTo(i, 0)`, `SGR_RESET` per row (I57) | — |
 | 13 | BUILT | `src/shell/render-cache.ts`, keyed on entry · `rev` · width · **focus** · theme name | — |
 | 14 | BUILT | `src/presentation/text.ts:108` — an equality, not an approximation | — |
-| 17 | PART | **four implementers** — `keyValue` (`src/presentation/blocks/kinds/structured.ts:125`), `logs` (`src/presentation/blocks/kinds/structured.ts:217`), `patch` (`src/presentation/patch/definition.ts:213`) and `table` (`src/presentation/table/definition.ts:157`) declare `BlockDefinition.window` (F134, CLOSED: 13–21× opening, 90–102× per drag step). This cell said *two, not four; `keyValue` and `code` declare none* — re-measured 2026-09-03: `keyValue` declares, `table` was uncounted, and row 7 above already reasoned about the `table` kind this row denied | **only `code` declares none** and renders whole at every offset — the render-path measurement and the ruling that closes it (`code` and `raw` gain a `window`, `lineRange` as the pin) are C14 §4a / C14 I23; a rows-in-one-block cap is the other residue |
+| 17 | PART | **four implementers** — `keyValue` (`src/presentation/blocks/kinds/structured.ts:125`), `logs` (`src/presentation/blocks/kinds/structured.ts:217`), `patch` (`src/presentation/patch/definition.ts:213`) and `table` (`src/presentation/table/definition.ts:157`) declare `BlockDefinition.window` (F134, CLOSED: 13–21× opening, 90–102× per drag step). This cell said *two, not four; `keyValue` and `code` declare none* — re-measured 2026-09-03: `keyValue` declares, `table` was uncounted, and row 7 above already reasoned about the `table` kind this row denied | **`code` and `raw` declare `window` as of 2026-09-04** (C14 §4a, C09 I25a, C04 I82 — `lineRange` is the pin, because a parse cannot be sliced); C14 §4a carries the before/after table rather than this row restating a figure. Residue: a rows-in-one-block cap, and the `code` block's whole-text control strip per frame named in §4a |
 | 18 | BUILT | `src/shell/refresh.ts` — `Source`, the `folds` memo (I47), stagger by source not by part | — |
 | 19 | PART | **the first claim holds and the second does not.** `resize` is an immediate commit reason, never coalesced (C03 §, I2). But *every SIGWINCH rebuilds the Fenwick index* is false: `src/viewport/viewport/viewport.ts:197` rebuilds **only when the width changed** — C14 I8, *a height change invalidates none, and doing both would make dragging a terminal's bottom edge cost a full remeasure per frame* — and step 0 refuses a resize to the size already held (C14 I21) | a **horizontal** drag is still N rebuilds + N renders + N writes, which is the half that survives |
 | 20 | BUILT | `visible: (host: RefreshHost) => boolean`, `src/shell/refresh.ts:212`, wired at `src/shell/construct.ts:760` | — |
@@ -4372,12 +4426,12 @@ what landed**.
 | 35 | RULED | **the ruling is in the entry.** The spinner is one frame by a premise that has expired — `src/shell/paint.ts:110` says a ticker is *"a timer this layer does not own and must not grow"*, and the refresh driver has owned one since 18 landed; the `steps` block already animates off `ctx.tick` (`src/presentation/blocks/kinds/structured.ts:403`). The pending entry is appended blank — `src/shell/execution.ts` `compose({ … blocks: [] })` in the shell route (re-measured 2026-09-03, still so) | nothing composes the notice, and there is no elapsed-time part — **the rendering half exists** (`continuation` `⎿` is a `GLYPH_TABLE` slot with `prefixCells` in `kinds/simple.ts`), so what is missing is the composer, not the glyph. **The adapter override has no surface yet** |
 | 36 | PART | **the container half is answered, in a different shape.** C04 I49's residue row — `⋯ N above, M below`, both directions, one row, `residue` in `src/presentation/blocks/glyphs.ts` — already says *this region is bounded and there is more* at container scope. What is left is **position rather than existence** | **the transcript-scope bar is untouched**, and the constraint the answer creates is the real content: a container bar must read I49's numbers or replace the row. Two mechanisms answering *is there more* at one scope is the shape C04 I50 refuses for `copy` |
 | 42 | PART | **the seam exists and is not what the entry assumed.** `createKeymap(bindings)` takes the list rather than owning it — `src/interaction/router/keymap.ts` — with one caller passing `defaultKeymap` in `src/shell/construct.ts` | **two missing pieces of different sizes**: the conflict rule throws (`KeymapError`) where this entry says it must become a ladder, and no config surface carries overrides. Not *the table is hard-coded*, which is what the row said before it was checked |
-| 11 | PART | **the block half is built** — `markdownBlocks` in `src/data/viewmodel/markdown.ts`, exported from the barrel and reachable as `b.markdown`. Headings → `rule`, fences → `code` with the info string as the language, pipe tables → `table` with **positional** keys, bullets → `notice` with the `bullet` glyph slot and its hanging gutter, ordered items → `notice` with the number as text, quotes → muted `notice`, everything else → `raw`. Inline stays literal. T2.40–T2.47, six mutations in `tools/mutate/runs/md-subset.mjs` | **three residues, each named on the block that carries it**: heading levels collapse, because `rule` has one `label` and draws one form; a quote has no gutter, because no `Glyph` slot means *quote* and `live`'s `▌` is a homonym (F161); nesting caps at three levels. **The inline half is entry 50** and is filed rather than deferred |
+| 11 | PART | **the block half and the inline half are built** — `markdownBlocks` in `src/data/viewmodel/markdown.ts`, exported from the barrel and reachable as `b.markdown`. Headings → `rule`, fences → `code` with the info string as the language, pipe tables → `table` with **positional** keys, bullets → `notice` with the `bullet` glyph slot and its hanging gutter, ordered items → `notice` with the number as text, quotes → muted `notice`, everything else → `raw`. `inline` in the same file (2026-09-04, with 50): `**` → bold, `*` and `_` → italic, as `TextSpan`s over the marker-stripped text; a backtick run stays literal. T2.40–T2.47 with T2.44 replaced by T2.33 and T2.34; mutations in `tools/mutate/runs/md-subset.mjs` | **four residues, each named**: a one-column pipe table is not recognised, because `DELIMITER` needs two cells and `| h |` over `|---|` stays a paragraph — the code phase found it and it is this entry's; inline code has no tone until `TextSpan.tone`; heading levels collapse, because `rule` has one `label` and draws one form; a quote has no gutter, because no `Glyph` slot means *quote* and `live`'s `▌` is a homonym (F161); nesting caps at three levels |
 | 51 | BUILT | **all three halves.** `ambiguousWidth: "narrow" \| "wide"` on `TerminalCapabilities`, detected from the locale's language subtag under POSIX precedence with C02 I4's override; `cells(text, ambiguous)` in `src/presentation/text.ts` with an `isAmbiguous` range table; `RAMP_BRAILLE` in `src/presentation/plot/ramp.ts` returned by `ladderFor` where the capability says wide, and `sparkline` padding with it. C02 I9, commitment 12, §3, §4's degradation row; T2.50–T2.54; `tools/mutate/runs/c02-ambiguous.mjs`, five mutations **The sweep is done** — SS50 in `tools/enforce/source-scans.mjs` fires on a `cells()` call naming neither the convention nor `// narrow-ok`, and it ran 43 → 0 with four annotated sites and three allow-listed files. **The palette is built** — `categorical` in `src/presentation/theme/tokens-dark.ts` and `src/presentation/theme/tokens-light.ts`, `CATEGORY_REFS` replacing the cycle in `src/presentation/plot/marks.ts`, C04 I50a refusing a ninth series in `src/data/viewmodel/validate.ts`. **The sets are built** — `SPINNER_SETS` in `src/presentation/blocks/glyphs.ts` with per-set intervals and shape-paired fallbacks, the refusal list turned into a narrow tier, and `glyphs` falling to ASCII on a wide terminal because box drawing is ambiguous throughout | **a third narrow-safe glyph set** is the refinement this leaves: `⋅ ∘ ◦` have no narrow form and `─ │ ┌` have none either, so a third set is mostly ASCII with a few survivors — worth building the day someone measures which survive. And the bar *styles* remain a catalogue: `Progress` has no `style` field and minting one with no consumer is the shape four entries this session were spent closing |
 | 33 | BUILT | **the refusal became a deferral and I5's property did not move.** `Settle = { line, into }` on `refuse`, `runShell`, `runHandoff`, `runLocal`, `runIntoView`, `runApp`, `start` and `route`; `appendAndCommit` settles into `into` or appends. The queue is a list in `src/shell/execution.ts`, `enqueue` at the guard, `drain` on `Guard.release()` gated on *nothing is running*, `clearQueue` before the release in `cancel`. T1.6, T1.21b, T1.46, T3.17 rewritten against the new mechanism; T3.18–T3.21 added; `tools/mutate/runs/c23-queue.mjs` — 8 mutations, 8 caught | **the seam's own branch had no row and a mutation is what said so**: `/ps` is the app route, which reuses the queued entry as its pending one and settles it directly, so ignoring `into` inside `appendAndCommit` survived every row until T1.6 queued a `builtinThenShell`. `runApp` is **not** converted to the seam — its pair differs by not calling `resetFocus` and by committing `"completion"` rather than `"input"`, and a green suite shows neither. **A third site came from reading the diff**: a queued *view* invocation owns an entry and this route has no settlement of its own, so C22 §13a's *it pops rather than settling, because there is no entry to settle* stopped covering it — true of a view submitted directly, false of a deferred one, and the entry would have streamed for ever marked *queued behind* something long finished. T3.21 |
 | 30 | PART | **the prompt half is built; the transcript half is not.** A chip is one PUA code point in the buffer — `insertChip` in `src/interaction/editor/editor.ts`, a side map to `{label, content}`, and `resolved` expanding it at `src/shell/construct.ts`'s submit and nowhere else. The walk seam is `ClusterText` in `src/interaction/editor/layout.ts`, serving `layout`, `displayRows`, `cursorCell` and `selectionSpans`. A paste of `CHIP_LINES` or more becomes one. T2.40–T2.47; `tools/mutate/runs/c17-chip.mjs` — 6 mutations, 6 caught | **the defect that happened is now the first mutation**: `clusterWidth(shown)` measures a cluster BY ITS BASE CODE POINT, right about clusters and wrong about a substituted string, so a twenty-cell label counted as `[`. Every index assertion passed while it was broken and only the two frame rows failed. **Two residues**: the wiring at `session.ts:549` has no row — T2.45 calls `selectionSpans` directly, so a seam-level row passes on the day nothing calls it — and the entry's *detect what it is* (`[JSON · 47 lines]`, one parse attempt) is a second decision with its own failure mode. **C23's half is untouched**: the transcript rendering the content as what it is needs the ENTRY's document to carry the block |
 | 51b | BUILT | **the bar half, and `ambiguousWidth` is a tier over what `barStyle` RETURNS.** `Progress.style` in `src/data/viewmodel/types.ts`, `barStyle(caps, name)` and `barStyleNames` in `src/presentation/blocks/glyphs.ts` on `spinnerFrames`'s shape, wired in `progressDefinition` and exposed by `b.progress`. T2.90–T2.93; `tools/mutate/runs/c09-bars.mjs` — 4 mutations, 4 caught | **the rows measure the returned pair, never the table** — a flag somebody wrote and a flag something consults differ exactly when the lookup is wrong, which is what caught the spinner sets. Six of seven unicode styles fall to ASCII at `wide` and `braille` does not, which `CALCIUM_BARS.md` did not say. `GlyphSet.progressFull` and `progressEmpty` are **removed**: one pair fixed in the glyph set was the single-style version of a table, and MG24 said so the moment the table arrived |
-| 50 | PART | **`Style.italic` is built and spans are not.** `italic?: boolean` in `src/presentation/theme/types.ts` beside bold · dim · inverse · underline, `SgrStyle.italic` in `src/terminal/escapes.ts` and SGR 3 written there and nowhere else. T1.19, T1.19b; `tools/mutate/runs/c10-italic.mjs` — 3 mutations, 3 caught. Entry 11's ruling (c) reversed: it decided a fallback onto `underline`, which C10 §4a already gives to word-level emphasis (C25 I10) | **the ORDER is unchanged and only its blocker moved.** Spans in the view model first, then 11's translator — a published-type change across every text-bearing kind, and `markdown.ts` already names the condition as *the day spans exist*. `SgrStyle.italic` has an `UNCONSUMED_MEMBERS` row for the right reason: nothing sets it yet, and MG24's equality arm removes the row the day something does |
+| 50 | BUILT | **spans in the view model, and italic's first writer** (2026-09-04). `TextSpan` in `src/data/viewmodel/types.ts` on `Raw`, `Notice`, `Rule` and `Cell`, refused to `code`; `checkSpans` in `src/data/viewmodel/validate.ts`; `runsOf` · `wrapRuns` · `sliceRuns` in `src/presentation/runs.ts`; `withSpan` and `paintRuns` in `src/presentation/blocks/paint.ts`, coalesced by style reference so no golden frame moved; `inline` in `src/data/viewmodel/markdown.ts` is the writer. C04 T1.23–26 · T2.31–34 · T3.62–67 · T6.81–85 and C10 T1.22 · T2.25 · T3.11 · T6.84, in the four spans test files, one per tier; T2.31 is the first frame that writes SGR 3, and MG24's `SgrStyle.italic` row came out the same day. Design and both walks: `docs/notes/CALCIUM_SPANS_DESIGN.md` | — a span tone (`TextSpan.tone`) and a span value (`TextSpan.value`) are deferred with symbols, and they belong to 11 and to ML-1 rather than here |
 | 22 | BUILT | **a builder in front of two existing kinds, and no seventeenth kind.** SS50 and MG24 both fired on the first `make enforce` and both were right — `art` in `src/presentation/art.ts`, published from `src/index.ts`; `ArtTier` and `ArtSpec` beside it. Selection is tier-eligible **and** fits, measured with `cells` — `widthOf` — so a `blocks` variant this terminal can draw and cannot fit falls to the next rung. The last rung is a `notice` with `tone: "accent"`, because `raw` carries no style. T2.84a–T2.84n, one per cell of §8a's table plus the two SS50 added, and `tools/mutate/runs/c09-art.mjs` — 9 mutations, 9 caught after one survivor wrote T2.84n | **three of the four validation checks were no longer this entry's**, which the walk found rather than the build: uniform line width and row-count alignment are roadmap 38's `fit` and `Valign`, and *report measured cells* is the selection rather than a report. Only the tab check survives. **MG24's answer was the consumer**: `wordmarkFor` in `examples/docker/src/banner.ts` was `art`'s loop written by hand — preference order, tier, fit — and is now the call, at the same threshold, since a composed row is `WHALE_CELLS + GAP` plus the wordmark's widest. It is `UNCONSUMED_MEMBERS`' first out-of-tree entry, a category the header counted at 1 and never wrote down. **What is NOT done**: `banner.ts` still hand-writes the vertical alignment `Valign` was added for and still says the framework has no opinion about it, and the composed `bannerRow` is a two-column group `art` cannot express — one block is its whole vocabulary |
 | 9 | BUILT | **a `code` block with a transform in front, one call wide.** `mermaidCode` in `src/presentation/mermaid.ts`, published from `src/index.ts`, calling `renderMermaidASCII` with `useAscii` from the capabilities and `colorMode: "none"`. `beautiful-mermaid` has a row in `DEPENDENCIES.md`, the first naming a non-permissive transitive licence. T2.80–T2.83 | **thin against a maintenance risk rather than a design one**: ten releases then five and a half months' silence, so a replacement costs a function body and nothing else. The rows assert the seam — the capability mapping, the colour refusal, the block's shape — and deliberately not what a flowchart looks like, which would fail on the package's next release for no reason anyone here cares about |
 | 44 | BUILT | **session resume, policy-gated.** `src/shell/construct.ts` reads `persistPolicy(manifest, config)`, and when anything is declared it loads `${stateDir}/transcript.ndjson`, seeds `createTranscriptWriter` and appends the saved documents in order. C13 I20, commitment 18; T1.28 asserts the default — an app that declares nothing persists nothing | **the ruling falls out rather than being enforced**: opening at the bottom with no offsets and no focus is what appending in order does, because none of them is written. A dropped line is announced (F35's class) rather than silently reducing the session |

@@ -107,7 +107,7 @@ The design is `planned` as a whole, and what follows is which of its *framework*
 | what | verdict | measurement | disposition |
 |---|---|---|---|
 | `AskOptions` carries `placement`, `dismissable`, `onSelect`; `resolve(text)` (`:24-25`) | — | **note was wrong**: `src/shell/local/registry.ts:32-52` — `question`, `detail`, `choices`, `placement` only; `onSelect` occurs nowhere in `src/`; `dismissable` is a `Layer` field (`viewport/overlay/types.ts:51`) and the registry's `:109` says it is *deliberately absent* from `ask`; `ask` resolves a choice key | note was wrong — figure; corrected in place 2026-09-03 |
-| markdown "still absent … the only hard gate left" (`:28-29`, `:288`) | PARTIAL | `markdownBlocks` (`src/data/viewmodel/markdown.ts:107`), exported `viewmodel/index.ts:95`, `b.markdown` (`shell/builders/index.ts:1659`), `test/contract/markdown.test.ts`; roadmap 11 PART — the block half landed, inline stays literal (entry 50) | note was wrong — figure; corrected in place |
+| markdown "still absent … the only hard gate left" (`:28-29`, `:288`) | PARTIAL | `markdownBlocks` (`src/data/viewmodel/markdown.ts:107`), exported `viewmodel/index.ts:95`, `b.markdown` (`shell/builders/index.ts:1659`), `test/contract/markdown.test.ts`; roadmap 11 PART — the block half landed, and the inline half with entry 50 on 2026-09-04 (`inline` in `markdown.ts`, spans over the marker-stripped text) | note was wrong — figure; corrected in place |
 | scrollable containers "blocked on C26" (`:291`, `:974`) | BUILT | roadmap 46 BUILT (`CALCIUM_ROADMAP.md:3974`); `Scroll` kind, `scroll-offsets.ts` | note was wrong — figure; corrected in place |
 | paste chip "Designed, unbuilt" (`:686-688`) | PARTIAL | `CHIP_LINES = 5` (`src/shell/construct.ts:151`), `[#n pasted · N lines]` emitted at `:1531-1534`; roadmap 30 PART — the prompt half; the transcript half is not | note was wrong — figure; corrected in place |
 | stall notice "the driver fires a notice when a stream goes quiet" (`:1630`) | BUILT | **this row said ABSENT for a few hours on 2026-09-03 and the grep it cited was wrong**: `grep -rni stall src/` returns fifteen hits — `src/shell/refresh.ts` `STALL_MS`, the per-entry watched map, the re-arming tick, `resolveStall`; wired at `execution.ts` (`refresh.watch`, `refresh.sawPatch`, `refresh.settled`); C23 §3b, I25, T1.30/T1.37/T6.30; `tools/mutate/runs/c23-refresh.mjs`. The streaming *timeout* of 0 is a different mechanism (the child's lifetime, not its silence) | note was right; the audit was wrong — restored in place, with the one residue: the threshold is a constant, not per far side |
@@ -237,8 +237,8 @@ checkbox (`:185-211`).
 
 | what | verdict | measurement | disposition |
 |---|---|---|---|
-| ML-1 per-token value text block (`:24`) | ABSENT | 30 `kind:` literals in `types.ts`, none token/span; `Cell` is `{text,tone,glyph,spark,bar}`; `Raw` is `{text}`; no `Span[]` | planned — own arc; the same mechanism roadmap 50's inline emphasis wants |
-| ML-2 structured diff (`:66`) | ABSENT | `Patch` is line-oriented (`types.ts:2441,2450`); `patch/collapse.ts` fold reusable | planned, after ML-1 |
+| ML-1 per-token value text block (`:24`) | PARTIAL | the span channel exists: `TextSpan` (`src/data/viewmodel/types.ts:278`), `{from, to, bold?, italic?, underline?}` in code units, on `Raw`, `Notice`, `Rule` and `Cell`, rendered through `src/presentation/runs.ts`; **no `value` member** — the channel carries appearance only (C04 I85) | mechanism built 2026-09-04 (roadmap 50); the value channel is deferred as `TextSpan.value`, and ML-1's consumer is what expires it (`CALCIUM_SPANS_DESIGN.md` §7) |
+| ML-2 structured diff (`:66`) | ABSENT | `Patch` is line-oriented (`types.ts:2441,2450`); `patch/collapse.ts` fold reusable | planned; the span channel it shares with ML-1 now exists and its field is named — `Hunk.lines[].spans` (C25 I10) — so what is missing is the writer, an intra-line diff |
 | ML-3 progress throughput / ETA (`:82`) | ABSENT | `Progress` (`types.ts:2372-2392`): `kind id label current total style` — no rate, eta, elapsed or spark | planned, small |
 | ML-4a metrics table with `Cell.spark` | BUILT | `types.ts:266` | — |
 | ML-4b ridgeline / histogram | BUILT | `PLOT_FORM_MEMBERS` | — |
@@ -405,13 +405,13 @@ small, or `owed now` and named above.
 | 7 | **cell ordering** — notebooks D5 | nothing, but it reverses C13's append-only shape | a C13 spec change first |
 | 8 | **export** — notebooks D7 | nothing | `plot/svg.ts` is the precedent |
 | 9 | **the dataframe filter** — C8 | C1 the profiler; the `presorted` trap ruled | — |
-| 10 | **the span channel** — ML-1 | nothing | a view-model change (C04/C09/C12/C25/C26); it is what ML-2 and roadmap 50's inline emphasis both want |
+| 10 | **the span channel** — ML-1 | **built 2026-09-04** as `TextSpan` (roadmap 50, C04 §3am) | no longer an arc: what remains of ML-1 is a `value` member on an existing type, deferred as `TextSpan.value`; ML-2's field is `Hunk.lines[].spans` (C25 I10) |
 
 **Multi-day, not arcs**: ML-T tensor (roadmap 3's residue; design at `CALCIUM_ENTRY3_KICKOFF.md`);
 Q2 quarter blocks for the image arm (after Q1's table collapse); ML-2 structured diff (after 10).
 
 **Small, and `owed now` or nearly**: D3 keep flag (~80 lines); B7 value store with a writer for
-`cursorPositions` (~120); Q1 collapse the duplicated `QUADRANT` table; `pulse` spinner set (~6);
+`cursorPositions` (~120); Q1 collapse the duplicated `QUADRANT` table; `pulse` spinner set (BUILT 2026-09-03 with the seven re-ruled `narrowOnly` sets — `CALCIUM_SPINNERS.md`);
 `step`/`question` glyph slots (~10); S0-2 correction to A2's drawing; ML-5b cost; ML-3 progress
 rate/eta; ML-5a lineage vocabulary; M5 role→slot Mermaid theming (~80); IM-10 Mermaid HD; D6.
 

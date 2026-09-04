@@ -16,7 +16,8 @@ The   cat   sat   on   the   mat   .
 ```
 
 **The unit is a token in wrapped prose**, not a row and not a cell — so `table` cannot hold
-it, `raw` has no per-span channel, and the plot forms are all axis-based.
+it, `raw`'s per-span channel carries appearance and not a value (`TextSpan`, C04 §3am, since
+2026-09-04), and the plot forms are all axis-based.
 
 **What it would need:**
 
@@ -26,9 +27,12 @@ tokens that survive wrapping             a token near a line end wraps as a unit
 selection by token                       ⇧← ⇧→ extends by token, not by grapheme
 ```
 
-**And it is the same mechanism spans need** — entry 50's inline emphasis wants a
-`{text, style}[]` and this wants a `{text, value}[]`. **One change to the view model serves
-both**, which is worth knowing before either is designed.
+**And it is the same mechanism spans needed** — entry 50's inline emphasis wanted a styled run
+and this wants a valued one. **The change landed for the first and reserved the symbol for the
+second** (2026-09-04, roadmap 50): `TextSpan` is `{from, to, bold?, italic?, underline?}` in
+code units over `Raw.text`, and the value is deferred as `TextSpan.value`
+(`CALCIUM_SPANS_DESIGN.md` §7) — so this block is a member on an existing type rather than a
+view-model change.
 
 **Consumers, and they are all real:**
 
