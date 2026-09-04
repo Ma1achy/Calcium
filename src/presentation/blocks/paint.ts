@@ -15,7 +15,8 @@ import { createElement, type ReactElement } from "react";
 import { SGR_RESET, sgr } from "../../terminal/escapes.js";
 import { resolve, resolveBackground, resolveTone, type Style } from "../theme/index.js";
 import type { ColourRef, ColourValue, ResolvedTheme } from "../theme/index.js";
-import type { Tone } from "../../data/viewmodel/index.js";
+import { COLORMAPS, continuousColour } from "../theme/colormap.js";
+import type { ColormapName, Tone } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { cells, truncate } from "../text.js";
 import type { Run, SpanAttrs } from "../runs.js";
@@ -38,18 +39,54 @@ export function withSpan(style: Style, attrs: SpanAttrs | undefined): Style {
 }
 
 /**
+ * What a run needs beyond the block's style to be painted: the theme and
+ * capabilities every renderer already holds, and the block's `colormap` by
+ * name where the block has one (C04 I90). Structural, so a `RenderContext`
+ * satisfies the first two by itself.
+ */
+export type RunContext = Readonly<{
+  theme: ResolvedTheme;
+  capabilities: TerminalCapabilities;
+  colormap?: ColormapName;
+}>;
+
+/**
+ * A run's style: the block's, or its span's tone in place of it; the span's
+ * attributes spread on top; and its value as a background (C10 I33, C04 I89,
+ * C04 I90).
+ *
+ * **Each colour comes from the resolver its owner already has.** A `tone` goes
+ * through `resolveTone` — the same call, the same memo, so two runs of one tone
+ * are one reference and coalesce below — and *replaces* `style`, because a run
+ * cannot be two tones. A `value` goes through `continuousColour` on the block's
+ * map, so the ladder is the colormap's: `undefined` below 8-bit, and the run
+ * then paints as its neighbours do and coalesces with them by reference — a
+ * 4-bit frame is byte-identical with and without the value (C10 I31). The gate
+ * refused a `value` on a block with no map, so the `colormap === undefined`
+ * arm is a total function's and not a branch anything reaches.
+ */
+export function runStyle(run: Run, style: Style, ctx: RunContext): Style {
+  const base = run.tone === undefined ? style : resolveTone(run.tone, ctx.theme, ctx.capabilities);
+  const merged = withSpan(base, run.attrs);
+  if (run.value === undefined || ctx.colormap === undefined) return merged;
+  const map = COLORMAPS[ctx.colormap];
+  const background = map === undefined ? undefined : continuousColour(map, run.value, ctx.capabilities);
+  return background === undefined ? merged : { ...merged, background };
+}
+
+/**
  * Runs to spans, adjacent runs of one style merged.
  *
- * The merge is by reference — `withSpan` returns `style` unchanged for a run
- * with no attributes — so a row with no spans paints as the single span it
+ * The merge is by reference — `runStyle` returns `style` unchanged for a run
+ * with nothing to say — so a row with no spans paints as the single span it
  * always was, and a styled run breaks the row into exactly the pieces its
- * attributes require. A `paint` that closed and reopened the same style between
+ * members require. A `paint` that closed and reopened the same style between
  * two plain pieces would change every golden frame while drawing the same thing.
  */
-export function paintRuns(runs: readonly Run[], style: Style): readonly Span[] {
+export function paintRuns(runs: readonly Run[], style: Style, ctx: RunContext): readonly Span[] {
   const out: { text: string; style: Style }[] = [];
   for (const run of runs) {
-    const merged = withSpan(style, run.attrs);
+    const merged = runStyle(run, style, ctx);
     const last = out[out.length - 1]; // cells-ok — an array index
     if (last !== undefined && last.style === merged) last.text += run.text;
     else out.push({ text: run.text, style: merged });

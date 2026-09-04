@@ -20,14 +20,22 @@
  * nothing outside it, and the runs still concatenate to `stripControl(text)`,
  * which is what the measurer wrapped (C09 I1).
  */
-import type { TextSpan } from "../data/viewmodel/index.js";
+import type { TextSpan, Tone } from "../data/viewmodel/index.js";
 import { stripControl } from "../data/text.js";
-import { clusterEnds, placeableClusters, wrapCellsParts, type AmbiguousWidth } from "./text.js";
+import { clusterEnds, placeableClusters, wrapCellsParts, type AmbiguousWidth, type Atom } from "./text.js";
 
 /** What a span contributes to a `Style` — and nothing a palette resolves (C10 I33). */
 export type SpanAttrs = Readonly<{ bold?: boolean; italic?: boolean; underline?: boolean }>;
 
-export type Run = Readonly<{ text: string; attrs?: SpanAttrs }>;
+/**
+ * A run: the text, and the three things a span may say about it.
+ *
+ * `tone` names a slot and `value` a reading (C04 I89, I90); neither is a
+ * colour, and `paintRuns` resolves each through the resolver its owner already
+ * has. `value` is the one member the wrapper reads — a valued run is an atom
+ * (C09 §5) — which is why it rides on the run and not only on the style.
+ */
+export type Run = Readonly<{ text: string; attrs?: SpanAttrs; tone?: Tone; value?: number }>;
 
 /**
  * A boundary that falls inside a grapheme cluster is moved to the cluster's end
@@ -63,6 +71,17 @@ function attrsOf(span: TextSpan): SpanAttrs | undefined {
   return Object.keys(attrs).length === 0 ? undefined : attrs; // cells-ok — a key count
 }
 
+/** A run carrying what its span said — and no member the span did not set. */
+function runOf(text: string, span: TextSpan): Run {
+  const attrs = attrsOf(span);
+  return {
+    text,
+    ...(attrs === undefined ? {} : { attrs }),
+    ...(span.tone === undefined ? {} : { tone: span.tone }),
+    ...(span.value === undefined ? {} : { value: span.value }),
+  };
+}
+
 /**
  * `(text, spans)` as runs that concatenate to `stripControl(text)`.
  *
@@ -79,10 +98,10 @@ export function runsOf(text: string, spans: readonly TextSpan[] | undefined): re
   const ends = clusterEnds(text);
   const out: Run[] = [];
   let at = 0;
-  const push = (piece: string, attrs: SpanAttrs | undefined): void => {
+  const push = (piece: string, span: TextSpan | undefined): void => {
     const clean = stripControl(piece);
     if (clean === "") return;
-    out.push(attrs === undefined ? { text: clean } : { text: clean, attrs });
+    out.push(span === undefined ? { text: clean } : runOf(clean, span));
   };
 
   for (const span of spans) {
@@ -91,7 +110,7 @@ export function runsOf(text: string, spans: readonly TextSpan[] | undefined): re
     const to = Math.min(text.length, snapUp(Math.min(span.to, text.length), ends)); // cells-ok — offsets
     if (to <= from) continue;
     push(text.slice(at, from), undefined);
-    push(text.slice(from, to), attrsOf(span));
+    push(text.slice(from, to), span);
     at = to;
   }
   push(text.slice(at), undefined);
@@ -138,7 +157,7 @@ export function runLines(runs: readonly Run[]): readonly (readonly Run[])[] {
     run.text.split("\n").forEach((piece, index) => {
       if (index > 0) out.push([]);
       if (piece !== "") {
-        out[out.length - 1]?.push(run.attrs === undefined ? { text: piece } : { text: piece, attrs: run.attrs }); // cells-ok — an array index
+        out[out.length - 1]?.push({ ...run, text: piece }); // cells-ok — an array index
       }
     });
   }
@@ -152,8 +171,15 @@ export function runLines(runs: readonly Run[]): readonly (readonly Run[])[] {
  * The unfittable-cluster substitution is applied to the runs **before** the
  * wrap, so that every row `wrapCellsParts` returns is an exact slice of the
  * text it was given and the offsets line up; the wrapper's own substitution
- * then has nothing left to replace. Row texts and row count are exactly
- * `wrapCells(stripControl(text), width)`'s, which is what the measurer counted.
+ * then has nothing left to replace. With no valued run, row texts and row
+ * count are exactly `wrapCells(stripControl(text), width)`'s.
+ *
+ * **A valued run is an atom** (C04 I90, C09 §5): its interval over the placed
+ * text is handed to the wrapper, which breaks nowhere strictly inside it. The
+ * atoms are computed after the substitution, per run, so a `?` standing in for
+ * a two-unit cluster moves no other run's offsets. This is the one place a
+ * span reaches geometry, and `notice` measures through this function for that
+ * reason.
  */
 export function wrapRuns(
   runs: readonly Run[],
@@ -162,7 +188,19 @@ export function wrapRuns(
 ): readonly (readonly Run[])[] {
   const placed = runs.map((run) => ({ ...run, text: placeableClusters(run.text, width) }));
   const text = runsText(placed);
-  return wrapCellsParts(text, width, ambiguous).map((row) =>
+  return wrapCellsParts(text, width, ambiguous, atomsOf(placed)).map((row) =>
     sliceRuns(placed, row.start, row.text.length), // cells-ok — a code-unit length
   );
+}
+
+/** The `[from, to)` intervals of the valued runs, over the runs' concatenated text. */
+export function atomsOf(runs: readonly Run[]): readonly Atom[] {
+  const out: Atom[] = [];
+  let at = 0;
+  for (const run of runs) {
+    const to = at + run.text.length; // cells-ok — a code-unit cursor
+    if (run.value !== undefined) out.push({ from: at, to });
+    at = to;
+  }
+  return out;
 }

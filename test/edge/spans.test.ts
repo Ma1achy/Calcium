@@ -16,6 +16,9 @@ import type { Block, TextSpan } from "../../src/data/viewmodel/index.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
 import { cells } from "../../src/presentation/text.js";
 import { ASCII_CAPS, FULL_CAPS, MONO_CAPS, measurable, visible } from "../support/render.js";
+import { resolveTone } from "../../src/presentation/theme/index.js";
+import { sgr } from "../../src/terminal/escapes.js";
+import { DARK_THEME } from "../support/render.js";
 
 const BOLD = "\x1b[1m";
 const UNBOLD = "\x1b[22m";
@@ -115,6 +118,78 @@ describe("C04 §3am — spans at the edges", () => {
     expect(full.renderToLines(notice(text, spans, { tone: "ok" }), 30), "and at 24-bit the two differ").not.toEqual(
       full.renderToLines(block({ kind: "notice", id: "n", tone: "ok", text }), 30),
     );
+  });
+});
+
+describe("C09 §5 — tone and value, the frames", () => {
+  const text = "The cat sat on the mat .";
+  const tokens = ((): readonly TextSpan[] => {
+    const out: TextSpan[] = [];
+    let at = 0;
+    text.split(" ").forEach((token, i) => {
+      out.push({ from: at, to: at + token.length, value: i / 6 }); // cells-ok — code-unit offsets
+      at += token.length + 1; // cells-ok — a code-unit cursor
+    });
+    return out;
+  })();
+  const cat = block({ kind: "notice", id: "n", tone: "default", text, colormap: "viridis", spans: tokens } as Block);
+  const plain = block({ kind: "notice", id: "n", tone: "default", text });
+  const eight = { ...FULL_CAPS, colourDepth: 8 as const };
+  const four = { ...FULL_CAPS, colourDepth: 4 as const };
+  const backgrounds = (line: string): number => (line.match(/\x1b\[48;5;\d+m/gu) ?? []).length;
+
+  it("T3.66 (C09 I1, C04 I90, C10 I31): a value per token at 12 and at 80 — one background per token, none on the spaces, and the measure is the rows", () => {
+    const kit = measurable({ capabilities: eight });
+    const at12 = kit.renderToLines(cat, 12);
+    expect(at12.map(visible)).toEqual(["The cat sat", "on the mat ."]);
+    expect(at12.map(backgrounds)).toEqual([3, 4]);
+    // Between two tokens: the background closes, the space, the next opens.
+    for (const row of at12) expect(row).toMatch(/\x1b\[49m \x1b\[48;5;\d+m/u);
+    expect(kit.measure(cat, 12)).toBe(2);
+
+    const at80 = kit.renderToLines(cat, 80);
+    expect(at80.map(visible)).toEqual([text]);
+    expect(at80.map(backgrounds)).toEqual([7]);
+    expect(kit.measure(cat, 80)).toBe(1);
+
+    const k4 = measurable({ capabilities: four });
+    expect(k4.renderToLines(cat, 12), "4-bit: byte-identical to the unvalued block").toEqual(k4.renderToLines(plain, 12));
+    expect(k4.renderToLines(cat, 80)).toEqual(k4.renderToLines(plain, 80));
+  });
+
+  it("T3.66 (C09 I1, C04 I90): the straddle — two rows plain, three valued, and the valued row is the whole token", () => {
+    const kit = measurable({ capabilities: eight });
+    const straddle = (spans?: readonly TextSpan[]): Block =>
+      block({ kind: "notice", id: "n", tone: "default", text: "x(abcde)yz", colormap: "viridis", ...(spans === undefined ? {} : { spans }) } as Block);
+    expect(kit.renderToLines(straddle(), 6).map(visible)).toEqual(["x(abcd", "e)yz"]);
+    const valued = kit.renderToLines(straddle([{ from: 2, to: 7, value: 0.5 }]), 6);
+    expect(valued.map(visible)).toEqual(["x(", "abcde)", "yz"]);
+    expect(valued.map(backgrounds)).toEqual([0, 1, 0]);
+    expect(valued[1]).toMatch(/\x1b\[48;5;\d+mabcde\x1b\[49m\)/u);
+    expect(kit.measure(straddle([{ from: 2, to: 7, value: 0.5 }]), 6)).toBe(3);
+    expect(kit.measure(straddle(), 6)).toBe(2);
+    // A valued run wider than the row is broken as text and carries its
+    // background onto both rows, as a bold word would carry its bold.
+    const wide = kit.renderToLines(block({ kind: "notice", id: "n", tone: "default", text: "ab abcdefghij cd", colormap: "viridis", spans: [{ from: 3, to: 13, value: 0.9 }] } as Block), 6);
+    expect(wide.map(visible)).toEqual(["ab", "abcdef", "ghij", "cd"]);
+    expect(wide.map(backgrounds)).toEqual([0, 1, 1, 0]);
+  });
+
+  it("T3.66 (C09 I1, C04 I89, C11 I14): a toned run in a table cell keeps its colour unfocused and takes the accent, unbroken, under focus", () => {
+    const table = block({
+      kind: "table",
+      id: "t",
+      columns: [COLUMN],
+      rows: [{ id: "r0", cells: { c0: { text: "run make now", spans: [{ from: 4, to: 8, tone: "identifier" }] } } }],
+      showHeader: false,
+    });
+    const identifier = sgr(resolveTone("identifier", DARK_THEME, FULL_CAPS));
+    const accent = sgr(resolveTone("accent", DARK_THEME, FULL_CAPS));
+    const [unfocused] = tables().renderToLines(table, 20);
+    expect(unfocused).toContain(`${identifier}make`);
+    const [focused] = measurable({ definitions: [tableDefinition], focus: { blockId: "t", rowId: "r0" } }).renderToLines(table, 20);
+    expect(focused).toContain(`${accent}run make now`);
+    expect((focused ?? "").match(/\x1b\[38;/gu), "one colour on the focused row").toHaveLength(1);
   });
 });
 

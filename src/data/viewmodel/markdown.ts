@@ -24,11 +24,16 @@
  * four characters `bold` and a `TextSpan` over them; `*em*` and `_em_` become
  * italic. The literal form this replaces was kept until spans existed because
  * keeping markers is reversible and dropping them is not — and that day is
- * this one. **Inline code stays literal**: `` `x` `` keeps its backticks,
- * because the run it would want is a *tone* and a span carries none until a
- * consumer appears (deferral symbol `TextSpan.tone`). Escapes (`\*`) are out
- * by name with the rest of CommonMark; an **unpaired** marker is literal, so
- * `2 * 3` and `a_b` keep their characters.
+ * this one. **Inline code is a `tone: "identifier"` span** (C04 I89, C09 §5):
+ * `` `x` `` becomes `x` with a span naming the slot the tree already uses for a
+ * name one refers back to — a flag, a path, a symbol, a command — where `meta`
+ * is the slot for timestamps and secondary detail. It was literal until the
+ * span had a `tone` to carry (the deferral symbol was `TextSpan.tone`, and this
+ * is the consumer that expired it). An **unclosed** backtick makes the rest of
+ * the line literal, and an **empty** pair is two characters, exactly as an
+ * unpaired `*` is one. Escapes (`\*`) are out by name with the rest of
+ * CommonMark; an **unpaired** marker is literal, so `2 * 3` and `a_b` keep
+ * their characters.
  *
  * Offsets are into the **emitted** text — the string with the markers gone —
  * because that is the member they decorate (C04 I84). Nested emphasis is
@@ -67,13 +72,15 @@ import type { Block, ColumnDef, TableRow, TextSpan } from "./types.js";
 export type Inline = Readonly<{ text: string; spans?: readonly TextSpan[] }>;
 
 /**
- * `**strong**`, `*em*`, `_em_` → spans; backtick runs literal; unpaired markers
- * literal.
+ * `**strong**`, `*em*`, `_em_` → attribute spans; `` `code` `` → a tone span;
+ * unpaired markers literal.
  *
  * **A toggle per marker kind, after unpaired markers are struck.** Counting
  * each kind first is what makes a lone `*` a character rather than an emphasis
  * that runs to the end of the line: the last occurrence of any kind with an odd
- * count is treated as text. Inside a backtick run nothing toggles.
+ * count is treated as text. Inside a backtick run nothing toggles, and a code
+ * run inside an emphasis is one span carrying the attribute and the tone
+ * (C04 §3am cell 12 — adjacent and disjoint, never nested).
  */
 export function inline(source: string): Inline {
   // Pass one: find the markers, skipping code runs, and note which are unpaired.
@@ -111,15 +118,17 @@ export function inline(source: string): Inline {
   const spans: TextSpan[] = [];
   let bold = false;
   let italic = false;
+  let code = false;
   let segStart = 0;
   const flush = (): void => {
-    if (text.length > segStart && (bold || italic)) {
+    if (text.length > segStart && (bold || italic || code)) {
       spans.push(
         Object.freeze({
           from: segStart,
           to: text.length,
           ...(bold ? { bold: true } : {}),
           ...(italic ? { italic: true } : {}),
+          ...(code ? { tone: CODE_TONE } : {}),
         }),
       );
     }
@@ -145,9 +154,24 @@ export function inline(source: string): Inline {
     const ch = source[pos] ?? "";
     if (ch === "`") {
       const close = source.indexOf("`", pos + 1);
-      const end = close === -1 ? source.length : close + 1;
-      text += source.slice(pos, end);
-      pos = end;
+      if (close === -1) {
+        // Unclosed: the rest of the line is literal, as pass one assumed.
+        text += source.slice(pos);
+        pos = source.length;
+        continue;
+      }
+      if (close === pos + 1) {
+        // An empty pair is two characters — a span cannot be empty (C04 I84).
+        text += "``";
+        pos += 2;
+        continue;
+      }
+      flush();
+      code = true;
+      text += source.slice(pos + 1, close);
+      flush();
+      code = false;
+      pos = close + 1;
       continue;
     }
     text += ch;
@@ -157,12 +181,22 @@ export function inline(source: string): Inline {
   return spans.length === 0 ? { text } : { text, spans: Object.freeze(spans) };
 }
 
+/** The slot an inline code run names (C04 I89, C09 §5) — a name one refers back to. */
+const CODE_TONE = "identifier" as const;
+
 const FENCE = /^(```|~~~)\s*([A-Za-z0-9_+-]*)\s*$/u;
 const HEADING = /^#{1,6}\s+(.*)$/u;
 const BULLET = /^(\s*)[-*+]\s+(.*)$/u;
 const ORDERED = /^(\s*)(\d+)[.)]\s+(.*)$/u;
 const QUOTE = /^\s*>\s?(.*)$/u;
-const DELIMITER = /^\s*\|?(\s*:?-{1,}:?\s*\|)+(\s*:?-{1,}:?\s*)\|?\s*$/u;
+/**
+ * A delimiter row: one or more dash cells, **and a pipe somewhere** (roadmap 11).
+ *
+ * One cell is enough — `| h |` over `|---|` is a one-column table — but the
+ * lookahead keeps the pipe mandatory, because without it a line of dashes under
+ * a paragraph containing `|` would turn the paragraph into a table (T2.48).
+ */
+const DELIMITER = /^(?=.*\|)\s*\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?\s*$/u;
 
 /** Two per level, capped — see the nesting residue above. */
 const INDENT_CELLS = 2;

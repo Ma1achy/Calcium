@@ -133,7 +133,19 @@ export function rowSpans(
       return;
     }
 
-    const textRuns = cell === undefined ? [] : runsOf(cell.text, cell.spans);
+    const spanned = cell === undefined ? [] : runsOf(cell.text, cell.spans);
+    // **A focused row drops a span's tone as it drops the cell's** (I14, C09
+    // §5): focus replaces `cell.tone` with `accent` below, and a span's `tone`
+    // is the same claim at a finer grain — a row that kept it would read as two
+    // things on the one occasion it must read as one. Attributes and a value
+    // are not claims about the foreground and survive.
+    const textRuns = options.focused
+      ? spanned.map((run) => {
+          if (run.tone === undefined) return run;
+          const { tone: _focusTakesIt, ...rest } = run;
+          return rest;
+        })
+      : spanned;
     const text = runsText(textRuns);
     const glyph = cell?.glyph === undefined ? "" : glyphFor(cell.glyph, ctx.capabilities);
 
@@ -181,7 +193,7 @@ export function rowSpans(
       { text: column?.align === "right" ? "" : " ".repeat(short) },
     ];
 
-    spans.push(...paintRuns(pieces, style));
+    spans.push(...paintRuns(pieces, style, ctx));
   });
 
   return spans;

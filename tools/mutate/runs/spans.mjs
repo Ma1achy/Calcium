@@ -17,6 +17,8 @@ const RUNS = "src/presentation/runs.ts";
 const PAINT = "src/presentation/blocks/paint.ts";
 const VALIDATE = "src/data/viewmodel/validate.ts";
 const SIMPLE = "src/presentation/blocks/kinds/simple.ts";
+const TEXT = "src/presentation/text.ts";
+const CELLS = "src/presentation/table/cells.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -34,8 +36,8 @@ const MUTATIONS = [
     // break space precedes, which is the first row of every paragraph.
     name: "wrapped spans are sliced by prefix sums of row lengths",
     file: RUNS,
-    from: "  return wrapCellsParts(text, width, ambiguous).map((row) =>\n    sliceRuns(placed, row.start, row.text.length), // cells-ok — a code-unit length\n  );",
-    to: "  let sum = 0;\n  return wrapCellsParts(text, width, ambiguous).map((row) => {\n    const out = sliceRuns(placed, sum, row.text.length);\n    sum += row.text.length;\n    return out;\n  });",
+    from: "  return wrapCellsParts(text, width, ambiguous, atomsOf(placed)).map((row) =>\n    sliceRuns(placed, row.start, row.text.length), // cells-ok — a code-unit length\n  );",
+    to: "  let sum = 0;\n  return wrapCellsParts(text, width, ambiguous, atomsOf(placed)).map((row) => {\n    const out = sliceRuns(placed, sum, row.text.length);\n    sum += row.text.length;\n    return out;\n  });",
     expect: "T3.62",
   },
   {
@@ -75,8 +77,8 @@ const MUTATIONS = [
     // right up to its ellipsis, which is exactly what a reader would not notice.
     name: "the truncation marker is painted inside the span",
     file: SIMPLE,
-    from: "        return paint([\n          ...paintRuns(shown, NO_STYLE),\n          { text: suffix },",
-    to: "        return paint([\n          ...paintRuns([...shown, { text: suffix, ...(shown[shown.length - 1]?.attrs === undefined ? {} : { attrs: shown[shown.length - 1]?.attrs }) }], NO_STYLE),\n          { text: \"\" },",
+    from: "        return paint([\n          ...paintRuns(shown, NO_STYLE, paintCtx),\n          { text: suffix },",
+    to: "        return paint([\n          ...paintRuns([...shown, { text: suffix, ...(shown[shown.length - 1]?.attrs === undefined ? {} : { attrs: shown[shown.length - 1]?.attrs }) }], NO_STYLE, paintCtx),\n          { text: \"\" },",
     expect: "T3.63",
   },
   {
@@ -90,12 +92,77 @@ const MUTATIONS = [
   },
   {
     // The measurer reads spans: one row per span. Every frame renders; the
-    // pair disagrees.
+    // pair disagrees. Re-anchored when `notice` gained `noticeRows` (C04 I90).
     name: "a notice measures a row per span",
     file: SIMPLE,
-    from: "      wrapCells(stripControl(block.text), proseWidth(width, prefixCells(block.glyph))).length, // cells-ok\n    ),",
-    to: "      wrapCells(stripControl(block.text), proseWidth(width, prefixCells(block.glyph))).length + (block.spans?.length ?? 0), // cells-ok\n    ),",
+    from: "  measure: (block: Notice, width: number): number => atLeastOne(noticeRows(block, width).length), // cells-ok",
+    to: "  measure: (block: Notice, width: number): number => atLeastOne(noticeRows(block, width).length + (block.spans?.length ?? 0)), // cells-ok",
     expect: "T1.25",
+  },
+  // --- C04 §3am.1: tone and value -------------------------------------------
+  {
+    // The tone ignored: the run paints in the block's colour. Every attribute
+    // row still passes, because the attributes still spread.
+    name: "a span's tone is ignored and the block's style painted",
+    file: PAINT,
+    from: "  const base = run.tone === undefined ? style : resolveTone(run.tone, ctx.theme, ctx.capabilities);",
+    to: "  const base = style;",
+    expect: "T2.35",
+  },
+  {
+    // Composed rather than replaced. At 24-bit the colour is the span tone's
+    // either way; at 1-bit the block's `bold` survives under the run, which is
+    // the one place the two readings differ (C10 T6.85).
+    name: "a span's tone composes with the block's instead of replacing it",
+    file: PAINT,
+    from: "  const base = run.tone === undefined ? style : resolveTone(run.tone, ctx.theme, ctx.capabilities);",
+    to: "  const base = run.tone === undefined ? style : { ...style, ...resolveTone(run.tone, ctx.theme, ctx.capabilities) };",
+    expect: "T2.26",
+  },
+  {
+    // The value never reaches a background. Every count is right; no `48`.
+    name: "a span's value paints nothing at any depth",
+    file: PAINT,
+    from: "  if (run.value === undefined || ctx.colormap === undefined) return merged;",
+    to: "  if (run.value === undefined || ctx.colormap === undefined || run.value >= 0) return merged;",
+    expect: "T2.36",
+  },
+  {
+    // The atoms dropped: a valued run breaks where the text would. The frame
+    // still renders, the measure still equals the render — both through
+    // `noticeRows` — and the token is in two rows.
+    name: "wrapRuns passes no atoms to the wrapper",
+    file: RUNS,
+    from: "  return wrapCellsParts(text, width, ambiguous, atomsOf(placed)).map((row) =>",
+    to: "  return wrapCellsParts(text, width, ambiguous).map((row) =>",
+    expect: "T1.19",
+  },
+  {
+    // The measurer back on `wrapCells`: right for every notice without a valued
+    // span, one row short exactly where a token moved. The frame is drawn and
+    // the count disagrees with it — C09 I1 broken by the mechanism C04 I90 admits.
+    name: "notice measures through wrapCells rather than noticeRows",
+    file: SIMPLE,
+    from: "  measure: (block: Notice, width: number): number => atLeastOne(noticeRows(block, width).length), // cells-ok",
+    to: "  measure: (block: Notice, width: number): number => atLeastOne(wrapCells(stripControl(block.text), proseWidth(width, prefixCells(block.glyph))).length), // cells-ok",
+    expect: "T3.66",
+  },
+  {
+    // A focused row keeps its span tones: a `38` inside the accent run.
+    name: "a focused table row keeps a span's tone",
+    file: CELLS,
+    from: "    const textRuns = options.focused\n      ? spanned.map((run) => {",
+    to: "    const textRuns = false\n      ? spanned.map((run) => {",
+    expect: "T3.66",
+  },
+  {
+    // The break-space arm reverted: a full row followed by a space starts the
+    // next row with the space.
+    name: "a space after a full row begins the next row",
+    file: TEXT,
+    from: '          } else if (segment === " ") {',
+    to: "          } else if (false) {",
+    expect: "T1.19",
   },
 ];
 

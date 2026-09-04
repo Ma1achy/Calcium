@@ -93,24 +93,30 @@ describe("roadmap 11 — the named subset, as blocks", () => {
     expect(kinds(markdownBlocks("| a | b |\n| - | - |")), "and with one, it is").toEqual(["table"]);
   });
 
-  it("T2.33 (C04 §3am, roadmap 11): inline emphasis is spans over the marker-stripped text, and inline code stays literal", () => {
+  it("T2.33 (C04 §3am, C04 I89, roadmap 11): inline emphasis is attribute spans and inline code an `identifier` span, over the marker-stripped text", () => {
     // The reversal T2.44 was written to permit: the markers are gone and the
     // spans sit at the offsets of the words they marked, in the emitted text.
+    // **The backticks go too** (2026-09-04): a code run is a `tone` span, and
+    // the slot is `identifier` — the one the tree uses for a name one refers
+    // back to (C09 §5). The row as first written kept the backticks and cited
+    // the deferral symbol; this is the consumer that expired it.
     const [para] = markdownBlocks("a **bold** and *em* and _em_ and `code` word");
     expect(para).toEqual({
       kind: "raw",
       id: "md-0",
-      text: "a bold and em and em and `code` word",
+      text: "a bold and em and em and code word",
       spans: [
         { from: 2, to: 6, bold: true },
         { from: 11, to: 13, italic: true },
         { from: 18, to: 20, italic: true },
+        { from: 25, to: 29, tone: "identifier" },
       ],
     });
 
     // Nested emphasis is adjacent disjoint spans with combined attributes
     // (§3am cell 12); an unpaired marker is a character; markers inside a
-    // backtick run do not toggle.
+    // backtick run do not toggle, and a code run inside an emphasis is one
+    // span carrying the attribute and the tone.
     expect(markdownBlocks("**a *b* c**")[0]).toMatchObject({
       text: "a b c",
       spans: [
@@ -121,9 +127,27 @@ describe("roadmap 11 — the named subset, as blocks", () => {
     });
     expect(markdownBlocks("2 * 3 and a_b")[0]).toEqual({ kind: "raw", id: "md-0", text: "2 * 3 and a_b" });
     expect(markdownBlocks("`a*b*c` and *d*")[0]).toMatchObject({
-      text: "`a*b*c` and d",
-      spans: [{ from: 12, to: 13, italic: true }],
+      text: "a*b*c and d",
+      spans: [{ from: 0, to: 5, tone: "identifier" }, { from: 10, to: 11, italic: true }],
     });
+    expect(markdownBlocks("**and `x`**")[0]).toMatchObject({
+      text: "and x",
+      spans: [{ from: 0, to: 4, bold: true }, { from: 4, to: 5, bold: true, tone: "identifier" }],
+    });
+    // An unclosed backtick makes the rest literal; an empty pair is two
+    // characters — a span cannot be empty (C04 I84).
+    expect(markdownBlocks("a `b *c*")[0]).toEqual({ kind: "raw", id: "md-0", text: "a `b *c*" });
+    expect(markdownBlocks("`` and *d*")[0]).toMatchObject({ text: "`` and d", spans: [{ from: 7, to: 8, italic: true }] });
+
+    // The frame: no backticks visible, and the run carries a `38` of its own
+    // between the paragraph's plain pieces (`raw` has no tone of its own).
+    const [line] = renderSequenceToLines(registry, markdownBlocks("run `make enforce` now"), 40, {
+      theme: DARK_THEME,
+      capabilities: FULL_CAPS,
+      focus: null,
+    });
+    expect(line?.replace(/\x1b\[[0-9;]*m/gu, "").trimEnd()).toBe("run make enforce now");
+    expect(line).toMatch(/^run \x1b\[38;2;\d+;\d+;\d+mmake enforce\x1b\[39m now/u);
   });
 
   it("T2.34 (C04 §3am, I88): the four members take spans, and a fence does not run the inline pass", () => {
@@ -133,8 +157,6 @@ describe("roadmap 11 — the named subset, as blocks", () => {
     expect(quote).toMatchObject({ kind: "notice", tone: "muted", text: "quoted", spans: [{ from: 0, to: 6, italic: true }] });
     const [heading] = markdownBlocks("# A **title**");
     expect(heading).toMatchObject({ kind: "rule", label: "A title", spans: [{ from: 2, to: 7, bold: true }] });
-    // Two columns: the delimiter regex needs two cells to see a table at all,
-    // which is entry 11's residue and not this arc's.
     const [table] = markdownBlocks("| h | i |\n|---|---|\n| **x** | y |") as [Table];
     expect(table.rows[0]?.cells["c0"]).toEqual({ text: "x", spans: [{ from: 0, to: 1, bold: true }] });
     expect(table.rows[0]?.cells["c1"]).toEqual({ text: "y" });
@@ -144,6 +166,27 @@ describe("roadmap 11 — the named subset, as blocks", () => {
     // The frame: the bytes carry the attribute and the visible text has no markers.
     const lines = frame(markdownBlocks("a **bold** word"));
     expect(lines).toEqual(["a bold word"]);
+  });
+
+  it("T2.48 (roadmap 11, F583): one delimiter cell makes a one-column table, and a line of dashes does not", () => {
+    // **The residue this closes.** `DELIMITER` needed two cells, so `| h |` over
+    // `|---|` stayed a paragraph — measured before the change: `["raw"]`.
+    const [one] = markdownBlocks("| h |\n|---|\n| x |\n| **y** |") as [Table];
+    expect(one).toMatchObject({ kind: "table" });
+    expect(one.columns.map((c) => [c.key, c.label])).toEqual([["c0", "h"]]);
+    expect(one.rows.map((r) => r.cells["c0"])).toEqual([{ text: "x" }, { text: "y", spans: [{ from: 0, to: 1, bold: true }] }]);
+    expect(kinds(markdownBlocks("| h\n|-\n| x")), "an outer pipe on one side is enough").toEqual(["table"]);
+    expect(kinds(markdownBlocks("a | b\n|-|")), "one dash cell under a pipe in prose is a table, as GFM has it").toEqual(["table"]);
+
+    // **The non-tables stay non-tables.** The delimiter row must carry a pipe:
+    // a bare line of dashes is a paragraph line, under prose with a `|` in it
+    // as under anything else, and a delimiter with no header above it is prose.
+    expect(kinds(markdownBlocks("a | b in prose\n---")), "dashes with no pipe are prose").toEqual(["raw"]);
+    expect(kinds(markdownBlocks("---")), "a bare rule line is prose").toEqual(["raw"]);
+    expect(kinds(markdownBlocks("| h |\n| x |")), "no delimiter, no table — T2.43's arm at one column").toEqual(["raw"]);
+
+    // The frame: a one-column table draws its header and its row, nothing else.
+    expect(frame(markdownBlocks("| h |\n|---|\n| x |"), FULL_CAPS, 12)).toEqual(["h", "x"]);
   });
 
   it("T2.45 (the frame): a list item draws the glyph slot, and it degrades", () => {

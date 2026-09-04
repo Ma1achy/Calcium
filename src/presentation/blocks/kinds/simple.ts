@@ -11,6 +11,7 @@ import type { ReactElement } from "react";
 import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
 import type { Glyph, Notice, Pills, Progress, Raw, Rule, Tip } from "../../../data/viewmodel/index.js";
 import { cells, stripControl, truncate, truncateParts, wrapCells } from "../../text.js";
+import type { Run } from "../../runs.js";
 import { runLines, runsOf, sliceRuns, wrapRuns } from "../../runs.js";
 import { NO_STYLE } from "../../theme/index.js";
 import { barStyle, glyphFor, glyphCells, glyphs } from "../glyphs.js";
@@ -133,6 +134,7 @@ export const ruleDefinition: BlockDefinition<Rule> = {
             ...paintRuns(
               [...sliceRuns(runsOf(block.label, block.spans), 0, kept.length), { text: suffix }], // cells-ok
               accent,
+              ctx,
             ),
             { text: `${" ".repeat(gap)}${g.horizontal.repeat(fill)}`, style: dim },
             { text: meta, style: tone("meta", ctx.theme, ctx.capabilities) },
@@ -147,23 +149,36 @@ export const ruleDefinition: BlockDefinition<Rule> = {
 
 // --- notice ----------------------------------------------------------------
 
+/**
+ * The rows a notice occupies — **the one layout function both halves call**
+ * (commitment 3, C04 I90).
+ *
+ * **Runs first, then the wrap** (C04 I86, §3am): the spans are cut from the
+ * text by offset, each run is stripped on its own, and the wrapper slices the
+ * runs by each row's source `start` — never by adding up row lengths, which
+ * drift by one unit at every dropped break space. With no valued span this is
+ * `wrapCells(stripControl(text), width)` row for row; with one, the valued run
+ * is an atom the wrapper keeps whole (C09 §5), which is the one way a span
+ * reaches geometry — so `measure` goes through here and not through
+ * `wrapCells`, or the two halves would disagree by a row exactly where a token
+ * moved.
+ */
+function noticeRows(block: Notice, width: number): readonly (readonly Run[])[] {
+  return wrapRuns(runsOf(block.text, block.spans), proseWidth(width, prefixCells(block.glyph)));
+}
+
 export const noticeDefinition: BlockDefinition<Notice> = {
   kind: "notice",
 
-  measure: (block: Notice, width: number): number =>
-    atLeastOne(
-      wrapCells(stripControl(block.text), proseWidth(width, prefixCells(block.glyph))).length, // cells-ok
-    ),
+  measure: (block: Notice, width: number): number => atLeastOne(noticeRows(block, width).length), // cells-ok
 
   render(block: Notice, ctx: RenderContext): ReactElement {
     const style = tone(block.tone, ctx.theme, ctx.capabilities);
     const prefix = prefixCells(block.glyph);
-    // **Runs first, then the wrap** (C04 I86, §3am): the spans are cut from the
-    // text by offset, each run is stripped on its own, and the wrapper slices
-    // the runs by each row's source `start` — never by adding up row lengths,
-    // which drift by one unit at every dropped break space. The rows are the
-    // rows `measure` counted: same text, same width, same wrapper.
-    const wrapped = wrapRuns(runsOf(block.text, block.spans), proseWidth(ctx.width, prefix));
+    const wrapped = noticeRows(block, ctx.width);
+    // The block's colormap reaches the painter by name; a valued run reads it
+    // there and nowhere else (C04 I90).
+    const paintCtx = { theme: ctx.theme, capabilities: ctx.capabilities, ...(block.colormap === undefined ? {} : { colormap: block.colormap }) };
 
     // A hanging indent: the glyph sits on the first row and the continuation
     // aligns under the text rather than under the glyph. That alignment is why
@@ -178,7 +193,7 @@ export const noticeDefinition: BlockDefinition<Notice> = {
                 : " ".repeat(prefix),
             style,
           },
-          ...paintRuns(line, style),
+          ...paintRuns(line, style, paintCtx),
         ]),
       ),
     );
@@ -446,12 +461,13 @@ export const rawDefinition: BlockDefinition<Raw> = {
     // marker outside every span (C04 I86); `raw` carries no tone, so the pieces
     // differ only where a span says so and a plain line is the bytes it was.
     const lines = runLines(runsOf(block.text, block.spans));
+    const paintCtx = { theme: ctx.theme, capabilities: ctx.capabilities, ...(block.colormap === undefined ? {} : { colormap: block.colormap }) };
     return rows(
       rawLines(block).map((line, i) => {
         const { kept, suffix } = truncateParts(line, width, ctx.capabilities);
         const shown = sliceRuns(lines[i] ?? [], 0, kept.length); // cells-ok — a code-unit length
         return paint([
-          ...paintRuns(shown, NO_STYLE),
+          ...paintRuns(shown, NO_STYLE, paintCtx),
           { text: suffix },
           { text: pad("", width - cells(kept, ctx.capabilities.ambiguousWidth) - cells(suffix, ctx.capabilities.ambiguousWidth)) },
         ]);

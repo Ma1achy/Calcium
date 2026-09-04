@@ -102,6 +102,43 @@ const MUTATIONS = [
     expect: "T2.33",
   },
   {
+    // Inline code as an attribute rather than a slot: the backticks still go,
+    // the offsets are still right, and the run is bold where it should be a
+    // tone — C04 I89's consumer, mapped onto C04 I85's member.
+    name: "inline code is a bold span rather than an identifier tone",
+    file: SRC,
+    from: "          ...(code ? { tone: CODE_TONE } : {}),",
+    to: "          ...(code ? { bold: true } : {}),",
+    expect: "T2.33",
+  },
+  {
+    // The backticks kept as text — the translation before this arc. Every
+    // other span's offsets are the old ones, so a row asserting them fails.
+    name: "inline code keeps its backticks",
+    file: SRC,
+    from: "      text += source.slice(pos + 1, close);",
+    to: "      text += source.slice(pos, close + 1);",
+    expect: "T2.33",
+  },
+  {
+    // The delimiter back to two cells: `| h |` over `|---|` is a paragraph
+    // again, and every two-column row still passes.
+    name: "a delimiter row needs two cells",
+    file: SRC,
+    from: "const DELIMITER = /^(?=.*\\|)\\s*\\|?\\s*:?-+:?\\s*(?:\\|\\s*:?-+:?\\s*)*\\|?\\s*$/u;",
+    to: "const DELIMITER = /^(?=.*\\|)\\s*\\|?\\s*:?-+:?\\s*(?:\\|\\s*:?-+:?\\s*)+\\|?\\s*$/u;",
+    expect: "T2.48",
+  },
+  {
+    // The pipe requirement dropped: a paragraph with a `|` over a line of
+    // dashes is a table. Every table row still passes — they all have pipes.
+    name: "a line of dashes is a delimiter row",
+    file: SRC,
+    from: "const DELIMITER = /^(?=.*\\|)\\s*",
+    to: "const DELIMITER = /^\\s*",
+    expect: "T2.48",
+  },
+  {
     // The inline pass skipped on a heading: a `rule` label keeps `**`. The
     // paragraph rows still pass, which is why T2.34 walks the four members.
     name: "a heading does not run the inline pass",

@@ -4,10 +4,10 @@
 import { describe, expect, it } from "vitest";
 import { applyPatch, block, validateBlock } from "../../src/data/viewmodel/index.js";
 import type { Block, TextSpan, ViewPatch } from "../../src/data/viewmodel/index.js";
-import { runsOf, sliceRuns, wrapRuns } from "../../src/presentation/runs.js";
-import { withSpan } from "../../src/presentation/blocks/paint.js";
+import { atomsOf, runsOf, sliceRuns, wrapRuns } from "../../src/presentation/runs.js";
+import { runStyle, withSpan } from "../../src/presentation/blocks/paint.js";
 import { resolveTone } from "../../src/presentation/theme/index.js";
-import { wrapCells } from "../../src/presentation/text.js";
+import { wrapCells, wrapCellsParts } from "../../src/presentation/text.js";
 import { sgr } from "../../src/terminal/escapes.js";
 import { doc } from "../support/blocks.js";
 import { ASCII_CAPS, FULL_CAPS, measurable } from "../support/render.js";
@@ -93,7 +93,49 @@ describe("C04 §3am — spans, tier 6", () => {
   });
 });
 
+describe("C09 §5 — tone and value, tier 6", () => {
+  it("C09 T6.84 (C04 I90): wrapRuns passing no atoms → T1.19 and T3.66 fail on the straddle; a measurer restored to wrapCells disagrees with its own render by a row", () => {
+    const text = "x(abcde)yz";
+    const runs = runsOf(text, [{ from: 2, to: 7, value: 0.5 }]);
+    const ruled = wrapCellsParts(text, 6, "narrow", atomsOf(runs));
+    expect(ruled.map((r) => r.text)).toEqual(["x(", "abcde)", "yz"]);
+    // The edit: the atoms not passed. The same string wraps in two.
+    const reverted = wrapCellsParts(text, 6);
+    expect(reverted.map((r) => r.text)).toEqual(["x(abcd", "e)yz"]);
+    expect(reverted.length).not.toBe(ruled.length);
+
+    // The edit: `notice.measure` back on `wrapCells(stripControl(text))`. It
+    // is right for every notice without a valued span and one short here,
+    // while the render — through `noticeRows` — draws three.
+    const kit = measurable();
+    const valued = block({ kind: "notice", id: "n", tone: "default", text, colormap: "viridis", spans: [{ from: 2, to: 7, value: 0.5 }] } as Block);
+    expect(wrapCells(text, 6)).toHaveLength(2);
+    expect(kit.measure(valued, 6)).toBe(3);
+    expect(kit.renderToLines(valued, 6)).toHaveLength(3);
+  });
+});
+
 describe("C10 §4e — span attributes, tier 6", () => {
+  it("C10 T6.85 (C10 I33, C04 I89): composing a span's tone with the block's instead of replacing it → T1.22's tone arm still passes on colour and T2.26 fails at 1-bit", () => {
+    const ctx1 = { theme, capabilities: caps(1) as never };
+    const ok1 = resolveTone("ok", theme, caps(1));
+    const identifier1 = resolveTone("identifier", theme, caps(1));
+    expect(ok1).toEqual({ bold: true });
+    expect(identifier1).toEqual({});
+    // Ruled: replacement. The run is the normal class, no bits.
+    expect(runStyle({ text: "x", tone: "identifier" }, ok1, ctx1)).toBe(identifier1);
+    // The edit: composition. The block's `bold` survives under the run, and
+    // the row T2.26 asserts — `let ` bold, `x` not — paints `x` bold too.
+    const composed = { ...ok1, ...identifier1 };
+    expect(composed).toEqual({ bold: true });
+    expect(composed).not.toEqual(identifier1);
+    // At 24-bit the two readings agree on colour, which is why T1.22 alone
+    // could not tell them apart and the 1-bit row exists.
+    const ok24 = resolveTone("ok", theme, FULL_CAPS);
+    const identifier24 = resolveTone("identifier", theme, FULL_CAPS);
+    expect({ ...ok24, ...identifier24 }.colour).toEqual(identifier24.colour);
+  });
+
   it("T6.84 (C10 I33): routing an attribute through a slot → T1.22 fails on colour; gating italic on unicode → T3.11 fails", () => {
     const base = resolveTone("default", theme, FULL_CAPS);
     expect(withSpan(base, { italic: true }).colour).toEqual(base.colour);

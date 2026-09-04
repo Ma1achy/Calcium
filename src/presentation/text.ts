@@ -619,10 +619,25 @@ export function wrapCells(
  */
 export type WrappedRow = Readonly<{ text: string; start: number }>;
 
+/**
+ * A `[from, to)` code-unit interval of the text no break may fall strictly
+ * inside — a valued span, which wraps as one token (C04 I90, C09 §5).
+ *
+ * **One property on the wrapper rather than a second wrapper.** A space inside
+ * an atom is not a break point; a full row with no break point outside its
+ * atoms breaks at the start of the atom the next cluster would extend, when
+ * something precedes that atom on the row and the atom fits a row at all; an
+ * atom that begins a row and still overflows it, or that could never fit one,
+ * is broken at a cluster boundary as any unbroken token is. `wrapCells` passes
+ * none, so no caller that is not a run caller changes.
+ */
+export type Atom = Readonly<{ from: number; to: number }>;
+
 export function wrapCellsParts(
   text: string,
   width: number,
   ambiguous: AmbiguousWidth = "narrow",
+  atoms: readonly Atom[] = [],
 ): readonly WrappedRow[] {
   const limit = Math.max(1, Math.floor(width));
   const out: WrappedRow[] = [];
@@ -643,11 +658,40 @@ export function wrapCellsParts(
       const w = clusterCells(segment, ambiguous);
 
       if (used + w > limit && line !== "") {
-        const at = breakPoint(line);
+        const at = breakPoint(line, lineStart, atoms);
         if (at === null) {
-          out.push({ text: line, start: lineStart });
-          lineStart += line.length; // cells-ok — a code-unit cursor
-          line = "";
+          // No break point outside an atom. If the cluster about to be placed
+          // extends an atom that began after this row did — and the atom can
+          // fit a row — the atom moves whole to the next row; otherwise the
+          // row is cut here, as an unbroken token is (C09 §5).
+          const atom = atomAround(lineStart + line.length, atoms); // cells-ok — a code-unit cursor
+          const moves =
+            atom !== undefined &&
+            atom.from > lineStart &&
+            cells(text.slice(atom.from, atom.to), ambiguous) <= limit;
+          if (moves) {
+            const cut = atom.from - lineStart; // cells-ok — a code-unit offset
+            const before = line.slice(0, cut).trimEnd();
+            // A row that would hold only the space before the atom is dropped
+            // with the space, as a break space is.
+            if (before !== "") out.push({ text: before, start: lineStart });
+            lineStart = atom.from;
+            line = line.slice(cut);
+          } else if (segment === " ") {
+            // A full row with no break point, and the next cluster is a space:
+            // the space *is* the break, and a break space is in no row (§5).
+            // Without this arm it began the next row, which a reader sees as
+            // an indent nobody asked for — measured at `"abcdef gh"` at 6.
+            out.push({ text: line, start: lineStart });
+            lineStart += line.length + 1; // cells-ok — a code-unit cursor, past the space
+            line = "";
+            used = 0;
+            continue;
+          } else {
+            out.push({ text: line, start: lineStart });
+            lineStart += line.length; // cells-ok — a code-unit cursor
+            line = "";
+          }
         } else {
           out.push({ text: line.slice(0, at).trimEnd(), start: lineStart });
           lineStart += at; // cells-ok — a code-unit cursor
@@ -752,10 +796,23 @@ function placeable(segment: string, limit: number): string {
  * case the caller breaks at the cluster boundary rather than growing past the
  * width. A line that overflows is a row the terminal adds and nobody counted.
  */
-function breakPoint(line: string): number | null {
-  const at = line.lastIndexOf(" ");
-  if (at <= 0) return null;
-  return at + 1;
+function breakPoint(line: string, lineStart: number, atoms: readonly Atom[]): number | null {
+  let at = line.lastIndexOf(" ");
+  while (at > 0) {
+    // The break lands after the space; a break strictly inside an atom is not
+    // one, and the search continues towards the row's start (C04 I90).
+    if (atomAround(lineStart + at + 1, atoms) === undefined) return at + 1; // cells-ok — a code-unit offset
+    at = line.lastIndexOf(" ", at - 1);
+  }
+  return null;
+}
+
+/** The atom `offset` falls strictly inside, if any — a boundary is inside none. */
+function atomAround(offset: number, atoms: readonly Atom[]): Atom | undefined {
+  for (const atom of atoms) {
+    if (atom.from < offset && offset < atom.to) return atom;
+  }
+  return undefined;
 }
 
 // --- Unicode data ---------------------------------------------------------

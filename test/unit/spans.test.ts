@@ -10,9 +10,9 @@ import { describe, expect, it } from "vitest";
 import { block, validateBlock, validateDocument } from "../../src/data/viewmodel/index.js";
 import type { Block, TextSpan, ViewDocument } from "../../src/data/viewmodel/index.js";
 import { stripControl } from "../../src/data/text.js";
-import { runsOf, runsText, sliceRuns, wrapRuns } from "../../src/presentation/runs.js";
+import { atomsOf, runLines, runsOf, runsText, sliceRuns, wrapRuns } from "../../src/presentation/runs.js";
 import { clusterEnds, truncateParts, wrapCells, wrapCellsParts } from "../../src/presentation/text.js";
-import { withSpan } from "../../src/presentation/blocks/paint.js";
+import { runStyle, withSpan } from "../../src/presentation/blocks/paint.js";
 import { resolveTone } from "../../src/presentation/theme/index.js";
 import { doc } from "../support/blocks.js";
 import { FULL_CAPS, measurable } from "../support/render.js";
@@ -148,7 +148,79 @@ describe("C04 §3am — spans and the measurer", () => {
   });
 });
 
+describe("C04 §3am.1 — the value member and the measurer", () => {
+  const text = "The cat sat on the mat .";
+  const perToken = (member: Partial<TextSpan>): readonly TextSpan[] => {
+    const out: TextSpan[] = [];
+    let at = 0;
+    for (const token of text.split(" ")) {
+      out.push({ from: at, to: at + token.length, ...member }); // cells-ok — code-unit offsets
+      at += token.length + 1; // cells-ok — a code-unit cursor
+    }
+    return out;
+  };
+  const valued = perToken({}).map((s, i) => ({ ...s, value: i / 6 }));
+  const withSpans = (spans?: readonly TextSpan[]): Block =>
+    block({ kind: "notice", id: "n", tone: "default", text, colormap: "viridis", ...(spans === undefined ? {} : { spans }) } as Block);
+
+  it("C04 T2.36 (C04 I90, C04 I83): measure is the same with every span member but value, and differs with value exactly when a valued run would straddle a row", () => {
+    const kit = measurable();
+    for (const width of [1, 3, 5, 7, 12, 40, 80]) {
+      const plain = kit.measure(withSpans(), width);
+      for (const member of [{ bold: true }, { italic: true }, { underline: true }, { tone: "identifier" as const }, { tone: "meta" as const, bold: true }]) {
+        expect(kit.measure(withSpans(perToken(member)), width), `${JSON.stringify(member)} at ${String(width)}`).toBe(plain);
+      }
+      // A value per token: prose already breaks at the spaces between tokens,
+      // so a single-word token never straddles a row and the count is the
+      // plain one at every width — the brief's frame at 12 and at 80 included.
+      expect(kit.measure(withSpans(valued), width), `valued at ${String(width)}`).toBe(plain);
+      expect(kit.renderToLines(withSpans(valued), width).length, `rows at ${String(width)}`).toBe(plain);
+    }
+    expect(kit.measure(withSpans(valued), 12)).toBe(2);
+    expect(kit.measure(withSpans(valued), 80)).toBe(1);
+
+    // **Where it differs**: a token that would otherwise be cut by the
+    // no-break-point arm. `x(abcde)yz` at 6 is `x(abcd` / `e)yz` plain and
+    // `x(` / `abcde)` / `yz` valued — one row more, and the render agrees.
+    const straddle = (spans?: readonly TextSpan[]): Block =>
+      block({ kind: "notice", id: "n", tone: "default", text: "x(abcde)yz", colormap: "viridis", ...(spans === undefined ? {} : { spans }) } as Block);
+    const bold = straddle([{ from: 2, to: 7, bold: true }]);
+    const val = straddle([{ from: 2, to: 7, value: 0.5 }]);
+    expect(kit.measure(straddle(), 6)).toBe(2);
+    expect(kit.measure(bold, 6), "bold is appearance and moves nothing").toBe(2);
+    expect(kit.measure(val, 6), "value is geometry and moves the row").toBe(3);
+    expect(kit.renderToLines(val, 6).length).toBe(3);
+    expect(kit.measure(val, 12), "and at a width where nothing straddles, nothing moves").toBe(kit.measure(straddle(), 12));
+  });
+});
+
 describe("C09 — runs, the arithmetic spans and tokens share", () => {
+  it("T1.19 (C09 I9, C04 I89, C04 I90): runs carry tone and value, and a valued run is an atom the wrapper keeps whole", () => {
+    const runs = runsOf("aa bb cc dd", [{ from: 3, to: 8, value: 0.5 }, { from: 9, to: 11, tone: "identifier", bold: true }]);
+    expect(runs).toEqual([{ text: "aa " }, { text: "bb cc", value: 0.5 }, { text: " " }, { text: "dd", attrs: { bold: true }, tone: "identifier" }]);
+    expect(atomsOf(runs), "a bold run is not an atom; a valued one is").toEqual([{ from: 3, to: 8 }]);
+    expect(sliceRuns(runs, 4, 6)).toEqual([{ text: "b cc", value: 0.5 }, { text: " " }, { text: "d", attrs: { bold: true }, tone: "identifier" }]);
+    expect(runLines(runsOf("a\nb", [{ from: 0, to: 3, value: 1 }]))).toEqual([[{ text: "a", value: 1 }], [{ text: "b", value: 1 }]]);
+    expect(runsOf("ab", [{ from: 0, to: 1 }]), "a span with no member is a plain run — the painter coalesces it with its neighbour").toEqual([{ text: "a" }, { text: "b" }]);
+
+    // The wrapper: a space inside an atom is not a break point.
+    expect(wrapCellsParts("aa bb cc dd", 5)).toEqual([{ text: "aa", start: 0 }, { text: "bb", start: 3 }, { text: "cc dd", start: 6 }]);
+    expect(wrapCellsParts("aa bb cc dd", 5, "narrow", [{ from: 3, to: 8 }])).toEqual([{ text: "aa", start: 0 }, { text: "bb cc", start: 3 }, { text: "dd", start: 9 }]);
+    // No break point outside the atom: it moves whole when something precedes it.
+    expect(wrapCellsParts("x(abcde)yz", 6)).toEqual([{ text: "x(abcd", start: 0 }, { text: "e)yz", start: 6 }]);
+    expect(wrapCellsParts("x(abcde)yz", 6, "narrow", [{ from: 2, to: 7 }])).toEqual([{ text: "x(", start: 0 }, { text: "abcde)", start: 2 }, { text: "yz", start: 8 }]);
+    // An atom wider than a row is broken as text is — the plain answer.
+    expect(wrapCellsParts("ab abcdefghij cd", 6, "narrow", [{ from: 3, to: 13 }])).toEqual(wrapCellsParts("ab abcdefghij cd", 6));
+    // A full row with no break point followed by a space: the space is the
+    // break and begins no row. Measured before the arm existed: `" gh"`.
+    expect(wrapCellsParts("abcdef gh", 6)).toEqual([{ text: "abcdef", start: 0 }, { text: "gh", start: 7 }]);
+    expect(wrapCellsParts("aa bb cc dd", 5, "narrow", [{ from: 3, to: 8 }]).map((r) => r.text)).not.toContain(" dd");
+
+    // `wrapRuns` derives the atoms from `value` alone.
+    expect(wrapRuns(runsOf("x(abcde)yz", [{ from: 2, to: 7, bold: true }]), 6).map((r) => runsText(r))).toEqual(["x(abcd", "e)yz"]);
+    expect(wrapRuns(runsOf("x(abcde)yz", [{ from: 2, to: 7, value: 0.5 }]), 6)).toEqual([[{ text: "x(" }], [{ text: "abcde", value: 0.5 }, { text: ")" }], [{ text: "yz" }]]);
+  });
+
   it("(C04 I86) wrapCellsParts: every row is an exact slice of the source from its start, and the break space is in no row", () => {
     const text = "the quick brown fox jumps";
     const rows = wrapCellsParts(text, 10);
@@ -209,6 +281,27 @@ describe("C09 — runs, the arithmetic spans and tokens share", () => {
 });
 
 describe("C10 §4e — span attributes and the resolved tone", () => {
+  it("T1.22 (C10 I33, C04 I89) — the tone arm: a run's tone replaces the block's, by reference, with the attribute still on top", () => {
+    const theme = store().current;
+    for (const depth of DEPTHS) {
+      const ctx = { theme, capabilities: { ...FULL_CAPS, colourDepth: depth } };
+      for (const blockTone of TONES) {
+        const base = resolveTone(blockTone, theme, caps(depth));
+        for (const spanTone of TONES) {
+          const other = resolveTone(spanTone, theme, caps(depth));
+          expect(runStyle({ text: "x", tone: spanTone }, base, ctx), `${spanTone} on ${blockTone} at ${String(depth)}`).toBe(other);
+          const merged = runStyle({ text: "x", tone: spanTone, attrs: { underline: true } }, base, ctx);
+          expect(merged.colour, `${spanTone} on ${blockTone} at ${String(depth)}`).toEqual(other.colour);
+          expect(merged.underline).toBe(true);
+          expect(merged.background).toBeUndefined();
+        }
+        expect(runStyle({ text: "x" }, base, ctx), "no member is the block's style itself").toBe(base);
+      }
+    }
+    // The fixture responds: at 24-bit `identifier` and `ok` are different colours.
+    expect(resolveTone("identifier", theme, caps(24)).colour).not.toEqual(resolveTone("ok", theme, caps(24)).colour);
+  });
+
   it("T1.22 (C10 I33): for every attribute, tone and depth the merge keeps both colour channels and sets the attribute", () => {
     const theme = store().current;
     for (const attr of ["bold", "italic", "underline"] as const) {
