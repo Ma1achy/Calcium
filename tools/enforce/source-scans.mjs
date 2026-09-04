@@ -735,7 +735,7 @@ export const SCANS = [
   // the rule silently, which is the failure this scan exists to prevent, arriving
   // through the scan itself. So: literal, and the cost is one word per token.
   //
-  // **The token list is restated here and that is a known cost** (lane M, M3):
+  // **The token list is restated here and that is a known cost** (F661):
   // `Glyph` gained `quote` and `nested` and this rule reported both as defects,
   // because the alternation is a second copy of the union with no mechanism
   // holding the two together. It is the reimplemented-rule shape — both copies

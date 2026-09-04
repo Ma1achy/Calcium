@@ -25622,3 +25622,411 @@ taken. The arm paints every label on `surface.bgDeep`, the one surface C10 §4 e
 
 **The arithmetic**: 19 entries, F630–F648, keyed in one move each — group 7 gains
 two, 9 four, 10 two, 11 five, 14 one, Singles five — and SP6 reads 652 = 652.
+
+---
+
+## F649 — The exclusion's conditional had fired, and neither half of it was acted on ★★★☆☆
+
+*2026-09-04 · Lane C, the page the SVG arm paints on, at 6196ab07+lanes4 (2026-09-04).*
+
+**Expected** — C10 §4's sentence *"if a surface ever paints text on it, that surface is wrong or the
+exclusion is"* reads as a decision someone would take. **Measured** — the SVG plot arm has painted
+every axis tick, axis title, legend row, end-of-line callout, `n reversed` notice, empty-figure
+message and sankey node label on `surface.bgDeep` since it was written; C12 §3ap.7 filed the debt as
+*"a note owed to C10, and it is not this component's to fix"* and nothing in C10 moved. **Where** —
+`src/presentation/plot/svg.ts:555` (was), `docs/components/C10_theme_resolution.md` §4, C12 §3ap.7.
+
+The reusable half: **a sentence that names a trigger and no watcher is satisfied by nobody looking.**
+It is A03 §2's vacuity class in prose — the conditional could not be violated, so it read as obeyed
+for as long as it went unasked. The repair is a row that asks the property (C10 T2.27), not a
+better sentence.
+
+---
+
+## F650 — The comment beside the ground named the right principle and took the wrong slot ★★☆☆☆
+
+*2026-09-04 · Lane C, the page the SVG arm paints on, at 6196ab07+lanes4 (2026-09-04).*
+
+**Expected** — `svg.ts`'s page comment says *"it is the one place this arm cannot follow
+`resolveBase`: a theme declaring `background: "inherit"` means the terminal's own background shows,
+and an SVG has no terminal underneath it. So the surface resolves directly."* **Measured** —
+`resolveBase` resolves **`surface.bg`** (`resolve.ts:418`). The comment cites the function whose
+slot it should take and takes a different one; the divergence it was written to explain is the
+*indirection*, not the *slot*. **Where** — `src/presentation/plot/svg.ts` ~line 1779,
+`src/presentation/theme/resolve.ts:418`.
+
+This is the *correct sentence justifying the wrong decision* class from CLAUDE.md, one level down:
+review checks whether the justification is true, and this one is.
+
+---
+
+## F651 — `bgDeep` is the surface whose polarity nobody constrained ★★★☆☆
+
+*2026-09-04 · Lane C, the page the SVG arm paints on, at 6196ab07+lanes4 (2026-09-04).*
+
+**Expected** — a surface excluded from the floors is excluded uniformly, so an arm painting on it is
+equally wrong on every theme. **Measured**, all three shipped themes, 27 slots each, both grounds:
+
+| | `bg` | `bgDeep` | direction |
+|---|---|---|---|
+| dark | `#1a1a1a` | `#141414` | recesses **away** from the tones — every ratio **rises**, all clear |
+| light | `#fafafa` | `#e8e8e8` | recesses **toward** them — every ratio **falls**, **twelve slots fail** |
+| high-contrast | `#000000` | `#1c1c1c` | `bgDeep` is **lighter** than `bg` — all clear |
+
+Light's twelve: `tone.muted` 2.44/2.5, `tone.ok` 4.29, `tone.warn` 4.30, `tone.info` 4.29,
+`tone.accent` 4.30, `tone.identifier` 4.31, `categorical.c4` 4.41, `syntax.string` 4.29,
+`syntax.comment` 2.89/3, `syntax.number` 4.30, `syntax.function` 4.30, `syntax.operator` 4.29.
+
+**Two themes in three passing is what made the exclusion look harmless**, and it is a property of
+each theme's authoring rather than of the slot — nothing constrains which side of `bg` a `bgDeep`
+sits on, because nothing measures it. **Where** — `tokens-{dark,light,high-contrast}.ts`, now
+asserted as a set in C10 T1.34.
+
+---
+
+## F652 — `categorical` is a `decoration` palette and the SVG arm paints it as text ★★★☆☆
+
+*2026-09-04 · Lane C, the page the SVG arm paints on, at 6196ab07+lanes4 (2026-09-04).*
+
+**Expected** — C10 I15: a `meaning` palette is contrast-validated, a `decoration` palette is not and
+is *"lint-restricted to declared art"*. **Measured** — `categorical.carries === "decoration"` on
+every shipped theme, and `svg.ts:1158` paints a line's end-of-series callout in
+`seriesRefOf(...)` — i.e. `categorical.cN` — as a `<text>` fill on the page (F382's ruling, so both
+arms agree with the legend). So C10 checks those eight slots against **nothing, on any surface**.
+The figures are comfortable — worst 6.26 dark, 5.17 light, 7.55 high-contrast — and **T2.27 is now
+the only row that asks**, because it reads fills off the document rather than palettes off the
+theme. **Where** — `svg.ts:1158`, `tokens-*.ts` `carries` fields, C10 I15, §4f.4.
+
+This is §4's own conditional one axis over: *a palette exempted because it carries no meaning*, and
+a surface that paints it as the only text naming a series.
+
+---
+
+## F653 — A ground used as ink is measured by nothing ★★☆☆☆
+
+*2026-09-04 · Lane C, the page the SVG arm paints on, at 6196ab07+lanes4 (2026-09-04).*
+
+**Expected** — a floor is a foreground on a surface, and every foreground the arm paints has one.
+**Measured** — `svg.ts:1132` inks a treemap/heatmap tile's label in **`ground`** over the tile's
+series fill, so the pair is `surface × categorical` and no §4 pairing holds it. Its ratio against
+the *page* is 1.00 by construction, which is why T2.27 has to exempt it by name. Worst against the
+fills: 6.26 dark, 5.17 light, 7.55 high-contrast. **Where** — `svg.ts:1132`, C10 §4f.4. Owed to C12,
+whose ink it is.
+
+---
+
+## F654 — A literal ground hex in a test outlives the ground ★★☆☆☆
+
+*2026-09-04 · Lane C, the page the SVG arm paints on, at 6196ab07+lanes4 (2026-09-04).*
+
+**Expected** — `test/unit/plot-arm-unification.test.ts` excludes the page from its series-fill count
+with `.filter((f) => f !== "#141414")`. **Measured** — after the ruling the arm no longer paints
+`#141414` as a page at all, so the filter would have gone on excluding a colour that is not there
+while **counting the page as a ninth series**. Two failures in one line, and both silent. Replaced
+with the page read off the document. **Where** — `test/unit/plot-arm-unification.test.ts:1176`.
+
+`plot-svg-colour.test.ts` and `plot-svg-path.test.ts` were already resolving through `hexOf(ref)` and
+cost one token each — the difference between a test naming a slot and a test naming a colour, in the
+same suite.
+
+---
+
+## F655 — The two new rows are not restatements of each other, and the mutation is what says so ★☆☆☆☆
+
+*2026-09-04 · Lane C, the page the SVG arm paints on, at 6196ab07+lanes4 (2026-09-04).*
+
+**Expected** — T2.27 (the page is a text surface) and T2.28 (four sites, one colour) might be one
+claim twice. **Measured** by hand: reverting `GROUND` to `surface.bgDeep` fails **T2.27** on the
+first frame (`expected [ '#1a1a1a', '#222222' ] to include '#141414'`) and leaves **T2.28 green**,
+because all four sites move together. A mutation killing both would have meant one row was a
+restatement. **Where** — `test/contract/theme.test.ts`, `tools/mutate/runs/c10-page-ground.mjs`.
+
+---
+
+## F656 — an SP rule can be implemented, inventoried, fabricated against, and never invoked by the gate ★★★☆☆
+
+*2026-09-04 · Lane E, SP10 and the gate's own wiring, at 6196ab07+lanes4 (2026-09-04).*
+
+**Expected.** Unwiring a rule from `tools/enforce/index.mjs` fails something. A03 commitment 14
+demands a fabricated violation per rule and 14b demands an inventory equality, so a rule that is off
+should be visible from three directions.
+
+**Measured.** It is visible from none. Deleting `...checkMnemonicRowIds(specs),` from the runner
+failed **nothing** — every SP fire-test calls the checker directly, and 14b compares rule *ids*
+against `SPEC_RULES`, which is a list. Measured on the pre-existing family too: with
+`...checkTestRowIds(specs),` removed, `npx vitest run test/unit/enforce-commitments.test.ts
+test/unit/enforce-rules.test.ts` produced **no new failures** (263 rows, the same two failing on
+another lane's in-flight spec edits). SP7 has been in the gate since it landed; nothing was checking
+that it still was.
+
+Only MG2 carries a wiring assertion (`expect(runner).toMatch(/\.\.\.checkLayerCycles\(files\),/)`),
+written for a different reason — `checkModuleGraph` does not run MG2, so the gate has to call it by
+name.
+
+**Closed the class, not the instance**: `SP10: the gate calls it, and so does every other SP rule`
+reads `index.mjs` and asserts a carrier per rule, with the carrier table compared to `SPEC_RULES`
+**by equality** so a new rule cannot be added without one. Fires on all three tried
+(`checkMnemonicRowIds`, `checkTestRowIds`, `checkSectionReferences`). Stated limit: it proves the
+gate *calls* the checker, not that it gates on the result — SP8 reports without gating, so demanding
+the spread into `violations` would be wrong for one of the ten.
+
+**Where**: `test/unit/enforce-commitments.test.ts` (the SP10 describe); `tools/enforce/index.mjs`.
+
+---
+
+## F657 — F635's duplicate never reached a commit, and the rule's yield over the corpus is zero ★★☆☆☆
+
+*2026-09-04 · Lane E, SP10 and the gate's own wiring, at 6196ab07+lanes4 (2026-09-04).*
+
+**Expected.** A rule motivated by a real duplicate finds more of them; the interesting result is the
+count beyond the one that motivated it.
+
+**Measured.** Zero, in both the tree and its history. At HEAD `docs/components/` declares **183
+mnemonic rows across 3 of 26 specs** (C09 10, C12 172, C22 1) in **23 families**, and no label is
+declared twice. Swept every historical version of the three specs that declare them — **358 commits
+touching them, 0 with a duplicate** — so the `SK10` collision F635 records lived only in lane S's
+working tree and was renamed to `SK11` before it landed. **No citation in the tree ever pointed at
+an ambiguous name**, which is the question the brief asks and the answer is a clean negative rather
+than an unchecked one.
+
+That the rule finds nothing today is the reportable result, not a verdict: it is a gate against a
+class demonstrated once, and the population it protects is large — **666 mnemonic-label citations
+across `test/` and `tools/`** (`SK10` alone is named 19 times, `AA1` 17, `SK1` 17). A label that
+stops locating one row breaks every one of them silently.
+
+**Where**: `tools/enforce/commitments.mjs` (SP10); `docs/architecture/A03_enforcement_suite.md` §7a.
+
+---
+
+## F658 — the mutation-anchor gate caught a run file the rest of the suite would have accepted ★☆☆☆☆
+
+*2026-09-04 · Lane E, SP10 and the gate's own wiring, at 6196ab07+lanes4 (2026-09-04).*
+
+**Expected.** A run file written but not run is inert until someone runs it.
+
+**Measured.** It is not: `MA4 (the equality arm)` in `test/unit/mutate-anchors.test.ts` resolves
+every `expect` string in every run file against a test path the run actually executes, and it failed
+on two of mine — compound expectations naming both the SP10 row and the SP7 row it also kills
+(`"SP10: … / SP7: …"`), which no single test name contains. The information those strings carried is
+real (one mutation must fail on both sides, which is the evidence the implementation is shared
+rather than copied), and it belongs in the comment rather than in the field a resolver reads. Worth
+recording as the counter-example to the usual direction: this is a gate that **is** run and did
+catch something, on a file nothing else in the suite reads.
+
+**Where**: `tools/mutate/runs/enforce-sp10.mjs`; `test/unit/mutate-anchors.test.ts` MA4.
+
+---
+
+## F659 — A glyph slot draws on the first row only, so every gutter-shaped mark is a bullet ★★★☆☆
+
+*2026-09-04 · Lane M, markdown's last three residues, at 6196ab07+lanes4 (2026-09-04).*
+
+**Expected.** Adding a `quote` slot to `Glyph` and setting it on the blockquote notice
+would give a quotation a gutter, since `prefixCells` reserves the columns on every row
+(that is how the hanging indent works).
+
+**Measured.** `noticeDefinition.render` draws `glyphLead` only at `index === 0` and
+`" ".repeat(prefix)` on rows 1..n. A three-row quotation therefore draws its mark once
+and sits under a blank for the rest:
+
+```
+⎸ one two three four        ⎸ one two three four
+  five six seven eight      ⎸ five six seven eight
+  nine ten                  ⎸ nine ten
+   ← what a slot gives       ← what a quotation needs
+```
+
+Every count agrees between the two frames — same rows, same width, same reserved
+columns — so `measure`, the row property and C09 I1 all pass with the left one. The
+frame is the only instrument that separates them. Same class as `continuation`'s
+flush-left indent (C09 §4), one property along.
+
+**Where.** `src/presentation/blocks/kinds/simple.ts`, `noticeDefinition.render`.
+Closed by `GLYPH_RAIL` (C09 I41): a token property, no schema change, no geometry
+change. The by-hand mutation reversing it fails T2.107 and **nothing else** — T2.109,
+the measure-equals-rows row, passes with the defect in.
+
+---
+
+## F660 — The depth cap's recorded reason was the weaker one, and the measured one is the opposite ★★★☆☆
+
+*2026-09-04 · Lane M, markdown's last three residues, at 6196ab07+lanes4 (2026-09-04).*
+
+**Expected.** `markdown.ts` recorded: *deeper items clamp rather than indenting further,
+because the indent comes out of the text's own width and an unbounded one is a paragraph
+nobody can read at 60 columns.* A wide indent, in other words.
+
+**Measured**, with the cap removed, at width 40:
+
+| depth | frame |
+|---|---|
+| 12 | `•                         depth 12 item text that is long enough to wrap` |
+| 18 | `• ` then `  depth 18 item text that is long enough` |
+| 25 | `• ` then `              depth 25 item text that is` |
+
+Past about depth 15 the indent **is not wide, it is gone**: the indent lives inside the
+item's text, so the wrapper treats a long run of leading spaces as a break, the first row
+is the mark alone, and the item reads as depth 0 having spent a row saying nothing. The
+cap keeps its place, and on a stronger argument than the one written down.
+
+**Also measured**: a width-scaled cap is not available at all. `indentOf` runs in
+`data/`, where no width exists and none may be read (A02 Seam 4) — constant or nothing.
+
+**Where.** `src/data/viewmodel/markdown.ts` §*Three residues*, now rewritten; C04 I96.
+
+---
+
+## F661 — SS39 restates the `Glyph` union as a regex, so a new token is reported by the rule that polices the type ★★☆☆☆
+
+*2026-09-04 · Lane M, markdown's last three residues, at 6196ab07+lanes4 (2026-09-04).*
+
+**Expected.** Adding `quote` and `nested` to `Glyph`, with rows in `GLYPH_TABLE` and
+entries in `validate.ts`'s `GLYPH_MEMBERS` (both `satisfies Record<Glyph, true>`, so a
+missing member fails to compile), would be complete.
+
+**Measured.** `make enforce` reported two SS39 violations — *a block names a glyph slot* —
+against `glyph: "quote"` and `glyph: "nested"` in `markdown.ts`. SS39's pattern carries
+the fourteen token names as a literal alternation, so the vocabulary is declared in three
+places of which two are checked by the compiler and one is a string. Both copies read as
+correct; the one that goes stale is the one nothing asserts against.
+
+Extended by hand (`quote|nested`) with a note in place. The class fix is to derive the
+list from `GLYPH_TOKENS`, which the scan table's shape does not allow today — it is a
+flat array of regexes with no import of `src/`. Filed as request R1.
+
+**Where.** `tools/enforce/source-scans.mjs`, the SS39 row.
+
+---
+
+## F662 — The ordered-list arm is where the depth collapse was invisible in principle ★☆☆☆☆
+
+*2026-09-04 · Lane M, markdown's last three residues, at 6196ab07+lanes4 (2026-09-04).*
+
+**Expected.** Marking an over-cap item is a bullet-list concern; ordered items carry
+their number as text and have no glyph.
+
+**Measured.** That is exactly why the ordered arm is the worse case. A bullet list's
+depth 3 and depth 4 differed only in text; an ordered list's differ in nothing at all
+that a reader could attribute to depth, because the number says *which* item and never
+*how deep*. So the mark applies to both arms, and the ordered arm gains a gutter only at
+the depth where it has something to say.
+
+**Where.** `src/data/viewmodel/markdown.ts`, the `ORDERED` arm; C04 I96, T2.108.
+
+---
+
+## F663 — `#` alone is not a heading, which is what makes cell 3 of the walk unreachable from markdown ★★☆☆☆
+
+*2026-09-04 · Lane M, markdown's last three residues, at 6196ab07+lanes4 (2026-09-04).*
+
+**Expected.** The classification-table cell *an empty label at tier 3* (C09 I21's
+unbroken line against tier 3's blank fill) would arrive from a markdown document.
+
+**Measured.** `HEADING` is `/^(#{1,6})\s+(.*)$/` — the whitespace is required — so `#`
+and `###` on their own lines render as the literal characters `#` and `###`, as
+paragraphs. The cell is reachable only from a hand-built `b.rule("", …, { level: 3 })`,
+which is what T2.106 constructs. The ruling stands and the fixture had to be built rather
+than found; noted because a row asserting it through `markdownBlocks` would have been
+vacuous and would have read as coverage.
+
+**Where.** `src/data/viewmodel/markdown.ts`; T2.106.
+
+---
+
+## F664 — C09 declares commitment 41 twice, and nothing gates commitment numbers ★★☆☆☆
+
+*2026-09-04 · Lane M, markdown's last three residues, at 6196ab07+lanes4 (2026-09-04).*
+
+**Expected.** A03's spec rules cover invariant numbering (SP2, *1..n in document order*)
+and duplicate test names (SP7).
+
+**Measured.** `docs/components/C09_block_library.md` §8 has two commitments numbered
+`41.` — the animated image and the run-tone one — and `make enforce` is green. SP1
+resolves each commitment's citation and never looks at its number, so the same failure
+SP2 exists to prevent is unwatched one list over. Left alone rather than renumbered,
+because renumbering is a change to a shared document mid-lane; my two are 42 and 43.
+
+**Where.** `docs/components/C09_block_library.md:1631–1632`. Filed as request R2.
+
+---
+
+## F665 — `cells()` reports U+00B7 as one cell under the wide convention, where Unicode classifies it Ambiguous ★★★☆☆
+
+*2026-09-04 · Lane M, markdown's last three residues, at 6196ab07+lanes4 (2026-09-04).*
+
+**Expected.** While measuring bullet candidates for the depth mark, the framework's own
+`cells()` was used as the authority (CLAUDE.md: *the same implementation the measurer
+uses*).
+
+**Measured**, twice — through the module under vitest and through `dist/`, agreeing:
+
+| char | Unicode EAW | `cells(c,"narrow")` | `cells(c,"wide")` |
+|---|---|---|---|
+| `·` U+00B7 | A | 1 | **1** |
+| `§` U+00A7 | A | 1 | **1** |
+| `×` U+00D7 | A | 1 | **1** |
+| `«` U+00AB | A | 1 | **1** |
+| `—` U+2014 | A | 1 | 2 |
+| `≤` U+2264 | A | 1 | 2 |
+| `→` U+2192 | A | 1 | 2 |
+| `▌` U+258C | A | 1 | 2 |
+
+So the range table appears to start above Latin-1: every Ambiguous character in
+`00A1–00FF` reports narrow under both conventions while everything from U+2000 up
+reports correctly. Four of the eight members of `PROSE_MARKS` are in that gap, and
+`PROSE_MARKS` is the set SS47 lets through *because it is prose* — so the one class of
+mark exempted from the substitution rule is also the class whose width is under-counted
+on a wide terminal. That is C02 I9's hazard in the punctuation set rather than the glyph
+set, and it reaches every error message in the tree (SS47's own stated blind spot,
+106 literals, arriving from the other direction).
+
+Not acted on — `·` was not chosen, and the ambiguous range table is another lane's file.
+Filed as request R3 with the measurement, so it is re-checkable rather than rediscovered.
+
+**Where.** `src/presentation/text.ts`'s `isAmbiguous` range table.
+
+---
+
+## F666 — the three owed items, in numbers ★★★☆☆
+
+*2026-09-04 · the merge, over three lanes, at 6196ab07+lanes4 (2026-09-04).*
+
+Three owed items — a page the SVG arm paints every label on, a spec rule with no gate behind
+it, and markdown's last three residues. This entry is their figures; each cites the entry that
+carries the measurement.
+
+**The page surface** (F649–F655). **27 slots × three themes**, measured against both
+grounds: dark and high-contrast clear either — dark because `bgDeep` recesses *away* from the
+tones and high-contrast because its `bgDeep` is the **lighter** of the two — and light
+**fails twelve times**, `tone.muted` at **2.44** under its own **2.5** floor (F651). So the
+surface was wrong rather than the exclusion, which is the half of C10 §4's conditional nobody
+had taken (F649). Moving the page to `surface.bg` costs dark **5.5 per cent uniformly**,
+gains light **17**, changes **no token and no floor**, and moves **212 of 244 SVG frames** in
+four roles at **982 occurrences**. Two slots the move does not reach are recorded rather than
+fixed: `categorical` is a `decoration` palette painted as a series' only text (F652), and a
+tile label is inked in `ground` over its own fill, a pairing no floor holds (F653).
+
+**SP10** (F656–F658). **183 mnemonic rows in 23 families across three specs** of 26,
+and **358 commits** touching them swept with **no duplicate beyond the one that motivated it** —
+F635's `SK10` collision lived in a working tree and was renamed before it landed (F657).
+That the yield is zero is the reportable result and not a verdict: the population it protects is
+**666 mnemonic-label citations** across `test/` and `tools/`, and a label that stops locating one
+row breaks every one of them silently. Its mutation pass found the larger thing — **unwiring any
+SP rule from the gate failed nothing**, on the new rule and on the pre-existing family both,
+because every fire-test calls its checker directly and the inventory compares *ids* against a
+list. Closed as a class by a rule-to-carrier table compared to `SPEC_RULES` by equality
+(F656).
+
+**Markdown** (F659–F665). Headings are **three tiers and not six**, because a fourth
+would be accepted and drawn as a third. The quote gutter is a **rail** and not a glyph slot,
+because a notice's glyph draws on row 0 and would gutter a three-row quotation exactly once —
+every count agreeing between the two frames, so the frame is the only instrument that separates
+them (F659). The rail character was measured rather than chosen: the obvious candidates are
+all two cells at ambiguous width and **U+23B8 is one under both** — the measurement that also
+turned up `cells()` reporting every Ambiguous character in `00A1–00FF` as narrow on a wide
+terminal, four of them in `PROSE_MARKS` (F665). The nesting cap keeps its place on a **new**
+reason: past about **depth 15 at width 40** the indent is *gone* rather than wide, the first row
+is the mark alone and the item reads as depth 0 (F660).
+
+**The arithmetic**: 18 entries, F649–F666, keyed in one move each — group 7 gains
+two, 9 three, 10 one, 11 six, 14 two, Singles four — and SP6 reads 670 = 670.
