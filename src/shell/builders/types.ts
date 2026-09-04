@@ -14,7 +14,7 @@
  * oversight.
  */
 
-import type { Action, Block, Cell, ErrorLike, Glyph, KeyValue, Tone } from "../../data/viewmodel/index.js";
+import type { Action, Block, Cell, ErrorLike, Glyph, KeyValue, Tone, TextSpan } from "../../data/viewmodel/index.js";
 import type { ProducerContext } from "../../data/adapters/types.js";
 
 /**
@@ -38,6 +38,20 @@ export type BlockOpts = Readonly<{
   /** An explicit value, which always wins over the builder's default. */
   gapBefore?: boolean;
 }>;
+
+/**
+ * The options of a builder whose block carries text a span can decorate —
+ * `rule`, the `notice` shorthands and `raw` (C04 §3am, C04 I88).
+ *
+ * A separate type rather than a member of `BlockOpts`, because a `spans`
+ * option on `b.table` or `b.plot` would be accepted and ignored — F207's
+ * member, one layer up. `Cell` takes its spans through `CellInput` already.
+ */
+export type TextOpts = BlockOpts &
+  Readonly<{
+    /** Styled runs inside the text, by code-unit offset (C04 I84). */
+    spans?: readonly TextSpan[];
+  }>;
 
 /**
  * A cell, or the string that is one with default tone (§4).

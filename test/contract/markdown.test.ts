@@ -93,13 +93,57 @@ describe("roadmap 11 — the named subset, as blocks", () => {
     expect(kinds(markdownBlocks("| a | b |\n| - | - |")), "and with one, it is").toEqual(["table"]);
   });
 
-  it("T2.44: inline emphasis is kept, character for character", () => {
-    // The ruling, asserted rather than described: the markers survive because
-    // no span-level styling exists to replace them with, and keeping them is
-    // reversible in a way that dropping them is not.
-    const [para] = markdownBlocks("a **bold** and *italic* and `code` word");
+  it("T2.33 (C04 §3am, roadmap 11): inline emphasis is spans over the marker-stripped text, and inline code stays literal", () => {
+    // The reversal T2.44 was written to permit: the markers are gone and the
+    // spans sit at the offsets of the words they marked, in the emitted text.
+    const [para] = markdownBlocks("a **bold** and *em* and _em_ and `code` word");
+    expect(para).toEqual({
+      kind: "raw",
+      id: "md-0",
+      text: "a bold and em and em and `code` word",
+      spans: [
+        { from: 2, to: 6, bold: true },
+        { from: 11, to: 13, italic: true },
+        { from: 18, to: 20, italic: true },
+      ],
+    });
 
-    expect(para).toMatchObject({ text: "a **bold** and *italic* and `code` word" });
+    // Nested emphasis is adjacent disjoint spans with combined attributes
+    // (§3am cell 12); an unpaired marker is a character; markers inside a
+    // backtick run do not toggle.
+    expect(markdownBlocks("**a *b* c**")[0]).toMatchObject({
+      text: "a b c",
+      spans: [
+        { from: 0, to: 2, bold: true },
+        { from: 2, to: 3, bold: true, italic: true },
+        { from: 3, to: 5, bold: true },
+      ],
+    });
+    expect(markdownBlocks("2 * 3 and a_b")[0]).toEqual({ kind: "raw", id: "md-0", text: "2 * 3 and a_b" });
+    expect(markdownBlocks("`a*b*c` and *d*")[0]).toMatchObject({
+      text: "`a*b*c` and d",
+      spans: [{ from: 12, to: 13, italic: true }],
+    });
+  });
+
+  it("T2.34 (C04 §3am, I88): the four members take spans, and a fence does not run the inline pass", () => {
+    const [item] = markdownBlocks("- one **two**");
+    expect(item).toMatchObject({ kind: "notice", glyph: "bullet", text: "one two", spans: [{ from: 4, to: 7, bold: true }] });
+    const [quote] = markdownBlocks("> *quoted*");
+    expect(quote).toMatchObject({ kind: "notice", tone: "muted", text: "quoted", spans: [{ from: 0, to: 6, italic: true }] });
+    const [heading] = markdownBlocks("# A **title**");
+    expect(heading).toMatchObject({ kind: "rule", label: "A title", spans: [{ from: 2, to: 7, bold: true }] });
+    // Two columns: the delimiter regex needs two cells to see a table at all,
+    // which is entry 11's residue and not this arc's.
+    const [table] = markdownBlocks("| h | i |\n|---|---|\n| **x** | y |") as [Table];
+    expect(table.rows[0]?.cells["c0"]).toEqual({ text: "x", spans: [{ from: 0, to: 1, bold: true }] });
+    expect(table.rows[0]?.cells["c1"]).toEqual({ text: "y" });
+    const [fence] = markdownBlocks("```\n**not** *emphasis*\n```");
+    expect(fence).toMatchObject({ kind: "code", text: "**not** *emphasis*" });
+    expect(fence).not.toHaveProperty("spans");
+    // The frame: the bytes carry the attribute and the visible text has no markers.
+    const lines = frame(markdownBlocks("a **bold** word"));
+    expect(lines).toEqual(["a bold word"]);
   });
 
   it("T2.45 (the frame): a list item draws the glyph slot, and it degrades", () => {

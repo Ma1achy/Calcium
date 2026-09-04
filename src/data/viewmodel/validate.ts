@@ -35,6 +35,7 @@ import {
   IS_MATRIX,
   MARKER3_MEMBERS,
   STYLE_ARMS,
+  TEXT_SPAN_KEYS,
   type OHLC,
   type Plot,
   type PlotForm,
@@ -661,15 +662,92 @@ function checkActions(b: Record<string, unknown>, e: string[], at: string): void
 }
 
 /**
+ * A member's spans (C04 I84, I85, §3am).
+ *
+ * **What the gate refuses is what a code-unit walk can decide.** `graphemes()` is
+ * L1's and this file is L0's, so a boundary inside a grapheme cluster is not
+ * visible here — except the one kind that is: a cut between the two halves of a
+ * surrogate pair. Everything else inside a cluster is snapped outward by the
+ * renderer, which preserves the width (C09).
+ *
+ * One error per fault, naming the span's index, and the walk stops at the first
+ * fault on a span — so a document with nine faulty spans reports nine lines and
+ * a reader can find each one.
+ */
+function checkSpans(b: Record<string, unknown>, member: string, e: string[], at: string): void {
+  const spans = b["spans"];
+  if (spans === undefined) return;
+  if (!isArray(spans)) {
+    e.push(`${at}: "spans" must be an array (C04 I84)`);
+    return;
+  }
+  const text = b[member];
+  const length = isString(text) ? text.length : 0; // cells-ok — a code-unit bound, not a width
+  let previousTo = 0;
+  spans.forEach((span, i) => {
+    const where = `${at}: spans[${String(i)}]`;
+    if (!isRecord(span)) {
+      e.push(`${where} must be a record (C04 I84)`);
+      return;
+    }
+    const from = span["from"];
+    const to = span["to"];
+    if (typeof from !== "number" || !Number.isInteger(from) || from < 0) {
+      e.push(`${where}: "from" must be a non-negative integer (C04 I84)`);
+      return;
+    }
+    if (typeof to !== "number" || !Number.isInteger(to) || to <= from) {
+      e.push(`${where}: "to" must be an integer greater than "from" — a span is [from, to) and never empty (C04 I84)`);
+      return;
+    }
+    if (to > length) {
+      e.push(`${where}: "to" (${String(to)}) is past the end of "${member}" (${String(length)} code units) (C04 I84)`);
+      return;
+    }
+    if (from < previousTo) {
+      e.push(`${where}: overlaps or precedes the span before it — spans are sorted by "from" and disjoint (C04 I84)`);
+      return;
+    }
+    previousTo = to;
+    if (isString(text) && (splitsSurrogate(text, from) || splitsSurrogate(text, to))) {
+      e.push(`${where}: a boundary falls between the two halves of a surrogate pair (C04 I84)`);
+      return;
+    }
+    for (const key of Object.keys(span)) {
+      if (!TEXT_SPAN_KEYS.has(key)) {
+        e.push(`${where}: unknown member "${key}" — a span carries from, to, bold, italic, underline and nothing else (C04 I85)`);
+        return;
+      }
+      if (key !== "from" && key !== "to" && typeof span[key] !== "boolean") {
+        e.push(`${where}: "${key}" must be a boolean (C04 I85)`);
+        return;
+      }
+    }
+  });
+}
+
+/** `i` lies strictly between a high and a low surrogate — the one cluster interior L0 can see. */
+function splitsSurrogate(text: string, i: number): boolean {
+  if (i <= 0 || i >= text.length) return false; // cells-ok — a code-unit index
+  const before = text.charCodeAt(i - 1);
+  const here = text.charCodeAt(i);
+  return before >= 0xd800 && before <= 0xdbff && here >= 0xdc00 && here <= 0xdfff;
+}
+
+/**
  * One entry per member of the union. `Record<BlockKind, …>` is the assertion:
  * a new kind without a row here is a type error, not a silent pass (T2.10).
  */
 const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
-  rule: (b, e, at) => requireString(b, "label", e, at),
+  rule: (b, e, at) => {
+    requireString(b, "label", e, at);
+    checkSpans(b, "label", e, at);
+  },
   notice: (b, e, at) => {
     requireString(b, "text", e, at);
     requireString(b, "tone", e, at);
     requireGlyph(b["glyph"], e, at);
+    checkSpans(b, "text", e, at);
   },
   keyValue: (b, e, at) => {
     requireArray(b, "rows", e, at);
@@ -725,6 +803,7 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
         for (const [key, cell] of Object.entries(row["cells"])) {
           if (!isRecord(cell)) continue;
           requireGlyph(cell["glyph"], e, `${at} cell "${key}"`);
+          checkSpans(cell, "text", e, `${at} cell "${key}"`);
           // I46 — the second numeric array, and the one no round trip would
           // have surfaced: a sparkline drawn from a cell's own numbers.
           requireFiniteNumbers(cell["spark"], e, `${at} cell "${key}"`, "spark");
@@ -1007,6 +1086,12 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
   code: (b, e, at) => {
     requireString(b, "language", e, at);
     requireString(b, "text", e, at);
+    // C04 I88 — `code` already carries a run stream over its text: the syntax
+    // tokens. A second stream over the same string is the collision spans exist
+    // to prevent, so the member is refused rather than merged.
+    if (b["spans"] !== undefined) {
+      e.push(`${at}: "spans" is refused on code — its syntax tokens are already a run stream over the text (C04 I88)`);
+    }
   },
   comparison: (b, e, at) => requireArray(b, "rows", e, at),
   patch: (b, e, at) => {
@@ -1049,7 +1134,10 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     checkFlex(b, e, at);
     checkAlign(b, e, at);
   },
-  raw: (b, e, at) => requireString(b, "text", e, at),
+  raw: (b, e, at) => {
+    requireString(b, "text", e, at);
+    checkSpans(b, "text", e, at);
+  },
   /**
    * C04 I47, §3c cell 5 — **refused at parse, not corrected at render.**
    *
@@ -2221,7 +2309,11 @@ function childBlocksOf(b: Record<string, unknown>): readonly unknown[] {
  * below carries the same check — one set, asked in two places, because the two
  * places are where the two fields live.
  */
-const FAR_SIDE_REFUSES_ON_BLOCK: readonly string[] = Object.freeze(["minHeight"]);
+// `lineRange` is the third member and the first whose writer is a definition's
+// `window` rather than an op (C04 I82, §3d): the argument is the same — a far
+// side naming which of its own lines a reader is looking at is declaring view
+// state it has no standing to declare.
+const FAR_SIDE_REFUSES_ON_BLOCK: readonly string[] = Object.freeze(["minHeight", "lineRange"]);
 const FAR_SIDE_REFUSES_ON_ROW: readonly string[] = Object.freeze(["expanded"]);
 
 function walkBlock(

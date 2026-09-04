@@ -202,12 +202,13 @@ export const logsDefinition: BlockDefinition<Logs> = {
    * slice. **`patch` is the second, and it got there differently**: its gutter
    * *is* derived from the whole block, so its window carries the width pinned
    * rather than deriving it again (C25 I21a) — the layout travels with the
-   * window instead of being independent of it. `widest` a whole `keyValue` and
-   * `tokenise` a whole code block are the two still open, and a layout that
-   * changes with the scroll position is the drift C14 exists to prevent
-   * (C09 §2a). `planColumns` is **not** one of them and was listed here in
-   * error: it reads the column definitions and the width, never the rows
-   * (F134).
+   * window instead of being independent of it. `keyValue` pins `widest` the
+   * same way, and `code` — whose derivation is a *parse* and cannot be pinned
+   * as a number — pins the whole `text` and a `lineRange` instead (C04 I82,
+   * C14 §4a); a layout that changes with the scroll position is the drift C14
+   * exists to prevent (C09 §2a). `planColumns` is **not** one of them and was
+   * listed here in error: it reads the column definitions and the width,
+   * never the rows (F134).
    *
    * `atLeastOne` is why the empty slice is refused rather than returned: a
    * `logs` with no lines measures 1, so a zero-row window would break I26. The

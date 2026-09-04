@@ -256,10 +256,42 @@ export const ACTION_KINDS: ReadonlySet<Action["kind"]> = new Set<Action["kind"]>
   "view",
 ]);
 
+// --- spans ----------------------------------------------------------------
+
+/**
+ * A styled run inside the text member it sits beside (§3am, I83–I88).
+ *
+ * `from`/`to` are **UTF-16 code-unit offsets** into that member — the unit
+ * `Token`, `sliceTokens`, `truncateParts.kept.length` and `codeRows.start`
+ * already use, and the one JSON carries without a second index. Half-open:
+ * `[from, to)`, `from < to`, sorted by `from`, no two overlapping (I84).
+ *
+ * **Three attributes and no colour, tone, `dim`, `inverse` or value** (I85).
+ * A span is appearance a renderer sets from the span; it never names a palette
+ * slot, so it never enters C10's ladder, floors or `MONO`. `tone` and `value`
+ * are deferred with their symbols — `TextSpan.tone`, `TextSpan.value` — and
+ * admitted by a consumer appearing, never by symmetry.
+ *
+ * **It carries no text**, which is what keeps `measure` honest by construction:
+ * the member's string is unchanged and no measurer reads `spans` (I83, I86).
+ */
+export type TextSpan = Readonly<{
+  from: number;
+  to: number;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+}>;
+
+/** The members of a span, for a gate that cannot silently take a sixth (I85). */
+export const TEXT_SPAN_KEYS: ReadonlySet<string> = new Set(["from", "to", "bold", "italic", "underline"]);
+
 // --- table ----------------------------------------------------------------
 
 export type Cell = Readonly<{
   text: string;
+  /** Styled runs inside `text`, by code-unit offset (§3am, I83). */
+  spans?: readonly TextSpan[];
   tone?: Tone;
   glyph?: Glyph;
   /** Inline sparkline. `null` is a gap — a position with no reading (I46a). */
@@ -401,7 +433,16 @@ export type Gap = Readonly<{ gapBefore?: boolean }>;
  */
 export type Floor = Readonly<{ minHeight?: number }>;
 
-export type Rule = Readonly<{ kind: "rule"; id: string; label: string; meta?: string }> & Gap & Floor;
+export type Rule = Readonly<{
+  kind: "rule";
+  id: string;
+  label: string;
+  /** Styled runs inside `label`, by code-unit offset (§3am, I83). */
+  spans?: readonly TextSpan[];
+  meta?: string;
+}> &
+  Gap &
+  Floor;
 
 export type Notice = Readonly<{
   kind: "notice";
@@ -409,6 +450,8 @@ export type Notice = Readonly<{
   tone: Tone;
   glyph?: Glyph;
   text: string;
+  /** Styled runs inside `text`, by code-unit offset (§3am, I83). */
+  spans?: readonly TextSpan[];
 }> & Gap & Floor;
 
 export type KeyValue = Readonly<{
@@ -2425,6 +2468,30 @@ export type Code = Readonly<{
   language: string;
   text: string;
   wrap?: boolean;
+  /**
+   * The source lines `[from, to)` this block draws, set by `code`'s `window`
+   * and by nothing else (§3d, I82; C09 I25a; C14 §4a).
+   *
+   * **A slice of `text` is a different parse, so the window does not slice.**
+   * `tokenise` is a function of every character before a line — a block
+   * comment is one token across four lines — and a window carrying only the
+   * sliced text re-tokenises from its first line and draws the comment's tail
+   * as live code, with every row count correct (F426). The window keeps `text`
+   * whole, the *same string reference*, and pins the range instead; `measure`
+   * counts the lines in range and `render` tokenises the whole text and
+   * produces only those rows. Two integers travel where a highlighter's mode
+   * could not.
+   *
+   * **Absolute line numbers**, so a window of a window narrows rather than
+   * re-bases, and the renderer indexes its per-line tokens by the same number
+   * the whole block would. Units are source lines: a wrapped line is one unit
+   * and a window never opens inside it (C09 I26).
+   *
+   * **Not a producer's** (MG27), on `presorted`'s argument: it names which of
+   * the block's own lines a reader is looking at, which is view state, and
+   * `validateDocument` refuses it from the far side (I67's set, third member).
+   */
+  lineRange?: readonly [number, number];
 }> & Gap & Floor;
 
 export type Comparison = Readonly<{
@@ -2663,7 +2730,15 @@ export type Share = number | Readonly<{ cells: number }>;
 export type Valign = "top" | "middle" | "bottom";
 
 /** The escape hatch, and load-bearing: the vocabulary never has to be complete. */
-export type Raw = Readonly<{ kind: "raw"; id: string; text: string }> & Gap & Floor;
+export type Raw = Readonly<{
+  kind: "raw";
+  id: string;
+  text: string;
+  /** Styled runs inside `text`, by code-unit offset (§3am, I83). */
+  spans?: readonly TextSpan[];
+}> &
+  Gap &
+  Floor;
 
 /**
  * A bounded region: a box of declared height holding children (C04 §3c, I47).

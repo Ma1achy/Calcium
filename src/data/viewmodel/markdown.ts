@@ -20,13 +20,20 @@
  * domain where rendering is incidental, and this subset is neither large nor
  * open.
  *
- * **Inline emphasis stays literal**: `**bold**` becomes the seven characters it
- * is. No span-level styling exists in this vocabulary — tone attaches to a
- * block, a `Cell`, a `keyValue` row or a pill and never to a run inside text —
- * so rendering emphasis is a new mechanism rather than a mapping. Keeping the
- * markers needs nothing, reads identically at every colour depth, and is
- * **reversible**: the day spans exist, the literal form is the thing they
- * replace. Rendering them by dropping the markers would not be.
+ * **Inline emphasis is spans** (roadmap 50, C04 §3am): `**bold**` becomes the
+ * four characters `bold` and a `TextSpan` over them; `*em*` and `_em_` become
+ * italic. The literal form this replaces was kept until spans existed because
+ * keeping markers is reversible and dropping them is not — and that day is
+ * this one. **Inline code stays literal**: `` `x` `` keeps its backticks,
+ * because the run it would want is a *tone* and a span carries none until a
+ * consumer appears (deferral symbol `TextSpan.tone`). Escapes (`\*`) are out
+ * by name with the rest of CommonMark; an **unpaired** marker is literal, so
+ * `2 * 3` and `a_b` keep their characters.
+ *
+ * Offsets are into the **emitted** text — the string with the markers gone —
+ * because that is the member they decorate (C04 I84). Nested emphasis is
+ * emitted as adjacent spans with combined attributes, since the type is sorted
+ * and disjoint rather than nested (§3am cell 12).
  *
  * **Indexed capture groups, not named ones, and that is a finding rather than a
  * style.** The first version used `(?<text>…)` and read `m.groups?.["text"]` —
@@ -54,7 +61,101 @@
  */
 
 import { block } from "./construct.js";
-import type { Block, ColumnDef, TableRow } from "./types.js";
+import type { Block, ColumnDef, TableRow, TextSpan } from "./types.js";
+
+/** The inline pass's answer: the text with markers removed, and the spans over it. */
+export type Inline = Readonly<{ text: string; spans?: readonly TextSpan[] }>;
+
+/**
+ * `**strong**`, `*em*`, `_em_` → spans; backtick runs literal; unpaired markers
+ * literal.
+ *
+ * **A toggle per marker kind, after unpaired markers are struck.** Counting
+ * each kind first is what makes a lone `*` a character rather than an emphasis
+ * that runs to the end of the line: the last occurrence of any kind with an odd
+ * count is treated as text. Inside a backtick run nothing toggles.
+ */
+export function inline(source: string): Inline {
+  // Pass one: find the markers, skipping code runs, and note which are unpaired.
+  type Mark = Readonly<{ at: number; kind: "**" | "*" | "_" }>;
+  const marks: Mark[] = [];
+  let i = 0;
+  while (i < source.length) {
+    const ch = source[i] ?? "";
+    if (ch === "`") {
+      const close = source.indexOf("`", i + 1);
+      i = close === -1 ? source.length : close + 1;
+      continue;
+    }
+    if (ch === "*" && source[i + 1] === "*") {
+      marks.push({ at: i, kind: "**" });
+      i += 2;
+      continue;
+    }
+    if (ch === "*" || ch === "_") {
+      marks.push({ at: i, kind: ch });
+      i += 1;
+      continue;
+    }
+    i += 1;
+  }
+  const literal = new Set<number>();
+  for (const kind of ["**", "*", "_"] as const) {
+    const ofKind = marks.filter((m) => m.kind === kind);
+    if (ofKind.length % 2 === 1) literal.add(ofKind[ofKind.length - 1]?.at ?? -1);
+  }
+
+  // Pass two: emit, toggling at each paired marker and closing a span whenever
+  // the attribute set changes.
+  let text = "";
+  const spans: TextSpan[] = [];
+  let bold = false;
+  let italic = false;
+  let segStart = 0;
+  const flush = (): void => {
+    if (text.length > segStart && (bold || italic)) {
+      spans.push(
+        Object.freeze({
+          from: segStart,
+          to: text.length,
+          ...(bold ? { bold: true } : {}),
+          ...(italic ? { italic: true } : {}),
+        }),
+      );
+    }
+    segStart = text.length;
+  };
+
+  let m = 0;
+  let pos = 0;
+  while (pos < source.length) {
+    const mark = marks[m];
+    if (mark !== undefined && mark.at === pos) {
+      m += 1;
+      if (literal.has(mark.at)) {
+        text += mark.kind;
+      } else {
+        flush();
+        if (mark.kind === "**") bold = !bold;
+        else italic = !italic;
+      }
+      pos += mark.kind.length;
+      continue;
+    }
+    const ch = source[pos] ?? "";
+    if (ch === "`") {
+      const close = source.indexOf("`", pos + 1);
+      const end = close === -1 ? source.length : close + 1;
+      text += source.slice(pos, end);
+      pos = end;
+      continue;
+    }
+    text += ch;
+    pos += 1;
+  }
+  flush();
+  return spans.length === 0 ? { text } : { text, spans: Object.freeze(spans) };
+}
 
 const FENCE = /^(```|~~~)\s*([A-Za-z0-9_+-]*)\s*$/u;
 const HEADING = /^#{1,6}\s+(.*)$/u;
@@ -113,7 +214,7 @@ export function markdownBlocks(source: string, idPrefix = "md"): readonly Block[
   let paragraph: string[] = [];
   const flush = (): void => {
     if (paragraph.length === 0) return;
-    out.push(block({ kind: "raw", id: id(), text: paragraph.join("\n") }));
+    out.push(block({ kind: "raw", id: id(), ...inline(paragraph.join("\n")) }));
     paragraph = [];
   };
 
@@ -156,7 +257,8 @@ export function markdownBlocks(source: string, idPrefix = "md"): readonly Block[
     if (heading !== null) {
       flush();
       // Every level maps to one form. The collapse is the first residue above.
-      out.push(block({ kind: "rule", id: id(), label: (heading[1] ?? "").trim() }));
+      const { text: label, spans } = inline((heading[1] ?? "").trim());
+      out.push(block({ kind: "rule", id: id(), label, ...(spans === undefined ? {} : { spans }) }));
       continue;
     }
 
@@ -173,7 +275,7 @@ export function markdownBlocks(source: string, idPrefix = "md"): readonly Block[
             id: `${idPrefix}-r${String(rows.length)}`,
             cells: Object.freeze(
               Object.fromEntries(
-                columns.map((c, j) => [c.key, Object.freeze({ text: values[j] ?? "" })]),
+                columns.map((c, j) => [c.key, Object.freeze(inline(values[j] ?? ""))]),
               ),
             ),
           }),
@@ -195,7 +297,7 @@ export function markdownBlocks(source: string, idPrefix = "md"): readonly Block[
         body.push(QUOTE.exec(lines[i] ?? "")?.[1] ?? "");
       }
       // Muted and unglyphed — the second residue.
-      out.push(block({ kind: "notice", id: id(), tone: "muted", text: body.join("\n") }));
+      out.push(block({ kind: "notice", id: id(), tone: "muted", ...inline(body.join("\n")) }));
       continue;
     }
 
@@ -214,7 +316,7 @@ export function markdownBlocks(source: string, idPrefix = "md"): readonly Block[
           // already draws — which is why a list item is a `notice` and not a
           // `raw` carrying a character this layer chose.
           glyph: "bullet",
-          text: `${pad}${bullet[2] ?? ""}`,
+          ...inline(`${pad}${bullet[2] ?? ""}`),
         }),
       );
       continue;
@@ -233,7 +335,7 @@ export function markdownBlocks(source: string, idPrefix = "md"): readonly Block[
           // in both renderings, so it needs no slot and F6 does not apply — and
           // no slot could carry it, since a glyph is one fixed mark. The cost is
           // the hanging indent, which the gutter would have given.
-          text: `${pad}${ordered[2] ?? ""}. ${ordered[3] ?? ""}`,
+          ...inline(`${pad}${ordered[2] ?? ""}. ${ordered[3] ?? ""}`),
         }),
       );
       continue;

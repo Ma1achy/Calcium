@@ -18,9 +18,44 @@ import type { ColourRef, ColourValue, ResolvedTheme } from "../theme/index.js";
 import type { Tone } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { cells, truncate } from "../text.js";
+import type { Run, SpanAttrs } from "../runs.js";
 
 /** A run of text and the style it carries. Width is the text's, never the run's. */
 export type Span = Readonly<{ text: string; style?: Style }>;
+
+/**
+ * A run's attributes onto the style its block resolved (C10 I33, C04 I85).
+ *
+ * **A spread, and it touches neither colour channel.** The span contributes at
+ * most `bold`, `italic` and `underline`; `colour` and `background` are the
+ * tone's and `withBackground`'s, so a span never enters `MONO`, the ladder or a
+ * floor — there is no colour for a floor to be about. Returning `style` itself
+ * when there is nothing to add is what lets `paintRuns` coalesce unstyled
+ * pieces by reference and keep a plain row's bytes exactly what they were.
+ */
+export function withSpan(style: Style, attrs: SpanAttrs | undefined): Style {
+  return attrs === undefined ? style : { ...style, ...attrs };
+}
+
+/**
+ * Runs to spans, adjacent runs of one style merged.
+ *
+ * The merge is by reference — `withSpan` returns `style` unchanged for a run
+ * with no attributes — so a row with no spans paints as the single span it
+ * always was, and a styled run breaks the row into exactly the pieces its
+ * attributes require. A `paint` that closed and reopened the same style between
+ * two plain pieces would change every golden frame while drawing the same thing.
+ */
+export function paintRuns(runs: readonly Run[], style: Style): readonly Span[] {
+  const out: { text: string; style: Style }[] = [];
+  for (const run of runs) {
+    const merged = withSpan(style, run.attrs);
+    const last = out[out.length - 1]; // cells-ok — an array index
+    if (last !== undefined && last.style === merged) last.text += run.text;
+    else out.push({ text: run.text, style: merged });
+  }
+  return out;
+}
 
 /** A tone, resolved. The only way a renderer obtains a style (I4). */
 export function tone(

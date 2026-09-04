@@ -76,6 +76,7 @@ export type {
   Steps,
   Table,
   TableRow,
+  TextSpan,
   Tip,
   Tone,
   ViewDocument,

@@ -83,6 +83,7 @@ import { blockId } from "../documents.js";
 import { defaulted, seq } from "./seq.js";
 import type {
   BlockOpts,
+  TextOpts,
   CellInput,
   ChipInput,
   ComparisonRow,
@@ -165,15 +166,21 @@ function toCells(input: Record<string, CellInput>): Record<string, Cell> {
 
 // --- the nineteen ---------------------------------------------------------
 
-function rule(label: string, meta?: string, opts?: BlockOpts): Rule {
+function rule(label: string, meta?: string, opts?: TextOpts): Rule {
   return finish<Rule>(
-    { kind: "rule", id: idOf(opts, "rule"), label, ...(meta === undefined ? {} : { meta }) } as Rule,
+    {
+      kind: "rule",
+      id: idOf(opts, "rule"),
+      label,
+      ...(opts?.spans === undefined ? {} : { spans: opts.spans }),
+      ...(meta === undefined ? {} : { meta }),
+    } as Rule,
     opts,
     true,
   );
 }
 
-function noticeOf(tone: Tone, text: string, glyph?: Glyph, opts?: BlockOpts): Notice {
+function noticeOf(tone: Tone, text: string, glyph?: Glyph, opts?: TextOpts): Notice {
   const g = glyphFor(tone, glyph);
   return finish<Notice>(
     {
@@ -182,6 +189,7 @@ function noticeOf(tone: Tone, text: string, glyph?: Glyph, opts?: BlockOpts): No
       tone,
       text,
       ...(g === undefined ? {} : { glyph: g }),
+      ...(opts?.spans === undefined ? {} : { spans: opts.spans }),
     } as Notice,
     opts,
     false,
@@ -189,10 +197,10 @@ function noticeOf(tone: Tone, text: string, glyph?: Glyph, opts?: BlockOpts): No
 }
 
 const notice = Object.assign(noticeOf, {
-  ok: (text: string, opts?: BlockOpts): Notice => noticeOf("ok", text, undefined, opts),
-  warn: (text: string, opts?: BlockOpts): Notice => noticeOf("warn", text, undefined, opts),
-  error: (text: string, opts?: BlockOpts): Notice => noticeOf("error", text, undefined, opts),
-  info: (text: string, opts?: BlockOpts): Notice => noticeOf("info", text, undefined, opts),
+  ok: (text: string, opts?: TextOpts): Notice => noticeOf("ok", text, undefined, opts),
+  warn: (text: string, opts?: TextOpts): Notice => noticeOf("warn", text, undefined, opts),
+  error: (text: string, opts?: TextOpts): Notice => noticeOf("error", text, undefined, opts),
+  info: (text: string, opts?: TextOpts): Notice => noticeOf("info", text, undefined, opts),
 });
 
 /**
@@ -1400,8 +1408,12 @@ function group(
   );
 }
 
-function raw(text: string, opts?: BlockOpts): Raw {
-  return finish<Raw>({ kind: "raw", id: idOf(opts, "raw"), text } as Raw, opts, false);
+function raw(text: string, opts?: TextOpts): Raw {
+  return finish<Raw>(
+    { kind: "raw", id: idOf(opts, "raw"), text, ...(opts?.spans === undefined ? {} : { spans: opts.spans }) } as Raw,
+    opts,
+    false,
+  );
 }
 
 /**

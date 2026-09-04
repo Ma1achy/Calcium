@@ -656,6 +656,13 @@ export const BUILDER_OMISSIONS = Object.freeze({
     "so a window hands its rows over already ordered; a producer setting it would assert an " +
     "order nothing can check the block against (FINDINGS F429)",
 
+  "code.lineRange":
+    "C04 I82, C09 I25a — the pin a *window* carries so a slice of a code block is the whole " +
+    "block's parse rather than its own: the text travels whole and the range says which lines " +
+    "are drawn. A hand-built code block setting it would name which of its own lines a reader " +
+    "is looking at, which is view state; `codeDefinition.window` is the one writer and " +
+    "`validateDocument` refuses it from the far side (C04 I67's set, third member)",
+
   "patch.numberWidth":
     "C25 I21a — not the producer's to set. It is what a *window* carries so its gutter " +
     "describes the block it came from rather than the slice it shows, and a hand-built patch " +
@@ -1660,15 +1667,6 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
     "rightward glyphs. A consumer outside `ramp.ts` would be evidence the design " +
     "had failed. T1.88 asserts the five mirrored levels it produces",
 
-  "SgrStyle.italic":
-    "roadmap 50 — `Style.italic` and its SGR-3 twin are the *capability*, and the " +
-    "consumer is span-level styling, which the entry's own ORDER puts behind spans " +
-    "in the view model. **The rule is right and firing for the right reason**: " +
-    "nothing sets italic today. It is recorded rather than deleted because entry " +
-    "11's ruling (c) was reversed for exactly this shape — *no consumer* was true " +
-    "of a field nobody could use because it did not exist, which is not an " +
-    "argument, it is the absence of one. The equality arm is the watch: the day a " +
-    "renderer sets it, this entry fails and is removed",
 
   // --- diagnostics: published to be read by a test, never by a component ----
   "LineEditor.killBuffer":
@@ -1930,7 +1928,6 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   // `shell/paint.ts` names it and the equality arm took the entry out. **Two
   // exemptions expired by one change and only one was predicted** — which is
   // the arm doing the job the prediction could not.
-  "SgrStyle.underline": "C01 — a style slot C10 does not yet emit; T-rows assert the escape it produces",
   "FrameSchedulerOptions.windows": "C03 — per-reason coalescing windows, injected by six test files to drive the scheduler deterministically",
   "Finding.subject": "C09 §7 — boundary-conformance report field, asserted by the suite it exists for",
   "Finding.assertion": "C09 §7 — as `subject`",

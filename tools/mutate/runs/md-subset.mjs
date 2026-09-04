@@ -74,11 +74,41 @@ const MUTATIONS = [
   {
     // The quote's tone. It draws the same characters either way, which is why
     // the assertion is on the block and not on the frame.
+    // Re-anchored when the quote gained the inline pass (C04 §3am): the line
+    // now spreads `inline(...)` where it carried `text`.
     name: "a blockquote is toned like a paragraph",
     file: SRC,
-    from: 'tone: "muted", text: body.join("\\n")',
-    to: 'tone: "default", text: body.join("\\n")',
+    from: 'tone: "muted", ...inline(body.join("\\n"))',
+    to: 'tone: "default", ...inline(body.join("\\n"))',
     expect: "T2.46",
+  },
+  {
+    // **The markers kept** — the translation this arc replaces. Every block
+    // still arrives, every kind is right, and the text carries seven
+    // characters the reader was not meant to see.
+    name: "inline emphasis keeps its markers",
+    file: SRC,
+    from: "        flush();\n        if (mark.kind === \"**\") bold = !bold;",
+    to: "        text += mark.kind;\n        flush();\n        if (mark.kind === \"**\") bold = !bold;",
+    expect: "T2.33",
+  },
+  {
+    // An unpaired marker consumed rather than kept: `2 * 3` loses its star and
+    // an italic runs to the end of the line.
+    name: "an unpaired marker toggles",
+    file: SRC,
+    from: "    if (ofKind.length % 2 === 1) literal.add(ofKind[ofKind.length - 1]?.at ?? -1);",
+    to: "",
+    expect: "T2.33",
+  },
+  {
+    // The inline pass skipped on a heading: a `rule` label keeps `**`. The
+    // paragraph rows still pass, which is why T2.34 walks the four members.
+    name: "a heading does not run the inline pass",
+    file: SRC,
+    from: "      const { text: label, spans } = inline((heading[1] ?? \"\").trim());",
+    to: "      const { text: label, spans } = { text: (heading[1] ?? \"\").trim(), spans: undefined };",
+    expect: "T2.34",
   },
 ];
 

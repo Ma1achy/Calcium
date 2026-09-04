@@ -10,10 +10,12 @@ import type { AmbiguousWidth } from "../../text.js";
 import type { ReactElement } from "react";
 import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
 import type { Glyph, Notice, Pills, Progress, Raw, Rule, Tip } from "../../../data/viewmodel/index.js";
-import { cells, stripControl, truncate, wrapCells } from "../../text.js";
+import { cells, stripControl, truncate, truncateParts, wrapCells } from "../../text.js";
+import { runLines, runsOf, sliceRuns, wrapRuns } from "../../runs.js";
+import { NO_STYLE } from "../../theme/index.js";
 import { barStyle, glyphFor, glyphCells, glyphs } from "../glyphs.js";
-import { clampSpans, fit, pad, paint, rows, tone, type Span } from "../paint.js";
-import type { BlockDefinition, NavElement, RenderContext } from "../types.js";
+import { clampSpans, pad, paint, paintRuns, rows, tone, type Span } from "../paint.js";
+import type { BlockDefinition, NavElement, RenderContext, Windowed } from "../types.js";
 
 /** Chips in a `pills` row are separated by two spaces — one is too close to read. */
 const CHIP_GAP = 2;
@@ -114,16 +116,24 @@ export const ruleDefinition: BlockDefinition<Rule> = {
     const lead = label === "" ? g.horizontal.repeat(2) : `${g.horizontal.repeat(2)} `;
     const gap = label === "" ? 0 : 1;
     const room = width - cells(lead, ctx.capabilities.ambiguousWidth) - gap - cells(meta, ctx.capabilities.ambiguousWidth);
-    const shown = truncate(label, Math.max(0, room), ctx.capabilities);
+    // The label's spans ride inside `kept` and the marker sits outside them
+    // (C04 I86); with no spans the pieces coalesce to the one span this always
+    // painted, so a plain rule's bytes are unchanged.
+    const { kept, suffix } = truncateParts(label, Math.max(0, room), ctx.capabilities);
+    const shown = kept + suffix;
     const fill = Math.max(0, width - cells(lead, ctx.capabilities.ambiguousWidth) - cells(shown, ctx.capabilities.ambiguousWidth) - gap - cells(meta, ctx.capabilities.ambiguousWidth));
 
     const dim = tone("dim", ctx.theme, ctx.capabilities);
+    const accent = tone("accent", ctx.theme, ctx.capabilities);
     return rows([
       paint(
         clampSpans(
           [
             { text: lead, style: dim },
-            { text: shown, style: tone("accent", ctx.theme, ctx.capabilities) },
+            ...paintRuns(
+              [...sliceRuns(runsOf(block.label, block.spans), 0, kept.length), { text: suffix }], // cells-ok
+              accent,
+            ),
             { text: `${" ".repeat(gap)}${g.horizontal.repeat(fill)}`, style: dim },
             { text: meta, style: tone("meta", ctx.theme, ctx.capabilities) },
           ],
@@ -148,7 +158,12 @@ export const noticeDefinition: BlockDefinition<Notice> = {
   render(block: Notice, ctx: RenderContext): ReactElement {
     const style = tone(block.tone, ctx.theme, ctx.capabilities);
     const prefix = prefixCells(block.glyph);
-    const wrapped = wrapCells(stripControl(block.text), proseWidth(ctx.width, prefix));
+    // **Runs first, then the wrap** (C04 I86, §3am): the spans are cut from the
+    // text by offset, each run is stripped on its own, and the wrapper slices
+    // the runs by each row's source `start` — never by adding up row lengths,
+    // which drift by one unit at every dropped break space. The rows are the
+    // rows `measure` counted: same text, same width, same wrapper.
+    const wrapped = wrapRuns(runsOf(block.text, block.spans), proseWidth(ctx.width, prefix));
 
     // A hanging indent: the glyph sits on the first row and the continuation
     // aligns under the text rather than under the glyph. That alignment is why
@@ -163,7 +178,7 @@ export const noticeDefinition: BlockDefinition<Notice> = {
                 : " ".repeat(prefix),
             style,
           },
-          { text: line, style },
+          ...paintRuns(line, style),
         ]),
       ),
     );
@@ -403,8 +418,44 @@ export const rawDefinition: BlockDefinition<Raw> = {
 
   measure: (block: Raw): number => atLeastOne(rawLines(block).length), // cells-ok
 
+  /**
+   * C09 I25 — rows `[from, to)`, as a smaller `raw` (C14 §4a).
+   *
+   * `logs`' shape and `logs`' argument: nothing here is derived from lines
+   * outside the slice — no tokens, no wrapping, no column — so the window is a
+   * slice of the text and needs no pin. `rawLines` splits on `\n` with no
+   * trailing-newline rule, so a slice joined on `\n` is exactly the rows the
+   * whole block would have drawn there. A line is one row and nothing can hang
+   * past `to` (I26).
+   */
+  window: (block: Raw, _width: number, from: number, to: number): Windowed => {
+    const lines = rawLines(block);
+    const lo = Math.max(0, Math.min(Math.trunc(from), lines.length - 1)); // cells-ok
+    const hi = Math.max(lo + 1, Math.min(Math.trunc(to), lines.length)); // cells-ok
+    return Object.freeze({
+      block: { ...block, text: lines.slice(lo, hi).join("\n") },
+      skipRows: 0,
+      dropRows: 0,
+    });
+  },
+
   render(block: Raw, ctx: RenderContext): ReactElement {
     const width = normaliseWidth(ctx.width);
-    return rows(rawLines(block).map((line) => fit(line, width, ctx.capabilities)));
+    // The runs cut per line, as `rawLines` cuts the text — one `\n` rule for
+    // both halves. A truncated line keeps the runs inside `kept` and paints the
+    // marker outside every span (C04 I86); `raw` carries no tone, so the pieces
+    // differ only where a span says so and a plain line is the bytes it was.
+    const lines = runLines(runsOf(block.text, block.spans));
+    return rows(
+      rawLines(block).map((line, i) => {
+        const { kept, suffix } = truncateParts(line, width, ctx.capabilities);
+        const shown = sliceRuns(lines[i] ?? [], 0, kept.length); // cells-ok — a code-unit length
+        return paint([
+          ...paintRuns(shown, NO_STYLE),
+          { text: suffix },
+          { text: pad("", width - cells(kept, ctx.capabilities.ambiguousWidth) - cells(suffix, ctx.capabilities.ambiguousWidth)) },
+        ]);
+      }),
+    );
   },
 };

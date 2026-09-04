@@ -120,6 +120,48 @@ const table = (
   } as Block;
 };
 
+/**
+ * `code`, and the one property the sweep exists for here (C09 I25a, C04 I82).
+ *
+ * **A block comment spanning lines, or the pin cannot fail.** Tokens that end
+ * where their line ends make a sliced text and a whole text the same parse, and
+ * a window carrying `text.slice(…)` would compare row-for-row identical to the
+ * pinned one. The comment opens on line 1 and closes on line 4, so a window
+ * opening inside it re-tokenises the tail as code unless the text travels whole.
+ */
+const code = (opts: Readonly<{ wrap?: boolean; trailingNewline?: boolean }> = {}): Block =>
+  ({
+    kind: "code",
+    id: `c${opts.wrap === true ? "w" : ""}${opts.trailingNewline === true ? "n" : ""}`,
+    language: "typescript",
+    text:
+      [
+        "const a = 1;",
+        "/* a block comment that opens here and runs on for a while",
+        "   so that a window opening on this line sees only its tail",
+        "   and would tokenise it as identifiers, not as the comment it is",
+        "   before it finally closes on this line */",
+        "const b = 2; // a line comment, one token, one line",
+        'const c = "a string that is long enough to wrap at the narrow widths";',
+        "export { a, b, c };",
+      ].join("\n") + (opts.trailingNewline === true ? "\n" : ""),
+    ...(opts.wrap === true ? { wrap: true } : {}),
+  }) as Block;
+
+/**
+ * `raw`, with the two edges its line rule has: a trailing newline is a blank
+ * row (unlike `code`'s), and an empty line in the middle is one too.
+ */
+const raw = (n: number, opts: Readonly<{ trailingNewline?: boolean; blankAt?: number }> = {}): Block =>
+  ({
+    kind: "raw",
+    id: `r${String(n)}${opts.trailingNewline === true ? "n" : ""}${opts.blankAt === undefined ? "" : "b"}`,
+    text:
+      Array.from({ length: n }, (_, i) => (i === opts.blankAt ? "" : `raw line ${String(i)} of ${String(n)}`)).join(
+        "\n",
+      ) + (opts.trailingNewline === true ? "\n" : ""),
+  }) as Block;
+
 const CORPUS: readonly Block[] = [
   logs(1),
   logs(2),
@@ -141,6 +183,14 @@ const CORPUS: readonly Block[] = [
   // A table with no rows at all: `hasBody` is false, so it is one message row
   // under a header and there is nothing to divide (C11 §5a).
   table({ rows: 0 }),
+  // C14 §4a — the two kinds that were owed a window. Under `EXACT_ROWS` at
+  // every width so the row-for-row comparison reads them, not only the count.
+  code(),
+  code({ trailingNewline: true }),
+  code({ wrap: true }),
+  raw(1),
+  raw(7),
+  raw(7, { trailingNewline: true, blankAt: 3 }),
 ];
 
 describe("C09 §2a — a block reduced to a valid smaller block", () => {
@@ -163,6 +213,10 @@ describe("C09 §2a — a block reduced to a valid smaller block", () => {
     // `dropRows` is a field the property never exercises — the vacuity this file
     // was written about, one field along.
     expect(report.kindsCovered, "and the kind whose units are not rows").toContain("table");
+    // **The two that were owed** (C14 §4a, T2.22 below). A `code` window that
+    // sliced its text balances the count exactly; only `window-rows` sees it.
+    expect(report.kindsCovered, "and the kind that pins its whole text").toContain("code");
+    expect(report.kindsCovered, "and the kind that slices").toContain("raw");
 
     // **The rows, and the bound that decides how many were read.** `checked`
     // counts (block, width) pairs and says nothing about the row comparison, so
@@ -312,23 +366,49 @@ describe("C09 §2a — a block reduced to a valid smaller block", () => {
     expect(r.window(plot, 80, 0, 1), "no window for a plot").toBeUndefined();
   });
 
-  it("T2.22 (C14 I23, C14 §4a): the kinds that window are named, and `code` and `raw` are owed one", () => {
-    // **A deferral that expires by itself.** C14 I23 says every kind whose rows
-    // are its lines declares a `window`, and C14 §4a measures that two do not:
-    // painting a 40-row window of a 2 000-line `code` block costs 1 406 ms
-    // against 21 ms for `logs`, because `windowSequence` keeps a windowless kind
-    // whole. This row pins the set *as it stands*, so the day `code` or `raw`
-    // gains a `window` it fails here and is rewritten as C14 T1.18 — the
-    // measurement half — rather than the request landing unnoticed. The
-    // negative half is the one to distrust (F-class: a negative claim passes
-    // hardest the day it becomes false), which is why it is a row and not a
-    // comment.
+  it("T2.22 (I25, I26, C14 I23): every kind whose rows are its lines windows, and `code` pins its parse by not slicing", () => {
+    // **The deferral this row was, expired on the day it was written for.** It
+    // pinned *code and raw do not window* so the day either gained a `window`
+    // it would fail here rather than land unnoticed; both landed (C14 §4a) and
+    // the row is now the positive half — the set of kinds that divide, and the
+    // property that makes `code`'s division correct rather than merely exact.
     const r = measurable();
     const windows = (kind: string): boolean => r.registry.get(kind)?.window !== undefined;
-    expect(["logs", "keyValue"].map(windows), "the C09 kinds that window today").toEqual([true, true]);
-    expect(windows("code"), "code is owed a window (C14 §4a) — when this fails, write C14 T1.18").toBe(false);
-    expect(windows("raw"), "raw is owed a window (C14 §4a) — when this fails, write C14 T1.18").toBe(false);
-    // The control that the probe reaches a definition at all.
-    expect(r.registry.get("code"), "code is registered").toBeDefined();
+    expect(
+      ["logs", "keyValue", "code", "raw"].map(windows),
+      "the C09 kinds whose rows are their lines all window",
+    ).toEqual([true, true, true, true]);
+
+    // **The pin, read off the block** (C04 I82). `text` is the same reference —
+    // not an equal string, the *same* one, which is what keeps the tokeniser's
+    // memo hitting on every frame — and the range names source lines.
+    const whole = code();
+    const win = r.window(whole, 100, 2, 4);
+    expect(win, "code windows").toBeDefined();
+    const piece = win?.block as { text: string; lineRange?: readonly [number, number] };
+    expect(piece.text === (whole as { text: string }).text, "the same string, not a copy").toBe(true);
+    expect(piece.lineRange, "source lines [2, 4)").toEqual([2, 4]);
+    expect(r.measure(win?.block as Block, 100), "and the block measures its range").toBe(2);
+
+    // **And the control that the fixture can fail**: the same two lines carried
+    // as their own text — what a slicing window would hand back — render
+    // differently, because the comment's tail is tokenised as code. This is
+    // the row the mutation *drop the pin* has to fail (C14 T6.21), and it is
+    // asserted here rather than left to `window-rows` above so the reason is
+    // in the failure message and not in a diff of SGR bytes.
+    const kept = r.renderToLines(win?.block as Block, 100);
+    const full = r.renderToLines(whole, 100);
+    expect(kept, "the windowed rows are the whole rendering's rows 2 and 3").toEqual(full.slice(2, 4));
+    const sliced = r.renderToLines(
+      { ...whole, text: (whole as { text: string }).text.split("\n").slice(2, 4).join("\n") } as Block,
+      100,
+    );
+    expect(visible(sliced[0] ?? ""), "the control draws the same characters").toBe(visible(kept[0] ?? ""));
+    expect(sliced, "and a sliced text draws them in a different slot").not.toEqual(kept);
+
+    // `raw` slices, and carries nothing (C14 §4a).
+    const rw = r.window(raw(7), 100, 2, 4);
+    expect((rw?.block as { text: string }).text, "two lines, as text").toBe("raw line 2 of 7\nraw line 3 of 7");
+    expect(Object.keys(rw?.block ?? {}).sort(), "no pin on a raw window").toEqual(["id", "kind", "text"]);
   });
 });

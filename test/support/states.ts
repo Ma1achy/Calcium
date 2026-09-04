@@ -316,6 +316,32 @@ export const STATES: readonly StateFixture[] = Object.freeze([
     },
   },
   {
+    name: "notice-spans",
+    of: "notice",
+    why:
+      "a span is appearance over the same text, so the pair with and without must measure alike and " +
+      "paint differently — and only a frame shows the attribute landing on the words, continuing " +
+      "across the wrap, and staying off the gutter (C04 I86, C10 I33)",
+    rows: (w, caps, theme) => {
+      const kit = measurable({ theme, capabilities: caps });
+      const text = "the quick brown fox jumps over the lazy dog and keeps running past the wrap";
+      const plain = block({ kind: "notice", id: "n", tone: "info", glyph: "ok", text });
+      const styled = block({
+        kind: "notice",
+        id: "n",
+        tone: "info",
+        glyph: "ok",
+        text,
+        spans: [
+          { from: 10, to: 19, bold: true },
+          { from: 35, to: 43, italic: true },
+          { from: 62, to: 74, underline: true },
+        ],
+      });
+      return [...kit.renderToLines(plain, w), ...kit.renderToLines(styled, w)];
+    },
+  },
+  {
     name: "prompt-paste-chip",
     of: "prompt",
     why:

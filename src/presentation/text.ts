@@ -468,26 +468,47 @@ export function truncateParts(
   text: string,
   width: number,
   caps: Readonly<{ unicode: "full" | "bmp" | "ascii"; ambiguousWidth?: AmbiguousWidth }>,
-): Readonly<{ kept: string; suffix: string }> {
+  from: "start" | "end" = "end",
+): Readonly<{ kept: string; prefix: string; suffix: string; start: number }> {
   const whole = stripControl(text);
   const limit = Math.max(0, Math.floor(width));
-  if (limit === 0) return { kept: "", suffix: "" };
-  if (cells(whole, caps.ambiguousWidth) <= limit) return { kept: whole, suffix: "" };
+  if (limit === 0) return { kept: "", prefix: "", suffix: "", start: 0 };
+  if (cells(whole, caps.ambiguousWidth) <= limit) return { kept: whole, prefix: "", suffix: "", start: 0 };
 
+  // **The marker is measured, as `truncate` measures it** (F292). This read
+  // `limit - 1` while `truncate` read `clusterCells(marker)`, so at
+  // `ambiguousWidth: "wide"` the two disagreed by one cell on the same cut —
+  // which is the drift a shared helper exists to prevent, one function along.
   const marker = caps.unicode === "ascii" ? "~" : "\u2026";
-  const budget = limit - 1;
-  if (budget <= 0) return { kept: "", suffix: marker };
+  const markerCells = clusterCells(marker, caps.ambiguousWidth);
+  if (markerCells > limit) return { kept: "", prefix: "", suffix: " ".repeat(limit), start: 0 };
+  const budget = limit - markerCells;
+  if (budget <= 0) {
+    return from === "start"
+      ? { kept: "", prefix: marker, suffix: "", start: whole.length } // cells-ok — a code-unit offset
+      : { kept: "", prefix: "", suffix: marker, start: 0 };
+  }
+
+  // `from` names the end characters are removed from (C04 I30): `"start"` walks
+  // the clusters in reverse and keeps the tail, so `kept` is an exact suffix
+  // and `start` is its code-unit offset — a caller slicing spans against it
+  // adds `start` rather than assuming zero.
+  const clusters = [...GRAPHEMES.segment(whole)].map((s) => s.segment);
+  const order = from === "start" ? [...clusters].reverse() : clusters;
 
   let kept = "";
   let used = 0;
-  for (const { segment } of GRAPHEMES.segment(whole)) {
+  for (const segment of order) {
     const w = clusterCells(segment, caps.ambiguousWidth);
     if (used + w > budget) break;
-    kept += segment;
+    kept = from === "start" ? segment + kept : kept + segment;
     used += w;
   }
 
-  return { kept, suffix: " ".repeat(budget - used) + marker };
+  const pad = " ".repeat(budget - used);
+  return from === "start"
+    ? { kept, prefix: marker + pad, suffix: "", start: whole.length - kept.length } // cells-ok — offsets
+    : { kept, prefix: "", suffix: pad + marker, start: 0 };
 }
 
 /**
@@ -575,16 +596,47 @@ export function wrapCells(
   width: number,
   ambiguous: AmbiguousWidth = "narrow",
 ): readonly string[] {
-  const limit = Math.max(1, Math.floor(width));
-  const out: string[] = [];
+  return wrapCellsParts(stripControl(text), width, ambiguous).map((row) => row.text);
+}
 
-  for (const paragraph of stripControl(text).split("\n")) {
+/**
+ * A wrapped row and where it begins in the source, in code units (C04 I86).
+ *
+ * **Every row is an exact contiguous slice of the source from `start`**, which
+ * is the property that lets a structure addressed by offset — a span, a token —
+ * be sliced against the rows at all. It is not the same as the rows
+ * concatenating to the source: a break drops the space it broke at (measured:
+ * `"the quick brown fox jumps"` at 10 gives rows summing to 18 units of 19), so
+ * a consumer adding up row lengths drifts by one unit per break, and `start` is
+ * what it reads instead.
+ *
+ * **Nothing is stripped here** — `wrapCells` strips before calling, because a
+ * caller holding offsets into the text has already stripped its runs one by one
+ * (`runsOf`), and stripping again would shift every offset after a control
+ * character. `placeable` still substitutes an unfittable cluster, so a row's
+ * `text` can differ from the source slice by a `?`; a caller that needs the two
+ * equal substitutes first (`placeableRuns`).
+ */
+export type WrappedRow = Readonly<{ text: string; start: number }>;
+
+export function wrapCellsParts(
+  text: string,
+  width: number,
+  ambiguous: AmbiguousWidth = "narrow",
+): readonly WrappedRow[] {
+  const limit = Math.max(1, Math.floor(width));
+  const out: WrappedRow[] = [];
+  let base = 0;
+
+  for (const paragraph of text.split("\n")) {
     if (paragraph === "") {
-      out.push("");
+      out.push({ text: "", start: base });
+      base += 1; // cells-ok — past the newline
       continue;
     }
 
     let line = "";
+    let lineStart = base;
     let used = 0;
     for (const raw of GRAPHEMES.segment(paragraph)) {
       const segment = placeable(raw.segment, limit);
@@ -593,10 +645,12 @@ export function wrapCells(
       if (used + w > limit && line !== "") {
         const at = breakPoint(line);
         if (at === null) {
-          out.push(line);
+          out.push({ text: line, start: lineStart });
+          lineStart += line.length; // cells-ok — a code-unit cursor
           line = "";
         } else {
-          out.push(line.slice(0, at).trimEnd());
+          out.push({ text: line.slice(0, at).trimEnd(), start: lineStart });
+          lineStart += at; // cells-ok — a code-unit cursor
           line = line.slice(at);
         }
         used = cells(line, ambiguous);
@@ -604,9 +658,57 @@ export function wrapCells(
       line += segment;
       used += w;
     }
-    out.push(line);
+    out.push({ text: line, start: lineStart });
+    base += paragraph.length + 1; // cells-ok — the paragraph and its newline
   }
 
+  return out;
+}
+
+/**
+ * The cluster substitution `wrapCellsParts` would make, applied to a string
+ * beforehand — so that the rows it then produces are exact slices of what was
+ * given. One cell in every capability mode, on `placeable`'s own argument.
+ */
+export function placeableClusters(text: string, width: number): string {
+  const limit = Math.max(1, Math.floor(width));
+  let ascii = true;
+  for (let i = 0; i < text.length; i += 1) { // cells-ok — a code-unit cursor
+    const c = text.charCodeAt(i);
+    if (c < 0x20 || c > 0x7e) {
+      ascii = false;
+      break;
+    }
+  }
+  if (ascii) return text;
+  let out = "";
+  for (const { segment } of GRAPHEMES.segment(text)) out += placeable(segment, limit);
+  return out;
+}
+
+/**
+ * The code-unit offsets at which a grapheme cluster ends, ascending, for a
+ * renderer that must not paint an escape inside one (C04 I84, C09).
+ *
+ * Every index is a boundary for printable ASCII, so that case returns nothing
+ * and the caller treats an empty answer as *every index*.
+ */
+export function clusterEnds(text: string): readonly number[] {
+  let ascii = true;
+  for (let i = 0; i < text.length; i += 1) { // cells-ok — a code-unit cursor
+    const c = text.charCodeAt(i);
+    if (c < 0x20 || c > 0x7e) {
+      ascii = false;
+      break;
+    }
+  }
+  if (ascii) return [];
+  const out: number[] = [];
+  let at = 0;
+  for (const { segment } of GRAPHEMES.segment(text)) {
+    at += segment.length; // cells-ok — a code-unit cursor
+    out.push(at);
+  }
   return out;
 }
 

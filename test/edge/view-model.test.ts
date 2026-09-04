@@ -689,6 +689,22 @@ describe("C04 §3d, §4 — the floor a layer above sets", () => {
     }
   });
 
+  it("T3.61 (I82): `lineRange` is the third member of the refused set, and its writer is a window", () => {
+    // **Asserted beside T3.49's two rather than folded into them**, so the set
+    // is checked as a set: the refusal is one list in `validate.ts`, and a
+    // third field that reached only one of the two places the list is read is
+    // how F231's class returns (§4).
+    const withRange = doc({
+      blocks: [
+        { kind: "code", id: "c", language: "typescript", text: "a\nb\nc", lineRange: [1, 2] } as unknown as Block,
+      ],
+    });
+    const far = validateDocument(withRange, { from: "farSide" });
+    expect(far.ok, "lineRange is refused from the far side").toBe(false);
+    if (!far.ok) expect(far.error.join(" ")).toContain("lineRange");
+    expect(validateDocument(withRange).ok, "and accepted without the flag — a window wrote it").toBe(true);
+  });
+
   it("T3.50 (I67): `reserve` floors, takes the maximum, and refuses what it cannot honour", () => {
     const base = doc({ blocks: [floored()] });
 

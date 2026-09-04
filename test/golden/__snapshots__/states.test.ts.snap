@@ -52,6 +52,13 @@ SWAP  -                unavailable
 PIDS  12
 ── notice · notice-continuation
   \` queued behind /logs
+── notice · notice-spans
++ the quick brown fox jumps over the
+  lazy dog and keeps running past the
+  wrap
++ the quick brown fox jumps over the
+  lazy dog and keeps running past the
+  wrap
 ── prompt · prompt-paste-chip
 read [#1 pasted · 184 lines] and summa
 rise it"
@@ -109,6 +116,9 @@ SWAP  -                unavailable
 PIDS  12
 ── notice · notice-continuation
   \` queued behind /logs
+── notice · notice-spans
++ the quick brown fox jumps over the lazy dog and keeps running past the wrap
++ the quick brown fox jumps over the lazy dog and keeps running past the wrap
 ── prompt · prompt-paste-chip
 read [#1 pasted · 184 lines] and summarise it"
 `;
@@ -165,6 +175,13 @@ SWAP  —                unavailable
 PIDS  12
 ── notice · notice-continuation
   ⎿ queued behind /logs
+── notice · notice-spans
+✓ the quick brown fox jumps over the
+  lazy dog and keeps running past the
+  wrap
+✓ the quick brown fox jumps over the
+  lazy dog and keeps running past the
+  wrap
 ── prompt · prompt-paste-chip
 read [#1 pasted · 184 lines] and summa
 rise it"
@@ -222,6 +239,9 @@ SWAP  —                unavailable
 PIDS  12
 ── notice · notice-continuation
   ⎿ queued behind /logs
+── notice · notice-spans
+✓ the quick brown fox jumps over the lazy dog and keeps running past the wrap
+✓ the quick brown fox jumps over the lazy dog and keeps running past the wrap
 ── prompt · prompt-paste-chip
 read [#1 pasted · 184 lines] and summarise it"
 `;
@@ -278,6 +298,13 @@ SWAP  -                unavailable
 PIDS  12
 ── notice · notice-continuation
   ⎿ queued behind /logs
+── notice · notice-spans
+✓ the quick brown fox jumps over the
+  lazy dog and keeps running past the
+  wrap
+✓ the quick brown fox jumps over the
+  lazy dog and keeps running past the
+  wrap
 ── prompt · prompt-paste-chip
 read [#1 pasted · 184 lines] and summa
 rise it"
@@ -335,6 +362,9 @@ SWAP  -                unavailable
 PIDS  12
 ── notice · notice-continuation
   ⎿ queued behind /logs
+── notice · notice-spans
+✓ the quick brown fox jumps over the lazy dog and keeps running past the wrap
+✓ the quick brown fox jumps over the lazy dog and keeps running past the wrap
 ── prompt · prompt-paste-chip
 read [#1 pasted · 184 lines] and summarise it"
 `;
@@ -391,6 +421,13 @@ SWAP  —                unavailable
 PIDS  12
 ── notice · notice-continuation
   ⎿ queued behind /logs
+── notice · notice-spans
+✓ the quick brown fox jumps over the
+  lazy dog and keeps running past the
+  wrap
+✓ the quick brown fox jumps over the
+  lazy dog and keeps running past the
+  wrap
 ── prompt · prompt-paste-chip
 read [#1 pasted · 184 lines] and summa
 rise it"
@@ -448,6 +485,9 @@ SWAP  —                unavailable
 PIDS  12
 ── notice · notice-continuation
   ⎿ queued behind /logs
+── notice · notice-spans
+✓ the quick brown fox jumps over the lazy dog and keeps running past the wrap
+✓ the quick brown fox jumps over the lazy dog and keeps running past the wrap
 ── prompt · prompt-paste-chip
 read [#1 pasted · 184 lines] and summarise it"
 `;
@@ -504,6 +544,13 @@ SWAP  —                unavailable
 PIDS  12
 ── notice · notice-continuation
   ⎿ queued behind /logs
+── notice · notice-spans
+✓ the quick brown fox jumps over the
+  lazy dog and keeps running past the
+  wrap
+✓ the quick brown fox jumps over the
+  lazy dog and keeps running past the
+  wrap
 ── prompt · prompt-paste-chip
 read [#1 pasted · 184 lines] and summa
 rise it"
@@ -561,6 +608,9 @@ SWAP  —                unavailable
 PIDS  12
 ── notice · notice-continuation
   ⎿ queued behind /logs
+── notice · notice-spans
+✓ the quick brown fox jumps over the lazy dog and keeps running past the wrap
+✓ the quick brown fox jumps over the lazy dog and keeps running past the wrap
 ── prompt · prompt-paste-chip
 read [#1 pasted · 184 lines] and summarise it"
 `;

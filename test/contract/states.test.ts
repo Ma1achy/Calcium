@@ -37,6 +37,7 @@ const EXPECTED_STATES = [
   "plot-heatmap-overfull",
   "kv-value-bar",
   "notice-continuation",
+  "notice-spans",
   "plot-gapped-line",
   "plot-heatmap",
   "plot-gapped-sparkline",
