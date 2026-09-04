@@ -215,11 +215,11 @@ assumed (C13's `settle` is the precedent for a throw leaving an unpatchable entr
 
 | deferral | symbol to grep | consumer that would expire it |
 |---|---|---|
-| a span tone | `TextSpan.tone` | inline code (`` `x` `` → `identifier`-like tone); or any adapter wanting a coloured run |
-| a span value | `TextSpan.value` | ML-1 per-token value (`CALCIUM_ML_BLOCKS.md` §1) |
+| ~~a span tone~~ **discharged 2026-09-04** | `TextSpan.tone` | inline code → `tone: "identifier"`, exactly the consumer named here; C04 I89, C09 §5, C10 §4e. The tone *replaces* the block's for the run, the attributes spread on top, the 1-bit collapse is the tone's and uncompensated |
+| ~~a span value~~ **discharged 2026-09-04** | `TextSpan.value` | ML-1 per-token value, C04 I90; background through `continuousColour` on the block's `colormap` (`Raw` and `Notice` gain the member), nothing below 8-bit; **a valued run is a wrap unit** — `wrapCellsParts` takes atoms, `notice` measures and renders through one `noticeRows`, and the one span member `measure` may read is `value`'s boundaries (C09 §5). Measured: a single-word token changes the count only where the row has no space at all |
 | `Hunk.lines[].spans` | `Hunk` in `types.ts` + C25 I10 | an intra-line diff — the writer, not the field, is what is missing |
 | `Tip.spans`, `KeyValue.rows[].spans`, `Logs`, `Events`, `Steps`, `Pills`, `Comparison` | the member name on each type | a writer; none exists (M2: tips are framework-authored) |
-| inline code in markdown | `TextSpan.tone` (same symbol) | the tone deferral above |
+| ~~inline code in markdown~~ **discharged 2026-09-04** | `TextSpan.tone` (same symbol) | the backticks go and the run is an `identifier` span; an unclosed or empty pair stays literal; a run inside emphasis is one span carrying attribute and tone (`markdown.ts`, C04 T2.33 as amended) |
 | heading levels, quote gutter, nesting cap | unchanged — `markdown.ts` residues | not this arc |
 | a span-aware `sort` for tables | `table/sort.ts:24` reads `cell.text` | nothing — sorting on text is right; recorded so nobody adds it |
 

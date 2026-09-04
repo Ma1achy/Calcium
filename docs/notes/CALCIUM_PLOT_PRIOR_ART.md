@@ -258,7 +258,16 @@ sankey           edge routing — the Mermaid problem, and it wants a real layou
                  ← RE-RULED the same day with a measurement, C12 §3d *Sankey*: `graphLayers`
                    transfers and nothing after it does — no edge weight, a bar for a label, a
                    ribbon for a mask bit, left-to-right for top-down. A new form, no consumer
+                 ← BUILT 2026-09-04 as `sankey` (C12 §3ap): the consumer arrived as
+                   `GraphEdge.weight` (C04 I92), and the form is exactly the ruling's shape —
+                   `graphLayers` plus a placement (`sankeyLayout`) and a drawing (`sankeyArea`,
+                   `sankeyMarks`). Compared before drawing against d3/plotly and
+                   `mermaid-ascii`'s sankey, which is one line per flow and no layout
 ```
+
+**Nothing on this list is refused any more.** Every entry above has either been built or
+had its reason measured away; what remains absent — `arc`, `chord` — is absent for want of a
+consumer and is not on the list.
 
 **`contour` was on this list and is not any more — see the correction below.**
 
@@ -773,8 +782,9 @@ a shared scale       small multiples · pair plot
 a real estimator     violin · ridgeline — both want the KDE density already needs
 designed for this    HORIZON — and sys-tui is its consumer
 circle work          PIE · radar — rough, and built anyway
-still refused        sankey · 3D          (contour was here — reversed; and 3D LEFT 2026-09-03 —
-                                          F435 retracted it and `plot3d` is built. Only sankey remains)
+still refused        —                    (contour was here — reversed; 3D LEFT 2026-09-03 — F435
+                                          retracted it and `plot3d` is built; sankey LEFT 2026-09-04,
+                                          built over `graphLayers` as C12 §3ap. The row is empty)
 ```
 
 **`horizon` is the one to notice.** It is the only chart type on any of these lists that was
@@ -965,6 +975,7 @@ refused      sankey · arc · chord · 3D — all edge routing or circles-with-e
                reversed 2026-08-15 and the `graph` form ships a layered router, so
                *layout is the expense* no longer refuses anything — sankey, arc and chord
                are simply absent, each waiting on a consumer
+             ← sankey's consumer arrived (C04 I92) and it is built, 2026-09-04 (C12 §3ap)
              (contour was in this group and did not belong to it — see the correction)
 ```
 

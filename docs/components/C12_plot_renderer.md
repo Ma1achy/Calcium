@@ -647,9 +647,13 @@ box-drawing mask and a sankey edge is a ribbon whose width is its weight — a *
 where a sankey layers left-to-right, because its bars need the vertical extent. So a sankey is
 `graphLayers` plus a new placement and a new drawing — a new form, `sankeyArea`, over the shared
 layering, not an option on `graph` — and the carrier change is a weighted edge on C04's `Graph`.
-**Not built because nothing consumes it**: no weighted edge set exists in `src/` or the examples.
-SS54 R20 and R21 watch it — `sankeyArea(` absent, `graphLayers` present — so this paragraph
-cannot outlive its premise the way the one it replaces did.
+**Built 2026-09-04, and the paragraph above is kept as the ruling it was** (§3ap). The consumer
+arrived as C04 I92 — `GraphEdge.weight`, required on `sankey` and refused on `graph` — and the
+form is exactly the shape this paragraph predicted: `graphLayers` untouched, a placement
+(`sankeyLayout`) and a drawing (`sankeyArea`, `sankeyMarks`) over it. SS54 R20 watched
+`sankeyArea(` absent and expired the day the symbol appeared, which is what it was for; R21
+(`graphLayers` present) stays, retargeted, because the form now rests on the premise the refusal
+did.
 
 ## 3e. Annotations — one feature, and the one that shares a name and not a mechanism
 
@@ -8538,6 +8542,156 @@ the gate stays as it is.
 
 ---
 
+## 3ap. `sankey` — bars for the nodes, ribbons for the flows, over `graph`'s layering
+
+§3d ruled it before there was a consumer: *passes 1–5 transfer as `graphLayers`, and nothing
+after them does*. The consumer arrived as C04 I92, and this section is the placement and the
+drawing the ruling said were missing. **Nothing in `graph.ts`'s six passes changed**; it gained
+one output, `origins`, which is topology rather than weight (§3ap.4 K1).
+
+### 3ap.1 — compared against two references, and what each settled
+
+**The pictures first, then the preference** — the memory rule, because a reference's default is
+its taste and not a measurement.
+
+| reference | what it draws | what it settled here |
+|---|---|---|
+| **d3-sankey** (the energy figure) and **plotly `go.Sankey`** | thin node rectangles stacked per layer with a pad; ribbons as two cubic Béziers, filled in a source-derived colour at about half opacity; labels beside the bar, to the right everywhere and to the **left** on the last layer | the whole shape — layers left to right, a bar's extent is its flow, a ribbon's width is its weight, links drawn before nodes, the last layer's label flipped so the figure does not trail off the right edge |
+| **`mermaid-ascii`'s `sankey`** (the only terminal implementation found) | **one line per flow**: `Source ████ ──> Target (100)`, the bar's *length* the value, `#` at ASCII, no layout at all | what to do with the value — **nothing**. The ribbon's width is the reading; a numeral beside every bar is the table that renderer draws *instead of* a figure, and this form has a layout to spend the cells on. And the ASCII pair: `#` for a bar, which both agree on |
+
+**The preference taken deliberately**: plotly's half-opacity ribbon is a *colour* effect, and
+this component has no second channel to spend on it (I6, I17). The terminal's equivalent is a
+**glyph** — the medium shade `▒` for a ribbon's interior against the solid `█` for a bar — which
+reads as the lighter colour at every depth from 24-bit down and is still two shapes at one bit.
+Both alternatives were rendered and read (§3ap.2).
+
+### 3ap.2 — the alphabet, and the frame that chose it (I111)
+
+Two candidates for a ribbon's interior, both drawn on the default fixture at 24-bit and read
+with the colour stripped:
+
+```
+A · solid + dim          B · shade                 the 1-bit question
+██b█████▄▄▄▄▄▄▄▄▄▄▄▄     █▒b▒▒▒▒▒▄▄▄▄▄▄▄▄▄▄▄▄      A: a bar and a ribbon are the same glyph,
+████████████████y██      █▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒y▒█         and `dim` is an attribute a dumb
+        ▀▀▀▀▀▀▀▀▀▀▀█             ▀▀▀▀▀▀▀▀▀▀▀█         terminal drops — the column of bars
+██a█████████████████     █▒a▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒█         disappears into the fill
+```
+
+**B is the ruling, and the argument is I17's rather than taste**: *the glyph is the channel at
+every depth*. A carries the bar/ribbon distinction in `dim`, which is an SGR attribute — gone at
+one bit and on any terminal that ignores attributes, where the whole figure becomes one block of
+`█` with letters in it. B carries it in the shape, so the frame at `MONO_UNICODE_CAPS` is the
+same frame as at 24-bit with the colours removed. That B also *looks* like the half-opacity
+ribbon the references draw is the medium shade being, literally, a 50% fill.
+
+The alphabet, one function (`sankeyAlphabet`), both arms in the same expression:
+
+| | narrow unicode | ASCII, or `ambiguousWidth: "wide"` |
+|---|---|---|
+| a bar, both halves | `█` | `#` |
+| a ribbon's interior | `▒` | `=` |
+| the upper half only | `▀` | `-` (bar: `#`) |
+| the lower half only | `▄` | `-` (bar: `#`) |
+| two owners in one cell | `▀`, the upper owner's slot as foreground and the **lower owner's as background** | `#` if either is a bar, else `=`, in the upper owner's slot |
+
+**`▀ ▄ █ ▒` are `East_Asian_Width=Ambiguous` every one**, so the wide arm takes the ASCII set —
+`barStyle`'s rule (C02 I9, A03 SS47) applied to the same family, and the reason there is one
+function rather than a glyph per site.
+
+**The two-owner cell is `image.ts`'s precedent and not a new licence.** C10 I21 admits a
+background only from a `surface` ref because its floors are measured for text *on* a surface; a
+half-block cell whose two halves are two flows has no text to be illegible, which is the one case
+I21 was widened for (`wash`, C12 I29). The slots are still named, not embedded — the area returns
+`categorical.cN` refs and `definition.ts` resolves them at the terminal's depth (I4).
+
+### 3ap.3 — the geometry, one function and two painters (I110)
+
+`sankeyLayout(g, { height, gap, min, quantum })` is pure — 0 `cells()`, 0 `caps` — and both
+arms call it: the terminal in **half-rows** with `quantum: true`, the SVG in **pixels** with
+`quantum: false`. Every bar, every slice and every ribbon end the two arms draw comes out of the
+same arithmetic on different units, which is I1's *measure the same* one level up and the
+opposite of `graph`'s arrangement, where the topology crosses and the placement does not
+(§3aj.6). It can cross here because nothing in it is a string: what does not cross is the
+horizontal axis and the labels, which are cells on one side and a font on the other (§3aj
+hazard 4).
+
+1. **The scale is one number.** For each layer, `(height − gap · (n − 1)) / Σflow`, where a
+   node's flow is the larger of its two sides and a dummy's is the weight it carries; the
+   **smallest** over the layers is the scale, so a unit of flow is the same height everywhere
+   and a ribbon leaves a bar at the width it arrives with.
+2. **A slice is `max(min, weight · scale)`** — rounded to a whole unit under `quantum`, never
+   below one. **A bar is the larger of its two sides**, summed over its rounded slices, so a bar
+   is exactly its slices with nothing between them on the side that sets it.
+3. **Stack from the top and centre, per layer**, then **relax**: four alternating sweeps pull
+   each bar toward the weighted mean of its neighbours' centres and `separate` restores the gap
+   **without reordering** — the ordering pass owns the order (§3ai.6) — shifting the whole stack
+   back inside `[0, height]` rather than clamping one bar.
+4. **Slices are ordered by the far end's centre**, on both sides, after the positions are final.
+5. **The vertical quantum is a half-row**, which is what `▀ ▄` buy: a flow that rounds below one
+   half-row still draws as one.
+
+The terminal arm (`sankeyArea`) puts the layers at `round(l · (width − 1) / (k − 1))` — first bar
+in column 0, last in the last column — and draws ribbons **column by column** between two bars
+along `t²(3 − 2t)`, the cubic's S sampled per cell; the SVG arm (`sankeyMarks`) draws the same
+S as two Béziers with their control points at the mid x, closed and filled at `fill-opacity
+0.5`. Ribbons first, bars over them (d3's order and the treemap's reason). A node's colour is
+its **declaration index** through `refOf` — plotly's per-node colour, and the reason the graph's
+per-layer `refOf(d)` is not reused.
+
+**The budget loop is the terminal's alone.** The row for the notice is spent before the drawing
+is chosen (§3ah.4); the gap is tried at one row, a half-row and none; when nothing fits the
+**least-flow** node is dropped — ties by declaration order reversed, so the order is total (I11)
+— and the layering re-run, because a dropped node takes its edges and their dummies with it
+(§3ai.4 G4). The SVG has no budget and drops nothing, which is `graph`'s split exactly.
+
+**Labels** sit one cell off the bar at the bar's centre row, to the right everywhere but the last
+layer. One that would run into the next bar, or into a label already written, is **dropped,
+never truncated** — §3n's oldest rule, arriving on a fourth form: the bar keeps its colour and its
+extent as a tile whose name did not fit keeps both, and nothing is said in the notice, because
+the notice is for data that is not drawn. Written **from the outside in**, so where two compete
+it is the inner one that goes — the sources and sinks are the reading a sankey exists for.
+
+### 3ap.4 — §8a, the classification table
+
+Structure at rest, so the table is primary. Every row is a cell two rules both claim; a row
+governed by one rule restates it and is not here.
+
+| | two rules | the cell | ruling |
+|---|---|---|---|
+| **K1** | deduplication (§3ai.4 G1) · a weight per edge | `a→b 2` and `b→a 3`: reversal makes them one edge | **the weights are summed.** A flow drawn once and counted once is data loss in the other direction; `graphLayers` gained `origins` — the declared edges each segment stands for — so `graph` reads nothing new and a sankey sums over it. The first origin is the edge that survived |
+| **K2** | slice stacking · crossing minimisation | the ribbons leaving one bar could cross each other at the bar | slices are ordered by the **far end's centre** on both sides, after placement, so a bar's fan leaves in the order it arrives. Stable on the segment index for equal centres (I11) |
+| **K3** | labels · width | three labels of 14, 12 and 16 cells in two gaps of 19 | the two outer ones fit exactly and the middle would run into the last, so **the middle is dropped** — written from the outside in, never truncated (§3n). Measured: `long-labels` names three at 80 columns and two at 40 |
+| **K4** | dummy nodes (§3ai.4 G5) · a ribbon through a layer | an edge spanning two layers has a waypoint in the middle one | the dummy is **ribbon, never bar**, in the declared source's slot, and it **counts in that layer's height and scale** — a ribbon passing through spends the layer's rows too. Measured on `cycle`: `a→c` through layer 1 at `[13, 16)`, the same slot on both of its sides |
+| **K5** | a bar's minimum · a small height | twelve sources in a four-row figure | a slice is never below one half-row; the gap falls one row → a half-row → none; then the **least-flow** node goes and the notice names it. Measured: `crowded` keeps eight of twelve at gap 0 and says `+4 more · src-01 · src-02 · src-03 · src-04` |
+| **K6** | total in ≠ total out | `hub` receives 2 and emits 5 | **the bar is the larger side** and the shorter side leaves bare bar below its last slice — what a sankey draws for a loss. Measured: `hub` is 16 half-rows; its one incoming ribbon covers `[1, 7)` and the ten below it are bar with nothing arriving |
+| **K7** | a reversed edge (§3ai.3) · a ribbon's colour | `c→a` is drawn as `a→c` | the ribbon is drawn **forward**, counted in `N reversed`, and keeps its **declared source's** colour — `c`'s, leaving `a`'s bar. The arithmetic does not say which colour; the walk did, and the colour is the one sign of the reversal beside the count |
+| **K8** | labels · two bars in one row | at gap 0 two one-half-row bars share a row, and both centre on it | one label per row centre; the second collides and is dropped (K3's rule, vertically). Measured on `crowded`: `src-05 · 07 · 09 · 11` named, their neighbours drawn and unnamed |
+| **K9** | two owners in one cell | a ribbon's lower edge over another's upper edge | `▀` in the upper owner's slot over the lower owner's as background (§3ap.2); at ASCII a bar wins the cell, else `=` |
+| **K10** | relaxation · the ordering pass | pulling a bar to its neighbours' mean could pass its sibling | `separate` restores the gap without reordering and shifts the **whole stack** back inside the height — a clamp on one bar is a relative move the shift cannot undo (§3ai.6's argument, vertically) |
+| **K11** | an isolated node · a bar whose extent is its flow | flow 0 | one minimum slice of bar and no ribbon. Drawn, because the node was declared (I79's shape) |
+| **K12** | the notice row · the budget | something dropped or reversed | the row is spent **before** the drawing is chosen — `graphArea`'s ruling and `treeArea`'s before it (§3ah.4) |
+| **K13** | one bit · bar against ribbon | no colour to separate them | the **glyph** does (§3ap.2, I17): `█` against `▒`, `▀`/`▄` for a half either way. The `dim` alternative was drawn and rejected on this row |
+| **K14** | `ambiguousWidth: "wide"` · the block family | every glyph doubles | the ASCII set, `barStyle`'s rule — one function, so the wide frame *is* the ASCII frame |
+
+### 3ap.5 — §8a-bis, the placement trace
+
+The relaxation is event-mediated inside itself, which the table cannot reach.
+
+| | sequence | the interaction | ruling |
+|---|---|---|---|
+| **S1** | sweep down, then up | the second can undo the first | alternate, four sweeps, the last one's separation standing — `graph`'s count and argument |
+| **S2** | a layer's bars pulled, then separated | separation before every bar has moved reads a half-applied order | pull every bar in the layer, then `separate` once (§3ai.5 S2's shape) |
+| **S3** | the stack pushed past the bottom, then the top | fixing the bottom bar alone moves it against its siblings | the ceiling pass walks up the stack and the lift walks down it, so the stack moves as one |
+| **S4** | positions relaxed, then slices ordered | ordering slices **before** the sweeps orders them against centres that then move | slices are assigned last, on the final positions, or the fan at a bar is stacked against a picture nobody drew |
+
+### 3ap.6 — what the second painter measured
+
+The arm-disagreement table's row, measured over the six variants at both widths: `silent 0/12`,
+`identityLabels 5/12`, `notice 2/12`, every other column `agree`. Both open cells are the nodes
+family's own shape — the terminal drops labels and nodes against a budget the SVG does not have
+(F318), and the reader files a notice's names as identity — and `graph` carries the same two.
+
 ## 3q. One value axis across the bands, and the record it never had
 
 **This section is written because three code comments cite it and it did not exist.** The
@@ -9960,6 +10114,9 @@ would have to be re-run rather than extended.
 - **I109** — **Every annotation kind crosses to the second arm as marks the type already had, and the legend names an annotation wherever the arm draws it.** `line` is one dashed full-width polyline; `band` is a shaded rect for the interior plus a dashed polyline per in-range edge; `confidence` is a shaded closed polyline where `fill` is on plus dashed upper and lower edges broken at every out-of-range sample; `whiskers` is one undashed two-point polyline per point, at its own `x` on the abscissa's domain, as `whiskersRows` places it. **The dash is the mark's** (`Mark.polyline.dashed`) and not the layer's, because a whisker on the annotation layer must not break into dots; **an interior has no stroke of its own**, so no outline runs along the ceiling for a sample above it — the clamped-threshold lie §3e forbids, arriving on a region; and **a claim is drawn behind the data in this arm as in the terminal**, a claim being an annotation-layer mark with no `seriesIndex` — the violin's IQR box carries one, sits on that layer for its width alone, and is the counted exemption. The terminal's rules cross with the kinds: an out-of-range edge is dropped, an interior clamps, a flat range admits every value. **Measured before the rule**: `annotationMarks` opened `if (a.kind !== "line") return []`, a `line` block with and without a `band` rendered byte-identical SVG, `line/confidence` and `line/confidence-unfilled` were one document, and the legend filtered `role !== "annotation"` under a comment saying the arm drew none. **A whisker's `x` is where it sits** (C04 I52): a value on the abscissa's domain, placed through the shared coordinate in both arms — it was read by neither and both agreed on an index spread nobody had ruled, and `whiskers-placed` is the fixture that shows it read (→ I23, I25, I55, C04 I52, §3e, FINDINGS F259).
 
 
+- **I110** — **A sankey is `graph`'s layering plus one placement that both arms draw from, and a node's extent is its flow.** `sankeyLayout` is pure — no `cells()`, no capabilities — and takes its height, gap and minimum as numbers, so the terminal calls it in half-rows with `quantum: true` and the SVG in pixels without; every bar, slice and ribbon end in either arm is that one function's answer (§3ap.3). **The scale is one number, the tightest layer's `(height − gaps) / Σflow`**, so a unit of flow is the same height in every layer and a ribbon leaves a bar at the width it arrives with; **a slice is never below one unit** and **a bar is the larger of its two sides**, the shorter leaving bare bar below its last slice — a loss, drawn (K6). **Slices are ordered by the far end's centre after placement** (K2, S4), and the relaxation separates without reordering (K10). **A deduplicated edge sums the weights it stands for** through `graphLayers`'s `origins` (K1); **a dummy is ribbon in its declared source's slot and counts in its layer's height** (K4); **a reversed edge is drawn forward, counted, and keeps its declared source's colour** (K7). **The terminal's budget loop is its own**: the notice row is spent first, the gap falls one row → a half-row → none, then the least-flow node goes and the notice names it (K5, K12); the SVG drops nothing (§3aj.6). **A label that does not fit is dropped and never truncated**, written from the outside in so the inner one goes first, and nothing is said of it in the notice (K3, K8, §3n). A node's colour is its declaration index through `refOf` (→ I1, I11, I58, C04 I92, §3d, §3ai.4 G1, G4, G5, §3n).
+- **I111** — **The bar and the ribbon are two glyphs at every depth, the ribbon's interior is the shade, and one function resolves the family for both width conventions.** `█` for a bar, `▒` for a ribbon's interior, `▀`/`▄` for a half either owns; `# = -` at ASCII, and the same three at `ambiguousWidth: "wide"` because every member of the block family is `East_Asian_Width=Ambiguous` — `barStyle`'s rule, in `sankeyAlphabet` (§3ap.2). **The shade rather than `dim` is I17's ruling and not taste**: an attribute is dropped at one bit and by any terminal that ignores SGR, and the frame it leaves is one block of `█` with letters in it; the shade is a shape, so the one-bit frame is the 24-bit frame with its colours removed — and it is, literally, the half-opacity fill the references draw. **Two owners in one cell put the lower one in the background**, `image.ts`'s half-block precedent and C10 I21's one widening (`wash`), never text on a tone; the slots cross as `categorical.cN` refs and are resolved in `definition.ts` at the terminal's depth. The SVG's ribbon is two cubic Béziers at `fill-opacity 0.5` in the declared source's slot (→ I4, I6, I17, C02 I9, C09 I22, C10 I21, C12 I29, A03 SS47).
+
 ## 8. Commitments
 
 1. Two forms — braille line plots with axes, and one-row sparklines — sharing a scaling core (I1).
@@ -10073,6 +10230,9 @@ would have to be re-run rather than extended.
 105. **A silhouette is quantised area-preserving in the nine block levels, with one family for the run and the ceiling stated** (I105). Nine levels put the boundary in the right place and cannot make it a line; that is arithmetic rather than tuning, and it is written down so the next reader does not spend four iterations on the quantisation (§3an, FINDINGS F495, F496, F501).
 
 ---
+
+110. **A sankey is a placement and a drawing over `graph`'s layering, and both arms draw from one geometry** (I110). `graphLayers` gained `origins` and nothing else; the scale is one number, a bar is the larger of its sides, a dummy is a ribbon, a reversed edge keeps its declared source's colour, and the budget loop — notice row first, gap ladder, least-flow drop — is the terminal's alone (§3ap.3, §3ap.4).
+111. **The ribbon's interior is the shade, chosen on the one-bit frame rather than the 24-bit one** (I111). Both candidates were drawn; the one that carried bar-against-ribbon in an attribute lost it where attributes are dropped, and the one that carries it in the glyph is also the half-opacity fill the references draw (§3ap.2).
 
 ## 9. Tests
 
@@ -10341,6 +10501,17 @@ Six tiers. No state machine — C12 is pure over the block.
 - **AC2** (I109): the marks each kind becomes — a `band` is one `stroke="none"` rect and two dashed edges, and an edge outside the range is not emitted while the rect still is; a `confidence` upper edge above the ceiling **breaks** its run rather than pinning to it, and the region carries no stroke; a whisker is one polyline with no dash; a `line` outside the range emits nothing where it used to emit a rule along the ceiling.
 - **AC3** (I109, §3e): the SVG legend of `line/annotation-label` names `budget` and `warm-up`; claims are emitted **before** the series they annotate; and the violin's IQR box — on the annotation layer for its width, carrying a `seriesIndex` — is opaque and emitted **after** its density, the counted exemption.
 
+- **SK1** (I110, §3ap.3): the default fixture's geometry, walked by hand and asserted as numbers — scale `14/11`, slices `6 · 1 · 4 · 3`, bars `a 7 · b 4 · c 3 · x 9 · y 5` half-rows, `a`'s two slices in far-end order — **and the fixture responds**: doubling one weight moves the frame.
+- **SK2** (I110 K6): `hub` receives 2 and emits 5 — its bar is 16 half-rows, its one incoming ribbon covers six of them, and the ten below are bar with no ribbon arriving. Read from the cells left of the bar, not from a count.
+- **SK3** (I110 K1, K7): `c→a` is drawn as `a→c` in **`c`'s** slot with `1 reversed` in the notice; and `a→b 2` beside `b→a 3` is one ribbon of weight 5 with the same notice.
+- **SK4** (I110 K4): an edge through a layer leaves ribbon cells in the middle column at the dummy's rows, in the source's slot, and no bar cell there.
+- **SK5** (I110 K3): `long-labels` names three at 80 columns and two at 40 — the middle one gone, the outer two intact, and no `…` anywhere in either frame.
+- **SK6** (I110 K5, I8): `crowded` keeps the eight largest sources at gap 0 and says `+4 more` with the four smallest by name, in a frame of exactly the declared height.
+- **SK7** (I111): the 24-bit frame's non-label glyphs are `█ ▒ ▀ ▄`, the ASCII frame's are `# = -`, the wide frame **is** the ASCII frame, the one-bit unicode frame keeps `█` and `▒` distinct, and a two-owner cell carries a background SGR at 24-bit.
+- **SK8** (I110, §3ap.3): the SVG draws one `<rect>` per declared node and one path per segment at `fill-opacity="0.5"`, the last layer's label `text-anchor="end"`, and the rect heights of `x` and `y` in the ratio `7 : 4` — continuous, because that arm has no quantum.
+- **SK9** (I110 K10, I11): two renders are byte-identical, and every layer's bars keep the ordering pass's order top to bottom after relaxation.
+- **SK10** (C04 I69, I92): the builder admits `graph` on `sankey` as the validator does. Runs the day `b.plot`'s guard is widened; until then it is a `todo` that names the file — a deferral whose condition is the code itself, so it cannot stay deferred once met.
+
 ### Tier 2 — contract / interface
 
 - **T2.1** (I2): a fuzz corpus — empty, single, constant, non-finite, 100,000-point, negative, mixed-sign, denormal — rasterises without throwing, at every width from 1 to 200.
@@ -10469,6 +10640,16 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T6.22** (I34, I21): a vertical raincloud reaching for the height ladder → T1.70 fails, and the density draws a per-cell scale where the axis is a run. Arithmetically self-consistent — the levels are monotone and the row count is right — and wrong about how much of each cell a level fills.
 
 ---
+
+- **T6.78** (I110, §3ap.4 K6): the bar taken from the in-side alone → **SK2 fails** — `hub` shrinks to its two units and the loss disappears, with every other assertion green.
+- **T6.79** (I110, K1): the weight read from the first origin only → **SK3's second half fails**: `a→b 2` and `b→a 3` draw a ribbon of 2, correct in every count but the one that carries the data.
+- **T6.80** (I110, K4): the dummy drawn as a bar → **SK4 fails** — a node the graph does not have, in the right colour at the right rows.
+- **T6.81** (I110, K3): the fit test removed so a label is written wherever its bar is → **SK5 fails**: `rate-limiter` runs under `upstream-service` at 40 columns. Labels written inner-first instead → **SK5 fails the other way**, keeping the middle name and losing the sink's.
+- **T6.82** (I110, K5): the sacrifice order reversed → **SK6 fails** — the largest sources go and the notice names `src-12`.
+- **T6.83** (I111, K13): the ribbon interior returned to `█` → **SK7 fails at one bit**, and the 24-bit frame still reads correctly in colour, which is why the row is asserted where it is. The two-owner background dropped → **SK7's SGR assertion fails**.
+- **T6.84** (I110, K7): the colour taken from the drawn source rather than the declared one → **SK3 fails**: the reversed ribbon arrives in `a`'s slot.
+- **T6.85** (I110, K12): the notice row spent after the drawing → **SK3 fails**: `composeRows` slices the figure to its height and the `1 reversed` row is the one that falls off.
+- **T6.86** (I110, K2): slices stacked in declaration order rather than by the far end's centre → **SK1 fails** on `a`'s slice order, with every bar height and every crossing count of the ordering pass unchanged. The control for the run is the gap ladder collapsed to none, which restacks every layer and moves SK1's walked positions and every sankey golden.
 
 ## 10. Out of scope
 

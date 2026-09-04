@@ -234,6 +234,43 @@ removes, and an absent member is not.
 
 **No block renderer reads the environment.** Capabilities arrive through `ctx`, never from `process.env` — C02's I5 extends here, and a renderer probing for itself is the bug that produces a table in ASCII beside a sparkline in Unicode.
 
+### 2b. The cap — the registry's bound on one block's rows
+
+**Ruled in C14 §4b, held here because the code is the registry's.** `createBlockRegistry({
+maxBlockRows })` — default `DEFAULT_MAX_BLOCK_ROWS`, 2 000 — is the most rows one block may
+occupy, and the registry applies it **before any definition sees the block**: `measure`,
+`render`, `elementsOf` and `windowSequence` each resolve a block to its *capped form* first.
+
+**The capped form is the kind's own `window`, which is why no kind implements the cap.**
+For a block whose `definition.measure` exceeds the cap, the form is
+`window(block, w, 0, cap, measureChild).block` with `capped: { shown, total }` attached, where
+`shown` is the form's own measured rows and `total` the block's. `measure` answers `shown + 1`;
+`render` draws the form and then one row — `… 2,000 of 50,000 rows`, `tone("muted")`, `~` on an
+ASCII terminal — clamped to the width so it is one row at every width the measurer counted. A
+kind with no `window` has no capped form (C14 I26), so `plot` is exactly as atomic as I27 says,
+and a block within the cap is returned **by reference**, so nothing downstream can observe the
+cap on a block it does not touch.
+
+**`capped` is view state on `lineRange`'s argument** (I25a, C04 I82): written by the registry,
+read by the registry, refused from a far side. It is attached *after* the definition's window
+and re-attached by `windowSequence` when a window reaches the marker row, because a window may
+build a fresh block — `patch`'s does — and a field a kind can drop is not view state. The
+registry reads it through a cast until C04 names the field (a request is recorded, not assumed).
+
+**The composition, in the registry's own terms.** `windowSequence` measures the capped form,
+windows it for `[from, min(to, shown))`, strips `capped` when `to ≤ shown` and carries it when
+`to > shown`; a window over the marker alone asks for `[shown − 1, shown)` and charges the
+content row to `skipRows`, because no kind's window returns zero rows (C11 I20). The floor (I33)
+applies after the cap. The gap (C04 §3a) is the sequence's and survives the spread.
+
+**What the measurement said and what it did not**, because a bound owes its figures (C14 §4b):
+paint is ~0.25 ms a row for every kind and linear with no knee, so the default is a policy —
+fifty screens, and `MAX_ROWS`'s figure — rather than a number the table chose; and the
+whole-block `measure` the roadmap named as the cost is 0.6 ms for a 50 000-row `table` and
+cannot be bounded by a marker that must say *of 50 000*. `code`'s first paint tokenises the whole
+text whatever the window, 1 696 ms at 50 000 rows, and a `code` window opening at line 0 could cut
+its text because nothing precedes the slice — owed here, to `kinds/code.ts`, and not built around.
+
 ---
 
 ## 3. The nineteen kinds
@@ -1005,6 +1042,66 @@ indexed as a density ramp. They look interchangeable and are not: a density ramp
 magnitude at a position, a dither ramp encodes a **threshold against a position-varying offset**.
 **The type is what tells them apart, because the eye does not.**
 
+### A GIF is the same block with more than one frame, and the frame is never geometry
+
+**`Image.data` takes GIF bytes beside PNG, and the six-byte signature chooses the decoder** (C04
+I93, I39). `decodeImage` is the codec's front door; `decodePng` is unchanged behind it and
+`decodeGif` (`image/gif.ts`) is the second decoder — LZW, interlacing, global and local colour
+tables, transparency and the three disposal methods, **299 lines in-tree** on `decodePng`'s own
+argument (`omggif` at 38.5 KB was the alternative, and a dependency row for a function is the
+*layout engine* side of the ledger's test). **Every frame is composited onto the logical screen**
+before anything above the codec sees it, so `frames[k]` is *the screen while frame k shows* and
+not the sub-rectangle the file stored; disposal is applied before the next frame is drawn, method 2
+clears to transparent (the background colour the format names is honoured by no viewer), method 3
+restores. **Delays are milliseconds and the short ones are clamped**: under `MIN_DELAY_MS` (20) a
+delay becomes `DEFAULT_DELAY_MS` (100), which is what browsers do for the `0` and `1` hundredths
+most files carry; browsers draw the line at 10 ms and this at 20, because 20 ms is 50 fps and over
+C03's 30 fps ceiling, so a file asking for it has frames skipped by the delta arithmetic either way.
+
+**Measured against a second decoder, not against itself.** The fixtures are written by `sharp` and
+compared frame by frame with `sharp`'s own composited pages — eight frames, zero differing pixels
+— and each fixture's bytes are scanned to show it carries what its row claims (a local table, a
+sub-rectangle with a transparent index, the interlace bit). The first transcription of one blob
+carried a stray character and the decoder refused it as *LZW minimum code size 0*: a real fixture
+wrongly copied is the instrument-before-subject class arriving by another door, and the script
+that compared the constants to the generator's output is what caught it.
+
+**The frame is view state and it enters the block through the context** (C04 I93, C22 I77).
+`RenderContext.frames` names the frame each image is on, by block id; the shell's `Frames` store
+writes it on the animation wake, and the block reads it in exactly one place — **below the
+protocol arm**, where the rasterising arms take their pixels. `measure` never receives it (I8):
+`height` is declared and every frame shares the logical screen, so a GIF measures as its first
+frame does at every width (C04 T2.39), and `imageCells` reads the extent, which a corrupt frame
+does not take away (`decodeGif` reads the screen before any frame, as `decodePng` reads the IHDR).
+Absent is frame 0, so a PNG never notices the field; out of range wraps.
+
+**The kitty arm uploads every frame once and the terminal animates — ruled on the figures.** The
+roadmap priced the protocol arm as *every tick is an image upload where the orbit's tick is a text
+frame*, and that is true of the design it imagined — a retransmission at the stable id on every
+wake — and was measured before it was ruled on: **75 bytes a tick for an 8x8 GIF and 29,662 for a
+320x240 gradient, 297 KB/s at 10 fps**, for as long as the image is on screen. kitty's animation
+protocol makes the per-tick figure **zero**: frame 0 goes as the placement's own `a=T` (raw RGBA,
+`f=32,o=z`, since the terminal reads no GIF — `f=100` is PNG and would draw nothing), every later
+frame as `a=f` carrying its gap in `z`, one `a=a` sets the root frame's gap and one starts the loop
+— **116,509 bytes once** for four 320x240 frames against 296,620 every second. So `transmitImage`
+sends the frames, `#sentImages` keeps it to once per digest as for a PNG, and **the session's wake
+is not armed for an image on this arm**: `visibleRows` gathers animated images only when
+`imageProtocol` is not `kitty`. The alternative — *frame 0 on kitty, animate only where we
+rasterise* — is what this degrades to on a terminal without the animation extension, which is why
+it was not chosen: a design whose failure mode is the other design costs nothing to prefer. **Two
+protocol readings are stated as unmeasured** (the plane-16 class above): that `v=1` on `a=a` loops
+for ever, and that a terminal without `a=f` keeps frame 0. Ghostty 1.3.1, the one terminal measured
+in this repository, does not implement the animation extension, so the first real-terminal read of
+this arm is owed there and the degraded picture is what it should show.
+
+**The wake is the orbit's** (C22 I77). One timer path, one stamp, and each animation reads its own
+elapsed time from it — the frame store walks whole delays and keeps the remainder, so a GIF beside a
+33 ms orbit shows each frame for its own delay and a spinner beside a GIF does not move it. The
+timer is armed for the earliest frame change on screen, floored at the `stream` rate, so a 500 ms
+GIF costs two wakes a second and not thirty; a still — PNG or one-frame GIF — arms **nothing**.
+Frame 0 after a loop keys as untouched, on `ScrollOffsets`' zero rule, because it draws what frame
+0 drew.
+
 ### The blind spot, and it has now been measured
 
 **Three width implementations matter and two are reachable here** — `cells()`, which every
@@ -1189,6 +1286,60 @@ marker where `truncate` measured the cluster: at `ambiguousWidth: "wide"` the el
 cells, so `kept + suffix` came to `limit + 1` — F292's shape, a row one cell wider than it was
 measured, one function along from where F292 found it. Both now read `clusterCells(marker)`,
 which is the drift a shared helper exists to prevent (I9).
+
+**A run carries a tone or a value, and each reaches colour through its owner's resolver — never
+through a value of its own** (C04 I89, C04 I90, C10 §4e). `Run` gains `tone?` and `value?`
+beside `attrs`, copied from the span by `runsOf` and carried through `sliceRuns`, `runLines` and
+`wrapRuns` unchanged. `paintRuns(runs, style, ctx)` takes the block's resolved style *and* the
+render context, and for each run: a `tone` **replaces** the block's style with `tone(run.tone,
+theme, caps)` — the same call the block made, memoised by C10, so two adjacent runs of one tone are
+one reference and coalesce as plain runs do; the attributes then spread on top by `withSpan`; and a
+`value` paints the run's **background** from the block's `colormap` through `continuousColour`,
+the resolver heatmap and image already use, so the ladder is the colormap's — `undefined` below
+8-bit, and a run whose only member is `value` then coalesces with its neighbours by reference and
+a 4-bit frame is byte-identical with and without it (C10 I31). Foreground stays whatever the tone
+(the span's or the block's) resolved. **The colormap reaches `paintRuns` by name on the context**
+(`ctx.colormap`), looked up in `COLORMAPS` there and nowhere else in this component; the gate has
+already refused a `value` on a block with no map, so a run with `value` and a context with no
+`colormap` cannot arise and is painted plain rather than thrown on.
+
+**A focused table row paints its span tones as it paints its cell tones: not at all.** C11 I14
+replaces `cell.tone` with `accent` for the focused row, and a span's `tone` is the same kind of
+claim at a finer grain, so `cells.ts` drops `tone` from the runs of a focused row before painting.
+The alternative — inline code keeping its colour inside a focused row — makes the row read as two
+things, and focus is the one time a row must read as one. Attributes and a `value` survive focus,
+because neither is a claim about the foreground.
+
+**A valued run is a wrap unit, and the wrapper learns one property rather than gaining a sibling**
+(C04 I90). `wrapCellsParts(text, width, ambiguous, atoms)` takes an optional list of `[from, to)`
+code-unit intervals into the text it is given, and never places a break **strictly inside** one:
+a space inside an atom is not a break point, and where a full line has no break point outside its
+atoms the break moves to the **start of the atom the next cluster would extend** — provided
+something precedes that atom on the row. An atom that begins a row and still does not fit is
+broken at a cluster boundary as any unbroken token is, which is C04 I90's *a value wider than the row
+is broken as text is*. An explicit newline inside an atom breaks, because it is the author's.
+`wrapRuns` computes the atoms from the runs' `value` members over the **placed** text (the
+substitution is per run, so a `?` for a two-unit cluster moves no other run's offsets) and passes
+them; `wrapCells` passes none, so every caller that is not a run caller is unchanged.
+**`notice`'s `measure` and `render` now share `noticeRows`**, which is `wrapRuns(runsOf(text,
+spans), proseWidth)` for both — the file's own *one layout function for the pair* rule, applied to
+the one wrapping text member. The height is therefore the same with and without every span member
+except `value`, and differs with `value` exactly when a valued run would otherwise straddle a row:
+measured, `"aa bb cc dd"` at 5 is three rows plain and three with `bb cc` valued (the plain
+wrapper already broke there, see the finding below), `"x(abcde)yz"` at 6 is two rows plain and
+**three** with `abcde` valued, and `"The cat sat on the mat ."` at 12 with a value per token is
+two rows either way, because prose already breaks at the spaces between tokens. **A single-word
+valued token never changes the count** unless the row around it has no space at all — the
+interaction is between `value` and the *no-break-point* arm, not the ordinary one.
+
+**Markdown's inline code is a `tone: "identifier"` span** (C04 §3am.1, roadmap 11 residue ii).
+Of `TONES`, `identifier` is the slot the tree uses for a name one can refer back to — a container
+name, an ID, a port, an image — and `meta` is the slot for timestamps, percentages and secondary
+detail; a backtick run in an agent's markdown is a flag, a path, a symbol or a command, which is
+the first kind. The backticks are gone from the text and the span sits at the offsets of what they
+enclosed; a backtick run inside emphasis is one span carrying both the attribute and the tone
+(§3am cell 12's adjacent-disjoint rule); an unclosed backtick, and an empty pair, are literal
+characters exactly as an unpaired `*` is. Fences are untouched.
 
 ---
 
@@ -1390,7 +1541,7 @@ next frame. MG27 is what keeps a producer from writing one (`BUILDER_OMISSIONS`)
 - **I23** — **A grammar can be registered after construction, and registering one invalidates the memo.** §4a promised that an unregistered language is readable now and highlighted *whenever someone registers it*; the constructor shipped with a fixed pair and no registration path, so the promise had no mechanism (F93). The invalidation is half the invariant rather than an implementation note: `tokenise` caches the plain-text fallback under the same key, so registration without it leaves every block already rendered flat until an unrelated cap eviction. **Measurement is unaffected by both**, which is what makes registration safe at any time — tokens change appearance and never line count (I8, T2.13).
 - **I24** — **A grammar in the default set has its emitted classes mapped, or the omission has a reason.** Shipping a grammar whose classes `SLOTS` does not carry is indistinguishable from not shipping it — measured: `markdown` emitted four runs and coloured none. Three classes are unmapped deliberately: `hljs-params` is ordinary identifiers, `hljs-strong` and `hljs-emphasis` are appearance rather than a rôle, and **`hljs-addition` / `hljs-deletion` are a change axis, which C04's ruling says is a marker and never a tone** (F30, F81).
 - **I25** — **A kind that divides declares `window`, and a window is a valid block of the same kind plus a residual offset.** `window(b, w, from, to)` returns `{ block, skipRows }`; the caller renders `block` and drops `skipRows` leading rows, and what remains is exactly what the full rendering would have put at rows `[from, to)`. The offset is not a convenience — it is what makes an indivisible unit (C25 I19) and a sticky header (C25 I18) expressible without inventing a row C14 never measured, which is drift three components from its cause. **A window is a block and never a list of rows**, because `Block[]` is what both consumers hold and a slice of rendered output would be a second height codepath.
-- **I25a** — **A kind whose layout is derived from its rows pins that layout into the window; a kind whose *parse* is pins the whole text and a line range, because a parse cannot be sliced.** `patch` pins `numberWidth` and `keyValue` pins `keyWidth`, because a window whose slice happens to hold shorter values would draw a narrower column and every row would shift sideways as the reader scrolls — measured at 14 cells against 3 for `keyValue`, and 4 against 1 for `patch` (C25 I21a). **`code` was refused on the other half of the same sentence, and the refusal was about slicing the text rather than about windowing**: `tokenise` is a function of every character before the slice, so a window carrying only the sliced text is a different *parse* rather than a narrower column — lines inside a block comment come back as live code, and `measure` never tokenises, so I26 holds while the rendering is wrong (F426). A width travels with a window; a parse does not. **So the text travels instead** (C14 §4a, C04 I82): `code`'s window keeps `text` whole — the same string reference — and pins the source-line range `[from, to)` in `lineRange`; `measure` and `render` both honour it, tokenisation runs over the whole text, and only the rows in range are produced. The pin is a range rather than a highlighter's mode, which is what the earlier refusal could not find a field for.
+- **I25a** — **A kind whose layout is derived from its rows pins that layout into the window; a kind whose *parse* is pins the whole text and a line range, because a parse cannot be sliced.** **One arm slices without loss: a window opening at line 0.** Nothing precedes the slice, so the parse of the first `to` lines is the whole block's over those lines by construction, and the window hands back the sliced `text` with no `lineRange` — the tokeniser runs over `to` lines rather than all of them (measured: 1 696 ms first paint of a 500-row window of a 50 000-line block against 196 ms steady, the cost a capped `code` block paid once per entry under C14 §4b). Every window opening later pins. `patch` pins `numberWidth` and `keyValue` pins `keyWidth`, because a window whose slice happens to hold shorter values would draw a narrower column and every row would shift sideways as the reader scrolls — measured at 14 cells against 3 for `keyValue`, and 4 against 1 for `patch` (C25 I21a). **`code` was refused on the other half of the same sentence, and the refusal was about slicing the text rather than about windowing**: `tokenise` is a function of every character before the slice, so a window carrying only the sliced text is a different *parse* rather than a narrower column — lines inside a block comment come back as live code, and `measure` never tokenises, so I26 holds while the rendering is wrong (F426). A width travels with a window; a parse does not. **So the text travels instead** (C14 §4a, C04 I82): `code`'s window keeps `text` whole — the same string reference — and pins the source-line range `[from, to)` in `lineRange`; `measure` and `render` both honour it, tokenisation runs over the whole text, and only the rows in range are produced. The pin is a range rather than a highlighter's mode, which is what the earlier refusal could not find a field for.
 - **I26** — **`measure(window(b, w, from, to, measureChild).block, w) − skipRows − dropRows === to − from`, checked generically over every kind that declares `window`.** The form without the residuals is the one the seam invites and it is false for any window that costs slack. **Both terms, because slack falls at both ends**: `skipRows` is leading only, and `table` is the first kind whose last unit can hang past `to` (F428). The consumer has always dropped the trailing rows — `session.ts` writes `rows.slice(0, ve.takeRows)` — so `dropRows` names an operation the seam already relied on and could not state. Relaxing the identity to `≥` was the other option and it is the worse one: containment is satisfied by every wrong answer inside the bounds. Enforced by `measurement-conformance.ts` rather than per kind, so an application's own arm is held to it — without that a consumer's window is silently short and the frame describes a document nobody holds. It is I1's rule over a window rather than over a block.
 - **I26a** — **`window` receives `measureChild`, on `elements`' argument and for the same quantity.** A kind whose unit boundaries depend on a child's height cannot compute them from `(block, width)` alone — a table row's offset is `header + Σ(1 + detailHeight(row))` — and a window that guessed would slice at the wrong row while I26's arithmetic still balanced. Supplied by the registry, so a kind cannot reach for its own (A02 Seam 1).
 - **I27** — **A kind that does not divide has no `window` member, and that is how atomicity is expressed.** `plot` is the case and it is permanent: C12 I1 makes height a function of the block alone, so reducing the series changes nothing and reducing `height` rescales the curve. An absent member cannot be deleted by a later edit; a branch returning the block unchanged can, and reads as an oversight either way.
@@ -1406,6 +1557,7 @@ next frame. MG27 is what keeps a producer from writing one (`BUILDER_OMISSIONS`)
 - **I36** — **An image has two arms and the dither is the first of them.** `imageProtocol: "kitty"` takes the protocol; `"none"`, `"iterm2"` and `"sixel"` take an ordered dither. **Two arms rather than four, and the refusals are for composition rather than effort.** Sixel draws at a cursor and does not participate in the grid. **iTerm2 does participate** — declared cell size, occupies cells, scrolls — and what it lacks is **per-cell addressability**: a kitty placeholder is ordinary text so any row is independently re-emittable and text can sit inside the rectangle, while an iTerm2 image is one escape at one cursor position that a row-level rewrite destroys. **That settles F248's diff measurement by construction**, since a full-frame rewrite is safe for placeholders and fatal for one blob. **The transmission does not travel in the frame**: Ink strips APC escapes — an `ESC _G` in a `Text` node renders to nothing — so the escape is written by **`transmitImage`**, prefixed to the frame's bytes at the composition root, and only the placeholders go through Ink as text. **Three measured properties make that safe**: Ink is not in the byte path, the diff baseline is `lines` rather than the write, and every frame reaches an *absolute* address before any row content — so a cursor the escape might have moved is corrected by the next byte. It **leads** the frame rather than following it, because placeholders for an unsent image draw nothing; it transmits on entry into the **document** rather than the viewport, keyed by digest so one image sends once; and `session.ts` is the only path that writes block rows, which is what makes one seam sufficient (§4c). **The dither is built first because most terminals are `"none"`** and a feature that shows nothing there is one most readers never see; **1-bit is not a further degradation**, because a dither is shape and colour was never its carrier. **The matrix is designed here because it is designed nowhere** — the note citing *the 3D renderer's ordered dither* cites a renderer the roadmap refuses — and it is an **8x8** Bayer threshold indexed in **dot** space over the 2x4 subcell grid, nine levels per cell, **varying with position so a gradient reads as texture rather than banding**. **8x8 rather than the 4x4 the note implies, and the frame chose it**: a 4x4's y-period equals a braille cell's height, so a flat region resolves identically in every cell row — and while the two are frame-identical at quarter levels, at 0.28 the 4x4 draws one glyph where the 8x8 resolves two. `plot/raster.ts` is reused rather than reimplemented. **The ramp is a third ladder axis**, and widening the `Serves` record is the check that a dither ramp cannot be indexed as a density ramp: one encodes a magnitude at a position, the other a threshold against a position-varying offset, and the type tells them apart because the eye does not (§4c).
 - **I37** — **The glyph axis is three rungs and a half block is the top one, gated on three things rather than on the terminal alone.** Below `kitty`, a cell is spent on colour or on shape: `▀` carries **two pixels at full colour**, braille carries **eight dots at one bit**, and the ASCII ramp carries nine glyphs. The half block is taken when `unicode` is not `ascii`, `ambiguousWidth` is not `wide`, `colourDepth` is at least **8**, and the block has **no `overlay`** — otherwise the dither. **Each gate has its own reason and none is a proxy for another.** `▀` is `East_Asian_Width=Ambiguous`, measured by `cells()` at `narrow=1` and `wide=2`, so a `wide` terminal draws the picture at double the width `imageCells` measured — the third consumer of `art.ts`'s switch and the first where braille's non-ambiguity is why the hazard is new (C02 I9, A03 SS50). Below `colourDepth: 8` the rung's whole claim is unfunded, and at 8 both channels go through `nearestAnsi256` so the picture is the 24-bit one quantised rather than a second rendering. **The overlay gate is the structural one**: the dither puts the picture in the glyph and the field in the foreground, and a half block has spent both colour channels on the picture — so unlike 1-bit, where C10 I31 draws the picture plain because nothing is left, there is a rung that can still carry the field and the block takes it. **A sequence trace cannot reach that gate** — *has an overlay* and *is 24-bit* both hold at rest with no event between them — which is why the artefact drawn for it was a classification table (§4c, → C04 I73, C10 I31).
 - **I38** — **A refusal to decode is drawn as the refusal, with the reason the decoder computed.** `decodePng` returns a `fault` for every rejection it makes — *not a PNG*, *interlaced PNG (Adam7)*, *bit depth 16*, *IDAT does not inflate* — and the block drew `alt` for all of them, so a reader was told the same nothing about a corrupt file and about a format this phase names as unbuilt. The **rasterising arms** draw a **`status` at `error`** carrying the fault, `alt` beneath it as the caption it always was, at the height the block committed and no more — **the arms, and not the block** (F413): the protocol arm needs the decoder only for `imageCells`'s aspect, and `decodePng` reads the IHDR before it refuses, so the extent survives what the rasteriser cannot. A picture the terminal can decode is drawn rather than described. `error` is the state and not `retrying`, because no attempt is coming: this is the widened gloss doing its work — *an operation failed and nothing more is coming* (§3a) — and the box the shell returns from twelve sites is the same box here. **The fault is not a verdict about the picture, only about this decoder**, and that is why it cannot gate the block: at the protocol arm the terminal decodes, the transmission is the bytes unchanged, and the identity is a hash of them. `Decoded`'s failure arm carries `size` so geometry and rasterising can want different things (→ C04 I73, C09 §8b G7).
+- **I39** — **A GIF is an image with more than one frame; the frame is view state read below the protocol arm, and on kitty the terminal animates.** The six-byte signature chooses `decodeGif` beside `decodePng` behind one front door (`decodeImage`), every frame is composited onto the logical screen before anything above the codec sees it, and delays under 20 ms are shown at 100 (§4c). **`measure` never sees the frame** (I8, C04 I93): `height` is declared and every frame shares the screen, so a GIF measures as its first frame does at every width, and the rasterising arms draw `frames[ctx.frames[id] ?? 0]` while the protocol arm ignores the field. **The kitty ruling is the measured one**: retransmitting a frame per tick would cost 75 bytes an 8x8 and 29,662 bytes a 320x240 per tick — 297 KB/s at 10 fps — where the animation protocol (`a=T` for frame 0 as raw RGBA, `a=f` per later frame with its gap, one `a=a` to start the loop) uploads once — 116,509 bytes for four 320x240 frames — and costs nothing per tick, so on that arm the shell arms **no wake**; a terminal without the extension keeps frame 0, which is the alternative ruling drawn by accident rather than a failure. **The fixtures are real and compared to a second decoder**: written by `sharp`, decoded pixel for pixel against `sharp`'s composited pages, with each blob's bytes scanned for the feature its row claims (→ C04 I93, C22 I77, C09 §4c).
 
 ---
 
@@ -1453,6 +1605,8 @@ next frame. MG27 is what keeps a producer from writing one (`BUILDER_OMISSIONS`)
 38. **The window's residual is a pair, and `window` is handed `measureChild`** (I26, I26a). Slack falls at both ends: `skipRows` is leading only, and `table` is the first kind whose last unit can hang past `to`. The consumer has been dropping trailing rows on every frame — `session.ts` writes `rows.slice(0, ve.takeRows)` — so `dropRows` states an operation the seam already depended on, rather than granting a new one; and the identity keeps its equality, because relaxing it to `≥` would pass every wrong answer inside the bounds (→ FINDINGS F428).
 39. **A kind pins a *presence* as readily as a width, and `table` pins two things and re-sorts nothing** (C11 I18, I19, I20). The action bar exists or does not, so a window moves it in **both** directions; the display order is not idempotent under slicing, because `kindOf` reads the values present and a slice can re-classify its own column. Neither field is a producer's, on `numberWidth`'s argument (→ C11 §5a, C25 I21a, FINDINGS F429).
 40. **A span's offsets meet the wrap, the cut and the cluster through the functions that already own them, and each gains one property rather than a sibling** (I1, I9, I19). Rows carry a source `start` and `wrapCells` projects them; a boundary inside a cluster snaps outward at both ends and the width does not move; runs coalesce by style reference so an unspanned row's bytes are unchanged; and `truncateParts` measures its marker as `truncate` does, which closed a one-cell overshoot at `ambiguousWidth: "wide"` (§5, → C04 §3am, C04 I84, C04 I86, C10 I33).
+41. **An animated image is the image block with a frame index from the context, and the kitty arm hands the terminal every frame once** (I39). The signature chooses the decoder, the frames are composited in the codec, `measure` never sees the frame, and the wake is the orbit's — a still arms nothing. The protocol ruling was taken on measured bytes rather than on the roadmap's estimate, and its degradation on a terminal without the animation extension is the ruling it replaced (→ C04 I93, C22 I77).
+41. **A run's tone and value reach colour through the resolvers that already own them, and the one span member that is geometry is carried by the wrapper as one property** (I1, I9, → C04 I89, C04 I90, C10 I31, C10 I33). A tone replaces the block's style through the memoised `tone()` call the block made; a value paints a background through `continuousColour` and says nothing below 8-bit; `wrapCellsParts` takes atoms and `notice` measures and renders through one `noticeRows`; a focused table row drops span tones as it drops cell tones; markdown's inline code is the `identifier` tone (§5).
 
 ---
 
@@ -1475,6 +1629,9 @@ rules could both claim the answer (CLAUDE.md, *rule interactions come in two kin
 | G7 | **bytes do not decode** × protocol arm | **the picture** — the terminal decodes, and the fault gates only the arms that rasterise | *the fault box, everywhere*, which is what F410 shipped and it was half right. The reason must reach a reader, and the block is the wrong place to gate: **measured, the protocol arm needs the decoder for exactly one thing** and the refusal does not take it away. FINDINGS **F413** |
 | G8 | `ambiguousWidth: "wide"` × 24-bit, no overlay | **braille** | nothing better is available, and the loss is worth naming: colour is present and unusable, which is the only rung where the terminal has more than the ladder can take |
 | G9 | a **1-pixel-tall** image × half block eligible | **half block**, both halves resolving to row 0 **by the arithmetic** | *index `y*2+1`*, off the end of the image — and that is a **point-sampling** implementation's hazard, which this is not. The ruling first said *clamped to the last row* and credited a guard: measured over 1.24 billion coordinates, **not one of `sampleRgb`'s four clamps ever binds**, because the coordinates are fractions of the image's own extent. Right about the cell, wrong about the mechanism — FINDINGS **F412** |
+| G10 | **protocol arm** × an image with more than one frame | **every frame uploaded once**, the terminal loops, **no wake** | *transmit the current frame each tick at the stable id* — the design the roadmap priced, and the figures refuse it: 29,662 bytes a tick for a 320x240 where the animation protocol is 116,509 once. And *frame 0 only* is what the chosen design already degrades to on a terminal without `a=f`, so it is not a second option but the first one's failure mode (I39) |
+| G11 | **placement refused** (G3) × an animated image at `kitty` | **half block, frame 0, still** | *the half block animates it* — it cannot, because the wake is not armed on the protocol arm and the store never advances; the rung is reached only past `MAX_PLACEHOLDER_SPAN`, so the picture is 298+ cells wide and the loss is a still where a still was already the honest answer. Recorded rather than repaired: arming the wake on the refusal path would mean the block telling the shell which arm it took, and no seam carries that |
+| G12 | **bytes do not decode** (G7) × a GIF at the protocol arm | **nothing drawn**, the fault box on every rasterising arm | *fall through to the bytes as for a PNG* — which is what the code does and is honest about: `f=100` with GIF data is a placement the terminal cannot decode, exactly as a corrupt PNG is, and the G7 argument (the terminal's decoder reads what ours refuses) has no GIF instance because the terminal reads no GIF at all. §4c's loud failure, and the same one the PNG path already has |
 
 ### G7's other half — measurable after all, and the answer moves the refusal
 
@@ -1565,6 +1722,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 
 ### Tier 1 — unit
 
+- **IF8** (C22 I77): `Frames.advance` is a function of elapsed time — four wakes of 25 ms and one of 100 leave the index, the remainder and `due` where one wake of 200 does; a full loop is frame 0 and keys as untouched; a minute idle lands where the clock says; a still and a zero advance are no-ops. In `test/edge/image-frames.test.ts` beside the rows that consume it.
+- **IF9** (I39): `transmitAnimation` is one `a=T` as raw RGBA, one `a=f` per later frame carrying its delay in `z`, an `a=a` for the root frame's gap and an `a=a,s=3` to run — every escape under 4096 bytes — and on the 8x8 fixture the whole upload is under ten ticks of retransmission.
 - **T1.1**: `register` in open state → `get` returns it, `kinds` includes it.
 - **T1.2**: `seal` → `sealed` true, existing kinds still resolve.
 - **T1.3**: `measure`/`render` after seal → work normally.
@@ -1587,6 +1746,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T1.16b** (I20): a double-width cluster straddling either boundary is dropped and its cell blanked, in both directions — the window is still exactly `to − from` cells and never `to − from ± 1`. Asserted at the left edge as well as the right, because the two are different code paths and only the right one resembles `truncate`.
 - **T1.16c** (I20): the composition law over a styled line, for every split point — `sliceCells(t, 0, a)` and `sliceCells(t, a, b)` measure `b` together. A property over the splits rather than three chosen ones, because the case that breaks it is whichever `a` lands inside a cluster and no chosen `a` is that one by construction.
 - **T1.17** (I9, I19, C04 I84, C04 I86): the four mechanisms of §5's *Runs* — `wrapCellsParts`'s rows are exact source slices from `start` with the break space in no row, and equal `wrapCells`'s; `runsOf` concatenates to `stripControl(text)` with a control character inside a span; a boundary inside a ZWJ family snaps outward and a span that collapses onto one boundary is dropped; `truncateParts` reports `start` from either end and, at `ambiguousWidth: "wide"`, `kept` plus a two-cell marker fits the limit. **Covered today by `test/unit/spans.test.ts` §*C09 — runs*, whose rows cite C04 I84 and C04 I86 and carry no C09 number** — the number is owed to those rows, not to a second file.
+
+- **T1.19** (I9, C04 I89, C04 I90): the tone-and-value half of §5's *Runs* — `runsOf` copies `tone` and `value` onto the run and `sliceRuns`, `runLines` and `wrapRuns` carry them; `wrapCellsParts` with an atom never breaks strictly inside it — a space inside the atom is skipped, a full row with no outside break point breaks at the atom's start when something precedes it, and an atom wider than the row is broken as text; `wrapRuns` derives the atoms from `value` alone, so a bold run is not one. Asserted on the row texts and starts, beside the plain wrapper's answer for the same string.
 
 ### Tier 2 — contract / interface
 
@@ -1616,6 +1777,15 @@ Six tiers. Every cell of the §6 transition table is covered.
 
 ### Tier 3 — edge cases
 
+- **IF1** (C04 I93): a PNG, a two-frame GIF, a one-frame GIF and neither are four answers from `decodeImage` — a still has no `animation`, a GIF's `pixels` is its frame 0, and `decodePng`'s own refusal wording is untouched behind the front door (HB8 reads it).
+- **IF2** (I39): every fixture decodes pixel for pixel to `sharp`'s composited pages, **eight frames compared and the count asserted**; each fixture's bytes are scanned for what its row claims — A's local table, B's sub-rectangles and transparent index, C's interlace bit, D's per-frame tables. Its control flips a byte of LZW data, which must change or refuse the frame.
+- **IF3** (I39): B's bytes carry delays of 0, 1 and 5 hundredths and arrive as 100, 100 and 50 ms; clearing C's interlace bit permutes its rows, so the flag is read rather than assumed.
+- **IF4** (I39): disposal 2, reached by patching B's control byte at an offset the scan finds, leaves frame 2's rectangle transparent under frame 3 where frame 3 does not paint; disposal 3 restores frame 1's dot. Its control is the unpatched bytes — disposal 1 — where the same cell is opaque.
+- **IF5** (I39, I38): a header cut short refuses with no extent; a zero logical screen refuses; a forbidden LZW code size refuses **with the extent**, and the block draws that reason in the `status` box.
+- **IF6** (C04 I93, I39): the half-block arm, read in colour — frame 0 is `38;2;255;0;0` and never green, frame 1 the reverse, no field is frame 0, index 2 of two wraps to 0.
+- **IF7** (I39): the dither arm draws a different picture at frame 2 than at frame 0 with the same row count; the kitty arm's placeholders are identical at both; `framesOf` answers the delays for the GIF and `null` for a still.
+- **IF10** (I39): `transmitImage` at `kitty` sends a GIF as `a=f` frames and never under `f=100`, a PNG beside it as its bytes, neither twice, nothing off the protocol arm, and an overlaid GIF composites into every frame.
+- **C04 T2.39**'s GIF half (C04 I93): `measure` and `imageCells` of the GIF equal the PNG of its first frame at widths 1, 2, 3, 8, 40 and 120, and the rows drawn at frames 0, 1, 2 and 7 all equal `measure`. Landed here rather than in `owed-gate.test.ts` because before the decoder a GIF fell to `alt` and measured 1 where the PNG measured 3.
 - **T3.1**: `measure` before `seal` → works.
 - **T3.53** (I33, → C04 I67): `measure` returns `max(definition.measure(…), minHeight)`. A block already taller keeps its own number, which is the arm a floor-always-wins implementation passes the other rows with.
 - **T3.54** (I33, I1): **the render pads and never bounds.** A one-row block with a floor of three draws three; a four-row block with a floor of three draws **four, first row included**. The second half is the row that matters — a fixed height drops an over-full box's *first* row, measured, and `overflowY: "hidden"` does not change it.
@@ -1666,8 +1836,11 @@ Six tiers. Every cell of the §6 transition table is covered.
 
 - **T3.65** (I19, C04 I86): the bytes rows for the same mechanisms — a span across a wrap, a span straddling a cut with the marker outside it in both directions, a boundary inside a cluster, a substituted cluster at width 1 — are C04 T3.62–T3.65 in `test/edge/spans.test.ts`, asserted on the painted row and never on a count, because every height assertion passes for a span sliced one unit early. C09's number is owed to them on T1.17's terms.
 
+- **T3.66** (I1, C04 I89, C04 I90, C10 I31): **the frames** — `"The cat sat on the mat ."` with a value per token at width 12 and at 80 paints one `48;5` background per token at 8-bit and none between them, two rows at 12 and one at 80, and the same document at 4-bit is byte-identical to the unvalued one; `"x(abcde)yz"` at 6 is two rows plain and three valued, and the valued row is the whole token; a `tone: "identifier"` span on a table cell paints the identifier colour on an unfocused row and the accent colour, unbroken, on the focused one; `measure` equals the rendered row count in every case.
+
 ### Tier 4 — integration
 
+- **C22 T4.17o, T4.17q** (C22 I77) — the wake, in `test/edge/image-frames.test.ts`, runnable since the validator accepted a GIF (F619, the gate landed with F628): a still arms no wake in 990 ms; a 100/200 ms GIF renders six times in 990 ms and not thirty, seeing frames `1 0 1 0 1 0`; at `kitty` the same document arms nothing; beside an 80 ms spinner the frame does not move at 80 ms and has at 120.
 - **T4.1** (with C11, C12): `table` and `plot` register through the public mechanism and satisfy the T2 suite identically to built-ins.
 - **T4.2** (with C10): the same block in both themes produces identical row counts.
 - **T4.3** (with C10): under `colourDepth: 1`, every tone resolves to a typographic style and status remains distinguishable by glyph alone (D29).
@@ -1685,6 +1858,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 
 ### Tier 6 — fail-on-revert
 
+- **T6.85** (I39): `decodeImage` never dispatching to `decodeGif` → IF1 fails, every GIF refused as *not a PNG*; disposal never applied → **IF4** fails while IF2's disposal-1 fixtures all pass, which is why IF4 patches the byte; interlace read as progressive, the transparent index painted, or the KwKwK case dropped → **IF2** fails against `sharp`'s pages; the delay clamp removed → IF3; the renderer reading frame 0 regardless of the context → **IF6**'s green arm fails while every row count passes; a GIF sent under `f=100` → IF10; later frames not uploaded → IF9. `tools/mutate/runs/c09-gif.mjs`, with `canvas[d + 3] = 0` as its control.
 - **T6.1** (I1): a measurer that under-counts wrapped lines by one → T2.1 fails at the wrapping width.
 - **T6.75** (I33): the `max` removed from `registry.measure` → T3.53 fails, and T4.49's second frame draws the one-row figure again — which is the defect as it shipped.
 - **T6.76** (I33, I1): the padding removed from `registry.render` → T3.54 fails. `measure` returns the floor and the element draws its own height, which is an I1 violation created by the mechanism built to keep I1 whole.
@@ -1713,6 +1887,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.24** (I31): letting the width ladder drop a row instead of reassigning it → T3.40 fails, and a narrow `status` block is shorter than `measure` committed. **The row count moving with the width is I1's divergence reintroduced through the path built to prevent it.**
 - **T6.25** (I31): labelling the height ladder's top rung `≥ 5` → T3.39 fails at exactly five rows. **The rung as it was first written**: two borders, two blanks and a tag row is six, and the figure was specified at five for as long as it existed on paper — caught by drawing it rather than by any assertion, which is why this row exists at all.
 - **T6.77** (I9, C04 I86): restoring `limit − 1` in `truncateParts` → T1.17's wide arm fails, `kept + suffix` at `limit + 1`; slicing wrapped spans by prefix sums of row lengths → C04 T3.62 fails on the second row, one unit early, and C04 T6.83 shows the reverted arithmetic beside the ruled one; `paintRuns` closing and reopening the same style between two plain pieces → every golden frame moves while drawing the same picture, which is the gate's no-move read as a row rather than as luck.
+- **T6.84** (C04 I89, C04 I90): `paintRuns` ignoring `run.tone` → C04 T2.35's rendering half fails on the run's colour while every attribute row still passes; ignoring `run.value` → C04 T2.36's rendering half fails on the missing `48`; `wrapRuns` passing no atoms → T1.19 and T3.66 fail on `"x(abcde)yz"`, and `notice`'s measure still equals its render because both go through `noticeRows` — which is the row that says the pair was kept honest by sharing the function and not by two sides agreeing; `notice.measure` restored to `wrapCells(stripControl(text))` → T3.66's `measure` arm fails at 6 by one row, with every frame still drawn; `cells.ts` keeping a span tone on a focused row → T3.66's focus arm fails on a `38` inside the accent run.
 - **T6.26** (I32): excluding `error` from animating → T3.43 fails, and `retrying` — which is `error` plus a line — loses its spinner. A per-state branch is the exception the composition immediately needs.
 
 ---

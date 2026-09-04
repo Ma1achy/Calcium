@@ -109,6 +109,19 @@ its entry is evicted or the transcript is cleared — C23 I9 and C23 I33, and §
 *teardown on freeze* row was deleted against exactly that. An app wanting launch
 to be cheap omits `every` and gets a one-shot.
 
+**`maxBlockRows` is the most rows one block may occupy** (C14 §4b, C14 I24; C09 §2b).
+
+```ts
+maxBlockRows?: number;   // a positive integer; default 2 000
+```
+
+A block over it draws its first rows and one marker row — `… 2,000 of 50,000 rows` — and
+the cap is the registry's, generic over `BlockDefinition`: it reaches an app's own kind
+the day that kind declares `window`, and never reaches a kind that does not (C14 I26). It is
+**per session and the app's to raise**; there is no per-block override, because a cap an
+adapter can lift per block is a cap on nothing. `0`, a negative, a fraction and `NaN` are
+refused at `createTui` as a `ConfigError` naming the field, before anything is built (C22 I7a).
+
 **`ManifestDocument` is what an author writes; `Manifest` is what the parser
 returns.** The distinction is new and it is C24's most expensive omission to date.
 

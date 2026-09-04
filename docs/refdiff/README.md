@@ -68,6 +68,7 @@ adding one means adding a reference renderer beside it.
 | graph | — | — | *no reference renderer — see reference.py SKIPPED* |
 | tree | — | — | *no reference renderer — see reference.py SKIPPED* |
 | treemap | — | — | *no reference renderer — see reference.py SKIPPED* |
+| sankey | — | — | *no reference renderer — see reference.py SKIPPED* |
 | calendar | — | — | *C04 I50b — as heatmap* |
 | correlation | — | — | *C04 I50b — as heatmap* |
 | confusion | — | — | *C04 I50b — as heatmap* |

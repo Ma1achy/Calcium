@@ -211,8 +211,9 @@ residue is paid in `skipRows`/`dropRows` as C09 I26 requires.
 
 **What this does not do.** It does not cap what an adapter may put in one block — a
 2 000-line `code` block is still 2 000 rows to scroll through, which is roadmap 46's
-territory — and it does not touch the first measure of a new entry, which is a property of
-`codeRows` and already cheap. It bounds the paint, which is the whole of what lagged.
+territory and, since §4b landed, the row cap's — and it does not touch the first measure of a
+new entry, which is a property of `codeRows` and already cheap. It bounds the paint, which is
+the whole of what lagged.
 
 **Owner.** The definitions live in `presentation/blocks/kinds/code.ts` and `simple.ts` (C09);
 this section states the bound the viewport relies on, and C09 I25 and C09 I26's rows check the
@@ -237,6 +238,114 @@ after). What remains linear in the document is a control-strip and a split over 
 frame, ~20 ms at 20 000 lines, which is the residue the heading names. **T1.18 asserts the rows
 produced rather than the milliseconds** — a CPU-fraction assertion measures the host, and the row
 count is the property the paint is linear in; the figures here are the record.
+
+---
+
+### 4b. The cap — rows one block may occupy, and the marker that says what was cut
+
+**Ruled 2026-09-04, measured first.** §4a bounds what one *frame* paints of a block; nothing
+bounded the block. A 50 000-row `logs` result is still 50 000 rows to scroll through, and every
+path with no window — a `panel`'s children, a pushed view's content, the conformance suite's
+whole render — paints all of them. The roadmap's *and a bound, because a fix is not a guarantee*
+suggested 2 000 rows with a visible marker, and named the whole-block `measure` as the cost.
+Measured against `dist/`, one block at width 100, before anything was built:
+
+| kind | rows | `measure`, whole | paint, whole | paint of `window [0, 500)` | `[0, 1 000)` | `[0, 2 000)` | `[0, 5 000)` |
+|---|---|---|---|---|---|---|---|
+| `logs` | 2 000 | 0.1 ms | 804 ms | 165 ms | 279 ms | 506 ms | — |
+| `logs` | 50 000 | 0.2 ms | — | 163 ms | 323 ms | 566 ms | 1 478 ms |
+| `raw` | 50 000 | 20.5 ms | — | 157 ms | 238 ms | 454 ms | 1 122 ms |
+| `code` | 50 000 | 17.7 ms | — | **1 696 ms** first, 196 ms after | 361 ms | 699 ms | 1 568 ms |
+| `table` | 50 000 | 0.6 ms | — | 131 ms | 210 ms | 400 ms | 940 ms |
+
+(`code`'s 20 000-row whole paint was 7 339 ms and `table`'s 3 872 ms; the 50 000-row whole paints
+were not taken.)
+
+**Three things the figures say, and the first one corrects the premise.** The whole-block
+`measure` is not the cost: 0.6 ms for a 50 000-row `table`, 0.2 ms for `logs`, and ~20 ms for
+`raw` and `code`, which is one split of the text. **A cap cannot bound it anyway** — the marker
+has to say *of 50 000 rows*, and knowing the total is the whole of what `measure` does — so the
+sentence that motivated the cap names a cost the cap does not touch and that does not need
+touching. Second, **paint is ~0.25 ms a row for every kind and linear with no knee**; nothing in
+the table picks a number, because halving the cap halves the cost at every size. Third,
+**`code`'s first paint tokenises the whole text whatever the window** — 1 696 ms at 50 000 rows
+for a 500-row window — because the window keeps `text` whole for the pin (§4a, C09 I25a). The
+cap through the window seam inherits that: the parse stays linear in the block. At `from === 0`
+the pin is unnecessary — nothing precedes the slice — so a `code` window opening at the first
+line could cut its text and tokenise only what it keeps; that is C09's to land and is recorded
+here rather than built around.
+
+**The ruling.** `TuiConfig.maxBlockRows`, default **2 000**, is the most rows one block may
+occupy. The default is a reading-length policy and not a figure the table produced: fifty
+screens of forty rows, and the number `MAX_ROWS` already gives the fallback adapter — one number
+in the tree rather than two that drift. It is the app's to raise, per session; a per-block
+override is **not** in scope, because a cap an adapter can lift per block is a cap on nothing.
+
+**A capped block draws its first rows and one marker row in `muted`** — `… 2,000 of 50,000 rows`
+(`~` on an ASCII terminal, `truncate`'s own pair) — D40's shape (C13 I14) one axis over. The
+marker is a row: `measure` counts it, the window sees it, and a reader scrolling to the block's
+foot reads what was cut rather than a block that happens to end. The alternative, a silent cut,
+is the empty-block class again.
+
+**It lives in one place, generic over `BlockDefinition`**: the registry's own `measure`, `render`,
+`elementsOf` and `windowSequence` (C09 §2b) resolve a block to its *capped form* before the
+definition sees it. The capped form is the definition's own `window(block, w, 0, cap)`, so **no
+kind implements the cap** and every kind that can be windowed is capped by the same code; the
+form carries `capped: { shown, total }` as view state, on `lineRange`'s argument (C04 I82) —
+written by the framework and refused from a far side. `shown` is `measure(window.block)` and not
+`cap`, because a window is a unit boundary: a `table` whose 2 000th row is expanded keeps the
+whole row (C09 I26's `dropRows`) and the marker says `2,003 of 50,001`, which is true. **Both
+numbers are display rows** — the unit `measure` counts and the reader scrolls — so a table's
+marker counts its header and its expanded details, not its data rows; the cap is on what a block
+*occupies*, and a kind's own unit is the window's business.
+
+**What is inside the cap and what is out, and it is one predicate.** The cap applies to exactly
+the kinds that declare `window` — `logs`, `raw`, `code`, `patch`, `table`, `keyValue` — because a
+kind's `window` is its statement that its rows are its lines. The kinds atomic by ruling are
+outside it by the same absence: `plot` (C12 I1 — reducing its data changes nothing about its
+height), `image` (a picture has an aspect, not lines), `scroll` (C04 §3c — its height is
+declared), `panel` and `group` (their height is their children's, and each child is capped
+through the child seam), `mosaic`, and every single-row kind. **No list of kinds is consulted**,
+which is what keeps the predicate right when a twentieth kind arrives: a kind that declares
+`window` is capped on the day it does.
+
+**The window and the cap compose, and the marker travels with the piece that reaches it.**
+`windowSequence` windows the *capped* block: rows `[from, to)` below the marker are the
+definition's window over the capped form with `capped` stripped, so a window in the middle of a
+capped block is byte-identical to one over the uncapped block; a window whose `to` reaches the
+marker row carries `capped` onto the piece, and the piece measures its definition's rows plus
+one. A window over the marker row alone takes the last content row and charges it to `skipRows`,
+because no kind's window returns zero rows (C09 §2a, C11 I20). The field is attached *after* the
+definition's window and never before it — `patch`'s window builds a fresh block and would drop
+it, and a field a kind can lose is not view state.
+
+#### The walk — indexed by rule interaction
+
+| cell | the rules that meet | ruling |
+|---|---|---|
+| cap × window inside the capped rows | I23 · I24 | The piece is the definition's window over the capped form, `capped` stripped; rows are the uncapped block's rows at the same offsets |
+| cap × window reaching the marker | I24 · I25 | The piece carries `capped`; `measure(piece) = definition.measure + 1`; the consumer's `takeRows` reaches the marker |
+| cap × window over the marker alone | I25 · C11 I20 | `window(shown − 1, shown)` and `skipRows + 1`: one content row paid as slack, then the marker |
+| cap × an expanded row at the boundary | I24 · C09 I26 | The unit is kept whole and `shown` says so; the marker reads `2,003 of 50,001` rather than a number the frame does not show |
+| cap × `minHeight` floor | I24 · C09 I33 | Cap first, floor after: `max(shown + 1, floor)`. A floored block is not windowed and is still capped — the capped form is what `windowSequence` keeps whole |
+| cap × D40's eviction marker | I24 · C13 I14 | Two axes, two markers, no interaction: D40 counts blocks per session and this counts rows per block. A session at both caps shows both, and the D40 notice is one row and never itself capped |
+| cap × a block exactly at the cap | I24 | `total ≤ cap` → no marker and the **same block reference**, so nothing downstream can tell the cap exists |
+| cap × `collapsedBefore` in a patch | I24 · C25 I18 | Collapsed regions are rows of the patch's own window; the path and hunk headers the window forces are inside `shown`; the fresh block `windowRows` builds is why `capped` is re-attached by the registry |
+| cap × a container's child | I24 · C09 I7 | `panel`'s children reach the registry through `measureChild`/`renderChild`, so a 50 000-row `logs` inside a `panel` is capped where the panel's own paint could not be windowed |
+| cap × `scroll`'s content | I24 · C04 §3c | The child is capped; `contentHeight` reads the capped height through the same seam, so the offset arithmetic and the drawn rows agree |
+| cap × a piece re-entering the registry | I24 | A block already carrying `capped` is never re-capped: its definition's rows plus one, and its window strips or carries the field as above |
+| cap × a throwing `measure` (C09 I11) | I24 · C09 I11 | The capped form needs the whole measure and never exists for a block whose measurer threw; containment is unchanged and the error block is drawn at the committed height |
+| cap × `elements` (C26) | I24 · C26 I8 | Elements are declared over the capped form: nothing beyond the cap can be focused, and the marker row declares none |
+| cap × the height cache (I3) and the lines cache (C22 I58) | I24 · I3 | The cap is a registry constant for the session; no key changes |
+
+**Read as frames, three cells**: a `logs` block one row over the cap (two thousand lines and the
+marker, no third state); a `table` whose boundary row is expanded (the marker names the rows the
+frame shows); and a window opening at row 1 998 of a 2 000-cap block (two content rows, then the
+marker, and the rows are the uncapped block's 1 998 and 1 999).
+
+**Owner.** The registry is C09's and holds the code (C09 §2b); this section holds the bound the
+viewport relies on, and I24–I26 state it. `TuiConfig.maxBlockRows` is C24's shape and C22's
+plumbing.
 
 ## 5. Resize
 
@@ -325,6 +434,9 @@ Copy mode remembers whether it was following, so leaving it resumes the tail rat
 - **I21** — `resize` to the size already held is a no-op: nothing is captured, nothing is restored, and **no `Change` is emitted**. The emit is the load-bearing half — a change reports that the view moved, and a view that did not move must not report one, whatever the caller intended by the call. C01 delivers a `SIGWINCH` whenever the size *may* have changed and holds no previous size to compare against, so this component is the first one that can tell.
 - **I22** — The height handed to `resize` is the **transcript region's**, not the terminal's. C14 holds no geometry above itself and cannot derive one from the other — the difference includes the prompt, whose height varies with what is typed — so the caller composing the frame owns the value (C22 I34). The failure is silent in both directions: too tall and `#maxTop()` leaves the document's last rows unreachable by any key, while the surplus rows `visible()` selects are discarded by the paint, so no count downstream is ever surprised. I10 holds throughout, because it compares the viewport with itself.
 - **I23** — **The render path draws at most the region's rows of any one block, plus a residue.** Every kind whose rows are its lines declares a `window` (C09 I25) — `logs`, `patch`, `table`, `keyValue`, and `code` and `raw` since §4a landed — and a window that must pin what the whole block derived carries the pin as view state (`presorted`, `lineRange`). Kinds that are atomic by ruling (`plot`, C12 I1; `scroll`, C04 §3c) are the stated exceptions and are bounded by their own height. A frame's paint cost is then linear in the region, not in the document, which is the property D40 was mistaken for providing.
+- **I24** — **One block occupies at most `maxBlockRows` rows plus one marker row, and the marker says what was cut.** The registry resolves every block to its capped form before any definition sees it — `window(block, w, 0, cap)` with `capped: { shown, total }` attached — so `measure` counts `shown + 1`, `render` draws `shown` rows and then `… shown of total rows` in `muted`, and no kind implements the cap. `shown` is the window's own rows and not `cap`, because a window is a unit boundary and the marker must name the rows on screen. A block whose rows are within the cap is returned by reference, unchanged. Default 2 000, the app's to raise per session and never per block (§4b, C09 §2b).
+- **I25** — **The window and the cap compose: a window over a capped block windows the capped rows, and the marker travels with the piece that reaches it.** `windowSequence` windows the capped form; a range below the marker yields the definition's window with `capped` stripped — byte-identical to the same range of the uncapped block — and a range whose `to` reaches the marker row carries `capped` onto the piece. The field is attached after the definition's window, never before, because a kind's window may build a fresh block and drop it. C09 I26's identity holds for every window of a capped block with the marker counted as one row.
+- **I26** — **The cap applies to exactly the kinds that declare `window`, and no list of kinds is consulted.** A kind's `window` is its statement that its rows are its lines; the kinds atomic by ruling — `plot` (C12 I1), `image`, `scroll` (C04 §3c), `panel`, `group`, `mosaic` and the single-row kinds — are outside the cap by the same absence that makes them unwindowable, and a container's children are capped individually through the child seam. A kind that declares `window` is capped on the day it does.
 
 ---
 
@@ -352,6 +464,9 @@ Copy mode remembers whether it was following, so leaving it resumes the tail rat
 20. A resize to the size already held does nothing and emits nothing (I21).
 21. The height `resize` is given is the transcript region's, and the caller that composed the frame owns it (I22).
 22. One block's rows on the render path are bounded by the region plus a residue, through the window seam and not through a cap on content (I23, §4a).
+23. One block occupies at most `maxBlockRows` rows plus a marker row that names what was cut; the cap is the registry's, generic over `BlockDefinition`, and no kind implements it (I24, §4b).
+24. A window over a capped block windows the capped rows, and the marker travels with the piece that reaches it (I25, §4b).
+25. The cap applies to exactly the kinds that declare `window`; atomic kinds are outside it by the same absence, and a container's children are capped through the child seam (I26, §4b).
 
 ---
 
@@ -381,6 +496,8 @@ Fake heights, no rendering.
 - **T1.16** (I18): exactly one visible entry reports `live: true`, and it is C13's `liveId`; a transcript with no live entry reports none.
 - **T1.17** (I18): measured heights are identical with and without the **live gutter** — it costs no rows. *Not the eviction marker, which is an ordinary entry and costs exactly the rows it measures (I13, C13 I14). Two different things were called "the marker" in one spec, and only the citation distinguished them.*
 - **T1.18** (I23): a 2 000-line `code` block and a 2 000-line `raw` block, windowed at `[0, 40)` through `windowSequence` → each windowed block measures at most `40 + skipRows + dropRows`, and the painted rows are the same forty the whole rendering would have put there (C09 I25). A block comment opening above the window and closing inside it → the rows inside are still drawn in the comment slot (the `lineRange` pin).
+- **T1.19** (I24): with `maxBlockRows: 10`, a 25-line `logs` block measures 11 and renders ten lines and the row `… 10 of 25 rows`; a 10-line block measures 10, renders no marker, and `windowSequence` hands back the **same block reference**; the same for `raw`, `code`, `keyValue`, `patch` and `table` — six kinds, one code path. A `plot` and a `panel` of the same nominal size are untouched, and the panel's 25-line child is capped inside it (I26).
+- **T1.20** (I24, I25): the marker is a row the window sees — `windowSequence` over a 25-line `logs` block capped at 10, at `[9, 11)`, yields a piece measuring 2 with `skipRows` 0 (line 9, then the marker); at `[10, 11)` a piece measuring 2 with `skipRows` 1, whose kept row is the marker alone; at `[3, 7)` a piece with no marker and no `capped` field whose rows equal the uncapped block's 3–6 byte for byte. **Read as frames**: the row text is asserted, not the count.
 
 ### Tier 2 — contract / interface
 
@@ -397,6 +514,8 @@ Fake heights, no rendering.
 - **T2.7**: every `Change` variant from C13 has a documented cache effect — exhaustive over the union.
 - **T2.11** (I19): over the same fuzz corpus as T2.1, `entryAtRow` agrees with `visible()` for every occupied row — the entry it names is the one whose `skipRows`/`takeRows` span covers that row, and the `rowOffset` it returns lands inside that entry's height. Asserted against `visible()` rather than against a hand-rolled walk, or the test reimplements the thing it checks and the two agree by construction.
 - **T2.12** (I19): `entryAtRow` performs no mutation — a thousand calls leave `scroll`, `anchor` and `stats` identical.
+- **T2.13** (I25, C09 I26): over every `[from, to)` of a capped `logs` and a capped `table`, `measure(piece) − skipRows − dropRows === to − from` with the marker counted, and the rows kept equal the capped rendering's rows at those offsets — the identity and the frame, because containment is not correctness.
+- **T2.14** (I24): `createBlockRegistry({ maxBlockRows })` refuses `0`, a negative, a fraction and `NaN` at construction, and `createTui` refuses the same values as a `ConfigError` naming `maxBlockRows` before anything is built.
 
 ### Tier 3 — edge cases
 
@@ -424,6 +543,12 @@ Fake heights, no rendering.
 - **T3.18**: a streaming entry patched a thousand times → the cache holds one live key for it, not a thousand.
 - **T3.19** (I23): a window opening in the middle of a wrapped source line → the whole line is kept and the surplus is charged to `skipRows`; a window of one row over a block whose every line wraps to three → one unit, `skipRows + dropRows === 2`.
 
+- **T3.20** (I24, C09 I26): a `table` whose row at the boundary is expanded to a three-row detail → the unit is kept whole, `shown` is `cap + 2` rows past the header, and the marker names `shown`, not `cap`. Asserted on the marker's text against the rows above it.
+- **T3.21** (I24, C09 I33): a capped block carrying `minHeight` above `shown + 1` measures the floor and below it measures `shown + 1`; in both cases `windowSequence` keeps it whole and the marker is drawn.
+- **T3.22** (I24, C13 I14): a transcript at the session block cap whose surviving entry holds a capped block → two markers on screen, D40's notice above and the row cap's beneath the block, and evicting further changes neither.
+- **T3.23** (I24, C25 I18): a `patch` over the cap → the piece is a valid `Patch` carrying its path header and `collapsedBefore` markers inside `shown`, and the registry's `capped` survives `windowRows` building a fresh block.
+- **T3.24** (I24, C09 I11): a kind whose `measure` throws on a block over the cap → contained exactly as before, one row, the fault reported once for `measure`; the cap adds no second report.
+
 ### Tier 4 — integration
 
 - **T4.1** (with C09): summed measured heights of a visible range equal the rows actually rendered, at seven widths. **The drift test.**
@@ -443,6 +568,8 @@ Fake heights, no rendering.
 - **T5.4**: the same, then `End` → snaps to the bottom and resumes following.
 - **T5.5**: dragging the terminal edge from 160 to 60 and back while scrolled to the middle → the same content is on screen at both ends, no blank frames.
 - **T5.6**: copy mode selecting forty rows across three entries and yanking → the clipboard holds exactly those rows as plain text.
+
+- **T4.11** (I24, with C13 and C09): a viewport over a transcript whose entry holds a 25-line `logs` block under `maxBlockRows: 10` → `totalRows` is `chrome + 11`, `visible()` at the foot selects the marker row, and the frame's last block row reads `… 10 of 25 rows`.
 
 - **T4.10** (with C13, §4): an entry appended empty and streaming, then settled with a document → `totalRows` covers its rows and `visible()` includes it. **The transition rather than either end**: `settle(id, doc)` is newer than this component's invalidation table, and both halves were separately correct while nothing measured the entry after the settle.
 
@@ -468,6 +595,8 @@ Fake heights, no rendering.
 - **T6.17** (I21): removing the unchanged-size guard → T3.12b fails, and every frame L4 composes emits a `Change` back at L4, because L4 now hands the region's height over per frame (C22 I34).
 - **T6.18** (I22): handing `resize` the terminal's height instead of the region's → C04 T5.1 fails at the foot of the document, and `paint`'s transcript region refuses the over-long selection instead of silently keeping its first rows. **Neither half of that existed when the defect did**: the paint truncated and the drift test was deferred, so the last three rows of every tall entry were unreachable and nothing in six tiers could say so.
 - **T6.21** (I23): removing `code`'s `window`, or dropping the `lineRange` pin so the slice re-tokenises from its first line → T1.18 fails on the row count in the first case and on the comment slot in the second; the frame is byte-identical for every block that has no multi-line token, which is why the pin's row is the comment one.
+- **T6.22** (I24): removing the capped-form resolution from `measure` alone → T1.19 fails on the count while `render` still draws the marker, and I1 is broken by the registry itself; removing it from `render` alone → T1.19 fails on the frame while the count holds, which is the silent-truncation class the marker exists to end. Removing the `capped` re-attachment in `windowSequence` → T1.20's `[9, 11)` piece measures 2 and the frame's last row is a content row, with every count in T2.1 still balancing.
+- **T6.23** (I26): consulting a list of kinds instead of `definition.window !== undefined` → T1.19's `panel` child row passes and the row for a test kind that declares `window` fails, because the list did not know it.
 - **T6.16** (I1): summing `measure(b, w)` instead of calling `measureSequence` → T2.9 fails, and every entry with a `gapBefore` is short by one row per gap. The most likely single defect in this component, because the summation is what a reader writes.
 
 ---

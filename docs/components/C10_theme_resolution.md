@@ -457,13 +457,16 @@ above are what tell them which.
 defect. The `▲` mark and the painted word `ERROR` both survive it, and both survive 1-bit where
 the colour does not (F34's two channels). A floor is a promise about text being readable; this
 one is being kept by a quieter promise, in a box whose whole subject is already visible.
-## 4e. Span attributes — set from the span, never from a slot, and lost rather than compensated where a depth cannot show them
+## 4e. Span attributes — set from the span, never from a slot, and lost rather than compensated where a depth cannot show them; and a span touches colour only through a named slot or the block's colormap
 
 C04 §3am gives four text members a `spans?: readonly TextSpan[]`, and a span carries three
-attributes — `bold`, `italic`, `underline` — and nothing a palette resolves. This section is
-the ruling on how those attributes meet a `Style` this component produced, and it extends
-the rule already written beside `Style.italic` (`theme/types.ts`): *an attribute a renderer
-sets, never a palette slot's fallback*.
+attributes — `bold`, `italic`, `underline` — and, since §3am.1 (2026-09-04), two members that
+*name* colour without *carrying* one: `tone`, a palette slot, and `value`, a reading through the
+block's `colormap`. This section is the ruling on how the attributes meet a `Style` this component
+produced, and it extends the rule already written beside `Style.italic` (`theme/types.ts`): *an
+attribute a renderer sets, never a palette slot's fallback*. The two colour-naming members are
+ruled at the end, and the ruling is that they add nothing to this component: each is resolved by
+the resolver its owner already has.
 
 **The merge is a spread, and it touches neither colour channel.** The renderer resolves the
 block's tone exactly as it does today — `tone(block.tone, theme, caps)` — and a run inside a
@@ -499,6 +502,32 @@ C25 I10 gives word-level diff emphasis to `underline`; a markdown span may also 
 writers, and no member has both: `Hunk.lines` carries no `spans` in the first pass (C04 I88)
 and when it does, its writer is the intra-line diff and not the markdown translator. The
 day a diff line can carry markdown, this paragraph is the row to reopen.
+
+**A span touches colour only through a named slot, resolved as any tone is** (C04 I89). A
+`tone` on a span is a `Tone`, and the renderer resolves it with the same `resolveTone(tone,
+theme, caps)` call the block made for its own — so it walks the same ladder, takes the same
+curated 4-bit index, collapses to the same `MONO` class at 1-bit and is memoised under the same
+key. It **replaces** the block's resolved style for the run rather than composing with it (a run
+cannot be two tones), and the span's attributes then spread on top exactly as above. Nothing here
+gains an entry: no `MONO` row, no floor, no ladder arm — a span never names a colour value, it
+names a slot, and C04's *a block names a palette slot; it never embeds a colour value* is now true
+of a run as well. The 1-bit consequence is the one §3 already states for every tone: a
+`tone: "identifier"` run is `normal` class, so on an `ok` block at 1-bit the run is the one *not*
+bold — the tone collapsed and was not compensated, which is I33's accepted loss with the sign
+reversed. The measured pair is C04 T2.35: at 24-bit the run's `38` is `identifier`'s and the rest
+of the row is the block's; at 1-bit the run's bytes are `identifier`'s collapse and nothing else.
+
+**And through the block's colormap, as a background, on the colormap's ladder** (C04 I90, I31). A
+`value` paints the run's background from `continuousColour(COLORMAPS[block.colormap], value,
+caps)` — heatmap's and image's resolver, unchanged — so it is `undefined` below 8-bit and the run
+paints plain there, `48;5` at 8-bit and `48;2` at 24. This is the **second** case I21's *a
+background only from a surface ref* admits, after the matrix cell (§4c): the background is the
+reading and no floor is measured for the text over it, and the ruling accepts that for the same
+reason it did there — a floor would delete the half of the map's range a map exists to encode
+(I31). The foreground is untouched: it is the block's tone or the span's, resolved above. A span
+carrying both `tone` and `value` takes its `38` from the slot and its `48` from the map, two
+channels from two owners, which is `withBackground`'s composition in the one other place it
+happens.
 
 
 ---
@@ -668,7 +697,7 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 - **I18** — A `defaultTheme` ships and satisfies every contrast floor, so the one required config field is one line to fill. A framework whose only required field has no working value is a framework nobody starts.
 - **I19** — Contrast is validated against `bg` and `bgElev`, the two surfaces text lands on, and never against `bgDeep`, which carries none. Validating against a surface no text meets would reject themes for a failure that cannot be seen.
 - **I20** — The shipped tokens are A01 Appendix A.1's catalogue, and T2.4 recomputes every ratio from them rather than trusting the recorded figures. The table is an assertion the suite upholds, not a record of intent.
-- **I21** — `Style` has exactly two colour channels, `colour` and `background`, and both are `ColourValue` or absent. `background` is set only by `resolveBackground` from a `surface` ref, **or by `wash`, which returns a blank `Span` and never a bare `Style`** (§4c). A palette slot still never resolves into it: a tone painted behind *text* is a tone nothing checked the floor for. `wash` is admitted because it carries no text — the floor is a property of a foreground on a surface, and a painted matrix cell has no foreground. The `Span` return is what makes that unforgeable: there is no way to hand the colour to a glyph.
+- **I21** — `Style` has exactly two colour channels, `colour` and `background`, and both are `ColourValue` or absent. `background` is set only by `resolveBackground` from a `surface` ref, **or by `wash`, which returns a blank `Span` and never a bare `Style`** (§4c), **or by a valued span through the block's colormap** (§4e, C04 I90 — the second admitted case after the matrix cell, and like it a framework channel rather than a palette slot). A palette slot still never resolves into it: a tone painted behind *text* is a tone nothing checked the floor for. `wash` is admitted because it carries no text — the floor is a property of a foreground on a surface, and a painted matrix cell has no foreground. The `Span` return is what makes that unforgeable: there is no way to hand the colour to a glyph.
 - **I22** — The two diff surfaces are text-bearing, and every `syntax` slot and every gutter tone (`ok`, `error`, `muted`) clears its floor against both in both variants (§4a) — **those twelve slots and no others**, asserted on the pairing rather than on its results, because a widened pairing passes on the tokens as shipped and only costs something later. There is no third or fourth: §4a measured a stronger pair for word-level emphasis and found under ten units of one channel between it and the plain pair, so word-level emphasis is `underline`'s and not a background's. `bgDeep` remains excluded because it carries no text; the criterion is text, not the word "surface".
 - **I23** — A diff background is the third signal and never the only one. At 1-bit it is absent, and the marker and the toned gutter carry the distinction alone (→ C25 I13, → A01 D29).
 - **I24** — A resolved colour always names its depth. There is no untagged form: `Style.colour` is absent or a `ColourValue`, never a bare string anywhere in the tree. The tag exists so a writer cannot guess, and a tag that is droppable is a tag that will be dropped.
@@ -683,7 +712,7 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 ---
 
 - **I32** — **`errorGround` and `errorInk` are one pair, minted together, checked together at the full meaning floor — and the floor on `error` is 2.5 because the slot now answers to two constraints that a dark page cannot satisfy at once.** The tag is the only painted run in C09's `status` box, and `tone.error` cannot stand in as its ground: it is authored as a foreground for a dark page, which is I21's rule from the other direction. The **ground is `tone.error` itself**, so text and box are one red by construction rather than by two literals kept in step by hand. **Measured over the whole 8-bit cube rather than over reds**: on dark and on high-contrast, **zero of 262,144** colours are both legible on `bgElev` and dark enough to hold white at 4.5; on light, **81,907** are, which is why light clears 4.5 unaided at 6.42–7.01. So 2.5 buys `#c62828` at **5.62 : 1** in the tag and costs the message text **2.83** against `bgElev` — `muted`'s standard, the quietest thing that must still be readable. **The alternative is real and is shipped**: high-contrast takes a light ground with dark ink, `#3d0000` on `#ff7171`, and needs no exception; the same would work on dark and gives up the dark red, which reads as a warning rather than a failure. **So this is a preference honoured, not a constraint discovered** — stated here because someone lightening the red to satisfy `FLOORS` would be undoing a decision rather than repairing an oversight. What keeps it honest is that the text is never the only carrier: the `▲` and the painted word both survive it, and both survive 1-bit where colour does not (§4d, F34). **And the pair has a 4-bit rung, which it was shipped without** (F240). The ground is `tone.error`'s **index** there for the same reason it is `tone.error`'s hex at 24-bit — one red by construction rather than two values kept in step — and the ink is the half that reads on it, which flips dark's from white to black because `tone.error` is a dark red at 24-bit and the bright one at four. **No ratio is claimed and none can be**: I26 rules the floor best-effort at this rung, 0-15 being the emulator's own values, so what is curated is a decision and not a measurement. **1-bit is untouched and is not the same case** — I8 leaves nothing to arrive, so the tag is distinguishable by being the one run that carries no styling, which is C09 §3a's rule and correct there alone.
-- **I33** — **A span's attributes are set by the renderer from the span, never resolved from a slot; they compose with the block's resolved tone by spread; and where a depth cannot show them they are lost and not compensated.** The merge `{ ...tone, ...spanAttrs }` writes at most `bold`, `italic`, `underline` and never `colour` or `background`, so a span never enters `MONO`, the ladder or a floor. At 1-bit a bold span on an emphasised-class block is absorbed — no fallback onto `underline` (C25 I10's) and no return to literal markers (C04 I85). The `unicode` axis gates glyphs and not attributes: SGR 3 is written at `ascii` exactly as at `full` (§4e, C04 §3am).
+- **I33** — **A span's attributes are set by the renderer from the span, never resolved from a slot; they compose with the resolved tone by spread; where a depth cannot show them they are lost and not compensated; and a span touches colour only through a named slot, resolved as any tone is, or through the block's colormap, resolved as any map is.** The merge `{ ...tone, ...spanAttrs }` writes at most `bold`, `italic`, `underline` and never `colour` or `background`; the tone it spreads onto is the block's, or the span's own `tone` resolved by the same `resolveTone` call and replacing the block's for the run (C04 I89); a `value` writes `background` through `continuousColour` and nothing below 8-bit (C04 I90, I31). So a span never enters `MONO`, the ladder or a floor **on its own account** — it names a slot or a reading, and the owner of each does the entering (§4e). At 1-bit a bold span on an emphasised-class block is absorbed — no fallback onto `underline` (C25 I10's) and no return to literal markers (C04 I85). The `unicode` axis gates glyphs and not attributes: SGR 3 is written at `ascii` exactly as at `full` (§4e, C04 §3am).
 
 
 ## 8. Commitments
@@ -716,7 +745,7 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 26. **A theme is refused for a family the framework will ask for and it does not have** — a missing palette and a collapsed one are one value at paint time, so the check is at resolve time, and it found the high-contrast theme drawing every plot series in one colour (I29, I30, F172, F179).
 27. **A colormap is framework data, a second channel, and vacuous below 8-bit** — not a palette family, `decoration` because the contrast floor would delete the half of the range a map exists to encode, and nothing at 4-bit because an ordering over unknown luminances is not an ordering (I31, §6).
 28. **A ground and its foreground are one thing, and a floor lowered to buy one says what it bought** (I32, §4d). The `status` tag's pair is minted and measured together at the meaning floor, because a ground without its matched ink is how a contrast floor goes unmeasured; the exception on `error` carries its figures, the cube sweep behind them and the alternative it declined, so the next reader can tell a decision from an oversight.
-29. **A span's attributes are the renderer's, compose by spread, and are lost rather than compensated where a depth cannot show them** (I33, §4e). Three booleans and no colour, so no floor, no ladder and no `MONO` entry; the 1-bit absorption of a bold span on an emphasised block is asserted as an identical pair so a later compensation is visible; italic is written at every depth and on every `unicode` rung.
+29. **A span's attributes are the renderer's, compose by spread, and are lost rather than compensated where a depth cannot show them; a span's colour is a slot's or a map's and never its own** (I33, §4e). Three booleans and no colour value, so no floor, no ladder and no `MONO` entry of the span's; a `tone` is resolved by `resolveTone` exactly as the block's is and replaces it for the run, a `value` by `continuousColour` as a background on the colormap's ladder; the 1-bit absorption of a bold span on an emphasised block is asserted as an identical pair so a later compensation is visible; italic is written at every depth and on every `unicode` rung.
 
 ---
 
@@ -748,7 +777,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T1.20** (I28): a theme declaring `light` over a dark `bg` is rejected at load, with both the declaration and the measured luminance in the message. **The state that is legal today**, so the row is a new refusal rather than a restatement.
 - **T1.21** (I27): a set of three loads, `names` is every key in declaration order, and switching between two themes of the **same** polarity is a switch — the case a variant-keyed store could not express. An unknown name **throws** and says what the set holds, because a silent no-op reports a change that did not happen.
 - **T1.21a** (I27): a set with no `dark` in it opens on its first key, and an empty set is refused. The literal default would be a name this component requires of every app's set; the empty case is the one failure a token check cannot see, because it is about the collection.
-- **T1.22** (I33): for each of `bold`, `italic`, `underline` and for each tone at depths 24, 8, 4 and 1, merging a span onto the resolved tone yields a `Style` whose `colour` and `background` are **identical** to the tone's and whose attribute is set — asserted on the pair, so a merge that routed through a slot fails on the colour and one that dropped the tone fails on the same line.
+- **T1.22** (I33): for each of `bold`, `italic`, `underline` and for each tone at depths 24, 8, 4 and 1, merging a span onto the resolved tone yields a `Style` whose `colour` and `background` are **identical** to the tone's and whose attribute is set — asserted on the pair, so a merge that routed through a slot fails on the colour and one that dropped the tone fails on the same line. **The tone arm** (C04 I89): for each pair of tones at each depth, a run whose span names the second tone paints with the second tone's `colour` — the object `resolveTone` returns, by reference — with the attribute still set on top, and the block's tone nowhere on the run.
 
 ### Tier 2 — contract / interface
 
@@ -777,6 +806,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.19** (I24): a source scan finds no string literal assigned to a `colour` field anywhere in `src/` (A03 SS36). Types stop this inside the tree; the scan is what stops it arriving through a cast, which is how a tag gets dropped in practice.
 - **T2.17** (I17): at depth 8, `{ok, warn, error, info, accent}` resolve to five distinct values, per variant. I17's 24-bit half and T2.3's 4-bit half both miss this: two tones distinct in hex can quantise onto one 256-colour index, and that failure is invisible in truecolour — which is where every value was authored and every golden will be reviewed. `dim`, `muted` and `default` collapsing at low depth is acceptable and is deliberately not asserted.
 - **T2.15** (§3): at depth 1, every `syntax` slot collapses to a typographic class and emits no colour code — including `syntax.key`.
+- **T2.26** (I33, I31, C04 I89, C04 I90): at depth 1 a `tone: "identifier"` run on an `ok` notice paints with **no** SGR 1 where the rest of the row has it — the tone's collapse, uncompensated; at depth 4 a valued run writes no `48` and the row's bytes equal the unvalued row's; at depth 8 it writes `48;5;<n>` where `n` is `continuousColour`'s index for the same value, and at 24 `48;2` with `sample`'s hex — the same resolver a heatmap cell went through, asserted by calling it.
 - **T2.25** (I33): at depth 1, `ok` with a bold span resolves to exactly `{ bold: true }` — the same object the tone alone gives — `default` with a bold span to `{ bold: true }`, and `muted` with a bold span to `{ dim: true, bold: true }`, painted as `1;2` in `sgr()`'s numeric order.
 
 ### Tier 3 — edge cases
@@ -843,6 +873,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.25** (I28): dropping the `variant`-against-`bg` pairing → T1.20 passes on a theme that lies about itself, and the field goes back to being a second record nothing checks.
 - **T6.26** (I28, §5a.4): restoring `VARIANTS` as a literal in the contrast suite → T2.23 fails. **Nothing else does**, which is the point: a third theme ships unchecked and eleven rows stay green.
 - **T6.84** (I33): resolving a span attribute through `resolve` or a slot → T1.22 fails on `colour`; gating italic on `caps.unicode` → T3.11 fails; adding an `underline` fallback for an absorbed 1-bit bold → C04 T3.67's identical pair fails, which is the row that says the absorption is a ruling and not an oversight.
+- **T6.85** (I33, C04 I89, C04 I90): composing a span's tone *with* the block's (`{ ...block, ...spanTone }`) rather than replacing it → T1.22's tone arm still passes on `colour` and **T2.26 fails at 1-bit**, where the `ok` block's `bold` survives under the `identifier` run — the row that shows composition and replacement differ only where a tone carries an attribute; painting a valued background at 4-bit through `nearestAnsi16` or a fixed index → T2.26's 4-bit pair fails, and C09 T3.66's 4-bit identity with it; a valued background written through `withBackground` from a surface ref → T2.26's 8-bit arm fails on the index.
 
 ---
 
