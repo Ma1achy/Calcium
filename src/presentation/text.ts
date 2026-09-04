@@ -851,7 +851,15 @@ function isZeroWidth(cp: number): boolean {
     (cp >= 0x1dc0 && cp <= 0x1dff) || // combining, supplement
     (cp >= 0x20d0 && cp <= 0x20f0) || // combining for symbols
     (cp >= 0xfe00 && cp <= 0xfe0f) || // variation selectors
-    (cp >= 0xfe20 && cp <= 0xfe2f) // combining half marks
+    (cp >= 0xfe20 && cp <= 0xfe2f) || // combining half marks
+    // **Variation selectors 17-256.** `Mn`, like every line above, and
+    // absent until the Ambiguous table was derived from its source: UAX #11
+    // classifies U+E0100..U+E01EF as Ambiguous, so without this line the
+    // derivation would have started measuring a combining mark at two cells
+    // under the wide convention. A repair that introduces an over-count one
+    // table over is the shape a generated table makes possible and a
+    // hand-written one hid.
+    (cp >= 0xe0100 && cp <= 0xe01ef) // variation selectors, supplement
   );
 }
 
@@ -860,40 +868,153 @@ function isRegionalIndicator(cp: number): boolean {
 }
 
 /**
- * `East_Asian_Width=Ambiguous`, the ranges that appear in terminal output (C02
- * I9).
+ * `East_Asian_Width=Ambiguous`, derived from the property rather than recalled
+ * (C02 I9).
  *
- * **Not the whole property, and the omission is deliberate.** UAX #11 lists
- * hundreds of ranges, most of them Cyrillic, Greek and Latin letters with
- * accents that no terminal renderer has ever drawn two cells wide in practice
- * because the fonts do not have wide forms for them. What this covers is the
- * part that is *drawn as geometry* and therefore actually doubles: box drawing,
- * block elements, geometric shapes, arrows, the dingbat marks C09 draws from,
- * and the enclosed alphanumerics.
+ * **The authority is `EastAsianWidth-17.0.0.txt`, dated 2025-07-24**, read from
+ * `unicode.org/Public/UCD/latest/ucd/`. `AMBIGUOUS_RANGES` below is every
+ * `; A` row in that file, sorted and merged: 179 ranges over 138,739 code
+ * points. It is data, not a package — DEPENDENCIES.md refuses a width library
+ * for `cells()` on the grounds that two implementations of one rule diverge in
+ * the cases nobody tests, and that reasoning is untouched by where the *table*
+ * came from.
  *
- * **The test of a range's inclusion is whether the tree draws from it.** Every
- * one below has a caller: `RAMP_UNICODE`'s lower blocks, `GLYPH_TABLE`'s marks,
- * C09's borders, C12's axes. A range with no caller would be a claim about
- * terminals nobody here has measured — which is the shape this whole finding is
- * about.
+ * **This reverses the rule that stood here** (F665). The old table began
+ * at U+2010 and its own comment called the omission deliberate: *most of the
+ * property is Cyrillic, Greek and Latin letters that no terminal draws two
+ * cells wide, so the test of inclusion is whether the tree draws from the
+ * range.* Both halves are wrong, and neither is wrong by a little.
  *
- * A width library was the alternative and DEPENDENCIES.md already refuses one
- * for `cells()`: two implementations of one rule diverge in the cases nobody
- * tests.
+ * - The premise is false **about the capability it is attached to**.
+ *   `ambiguousWidth: "wide"` is set when the terminal applies the wide
+ *   convention, and a terminal that applies it applies it to the *property* —
+ *   Greek, Cyrillic and Latin-1 included. That is what the option means in the
+ *   emulators that offer it. A sentence about fonts answered a question about
+ *   glyph design; the capability asks about a width convention.
+ * - The inclusion test is indexed to the wrong corpus. `cells()` measures what
+ *   it is handed, and most of what it is handed is far-side text — an adapter's
+ *   error message, a log line, a column of units. *Does the tree draw from this
+ *   range* is a question about the glyph tables; `§` `·` `×` `°` `±` `µ` `π`
+ *   `Σ` arrive from outside them.
+ *
+ * The cost was one-directional and it is the hazard C01 and C02 both name: a
+ * row measured at *n* cells that draws *n+1* wraps, and a wrapped line scrolls
+ * the alternate screen. Measured against the property before the change, at
+ * `ambiguousWidth: "wide"`: **138,132 code points measured one cell where the
+ * property says two**, three of them (`§` `·` `×`) members of SS47's
+ * `PROSE_MARKS` — the one set exempted from the substitution rule *because it
+ * is prose*, and so the one set that reaches a frame unconverted.
+ *
+ * **`DRAWN_AS_GEOMETRY` is a deviation, and it is recorded rather than
+ * inherited.** These are the blocks the framework draws its own geometry from,
+ * kept whole even where the property says Neutral: 625 code points are
+ * Ambiguous here for no reason but this list (576 Neutral, 49 Wide). The reason
+ * is that C12 and C09 gate those glyphs *on this answer* — `halfBlockEligible`,
+ * `linedraw`, the ramp arms — so classifying them Ambiguous is what makes the
+ * wide-convention gate fire at all, and the deviation errs in the harmless
+ * direction: an over-count pads a row, an under-count wraps it. The premise to
+ * re-check is that those gates still read this function; the day they take a
+ * capability directly, this list is dead.
+ *
+ * **The largest consequence, stated so it is re-checkable rather than
+ * rediscovered**: the property makes the private use areas Ambiguous
+ * (U+E000..U+F8FF and the two supplementary planes, 137,468 code points), so a
+ * consumer's icon font measures two cells under the wide convention. That is
+ * what the property says and what a wide-convention terminal does; it is not
+ * something this repository has measured on a real emulator.
+ *
+ * **What this function still does not fix**: `isWide` has the same disease and
+ * a worse one, because its errors land in the *default* mode. 8,619 code points
+ * are Wide in the property and measure one cell here — Tangut (7,382), Yijing
+ * hexagrams, Hangul Jamo Extended-A, and thirty-odd emoji singletons including
+ * `⌚` `⏰` `⚡` `⚪` `⛄` `✅` `✨` `❌` `❗` `➕` `⭐` `⭕`. Left alone here
+ * deliberately: it is a second table with a second blast radius, and every one
+ * of those defects is an under-count in `ambiguousWidth: "narrow"`, which is
+ * every golden frame in the tree.
  */
 function isAmbiguous(cp: number): boolean {
-  return (
-    (cp >= 0x2010 && cp <= 0x2027) || // general punctuation: dashes, quotes, ellipsis
-    (cp >= 0x2190 && cp <= 0x21ff) || // arrows
-    (cp >= 0x2200 && cp <= 0x22ff) || // mathematical operators
-    (cp >= 0x2460 && cp <= 0x24ff) || // enclosed alphanumerics
-    (cp >= 0x2500 && cp <= 0x257f) || // box drawing
-    (cp >= 0x2580 && cp <= 0x259f) || // block elements — the height ladder lives here
-    (cp >= 0x25a0 && cp <= 0x25ff) || // geometric shapes — ▌ ● ○ ▸ ▾
-    (cp >= 0x2600 && cp <= 0x26ff) || // miscellaneous symbols
-    (cp >= 0x2b00 && cp <= 0x2b1f) // arrows and shapes, supplemental
-  );
+  return inRanges(cp, AMBIGUOUS_RANGES) || inRanges(cp, DRAWN_AS_GEOMETRY);
 }
+
+/**
+ * `[lo, hi]` pairs, flat and ascending, searched in log time.
+ *
+ * A flat array rather than an array of pairs: 179 ranges are searched on every
+ * grapheme of every row of every frame C14 virtualises, and the pair objects
+ * would be 179 allocations read a million times.
+ */
+function inRanges(cp: number, ranges: readonly number[]): boolean {
+  let lo = 0;
+  let hi = (ranges.length >> 1) - 1;   // cells-ok: a pair count, not a display width
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (cp < (ranges[mid * 2] as number)) hi = mid - 1;
+    else if (cp > (ranges[mid * 2 + 1] as number)) lo = mid + 1;
+    else return true;
+  }
+  return false;
+}
+
+/**
+ * Every `; A` row of `EastAsianWidth-17.0.0.txt`, merged. Generated, not typed:
+ * the table above it was written by hand and nothing had ever checked it
+ * against its source.
+ */
+const AMBIGUOUS_RANGES: readonly number[] = [
+  0xa1, 0xa1, 0xa4, 0xa4, 0xa7, 0xa8, 0xaa, 0xaa, 0xad, 0xae,
+  0xb0, 0xb4, 0xb6, 0xba, 0xbc, 0xbf, 0xc6, 0xc6, 0xd0, 0xd0,
+  0xd7, 0xd8, 0xde, 0xe1, 0xe6, 0xe6, 0xe8, 0xea, 0xec, 0xed,
+  0xf0, 0xf0, 0xf2, 0xf3, 0xf7, 0xfa, 0xfc, 0xfc, 0xfe, 0xfe,
+  0x101, 0x101, 0x111, 0x111, 0x113, 0x113, 0x11b, 0x11b, 0x126, 0x127,
+  0x12b, 0x12b, 0x131, 0x133, 0x138, 0x138, 0x13f, 0x142, 0x144, 0x144,
+  0x148, 0x14b, 0x14d, 0x14d, 0x152, 0x153, 0x166, 0x167, 0x16b, 0x16b,
+  0x1ce, 0x1ce, 0x1d0, 0x1d0, 0x1d2, 0x1d2, 0x1d4, 0x1d4, 0x1d6, 0x1d6,
+  0x1d8, 0x1d8, 0x1da, 0x1da, 0x1dc, 0x1dc, 0x251, 0x251, 0x261, 0x261,
+  0x2c4, 0x2c4, 0x2c7, 0x2c7, 0x2c9, 0x2cb, 0x2cd, 0x2cd, 0x2d0, 0x2d0,
+  0x2d8, 0x2db, 0x2dd, 0x2dd, 0x2df, 0x2df, 0x300, 0x36f, 0x391, 0x3a1,
+  0x3a3, 0x3a9, 0x3b1, 0x3c1, 0x3c3, 0x3c9, 0x401, 0x401, 0x410, 0x44f,
+  0x451, 0x451, 0x2010, 0x2010, 0x2013, 0x2016, 0x2018, 0x2019, 0x201c, 0x201d,
+  0x2020, 0x2022, 0x2024, 0x2027, 0x2030, 0x2030, 0x2032, 0x2033, 0x2035, 0x2035,
+  0x203b, 0x203b, 0x203e, 0x203e, 0x2074, 0x2074, 0x207f, 0x207f, 0x2081, 0x2084,
+  0x20ac, 0x20ac, 0x2103, 0x2103, 0x2105, 0x2105, 0x2109, 0x2109, 0x2113, 0x2113,
+  0x2116, 0x2116, 0x2121, 0x2122, 0x2126, 0x2126, 0x212b, 0x212b, 0x2153, 0x2154,
+  0x215b, 0x215e, 0x2160, 0x216b, 0x2170, 0x2179, 0x2189, 0x2189, 0x2190, 0x2199,
+  0x21b8, 0x21b9, 0x21d2, 0x21d2, 0x21d4, 0x21d4, 0x21e7, 0x21e7, 0x2200, 0x2200,
+  0x2202, 0x2203, 0x2207, 0x2208, 0x220b, 0x220b, 0x220f, 0x220f, 0x2211, 0x2211,
+  0x2215, 0x2215, 0x221a, 0x221a, 0x221d, 0x2220, 0x2223, 0x2223, 0x2225, 0x2225,
+  0x2227, 0x222c, 0x222e, 0x222e, 0x2234, 0x2237, 0x223c, 0x223d, 0x2248, 0x2248,
+  0x224c, 0x224c, 0x2252, 0x2252, 0x2260, 0x2261, 0x2264, 0x2267, 0x226a, 0x226b,
+  0x226e, 0x226f, 0x2282, 0x2283, 0x2286, 0x2287, 0x2295, 0x2295, 0x2299, 0x2299,
+  0x22a5, 0x22a5, 0x22bf, 0x22bf, 0x2312, 0x2312, 0x2460, 0x24e9, 0x24eb, 0x254b,
+  0x2550, 0x2573, 0x2580, 0x258f, 0x2592, 0x2595, 0x25a0, 0x25a1, 0x25a3, 0x25a9,
+  0x25b2, 0x25b3, 0x25b6, 0x25b7, 0x25bc, 0x25bd, 0x25c0, 0x25c1, 0x25c6, 0x25c8,
+  0x25cb, 0x25cb, 0x25ce, 0x25d1, 0x25e2, 0x25e5, 0x25ef, 0x25ef, 0x2605, 0x2606,
+  0x2609, 0x2609, 0x260e, 0x260f, 0x261c, 0x261c, 0x261e, 0x261e, 0x2640, 0x2640,
+  0x2642, 0x2642, 0x2660, 0x2661, 0x2663, 0x2665, 0x2667, 0x266a, 0x266c, 0x266d,
+  0x266f, 0x266f, 0x269e, 0x269f, 0x26bf, 0x26bf, 0x26c6, 0x26cd, 0x26cf, 0x26d3,
+  0x26d5, 0x26e1, 0x26e3, 0x26e3, 0x26e8, 0x26e9, 0x26eb, 0x26f1, 0x26f4, 0x26f4,
+  0x26f6, 0x26f9, 0x26fb, 0x26fc, 0x26fe, 0x26ff, 0x273d, 0x273d, 0x2776, 0x277f,
+  0x2b56, 0x2b59, 0x3248, 0x324f, 0xe000, 0xf8ff, 0xfe00, 0xfe0f, 0xfffd, 0xfffd,
+  0x1f100, 0x1f10a, 0x1f110, 0x1f12d, 0x1f130, 0x1f169, 0x1f170, 0x1f18d, 0x1f18f, 0x1f190,
+  0x1f19b, 0x1f1ac, 0xe0100, 0xe01ef, 0xf0000, 0xffffd, 0x100000, 0x10fffd,
+];
+
+/**
+ * The blocks the framework draws geometry from, kept Ambiguous whole. See
+ * `isAmbiguous` for why this deviation exists and which premise retires it.
+ */
+const DRAWN_AS_GEOMETRY: readonly number[] = [
+  0x2010, 0x2027, // general punctuation: dashes, quotes, ellipsis
+  0x2190, 0x21ff, // arrows
+  0x2200, 0x22ff, // mathematical operators
+  0x2460, 0x24ff, // enclosed alphanumerics
+  0x2500, 0x257f, // box drawing
+  0x2580, 0x259f, // block elements — the height ladder lives here
+  0x25a0, 0x25ff, // geometric shapes — ▌ ● ○ ▸ ▾
+  0x2600, 0x26ff, // miscellaneous symbols
+  0x2b00, 0x2b1f, // arrows and shapes, supplemental — no Ambiguous member at
+                  // all in the property, so this range is deviation entire
+];
 
 function isWide(cp: number): boolean {
   return (

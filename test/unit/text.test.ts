@@ -372,3 +372,86 @@ describe("C09 §5 — the printable-ASCII path", () => {
     expect(cells("\n"), "and so is a newline").toBe(1);
   });
 });
+
+/**
+ * C09 T1.27 — the Ambiguous set is `East_Asian_Width=Ambiguous`, not a memory
+ * of it (C09 §5, C09 I6, C02 I9).
+ *
+ * The table this pins replaced one that began at U+2010 and called the omission
+ * deliberate: *the rest of the property is letters no terminal draws wide.* That
+ * is a claim about fonts and the capability is a claim about a **convention**,
+ * so 138,132 code points measured one cell where the property says two — and a
+ * row measured at n cells that draws n+1 wraps, which scrolls the alternate
+ * screen (F665).
+ *
+ * **The sets below are the property's, transcribed from
+ * `EastAsianWidth-17.0.0.txt` (2025-07-24) and not chosen.** Latin-1 because it
+ * is where the gap started and because `§` `·` `×` live there; both halves,
+ * because a row asserting only the Ambiguous half passes just as well on a
+ * table that says *everything* is Ambiguous.
+ */
+describe("cells — the Ambiguous set against its source (C09 §5)", () => {
+  /** U+00A0..U+00FF with `; A` in the property — 44 of the 96. */
+  const LATIN1_AMBIGUOUS = "¡¤§¨ª\u00ad®°±²³´¶·¸¹º¼½¾¿ÆÐ×ØÞßàáæèéêìíðòó÷øùúüþ";
+  /** The other 52, every one Neutral. `µ` and `«` `»` are here, not above. */
+  const LATIN1_NEUTRAL = "\u00a0¢£¥¦©«¬¯µ»ÀÁÂÃÄÅÇÈÉÊËÌÍÎÏÑÒÓÔÕÖÙÚÛÜÝâãäåçëîïñôõöûýÿ";
+
+  it("T1.27 (I6, C02 I9): every Latin-1 Ambiguous character is two cells at wide and one at narrow", () => {
+    // **The fabricated violation.** Restoring the old table — any table whose
+    // lowest range starts at U+2010 — makes every row here report 1 at wide.
+    expect([...LATIN1_AMBIGUOUS].length, "the property's Latin-1 Ambiguous count").toBe(44);
+    for (const c of LATIN1_AMBIGUOUS) {
+      const cp = `U+${(c.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, "0")}`;
+      expect(cells(c, "wide"), `${cp} at ambiguousWidth "wide"`).toBe(2);
+      expect(cells(c, "narrow"), `${cp} at ambiguousWidth "narrow"`).toBe(1);
+    }
+  });
+
+  it("T1.27b (I6): the control — every Latin-1 Neutral character is one cell under both conventions", () => {
+    // **The control the row above owes.** It passed before the fix and passes
+    // after, so it is not evidence for the change; what it refuses is the
+    // repair that over-shoots — a table that answers *Ambiguous* for the block
+    // rather than for the property satisfies T1.27 exactly and fails here.
+    expect([...LATIN1_NEUTRAL].length, "the property's Latin-1 Neutral count").toBe(52);
+    for (const c of LATIN1_NEUTRAL) {
+      const cp = `U+${(c.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, "0")}`;
+      expect(cells(c, "wide"), `${cp} at ambiguousWidth "wide"`).toBe(1);
+      expect(cells(c, "narrow"), `${cp} at ambiguousWidth "narrow"`).toBe(1);
+    }
+  });
+
+  it("T1.27c (I6): SS47's PROSE_MARKS, accounted one mark at a time", () => {
+    // **The count is asserted because the count was wrong.** The finding said
+    // four of eight, the ledger correction said five of ten, and the property
+    // says **seven of ten are Ambiguous and three of those were in the gap**.
+    // A row per mark rather than a total, because a total is satisfied by the
+    // wrong three.
+    const marks = [..."—§·×≤≥→«»⚠"];
+    expect(marks.length, "SS47's PROSE_MARKS").toBe(10);
+    const wide = Object.fromEntries(marks.map((m) => [m, cells(m, "wide")]));
+    expect(wide, "seven Ambiguous at 2, «» Neutral at 1, ⚠ Neutral but inside the geometry deviation").toEqual({
+      "—": 2, "§": 2, "·": 2, "×": 2, "≤": 2, "≥": 2, "→": 2, "«": 1, "»": 1, "⚠": 2,
+    });
+  });
+
+  it("T1.27d (I6): the geometry deviation is deliberate, and it is asserted where it is claimed", () => {
+    // C09 §5 keeps nine blocks Ambiguous whole even where the property says
+    // Neutral, because §4c's gates read this answer. 625 code points depend on
+    // that list; these are four of them, and the day a generated table is
+    // dropped in without the deviation this fails here rather than in fifteen
+    // golden frames.
+    for (const c of "▐░▖▚") expect(cells(c, "wide"), `${c} — Neutral in the property, drawn as geometry here`).toBe(2);
+    for (const c of "▐░▖▚") expect(cells(c, "narrow"), `${c} at narrow`).toBe(1);
+  });
+
+  it("T1.27e (I6): a supplementary variation selector is zero cells, not two", () => {
+    // The property calls U+E0100..U+E01EF Ambiguous, so deriving the table from
+    // it started measuring a combining mark at two cells under the wide
+    // convention until `isZeroWidth` grew the range. A repair that introduces
+    // an over-count one table over is what a generated table makes possible and
+    // a hand-written one hid.
+    expect(cells("\u{E0100}", "wide"), "VARIATION SELECTOR-17 at wide").toBe(0);
+    expect(cells("\u{E01EF}", "narrow"), "VARIATION SELECTOR-256 at narrow").toBe(0);
+    expect(cells("\u{DFFFF}", "wide"), "and the code point below the range is untouched").toBe(1);
+  });
+});

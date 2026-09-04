@@ -996,6 +996,21 @@ export const SCANS = [
  * A second limit: this reads literals lexically, so a mark built by
  * `String.fromCodePoint` or held in a variable passes. Every current site is a
  * literal, and a computed one would be a change worth noticing on its own.
+ *
+ * **A third, and it is about the exemption rather than the scan** (F665).
+ * `PROSE_MARKS` is let through *because it is prose*, so it is the one class of
+ * mark that reaches a frame unconverted — and this rule says nothing about
+ * whether those marks are **measured** correctly. Seven of the ten are
+ * `East_Asian_Width=Ambiguous` and three of the seven — `§` `·` `×` — measured
+ * one cell at `ambiguousWidth: "wide"` and drew two, which is the wrap this
+ * exemption's own subjects are most likely to cause. Two of the ten (`«` `»`)
+ * are Neutral and were right; one (`⚠`) is Neutral and is over-counted by
+ * C09's recorded geometry deviation. **Measured against the property, not
+ * recalled**: `EastAsianWidth-17.0.0.txt`, 2025-07-24.
+ *
+ * The width half is C09 §5's and is fixed there. It is recorded here because
+ * the two rules meet on one set and neither one's tests could see the other's
+ * failure: a scan about substitution is green whatever the marks measure.
  */
 const PROSE_MARKS = new Set("—§·×≤≥→«»⚠");
 
