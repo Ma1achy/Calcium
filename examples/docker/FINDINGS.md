@@ -24449,7 +24449,7 @@ section for what the suite said.
 
 ---
 
-## F591 — the wrapper breaks one word early when a row is exactly full (not fixed) ★★☆☆☆
+## F591 — the wrapper breaks one word early when a row is exactly full (FIXED 2026-09-04) ★★☆☆☆
 
 *2026-09-04 · Lane T, spans — tone, value and the atom wrap, at 53107246+lanes (2026-09-04).*
 
@@ -24458,9 +24458,15 @@ section for what the suite said.
 **Measured**: `["aa", "bb", "cc dd"]`. The overflow check fires on the *space* after a full row, and
 the break-point search then takes the last space *inside* the full row rather than treating the
 overflowing space as the break — so `bb` is pushed to the next row though `aa bb` fits. Same shape as
-F590 but on the branch that *has* a break point; not fixed here because it changes the row set of every
-paragraph with an exactly-full row and the golden files are shared. One line in the same place as
-F590's arm; recorded rather than ruled.
+F590 but on the branch that *has* a break point.
+
+**Fixed 2026-09-04, and the reason it was deferred was wrong by two orders of magnitude.** *It
+changes the row set of every paragraph with an exactly-full row and the golden files are shared*
+was an estimate, never a measurement: the fix moves **three** golden frames, all three of them
+`containment.test.ts`'s error box wrapping at 40, and the terminal baseline's whole set moves
+**none**. A sweep of 14 strings × widths 1–40 put the defect at **102 of 560 pairs** before and
+**0** after. The repair also subsumed F590's arm rather than sitting beside it — F590 had written
+the same rule a second time and ignored the search's answer — which is what turned up F642.
 
 **Where**: `src/presentation/text.ts` `wrapCellsParts`, the `at !== null` branch.
 
@@ -25156,3 +25162,463 @@ fps; kitty's **animation protocol uploads 116 509 B once and 0 B/tick**, smaller
 
 **The arithmetic**: 42 entries, F588–F629, keyed in one move each — group 2 gains one,
 7 one, 9 five, 10 three, 11 six, 14 one, Singles twenty-five — and SP6 reads 633 = 633.
+
+---
+
+## F630 — every sankey SVG label was under every floor, on both themes, in all six variants ★★★☆☆
+
+*2026-09-04 · Lane S, the sankey node label, at 106fc7a0+lanes3 (2026-09-04).*
+
+**Expected**: some variants unreadable and some fine — the brief's own framing, *"if some are
+fine, the ruling has to explain the difference"*.
+
+**Measured**: none are fine. 33 labels across the six baselines, backdrop taken from the raster
+with the `<text>` stripped, worst pixel of the glyph box:
+
+| | worst | best | median |
+|---|---|---|---|
+| dark, `tone.muted` `#626262` | **1.02** (`src-04`) | 1.41 (`src-12`) | 1.05 |
+| light, `tone.muted` `#94959c` | **1.02** (`src-05`) | 1.25 | 1.15 |
+
+`muted`'s own floor is 2.5 and body text's is 4.5. Not one label reaches either.
+
+**Why placement could not have helped**, which is the part that is not obvious from the number:
+the label is *already* in d3's place — right of the bar, left of it on the last layer — and
+`x0 = xOf(la) + nodeW` puts the ribbon at the bar's edge. *Outside the bar* and *on the ribbon*
+are one region. There is no node in the corpus with bare ground beside it: a source's label sits
+on its outgoing ribbons, a sink's on its incoming ones.
+
+**Where**: `src/presentation/plot/svg.ts` `sankeyMarks`; `docs/components/C12_plot_renderer.md`
+§3ap.4 K15 and §3ap.7 (new), C12 I112.
+
+---
+
+## F631 — the reference table kept what transferred and dropped the condition that made it work ★★☆☆☆
+
+*2026-09-04 · Lane S, the sankey node label, at 106fc7a0+lanes3 (2026-09-04).*
+
+**Expected**: §3ap.1 records two references and what each settled, so the label's ground was
+either ruled on or recorded as open.
+
+**Measured**: it recorded *"labels beside the bar, to the right everywhere and to the left on the
+last layer"* — the placement — and nothing about the ink or what is behind it. The placement
+transferred and its precondition did not: d3's energy figure reads because the paper is white and
+the links are pale, not because a decision was taken. Calcium's page is `#141414` with the
+source's slot at `fill-opacity 0.5`, and the same placement lands the same text on a fill.
+
+**And the other reference had already answered it.** `plotly.js`'s
+`src/traces/sankey/attributes.js` declares `textfont: fontAttrs({ autoShadowDflt: true })`, and
+`src/plots/font_attributes.js` documents that default as *"**auto** places minimal shadow and
+applies contrast text font color"* — a halo **and** a contrast ink, shipped as the default because
+plotly cannot assume a pale link either. Two of the brief's three candidates, together, sitting in
+a reference the section already cites.
+
+This is the compression class from CLAUDE.md arriving on a comparison table: the row is correct
+about what it says and silent about the half that does not survive the move.
+
+**Where**: `docs/components/C12_plot_renderer.md` §3ap.1's table (unchanged — §3ap.7 now carries
+the second reading rather than rewriting the first).
+
+---
+
+## F632 — the SVG arm paints every one of its labels on the one surface C10 §4 does not check ★★★☆☆
+
+*2026-09-04 · Lane S, the sankey node label, at 106fc7a0+lanes3 (2026-09-04).*
+
+**Expected**: `surface.bgDeep`'s exclusion from `textSurfaces` is a live rule about a surface no
+text lands on.
+
+**Measured**: it is false today. `contrast.ts` says *"`bgDeep` is excluded because it carries no
+text; if a surface ever paints text on it, that surface is wrong or the exclusion is"* — and
+`plotToSvg` fills the whole page with `GROUND: ColourRef = "surface.bgDeep"` and then writes every
+axis label, every node label, every tile label and the reversed notice onto it.
+
+The figures that make it concrete: `tone.muted` on `bgDeep` is **3.02** on dark and **2.44** on
+light — the light one under `muted`'s *own* 2.5 floor, and nothing in C10's validation would
+report it, because the pairing it is validated against is `bg`/`bgElev`.
+
+I112's ruling clears 4.5 on both variants so nothing in this lane is unreadable now, but the
+exclusion is a rule with a false premise and no future theme is checked against the surface this
+arm's text lands on. **Owed to C10's owner** — see `laneS-requests.md` R1.
+
+**Where**: `src/presentation/theme/contrast.ts` `textSurfaces`; `src/presentation/plot/svg.ts`
+`GROUND`.
+
+---
+
+## F633 — a label-box probe reported a shipped, readable figure at ratio 1.00 ★★★☆☆
+
+*2026-09-04 · Lane S, the sankey node label, at 106fc7a0+lanes3 (2026-09-04).*
+
+**Expected**: sampling the backdrop over a label's box and keeping the worst pixel measures what a
+reader gets.
+
+**Measured**: it measures the box. Pointed at `graph`, every one of `graph-crowded`'s fourteen
+labels came back `ink #141414 · backdrop #141414 · ratio 1.00` — ground on ground, apparently the
+worst defect in the tree. **Rendered and looked at, `graph-crowded` is fine**: the nodes are wide
+pills, the labels sit inside them at 6.2–13.9, and the 1.00 is the monospace-advance estimate
+overhanging the pill by a pixel or two at each end and catching the page behind it.
+
+**The repair, and it is the reusable part**: take the glyph mask by *difference* rather than by
+estimate — render twice, once as it ships and once with the label's `fill` set to `none`, and every
+pixel that changed is a pixel the ink painted. Read the backdrop off the second render at exactly
+those pixels. That instrument is exact, needs no font metrics, and works identically before and
+after a halo is added. It is what §3ap.7's after-table is measured with.
+
+Note the direction of the error: the estimate over-reports a defect where the fill is *smaller*
+than the label, and would under-report one where the label sits on a large uniform fill. The
+sankey reading survived it — the worst backdrops there are ribbon colours, not the ground — but it
+survived by luck rather than by the instrument being sound.
+
+**Where**: `docs/catalogue/laneS/measure.mts` (the estimate) and `behind.mts` (the difference),
+both gitignored.
+
+---
+
+## F634 — a renderer feature a byte-compare golden cannot check, and the assertion split that reaches it ★★☆☆☆
+
+*2026-09-04 · Lane S, the sankey node label, at 106fc7a0+lanes3 (2026-09-04).*
+
+**Expected**: asserting the label's `fill` and `stroke` hexes covers the ruling.
+
+**Measured**: it does not. `paint-order="stroke"` is what puts the halo *under* the fill; drop the
+attribute and keep the stroke, and every label becomes a ground-coloured blob while both hex
+attributes are exactly where a rule reading them expects. Run by hand: the ink mutation kills **24**
+SK11 rows, the halo mutation **24**, and this one **12** — the ratio half of SK11 is blind to it by
+construction, because it reads the two attributes and computes `ratio(fill, stroke)`.
+
+So the `paint-order` assertion is separate from the two colour ones rather than folded into them,
+and the 12-against-24 asymmetry is recorded as T6.89 rather than left as a number nobody wrote down.
+
+`paint-order` support was **checked rather than assumed**: rendered through the same librsvg the
+catalogue uses, against the two-element `fill="none"` stroke idiom as a control — identical output.
+That idiom is the named fallback if a consumer's renderer ever drops it.
+
+**Where**: `test/unit/plot-svg-path.test.ts` SK11; `docs/components/C12_plot_renderer.md` T6.87–T6.89;
+`tools/mutate/runs/c12-sankey.mjs`.
+
+---
+
+## F635 — `make enforce` does not catch a duplicate test-row name ★★☆☆☆
+
+*2026-09-04 · Lane S, the sankey node label, at 106fc7a0+lanes3 (2026-09-04).*
+
+**Expected**: two rows both called `SK10` in one spec is caught, the way a bare invariant citation
+is.
+
+**Measured**: it is not. C12 §9 already had an `SK10` (`C04 I69, I92`, the builder deferral); the
+row added in this lane was drafted as `SK10` too, and with **both** in the file `make enforce`
+reported `338 files · 26 specs · 15 728 invariant references resolved · no violations`. It was
+caught by reading a grep, not by a gate.
+
+The cost is exactly the citation class the audit warns about: `T6.87 → SK10 fails` would resolve
+against whichever row a reader found first, and both readings are plausible. Renamed to `SK11`
+here; the gate is **owed** — see `laneS-requests.md` R2.
+
+**Where**: `tools/enforce/`; `docs/components/C12_plot_renderer.md` §9.
+
+---
+
+## F636 — the enforcer *does* catch the bare invariant in a mutation run file, and it took two runs to see ★☆☆☆☆
+
+*2026-09-04 · Lane S, the sankey node label, at 106fc7a0+lanes3 (2026-09-04).*
+
+`make enforce` was green with the code and spec landed, and went red only once
+`tools/mutate/runs/c12-sankey.mjs` carried a bare `I112`: *"cites a bare I112 and nothing before it
+says which spec owns it — write it as `C09 I112`"*. The suggested owner is `C09`, because the run
+file is not in `OWNERS`/`TOPICS` and the resolver falls back. Qualified to `C12 I112` and green.
+
+Recorded because it is the opposite of F635 and worth the contrast: the rule that resolves a *citation*
+is exact and the rule that would resolve a *definition* does not exist.
+
+**Where**: `tools/mutate/runs/c12-sankey.mjs:154,167,179`.
+
+---
+
+## F637 — A unit that over-states its height survives the whole patch suite ★★★☆☆
+
+*2026-09-04 · Lane U, the patch window's unit walk, at 106fc7a0+lanes3 (2026-09-04).*
+
+**Expected.** `unitsOf`'s `rows` is load-bearing — it is what `rowsOf` lays out and what
+every window budget is spent against — so a wrong row count should fail something.
+
+**Measured.** Restating a unit's rows as its **line** count (`removes.length + adds.length`)
+rather than asking `pairedRows` passed **99 rows across eight files**: `test/contract/`
+`patch-window`, `patch-view`, `patch`, `block-window`, `test/integration/patch`,
+`test/edge/patch`, `test/unit/patch`, `test/golden/patch`. Not one assertion moved.
+
+**Why.** Every row in the file bounds a window **from above** — `totalRows(win) <= height`,
+"never begins inside a run", "every line reachable from some offset". An over-stated unit
+shows *less* diff than the region could hold and never more, so it satisfies all of them.
+Containment is satisfied by every wrong answer inside the bounds. The golden frames do not
+reach it either, because they render the whole patch and never a window.
+
+**Where.** `src/presentation/patch/window.ts` `unitsOf`; landed as `T1.20c` in
+`test/contract/patch-window.test.ts`, which states the **equality** across the seam —
+`hunkHeaderRows` walks `unitsOf`, the expectation comes from `height.ts`'s `hunkRows`, which
+`measure` uses and which never sees a unit. It kills the mutation and it is the only row that
+does. Recorded in C25 as T1.20c and in `tools/mutate/runs/c25-intraline.mjs` as
+`ROWS-RESTATED`. This gap predates the de-duplication — the same mutation was available
+against the old hand-rolled walk.
+
+---
+
+## F638 — A row whose expectation is derived from its subject cannot see a change to its subject ★★★☆☆
+
+*2026-09-04 · Lane U, the patch window's unit walk, at 106fc7a0+lanes3 (2026-09-04).*
+
+**Expected.** `T1.20b`, the characterisation row this lane owes, derives the boundary set from
+`changedRuns` and asserts every window cut falls on one. Its first comment claimed that
+breaking `changedRuns` would therefore fail it — the call-site coverage the brief asks for.
+
+**Measured.** It does not. Removing `changedRuns`' `flush()` at a context line (so runs no
+longer close) leaves **T1.20b green**: the code and the expectation move together. What fails
+is the older `T1.20` row, whose "changed, and changed before it" predicate is written out by
+hand and is independent of the function.
+
+**Consequence, and it inverts the obvious tidy-up.** `T1.20`'s hand-rolled predicate looks
+like the fourth copy of the grouping that this lane exists to remove, and deleting it as
+duplicate coverage would have lost the only row that sees a change to `changedRuns`. The two
+are complementary: one states the rule independently on one fixture, the other states the
+agreement over the corpus. Both blind spots are now written in the test file, in C25's T1.20b
+row, and in the mutation run's header.
+
+**Where.** `test/contract/patch-window.test.ts`; `tools/mutate/runs/c25-intraline.mjs`
+(`FLUSH-GONE`).
+
+---
+
+## F639 — A corpus row forces its layout, and a width does not settle it ★★☆☆☆
+
+*2026-09-04 · Lane U, the patch window's unit walk, at 106fc7a0+lanes3 (2026-09-04).*
+
+**Expected.** A check parameterised by a split width (120) walks split units.
+
+**Measured.** The first run of `T1.20b` failed on `patch-forced-unified` — a corpus fixture
+whose `layout: "unified"` field wins over the width (C25 §3) — charging a unified window with
+a split boundary set. **The code was right and the check was wrong**, which is the disposition
+worth recording: a fixture set containing a member that opts out of the axis you are sweeping
+turns a correct implementation red. The row now reads the layout through `layoutFor`.
+
+**Where.** `test/contract/patch-window.test.ts`; fixture `patch-forced-unified` in
+`test/support/blocks.ts`.
+
+---
+
+## F640 — `pairedRows` is a fourth walk of the same grouping, and it is deliberate ★☆☆☆☆
+
+*2026-09-04 · Lane U, the patch window's unit walk, at 106fc7a0+lanes3 (2026-09-04).*
+
+**Expected.** F595/P2 names three copies of the run grouping. After this lane there are two
+functions that walk lines and decide where a run ends: `changedRuns` and `height.ts`'s
+`pairedRows`.
+
+**Measured.** `pairedRows` is not a copy that should be folded in, and the reason is in its own
+doc comment: it reads `lines` and **allocates nothing**, which is what makes `measure` as
+cheap in split as in unified (C09 I1). `changedRuns` allocates two arrays per run. Folding
+`pairedRows` into it would put an allocation on the per-block-per-frame measurement path that
+C14 calls without rendering.
+
+**So it is a recorded divergence rather than an owed de-duplication** — but nothing says so
+where a reader would look. Someone applying F595/P2's argument one function further along
+would make `measure` allocate. Request R1 asks for the sentence.
+
+**Where.** `src/presentation/patch/height.ts:60`.
+
+---
+
+## F641 — Cross-lane observation, not acted on ★☆☆☆☆
+
+*2026-09-04 · Lane U, the patch window's unit walk, at 106fc7a0+lanes3 (2026-09-04).*
+
+`make enforce` reported **2** violations on one run and **1** on the next during this lane,
+both `SP9` naming `C12 I112` — an invariant landed by another lane between the two runs. No
+C25 violation at any point. Not touched; recorded so the lead does not read it as this lane's.
+
+---
+
+## F642 — F590's arm swallowed a space strictly inside an atom ★★☆☆☆
+
+*2026-09-04 · Lane W, the wrapper's early break, at 106fc7a0+lanes3 (2026-09-04).*
+
+**Expected** (C04 I90): a break strictly inside an atom is not a break; an atom too wide for any
+row is cut at a cluster boundary as an unbroken token is, and a cluster-boundary cut drops
+nothing.
+
+**Measured**: `wrapCellsParts("aaa bbb ccc", 7, "narrow", [{ from: 0, to: 11 }])` →
+`[{ text: "aaa bbb", start: 0 }, { text: "ccc", start: 8 }]` — the space at offset 7, *inside the
+value*, was consumed as a break space. `breakPoint` returns `null` here (both interior spaces are
+inside the atom), so F590's arm fired and dropped a character of content from inside a valued run.
+Every existing row passes: each row is still an exact slice from its `start`, so C04 I86's
+assertion holds, and the *count* is right — the source is one character shorter than it was and
+nothing measures that. **Measured after the guard**: `aaa bbb` / `" ccc"` (start 7).
+
+**How it was found**: not by a test. Writing the new arm's guards forced the question *which rules
+could both claim this cell*, and the atom row of the walk table had no ruling — so the old arm was
+run against the input that fills it. The finding is a by-product of indexing by rule interaction,
+which is the fourth instance of that method paying for itself before code.
+
+**Where**: `src/presentation/text.ts` `wrapCellsParts`, the arm F590 added; row T1.19.
+
+---
+
+## F643 — the spec's own example for `value` changing the height showed nothing ★★☆☆☆
+
+*2026-09-04 · Lane W, the wrapper's early break, at 106fc7a0+lanes3 (2026-09-04).*
+
+**Expected**: C09 §5 illustrates *the height differs with `value` exactly when a valued run would
+otherwise straddle a row* with three measured examples, the first being `"aa bb cc dd"` at 5.
+
+**Measured**: that example read *three rows plain and three with `bb cc` valued* — the same number
+on both sides — with a parenthesis excusing it (*the plain wrapper already broke there*). A
+fixture that does not respond to the thing under test, in the sentence that exists to demonstrate
+the thing, and the excuse **was the defect**: the plain wrapper broke there because of F591. With
+the arm it is two rows plain and three valued, and the example now shows what it claims.
+
+The general lesson is the one `test/support/README.md` already carries — a fixture must be shown
+to respond before it is asserted against — arriving in **prose**, where nothing checks it: the
+sentence was true, the reader could verify it, and it demonstrated nothing.
+
+**Where**: `docs/components/C09_block_library.md` §5 *Runs*.
+
+---
+
+## F644 — a per-row width assertion cannot see a row that breaks early ★★★☆☆
+
+*2026-09-04 · Lane W, the wrapper's early break, at 106fc7a0+lanes3 (2026-09-04).*
+
+**Expected**: C09 T3.10b (*no wrapped row exceeds the width it was wrapped at*) is the wrapper's
+property row, and F590/F591 are wrapper defects.
+
+**Measured**: T3.10b passes on every one of them, because a **short** row fits. Both findings are
+instances of one property nothing asserted — *no row could have taken the first word of the next
+row* — and swept over 14 strings × widths 1–40 (560 pairs) that property was violated on **102
+pairs, 161 row joins**, before the arm; **0 and 0** after. The sweep is now T3.10b2.
+
+**The count is the argument for sweeping rather than pinning.** F591 was recorded from one string;
+the same defect was live at almost every width of almost every string in the corpus, and two
+pinned rows would have closed the instance and left the class.
+
+**Where**: `test/unit/text.test.ts` T3.10b2; C09 §5, §9 T3.10b2.
+
+---
+
+## F645 — the shared tree's golden gate was red before this lane, and the brief said green ★★☆☆☆
+
+*2026-09-04 · Lane W, the wrapper's early break, at 106fc7a0+lanes3 (2026-09-04).*
+
+**Expected** (lanes3/COMMON.md): *base commit 106fc7a0 … every gate green … golden 407 frames*.
+
+**Measured**: `npm run golden` in the shared working tree fails SB3 with six moved SVG baselines —
+`sankey-{chain,crowded,cycle,default,long-labels,loss}.svg`. **Not this lane's**: reverting
+`src/presentation/text.ts` to HEAD and re-running `test/golden/svg-baseline.test.ts` leaves the
+same six moved, and the tree carries another lane's in-flight edit to
+`src/presentation/plot/svg.ts` that re-inks sankey node labels (`NODE_LABEL`, a halo stroke),
+which is what moves them.
+
+**Why it is worth a row**: with the brief's *green at base* taken on trust, six moved SVGs read as
+this lane's blast radius, and the honest answer — *three snapshots, no SVG, no terminal baseline* —
+would have been lost inside them. The measurement cost one 40-second run. It is the sixth blind
+spot's instrument pointed at a lane brief: a claim carried into a step, held in a plan and in no
+file that was measured.
+
+**Where**: `test/golden/svg-baseline.test.ts` SB3; measured at the shared tree, 2026-09-04.
+
+---
+
+## F646 — a mutation expectation must be a verbatim substring of the corpus, and a row with no number cannot be named ★☆☆☆☆
+
+*2026-09-04 · Lane W, the wrapper's early break, at 106fc7a0+lanes3 (2026-09-04).*
+
+**Expected**: `expect:` on a mutation row names the instrument that catches it, in the form the
+other rows use (`"T3.62"`).
+
+**Measured**: MA4 checks the expectation string against the **text of the test files the run
+invokes**, so `"T1.19, T3.10b2, C04 T2.36"` and any prose expectation are reported unreachable —
+three of mine were, on the first full run. A single id is required. The row this lane must name
+for the trailing-space guard (`"abc   def"` at 5) is the exact-slice row in
+`test/unit/spans.test.ts`, which **has no T number** — C09 §9 T1.17 already records that the
+number is owed to those rows — so the expectation quotes the row's title (*the break space is in
+no row*) instead. That works and is second best: a title is renamed more easily than a number.
+
+**Where**: `tools/mutate/anchors.mjs` MA4; `tools/mutate/runs/spans.mjs`; C09 §9 T1.17. See the
+requests file.
+
+---
+
+## F647 — a blind spot found in one component was checked in the next and was not there ★★★☆☆
+
+*2026-09-04 · the lead, at 106fc7a0+lanes3 (2026-09-04).*
+
+**Expected**: F637's class — *a unit that over-states its rows survives every window
+assertion, because every row bounds the window from above and an over-stated unit shows less
+diff and never more* — reads as open across every kind that states a height and a unit count.
+Containment is satisfied by every wrong answer inside the bounds, and nothing in that argument
+is about the patch.
+
+**Measured**: it is not open. `src/presentation/table/definition.ts`'s own `unitsOf` was
+mutated the same way — `rows: 1 + detailHeight` → `2 + detailHeight` — and **six rows failed
+immediately**, `T2.14` among them. The probe is `scratchpad/probe-table-unit-rows.sh`.
+
+**Why the two differ, which is the reusable half.** The table's `measure` computes its height
+by its own arithmetic and never asks `unitsOf`, so a wrong unit is contradicted by an
+independent source in the same file. The patch's `measure` and `unitsOf` shared the wrong
+number: `hunkRows` walked the same restated count, so every assertion moved with the defect
+and agreed. **What distinguishes the two is not the kind and not the shape of the invariants —
+it is whether the expectation has a source independent of the thing it measures**, which is
+F638 stated over a component rather than over a row.
+
+So F637 is an instance and not a class, and the check that says so cost one mutation and
+one script. The habit is the one that found it: when a lane names a blind spot, run its
+mutation against the nearest component that has the same shape before writing the class down.
+A blind spot asserted over a kind is a claim like any other, and the cheapest moment to find
+out it is narrower is before a rule is written to cover it.
+
+**Where**: `src/presentation/table/definition.ts` `unitsOf`; `scratchpad/probe-table-unit-rows.sh`;
+compare `src/presentation/patch/window.ts` `unitsOf` and `height.ts` `hunkRows`.
+
+---
+
+## F648 — the three residues, in numbers ★★★☆☆
+
+*2026-09-04 · the merge, over three lanes, at 106fc7a0+lanes3 (2026-09-04).*
+
+Three residues left by the seven owed items — a recorded-and-not-fixed wrapper defect, a
+de-duplication owed with a symbol, and a form's labels nobody had measured. This entry is
+their figures; each cites the entry that carries the measurement.
+
+**F591, fixed** (F642–F646). The deferral's reason — *it changes the row set of
+every paragraph with an exactly-full row and the goldens are shared* — was an estimate and
+wrong: the 560-pair sweep went **102 violations to 0** (F644), **three** golden frames
+moved and not every paragraph, and the terminal baseline moved **none**. The repair
+**subsumed** F590's arm rather than sitting beside it — F590 had written the same rule twice
+with the search's answer ignored — and that is how F642 surfaced: F590's arm swallowed a
+space strictly inside an atom, dropping a content character from inside a valued run while
+every existing row passed, because each row is still an exact slice from its `start` and
+nothing measures that the source got shorter. The spec's own example for `value` changing the
+height showed nothing, and its excuse *the plain wrapper already broke there* **was** the
+defect (F643).
+
+**`unitsOf`, de-duplicated** (F637–F641). **122 hunk-by-layout rows** and **481
+units** byte-identical across the corpus, and the walk's load-bearing cell was an interleaved
+run whose sides must be **summed and not ordered**. What the corpus could not see is the unit
+count itself: restating a unit's rows as its line count passed **99 rows across eight files**
+(F637) — every row bounds a window from above, so an over-stated unit shows less diff and
+never more. The row that kills it states the **equality across the seam**, the expectation
+coming from `height.ts` rather than from the walk. `pairedRows` stays a fourth walk **on
+purpose**: it allocates nothing, which is what keeps `measure` as cheap in split as in unified
+(F640).
+
+**Sankey labels** (F630–F636). **33 labels, worst 1.02** against `muted`'s own 2.5
+floor and body text's 4.5 — on both themes and in all six variants, not some (F630) —
+and placement could not have helped, because the label is already in d3's place and *outside
+the bar* and *on the ribbon* are one region. Ruled as `tone.default` on a `bgDeep` halo:
+**7.59 to 12.43** after, where the halo alone left `muted` at **2.44**. The precedent is
+plotly's `autoShadowDflt: true` — *minimal shadow and a contrast text font colour*, shipped as
+a default because plotly cannot assume a pale link either — in a reference §3ap.1 already
+cited for the placement and silent about the ink (F631); d3's placement was already
+taken. The arm paints every label on `surface.bgDeep`, the one surface C10 §4 excludes from
+`textSurfaces` on the premise that no text lands on it (F632).
+
+**The arithmetic**: 19 entries, F630–F648, keyed in one move each — group 7 gains
+two, 9 four, 10 two, 11 five, 14 one, Singles five — and SP6 reads 652 = 652.

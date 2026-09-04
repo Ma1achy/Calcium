@@ -3341,13 +3341,16 @@ PART  11 markdown                  translates to existing blocks. CHECKED 2026-0
                                    paragraphs, list items, quotes, headings and pipe cells and
                                    never inside a fence; a backtick run is literal and an
                                    unpaired marker is text. T2.33 and T2.34 replace T2.44.
-                                   STILL PART, AND THE RESIDUE IS NAMED: (i) a one-column
-                                   pipe table is not a table — `DELIMITER` needs two cells, so
-                                   `| h |` over `|---|` stays a paragraph; found by the code
-                                   phase's T2.34 fixture and this entry's to fix, not 50's;
-                                   (ii) inline code has no tone until `TextSpan.tone`;
-                                   (iii) heading levels, the quote gutter and the nesting cap,
-                                   as before
+                                   STILL PART, AND THE RESIDUE IS NAMED. (i) AND (ii)
+                                   CLOSED 2026-09-04, the day after they were written —
+                                   `DELIMITER` now takes one cell and requires a pipe, so
+                                   `| h |` over `|---|` is a one-column table (T2.48), and
+                                   inline code is an `identifier`-toned span now that
+                                   `TextSpan.tone` exists (C04 I89, T2.33). WHAT REMAINS is
+                                   (iii): heading levels, the quote gutter and the nesting
+                                   cap, as before — none of the three has a symbol, because
+                                   each is a decision about what to draw rather than a
+                                   mechanism that is missing
 BUILT 12 OUTPUT DIFFING          ★★ the whole frame is written every keystroke — ~10,000 cells
                                    to change one. Anticipated in a comment, never built.
                                    Smallest fix, biggest effect, invalidation already exists
