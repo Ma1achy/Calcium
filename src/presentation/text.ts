@@ -914,7 +914,7 @@ function isRegionalIndicator(cp: number): boolean {
  * geometry from should measure what a wide-convention terminal draws it as.
  *
  * **The premise this list used to rest on is false at HEAD, and it was checked
- * rather than inherited** (`LANEW-GEOMETRY-PREMISE`). It read *C12 and C09 gate those glyphs on this
+ * rather than inherited** (`F696`). It read *C12 and C09 gate those glyphs on this
  * answer — `halfBlockEligible`, `linedraw`, the ramp arms — so classifying them
  * Ambiguous is what makes the wide-convention gate fire at all*, and named its
  * own retirement: *the day they take a capability directly, this list is dead.*
@@ -1030,7 +1030,7 @@ const DRAWN_AS_GEOMETRY: readonly number[] = [
 /**
  * `East_Asian_Width` in {`W`, `F`}, derived from the property rather than
  * recalled — the second half of what `isAmbiguous` left owed (F665, and this
- * pass's own finding on the Wide table, `LANEW-WIDE`).
+ * pass's own finding on the Wide table, `F693`).
  *
  * **The authority is `EastAsianWidth-17.0.0.txt`, dated 2025-07-24**, the same
  * file and the same revision `AMBIGUOUS_RANGES` was generated from, read from
@@ -1086,7 +1086,7 @@ const DRAWN_AS_GEOMETRY: readonly number[] = [
  * so the Ambiguous arm runs first fails no row in the suite, because at narrow
  * the Ambiguous arm is short-circuited by the convention and at wide both arms
  * say two. The ordering is therefore *not* what resolves this — a sentence
- * resting on it would forbid nothing (`LANEW-ORDER`) — and what does settle it
+ * resting on it would forbid nothing (`F698`) — and what does settle it
  * is that a glyph the property already calls Wide is two cells under *every* convention,
  * which is the whole of what the deviation was trying to buy for it. What the
  * list still governs is the 576 Neutral code points in those blocks, which is

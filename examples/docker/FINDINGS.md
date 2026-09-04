@@ -26672,3 +26672,669 @@ chain, and fixing the top link is what makes the next one measurable.**
 **Where.** `test/unit/plot-y-axis.test.ts` YA4 (C12 I47, §3f);
 `src/presentation/plot/furniture.ts` `labelColumnWidth`; the two mutations recorded in the
 row's own comment.
+
+---
+
+## F693 — the Wide table was wrong in both directions, and the over-count was inside the under-count ★★★☆☆
+
+*2026-09-04 · Lane W, the Wide table derived from the property, at 311ab18e+lanes6 (2026-09-04).*
+
+**Expected.** `isWide`'s 17 hand-written blocks to be an incomplete list of Wide ranges: an
+addition, so a repair is a union.
+
+**Measured.** Against the property: **8,619 code points are `W` or `F` and measured one cell**
+(65 runs — Tangut and components 7,529, Kana Extended/Supplement and Nushu 687, Tai Xuan Jing
+and counting rods 110, Yijing 64, enclosed ideographic supplement 61, Hangul Jamo Extended-A 29,
+ideographic marks and Kana Extended-B 25, ~35 singletons) **and 369 code points measured two
+cells and are not `W` or `F`** (51 runs). The second number is what makes a union wrong: eight
+of the 369 are **U+3248..U+324F, which the property calls Ambiguous**, so the coarse
+`0x3041..0x33ff` produced an over-count *inside* an under-counting table, and a union of a
+generated table onto the old blocks satisfies every row about the 8,619 while keeping all
+eight. Deriving both tables from one file makes the disagreement impossible rather than fixed —
+the property's classes are disjoint, and `WIDE_RANGES ∩ AMBIGUOUS_RANGES` measures **0**.
+
+**Where.** `src/presentation/text.ts` (`isWide`, `WIDE_RANGES`); the rows that refuse a union
+are `test/unit/text.test.ts` T1.28b and T1.28c; the mutation that reproduces the union is row 2
+of `tools/mutate/runs/c09-text-wide.mjs`.
+
+---
+
+## F694 — the safe direction of the repair had to be measured, not argued ★★☆☆☆
+
+*2026-09-04 · Lane W, the Wide table derived from the property, at 311ab18e+lanes6 (2026-09-04).*
+
+**Expected.** Narrowing 369 code points from two cells to one to be the dangerous half of the
+repair, because an under-count is what wraps a row.
+
+**Measured.** 302 of the 369 are the **text-presentation** emoji of plane 1 — U+1F321..U+1F32C,
+U+1F5A5..U+1F5FA and neighbours — which the property calls Neutral because a terminal draws them
+one cell until a variation selector asks for the emoji form. Cross-checked against
+`emoji-data.txt` 17.0.0: **of the 369, none has `Emoji_Presentation=Yes`**, so no glyph a
+terminal draws double-width lost a cell. `cells("\u{1F321}\u{FE0F}")` is still 2, via
+`clusterCells`'s existing U+FE0F promotion. The remaining 67 are unassigned gaps the coarse
+blocks swallowed.
+
+**Where.** T1.28b asserts both halves — the narrowing and the U+FE0F form that survives it.
+
+---
+
+## F695 — the property's `W` defaults live in header prose, and a row parser cannot see them ★★☆☆☆
+
+*2026-09-04 · Lane W, the Wide table derived from the property, at 311ab18e+lanes6 (2026-09-04).*
+
+**Expected.** `; W` and `; F` rows to be the whole of the Wide property.
+
+**Measured.** The file's header gives `W` to the *unassigned* code points of three CJK blocks
+and to everything undesignated in planes 2 and 3 — a rule stated in prose above `@missing:
+0000..10FFFF; N`, not in any row. Checked: in 17.0.0 those blocks are listed in full, so the
+defaults contribute **0** code points beyond the rows, and the generated table is complete. The
+premise is recorded in `WIDE_RANGES`'s docstring because the day a revision stops listing them,
+a generator reading rows alone loses tens of thousands of cells silently and in the
+under-counting direction.
+
+**Where.** `src/presentation/text.ts`, `WIDE_RANGES` docstring.
+
+---
+
+## F696 — a deviation's stated premise was already false, and it named its own retirement ★★★☆☆
+
+*2026-09-04 · Lane W, the Wide table derived from the property, at 311ab18e+lanes6 (2026-09-04).*
+
+**Expected.** `DRAWN_AS_GEOMETRY`'s recorded justification — *§4c's gates read this answer:
+`halfBlockEligible`, C12's line-draw and ramp arms, so classifying those glyphs Ambiguous is
+what makes the wide-convention gate fire at all* — to hold, since it carries its own re-check
+condition: *the day one takes the capability directly, its range is dead.*
+
+**Measured.** `isAmbiguous` has exactly **one** caller in the whole tree — `clusterCells`, four
+hundred lines above it. `halfBlockEligible` takes `caps.ambiguousWidth` as a parameter
+(`src/presentation/image/halfblock.ts:80`), and every other gate named reads the capability
+directly. The condition the deferral named has been met and nothing was watching it. The list
+is not dead — the *measurement* claim above it still holds — but the claim it rested on was a
+gate that does not exist, which is a smaller and different argument.
+
+**Where.** `src/presentation/text.ts` `isAmbiguous` docstring; `docs/components/C09_block_library.md` §5.
+
+---
+
+## F697 — the deviation's own figure was 49 code points too large, and now is by construction ★★☆☆☆
+
+*2026-09-04 · Lane W, the Wide table derived from the property, at 311ab18e+lanes6 (2026-09-04).*
+
+**Expected.** `DRAWN_AS_GEOMETRY` to govern the 625 code points its docstring names.
+
+**Measured.** Reproduced exactly: 625 = 576 Neutral + 49 Wide. The 49 (`⛄` `⚡` `⛔` `◽` `⚽`,
+the zodiac, the trigrams) are `W` in the property, so after this change `isWide` answers for
+them and they are two cells under **both** conventions. What the list still governs is **576**.
+
+**Where.** T1.28d asserts the intersection in both modes with a Neutral control; the figure is
+corrected in the docstring and in C09 §5.
+
+---
+
+## F698 — the ruling that resolved the overlap could not be violated, and the mutation pass is what said so ★★★☆☆
+
+*2026-09-04 · Lane W, the Wide table derived from the property, at 311ab18e+lanes6 (2026-09-04).*
+
+**Expected.** *`clusterCells` asks `isWide` before `isAmbiguous`, so the property wins* to be
+the mechanism resolving the 49-code-point intersection — a sentence about ordering, written
+into the docstring as a ruling.
+
+**Measured.** Swapping the two tests — `if (ambiguous === "wide" && isAmbiguous(base)) return 2;
+return isWide(base) ? 2 : 1;` — **fails no row in the suite** (57/57 green across
+`text.test.ts` and `text-width.test.ts`). At narrow the Ambiguous arm is short-circuited by the
+convention; at wide both arms answer two. The sentence named a distinction that does not exist
+— A03 §2's vacuity class arriving in prose — and it read as a ruling. The docstring now says
+what does resolve it: with `WIDE_RANGES ∩ AMBIGUOUS_RANGES = ∅` the order cannot decide
+anything, and a glyph the property already calls Wide is two cells under every convention,
+which is all the deviation was buying for it.
+
+**Where.** `src/presentation/text.ts` `isWide` docstring; the measurement is reported rather
+than asserted, because there is no row to write for a distinction that does not exist.
+
+---
+
+## F699 — a test corpus of one representative per range cannot see a collapse ★★☆☆☆
+
+*2026-09-04 · Lane W, the Wide table derived from the property, at 311ab18e+lanes6 (2026-09-04).*
+
+**Expected.** T1.28's first draft — one representative code point per run of the 8,619, 27 of
+them — to pin the table.
+
+**Measured.** Collapsing `0x17000, 0x18cd5` to `0x17000, 0x17000`, which removes **7,382**
+Tangut ideographs from the table, left all 36 rows green. Every representative had been written
+as its run's **first** member, and a collapse onto element zero keeps exactly that. Rewritten as
+28 `[lo, hi]` runs asserted at both bounds and the midpoint; the mutation now fails T1.28, and
+the mirror mutation (a collapse onto the *last* member) is row 5 of the run file.
+
+**Where.** `test/unit/text.test.ts` T1.28; `tools/mutate/runs/c09-text-wide.mjs` rows 4 and 5.
+
+---
+
+## F700 — A03 SP5 cannot tell a finding number from a Unicode code point ★★☆☆☆
+
+*2026-09-04 · Lane W, the Wide table derived from the property, at 311ab18e+lanes6 (2026-09-04).*
+
+**Expected.** Writing `U+F900..U+FAFF` in a docstring — the third of the property's default-`W`
+blocks — to be ordinary prose.
+
+**Measured.** `make enforce` reported two SP5 violations at that line, each naming the digits of the
+code point as a finding the ledger does not have — and this entry cannot quote the message,
+because a bare number in that form is the violation. SP5's `CITATION` regex is
+`/(?<![A-Za-z0-9_])(F\d+[a-z]?)(?![A-Za-z0-9_])/u`, and `+` is not in the excluded class, so
+every code point of the form `U+F` plus digits reads as a citation. `0xf900` in a hex literal is
+exempt only by accident — `x` is a letter. The collision set is small (U+F000..U+FFFF written in
+that form) and `src/presentation/text.ts` is the one file in the tree likely to write one. Worked
+around here by naming the block instead; the rule is not this lane's file.
+
+**Where.** `tools/enforce/findings.mjs:97`; worked around in `src/presentation/text.ts`,
+`WIDE_RANGES` docstring.
+
+---
+
+## F701 — the frame was arithmetically self-consistent and its columns did not line up ★★★☆☆
+
+*2026-09-04 · Lane W, the Wide table derived from the property, at 311ab18e+lanes6 (2026-09-04).*
+
+**Expected.** The under-count to show as a row that overruns its width.
+
+**Measured.** Rendering C11's `ps` table at width 60 with `⚡ events` and `⭐ starred` as cell
+text, before and after, and reading the rows rather than the totals:
+
+```
+BEFORE                                                       measured / drawn
+      uuid     family           status       detail              60 / 60
+▸  ●  a3f9b21  ⚡ events         running      ep 1/40             59 / 60
+▸  ●  7c2d4e1  ⭐ starred        succeeded    ep 2/40             59 / 60
+▸  ●  2e8a04c  family-3         failed       ep 3/40             60 / 60
+
+AFTER
+      uuid     family           status       detail              60 / 60
+▸  ●  a3f9b21  ⚡ events        running      ep 1/40              60 / 60
+▸  ●  7c2d4e1  ⭐ starred       succeeded    ep 2/40              60 / 60
+▸  ●  2e8a04c  family-3         failed       ep 3/40              60 / 60
+```
+
+Every row before the change *drew* 60 cells, so no assertion about a row's width could see
+anything. What is wrong is inside the frame: the `family` column padded `⚡ events` as though it
+were 9 cells, so `status` begins at cell 27 on the two emoji rows and at cell 26 on the plain
+one — **one frame, two answers to where a column starts**. And the row hands C22 a string
+that *measures* 59: a frame that pads to 60 by the same measure emits 61 drawn cells, which is
+the wrap one layer up. Both halves are invisible to a count.
+
+**Where.** Reproduced with `psTable` from `test/support/blocks.ts` through `measurable` at
+widths 60/62/64; the probe was temporary and is not in the tree.
+
+---
+
+## F702 — no golden frame moves, and the reason is worth recording ★☆☆☆☆
+
+*2026-09-04 · Lane W, the Wide table derived from the property, at 311ab18e+lanes6 (2026-09-04).*
+
+**Expected.** Goldens to move in the narrow arm, since the default convention is what every
+golden is rendered in.
+
+**Measured.** **Zero.** Scanned every file under `test/golden/` for a code point whose width
+changes in either direction: **0 files affected**. Running `npm run golden` with and without the
+change gives the identical result — 406 of 407 rows pass, and the single failure
+(`svg-baseline.test.ts` SB3, 10 SVG names) reproduces with `src/presentation/text.ts` reverted
+to HEAD, so it is another lane's. The affected characters in the tree are `⚡` in three test
+files and one docstring, `✨` in `tools/spinner.js`, and prose in `docs/`; none reaches a golden
+input. The exposure is therefore **entirely far-side text**, which is the argument the docstring
+now rests on instead of a literal count.
+
+---
+
+## F703 — The right margin is a fixed fraction and everything drawn in it is content ★★★☆☆
+
+*2026-09-04 · Lane C, the SVG right margin, at 311ab18e+lanes6 (2026-09-04).*
+
+**Expected**: the brief reported one defect — the callout at `x=620.4` in a 640 viewBox on three
+`line-callout-*` frames.
+
+**Measured**: every `<text>` in all 244 committed frames, laid against its own `viewBox` at the
+advance measured below — **13 strings in 7 frames** are off the page. The worst is not one of the
+three: `line-both-axes-narrow`'s callout `eu-west-1-primary-p99-latency 0.8774` runs **240.5 px**
+past the edge, 38% of the figure, and renders as `eu`. The right-hand **value label** `100` overruns
+by 2.1 px in six frames, which is why this is not a callout defect with a callout fix — the margin is
+short for everything drawn in it. The one graceful case is `heatmap-both-axes-narrow`, 0.5 px past
+`x=0` **inside a clip** (§3ak.41's clip, doing its job).
+
+**Where**: `src/presentation/plot/svg.ts` `area()`; the probe is
+`docs/catalogue/laneC/overflow.mjs` (gitignored).
+
+---
+
+## F704 — `SVG_EM = 0.6` was below every monospace face measured, in the one direction that clips ★★★☆☆
+
+*2026-09-04 · Lane C, the SVG right margin, at 311ab18e+lanes6 (2026-09-04).*
+
+**Expected**: the request proposed `longest × SVG_FONT_SIZE × 0.6 + gap`, and 0.6 was already in the
+file documented as *this arm's own estimate*.
+
+**Measured**, from `hmtx ÷ head.unitsPerEm` on the shipped `.ttf` files, and confirmed by rendering
+20 glyphs at size 120 through the same `sharp` the goldens go through:
+
+| face | advance ÷ em |
+|---|---|
+| Courier New, Andale Mono, Monaco | 0.6001 |
+| DejaVu Sans Mono (the container's `fc-match monospace`), Menlo | 0.6021 |
+| **SF Mono** (`SFNSMono.ttf`) | **0.6182** |
+
+Every one is **above** 0.6. The arm emits `font-family="monospace"` — a generic family, so the face is
+the renderer's choice and the metric is unknowable at emit time; the constant is used only for
+reserving room and for deciding how many characters fit in room, and both want an upper bound.
+`SVG_EM_MAX = 0.65` is 5% above the widest measured; the cost is 4.6 px of blank on the corpus's
+widest string, and the stated falsification is a face above 0.65.
+
+**Where**: `src/presentation/plot/svg.ts:106–137`; the probes are `docs/catalogue/laneC/advance.mjs`
+and `docs/catalogue/laneC/ttf.py`.
+
+---
+
+## F705 — The 0.6 estimate was already cutting a head, sub-pixel, on the left ★★☆☆☆
+
+*2026-09-04 · Lane C, the SVG right margin, at 311ab18e+lanes6 (2026-09-04).*
+
+**Expected**: §3ak.41 fixed the left gutter by growing it to `widest × 12 × 0.6 + 6`.
+
+**Measured**: `boxplot-default`'s `sepal_length` is `end`-anchored at `x=86.4` and is 86.70 px wide at
+DejaVu's true advance — it starts at **−0.30**, and at SF Mono's 0.6182 it starts at **−2.6**, a third
+of a glyph gone. Under the clip, silently, which is the exact failure mode §3ak.41 was written
+against. The bound moves that label's start to +6.9.
+
+**Where**: `test/golden/svg-baseline/boxplot-default.svg`, and `docs/catalogue/laneC/boxplot-default-after.png`.
+
+---
+
+## F706 — "Every SVG golden moves" is false: 10 of 244 ★★☆☆☆
+
+*2026-09-04 · Lane C, the SVG right margin, at 311ab18e+lanes6 (2026-09-04).*
+
+**Expected**: the brief said *every SVG golden moves, because the layout moves*.
+
+**Measured**: **10 move, 234 are byte-identical**, and `SB3` names the same ten. The reserve is zero
+where nothing is drawn on the right, so a figure with nothing to reserve for does not move — which is
+the half of the rule that would otherwise make it the wrong rule.
+
+**Where**: `test/golden/svg-baseline.test.ts` SB3; probe `docs/catalogue/laneC/moved.mjs`.
+
+---
+
+## F707 — The reserve and the fit are two derivations of one product, and they meet at equality ★★★☆☆
+
+*2026-09-04 · Lane C, the SVG right margin, at 311ab18e+lanes6 (2026-09-04).*
+
+**Expected**: a margin sized for `100` holds `100`.
+
+**Measured**: `rightRoom` grants `3 × 12 × 0.65 + 6`, `fitLabel` divides the same three numbers back
+out, and `23.400000000000006 / 7.8` is `2.9999…` — so `100` shipped as **`1…`** in a margin sized for
+it. Found by **reading the diff of the moved frames**, not by any count: every frame still rendered,
+every coordinate was inside the page, and the golden would have recorded it. The remedy is a `1e-9`
+tolerance, nine orders below a glyph.
+
+**Where**: `src/presentation/plot/svg.ts` `fitLabel`; row `RM5`.
+
+---
+
+## F708 — A containment row cannot see a reserve going missing ★★★☆☆
+
+*2026-09-04 · Lane C, the SVG right margin, at 311ab18e+lanes6 (2026-09-04).*
+
+**Expected**: the geometric row `RM1` — *every string inside its own viewBox* — is the row that fails
+if the fix is reverted.
+
+**Measured**, by hand: setting `rightRoom` back to 0 fails `RM2`, `RM3`, `RM4`, `RM5` **and `G11a`**
+and leaves `RM1` green, because the `fitLabel` at the drawing site still cuts the callout to the
+page — the frame reads `alp…` instead of running off. The two halves of the rule are killed by
+different rows, and only reconstructing **both** halves of the shipped state (fixed margin *and* no
+cut) fails `RM1`. Reverting the advance to 0.6 also fails `RM1`, which is what makes the bound
+load-bearing rather than decorative.
+
+**Where**: `tools/mutate/runs/c12-svg-right-margin.mjs`, header and rows 1–2; spec T6.90.
+
+---
+
+## F709 — Two goldens differ in bytes and are the same picture ★★☆☆☆
+
+*2026-09-04 · Lane C, the SVG right margin, at 311ab18e+lanes6 (2026-09-04).*
+
+**Expected**: `line-callout-name` and `line-callout-both` are separate frames because §3ak.47 made the
+three callout modes draw three documents.
+
+**Measured**: both render the identical image — the callouts are clipped to `alp` / `bet` at the
+page edge, so the difference the byte-compare certifies (` 0.8774` / ` 99.12`) is entirely off-page.
+A frame gate that compares bytes cannot report that two of its frames are one picture.
+
+**Where**: `docs/catalogue/laneC/line-callout-{name,both}.png`.
+
+---
+
+## F710 — The callout and the right-hand value label overprint (owed) ★★☆☆☆
+
+*2026-09-04 · Lane C, the SVG right margin, at 311ab18e+lanes6 (2026-09-04).*
+
+**Expected**: containment was the defect.
+
+**Measured**: `line-callout-multiseries`' top-right corner renders `90012` — `99.12` written over
+`100` — and `line-both-axes-narrow`'s callout `e` sits on the label `0`. Both texts are at the
+coordinates their own rules give them and both are inside the canvas, so **no arithmetic assertion
+sees it**; it is visible only as a picture, and it is unchanged by this fix (both move right
+together). The terminal has a rule for it — I48's contention ladder, *one series' last reading, and
+three that contend for rows* — and this arm implements none of it.
+
+**Where**: `docs/catalogue/laneC/line-callout-multiseries.png`; C12 §3ak.49b's first residue
+paragraph, which carries the placeholder mark ⊕ at 311ab18e+lanes6 and is to be repointed to this
+number.
+
+---
+
+## F711 — The two arms disagree about whether a callout needs a right-hand axis ★★☆☆☆
+
+*2026-09-04 · Lane C, the SVG right margin, at 311ab18e+lanes6 (2026-09-04).*
+
+**Expected**: a callout is *a name at the line's end* (I48) and the axis is a separate member.
+
+**Measured**, both arms, on `yAxis: false, yCallout: "both"`: the **terminal draws no callout at
+all** — `definition.ts:1376` folds the callout into the right *label* column, `right = sides.right ?
+max(wanted, calloutWidth(...)) : 0`, so with no right axis there is no column and nothing is written
+— while the SVG draws `alpha 10`. The disagreement predates this change (the SVG always drew it) and
+is not in the disagreement matrix. Not ruled here.
+
+**Where**: `docs/catalogue/laneC/nogutter2.mjs` (terminal frame) and `nogutter.mjs` (SVG).
+
+---
+
+## F712 — A mutation anchor's uniqueness is a property of the tree, not of the run ★★☆☆☆
+
+*2026-09-04 · Lane C, the SVG right margin, at 311ab18e+lanes6 (2026-09-04).*
+
+**Expected**: `c12-arm-seam.mjs`'s gutter anchor is a one-line string and had been unique for as long
+as it existed.
+
+**Measured**: growing the right margin with the *same expression* on the other side of the box made
+that line match twice — the anchor check reported `1 ambiguous` and the mutation would have silently
+mutated whichever came first. Re-anchored on the gutter's own preceding line. A run file's anchors
+are only as unique as the code around them, and a correct new function can invalidate one without
+touching it.
+
+**Where**: `tools/mutate/runs/c12-arm-seam.mjs`, the `THE ROOM` mutation; `tools/mutate/anchors.mjs`.
+
+---
+
+## F713 — `gutterRoom` reserves from `labels` and the drawing writes `labels[i] ?? String(tick)` (owed) ★★☆☆☆
+
+*2026-09-04 · Lane C, the SVG right margin, at 311ab18e+lanes6 (2026-09-04).*
+
+**Expected**: the left reserve measures what the left draws.
+
+**Measured**: it reads `figure.value?.labels ?? []`, and the emitter writes `axis.labels[i] ??
+String(tick)` — an axis whose `labels` array is short reserves for nothing and draws a number. **No
+instance in the corpus**: every axis in it labels every tick. `rightRoom` does it correctly, so the
+two sides of the box now measure differently. Not fixed here, because fixing it moves guttered frames
+on a case that is fine — §3ak.41's own ruling about narrowing.
+
+**Where**: `src/presentation/plot/svg.ts` `gutterRoom`; C12 §3ak.49b's second residue paragraph,
+which carries the placeholder mark ⊕ at 311ab18e+lanes6 and is to be repointed to this number.
+
+---
+
+## F714 — I21's fourth admitted case states a condition that is false of both its sites ★★★☆☆
+
+*2026-09-04 · Lane P, C10 I21's picture cell, at 311ab18e+lanes6 (2026-09-04).*
+
+**Expected** (from the brief, from C10 §4f, §4g.2, §4g.4 and I35, which all repeat it): a picture
+cell *carries no text*, and the remedy is a `wash`-shaped `pictureCell(ref)` returning a blank
+`Span` so the rule becomes unforgeable.
+
+**Measured**, off the shipped 24-bit and 8-bit terminal goldens for `sankey-*` and `plot3d-*`:
+every background-bearing cell **carries a glyph**, and there is no exception. Sankey's set is
+exactly `{▀}` — 28 cells across the shipped corpus — and `plot3d`'s is `▀▁▂▃▅▆▇▌` plus 46 distinct
+braille patterns. `sankey.ts`'s own header says the glyph "carries bar against ribbon at every
+depth (I17)": it is the half that survives at 1-bit, so a blank `Span` would erase the drawing.
+
+`carries no text` was never true. It read as a caller's discipline that nobody enforced; it was in
+fact a **statement nobody could have satisfied**, which is why nothing enforced it.
+
+**Where**: `docs/components/C10_theme_resolution.md` I21, §4c, §4f, §4g.2, §4g.4 (all rewritten);
+measurement reproduced permanently as T1.36 in `test/unit/theme.test.ts`.
+
+---
+
+## F715 — Neither call site reaches the background through `slot()` — the sentence naming the mechanism was wrong in both halves ★★★☆☆
+
+*2026-09-04 · Lane P, C10 I21's picture cell, at 311ab18e+lanes6 (2026-09-04).*
+
+**Expected**: "`sankey.ts` and `scatter3.ts` both reach it through `slot(...).colour`" — stated
+twice in C10 (§4f and §4g.4) and repeated in I35's limits paragraph.
+
+**Measured**: `sankey.ts` contains **no `slot(` call at all**. It names `ColourRef`s (`cell()`,
+line 506) and the resolution happens in `definition.ts`'s `sankeyRows` — a different file, and one
+outside this lane's ownership. `scatter3.ts` does call `slot()`, but every one of its four calls is
+a **foreground**: a series colour, an axis tone, the muted frame ink, and `surface.bg` for inverted
+glyphs. By the time a cell is built (line 1459) it holds resolved `ColourValue`s, not refs — and
+under the default `colourBy: "depth"` those come from a **colormap**, which is §4e's already-
+admitted case. Only under `colourBy: "series"` is a picture cell's background a palette slot at all.
+
+This is the "ask where a claim was written down" instrument firing: three documents cite the
+situation, none cites a measurement, and the mechanism named does not exist at one of the two sites.
+
+**Where**: corrected in C10 §4f and §4c.1's table.
+
+---
+
+## F716 — The remedy could not have been built where it was scoped — an import edge nobody checked ★★☆☆☆
+
+*2026-09-04 · Lane P, C10 I21's picture cell, at 311ab18e+lanes6 (2026-09-04).*
+
+**Expected**: a new helper in `src/presentation/theme/**`.
+
+**Measured**: `Span`, `slot` and `wash` all live in `src/presentation/blocks/paint.ts`, and
+`paint.ts` line 16 imports `../theme/index.js`. So a `Span`-returning helper in `theme/` is
+`theme → blocks/paint → theme` — the cycle MG1 and MG22 exist to refuse. The helper's natural home,
+beside `wash`, is a file the brief did not grant.
+
+The resolution was to move the helper's *subject* rather than its home: `isPictureGlyph` is a pure
+codepoint predicate, so it lives in `theme/` with no import of `blocks/` at all and no cycle.
+
+**Where**: `src/presentation/theme/picture.ts`; reasoning recorded in C10 §4c.1's third table row.
+
+---
+
+## F717 — `SankeyCell` is one type serving two kinds of cell, so it cannot carry the guarantee ★★☆☆☆
+
+*2026-09-04 · Lane P, C10 I21's picture cell, at 311ab18e+lanes6 (2026-09-04).*
+
+**Expected**: a type that refuses a text-bearing picture cell.
+
+**Measured**: `SankeyCell` is `{ text: string; ref?: ColourRef; background?: ColourRef }` and it
+inhabits **both** the picture cells and the label cells — `sankeyArea` pushes `{ text: ch }` for
+every character of a node's label. Half its inhabitants are text, so the type cannot forbid text;
+the expressible guarantee is a discriminated union, and `definition.ts` reads `.text`, `.ref` and
+`.background` off it, so that union cannot land without editing a file this lane does not own.
+
+The discipline that actually holds today is structural and undocumented: `cellOf` is reached only
+where `text[r]?.[c]` is `undefined`, so a label character can never acquire a background. That is
+one `if` in one function, and nothing states it.
+
+**Where**: recorded in C10 §4c.1 and left owed in §4g.4 with both blocker files named.
+
+---
+
+## F718 — A picture cell's ink is a *text* tone and no artefact reaches the pair ★★☆☆☆
+
+*2026-09-04 · Lane P, C10 I21's picture cell, at 311ab18e+lanes6 (2026-09-04).*
+
+**Expected**: the hazard at a picture cell is `categorical × categorical` at 1.00 — the figure
+repeated in §4f, §4g.2, §4g.4 and I35.
+
+**Measured**: in `plot3d-colour-series` at 24-bit the braille outlines are drawn in
+`tone.muted` — `#626262` — over a `categorical` or colormap background, e.g. `#3cbf9a`. That is a
+slot **authored as text** used as ink over a picture background. It is neither
+`categorical × categorical` nor a foreground on a surface, so §4f's sweep misses it (that sweep is
+indexed by *text sites*, and a wireframe is not one) and §4g.2's table had no row for it.
+
+Left as a reading question for C12 rather than a floor for C10: `ratio` answers *can a character be
+recovered*, and a cage drawn over a shaded face is judged on whether the cage reads.
+
+**Where**: new row in C10 §4g.2; new owed bullet in §4g.4.
+
+---
+
+## F719 — The 1.00 figure in the frame is a different object from the 1.00 figure in the palette ★★☆☆☆
+
+*2026-09-04 · Lane P, C10 I21's picture cell, at 311ab18e+lanes6 (2026-09-04).*
+
+**Expected**: 1.00 is the hazard — "invisible in greyscale and legible only by hue".
+
+**Measured**: in `plot3d-colour-series`, seventeen cells carry `▀` with **fg and bg the same
+categorical slot**, `#3cbf9a` on `#3cbf9a`. That is not the palette's worst pair leaking into a
+frame; it is the correct drawing — two adjacent half-cells of one surface are one region, and a
+solid block is what should appear. A hazard read off the palette and an intended reading in the
+frame print the same number, and four documents repeat the number without distinguishing them.
+
+**Where**: C10 §4c.1, penultimate paragraph.
+
+---
+
+## F720 — A corpus-derived row cannot see a widening — measured, not reasoned ★★☆☆☆
+
+*2026-09-04 · Lane P, C10 I21's picture cell, at 311ab18e+lanes6 (2026-09-04).*
+
+**Expected**: T1.36, which derives the admitted alphabet from the shipped goldens rather than from
+the constructors' own tables, covers the alphabet.
+
+**Measured**, by hand-running the `ALPHABET-WIDE` mutation (widen `isPictureGlyph` to *anything not
+alphanumeric*): **T1.36 survives**, T1.35 fails. A row indexed by what the corpus contains sees a
+*narrowing* of the admitted set and is blind to a *widening* of it, because everything the corpus
+holds is still admitted.
+
+Both rows are therefore load-bearing and neither substitutes for the other. Recorded on the
+mutation entry rather than repaired, because the asymmetry is a property of the instrument.
+
+**Where**: `tools/mutate/runs/c10-picture-cell.mjs`, `ALPHABET-WIDE`.
+
+---
+
+## F721 — Removing either guard is invisible in every frame — measured ★★☆☆☆
+
+*2026-09-04 · Lane P, C10 I21's picture cell, at 311ab18e+lanes6 (2026-09-04).*
+
+**Expected**: a guard on a rendering path is covered by the golden corpus.
+
+**Measured**, by hand-running `SANKEY-UNGUARDED`: with `sankeyArea`'s `assertPictureGlyph` call
+deleted, **313 of 314 rows passed** across `test/unit/theme.test.ts`, `test/golden/terminal-
+baseline.test.ts` and `test/golden/plot-forms.test.ts` — the single failure being T1.37, the row
+written for it. No input the tree produces trips the guard, which is exactly what makes it a guard
+worth having and exactly what makes a green run indistinguishable from its absence.
+
+**Where**: T6.92 in C10; `SANKEY-UNGUARDED` and `PLOT3D-UNGUARDED` in the run file.
+
+---
+
+## F722 — Not mine — red rows in the shared tree ★☆☆☆☆
+
+*2026-09-04 · Lane P, C10 I21's picture cell, at 311ab18e+lanes6 (2026-09-04).*
+
+The three lanes are working in **one checkout**, not three worktrees, so the tree carries Lane C's
+and Lane W's edits alongside mine. Two gates are red and neither is attributable to Lane P:
+
+- `make enforce`: 8 × SP5 on `docs/components/C12_plot_renderer.md` (lines 7651, 7657, 10333,
+  10452) citing three numbers past the end of the ledger, which `examples/docker/FINDINGS.md` did
+  not have. `git show HEAD` of that file has **zero** occurrences of them, so they arrived
+  this session; they were withdrawn before this merge, which assigns the same three numbers
+  to lane W's own entries.
+- `npm test`: `test/unit/enforce-commitments.test.ts` SP5 (the same thing) and
+  `test/unit/mutate-anchors.test.ts` MA4, which names `c12-arm-seam.mjs` — one anchor missing and
+  not on the exemption list. `c10-picture-cell.mjs` is not implicated; the pass counts 136 runs.
+- `test/golden/svg-baseline.test.ts` SB3: ten SVG frames moved — `boxplot-default`,
+  `heatmap-both-axes-narrow`, five `line-callout-*`, two `line-yaxis-*`, `line-both-axes-narrow`.
+  Every one is an SVG-arm form, `svg.ts` is modified in this tree, and Lane P touched neither.
+
+---
+
+## F723 — A gate invented a citation from a Unicode code point ★★★☆☆
+
+*2026-09-04 · the lead, closing lanes6, at 311ab18e+lanes6.*
+
+**Expected.** A03 SP5's citation pattern to be narrow in the direction it was written for:
+`(?<![A-Za-z0-9_])(F\d+[a-z]?)(?![A-Za-z0-9_])`, so a bare `F1` inside an identifier or a hex
+string is not a citation. `0xF900` and `\uF900` were excluded from the day it was written.
+
+**Measured.** They were excluded *because `x` and `u` are word characters*, not because the rule
+knows what a hex form looks like — and **`+` is not a word character**. So `U+F900` read as a
+citation of the finding those four digits spell — some two hundred past the end of the ledger —
+and the rule reported it. This entry cannot write that number down, which is the defect stated
+as an inconvenience. It fired
+on a docstring naming a block of the East Asian Width property (F700), where writing the block's
+own code points is the ordinary way to say what the block is.
+
+**Which direction it fails in is the whole reason it surfaced.** This is the **loud** failure and
+not the quiet one: the rule *invents* a citation rather than dropping one, so it announced itself
+on the first file that wrote a code point in that form. The quiet twin — a real citation the
+pattern cannot see — is what the other two exclusions do, and nothing would have reported those.
+A rule with one lookbehind covering three forms cannot tell you which of the three it is about.
+
+**Fixed with its own named lookbehind** — `(?<!U\+)` beside `(?<![A-Za-z0-9_])` — rather than by
+adding `+` to the character class. The class version works and says nothing: it would exclude
+every `F` preceded by a plus sign, in a rule whose subject is Unicode notation. The exclusion now
+names the form it is about, which is what makes it re-checkable. **A fabricated violation and a
+control both die when the lookbehind is removed**: `U+F900` must not fire and a citation of a
+real finding in the same numeric neighbourhood must, and the lane W entry that motivated this carries `U+F900..U+FAFF` and
+`U+F000..U+FFFF` in the ledger as the live control.
+
+**Where.** `tools/enforce/findings.mjs`, the `CITATION` regex and its docstring;
+`test/unit/enforce-commitments.test.ts`.
+
+---
+
+## F724 — the three owed items of lanes6, in numbers ★★★☆☆
+
+*2026-09-04 · the lead, closing lanes6, at 311ab18e+lanes6.*
+
+**lanes6's three, not F666's three.** F666 counted the page surface, SP10 and markdown; this
+counts `isWide`, the SVG right margin and the picture cell. Each of the three had a request that
+named an expectation, and in each the number that came back is the finding.
+
+**`isWide` — a repair that had to go in both directions at once.** **8,619** code points are `W`
+or `F` in `EastAsianWidth-17.0.0.txt` and measured **one cell in the default mode**, across **65
+runs** — Tangut and its components 7,529, Kana Extended and Nushu 687, the Yijing hexagrams 64,
+Hangul Jamo Extended-A 29, and about thirty-five emoji singletons that appear in ordinary far-side
+text. That is the under-count, and a union onto the hand-written blocks satisfies every row about
+it. **369 code points went the other way** — measured two cells and are not `W` or `F` — and the
+safe direction was measured rather than argued: cross-checked against `emoji-data.txt` 17.0.0,
+**none of the 369 has `Emoji_Presentation=Yes`**, so no glyph a terminal draws double-width lost a
+cell (F694). **The second overlap is what makes a union the wrong repair**: the geometry deviation
+claimed **625** code points, and **49 of them the property calls Wide**, so the deviation's own
+figure drops **625 to 576** and `⛄` `⚡` `⛔` and the zodiac are now two cells under both
+conventions by construction (F697). **After the sweep, zero under-counts in both modes**, and
+every remaining disagreement is one of the three recorded deviations: **602 = 576 + 26**. **Zero
+goldens moved, and that was measured twice** — once by scanning every file under `test/golden/`
+for an affected code point (0 files) and once by running the suite with and without the change
+(F702). The exposure is entirely far-side text, which is what the docstring now rests on instead
+of a count of the tree's own characters.
+
+**The SVG callout — the brief named one frame and the corpus had seven.** Every `<text>` in all
+**244** committed frames, laid against its own `viewBox`: **13 strings in 7 frames** off the page,
+and the worst is **not** one of the three the brief named — `line-both-axes-narrow`'s callout runs
+**240.5 px** past the edge, **38% of the figure**, in the fixture whose own comment named that
+case, rendering as **two characters of thirty-six** (F703). The constant behind it was
+`SVG_EM = 0.6`, and **0.6 is below every monospace face measured** — 0.6001 Courier New, Andale
+Mono and Monaco; 0.6021 DejaVu Sans Mono and Menlo; **0.6182 SF Mono** — in the one direction that
+clips. So it became a **bound**, `SVG_EM_MAX = 0.65`, 5% above the widest measured, **with the
+falsification stated**: a face above 0.65 (F704). And *every SVG golden moves* was false —
+**10 of 244**, the reserve being zero where nothing is drawn on the right (F706).
+
+**The picture cell — the request's premise was false three ways.** C10 I21 admitted a background
+for *a cell that carries no text*, and the remedy asked for was a blank `Span`. Measured off the
+shipped goldens: **both sites always carry a glyph**, sankey's set is exactly `{▀}` at 28 cells and
+`plot3d`'s is `▀▁▂▃▅▆▇▌` plus 46 braille patterns, and **the glyph is load-bearing** — it is the
+half that survives at 1-bit, so a blank `Span` would have erased the drawing (F714). The mechanism
+the documents named does not exist at one of the two sites (F715), and the helper could not have
+been built where it was scoped (F716). So **the admission moved from the text to the alphabet**:
+not *carries no text* but *draws from the picture alphabet*, a pure code-point predicate, and
+**the new reason survives a non-blank glyph where the old one never could**. **All twelve frame
+hashes identical.**
+
+**What the three share.** In each, the request was right that something was wrong and wrong about
+what — a union, a callout, a blank cell — and in each the corrected shape came out of a
+measurement that the request did not ask for. **Cites every entry F693–F723 by number.**

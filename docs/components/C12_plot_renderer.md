@@ -7648,13 +7648,13 @@ and `100` at the same anchor: the top-right of that frame is `90012`, unreadable
 before this change and after it, because both texts move right together. The terminal has a rule for
 this and it is I48's contention ladder — *one series' last reading, and three that contend for rows* —
 which this arm does not implement at all. **No arithmetic assertion could see it**: both texts are
-inside the canvas, at the coordinates their own rules give them. Owed, with the frame named — the lane's ledger carries it (⊕).
+inside the canvas, at the coordinates their own rules give them. Owed, with the frame named — the lane's ledger carries it (F710).
 
 **The left gutter reserves from `figure.value.labels` and the drawing writes `labels[i] ?? String(tick)`.**
 So an axis whose `labels` array is short reserves for nothing and draws a number. No instance in the
 corpus — every axis in it labels every tick — and it is the same class as the defect above, on the other
 side of the box. Recorded rather than fixed, because fixing it moves guttered frames on a case that is
-fine, which is the ruling §3ak.41 already made about narrowing (⊕).
+fine, which is the ruling §3ak.41 already made about narrowing (F713).
 
 ---
 ---
