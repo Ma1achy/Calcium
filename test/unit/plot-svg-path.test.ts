@@ -1047,6 +1047,139 @@ describe("G11 — a callout is a name at the line's end", () => {
   });
 });
 
+describe("RM — the right margin is grown to fit what is drawn in it (C12 I113, §3ak.49)", () => {
+  /**
+   * **The widest advance measured, not the bound the arm reserves at.**
+   * `SVG_EM_MAX` is 0.65 and the containment rows assert against 0.6182 — SF
+   * Mono, the widest of six faces measured from `hmtx ÷ head.unitsPerEm`. A row
+   * asserting at the arm's own constant would agree with it by construction and
+   * find nothing; this one asks whether a real renderer's glyphs fit.
+   */
+  const WIDEST_FACE = 0.6182;
+  const layout = SVG_DEFAULT_LAYOUT;
+
+  /** Every `<text>` the document places, in page coordinates. */
+  const placed = (svg: string): Array<{ text: string; left: number; right: number; clipped: boolean }> =>
+    [...svg.matchAll(/<text ([^>]*)>([^<]*)<\/text>/gu)].map((m) => {
+      const attrs = m[1] ?? "";
+      const text = m[2] ?? "";
+      const x = Number(/(?:^| )x="([-\d.]+)"/u.exec(attrs)?.[1] ?? "NaN");
+      const size = Number(/font-size="([\d.]+)"/u.exec(attrs)?.[1] ?? String(SVG_FONT_SIZE));
+      const anchor = /text-anchor="(\w+)"/u.exec(attrs)?.[1] ?? "start";
+      const w = [...text].length * size * WIDEST_FACE; // cells-ok — a character count
+      const left = anchor === "start" ? x : anchor === "end" ? x - w : x - w / 2;
+      return { text, left, right: left + w, clipped: /clip-path=/u.test(attrs) };
+    });
+
+  /** The frame's right edge — the vertical rule furthest right. */
+  const rightEdge = (svg: string): number => {
+    let at = 0;
+    for (const m of svg.matchAll(/<line x1="([-\d.]+)" y1="[-\d.]+" x2="([-\d.]+)"/gu)) {
+      if (m[1] === m[2]) at = Math.max(at, Number(m[1]));
+    }
+    return at;
+  };
+
+  const line = (extra: Record<string, unknown>): Plot => vmBlock({
+    kind: "plot", id: "rr", form: "line", height: 8, axes: true, legend: false,
+    series: [{ label: "alpha", values: [50, 90, 10] }, { label: "beta", values: [10, 40, 99] }],
+    ...extra,
+  } as unknown as Plot);
+
+  it("RM1 (C12 I113): every string in the catalogue is on the page, which the byte-compare golden could not ask", () => {
+    // **The golden certified this defect for as long as it existed.** A frame
+    // compared byte for byte agrees with whatever it recorded, and
+    // `line-callout-both` recorded `alpha 0.8774` at x=620.4 in a 640-wide
+    // viewBox — 67 px off the page, read as `alp`. So the assertion is
+    // geometric and over the emitted document: nothing is placed where it
+    // cannot be read.
+    //
+    // A clipped text is contained by construction and cut by design (§3ak.41),
+    // so it is excluded rather than exempted — the clip is what bounds it.
+    const outside: string[] = [];
+    for (const [form, variants] of Object.entries(CATALOGUE_FORMS)) {
+      for (const [variant, spec] of Object.entries(variants)) {
+        const { cursor, ...rest } = spec as Record<string, unknown>;
+        void cursor;
+        const svg = plotToSvg(vmBlock({ kind: "plot", id: "cat", ...rest } as unknown as Plot), THEME, layout);
+        if (svg === null) continue;
+        for (const t of placed(svg)) {
+          if (t.clipped) continue;
+          if (t.left < -0.5 || t.right > layout.width + 0.5) {
+            outside.push(`${form}/${variant}: "${t.text}" spans ${t.left.toFixed(1)}…${t.right.toFixed(1)} of ${String(layout.width)}`);
+          }
+        }
+      }
+    }
+    expect(outside, "every callout, label and title inside its own viewBox").toEqual([]);
+  });
+
+  it("RM2 (C12 I113): the margin is the maximum of the two things drawn in it, and zero where neither is", () => {
+    // **`definition.ts`'s own expression in pixels** —
+    // `right = sides.right ? max(wanted, calloutWidth(...)) : 0`. The three
+    // frames differ only in what is written on the right.
+    const bare = plotToSvg(line({ yAxis: "left" }), THEME, layout) ?? "";
+    const labelled = plotToSvg(line({ yAxis: "both" }), THEME, layout) ?? "";
+    const called = plotToSvg(line({ yAxis: "both", yCallout: "both" }), THEME, layout) ?? "";
+
+    // **A figure with nothing to reserve for does not move**, which is the half
+    // of this rule that would make it the wrong rule (F325's shape).
+    expect(rightEdge(bare), "the fixed margin stays where nothing is drawn in it")
+      .toBeCloseTo(layout.width * (1 - layout.pad), 6);
+    // `100` is three glyphs and a gap, which is wider than `width · pad` on the
+    // default layout — the 2 px overrun six committed frames carried.
+    expect(rightEdge(labelled), "a right-hand value label takes the room its glyphs need")
+      .toBeCloseTo(layout.width - (3 * SVG_FONT_SIZE * 0.65 + 6), 6);
+    // `alpha 99` and `beta 99` — eight glyphs, so the callout wins the maximum.
+    expect(rightEdge(called), "and the callout wins where it is the wider of the two")
+      .toBeCloseTo(layout.width - (8 * SVG_FONT_SIZE * 0.65 + 6), 6);
+    expect(rightEdge(called), "which is strictly more room than the labels alone asked for")
+      .toBeLessThan(rightEdge(labelled));
+  });
+
+  it("RM3 (C12 I113, I48): the marks walk and the axis emitter answer to one box", () => {
+    // **The interaction the walk found, and it is not the overflow.** `area()`
+    // is called from two places; a room that read the theme — or that either
+    // caller computed differently — would draw the data against a different box
+    // than the furniture, with every arithmetic assertion still passing. The
+    // callout is written by the marks walk at the series' last point and the
+    // frame is drawn by the emitter, so the two agreeing is the assertion.
+    const svg = plotToSvg(line({ yAxis: "both", yCallout: "both" }), THEME, layout) ?? "";
+    const callouts = [...svg.matchAll(/<text x="([-\d.]+)"[^>]*text-anchor="start"[^>]*>(alpha[^<]*)<\/text>/gu)];
+    expect(callouts.length, "one callout for the named series").toBe(1); // cells-ok — a callout count
+    expect(Number(callouts[0]?.[1]), "written a gap past the frame the other call drew")
+      .toBeCloseTo(rightEdge(svg) + 6, 6);
+  });
+
+  it("RM4 (C12 I113, §3ak.41): past the cap the callout is cut at the tail and marked", () => {
+    // **The half §3ak.41 wrote with no instance in the corpus.** There is one
+    // now and it is committed: `line-both-axes-narrow`'s callout is 36
+    // characters wanting 281 px of a 640-wide page, of which two were drawn.
+    const long = plotToSvg(line({
+      yAxis: "both", yCallout: "both",
+      series: [{ label: "eu-west-1-primary-p99-latency", values: [50, 90, 10] }],
+    }), THEME, layout) ?? "";
+    const cut = placed(long).find((t) => t.text.startsWith("eu-west"));
+    expect(cut?.text.endsWith("…"), "cut at the tail and marked").toBe(true);
+    expect(cut?.text.startsWith("eu-west-1"), "the head — the part that names it — survives").toBe(true);
+    expect(cut?.right ?? 0, "and what is left is on the page").toBeLessThanOrEqual(layout.width + 0.5);
+    expect(rightEdge(long), "the margin is capped at a third whatever the string wants")
+      .toBeCloseTo(layout.width - (layout.width / 3 + 6), 2);
+  });
+
+  it("RM5 (C12 I113): a string in a margin sized for exactly that string is not cut", () => {
+    // **The reserve and the fit are two derivations of one product.** At
+    // exactly the granted room `23.400000000000006 / 7.8` is `2.9999…`, so
+    // `100` shipped as `1…` in a margin sized for `100` — a defect the frame
+    // showed and no count would have. The row is the boundary itself.
+    const svg = plotToSvg(line({ yAxis: "right" }), THEME, layout) ?? "";
+    const right = placed(svg).filter((t) => !t.clipped && t.left > rightEdge(svg));
+    expect(right.length, "the right-hand column has labels in it").toBeGreaterThan(0); // cells-ok — a label count
+    expect(right.map((t) => t.text).filter((t) => t.includes("…")),
+      "and none of them is cut, because the room was sized for them").toEqual([]);
+  });
+});
+
 describe("G10 — a choice forced by cells", () => {
   it("G10b (C12 I80, §3ak.46, F366): `plotCorners` counts the grid's steps, and this arm has no grid", () => {
     // **I80's second instance, and the probe is the finding.** Corner cells
@@ -1482,7 +1615,7 @@ describe("G6c — the distribution family, where containment says nothing", () =
     expect(guttered(long), "drawn whole, which is what the terminal draws")
       .toEqual(["petal_length", "sepal_width"]);
     // The room is the label's, so the anchor sits exactly at its width.
-    expect(gutterOf(long)).toBeCloseTo(12 * SVG_FONT_SIZE * 0.6 + 6, 6);
+    expect(gutterOf(long)).toBeCloseTo(12 * SVG_FONT_SIZE * 0.65 + 6, 6);
 
     // **Past the cap the arm still has to cut, and it cuts the tail.** No corpus
     // instance — the longest identity string is twelve characters and a third of
@@ -1506,7 +1639,7 @@ describe("G6c — the distribution family, where containment says nothing", () =
     ) ?? "";
     for (const m of wide.matchAll(/<text x="([-\d.]+)"[^>]*text-anchor="end"[^>]*>([^<]*)<\/text>/gu)) {
       const right = Number(m[1]);
-      expect(right - (m[2]?.length ?? 0) * SVG_FONT_SIZE * 0.6,
+      expect(right - (m[2]?.length ?? 0) * SVG_FONT_SIZE * 0.65,
         `\`${m[2] ?? ""}\` starts inside the viewBox`).toBeGreaterThanOrEqual(-0.001);
     }
   });

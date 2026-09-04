@@ -909,12 +909,25 @@ function isRegionalIndicator(cp: number): boolean {
  * inherited.** These are the blocks the framework draws its own geometry from,
  * kept whole even where the property says Neutral: 625 code points are
  * Ambiguous here for no reason but this list (576 Neutral, 49 Wide). The reason
- * is that C12 and C09 gate those glyphs *on this answer* — `halfBlockEligible`,
- * `linedraw`, the ramp arms — so classifying them Ambiguous is what makes the
- * wide-convention gate fire at all, and the deviation errs in the harmless
- * direction: an over-count pads a row, an under-count wraps it. The premise to
- * re-check is that those gates still read this function; the day they take a
- * capability directly, this list is dead.
+ * is that the deviation errs in the harmless direction — an over-count pads a
+ * row, an under-count wraps it — and that a glyph the framework draws its own
+ * geometry from should measure what a wide-convention terminal draws it as.
+ *
+ * **The premise this list used to rest on is false at HEAD, and it was checked
+ * rather than inherited** (`LANEW-GEOMETRY-PREMISE`). It read *C12 and C09 gate those glyphs on this
+ * answer — `halfBlockEligible`, `linedraw`, the ramp arms — so classifying them
+ * Ambiguous is what makes the wide-convention gate fire at all*, and named its
+ * own retirement: *the day they take a capability directly, this list is dead.*
+ * They already do. `isAmbiguous` has exactly **one** caller in the tree —
+ * `clusterCells`, four hundred lines up — and every gate named above reads
+ * `caps.ambiguousWidth` directly. So the list is not dead but it is no longer
+ * load-bearing for a *gate*: what survives is the measurement question above,
+ * which is a smaller claim and the one the rows assert.
+ *
+ * **And 49 of its code points are settled elsewhere now.** The property calls
+ * them `W`, `isWide` answers first, and they are two cells under both
+ * conventions; the figure below is 625 code points of which **576** are the
+ * deviation's own after that.
  *
  * **The largest consequence, stated so it is re-checkable rather than
  * rediscovered**: the property makes the private use areas Ambiguous
@@ -923,14 +936,12 @@ function isRegionalIndicator(cp: number): boolean {
  * what the property says and what a wide-convention terminal does; it is not
  * something this repository has measured on a real emulator.
  *
- * **What this function still does not fix**: `isWide` has the same disease and
- * a worse one, because its errors land in the *default* mode. 8,619 code points
- * are Wide in the property and measure one cell here — Tangut (7,382), Yijing
- * hexagrams, Hangul Jamo Extended-A, and thirty-odd emoji singletons including
- * `⌚` `⏰` `⚡` `⚪` `⛄` `✅` `✨` `❌` `❗` `➕` `⭐` `⭕`. Left alone here
- * deliberately: it is a second table with a second blast radius, and every one
- * of those defects is an under-count in `ambiguousWidth: "narrow"`, which is
- * every golden frame in the tree.
+ * **The debt this paragraph used to carry is paid**: `isWide` had the same
+ * disease and a worse one, because its errors landed in the *default* mode. It
+ * is now `WIDE_RANGES`, derived from the same file and the same revision — see
+ * its docstring for the two directions it was wrong in and for why the overlap
+ * between the two tables is settled by the property rather than by the order of
+ * the two `if`s in `clusterCells`.
  */
 function isAmbiguous(cp: number): boolean {
   return inRanges(cp, AMBIGUOUS_RANGES) || inRanges(cp, DRAWN_AS_GEOMETRY);
@@ -1016,24 +1027,129 @@ const DRAWN_AS_GEOMETRY: readonly number[] = [
                   // all in the property, so this range is deviation entire
 ];
 
+/**
+ * `East_Asian_Width` in {`W`, `F`}, derived from the property rather than
+ * recalled — the second half of what `isAmbiguous` left owed (F665, and this
+ * pass's own finding on the Wide table, `LANEW-WIDE`).
+ *
+ * **The authority is `EastAsianWidth-17.0.0.txt`, dated 2025-07-24**, the same
+ * file and the same revision `AMBIGUOUS_RANGES` was generated from, read from
+ * `unicode.org/Public/UCD/latest/ucd/`. `WIDE_RANGES` is every `; W` and `; F`
+ * row in it, sorted and merged: 123 ranges over 182,876 code points. Wide and
+ * Fullwidth are one table because they are one answer — both are two cells under
+ * every convention, and the distinction is about the *source* of the glyph, not
+ * its width.
+ *
+ * **This is the table whose errors landed in the default mode.** The hand-written
+ * ranges above it were seventeen coarse blocks, and measured against the property
+ * they were wrong in both directions:
+ *
+ * - **8,619 code points are `W` or `F` and measured one cell**, in 65 runs —
+ *   Tangut and its components (7,529), Kana Extended/Supplement and Nushu (687),
+ *   Tai Xuan Jing and counting rods (110), the Yijing hexagrams (64), enclosed
+ *   ideographic supplement (61), Hangul Jamo Extended-A (29), and about
+ *   thirty-five singletons: `⌚` `⏰` `⚡` `⚪` `⛄` `✅` `✨` `❌` `❗` `➕`
+ *   `⭐` `⭕` `🀄` among them. Every one is an **under-count at
+ *   `ambiguousWidth: "narrow"`** — the default, and the convention every golden
+ *   frame in the tree is rendered in — which is I1's hazard in the mode that is
+ *   always on: a row measured at *n* cells that draws *n+1* wraps, and a wrapped
+ *   line scrolls the alternate screen.
+ * - **369 code points measured two cells and are not `W` or `F`**, in 51 runs.
+ *   Most are unassigned gaps the coarse blocks swallowed (U+2FD6..U+2FEF,
+ *   U+31E6..U+31EE, U+A4C7..U+A4CF); 302 are the **text-presentation** emoji of
+ *   plane 1 — U+1F321..U+1F32C, U+1F5A5..U+1F5FA and their neighbours — which
+ *   the property calls Neutral because a terminal draws them one cell **until a
+ *   variation selector asks for the emoji form**, which `clusterCells` already
+ *   answers two for. Checked rather than assumed: of those 369, **none has
+ *   `Emoji_Presentation=Yes`** (`emoji-data.txt`, 17.0.0, 2025-07-25), so no
+ *   glyph a terminal draws double-width loses a cell here.
+ *
+ * **The two tables overlap, and the overlap is resolved by the property rather
+ * than by the order of the two `if`s.** `0x3041..0x33ff` claimed
+ * U+3248..U+324F, which the property calls Ambiguous — so those eight measured
+ * **two at narrow where they should measure one**, an over-count sitting inside
+ * an under-counting table. Deriving both tables from one file makes the
+ * arithmetic impossible rather than merely fixed: the property's classes are
+ * disjoint, so `WIDE_RANGES ∩ AMBIGUOUS_RANGES = ∅` by construction, and with
+ * an empty intersection the order of the two tests cannot decide anything.
+ * Measured: 0 code points in both. This is why the repair is a **derivation and
+ * not an addition** — a second table unioned on top of the old one would have
+ * kept all eight, and T1.28c is the row that refuses it.
+ *
+ * **Where the property and the recorded deviation do meet, the property's answer
+ * stands — and the ordering is not what says so.** `DRAWN_AS_GEOMETRY` keeps
+ * nine blocks Ambiguous whole,
+ * and **49 of their code points are `W` in the property** — `⛄` `⚡` `⛔` `◽`
+ * `⚽` and the zodiac among them. They are two cells in **both** modes, and the
+ * reason is that both tables answer 2 for them rather than that `clusterCells`
+ * asks `isWide` first. **Measured**: swapping the two tests in `clusterCells`
+ * so the Ambiguous arm runs first fails no row in the suite, because at narrow
+ * the Ambiguous arm is short-circuited by the convention and at wide both arms
+ * say two. The ordering is therefore *not* what resolves this — a sentence
+ * resting on it would forbid nothing (`LANEW-ORDER`) — and what does settle it
+ * is that a glyph the property already calls Wide is two cells under *every* convention,
+ * which is the whole of what the deviation was trying to buy for it. What the
+ * list still governs is the 576 Neutral code points in those blocks, which is
+ * what its figure means after this change.
+ *
+ * **The population this is indexed to is far-side text, not the tree's own
+ * literals.** The request that raised this said `⚡` appears 26 times in `src/`
+ * and `test/`; measured at the commit before this change it was **6** — one a
+ * docstring, four a test fixture's label, one a spinner corpus — and 36 in the
+ * whole repository, nearly all of it prose that never reaches a frame. That
+ * count is not the argument in either direction, and the old table's
+ * comment resting on one like it is how it went wrong: `cells()` measures
+ * whatever a far side hands it, and a container name, a log line, a commit
+ * subject or a unit column may carry any of these.
+ */
 function isWide(cp: number): boolean {
-  return (
-    (cp >= 0x1100 && cp <= 0x115f) || // Hangul Jamo
-    (cp >= 0x2e80 && cp <= 0x303e) || // CJK radicals, Kangxi, punctuation
-    (cp >= 0x3041 && cp <= 0x33ff) || // Hiragana through CJK compatibility
-    (cp >= 0x3400 && cp <= 0x4dbf) || // CJK extension A
-    (cp >= 0x4e00 && cp <= 0x9fff) || // CJK unified
-    (cp >= 0xa000 && cp <= 0xa4cf) || // Yi
-    (cp >= 0xac00 && cp <= 0xd7a3) || // Hangul syllables
-    (cp >= 0xf900 && cp <= 0xfaff) || // CJK compatibility ideographs
-    (cp >= 0xfe10 && cp <= 0xfe19) || // vertical forms
-    (cp >= 0xfe30 && cp <= 0xfe6f) || // CJK compatibility forms
-    (cp >= 0xff00 && cp <= 0xff60) || // fullwidth forms
-    (cp >= 0xffe0 && cp <= 0xffe6) || // fullwidth signs
-    (cp >= 0x1f300 && cp <= 0x1f64f) || // pictographs, emoticons
-    (cp >= 0x1f680 && cp <= 0x1f6ff) || // transport
-    (cp >= 0x1f900 && cp <= 0x1f9ff) || // supplemental symbols
-    (cp >= 0x1fa70 && cp <= 0x1faff) || // extended-A
-    (cp >= 0x20000 && cp <= 0x3fffd) // CJK extensions B onward
-  );
+  return inRanges(cp, WIDE_RANGES);
 }
+
+/**
+ * Every `; W` and `; F` row of `EastAsianWidth-17.0.0.txt`, merged. Generated,
+ * not typed — for the reason `AMBIGUOUS_RANGES` was, and with a second one: the
+ * table it replaced had never been checked against its source and was wrong about
+ * 8,988 code points in both directions.
+ *
+ * **The file's three `@missing`-style defaults were checked and add nothing
+ * today.** Its header gives `W` to the *unassigned* code points of
+ * U+3400..U+4DBF, U+4E00..U+9FFF and the CJK Compatibility Ideographs block, and
+ * to everything undesignated in planes 2 and 3 — rules that live in prose above
+ * the data rather than in a row a parser sees. (The third block is named rather
+ * than written in hex: a code point of the form `U+F` and three digits is
+ * indistinguishable from a citation of the ledger to A03 SP5's pattern, which
+ * takes `+` as a word boundary — and this is the one file in the tree where a
+ * code point and a finding number can collide.) Measured against 17.0.0: those
+ * blocks are listed in full, so the defaults contribute **0** code points beyond
+ * the rows. Recorded
+ * because the day a revision stops listing them, a generator reading rows alone
+ * loses tens of thousands of cells silently and in the under-counting direction.
+ */
+const WIDE_RANGES: readonly number[] = [
+  0x1100, 0x115f, 0x231a, 0x231b, 0x2329, 0x232a, 0x23e9, 0x23ec, 0x23f0, 0x23f0,
+  0x23f3, 0x23f3, 0x25fd, 0x25fe, 0x2614, 0x2615, 0x2630, 0x2637, 0x2648, 0x2653,
+  0x267f, 0x267f, 0x268a, 0x268f, 0x2693, 0x2693, 0x26a1, 0x26a1, 0x26aa, 0x26ab,
+  0x26bd, 0x26be, 0x26c4, 0x26c5, 0x26ce, 0x26ce, 0x26d4, 0x26d4, 0x26ea, 0x26ea,
+  0x26f2, 0x26f3, 0x26f5, 0x26f5, 0x26fa, 0x26fa, 0x26fd, 0x26fd, 0x2705, 0x2705,
+  0x270a, 0x270b, 0x2728, 0x2728, 0x274c, 0x274c, 0x274e, 0x274e, 0x2753, 0x2755,
+  0x2757, 0x2757, 0x2795, 0x2797, 0x27b0, 0x27b0, 0x27bf, 0x27bf, 0x2b1b, 0x2b1c,
+  0x2b50, 0x2b50, 0x2b55, 0x2b55, 0x2e80, 0x2e99, 0x2e9b, 0x2ef3, 0x2f00, 0x2fd5,
+  0x2ff0, 0x303e, 0x3041, 0x3096, 0x3099, 0x30ff, 0x3105, 0x312f, 0x3131, 0x318e,
+  0x3190, 0x31e5, 0x31ef, 0x321e, 0x3220, 0x3247, 0x3250, 0xa48c, 0xa490, 0xa4c6,
+  0xa960, 0xa97c, 0xac00, 0xd7a3, 0xf900, 0xfaff, 0xfe10, 0xfe19, 0xfe30, 0xfe52,
+  0xfe54, 0xfe66, 0xfe68, 0xfe6b, 0xff01, 0xff60, 0xffe0, 0xffe6, 0x16fe0, 0x16fe4,
+  0x16ff0, 0x16ff6, 0x17000, 0x18cd5, 0x18cff, 0x18d1e, 0x18d80, 0x18df2, 0x1aff0, 0x1aff3,
+  0x1aff5, 0x1affb, 0x1affd, 0x1affe, 0x1b000, 0x1b122, 0x1b132, 0x1b132, 0x1b150, 0x1b152,
+  0x1b155, 0x1b155, 0x1b164, 0x1b167, 0x1b170, 0x1b2fb, 0x1d300, 0x1d356, 0x1d360, 0x1d376,
+  0x1f004, 0x1f004, 0x1f0cf, 0x1f0cf, 0x1f18e, 0x1f18e, 0x1f191, 0x1f19a, 0x1f200, 0x1f202,
+  0x1f210, 0x1f23b, 0x1f240, 0x1f248, 0x1f250, 0x1f251, 0x1f260, 0x1f265, 0x1f300, 0x1f320,
+  0x1f32d, 0x1f335, 0x1f337, 0x1f37c, 0x1f37e, 0x1f393, 0x1f3a0, 0x1f3ca, 0x1f3cf, 0x1f3d3,
+  0x1f3e0, 0x1f3f0, 0x1f3f4, 0x1f3f4, 0x1f3f8, 0x1f43e, 0x1f440, 0x1f440, 0x1f442, 0x1f4fc,
+  0x1f4ff, 0x1f53d, 0x1f54b, 0x1f54e, 0x1f550, 0x1f567, 0x1f57a, 0x1f57a, 0x1f595, 0x1f596,
+  0x1f5a4, 0x1f5a4, 0x1f5fb, 0x1f64f, 0x1f680, 0x1f6c5, 0x1f6cc, 0x1f6cc, 0x1f6d0, 0x1f6d2,
+  0x1f6d5, 0x1f6d8, 0x1f6dc, 0x1f6df, 0x1f6eb, 0x1f6ec, 0x1f6f4, 0x1f6fc, 0x1f7e0, 0x1f7eb,
+  0x1f7f0, 0x1f7f0, 0x1f90c, 0x1f93a, 0x1f93c, 0x1f945, 0x1f947, 0x1f9ff, 0x1fa70, 0x1fa7c,
+  0x1fa80, 0x1fa8a, 0x1fa8e, 0x1fac6, 0x1fac8, 0x1fac8, 0x1facd, 0x1fadc, 0x1fadf, 0x1faea,
+  0x1faef, 0x1faf8, 0x20000, 0x2fffd, 0x30000, 0x3fffd,
+];

@@ -1,9 +1,13 @@
 // C10 tier 1 — unit. The ladder at each depth, the 1-bit collapse, and the
 // rejection paths that keep a broken theme off the screen.
+import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { fires, sourceOf } from "../support/source.js";
 import {
+  assertPictureGlyph,
   clearResolutionCache,
   defaultTheme,
+  isPictureGlyph,
   loadTheme,
   ratio,
   resolve,
@@ -493,5 +497,112 @@ describe("C10 resolution", () => {
     clearResolutionCache();
     expect(loadTheme(defaultTheme, "dark").ok).toBe(true);
     expect(loadTheme(defaultTheme, "light").ok).toBe(true);
+  });
+});
+
+/**
+ * I21's fourth admitted case — the picture cell (C10 §4c.1).
+ *
+ * The admission used to read *the cell carries no text*, and the golden read
+ * below is what falsified it: both shipped picture-cell constructors always
+ * draw a glyph. The condition that is true is that the glyph is a **fill**, and
+ * these rows are what makes the alphabet evidence rather than a stipulation.
+ */
+describe("C10 §4c.1 — the picture cell's alphabet", () => {
+  it("T1.35 (C10 I21, §4c.1): the alphabet admits the fills and refuses everything a reader reads", () => {
+    // Admitted, by range and not by a list the rows could agree with.
+    expect(isPictureGlyph(" "), "the blank — `wash`'s own case through this door").toBe(true);
+    for (let cp = 0x2580; cp <= 0x259f; cp += 1) {
+      expect(isPictureGlyph(String.fromCodePoint(cp)), `U+${cp.toString(16)} block element`).toBe(true);
+    }
+    for (let cp = 0x2800; cp <= 0x28ff; cp += 1) {
+      expect(isPictureGlyph(String.fromCodePoint(cp)), `U+${cp.toString(16)} braille`).toBe(true);
+    }
+
+    // Refused — and the refusal list is where the ruling shows. `#`, `=` and
+    // `-` are `sankeyAlphabet`'s ASCII arm: the set a brand put on the
+    // *alphabet* would have had to admit, and which a brand on the background
+    // *channel* never has to, because `cellOf` passes no lower owner there.
+    for (const ch of ["a", "Z", "0", "#", "=", "-", "_", "→", "─", "│", "╭", "↗"]) {
+      expect(isPictureGlyph(ch), `${JSON.stringify(ch)} is not a fill`).toBe(false);
+    }
+
+    // Not one glyph is not one cell — a cluster and the empty string both out.
+    expect(isPictureGlyph(""), "the empty string").toBe(false);
+    expect(isPictureGlyph("▀▀"), "two fills are not one cell").toBe(false);
+  });
+
+  it("T1.36 (C10 I21, §4c.1, C12): every glyph the shipped frames paint a background under is admitted", () => {
+    // **Read off the goldens, not off the constructors.** An admission list
+    // derived from the table the constructors read agrees with itself and
+    // passes on any addition — T2.20's reason, one artefact along. These bytes
+    // are the frames the two sites actually produce on every shipped depth.
+    const dir = new URL("../golden/terminal-baseline/", import.meta.url);
+    const names = readdirSync(dir).filter(
+      (n) => /^(sankey|plot3d)-/u.test(n) && /-(24bit|8bit)-/u.test(n) && n.endsWith(".txt"),
+    );
+    expect(names.length, "the corpus is not empty — an empty scan is a green scan").toBeGreaterThan(20);
+
+    const sankeyGlyphs = new Set<string>();
+    const plot3dGlyphs = new Set<string>();
+    for (const name of names) {
+      const text = readFileSync(new URL(name, dir), "utf8");
+      const into = name.startsWith("sankey") ? sankeyGlyphs : plot3dGlyphs;
+      // Walk the SGR state and collect the glyph of every cell with a
+      // background set. `48;` opens one, `49` closes it, `0`/`` resets both.
+      let painted = false;
+      for (const m of text.matchAll(/\u001b\[([0-9;]*)m|([^])/gu)) {
+        const sgrParams = m[1];
+        if (sgrParams !== undefined) {
+          if (sgrParams.startsWith("48;")) painted = true;
+          else if (sgrParams === "49" || sgrParams === "0" || sgrParams === "") painted = false;
+          continue;
+        }
+        const ch = m[2];
+        if (painted && ch !== undefined && ch !== "\n") into.add(ch);
+      }
+    }
+
+    // The control the scan owes: a reader that saw no backgrounds would report
+    // a clean corpus, which is what a broken walk looks like.
+    expect(sankeyGlyphs.size, "sankey paints backgrounds at all").toBeGreaterThan(0);
+    expect(plot3dGlyphs.size, "plot3d paints backgrounds at all").toBeGreaterThan(0);
+
+    // Asserted as a set. Sankey's is exactly one glyph — `▀`, the half that
+    // carries bar against ribbon at 1-bit, which is why a blank `Span` could
+    // never have served this site.
+    expect([...sankeyGlyphs].sort()).toEqual(["▀"]);
+    for (const ch of [...sankeyGlyphs, ...plot3dGlyphs]) {
+      expect(isPictureGlyph(ch), `${JSON.stringify(ch)} U+${ch.codePointAt(0)!.toString(16)} is painted over`).toBe(true);
+    }
+    // And plot3d's set is wider than one range, so the row is not satisfied by
+    // the block elements alone.
+    expect([...plot3dGlyphs].some((c) => c.codePointAt(0)! >= 0x2800), "braille is in it").toBe(true);
+    expect([...plot3dGlyphs].some((c) => c.codePointAt(0)! < 0x2600), "block elements are in it").toBe(true);
+  });
+
+  it("T1.37 (C10 I21, §4c.1): the refusal fires, and both constructors are on it", () => {
+    // The function, with its control beside it — a throw asserted without one
+    // is satisfied by a function that always throws.
+    expect(() => { assertPictureGlyph("a", "site"); }).toThrow(/C10 I21/u);
+    expect(() => { assertPictureGlyph("-", "site"); }).toThrow(/not one/u);
+    expect(() => { assertPictureGlyph("▀", "site"); }, "the control").not.toThrow();
+    expect(() => { assertPictureGlyph("⠉", "site"); }, "the control").not.toThrow();
+
+    // **And the sites, asserted on stripped source — with the limit stated.**
+    // Neither guard is reachable from a public surface: `sankeyArea` takes its
+    // glyph from `sankeyAlphabet(caps)` and `mixedRows` is not exported, which
+    // is the same measurement that says no input the tree produces trips them.
+    // So the honest row is that the call is *there*, on the background arm, and
+    // T6.92 is what says removing it is invisible in every other result.
+    const sankeySrc = sourceOf("src/presentation/plot/sankey.ts");
+    const scatterSrc = sourceOf("src/presentation/plot/scatter3.ts");
+    expect(fires(sankeySrc, /assertPictureGlyph\(text, "sankeyArea"\)/u), "sankey's cell").toBe(true);
+    expect(fires(scatterSrc, /assertPictureGlyph\(glyph, "plot3d mixedRows"\)/u), "plot3d's span").toBe(true);
+    // The control for the stripper: both files still hold the construction the
+    // guard sits in front of, so a stripper that ate the code would fail here
+    // rather than pass over an empty string.
+    expect(fires(sankeySrc, /background: refOf\(below\)/u), "stripper control").toBe(true);
+    expect(fires(scatterSrc, /colour, background: bg/u), "stripper control").toBe(true);
   });
 });

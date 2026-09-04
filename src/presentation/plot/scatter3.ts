@@ -15,6 +15,7 @@
 import type { AxisSpec3, Plot, Point3, Surface3, Tone } from "../../data/viewmodel/index.js";
 import type { RenderContext } from "../blocks/types.js";
 import type { ColourValue } from "../theme/types.js";
+import { assertPictureGlyph } from "../theme/picture.js";
 // **`HALF_BLOCK` is gone from this file and that is the finding, not the
 // tidy-up** (C12 I104). `▀` was the area raster; it is now one of sixteen
 // quadrant masks and `QUADRANTS[3]` is the same character, reached by the
@@ -1451,12 +1452,20 @@ function mixedRows(
   }
   const folded = foldBraille(dots);
 
-  const span = (glyph: string, colour: ColourValue | undefined, bg?: ColourValue): Span =>
-    colour === undefined && bg === undefined
-      ? { text: glyph }
-      : bg === undefined
-        ? { text: glyph, style: colour === undefined ? {} : { colour } }
-        : { text: glyph, style: colour === undefined ? { background: bg } : { colour, background: bg } };
+  // **The one construction in the plot arm that sets a background** — the other
+  // is `sankey.ts`'s `cell`, and the two are what I21's picture-cell admission
+  // is about (C10 §4c.1). The check is on the background arm alone: a glyph
+  // drawn as ink on the page is §4's own case and needs no admission, while a
+  // glyph over a painted region needs to be a **fill** rather than something a
+  // reader reads. `assertPictureGlyph` is that condition, and it replaces the
+  // one I21 used to state — *the cell carries no text* — which was false of
+  // every cell here, all of them braille, quadrants or block elements.
+  const span = (glyph: string, colour: ColourValue | undefined, bg?: ColourValue): Span => {
+    if (colour === undefined && bg === undefined) return { text: glyph };
+    if (bg === undefined) return { text: glyph, style: colour === undefined ? {} : { colour } };
+    assertPictureGlyph(glyph, "plot3d mixedRows");
+    return { text: glyph, style: colour === undefined ? { background: bg } : { colour, background: bg } };
+  };
 
   /** The nearest sample of a kind in a rectangle of the grid, by colour. */
   /**

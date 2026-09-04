@@ -994,7 +994,13 @@ const results = runPass({
       // head — `betal_length`, a different word, with nothing to say so.
       name: "THE ROOM: the gutter is a tenth of the width whatever its labels are",
       file: SVG,
-      from: "  return Math.min(layout.width / 3, widest * SVG_FONT_SIZE * SVG_EM) + LABEL_GAP;",
+      // **Re-anchored, and the ambiguity is the finding** (§3ak.49): the right
+      // margin is now grown by the same expression on the other side of the
+      // box, so the old one-line anchor matches twice and mutates whichever
+      // comes first. The gutter's own preceding line is what tells them apart.
+      from: "  for (const l of labels) widest = Math.max(widest, l.length); // cells-ok \u2014 a character count\n"
+        + "  if (widest === 0) return 0; // cells-ok \u2014 a character count\n"
+        + "  return Math.min(layout.width / 3, widest * SVG_FONT_SIZE * SVG_EM_MAX) + LABEL_GAP;",
       to: "  return 0;",
       expect: "G6c5",
     },

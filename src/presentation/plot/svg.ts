@@ -104,8 +104,22 @@ export type SvgLayout = Readonly<{
 export const SVG_FONT_SIZE = 12;
 
 /**
- * A monospace glyph's advance as a share of its size — **this arm's own
- * estimate, and the only one it has** (F343, §3ak.41).
+ * The widest a monospace glyph's advance is, as a share of its size — **a bound
+ * over the faces a renderer may pick, not one font's metric** (C12 I113, F343,
+ * §3ak.41, §3ak.49).
+ *
+ * **Measured, because the number it replaces was a guess in the direction that
+ * clips.** `font-family="monospace"` is a *generic* family: the face is the
+ * renderer's choice and its metrics are unknowable here. Over six faces —
+ * `hmtx ÷ head.unitsPerEm`, and confirmed by rendering 20 glyphs at size 120 —
+ * Courier New, Andale Mono and Monaco are 0.6001, DejaVu Sans Mono and Menlo
+ * 0.6021, **SF Mono 0.6182**. Every one of them is **above** the 0.6 this
+ * carried, and every use of it — reserving room, and deciding how many
+ * characters fit in room — wants the bound rather than the mean.
+ *
+ * 0.65 is 5% above the widest measured. The cost is 4.6 px of blank on the
+ * corpus's widest reserved string, 0.7% of the width; **the falsification is a
+ * face above 0.65**, which clips again and which nothing measured comes near.
  *
  * §3ak.20 ruled that the gutter's *width* does not cross: `min(cells(widest),
  * width / 3)` calls `cells()` and hazard 4 forbids that in a shared layout. It
@@ -120,7 +134,7 @@ export const SVG_FONT_SIZE = 12;
  * **head** — `petal_length` renders as `betal_length`, a different word, with
  * nothing on the page to say anything was removed.
  */
-const SVG_EM = 0.6;
+const SVG_EM_MAX = 0.65;
 
 /** The gap between a gutter label and the plot area, in px. */
 const LABEL_GAP = 6;
@@ -478,7 +492,60 @@ function gutterRoom(
   let widest = 0;
   for (const l of labels) widest = Math.max(widest, l.length); // cells-ok — a character count
   if (widest === 0) return 0; // cells-ok — a character count
-  return Math.min(layout.width / 3, widest * SVG_FONT_SIZE * SVG_EM) + LABEL_GAP;
+  return Math.min(layout.width / 3, widest * SVG_FONT_SIZE * SVG_EM_MAX) + LABEL_GAP;
+}
+
+/**
+ * The right margin the callout and the right-hand value labels need, in px —
+ * **grown to fit, capped at a third, and zero where neither is drawn**
+ * (C12 I113, §3ak.49).
+ *
+ * `gutterRoom`'s shape on the other side, and the terminal's own expression in
+ * this arm's units: `definition.ts` sizes its right column
+ * `sides.right ? max(wanted, calloutWidth(block, ambiguous, stacked)) : 0`,
+ * because **one column holds both** — a second reserve would be a second box.
+ * The left column budgets for the labels alone there and here, for the same
+ * reason: a callout is only ever written on the right.
+ *
+ * **No theme, and that is the interaction the walk found rather than the
+ * overflow.** `area()` is called from the marks walk and from the axis emitter;
+ * a room that read an ink would answer differently in the two, and the data
+ * would be drawn against a different box than the furniture with every
+ * arithmetic assertion passing.
+ *
+ * **A `yCallout` on a form that draws no polyline reserves anyway.** The
+ * alternative is reading `figure.marks`, which the marks walk's own
+ * `Omit<Figure, "marks">` call site cannot, and `calloutWidth` has exactly the
+ * same property in the other arm — it sizes from the block's series without
+ * asking where the ink lands.
+ */
+function rightRoom(figure: Figure | Omit<Figure, "marks">, layout: SvgLayout): number {
+  let widest = 0;
+  // **A `null` is a series with no finite reading**, which `calloutOf` already
+  // answers: `"name"` gives a string and `"last"` gives nothing. Skipped by the
+  // reserve exactly where the drawing skips it.
+  if (figure.callout !== null) {
+    for (const text of figure.callout) {
+      if (text !== null) widest = Math.max(widest, text.length); // cells-ok — a character count
+    }
+  }
+  // **The drawing's own two clauses, read rather than restated**: the labels go
+  // on the right only where `valueLabels` asks for that side, and only where the
+  // value axis is the ordinate — `"both"` on a horizontal figure writes them
+  // *under* the box, where this margin is not what holds them.
+  const valueOnX = figure.orientation === "horizontal" && figure.value !== null;
+  const onRight = figure.valueLabels === "right" || figure.valueLabels === "both";
+  if (!valueOnX && onRight && figure.value !== null) {
+    const axis = figure.value;
+    for (const [i, tick] of axis.ticks.entries()) {
+      // `labels[i] ?? String(tick)` is what the emitter writes, so it is what is
+      // measured; reserving from `labels` alone would size for a string the
+      // frame does not draw.
+      widest = Math.max(widest, (axis.labels[i] ?? String(tick)).length); // cells-ok — a character count
+    }
+  }
+  if (widest === 0) return 0; // cells-ok — a character count
+  return Math.min(layout.width / 3, widest * SVG_FONT_SIZE * SVG_EM_MAX) + LABEL_GAP;
 }
 
 /**
@@ -486,24 +553,39 @@ function gutterRoom(
  *
  * **Past the cap the arm still has to cut, and it cuts the tail.** That is what
  * `truncate` does in the other arm and what `heatmap/captions-left` draws —
- * `epoch…` — and it is the half of this that has no instance in the corpus: the
- * longest identity string is twelve characters and the cap is a third of 640.
- * Written anyway, because the defect is *an unmarked cut at the head* and a
- * forty-character label reaches it whatever the gutter is.
+ * `epoch…`. **It had no instance in the corpus and now has one on the other
+ * side of the box**: `line-both-axes-narrow`'s callout is 36 characters wanting
+ * 281 px, the cap is a third of 640, and two characters of it were on the page
+ * (§3ak.49).
  */
 function fitLabel(text: string, room: number): string {
-  const chars = Math.floor(Math.max(0, room) / (SVG_FONT_SIZE * SVG_EM)); // cells-ok — a character count
+  // **The reserve and the fit are two derivations of one product, and they meet
+  // at equality** (§3ak.49). `rightRoom` grants `len · size · advance` and this
+  // divides the same three numbers back out: at exactly the granted room
+  // `23.400000000000006 / 7.8` is `2.9999…`, and `100` shipped as `1…` in a
+  // margin sized for it. The tolerance is nine orders below a glyph, so it can
+  // admit no character that does not fit; the alternative is a second expression
+  // for the same quantity, which is what produced the disagreement.
+  const chars = Math.floor(Math.max(0, room) / (SVG_FONT_SIZE * SVG_EM_MAX) + 1e-9); // cells-ok — a character count
   if (text.length <= chars) return text; // cells-ok — a character count
   if (chars <= 1) return chars === 1 ? "\u2026" : ""; // cells-ok — a character count
   return `${text.slice(0, chars - 1)}\u2026`; // cells-ok — a character count
 }
 
-function area(layout: SvgLayout, legend: FigureLegend | null = null, room = 0): Area {
+function area(
+  layout: SvgLayout,
+  legend: FigureLegend | null = null,
+  room = 0,
+  right = 0,
+): Area {
   const box = {
     // **A floor and not a fraction** (F343). The tenth stays the minimum; a
     // gutter whose labels want more takes more, up to a third.
     left: Math.max(layout.width * (layout.gutter + layout.pad), room),
-    right: layout.width * (1 - layout.pad),
+    // **And the same floor on the other side** (C12 I113, §3ak.49). The margin
+    // holds the callout and the right-hand value labels, so it is `width · pad`
+    // until one of them wants more.
+    right: layout.width - Math.max(layout.width * layout.pad, right),
     top: layout.height * layout.pad,
     bottom: layout.height * (1 - layout.gutter),
   };
@@ -724,7 +806,17 @@ function boxFor(figure: Omit<Figure, "marks">, box: Area): Area {
  * neither is furniture, which is `xTitleRow`'s own reason — *furniture is not a
  * series*.
  */
-function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out: string[]): readonly string[] {
+// **`canvas` is the page's width and `box` is the plot's** (C12 I113, §3ak.49).
+// The callout is written outside the box by construction, so the only edge that
+// can contain it is the page's, and the walk had no member holding it.
+function walk(
+  figure: Figure,
+  block: Plot,
+  box: Area,
+  canvas: number,
+  theme: ResolvedTheme,
+  out: string[],
+): readonly string[] {
   const at = projected(figure, box);
   const map = figure.ramp === null ? undefined : COLORMAPS[figure.ramp];
   const furniture = inkOf(LABEL, theme);
@@ -1176,10 +1268,16 @@ function walk(figure: Figure, block: Plot, box: Area, theme: ResolvedTheme, out:
       // The series' colour, so the second arm draws the tone the first does
       // and both agree with the legend (F382).
       const ink = inkOf(seriesRefOf(block.series[i], i), theme) ?? furniture;
-      out.push(`<text x="${n(end[0] + LABEL_GAP)}" ` +
+      // **Cut to the canvas and marked, where the reserve was capped** (C12
+      // I113, §3ak.49). `rightRoom` takes a third of the width at most, so a
+      // long enough callout is wider than the margin that was grown for it —
+      // and the cut belongs where the string is written, against the page's own
+      // edge, rather than being inferred from the box.
+      const at = end[0] + LABEL_GAP;
+      out.push(`<text x="${n(at)}" ` +
         `y="${n(end[1] + SVG_FONT_SIZE / 3)}" text-anchor="start" ` +
         `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${ink}">` +
-        `${escape(text)}</text>`);
+        `${escape(fitLabel(text, canvas - at))}</text>`);
     }
   }
 
@@ -1527,7 +1625,7 @@ function marks(
   theme: ResolvedTheme,
 ): readonly string[] {
   const family = svgFamilyOf(block.form);
-  const box = area(layout, figure.legend, gutterRoom(block, figure, layout));
+  const box = area(layout, figure.legend, gutterRoom(block, figure, layout), rightRoom(figure, layout));
   const out: string[] = [];
 
   // **The families that have crossed**, and the list is the diff (§3ak.10).
@@ -1544,7 +1642,7 @@ function marks(
     || family === "field" || family === "horizon" || family === "stacked"
     || family === "span" || family === "funnel" || family === "track"
     || family === "bullet" || family === "density") && "marks" in figure) {
-    return walk(figure, block, box, theme, out);
+    return walk(figure, block, box, layout.width, theme, out);
   }
 
   if (family === "nodes") {
@@ -1778,7 +1876,7 @@ export function plotToSvg(
   if (figure === null) return null;
   const range = figure.value?.range ?? figure.extent ?? { min: 0, max: 1 };
   const axis = figure.value;
-  const box = area(layout, figure.legend, gutterRoom(block, figure, layout));
+  const box = area(layout, figure.legend, gutterRoom(block, figure, layout), rightRoom(figure, layout));
 
   // **Furniture is not a picture**, and this is the second clause because it is
   // a second failure. `series: []` on a plain form, and a series that is all
@@ -1979,7 +2077,13 @@ export function plotToSvg(
         // **The left side is `end`-anchored too and had no clip at all**, so a
         // long value label ran off the viewBox rather than being cut inside a
         // rectangle — the same head-first loss with nothing catching it (F343).
-        const shown = side === "left" ? fitLabel(text, box.left - LABEL_GAP) : text;
+        // **Both sides are cut to the room they have now** (C12 I113,
+        // §3ak.49). The right-hand label overran the fixed margin by 2 px in
+        // six committed frames — it shares the callout's column and it shares
+        // the callout's cap.
+        const shown = side === "left"
+          ? fitLabel(text, box.left - LABEL_GAP)
+          : fitLabel(text, layout.width - at);
         parts.push(`<text x="${n(at)}" y="${n(y + SVG_FONT_SIZE / 3)}" ` +
           `text-anchor="${side === "left" ? "end" : "start"}" ` +
           `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${label}">` +

@@ -1,28 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
 <rect width="100%" height="100%" fill="#1a1a1a"/>
 <line x1="89.6" y1="12.8" x2="89.6" y2="288" stroke="#2c2c2c" stroke-width="1"/>
-<line x1="89.6" y1="288" x2="614.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
-<line x1="614.4" y1="12.8" x2="614.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
-<line x1="89.6" y1="12.8" x2="614.4" y2="12.8" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="89.6" y1="288" x2="595" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="595" y1="12.8" x2="595" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="89.6" y1="12.8" x2="595" y2="12.8" stroke="#2c2c2c" stroke-width="1"/>
 <text x="83.6" y="292" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">0</text>
-<text x="620.4" y="292" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">0</text>
+<text x="601" y="292" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">0</text>
 <text x="83.6" y="154.4" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">50</text>
-<text x="620.4" y="154.4" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">50</text>
+<text x="601" y="154.4" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">50</text>
 <text x="83.6" y="16.8" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">100</text>
-<text x="620.4" y="16.8" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">100</text>
+<text x="601" y="16.8" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">100</text>
 <text x="89.6" y="300" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">0</text>
-<text x="143.151" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">5</text>
-<text x="196.702" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">10</text>
-<text x="250.253" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">15</text>
-<text x="303.804" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">20</text>
-<text x="357.355" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">25</text>
-<text x="410.906" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">30</text>
-<text x="464.457" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">35</text>
-<text x="518.008" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">40</text>
-<text x="571.559" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">45</text>
-<text x="614.4" y="300" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">49</text>
-<path d="M89.6 150.4 L100.31 136.663 L111.02 123.063 L121.731 109.736 L132.441 96.816 L143.151 84.431 L153.861 72.705 L164.571 61.756 L175.282 51.692 L185.992 42.614 L196.702 34.614 L207.412 27.77 L218.122 22.151 L228.833 17.814 L239.543 14.802 L250.253 13.145 L260.963 12.859 L271.673 13.947 L282.384 16.399 L293.094 20.189 L303.804 25.281 L314.514 31.622 L325.224 39.151 L335.935 47.791 L346.645 57.456 L357.355 68.05 L368.065 79.467 L378.776 91.593 L389.486 104.306 L400.196 117.479 L410.906 130.982 L421.616 144.679 L432.327 158.432 L443.037 172.106 L453.747 185.562 L464.457 198.668 L475.167 211.291 L485.878 223.305 L496.588 234.592 L507.298 245.037 L518.008 254.536 L528.718 262.995 L539.429 270.329 L550.139 276.464 L560.849 281.34 L571.559 284.908 L582.269 287.132 L592.98 287.989 L603.69 287.472 L614.4 285.585" fill="none" stroke="#e69f00" stroke-width="2"/>
-<path d="M89.6 150.4 L100.31 164.137 L111.02 177.737 L121.731 191.064 L132.441 203.984 L143.151 216.369 L153.861 228.095 L164.571 239.044 L175.282 249.108 L185.992 258.186 L196.702 266.186 L207.412 273.03 L218.122 278.649 L228.833 282.986 L239.543 285.998 L250.253 287.655 L260.963 287.941 L271.673 286.853 L282.384 284.401 L293.094 280.611 L303.804 275.519 L314.514 269.178 L325.224 261.649 L335.935 253.009 L346.645 243.344 L357.355 232.75 L368.065 221.333 L378.776 209.207 L389.486 196.494 L400.196 183.321 L410.906 169.818 L421.616 156.121 L432.327 142.368 L443.037 128.694 L453.747 115.238 L464.457 102.132 L475.167 89.509 L485.878 77.495 L496.588 66.208 L507.298 55.763 L518.008 46.264 L528.718 37.805 L539.429 30.471 L550.139 24.336 L560.849 19.46 L571.559 15.892 L582.269 13.668 L592.98 12.811 L603.69 13.328 L614.4 15.215" fill="none" stroke="#56b4e9" stroke-width="2"/>
-<text x="620.4" y="289.585" text-anchor="start" font-size="12" font-family="monospace" fill="#e69f00">alpha</text>
-<text x="620.4" y="19.215" text-anchor="start" font-size="12" font-family="monospace" fill="#56b4e9">beta</text>
+<text x="141.171" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">5</text>
+<text x="192.743" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">10</text>
+<text x="244.314" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">15</text>
+<text x="295.886" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">20</text>
+<text x="347.457" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">25</text>
+<text x="399.029" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">30</text>
+<text x="450.6" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">35</text>
+<text x="502.171" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">40</text>
+<text x="553.743" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">45</text>
+<text x="595" y="300" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">49</text>
+<path d="M89.6 150.4 L99.914 136.663 L110.229 123.063 L120.543 109.736 L130.857 96.816 L141.171 84.431 L151.486 72.705 L161.8 61.756 L172.114 51.692 L182.429 42.614 L192.743 34.614 L203.057 27.77 L213.371 22.151 L223.686 17.814 L234 14.802 L244.314 13.145 L254.629 12.859 L264.943 13.947 L275.257 16.399 L285.571 20.189 L295.886 25.281 L306.2 31.622 L316.514 39.151 L326.829 47.791 L337.143 57.456 L347.457 68.05 L357.771 79.467 L368.086 91.593 L378.4 104.306 L388.714 117.479 L399.029 130.982 L409.343 144.679 L419.657 158.432 L429.971 172.106 L440.286 185.562 L450.6 198.668 L460.914 211.291 L471.229 223.305 L481.543 234.592 L491.857 245.037 L502.171 254.536 L512.486 262.995 L522.8 270.329 L533.114 276.464 L543.429 281.34 L553.743 284.908 L564.057 287.132 L574.371 287.989 L584.686 287.472 L595 285.585" fill="none" stroke="#e69f00" stroke-width="2"/>
+<path d="M89.6 150.4 L99.914 164.137 L110.229 177.737 L120.543 191.064 L130.857 203.984 L141.171 216.369 L151.486 228.095 L161.8 239.044 L172.114 249.108 L182.429 258.186 L192.743 266.186 L203.057 273.03 L213.371 278.649 L223.686 282.986 L234 285.998 L244.314 287.655 L254.629 287.941 L264.943 286.853 L275.257 284.401 L285.571 280.611 L295.886 275.519 L306.2 269.178 L316.514 261.649 L326.829 253.009 L337.143 243.344 L347.457 232.75 L357.771 221.333 L368.086 209.207 L378.4 196.494 L388.714 183.321 L399.029 169.818 L409.343 156.121 L419.657 142.368 L429.971 128.694 L440.286 115.238 L450.6 102.132 L460.914 89.509 L471.229 77.495 L481.543 66.208 L491.857 55.763 L502.171 46.264 L512.486 37.805 L522.8 30.471 L533.114 24.336 L543.429 19.46 L553.743 15.892 L564.057 13.668 L574.371 12.811 L584.686 13.328 L595 15.215" fill="none" stroke="#56b4e9" stroke-width="2"/>
+<text x="601" y="289.585" text-anchor="start" font-size="12" font-family="monospace" fill="#e69f00">alpha</text>
+<text x="601" y="19.215" text-anchor="start" font-size="12" font-family="monospace" fill="#56b4e9">beta</text>
 </svg>

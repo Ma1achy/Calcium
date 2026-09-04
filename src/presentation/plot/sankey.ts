@@ -32,7 +32,7 @@
  */
 import type { Graph } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
-import type { ColourRef } from "../theme/index.js";
+import { assertPictureGlyph, type ColourRef } from "../theme/index.js";
 import { cells } from "../text.js";
 import { graphLayers } from "./graph.js";
 import { refOf } from "./marks.js";
@@ -499,11 +499,29 @@ export function sankeyArea(
   return { rows: out, dropped, reversed: layout.reversed };
 }
 
-/** A cell naming its owner's slot, and the lower owner's as a background where there is one. */
+/**
+ * A cell naming its owner's slot, and the lower owner's as a background where
+ * there is one.
+ *
+ * **The background channel is where I21's admission is checked** (C10 §4c.1).
+ * A cell with two owners is a picture cell: `▀` with one slot in front and one
+ * behind is two *regions of one cell*, not ink on a ground, and that is why a
+ * palette slot may reach the background here when `resolveBackground` refuses
+ * it. The condition used to read *the cell carries no text* and was false of
+ * every cell this function builds — the glyph is always drawn, and it is the
+ * half that survives at 1-bit (I17). The condition that is true is that the
+ * glyph is a **fill**, and `assertPictureGlyph` is what holds it.
+ *
+ * Checked on the background arm alone, which is what keeps the ASCII fallback
+ * out of the alphabet: `cellOf` never passes `below` when `a.ascii`, so `#`,
+ * `=` and `-` never reach a painted cell and never had to be admitted.
+ */
 function cell(text: string, owner: number, below?: number): SankeyCell {
   if (owner < 0) return { text };
   const ref = refOf(owner);
-  return below === undefined || below < 0 ? { text, ref } : { text, ref, background: refOf(below) };
+  if (below === undefined || below < 0) return { text, ref };
+  assertPictureGlyph(text, "sankeyArea");
+  return { text, ref, background: refOf(below) };
 }
 
 function cellOf(top: Half | null, bot: Half | null, a: Alphabet): SankeyCell {
