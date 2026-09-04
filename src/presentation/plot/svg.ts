@@ -816,6 +816,14 @@ function walk(
   canvas: number,
   theme: ResolvedTheme,
   out: string[],
+  // **A second collector, and the shape is `out`'s own** (C12 I114, §3ak.50b).
+  // The callout's row is *ink* — the last point of the last polyline a series
+  // drew, taken through `at()` — so unlike `rightRoom` it cannot be a pure
+  // function two readers call: `rightRoom` is the precedent for the column's
+  // **width** and the wrong precedent for its **rows**. Deriving it a second
+  // time from `figure.marks` is the mechanism §3ak.49 records for `fitLabel`,
+  // one product written twice and disagreeing at equality.
+  rows: number[],
 ): readonly string[] {
   const at = projected(figure, box);
   const map = figure.ramp === null ? undefined : COLORMAPS[figure.ramp];
@@ -1278,6 +1286,16 @@ function walk(
         `y="${n(end[1] + SVG_FONT_SIZE / 3)}" text-anchor="start" ` +
         `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${ink}">` +
         `${escape(fitLabel(text, canvas - at))}</text>`);
+      // **The row leaves the walk here, at the site that wrote the text** (C12
+      // I114, §3ak.50b). Past both `continue`s, so the collector holds the rows
+      // that are *on the page* rather than the rows the reserve was taken for —
+      // the two are deliberately allowed to disagree, since `rightRoom` grants
+      // room to a `yCallout` on a form that draws no polyline (§3ak.49a).
+      //
+      // **The centre and not the baseline**, because the axis emitter compares
+      // against its own `y` before the same `SVG_FONT_SIZE / 3` shift; taking
+      // the baseline here would be one of the two expressions written twice.
+      rows.push(end[1]);
     }
   }
 
@@ -1623,6 +1641,15 @@ function marks(
   figure: Figure | Omit<Figure, "marks">,
   layout: SvgLayout,
   theme: ResolvedTheme,
+  // **Forwarded and never read here** (C12 I114, §3ak.50b). Only the walk draws
+  // a callout, so every other family leaves it empty and the axis emitter
+  // displaces nothing — which is the same sentence as *a figure with nothing
+  // contended does not move*.
+  //
+  // **Required rather than defaulted**, with one call site: a default would let
+  // a caller drop the collector and silently restore the overprint, which is
+  // the wiring failure `RC5` is written against.
+  rows: number[],
 ): readonly string[] {
   const family = svgFamilyOf(block.form);
   const box = area(layout, figure.legend, gutterRoom(block, figure, layout), rightRoom(figure, layout));
@@ -1642,7 +1669,7 @@ function marks(
     || family === "field" || family === "horizon" || family === "stacked"
     || family === "span" || family === "funnel" || family === "track"
     || family === "bullet" || family === "density") && "marks" in figure) {
-    return walk(figure, block, box, layout.width, theme, out);
+    return walk(figure, block, box, layout.width, theme, out, rows);
   }
 
   if (family === "nodes") {
@@ -1884,7 +1911,13 @@ export function plotToSvg(
   // returns `null` and the `?? { min: 0, max: 1 }` above furnishes an axis out
   // of nothing. Drawn, that is five gridlines labelled 0 to 1 over an empty
   // box: a plot of a range the block never had.
-  const body = marks(block, figure, layout, theme);
+  // **The callout rows, filled by the walk and read by the axis emitter below**
+  // (C12 I114, §3ak.50). `plotToSvg` has always drawn the marks before the
+  // furniture; what changes is that the order is now load-bearing rather than
+  // incidental — the emitter reads what the walk wrote, so moving either past
+  // the other empties this and silently restores the overprint (→ `RC5`).
+  const calloutRows: number[] = [];
+  const body = marks(block, figure, layout, theme, calloutRows);
 
   const parts: string[] = [
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n(layout.width)} ${n(layout.height)}" ` +
@@ -2073,6 +2106,25 @@ export function plotToSvg(
         : figure.valueLabels === "both" ? ["left", "right"] as const
         : [figure.valueLabels];
       for (const side of sides) {
+        // **The callout displaces the right gutter's content on its row and
+        // never the left's** — I48's clause in this arm's units (C12 I114,
+        // §3ak.50a). The reason carries whole: the reading is the number a live
+        // chart is read for, which is a fact about a reader rather than about a
+        // cell. Only the *third* clause of I48 fails to cross, and it fails
+        // because both remedies it weighed were rejected against I1's row
+        // count, which a fixed `viewBox` does not have (§3ak.50d).
+        //
+        // **A row is a band and the band is a bound.** A glyph's ink is inside
+        // its em box, so two baselines a full em apart cannot overlap and
+        // anything closer may — `SVG_EM_MAX`'s argument one axis along. It errs
+        // by at most half a glyph, suppressing a number still legible off the
+        // axis rather than smearing `99.12` over `100` into `90012`.
+        //
+        // **Continue rather than break, and below the gridline rather than
+        // above it.** The tick keeps its rule: the loop body draws a rule *and*
+        // a label, and suppressing one glyph more than the ruling asks changes
+        // the figure's geometry while every text assertion agrees (→ `RC4`).
+        if (side === "right" && calloutRows.some((r) => Math.abs(r - y) < SVG_FONT_SIZE)) continue;
         const at = side === "left" ? box.left - LABEL_GAP : box.right + LABEL_GAP;
         // **The left side is `end`-anchored too and had no clip at all**, so a
         // long value label ran off the viewBox rather than being cut inside a

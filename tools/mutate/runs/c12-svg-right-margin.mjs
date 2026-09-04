@@ -96,8 +96,13 @@ const results = runPass({
       // against another — every arithmetic assertion still passing.
       name: "the marks walk reserves nothing, so the data and the furniture answer to two boxes",
       file: SVG,
-      from: "    return walk(figure, block, box, layout.width, theme, out);",
-      to: "    return walk(figure, block, area(layout, figure.legend, gutterRoom(block, figure, layout)), layout.width, theme, out);",
+      // **Re-anchored when the callout's row collector was threaded through
+      // this call** (C12 I114, §3ak.50b), and **re-run by hand rather than
+      // re-anchored on faith** — a stale anchor and a dead mutation read the
+      // same green. It still kills `RM3`, and now `RM4`, `RC2` and `G11a` with
+      // it.
+      from: "    return walk(figure, block, box, layout.width, theme, out, rows);",
+      to: "    return walk(figure, block, area(layout, figure.legend, gutterRoom(block, figure, layout)), layout.width, theme, out, rows);",
       expect: "RM3",
     },
     {

@@ -10,7 +10,7 @@
  * error* — an assertion about pixels would be discovering it exactly that way.
  */
 import { describe, expect, it } from "vitest";
-import { sourceOf } from "../support/source.js";
+import { fires, sourceOf } from "../support/source.js";
 import sharp from "sharp";
 import {
   plotToSvg,
@@ -1177,6 +1177,234 @@ describe("RM — the right margin is grown to fit what is drawn in it (C12 I113,
     expect(right.length, "the right-hand column has labels in it").toBeGreaterThan(0); // cells-ok — a label count
     expect(right.map((t) => t.text).filter((t) => t.includes("…")),
       "and none of them is cut, because the room was sized for them").toEqual([]);
+  });
+});
+
+describe("RC — the callout displaces the label it lands on (C12 I114, §3ak.50)", () => {
+  const layout = SVG_DEFAULT_LAYOUT;
+  /**
+   * **The widest face measured, as `RM` uses it** — a box drawn at the arm's
+   * own `SVG_EM_MAX` would agree with the code by construction.
+   */
+  const WIDEST_FACE = 0.6182;
+
+  /** Every `<text>`, with the band its ink paints. */
+  const texts = (svg: string): Array<{
+    text: string; x: number; y: number; left: number; right: number; anchor: string; fill: string; clipped: boolean;
+  }> =>
+    [...svg.matchAll(/<text ([^>]*)>([^<]*)<\/text>/gu)].map((m) => {
+      const attrs = m[1] ?? "";
+      const text = m[2] ?? "";
+      const x = Number(/(?:^| )x="([-\d.]+)"/u.exec(attrs)?.[1] ?? "NaN");
+      const size = Number(/font-size="([\d.]+)"/u.exec(attrs)?.[1] ?? String(SVG_FONT_SIZE));
+      const anchor = /text-anchor="(\w+)"/u.exec(attrs)?.[1] ?? "start";
+      const w = [...text].length * size * WIDEST_FACE; // cells-ok — a character count
+      const left = anchor === "start" ? x : anchor === "end" ? x - w : x - w / 2;
+      return {
+        text, x, y: Number(/(?:^| )y="([-\d.]+)"/u.exec(attrs)?.[1] ?? "NaN"),
+        left, right: left + w, anchor,
+        fill: /fill="([^"]+)"/u.exec(attrs)?.[1] ?? "",
+        clipped: /clip-path=/u.test(attrs),
+      };
+    });
+
+  /**
+   * A callout is a **start**-anchored text in a series' own colour; a value
+   * label is drawn in the theme's `label` slot. Read off the document rather
+   * than off the block, because what is on the page is the subject.
+   */
+  const LABEL_INK = "#626262";
+  const callouts = (svg: string): ReturnType<typeof texts> =>
+    texts(svg).filter((t) => t.anchor === "start" && t.fill !== LABEL_INK && !t.clipped && t.text !== "");
+
+  /**
+   * **A legend entry is excluded by the emitter's own pair, not by a
+   * coordinate.** It is pushed as `<rect>` then `<text>` with
+   * `x = swatch.x + swatch.width + 4`, so the arithmetic identifies it exactly
+   * — and a value label can never satisfy it. Written this way because the
+   * legend shares the right band with the value labels and the callout, which
+   * is the lane's legend finding and is *not* what `RC1` is about.
+   */
+  const legendTexts = (svg: string): ReadonlySet<string> => {
+    const out = new Set<string>();
+    for (const m of svg.matchAll(
+      /<rect x="([-\d.]+)" y="[-\d.]+" width="([\d.]+)" height="[\d.]+" fill="[^"]+"\/>\n<text x="([-\d.]+)"[^>]*>([^<]*)<\/text>/gu,
+    )) {
+      if (Math.abs(Number(m[3]) - (Number(m[1]) + Number(m[2]) + 4)) < 1e-6) out.add(`${String(Number(m[3]))}|${m[4] ?? ""}`);
+    }
+    return out;
+  };
+
+  /**
+   * The right-hand value labels: the axis emitter writes them at
+   * `box.right + LABEL_GAP`, which is past the half-width on every layout the
+   * cap allows (`box.left ≤ width / 3 + 6`), and the legend is the only other
+   * label-ink text in that half.
+   */
+  const rightLabels = (svg: string): ReturnType<typeof texts> => {
+    const legend = legendTexts(svg);
+    return texts(svg).filter((t) =>
+      t.fill === LABEL_INK && t.anchor === "start" && !t.clipped
+      && t.x > layout.width / 2 && !legend.has(`${String(t.x)}|${t.text}`));
+  };
+
+  /**
+   * The left gutter's labels: `end`-anchored at `box.left - LABEL_GAP`, which
+   * is the **smallest** such x in the document — the abscissa's last caption is
+   * `end`-anchored too, at `box.right`.
+   */
+  const leftLabels = (svg: string): ReturnType<typeof texts> => {
+    const ends = texts(svg).filter((t) => t.fill === LABEL_INK && t.anchor === "end" && !t.clipped);
+    const at = Math.min(...ends.map((t) => t.x));
+    return ends.filter((t) => t.x === at);
+  };
+
+  const line = (extra: Record<string, unknown>): Plot => vmBlock({
+    kind: "plot", id: "rc", form: "line", height: 8, axes: true, legend: false,
+    yCallout: "last",
+    series: [{ label: "alpha", values: [50, 90, 0.8774] }],
+    ...extra,
+  } as unknown as Plot);
+
+  it("RC1 (C12 I114): no callout overprints a right-hand value label, over the whole catalogue", () => {
+    // **The row `RM1` could not be, and the measured proof of it.** Ten pairs
+    // in six of 212 drawn frames overprinted — `99.12` written over `100` as
+    // `90012`, `e` over `0` — and every one of the ten was **inside its own
+    // `viewBox`**, so `RM1` agreed with all of them for as long as they
+    // existed. Containment is not correctness.
+    const bad: string[] = [];
+    for (const [form, variants] of Object.entries(CATALOGUE_FORMS)) {
+      for (const [variant, spec] of Object.entries(variants)) {
+        const { cursor, ...rest } = spec as Record<string, unknown>;
+        void cursor;
+        const svg = plotToSvg(vmBlock({ kind: "plot", id: "cat", ...rest } as unknown as Plot), THEME, layout);
+        if (svg === null) continue;
+        for (const c of callouts(svg)) {
+          for (const l of rightLabels(svg)) {
+            if (Math.abs(c.y - l.y) >= SVG_FONT_SIZE) continue;
+            if (c.right <= l.left + 1e-3 || l.right <= c.left + 1e-3) continue;
+            bad.push(`${form}/${variant}: "${c.text}" over "${l.text}" at y ${c.y.toFixed(2)}/${l.y.toFixed(2)}`);
+          }
+        }
+      }
+    }
+    expect(bad, "a callout and a right-hand value label never paint the same band").toEqual([]);
+  });
+
+  it("RC2 (C12 I114, I48): the left label on the contested tick stands, which is the clause the right one loses by", () => {
+    // **`never the left's`, asserted on the tick that has two chances.** At
+    // `yAxis: "both"` one tick carries a label on each side and only the right
+    // is contended, so a rule that displaced by row rather than by side would
+    // lose the reading here and nowhere else. Asserted on **that tick**, not on
+    // a count: a count agrees with a rule that drops the wrong one.
+    const svg = plotToSvg(line({ yAxis: "both" }), THEME, layout) ?? "";
+    const c = callouts(svg)[0];
+    expect(c?.text, "the callout is drawn").toBe("0.8774");
+    const contestedLeft = leftLabels(svg).filter((l) => Math.abs(l.y - (c?.y ?? NaN)) < SVG_FONT_SIZE);
+    expect(contestedLeft.map((l) => l.text), "the left label on the callout's own row survives").toEqual(["0"]);
+    const contestedRight = rightLabels(svg).filter((l) => Math.abs(l.y - (c?.y ?? NaN)) < SVG_FONT_SIZE);
+    expect(contestedRight.map((l) => l.text), "and the right one on that same row is gone").toEqual([]);
+  });
+
+  it("RC3 (C12 I114): exactly the contested labels go, and a figure with nothing contested does not move", () => {
+    // **Designing the mutations gave this row its shape.** `RC1` is satisfied
+    // by deleting the whole right column — a rule that suppresses every label
+    // has no overprint in it — so the assertion is the **set** that survives
+    // and not the absence of a collision.
+    //
+    // **And the fixture's tick pitch is the row's sensitivity, measured.** At
+    // `height: 8` the right column's labels are 137.6 px apart, so a threshold
+    // widened by *four times* suppresses nothing extra and this row survives
+    // it — found by running that mutation and watching it kill nothing, which
+    // is the mutation pass indicting the fixture rather than the rule. At
+    // `height: 40` the pitch is **15.29 px**, a quarter of a glyph's height
+    // above the threshold itself, so the same widening is visible. Both are
+    // asserted, because the sparse case is the one the corpus has.
+    for (const extra of [{}, { height: 40 }]) {
+      const without = plotToSvg(line({ yAxis: "right", yCallout: "none", ...extra }), THEME, layout) ?? "";
+      const withOne = plotToSvg(line({ yAxis: "right", ...extra }), THEME, layout) ?? "";
+      const c = callouts(withOne)[0];
+      expect(c, "the callout is drawn").toBeDefined();
+      const expected = rightLabels(without)
+        .filter((l) => Math.abs(l.y - (c?.y ?? NaN)) >= SVG_FONT_SIZE)
+        .map((l) => `${l.text}@${l.y.toFixed(3)}`);
+      expect(expected.length, "and some labels are uncontested, or this row asserts nothing") // cells-ok — a label count
+        .toBeGreaterThan(0);
+      expect(rightLabels(withOne).map((l) => `${l.text}@${l.y.toFixed(3)}`),
+        "the right column keeps every label the callout did not land on, by value and by row").toEqual(expected);
+    }
+
+    // **The half that would make this the wrong rule** (F325's shape). With no
+    // right-hand column there is nothing to displace, so the gutter the figure
+    // *does* draw is untouched by the callout arriving.
+    const leftOnly = plotToSvg(line({ yAxis: "left" }), THEME, layout) ?? "";
+    const leftBare = plotToSvg(line({ yAxis: "left", yCallout: "none" }), THEME, layout) ?? "";
+    expect(leftLabels(leftOnly).map((l) => `${l.text}@${l.y.toFixed(3)}`),
+      "a callout on a figure with no right-hand labels displaces nothing")
+      .toEqual(leftLabels(leftBare).map((l) => `${l.text}@${l.y.toFixed(3)}`));
+  });
+
+  it("RC4 (C12 I114): a displaced label keeps its gridline, which is what the ruling leaves behind", () => {
+    // **The rejection path.** The loop body draws a rule *and* a label; a
+    // suppression written one line up takes both, and the figure loses a
+    // gridline while every text assertion still agrees. Neither walk artefact
+    // indexes this — it is what the decision leaves behind rather than a cell
+    // two rules claim.
+    const horizontals = (svg: string): number => // cells-ok — a gridline count
+      [...svg.matchAll(/<line x1="([-\d.]+)" y1="([-\d.]+)" x2="([-\d.]+)" y2="([-\d.]+)"/gu)]
+        .filter((m) => m[2] === m[4] && m[1] !== m[3]).length; // cells-ok — a gridline count
+    const withOne = plotToSvg(line({ yAxis: "right", plotFrame: "grid" }), THEME, layout) ?? "";
+    const without = plotToSvg(line({ yAxis: "right", plotFrame: "grid", yCallout: "none" }), THEME, layout) ?? "";
+    expect(rightLabels(withOne).length, "a label was displaced, or this row asserts nothing") // cells-ok — a label count
+      .toBeLessThan(rightLabels(without).length); // cells-ok — a label count
+    expect(horizontals(withOne), "and the grid is the grid the figure had").toBe(horizontals(without));
+  });
+
+  it("RC5 (C12 I114, §3ak.50b): the emitter reads what the walk wrote, so the order is the mechanism", () => {
+    // **The wiring rather than the rule.** The row is ink, so it leaves the
+    // walk through a collector rather than through a second pure function; the
+    // consequence is that `plotToSvg`'s call order stops being incidental.
+    // Reversing it empties the collector and silently restores every overprint,
+    // with `RC1`'s catalogue sweep the only thing that would notice.
+    const src = sourceOf("src/presentation/plot/svg.ts");
+    const walkAt = src.indexOf("const body = marks(block, figure, layout, theme, calloutRows);");
+    const readAt = src.indexOf("calloutRows.some(");
+    expect(walkAt, "the walk is called with the collector").toBeGreaterThan(-1);
+    expect(readAt, "and the axis emitter reads it").toBeGreaterThan(-1);
+    expect(walkAt, "the walk fills the collector before the emitter reads it").toBeLessThan(readAt);
+    // **The control**: the matcher can see the thing it asserts about, after
+    // the stripper has run (`test/support/source.ts`'s own rule).
+    expect(fires(src, /calloutRows\.some\(/u), "the matcher fires on the stripped source").toBe(true);
+  });
+
+  it("RC6 (C12 I114, §3ak.50e): a left gutter label is cut only where the gutter is at its cap", () => {
+    // **F713's real hazard, and F713 itself is not a defect.** `ValueAxis` is
+    // built in one place — `valueAxisOf`, `{ ...axis, labels: tickLabels(...) }`
+    // — and `tickLabels` is `axis.ticks.map(...)`, so `labels` is total over
+    // `ticks` by construction and `gutterRoom` and the emitter are the same
+    // function rather than two that happen to agree on this corpus. The
+    // mirrored fix would have changed nothing.
+    //
+    // What nothing watched is the symptom if they ever part: `fitLabel` cuts
+    // rather than overflows, so an under-measured reserve reads as a **shorter
+    // number** with nothing on the page to say so. A cut is legitimate only at
+    // the cap, which is `width / 3` (§3ak.41 — `heatmap/captions-left` is the
+    // instance).
+    const bad: string[] = [];
+    for (const [form, variants] of Object.entries(CATALOGUE_FORMS)) {
+      for (const [variant, spec] of Object.entries(variants)) {
+        const { cursor, ...rest } = spec as Record<string, unknown>;
+        void cursor;
+        const svg = plotToSvg(vmBlock({ kind: "plot", id: "cat", ...rest } as unknown as Plot), THEME, layout);
+        if (svg === null) continue;
+        for (const l of leftLabels(svg)) {
+          if (!l.text.includes("…")) continue;
+          if (l.x >= layout.width / 3) continue;
+          bad.push(`${form}/${variant}: "${l.text}" cut at x ${l.x.toFixed(1)}, below the cap ${(layout.width / 3).toFixed(1)}`);
+        }
+      }
+    }
+    expect(bad, "no left gutter label is cut inside a gutter that was not capped").toEqual([]);
   });
 });
 
