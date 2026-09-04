@@ -862,6 +862,22 @@ const GLYPH_TABLE: Readonly<Record<Glyph, readonly [unicode: string, ascii: stri
     collapse: ["▾", "v"],
     live: ["▌", "|"],
     bullet: ["•", "-"],
+    // **`⎸` U+23B8 is `East_Asian_Width=Neutral` — one cell under both
+    // conventions** — where `▌`, `│`, `┃`, `▎`, `▏`, `┆`, `┊` and `╎` are all
+    // Ambiguous and draw two on a terminal that says wide (measured with
+    // `cells()`). `continuation`'s note below says a third set of narrow
+    // survivors is the better answer the day someone measures one; this is the
+    // first slot picked *because* of that measurement. Not `live`'s `▌` for
+    // F161's reason as well: a shared mark acquires a consumer that cannot take
+    // it, and a live gutter and a quotation are two rôles in one position.
+    // The ASCII half is plain text's own quotation mark.
+    quote: ["⎸", ">"],
+    // **`⁃` U+2043 is Neutral too**, where the bullets a reader reaches for —
+    // `◦`, `‣`, `▪` — are Ambiguous. The ASCII half is `~`, the mark C04 §5
+    // already gives a bounded region, and deliberately not `-`: that is
+    // `bullet`'s, and reusing it would spend the whole distinction at exactly
+    // the rung that needs it.
+    nested: ["⁃", "~"],
     // **U+23BF is `East_Asian_Width=Neutral` — one cell under both
     // conventions**, where `└` and `╰` are Ambiguous and draw two, as do `▲`
     // and `⋯` above. That buys nothing today, because `glyphs()` discards the

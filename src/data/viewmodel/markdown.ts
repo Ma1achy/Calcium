@@ -50,23 +50,40 @@
  * have been the other fix and is the wrong one: the member is still unconsumed,
  * and the census is worth more than the syntax.
  *
- * ## Three residues, named because a silent one is the empty-block class
+ * ## The three residues, closed (C04 §3an, I94, I95, I96)
  *
- * - **Heading levels collapse.** `rule` carries one `label` and draws one form —
- *   `── label ────`. `##` and `###` cannot differ. The fix, when a consumer
- *   needs it, is a `level` field on `Rule`; that is a published type and it has
- *   no consumer, so it is filed rather than built.
- * - **Blockquotes have no gutter.** `prefixCells` draws one from a `Glyph`, and
- *   no slot means *quote*. `live` is `▌`, which looks exactly right and means
- *   something else — a homonym is how a shared mark acquires a fourth consumer
- *   that cannot take it (F161). So a quote is muted text.
- * - **Nesting caps at three levels**, two spaces each. Deeper items clamp rather
- *   than indenting further, because the indent comes out of the text's own width
- *   and an unbounded one is a paragraph nobody can read at 60 columns.
+ * - **Heading levels reach three tiers.** `Rule.level` is `1 | 2 | 3` and the
+ *   fill is the axis — heavy, light, blank. `#` → 1, `##` → 2, and `###`
+ *   through `######` → 3: **four levels onto one form, stated here**, against
+ *   six onto one in silence. The type says three because a terminal tells three
+ *   apart, so a fourth tier fails to compile rather than being drawn as a third.
+ * - **A blockquote has a rail.** `Glyph.quote` is drawn on **every** row of the
+ *   notice rather than on the first (C09 I41), in the columns `prefixCells`
+ *   already reserves — so it costs no geometry. Not `live`'s `▌`: F161's
+ *   argument about a shared mark, and a measurement the argument does not reach
+ *   — `▌` is Ambiguous and draws two cells on a terminal that says wide, where
+ *   C09's rendering is Neutral. The tone is the block's, since a second tone on
+ *   the gutter is a colour distinction and colour is gone at 1-bit.
+ * - **Nesting caps at three levels and the cap is marked.** Two cells each, and
+ *   an item past the cap takes `Glyph.nested` rather than `bullet` — so depth 3
+ *   and depth 4 are not one frame. **The cap's reason is the measured one and
+ *   not the recorded one**: uncapped at width 40 an item past about depth 15
+ *   does not draw a wide indent, it draws *none* — the leading spaces are the
+ *   wrapper's break, the first row is the mark alone, and the item reads as
+ *   depth 0 having spent a row saying nothing.
+ *
+ * ## A blockquote's body is prose, out by name
+ *
+ * `> # Heading` is the six characters `# Head…` inside the rail, and `> - a`
+ * keeps its `-`. Not an omission and not a deferral: the quote is **one**
+ * `notice` and one notice has **one** `glyph`, so re-parsing the body would want
+ * a rail on a `rule`, a `code` and a `table` — and none of the three has a slot
+ * to hold one. It is unexpressible in the block vocabulary rather than unbuilt,
+ * which is the difference between a residue and a gap (C04 I95).
  */
 
 import { block } from "./construct.js";
-import type { Block, ColumnDef, TableRow, TextSpan } from "./types.js";
+import type { Block, ColumnDef, Glyph, HeadingLevel, TableRow, TextSpan } from "./types.js";
 
 /** The inline pass's answer: the text with markers removed, and the spans over it. */
 export type Inline = Readonly<{ text: string; spans?: readonly TextSpan[] }>;
@@ -185,7 +202,7 @@ export function inline(source: string): Inline {
 const CODE_TONE = "identifier" as const;
 
 const FENCE = /^(```|~~~)\s*([A-Za-z0-9_+-]*)\s*$/u;
-const HEADING = /^#{1,6}\s+(.*)$/u;
+const HEADING = /^(#{1,6})\s+(.*)$/u;
 const BULLET = /^(\s*)[-*+]\s+(.*)$/u;
 const ORDERED = /^(\s*)(\d+)[.)]\s+(.*)$/u;
 const QUOTE = /^\s*>\s?(.*)$/u;
@@ -198,13 +215,33 @@ const QUOTE = /^\s*>\s?(.*)$/u;
  */
 const DELIMITER = /^(?=.*\|)\s*\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?\s*$/u;
 
-/** Two per level, capped — see the nesting residue above. */
+/** Two per level, capped — see the nesting residue above (C04 I96). */
 const INDENT_CELLS = 2;
 const MAX_DEPTH = 3;
 
+/** The tiers a heading reaches; `######` is the third, and so is `###` (C04 I94). */
+const MAX_TIER = 3;
+
+/** The source's own nesting level, before the cap — the number the mark reads. */
+function depthOf(raw: string): number {
+  return Math.floor(raw.replace(/\t/gu, "  ").length / INDENT_CELLS); // cells-ok — spaces, not text
+}
+
 function indentOf(raw: string): number {
-  const level = Math.floor(raw.replace(/\t/gu, "  ").length / INDENT_CELLS); // cells-ok — spaces, not text
-  return Math.min(level, MAX_DEPTH) * INDENT_CELLS;
+  return Math.min(depthOf(raw), MAX_DEPTH) * INDENT_CELLS;
+}
+
+/**
+ * The mark an item at this depth carries (C04 I96).
+ *
+ * **The cap is a bounded region and a bounded region carries its mark.** Past
+ * `MAX_DEPTH` every item takes the same indent, so `bullet` alone would draw
+ * depth 3 and depth 4 as one frame — a document that means two things. Beyond
+ * the bound the frame says *at least this deep* and no more, which is all a
+ * residue marker ever says.
+ */
+function markOf(raw: string): Glyph {
+  return depthOf(raw) > MAX_DEPTH ? "nested" : "bullet";
 }
 
 /** A pipe row split into its cells, outer pipes discarded. */
@@ -290,9 +327,12 @@ export function markdownBlocks(source: string, idPrefix = "md"): readonly Block[
     const heading = HEADING.exec(line);
     if (heading !== null) {
       flush();
-      // Every level maps to one form. The collapse is the first residue above.
-      const { text: label, spans } = inline((heading[1] ?? "").trim());
-      out.push(block({ kind: "rule", id: id(), label, ...(spans === undefined ? {} : { spans }) }));
+      // **The collapse is here rather than in the type** (C04 I94): three tiers
+      // are drawn, so `###` through `######` take the third — four levels onto
+      // one form, in the one place a reader can see it happen.
+      const level = Math.min((heading[1] ?? "#").length, MAX_TIER) as HeadingLevel;
+      const { text: label, spans } = inline((heading[2] ?? "").trim());
+      out.push(block({ kind: "rule", id: id(), label, level, ...(spans === undefined ? {} : { spans }) }));
       continue;
     }
 
@@ -330,8 +370,11 @@ export function markdownBlocks(source: string, idPrefix = "md"): readonly Block[
         i += 1;
         body.push(QUOTE.exec(lines[i] ?? "")?.[1] ?? "");
       }
-      // Muted and unglyphed — the second residue.
-      out.push(block({ kind: "notice", id: id(), tone: "muted", ...inline(body.join("\n")) }));
+      // **Muted, and railed** (C04 I95). The gutter is a `Glyph` slot like
+      // every other mark, and it is the first token C09 draws on every row
+      // rather than on the first — which is what a quotation's gutter is and a
+      // status mark is not.
+      out.push(block({ kind: "notice", id: id(), tone: "muted", glyph: "quote", ...inline(body.join("\n")) }));
       continue;
     }
 
@@ -349,7 +392,7 @@ export function markdownBlocks(source: string, idPrefix = "md"): readonly Block[
           // `•` / `-`, and `notice`'s gutter is the hanging indent `prefixCells`
           // already draws — which is why a list item is a `notice` and not a
           // `raw` carrying a character this layer chose.
-          glyph: "bullet",
+          glyph: markOf(bullet[1] ?? ""),
           ...inline(`${pad}${bullet[2] ?? ""}`),
         }),
       );
@@ -365,10 +408,17 @@ export function markdownBlocks(source: string, idPrefix = "md"): readonly Block[
           kind: "notice",
           id: id(),
           tone: "default",
-          // **No glyph, and the number is text.** A digit is the same character
-          // in both renderings, so it needs no slot and F6 does not apply — and
-          // no slot could carry it, since a glyph is one fixed mark. The cost is
-          // the hanging indent, which the gutter would have given.
+          // **No glyph while the item is inside the cap, and the number is
+          // text.** A digit is the same character in both renderings, so it
+          // needs no slot and F6 does not apply — and no slot could carry it,
+          // since a glyph is one fixed mark. The cost is the hanging indent,
+          // which the gutter would have given.
+          //
+          // **Past the cap it takes the mark anyway** (C04 I96): a number says
+          // *which* item and never *how deep*, so this is the arm where depth 3
+          // and depth 4 would otherwise be one frame with nothing at all to tell
+          // them apart.
+          ...(depthOf(ordered[1] ?? "") > MAX_DEPTH ? { glyph: "nested" as const } : {}),
           ...inline(`${pad}${ordered[2] ?? ""}. ${ordered[3] ?? ""}`),
         }),
       );

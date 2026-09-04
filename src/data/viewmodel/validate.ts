@@ -84,6 +84,7 @@ const GLYPH_MEMBERS = {
   ok: true, warn: true, error: true, info: true, pending: true,
   working: true, running: true, queued: true, cancelled: true,
   expand: true, collapse: true, live: true, bullet: true,
+  quote: true, nested: true,
   continuation: true,
 } satisfies Record<Glyph, true>;
 
@@ -793,6 +794,14 @@ function splitsSurrogate(text: string, i: number): boolean {
 const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
   rule: (b, e, at) => {
     requireString(b, "label", e, at);
+    // C04 I94 — three drawn forms, so three values. A fourth would be accepted
+    // and drawn as a third, which is the member-accepted-and-ignored shape one
+    // layer up from where F207 usually finds it; the type refuses it for a
+    // caller who compiles and this refuses it for a far side that does not.
+    const level = b["level"];
+    if (level !== undefined && level !== 1 && level !== 2 && level !== 3) {
+      e.push(`${at}: "level" must be 1, 2 or 3 (C04 I94) — a rule draws three forms, and a fourth would be drawn as one of them`);
+    }
     // C04 I90 — a rule has no valued span to read a map through; the builder
     // half is `ValuedTextOpts`, and this is the gate half (F589).
     if (b["colormap"] !== undefined) {

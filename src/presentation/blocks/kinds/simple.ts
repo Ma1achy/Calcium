@@ -69,6 +69,27 @@ const GLYPH_INDENT: ReadonlyMap<Glyph, number> = new Map<Glyph, number>([
 ]);
 
 /**
+ * The tokens drawn on **every** row rather than on the first — a rail (C09 I41,
+ * C04 I95).
+ *
+ * **A property of the token, as the indent above is.** A quotation's gutter runs
+ * the height of what it quotes; a status mark sits on the line it is about. That
+ * difference belongs to the mark, which already knows which it is, so the block
+ * schema learns nothing and `measure` still receives no capability.
+ *
+ * **The geometry cannot move**, which is what makes this safe: `prefixCells`
+ * already subtracts the gutter from every row's width so the continuation rows
+ * hang under the text, and those columns are reserved and blank on rows 1..n
+ * whether or not anything is drawn in them. A rail fills them.
+ *
+ * **The frame is the only instrument that separates the two.** A quotation
+ * carrying an ordinary glyph draws its mark once and its remaining rows under a
+ * blank — same rows, same width, same reserved columns, every count agreeing.
+ * `continuation`'s indent one property along, found the same way.
+ */
+const GLYPH_RAIL: ReadonlySet<Glyph> = new Set<Glyph>(["quote"]);
+
+/**
  * The exact string a glyph draws on a notice's first row.
  *
  * **The one place the lead exists**, because `prefixCells` below is its cell
@@ -104,6 +125,20 @@ export const ruleDefinition: BlockDefinition<Rule> = {
     const g = glyphs(ctx.capabilities);
     const width = normaliseWidth(ctx.width);
     const label = stripControl(block.label);
+    // **Three tiers, and the fill is the whole axis** (C09 I40, C04 I94). The
+    // lead stays two cells and the label stays in its column, so `measure` is 1
+    // at every tier and the tiers differ where the eye already is.
+    //
+    // **The blank fill is drawn rather than dropped**: spaces to the width, so
+    // `meta` stays at the right edge and the row is exactly the width at every
+    // tier — a tier that shortened the row would put a second geometry on a kind
+    // whose whole claim is that it has one.
+    //
+    // **An empty label takes the weight back.** I21 says an empty label draws an
+    // unbroken line, and at tier 3 the two rules meet in one cell: a two-cell
+    // lead with nothing after it is not a rule at all.
+    const weight = block.level === 1 ? g.heavyHorizontal : g.horizontal;
+    const fillChar = block.level === 3 && label !== "" ? " " : weight;
     const meta = block.meta === undefined || block.meta === "" ? "" : ` ${stripControl(block.meta)}`;
 
     // `\u2500\u2500 label \u2500\u2500\u2500\u2500 meta`. The fill takes what the two ends leave; the
@@ -114,7 +149,7 @@ export const ruleDefinition: BlockDefinition<Rule> = {
     // a two-cell gap at the left of a rule that is a boundary rather than a
     // heading. Found by reading C19's menu edge in a frame — the block was
     // present, the row was exactly the width, and every assertion held.
-    const lead = label === "" ? g.horizontal.repeat(2) : `${g.horizontal.repeat(2)} `;
+    const lead = label === "" ? weight.repeat(2) : `${weight.repeat(2)} `;
     const gap = label === "" ? 0 : 1;
     const room = width - cells(lead, ctx.capabilities.ambiguousWidth) - gap - cells(meta, ctx.capabilities.ambiguousWidth);
     // The label's spans ride inside `kept` and the marker sits outside them
@@ -136,7 +171,7 @@ export const ruleDefinition: BlockDefinition<Rule> = {
               accent,
               ctx,
             ),
-            { text: `${" ".repeat(gap)}${g.horizontal.repeat(fill)}`, style: dim },
+            { text: `${" ".repeat(gap)}${fillChar.repeat(fill)}`, style: dim },
             { text: meta, style: tone("meta", ctx.theme, ctx.capabilities) },
           ],
           width,
@@ -183,12 +218,16 @@ export const noticeDefinition: BlockDefinition<Notice> = {
     // A hanging indent: the glyph sits on the first row and the continuation
     // aligns under the text rather than under the glyph. That alignment is why
     // the prefix comes out of every row's width, not only the first.
+    //
+    // **A rail is the exception, and it costs no geometry** (I41): the columns
+    // are already reserved on every row, so `quote` fills what was blank there.
+    const rail = block.glyph !== undefined && GLYPH_RAIL.has(block.glyph);
     return rows(
       wrapped.map((line, index) =>
         paint([
           {
             text:
-              index === 0 && block.glyph !== undefined
+              (index === 0 || rail) && block.glyph !== undefined
                 ? glyphLead(block.glyph, ctx.capabilities)
                 : " ".repeat(prefix),
             style,

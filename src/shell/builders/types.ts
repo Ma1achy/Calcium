@@ -14,7 +14,7 @@
  * oversight.
  */
 
-import type { Action, Block, Cell, ColormapName, ErrorLike, Glyph, KeyValue, Tone, TextSpan } from "../../data/viewmodel/index.js";
+import type { Action, Block, Cell, ColormapName, ErrorLike, Glyph, HeadingLevel, KeyValue, Tone, TextSpan } from "../../data/viewmodel/index.js";
 import type { ProducerContext } from "../../data/adapters/types.js";
 
 /**
@@ -63,6 +63,19 @@ export type TextOpts = BlockOpts &
  * F207's shape, at the public door. A narrower type makes supplying one a
  * compile error where it was a no-op (C04 I76's argument, F85).
  */
+/**
+ * `TextOpts` for the one member that carries a heading tier — `rule` (C04 I94).
+ *
+ * Split from `TextOpts` on `ValuedTextOpts`' own argument, in the other
+ * direction: `level` on `b.notice` or `b.raw` would be a member accepted and
+ * ignored, which is the shape F207 names and F85 answers with a narrower type.
+ */
+export type RuleOpts = TextOpts &
+  Readonly<{
+    /** Which of the three drawn forms; absent is 2 (C04 I94, C09 I40). */
+    level?: HeadingLevel;
+  }>;
+
 export type ValuedTextOpts = TextOpts &
   Readonly<{
     /** The map a valued span reads through (C04 I90). */

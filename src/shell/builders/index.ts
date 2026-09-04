@@ -83,7 +83,7 @@ import { blockId } from "../documents.js";
 import { defaulted, seq } from "./seq.js";
 import type {
   BlockOpts,
-  TextOpts,
+  RuleOpts,
   ValuedTextOpts,
   CellInput,
   ChipInput,
@@ -167,12 +167,13 @@ function toCells(input: Record<string, CellInput>): Record<string, Cell> {
 
 // --- the nineteen ---------------------------------------------------------
 
-function rule(label: string, meta?: string, opts?: TextOpts): Rule {
+function rule(label: string, meta?: string, opts?: RuleOpts): Rule {
   return finish<Rule>(
     {
       kind: "rule",
       id: idOf(opts, "rule"),
       label,
+      ...(opts?.level === undefined ? {} : { level: opts.level }),
       ...(opts?.spans === undefined ? {} : { spans: opts.spans }),
       ...(meta === undefined ? {} : { meta }),
     } as Rule,

@@ -198,6 +198,35 @@ export type Glyph =
   | "live"
   | "bullet"
   /**
+   * A quotation's gutter — **a rail rather than a mark** (C04 I95, C09 I41).
+   *
+   * The second token whose drawn form is a property of the token rather than of
+   * the block: `continuation` carries an indent, and this one repeats. C09 draws
+   * it on every row of its notice, in the columns `prefixCells` already reserves
+   * for the hanging indent, so the geometry does not move and `measure` still
+   * needs no capability.
+   *
+   * **Not `live`'s `▌`, and the second reason is the one F161's argument does
+   * not reach.** F161 is about a shared mark acquiring a consumer that cannot
+   * take it; the measurement is about the character. `▌` and every box-drawing
+   * vertical are `East_Asian_Width=Ambiguous` — one cell narrow and two wide by
+   * the framework's own `cells()` — where C09's rendering is Neutral and one
+   * cell under both conventions. `continuation`'s note said a third set of
+   * narrow survivors is the better answer the day someone measures one; this is
+   * the first slot chosen *because* of that measurement rather than beside it.
+   */
+  | "quote"
+  /**
+   * A list item nested deeper than the indent can show (C04 I96).
+   *
+   * The indent is capped at three levels, so depth 3 and depth 4 would draw one
+   * frame — a document that means two things. The mark says which side of the
+   * bound the item is on, and past it the frame says *at least this deep* and no
+   * more, which is what a bounded region says: a residue marker does not report
+   * how many characters it dropped either (C04 I49).
+   */
+  | "nested"
+  /**
    * A line subordinate to the one above it (C09 §4).
    *
    * **The only token whose eligibility is a property of the entry rather than
@@ -449,10 +478,26 @@ export type Floor = Readonly<{
   capped?: Readonly<{ shown: number; total: number }>;
 }>;
 
+/**
+ * The three forms a `rule` draws (C04 I94, §3an).
+ *
+ * **Three and not six**, because a terminal tells three apart: the fill is the
+ * axis — heavy, light, blank — and a fourth tier would be accepted and drawn as
+ * a third, which is F207's member at the door. The six ATX levels collapse at
+ * the markdown translator, where the collapse can be read.
+ */
+export type HeadingLevel = 1 | 2 | 3;
+
 export type Rule = Readonly<{
   kind: "rule";
   id: string;
   label: string;
+  /**
+   * Which of the three forms (I94, C09 I40). **Absent is 2** — the form every
+   * rule in the tree already draws, so the member is additive and no existing
+   * frame moves.
+   */
+  level?: HeadingLevel;
   /** Styled runs inside `label`, by code-unit offset (§3am, I83). */
   spans?: readonly TextSpan[];
   meta?: string;

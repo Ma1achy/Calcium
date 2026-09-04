@@ -17,6 +17,7 @@ export type {
   LocalDocument,
   ProducedMeta,
   Glyph,
+  HeadingLevel,
   Action,
   Block,
   BlockKind,
