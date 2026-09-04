@@ -27426,6 +27426,10 @@ awareness of it), which is `legendOf` / the legend emitter and not this arm's ca
 **Where**: `src/presentation/plot/svg.ts`, legend emitter (`const originX = place === "right" ?
 box.right + 12 : …`) against `rightRoom`.
 
+**Closed by F732 (C12 I115 / §3ak.50f), 2026-09-04, and corrected**: 2 pairs in 2 frames, not four;
+the tick-`100`-against-legend half is *not drawn* (I114 suppresses it) rather than measured; and the
+conflict was one rule applied twice — `area()` reserving two columns off one edge — not two rules.
+
 ---
 
 ## F727 — F713's premise is false: a `ValueAxis`'s labels cannot be short ★★★☆☆
@@ -27608,3 +27612,303 @@ mutation pass indicted a **fixture** rather than a rule and two predictions were
 and one anchor moved under the change and was re-run rather than re-anchored on faith (F730).
 
 **Cites every entry F725–F730 by number.**
+
+---
+
+## F732 — F726 was one rule applied twice, not two in conflict — and its fourth interaction was not on the page ★★★★☆
+
+*2026-09-04 · the lead, closing lanes8, at 0e631f00+lanes8.*
+
+**Expected** (F726, the lane brief, C12 §3ak.50c's walk row): the callout striking the legend is a
+conflict between I48's *does not replace the legend* and I114's displacement, with nothing to
+decide which gives; and a fourth interaction — the right-hand tick `100` colliding with `alpha` on
+its own — that a callout-framed repair would leave standing.
+
+**Measured** on `line-callout-multiseries` at 640 × 320: `box.right` = 459.2; value labels at
+465.2, callout at 465.2, legend swatch at 471.2, text at 484.8. `rightRoom` = 52.8 and
+`LEGEND_SHARE · width` = 128, so `area()` moves `box.right` in by 180.8 px — **and all three
+writers anchor on `box.right`.** Nothing is drawn between x 587.2 and 640: 52.8 px, 8.25% of the
+canvas, reserved for the column and empty, while `99.12` paints through `alpha`. **Nothing had to
+give**: two reserves were taken off one edge and one was written to.
+
+**The fourth interaction does not exist.** `100` is **not drawn** on the right in either frame —
+I114 suppresses it, 2.415 px from the callout. Sweeping all 244 committed frames for texts within
+a glyph height sharing a band: **126 pairs in 11 frames**; the right band's share is **2 pairs in
+2 frames**, not four. Wrong in both directions: not instanced for the reason given, and **latent
+because I114's suppression hides it** — constructible with no callout at all (`yAxis: "right"`,
+right legend: `alpha`'s first glyph 2.655 px inside `100`'s ink). That argues for placing the
+legend, the opposite of F726's warning.
+
+**Ruled, C12 §3ak.50f / I115**: the right band is ordered outward from the box, each writer
+anchoring on the previous one's outer edge — labels and callout at `box.right + LABEL_GAP`, the
+legend at `box.right + rightRoom + 12`, both cuts to the column's edge. The offered reading of I48
+(content, not layout) **survives and is not load-bearing**: the ruling displaces nothing, so the
+stricter reading licenses it too, and a sentence that licenses a decision under both readings did
+not decide it (MG24's class). **Goldens: 2 of 244 move**, exactly the two overprinting frames,
+because `rightRoom` is 0 on 81 of the 83 right-legend frames; both read as pictures, the swatch
+out of the digits. **Mutation**: the shipped defect restored kills `RC7` alone — `RC1` and `RM1`
+survive, which is the finding restated. Two cut reversions survived pass one on corpus grounds
+(no frame has a right legend *and* a writer past the cap) and die on pass two against constructed
+fixtures. **Owed**: `legendFit` — the legend has no cut at either anchor; tightest slack 18.80 px
+(`waffle-over-100`). **F726 closed** by this entry.
+
+**Where**: `src/presentation/plot/svg.ts` `area()` / legend `originX`; `test/unit/plot-svg-path.test.ts` `RC7`;
+`tools/mutate/runs/c12-svg-legend-column.mjs`.
+
+---
+
+## F733 — the overprint sweep's residue outside the right band — three shapes in six frames ★★☆☆☆
+
+*2026-09-04 · the lead, closing lanes8, at 0e631f00+lanes8.*
+
+**Measured** by F732's 244-frame sweep, outside the band it was written for: `pairplot-default`
+and `smallmultiples-default` emit **byte-identical texts at identical coordinates** several times
+(`"100"` at 41.0 … 64.4, y 16.8, three times) — panels re-emitting one gutter label;
+`line-candlestick` (`30`/`31`) and `line-candlestick-dense` (`150`/`159`) overprint their last two
+abscissa captions at y 300; `sankey-crowded`'s `src-01`/`src-02` and `treemap-default`'s tile
+names overlap at 11.6 px and 1 px pitches. Every one is inside its `viewBox` and inside a golden
+that agrees with it. **Open** — recorded with the frame names so the next sweep starts here.
+
+**Where**: `test/golden/svg-baseline/` as named.
+
+---
+
+## F734 — a roadmap entry's recorded symbol had the wrong sign, and the count that certified it cannot count signs ★★★★☆
+
+*2026-09-04 · the lead, closing lanes8, at 0e631f00+lanes8.*
+
+**Expected**: entry 26's body ends *Symbol: `documentView.open`*, read by the brief and by
+`roadmap-status.mjs`'s grep-reach line as the symbol whose absence keeps the entry open.
+
+**Measured**: `documentView.open` is **called** — `src/shell/execution.ts:1099`, the one path that
+pushes a view. The grep-reach count checks for a backtick in the clause; a present symbol satisfies
+it exactly as an absent one does. Found by resolving the first symbol the count had certified.
+The live claim is a **relationship between call sites**, not a name: the only settlement is at
+`execution.ts:983` guarded by `settle.into !== null`; `pushView` (`actions.ts:141`) appends nothing;
+both pop sites (`keys.ts:900`, `execution.ts:895`) patch nothing. **Ruled unverifiable by a symbol**
+in the clause, with the measurement, rather than inventing a name (F161).
+
+**Where**: `CALCIUM_ROADMAP.md` entry 26 and the confirmed-OPEN paragraph; `tools/roadmap-status.mjs`.
+
+---
+
+## F735 — entry 3 had three records, one blank, and the resolver agreed with all of them ★★★☆☆
+
+*2026-09-04 · the lead, closing lanes8, at 0e631f00+lanes8.*
+
+**Expected**: rule 1b (F667) fails when the Order column and the evidence table disagree.
+
+**Measured**: `| 3 | PART |` in the table, **blank** in the Order column, and `**3**` in the
+confirmed-OPEN paragraph whose own prose said *3 is PART in the table above*. `roadmap-status.mjs`
+printed *every claim resolves*: 1b iterated `marked`, and a blank column is not marked; `OPEN` was
+also absent from the table regex. The column and the paragraph were wrong; the prose and the table
+were right. **Fixed**: column → `PART 3`; 1b iterates the table and reads a blank column as `OPEN`;
+RS13 is the fabricated violation. Fixing 3 emptied `OPEN_BUILT_WORDS` by its own equality rule
+(RS8b is now an emptiness row with its vacuity stated), and 3's evidence cell cited
+`PLOT_FORM_MEMBERS` against two files neither of which holds it — check 1 found that the moment 3
+was marked; repaired to `validate.ts:2328`.
+
+**Where**: `CALCIUM_ROADMAP.md`; `tools/roadmap-status.mjs` rule 1b; `test/unit/roadmap-status.test.ts`.
+
+---
+
+## F736 — two historical false zeros in the confirmed-OPEN paragraph, and the gate arm built from them ★★★★☆
+
+*2026-09-04 · the lead, closing lanes8, at 0e631f00+lanes8.*
+
+**Expected**: *`camera`, `azimuth`, `elevation`, `halfBlockRows` occur zero times in
+`src/presentation/plot/`* (entry 52) and *`tensor` and `heatmap` occur zero times in `src/`* (entry 3).
+
+**Measured**: 33, 7, 7 and 1 (whole-word); `heatmap` is a built form (`plot/heatmap.ts`); `tensor`
+is still 0. 52's own landing condition — the field, the cache-key axis and one binding together —
+is met (`RenderContext.cameras`, `Cameras.key`, orbit bindings). 52 → BUILT with an evidence row; 3
+→ PART; both left the paragraph into dated *left this list* paragraphs.
+
+**Mechanism**: check 6 in `roadmap-status.mjs` — a declared `` **Gate**: `x` occurs zero times in `src/…` ``
+is resolved against its scope with comments stripped, whole-word, and **fails when the symbol is
+present**; an empty scope fails (RS12c, the control that must fail when the corpus is stubbed — or
+RS12b is vacuous). Declared form only, because a rule over every backticked symbol fires on 29's
+`chromeRows`, 24's `defaultTheme` and 28's `cursorCell`, each named precisely as counter-evidence.
+Two live gates: `defaultRoute` (entry 32) and `tensor` (entry 3). In `make all`'s path already —
+RS1 runs the tool against the real roadmap under `make instruments`. Reach line before / after:
+**5/8 carry their own symbol — 26, 32, 37 blanket** → **6/6; two gated, two ruled unverifiable (26, 37)**.
+Four by-hand mutations, four distinct deaths (RS12 · 8 rows incl. RS1/RS12b/RS12d · RS12d · RS13).
+
+**Where**: `tools/roadmap-status.mjs` check 6; `CALCIUM_ROADMAP.md` confirmed-OPEN paragraph.
+
+---
+
+## F737 — roadmap 48's sixth reading: the increment carries the ratio ★★☆☆☆
+
+*2026-09-04 · the lead, closing lanes8, at 0e631f00+lanes8.*
+
+**Measured**: `nameExactnessSignal` **566 / 1759 = 32.2%** (prior 382/1171, 388/1219, 389/1220).
+Base +539, exact +177 → the **increment is 32.8%** exact against a standing 32.2%: new members
+carry the ratio rather than diluting it. **Not answered**: whether existing members moved *out*
+while others moved in (`AskOptions.placement` is the one known instance) — the signal returns
+totals and `shared`, not the member set, so the composition reading 48 asks for needs one added
+return field in `tools/enforce/module-graph.mjs` plus a worktree at the 2026-08-15 commit. Named,
+costed, left. By-use: 114/433 (was 86/325); 170 of 302 clearings ambiguous; **17 named only in an
+example's tests** — a category the earlier reading had no row for.
+
+**Where**: `CALCIUM_ROADMAP.md` entry 48; `tools/enforce/module-graph.mjs`.
+
+---
+
+## F738 — roadmap 49: twelve golden files, two importing `src/shell/`, and a false third ★★☆☆☆
+
+*2026-09-04 · the lead, closing lanes8, at 0e631f00+lanes8.*
+
+**Expected** (the clause): five golden files, one importing `src/shell/`.
+
+**Measured**: **12** test files under `test/golden/`; **2** import from `src/shell/` —
+`continuation.test.ts` and `patch.test.ts`. `grep -l "shell/"` says **three**:
+`containment.test.ts`'s hit is the string `shell/session.ts` inside a stack-trace fixture — a
+matcher seeing one encoding. Coverage still **1 of 8** named things; seven files were added
+without a frame among them, which is the entry demonstrating its own claim again.
+
+**Where**: `test/golden/`; `CALCIUM_ROADMAP.md` entry 49.
+
+---
+
+## F739 — roadmap 29's four consumers do not share a shape ★★☆☆☆
+
+*2026-09-04 · the lead, closing lanes8, at 0e631f00+lanes8.*
+
+**Expected**: *FOUR roadmap consumers* as one argument for a chrome row budget.
+
+**Measured**: 35, 37 and 15 each want a row in the frame's chrome; **46 is a scrollbar at container
+scope** and wants no chrome row — the row already states the distinction without drawing the
+conclusion. Three of one shape and one mis-filed (F161's question). `TuiConfig.chrome` is exactly
+`{ header, footer }` (`shell/types.ts:432`), footer empty; `chromeRows` at `viewport/types.ts:80`
+still C14's per-entry chrome; `setMode` has one caller passing `"navigate"`, `"interact"` set
+nowhere. And the structural half: `HEADER_ROWS`/`FOOTER_ROWS` are `1` and `frame.ts:128` asserts
+four regions sum to `rows`, so a three-line footer is refused by construction, not merely unbuilt
+— which is the ruling entry 29 actually owes.
+
+**Where**: `CALCIUM_ROADMAP.md` entry 29; `src/shell/frame.ts`, `src/shell/chrome.ts`.
+
+---
+
+## F740 — roadmap 37 ruled unverifiable by a symbol, and 32 gated on `defaultRoute` ★★☆☆☆
+
+*2026-09-04 · the lead, closing lanes8, at 0e631f00+lanes8.*
+
+**37**: *should the prompt be bracketed* is taste; *is it bracketed* is negative-existence with no
+carrier — `separatorRow` 0, `regionSeparator` 0, `divider` 1 (a comment in `plot/svg.ts`). Both
+halves of the refusal register's ruling at once, so: unverifiable, stated. The satisfier side
+holds: `ThemeTokens.background: "terminal" | "surface"` at `theme/types.ts:137`, so entry 39's
+correction landed and 37's own correction stands on both halves. **32**: F89's retraction had
+reached the body and **not** the clause (F86/F89/F92's shape); the clause now carries it
+(`CommandPolicy` at `index.ts:278` → `shell/types.ts:430` → `config.ts:108` → `execution.ts:174`),
+with **Gate**: `defaultRoute` occurs 0 times in `src/`.
+
+**Where**: `CALCIUM_ROADMAP.md` entries 32 and 37.
+
+---
+
+## F741 — group 11's heading was out by 66, and only on the open half ★★★☆☆
+
+*2026-09-04 · the lead, closing lanes8, at 0e631f00+lanes8.*
+
+**Expected** (the heading): *157: 96 closed, 61 open*.
+
+**Measured** under SP6's own definition of keyed: **223** distinct ids in group 11 — 222 opening an
+entry (77 prose, 145 table rows), one (`F272b`) keyed beside F272. Short by **66**. A scan for an
+unqualified `**Fixed**` / `Closed by` still returns **96** — the closed figure was current; the
+open one was never re-derived, so the sentence read as maintained while two-thirds of the ids that
+arrived since went uncounted. F142's class in the section that keys F142. Corrected to
+**105 closed, 117 open**, with the classification rule written beside the number (F742).
+
+**Where**: `examples/docker/TRIAGE.md` §11 heading.
+
+---
+
+## F742 — the 96 / 61 split was not re-derivable by any reader, and neither was its replacement until the rule was written down ★★★☆☆
+
+*2026-09-04 · the lead, closing lanes8, at 0e631f00+lanes8.*
+
+**Measured**: no entry carries a disposition field. Dispositions appear in prose in at least
+fourteen wordings, **58 of 222 entries state none**, ten state a partial one (`Instance fixed …
+class open`; `Fixed for ghostty; WezTerm and Konsole owed`). So the split is a reading, not a
+derivation, and re-taking it means 222 judgements. **Rule, now in the section**: an entry is closed
+when its own text states a completed disposition for the finding it keys; open otherwise, partials
+included. Result 105 / 117.
+
+**Where**: `examples/docker/TRIAGE.md` §11.
+
+---
+
+## F743 — the composition of group 11's open entries: 88 honest, 12 borderline, 17 nobody questioned — and the 17 are one cohort ★★★★☆
+
+*2026-09-04 · the lead, closing lanes8, at 0e631f00+lanes8.*
+
+**The question was composition, not count.** Of 117 open: **88** state a blind spot (residue,
+limit, control or measured zero yield — F349, F434, F479, F181, F721, F713); **12** borderline
+(measured, residue implied — F373, F453, F370, F294, F367, F330, F431, F687, F691, F147, F56, F60);
+**17** with nothing but the instance — F127, F104, F142, F87, F94, F95, F99, F102, F105, F109, F114,
+F115, F121, F131, F133, F136, F2.
+
+**Sixteen of the seventeen are the F142 inventory sweep's second cohort** — filed *by mechanism from
+the entry* to satisfy a coverage gate, and the gate they were filed for is the one gate that cannot
+ask whether a row says anything. Every corpus in the bucket is unstated. Ranked by reach, the three
+to read first: **F127** (MG3 has never walked `import type` — largest corpus, cheapest fabricated
+violation: one type-only `data/` → `shell/` import); **F104** (`block()` transparent to excess
+properties — two independent confirmations since, F479 and F589, and no measurement of its own);
+**F142** (still firing — F741, F744). Rule and buckets written into §11 with the ids so the next
+reader checks the classification rather than inheriting it.
+
+**Where**: `examples/docker/TRIAGE.md` §11.
+
+---
+
+## F744 — a truthful per-row column and SP6's total were not both satisfiable, because one id had two owners ★★★★☆
+
+*2026-09-04 · the lead, closing lanes8, at 0e631f00+lanes8.*
+
+**Expected** (F434, recorded beside the rule): the per-row column is unchecked; 6 of 14 rows out,
+the total passing because errors cancel.
+
+**Measured** with the reader's own regex: **8 of 15 rows out** (−1, +1, −1, +1, +2, −1, −6, +6), and
+the per-section counts summed to **736** against **735** distinct, because **F30 was bolded in group
+4's table and again in group 7's row**. Under `sum(declared) === keyed.size`, correcting any one row
+turns the gate red — so the column could not be made truthful a row at a time, a stronger statement
+than F434's *unchecked*. **Ruled**: one owner per id. F30's mechanism is the change axis (group 4);
+group 7 cites it unbolded. The column was then rewritten from the reader's count —
+`19 69 7 4 10 2 93 28 97 66 223 4 4 26 83`, sum 735 — and the figure recorded beside the limit in
+`checkTriageInventory`. Still not gated per row, for the stated reason; the next drift is measured
+against a reconciled column rather than an unknown one. **Control**: unbolding one id takes the
+sum to 734 and SP6 fires.
+
+**Where**: `examples/docker/TRIAGE.md` ranking table, group 7; `tools/enforce/findings.mjs`.
+
+---
+
+## F745 — group 13 declared six and keyed none, for two reasons that read as one ★★★☆☆
+
+*2026-09-04 · the lead, closing lanes8, at 0e631f00+lanes8.*
+
+**Expected**: `## 13 · Text the framework emits — **6**` keys six ids.
+
+**Measured**: zero. (1) Its four ids — F55, F152, F153, F215 — were rows of the F142 cohort table,
+which sits **under §14's heading**, so they were counted against group 14 (30 keyed against 24
+declared). (2) Its one in-section paragraph opens `**F55.**` — full stop inside the bold — which
+`/\*\*(F\d+[a-z]?)\*\*/` does not match. The declared six names no members anywhere; two of them
+never existed as a list. **Fixed**: the four rows moved into §13 with a dated note; `**F55**.`;
+row 13 reads 4 and row 14 reads 26.
+
+**Where**: `examples/docker/TRIAGE.md` §13, §14.
+
+---
+
+## F746 — a run file put the survivor control in the harness's sentinel slot, and the harness refused to report ★★★☆☆
+
+*2026-09-04 · the lead, closing lanes8, at 0e631f00+lanes8.*
+
+**Expected**: `c12-svg-legend-column.mjs` runs four mutations and reports four kills — Lane L had run each by hand.
+
+**Measured**: `BlindHarnessError` — *a mutation that cannot survive was not caught*. The run's `control` was the `+ 1e-9` edge widening, a change **designed to survive** (inside `fitLabel`'s tolerance); the harness's `control` is defined as a mutation whose kill is not in doubt, because its job is to prove the pass can see a kill at all. Two real instruments — the pass's survivor control and the harness's liveness sentinel — share a name and have one slot, and the run inverted them. **The harness caught it**: this is the control pair doing exactly what F-early's blind-harness incident built it for, and the failure mode it refused reads as thoroughness (*four caught* off a pass that could not see). Fixed: the shipped defect is the sentinel; the survivor is recorded in the file's header as run by hand with no slot. Re-run: every mutation caught.
+
+**Where**: `tools/mutate/runs/c12-svg-legend-column.mjs`; C12 T6.92.
+
+---

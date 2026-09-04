@@ -29,20 +29,20 @@ type change.
 
 | rank | mechanism | ids keyed | consumers | ⚠ | disposition |
 |---|---|---|---|---|---|
-| **1** | [The consumer cannot reach a fact the framework holds](#1) | 20 | **11 open** | ⚠ C07 · C24 | real Calcium work, with consumers |
-| **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 68 | **5 open** (9 closed) | ⚠ C04 · C23 | real Calcium work · **7 of 13 fixed** — and F165 is the first found by roadmap 48's residue rather than by a consumer reaching for something |
+| **1** | [The consumer cannot reach a fact the framework holds](#1) | 19 | **11 open** | ⚠ C07 · C24 | real Calcium work, with consumers |
+| **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 69 | **5 open** (9 closed) | ⚠ C04 · C23 | real Calcium work · **7 of 13 fixed** — and F165 is the first found by roadmap 48's residue rather than by a consumer reaching for something |
 | **3** | [A block cannot express what the surface needs](#3) | 7 | **4 open** | ⚠ C04 | mixed — two absorbed |
 | **4** | [A change axis distinct from `Tone`](#4) | 4 | **4 open** | ⚠ C04 · C09 · C10 | real Calcium work · needs a ruling |
 | **5** | [The far side's shape is not the framework's contract](#5) | 10 | **2 open** | ⚠ C05 | mostly app-side · one shim |
 | **6** | [Rendered from data that has since moved](#6) | 2 | **2 open** | ⚠ C04 | real Calcium work |
-| **7** | [An artefact describes the world rather than being checked against it](#7) | 95 | **20** | — | artefact discipline — **no code**, and F164 is the first found by an instrument's *population* step rather than by a reader; **F210 is the first where the artefact is a component's own spec and the thing it contradicts is a shipped frame**, and **F233 the first where what it contradicts is a *fix*** — four present-tense statements of a repaired defect, in the two components the repair did not touch |
-| **8** | [Absence indistinguishable from failure](#8) | 27 | **7 open** (7 closed) | partly | real Calcium work · **7 of 10 fixed** — F151 is the class F35 closed in the half an app-side test cannot reach, and **F167 is the class arriving in a *value*: a validator agreeing twice about two different documents** |
-| **9** | [**The instrument was wrong**](#9) | 95 | **17** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
+| **7** | [An artefact describes the world rather than being checked against it](#7) | 98 | **20** | — | artefact discipline — **no code**, and F164 is the first found by an instrument's *population* step rather than by a reader; **F210 is the first where the artefact is a component's own spec and the thing it contradicts is a shipped frame**, and **F233 the first where what it contradicts is a *fix*** — four present-tense statements of a repaired defect, in the two components the repair did not touch |
+| **8** | [Absence indistinguishable from failure](#8) | 28 | **7 open** (7 closed) | partly | real Calcium work · **7 of 10 fixed** — F151 is the class F35 closed in the half an app-side test cannot reach, and **F167 is the class arriving in a *value*: a validator agreeing twice about two different documents** |
+| **9** | [**The instrument was wrong**](#9) | 98 | **17** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
 | **10** | [**A claim carried without a record**](#10) | 66 | **11** | — | **new at F80** · method — six findings disproved, and **F166 unblocked an entry while F168 found what the same row was silent about**; F184 is the first where the unrecorded claim was a *rule* rather than a fact, governing thirty forms from a parameter's doc comment |
-| **11** | [A gate that passes without checking](#11) | 224 | **16** | — | 9 closed · **7 open** — four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
+| **11** | [A gate that passes without checking](#11) | 232 | **16** | — | **105 closed · 117 open** of 223 keyed — the heading was out by 66 and this row's count column by 1, which cannot be corrected alone (§11) · four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
 | **12** | [**A time-based assertion under contention**](#12) | 4 | **3** | — | **new at F80** · Calcium's own suite |
-| **13** | [Text the framework emits](#13) | 6 | **4** | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
-| **14** | [A constant, a channel or a rule that outlived its configuration](#14) | 24 | **13 open** | ⚠ C12 | **new at F492** · real Calcium work — every member reads as deliberate, which is why review found none of them |
+| **13** | [Text the framework emits](#13) | 4 | **4** | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
+| **14** | [A constant, a channel or a rule that outlived its configuration](#14) | 26 | **13 open** | ⚠ C12 | **new at F492** · real Calcium work — every member reads as deliberate, which is why review found none of them |
 | — | [Singles](#singles) | 83 | 1 each | — | see each · **F176 is the one to read twice**: the instrument had the evidence in a committed snapshot and the reading step was skipped |
 
 **Four groups are new since F55** — 9, 10, 12, and F81's arrival in 4. Group 9 is the one
@@ -356,7 +356,7 @@ badly and *"the banner overflows when you resize"* argues for itself immediately
 <a id="7"></a>
 ## 7 · An artefact describes the world rather than being checked against it — **twenty-seven more at F512–F726, twenty-one of them corrected in place; F537 and F726 open**
 
-**F726** — `rightRoom`'s own doc says the callout and the right-hand value labels **share one column**, so there are two contenders. **There are three.** On `line-callout-multiseries` and `line-callout-last` the callout `99.12` spans x 465.2 … 504.2 at y 19.215 and the legend entry `alpha` sits at x 484.8, y 24.8 — **19.4 px of horizontal overlap and 5.585 px of vertical**, visible in the PNG as a strike through the word — and a **fourth interaction with no callout in it at all**: the right-hand tick `100` overlaps `alpha` too, so the tick column and the legend collide on their own. The mechanism is arithmetic and stated in the code: the legend's `originX = box.right + 12` and the labels' `at = box.right + LABEL_GAP` are 6 px apart while `rightRoom` grows `box.right` inward by the *callout's* width, so the wider the callout the further into the legend it reaches. **Not fixed, and the reason is the invariant rather than the lane boundary**: C12 I48 ends *a callout does not replace the legend*, so displacement — correct for a tick — is the one remedy forbidden here, and the repair is the legend's placement. Recorded as I114's first stated blind spot. F725 is the same sweep's other half, the ten pairs that could be fixed. Open
+**F726** — **closed and corrected by F732** (2 pairs in 2 frames; the tick half not drawn; one rule applied twice). As written: `rightRoom`'s own doc says the callout and the right-hand value labels **share one column**, so there are two contenders. **There are three.** On `line-callout-multiseries` and `line-callout-last` the callout `99.12` spans x 465.2 … 504.2 at y 19.215 and the legend entry `alpha` sits at x 484.8, y 24.8 — **19.4 px of horizontal overlap and 5.585 px of vertical**, visible in the PNG as a strike through the word — and a **fourth interaction with no callout in it at all**: the right-hand tick `100` overlaps `alpha` too, so the tick column and the legend collide on their own. The mechanism is arithmetic and stated in the code: the legend's `originX = box.right + 12` and the labels' `at = box.right + LABEL_GAP` are 6 px apart while `rightRoom` grows `box.right` inward by the *callout's* width, so the wider the callout the further into the legend it reaches. **Not fixed, and the reason is the invariant rather than the lane boundary**: C12 I48 ends *a callout does not replace the legend*, so displacement — correct for a tick — is the one remedy forbidden here, and the repair is the legend's placement. Recorded as I114's first stated blind spot. F725 is the same sweep's other half, the ten pairs that could be fixed. Open
 
 **F697** — `DRAWN_AS_GEOMETRY`'s docstring said the deviation governs **625** code points, and reproducing the figure exactly — 625 = 576 Neutral + 49 Wide — is what showed **49 of them are `W` in the property** (`⛄` `⚡` `⛔` `◽` `⚽`, the zodiac, the trigrams). After F693 those 49 are `isWide`'s and are two cells under **both** conventions, so what the list still governs is **576**. The figure was right about its own arithmetic and wrong about its subject, which is why reproducing it rather than re-deriving it is what corrected the reading. Corrected in the docstring and in C09 §5; T1.28d asserts the intersection in both modes with a Neutral control
 
@@ -464,7 +464,7 @@ wrongness and the split is the finding: `DOCKER_TUI_SURFACES.md`'s corrections i
 |---|---|
 | **F4** · **F11** | the far side — a mock's shapes encoded as docker's, then three more surfaces the same way (F11 caught *ahead*, the only one that cost nothing) |
 | **F3** · **F6** · **F10** | the far side — R01's premise expired, a glyph the vocabulary lacks, `stats --format json` is a screen redraw |
-| **F30** · **F38** · **F42** · **F9** | the framework — a verdict the union lacks, a binding that does not exist, a layout chosen by width, a startup step naming an effect with no mechanism |
+| F30 · **F38** · **F42** · **F9** | the framework — a verdict the union lacks, a binding that does not exist, a layout chosen by width, a startup step naming an effect with no mechanism |
 | **F303** | **itself — a plan retiring a compensation with a sentence about a different quantity** | `CALCIUM_SVG_COMPLETION.md`: *the aspect compensation the terminal arm needs **disappears** because an SVG square is square*. **True about `CELL_ASPECT`** — a braille dot is square and a pixel is square, so `squareColumns` and `rx = 2·ry` really are terminal facts and G2 stands. **And attached to a decision about the box.** What does not disappear is `radiusFor`'s `min` — fitting an isotropic figure into an anisotropic one — which the terminal does in dots and the second arm would do in pixels. Measured: every pie and every radar in the catalogue is **height-bound at every width**, so `radiusFor`'s `byWidth` arm is dead across the corpus and its `min` reads as deciding nothing; the second arm's plot area is 396.8 × 275.2 px, so a unit square through `projected` is an **ellipse** and a waffle's hundred squares are 39.7 × 27.5. **MG24's class arriving in a plan rather than in a rule** — review checks whether a justification is true and this one is, which is how it survived into three forms' worth of design. **Fixed**, as I69: a figure member, because an arm-local repair writes the inset twice in two units, which is the defect `aspect.ts` exists to have ended |
 | **F304** | **itself — a record's row with three subjects, whose reason fits two** | `HAS_VALUE_AXIS` enters the proportion family on one line: *an angle, a polygon's radius, a count of squares — the reading is a share of a whole, which is not a position on a scale.* An angle is; a count of squares is; **a polygon's radius is not**. `radarCeiling` nices `{0, top}` to six ticks, every vertex is `v / ceiling`, and the four rings at a fifth through four fifths of the radius **are that scale drawn**. The record's own doc says it is *not the gutter question*, so `radar: false` is right about the gutter and wrong about the question asked. **F267 is the same defect on the row below**, and neither is carelessness: three forms bundled, and the shared reason on a bundled row is rarely any of the subjects'. **And the correction exposes what the row hid**: `radarCeiling` passes `{}` where every other axis passes the block, so a radar's `yMin`, `yMax` and `yFormat` are **read by nothing** — and no catalogue radar pins one, so no frame could say so. **Fixed** — `valueAxisOf({0, top}, 6, block)` is `radarCeiling` with the pin threaded, and closes both halves in one expression |
 | **F438** | **itself — a geometry sentence written from the case to hand, three times** | §3al's edge-on rule read *the projected extent is zero on one screen axis*, then *both screen axes spread*, and **each was true of the plane it was written against**. Measured over five in-plane directions: **collinearity holds in all five and a zero screen extent in two**, so the image being a line is the rule and axis-alignment is where that line is parallel to a frame axis. **Two probes agreed with themselves first** — both built the plane in world space and ran it through `unitOf`, which normalises each axis by its own extent, so the eye left the plane and only azimuth 0 survived by symmetry. A probe producing one honest row and four wrong ones reads as a measurement. The third builds the plane from the basis, edge-on by construction. **A claim about geometry written while looking at one configuration is a claim about that configuration** |
@@ -514,6 +514,16 @@ and `bannerLines` has two. A comparison that varies one while the other silently
 answer is a frame-read that cannot be wrong. **Read the ladder before choosing the pair.**
 
 ---
+
+**F734** — a roadmap entry's recorded symbol had the **wrong sign** — `documentView.open` is called at `execution.ts:1099` — and the grep-reach count certified it because a backtick is a backtick; ruled unverifiable by a symbol, with the call-site relationship written instead
+
+**F735** — entry 3: `PART` in the table, **blank** in the Order column, listed as confirmed-OPEN — three records and the resolver agreed with all three because 1b iterated `marked`; fixed, RS13 is the violation
+
+**F736** — two historical false zeros — 52's four names occur 33/7/7/1, 3's `heatmap` is a built form — and the declared `**Gate**` arm built from them; reach 5/8 → 6/6, two gated, two ruled unverifiable
+
+**F737** — roadmap 48's sixth reading: 566/1759 = 32.2%, increment 32.8% — new members carry the ratio; the composition reading needs the member set the signal does not return
+
+**F740** — 37 ruled unverifiable (taste and negative-existence with no carrier — three candidates at 0, 0, 1-in-a-comment); 32's F89 retraction reached the clause and gained `defaultRoute` as a gate
 
 <a id="8"></a>
 
@@ -764,6 +774,8 @@ says a demo of a plot should have a shape.
 
 ---
 
+**F746** — a mutation run put the *survivor* control in the harness's *sentinel* slot; the harness threw `BlindHarnessError` rather than report four kills off a pass that could not see one — the instrument catching its own misuse
+
 <a id="10"></a>
 
 **Keyed here by the F142 inventory sweep** — the second cohort, filed after this document's own count was last derived. Placed by mechanism from the entry; SP6 proves coverage and not placement, which is its stated limit.
@@ -968,7 +980,67 @@ through a menu in as many words — as the reason the implementation writes ever
 
 
 **F491** — C12 §3am's refusal of box-drawing joins rests on one *mechanism* among four arguments: a strictly-nearer test refuses the second edge **by construction** at exactly the cell a join needs. **Every clause is true and the consequence is a tenth of what the wording implies.** Built both ways on a cube's twelve edges: **36 corners and 8 tees against 29 and 5** — seven corners and three tees, not a figure coming apart at every vertex. And three fixtures built to make it categorical are *identical* under both rules. The reason is the arm's corner routing, needed for a different problem, which produces corner glyphs from a **single** stroke — so a corner is not evidence of two edges meeting, and the row that counted corners survived its own mutation. **The class: a refusal states a mechanism and a consequence, and only the mechanism is checkable from the armchair.** Both were carried as one claim for four steps; *refused by construction* is a statement about a code path and reads as one about a picture
-## 11 · A gate that passes without checking — **157: 96 closed, 61 open**
+## 11 · A gate that passes without checking — **223 keyed · 222 entries: 105 closed, 117 open**
+
+**The composition, measured 2026-09-04 at `86d3b191`.** The heading read *157: 96 closed, 61 open*
+and the total was out by **66**. Under SP6's own definition of *keyed* — a bolded id anywhere in the
+section — group 11 keys **223** distinct ids: 222 open an entry (77 as prose, 145 as a table row)
+and one, F272b, is keyed beside F272 rather than opening one. **The closed half was current and the
+open half was not**, which is the shape to watch for: 96 is still what a scan for an unqualified
+*Fixed* or *Closed* returns, so the sentence read as maintained while two-thirds of the arrivals
+since it was derived went uncounted. F142 in this group is the row this fired on, and it is one of
+the rows that states nothing beyond its own sentence.
+
+**No entry carries a disposition field**, so the split is a reading and not a derivation. The rule
+used: *an entry is closed when its own text states a completed disposition for the finding it keys*
+— `**Fixed**`, `Closed by`, `**Ruled**`, `Renamed to`, `Implemented`, `Wired` — and open otherwise,
+**the partial ones included**: *Fixed two of three* (F422), *Fixed for ghostty; WezTerm and Konsole
+owed* (F415), *Instance fixed … class open* (F159, F160), *Closed for the tick* (F710). Ten entries
+state a partial disposition and **fifty-eight state none at all**. So 96 / 61 was never re-derivable
+by a reader, and neither is 105 / 117 without the rule beside it — which is why the rule is written
+here and not only the number.
+
+**And the split that predicts the next findings** — of the 117 open, how many say what their gate
+still does *not* reach:
+
+| | | named instances |
+|---|---|---|
+| **a blind spot stated** — the entry names the residue, the limit, the control, or a measured zero yield | **88** | F349 (*Stated blind spot — a collision needs two variants differing in one field*), F434 (*Not gated: `keyed` has no strong enough definition*), F479 (*Recorded as a known limit with its measurement*), F181 (*blind spot recorded at MG27's declaration*) |
+| **borderline** — measured, with the residue implied rather than written | **12** | F373, F453, F370, F294, F147, F56 |
+| **nobody has questioned it** — the instance and nothing else: no reach, no control, no residue, no disposition | **17** | F127, F104, F142, F87, F94, F95, F99, F102, F105, F109, F114, F115, F121, F131, F133, F136, F2 |
+
+**Sixteen of the seventeen arrived in one batch** — the F142 inventory sweep's second cohort at the
+end of this section, *placed by mechanism from the entry*, with SP6 proving coverage and not
+placement. The un-questioned residue is not spread through the group; it is one table nobody has been
+back to. **A cohort filed to satisfy a coverage gate is where the next finding is**, because the gate
+it was filed for is the one gate that cannot ask whether the row says anything.
+
+**Ranked by reach, the three to read first.** The argument for a place is what a fabricated violation
+or a frame would ask, not severity:
+
+1. **F127 — MG3 has never walked `import type`.** The largest corpus in the bucket and the cheapest
+   probe. MG3 is the layering rule, over every import in `src/`, and CLAUDE.md calls acyclicity and
+   L0's two halves the tree's central invariant. The fabricated violation is one line — a type-only
+   import from `data/` into `shell/` — and `make enforce` either goes red or the rule has a hole
+   exactly the width of `import type`, over a corpus the row does not state.
+2. **F104 — `block()` is transparent to excess properties, so C04's narrowings land unenforced.**
+   The corpus is every narrowing C04 states, on the published builder. Two instances of the shape
+   have since been measured elsewhere and both were real — F479's `tone: "chartreuse"` accepted by
+   seven carriers with `slot()` returning `{}`, and F589's `colormap` accepted on a `rule` — so the
+   general row is the one entry here with two independent confirmations and no measurement of its own.
+3. **F142 — a derived count is derived once, and nothing re-derives it.** It is the row this
+   measurement fired on and it is still firing. The ranking table's per-group column now disagrees
+   with **8 of 15** sections — −1, +1, −1, +1, +2, −1, −6, +6 — against F434's measured 6 of 14, and
+   **the total still passes because the errors cancel**. Group 13 declares 6 ids and keys **none**;
+   group 14 declares 24 and keys 30; row 11 reads 224 against 223.
+
+**Why row 11's `224` is not corrected here.** SP6's only assertion over the ranking table is the sum
+against the distinct ids keyed, and the sum is exact today at 735. Correcting one row to its measured
+value makes the sum 734 and turns `make enforce` red, so no row can be fixed alone. And the
+per-section counts sum to **736**, because F30 is keyed in both group 4 and group 7: **a truthful
+per-row column and the total check are not simultaneously satisfiable while any id is keyed twice.**
+That is the half of F434's recorded limit that was not stated — it recorded that the column is
+unchecked, not that it is unfixable a row at a time.
 
 **F725** — F710 named **two** frames where a callout overprints a right-hand value label. Sweeping all **212 drawn baselines** for `<text>` pairs whose painted bands overlap: **10 pairs in 6 frames**, and `line-callout-single` — **one series, one callout, the simplest figure the corpus has** — is one of them. Every pair is **2.415 px** apart, which is the difference between `end[1] + SVG_FONT_SIZE / 3` and `y + SVG_FONT_SIZE / 3` and nothing else, so the class is *every frame that draws a callout beside a right axis* and a series' last sample is very often at an axis end. **The geometric row `RM1` agreed with all ten for as long as they existed**, every string being inside its own `viewBox` — the measured instance of *containment is not correctness*, and the reason `RC1` had to be a different row rather than a stricter one. Closed by C12 I114 / §3ak.50 and `RC1`; F726 is the third writer the same sweep found and cannot be fixed the same way, and F729 is the same class with both writers being the axis emitter, which `RC1`'s shape cannot reach — keyed in 7 and 14
 
@@ -1318,6 +1390,24 @@ reads goes through the entry point a user has.
 
 ---
 
+**F732** — F726 reframed and closed — `area()` reserved two columns off one edge and all three writers anchored on it; the *fourth interaction* was a tick I114 does not draw; **2 of 244** goldens move; the shipped defect restored kills `RC7` alone while `RC1`/`RM1` survive; `legendFit` owed at 18.80 px slack
+
+**F733** — the sweep's residue outside the right band — identical texts at identical coordinates in `pairplot`/`smallmultiples`, abscissa overprints in both candlesticks, 11.6 px / 1 px pitches in `sankey-crowded` / `treemap` — every one inside a golden that agrees with it. Open
+
+**F738** — roadmap 49: **12** golden files, **2** importing `src/shell/`, a stack-trace string as the false third; still 1 of 8
+
+**F739** — roadmap 29's four consumers are three of one shape and one mis-filed (46 is container-scoped); and `frame.ts:128`'s four-region sum refuses a three-line footer by construction
+
+**F741** — this group's heading said 61 open; the reader says **117** of 223 keyed — out by 66 on the open half only
+
+**F742** — the split was a reading with no rule: fourteen disposition wordings, 58 entries stating none; the rule is now beside the number
+
+**F743** — the composition — **88 blind-spot-stated · 12 borderline · 17 nobody questioned**, sixteen of them the F142 cohort; F127, F104, F142 to read first
+
+**F744** — F30 keyed in two groups made a truthful column and SP6's sum mutually exclusive; ruled one owner per id, column rewritten from the reader's count, figure recorded beside the limit
+
+**F745** — group 13 declared 6 and keyed 0 — its ids sat under §14's heading and `**F55.**` hid its own id from the reader; four rows moved home
+
 <a id="12"></a>
 
 **Keyed here by the F142 inventory sweep** — the second cohort, filed after this document's own count was last derived. Placed by mechanism from the entry; SP6 proves coverage and not placement, which is its stated limit.
@@ -1378,7 +1468,7 @@ that fails under contention will fail eventually whether or not anyone introduce
 <a id="13"></a>
 ## 13 · Text the framework emits — **6**
 
-**F55.** `PROMPT = "❯ "` and `b.live`'s default `loading…` are constants concatenated into a
+**F55**. `PROMPT = "❯ "` and `b.live`'s default `loading…` are constants concatenated into a
 frame with nothing between them and the terminal. C09 §4 argues at length that a glyph is a
 slot and never a character, *because* a block-supplied one was emitted verbatim and broke under
 `LANG=C`. These are L4 text, outside that vocabulary, and they break the same way.
@@ -1387,6 +1477,15 @@ slot and never a character, *because* a block-supplied one was emitted verbatim 
 prompt, it is on every frame the shell ever draws, it is on the line the reader types into, and
 no application can replace it. It is low on the list because it wants the same ruling C09 §4
 already made — folding it in is cheaper than making a second one.
+
+**Keyed here on 2026-09-04, moved from the F142 cohort table under §14 where they had been counted against the wrong group** — the section keyed no id at all (`**F55.**` carried its full stop inside the bold, which SP6's reader does not match), so its ranking row said 6 over a section the reader saw as empty, and group 14 read 30 against 24.
+
+| | why this group |
+|---|---|
+| **F55** | the framework draws two characters it does not substitute — this group's subject |
+| **F152** | the framework emits a sentence about the wrong subject — the far side failed and the notice names the app author's adapter |
+| **F153** | the framework emits a sentence about the wrong fault — an absent required field reported as a value of the wrong type |
+| **F215** | the framework emits a sentence about a vocabulary one fork out of date — a rejected theme preference is *not dark or light* on a set that holds three, and no test asserts the string |
 
 ---
 
@@ -1457,10 +1556,6 @@ written as one. Every member reads as deliberate, which is why none was found by
 |---|---|
 | **F378** | **the dither, for any figure with a painted ground** | `plotToSvg` → `b.image` at `imageProtocol: "none"` gives **511 of 784 cells inked** and no findable curve. The SVG paints its own `#141414` — right for a browser — so the PNG's mean luminance is **22 of 255**, and an ordered dither turns a flat 8% ground into a regular 8%-dense texture the figure is then drawn inside. **A pairing rather than a defect in either part**: C09 I36's dither is built for photographs, which have no flat ground, and a rendered figure is nearly all ground. Consumer-side remedy measured — a `linear` map of 20 → 0 takes it to **42 inked cells** and the curve appears. Recorded in `examples/plots`, because normalising a figure's ground is the caller's knowledge about their own picture |
 | **F375** | **a bar's value labels, at a dashboard's density** | `4.17.4` is `4.1` and `7.4`; `3.83.4` is two numbers; `4.34.16.8` is three. A reader does not see a crowded row, they see **one number that is not any of the values**. **The same renderer has the rule one label row away** — `columnLabels` guards the category names with `start >= cells(row)` and drops rather than abut — so this is a missing clause, not an open question, with the drop-or-abut choice already made beside it. Found by looking at the demo at the width its own layout gives a bar: 53 cells, four categories, four series |
-| **F55** | the framework draws two characters it does not substitute — this group's subject |
-| **F152** | the framework emits a sentence about the wrong subject — the far side failed and the notice names the app author's adapter |
-| **F153** | the framework emits a sentence about the wrong fault — an absent required field reported as a value of the wrong type |
-| **F215** | the framework emits a sentence about a vocabulary one fork out of date — a rejected theme preference is *not dark or light* on a set that holds three, and no test asserts the string |
 
 
 ## Singles — one consumer each

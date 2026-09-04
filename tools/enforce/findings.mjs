@@ -354,6 +354,16 @@ export function checkTriageInventory(io) {
   // reconciling the counts first, and several of them carry prose meaning the
   // column does not ("13 open, 5 closed"). A gate over numbers nobody maintains
   // would be red on arrival and edited to fit.
+  //
+  // **Reconciled once, 2026-09-04, and the limit stayed.** Re-measured at 8 of 15
+  // rows out (−1, +1, −1, +1, +2, −1, −6, +6), with a fourth shape F434 had not
+  // named: F30 was keyed in two groups, so the per-section counts summed to 736
+  // against 735 distinct — a truthful column and this sum were not both
+  // satisfiable. Ruled one owner per id (F30 → group 4; group 7 cites it unbolded),
+  // §13's four ids moved home from the cohort table under §14, and the column
+  // rewritten from this reader's own count. Still not gated per row, for the
+  // reason above; the figure is here so the next drift is measured against a
+  // reconciled column rather than an unknown one.
   const declared = [...triage.matchAll(/^\|\s*(?:\*\*)?(?:\d+|—)(?:\*\*)?\s*\|[^|]*\|\s*(\d+)\s*\|/gmu)].map(
     (m) => Number(m[1]),
   );
