@@ -552,7 +552,23 @@ const SVG_CAPS = Object.freeze({ colourDepth: 24 as const, unicode: "full" as co
  * labels. A literal is a second source of truth for a colour C10 owns, and
  * nothing can assert a colour it also chose.
  */
-const GROUND: ColourRef = "surface.bgDeep";
+// **The page is a surface `textSurfaces` holds, and that is `surface.bg`**
+// (C10 I34, §4f, F632). It was `surface.bgDeep` — the one surface C10 §4
+// excludes from every contrast floor, on the stated grounds that it carries no
+// text — while this arm wrote every tick, title, legend row, callout, notice
+// and node label onto it. The exclusion names a trigger and nothing watched it.
+//
+// Measured across all three themes before the change: against `bg` every slot
+// clears its floor; against `bgDeep` **light fails twelve times**, `tone.muted`
+// at 2.44 under its own 2.5. The surface moved rather than the check, because
+// widening the check binds `tone`, `categorical` and `syntax` — a callout takes
+// its *series* colour — to a page only this arm paints.
+//
+// **The cost, on dark, stated**: every ratio here falls 5.5% — `muted` 3.02 to
+// 2.85, a node label 12.43 to 11.74 — and 2.85 is `muted`'s own figure against
+// `bg`, which is a floor checked on every load rather than a better one checked
+// never. Light gains 17% and high-contrast 23%.
+const GROUND: ColourRef = "surface.bg";
 const RULE: ColourRef = "surface.border";
 const LABEL: ColourRef = "tone.muted";
 
@@ -566,10 +582,12 @@ const LABEL: ColourRef = "tone.muted";
  * are one region. Measured on the six baselines before the ruling: **1.02 at
  * worst, 1.41 at best**, over 33 labels and both shipped variants.
  *
- * With the halo below, `tone.default` on `surface.bgDeep` measures **12.43** on
- * dark and **9.25** on light against a floor of 4.5. Keeping `tone.muted` and
- * adding only the halo measures 3.02 and **2.44** — the light figure under
- * `muted`'s own floor — which is why the ink is half the ruling.
+ * With the halo below, `tone.default` on the page's ground measures **11.74**
+ * on dark and **10.86** on light against a floor of 4.5. Keeping `tone.muted`
+ * and adding only the halo measures 2.85 and **2.86** — which is why the ink is
+ * half the ruling. (The figures were 12.43 and 9.25, and 3.02 and **2.44**, when
+ * the page was `surface.bgDeep`; the ink's ruling is unchanged and the ground
+ * under it moved to a checked surface — C10 I34, §4f.)
  */
 const NODE_LABEL: ColourRef = "tone.default";
 
@@ -578,9 +596,11 @@ const NODE_LABEL: ColourRef = "tone.default";
  *
  * `sankeyArea` writes a label cell as `{ text: ch }` with no `ref` and no
  * background, so the ribbon glyph is *replaced* where the letter is. An SVG
- * cannot substitute a region, so it paints one: a `bgDeep` stroke under the
+ * cannot substitute a region, so it paints one: a stroke in `GROUND` under the
  * fill, which puts the page's ground behind every glyph whatever it was drawn
- * over. Plotly's `go.Sankey` reaches the same answer from the same constraint —
+ * over. **The page's ground and not a slot of its own** (C10 I34): a halo that
+ * did not move with the page would be a rim rather than a hole. Plotly's
+ * `go.Sankey` reaches the same answer from the same constraint —
  * its `textfont` defaults to `shadow: "auto"`, *minimal shadow and a contrast
  * text colour* — while d3's energy figure does nothing, because a white paper
  * under pale links needs nothing (§3ap.7).

@@ -2104,9 +2104,12 @@ describe("SK11 — the sankey node label reads against what it is drawn on (C12 
     const hexOf = (ref: ColourRef): string =>
       `#${rgbOf(ref, theme).map((v) => v.toString(16).padStart(2, "0")).join("")}`;
     const ink = hexOf("tone.default");
-    const ground = hexOf("surface.bgDeep");
+    // **The page's ground, which is `surface.bg`** (C10 I34, §4f). The halo is
+    // the page showing through the glyph, so it is the page's slot and never
+    // one of its own — a second constant would be a rim, not a hole.
+    const ground = hexOf("surface.bg");
 
-    it.each(VARIANTS)("%s — every node label is tone.default over a bgDeep halo", (variant) => {
+    it.each(VARIANTS)("%s — every node label is tone.default over a page-ground halo", (variant) => {
       const labels = labelsOf(sankeySvg(variant, theme));
       expect(labels.length, `${name}/${variant} names at least one node`).toBeGreaterThan(0);
       for (const l of labels) {

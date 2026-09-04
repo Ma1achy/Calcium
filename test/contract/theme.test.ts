@@ -18,6 +18,8 @@ import {
   textSurfaces,
   type ColourRef,
 } from "../../src/presentation/theme/index.js";
+import { plotToSvg } from "../../src/presentation/plot/svg.js";
+import { CATALOGUE_FORMS } from "../../tools/catalogue-forms.js";
 import { checkSourceScans, SCANS } from "../../tools/enforce/source-scans.mjs";
 import { caps, DEPTHS, store, SURFACES, SYNTAX_SLOTS, TONES } from "../support/theme.js";
 
@@ -40,6 +42,42 @@ const VARIANTS = Object.keys(defaultTheme);
 /** The tokens beside the name, so no row indexes a record and finds `undefined`. */
 const SHIPPED = Object.entries(defaultTheme);
 
+/**
+ * Every hex a theme's palettes carry, with the slot that carries it — so a
+ * colour scraped out of a document can be named and given its floor.
+ *
+ * **Built from the tokens rather than from a list**, for T2.23's reason: a list
+ * here covers what the test already knew about.
+ */
+function slotsByHex(tokens: (typeof SHIPPED)[number][1]): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const [family, palette] of Object.entries(tokens.palettes)) {
+    for (const [slot, hex] of Object.entries(palette.slots)) {
+      if (typeof hex === "string") out.set(hex.toLowerCase(), `${family}.${slot}`);
+    }
+  }
+  return out;
+}
+
+/** The one `<rect>` that covers the page, and the hex it is filled with. */
+function pageFill(svg: string): string | undefined {
+  return /<rect width="100%" height="100%" fill="(#[0-9a-f]{6})"\/>/u.exec(svg)?.[1];
+}
+
+/** Every `fill` an SVG `<text>` element carries, in document order. */
+function textFills(svg: string): readonly string[] {
+  return [...svg.matchAll(/<text[^>]*\sfill="(#[0-9a-f]{6})"/gu)].map((m) => m[1] ?? "");
+}
+
+/** One catalogue spec as a plot block. */
+function plotOf(form: string, variant: string): Parameters<typeof plotToSvg>[0] | undefined {
+  const spec = (CATALOGUE_FORMS as Record<string, Record<string, Record<string, unknown>>>)[form]?.[variant];
+  if (spec === undefined) return undefined;
+  const { cursor, ...rest } = spec;
+  void cursor;
+  return { kind: "plot", id: "t225", ...rest } as Parameters<typeof plotToSvg>[0];
+}
+
 function sourceFiles(dir = "src"): string[] {
   const out: string[] = [];
   for (const name of readdirSync(dir)) {
@@ -51,6 +89,91 @@ function sourceFiles(dir = "src"): string[] {
 }
 
 describe("C10 contract", () => {
+  /**
+   * **T2.27 (C10 I34, §4f.3) — the page a renderer paints is a surface
+   * `textSurfaces` holds.**
+   *
+   * §4's exclusion of `bgDeep` names a trigger — *if a surface ever paints text
+   * on it* — and named no watcher, so the SVG plot arm painted every label on
+   * the one surface no floor is measured against, for as long as it has
+   * existed. This is the watcher, for the one ground that has one.
+   *
+   * **Asserted against `textSurfaces(tokens)` and never against a hex**, so what
+   * fails is *this ground is not a text surface* whatever the theme makes it —
+   * the class rather than the instance. Reverting the page to `surface.bgDeep`
+   * fails this row on every shipped theme (T6.86).
+   */
+  it("T2.27 (I34, §4f): the SVG arm's page is a text surface, and every label on it clears its floor", () => {
+    let checked = 0; // cells-ok — a frame count
+    for (const [variant, tokens] of SHIPPED) {
+      const theme = store(variant).current;
+      const grounds = new Set(textSurfaces(tokens).map(([, hex]) => hex.toLowerCase()));
+      const named = slotsByHex(tokens);
+      for (const [form, variants] of Object.entries(CATALOGUE_FORMS)) {
+        for (const name of Object.keys(variants)) {
+          const block = plotOf(form, name);
+          if (block === undefined) continue;
+          const svg = plotToSvg(block, theme);
+          if (svg === null) continue; // a refusal has no page
+          const page = pageFill(svg);
+          expect(page, `${variant} ${form}/${name} paints a page`).toBeDefined();
+          expect(grounds, `${variant} ${form}/${name}: the page is a surface text lands on`)
+            .toContain((page ?? "").toLowerCase());
+          checked += 1; // cells-ok — a frame count
+          for (const fill of textFills(svg)) {
+            // **The one exclusion, by name and not by silence** (§4f.4): a
+            // treemap or heatmap tile's label is inked in the *page's ground*
+            // over a series fill, so its ratio against the page is 1 by
+            // construction. That pair is `surface × categorical` and no §4
+            // pairing holds it — recorded as owed rather than asserted here.
+            if (fill.toLowerCase() === (page ?? "").toLowerCase()) continue;
+            const slot = named.get(fill.toLowerCase());
+            expect(slot, `${variant} ${form}/${name}: ${fill} is a palette slot and not a literal`).toBeDefined();
+            const floor = floorFor((slot ?? ".").split(".")[1] ?? "");
+            expect(ratio(fill, page ?? "#000000"), `${variant} ${form}/${name}: ${slot ?? fill} on the page`)
+              .toBeGreaterThanOrEqual(floor);
+          }
+        }
+      }
+    }
+    // Derived, so a form or variant leaving the catalogue moves it (F256).
+    const forms = Object.values(CATALOGUE_FORMS).reduce((n, v) => n + Object.keys(v).length, 0);
+    expect(checked, "every drawn frame on every shipped theme").toBeGreaterThan(forms * SHIPPED.length * 0.5);
+  });
+
+  /**
+   * **T2.28 (C10 I34, §4f.2) — four sites, one constant.**
+   *
+   * The page, a sankey label's halo, a tile label's ink and the stroke parting
+   * two adjacent tiles are all *the page showing through*, and a second constant
+   * for any of them is a rim rather than a hole — a difference a byte-compare
+   * golden records faithfully and cannot object to. Asserted as an equality
+   * across the four rather than four comparisons against a literal.
+   */
+  it("T2.28 (I34, §4f): the page, the halo, the tile ink and the separator are one colour", () => {
+    for (const [variant] of SHIPPED) {
+      const theme = store(variant).current;
+      const sankey = plotToSvg(plotOf("sankey", "crowded") ?? plotOf("sankey", "default")!, theme);
+      const treemap = plotToSvg(plotOf("treemap", "default")!, theme);
+      expect(sankey, `${variant}: the sankey draws`).not.toBeNull();
+      expect(treemap, `${variant}: the treemap draws`).not.toBeNull();
+      const page = pageFill(sankey ?? "");
+      expect(pageFill(treemap ?? ""), `${variant}: both figures paint the same page`).toBe(page);
+
+      const halos = [...(sankey ?? "").matchAll(/<text[^>]*\sstroke="(#[0-9a-f]{6})"/gu)].map((m) => m[1]);
+      expect(halos.length, `${variant}: the sankey haloes its node labels`).toBeGreaterThan(0);
+      for (const h of halos) expect(h, `${variant}: a halo is the page`).toBe(page);
+
+      const inks = [...(treemap ?? "").matchAll(/<text[^>]*\sfill="(#[0-9a-f]{6})"/gu)].map((m) => m[1]);
+      expect(inks.length, `${variant}: the treemap names its tiles`).toBeGreaterThan(0);
+      for (const i of inks) expect(i, `${variant}: a tile label is inked in the page`).toBe(page);
+
+      const edges = [...(treemap ?? "").matchAll(/<rect[^>]*\sstroke="(#[0-9a-f]{6})"/gu)].map((m) => m[1]);
+      expect(edges.length, `${variant}: adjacent tiles are parted`).toBeGreaterThan(0);
+      for (const e of edges) expect(e, `${variant}: a separator is the page`).toBe(page);
+    }
+  });
+
   it("T2.1 (I1): a thousand calls return identical styles and touch nothing", () => {
     const current = store().current;
     const first = resolveTone("ok", current, caps(8));

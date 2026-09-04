@@ -14,9 +14,61 @@ import {
   validatePaintedFloors,
 } from "../../src/presentation/theme/index.js";
 import { floorFor } from "../../src/presentation/theme/index.js";
+import { REQUIRED_SLOTS } from "../../src/presentation/theme/contrast.js";
 import { caps, DEPTHS, store, SURFACES, TONES, withTone } from "../support/theme.js";
 
+/**
+ * **T1.34's fixture: §4f.1's table, recomputed.** The twelve light slots that
+ * fail against `bgDeep` — the whole reason the page moved rather than the check.
+ * Held as a set with its figures so the row asserts *which* twelve, not *some*:
+ * element zero is the degenerate one, and an arm collapsing onto it survives a
+ * `.some()`.
+ */
+const LIGHT_FAILS_ON_BGDEEP: readonly (readonly [string, string, number])[] = [
+  ["tone", "muted", 2.44], ["tone", "ok", 4.29], ["tone", "warn", 4.30],
+  ["tone", "info", 4.29], ["tone", "accent", 4.30], ["tone", "identifier", 4.31],
+  ["categorical", "c4", 4.41], ["syntax", "string", 4.29], ["syntax", "comment", 2.89],
+  ["syntax", "number", 4.30], ["syntax", "function", 4.30], ["syntax", "operator", 4.29],
+];
+
 describe("C10 resolution", () => {
+  it("T1.34 (I34, §4f.1): every slot clears its floor on `bg`, and light fails twelve times on `bgDeep`", () => {
+    // **Both halves, because either alone reads as the other's evidence.** The
+    // first is why the page can be `bg`; the second is why widening the check to
+    // `bgDeep` was the arm not taken, and it is a property of the *theme's*
+    // polarity — dark's `bgDeep` recesses away from its tones and light's
+    // recesses toward them, so a surface outside the check is a surface whose
+    // polarity nobody constrained.
+    for (const [name, tokens] of Object.entries(defaultTheme)) {
+      const failed: string[] = [];
+      // **`REQUIRED_SLOTS`' families and not every palette** — `spectrum` is
+      // declared art, `carries: "decoration"`, and lands on no page. Derived
+      // rather than listed, so a fourth family the framework resolves against
+      // enters this row on the day it is added (I30).
+      for (const family of Object.keys(REQUIRED_SLOTS)) {
+        const palette = tokens.palettes[family];
+        if (palette === undefined) continue;
+        for (const [slot, hex] of Object.entries(palette.slots)) {
+          if (typeof hex !== "string") continue;
+          const floor = floorFor(slot);
+          expect(ratio(hex, tokens.surfaces.bg), `${name} ${family}.${slot} on bg`).toBeGreaterThanOrEqual(floor);
+          if (ratio(hex, tokens.surfaces.bgDeep) < floor) failed.push(`${family}.${slot}`);
+        }
+      }
+      // **The set, not its first member.** `dark` and `high-contrast` clear
+      // `bgDeep` too, which is exactly what makes the exclusion look harmless.
+      if (name === "light") {
+        expect(failed.sort()).toEqual(LIGHT_FAILS_ON_BGDEEP.map(([f, s]) => `${f}.${s}`).sort());
+        for (const [family, slot, figure] of LIGHT_FAILS_ON_BGDEEP) {
+          const hex = tokens.palettes[family]?.slots[slot] ?? "";
+          expect(ratio(hex, tokens.surfaces.bgDeep), `light ${family}.${slot} on bgDeep`).toBeCloseTo(figure, 1);
+        }
+      } else {
+        expect(failed, `${name} clears bgDeep too, which is why one theme in three hid this`).toEqual([]);
+      }
+    }
+  });
+
   it("T1.1 (I1): every tone at every depth yields a Style and never throws", () => {
     // Forty cases. Totality is the invariant a renderer depends on without ever
     // stating it: a missing slot mid-frame must not be what takes a session down.

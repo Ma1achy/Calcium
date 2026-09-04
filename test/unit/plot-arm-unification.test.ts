@@ -1171,9 +1171,14 @@ describe("U — the seam, asserted from both arms", () => {
       // **Every element that can carry a series fill, not only `rect`** — a
       // dotplot draws `circle` and a curve draws `path`, and a matcher that sees
       // one encoding reports absence when the value changes form.
+      // **The page rect, off the document rather than by its hex** (C10 I34).
+      // It was `#141414` and is now `surface.bg` — a literal here would have
+      // gone on excluding a colour the arm no longer paints while silently
+      // counting the page as a series.
+      const page = /<rect width="100%" height="100%" fill="(#[0-9a-f]{6})"\/>/u.exec(svg)?.[1];
       const svgFills = new Set([...svg.matchAll(/<(?:rect|circle|path|polygon)[^>]*fill="(#[0-9a-f]{6})"/gu)]
         .map((m) => m[1] ?? "")
-        .filter((f) => f !== "#141414"));
+        .filter((f) => f !== page));
       asked += 1; // cells-ok — a form count
       rows.push(`${form}: terminal ${String(term.size)} · svg ${String(svgFills.size)}`); // cells-ok — a colour count
       expect(svgFills.size, `${form}: the same number of slots on both sides`)

@@ -103,7 +103,10 @@ describe("TC — the SVG arm takes its colour from the theme", () => {
     // *furniture is not a series*, so it is muted, and the rule and the ground
     // are surfaces because they are drawn on the page rather than said about
     // the data.
-    expect(svg, "the ground is a surface").toContain(`fill="${hexOf("surface.bgDeep", DARK_THEME)}"`);
+    // **`surface.bg` and not `surface.bgDeep`** (C10 I34, §4f): the page carries
+    // every label this arm writes, and `bgDeep` is the one surface C10 §4
+    // excludes from every floor. The ref is asserted, not the hex.
+    expect(svg, "the ground is a surface").toContain(`fill="${hexOf("surface.bg", DARK_THEME)}"`);
     expect(svg, "the frame is the border surface").toContain(`stroke="${hexOf("surface.border", DARK_THEME)}"`);
     expect(svg, "the tick labels are muted, not toned").toContain(`fill="${hexOf("tone.muted", DARK_THEME)}"`);
     expect(svg.includes(hexOf("tone.error", DARK_THEME)), "nothing here carries meaning").toBe(false);

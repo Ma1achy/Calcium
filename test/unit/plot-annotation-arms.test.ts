@@ -130,7 +130,10 @@ describe("C12 I109 — every annotation kind crosses to the second arm", () => {
     // would cost, and they did move in the first draft.
     const violin = CATALOGUE_FORMS.violin["default"]!;
     const vs = elements(plotToSvg(block({ kind: "plot", id: "v", ...violin } as never), DARK_THEME) ?? "");
-    // The canvas ground is the same colour and has no `x`; the boxes are placed.
+    // `#141414` is `surface.bgDeep`, which is the violin box's own ink in the
+    // *terminal* figure (F389) and is no longer the page — C10 I34 moved the
+    // page to `surface.bg`. The `x="` filter predates that and still holds:
+    // the page rect is placed by `width="100%"` and carries no `x`.
     const boxes = vs.filter((el) => el.startsWith("<rect") && el.includes('fill="#141414"') && el.includes('x="'));
     expect(boxes.length, "one IQR box per series").toBe(violin.series.length);
     for (const box of boxes) {

@@ -11,6 +11,15 @@
  * `muted` was the case in point: 2.52 on `bg`, 2.31 on `bgElev`. `bgDeep` is
  * excluded because it carries no text; if a surface ever paints text on it, that
  * surface is wrong or the exclusion is.
+ *
+ * **That conditional has fired once and the answer was *the surface*** (C10 I34,
+ * §4f, F632). The SVG plot arm painted its page in `bgDeep` and wrote every
+ * label on it; measured across the three shipped themes, light failed twelve
+ * slots there — `tone.muted` at 2.44 under its own 2.5 — while every one of them
+ * clears against `bg`. The page is `surface.bg` now. **The exclusion is not the
+ * watcher**, and nothing here can be: C10 T2.27 asserts the arm's page is a hex
+ * some member of `textSurfaces` holds, which closes that ground rather than the
+ * class of grounds.
  */
 
 import type { PaletteSpec, ThemeError, ThemeTokens } from "./types.js";
@@ -91,7 +100,15 @@ export function floorFor(slot: string): number {
   return FLOORS[slot] ?? DEFAULT_FLOOR;
 }
 
-/** The two surfaces text lands on. `bgDeep` is not one of them, by decision. */
+/**
+ * The two surfaces text lands on. `bgDeep` is not one of them, by decision.
+ *
+ * **Exported for a second reason since C10 I34**: a renderer that paints its own
+ * page must paint it in a surface this function holds, and C10 T2.27 asserts
+ * that against the returned pairs rather than against a hex literal. So the
+ * failure it catches is *this ground is not a text surface*, whatever the theme
+ * happens to make that ground — the class, not the instance.
+ */
 export function textSurfaces(tokens: ThemeTokens): readonly (readonly [string, string])[] {
   return [
     ["bg", tokens.surfaces.bg],

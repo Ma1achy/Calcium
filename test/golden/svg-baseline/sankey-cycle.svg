@@ -1,17 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
-<rect width="100%" height="100%" fill="#141414"/>
+<rect width="100%" height="100%" fill="#1a1a1a"/>
 <path d="M100.096 48.2 C223.424 48.2 223.424 12.8 346.752 12.8 L346.752 173.12 C223.424 173.12 223.424 208.52 100.096 208.52 Z" fill="#e69f00" fill-opacity="0.5"/>
 <path d="M357.248 119.68 C480.576 119.68 480.576 127.68 603.904 127.68 L603.904 234.56 C480.576 234.56 480.576 226.56 357.248 226.56 Z" fill="#56b4e9" fill-opacity="0.5"/>
 <path d="M100.096 208.52 C223.424 208.52 223.424 234.56 346.752 234.56 L346.752 288 C223.424 288 223.424 261.96 100.096 261.96 Z" fill="#3cbf9a" fill-opacity="0.5"/>
 <path d="M357.248 234.56 C480.576 234.56 480.576 234.56 603.904 234.56 L603.904 288 C480.576 288 480.576 288 357.248 288 Z" fill="#3cbf9a" fill-opacity="0.5"/>
 <path d="M357.248 12.8 C480.576 12.8 480.576 12.8 603.904 12.8 L603.904 119.68 C480.576 119.68 480.576 119.68 357.248 119.68 Z" fill="#56b4e9" fill-opacity="0.5"/>
-<rect x="89.6" y="48.2" width="10.496" height="213.76" fill="#e69f00" stroke="#141414" stroke-width="1"/>
-<text x="106.096" y="159.08" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#141414" stroke-width="3" stroke-linejoin="round" paint-order="stroke">a</text>
-<rect x="346.752" y="12.8" width="10.496" height="213.76" fill="#56b4e9" stroke="#141414" stroke-width="1"/>
-<text x="363.248" y="123.68" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#141414" stroke-width="3" stroke-linejoin="round" paint-order="stroke">b</text>
-<rect x="603.904" y="12.8" width="10.496" height="106.88" fill="#f0e442" stroke="#141414" stroke-width="1"/>
-<text x="597.904" y="70.24" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#141414" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="end">d</text>
-<rect x="603.904" y="127.68" width="10.496" height="160.32" fill="#3cbf9a" stroke="#141414" stroke-width="1"/>
-<text x="597.904" y="211.84" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#141414" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="end">c</text>
+<rect x="89.6" y="48.2" width="10.496" height="213.76" fill="#e69f00" stroke="#1a1a1a" stroke-width="1"/>
+<text x="106.096" y="159.08" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round" paint-order="stroke">a</text>
+<rect x="346.752" y="12.8" width="10.496" height="213.76" fill="#56b4e9" stroke="#1a1a1a" stroke-width="1"/>
+<text x="363.248" y="123.68" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round" paint-order="stroke">b</text>
+<rect x="603.904" y="12.8" width="10.496" height="106.88" fill="#f0e442" stroke="#1a1a1a" stroke-width="1"/>
+<text x="597.904" y="70.24" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="end">d</text>
+<rect x="603.904" y="127.68" width="10.496" height="160.32" fill="#3cbf9a" stroke="#1a1a1a" stroke-width="1"/>
+<text x="597.904" y="211.84" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="end">c</text>
 <text x="89.6" y="300" font-size="12" font-family="monospace" fill="#d4b35a">1 reversed</text>
 </svg>
