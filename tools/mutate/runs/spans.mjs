@@ -12,7 +12,7 @@ import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
 const CMD =
-  "npx vitest run test/unit/spans.test.ts test/contract/spans.test.ts test/edge/spans.test.ts test/revert/spans.test.ts";
+  "npx vitest run test/unit/spans.test.ts test/contract/spans.test.ts test/edge/spans.test.ts test/revert/spans.test.ts test/unit/text.test.ts";
 const RUNS = "src/presentation/runs.ts";
 const PAINT = "src/presentation/blocks/paint.ts";
 const VALIDATE = "src/data/viewmodel/validate.ts";
@@ -157,11 +157,34 @@ const MUTATIONS = [
   },
   {
     // The break-space arm reverted: a full row followed by a space starts the
-    // next row with the space.
-    name: "a space after a full row begins the next row",
+    // next row with the space (F590) and breaks a word early (F591). The old
+    // anchor was `} else if (segment === " ") {` inside the no-break-point
+    // branch; that arm is this one with the search's answer ignored, and the
+    // two were one rule written twice.
+    name: "a space after a full row is not the break",
     file: TEXT,
-    from: '          } else if (segment === " ") {',
-    to: "          } else if (false) {",
+    from: "        if (\n          segment === \" \" &&",
+    to: "        if (\n          false &&",
+    // Run by hand on landing: T1.19, T3.10b2 and C04 T2.36 all fail, the
+    // third because `"aa bb cc dd"` at 5 is two rows plain only with the arm.
+    expect: "T3.10b2",
+  },
+  {
+    // The first guard gone: the arm fires on the second space of a run, so a
+    // row of trailing spaces breaks there and a content space is swallowed.
+    name: "a row already ending in a space still breaks at the next one",
+    file: TEXT,
+    from: '          !line.endsWith(" ") &&',
+    to: "          true &&",
+    expect: "the break space is in no row",
+  },
+  {
+    // The second guard gone: the break lands strictly inside an atom and the
+    // space it drops is content inside a value (F593).
+    name: "a break space inside an atom is still a break",
+    file: TEXT,
+    from: "          atomAround(lineStart + line.length + 1, atoms) === undefined // cells-ok — a code-unit cursor",
+    to: "          true // cells-ok — a code-unit cursor",
     expect: "T1.19",
   },
 ];

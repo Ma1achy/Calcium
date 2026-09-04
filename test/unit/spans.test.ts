@@ -203,18 +203,26 @@ describe("C09 — runs, the arithmetic spans and tokens share", () => {
     expect(runLines(runsOf("a\nb", [{ from: 0, to: 3, value: 1 }]))).toEqual([[{ text: "a", value: 1 }], [{ text: "b", value: 1 }]]);
     expect(runsOf("ab", [{ from: 0, to: 1 }]), "a span with no member is a plain run — the painter coalesces it with its neighbour").toEqual([{ text: "a" }, { text: "b" }]);
 
-    // The wrapper: a space inside an atom is not a break point.
-    expect(wrapCellsParts("aa bb cc dd", 5)).toEqual([{ text: "aa", start: 0 }, { text: "bb", start: 3 }, { text: "cc dd", start: 6 }]);
+    // The wrapper: a space inside an atom is not a break point. Plain, the row
+    // is exactly full when the space arrives and the space is the break, so
+    // `aa bb` holds (F591; measured before the arm: `aa` / `bb` / `cc dd`).
+    expect(wrapCellsParts("aa bb cc dd", 5)).toEqual([{ text: "aa bb", start: 0 }, { text: "cc dd", start: 6 }]);
     expect(wrapCellsParts("aa bb cc dd", 5, "narrow", [{ from: 3, to: 8 }])).toEqual([{ text: "aa", start: 0 }, { text: "bb cc", start: 3 }, { text: "dd", start: 9 }]);
     // No break point outside the atom: it moves whole when something precedes it.
     expect(wrapCellsParts("x(abcde)yz", 6)).toEqual([{ text: "x(abcd", start: 0 }, { text: "e)yz", start: 6 }]);
     expect(wrapCellsParts("x(abcde)yz", 6, "narrow", [{ from: 2, to: 7 }])).toEqual([{ text: "x(", start: 0 }, { text: "abcde)", start: 2 }, { text: "yz", start: 8 }]);
     // An atom wider than a row is broken as text is — the plain answer.
     expect(wrapCellsParts("ab abcdefghij cd", 6, "narrow", [{ from: 3, to: 13 }])).toEqual(wrapCellsParts("ab abcdefghij cd", 6));
-    // A full row with no break point followed by a space: the space is the
-    // break and begins no row. Measured before the arm existed: `" gh"`.
+    // A full row followed by a space: the space is the break and begins no
+    // row, whether or not the row has an earlier break point. Measured before
+    // the arm existed: `" gh"` (F590) and `aa` / `bb` / `cc dd` (F591).
     expect(wrapCellsParts("abcdef gh", 6)).toEqual([{ text: "abcdef", start: 0 }, { text: "gh", start: 7 }]);
     expect(wrapCellsParts("aa bb cc dd", 5, "narrow", [{ from: 3, to: 8 }]).map((r) => r.text)).not.toContain(" dd");
+    // …unless the break would fall strictly inside an atom, which is no break
+    // (C04 I90): an atom too wide for a row is cut at a cluster boundary and
+    // drops nothing. Measured before the guard: `aaa bbb` / `ccc`, a content
+    // space swallowed inside a value (F593).
+    expect(wrapCellsParts("aaa bbb ccc", 7, "narrow", [{ from: 0, to: 11 }])).toEqual([{ text: "aaa bbb", start: 0 }, { text: " ccc", start: 7 }]);
 
     // `wrapRuns` derives the atoms from `value` alone.
     expect(wrapRuns(runsOf("x(abcde)yz", [{ from: 2, to: 7, bold: true }]), 6).map((r) => runsText(r))).toEqual(["x(abcd", "e)yz"]);

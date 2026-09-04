@@ -14,6 +14,7 @@ import {
   stripControl,
   truncate,
   wrapCells,
+  wrapCellsParts,
 } from "../../src/presentation/text.js";
 import { SGR_RESET } from "../../src/terminal/escapes.js";
 
@@ -137,6 +138,62 @@ describe("wrapCells (§3)", () => {
         expect(cells(line), `"${line}" at width ${width}`).toBeLessThanOrEqual(width);
       }
     }
+  });
+
+  it("T3.10b2 (C04 I86, §5): no row could have taken the first word of the next row", () => {
+    // The general property F591 is one instance of, swept rather than pinned:
+    // a row breaking one word early is invisible to a per-row width assertion,
+    // because a short row fits. Measured before the arm: 161 violating joins
+    // over 102 of these 560 (string, width) pairs — the wrapper broke early at
+    // every width where a row filled exactly and a space followed. After: 0.
+    const corpus = [
+      "aa bb cc dd",
+      "abcdef gh",
+      "abc   def",
+      "ab  cd",
+      "the quick brown fox jumps over the lazy dog",
+      "a bb ccc dddd eeeee ffffff",
+      "one two three four five six seven eight nine ten",
+      "Calcium is a framework for building terminal user interfaces over JSON emitting CLIs",
+      "x y z aa bbb cccc ddddd",
+      "日本 語です テスト します",
+      "an unbrokenwordthatisverylong indeed here",
+      "i i i i i i i i i i i i i i i i i i i i",
+      "tip: run make enforce before opening an MR, it is five seconds",
+      "no such container: calcium-dev-probe-0001 (try docker ps -a)",
+    ];
+
+    const early: string[] = [];
+    for (const text of corpus) {
+      const ascii = !/[^ -~]/u.test(text);
+      for (let width = 1; width <= 40; width += 1) {
+        const rows = wrapCellsParts(text, width);
+        // The two guards the arm must not move, over the same 560 pairs: no
+        // row overflows, and every row is an exact slice from its `start`
+        // (C04 I86) — asserted on the ASCII members, since a cluster too wide
+        // for the row is substituted and a substituted row is not a slice.
+        for (const row of rows) {
+          expect(cells(row.text), `"${row.text}" at ${width}`).toBeLessThanOrEqual(width);
+          if (ascii) expect(text.slice(row.start, row.start + row.text.length)).toBe(row.text); // cells-ok — a code-unit slice
+        }
+        for (let i = 0; i + 1 < rows.length; i += 1) {
+          const row = rows[i]!;
+          const next = rows[i + 1]!;
+          // Only where the join is legitimate: the two rows are separated by
+          // exactly one source space, the next row does not open with content
+          // whitespace, and its first word is whole rather than the head of a
+          // token the wrapper had to cut mid-cluster.
+          if (text.slice(row.start + row.text.length, next.start) !== " ") continue; // cells-ok — a code-unit slice
+          const word = next.text.split(" ")[0]!;
+          if (word === "" || next.text.startsWith(" ")) continue;
+          const after = next.start + word.length; // cells-ok — a code-unit cursor
+          if (after < text.length && text[after] !== " ") continue; // cells-ok — a code-unit index
+          if (cells(`${row.text} ${word}`) <= width) early.push(`w=${width} "${row.text}" + "${word}" of "${text}"`);
+        }
+      }
+    }
+
+    expect(early).toEqual([]);
   });
 
   it("T3.10c: an unbroken token breaks mid-word rather than overflowing", () => {

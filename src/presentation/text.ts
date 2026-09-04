@@ -658,6 +658,31 @@ export function wrapCellsParts(
       const w = clusterCells(segment, ambiguous);
 
       if (used + w > limit && line !== "") {
+        // A row that fills exactly and is followed by a space breaks at that
+        // space, whether or not it has an earlier break point (C09 §5). The
+        // overflow check fires on the space, so `used === limit` here; taking
+        // the search's answer instead moved the last word down off a row it
+        // fitted (`"aa bb cc dd"` at 5 gave `aa` / `bb` / `cc dd`, F591), and
+        // taking no break at all began the next row with the space (F590).
+        // Two guards. A row already ending in a space is at its second space
+        // or later, where the break was the first one and the surplus is the
+        // next row's content — three spaces in `"abc   def"` at 5 keep the
+        // pinned `" def"`. And a break strictly inside an atom is no break
+        // (C04 I90), which is `breakPoint`'s own test at this position: an
+        // unfittable atom is cut at a cluster boundary, and a cluster-boundary
+        // cut drops nothing (F593).
+        if (
+          segment === " " &&
+          !line.endsWith(" ") &&
+          atomAround(lineStart + line.length + 1, atoms) === undefined // cells-ok — a code-unit cursor
+        ) {
+          out.push({ text: line, start: lineStart });
+          lineStart += line.length + 1; // cells-ok — a code-unit cursor, past the space
+          line = "";
+          used = 0;
+          continue;
+        }
+
         const at = breakPoint(line, lineStart, atoms);
         if (at === null) {
           // No break point outside an atom. If the cluster about to be placed
@@ -677,16 +702,6 @@ export function wrapCellsParts(
             if (before !== "") out.push({ text: before, start: lineStart });
             lineStart = atom.from;
             line = line.slice(cut);
-          } else if (segment === " ") {
-            // A full row with no break point, and the next cluster is a space:
-            // the space *is* the break, and a break space is in no row (§5).
-            // Without this arm it began the next row, which a reader sees as
-            // an indent nobody asked for — measured at `"abcdef gh"` at 6.
-            out.push({ text: line, start: lineStart });
-            lineStart += line.length + 1; // cells-ok — a code-unit cursor, past the space
-            line = "";
-            used = 0;
-            continue;
           } else {
             out.push({ text: line, start: lineStart });
             lineStart += line.length; // cells-ok — a code-unit cursor
