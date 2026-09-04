@@ -27,7 +27,7 @@
  * run of changed lines — and never from arbitrary line offsets.
  */
 import type { Hunk, Patch } from "../../data/viewmodel/index.js";
-import { block } from "../../data/viewmodel/index.js";
+import { block, changedRuns } from "../../data/viewmodel/index.js";
 import { isCollapsed, layoutFor, pairedRows, patchHeight, type Layout } from "./height.js";
 import { numberWidth } from "./layout.js";
 
@@ -42,6 +42,31 @@ import { numberWidth } from "./layout.js";
  */
 type Unit = Readonly<{ lineFrom: number; lineTo: number; rows: number }>;
 
+/**
+ * The units of one hunk — **grouped by `changedRuns` and not by a walk of this
+ * file's own** (C25 I19b).
+ *
+ * The grouping is one implementation, `changedRuns` in
+ * `src/data/viewmodel/intraline.ts`, and it now has three readers: the renderer
+ * (`definition.ts`), the intra-line diff (`intralineLines`) and this. A fourth
+ * copy is therefore a visible change rather than a silent one — which is the
+ * point, because two walks of the same rule drift into a window whose row range
+ * disagrees with the rows the renderer draws, and that disagreement is only
+ * visible in a frame.
+ *
+ * **What this adds over `changedRuns` is indices, and it holds them itself.**
+ * A `ChangedRun` carries its two sides and no positions, and a context entry is
+ * a bare `Line` — so honest indices on *every* entry would mean wrapping the
+ * context line in a record, a change to the union's shape that both existing
+ * callers would carry and neither would read. The cursor below is exact instead:
+ * a run is a maximal *contiguous* stretch of non-context lines, so it spans
+ * `removes.length + adds.length` of them. Their **count** and not their order —
+ * `-a +b -c +d` is one run whose two sides interleave in the document, and
+ * `changedRuns` does not preserve that order within a run.
+ *
+ * `rows` still comes from `pairedRows`, so the row arithmetic stays the one
+ * `height.ts` owns and a unit cannot disagree with `measure` about its height.
+ */
 function unitsOf(hunk: Hunk, layout: Layout): readonly Unit[] {
   const lines = hunk.lines;
   if (layout === "unified") {
@@ -49,21 +74,16 @@ function unitsOf(hunk: Hunk, layout: Layout): readonly Unit[] {
   }
 
   const units: Unit[] = [];
-  let runFrom = -1;
-  for (let i = 0; i < lines.length; i += 1) {  // cells-ok — a line count, not a width
-    const isContext = lines[i]?.kind === "context";
-    if (isContext) {
-      if (runFrom >= 0) {
-        units.push({ lineFrom: runFrom, lineTo: i, rows: pairedRows(lines.slice(runFrom, i)) });
-        runFrom = -1;
-      }
-      units.push({ lineFrom: i, lineTo: i + 1, rows: 1 });
+  let at = 0;
+  for (const group of changedRuns(lines)) {
+    if ("kind" in group) {
+      units.push({ lineFrom: at, lineTo: at + 1, rows: 1 });
+      at += 1;
       continue;
     }
-    if (runFrom < 0) runFrom = i;
-  }
-  if (runFrom >= 0) {
-    units.push({ lineFrom: runFrom, lineTo: lines.length, rows: pairedRows(lines.slice(runFrom)) });  // cells-ok — a line count, not a width
+    const to = at + group.removes.length + group.adds.length;  // cells-ok — line counts, not widths
+    units.push({ lineFrom: at, lineTo: to, rows: pairedRows(lines.slice(at, to)) });
+    at = to;
   }
   return units;
 }
