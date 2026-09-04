@@ -577,6 +577,7 @@ The suite governs the source. **SP1 governs the documents the source is written 
 | SP7 | A test row's number is unique within its spec; `Tn.x` placeholders exempt | `docs/components/` | A03 §2 · A03 §7a |
 | SP8 | Every `§` reference resolves against the document that owns it — **reported, not gated** | `src/`, `test/`, `tools/`, `docs/` outside `notes/` | A02 §1 · A03 §7a |
 | SP9 | Every invariant is named by at least one test row; the uncited are an exemption list compared **by equality** | `docs/components/` against `test/**/*.ts` | A03 §7a · FINDINGS |
+| SP10 | A mnemonic test-row label — `SK10`, `HZ4` — is unique **within one document**; reuse across specs is legitimate and not gated | `docs/components/` | A03 §2 · A03 §7a |
 
 They run in `make enforce` and their fire-tests are `test/unit/enforce-commitments.test.ts`.
 
@@ -606,6 +607,38 @@ strength.** A spec under construction writes `T3.x` for a row whose number is no
 C26 §8b carries seven — and a placeholder is not a claim about a row, so `x` rows are excluded
 before the comparison. The cost is real: two rows that both stay `T3.x` are two this rule will
 never separate, and only their landing numbers close that.
+
+**SP10 is SP7 for the rows a spec names by mnemonic, and it is the definition side of a rule
+that was already exact in the other direction** (F635). A tier does not have to number its rows:
+C12 §9 names them `SK` for sankey, `HZ` for horizon, `PR` for projection, and **183 rows across
+three specs are declared that way** — none of which SP7 can see, because `T\d+\.` is the whole of
+what it matches.
+
+The measured instance is C12's. Two rows both called `SK10` sat in §9 and `make enforce` reported
+*338 files · 26 specs · 15 728 invariant references resolved · no violations* with both in the
+file; it was caught by reading a grep. A fail-on-revert row saying *`T6.87` → `SK10` fails* then
+resolves against whichever row a reader meets first and **neither reading is wrong** — §2's failure
+arriving at the citation rather than at the rule, which is SP7's own argument. SP3 catches a bare
+`I112` in a run file and SP5 catches an `Fnn` that resolves to nothing: both prove a *citation* has
+a target, and nothing proved the target was one target.
+
+**Its blind spot is the scope, and the scope is a ruling rather than a limitation.** `IF8` is
+declared in C09 §9 and again in C22 §9, about two different things, and both are correct: a
+mnemonic is a two- or three-letter mark that means something inside the component that draws it, so
+`SK` in C12 and `SK` in another spec are different subjects. A corpus-wide comparison would gate
+legitimate reuse and be switched off, which is §2's lesson about every rule in this list. The cost
+is named: a citation writing `SK10` with no spec in front of it is ambiguous *across* documents and
+this rule cannot say so — the qualified-reference habit SP3 enforces is what closes that, and only
+for invariants.
+
+**A second blind spot: it matches a shape, not a section.** Any bolded, dashed list item whose
+label is two-or-more capitals followed by digits is read as a declaration wherever it sits.
+Measured 2026-09-04, all 183 matches in `docs/components/` are test rows and all 183 sit inside a
+Tests section, so the shape is exact today and stops being so the day a spec writes a glossary in
+that form. **And there is no placeholder arm**: SP7 exempts `Tn.x` because a spec under
+construction writes one, the mnemonic families have no such convention, and the corpus carries zero
+such rows — an exemption here would be a clause with nothing to be wrong about, which is §2's
+vacuity class installed inside the rule against it.
 
 **SP2 is a check that existed as a habit rather than a mechanism**, which is the same class as SS3 (§2) approached from the other side: not a rule written down and never built, but a rule performed reliably and never written down. Ordering was verified by ad-hoc script while the specs were written and caught every time. When the habit stopped, the drift resumed — twenty of twenty-five specs, C04 declaring `…17, 22, 23, 24, 25, 26, 27, 28, 19, 29, 18, 20, 20a, 33, 32, 31, 30, 21` — and nothing went red, because nothing was missing and no citation dangled. The list had simply stopped locating anything.
 

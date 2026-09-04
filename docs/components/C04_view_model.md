@@ -88,7 +88,11 @@ type Block =
 /** Every block may declare one blank row before it (§3a). */
 type Gap      = Readonly<{ gapBefore?: boolean }>;
 
-type Rule     = Readonly<{ kind: "rule"; id: string; label: string; meta?: string }> & Gap;
+/** The three forms a rule draws, and there are three because a terminal tells three apart (§3an, I94). */
+type HeadingLevel = 1 | 2 | 3;
+type Rule     = Readonly<{ kind: "rule"; id: string; label: string;
+                           level?: HeadingLevel;    // absent is 2 — the form every rule already drew (I94)
+                           meta?: string }> & Gap;
 type Notice   = Readonly<{ kind: "notice"; id: string; tone: Tone; glyph?: Glyph; text: string }> & Gap;
 type KeyValue = Readonly<{ kind: "keyValue"; id: string;
                            rows: readonly Readonly<{ label: string; value: string; tone?: Tone }>[] }> & Gap;
@@ -556,6 +560,7 @@ type Glyph =
   | "ok" | "warn" | "error" | "info"
   | "pending" | "working" | "running" | "queued" | "cancelled"
   | "expand" | "collapse" | "live" | "bullet"
+  | "quote" | "nested"      // §3an — a rail, and the mark past the depth cap
   | "continuation";
 ```
 
@@ -2324,6 +2329,143 @@ valued span would otherwise straddle a row. A `value` on a span wider than the r
 text is.
 
 
+## 3an. The markdown subset's last three residues — three tiers, a rail, and a bounded depth
+
+Roadmap 11 named four residues, closed two, and left three that are one sentence three
+times: **the vocabulary had no way to say it.** A heading's level, a quote's gutter and a
+list item's depth are three facts the source carries and the document could not. Each
+closes with one member, and each member's drawn form is ruled here with the frames in
+front of it — because a member the renderer accepts and draws identically is F207's shape
+one layer along, and a `level` nothing draws differently is exactly that.
+
+### The heading is three tiers, because a terminal tells three apart
+
+`Rule` draws one figure and six ATX levels collapsed onto it. Measured at 80 and 40, in
+both alphabets, the forms that survive one bit and no colour:
+
+| tier | unicode | ascii |
+|---|---|---|
+| 1 | `━━ Interface ━━━━━━…` | `== Interface ======…` |
+| 2 | `── Interface ──────…` | `-- Interface ------…` |
+| 3 | `── Interface`, blank to the width | `-- Interface` |
+
+**One axis with three values — the fill — and nothing else moves.** The lead stays two
+cells and the label stays in the column every other block starts at, so the tiers differ
+where the eye is already scanning; `measure` is one row at every tier, so C09 I1 is
+untouched and no geometry is at stake. Weight then presence, because both are pairs the
+tree already holds: `heavyHorizontal` is `━`/`=` and blank is a pair by construction.
+
+**Case is not an axis and neither is indentation.** Upper-casing a label changes its cell
+count for scripts that have no case, which puts a capability decision inside a transform
+that cannot see one; indenting a heading moves the label off the column a rule exists to
+mark.
+
+**So the type says three and not six.** `level: 4` would be accepted and drawn as
+something else, and `HeadingLevel = 1 | 2 | 3` makes it fail to compile instead. **The
+collapse moves to the translator and is stated there**: `#` → 1, `##` → 2, `###`
+through `######` → 3. Four levels onto one form, written down, against six onto one in
+silence.
+
+**Absent is 2**, which is the form every rule in the tree draws today — so the member is
+additive and no existing frame moves.
+
+### The quote gets a rail, and a rail is not a glyph on the first row
+
+`prefixCells` reserves a gutter and `glyphLead` fills it **on the first row only** — the
+hanging indent every notice wants, and the wrong shape for a quotation. Read the frame and
+a three-line quote carrying an ordinary glyph draws its mark once and its remaining rows
+under a blank; that is a bullet, not a gutter.
+
+So `quote` is a **rail**: the same reserved columns, drawn on **every** row. The geometry
+does not move at all — `prefixCells` already subtracts the gutter from every row's width —
+and the only thing that changes is what fills rows 1..n. It is a property of the token, as
+the `continuation` indent is, so the block schema learns nothing and `measure` still needs
+no capability.
+
+**Not `live`'s `▌`, for two reasons and the second is the one that would have been
+missed.** F161 is the argument against reusing a mark on a consumer count; the measurement
+is the argument against the character. `▌` is `East_Asian_Width=Ambiguous` and so is every
+box-drawing vertical — `│ ┃ ▎ ▏ ┆ ┊ ╎` all measure 1 narrow and 2 wide by the framework's
+own `cells()` — while `⎸` (U+23B8) measures **1 under both conventions**. That is
+`continuation`'s ruling reached a second time, and the first time it has been the *reason*
+for a choice rather than a note beside one. The ASCII half is `>`, which is the plain-text
+quotation mark everywhere plain text has one — degradation preserving meaning, as
+`tree(1)`'s backtick did for `continuation`.
+
+**The rail takes the block's tone**, which for a quote is `muted`. A second tone on the
+gutter would be a colour distinction, and colour is gone at 1-bit where the rail is not.
+
+**And a blockquote's body is prose — out by name, with a reason from the vocabulary.** A
+quoted heading renders as the characters `# Heading`, and a quoted list item as `- a`,
+because the quote is one `notice` and one notice has one `glyph`. Re-parsing the body
+would want a rail on a `rule`, a `code` and a `table`, and none of the three has a slot
+to put one in. So this is not a deferral waiting on effort; it is unexpressible in the
+block vocabulary, and saying so is what stops it being rediscovered.
+
+### The depth cap stays, and the reason it was given was the weaker one
+
+The recorded reason was *an unbounded indent is a paragraph nobody can read at 60
+columns*. Measured at 40 columns with the cap removed, it is worse than unreadable — the
+indent **disappears**:
+
+```
+depth 12   |•                         depth 12 item text that is long enough to wrap|
+depth 18   |• |
+           |  depth 18 item text that is long enough|
+depth 25   |• |
+           |              depth 25 item text that is|
+```
+
+The indent lives in the item's text, so the wrapper treats it as a break: past about
+depth 15 at width 40 the leading spaces are consumed, the first row is the mark alone,
+and the item reads as depth 0 having spent a row saying nothing. **A wide indent was the
+worry and a lost one is the outcome.** The cap stays, and it stays on the measurement
+rather than on the sentence.
+
+**A width-scaled cap is not available at this layer**, which is worth stating because it
+is the first thing a reader proposes: the indent is computed in `data/`, where no width
+exists and none may be read (A02 Seam 4). Constant or nothing.
+
+**What the cap cost was a document that means two things**, and that is what `nested`
+closes. Four tiers are drawn — indents 0, 2, 4, 6 for depths 0 through 3 — and every
+item deeper takes the same indent. The mark says which side of the bound the item is on:
+`bullet` up to the cap, `nested` past it. Beyond it the frame says *at least this deep*,
+which is exactly what a bounded region says and no more — `⋯` does not report how many
+characters it dropped either (I49's shape, one axis over). `⁃` (U+2043) is Neutral, one
+cell under both conventions, measured beside `◦`, `‣` and `▪`, which are all Ambiguous;
+the ASCII half is `~`, the mark C04 §5 already gives a bounded region, and not `-`, which
+is `bullet`'s and would take the distinction away at exactly the rung that needs it.
+
+**An ordered item takes the mark too.** Its number says *which* item and never *how deep*,
+so depth 3 and depth 4 would otherwise be one frame on the arm that has no glyph at all.
+
+### §3an walk — a classification table, because none of this is event-mediated
+
+A heading's tier, a quote's gutter and an item's depth all hold **at rest**: there is no
+sequence that produces any of them, so a trace has no row for one however long it runs.
+The artefact is a table, indexed by the cells where **two** rules could both claim the
+answer.
+
+| # | the cell | the two rules | the ruling |
+|---|---|---|---|
+| 1 | `###### h` | *six ATX levels* × *three drawn forms* | mapped to tier 3 at the translator and stated there; the type cannot hold a fourth |
+| 2 | `# ` — a tier-1 heading with an empty label | I21 *an empty label draws an unbroken line* × *the tier chooses the fill* | the unbroken line is drawn in the tier's own weight: heavy at 1, light at 2 |
+| 3 | `### ` — an empty label at tier 3 | I21 × *tier 3's fill is blank* | the light unbroken line. A blank fill with no label to set apart is not a rule at all, so tier 3 falls back to tier 2's fill exactly when the label is empty |
+| 4 | `### h` carrying `meta` | *the row is exactly the width* × *tier 3 draws no rule* | the fill is drawn **as spaces** rather than dropped, so `meta` stays right-aligned and the row is the width at every tier |
+| 5 | `> # Heading` | *a quote is one notice* × *a heading is a rule* | the body is prose. One notice has one glyph, and `rule` has no slot for a rail |
+| 6 | `> - a` | *the quote's rail* × *the bullet's mark* | the same cell and the same ruling: the rail wins because it is the only slot, and the `-` is text |
+| 7 | a quote of three rows | *a glyph draws on the first row* × *a gutter is a rail* | `quote` is a rail token — every row, in the columns already reserved. Nothing in `measure` moves |
+| 8 | a quote at tone `error` | I6 *`error` and `warn` oblige a glyph* × *the rail is that glyph* | accepted: the slot is filled, and a quotation of an error is a document a producer may mean. Markdown never builds one — its quotes are `muted` |
+| 9 | depth 3 against depth 4 | *the cap clamps the indent* × *one frame is one document* | the mark differs: `bullet` at the cap, `nested` past it |
+| 10 | depth 4 against depth 5 | *the mark says past the cap* × *two documents, one frame* | one frame, and that is what bounded means rather than a defect left over |
+| 11 | `1. ` past the cap | *ordered items carry no glyph* × *the cap must be marked* | the ordered arm takes `nested` too; the number is not a depth |
+| 12 | a deep item inside a quote | cell 6 × cell 9 | cell 6 wins — a quoted list is prose, so no depth is computed for it at all |
+| 13 | `nested` at `unicode: "ascii"` | *1:1 by cell count* × *the distinction must survive the flat alphabet* | `~`, the framework's own bounded-region mark, and not `-` |
+| 14 | `quote` at `ambiguousWidth: "wide"` | *`glyphs()` discards the Unicode set when ambiguous is wide* × *`GLYPH_TABLE` follows `unicode` alone* | a Neutral character, measured: `⎸` is one cell under both conventions where every vertical rule is two under one of them |
+
+Cells 3, 4, 7 and 11 are the four that no assertion about a single rule reaches, and cell 7
+is the one the frame found: every count agreed with a quote drawing its mark once.
+
 ## 4. Patches
 
 **Four ops carry data and two carry view state, and that split is the whole reason the fifth and sixth exist.** `append`, `replace`, `merge` and `status` all say *something arrived or changed on the far side*. `expand` says *the reader opened a row*. C13 gates the first four on an entry still streaming (C13 §6) — a settled stream can receive nothing more — and the gate is wrong for the second kind: expansion is exactly what a reader does to a **finished** table.
@@ -2652,6 +2794,10 @@ persisted document rests on.
 - **I91** — **`Hunk.lines[].spans` carries attributes only, and its writer is the builder's intra-line diff over a paired remove/add run.** `tone` and `value` are refused on a hunk line at the gate: the gutter's and the syntax's are the two palettes a row has (C25 §3). The diff runs once, at construction, never at render — C25 I7 keeps the renderer pure over the block — and emits `underline` on the changed words of both sides (C25 I10). A `context` line carries none (→ C25 I10).
 - **I92** — **`GraphEdge.weight` is a flow: required on every edge of `form: "sankey"`, refused on `form: "graph"`, positive and finite.** `sankey` takes `graph` on `graph`'s own rule — required, `hierarchy` refused beside it — and shares its layering (C12 §3d, `graphLayers`); a zero or negative weight is refused because a ribbon of no width is an edge that is not there, and an ignored weight on `graph` is I77's accepted-and-ignored (→ C12 §3d).
 - **I93** — **`Image.data` carries PNG or GIF bytes and the codec tells them apart by signature; a GIF's frames are its own, and the frame shown is view state, never geometry.** `height` is declared, so every frame shares the logical screen and `measure` is the same number for a still and an animation. The frame index advances on the shell's animation wake and is read by the renderer through view state — `Cameras`' shape with `ScrollOffsets`' zero rule, frame 0 after a loop keying as untouched (C22 I77); at `imageProtocol: "kitty"` the terminal animates from one transmission and the shell holds no frame (C09 I39) (→ C09, §3g).
+- **I94** — **`Rule.level` names one of three drawn forms, absent is the second, and the six ATX levels collapse at the translator rather than in the type.** The axis is the **fill** and nothing else: heavy at tier 1, light at 2, blank at 3, with the lead at two cells and the label in the same column throughout — so `measure` is one row at every tier and no geometry is at stake. Case is not an axis, because upper-casing changes cell count for scripts that have no case and puts a capability decision inside a transform that cannot see one; indentation is not one either, because it moves the label off the column the rule exists to mark. **`HeadingLevel = 1 | 2 | 3` rather than `1..6`**: a fourth tier would be accepted and drawn as a third, which is F207's member one layer up from where that finding usually lives, and the type is where it is cheapest to refuse. **An empty label never takes the blank fill** — tier 3 falls back to tier 2's light rule there, because a rule with no label and no line is not a rule (I21) — and the fill is drawn as **spaces** rather than dropped, so `meta` stays right-aligned and the row is exactly the width at every tier (→ C09 I40, §3an).
+- **I95** — **`Glyph.quote` is a rail — drawn on every row of its block rather than on the first — and a blockquote's body is prose.** The reserved columns are `prefixCells`' own, so the geometry does not move and `measure` still needs no capability; only what fills rows 1..n changes, which is a property of the **token** exactly as `continuation`'s indent is, and the block schema learns nothing. **Not `live`'s `▌`**, on F161's argument about a shared mark and on a second the argument does not reach: `▌` and every box-drawing vertical are `East_Asian_Width=Ambiguous` — 1 narrow, 2 wide by the framework's own `cells()` — where `⎸` (U+23B8) is one cell under both, which is `continuation`'s measurement reaching a decision rather than a footnote. The ASCII half is `>`, plain text's own quotation mark. **The rail takes the block's tone**, since a second tone would be a colour distinction and colour is gone at 1-bit where the rail is not. **A quoted heading and a quoted list item are text**, and that is unexpressible rather than deferred: re-parsing a body would want a rail on a `rule`, a `code` and a `table`, and none of the three has a slot to hold one (→ C09 I41, §3an).
+- **I96** — **The list indent is bounded at three levels and `Glyph.nested` says which side of the bound an item is on.** The bound stays on a measurement rather than on its first reason: with the cap removed, at width 40 an item past about depth 15 loses its indent entirely — the leading spaces are the wrapper's break, the first row is the mark alone, and a deep item reads as depth 0 having spent a row saying nothing. A width-scaled cap is not available, because the indent is computed where no width exists and none may be read. **What the cap cost is a document that means two things**, so depth 0–3 take `bullet` and everything deeper takes `nested`; past it the frame says *at least this deep* and no more, which is what a bounded region says — a residue marker does not report how many characters it dropped either (I49). **The ordered arm takes the mark too**, because a number says which item and never how deep. `⁃` (U+2043) is Neutral where `◦`, `‣` and `▪` are Ambiguous; the ASCII half is `~`, §5's own bounded-region mark, and not `-`, which is `bullet`'s and would spend the distinction at the rung that needs it (→ C09 I41, §3an).
+
 
 ## 7. Commitments
 
@@ -2746,6 +2892,9 @@ persisted document rests on.
 86. **A hunk line's spans are written once by the builder and carry attributes only** (I91). The renderer stays pure over the block; the line's two palettes are not a third.
 87. **A weighted edge is a sankey's and only a sankey's** (I92). Required there, refused on `graph`, and positive — the type is one member and the gate is where the two forms differ.
 88. **An image's carrier takes a GIF, and the frame is view state** (I93). The signature decides the codec; the declared height keeps every frame the same geometry.
+89. **A heading is three tiers and the type carries three** (I94). Six ATX levels had one form and the fix is a member, but a member the renderer draws identically is the defect it was meant to close — so the fill is the axis, the forms were chosen against frames at 80 and 40 in both alphabets, and the collapse of `###` through `######` moves to the translator where it can be read (→ C09 I40).
+90. **A quote's gutter is a rail rather than a mark, and the character was measured rather than reached for** (I95). A glyph draws on the first row and a quotation needs every row, which no count of assertions would have said and one frame did; `▌` was the obvious character and is two cells on a terminal that draws ambiguous wide, where `⎸` is one under both. And a quoted heading is text, because one notice has one glyph and three of the kinds a body could hold have none (→ C09 I41).
+91. **The depth cap keeps its place on a measurement, and the clamp is marked** (I96). The recorded reason was that an unbounded indent is unreadable; measured, it is not wide but *absent*, because the wrapper eats a long run of leading spaces. The cap therefore stays, and the frame at it stops meaning two things: `nested` past the bound says *at least this deep*, which is all a bounded region ever says (→ C09 I41).
 
 ---
 
@@ -2816,6 +2965,9 @@ The generic suite. **These run against every registered block kind, including ap
 - **T2.37** (I91): `b.patch` over a hunk whose remove and add lines differ in one word emits `underline` spans on that word on both lines and none on the context line; the same hunk supplied as a document round-trips through `validateDocument` with its spans, and a `tone` on one of them is refused.
 - **T2.38** (I92): a `sankey` document whose edges all carry positive weights validates; one edge with no weight, a zero weight, and a weight on `form: "graph"` are each one error naming the edge's index; `sankey` without `graph` and `sankey` with both `graph` and `hierarchy` are refused on `graph`'s rule.
 - **T2.39** (I93): a GIF's bytes in `Image.data` decode to their frames and delays by signature; `measure` of a two-frame image equals `measure` of its first frame as a still, at every width.
+- **T2.106** (I94, → C09 I40): the six ATX levels reach tiers 1, 2, 3, 3, 3, 3; the three tiers draw three distinct fills at 80 and at 40 in both alphabets while the lead and the label column are the same in all three; `level: 4` is one gate error; a rule with no `level` draws byte-for-byte what it drew before; an empty label at tier 3 draws the light unbroken line and at tier 1 the heavy one; a tier-3 rule carrying `meta` is exactly the width with the meta at its right edge; and `measure` is 1 at every tier and every width.
+- **T2.107** (I95, → C09 I41): a three-row blockquote draws the rail on **every** row and the same notice with an ordinary glyph draws it on the first only; the rail's columns are the ones `measure` reserved, so the row count is identical with the glyph and without it; `⎸` and `>` are one cell each and `cells("⎸", "wide")` is 1 where `cells("▌", "wide")` is 2; a quoted heading is the characters `# Heading` inside the rail and not a `rule`; and `quote` on a `warn` notice satisfies I6.
+- **T2.108** (I96, → C09 I41): a list five levels deep draws four indents and the mark changes at the fourth — depths 0–3 `bullet`, depths 4 and 5 `nested` — so the depth-3 and depth-4 rows are not the same frame; an ordered item past the cap carries the mark too; the ASCII rendering keeps the distinction (`-` against `~`); and the uncapped control at width 40 loses its indent, which is the measurement the cap rests on.
 - **T2.34** (§3am): the same translation on a list item and on a blockquote lands the spans on the `notice`, on a heading on the `rule`'s `label`, and on a pipe-table cell on the `Cell` — the four members of I88 — and on a fenced block **does not** run: `**` inside a fence is seven characters.
 
 ### Tier 3 — edge cases

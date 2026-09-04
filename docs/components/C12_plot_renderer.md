@@ -8743,7 +8743,7 @@ the second render. Worst pixel per figure, over 193 to 2 308 ink pixels each:
 
 | figure | before (dark, `#626262`) | after (dark, `#d4d4d4`) | after (light, `#383a42`) |
 |---|---|---|---|
-| `default` · `chain` · `loss` · `cycle` · `long-labels` | **1.04**, a ribbon | **12.43**, the page ground | **9.25**, the page ground |
+| `default` · `chain` · `loss` · `cycle` · `long-labels` | **1.04**, a ribbon | **11.74**, the page ground | **10.86**, the page ground |
 | `crowded` | **1.04**, a ribbon | **9.51** | **7.59** |
 
 The floor is 4.5 and the worst cell in the table is 7.59. **`crowded` is the one figure whose
@@ -8753,15 +8753,18 @@ is not a case the ruling has to answer — 9.51 and 7.59 are three times the flo
 but it is the reason the row is a table and not a single number.
 
 **And the halo alone would not have been enough**, which is why the ink is half the ruling and
-not a preference beside it: `tone.muted` *on the halo* measures **3.02** on dark and **2.44** on
-light — the light one under `muted`'s own 2.5 floor, on a surface C10 §4 does not check.
+not a preference beside it: `tone.muted` *on the halo* measures **2.85** on dark and **2.86** on
+light, against `muted`'s own 2.5 floor.
 
-**A note owed to C10, and it is not this component's to fix.** `surface.bgDeep` is excluded from
-`textSurfaces` on the stated grounds that it carries no text — *"if a surface ever paints text on
-it, that surface is wrong or the exclusion is"*. This arm paints every one of its labels on it.
-The ruling above clears 4.5 on both variants so nothing here is unreadable, but the exclusion is
-now false, and no theme loaded in future is checked against the surface this figure's text lands
-on.
+**The note owed to C10 was paid the same day, and the answer was that the surface was wrong**
+(C10 §4f, I34). `surface.bgDeep` is excluded from `textSurfaces` on the stated grounds that it
+carries no text — *"if a surface ever paints text on it, that surface is wrong or the exclusion
+is"* — and this arm painted every one of its labels on it, so the exclusion's own conditional had
+fired. C10 measured all 27 slots against both grounds on all three themes: dark and high-contrast
+cleared, **light failed twelve times**, `muted` among them at **2.44** against its own 2.5 floor.
+The page is now `surface.bg`, which every theme load checks. **The figures above moved with it and
+the ruling did not**: the ink is still `tone.default` and the halo is still the page's ground.
+Dark loses 5.5% uniformly, light gains 17%, and no token and no floor moved.
 
 **What was checked rather than assumed**: `paint-order` is not universally implemented, and a
 renderer that drops it paints the stroke *over* the fill — every label becomes a

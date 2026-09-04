@@ -716,6 +716,33 @@ defect.
 
 ---
 
+### `rule` — three tiers, and the axis is the fill
+
+A heading has a level and `rule` drew one figure, so `Rule.level` arrives with the
+question of what three forms are (C04 I94, §3an). The answer is **one axis**: the lead
+stays two cells, the label stays in the column every other block starts at, and only the
+fill changes.
+
+| tier | lead | fill | unicode | ascii |
+|---|---|---|---|---|
+| 1 | 2 cells, heavy | `heavyHorizontal` | `━━ Interface ━━━━━…` | `== Interface =====…` |
+| 2 | 2 cells, light | `horizontal` | `── Interface ─────…` | `-- Interface -----…` |
+| 3 | 2 cells, light | space | `── Interface` | `-- Interface` |
+
+**The fill is drawn rather than dropped**, as spaces — so the row is exactly the width at
+every tier, `meta` stays at the right edge in all three, and `measure` is 1 throughout.
+A tier that shortened the row would put a second geometry on a kind whose whole claim is
+that it has one.
+
+**An empty label never takes the blank fill.** I21 says an empty label draws an unbroken
+line, and at tier 3 the two rules meet in one cell: a two-cell lead with nothing after it
+is not a rule at all. So the fill falls back to the tier's own weight exactly when the
+label is empty — heavy at tier 1, light at 2 and 3.
+
+**Both marks are pairs the table already holds**, which is why no character is authored
+here: `heavyHorizontal` is `━`/`=` and `horizontal` is `─`/`-`, resolved through
+`glyphs(ctx.capabilities)` like every other rule character (SS47).
+
 ## 4. Capability fallbacks
 
 Every substitution is **1:1 by column count** (C04 §5). This is the constraint that keeps measurement honest under degradation.
@@ -747,6 +774,8 @@ C09 owns both renderings of every glyph a block can name (C04 §5). A block name
 | `collapse` | `▾` | `v` | An expanded row |
 | `live` | `▌` | `\|` | The live-state gutter (D6) |
 | `bullet` | `•` | `-` | A list marker with no status meaning |
+| `quote` | `⎸` | `>` | A quotation's gutter — a **rail**, drawn on every row (C04 I95) |
+| `nested` | `⁃` | `~` | A list item nested deeper than the indent shows (C04 I96) |
 | `continuation` | `⎿` | `` ` `` | A line subordinate to the one above — the entry's own state, under its command |
 
 **Why this is a closed union and not a string.** While the field was free, C09 emitted a block-supplied character verbatim — so the 1:1 guarantee held for the glyphs C09 chose and silently did not hold for the ones an adapter wrote. That is a guarantee that is mostly-true, and mostly-true fails only under `LANG=C`, only for the users least able to describe what they are seeing. It also drifted immediately: before tokenisation the tree carried `✗`, `✖`, `*`, `+` and `▲` in glyph positions, across five files, for three rôles.
@@ -792,6 +821,36 @@ C09 owns both renderings of every glyph a block can name (C04 §5). A block name
 **On the character, measured rather than chosen.** `⎿` is `East_Asian_Width=Neutral` — **one cell under both conventions**. The corner a reader would reach for instead is not: `└` and `╰` are Ambiguous and draw two cells wide, as do `▲` and `⋯` already in these tables. That does not buy anything *today*, because `glyphs()` discards the whole Unicode set at `ambiguousWidth: "wide"` and this table follows `unicode` alone — so it is a property of the character and not yet an argument. It is recorded because §4's own note says a third set of narrow survivors is *the better answer the day someone measures one*, and this is a measurement, filed where that note can find it.
 
 The ASCII half is `` ` ``, which is `tree(1)`'s rendering of the same hook in its ASCII mode — a precedent rather than a preference, and degradation preserving meaning rather than appearance.
+
+#### A rail — the one token property that changes what rows 1..n carry
+
+`GLYPH_INDENT` established that a **property of the token** can change what a gutter
+draws without the block schema learning anything, and `GLYPH_RAIL` is the second such
+property. A rail token is drawn on **every** row of its notice rather than on the first.
+
+**The geometry does not move, and that is what makes it safe.** `prefixCells` already
+subtracts the gutter from every row's width — the hanging indent depends on it — so the
+columns are reserved on rows 1..n whether or not anything is drawn in them. The rail
+fills columns that were already blank; `measure` is unchanged, needs no capability, and
+C09 I1 holds by construction rather than by a second argument.
+
+**One member, one frame-read.** A quotation carrying an ordinary glyph draws its mark on
+row 0 and nothing beneath it:
+
+```
+⎸ the first row of a quotation that      ⎸ the first row of a quotation that
+  wraps onto a second                    ⎸ wraps onto a second
+   ← a glyph                              ← a rail
+```
+
+Every count agrees in both frames — same rows, same width, same reserved columns — so no
+assertion about geometry separates them, and a suite indexed by blocks reports the left
+one as a working gutter. It is the same class as `continuation`'s indent, found the same
+way.
+
+**The set is here rather than on the token's declaration** for the reason `GLYPH_INDENT`
+gives: whether a mark repeats is a rendering property, and C04 owns the vocabulary while
+C09 owns both renderings.
 
 **Anything outside the vocabulary is text, not a glyph.** `↗ open`, `⊘ cancel`, `⬡ pods` and `≡ logs` are action labels and footer hints — text that happens to begin with a character, never a glyph slot — and their behaviour under ASCII is the app's. That is what keeps this table's guarantee absolute rather than nearly absolute.
 
@@ -1581,8 +1640,8 @@ next frame. MG27 is what keeps a producer from writing one (`BUILDER_OMISSIONS`)
 - **I37** — **The glyph axis is three rungs and a half block is the top one, gated on three things rather than on the terminal alone.** Below `kitty`, a cell is spent on colour or on shape: `▀` carries **two pixels at full colour**, braille carries **eight dots at one bit**, and the ASCII ramp carries nine glyphs. The half block is taken when `unicode` is not `ascii`, `ambiguousWidth` is not `wide`, `colourDepth` is at least **8**, and the block has **no `overlay`** — otherwise the dither. **Each gate has its own reason and none is a proxy for another.** `▀` is `East_Asian_Width=Ambiguous`, measured by `cells()` at `narrow=1` and `wide=2`, so a `wide` terminal draws the picture at double the width `imageCells` measured — the third consumer of `art.ts`'s switch and the first where braille's non-ambiguity is why the hazard is new (C02 I9, A03 SS50). Below `colourDepth: 8` the rung's whole claim is unfunded, and at 8 both channels go through `nearestAnsi256` so the picture is the 24-bit one quantised rather than a second rendering. **The overlay gate is the structural one**: the dither puts the picture in the glyph and the field in the foreground, and a half block has spent both colour channels on the picture — so unlike 1-bit, where C10 I31 draws the picture plain because nothing is left, there is a rung that can still carry the field and the block takes it. **A sequence trace cannot reach that gate** — *has an overlay* and *is 24-bit* both hold at rest with no event between them — which is why the artefact drawn for it was a classification table (§4c, → C04 I73, C10 I31).
 - **I38** — **A refusal to decode is drawn as the refusal, with the reason the decoder computed.** `decodePng` returns a `fault` for every rejection it makes — *not a PNG*, *interlaced PNG (Adam7)*, *bit depth 16*, *IDAT does not inflate* — and the block drew `alt` for all of them, so a reader was told the same nothing about a corrupt file and about a format this phase names as unbuilt. The **rasterising arms** draw a **`status` at `error`** carrying the fault, `alt` beneath it as the caption it always was, at the height the block committed and no more — **the arms, and not the block** (F413): the protocol arm needs the decoder only for `imageCells`'s aspect, and `decodePng` reads the IHDR before it refuses, so the extent survives what the rasteriser cannot. A picture the terminal can decode is drawn rather than described. `error` is the state and not `retrying`, because no attempt is coming: this is the widened gloss doing its work — *an operation failed and nothing more is coming* (§3a) — and the box the shell returns from twelve sites is the same box here. **The fault is not a verdict about the picture, only about this decoder**, and that is why it cannot gate the block: at the protocol arm the terminal decodes, the transmission is the bytes unchanged, and the identity is a hash of them. `Decoded`'s failure arm carries `size` so geometry and rasterising can want different things (→ C04 I73, C09 §8b G7).
 - **I39** — **A GIF is an image with more than one frame; the frame is view state read below the protocol arm, and on kitty the terminal animates.** The six-byte signature chooses `decodeGif` beside `decodePng` behind one front door (`decodeImage`), every frame is composited onto the logical screen before anything above the codec sees it, and delays under 20 ms are shown at 100 (§4c). **`measure` never sees the frame** (I8, C04 I93): `height` is declared and every frame shares the screen, so a GIF measures as its first frame does at every width, and the rasterising arms draw `frames[ctx.frames[id] ?? 0]` while the protocol arm ignores the field. **The kitty ruling is the measured one**: retransmitting a frame per tick would cost 75 bytes an 8x8 and 29,662 bytes a 320x240 per tick — 297 KB/s at 10 fps — where the animation protocol (`a=T` for frame 0 as raw RGBA, `a=f` per later frame with its gap, one `a=a` to start the loop) uploads once — 116,509 bytes for four 320x240 frames — and costs nothing per tick, so on that arm the shell arms **no wake**; a terminal without the extension keeps frame 0, which is the alternative ruling drawn by accident rather than a failure. **The fixtures are real and compared to a second decoder**: written by `sharp`, decoded pixel for pixel against `sharp`'s composited pages, with each blob's bytes scanned for the feature its row claims (→ C04 I93, C22 I77, C09 §4c).
-
----
+- **I40** — **A `rule`'s three tiers differ in one thing — the fill — and the row is exactly the width at every one of them.** The lead is two cells and the label's column is fixed, so the tiers differ where the eye already is; tier 3's fill is **drawn as spaces** rather than dropped, which keeps `meta` at the right edge and keeps `measure` a constant 1 (I1). **An empty label never takes the blank fill**: I21's unbroken line and tier 3's absent one meet in one cell, and a two-cell lead with nothing after it is not a rule — so the fill falls back to the tier's own weight there, heavy at 1 and light at 2 and 3. Every character is a pair the vocabulary already holds, resolved through `glyphs(ctx.capabilities)`, so nothing is authored in the renderer (→ C04 I94, A03 SS47).
+- **I41** — **A rail is a glyph drawn on every row of its notice, and it is a property of the token rather than of the block.** `GLYPH_RAIL` sits beside `GLYPH_INDENT` for the same reason: the schema learns nothing, and `measure` still receives no capability. **The geometry cannot move**, because `prefixCells` already subtracts the gutter from every row's width to hang the indent — so a rail fills columns that were reserved and blank, and I1 holds by construction rather than by an argument about it. **The frame is the only instrument that separates a rail from a glyph**: both draw the same rows at the same width with the same reserved columns, and a quotation whose mark appears once and whose remaining rows sit under a blank passes every count. `continuation`'s indent one property along, found the same way (→ C04 I95, C04 I96).
 
 ## 8. Commitments
 
@@ -1629,6 +1688,8 @@ next frame. MG27 is what keeps a producer from writing one (`BUILDER_OMISSIONS`)
 39. **A kind pins a *presence* as readily as a width, and `table` pins two things and re-sorts nothing** (C11 I18, I19, I20). The action bar exists or does not, so a window moves it in **both** directions; the display order is not idempotent under slicing, because `kindOf` reads the values present and a slice can re-classify its own column. Neither field is a producer's, on `numberWidth`'s argument (→ C11 §5a, C25 I21a, FINDINGS F429).
 40. **A span's offsets meet the wrap, the cut and the cluster through the functions that already own them, and each gains one property rather than a sibling** (I1, I9, I19). Rows carry a source `start` and `wrapCells` projects them; a boundary inside a cluster snaps outward at both ends and the width does not move; runs coalesce by style reference so an unspanned row's bytes are unchanged; and `truncateParts` measures its marker as `truncate` does, which closed a one-cell overshoot at `ambiguousWidth: "wide"` (§5, → C04 §3am, C04 I84, C04 I86, C10 I33).
 41. **An animated image is the image block with a frame index from the context, and the kitty arm hands the terminal every frame once** (I39). The signature chooses the decoder, the frames are composited in the codec, `measure` never sees the frame, and the wake is the orbit's — a still arms nothing. The protocol ruling was taken on measured bytes rather than on the roadmap's estimate, and its degradation on a terminal without the animation extension is the ruling it replaced (→ C04 I93, C22 I77).
+42. **A rule's tiers move one thing and the empty label is the cell where two rules meet** (I40, I21). The fill carries the level and nothing else does, so `measure` is untouched and the label stays where a reader is already looking; tier 3 draws its fill as spaces rather than shortening the row, and an empty label takes the weight back because a lead with nothing after it is not a rule (→ C04 I94).
+43. **A gutter that repeats is a property of the mark, and the frame is what said so** (I41). `GLYPH_RAIL` beside `GLYPH_INDENT`: the columns are already reserved on every row for the hanging indent, so a rail costs no geometry and the block schema learns nothing — and a mark drawn once with its remaining rows blank agrees with every count there is (→ C04 I95).
 41. **A run's tone and value reach colour through the resolvers that already own them, and the one span member that is geometry is carried by the wrapper as one property** (I1, I9, → C04 I89, C04 I90, C10 I31, C10 I33). A tone replaces the block's style through the memoised `tone()` call the block made; a value paints a background through `continuousColour` and says nothing below 8-bit; `wrapCellsParts` takes atoms and `notice` measures and renders through one `noticeRows`; a focused table row drops span tones as it drops cell tones; markdown's inline code is the `identifier` tone (§5).
 
 ---
@@ -1796,6 +1857,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.22** (I25, I26, C14 I23): `code` and `raw` declare `window`, and the I26 identity and the row-for-row comparison hold over both at every offset — a `code` block with a block comment spanning lines, a wrapped one whose every line is three rows, a `raw` block with a trailing newline and blank lines. The row that pinned *code and raw do not window* is rewritten as this one on the day it expired (C14 §4a).
 - **T2.21** (I26a): `tableDefinition.window` handed the registry's measurer and handed a stub returning 1 cuts in different places — `dropRows` of 2 against 1 for the same range. Asserting the signature would pass against a window that accepted the parameter and ignored it, which is how `table` came to be unwindowable for want of one (F428).
 - **T2.18** (I17, C04 I25): a sequence measures `Σ` its blocks plus one row per `gapBefore`, and renders exactly that many; a `row` group ignores the field.
+- **T2.109** (I40, I41, I1): the headline row at the two new members — a `rule` at each of the three tiers measures 1 and renders exactly 1 row of exactly the width at every width of the sweep and in both alphabets, `meta` landing at the right edge in all three; and a notice carrying a rail measures exactly what the same notice measures without it, at every width, while the rendered rows differ only in the reserved columns.
 - **T2.10**: golden frames for every kind at four widths in both themes and both unicode modes.
 
 ### Tier 3 — edge cases
