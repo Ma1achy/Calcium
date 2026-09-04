@@ -504,6 +504,66 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
     ascii: PULSE_ASCII,
     narrowOnly: true,
   }),
+  /**
+   * **The other seven of the catalogue's refused eight** (`CALCIUM_SPINNERS.md`,
+   * *Refused, with the reason*), re-measured 2026-09-03: every frame is one
+   * cell under the narrow convention and two under wide, none has an emoji
+   * form, so each is the tier and not a refusal — the same ruling that moved
+   * `growVertical`. Two carry an interval the catalogue did not: `triangle` and
+   * `circleHalves` are 50 ms in `cli-spinners`, which is below the per-frame
+   * floor a four-frame set has (T2.72), so they take 120.
+   */
+  growHorizontal: Object.freeze({
+    frames: Object.freeze(["▏", "▎", "▍", "▌", "▋", "▊", "▉", "▊", "▋", "▌", "▍", "▎"]),
+    intervalMs: 120,
+    ascii: PULSE_ASCII,
+    narrowOnly: true,
+  }),
+  noise: Object.freeze({
+    frames: Object.freeze(["▓", "▒", "░"]),
+    intervalMs: 100,
+    ascii: PULSE_ASCII,
+    narrowOnly: true,
+  }),
+  boxBounce2: Object.freeze({
+    frames: Object.freeze(["▌", "▀", "▐", "▄"]),
+    intervalMs: 120,
+    ascii: TURN_ASCII,
+    narrowOnly: true,
+  }),
+  triangle: Object.freeze({
+    frames: Object.freeze(["◢", "◣", "◤", "◥"]),
+    intervalMs: 120,
+    ascii: TURN_ASCII,
+    narrowOnly: true,
+  }),
+  circleHalves: Object.freeze({
+    frames: Object.freeze(["◐", "◓", "◑", "◒"]),
+    intervalMs: 120,
+    ascii: TURN_ASCII,
+    narrowOnly: true,
+  }),
+  pipe: Object.freeze({
+    frames: Object.freeze(["┤", "┘", "┴", "└", "├", "┌", "┬", "┐"]),
+    intervalMs: 100,
+    ascii: TURN_ASCII,
+    narrowOnly: true,
+  }),
+  arrow: Object.freeze({
+    frames: Object.freeze(["←", "↖", "↑", "↗", "→", "↘", "↓", "↙"]),
+    intervalMs: 100,
+    ascii: TURN_ASCII,
+    narrowOnly: true,
+  }),
+
+  // pulse — the agent-tui playground's set (`tools/spinner.js`), which shipped
+  // there and not here; measured 2026-09-03 as one cell on both conventions, so
+  // it needs no tier. 720 ms a cycle at the playground's own 120 ms.
+  pulse: Object.freeze({
+    frames: Object.freeze(["✢", "✲", "✱", "✻", "✱", "✲"]),
+    intervalMs: 120,
+    ascii: PULSE_ASCII,
+  }),
 });
 
 /** The default, and the set this returned before it took a name. */

@@ -255,6 +255,9 @@ sankey           edge routing — the Mermaid problem, and it wants a real layou
                  ← the Mermaid ruling was REVERSED (CALCIUM_ROADMAP.md, 2026-08-15) and a
                    layered router ships as the `graph` form; sankey stays absent on its own
                    merits, not on that ruling (2026-09-03)
+                 ← RE-RULED the same day with a measurement, C12 §3d *Sankey*: `graphLayers`
+                   transfers and nothing after it does — no edge weight, a bar for a label, a
+                   ribbon for a mask bit, left-to-right for top-down. A new form, no consumer
 ```
 
 **`contour` was on this list and is not any more — see the correction below.**

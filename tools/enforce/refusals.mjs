@@ -87,7 +87,10 @@ export const REFUSALS = Object.freeze([
     why: "a fit refusal: it emits SGR, hardcodes a narrow width model and reads `process.stdout.columns`" },
   { id: "R11", where: "DEPENDENCIES.md § Not installed · a TypeScript linter (typescript-eslint)",
     premise: { absent: "typescript-eslint", in: "package.json" },
-    why: "87 packages against one rule with a measured catch (`no-floating-promises`); the row says *decide after C23 lands*, and C23 has landed — the decision is owed, and this entry is what notices if it is taken" },
+    why: "decided 2026-09-03 by running it: 13 packages on top of this tree (not 87), 106 findings and 0 defects against `src/`, and `no-floating-promises` — the rule the question was held open for — fired zero times. The package the row refuses, by name" },
+  { id: "R11b", where: "DEPENDENCIES.md § Not installed · a TypeScript linter (typescript-eslint)",
+    premise: { present: "\"typescript\": \"7.", in: "package.json" },
+    why: "the second premise: typescript-eslint 8.69.0's peer range is `typescript <6.1.0` and this tree compiles with 7.0.2, so it does not install without `--legacy-peer-deps`. Holds while the compiler is a 7.x. **Blind spot**: the range is the package's, not this tree's — typescript-eslint widening it to 7 is invisible here, and the row's other reopen condition (a floating promise in `src/`) is what SS54 cannot see by construction" },
 
   // --- C12 — refusals written as symbols ------------------------------------
   { id: "R12", where: "C12 I58 · §3ai",
@@ -102,6 +105,32 @@ export const REFUSALS = Object.freeze([
   { id: "R15", where: "C12 I87 · §3am · `SVG_FAMILY.plot3d`",
     premise: { present: "plot3d: null" },
     why: "the SVG arm draws no 3D projection and the `origin` table has no fixed corner for one — a projected cloud's corner is a function of the camera. Two `null` seams, both watched" },
+
+  // --- re-ruled 2026-09-03: refusals whose premise had expired ---------------
+  //
+  // Each of these was a sentence that stayed true in the document after the
+  // tree moved under it. The new rows name the premise that actually holds.
+  { id: "R18", where: "CALCIUM_ROADMAP.md § Fights the architecture · Video / GIF",
+    premise: { absent: "decodeGif(" },
+    why: "a cost refusal: `decodePng` is the only codec, nothing carries a second raster, and the frame scheduler was never the obstacle. The day a GIF decoder lands the cost has been paid and the row is re-argued" },
+  { id: "R19", where: "CALCIUM_ROADMAP.md § Fights the architecture · Video / GIF",
+    premise: { present: "ORBIT_RATE" },
+    why: "the true premise: a continuous full-frame redraw on C03's `stream` rung already exists — the orbit, delta-timed in `session.ts` (C22 I74). The ruling's *the scheduler carries 30 fps today* rests on that consumer being in the tree; if the orbit goes, the frame path the ruling cites goes with it" },
+  { id: "R20", where: "C12 §3d · Sankey",
+    premise: { absent: "sankeyArea(" },
+    why: "not a fold over `graph`: a weighted edge, a bar for a label, a ribbon for a mask bit, left-to-right for top-down. Refused on no consumer — no weighted edge set exists — and the form's own symbol is what expires it" },
+  { id: "R21", where: "C12 §3d · Sankey",
+    premise: { present: "graphLayers" },
+    why: "the fold premise: passes 1–5 transfer as `graphLayers` and nothing after them does. The ruling *a new form over the shared layering* rests on the shared layering existing" },
+  { id: "R22", where: "CALCIUM_ROADMAP.md § Session resume / history · Rewind",
+    premise: { present: "UNDO_LIMIT" },
+    why: "narrowed 2026-09-03 from *every mutation is reversible and nothing is* to *every transcript mutation*: the editor's are (C17 §6, two stacks, 200 units). The narrowed sentence rests on the editor's undo existing; the transcript half — `ViewPatch` has no delete, `evict` has no inverse — is a claim about absence that has no single symbol" },
+  { id: "R23", where: "docs/notes/CALCIUM_MERMAID_THEMING.md § re-scoped: role → palette slot",
+    premise: { absent: "AsciiTheme" },
+    why: "owed, not refused: the note re-scoped node colouring to `beautiful-mermaid`'s eight `AsciiTheme` roles mapped onto C10 slots (~80 lines) and nothing in `src/` names the type yet. The day it does, the owed row is paid and this one is removed — a deferral with a symbol, so it cannot expire unnoticed" },
+  { id: "R24", where: "docs/notes/CALCIUM_MERMAID_THEMING.md § re-scoped: role → palette slot",
+    premise: { present: "beautiful-mermaid", in: "package.json" },
+    why: "the re-scope rests on the library that exposes the roles; a `present` row on the package is the only form the register has for *in node_modules*, and it is the row the audit asked for" },
 
   // --- taste, marked and counted ---------------------------------------------
   { id: "R16", where: "docs/notes/CALCIUM_PLOT_PRIOR_ART.md · pie",

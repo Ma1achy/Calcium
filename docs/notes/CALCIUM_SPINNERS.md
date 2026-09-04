@@ -138,21 +138,34 @@ codepoint increments the pattern. `binary4` visibly carries; `binary8` reads as 
 
 ---
 
-## Refused, with the reason — so they are not re-proposed
+## Refused, with the reason — and the reason expired, so they are a tier now
 
-**Seven of `cli-spinners`' most visually interesting sets are unsafe**, and they are the ones
-anyone reaches for first:
+**This section refused eight sets on `EA=Ambiguous`, and roadmap 51 then made ambiguous width a
+capability** — `ambiguousWidth: "narrow" | "wide"` on `TerminalCapabilities` (C02 I9), with
+`SPINNER_SETS` carrying a `narrowOnly` tier that serves the set where the terminal says narrow
+and its ASCII pair where it says wide. So *ambiguous* stopped being a refusal the day the tier
+existed, and only `growVertical` had crossed. **Re-measured 2026-09-03, every frame of all eight
+through `cells()` on both conventions**: 1 cell narrow, 2 cells wide, none in T2.71's emoji list —
+every one is legal on the `narrow` arm and every one now ships as a `narrowOnly` set
+(`src/presentation/blocks/glyphs.ts`). The table is kept as the measurement it was:
 
-| set | why |
-|---|---|
-| `growVertical` `▁▃▄▅▆▇` | every frame EA=Ambiguous |
-| `growHorizontal` `▏▎▍▌▋▊▉` | every frame EA=Ambiguous |
-| `noise` `▓▒░` | `▓ ▒` ambiguous |
-| `boxBounce2` `▌▀▐▄` | `▌ ▀ ▄` ambiguous |
-| `triangle` `◢◣◤◥` | all four ambiguous |
-| `circleHalves` `◐◓◑◒` | `◐ ◑` ambiguous |
-| `pipe` `┤┘┴└├┌┬┐` | all eight ambiguous — box drawing is ambiguous throughout |
-| `arrow` `←↖↑↗→↘↓↙` | all eight ambiguous |
+| set | measured | disposition |
+|---|---|---|
+| `growVertical` `▁▃▄▅▆▇` | every frame EA=Ambiguous | `narrowOnly`, already shipped with roadmap 51 |
+| `growHorizontal` `▏▎▍▌▋▊▉` | every frame EA=Ambiguous | `narrowOnly`, 12-frame ping-pong at 120 ms — 1440 ms, in band |
+| `noise` `▓▒░` | all three ambiguous (`░` too — the row said two) | `narrowOnly`, 100 ms a frame |
+| `boxBounce2` `▌▀▐▄` | all four ambiguous (the row said three) | `narrowOnly`, 120 ms |
+| `triangle` `◢◣◤◥` | all four ambiguous | `narrowOnly`, **120 ms and not the catalogue's 50** — 50 is below the per-frame floor T2.72 asserts for a short set |
+| `circleHalves` `◐◓◑◒` | all four ambiguous (the row said two) | `narrowOnly`, **120 ms and not the catalogue's 50**, same reason |
+| `pipe` `┤┘┴└├┌┬┐` | all eight ambiguous — box drawing is ambiguous throughout | `narrowOnly`, 100 ms — 800 ms, in band |
+| `arrow` `←↖↑↗→↘↓↙` | all eight ambiguous | `narrowOnly`, 100 ms — 800 ms, in band |
+
+**Three rows undercounted their own ambiguity** — `noise`, `boxBounce2` and `circleHalves` each
+named a subset of frames as ambiguous and every frame is — which changed nothing about the
+verdict and is recorded because a table that is right about the answer and wrong about the
+count is the kind that gets copied. **And `pulse` `✢ ✲ ✱ ✻ ✱ ✲`**, the agent-tui playground's
+set (`tools/spinner.js`), measured with them: 1 cell on both conventions, no emoji form, six
+frames at 120 ms is 720 ms — in band on every arm, so it ships without the tier.
 
 **And the near-dots**: `·` `•` `‧` `°` are all ambiguous. **`⋅` (dot operator), `∘` (ring
 operator) and `◦` (white bullet) are narrow** and give the same quietest-possible frame.
