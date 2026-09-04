@@ -35,6 +35,7 @@ import { horizonBandCount, horizonBandT, horizonBaseline, levelCaption } from ".
 import { horizonIsSigned } from "./horizon.js";
 import { drawnBlock } from "./derive.js";
 import { graphLayers } from "./graph.js";
+import { sankeyLayout } from "./sankey.js";
 import { facetWidths } from "./facet.js";
 import { normalisedOf } from "../../data/viewmodel/range.js";
 
@@ -63,7 +64,7 @@ import {
   type GlyphRole,
   type FigureLegend,
 } from "./figure.js";
-import type { Plot, PlotForm } from "../../data/viewmodel/index.js";
+import type { Plot, PlotForm, Graph } from "../../data/viewmodel/index.js";
 
 /**
  * The image path's layout — **its own units, and no cells anywhere** (§3aj
@@ -1283,6 +1284,91 @@ function nodeMarks(
  * size, and the clip already stops the label leaving its box — a rule with no
  * instance would be a policy invented for a case nobody has measured.
  */
+/**
+ * `sankey` — the same layout the terminal draws, in pixels (C12 I110, §3ap.3).
+ *
+ * **`sankeyLayout` is the shared geometry and this is its second painter.**
+ * Called with the box's height, an 8 px pad and a 1 px floor, `quantum: false`
+ * — the terminal calls it in half-rows with `quantum: true`, and every bar and
+ * ribbon end here is the same arithmetic on different units. **No drop loop**,
+ * as with `graph`: the terminal drops nodes against a cell budget an SVG does
+ * not have (§3aj.6).
+ *
+ * A ribbon is the standard link — two cubic Béziers with their control points
+ * at the mid x, closed — filled in the **declared source's** slot at half
+ * opacity, plotly's and d3's convention and the reason the terminal's ribbon
+ * interior is the shade glyph rather than the solid block (§3ap.2). A bar is a
+ * rect in its own node's slot; a dummy draws nothing. Labels sit right of a bar
+ * and left of one in the last layer, in the arm's own font units, never
+ * measured (§3aj hazard 4). The reversed-edge notice is `graph`'s, verbatim.
+ */
+function sankeyMarks(
+  g: Graph,
+  box: Readonly<{ left: number; right: number; top: number; bottom: number }>,
+  w: number,
+  h: number,
+  ink: string,
+  ground: string | undefined,
+  theme: ResolvedTheme,
+  out: string[],
+): readonly string[] {
+  const lay = sankeyLayout(g, { height: h, gap: 8, min: 1, quantum: false });
+  const k = lay.layers.length; // cells-ok — a layer count
+  if (k === 0) return out;
+  const nodeW = Math.max(4, Math.min(12, w * 0.02));
+  const xOf = (l: number): number => box.left + (k <= 1 ? 0 : (l * (w - nodeW)) / (k - 1)); // cells-ok — a layer index
+  const declared = g.nodes.length; // cells-ok — a node count
+
+  for (const r of lay.ribbons) {
+    const la = lay.bars.get(r.from)?.layer;
+    const lb = lay.bars.get(r.to)?.layer;
+    if (la === undefined || lb === undefined) continue;
+    const fill = r.source >= 0 ? inkOf(refOf(r.source), theme) : undefined;
+    if (fill === undefined) continue;
+    const x0 = xOf(la) + nodeW;
+    const x1 = xOf(lb);
+    const mx = (x0 + x1) / 2;
+    const y = (v: number): string => n(box.top + v);
+    out.push(
+      `<path d="M${n(x0)} ${y(r.sy0)} C${n(mx)} ${y(r.sy0)} ${n(mx)} ${y(r.ty0)} ${n(x1)} ${y(r.ty0)} ` +
+        `L${n(x1)} ${y(r.ty1)} C${n(mx)} ${y(r.ty1)} ${n(mx)} ${y(r.sy1)} ${n(x0)} ${y(r.sy1)} Z" ` +
+        `fill="${fill}" fill-opacity="0.5"/>`,
+    );
+  }
+
+  for (const b of lay.bars.values()) {
+    if (b.id >= declared) continue; // cells-ok — a node count
+    const fill = inkOf(refOf(b.id), theme);
+    if (fill === undefined) continue;
+    const x = xOf(b.layer);
+    out.push(
+      `<rect x="${n(x)}" y="${n(box.top + b.y0)}" width="${n(nodeW)}" height="${n(Math.max(0, b.y1 - b.y0))}" ` +
+        `fill="${fill}" stroke="${ground ?? fill}" stroke-width="1"/>`,
+    );
+    const label = lay.labelOf(b.id);
+    if (label === "") continue;
+    const last = b.layer === k - 1 && k > 1; // cells-ok — a layer count
+    const tx = last ? x - LABEL_GAP : x + nodeW + LABEL_GAP;
+    out.push(
+      `<text x="${n(tx)}" y="${n(box.top + (b.y0 + b.y1) / 2 + SVG_FONT_SIZE / 3)}" ` +
+        `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${ink}"` +
+        `${last ? ' text-anchor="end"' : ""}>${escape(label)}</text>`,
+    );
+  }
+
+  if (lay.reversed > 0) {
+    const warn = inkOf("tone.warn", theme);
+    if (warn !== undefined) {
+      out.push(
+        `<text x="${n(box.left)}" y="${n(box.bottom + SVG_FONT_SIZE)}" ` +
+          `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${warn}">` +
+          `${escape(String(lay.reversed))} reversed</text>`,
+      );
+    }
+  }
+  return out;
+}
+
 function nodeType(rankHeight: number): number {
   return Math.min(SVG_FONT_SIZE, rankHeight * 0.8);
 }
@@ -1433,6 +1519,7 @@ function marks(
 
     const g = block.graph;
     if (g === undefined) return out;
+    if (block.form === "sankey") return sankeyMarks(g, box, w, h, ink0, ground, theme, out);
     // **No pruning**, which is §3aj.6's other half: `graphArea` drops
     // least-connected nodes until the figure fits a cell budget, and an SVG
     // has none. A shared pruner would put a terminal's constraint into a

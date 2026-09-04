@@ -225,7 +225,17 @@ const MEASURED = {
   "timeline": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "bullet": { silent: "0/2", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "utilisation": { silent: "0/2", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
-  "sankey": "refused", // PLACEHOLDER — the sankey lane measures this row
+  // **The nodes family's third, measured the day it landed** (C12 §3ap). Six
+  // variants, twelve pairs, and both open cells are the family's own shape:
+  // `identityLabels` 5/12 is `crowded` at both widths (the terminal keeps eight
+  // of twelve sources and names the four it dropped in the notice, which the
+  // reader files as names; this arm draws all thirteen), `long-labels` at 40
+  // (the middle label is dropped rather than truncated, §3n) and `cycle` at
+  // both widths (the terminal's `1 reversed` reads as the word `reversed`, the
+  // SVG's as `1 reversed` — `graph`'s 4/4 on the same reader). `notice` 2/12 is
+  // `crowded` — F318's legitimate difference on a third form of the family: the
+  // terminal drops against a row budget and this arm has nothing to drop.
+  "sankey": { silent: "0/12", "numericLabels": "agree", "identityLabels": "5/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "2/12" },
   "graph": { silent: "0/4", "numericLabels": "agree", "identityLabels": "4/4", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "2/4" },
   "tree": { silent: "0/12", "numericLabels": "agree", "identityLabels": "8/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "6/12" },
   "treemap": { silent: "0/2", "numericLabels": "agree", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
@@ -615,15 +625,16 @@ describe("AD — the two arms decide separately, and here is where", () => {
     }
     // **46, and the last two are the density family** (F383). This was 44 for as
     // long as `violin` and `ridgeline` were `null` in `SVG_FAMILY`.
-    expect(claimed.length, "forms the SVG arm claims").toBe(46); // cells-ok — a form count
+    // **47 with `sankey`** (C12 §3ap), the nodes family's third.
+    expect(claimed.length, "forms the SVG arm claims").toBe(47); // cells-ok — a form count
     // **One refused again, and it is `plot3d`** — the count went to zero
     // when F383 gave the density family an emitter, and a form whose geometry
     // this path cannot compute brought it back (C12 §3am). The refusal is what
     // `U11` needed to wake up.
     expect(Object.values(MEASURED).length - claimed.length, "forms it refuses").toBe(1); // cells-ok — a form count
     // 46 forms x 8 columns; two more forms claimed is sixteen more cells (F383).
-    expect(open + closed + legitimate, "cells over claimed forms").toBe(368); // cells-ok — a cell count
-    expect(legitimate, "cells whose difference is a resolution fact, not work owed").toBe(46); // cells-ok — a cell count
+    expect(open + closed + legitimate, "cells over claimed forms").toBe(376); // cells-ok — a cell count; 368 + `sankey`'s eight
+    expect(legitimate, "cells whose difference is a resolution fact, not work owed").toBe(47); // cells-ok — a cell count; 46 + `sankey.notice`
     // **49 -> 52**: the density family brings three open cells of its own —
     // both arms draw the outline and label the value axis from different ranges.
     // **54 → 53, and the cell that closed is `ridgeline.identityLabels`**
@@ -635,9 +646,12 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // `pie.identityLabels` (the legend's `⋯ 5 more` read as a name) and
     // `radar.identityLabels` (a bottom row read against angular order). None is
     // an arm's decision; each is named on its row above.
-    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(56); // cells-ok — a cell count
+    // **57 with `sankey.identityLabels`** — the label drop and the reader's
+    // `reversed`, named on the row (C12 §3ap).
+    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(57); // cells-ok — a cell count
     // 269 → 266: the three cells named above moved from agree to open.
-    expect(closed, "cells where they already agree — the work it must not undo").toBe(266); // cells-ok — a cell count
+    // 266 → 272: `sankey`'s six agreeing cells.
+    expect(closed, "cells where they already agree — the work it must not undo").toBe(272); // cells-ok — a cell count
     // 268 → 269, the other side of the same cell (F386): one disagreement
     // became one agreement, so the two counters move opposite by one and the
     // total is unchanged. That relation is what AD4 is for.
@@ -913,7 +927,8 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // refusals now, all by family.
     // **238**: `line/log` (C04 I81), `line/whiskers-placed` (C04 I52) and
     // `pie/all-zero` (C12 I108 finding 5).
-    expect(corpus.size, "variants in the corpus").toBe(238); // cells-ok — a variant count
+    // **244**: the six `sankey` variants (C12 §3ap).
+    expect(corpus.size, "variants in the corpus").toBe(244); // cells-ok — a variant count
     // **206, thirteen up on 193** — every one of `plot3d`'s twenty-five variants
     // draws a distinct frame, so none of them collides with another and none
     // with each other. **The marker arm separating is not free**: it draws the
@@ -938,7 +953,8 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // **228**: the twenty-one fixtures for unreached rules are each a distinct
     // frame — none collides with the variant it was cut from, which is the
     // response `test/support/README.md` asks a fixture to show.
-    expect(t.distinct, "distinct terminal frames").toBe(231); // cells-ok — a frame count; 228 + `line/log`, `line/whiskers-placed`, `pie/all-zero`
+    // **237**: the six `sankey` variants, each a distinct frame (C12 §3ap).
+    expect(t.distinct, "distinct terminal frames").toBe(237); // cells-ok — a frame count; 228 + `line/log`, `line/whiskers-placed`, `pie/all-zero` + six `sankey`
     // **134 -> 148**: the density family draws, so nineteen violin variants and
     // one ridgeline stop colliding in the single refusal group (F383).
     // **153, and the addition is a *collision*** — `plot3d`'s variants all
@@ -951,7 +967,8 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // `confidence` kind drew one (C12 I108, I109).
     // **169**: fourteen of the twenty-one draw here; the seven `plot3d` ones
     // join the one refusal document.
-    expect(s.distinct, "distinct documents").toBe(172); // cells-ok — a frame count; the four axis variants join the one refusal group + `line/log`, `line/whiskers-placed`, `pie/all-zero`
+    // **178**: the six `sankey` documents, each distinct — this arm draws all of them.
+    expect(s.distinct, "distinct documents").toBe(178); // cells-ok — a frame count; the four axis variants join the one refusal group + `line/log`, `line/whiskers-placed`, `pie/all-zero` + six `sankey`
 
     // **The terminal's four are F350's**, and asserting them keeps that finding
     // alive: three are variants whose names state a claim their block does not

@@ -1012,6 +1012,8 @@ export const MARK_EXEMPTIONS = Object.freeze({
     "the braille blank, folded per mode by `definition.ts`; braille is chosen only where the capability allows it",
   "src/presentation/plot/linedraw.ts":
     "the box-drawing glyph tables — the vocabulary for line-style curves, gated by ambiguousWidth in `definition.ts`",
+  "src/presentation/plot/sankey.ts":
+    "`sankeyAlphabet` is the pair resolved where the capability is in hand — `▀ ▄ █ ▒` at narrow unicode and `# - =` at ASCII or wide, one function, both arms in the same expression (C12 I111). The premise to re-check: every mark in the file is read from that table, so a glyph written beside it rather than into it is what this reason does not cover",
   "src/presentation/image/halfblock.ts":
     "`HALF_BLOCK` is `linedraw.ts`'s premise one module over — a rendering primitive rather than framework text, and gated by ambiguousWidth in `halfBlockEligible` in the same file rather than one away. The premise to re-check: it is the *only* mark here, so a second one is a second decision and this reason would not cover it",
   "src/shell/config.ts":

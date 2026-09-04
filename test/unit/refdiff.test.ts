@@ -141,7 +141,12 @@ describe("refdiff — the grid is the model, not the answer", () => {
     // transitive EPL-2.0. Named so the gap is recorded rather than silent, and
     // it sits beside `tree` for the same reason: a figure whose subject is a
     // shape has no reference that renders to a cell grid.
-    const recorded = new Set(["smallmultiples", "pairplot", "treemap", "flame", "icicle", "tree", "graph"]);
+    // `sankey` is the shape family's sixth and joins for `graph`'s reason: the
+    // desktop reference is plotly or d3, neither a dependency this comparison
+    // should acquire, and matplotlib's `Sankey` is a single-node flow diagram
+    // rather than a layered one. C12 §3ap.1 records the comparison that was
+    // made by eye against both, and SK1–SK6 assert the geometry directly.
+    const recorded = new Set(["smallmultiples", "pairplot", "treemap", "flame", "icicle", "tree", "graph", "sankey"]);
     // `contour` is not here: it is *unisolable* rather than unreferenced, so it
     // leaves through `excluded` above. Both halves of the record still name it.
     expect(new Set(missing), "forms with neither a reference nor a recorded reason").toEqual(recorded);

@@ -246,7 +246,9 @@ describe("PC — the phase catalogue's two claims", () => {
     const refused = forms.filter((f) => SVG_FAMILY[f as keyof typeof SVG_FAMILY] === null);
     const claimed = forms.filter((f) => SVG_FAMILY[f as keyof typeof SVG_FAMILY] !== null);
     expect(refused.length + claimed.length, "every form is on exactly one side").toBe(forms.length);
-    expect(forms.length, "and the union is 47").toBe(47);
+    // 48 since `sankey` (C12 §3ap, 2026-09-04) — the one count row the lane's sweep of
+    // "47" did not reach, found by the whole suite.
+    expect(forms.length, "and the union is 48").toBe(48);
     // **The refused set is empty, and the sentence above is why that is asserted
     // by equality** (F383). *A number here would be a row that fails on every
     // commit that works* was right about a **count**; it stopped being right the

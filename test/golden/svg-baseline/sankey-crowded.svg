@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
+<rect width="100%" height="100%" fill="#141414"/>
+<path d="M100.096 12.8 C352 12.8 352 71.467 603.904 71.467 L603.904 73.867 C352 73.867 352 15.2 100.096 15.2 Z" fill="#e69f00" fill-opacity="0.5"/>
+<path d="M100.096 23.2 C352 23.2 352 73.867 603.904 73.867 L603.904 78.667 C352 78.667 352 28 100.096 28 Z" fill="#56b4e9" fill-opacity="0.5"/>
+<path d="M100.096 36 C352 36 352 78.667 603.904 78.667 L603.904 85.867 C352 85.867 352 43.2 100.096 43.2 Z" fill="#3cbf9a" fill-opacity="0.5"/>
+<path d="M100.096 51.2 C352 51.2 352 85.867 603.904 85.867 L603.904 95.467 C352 95.467 352 60.8 100.096 60.8 Z" fill="#f0e442" fill-opacity="0.5"/>
+<path d="M100.096 68.8 C352 68.8 352 95.467 603.904 95.467 L603.904 107.467 C352 107.467 352 80.8 100.096 80.8 Z" fill="#8fa8ff" fill-opacity="0.5"/>
+<path d="M100.096 88.8 C352 88.8 352 107.467 603.904 107.467 L603.904 121.867 C352 121.867 352 103.2 100.096 103.2 Z" fill="#f07a3c" fill-opacity="0.5"/>
+<path d="M100.096 111.2 C352 111.2 352 121.867 603.904 121.867 L603.904 138.667 C352 138.667 352 128 100.096 128 Z" fill="#e4a3c4" fill-opacity="0.5"/>
+<path d="M100.096 136 C352 136 352 138.667 603.904 138.667 L603.904 157.867 C352 157.867 352 155.2 100.096 155.2 Z" fill="#cfcfcf" fill-opacity="0.5"/>
+<path d="M100.096 163.2 C352 163.2 352 157.867 603.904 157.867 L603.904 179.467 C352 179.467 352 184.8 100.096 184.8 Z" fill="#e69f00" fill-opacity="0.5"/>
+<path d="M100.096 192.8 C352 192.8 352 179.467 603.904 179.467 L603.904 203.467 C352 203.467 352 216.8 100.096 216.8 Z" fill="#56b4e9" fill-opacity="0.5"/>
+<path d="M100.096 224.8 C352 224.8 352 203.467 603.904 203.467 L603.904 229.867 C352 229.867 352 251.2 100.096 251.2 Z" fill="#3cbf9a" fill-opacity="0.5"/>
+<path d="M100.096 259.2 C352 259.2 352 229.867 603.904 229.867 L603.904 258.667 C352 258.667 352 288 100.096 288 Z" fill="#f0e442" fill-opacity="0.5"/>
+<rect x="89.6" y="12.8" width="10.496" height="2.4" fill="#e69f00" stroke="#141414" stroke-width="1"/>
+<text x="106.096" y="18" font-size="12" font-family="monospace" fill="#626262">src-01</text>
+<rect x="89.6" y="23.2" width="10.496" height="4.8" fill="#56b4e9" stroke="#141414" stroke-width="1"/>
+<text x="106.096" y="29.6" font-size="12" font-family="monospace" fill="#626262">src-02</text>
+<rect x="89.6" y="36" width="10.496" height="7.2" fill="#3cbf9a" stroke="#141414" stroke-width="1"/>
+<text x="106.096" y="43.6" font-size="12" font-family="monospace" fill="#626262">src-03</text>
+<rect x="89.6" y="51.2" width="10.496" height="9.6" fill="#f0e442" stroke="#141414" stroke-width="1"/>
+<text x="106.096" y="60" font-size="12" font-family="monospace" fill="#626262">src-04</text>
+<rect x="89.6" y="68.8" width="10.496" height="12" fill="#8fa8ff" stroke="#141414" stroke-width="1"/>
+<text x="106.096" y="78.8" font-size="12" font-family="monospace" fill="#626262">src-05</text>
+<rect x="89.6" y="88.8" width="10.496" height="14.4" fill="#f07a3c" stroke="#141414" stroke-width="1"/>
+<text x="106.096" y="100" font-size="12" font-family="monospace" fill="#626262">src-06</text>
+<rect x="89.6" y="111.2" width="10.496" height="16.8" fill="#e4a3c4" stroke="#141414" stroke-width="1"/>
+<text x="106.096" y="123.6" font-size="12" font-family="monospace" fill="#626262">src-07</text>
+<rect x="89.6" y="136" width="10.496" height="19.2" fill="#cfcfcf" stroke="#141414" stroke-width="1"/>
+<text x="106.096" y="149.6" font-size="12" font-family="monospace" fill="#626262">src-08</text>
+<rect x="89.6" y="163.2" width="10.496" height="21.6" fill="#e69f00" stroke="#141414" stroke-width="1"/>
+<text x="106.096" y="178" font-size="12" font-family="monospace" fill="#626262">src-09</text>
+<rect x="89.6" y="192.8" width="10.496" height="24" fill="#56b4e9" stroke="#141414" stroke-width="1"/>
+<text x="106.096" y="208.8" font-size="12" font-family="monospace" fill="#626262">src-10</text>
+<rect x="89.6" y="224.8" width="10.496" height="26.4" fill="#3cbf9a" stroke="#141414" stroke-width="1"/>
+<text x="106.096" y="242" font-size="12" font-family="monospace" fill="#626262">src-11</text>
+<rect x="89.6" y="259.2" width="10.496" height="28.8" fill="#f0e442" stroke="#141414" stroke-width="1"/>
+<text x="106.096" y="277.6" font-size="12" font-family="monospace" fill="#626262">src-12</text>
+<rect x="603.904" y="71.467" width="10.496" height="187.2" fill="#8fa8ff" stroke="#141414" stroke-width="1"/>
+<text x="597.904" y="169.067" font-size="12" font-family="monospace" fill="#626262" text-anchor="end">sink</text>
+</svg>

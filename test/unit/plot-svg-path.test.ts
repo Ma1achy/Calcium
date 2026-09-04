@@ -357,6 +357,23 @@ const datumFor = (form: PlotForm): Record<string, unknown> => {
       },
     };
   }
+  // **The same shape with a weight on every edge** (C04 I92) — `graph`'s datum
+  // is refused on `sankey` and a sankey's on `graph`, so the two cannot share
+  // an entry however alike they look. Unequal weights, because equal ones are
+  // the degenerate input on which a ribbon drawn at the wrong width still
+  // agrees with every other.
+  if (form === "sankey") {
+    return {
+      series: [],
+      graph: {
+        nodes: [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "d" }],
+        edges: [
+          { from: "a", to: "b", weight: 3 }, { from: "a", to: "c", weight: 1 },
+          { from: "b", to: "d", weight: 3 }, { from: "c", to: "d", weight: 1 },
+        ],
+      },
+    };
+  }
   // **A fourth datum shape, and the family holds two of them** (§3ak.26). A
   // pie and a waffle read `segments`; a radar reads `categories` + `series`, and
   // it is the only member of its family that has a pin to sit outside of.
@@ -468,7 +485,23 @@ const datumFor = (form: PlotForm): Record<string, unknown> => {
  */
 function blockFor(form: PlotForm, id: string, height: number): Plot {
   if (svgFamilyOf(form) !== "facets") {
-    return b.plot({ id, form, height, axes: true, ...datumFor(form) } as Parameters<typeof b.plot>[0]);
+    const spec = { id, form, height, axes: true, ...datumFor(form) } as Parameters<typeof b.plot>[0];
+    // **`sankey` goes through the builder the day the builder admits it.**
+    // `b.plot`'s C04 I69 guard reads `drawn !== "graph"` and refuses a sankey's
+    // `graph`, while the validator admits it (C04 I92, T2.38) — the two gates
+    // disagree, which is the state GG1 exists to catch one form over. The
+    // builder is not this lane's file; the fix is written to its owner
+    // (`src/shell/builders/index.ts`, the `graph` arm) and this branch expires
+    // on its own: once `b.plot` accepts the block, the try succeeds and the
+    // fallback is dead code that `SK10` reports.
+    if (form === "sankey") {
+      try {
+        return b.plot(spec);
+      } catch {
+        return vmBlock({ kind: "plot", ...spec } as Plot);
+      }
+    }
+    return b.plot(spec);
   }
   return vmBlock({
     kind: "plot", id, form, height, axes: true, series: [],

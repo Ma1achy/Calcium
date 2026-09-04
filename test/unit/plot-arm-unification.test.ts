@@ -655,7 +655,7 @@ describe("U — the seam, asserted from both arms", () => {
         tally[i]![kind] += 1;
       });
     }
-    expect(forms, "forms traced").toBe(47); // cells-ok — a form count
+    expect(forms, "forms traced").toBe(48); // cells-ok — a form count; 47 before `sankey`
 
     // **The record, and it is the specification.** A cell moving is a finding:
     // a rung that stops changing a form, or starts changing one it did not.
@@ -698,11 +698,18 @@ describe("U — the seam, asserted from both arms", () => {
     // | 8 → 1 | `layout` | **the arm switches** — `halfBlockEligible` needs 8, so below the floor the picture becomes marker glyphs at different coordinates |
     // | 1 → ascii | `glyph` | the marker arm both sides, unicode marks to ASCII marks at the same positions |
     // | 24 → wide | `layout` | **the arm switches again, on `ambiguousWidth` rather than on colour** — the one rung where a *width* capability moves geometry, and the reason `halfBlockEligible` reads three fields rather than one |
+    //
+    // **`sankey` contributed one cell to each edge too, and none of them is a
+    // `layout`** (C12 §3ap): the geometry is a function of the flows and the
+    // height and of nothing the ladder moves. `colour` at both colour edges —
+    // the slots quantise, then vanish, and the stripped frame is byte-identical
+    // (SK7's equality) — and `glyph` at the two alphabet edges, where
+    // `sankeyAlphabet` swaps `▀ ▄ █ ▒` for `# - =` in one expression.
     expect(tally).toEqual([
-      { same: 1, colour: 46, glyph: 0, layout: 0 },
-      { same: 1, colour: 21, glyph: 3, layout: 22 },
-      { same: 0, colour: 0, glyph: 38, layout: 9 },
-      { same: 0, colour: 0, glyph: 38, layout: 9 },
+      { same: 1, colour: 47, glyph: 0, layout: 0 },
+      { same: 1, colour: 22, glyph: 3, layout: 22 },
+      { same: 0, colour: 0, glyph: 39, layout: 9 },
+      { same: 0, colour: 0, glyph: 39, layout: 9 },
     ]);
   });
 
@@ -806,7 +813,7 @@ describe("U — the seam, asserted from both arms", () => {
     // drawable at this rung and `truncate` reserves both its cells since F292,
     // so its width is a cost and not a defect. `~` is the *repertoire* fallback,
     // which is a different question (§3ak.24).
-    expect(frames, "catalogue variants rendered at the wide rung").toBe(238); // cells-ok — a frame count; 213 + twenty-two fixtures for unreached rules + `line/log`, `line/whiskers-placed`, `pie/all-zero`
+    expect(frames, "catalogue variants rendered at the wide rung").toBe(244); // cells-ok — a frame count; 213 + twenty-two fixtures for unreached rules + `line/log`, `line/whiskers-placed`, `pie/all-zero` + the six `sankey` variants
     expect([...seen.keys()].sort(), "two-cell characters still emitted").toEqual(["…"]);
   });
 

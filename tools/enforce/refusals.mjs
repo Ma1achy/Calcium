@@ -110,18 +110,18 @@ export const REFUSALS = Object.freeze([
   //
   // Each of these was a sentence that stayed true in the document after the
   // tree moved under it. The new rows name the premise that actually holds.
-  { id: "R18", where: "CALCIUM_ROADMAP.md § Fights the architecture · Video / GIF",
-    premise: { absent: "decodeGif(" },
-    why: "a cost refusal: `decodePng` is the only codec, nothing carries a second raster, and the frame scheduler was never the obstacle. The day a GIF decoder lands the cost has been paid and the row is re-argued" },
-  { id: "R19", where: "CALCIUM_ROADMAP.md § Fights the architecture · Video / GIF",
+  { id: "R18", where: "CALCIUM_ROADMAP.md § Already shipped · Video / GIF",
+    premise: { present: "decodeGif(" },
+    why: "**expired and converted 2026-09-04**: the cost refusal was paid — `decodeGif` in `src/presentation/image/gif.ts` (299 lines, LZW and compositing in-tree, no dependency row), `Frames` in `src/shell/frames.ts`, and the wake shared with the orbit. The row now says BUILT and rests on the decoder being in the tree; the day it is removed the roadmap entry is describing a decoder that does not exist" },
+  { id: "R19", where: "CALCIUM_ROADMAP.md § Already shipped · Video / GIF",
     premise: { present: "ORBIT_RATE" },
-    why: "the true premise: a continuous full-frame redraw on C03's `stream` rung already exists — the orbit, delta-timed in `session.ts` (C22 I74). The ruling's *the scheduler carries 30 fps today* rests on that consumer being in the tree; if the orbit goes, the frame path the ruling cites goes with it" },
-  { id: "R20", where: "C12 §3d · Sankey",
-    premise: { absent: "sankeyArea(" },
-    why: "not a fold over `graph`: a weighted edge, a bar for a label, a ribbon for a mask bit, left-to-right for top-down. Refused on no consumer — no weighted edge set exists — and the form's own symbol is what expires it" },
-  { id: "R21", where: "C12 §3d · Sankey",
+    why: "the premise the ruling rested on and the one the build rides: a continuous redraw on C03's `stream` rung — the orbit, delta-timed in `session.ts` (C22 I74). The GIF's frame advance is on the **same** timer path (`#motionAt`, C22 I77), so if the orbit's wake goes, the frames' wake goes with it and the roadmap entry's *rides the orbit's wake* is false" },
+  // R20 expired 2026-09-04 and is removed rather than re-argued: it watched
+  // `sankeyArea(` absent, and the form is built (C12 §3ap). Its premise did
+  // what a premise is for — the row failed the day the symbol appeared.
+  { id: "R21", where: "C12 §3ap · sankey",
     premise: { present: "graphLayers" },
-    why: "the fold premise: passes 1–5 transfer as `graphLayers` and nothing after them does. The ruling *a new form over the shared layering* rests on the shared layering existing" },
+    why: "the fold premise, now the form's foundation: passes 1–5 are `graphLayers` and the sankey is a placement and a drawing over them. The ruling *a new form over the shared layering, not an option on `graph`* rests on the shared layering existing" },
   { id: "R22", where: "CALCIUM_ROADMAP.md § Session resume / history · Rewind",
     premise: { present: "UNDO_LIMIT" },
     why: "narrowed 2026-09-03 from *every mutation is reversible and nothing is* to *every transcript mutation*: the editor's are (C17 §6, two stacks, 200 units). The narrowed sentence rests on the editor's undo existing; the transcript half — `ViewPatch` has no delete, `evict` has no inverse — is a claim about absence that has no single symbol" },

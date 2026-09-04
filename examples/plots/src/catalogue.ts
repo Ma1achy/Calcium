@@ -349,13 +349,14 @@ export const CATALOGUE: Readonly<Record<PlotForm, Entry>> = Object.freeze({
   flame: { says: "a stack, widest at the root", at: (p, h, x) => plot("flame", h, { hierarchy: budget(p), series: [], ...x }) },
   icicle: { says: "the same, growing down", at: (p, h, x) => plot("icicle", h, { hierarchy: budget(p), series: [], ...x }) },
   tree: { says: "the shape, as nodes and edges", at: (p, h, x) => plot("tree", h, { hierarchy: budget(p), series: [], ...x }) },
-  // PLACEHOLDER — the sankey lane replaces this with the catalogue's real entry.
+  // Three sources into two sinks, and the phase moves one flow so the ribbon
+  // it draws — and the bar at each end of it — changes height (C12 §3ap).
   sankey: { says: "flows between nodes, ribbons by weight", at: (p, h, x) => plot("sankey", h, {
     graph: {
-      nodes: [{ id: "in" }, { id: "cache" }, { id: "miss" }, { id: "out" }],
+      nodes: [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "x" }, { id: "y" }],
       edges: [
-        { from: "in", to: "cache", weight: 3 + (p % 3) }, { from: "in", to: "miss", weight: 1 },
-        { from: "cache", to: "out", weight: 3 + (p % 3) }, { from: "miss", to: "out", weight: 1 },
+        { from: "a", to: "x", weight: 4 + (p % 3) }, { from: "a", to: "y", weight: 1 },
+        { from: "b", to: "y", weight: 3 }, { from: "c", to: "x", weight: 2 },
       ],
     }, series: [], ...x }) },
   graph: { says: "nodes and the edges between", at: (p, h, x) => plot("graph", h, {

@@ -1407,17 +1407,92 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
       ],
     },
   },
-  // PLACEHOLDER — the sankey lane replaces this with the catalogue's real variants.
+  // **Six variants, one per rule the form has** (C12 §3ap.4). Each is chosen
+  // so that one interaction is visible in the frame and would be invisible in
+  // the others: unequal flows, a chain through a hub, a node that emits more
+  // than it takes, a cycle the reversal pass turns round (with an edge that
+  // spans two layers, so a dummy carries a ribbon through), labels that do not
+  // fit at 40 columns, and more sources than the height has rows for.
   sankey: {
+    // Three sources into two sinks, every flow a different weight.
     default: {
       form: "sankey", height: 9, series: [],
       graph: {
-        nodes: [{ id: "a" }, { id: "b" }, { id: "x" }, { id: "y" }],
+        nodes: [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "x" }, { id: "y" }],
         edges: [
-          { from: "a", to: "x", weight: 3 },
+          { from: "a", to: "x", weight: 5 },
           { from: "a", to: "y", weight: 1 },
-          { from: "b", to: "y", weight: 2 },
+          { from: "b", to: "y", weight: 3 },
+          { from: "c", to: "x", weight: 2 },
         ],
+      },
+    },
+    // A chain through two middle nodes; every bar's in-side equals its out-side.
+    chain: {
+      form: "sankey", height: 9, series: [],
+      graph: {
+        nodes: [{ id: "in" }, { id: "cache" }, { id: "miss" }, { id: "out" }],
+        edges: [
+          { from: "in", to: "cache", weight: 4 },
+          { from: "in", to: "miss", weight: 1 },
+          { from: "cache", to: "out", weight: 4 },
+          { from: "miss", to: "out", weight: 1 },
+        ],
+      },
+    },
+    // `hub` emits 5 and receives 2: the bar is the larger side and the in-side
+    // leaves bare bar below its one ribbon (K6).
+    loss: {
+      form: "sankey", height: 9, series: [],
+      graph: {
+        nodes: [{ id: "src" }, { id: "hub" }, { id: "p" }, { id: "q" }],
+        edges: [
+          { from: "src", to: "hub", weight: 2 },
+          { from: "hub", to: "p", weight: 3 },
+          { from: "hub", to: "q", weight: 2 },
+        ],
+      },
+    },
+    // `c -> a` closes a cycle and is reversed; drawn as `a -> c` it spans two
+    // layers, so a dummy in the middle layer carries its ribbon through, and
+    // the notice row says `1 reversed`.
+    cycle: {
+      form: "sankey", height: 9, series: [],
+      graph: {
+        nodes: [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "d" }],
+        edges: [
+          { from: "a", to: "b", weight: 3 },
+          { from: "b", to: "c", weight: 2 },
+          { from: "c", to: "a", weight: 1 },
+          { from: "b", to: "d", weight: 2 },
+        ],
+      },
+    },
+    // Fourteen, twelve and sixteen cells of label: at 80 columns all three
+    // fit; at 40 the gaps are nineteen, the two outer labels fit them exactly
+    // and the middle one would run into the last, so it is the one dropped.
+    "long-labels": {
+      form: "sankey", height: 7, series: [],
+      graph: {
+        nodes: [{ id: "authentication" }, { id: "rate-limiter" }, { id: "upstream-service" }],
+        edges: [
+          { from: "authentication", to: "rate-limiter", weight: 3 },
+          { from: "rate-limiter", to: "upstream-service", weight: 3 },
+        ],
+      },
+    },
+    // Twelve sources into one sink in five rows: the least-flow sources are
+    // dropped until the stack fits, and the notice row names them (I8).
+    crowded: {
+      form: "sankey", height: 5, series: [],
+      graph: {
+        nodes: [
+          ...Array.from({ length: 12 }, (_n, i) => ({ id: `src-${String(i + 1).padStart(2, "0")}` })),
+          { id: "sink" },
+        ],
+        edges: Array.from({ length: 12 }, (_n, i) => ({
+          from: `src-${String(i + 1).padStart(2, "0")}`, to: "sink", weight: i + 1,
+        })),
       },
     },
   },

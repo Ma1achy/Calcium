@@ -60,7 +60,10 @@ type Edge = readonly [number, number];
  * Iterative rather than recursive, because a 256-node path is 256 frames and a
  * renderer that throws on deep input fails on the data it was built for.
  */
-function acyclic(n: number, edges: readonly Edge[]): { dag: readonly Edge[]; reversed: number } {
+function acyclic(
+  n: number,
+  edges: readonly Edge[],
+): { dag: readonly Edge[]; origins: readonly (readonly number[])[]; reversed: number } {
   const out = Array.from({ length: n }, (): number[] => []);
   edges.forEach(([a], i) => out[a]!.push(i));
   const state = new Int8Array(n);
@@ -89,16 +92,28 @@ function acyclic(n: number, edges: readonly Edge[]): { dag: readonly Edge[]; rev
     }
   }
 
-  const seen = new Set<string>();
+  // **A deduplicated edge keeps every input it stands for** (§3ap.4 K1). The
+  // drawing of `graph` needs only the surviving edge; a sankey needs the weight
+  // of both, because a flow that was drawn once and counted once is data loss
+  // in the other direction. `origins` is indices into `edges`, one list per
+  // surviving edge, and the first entry is the one the edge was created from.
+  const seen = new Map<string, number>();
   const dag: Edge[] = [];
+  const origins: number[][] = [];
   edges.forEach(([a, b], i) => {
     const e: Edge = back.has(i) ? [b, a] : [a, b];
     const key = `${e[0]}:${e[1]}`;
-    if (e[0] === e[1] || seen.has(key)) return;
-    seen.add(key);
+    if (e[0] === e[1]) return;
+    const kept = seen.get(key);
+    if (kept !== undefined) {
+      origins[kept]!.push(i);
+      return;
+    }
+    seen.set(key, dag.length); // cells-ok — an edge count
     dag.push(e);
+    origins.push([i]);
   });
-  return { dag, reversed: back.size };
+  return { dag, origins, reversed: back.size };
 }
 
 // ------------------------------------------------------------- pass 3
@@ -136,7 +151,7 @@ function expand(
   n: number,
   dag: readonly Edge[],
   L: readonly number[],
-): { layers: number[][]; seg: Edge[] } {
+): { layers: number[][]; seg: Edge[]; of: number[] } {
   const layers: number[][] = [];
   const push = (l: number, id: number): void => {
     while (layers.length <= l) layers.push([]); // cells-ok — a layer count
@@ -145,10 +160,13 @@ function expand(
   for (let u = 0; u < n; u += 1) push(L[u]!, u);
   let next = n;
   const seg: Edge[] = [];
-  for (const [a, b] of dag) {
+  /** The dag edge each segment is a piece of, so a chain through dummies stays one edge. */
+  const of: number[] = [];
+  dag.forEach(([a, b], k) => {
     if (L[b]! - L[a]! <= 1) {
       seg.push([a, b]);
-      continue;
+      of.push(k);
+      return;
     }
     let prev = a;
     for (let l = L[a]! + 1; l < L[b]!; l += 1) {
@@ -156,11 +174,13 @@ function expand(
       next += 1;
       push(l, d);
       seg.push([prev, d]);
+      of.push(k);
       prev = d;
     }
     seg.push([prev, b]);
-  }
-  return { layers, seg };
+    of.push(k);
+  });
+  return { layers, seg, of };
 }
 
 // ------------------------------------------------------------- pass 5
@@ -288,6 +308,13 @@ export function graphLayers(g: Graph): {
   rows: readonly (readonly number[])[];
   reversed: number;
   edges: readonly (readonly [number, number])[];
+  /**
+   * For each segment, the indices into `g.edges` it carries — one for an edge
+   * drawn as declared, two where reversal made two declared edges the same one,
+   * the first being the edge that survived (§3ap.4 K1). A sankey sums the
+   * weights over it; `graph` reads nothing from it.
+   */
+  origins: readonly (readonly number[])[];
   labelOf: (id: number) => string;
 } {
   const keep = new Set(g.nodes.map((_n, i) => i));
@@ -296,14 +323,20 @@ export function graphLayers(g: Graph): {
     rows: laid.rows,
     reversed: laid.reversed,
     edges: laid.seg.map((e) => [e[0], e[1]] as const),
+    origins: laid.origins,
     labelOf: (id) => (id < g.nodes.length ? labelOf(g, id) : ""), // cells-ok — a node count
   };
 }
 
-function lay(g: Graph, keep: ReadonlySet<number>): { rows: number[][]; seg: readonly Edge[]; reversed: number } {
+function lay(
+  g: Graph,
+  keep: ReadonlySet<number>,
+): { rows: number[][]; seg: readonly Edge[]; origins: readonly (readonly number[])[]; reversed: number } {
   const index = new Map(g.nodes.map((node, i) => [node.id, i]));
   const edges: Edge[] = [];
-  for (const e of g.edges) {
+  /** The declared index of each edge that survived the two filters below. */
+  const declared: number[] = [];
+  for (const [i, e] of g.edges.entries()) {
     const a = index.get(e.from);
     const b = index.get(e.to);
     if (a === undefined || b === undefined) continue;
@@ -311,14 +344,20 @@ function lay(g: Graph, keep: ReadonlySet<number>): { rows: number[][]; seg: read
     // behind draws a line to a place nothing is.
     if (!keep.has(a) || !keep.has(b)) continue;
     edges.push([a, b]);
+    declared.push(i);
   }
-  const { dag, reversed } = acyclic(g.nodes.length, edges); // cells-ok — an edge count
+  const { dag, origins, reversed } = acyclic(g.nodes.length, edges); // cells-ok — an edge count
   const L = layerOf(g.nodes.length, dag); // cells-ok — an edge count
-  const { layers, seg } = expand(g.nodes.length, dag, L); // cells-ok — an edge count
+  const { layers, seg, of } = expand(g.nodes.length, dag, L); // cells-ok — an edge count
   const kept = layers
     .map((row) => row.filter((id) => id >= g.nodes.length || keep.has(id))) // cells-ok — an edge count
     .filter((row) => row.length > 0); // cells-ok — a node count
-  return { rows: order(kept, seg), seg, reversed };
+  return {
+    rows: order(kept, seg),
+    seg,
+    origins: of.map((k) => (origins[k] ?? []).map((i) => declared[i] ?? i)),
+    reversed,
+  };
 }
 
 /**

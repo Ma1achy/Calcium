@@ -449,6 +449,12 @@ SKIPPED = {
     "graph": "no matplotlib primitive; the reference is the Sugiyama pipeline "
              "and F242 measures it directly — crossings, fit and collisions "
              "over 360 graphs",
+    # A sankey is the same pipeline plus a placement. matplotlib's `Sankey` is
+    # a single-node flow diagram with arrows and no layering, so it is not the
+    # figure C12 §3ap draws; the references compared by eye were d3-sankey and
+    # plotly's `go.Sankey`, and neither is a pip line this image should carry.
+    "sankey": "no matplotlib primitive of this shape; the layered references "
+              "are d3/plotly, and SK1-SK6 assert the geometry directly",
     "smallmultiples": "a composition of other forms; matplotlib's subplot grid "
                       "shares no geometry with ours to diff",
     "pairplot": "same — seaborn's PairGrid is furniture-dominated at this size",

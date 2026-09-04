@@ -26,8 +26,6 @@ import { paint, rows, slot, tone, type Span } from "../blocks/paint.js";
 import { cells, fitStyled, truncate } from "../text.js";
 import { SGR_RESET } from "../../terminal/escapes.js";
 
-/** The sankey renderer lands after its type (C04 I92, C12 §3d); the lane that builds it deletes this. */
-export const SANKEY_IS_NOT_BUILT = "sankeyArea";
 import { AXIS_GUTTER, FRAME_RIGHT, plotAreaRows, plotHeight } from "./height.js";
 import { columnsForAspect } from "./aspect.js";
 import {
@@ -37,6 +35,7 @@ import {
 } from "./figure.js";
 import { treeArea } from "./tree.js";
 import { graphArea } from "./graph.js";
+import { sankeyArea, type SankeyCell } from "./sankey.js";
 import { curveRows, isBlank } from "./curve.js";
 import { crossRow, gridRow, xRowFor, xTitleRow } from "./furniture.js";
 import type { Axis, XAxis } from "./axes.js";
@@ -89,7 +88,7 @@ import { horizonGrid, horizonIsSigned, horizonLegendSpans, horizonSpans } from "
 import { smallMultiplesRows } from "./facet.js";
 import { stripHeights } from "./strips.js";
 import type { Annotation, OHLC, QuartileSummary, Plot, PlotForm, Series } from "../../data/viewmodel/index.js";
-import type { ColourRef } from "../theme/index.js";
+import type { ColourRef, Style } from "../theme/index.js";
 import type { BlockDefinition, NavElement, RenderContext } from "../blocks/types.js";
 import type { MeasureFn } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
@@ -1958,6 +1957,69 @@ function graphRows(block: Plot, width: number, ctx: RenderContext): readonly str
   return composeRows(plotHeight(block), [], out, []);
 }
 
+/**
+ * `sankey` — bars and ribbons over `graph`'s layering, and the same notice row
+ * (C12 I110, I111, §3ap).
+ *
+ * **The area names slots and this is where they are resolved.** `sankeyArea`
+ * returns cells carrying `categorical.cN` refs — a foreground for the owner and,
+ * where two owners share a cell, a background for the lower one — and C10
+ * turns each into a `Style` here at the terminal's depth (I4). Adjacent cells
+ * in one style coalesce into one span, so a plain row's bytes are what they
+ * would have been from a string.
+ */
+function sankeyRows(block: Plot, width: number, ctx: RenderContext): readonly string[] {
+  const g = block.graph;
+  const areaRows = plotAreaRows(block);
+  const layout: Layout = { gutter: 0, labelColumn: 0, areaWidth: width, areaRows, width };
+  if (g === undefined) return emptyRows(block, layout, ctx);
+
+  const drawn = sankeyArea(g, areaRows, width, ctx.capabilities);
+  const styleOf = (cell: SankeyCell): Style | undefined => {
+    if (cell.ref === undefined) return undefined;
+    const fg = slot(cell.ref, ctx.theme, ctx.capabilities);
+    if (cell.background === undefined) return fg;
+    const bg = slot(cell.background, ctx.theme, ctx.capabilities).colour;
+    return bg === undefined ? fg : { ...fg, background: bg };
+  };
+  const out = drawn.rows.map((cells) => {
+    const spans: Span[] = [];
+    let run = "";
+    let key = "";
+    let style: Style | undefined;
+    const flush = (): void => {
+      if (run !== "") spans.push(style === undefined ? { text: run } : { text: run, style });
+      run = "";
+    };
+    for (const cell of cells) {
+      const k = `${cell.ref ?? ""}|${cell.background ?? ""}`;
+      if (k !== key) {
+        flush();
+        key = k;
+        style = styleOf(cell);
+      }
+      run += cell.text;
+    }
+    flush();
+    return line(spans, layout, ctx);
+  });
+  const sep = partSeparator(ctx.capabilities);
+  const parts: string[] = [];
+  if (drawn.dropped.length > 0) parts.push(`+${String(drawn.dropped.length)} more`); // cells-ok — a node count
+  if (drawn.reversed > 0) parts.push(`${String(drawn.reversed)} reversed`); // cells-ok — an edge count
+  if (drawn.dropped.length > 0) parts.push(drawn.dropped.join(sep)); // cells-ok — a node count
+  if (parts.length > 0) { // cells-ok — a part count
+    out.push(
+      line(
+        [{ text: areaText(parts.join(sep), layout, ctx), style: tone("warn", ctx.theme, ctx.capabilities) }],
+        layout,
+        ctx,
+      ),
+    );
+  }
+  return composeRows(plotHeight(block), [], out, []);
+}
+
 function treemapRows(block: Plot, width: number, ctx: RenderContext): readonly string[] {
   const root = block.hierarchy;
   const areaRows = plotAreaRows(block);
@@ -2583,9 +2645,7 @@ const FORM_ROWS: Readonly<
   treemap: (block, width, ctx) => treemapRows(block, width, ctx),
   tree: (block, width, ctx) => treeRows(block, width, ctx),
   graph: (block, width, ctx) => graphRows(block, width, ctx),
-  sankey: () => {
-    throw new Error(SANKEY_IS_NOT_BUILT);
-  },
+  sankey: (block, width, ctx) => sankeyRows(block, width, ctx),
 
   // --- the six that had no renderer -------------------------------------
   //
