@@ -40,7 +40,7 @@
 import { HAS_CALLOUT, HAS_DETAIL_RUNGS, HAS_Y_GUTTER, HIERARCHY_ROLE, HONOURS_AXIS_CROSS, IS_FIELD_FORM, IS_MATRIX, ORIGIN_DEFAULT, STYLE_ARMS, block, cell, hierarchyFault, markdownBlocks, rebuild } from "../../data/viewmodel/index.js";
 import { samplesChildren, samplesLayout, type Sample, type SamplesOptions, samplesScale } from "./samples.js";
 import { readFileSync } from "node:fs";
-import { digestOf, overlayFault, parseAreas } from "../../data/viewmodel/index.js";
+import { digestOf, intralineLines, overlayFault, parseAreas } from "../../data/viewmodel/index.js";
 import { COLORMAPS } from "../../data/colormaps/index.js";
 import { parseStartDate } from "../../data/dates.js";
 import type {
@@ -84,6 +84,7 @@ import { defaulted, seq } from "./seq.js";
 import type {
   BlockOpts,
   TextOpts,
+  ValuedTextOpts,
   CellInput,
   ChipInput,
   ComparisonRow,
@@ -173,7 +174,6 @@ function rule(label: string, meta?: string, opts?: TextOpts): Rule {
       id: idOf(opts, "rule"),
       label,
       ...(opts?.spans === undefined ? {} : { spans: opts.spans }),
-      ...(opts?.colormap === undefined ? {} : { colormap: opts.colormap }),
       ...(meta === undefined ? {} : { meta }),
     } as Rule,
     opts,
@@ -181,7 +181,7 @@ function rule(label: string, meta?: string, opts?: TextOpts): Rule {
   );
 }
 
-function noticeOf(tone: Tone, text: string, glyph?: Glyph, opts?: TextOpts): Notice {
+function noticeOf(tone: Tone, text: string, glyph?: Glyph, opts?: ValuedTextOpts): Notice {
   const g = glyphFor(tone, glyph);
   return finish<Notice>(
     {
@@ -199,10 +199,10 @@ function noticeOf(tone: Tone, text: string, glyph?: Glyph, opts?: TextOpts): Not
 }
 
 const notice = Object.assign(noticeOf, {
-  ok: (text: string, opts?: TextOpts): Notice => noticeOf("ok", text, undefined, opts),
-  warn: (text: string, opts?: TextOpts): Notice => noticeOf("warn", text, undefined, opts),
-  error: (text: string, opts?: TextOpts): Notice => noticeOf("error", text, undefined, opts),
-  info: (text: string, opts?: TextOpts): Notice => noticeOf("info", text, undefined, opts),
+  ok: (text: string, opts?: ValuedTextOpts): Notice => noticeOf("ok", text, undefined, opts),
+  warn: (text: string, opts?: ValuedTextOpts): Notice => noticeOf("warn", text, undefined, opts),
+  error: (text: string, opts?: ValuedTextOpts): Notice => noticeOf("error", text, undefined, opts),
+  info: (text: string, opts?: ValuedTextOpts): Notice => noticeOf("info", text, undefined, opts),
 });
 
 /**
@@ -642,9 +642,11 @@ function plot(
     // the one that matters: a node set accepted on a `line` is data the
     // renderer never opens, and accepted-and-ignored is the worst of three
     // answers (F207).
-    if (graph !== undefined && drawn !== "graph") {
+    // **`sankey` takes `graph` on `graph`'s own rule** (C04 I92, C12 §3ap): required
+    // there, refused everywhere else, and `graphLayout` stays `graph`'s alone.
+    if (graph !== undefined && drawn !== "graph" && drawn !== "sankey") {
       throw new Error(
-        `b.plot: "graph" is set on form "${drawn}" (C04 I69) — only a graph reads it`,
+        `b.plot: "graph" is set on form "${drawn}" (C04 I69) — only a graph or a sankey reads it`,
       );
     }
     if (graphLayout !== undefined && drawn !== "graph") {
@@ -1087,7 +1089,11 @@ function patch(
       id: idOf(spec, "patch"),
       path,
       language,
-      hunks,
+      // **The intra-line diff runs here, once** (C25 I10, C04 I91). The builder
+      // is the writer of `Hunk.lines[].spans`; the renderer paints what the line
+      // carries and never diffs (C25 I7). A hunk whose lines already carry spans
+      // keeps them, which is what makes this idempotent over its own output.
+      hunks: hunks.map((hunk) => ({ ...hunk, lines: intralineLines(hunk.lines) })),
       ...(layout === undefined ? {} : { layout }),
       ...(collapsedAfter === undefined ? {} : { collapsedAfter }),
       ...(actions === undefined ? {} : { actions }),
@@ -1184,10 +1190,12 @@ function image(
     );
   }
   const bytes = data ?? readFileSync(path ?? "").toString("base64");
-  if (!bytes.startsWith("iVBORw0KGgo")) {
+  // PNG's eight-byte signature, or GIF's `GIF87a` / `GIF89a` (C04 I93) — as
+  // base64 prefixes, since that is the form the block carries.
+  if (!bytes.startsWith("iVBORw0KGgo") && !bytes.startsWith("R0lGODdh") && !bytes.startsWith("R0lGODlh")) {
     throw new TypeError(
-      "b.image: the bytes are not a PNG (C04 I73) — phase 1 reads PNG only, and a signature that " +
-        "does not match is a format this cannot draw rather than an image that is broken",
+      "b.image: the bytes are not a PNG or a GIF (C04 I73, C04 I93) — a signature that matches " +
+        "neither is a format this cannot draw rather than an image that is broken",
     );
   }
   // **One refusal, thrown here and pushed by the validator** (C04 I74).
@@ -1410,7 +1418,7 @@ function group(
   );
 }
 
-function raw(text: string, opts?: TextOpts): Raw {
+function raw(text: string, opts?: ValuedTextOpts): Raw {
   return finish<Raw>(
     {
       kind: "raw",

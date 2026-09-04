@@ -591,6 +591,10 @@ function checkForbiddenEdges(files, readFile) {
  * that no builder *can*.
  */
 export const BUILDER_NEVER = Object.freeze({
+  capped:
+    "written only by C09's registry when a block exceeds `maxBlockRows` (C14 I24, C09 §2b) — " +
+    "the marker it drives says what the framework cut, and a builder that set it would let a " +
+    "producer claim a cut that never happened",
   minHeight:
     "written only by `op: \"reserve\"` (C04 I67, §3d) — it is view state the shell sets " +
     "after a renderer gave way, and nothing on the far side or in an author's hands knows " +

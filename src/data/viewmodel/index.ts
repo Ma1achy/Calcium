@@ -91,6 +91,8 @@ export { hierarchyFault, validateBlock, validateDocument, type Validity } from "
 
 export { applyPatch } from "./patch.js";
 
+export { changedRuns, intralineLines, type ChangedRun } from "./intraline.js";
+
 export { childBlocks, hasChildren, isContainerKind, type ContainerBlock } from "./tree.js";
 
 export { markdownBlocks } from "./markdown.js";

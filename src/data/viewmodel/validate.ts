@@ -793,6 +793,11 @@ function splitsSurrogate(text: string, i: number): boolean {
 const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
   rule: (b, e, at) => {
     requireString(b, "label", e, at);
+    // C04 I90 — a rule has no valued span to read a map through; the builder
+    // half is `ValuedTextOpts`, and this is the gate half (F589).
+    if (b["colormap"] !== undefined) {
+      e.push(`${at}: "colormap" is refused on rule — a rule has no valued span to read it (C04 I90)`);
+    }
     checkSpans(b, "label", e, at);
   },
   notice: (b, e, at) => {
@@ -1219,7 +1224,7 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
   /**
    * C04 I73, §3g.1 — refused at both gates, each naming its own part.
    *
-   * **The PNG check is a signature check and not a decode.** `data/` may not
+   * **The PNG-or-GIF check is a signature check and not a decode.** `data/` may not
    * import the codec — that is L1's — and a gate that decoded would do the
    * expensive half of the work twice. The eight signature bytes are what
    * separates *this is not a PNG* from *this PNG is broken*, and the second is
@@ -1243,10 +1248,12 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     if (typeof data === "string") {
       // The base64 of the eight-byte PNG signature. Checked as a prefix so a
       // truncated or mislabelled file is refused here rather than drawn.
-      if (!data.startsWith("iVBORw0KGgo")) {
+      // PNG, GIF87a or GIF89a by base64 signature (C04 I73, I93) — the same three
+      // prefixes `b.image` checks, so the two gates are one rule.
+      if (!data.startsWith("iVBORw0KGgo") && !data.startsWith("R0lGODdh") && !data.startsWith("R0lGODlh")) {
         e.push(
-          `${at}: "data" is not a PNG (C04 I73) — phase 1 reads PNG only, and a signature that ` +
-            `does not match is a format this cannot draw rather than an image that is broken`,
+          `${at}: "data" is not a PNG or a GIF (C04 I73, C04 I93) — a signature that matches neither ` +
+            `is a format this cannot draw rather than an image that is broken`,
         );
       }
     }
@@ -2378,7 +2385,7 @@ function childBlocksOf(b: Record<string, unknown>): readonly unknown[] {
 // `window` rather than an op (C04 I82, §3d): the argument is the same — a far
 // side naming which of its own lines a reader is looking at is declaring view
 // state it has no standing to declare.
-const FAR_SIDE_REFUSES_ON_BLOCK: readonly string[] = Object.freeze(["minHeight", "lineRange"]);
+const FAR_SIDE_REFUSES_ON_BLOCK: readonly string[] = Object.freeze(["minHeight", "lineRange", "capped"]);
 const FAR_SIDE_REFUSES_ON_ROW: readonly string[] = Object.freeze(["expanded"]);
 
 function walkBlock(

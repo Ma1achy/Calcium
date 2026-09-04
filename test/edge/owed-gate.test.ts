@@ -42,6 +42,12 @@ describe("C04 §3am.1 (C04 I89, C04 I90) — tone and value on a span", () => {
     const none = errorsOf([{ kind: "notice", id: "n", tone: "default", text: "alpha beta", spans: [{ from: 6, to: 10, value: 0 }] } as unknown as Block]);
     expect(none).toContain("I90");
   });
+
+  it("T2.36 (C04 I90): colormap on a rule is one gate error — a rule has no valued span", () => {
+    const r = errorsOf([{ kind: "rule", id: "r", label: "x", colormap: "viridis" } as unknown as Block]);
+    expect(r).toContain("colormap");
+    expect(r).toContain("I90");
+  });
 });
 
 describe("C04 I91 — a hunk line's spans are attributes only", () => {

@@ -438,7 +438,16 @@ export type Gap = Readonly<{ gapBefore?: boolean }>;
  * all: `validateDocument` refuses it at the adapter boundary, which is the half
  * F231 found missing from `expanded`.
  */
-export type Floor = Readonly<{ minHeight?: number }>;
+export type Floor = Readonly<{
+  minHeight?: number;
+  /**
+   * The registry's row cap, applied (C14 I24, C09 §2b). `shown` is the rows this
+   * capped form draws, `total` the rows the block had. **Not a producer's**
+   * (MG27, `BUILDER_NEVER`): written by C09's registry and refused from a far side
+   * beside `minHeight` and `lineRange` (C04 §4).
+   */
+  capped?: Readonly<{ shown: number; total: number }>;
+}>;
 
 export type Rule = Readonly<{
   kind: "rule";

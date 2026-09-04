@@ -51,7 +51,21 @@ export type TextOpts = BlockOpts &
   Readonly<{
     /** Styled runs inside the text, by code-unit offset (C04 I84). */
     spans?: readonly TextSpan[];
-    /** The map a valued span reads through (C04 I90); `raw` and `notice` only. */
+  }>;
+
+/**
+ * `TextOpts` for the two members that carry a `colormap` — `raw` and `notice`
+ * (C04 I90).
+ *
+ * **Split from `TextOpts` rather than a member of it**, for the reason the
+ * paragraph above gives: `Rule` has no `colormap`, so `b.rule(label, meta,
+ * { colormap })` would build a block carrying a member nothing reads —
+ * F207's shape, at the public door. A narrower type makes supplying one a
+ * compile error where it was a no-op (C04 I76's argument, F85).
+ */
+export type ValuedTextOpts = TextOpts &
+  Readonly<{
+    /** The map a valued span reads through (C04 I90). */
     colormap?: ColormapName;
   }>;
 
