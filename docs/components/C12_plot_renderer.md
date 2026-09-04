@@ -7546,6 +7546,116 @@ question was *does this arm read it*, which only a rendered comparison answers. 
 the same shape and the same blind spot — it reads the type against the files — and **a grep over names
 cannot see a value that arrives through a transform**, which is what this whole pass has been building.
 
+
+### 3ak.49 — the right margin is a fixed fraction and the callout is content, so the callout is drawn off the page
+
+§3ak.41 grew the **left** margin to fit its labels and left the right one at `width · pad` — 25.6 px on
+a 640 canvas — while §3ak.47 gave that side a string whose length is the *series' name and its reading*.
+The two commits are three sections apart and neither is wrong on its own.
+
+```
+line-callout-both     x=620.4  text-anchor="start"  "alpha 0.8774"   →  ends at 707, viewBox is 640
+line-both-axes-narrow x=620.4  text-anchor="start"  "eu-west-1-primary-p99-latency 0.8774"
+                                                                     →  ends at 881, 38% of the figure gone
+```
+
+**Read as a picture, `line-both-axes-narrow` says `eu`.** Two characters of thirty-six, and the fixture's
+own comment in `catalogue-forms.ts` is *the right column's width comes from a callout, which is the case a
+dashboard actually has* — written for the terminal's narrow rung, which sizes that column with
+`calloutWidth(block, ambiguous, stacked)` **before the layout exists** (I48). So the two arms answer *does
+the callout fit* differently and one of them does not ask.
+
+#### Measured first: seven frames, thirteen strings, and the corpus's worst is not the one that was reported
+
+Every `<text>` in all 244 committed frames, laid against its own `viewBox` at the advance measured below:
+
+| frame | string | past the edge |
+|---|---|---|
+| `line-both-axes-narrow` | `eu-west-1-primary-p99-latency 0.8774` | **240.5 px** |
+| `line-callout-both` | `alpha 0.8774` / `beta 99.12` | 67.1 / 52.7 |
+| `line-callout-single` | `0.8774` | 23.8 |
+| `line-callout-name` | `alpha` / `beta` | 16.5 / 9.3 |
+| `line-both-axes-narrow`, `line-callout-*`, `line-yaxis-right`, `line-yaxis-both` | `100` | 2.1 each |
+| `heatmap-both-axes-narrow` | `ap-south-1-primary-db` | 0.5 **inside a clip** |
+
+Two things the count changes. The **right-hand value label** overruns too — `100` at `box.right + 6` is
+three glyphs in a 25.6 px margin — so this is not a callout defect with a callout fix; the margin is
+short for everything drawn in it. And the last row is the one case that degrades gracefully, because
+§3ak.41 put a clip there: contained, cut, *and* the cut is at the head, which is why the clip alone was
+not the remedy then and is not the remedy now.
+
+#### The advance ratio is a guess about a font this arm cannot see, so it is measured and stated as a bound
+
+The proposal was `longest × SVG_FONT_SIZE × 0.6 + gap`, and `0.6` was already in the file as `SVG_EM`,
+documented as *this arm's own estimate*. It is **low for every monospace face measured**, which is the
+one direction that reproduces this defect:
+
+| face | advance ÷ em | how |
+|---|---|---|
+| Courier New, Andale Mono, Monaco | 0.6001 | `hmtx`/`head` over the shipped `.ttf` |
+| DejaVu Sans Mono, Menlo | 0.6021 | same, and confirmed by rendering — 72.2 px for 20 glyphs at size 120 |
+| **SF Mono** (`SFNSMono.ttf`) | **0.6182** | same |
+
+The arm emits `font-family="monospace"`, a **generic** family: the face is the renderer's choice and the
+metrics are unknowable at emit time. So the constant is not an estimate of one font, it is an **upper
+bound over the faces a renderer is likely to pick**, and it is used for exactly two things — reserving
+room, and deciding how many characters fit in room — both of which want the bound and not the mean.
+`SVG_EM` becomes **`SVG_EM_MAX = 0.65`**, 5% above the widest face measured.
+
+**What the bound costs, and what falsifies it.** Too generous is a visible margin and too small is this
+defect again, and the two are not the same size: on the corpus's widest reserved string the headroom is
+`12 × 12 × (0.65 − 0.6182) = 4.6 px` of blank — 0.7% of the width, invisible — against a cut word. The
+falsification is stated rather than assumed away: **a monospace face whose advance exceeds 0.65 clips
+again**, and no face measured is within 5% of it.
+
+#### The ruling
+
+- **The right margin is grown to fit, capped at a third, exactly as the left is** — `rightRoom` mirrors
+  `gutterRoom` and the cap is the same cap for the same reason.
+- **One room for both readers, and it is the maximum** — the callout and the right-hand value labels are
+  drawn in the same column, so two reserves would be two boxes. This is `definition.ts`'s own shape:
+  `right = sides.right ? max(wanted, calloutWidth(...)) : 0`, in pixels.
+- **Past the cap the string is cut with an ellipsis**, through `fitLabel`, so the 36-character callout is
+  contained *and* says it was cut. §3ak.41 wrote that half with no instance in the corpus; this is the
+  instance.
+- **The room is a function of the block, the figure and the layout, and never of the theme.** `area()` is
+  called from two places — the marks walk and the axis emitter — and if the two computed different rooms
+  the marks would be drawn against a different box than the furniture. That is the interaction the walk
+  found, not the overflow.
+- **The reserve is zero where nothing is drawn on the right**, so a frame with no callout and no
+  right-hand labels keeps `width · pad` and does not move. A margin rule that moved figures with nothing
+  to reserve for would be the wrong rule (F325's shape, one direction along).
+
+#### 3ak.49a · The walk — a table, because every one of these rules holds at rest
+
+Structural interactions (§3ak.4's second shape): no event mediates any of these, so a trace would index
+the wrong thing.
+
+| the cell | rule A | rule B | ruling |
+|---|---|---|---|
+| a callout **and** right-hand value labels | reserve the callout's length | reserve the labels' length | one column, `max` of the two — the terminal's own expression |
+| a callout longer than a third of the width | grown to fit | capped at `width / 3` | the cap wins and `fitLabel` marks the cut; `line-both-axes-narrow` is the first instance either arm has had |
+| `area()` in the marks walk **and** in the axis emitter | each computes its own room | the box must be one box | the room takes no theme, so both calls answer identically by construction — this is what a theme-conditional reserve would have broken silently |
+| `valueLabels: "both"` with `orientation: "horizontal"` | `"both"` means a right-hand column | the value axis runs along **x**, so the labels are under the box | `!valueOnX` gates the reserve, the same clause the drawing uses |
+| a right-hand **legend** and a callout | the legend takes a band off `box.right` | the callout starts at `box.right + gap` | the band already moved `box.right` inward, so the callout is reserved against the *narrowed* box and lands inside — `line-callout-multiseries` is the frame, and it uncovered a **second** defect below |
+| a callout whose text is `null` | the series has no finite reading | a name always exists | `calloutOf` already answers this: `"name"` gives a string, `"last"` gives `null`, and a `null` is skipped by both the reserve and the drawing |
+| `yCallout` on a form that draws no polyline | the block asks for a callout | nothing sets an `ends` entry, so nothing is drawn | reserved anyway, and deliberately: `calloutWidth` has the same property in the terminal, and the alternative reads `figure.marks`, which the marks walk's own `Omit<Figure, "marks">` call site cannot |
+
+#### 3ak.49b · Residue — two, and the first is only visible as a picture
+
+**The callout and the right-hand value label overprint.** `line-callout-multiseries` renders `99.12`
+and `100` at the same anchor: the top-right of that frame is `90012`, unreadable, and it is unreadable
+before this change and after it, because both texts move right together. The terminal has a rule for
+this and it is I48's contention ladder — *one series' last reading, and three that contend for rows* —
+which this arm does not implement at all. **No arithmetic assertion could see it**: both texts are
+inside the canvas, at the coordinates their own rules give them. Owed, with the frame named — the lane's ledger carries it (⊕).
+
+**The left gutter reserves from `figure.value.labels` and the drawing writes `labels[i] ?? String(tick)`.**
+So an axis whose `labels` array is short reserves for nothing and draws a number. No instance in the
+corpus — every axis in it labels every tick — and it is the same class as the defect above, on the other
+side of the box. Recorded rather than fixed, because fixing it moves guttered frames on a case that is
+fine, which is the ruling §3ak.41 already made about narrowing (⊕).
+
 ---
 ---
 ---
@@ -10220,6 +10330,7 @@ would have to be re-run rather than extended.
 - **I110** — **A sankey is `graph`'s layering plus one placement that both arms draw from, and a node's extent is its flow.** `sankeyLayout` is pure — no `cells()`, no capabilities — and takes its height, gap and minimum as numbers, so the terminal calls it in half-rows with `quantum: true` and the SVG in pixels without; every bar, slice and ribbon end in either arm is that one function's answer (§3ap.3). **The scale is one number, the tightest layer's `(height − gaps) / Σflow`**, so a unit of flow is the same height in every layer and a ribbon leaves a bar at the width it arrives with; **a slice is never below one unit** and **a bar is the larger of its two sides**, the shorter leaving bare bar below its last slice — a loss, drawn (K6). **Slices are ordered by the far end's centre after placement** (K2, S4), and the relaxation separates without reordering (K10). **A deduplicated edge sums the weights it stands for** through `graphLayers`'s `origins` (K1); **a dummy is ribbon in its declared source's slot and counts in its layer's height** (K4); **a reversed edge is drawn forward, counted, and keeps its declared source's colour** (K7). **The terminal's budget loop is its own**: the notice row is spent first, the gap falls one row → a half-row → none, then the least-flow node goes and the notice names it (K5, K12); the SVG drops nothing (§3aj.6). **A label that does not fit is dropped and never truncated**, written from the outside in so the inner one goes first, and nothing is said of it in the notice (K3, K8, §3n). A node's colour is its declaration index through `refOf` (→ I1, I11, I58, C04 I92, §3d, §3ai.4 G1, G4, G5, §3n).
 - **I111** — **The bar and the ribbon are two glyphs at every depth, the ribbon's interior is the shade, and one function resolves the family for both width conventions.** `█` for a bar, `▒` for a ribbon's interior, `▀`/`▄` for a half either owns; `# = -` at ASCII, and the same three at `ambiguousWidth: "wide"` because every member of the block family is `East_Asian_Width=Ambiguous` — `barStyle`'s rule, in `sankeyAlphabet` (§3ap.2). **The shade rather than `dim` is I17's ruling and not taste**: an attribute is dropped at one bit and by any terminal that ignores SGR, and the frame it leaves is one block of `█` with letters in it; the shade is a shape, so the one-bit frame is the 24-bit frame with its colours removed — and it is, literally, the half-opacity fill the references draw. **Two owners in one cell put the lower one in the background**, `image.ts`'s half-block precedent and C10 I21's one widening (`wash`), never text on a tone; the slots cross as `categorical.cN` refs and are resolved in `definition.ts` at the terminal's depth. The SVG's ribbon is two cubic Béziers at `fill-opacity 0.5` in the declared source's slot (→ I4, I6, I17, C02 I9, C09 I22, C10 I21, C12 I29, A03 SS47).
 - **I112** — **A sankey's SVG node label is `tone.default` on a halo of the page's own ground, and the halo is the terminal's cell substitution written in the other medium.** (The halo was `surface.bgDeep` when this was ruled and is `surface.bg` since C10 §4f moved the page; §3ap.7's body recorded the move and this sentence did not, which is the compression class — the abstract keeping a claim the section it summarises had already corrected.) The label is already in the references' place — right of the bar, left of it on the last layer — and §3ap.4 K15 is the cell that place cannot answer: a ribbon begins at the bar's edge, so *outside the bar* and *on the ribbon* are one region, and no node in the corpus has bare ground beside it. Measured before the ruling, over 33 labels and both shipped variants: **1.02 at worst and 1.41 at best**, against `tone.muted`'s own recessive floor of 2.5 and body text's 4.5. The ink moves because a node label names the datum rather than the axis, and the halo goes behind it because the terminal's label cell is `{ text: ch }` with no `ref` and no background — the ribbon glyph is *replaced* there, and an SVG paints the region it cannot substitute (`stroke` in the page's ground at `SVG_FONT_SIZE / 4`, `paint-order="stroke"`). **After, measured under the ink rather than argued from `paint-order`** — the backdrop taken from a second render with the label's `fill` set to `none`, at exactly the pixels the ink changed: **12.43 on dark and 9.25 on light** for five of the six figures, and **9.51 / 7.59** on `crowded`, where one label's halo meets the next one's antialiased edge. Worst cell 7.59 against a floor of 4.5. **Both halves are load-bearing** — the halo alone leaves `muted` at 3.02 and 2.44, the light figure under its own floor. `sankeyLayout` does not move and the terminal frames are byte-identical: this is the second painter's ink, not the shared geometry's (→ I110, I111, C10 I32, §3ap.4 K15, §3ap.7).
+- **I113** — **The right margin is grown to fit what is drawn in it, and a glyph's advance is a bound rather than an estimate.** The callout (I48, I81) and the right-hand value labels (I47) share one column in the SVG arm, so `rightRoom` reserves the **maximum** of the two — `definition.ts`'s `right = sides.right ? max(wanted, calloutWidth(...)) : 0` in pixels — grown from `width · pad`, capped at `width / 3`, and **zero where neither is drawn**, so a figure with nothing to reserve for does not move. Past the cap the string is cut with an ellipsis by `fitLabel`, which is the half §3ak.41 wrote with no instance and `line-both-axes-narrow` supplies: 36 characters wanting 281 px in a 25.6 px margin, of which **two were on the page**. **Measured before the rule**: 13 strings in 7 of 244 committed frames past their own `viewBox`, the worst 240.5 px — 38% of the figure — and the right-hand `100` among them, which is why the reserve is not the callout's alone. **`SVG_EM_MAX = 0.65` is an upper bound over measured faces and not one font's metric**: `font-family="monospace"` is generic, so the face is the renderer's choice, and the advance measured over six of them runs 0.6001 (Courier New, Andale Mono, Monaco) to 0.6182 (SF Mono) — every one of them **above** the 0.6 the constant carried, in the one direction that clips. It is used for reserving and for fitting, both of which want the bound; the cost is 4.6 px of blank on the corpus's widest string and the falsification is stated — a face above 0.65 clips again. **The room takes no theme**, because `area()` is called from the marks walk and from the axis emitter and a room that differed between them would draw the data against a different box than the furniture, silently and with every arithmetic assertion passing (→ I47, I48, I81, §3ak.41, §3ak.49).
 
 ## 8. Commitments
 
@@ -10338,6 +10449,7 @@ would have to be re-run rather than extended.
 110. **A sankey is a placement and a drawing over `graph`'s layering, and both arms draw from one geometry** (I110). `graphLayers` gained `origins` and nothing else; the scale is one number, a bar is the larger of its sides, a dummy is a ribbon, a reversed edge keeps its declared source's colour, and the budget loop — notice row first, gap ladder, least-flow drop — is the terminal's alone (§3ap.3, §3ap.4).
 112. **The SVG node label gets an ink and a ground of its own, because placement had already been spent** (I112). Six frames read as pictures and 33 labels measured at 1.02–1.41 against floors of 2.5 and 4.5; d3 does nothing about it and its readability does not transfer, plotly's default does both halves, and the terminal was already substituting the cell. `tone.default` on a halo of the page's own ground, 12.43 and 9.25 — and the note that opened, *this arm paints text on a surface C10 §4 excludes*, was paid by C10 §4f moving the page to `surface.bg` (§3ap.4 K15, §3ap.7).
 111. **The ribbon's interior is the shade, chosen on the one-bit frame rather than the 24-bit one** (I111). Both candidates were drawn; the one that carried bar-against-ribbon in an attribute lost it where attributes are dropped, and the one that carries it in the glyph is also the half-opacity fill the references draw (§3ap.2).
+113. **The SVG arm sizes its right margin the way the terminal sizes its right column, and its glyph advance is a bound** (I113). Both arms now answer *does the callout fit* before the layout exists; the margin serves the value labels drawn in it as well as the callout, past the cap the string is marked, and `SVG_EM_MAX` is the widest advance measured over six monospace faces rather than a guess at one (§3ak.49).
 
 ## 9. Tests
 
@@ -10596,6 +10708,7 @@ Six tiers. No state machine — C12 is pure over the block.
 - **U1b** (I62, §3ak): **each arm's output is a faithful projection of the figure** — every `Drawn` appears as an element in the SVG and as a glyph at the mapped cell in the terminal. This is what catches *the shared layer says a diamond and the terminal draws a comma*.
 - **U2–U3** (I59, §3ak.17): **U1b's subject, crossed over every form and every variant** — 86 drawn documents, every mark accounted for by an element. *As written they inherited U1's subject and so inherited its vacuity: crossing `f(x) === f(x)` over the catalogue is one tautology 178 times.* `U3` keys the emitter off **`spec.form`** and not the catalogue bucket, because one variant's bucket lies — `line/whiskers` is a `scatter` — and an instrument keyed off the bucket compares a curve figure against a scatter document and reports a dropped mark that never existed (F290).
 - **U4** (I62, §3ak): identical across themes, because the refs are unresolved — a theme change moves nothing in the figure.
+- **RM1–RM5** (I113, §3ak.49): **the right margin, and the rows are split by which half of the rule they can see.** `RM1` is geometric over the emitted document and over the whole catalogue — every `<text>` inside its own `viewBox` at **0.6182**, the widest face measured, and not at the arm's own constant, because a row asserting at `SVG_EM_MAX` agrees with the code by construction. It is the row the byte-compare golden could not make: `line-callout-both` recorded `alpha 0.8774` 67 px off the page and agreed with itself for as long as it existed. `RM2` is the reserve — the maximum of the callout and the right-hand labels, and **zero where neither is drawn**, which is the half that would make this the wrong rule. `RM3` asserts that the marks walk and the axis emitter answer to one box, which is the interaction the walk found rather than the overflow. `RM4` is the cap and the marked cut. `RM5` is the boundary where the reserve and the fit meet — a string in a margin sized for exactly that string. **The hand pass is what indexed them**: removing the reserve does not fail `RM1`, because the fit still contains the string, and removing the fit does not fail `RM2` — a containment row cannot see a reserve going missing and a reserve row cannot see containment going missing.
 - **U5** (I59, §3ak.17): **the SVG arm cannot see a capability, asserted on the signature rather than on a frame.** *As written — `identical at every capability set` — the row had no parameter to vary and therefore nothing to be wrong about.* `plotToSvg` takes a block, a theme and a layout; `svg.ts` imports no `Caps`. The guard is structural and says so, so a green run is not read as a measurement.
 - **U6** (I59, §3ak.15, §3ak.17): **walk artefact B — the rung ladder as a trace, and the degradation audit this component has never had.** Its first half, *the terminal's figure is identical at every capability set*, is unfalsifiable for U5's reason and becomes the same structural guard: the emitters take `block` alone. **The content is the second half**, and it is a record — 46 forms against the four edges that isolate one capability each, classified on raw frames. *The `CAPS` array's neighbours are not those edges*: `ascii` is two capabilities from full, so a trace walking the array would attribute a colour change to the unicode rung. `U6c` is the control — `tree` draws no SGR at 24-bit, so its `same` cells are what make the other 45 evidence.
 - **T1–T5** (§3ak, §6b): the terminal arm is byte-identical throughout — `TB1`–`TB5` over 1780 baseline frames crossed on width as well as capability set, plus the glyph-per-role, 1-bit strip, truncation-ladder and `ambiguousWidth` rows named in the rung table.
@@ -10759,6 +10872,7 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T6.84** (I110, K7): the colour taken from the drawn source rather than the declared one → **SK3 fails**: the reversed ribbon arrives in `a`'s slot.
 - **T6.85** (I110, K12): the notice row spent after the drawing → **SK3 fails**: `composeRows` slices the figure to its height and the `1 reversed` row is the one that falls off.
 - **T6.86** (I110, K2): slices stacked in declaration order rather than by the far end's centre → **SK1 fails** on `a`'s slice order, with every bar height and every crossing count of the ordering pass unchanged. The control for the run is the gap ladder collapsed to none, which restacks every layer and moves SK1's walked positions and every sankey golden.
+- **T6.90** (I113, §3ak.49): six mutations in `c12-svg-right-margin.mjs`, run by hand and each producing the row it names — the shipped state restored, the fixed right margin **and** no cut at the drawing site (→ `RM1`, and `line-callout-both` reads `alp` again); the reserve alone removed (→ `RM2`, `RM3`, `RM4`, `RM5`, and **`RM1` survives**, which is the finding: the fit contains what the missing reserve overran); `SVG_EM_MAX` back to the 0.6 it replaced (→ **`RM1`**, and `G6c5` on the other side of the box, because 0.6 is below every one of the six faces measured); the exact-fit tolerance dropped (→ `RM5`, and `G11a`, which is how the defect was found — `100` rendered as `1…` in a margin sized for `100`); the marks walk given a different room than the axis emitter (→ `RM3`); and the cap removed (→ `RM4`). The control is the advance at 0.2.
 
 ## 10. Out of scope
 
