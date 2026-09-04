@@ -27026,6 +27026,22 @@ three that contend for rows* — and this arm implements none of it.
 paragraph, which carries the placeholder mark ⊕ at 311ab18e+lanes6 and is to be repointed to this
 number.
 
+**Corrected at d29cb2cf+lanes7 — two frames was what someone had looked at, not the class
+(F725).** Sweeping all 212 drawn baselines for `<text>` pairs whose painted bands overlap gives
+**10 callout × right-tick pairs in 6 frames** — `line-callout-single`, `line-callout-last`,
+`line-callout-name`, `line-callout-both`, `line-callout-multiseries` and `line-both-axes-narrow`
+— and **every pair is 2.415 px apart**, the difference between `end[1] + SVG_FONT_SIZE / 3` and
+`y + SVG_FONT_SIZE / 3`. `line-callout-single` is one series and one callout, the simplest figure
+the corpus has. **Every one of the ten was inside its own `viewBox`**, so the geometric
+containment row agreed with all ten for as long as they existed — which is what makes this the
+measured instance of *containment is not correctness* rather than an example of it. **And a
+third writer contends in the same band**: the legend's `originX = box.right + 12` against the
+labels' `box.right + LABEL_GAP`, 19.4 px of horizontal overlap with the callout `99.12` on two
+frames, and the right-hand tick `100` reaching the legend entry `alpha` with no callout involved
+at all. Displacement — the remedy that is correct for a tick — is the one thing C12 I48 forbids
+there (*a callout does not replace the legend*), so that half is **recorded and not fixed**
+(F726). Closed for the tick by I114 / §3ak.50 and `RC1`.
+
 ---
 
 ## F711 — The two arms disagree about whether a callout needs a right-hand axis ★★☆☆☆
@@ -27061,7 +27077,7 @@ touching it.
 
 ---
 
-## F713 — `gutterRoom` reserves from `labels` and the drawing writes `labels[i] ?? String(tick)` (owed) ★★☆☆☆
+## F713 — `gutterRoom` reserves from `labels` and the drawing writes `labels[i] ?? String(tick)` (corrected — the premise is false, F727) ★★☆☆☆
 
 *2026-09-04 · Lane C, the SVG right margin, at 311ab18e+lanes6 (2026-09-04).*
 
@@ -27075,6 +27091,22 @@ on a case that is fine — §3ak.41's own ruling about narrowing.
 
 **Where**: `src/presentation/plot/svg.ts` `gutterRoom`; C12 §3ak.49b's second residue paragraph,
 which carries the placeholder mark ⊕ at 311ab18e+lanes6 and is to be repointed to this number.
+
+**Corrected at d29cb2cf+lanes7 — the premise above is false, and measuring is what said so
+(F727).** The claim is kept visible because it is the thing that was disproved. `ValueAxis` is
+produced in exactly one place — `valueAxisOf` returning `{ ...axis, labels: tickLabels(...) }`,
+with `tickLabels` mapping over `ticks` — at three call sites, and there is **no `ValueAxis`
+object literal anywhere in the tree**. So `labels` is total over `ticks` **by construction**,
+`labels[i]` is never `undefined`, the `?? String(tick)` branch is unreachable, and **the two
+reserves are the same function** rather than two that happen to agree on this corpus. **The
+mirrored fix would have changed nothing** — a fix indicting its diagnosis. **Wrong in both
+directions, which is the shape**: it was not a defect for the reason given, and the hazard it
+points at is real and stated differently. `gutterRoom` and the left drawing are two expressions
+of one width, and if they ever part the symptom is a **silently ellipsised gutter label** —
+`fitLabel` cuts rather than overflows, so an under-measured reserve reads as a *shorter number*
+with nothing on the page to say so. That is what nothing was watching, and `RC6` watches it now
+over the whole catalogue: a left gutter label may be cut only where the gutter is at its
+`width / 3` cap.
 
 ---
 
@@ -27338,3 +27370,241 @@ hashes identical.**
 **What the three share.** In each, the request was right that something was wrong and wrong about
 what — a union, a callout, a blank cell — and in each the corrected shape came out of a
 measurement that the request did not ask for. **Cites every entry F693–F723 by number.**
+
+---
+
+## F725 — the two overprinting frames were six, and the simplest frame in the corpus was one of them ★★★☆☆
+
+*2026-09-04 · Lane O, the SVG callout's row, at d29cb2cf+lanes7 (2026-09-04).*
+
+**Expected** (the brief, and §3ak.49b's residue): `line-callout-multiseries` and
+`line-both-axes-narrow` overprint a callout on a right-hand value label.
+
+**Measured**: sweeping all 212 drawn baselines for `<text>` pairs whose painted bands overlap gives
+**10 callout × right-tick pairs in 6 frames** — `line-callout-single`, `line-callout-last`,
+`line-callout-name`, `line-callout-both`, `line-callout-multiseries`, `line-both-axes-narrow`. Every
+contended pair sits **2.415 px** apart, because a callout's baseline is
+`end[1] + SVG_FONT_SIZE / 3` and a tick's is `y + SVG_FONT_SIZE / 3` where the two `y` values differ
+by the rasteriser's own rounding.
+
+`line-callout-single` is the finding inside the finding: **one series, one callout, the simplest
+figure the corpus has**, and it overprints. The two frames named in the brief were the two someone
+had looked at, not the class — and the class is *every* frame that draws a callout beside a right
+axis, because a series' last sample is very often at an axis end.
+
+**Where**: `test/golden/svg-baseline/line-callout-*.svg`, `line-both-axes-narrow.svg`.
+`src/presentation/plot/svg.ts` — the callout in `walk`, the labels in `plotToSvg`'s axis emitter.
+
+**Closed** by C12 I114 / §3ak.50 and `RC1`.
+
+---
+
+## F726 — the right column has three writers, not two, and I48 forbids the remedy that fixed the tick ★★★☆☆
+
+*2026-09-04 · Lane O, the SVG callout's row, at d29cb2cf+lanes7 (2026-09-04).*
+
+**Expected**: `rightRoom`'s own doc says the callout and the right-hand value labels *share one
+column*, so there are two contenders.
+
+**Measured**: there are three. On `line-callout-multiseries` and `line-callout-last` the callout
+`99.12` spans x 465.2 … 504.2 at y 19.215, and the legend entry `alpha` sits at x 484.8, y 24.8 —
+19.4 px of horizontal overlap, 5.585 px of vertical. Visible in the PNG as a strike through the word
+`alpha`. **And a fourth interaction with no callout in it at all**: the right-hand tick `100`
+(x 465.2 … 488.6, y 16.8) also overlaps `alpha`, so the tick column and the legend collide on their
+own.
+
+The mechanism is arithmetic and stated in the code: the legend's `originX = box.right + 12` and the
+right-hand labels' `at = box.right + LABEL_GAP` are 6 px apart, while `rightRoom` grows `box.right`
+inward by the *callout's* width — so the wider the callout, the further into the legend it reaches.
+
+**Not fixed, and the reason is the invariant rather than the lane boundary.** C12 I48 ends *a callout
+does not replace the legend*: it names a value where a legend names an identity, and only together do
+they say which line is which and what each reads. So displacement — the remedy that is correct for a
+tick — is the one thing forbidden here, and the repair is the legend's placement (or the reserve's
+awareness of it), which is `legendOf` / the legend emitter and not this arm's callout.
+
+**Where**: `src/presentation/plot/svg.ts`, legend emitter (`const originX = place === "right" ?
+box.right + 12 : …`) against `rightRoom`.
+
+---
+
+## F727 — F713's premise is false: a `ValueAxis`'s labels cannot be short ★★★☆☆
+
+*2026-09-04 · Lane O, the SVG callout's row, at d29cb2cf+lanes7 (2026-09-04).*
+
+**Expected** (§3ak.49b, and this lane's brief): *`gutterRoom` reads `figure.value?.labels ?? []`; the
+emitter writes `axis.labels[i] ?? String(tick)`. An axis whose `labels` array is short reserves for
+nothing and draws a number. No instance in the corpus.*
+
+**Measured, by asking where the claim was written down**: it cannot have an instance. `ValueAxis` is
+produced in exactly one place —
+
+    // src/presentation/plot/figure.ts:71
+    return { ...axis, labels: tickLabels(axis, block.yFormat) };
+    // src/presentation/plot/axes.ts:511
+    return axis.ticks.map((v) => formatValue(v, scaleFormat(format, axis.range.scale), placesFor(axis)));
+
+— `tickLabels` is `ticks.map(...)`, so `labels.length === ticks.length` **by construction**; and
+`valueAxisOf` is the only producer, at three call sites (`figure.ts`'s `axisOver`, its radar arm,
+`definition.ts:1735`). There is no `ValueAxis` object literal anywhere in the tree.
+
+So `labels[i]` is never `undefined`, `?? String(tick)` is a fallback for a case that cannot arise,
+and the two reserves are **the same function** rather than two that happen to agree on this corpus.
+The mirrored fix would have changed nothing — a fix indicting its diagnosis.
+
+**Wrong in both directions, which is the shape.** It was not a defect for the reason given, and the
+hazard it points at is real and stated differently: `gutterRoom` and the left drawing are two
+expressions of one width, and if they ever part the symptom is a **silently ellipsised gutter
+label** — `fitLabel` cuts rather than overflows, so an under-measured reserve reads as a *shorter
+number* with nothing on the page to say so. That is what nothing was watching, and `RC6` watches it
+now over the whole catalogue: a left gutter label may be cut only where the gutter is at its
+`width / 3` cap.
+
+**Where**: `src/presentation/plot/figure.ts:64–71`, `src/presentation/plot/axes.ts:511`,
+`src/presentation/plot/svg.ts` `gutterRoom` / `rightRoom`.
+
+---
+
+## F728 — the row's sensitivity was the fixture's tick pitch, and only running the mutation said so ★★★☆☆
+
+*2026-09-04 · Lane O, the SVG callout's row, at d29cb2cf+lanes7 (2026-09-04).*
+
+**Expected**: widening the collision threshold from `SVG_FONT_SIZE` to four times it suppresses
+labels that were never contended, so `RC3`'s set assertion fails.
+
+**Measured**: at the fixture's `height: 8` it killed **nothing** — all 173 rows passed. The right
+column's tick pitch there is **137.6 px**, so four glyph heights (48 px) reach no neighbour. The
+mutation was indicting the fixture, not the rule.
+
+Pitch against the block's declared height, at the default 640 × 320 layout:
+
+| block `height` | right labels | pitch |
+|---|---|---|
+| 8 | 3 | 137.60 px |
+| 16 | 6 | 55.04 px |
+| 24 | 10 | 30.58 px |
+| 40 | 19 | **15.29 px** |
+| 64 | 19 | 15.29 px (saturated) |
+
+`RC3` gained a second fixture at `height: 40`, and the same mutation now kills `RC3` **alone** —
+which is also the row's real point: `RC1` accepts an over-eager rule, because a right column that has
+been deleted has no overprint in it.
+
+**And a second prediction was wrong.** Inverting the side (`"right"` → `"left"`) was expected to
+leave `RC1` standing, on the reasoning that the right column would be clean by having lost the wrong
+glyph. It does not: the right label survives *and* the callout still lands on it, so `RC1` dies with
+`RC2`, `RC3` and `RC4`.
+
+**Where**: `test/unit/plot-svg-path.test.ts` `RC3`; `tools/mutate/runs/c12-svg-callout-row.mjs`.
+
+---
+
+## F729 — the SVG arm's label density is a *cell* count against a fixed pixel canvas, and the margin is 3.29 px ★★☆☆☆
+
+*2026-09-04 · Lane O, the SVG callout's row, at d29cb2cf+lanes7 (2026-09-04).*
+
+**Expected**: nothing. Found while measuring F728's pitch table.
+
+**Measured**: the tick count is `ticksFor(plotAreaRows(block))` — derived from the block's declared
+**row** height — while the SVG canvas height is whatever `svgLayout` was given, and the corpus only
+ever renders at 320. At `height: 40` that puts 19 right-hand labels in the box at **15.29 px** pitch
+with a 12 px font: **3.29 px of leading**, and it saturates at 19 so nothing overprints. The ceiling
+is the only reason.
+
+Take the same block to a shorter canvas and the value labels overprint **each other**:
+
+| `svgLayout(640, h)` | right labels | min pitch |
+|---|---|---|
+| 320 | 19 | 15.29 px |
+| 240 | 19 | **11.47 px** |
+| 200 | 19 | **9.55 px** |
+| 160 | 19 | **7.64 px** |
+| 120 | 19 | **5.73 px** |
+
+**`RC1` cannot see this**, and that is the point worth recording: `RC1` indexes *callout against
+label*, so a label-against-label collision is outside its shape however many frames it sweeps. It is
+the same class as F725 with both writers being the axis emitter, and it wants its own row and its own
+ruling — a tick count that is a function of a cell height the second arm does not draw at is a width
+crossing the seam in the direction §3aj hazard 3 does not name.
+
+**Where**: `src/presentation/plot/figure.ts` `axisOver` (`ticksFor(plotAreaRows(block))`),
+`src/presentation/plot/svg.ts` axis emitter, `svgLayout`.
+
+---
+
+## F730 — one mutation anchor moved under this change, and re-running it is what verified the move ★★☆☆☆
+
+*2026-09-04 · Lane O, the SVG callout's row, at d29cb2cf+lanes7 (2026-09-04).*
+
+`tools/mutate/runs/c12-svg-right-margin.mjs`'s `RM3` mutation anchors on the `walk(...)` call, which
+gained the row collector. Re-anchored **and re-run by hand** rather than re-anchored on faith: it
+still kills `RM3`, and now `RM4`, `RC2` and `G11a` with it. A stale anchor and a dead mutation read
+the same green, and the harness reports whether an anchor *exists* rather than whether it still
+selects the mechanism.
+
+A sweep of every `from:` anchor in the seven run files that name `src/presentation/plot/svg.ts` found
+no other stale svg.ts anchor.
+
+**Where**: `tools/mutate/runs/c12-svg-right-margin.mjs:104`.
+
+---
+
+## F731 — the last two owed items, in numbers ★★★☆☆
+
+*2026-09-04 · the lead, closing lanes7, at d29cb2cf+lanes7.*
+
+**lanes7's two, and both were owed with a number already attached.** F710 named an overprint
+and F713 a reserve reading a different array from the drawing, and in each the request named an
+expectation. In each the number that came back is the finding, and in one of the two the
+expectation was **false**.
+
+**The overprint — two frames was what someone had looked at, not the class.** Sweeping all
+**212** drawn baselines of the 244 committed frames for `<text>` pairs whose painted bands
+overlap: **10 callout × right-tick pairs in 6 frames**, not the two reported, and **every pair
+2.415 px apart** — a callout's baseline is `end[1] + SVG_FONT_SIZE / 3` and a tick's is
+`y + SVG_FONT_SIZE / 3`, so the gap is the rasteriser's own rounding and nothing else. The
+simplest figure the corpus has, `line-callout-single` — one series, one callout — is one of the
+six. **And every one of the ten was inside its own `viewBox`, so the containment row agreed with
+all ten**: *containment is not correctness*, measured rather than argued (F725).
+
+**What carried across the change of units, and what did not.** C12 I48's first two clauses carry
+to the image arm **unchanged**, because their reason is what a reader needs and not what a cell
+is: a callout displaces the right-hand value label it lands on, and never the left's. Its third
+— *two on one row resolve to the later, with a one-cell mark saying so* — **does not carry**,
+and the reason is that both alternatives it rejected were rejected against a **row count a fixed
+canvas does not have** (`+N` needs the width being sized; a second row changes the count and
+breaks I1). A conclusion whose reasons are gone is not a conclusion, however well it reads.
+
+**Two callouts contending was measured rather than built: zero instances.** Four frames carry
+two callouts and the **closest pair is 84.757 px** apart. Named `calloutNudge` and left open,
+with the pixel-only third option stated, rather than built against a case the corpus cannot
+produce.
+
+**The row is carried from the ink rather than recomputed**, which is the one design decision
+worth the sentence. `rightRoom` is the precedent for the column's *width* and the wrong
+precedent for its *rows*: a width is a pure function of the figure, and the row is the last
+point of the last non-annotation polyline, which exists only inside the marks walk. A second
+pure function would be **one product written twice** — the mechanism already recorded for a
+reserve disagreeing with its own fit at equality (F707) — so the walk fills a collector at the
+site where the text is pushed and the axis emitter reads it.
+
+**The reserve — the premise was false, and the fix would have changed nothing.** `ValueAxis` is
+produced in exactly one place, `valueAxisOf` returning `{ ...axis, labels: tickLabels(...) }`,
+and `tickLabels` maps over `ticks`; three call sites, **no object literal anywhere in the
+tree**. So `labels` is total over `ticks` by construction, the `?? String(tick)` branch is
+unreachable, and **the two reserves are the same function** rather than two that agree on this
+corpus. F713 is corrected in place and its claim kept visible as the thing that was disproved.
+**Wrong in both directions, which is the shape**: the hazard it pointed at is real and stated
+differently — a **silently ellipsised** left gutter label if the two ever part, because
+`fitLabel` cuts rather than overflows — and nothing was watching it. `RC6` watches it now
+(F727).
+
+**What the corpus cost, in frames.** **Six of 244 frames moved, ten `<text>` elements removed,
+nothing added and no coordinate changed.** Two things were recorded rather than fixed and both
+name their owner: a third writer in the right band — the **legend**, which I48 explicitly
+forbids displacing, so the repair is the legend's placement (F726); and label-against-label,
+which the new geometric row cannot see because it indexes callout-against-label (F729). The
+mutation pass indicted a **fixture** rather than a rule and two predictions were wrong (F728),
+and one anchor moved under the change and was re-run rather than re-anchored on faith (F730).
+
+**Cites every entry F725–F730 by number.**
