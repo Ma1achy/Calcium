@@ -25973,7 +25973,15 @@ uses*).
 
 So the range table appears to start above Latin-1: every Ambiguous character in
 `00A1–00FF` reports narrow under both conventions while everything from U+2000 up
-reports correctly. Four of the eight members of `PROSE_MARKS` are in that gap, and
+reports correctly. **Three of the ten members** of `PROSE_MARKS` are in that gap — `§ · ×` —
+and **both earlier counts here were wrong**: this entry first said *four of the eight*, a lead
+correction re-measured against `dist/` and said *five of the ten*, and the property itself says
+three. `«` U+00AB and `»` U+00BB are **Neutral**, not Ambiguous, so the 1 they reported was right;
+`⚠` U+26A0 is Neutral too and reports **2** under the wide convention, an *over*-count inside the
+geometry deviation and a direction no version of this entry mentioned. Measured row by row against
+`EastAsianWidth-17.0.0.txt` (F680), and the correction being wrong the same way the original was is
+F690. That is the class where a finding's own example is checked by nothing, three times over: the
+table above lists eight characters and the set has ten. And
 `PROSE_MARKS` is the set SS47 lets through *because it is prose* — so the one class of
 mark exempted from the substitution rule is also the class whose width is under-counted
 on a wide terminal. That is C02 I9's hazard in the punctuation set rather than the glyph
@@ -26062,3 +26070,605 @@ beyond its motivating case and said so; the SP-wiring rule found three carriers)
 
 **Where**: `tools/roadmap-status.mjs` rule 1b; `test/unit/roadmap-status.test.ts` RS11 with RS11b
 as its control; `CALCIUM_ROADMAP.md` entries 7 and 11.
+
+---
+
+## F668 — F652 and F653 are one pairing, and the evidence was already in the table ★★★☆☆
+
+*2026-09-04 · Lane I, the pairing the two SVG debts were one of, at f01c4f35+lanes5 (2026-09-04).*
+
+**Expected**: two findings about two sites — a callout inked in `categorical.cN` on the page, and a
+tile label inked in the page's ground *over* a `categorical` fill — needing either two rulings or
+one ruling with two arms.
+
+**Measured**: `ratio(a, b)` is symmetric, so *ink on ground* and *ground on ink* are the same two
+colours and the same number. C10 §4f.1's last two rows — *"worst `categorical` — a callout at a
+line's end"* and *"worst tile label, where the ground is the **ink**"* — carry **identical figures
+on all three themes** (6.26 / 5.17 / 7.55). Re-measured from the shipped tokens: worst `categorical`
+against `bg` is 6.26 dark (`c6`), 5.17 light (`c4`), 7.55 high-contrast (`c6`).
+
+The two rows were written from the two *sites*, and the identity of the numbers is what says the
+constraint behind them is one. Nobody read it, so a single pairing was filed as two debts.
+
+**Where**: `docs/components/C10_theme_resolution.md` §4f.1 (the table), now §4g and I35.
+
+---
+
+## F669 — the class is ten sites, not two, and four of them are in the arm neither finding named ★★★☆☆
+
+*2026-09-04 · Lane I, the pairing the two SVG debts were one of, at f01c4f35+lanes5 (2026-09-04).*
+
+**Expected**: the brief's sweep cell — *is there any other text in either arm whose ink and ground
+are not a validated pair* — to turn up nothing or one more site.
+
+**Measured**: ten. In the SVG arm — the callout (`svg.ts:1179`), the treemap/heatmap tile label
+(`:1152`), the **graph node label** (`:1320`), the **outline label**, one slot per depth (`:1504`),
+and the label-at-a-point branch (`:1137`), reachable when a hierarchy label has no box. In the
+**terminal arm** — the callout column (`definition.ts:987`, `refOf(s, seriesIndex)`), a flame or
+icicle frame's name inside its own bar (`:1849`), a pie's legend rows (`:3014`) and a run's label
+(`:2068`), all through `slot(categoryRef(i), …)`. Every one is `categorical` as ink or as ground and
+none was a validated pair.
+
+The terminal callout is the same figure in the same slot as the SVG one, which is D11 holding — so
+the arm that moves the *sites* has to move ten across a seam that must agree, and the arm that moves
+the *check* moves one function. The sweep is what decided the ruling.
+
+**Where**: `src/presentation/plot/svg.ts`, `src/presentation/plot/definition.ts`;
+recorded in C10 §4g.1 and C12 §3ap.7.
+
+---
+
+## F670 — I15's third clause was enforced for one member of its class ★★★☆☆
+
+*2026-09-04 · Lane I, the pairing the two SVG debts were one of, at f01c4f35+lanes5 (2026-09-04).*
+
+**Expected**: *"a `decoration` palette … is lint-restricted to declared art"* to be a rule with a
+mechanism, since the token file cites it as `(I15, SS21)`.
+
+**Measured**: SS21's pattern is `/["'`]spectrum\.\w|palettes\s*\.\s*spectrum/` — it matches
+`spectrum` and nothing else. `categorical` is the other `decoration` palette, the framework paints
+it as text at ten sites, and no scan, floor or type reaches any of them. The citation sits beside the
+**spectrum** palette in `tokens-dark.ts:193`, which is why it reads as covering the clause.
+
+A claim about a class, a mechanism covering one member, and a citation that resolves.
+
+**Where**: `tools/enforce/source-scans.mjs:284`, `src/presentation/theme/tokens-dark.ts:193`,
+C10 I15 (reworded).
+
+---
+
+## F671 — the widest arm is refused by the light theme, by 7 stops out of 9 ★★☆☆☆
+
+*2026-09-04 · Lane I, the pairing the two SVG debts were one of, at f01c4f35+lanes5 (2026-09-04).*
+
+**Expected**: deleting `validatePalette`'s `carries === "decoration"` skip to be the simple rule, and
+its cost to be an argument about art rather than a number.
+
+**Measured**: light's `spectrum` fails **7 of its 9 stops** against `bg` — 2.36, 3.06, 3.07, 3.30,
+3.51, 3.88, 4.00 — and against `bgElev` all seven are lower again. Dark and high-contrast clear.
+Applied by hand, the light theme **stops loading entirely**: ten rows of
+`test/contract/theme.test.ts` fail together, the first of them a purity test.
+
+This is I31's own measurement arriving from the other side — a floor deletes the low end a
+sequential ramp exists to have.
+
+**Where**: measured with a probe against `dist/`; recorded in C10 §4g.3, I35, T6.89, and in
+`tools/mutate/runs/c10-decoration-text.mjs`.
+
+---
+
+## F672 — the mutation's expected row was wrong, and the way it was wrong is reusable ★★☆☆☆
+
+*2026-09-04 · Lane I, the pairing the two SVG debts were one of, at f01c4f35+lanes5 (2026-09-04).*
+
+**Expected**: the wide arm to be killed by **T2.4**, the row that recomputes every floor from the
+shipped tokens.
+
+**Measured**: T2.4 stays **green**. It recomputes its own ratios and never calls `validateTokens`,
+so a theme that is *rejected* does not fail it — what fails is everything that needs a store, and the
+first name in the list is `T2.1 (I1): a thousand calls return identical styles`. A rejected theme is
+not a failing ratio, and an `expect` anchor written from the rule rather than from a run names the
+wrong check as the one holding the line.
+
+**Where**: `tools/mutate/runs/c10-decoration-text.mjs`, mutation 4 (comment records both).
+
+---
+
+## F673 — a hex→slot map is not injective across palettes, and two contract rows resolved a floor through it ★★★☆☆
+
+*2026-09-04 · Lane I, the pairing the two SVG debts were one of, at f01c4f35+lanes5 (2026-09-04).*
+
+**Expected**: `slotsByHex` in `test/contract/theme.test.ts` to name the slot a scraped fill came
+from, so T2.27 could take that slot's floor.
+
+**Measured**: I17 forbids two slots of **one** palette sharing a value and says nothing across
+palettes. The shipped set is full of cross-palette collisions — **8 on light**, **10 on
+high-contrast**, none on dark: `tone.default` = `syntax.punctuation` = `spectrum.outline`,
+`tone.muted` = `syntax.comment`, `tone.ok` = `syntax.string`, and so on. A `Map<hex, slot>` keeps
+whichever came last in `Object.entries(tokens.palettes)`, so **T2.27 has been resolving axis
+furniture (`tone.muted`, floor 2.5) to `syntax.comment` (floor 3)** and asserting a number it did not
+choose. Nothing fails today because both floors clear on the shipped values.
+
+Found by T2.29b on its **first run**, which reported `spectrum.outline` for a fill that is
+`tone.default`. The map now returns every slot and T2.27 takes the strictest floor among them.
+
+**Where**: `test/contract/theme.test.ts` `slotsByHex`, T2.27; measured with a probe over the three
+shipped token files.
+
+---
+
+## F674 — C12's summaries kept `surface.bgDeep` after §4f moved the page ★★★☆☆
+
+*2026-09-04 · Lane I, the pairing the two SVG debts were one of, at f01c4f35+lanes5 (2026-09-04).*
+
+**Expected**: C12 to agree with C10 §4f, which moved the SVG page from `surface.bgDeep` to
+`surface.bg`.
+
+**Measured**: §3ap.7's **body** records the move correctly — *"The page is now `surface.bg` … the
+halo is still the page's ground"*. Five **summaries** of that body did not: §3ap.4's K15 row, the
+ruling line, the element shape, **I112's headline sentence**, commitment 112, and test row SK11 all
+still name `surface.bgDeep`. The shipped golden disagrees with all five —
+`test/golden/svg-baseline/sankey-crowded.svg` strokes every label `#1a1a1a`, which is dark `bg`.
+
+This is the compression class exactly: the body is correct and the abstract kept the claim the body
+had already corrected, so reading the section against the code finds nothing and reading the abstract
+against the section finds six.
+
+**Where**: `docs/components/C12_plot_renderer.md` lines 8676, 8723, 8732, I112, commitment 112,
+SK11 — all corrected.
+
+---
+
+## F675 — the SVG arm's callout is placed outside its own canvas, and the golden records it ★★★☆☆
+
+*2026-09-04 · Lane I, the pairing the two SVG debts were one of, at f01c4f35+lanes5 (2026-09-04).*
+
+**Expected**: the callout column to be reserved in both arms, since `calloutWidth` computes the
+cells a callout needs *before* the layout exists (C12 I48, `definition.ts:884`).
+
+**Measured**: only the terminal arm does. The SVG arm places the callout at `end[0] + LABEL_GAP`
+with `text-anchor="start"` and reserves a **fixed** 25.6 px between the plot box (614.4) and the
+viewBox (640). In the shipped golden `line-callout-both.svg`, `alpha 0.8774` starts at x = 620.4 at
+`font-size="12"` monospace — about 86 px of glyphs ending near **707 in a 640-wide canvas**, so
+**67 px, or 10% of the figure's width, is off the page**. `line-callout-name.svg` and
+`line-callout-single.svg` are the same, and the right-hand y-axis label `100` overruns by 2 px.
+
+Read as a picture on high-contrast, the callout is clipped mid-string at the frame's edge. Every
+byte-compare golden records this faithfully and none can object to it — a snapshot records, it does
+not check.
+
+**Not repaired**: the fix is a width reservation in `svgLayout`, which is C12's geometry and outside
+this lane's ruling. Filed as a request.
+
+**Where**: `src/presentation/plot/svg.ts` callout branch (`:1179`),
+`test/golden/svg-baseline/line-callout-{both,name,single}.svg`.
+
+---
+
+## F676 — a picture cell's two colours are 1.00 apart and nothing checks the cell carries no text ★★☆☆☆
+
+*2026-09-04 · Lane I, the pairing the two SVG debts were one of, at f01c4f35+lanes5 (2026-09-04).*
+
+**Expected**: I21's picture-cell admission — *a palette ref may be a background for a cell that
+carries no text* — to be enforced by the type, the way `wash` is (it returns a `Span`, so there is no
+way to hand the colour to a glyph).
+
+**Measured**: it is not. `sankey.ts:506` and `scatter3.ts:1459` both build the background through
+`slot(ref, …).colour` rather than `resolveBackground`, so *carries no text* is a property of the
+caller. And the margin is the whole argument: the worst `categorical × categorical` pair measures
+**1.00** on **all three** shipped themes — dark and high-contrast `c2`/`c3` (`#56b4e9` / `#3cbf9a`),
+light `c3`/`c6` — because a categorical palette is authored for hue and I17 only forbids two slots
+being *equal*. A half-block cell whose two owners are 1.00 apart is invisible in greyscale and to a
+reader who cannot separate those hues.
+
+**Where**: `src/presentation/plot/sankey.ts:506`, `src/presentation/plot/scatter3.ts:1459`;
+recorded in C10 §4g.1, §4g.4 and I35, and named as the mutation the run file cannot score.
+
+---
+
+## F677 — `surface.bgElev` is resolved by nothing in `src/` ★★☆☆☆
+
+*2026-09-04 · Lane I, the pairing the two SVG debts were one of, at f01c4f35+lanes5 (2026-09-04).*
+
+**Expected**: `bgElev` to be, as C10 §4 says, *"every panel, overlay and confirm"* — the second
+surface text lands on, and the reason a floor checked against `bg` alone has a gap.
+
+**Measured**: `grep -rn '"surface\.' src` returns `surface.selection`, `surface.errorInk`,
+`surface.errorGround`, `surface.bg`, `surface.border`, `surface.diffAdd`, `surface.diffRemove`,
+`surface.bgDeep` — and **no `surface.bgElev` at all**. Nothing in the tree paints it. The floor
+checked against it is therefore a claim about where blocks land rather than a measured site.
+
+It is included in the new pairing anyway, because it costs nothing (worst 4.74) and because the
+alternative is §4's own named gap — but stated rather than assumed, since an invariant is vacuous
+until its subject exists.
+
+**Where**: C10 §4g.2 last row, §4g.4 second bullet, I35.
+
+---
+
+## F678 — a fallback whose failure mode is the rule's own negation ★☆☆☆☆
+
+*2026-09-04 · Lane I, the pairing the two SVG debts were one of, at f01c4f35+lanes5 (2026-09-04).*
+
+**Expected**: `fill="${ground ?? ink}"` at `svg.ts:1152` and `:1320` to be an ordinary defensive
+fallback.
+
+**Measured**: `ink` at those two sites is the fill of the rect the label sits on. So if
+`surface.bg` ever failed to resolve, the label would be painted in **exactly the colour behind it** —
+a ratio of 1.00 by construction, and the one state §4g exists to forbid. It is unreachable today
+(`surface.bg` is required by the type and `validateTokens` refuses a non-hex surface), so it is
+recorded rather than repaired.
+
+**Where**: `src/presentation/plot/svg.ts:1152`, `:1320`; C10 §4g.4 fourth bullet.
+
+---
+
+## F679 — a mutation anchor is a claim about the tree, so a new function can falsify one it never touched ★★☆☆☆
+
+*2026-09-04 · Lane I, the pairing the two SVG debts were one of, at f01c4f35+lanes5 (2026-09-04).*
+
+**Expected**: adding `validateDecorationText` to `contrast.ts` to be invisible to the mutation
+harness, since it comes with its own run file whose anchors were checked for uniqueness (F219).
+
+**Measured**: **MA4 failed** — `c10-error-pair.mjs: 1 ambiguous anchor(s)`. That run's mutation 2
+anchors on `    if (measured >= DEFAULT_FLOOR) continue;`, which was unique in the tree until the new
+function wrote the same line. The run file was not edited, its anchor was still correct English, and
+it had silently become a claim that could land the mutation in the wrong function.
+
+**The uniqueness check is a property of the tree and not of the run file**, so the discipline
+*"anchors checked for uniqueness before the pass"* protects the run being written and not the ones
+already there. The gate is what caught it — MA4's equality arm, on the first full-suite run.
+
+**Repaired** by writing the new check as `if (measured < DEFAULT_FLOOR) { … }` rather than as the
+guard-and-`continue` form, with the reason at the site; the new run file's own anchor moved with it
+and was re-verified by hand (T2.29c still fails under it). MA4's ambiguous count went 11 → 10 and
+`c10-error-pair.mjs` left the report. Re-anchoring `c10-error-pair.mjs` instead was declined: that is
+a re-anchor without running the pass, which is the thing that rots a mutation run.
+
+**Where**: `src/presentation/theme/contrast.ts` `validateDecorationText`,
+`tools/mutate/runs/c10-error-pair.mjs:64`, `tools/mutate/runs/c10-decoration-text.mjs` mutation 2.
+
+---
+
+## F680 — F665's own table is wrong in two rows, and the corrected count is wrong too ★★★☆☆
+
+*2026-09-04 · Lane B, the ambiguous-width table and its authority, at f01c4f35+lanes5 (2026-09-04).*
+
+**Expected** (from the lane brief, which restates the ledger): five of the ten members of SS47's
+`PROSE_MARKS` are East-Asian-Ambiguous characters in the Latin-1 gap, `«` and `»` among them; and
+`— ≤ ≥ → ⚠` "are all in the table and report 2 correctly".
+
+**Measured.** `«` U+00AB and `»` U+00BB are **Neutral**, not Ambiguous — they were reporting 1 and 1
+was right. `⚠` U+26A0 is **Neutral** too, and reports 2 under the wide convention, so it is
+*over*-counted by the geometry deviation rather than correct. The real accounting is:
+
+| | marks | width at `wide` before | verdict |
+|---|---|---|---|
+| Ambiguous, already in the table | `—` `≤` `≥` `→` | 2 | right |
+| Ambiguous, in the gap | `§` `·` `×` | 1 | **under-count — the defect** |
+| Neutral | `«` `»` | 1 | right |
+| Neutral, inside the geometry deviation | `⚠` | 2 | over-count, harmless direction |
+
+So **three of ten, not five of ten and not four of eight**, and a fourth mark is wrong in the
+opposite direction, which no version of the finding mentions. The conclusion survives all three
+counts; the count has now been asserted one mark at a time (C09 T1.27c) rather than as a total,
+because a total is satisfied by the wrong three.
+
+**Where:** the brief's table; `tools/enforce/source-scans.mjs:1000`; now recorded at C09 §5 and
+`test/unit/text.test.ts` T1.27c.
+
+---
+
+## F681 — the omission was a written-down policy, and the argument for it is false about the capability ★★★☆☆
+
+*2026-09-04 · Lane B, the ambiguous-width table and its authority, at f01c4f35+lanes5 (2026-09-04).*
+
+**Expected.** The finding treats the Latin-1 gap as an oversight in a hand-written table.
+
+**Measured.** It is a stated ruling with a stated reason, in the function's own docstring at
+`src/presentation/text.ts:861-882` (as at f01c4f35): *"Not the whole property, and the omission is
+deliberate… most of them Cyrillic, Greek and Latin letters with accents that no terminal renderer
+has ever drawn two cells wide in practice because the fonts do not have wide forms for them… The
+test of a range's inclusion is whether the tree draws from it."* Neither half of that survives
+contact with the thing it is attached to:
+
+- The premise is about **fonts**; `ambiguousWidth` is about a **convention**. An emulator with the
+  wide-convention setting applies it to the property, Latin-1 and Greek and Cyrillic included —
+  that is what the option means (C02 I9's own subject).
+- The inclusion test is indexed to the **glyph tables**, and `cells()` measures what it is handed.
+  Most of what it is handed is far-side text, where `§` `·` `×` `°` `±` `π` `Σ` come from.
+
+This is CLAUDE.md's *correct sentence justifying the wrong decision* one turn further on: the
+sentence is not merely irrelevant, it is false, and it read as deliberate for the life of the table.
+It is also the *ask where the claim was written down* instrument answering **"in the code, with an
+argument"** — the strongest form, and the one that most discourages checking.
+
+---
+
+## F682 — the same table has a second and larger defect, in the default mode ★★★☆☆
+
+*2026-09-04 · Lane B, the ambiguous-width table and its authority, at f01c4f35+lanes5 (2026-09-04).*
+
+**Expected.** The gap is in `isAmbiguous`, and the wide convention is where it bites.
+
+**Measured**, by sweeping U+0080..U+10FFFF against the property:
+
+| mode | class | direction | code points | runs |
+|---|---|---|---|---|
+| **narrow** | W | measures 1, property says 2 | **8,619** | 65 |
+| narrow | N | measures 2, property says 1 | 387 | 51 |
+| narrow | A | measures 2, property says 1 | 8 | 1 |
+| wide | A | measures 1, property says 2 | 138,132 | 97 |
+| wide | W | measures 1, property says 2 | 8,570 | 46 |
+| wide | N | measures 2, property says 1 | 963 | 132 |
+
+The 8,619 are `isWide`'s, not `isAmbiguous`'s, and they are **under-counts in `ambiguousWidth:
+"narrow"`** — the default, and the mode every golden frame in the tree is rendered in. Tangut
+(U+17000..U+18CD5, 7,382), Kana Extended (U+1B000..U+1B2FB, 687), the Yijing hexagrams
+(U+4DC0..U+4DFF, 64), Hangul Jamo Extended-A (U+A960..U+A97C, 29), and about thirty emoji
+singletons that appear in ordinary output: `⌚` `⏰` `⚡` `⚪` `⛄` `⛔` `✅` `✨` `❌` `❗` `➕` `⭐`
+`⭕` `🀄`. Left unfixed deliberately (second table, second blast radius) and requested.
+
+The 8 at narrow are U+3248..U+324F, which the property calls Ambiguous and `isWide`'s coarse
+`0x3041..0x33ff` claims outright — **the two tables overlap**, which the property's classes cannot.
+
+---
+
+## F683 — deriving from the property created a defect one table over, and the walk is what caught it ★★☆☆☆
+
+*2026-09-04 · Lane B, the ambiguous-width table and its authority, at f01c4f35+lanes5 (2026-09-04).*
+
+**Expected.** Replacing a hand-written subset with the full property can only widen the answer
+toward the truth.
+
+**Measured.** The property classifies **U+E0100..U+E01EF (VARIATION SELECTOR-17..256) as
+Ambiguous**. They are `Mn` combining marks and `isZeroWidth` did not list them, so the derived table
+would have measured a combining mark at **two cells** under the wide convention — an over-count the
+hand-written table could not have had, because it never reached plane 14. Found in the by-hand
+classification table (the cell where R1 *zero-width* and R5 *ambiguous* both claim a code point),
+before the sweep was re-run. Fixed by widening `isZeroWidth`; pinned by C09 T1.27e; the reverting
+mutation is row 4 of `tools/mutate/runs/c09-text-ambiguous.mjs`.
+
+**The reusable half:** a generated table makes reachable every part of the property the hand-written
+one had silently excluded, including the parts another table was supposed to answer first. *Ask what
+the new data reaches that the old data could not* is a different question from *is the new data
+right*, and only the first one finds this.
+
+---
+
+## F684 — a corpus sweep over "every non-ASCII character in the tree" reads binaries ★★☆☆☆
+
+*2026-09-04 · Lane B, the ambiguous-width table and its authority, at f01c4f35+lanes5 (2026-09-04).*
+
+**Expected.** Walking `src/`, `test/` and `docs/` for non-ASCII characters gives the characters the
+tree actually contains.
+
+**Measured.** The first sweep reported **25,363 distinct non-ASCII code points and 2,794
+disagreements**, headed by U+FFFD at 3,382,599 occurrences in `src/.DS_Store`, and by Cyrillic and
+Greek from `test/fixtures/meshes/*.obj.gz` and `docs/catalogue/animation/*.gif` decoded as UTF-8.
+Restricted to text extensions and files free of U+FFFD, the honest figures are **597 distinct code
+points and 98 disagreements**. The wrong corpus does not change the ruling here — but every one of
+its top twenty rows is a mesh binary, and a reader taking "Cyrillic appears 235 times in the tree"
+from it would be reading `stanford-bunny.obj.gz`. This is *a corpus chosen for a property may not
+have it*, in the cheapest possible form.
+
+---
+
+## F685 — the deviation masks a defect in one mode and not the other ★★☆☆☆
+
+*2026-09-04 · Lane B, the ambiguous-width table and its authority, at f01c4f35+lanes5 (2026-09-04).*
+
+**Measured.** 49 of the code points kept Ambiguous by `DRAWN_AS_GEOMETRY` are **Wide** in the
+property (`⚡` U+26A1, `⚪` U+26AA, `⛄` U+26C4, `⛔` U+26D4, `♈`..`♓`, `☰`..`☷`, …). At
+`ambiguousWidth: "wide"` they measure 2, which is right — *for the wrong reason*. At `"narrow"` they
+measure 1, which is wrong, and the deviation is why no test at the wide convention can see it. A
+guard that is accidentally correct in the mode people test and wrong in the mode people ship is
+worth naming as a shape: **the deviation is not neutral about the gap it overlaps.**
+
+---
+
+## F686 — a `grep … | head` cost a test number ★☆☆☆☆
+
+*2026-09-04 · Lane B, the ambiguous-width table and its authority, at f01c4f35+lanes5 (2026-09-04).*
+
+**Measured.** `T6.85` was chosen after grepping the docs tree for it and reading ten lines of output
+through `head`; C09 already declared T6.85 at line 1965, past the cut. `make enforce`'s SP7 caught
+it in one run, which is the system working — but the lesson is the one already in the ledger about
+exit codes through pipes, in its other form: **`head` on a uniqueness check answers a different
+question from the one asked.** Renumbered T6.86.
+
+---
+
+## F687 — `partSeparator` resolves on `unicode` alone, and its parameter type is why ★★★☆☆
+
+*2026-09-04 · Lane B, the ambiguous-width table and its authority, at f01c4f35+lanes5 (2026-09-04).*
+
+**Expected.** Fixing the width table would move golden frames and nothing else.
+
+**Measured.** `npm test` goes from 5,108 green to **two red rows, both in C12, both real**, and the
+first has a one-line cause:
+
+```ts
+// src/presentation/plot/marks.ts:163
+export function partSeparator(caps: Pick<TerminalCapabilities, "unicode">): string {
+  return caps.unicode === "ascii" ? " - " : " · ";
+}
+```
+
+U+00B7 is Ambiguous, so at `ambiguousWidth: "wide"` this separator is **two cells** where the
+renderer counted one. `test/unit/plot-arm-unification.test.ts` U6f (C12 I54) runs `cells()` over
+rendered output at the wide rung and forbids any two-cell glyph but `…`; it now reports
+`heatmap/default draws a two-cell glyph at wide: expected '·' to be '…'`. The callers are
+`heatmap.ts:434`, `:435` and `:501` — the `+n more · …` and `· n older not shown` notices.
+
+**This is F292's truncation-marker defect, in the same shape, four functions along**: a mark chosen
+from `unicode` when the width also depends on `ambiguousWidth`. It is also the case for reading the
+*type*: `Pick<TerminalCapabilities, "unicode">` means the function **cannot ask** the question it
+needs to answer, and `categoryMarks` **twelve lines below it in the same file** takes the full
+alphabet and switches on `caps.ambiguousWidth === "wide"`. The right neighbour got it right; the
+narrow parameter is what stopped anyone noticing the wrong one.
+
+Not fixed here — `src/presentation/plot/` is not this lane's. The fix is the sibling's shape: widen
+the parameter and add the arm (` - `, or a one-cell mark, at wide).
+
+---
+
+## F688 — a test constructed the state it claims and the measurer refused to produce it ★★★☆☆
+
+*2026-09-04 · Lane B, the ambiguous-width table and its authority, at f01c4f35+lanes5 (2026-09-04).*
+
+**Expected.** `test/unit/plot-y-axis.test.ts` YA4 says in its own comment: *"`café` is Ambiguous, so
+a terminal reporting `wide` measures it at five cells and a default measurement at four — the exact
+drift §3f names."*
+
+**Measured, at f01c4f35.** `é` U+00E9 is Ambiguous in the property and was **not in the table**, so
+`cells("café", "wide")` was **4**, exactly equal to the narrow answer. The row's premise was false,
+the drift it was written to catch could not occur, and the assertion passed for that reason. After
+the fix `cells("café","wide")` is 5 — and YA4 **fails**, on `firsts.size` = 2: with a genuinely
+ambiguous row label the two y-axis gutters no longer line up in one column, which is the C12 I47
+defect the row exists for.
+
+So the test row was green for the wrong reason for its whole life, and the thing that made it green
+was the very table it was testing around. MEMORY's *a test must construct the state it claims* and
+*an invariant is vacuous until its subject exists*, met in one row — and the instrument that found
+it was not a review of the test but a change to the substrate underneath it. **A vacuous test is
+indistinguishable from a satisfied one until the thing it depends on starts behaving.**
+
+Not fixed here (C12's file, C12's invariant). It is a real defect and it should not be made green by
+changing the label.
+
+---
+
+## F689 — deriving a table from its source retired a mutation, and only running it said so ★★☆☆☆
+
+*2026-09-04 · Lane B, the ambiguous-width table and its authority, at f01c4f35+lanes5 (2026-09-04).*
+
+**Expected.** `tools/mutate/runs/c02-ambiguous.mjs` row 2 — *"block elements are not ambiguous"* —
+anchors on `(cp >= 0x2580 && cp <= 0x259f) || // block elements …` and kills C02 T2.52. The range
+moved into `DRAWN_AS_GEOMETRY`, so the obvious re-anchor is that list's row, and MA4 goes green.
+
+**Measured.** MA4 *did* go green and **the mutation stopped mutating**: deleting the geometry row
+leaves T2.52 passing 5 of 5, because `AMBIGUOUS_RANGES` carries U+2580..U+258F and U+2592..U+2595
+from the property itself. A valid anchor that is no longer a mutation is exactly what MA4 cannot
+see — it checks that anchors resolve, not that they change an answer.
+
+Re-anchored a second time as a guard inside `isAmbiguous` (`if (cp >= 0x2580 && cp <= 0x259f) return
+false;`), which is what the row's *name* claims and which kills T2.52 as the original did. Verified
+by hand. **MEMORY's *never re-anchor without running the pass* earned its keep in one turn**, and
+the general shape is new: deriving a table from its source can make a deletion behaviour-preserving,
+so every mutation whose subject is one row of that table needs re-running rather than re-pointing.
+
+---
+
+## F690 — A correction to a finding was itself wrong in the same way the finding was ★★★☆☆
+
+*2026-09-04 · the lead, closing lanes5, at f01c4f35+lanes5.*
+
+**Expected.** F665's count had already been corrected once — *four of the eight* became
+**five of the ten**, re-measured against `dist/` — so the number standing in the ledger was
+the measured one and the entry was closed.
+
+**Measured.** It is **three of ten**. `«` U+00AB and `»` U+00BB are **Neutral**, not
+Ambiguous: they were reporting 1 and 1 was right. `⚠` U+26A0 is Neutral too and reports **2**
+under the wide convention, so it is *over*-counted by the geometry deviation — a direction no
+version of the finding mentioned at all. Lane B read `EastAsianWidth-17.0.0.txt` itself, row
+by row (F680); the accounting is four Ambiguous marks already in the table, **three** Ambiguous
+in the Latin-1 gap (`§` `·` `×`, the defect), two Neutral reporting correctly, and one Neutral
+over-counted.
+
+**The shape, which is the reusable half.** Three statements of one number, each taken against
+a **narrower authority than the last** — the entry's own eight-row table, then the framework's
+`cells()` through `dist/`, then the Unicode property — and **the conclusion held through all
+three**, which is exactly why nobody stopped. A correction reads as the checked version of a
+claim, so it inherits the claim's authority along with its subject; this one was re-measured
+against the same instrument that was wrong, which is not a check at all. The lesson is not
+that counts drift under restatement — it is **which authority a count is taken against**, and
+that question is answerable in twenty minutes and was never asked.
+
+**And the total is the wrong assertion.** *n of ten* is satisfied by the wrong n marks, which
+is why the repair is C09 T1.27c asserting the marks **one at a time** rather than a better
+number. That is *assert the artefact, not a proxy* arriving in a count.
+
+**Where.** F665's body, corrected in place; F680 carries the row-by-row measurement;
+`test/unit/text.test.ts` T1.27c; C09 §5.
+
+---
+
+## F691 — The wide separator was a mark measured by a function that could not see the capability its width depends on ★★★☆☆
+
+*2026-09-04 · the lead, closing lanes5, at f01c4f35+lanes5.*
+
+**Expected.** `partSeparator` chooses a separator from the **repertoire**, so
+`Pick<TerminalCapabilities, "unicode">` is the whole of the question it has to answer, and a
+width table fix could not reach it.
+
+**Measured.** It returned `' · '` on the unicode arm, and U+00B7 is East-Asian Ambiguous —
+**two cells at `ambiguousWidth: "wide"`**, where all five plot sites that draw it had counted
+one. So five sites drew one cell over their own measurement at exactly one rung, and it was
+invisible for as long as `cells()` under-counted Latin-1 (F665, F680): the moment the table was
+derived from the property, C12 I54's row reported the two-cell glyph and the defect had been
+there the whole time.
+
+**`categoryMarks` is twelve lines below it in the same file**, takes the whole alphabet and
+already substitutes at the wide rung. The right neighbour got it right, and the **narrow
+parameter type is what stopped anyone comparing them**: a function that cannot ask the question
+does not read as a function that failed to. This is **F292's shape four functions along** — a
+mark chosen from `unicode` when the mark's width depends on `ambiguousWidth`.
+
+**Fixed, and the fix moved a gate.** The wide arm now takes the ASCII form rather than a third
+literal — the hyphen is Neutral, one cell under both conventions, and already in the function.
+Widening the parameter broke **G4**, which scans `svg.ts` for the literals `ambiguousWidth` and
+`TerminalCapabilities` precisely so the image path cannot acquire a terminal fact. So the
+shared caption now takes a **separator** rather than a capability and its marks, and `marks.ts`
+exports `IMAGE_SEPARATOR` for the arm with no cell grid. The rule was right and the routing was
+the repair: a capability record handed to the SVG arm to be ignored is the thing G4 exists to
+refuse.
+
+**Where.** `src/presentation/plot/marks.ts` `partSeparator` and `IMAGE_SEPARATOR`;
+`src/presentation/plot/heatmap.ts:434`, `:435`, `:501` and the caption sites;
+`src/presentation/plot/svg.ts:2114`; G4 in `tools/enforce/source-scans.mjs`; C12 I54's U6f.
+
+---
+
+## F692 — One test row, four layers of vacuity, each hiding the next ★★★☆☆
+
+*2026-09-04 · the lead, closing lanes5, at f01c4f35+lanes5.*
+
+**Expected.** C12's YA4 — *both y-axis gutters are straight at the wide rung* — to be a row
+whose fixture makes the drift it names possible, its own comment naming `café` as the label
+that measures five cells at `wide` and four at the default.
+
+**Measured**, four times. **Each layer was only visible once the one before it was removed**,
+which is the finding:
+
+- **(a) It was green because the drift could not occur.** `é` was outside the ambiguous
+  range table, so `cells("café", "wide")` was **4** — identical to the narrow answer. The row
+  passed for precisely the reason it was written to catch (F688).
+- **(b) With the width fixed it failed, and the assertion was the wrong one.** It measured the
+  edge's **string index**, and `café` is five cells in four characters, so a **correctly
+  aligned** frame reports edges at 5 and at 6. The renderer was right and the row was wrong
+  about what a column is — vacuous in one direction and wrong in the other, from one missing
+  width.
+- **(c) Measuring in cell columns made it pass, and it was still vacuous.** *Every edge in one
+  column* is satisfied by a **uniformly wrong** width. Proved rather than argued: mutating
+  `labelColumnWidth` to count code units left the edges in one column, moving together, and
+  the row stayed green.
+- **(d) Asserting *which* column did not catch it either, because the fixture tied.** The other
+  labels were `beta` and `gamma`, and `gamma` is five code units and five cells — so both
+  conventions returned the same width and the literal agreed with the defect.
+
+Only after narrowing the labels to `["café", "ab", "cd"]` — so the ambiguous label is
+**strictly widest in cells (5) and strictly not in code units (4)** — does the row kill both
+the code-unit mutation and the wrong-convention mutation.
+
+**The shape.** Two of these are in the ledger separately: a containment assertion is satisfied
+by every wrong answer that is uniform, and a fixture that ties makes an assertion about a
+*choice* vacuous while it reads as specific. What is new is the **stack** — four in one row,
+each concealed by the one above it — so no single pass over the test could have found more
+than the first, and three of the four are only reachable by changing something underneath the
+row and watching what it does. **A test is not one claim that can be right or wrong; it is a
+chain, and fixing the top link is what makes the next one measurable.**
+
+**Where.** `test/unit/plot-y-axis.test.ts` YA4 (C12 I47, §3f);
+`src/presentation/plot/furniture.ts` `labelColumnWidth`; the two mutations recorded in the
+row's own comment.
