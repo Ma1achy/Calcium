@@ -44,6 +44,8 @@ export type RenderOptions = Readonly<{
   cursorPositions?: RenderContext["cursorPositions"];
   /** Per-plot live cameras (C12 I83). Absent is each block's own. */
   cameras?: RenderContext["cameras"];
+  /** Per-image frame indices (C04 I93, C22 I77). Absent is frame 0. */
+  frames?: RenderContext["frames"];
   /**
    * Caller-owned scratch (C12 I107). Absent is a miss on every lookup, which is
    * the same frame at the same cost — a cache whose absence changes a picture
@@ -75,6 +77,7 @@ export function renderToLines(
     ...(options.scrollOffsets === undefined ? {} : { scrollOffsets: options.scrollOffsets }),
     ...(options.cursorPositions === undefined ? {} : { cursorPositions: options.cursorPositions }),
     ...(options.cameras === undefined ? {} : { cameras: options.cameras }),
+    ...(options.frames === undefined ? {} : { frames: options.frames }),
     ...(options.scratch === undefined ? {} : { scratch: options.scratch }),
     tick: options.tick ?? 0,
   };
@@ -125,6 +128,7 @@ export function renderSequenceToLines(
     ...(options.scrollOffsets === undefined ? {} : { scrollOffsets: options.scrollOffsets }),
     ...(options.cursorPositions === undefined ? {} : { cursorPositions: options.cursorPositions }),
     ...(options.cameras === undefined ? {} : { cameras: options.cameras }),
+    ...(options.frames === undefined ? {} : { frames: options.frames }),
     ...(options.scratch === undefined ? {} : { scratch: options.scratch }),
     tick: options.tick ?? 0,
   };

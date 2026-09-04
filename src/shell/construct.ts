@@ -51,6 +51,7 @@ import type { EntryId } from "../viewport/transcript/index.js";
 import { createViewport } from "../viewport/viewport/index.js";
 import { RenderCache } from "./render-cache.js";
 import { Cameras } from "./cameras.js";
+import { Frames } from "./frames.js";
 import { CursorPositions } from "./cursor-positions.js";
 import { RenderScratchStore } from "./render-scratch.js";
 import { ScrollOffsets } from "./scroll-offsets.js";
@@ -333,6 +334,8 @@ export type Graph = Readonly<{
   rendered: RenderCache;
   scrollOffsets: ScrollOffsets;
   cameras: Cameras;
+  /** C22 I77 — the frame each animated image is on, keyed like the two above and dropped with them. */
+  frames: Frames;
   /** C22 I76 — the crosshair of each plot, keyed like the two above and dropped with them. */
   cursorPositions: CursorPositions;
   /**
@@ -505,7 +508,12 @@ export async function constructGraph(
     // the only thing that knows which block gave way, and the shell has to
     // address one to reserve rows for it.
     const blockFaults = new BlockFaultLog();
-    const blocks = createBlockRegistry({ defaults: true, onError: blockFaults.report });
+    const blocks = createBlockRegistry({
+      defaults: true,
+      onError: blockFaults.report,
+      // C14 I24 — the app's cap on one block's rows, resolved in `config.ts`.
+      maxBlockRows: config.maxBlockRows,
+    });
     // **The three the framework itself produces** (C09 §1, I13). `defaults`
     // ships C09's fourteen; `table`, `plot` and `patch` register through the
     // public mechanism, and until this line nobody called it — so a stock
@@ -660,6 +668,10 @@ export async function constructGraph(
     // written by nothing in `src/` — the counter-example I71 cited when the
     // camera landed. Same key shape, same subscription, same reason.
     const cursorPositions = new CursorPositions();
+    // **And the animated images' frame positions** (C22 I77, C04 I93). Same key
+    // shape, same subscription, same reason — and the fourth store to join it,
+    // which is the count the argument was written to survive.
+    const frames = new Frames();
     // **This one does not join the subscription, and the difference is the
     // point** (C12 I107, §6o.1). The two stores above are keyed by entry id and
     // must be told when an entry goes; this is keyed on the caller's own
@@ -675,12 +687,14 @@ export async function constructGraph(
           scrollOffsets.delete(id);
           cameras.delete(id);
           cursorPositions.delete(id);
+          frames.delete(id);
         }
       } else if (change.kind === "clear") {
         rendered.clear();
         scrollOffsets.clear();
         cameras.clear();
         cursorPositions.clear();
+        frames.clear();
       }
     });
 
@@ -919,6 +933,7 @@ export async function constructGraph(
       scrollOffsets,
       cameras,
       cursorPositions,
+      frames,
       scratch,
       overlays,
       history,

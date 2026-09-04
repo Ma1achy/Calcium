@@ -149,7 +149,15 @@ const KNOWN_STALE = {
   // Each is a one-token repair, and listed rather than repaired for the reason
   // at the head of this list: the repair belongs to whoever runs the pass.
   "c04-scroll.mjs": 1,
-  "c22-camera.mjs": 1,
+  // **`c22-camera` went from one to three and `c22-cursor` joined, under C22 I77
+  // on 2026-09-04, neither run that day** (lane V). The render slot gained an
+  // eighth axis (`framesKey`), the commit reason became `orbits.length > 0 ||
+  // frames.length > 0`, and the cap's ternary moved onto one line (`const floor
+  // = … ? ORBIT_MS : ORBIT_MS_TORN`); `c22-cursor`'s slot fragment moved with the
+  // first. One-token repairs each, listed rather than repaired for the reason at
+  // the head of this list — the lane could not run the pass.
+  "c22-camera.mjs": 3,
+  "c22-cursor.mjs": 1,
   "c26-address.mjs": 3,
   "c26-focus-target.mjs": 2,
   "c26-semantic-copy.mjs": 2,

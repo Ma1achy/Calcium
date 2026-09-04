@@ -133,6 +133,17 @@ export type RenderContext = Readonly<{
    */
   cameras?: Readonly<Record<string, Camera>>;
   /**
+   * The frame each animated image is showing, by block id (C04 I93, C22 I77).
+   *
+   * **Written by L4's `Frames`** (`shell/frames.ts`) on the animation wake,
+   * read by the image block's rasterising arms, which draw `frames[index]`
+   * and never advance anything. Absent is frame 0, which is what a still is
+   * always on — so a renderer reads `?? 0` and a PNG never notices the field.
+   * `measure` does not receive it (I8): every frame shares the logical
+   * screen, so the frame is appearance and never geometry.
+   */
+  frames?: Readonly<Record<string, number>>;
+  /**
    * Caller-owned scratch for work a renderer would otherwise repeat (C12 I107).
    *
    * **An input, which is what keeps I11 satisfied.** C12 I11 forbids state that

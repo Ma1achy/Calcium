@@ -8,12 +8,13 @@ import { Box, Text } from "ink";
 import { createElement, type ReactElement } from "react";
 import { columnsForAspect } from "../../plot/aspect.js";
 import {
-  decodePng,
+  decodeImage,
   ditherAscii,
   ditherBraille,
   HALF_BLOCK,
   halfBlockEligible,
   halfBlockRows,
+  type Animation,
   type Decoded,
   type Pixels,
 } from "../../image/index.js";
@@ -48,9 +49,9 @@ function decodedOf(block: Image): Decoded {
   if (held !== undefined) return held;
   let decoded: Decoded;
   try {
-    decoded = decodePng(Uint8Array.from(Buffer.from(block.data, "base64")));
+    decoded = decodeImage(Uint8Array.from(Buffer.from(block.data, "base64")));
   } catch {
-    // **The one refusal `decodePng` cannot phrase**, because it never received
+    // **The one refusal the codec cannot phrase**, because it never received
     // bytes: `Buffer.from(…, "base64")` is lenient and `Uint8Array.from` is not.
     decoded = { ok: false, fault: "the block's data is not base64" };
   }
@@ -58,10 +59,34 @@ function decodedOf(block: Image): Decoded {
   return decoded;
 }
 
-/** What an arm that **rasterises** needs: a glyph per cell wants real samples. */
-function pixelsOf(block: Image): Pixels | null {
+/**
+ * What an arm that **rasterises** needs: a glyph per cell wants real samples.
+ *
+ * **The frame is the context's, never the block's** (C04 I93, C22 I77). A still
+ * has one frame and `frames[index]` is `pixels` for every index; an animation
+ * has several and the shell says which is showing. Out of range wraps rather
+ * than refusing — the store keeps the index inside the count, and a block whose
+ * bytes changed under a held index has a new digest and a new slot.
+ */
+function pixelsOf(block: Image, frame = 0): Pixels | null {
   const decoded = decodedOf(block);
-  return decoded.ok ? decoded.pixels : null;
+  if (!decoded.ok) return null;
+  if (decoded.animation === undefined || frame === 0) return decoded.pixels;
+  const frames = decoded.animation.frames;
+  return frames[((frame % frames.length) + frames.length) % frames.length] ?? decoded.pixels; // cells-ok — a frame count
+}
+
+/**
+ * The frames and delays of an animated image, or `null` for a still (C04 I93).
+ *
+ * **This is what the shell's wake reads and it is the only thing it reads**:
+ * `visibleRows` asks each image on screen whether it animates and, if so, at
+ * what delays — the block knows, the store does not, and the decoder is
+ * already memoised on the digest so the question costs a map lookup.
+ */
+export function framesOf(block: Image): Animation | null {
+  const decoded = decodedOf(block);
+  return decoded.ok ? (decoded.animation ?? null) : null;
 }
 
 /**
@@ -73,9 +98,11 @@ function pixelsOf(block: Image): Pixels | null {
  * only the second, was refused along with the arms that need the first.
  *
  * `decodePng` fills the IHDR in its chunk walk and refuses after, so a 16-bit or
- * interlaced PNG arrives here with its extent intact. Absent exactly when the
- * failure is a failure to *find* a picture — no signature, no IHDR, a zero
- * dimension — and then the 20-column placeholder is still the honest answer.
+ * interlaced PNG arrives here with its extent intact; `decodeGif` reads the
+ * logical screen before any frame, so a GIF's extent survives a corrupt frame.
+ * Absent exactly when the failure is a failure to *find* a picture — no
+ * signature, no IHDR, a zero dimension — and then the 20-column placeholder is
+ * still the honest answer.
  */
 function extentOf(block: Image): Readonly<{ width: number; height: number }> | null {
   const decoded = decodedOf(block);
@@ -167,7 +194,11 @@ export const imageDefinition: BlockDefinition<Image> = {
 
     // **Below here every arm rasterises, so this is where the refusal goes**
     // (C09 I38, F410, F413).
-    const px = pixelsOf(block);
+    //
+    // **And this is where the frame enters** (C04 I93, C22 I77): the protocol
+    // arm above transmitted every frame once and the terminal is animating it,
+    // so the index is read only by the arms that draw a glyph per cell.
+    const px = pixelsOf(block, ctx.frames?.[block.id] ?? 0);
 
     // **A block whose bytes do not decode draws the refusal, with the reason**
     // (I38, F410). It drew `alt` for every one of them, and the ruling that put

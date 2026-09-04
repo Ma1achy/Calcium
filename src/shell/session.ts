@@ -33,9 +33,10 @@ import { composeFrame } from "./render-frame.js";
 import { focusKey } from "./render-cache.js";
 import { reserveNeeded } from "./block-faults.js";
 import { descendants } from "../data/viewmodel/index.js";
-import type { Block, Plot } from "../data/viewmodel/index.js";
+import type { Block, Image, Plot } from "../data/viewmodel/index.js";
 import { renderSequenceToLines } from "../presentation/render-lines.js";
 import { animationIntervalOf } from "../presentation/blocks/index.js";
+import { framesOf } from "../presentation/blocks/kinds/image.js";
 import type { FocusState } from "../presentation/blocks/index.js";
 import { contextAt } from "../interaction/completion/index.js";
 import { selectionSpans, type CellSpan } from "../interaction/editor/index.js";
@@ -155,9 +156,22 @@ const EMPTY_SPANS: readonly CellSpan[] = Object.freeze([]);
 type Animated = Readonly<{
   spinnerMs: number | null;
   orbits: readonly Readonly<{ entryId: string; blockId: string; declared: Plot["camera"] }>[];
+  /**
+   * The animated images the frame drew on a rasterising arm (C22 I77, C04
+   * I93). **Not gathered at `kitty`**: there the terminal holds every frame and
+   * runs the loop itself, so the session has nothing to advance and arms
+   * nothing — a still must cost nothing, and on that arm an animation costs the
+   * same. The delays travel with the entry for `Cameras`' reason: only the
+   * block knows them.
+   */
+  frames: readonly Readonly<{ entryId: string; blockId: string; delays: readonly number[] }>[];
 }>;
 
-const NOTHING_ANIMATES: Animated = Object.freeze({ spinnerMs: null, orbits: Object.freeze([]) });
+const NOTHING_ANIMATES: Animated = Object.freeze({
+  spinnerMs: null,
+  orbits: Object.freeze([]),
+  frames: Object.freeze([]),
+});
 
 /**
  * The orbit's cadence, and it is C03's two windows rather than two new numbers
@@ -246,7 +260,13 @@ class Session implements TuiInstance {
    * than by however long the session was idle.
    */
   #tickAt: number | null = null;
-  #orbitAt: number | null = null;
+  /**
+   * When continuous motion — the orbits' angles and the images' frames — was
+   * last advanced (I74, I77). **One stamp for both populations**, because both
+   * are `f(Δt)` from the same wake and a second stamp would be a second place
+   * for the reset on stop to miss.
+   */
+  #motionAt: number | null = null;
 
   /** The armed tick, disposed and re-armed on every frame. */
   #spinner: Disposable | null = null;
@@ -520,7 +540,7 @@ class Session implements TuiInstance {
     this.#spinner = null;
     this.#animation = NOTHING_ANIMATES;
     this.#tickAt = null;
-    this.#orbitAt = null;
+    this.#motionAt = null;
     // **Here, not in `beforeRelease`** (C23 I12). The flag `beginStopping` sets
     // is read at the top of a tick and cannot see a `fetch` already in flight;
     // stopping the timers alongside it is what makes the promise hold. Same
@@ -720,27 +740,40 @@ class Session implements TuiInstance {
   #armSpinner(): void {
     this.#spinner?.[Symbol.dispose]();
     this.#spinner = null;
-    const { spinnerMs, orbits } = this.#animation;
+    const { spinnerMs, orbits, frames } = this.#animation;
     // **The capability chooses the orbit's cadence, and the same switch chooses
     // its commit reason** (I73). A full-frame rewrite thirty times a second on a
     // terminal without DECSET 2026 shows a horizontal seam every frame, and the
     // tear is worse than the slower rotation.
-    const orbitMs =
-      orbits.length === 0
-        ? null
-        : this.#graph?.capabilities.synchronisedUpdate === true
-          ? ORBIT_MS
-          : ORBIT_MS_TORN;
-    const ms =
-      spinnerMs === null ? orbitMs : orbitMs === null ? spinnerMs : Math.min(spinnerMs, orbitMs);
+    const floor = this.#graph?.capabilities.synchronisedUpdate === true ? ORBIT_MS : ORBIT_MS_TORN;
+    const orbitMs = orbits.length === 0 ? null : floor;
+    // **An animated image wakes when its next frame is due, and no sooner**
+    // (I77). The orbit has no natural cadence and takes the floor; a GIF has
+    // one — its delays — so the timer is armed for the earliest frame change on
+    // screen, floored at the same rate the orbit is. A 500 ms GIF costs two
+    // wakes a second and not thirty, and a 20 ms one is capped where C03's
+    // `stream` window would cap it anyway, its frames skipped by the delta
+    // arithmetic rather than drawn late one by one.
+    let framesMs: number | null = null;
+    if (frames.length > 0) {
+      const graph = this.#graph;
+      let due = Number.POSITIVE_INFINITY;
+      for (const f of frames) {
+        const d = graph?.frames.due(f.entryId, f.blockId, f.delays) ?? 0;
+        if (d < due) due = d;
+      }
+      framesMs = Math.max(floor, Number.isFinite(due) ? due : floor);
+    }
+    const candidates = [spinnerMs, orbitMs, framesMs].filter((m): m is number => m !== null);
+    const ms = candidates.length === 0 ? null : Math.min(...candidates);
     if (ms === null) {
       this.#tickAt = null;
-      this.#orbitAt = null;
+      this.#motionAt = null;
       return;
     }
     const now = this.config.clock();
     this.#tickAt ??= now;
-    this.#orbitAt ??= now;
+    this.#motionAt ??= now;
     this.#spinner = this.config.schedule(() => void this.#animate(), ms);
   }
 
@@ -758,18 +791,24 @@ class Session implements TuiInstance {
     const graph = this.#graph;
     if (graph === null) return;
     const now = this.config.clock();
-    const { spinnerMs, orbits } = this.#animation;
+    const { spinnerMs, orbits, frames } = this.#animation;
 
     // **The angle is `ω · Δt` and never `ω` per wake** (I74). The timer is armed
     // at the fastest cadence anything on screen wants, so a step per wake turns
     // the plot **25% fast** the moment an 80 ms spinner appears beside a capped
     // 100 ms orbit — its speed decided by something it has nothing to do with.
     // The counter below is the same defect pointing the other way.
-    if (orbits.length > 0) {
-      const since = now - (this.#orbitAt ?? now);
-      this.#orbitAt = now;
+    //
+    // **The frame index is the same arithmetic one store along** (I77): the
+    // elapsed time goes into `Frames.advance`, which walks whole delays and
+    // keeps the remainder, so a GIF beside a 33 ms orbit shows each frame for
+    // its own delay and not for one wake. One stamp serves both, read once.
+    if (orbits.length > 0 || frames.length > 0) {
+      const since = now - (this.#motionAt ?? now);
+      this.#motionAt = now;
       const azimuth = ORBIT_RATE * since;
       for (const o of orbits) graph.cameras.nudge(o.entryId, o.blockId, o.declared, { azimuth });
+      for (const f of frames) graph.frames.advance(f.entryId, f.blockId, f.delays, since);
     }
 
     // **Whole intervals, and the remainder is kept** (I74). A step per wake
@@ -786,7 +825,7 @@ class Session implements TuiInstance {
       }
     }
 
-    graph.scheduler.commit(orbits.length > 0 ? "stream" : "spinner");
+    graph.scheduler.commit(orbits.length > 0 || frames.length > 0 ? "stream" : "spinner");
   }
 
   #paintDeps(graph: Graph, frame: Composed): PaintDeps {
@@ -1016,6 +1055,14 @@ function visibleRows(
   // stops ticking (I60a) — and without this the timer another entry's spinner
   // keeps alive would turn a camera nobody is looking at.
   const orbits: { entryId: string; blockId: string; declared: Plot["camera"] }[] = [];
+  // **The animated images the frame drew, on the arms that draw them** (C22
+  // I77). Gathered from the same windowed set as the orbits and for the same
+  // reason, and **not at `kitty`**: the protocol arm handed the terminal every
+  // frame once, so there the image is a still as far as this session's timer
+  // is concerned. On the halfblock and dither arms each frame is a text frame,
+  // which is the orbit's own cost and no more.
+  const frames: { entryId: string; blockId: string; delays: readonly number[] }[] = [];
+  const rasterising = graph.capabilities.imageProtocol !== "kitty";
   for (const ve of graph.viewport.visible().entries) {
     const entry = graph.transcript.entries.find((e) => e.id === ve.id);
     if (entry === undefined) continue;
@@ -1088,6 +1135,13 @@ function visibleRows(
     // would read as a key that does nothing; every index is in the key, because
     // absent is *no crosshair* and zero is *the first sample*.
     const cursorKey = graph.cursorPositions.key(entry.id);
+    // **The eighth axis, and its symptom is the sixth's** (C22 I77, C04 I93).
+    // A frame index changes what is rendered and moves none of the other seven,
+    // so without it an animated image is served frame 0 for the life of the
+    // session — a correct still, which is what a reader on the dither arm would
+    // report as *the GIF does not animate*. Zero omitted, as the offsets are:
+    // frame 0 after a loop draws what frame 0 drew.
+    const framesKey = graph.frames.key(entry.id);
 
     // **Containers are walked, and it is C04's `descendants` rather than a
     // copy** (C22 I73). `animationIntervalOf` learned this from the mutation
@@ -1111,12 +1165,20 @@ function visibleRows(
         if (!graph.cameras.orbiting(entry.id, plot.id)) continue;
         orbits.push({ entryId: entry.id, blockId: plot.id, declared: plot.camera });
       }
+      if (rasterising) {
+        for (const b of [blk, ...descendants(blk)]) {
+          if (b.kind !== "image") continue;
+          const animation = framesOf(b as Image);
+          if (animation === null) continue;
+          frames.push({ entryId: entry.id, blockId: b.id, delays: animation.delays });
+        }
+      }
     }
 
     const cadence = animationIntervalOf(windowed.blocks);
     if (cadence !== null && (fastest === null || cadence < fastest)) fastest = cadence;
     const animated = cadence === null ? "" : `\u0000${String(tick)}`;
-    const slot = `${key}\u0000${range}\u0000${offsets}\u0000${orbitKey}\u0000${cursorKey}${animated}`;
+    const slot = `${key}\u0000${range}\u0000${offsets}\u0000${orbitKey}\u0000${cursorKey}\u0000${framesKey}${animated}`;
     const held = graph.rendered.get(entry.id, entry.rev, width, slot, theme);
     // **Faults from here are this entry's** (I69). A `BlockFault` names a block
     // and ids are unique within a document and not across entries (C04 I14), so
@@ -1155,6 +1217,10 @@ function visibleRows(
           // `cursorKey` above is its axis — the three halves I71 said land
           // together or not at all.
           cursorPositions: graph.cursorPositions.forEntry(entry.id),
+          // **The frame each animated image is on, with its writer** (C22 I77,
+          // C04 I93). `Frames` in `shell/`, advanced on the wake above, keyed by
+          // `framesKey` — the three halves I71 says land together.
+          frames: graph.frames.forEntry(entry.id),
           // **The field and its writer land together, again** (C12 I107, §6o
           // row 9). One store per session and no key of its own here: the
           // scratch is keyed on the caller's arrays inside C12, which is what
@@ -1198,7 +1264,11 @@ function visibleRows(
     const rows = [...keptChrome, ...lines.slice(windowed.skipRows)];
     out.push(...rows.slice(0, ve.takeRows));
   }
-  onAnimation(fastest === null && orbits.length === 0 ? NOTHING_ANIMATES : { spinnerMs: fastest, orbits });
+  onAnimation(
+    fastest === null && orbits.length === 0 && frames.length === 0
+      ? NOTHING_ANIMATES
+      : { spinnerMs: fastest, orbits, frames },
+  );
   return out;
 }
 

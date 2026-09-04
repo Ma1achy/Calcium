@@ -232,6 +232,56 @@ export function transmitRgba(id: number, px: Pixels, cols: number, rows: number)
 }
 
 /**
+ * An animated image, **uploaded once and animated by the terminal** (C09 I39).
+ *
+ * **The roadmap priced the wrong design.** It said *every tick is an image
+ * upload where the orbit's tick is a text frame*, which is true of retransmitting
+ * a frame at a stable id on every wake — measured 2026-09-04 through this file's
+ * own `transmitRgba`: **75 bytes a tick for an 8x8 and 29,662 for a 320x240
+ * gradient, 297 KB/s at 10 fps**, for as long as the image is on screen. kitty's
+ * animation protocol makes that zero: frame 0 goes as the placement's own
+ * transmission, every later frame as `a=f` with its gap in `z`, and one `a=a`
+ * starts the loop — **116,509 bytes once** for the same four-frame 320x240,
+ * against 296,620 every second. The session's wake is **not armed** for an
+ * image on this arm, because nothing here has anything to advance.
+ *
+ * **Raw pixels, for `transmitRgba`'s reason**: the frames are composited RGBA
+ * already and a terminal reads no GIF, so the choice is a PNG encoder or `f=32`,
+ * and `f=32` with `o=z` costs nothing this file does not already pay.
+ *
+ * **Two protocol readings are unmeasured here and stated** (§4c's plane-16
+ * class): that `v=1` on `a=a` loops for ever, and that a terminal without the
+ * animation extension ignores `a=f` and `a=a` and keeps frame 0 — which is the
+ * still the other ruling would have drawn on purpose, so the degradation is the
+ * alternative rather than a failure. `q=2` suppresses the reply either way.
+ */
+export function transmitAnimation(
+  id: number,
+  frames: readonly Pixels[],
+  delays: readonly number[],
+  cols: number,
+  rows: number,
+): string {
+  const esc = String.fromCharCode(27);
+  const first = frames[0];
+  if (first === undefined) return "";
+  let out = transmitRgba(id, first, cols, rows);
+  for (let k = 1; k < frames.length; k += 1) { // cells-ok — a frame count
+    const px = frames[k];
+    if (px === undefined) continue;
+    const z = deflateSync(Buffer.from(px.data));
+    const opts =
+      `a=f,i=${String(id)},f=32,o=z,s=${String(px.width)},v=${String(px.height)},` +
+      `z=${String(Math.max(1, Math.round(delays[k] ?? 0)))},q=2`;
+    out += chunked(opts, z.toString("base64"));
+  }
+  // The root frame's gap is set by editing frame 1, then the loop is started.
+  out += `${esc}_Ga=a,i=${String(id)},r=1,z=${String(Math.max(1, Math.round(delays[0] ?? 0)))},q=2${esc}\\`;
+  out += `${esc}_Ga=a,i=${String(id)},s=3,v=1,q=2${esc}\\`;
+  return out;
+}
+
+/**
  * One placeholder cell: the character, its row, its column, and the id in the
  * foreground colour.
  *

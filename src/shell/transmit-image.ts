@@ -24,9 +24,9 @@
  * Property 3 is why the arm survives either answer. The first real-terminal test
  * is where it is checked, beside the plane-16 width guarantee.
  */
-import { imageId, imageKey, payload, transmit, transmitRgba } from "../presentation/image/kitty.js";
+import { imageId, imageKey, payload, transmit, transmitAnimation, transmitRgba } from "../presentation/image/kitty.js";
 import { compositeOverlay } from "../presentation/image/overlay.js";
-import { decodePng } from "../presentation/image/index.js";
+import { decodeImage } from "../presentation/image/index.js";
 import { imageCells } from "../presentation/blocks/kinds/image.js";
 import type { Block, Image } from "../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
@@ -106,22 +106,43 @@ export function transmitImage(
     // failure this file's own header warns about arriving through the box
     // rather than through a missing transmission.
     const box = imageCells(image, width);
-    if (image.overlay === undefined) {
+    // **A PNG with no overlay is the bytes unchanged**, which needs no decoder
+    // at all — the terminal's reads formats ours refuses (C09 §8b G7).
+    const isPng = image.data.startsWith("iVBORw0KGgo");
+    if (image.overlay === undefined && isPng) {
       out += transmit(imageId(key), payload(bytes), box.cols, box.rows);
       continue;
     }
-    // **The composited arm** (C04 §3h.2). The decode is here rather than in the
-    // renderer because this is the only place the overlaid pixels exist: the
-    // renderer draws placeholders at `kitty` and never looks at a pixel.
+    // **Every other case needs pixels, and this is the only place they exist
+    // for the protocol arm** (C04 §3h.2, C09 I39): the renderer draws
+    // placeholders at `kitty` and never looks at one. A GIF is decoded here
+    // because kitty reads no GIF — `f=100` is PNG — so its frames go as raw
+    // RGBA, all of them once, and the terminal runs the animation
+    // (`transmitAnimation`). An overlay is composited into every frame.
     //
-    // **A picture that does not decode falls through to the plain bytes.** The
-    // renderer's `alt` fallback is what the reader gets, and refusing here would
-    // leave a placement with no transmission — nothing drawn, blamed on the
-    // image. The overlay is lost and the picture is not.
-    const decoded = decodePng(bytes);
-    out += decoded.ok
-      ? transmitRgba(imageId(key), compositeOverlay(decoded.pixels, image.overlay), box.cols, box.rows)
-      : transmit(imageId(key), payload(bytes), box.cols, box.rows);
+    // **A picture that does not decode falls through to the plain bytes.** For
+    // a PNG that is the terminal's own decoder getting a chance ours did not
+    // take; for a GIF it is nothing drawn, which is §4c's loud failure and the
+    // same one a corrupt PNG already has. The renderer's fault box is what the
+    // reader gets on every rasterising arm either way.
+    const decoded = decodeImage(bytes);
+    if (!decoded.ok) {
+      out += transmit(imageId(key), payload(bytes), box.cols, box.rows);
+      continue;
+    }
+    const overlay = image.overlay;
+    const composite = (px: Parameters<typeof compositeOverlay>[0]): typeof px =>
+      overlay === undefined ? px : compositeOverlay(px, overlay);
+    out +=
+      decoded.animation === undefined
+        ? transmitRgba(imageId(key), composite(decoded.pixels), box.cols, box.rows)
+        : transmitAnimation(
+            imageId(key),
+            decoded.animation.frames.map(composite),
+            decoded.animation.delays,
+            box.cols,
+            box.rows,
+          );
   }
   return out;
 }
