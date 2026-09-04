@@ -7648,13 +7648,118 @@ and `100` at the same anchor: the top-right of that frame is `90012`, unreadable
 before this change and after it, because both texts move right together. The terminal has a rule for
 this and it is I48's contention ladder — *one series' last reading, and three that contend for rows* —
 which this arm does not implement at all. **No arithmetic assertion could see it**: both texts are
-inside the canvas, at the coordinates their own rules give them. Owed, with the frame named — the lane's ledger carries it (F710).
+inside the canvas, at the coordinates their own rules give them. **Closed by §3ak.50 and I114** (F710).
 
 **The left gutter reserves from `figure.value.labels` and the drawing writes `labels[i] ?? String(tick)`.**
 So an axis whose `labels` array is short reserves for nothing and draws a number. No instance in the
 corpus — every axis in it labels every tick — and it is the same class as the defect above, on the other
 side of the box. Recorded rather than fixed, because fixing it moves guttered frames on a case that is
-fine, which is the ruling §3ak.41 already made about narrowing (F713).
+fine, which is the ruling §3ak.41 already made about narrowing (F713). **Ruled in §3ak.50c, and the
+ruling is that the premise is false**: `labels` cannot be short, so there is nothing to fix and what
+was missing is the watch.
+
+---
+
+## 3ak.50 — the callout displaces the label it lands on, and the row has to leave the walk to say so
+
+**I48 already ruled this and it is not this arm's to invent.** *It displaces the right gutter's
+content on its row and never the left's.* The question §3ak.49b left open is whether that sentence
+survives the change of units, and the answer is that **one half of it does and the other half's
+reason does not** — which is exactly the thing the disagreement matrix exists to record.
+
+### 3ak.50a · What carries, and what carries only its conclusion
+
+| I48's clause | its reason in cells | in pixels | ruling |
+|---|---|---|---|
+| the callout displaces the **right** gutter's content on its row | the reading is the number a live chart is read for, and two writers on one row is I24's four-gutter defect | the same, with *row* meaning *the band a 12 px glyph paints* | **carries whole.** The reason is about what a reader needs, not about cells |
+| and **never the left's** | *your data is here* reaches only the gutter it is written in | the callout is written at `end[0] + LABEL_GAP`, which is never left of the box | **carries, and is stronger here**: the left label is not merely spared, it is never contended for |
+| two on one row: the later wins, and a one-cell `+` says so | not `+N`, whose count needs the width being sized; not a second row, **which would change the count and break I1** | there is no row count and no `plotHeight`; the `viewBox` is fixed whatever is written in the margin | **the conclusion does not carry, because its reason is gone.** See §3ak.50d |
+
+**The unit of *row* is a bound and not a measurement**, on `SVG_EM_MAX`'s own argument one axis
+along. Two `<text>` baselines a full em apart cannot have overlapping ink, because a glyph's ink is
+inside its em box; anything closer may. So `|y₁ − y₂| < SVG_FONT_SIZE` is the collision test, and it
+errs by suppressing a tick that would have cleared by at most half a glyph — the safe direction,
+because a suppressed number is a number you can still read off the axis and a smeared one is
+`90012`. **The falsification is stateable**: a face whose ink escapes its em box, which is the same
+falsification `SVG_EM_MAX` already carries.
+
+### 3ak.50b · The row is ink, so it is carried and not shared
+
+**`rightRoom` is the wrong precedent and saying so is half the ruling.** The *width* of the right
+column is a pure function of the figure, which is why one function serves both readers and why it
+takes no theme (I113). The *row* is not: I48 requires it be read from ink, and in this arm the ink is
+the last point of the last non-annotation polyline a series drew, taken through `projected` — which
+exists only inside `walk`. A second pure function computing it from `figure.marks` would be a
+**second derivation of one quantity**, which is precisely the mechanism §3ak.49 records for
+`fitLabel`: the reserve and the fit disagreed at equality because the product was written twice.
+
+So the row **leaves the walk by being handed out**. `walk` already takes `out: string[]` as a
+mutable collector; it takes a second, and `marks` forwards it. What that costs, stated:
+
+- **Two functions gain a parameter** — `marks` and `walk` — and neither gains a return type.
+- **An ordering that was incidental becomes load-bearing.** `plotToSvg` has always called `marks`
+  before the axis emitter; now the emitter reads what the walk wrote, so moving either would empty
+  the collector and silently restore the overprint. `RC5` is the row that watches it.
+- **The collector holds only rows that were actually drawn.** It is filled at the `out.push` site,
+  past both `continue`s, so a `null` callout and a series with no `ends` entry contribute nothing —
+  the displacement follows the ink and not the reserve, and the two are *deliberately* allowed to
+  disagree (§3ak.49a's last row reserves for a callout no polyline draws).
+
+### 3ak.50c · The walk — a table, because the contenders all hold at rest
+
+Structural again, and for the same reason as §3ak.49a: nothing happens between a tick and a callout.
+
+| the cell | rule A | rule B | ruling |
+|---|---|---|---|
+| a callout's row overlaps a **right-hand** value label's | I47 labels every tick on the side asked for | I48 displaces the right gutter's content | **the callout wins and the label is not emitted.** Not moved: moving a tick's label off its tick is the lie I55 separates a tick from a label to forbid |
+| a callout's row overlaps a **left-hand** value label's | the same | I48's *never the left's* | **the left label stands**, at `yAxis: "both"` where one tick has a label on each side and only one of them is contended |
+| the callout was **cut** by the cap, so it is narrower | `fitLabel` cuts at the drawing site (§3ak.41) | displacement | **displacement is decided by the row alone.** A width test would be a tautology today — both texts are written at the same `x` by construction, since `end[0] ≤ box.right` — and a tautology that stops firing the day the callout's `x` moves |
+| a callout on a figure with **no** right-hand labels (`yAxis: "left"`, `null`) | there is a callout | there is nothing on the right | **nothing changes**, and the frame must not move. This is the half that would make it the wrong rule |
+| `valueLabels: "both"` on a **horizontal** figure | `"both"` names a right-hand column | the labels are written *under* the box | **no displacement.** Governed by `!valueOnX`, the same clause `rightRoom` reads |
+| a suppressed label's **gridline** | the tick keeps its rule | the label goes | **the rule is still drawn.** This is what the decision leaves behind, and it is not a cell either artefact shape indexes: the loop body draws a rule *and* a label, and suppressing one glyph more than intended changes the figure's geometry rather than its text |
+| a callout's row overlaps a **legend** entry's | the legend is furniture in the same right band | I48: *a callout does not replace the legend* | **out of this ruling and recorded.** The same invariant that licenses displacing a tick forbids displacing a legend row, so the remedy is the legend's placement and not the callout's. **Measured and real**, and unnumbered on purpose: the ledger runs to F724 and `examples/docker/FINDINGS.md` is not this lane's file, so the number is the lead's to assign — `<scratchpad>/lanes7/laneO-findings.md` carries the body |
+| two **callouts** overlap each other | I48's later-wins ladder | I81's stated blind spot: this arm stacks text at the same `y` | **§3ak.50d.** Still open, now with a measurement |
+
+### 3ak.50d · Two callouts, and the third option cells did not have
+
+**Measured first: zero instances.** Across the 212 committed frames that draw anything, no two
+callout texts come within `SVG_FONT_SIZE` of each other; only 4 frames carry two at all, and the
+closest pair is **84.757 px** apart — `0.8774` against `31.68` on `line-callout-multiseries`, seven
+glyph heights. So I81's blind spot is still a blind spot and building a
+mechanism for it now would be an invariant vacuous until its subject exists.
+
+**And the mechanism it would build is the wrong one.** I48 chose *later wins plus a one-cell `+`*
+over two named alternatives, and it rejected both for reasons this arm does not have: `+N` needs the
+ink that needs the width that needs the column being sized, and a second row *changes the count and
+breaks I1*. Neither binds a fixed `viewBox`. **A choice between two bad options means a third is
+missing**, and here the third is the affordance the terminal lacks: **nudge the later callout by a
+glyph height**, which is a lie about a row in cells and merely a placement in pixels, where a label
+is *near* a coordinate rather than *at* one (I55). It is named rather than built, because it needs
+its own containment ruling against the canvas edge and there is nothing in the corpus to read it on.
+
+**What is owed, as a symbol so the deferral is checkable by grep**: `calloutNudge`.
+
+### 3ak.50e · F713 is not a defect, and the record is what was wrong
+
+§3ak.49b said the two sides of the box measure differently: `gutterRoom` reads
+`figure.value?.labels ?? []` and the emitter writes `axis.labels[i] ?? String(tick)`. **Going to
+find where that was written down turns up the opposite.** `ValueAxis.labels` is built in exactly one
+place — `valueAxisOf` in `figure.ts`, `{ ...axis, labels: tickLabels(axis, block.yFormat) }` — and
+`tickLabels` is `axis.ticks.map(...)`. It is **total over `ticks` by construction**, at all three
+call sites in the tree (`figure.ts`'s `axisOver` and its radar arm, `definition.ts`). No `ValueAxis`
+literal exists anywhere else.
+
+So `labels[i]` is never `undefined`, the `?? String(tick)` is a fallback for a case that cannot
+arise, and the two reserves are not merely equal on the corpus — **they are the same function**. The
+mirrored fix would have changed nothing, which is a fix indicting its diagnosis.
+
+**Wrong in both directions, which is the shape to watch for.** It was not a defect for the reason
+given, and the hazard it was pointing at is real and stated differently: the left reserve and the
+left drawing are two expressions of one width, and if they ever part the symptom is a **silently
+ellipsised gutter label** — `fitLabel(text, box.left - LABEL_GAP)` cuts rather than overflows, and a
+cut label reads as a shorter number. That is what nothing was watching. `RC6` watches it over the
+whole catalogue, and it is non-vacuous: it fires the moment `gutterRoom` under-measures by a
+character, from any cause including the one F713 named.
 
 ---
 ---
@@ -10331,6 +10436,7 @@ would have to be re-run rather than extended.
 - **I111** — **The bar and the ribbon are two glyphs at every depth, the ribbon's interior is the shade, and one function resolves the family for both width conventions.** `█` for a bar, `▒` for a ribbon's interior, `▀`/`▄` for a half either owns; `# = -` at ASCII, and the same three at `ambiguousWidth: "wide"` because every member of the block family is `East_Asian_Width=Ambiguous` — `barStyle`'s rule, in `sankeyAlphabet` (§3ap.2). **The shade rather than `dim` is I17's ruling and not taste**: an attribute is dropped at one bit and by any terminal that ignores SGR, and the frame it leaves is one block of `█` with letters in it; the shade is a shape, so the one-bit frame is the 24-bit frame with its colours removed — and it is, literally, the half-opacity fill the references draw. **Two owners in one cell put the lower one in the background**, `image.ts`'s half-block precedent and C10 I21's one widening (`wash`), never text on a tone; the slots cross as `categorical.cN` refs and are resolved in `definition.ts` at the terminal's depth. The SVG's ribbon is two cubic Béziers at `fill-opacity 0.5` in the declared source's slot (→ I4, I6, I17, C02 I9, C09 I22, C10 I21, C12 I29, A03 SS47).
 - **I112** — **A sankey's SVG node label is `tone.default` on a halo of the page's own ground, and the halo is the terminal's cell substitution written in the other medium.** (The halo was `surface.bgDeep` when this was ruled and is `surface.bg` since C10 §4f moved the page; §3ap.7's body recorded the move and this sentence did not, which is the compression class — the abstract keeping a claim the section it summarises had already corrected.) The label is already in the references' place — right of the bar, left of it on the last layer — and §3ap.4 K15 is the cell that place cannot answer: a ribbon begins at the bar's edge, so *outside the bar* and *on the ribbon* are one region, and no node in the corpus has bare ground beside it. Measured before the ruling, over 33 labels and both shipped variants: **1.02 at worst and 1.41 at best**, against `tone.muted`'s own recessive floor of 2.5 and body text's 4.5. The ink moves because a node label names the datum rather than the axis, and the halo goes behind it because the terminal's label cell is `{ text: ch }` with no `ref` and no background — the ribbon glyph is *replaced* there, and an SVG paints the region it cannot substitute (`stroke` in the page's ground at `SVG_FONT_SIZE / 4`, `paint-order="stroke"`). **After, measured under the ink rather than argued from `paint-order`** — the backdrop taken from a second render with the label's `fill` set to `none`, at exactly the pixels the ink changed: **12.43 on dark and 9.25 on light** for five of the six figures, and **9.51 / 7.59** on `crowded`, where one label's halo meets the next one's antialiased edge. Worst cell 7.59 against a floor of 4.5. **Both halves are load-bearing** — the halo alone leaves `muted` at 3.02 and 2.44, the light figure under its own floor. `sankeyLayout` does not move and the terminal frames are byte-identical: this is the second painter's ink, not the shared geometry's (→ I110, I111, C10 I32, §3ap.4 K15, §3ap.7).
 - **I113** — **The right margin is grown to fit what is drawn in it, and a glyph's advance is a bound rather than an estimate.** The callout (I48, I81) and the right-hand value labels (I47) share one column in the SVG arm, so `rightRoom` reserves the **maximum** of the two — `definition.ts`'s `right = sides.right ? max(wanted, calloutWidth(...)) : 0` in pixels — grown from `width · pad`, capped at `width / 3`, and **zero where neither is drawn**, so a figure with nothing to reserve for does not move. Past the cap the string is cut with an ellipsis by `fitLabel`, which is the half §3ak.41 wrote with no instance and `line-both-axes-narrow` supplies: 36 characters wanting 281 px in a 25.6 px margin, of which **two were on the page**. **Measured before the rule**: 13 strings in 7 of 244 committed frames past their own `viewBox`, the worst 240.5 px — 38% of the figure — and the right-hand `100` among them, which is why the reserve is not the callout's alone. **`SVG_EM_MAX = 0.65` is an upper bound over measured faces and not one font's metric**: `font-family="monospace"` is generic, so the face is the renderer's choice, and the advance measured over six of them runs 0.6001 (Courier New, Andale Mono, Monaco) to 0.6182 (SF Mono) — every one of them **above** the 0.6 the constant carried, in the one direction that clips. It is used for reserving and for fitting, both of which want the bound; the cost is 4.6 px of blank on the corpus's widest string and the falsification is stated — a face above 0.65 clips again. **The room takes no theme**, because `area()` is called from the marks walk and from the axis emitter and a room that differed between them would draw the data against a different box than the furniture, silently and with every arithmetic assertion passing (→ I47, I48, I81, §3ak.41, §3ak.49).
+- **I114** — **In the SVG arm too, a callout displaces the right-hand value label it lands on and never the left's — and the row it lands on is carried out of the walk rather than derived a second time.** I48's first two clauses carry across the change of units unchanged, because their reason is what a reader needs and not what a cell is; its third — *two on one row, the later wins and a one-cell `+`* — does **not**, because both alternatives it rejected were rejected for reasons a fixed `viewBox` does not have (`+N` needs the width being sized; a second row *changes the count and breaks I1*). **A row is `|y₁ − y₂| < SVG_FONT_SIZE`**, a bound rather than a measurement on `SVG_EM_MAX`'s own argument: a glyph's ink is inside its em box, so baselines a full em apart cannot overlap and anything closer may — erring by at most half a glyph, in the direction that suppresses a number a reader can still get off the axis rather than smearing two into `90012`. **The row is ink and therefore carried, not shared.** `rightRoom` is the precedent for the column's *width* and the wrong precedent for its *rows*: the width is a pure function of the figure and the row is the last point of the last non-annotation polyline taken through `projected`, which exists only inside `walk` — so `walk` fills a second mutable collector at the site where the text is pushed, past both `continue`s, and the axis emitter reads it. The cost is stated rather than hidden: two functions gain a parameter, and `plotToSvg`'s call order stops being incidental. **A second pure derivation was refused**, because that is exactly the mechanism §3ak.49 records for `fitLabel` — one product written twice, disagreeing at equality. **The gridline of a suppressed label is still drawn**, which is what the decision leaves behind and is a cell neither walk artefact indexes. **Measured before the rule**: 10 overprinting pairs in 6 of 212 drawn frames, every one of them a callout on a right-hand tick label, and every one of them inside its own `viewBox` — so `RM1` agreed with all ten. **Stated blind spots, two**: a callout against a *legend* row is real and not ruled here (4 pairs in 2 frames, in this lane's ledger and unnumbered until it reaches `examples/docker/FINDINGS.md`), because I48's own *a callout does not replace the legend* makes that the legend's placement question; and two callouts against each other keeps I81's blind spot, with zero instances measured and the pixel-only third option named as `calloutNudge` (→ I47, I48, I55, I81, I113, §3ak.50).
 
 ## 8. Commitments
 
@@ -10450,6 +10556,7 @@ would have to be re-run rather than extended.
 112. **The SVG node label gets an ink and a ground of its own, because placement had already been spent** (I112). Six frames read as pictures and 33 labels measured at 1.02–1.41 against floors of 2.5 and 4.5; d3 does nothing about it and its readability does not transfer, plotly's default does both halves, and the terminal was already substituting the cell. `tone.default` on a halo of the page's own ground, 12.43 and 9.25 — and the note that opened, *this arm paints text on a surface C10 §4 excludes*, was paid by C10 §4f moving the page to `surface.bg` (§3ap.4 K15, §3ap.7).
 111. **The ribbon's interior is the shade, chosen on the one-bit frame rather than the 24-bit one** (I111). Both candidates were drawn; the one that carried bar-against-ribbon in an attribute lost it where attributes are dropped, and the one that carries it in the glyph is also the half-opacity fill the references draw (§3ap.2).
 113. **The SVG arm sizes its right margin the way the terminal sizes its right column, and its glyph advance is a bound** (I113). Both arms now answer *does the callout fit* before the layout exists; the margin serves the value labels drawn in it as well as the callout, past the cap the string is marked, and `SVG_EM_MAX` is the widest advance measured over six monospace faces rather than a guess at one (§3ak.49).
+114. **The right column's *width* was one question and its *rows* are another, and only the first could be answered by a shared pure function** (I114). The callout displaces the right-hand value label it overlaps and never the left's — I48's clause in this arm's units, with the third clause's conclusion refused because its reason was I1's row count and there is no row count here. What made it look unfixable is that the row is **ink**: `rightRoom` could be shared because a width is a function of the figure, and the row is the last point of a polyline inside the marks walk, so it is handed out through a collector rather than derived again. Ten overprints in six frames, all inside their own `viewBox`, so the geometric row that exists could not see one and `RC1` is the row that can (§3ak.50).
 
 ## 9. Tests
 
@@ -10709,6 +10816,7 @@ Six tiers. No state machine — C12 is pure over the block.
 - **U2–U3** (I59, §3ak.17): **U1b's subject, crossed over every form and every variant** — 86 drawn documents, every mark accounted for by an element. *As written they inherited U1's subject and so inherited its vacuity: crossing `f(x) === f(x)` over the catalogue is one tautology 178 times.* `U3` keys the emitter off **`spec.form`** and not the catalogue bucket, because one variant's bucket lies — `line/whiskers` is a `scatter` — and an instrument keyed off the bucket compares a curve figure against a scatter document and reports a dropped mark that never existed (F290).
 - **U4** (I62, §3ak): identical across themes, because the refs are unresolved — a theme change moves nothing in the figure.
 - **RM1–RM5** (I113, §3ak.49): **the right margin, and the rows are split by which half of the rule they can see.** `RM1` is geometric over the emitted document and over the whole catalogue — every `<text>` inside its own `viewBox` at **0.6182**, the widest face measured, and not at the arm's own constant, because a row asserting at `SVG_EM_MAX` agrees with the code by construction. It is the row the byte-compare golden could not make: `line-callout-both` recorded `alpha 0.8774` 67 px off the page and agreed with itself for as long as it existed. `RM2` is the reserve — the maximum of the callout and the right-hand labels, and **zero where neither is drawn**, which is the half that would make this the wrong rule. `RM3` asserts that the marks walk and the axis emitter answer to one box, which is the interaction the walk found rather than the overflow. `RM4` is the cap and the marked cut. `RM5` is the boundary where the reserve and the fit meet — a string in a margin sized for exactly that string. **The hand pass is what indexed them**: removing the reserve does not fail `RM1`, because the fit still contains the string, and removing the fit does not fail `RM2` — a containment row cannot see a reserve going missing and a reserve row cannot see containment going missing.
+- **RC1–RC6** (I114, §3ak.50): **the callout's row, and the first of them is the row `RM1` could not be.** `RC1` is geometric over the whole catalogue and it is the one the corpus needed: no callout's painted band overlaps a right-hand value label's, where `RM1` asks only whether a string is on the page and agreed with all ten overprints for as long as they existed. **Containment is not correctness**, and this is the measured instance of that — every one of those ten strings was inside its `viewBox`. `RC2` is the left side, at `yAxis: "both"`, where one tick has a label on each side and I48 says only the right one may go: the row asserts the **left label survives on the contended tick specifically**, not merely that left labels exist, because a count agrees with a rule that drops the wrong one. `RC3` is the half that would make this the wrong rule, and **designing the mutations is what gave it its shape**: `RC1` is satisfied by deleting the whole right column, so a row asserting only *no overprint* accepts an over-eager rule that suppresses every label. `RC3` therefore asserts the **set** — the right column still reads every label the callout did not land on, by value *and* by row — and it asserts it at **two tick pitches**, because the first mutation run showed the sparse one cannot see a widened threshold: at `height: 8` the labels are 137.6 px apart and four times a glyph reaches nothing, at `height: 40` they are **15.29 px** apart and it reaches a neighbour. The second half of the row is the figure with no right-hand column at all, whose left gutter must be untouched by a callout arriving. `RC4` is the suppressed label's **gridline**, still drawn, which is what the ruling leaves behind. `RC5` is the wiring rather than the mechanism: it asserts the emitter reads what the walk wrote, by constructing a block whose callout lands on a tick and checking the *emitter's* output, so it fails if `marks` is ever called after the axis pass. `RC6` is F713's real hazard on the other side of the box — no left-hand value label in the catalogue is ellipsised, which fires the moment `gutterRoom` under-measures what the emitter draws, from any cause.
 - **U5** (I59, §3ak.17): **the SVG arm cannot see a capability, asserted on the signature rather than on a frame.** *As written — `identical at every capability set` — the row had no parameter to vary and therefore nothing to be wrong about.* `plotToSvg` takes a block, a theme and a layout; `svg.ts` imports no `Caps`. The guard is structural and says so, so a green run is not read as a measurement.
 - **U6** (I59, §3ak.15, §3ak.17): **walk artefact B — the rung ladder as a trace, and the degradation audit this component has never had.** Its first half, *the terminal's figure is identical at every capability set*, is unfalsifiable for U5's reason and becomes the same structural guard: the emitters take `block` alone. **The content is the second half**, and it is a record — 46 forms against the four edges that isolate one capability each, classified on raw frames. *The `CAPS` array's neighbours are not those edges*: `ascii` is two capabilities from full, so a trace walking the array would attribute a colour change to the unicode rung. `U6c` is the control — `tree` draws no SGR at 24-bit, so its `same` cells are what make the other 45 evidence.
 - **T1–T5** (§3ak, §6b): the terminal arm is byte-identical throughout — `TB1`–`TB5` over 1780 baseline frames crossed on width as well as capability set, plus the glyph-per-role, 1-bit strip, truncation-ladder and `ambiguousWidth` rows named in the rung table.
@@ -10873,6 +10981,7 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T6.85** (I110, K12): the notice row spent after the drawing → **SK3 fails**: `composeRows` slices the figure to its height and the `1 reversed` row is the one that falls off.
 - **T6.86** (I110, K2): slices stacked in declaration order rather than by the far end's centre → **SK1 fails** on `a`'s slice order, with every bar height and every crossing count of the ordering pass unchanged. The control for the run is the gap ladder collapsed to none, which restacks every layer and moves SK1's walked positions and every sankey golden.
 - **T6.90** (I113, §3ak.49): six mutations in `c12-svg-right-margin.mjs`, run by hand and each producing the row it names — the shipped state restored, the fixed right margin **and** no cut at the drawing site (→ `RM1`, and `line-callout-both` reads `alp` again); the reserve alone removed (→ `RM2`, `RM3`, `RM4`, `RM5`, and **`RM1` survives**, which is the finding: the fit contains what the missing reserve overran); `SVG_EM_MAX` back to the 0.6 it replaced (→ **`RM1`**, and `G6c5` on the other side of the box, because 0.6 is below every one of the six faces measured); the exact-fit tolerance dropped (→ `RM5`, and `G11a`, which is how the defect was found — `100` rendered as `1…` in a margin sized for `100`); the marks walk given a different room than the axis emitter (→ `RM3`); and the cap removed (→ `RM4`). The control is the advance at 0.2.
+- **T6.91** (I114, §3ak.50): five mutations in `c12-svg-callout-row.mjs`, **run by hand and reported as measured rather than as predicted** — the displacement removed entirely (→ `RC1` `RC2` `RC3` `RC4` `RC5`, and **`RM1` survives**, which is the whole finding: an overprint is inside its own `viewBox`); the threshold widened from `SVG_FONT_SIZE` to four times it (→ **`RC3` alone** — over-suppression leaves no overprint for `RC1` to see, which is what a row asserting only *no collision* accepts); the test *inverted* so the **left** label is suppressed (→ `RC1` `RC2` `RC3` `RC4`); the suppression moved above the `gridded` branch (→ `RC2` `RC3` `RC4`, and **not `RC1`** — the figure loses a gridline and every collision assertion agrees); and the collector detached from the walk, which is the ordering mutation (→ `RC1` `RC2` `RC3` `RC4` `RC5`). **The control is `<` widened to `<=`**, which nothing sees because the corpus's closest contended pair is 2.415 px and its closest uncontested pair 15.29. **Two predictions were wrong and running it is what said so**: the inversion was expected to leave `RC1` standing and does not, and the four-times widening was expected to kill `RC3` at the sparse fixture and did not — at `height: 8` the right column's pitch is 137.6 px, so four times a glyph reaches nothing. `RC3` gained its dense fixture from that survival, which is the mutation pass indicting a fixture rather than a rule.
 
 ## 10. Out of scope
 
