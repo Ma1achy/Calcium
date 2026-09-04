@@ -56,7 +56,7 @@ const results = runPass({
       file: SVG,
       from: "  return Math.min(layout.width / 3, widest * SVG_FONT_SIZE * SVG_EM_MAX) + LABEL_GAP;\n}\n\n/**\n * A gutter label cut to the room it has",
       to: "  return 0;\n}\n\n/**\n * A gutter label cut to the room it has",
-      also: [{ file: SVG, from: "`${escape(fitLabel(text, canvas - at))}</text>`);", to: "`${escape(text)}</text>`);" }],
+      also: [{ file: SVG, from: "`${escape(fitLabel(text, columnEdge - at))}</text>`);", to: "`${escape(text)}</text>`);" }],
       expect: "RM1",
     },
     {
@@ -101,8 +101,12 @@ const results = runPass({
       // re-anchored on faith** — a stale anchor and a dead mutation read the
       // same green. It still kills `RM3`, and now `RM4`, `RC2` and `G11a` with
       // it.
-      from: "    return walk(figure, block, box, layout.width, theme, out, rows);",
-      to: "    return walk(figure, block, area(layout, figure.legend, gutterRoom(block, figure, layout)), layout.width, theme, out, rows);",
+      // **Re-anchored again for C12 I115** (§3ak.50f): the walk now takes the
+      // column's outer edge, `box.right + rightRoom(...)`, in place of the page
+      // width. The mutation is unchanged — the walk's box reserves nothing on the
+      // right — and it is run rather than trusted (MA4).
+      from: "    return walk(figure, block, box, box.right + rightRoom(figure, layout), theme, out, rows);",
+      to: "    return walk(figure, block, area(layout, figure.legend, gutterRoom(block, figure, layout)), box.right + rightRoom(figure, layout), theme, out, rows);",
       expect: "RM3",
     },
     {

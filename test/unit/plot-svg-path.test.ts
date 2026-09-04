@@ -1406,6 +1406,132 @@ describe("RC — the callout displaces the label it lands on (C12 I114, §3ak.50
     }
     expect(bad, "no left gutter label is cut inside a gutter that was not capped").toEqual([]);
   });
+
+  /**
+   * A legend entry, with its geometry — the emitter's own `rect`-then-`text`
+   * pair, the same arithmetic `legendTexts` identifies one by, kept as
+   * positions because `RC7` asserts where the entry is and not merely that it
+   * is somewhere.
+   */
+  const legendEntries = (svg: string): readonly { x: number; y: number; text: string; left: number; right: number }[] => {
+    const out: { x: number; y: number; text: string; left: number; right: number }[] = [];
+    for (const m of svg.matchAll(
+      /<rect x="([-\d.]+)" y="([-\d.]+)" width="([\d.]+)" height="[\d.]+" fill="[^"]+"\/>\n<text x="([-\d.]+)" y="([-\d.]+)"[^>]*>([^<]*)<\/text>/gu,
+    )) {
+      const x = Number(m[4]);
+      if (Math.abs(x - (Number(m[1]) + Number(m[3]) + 4)) > 1e-6) continue;
+      const text = m[6] ?? "";
+      out.push({ x, y: Number(m[5]), text, left: x, right: x + [...text].length * SVG_FONT_SIZE * WIDEST_FACE }); // cells-ok — a character count
+    }
+    return out;
+  };
+
+  it("RC7 (C12 I115, §3ak.50f): the right band's writers hold disjoint columns, and a figure with no column does not move", () => {
+    // **Three writers, one anchor, and 52.8 px of reserved canvas nobody drew
+    // in.** `area()` subtracts the column's reserve *and* the legend's band
+    // from `box.right` and then the value labels (`box.right + 6`), the
+    // callout (`end[0] + 6`) and the legend (`box.right + 12`) all anchor on
+    // it — so the column is painted over the legend while its own reserve
+    // stands empty at the canvas edge. Both overprinting pairs were **inside
+    // their own `viewBox`**, so containment saw neither: this asserts columns.
+    const bad: string[] = [];
+    for (const [form, variants] of Object.entries(CATALOGUE_FORMS)) {
+      for (const [variant, spec] of Object.entries(variants)) {
+        const { cursor, ...rest } = spec as Record<string, unknown>;
+        void cursor;
+        const svg = plotToSvg(vmBlock({ kind: "plot", id: "cat", ...rest } as unknown as Plot), THEME, layout);
+        if (svg === null) continue;
+        const entries = legendEntries(svg);
+        for (const w of [...callouts(svg), ...rightLabels(svg)]) {
+          for (const e of entries) {
+            if (Math.abs(w.y - e.y) >= SVG_FONT_SIZE) continue;
+            if (w.right <= e.left + 1e-3 || e.right <= w.left + 1e-3) continue;
+            bad.push(`${form}/${variant}: "${w.text}" over legend "${e.text}" at y ${w.y.toFixed(2)}/${e.y.toFixed(2)}`);
+          }
+        }
+      }
+    }
+    expect(bad, "no legend entry shares a band with a callout or a right-hand value label").toEqual([]);
+
+    // **F726's fourth interaction, which the corpus does not have and which is
+    // real** — the tick column against the legend, with *no callout in the
+    // figure at all*. F726 records it as measured on `line-callout-*`; it is
+    // not there, because C12 I114 suppresses that tick 2.415 px from the callout.
+    // Constructed here instead. **The fixture property that makes it sensitive
+    // is the width of the widest right-hand tick label**: `100` is three
+    // characters, so `rightRoom` is 29.4 px and the old anchor put `alpha`'s
+    // first glyph at 508.2, **2.655 px inside** the ink of `100`, which ends at
+    // 510.855. One character and the defect vanishes — which is why the number
+    // is written down rather than the shape.
+    const legendRight = (extra: Record<string, unknown>): Plot => vmBlock({
+      kind: "plot", id: "rc7", form: "line", height: 8, axes: true, legend: "right",
+      series: [{ label: "alpha", values: [50, 90, 0.8774] }, { label: "beta", values: [10, 20, 30] }],
+      ...extra,
+    } as unknown as Plot);
+
+    const ticksOnly = plotToSvg(legendRight({ yAxis: "right" }), THEME, layout) ?? "";
+    const tick100 = texts(ticksOnly).find((t) => t.text === "100" && t.anchor === "start");
+    expect(tick100?.left).toBeCloseTo(488.6, 6);
+    // 488.6 + 3 · 12 · 0.6182. The **reserve** granted it 23.4 px on
+    // `SVG_EM_MAX`'s 0.65 bound and the ink takes 22.255 of it, which is the
+    // bound erring in the safe direction and is why the two numbers differ.
+    expect(tick100?.right).toBeCloseTo(510.8552, 4);
+    // `box.right` is 482.6 and `rightRoom` is 29.4, so `originX` is
+    // 482.6 + 29.4 + 12 = 524 and the entry's **text** is a swatch and a gap
+    // further on, at 537.6 — **26.7 px clear of the tick's ink**, where the old
+    // `originX` of 494.6 put that text at 508.2, inside 488.6 … 510.855.
+    expect(legendEntries(ticksOnly).map((e) => e.x)).toEqual([537.6, 537.6]);
+
+    // **The half that would make it the wrong rule.** No right-hand column, so
+    // `rightRoom` is 0 and the legend keeps `box.right + 12` **exactly** —
+    // 486.4 + 12 = 498.4, its text at 512. That is 81 of the 83 frames in the
+    // catalogue that carry a right-placed legend, so a rule that pushed every
+    // legend outward passes the sweep above and fails here.
+    const noColumn = plotToSvg(legendRight({ yAxis: "left" }), THEME, layout) ?? "";
+    expect(legendEntries(noColumn).map((e) => e.x)).toEqual([512, 512]);
+
+    // **And the callout's own column, asserted as a position.** `box.right` is
+    // 459.2, the callout and the mirrored labels are written at 465.2, and the
+    // reserve is 52.8 px — 6.8 glyphs — so `originX` is 524 and the text 537.6.
+    const withCallout = plotToSvg(legendRight({ yAxis: "both", yCallout: "last" }), THEME, layout) ?? "";
+    expect(legendEntries(withCallout).map((e) => e.x)).toEqual([537.6, 537.6]);
+    expect(callouts(withCallout).map((c) => c.x)).toEqual([465.2, 465.2]);
+
+    // **The cut moves with the anchor, and both cuts are asserted on the string
+    // rather than on a collision** — because the first mutation pass left both
+    // standing: no frame in the catalogue has a right legend *and* a writer past
+    // the cap, so reverting either cut to `layout.width` failed nothing. The
+    // clause is not vacuous; the corpus was. Two constructed instances:
+    //
+    // The callout's, at the default width. `yCallout: "name"` on a 48-character
+    // series label wants 374 px against a 213.3 px cap, so the column is capped
+    // and the callout is cut to **27 characters** ending at 498.97 — inside the
+    // column, whose legend sits at 524. Cut to the page instead it takes 42 and
+    // runs to 610, through the legend's text at 537.6.
+    const longName = "a-very-long-series-name-that-cannot-possibly-fit";
+    const capped = plotToSvg(vmBlock({
+      kind: "plot", id: "rc7c", form: "line", height: 8, axes: true, legend: "right",
+      yAxis: "right", yCallout: "name", series: [{ label: longName, values: [0.8774, 50, 99] }],
+    } as unknown as Plot), THEME, layout) ?? "";
+    expect(callouts(capped).map((c) => `${c.text}@${String(c.x)}`)).toEqual([`${longName.slice(0, 26)}…@298.667`]);
+    expect(legendEntries(capped).map((e) => e.x)).toEqual([537.6]);
+
+    // The right-hand value label's, which **cannot be reached at the default
+    // width**: `formatReadout` writes a number, ~18 characters at worst, 140 px
+    // against a 213.3 px cap. At `svgLayout(160, 200)` the cap is 53.3 px — 6.8
+    // glyphs on the bound — and a readout of `0.000123` wants 8, so the label
+    // is cut to `0.000…` inside the column. Cut to the page it would take 10
+    // and stand uncut.
+    const narrow = plotToSvg(vmBlock({
+      kind: "plot", id: "rc7n", form: "line", height: 8, axes: true, legend: "right",
+      yAxis: "right", series: [{ label: "a", values: [0.000123, 0.000456, 0.000789] }],
+    } as unknown as Plot), THEME, svgLayout(160, 200)) ?? "";
+    const narrowLegend = new Set(legendEntries(narrow).map((e) => e.x));
+    const narrowLabels = texts(narrow).filter((t) =>
+      t.fill === LABEL_INK && t.anchor === "start" && t.x > 60 && t.y < 190 && !narrowLegend.has(t.x));
+    expect(narrowLabels.length).toBeGreaterThan(0);
+    expect(narrowLabels.map((t) => t.text)).toEqual(narrowLabels.map(() => expect.stringMatching(/^0\.00[01]…$/u)));
+  });
 });
 
 describe("G10 — a choice forced by cells", () => {

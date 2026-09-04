@@ -806,14 +806,20 @@ function boxFor(figure: Omit<Figure, "marks">, box: Area): Area {
  * neither is furniture, which is `xTitleRow`'s own reason — *furniture is not a
  * series*.
  */
-// **`canvas` is the page's width and `box` is the plot's** (C12 I113, §3ak.49).
-// The callout is written outside the box by construction, so the only edge that
-// can contain it is the page's, and the walk had no member holding it.
+// **`columnEdge` is the right-hand column's outer edge and `box` is the plot's**
+// (C12 I113 I115, §3ak.49, §3ak.50f). The callout is written outside the box by
+// construction, so the walk needs an edge that can contain it — and the page's
+// width was the wrong one. **It is the page's width wherever nothing sits beyond
+// the column**, which is every figure without a right-placed legend: the reserve
+// is taken off the same edge the callout is written from, so `box.right +
+// rightRoom` *is* `layout.width` whenever the cap binds. Where a legend does sit
+// beyond it, cutting to the page licensed the callout to write across the band
+// the legend had just been moved out of (§3ak.50f).
 function walk(
   figure: Figure,
   block: Plot,
   box: Area,
-  canvas: number,
+  columnEdge: number,
   theme: ResolvedTheme,
   out: string[],
   // **A second collector, and the shape is `out`'s own** (C12 I114, §3ak.50b).
@@ -1276,16 +1282,18 @@ function walk(
       // The series' colour, so the second arm draws the tone the first does
       // and both agree with the legend (F382).
       const ink = inkOf(seriesRefOf(block.series[i], i), theme) ?? furniture;
-      // **Cut to the canvas and marked, where the reserve was capped** (C12
-      // I113, §3ak.49). `rightRoom` takes a third of the width at most, so a
-      // long enough callout is wider than the margin that was grown for it —
-      // and the cut belongs where the string is written, against the page's own
-      // edge, rather than being inferred from the box.
+      // **Cut to the column and marked, where the reserve was capped** (C12
+      // I113 I115, §3ak.49, §3ak.50f). `rightRoom` takes a third of the width at
+      // most, so a long enough callout is wider than the margin that was grown
+      // for it — and the cut belongs where the string is written rather than
+      // being inferred from the box. **The edge is the column's and not the
+      // page's**, which is the same number on every figure with no legend beyond
+      // it and is what stops a capped callout writing through one that has.
       const at = end[0] + LABEL_GAP;
       out.push(`<text x="${n(at)}" ` +
         `y="${n(end[1] + SVG_FONT_SIZE / 3)}" text-anchor="start" ` +
         `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${ink}">` +
-        `${escape(fitLabel(text, canvas - at))}</text>`);
+        `${escape(fitLabel(text, columnEdge - at))}</text>`);
       // **The row leaves the walk here, at the site that wrote the text** (C12
       // I114, §3ak.50b). Past both `continue`s, so the collector holds the rows
       // that are *on the page* rather than the rows the reserve was taken for —
@@ -1669,7 +1677,7 @@ function marks(
     || family === "field" || family === "horizon" || family === "stacked"
     || family === "span" || family === "funnel" || family === "track"
     || family === "bullet" || family === "density") && "marks" in figure) {
-    return walk(figure, block, box, layout.width, theme, out, rows);
+    return walk(figure, block, box, box.right + rightRoom(figure, layout), theme, out, rows);
   }
 
   if (family === "nodes") {
@@ -2135,7 +2143,11 @@ export function plotToSvg(
         // the callout's cap.
         const shown = side === "left"
           ? fitLabel(text, box.left - LABEL_GAP)
-          : fitLabel(text, layout.width - at);
+          // **The column's outer edge and not the page's** (C12 I115,
+          // §3ak.50f), for the same reason the callout's cut moved: a label cut
+          // to the canvas may be cut to nothing it collides with, and where a
+          // legend sits beyond the column that is the band it collides with.
+          : fitLabel(text, box.right + rightRoom(figure, layout) - at);
         parts.push(`<text x="${n(at)}" y="${n(y + SVG_FONT_SIZE / 3)}" ` +
           `text-anchor="${side === "left" ? "end" : "start"}" ` +
           `font-size="${n(SVG_FONT_SIZE)}" font-family="monospace" fill="${label}">` +
@@ -2447,7 +2459,17 @@ export function plotToSvg(
     const swatch = SVG_FONT_SIZE * 0.8;
     const step = SVG_FONT_SIZE * 1.6;
     const sideways = place === "left" || place === "right";
-    const originX = place === "right" ? box.right + 12 : place === "left" ? 6 : box.left;
+    // **The legend anchors on the column's outer edge, not on the box's** (C12
+    // I115, §3ak.50f, F726). `area()` takes the column's reserve *and* this
+    // legend's band off one edge, and every writer in the band was anchored to
+    // that edge — so the value labels and the callout were drawn on top of the
+    // legend while the 52.8 px reserved for them stood empty at the canvas.
+    // **The order is outward from the box**: a value label names a tick and has
+    // to stay beside it, a legend names identities and can take the outside.
+    // `rightRoom` is 0 wherever there is no column, so this is `box.right + 12`
+    // unchanged on every figure that had no contention.
+    const originX = place === "right" ? box.right + rightRoom(figure, layout) + 12
+      : place === "left" ? 6 : box.left;
     const originY = place === "above" ? box.top - step * legend.slots.length : place === "below" // cells-ok — a legend entry count
       ? box.bottom + SVG_FONT_SIZE * 2
       : box.top + SVG_FONT_SIZE;
