@@ -104,8 +104,9 @@ export const QUIET = (): void => undefined;
 export function registry(
   definitions: readonly BlockDefinition<never>[] = [],
   onError: (fault: BlockFault) => void = LOUD,
+  maxBlockRows?: number,
 ): BlockRegistry {
-  const r = createBlockRegistry({ onError });
+  const r = createBlockRegistry(maxBlockRows === undefined ? { onError } : { onError, maxBlockRows });
   for (const definition of definitions) r.register(definition as unknown as BlockDefinition);
   return r;
 }
@@ -123,6 +124,8 @@ export function measurable(
     theme?: ResolvedTheme;
     capabilities?: TerminalCapabilities;
     tick?: number;
+    /** The registry's row cap (C14 I24); the default is C09's. A suite about a definition's arithmetic raises it. */
+    maxBlockRows?: number;
     /**
      * Kinds registered through C09's public `register`, on top of the fourteen
      * defaults. `table`, `plot` and `patch` are **not** defaults — C11, C12 and
@@ -171,7 +174,7 @@ export function measurable(
     to: number,
   ) => Readonly<{ block: Block; skipRows: number; dropRows: number }> | undefined;
 }> {
-  const r = registry(options.definitions ?? [], options.onError ?? LOUD);
+  const r = registry(options.definitions ?? [], options.onError ?? LOUD, options.maxBlockRows);
   const render: RenderOptions = {
     theme: options.theme ?? DARK_THEME,
     capabilities: options.capabilities ?? FULL_CAPS,

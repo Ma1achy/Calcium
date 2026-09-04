@@ -62,12 +62,20 @@ describe("C14 §4a — the render path is bounded by the region", () => {
       expect(midRows.slice(mid.skipRows, mid.skipRows + H), `${kind}: rows 1000–1039`).toEqual(full.slice(1000, 1000 + H));
     }
 
-    // **`text` travels whole** (C04 I82): the same string reference, which is
-    // what keeps `tokenise`'s memo hitting on every frame of a scrolled block.
+    // **`text` travels whole once the window has scrolled** (C04 I82, C09 I25a):
+    // the same string reference, which is what keeps `tokenise`'s memo hitting on
+    // every frame of a scrolled block. **At line 0 it slices instead** — nothing
+    // precedes the slice, so the parse is the whole block's over those lines, and
+    // the tokeniser runs over `to` lines rather than 2 000 (the arm F603 measured
+    // at 1 696 ms against 196 ms for a capped block's first paint).
     const block = long("code", 2000);
-    const piece = r.registry.windowSequence([block], W, 0, H).blocks[0] as { text: string; lineRange?: readonly [number, number] };
-    expect(piece.text === (block as { text: string }).text, "the same string").toBe(true);
-    expect(piece.lineRange).toEqual([0, H]);
+    const source = (block as { text: string }).text;
+    const top = r.registry.windowSequence([block], W, 0, H).blocks[0] as { text: string; lineRange?: readonly [number, number] };
+    expect(top.text, "the first H lines, sliced").toBe(source.split("\n").slice(0, H).join("\n"));
+    expect(top.lineRange, "and no pin").toBeUndefined();
+    const scrolled = r.registry.windowSequence([block], W, 1000, 1000 + H).blocks[0] as { text: string; lineRange?: readonly [number, number] };
+    expect(scrolled.text === source, "the same string").toBe(true);
+    expect(scrolled.lineRange).toEqual([1000, 1000 + H]);
   });
 
   it("T1.18 (I23, C04 I82): a block comment opening above the window is still drawn in the comment slot inside it", () => {

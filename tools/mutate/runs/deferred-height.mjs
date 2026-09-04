@@ -81,8 +81,9 @@ const results = runPass({
       // rows, so I26's identity breaks outside the definition.
       name: "a floored block is windowed anyway",
       file: REG,
-      from: "      const windowable = floorOf(block) > 0 ? undefined : resolved.definition.window;",
-      to: "      const windowable = resolved.definition.window;",
+      // Re-anchored 2026-09-04: `windowSequence` windows the capped form (C14 §4b).
+      from: "      const windowable = form === null || floorOf(block) > 0 ? undefined : form.definition.window;",
+      to: "      const windowable = form === null ? undefined : form.definition.window;",
       expect: "T3.52",
     },
     {

@@ -13,6 +13,7 @@
  */
 
 import { createFallbackAdapter } from "../data/adapters/index.js";
+import { DEFAULT_MAX_BLOCK_ROWS } from "../presentation/blocks/index.js";
 import { slashPolicy } from "../interaction/parser/index.js";
 import { createExecutionPipeline } from "./execution.js";
 import { makeDefaultChrome } from "./chrome.js";
@@ -108,6 +109,13 @@ export function validateConfig(config: TuiConfig): void {
   for (const field of REQUIRED) {
     if (config[field] === undefined || config[field] === null) throw new ConfigError(field);
   }
+  // C14 I24, T2.14 — refused at the call site, before anything is built. A cap
+  // of `0` marks every block and a fraction puts the marker at a row nothing
+  // measured; the registry refuses the same values, and this names the field.
+  const cap = config.maxBlockRows;
+  if (cap !== undefined && (!Number.isInteger(cap) || cap < 1)) {
+    throw new ConfigError("maxBlockRows", `must be a positive integer, got ${String(cap)}`);
+  }
 }
 
 export type Ambient = Readonly<{
@@ -156,6 +164,9 @@ export function resolveConfig(config: TuiConfig, ambient: Ambient) {
     completionSources: config.completionSources ?? [],
     chrome: config.chrome ?? makeDefaultChrome(config.name, config.binary),
     blocks: config.blocks ?? [],
+    // C14 I24 — the registry's default, resolved here so there is one place
+    // the value lives and one constant it is read from (C09 §2b).
+    maxBlockRows: config.maxBlockRows ?? DEFAULT_MAX_BLOCK_ROWS,
     transport: config.transport,
 
     // Absent, nothing is retained. Present without a count, 50 (§2).

@@ -343,8 +343,18 @@ export const codeDefinition: BlockDefinition<Code> = {
     let last = hi;
     while (last < all.length && all[last]?.line === lastLine) last += 1; // cells-ok — a row count
 
+    // **A window opening at line 0 slices rather than pins** (C09 I25a, F603):
+    // nothing precedes the slice, so the parse of `lines[0, lastLine]` is the
+    // whole block's over those lines by construction, and the tokeniser runs over
+    // `to` lines rather than all of them. Measured before this arm: 1 696 ms first
+    // paint of a 500-row window of a 50 000-line block, 196 ms steady — and a
+    // capped `code` block (C14 §4b) pays the first figure once per entry.
+    const windowed: Code =
+      firstLine === 0
+        ? { ...block, text: block.text.split("\n").slice(0, lastLine + 1).join("\n") }
+        : { ...block, lineRange: [firstLine, lastLine + 1] as const };
     return Object.freeze({
-      block: { ...block, lineRange: [firstLine, lastLine + 1] as const },
+      block: windowed,
       skipRows: lo - first, // cells-ok
       dropRows: last - hi, // cells-ok
     });

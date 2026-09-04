@@ -431,6 +431,17 @@ export type TuiConfig = Readonly<{
   completionSources?: readonly CompletionSource[];
   chrome?: Readonly<{ header: ChromeFn; footer: ChromeFn }>;
   blocks?: readonly BlockDefinition[];
+  /**
+   * The most rows one block may occupy (C14 §4b, I24; C09 §2b). Default 2 000.
+   *
+   * A block over it draws its first rows and one marker row — `… 2,000 of
+   * 50,000 rows` — and the cap is the registry's, generic over
+   * `BlockDefinition`: it reaches an app's own kind the day that kind declares
+   * `window` and never a kind that does not. **Per session and never per
+   * block**, because a cap an adapter can lift per block is a cap on nothing.
+   * A positive integer; anything else is a `ConfigError` at `createTui`.
+   */
+  maxBlockRows?: number;
   transport?: TransportRouter;
 
   /** Off by default; 50 when enabled without a count (C13 §5a). */
@@ -670,8 +681,8 @@ export class UnusableTerminalError extends Error {
 
 /** Thrown by `createTui` for a missing required field (T2.7, I7a). */
 export class ConfigError extends Error {
-  constructor(readonly field: string) {
-    super(`createTui: \`${field}\` is required`);
+  constructor(readonly field: string, reason = "is required") {
+    super(`createTui: \`${field}\` ${reason}`);
     this.name = "ConfigError";
   }
 }

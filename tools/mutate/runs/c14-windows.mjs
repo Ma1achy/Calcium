@@ -53,9 +53,11 @@ const results = runPass({
       // tone. Only a row that reads the frame can see it.
       name: "PIN-DROPPED: the window slices `text` instead of pinning `lineRange`",
       file: CODE,
-      from: "      block: { ...block, lineRange: [firstLine, lastLine + 1] as const },",
+      // Re-anchored 2026-09-04: the window's zero-offset arm slices (C09 I25a, F603),
+      // so the pin is the `else` of a conditional rather than the whole return.
+      from: "        : { ...block, lineRange: [firstLine, lastLine + 1] as const };",
       to:
-        "      block: { ...block, text: block.text.split(\"\\n\").slice(firstLine, lastLine + 1).join(\"\\n\") },",
+        "        : { ...block, text: block.text.split(\"\\n\").slice(firstLine, lastLine + 1).join(\"\\n\") };",
       expect: "T1.18",
     },
     {
