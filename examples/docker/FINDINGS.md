@@ -26030,3 +26030,35 @@ is the mark alone and the item reads as depth 0 (F660).
 
 **The arithmetic**: 18 entries, F649–F666, keyed in one move each — group 7 gains
 two, 9 three, 10 one, 11 six, 14 two, Singles four — and SP6 reads 670 = 670.
+
+---
+
+## F667 — two records of one entry's status, and the resolver compared neither ★★★☆☆
+
+*2026-09-04 · the lead, closing lanes4, at f6828b84.*
+
+**Expected**: `tools/roadmap-status.mjs` says *52/52 entries accounted for, every claim resolves*,
+so an entry's recorded state is right.
+
+**Measured**: entry 11 was pushed with **`PART` in the Order column and `BUILT` in the evidence
+table**, and the tool printed *every claim resolves* on that tree, before the fix and after it.
+The parser has built both maps since the tool existed — `marked` from the column, the status cell
+from the table — and **rule 1 reads the evidence row only for its citations**. So the resolver is
+exact about whether a claim points at something real and had no opinion about whether the two
+claims are the same claim. The status pass writes one and a later reader updates the other.
+
+**The rule found a second instance on its first run**: **entry 7**, `RULED` in the column against
+`PART` in the table, and older than this session. `RULED` means *the ruling is in the entry* —
+entries 6 and 35 use it that way and agree in both places — while entry 7 has three stages built
+and one design question open, which is `PART`. The column went stale when the stages landed.
+
+**Its blind spot, stated where the rule is**: an entry whose two records **agree and are both
+wrong** is nothing's. Resolution is rule 1's and agreement is this one's; neither is truth.
+
+**The shape**: this is [[a-gate-that-exists-and-is-not-run]]'s sibling one column along — not a
+check that never ran, but two values a check had in hand and never compared. It is also the third
+time this session a rule found an instance nobody had reported on its first run (SP10 found none
+beyond its motivating case and said so; the SP-wiring rule found three carriers).
+
+**Where**: `tools/roadmap-status.mjs` rule 1b; `test/unit/roadmap-status.test.ts` RS11 with RS11b
+as its control; `CALCIUM_ROADMAP.md` entries 7 and 11.

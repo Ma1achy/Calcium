@@ -361,6 +361,30 @@ describe("roadmap-status — the Order column's verifier", () => {
     expect(r.out).not.toContain("queue-engine.ts");
   });
 
+  it("RS11 (F667): the two records of one entry's status must agree", () => {
+    // **The rule that found two instances on its first run, one of them a day old.**
+    // The Order column and the evidence table each carry a status per entry and the
+    // parser has built both maps since this tool existed — nothing compared them,
+    // so entry 11 shipped `PART` in the column against `BUILT` in the table and
+    // this tool printed *every claim resolves* on that tree. Entry 7 had been
+    // disagreeing (`RULED` against `PART`) for longer.
+    const r = run(mutate("BUILT 11 markdown", "PART  11 markdown"));
+    expect(r.ok, "a disagreement is a failure").toBe(false);
+    expect(r.out).toContain("entry 11");
+    expect(r.out).toContain("the Order column says PART and the evidence table says BUILT");
+  });
+
+  it("RS11b: agreement is not resolution — the control", () => {
+    // **Without this row the check is indistinguishable from one that fires on any
+    // edit to the column.** The real roadmap's 42 marked entries all agree, and the
+    // rule must be silent on every one of them; what it does *not* check is whether
+    // the pair is right, which is rule 1's job for the citations and nobody's for
+    // the status itself.
+    const r = run(ROADMAP);
+    expect(r.ok, "the corpus as it stands").toBe(true);
+    expect(r.out).not.toContain("two records of one fact");
+  });
+
   it("RS6: an Order block with no entries fails rather than reporting a clean scan", () => {
     // Group 9's ruling, in the instrument written to check a list. An exit status
     // is one bit and it is the same bit for *every claim resolves* and for *there

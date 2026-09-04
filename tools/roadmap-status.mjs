@@ -138,9 +138,12 @@ function parse(text) {
 
   // The evidence table: `| 17 | PART | … | … |`.
   const evidence = new Map();
+  /** number -> the status the evidence table gives it, for the agreement check. */
+  const tableStatus = new Map();
   for (const line of text.split("\n")) {
     const m = /^\| (\d+) \| (BUILT|PART|RULED) \| (.*) \|$/.exec(line);
     if (m === null) continue;
+    tableStatus.set(m[1], m[2]);
     // The residue is the last cell and is a description of what is *not* done, so
     // its identifiers name absent things. Only the evidence cell is resolved.
     const cells = m[3].split(" | ");
@@ -165,6 +168,7 @@ function parse(text) {
 
   return {
     all,
+    tableStatus,
     marked,
     described,
     evidence,
@@ -256,7 +260,7 @@ function resolve(cell) {
 // `--file` takes an absolute path from the fixture and a relative one from the
 // Makefile, so it is resolved rather than always joined.
 const text = readFileSync(isAbsolute(ROADMAP) ? ROADMAP : join(ROOT, ROADMAP), "utf8");
-const { all, marked, described, evidence, confirmedOpen, unchecked } = parse(text);
+const { all, marked, described, evidence, tableStatus, confirmedOpen, unchecked } = parse(text);
 
 const fail = [];
 
@@ -271,6 +275,31 @@ for (const [entry] of [...marked].sort((a, b) => Number(a[0]) - Number(b[0]))) {
   const problems = resolve(cell);
   if (problems.length === 0) resolved += 1;
   for (const p of problems) fail.push(`entry ${entry}: ${p}`);
+}
+
+// --- 1b. the two records of one entry's status agree -------------------------
+//
+// **Two records of the same fact, and nothing compared them** (F667). The Order
+// column and the evidence table each carry a status per entry; the parser has
+// built both maps since this tool existed and rule 1 reads the evidence row only
+// for its *citations*. Entry 11 shipped with `PART` in the column and `BUILT` in
+// the table, and this tool printed *every claim resolves* on that tree — the
+// resolver is exact about whether a claim points at something real and had no
+// opinion about whether the two claims are the same claim.
+//
+// Its blind spot, stated: an entry marked in neither place is rule 2's, and an
+// entry whose two records agree and are both *wrong* is nothing's — resolution
+// is what rule 1 checks and agreement is what this one checks; neither is truth.
+for (const [entry, status] of [...marked].sort((a, b) => Number(a[0]) - Number(b[0]))) {
+  const row = evidence.get(entry);
+  if (row === undefined) continue; // rule 1 has already said so
+  const said = tableStatus.get(entry);
+  if (said !== undefined && said !== status) {
+    fail.push(
+      `entry ${entry}: the Order column says ${status} and the evidence table says ${said}` +
+        " — two records of one fact, and a reader believes whichever they met first",
+    );
+  }
 }
 
 // --- 2. the partition, by equality ------------------------------------------

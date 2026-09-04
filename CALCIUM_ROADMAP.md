@@ -3119,7 +3119,7 @@ RULED 6  phase 2                   the empty-block convention · rendering flags
                                    closed-set test is answered because there are NO MEMBERS —
                                    the framework understands exactly one presentation-selecting
                                    flag and does it by RESERVING THE NAME. C05 §8b, C22 §13b
-RULED 7  THE NAVIGATION MODEL      scopes + modes + policies + pointer — design first, it subsumes
+PART  7  THE NAVIGATION MODEL      scopes + modes + policies + pointer — design first, it subsumes
                                    the small navigation items rather than sitting beside them.
                                    SPECIFIED as C26; stages 1–3 built (interaction is a focus
                                    target, blocks report elements, focus holds an address).
@@ -3231,7 +3231,7 @@ BUILT 9  mermaid (text path)       cheap once the dependency is vetted, distinct
                                    which is C02 I9's tier arriving in a renderer that already
                                    had the switch
 PART  10 question / menu primitive biggest unlock for agent UIs — lands inside the navigation model
-PART  11 markdown                  translates to existing blocks. CHECKED 2026-08-15 AND THE
+BUILT 11 markdown                  translates to existing blocks. CHECKED 2026-08-15 AND THE
                                    GREP RESOLVES AGAINST SOMETHING ELSE: `markdown` is in
                                    `src/` — as a highlight.js LANGUAGE registered by C09's
                                    `code` block, `presentation/blocks/kinds/code.ts`. That is
