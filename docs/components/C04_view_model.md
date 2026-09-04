@@ -2295,8 +2295,32 @@ homonym, and the note says so.
 adapter — a span is document data and the gate refuses a malformed one exactly as it refuses
 a malformed `Cell.spark`. **Who may not carry one**: `code`, whose syntax tokens are already a
 run stream over the same text, and two streams over one string is the collision this section
-exists to prevent (I88). `tip`, `keyValue`, `logs`, `events`, `steps`, `pills`, `comparison`
-and `Hunk.lines` have no writer today and are deferred with symbols rather than widened.
+exists to prevent (I88). `tip`, `keyValue`, `logs`, `events`, `steps`, `pills` and `comparison`
+have no writer today and are deferred with symbols rather than widened. **`Hunk.lines[].spans`
+has its writer as of 2026-09-04** — the builder's intra-line diff, attributes only (I91).
+
+### 3am.1 — the two members the first pass deferred, admitted by their consumers
+
+**`tone`** (I89). Markdown's inline code — `` `x` `` — is a run that wants a palette slot and not
+an attribute: a monospace face is not a thing a terminal has, and bold is what emphasis already
+uses. A span's `tone` is a `Tone`, resolved by C10 exactly as `Cell.tone` is, and it **replaces**
+the block's tone for the run rather than composing with it; the span's attributes still spread on
+top. The 1-bit objection the deferral rested on — a tone collapses onto the same `bold`/`dim` the
+attributes use — is true and is the accepted loss C10 I33 already names for attributes; a run
+that is both `tone: "identifier"` and `bold` at 1-bit is bold once. Refused on a hunk line, whose
+two palettes are already the gutter's and the syntax's (I91).
+
+**`value`** (I90). ML-1's per-token channel: a number in `[0, 1]`, mapped through the **block's**
+`colormap` — `Raw` and `Notice` gain the member, closed to `COLORMAP_NAMES` as every colormap
+member is (C10 I31) — and painted as the run's background at 8-bit and above, nothing below, which
+is the colormap ladder unchanged. A span with `value` and no block `colormap` is refused: a
+reading with no map paints nothing, and paints-nothing is F172's collision. **A valued span is a
+wrap unit**: a token near a row end wraps as a whole, which is the note's second requirement and
+the one that makes `measure` read a span — its *boundaries*, never its appearance. I83 is
+narrowed to say that, and the row that keeps it honest is the one asserting `measure` is the same
+number with and without every span member *except* `value`, and different with it exactly when a
+valued span would otherwise straddle a row. A `value` on a span wider than the row is broken as
+text is.
 
 
 ## 4. Patches
@@ -2622,6 +2646,11 @@ persisted document rests on.
 - **I86** — **A span changes no geometry at any stage: it continues across a wrap, clips to the kept text at a cut, and follows a substituted cluster.** A wrapped span is carried by source offset — every wrapped row is an exact contiguous slice of the source from a known `start`, and `wrapCells` drops break spaces, so prefix sums of row lengths drift one unit per break and are the wrong arithmetic. A truncated span is clipped to `truncateParts.kept`; the marker and its padding are never inside a span. A cluster the wrapper replaces with `?` keeps its span. `measure` is the same number with and without `spans` at every width (→ C09 I1, I19).
 - **I87** — **A span travels with its text through every patch and stops at the copy buffer.** `replace` carries a whole `Block` and `merge` a whole `Cell`, so no `ViewPatch` arm can write `text` without its `spans`; a patch that widened to a text-only arm would reopen the class this closes. Copy takes `text` and drops `spans`, as it drops tone. A `TextSpan` is plain data and survives `JSON.parse(JSON.stringify(d))` (§5a). C17's `CellSpan` is a result in display cells over the editor's rows and shares a name only.
 - **I88** — **Four members carry spans in the first pass and `code` is refused one.** `Raw.text`, `Notice.text`, `Rule.label` and `Cell.text` — the four the markdown translator emits text into. A `code` block with `spans` is refused at the gate: its syntax tokens are a run stream over the same text, and two streams over one string is the collision the mechanism exists to prevent. Every other text member is deferred with its symbol (`CALCIUM_SPANS_DESIGN.md` §7) and admitted by a writer appearing, never by symmetry.
+- **I89** — **A span's `tone` is a palette slot resolved by C10 for the run alone, replacing the block's tone inside the span, and it is refused where a line already carries two palettes.** Its consumer is markdown's inline code; it composes with the span's own attributes by spread and with nothing else. At 1-bit it collapses as any tone does and is not compensated (C10 I33). A hunk line refuses it (I91) (→ C10 §4e, §3am.1).
+- **I90** — **A span's `value` is a reading in `[0, 1]` mapped through the block's `colormap`, refused without one, painted as background at 8-bit and above and as nothing below, and a valued span is a wrap unit — the one span member `measure` may read.** `Raw.colormap` and `Notice.colormap` are `ColormapName`s and an unknown name is a document error (C10 I31). I83 is narrowed: no measurer reads a span's appearance; a valued span's boundaries are geometry, because a token that wraps as a unit moves a row break (→ C09, `CALCIUM_ML_BLOCKS.md` §1).
+- **I91** — **`Hunk.lines[].spans` carries attributes only, and its writer is the builder's intra-line diff over a paired remove/add run.** `tone` and `value` are refused on a hunk line at the gate: the gutter's and the syntax's are the two palettes a row has (C25 §3). The diff runs once, at construction, never at render — C25 I7 keeps the renderer pure over the block — and emits `underline` on the changed words of both sides (C25 I10). A `context` line carries none (→ C25 I10).
+- **I92** — **`GraphEdge.weight` is a flow: required on every edge of `form: "sankey"`, refused on `form: "graph"`, positive and finite.** `sankey` takes `graph` on `graph`'s own rule — required, `hierarchy` refused beside it — and shares its layering (C12 §3d, `graphLayers`); a zero or negative weight is refused because a ribbon of no width is an edge that is not there, and an ignored weight on `graph` is I77's accepted-and-ignored (→ C12 §3d).
+- **I93** — **`Image.data` carries PNG or GIF bytes and the codec tells them apart by signature; a GIF's frames are its own, and the frame shown is view state, never geometry.** `height` is declared, so every frame shares the logical screen and `measure` is the same number for a still and an animation. The frame index advances on the shell's animation wake and is read by the renderer through view state, on the pattern `Cameras` set (C22 I74) (→ C09, §3g).
 
 ## 7. Commitments
 
@@ -2712,6 +2741,10 @@ persisted document rests on.
 82. **Three attributes, set from the span and never from a slot** (I85). `bold`, `italic`, `underline`; no tone, colour, `dim`, `inverse` or `value`, each deferred with a symbol. The 1-bit absorption of a bold span on an emphasised block is accepted and asserted, not compensated, and the view model never decides a fallback because it never sees a capability (→ C10 I33).
 83. **Geometry is untouched across wrap, cut and substitution, and the wrapper carries spans by source offset** (I86). `wrapCells` drops break spaces, so a span sliced by row-length prefix sums drifts; every row is an exact slice from a known start and that is the arithmetic (→ C09).
 84. **A span travels with its text, stops at copy, and is refused on `code`** (I87, I88). No patch arm writes text without spans because none writes less than a block or a cell; copy drops appearance; `code` already has a run stream over its text.
+85. **The two deferred span members are admitted by their consumers, and each names the ruling that admitted it** (I89, I90, §3am.1). `tone` for inline code, replacing the block's tone inside the run; `value` for the per-token channel, through the block's colormap, and the one span member that is geometry because a token wraps whole.
+86. **A hunk line's spans are written once by the builder and carry attributes only** (I91). The renderer stays pure over the block; the line's two palettes are not a third.
+87. **A weighted edge is a sankey's and only a sankey's** (I92). Required there, refused on `graph`, and positive — the type is one member and the gate is where the two forms differ.
+88. **An image's carrier takes a GIF, and the frame is view state** (I93). The signature decides the codec; the declared height keeps every frame the same geometry.
 
 ---
 
@@ -2777,6 +2810,11 @@ The generic suite. **These run against every registered block kind, including ap
 - **T2.31** (I85) — **the first frame in which `Style.italic` is written by a renderer.** A `notice` with `text: "a b c"` and `spans: [{from: 2, to: 3, italic: true}]` paints `b` inside an SGR whose parameters include `3` and closes the run with a reset before ` c`; the same span with `bold` gives `1`, with `underline` `4`, with all three `1;3;4` in that order. The row is the one that removes `SgrStyle.italic` from `UNCONSUMED_MEMBERS`, and it asserts the bytes rather than the field.
 - **T2.32** (I88): a `code` block carrying `spans` is refused at the gate with an error naming the member; a `raw` block carrying the same array is accepted.
 - **T2.33** (§3am, roadmap 11): `markdownBlocks("a **bold** and *em* and _em_ and `code` word")` yields one `raw` whose `text` is `"a bold and em and em and `code` word"` — the markers gone — with three spans at the offsets of `bold`, `em` and `em` carrying `bold`, `italic`, `italic`, and **the backticks retained** (the inline-code deferral, symbol `TextSpan.tone`). The row replaces T2.44 (*inline emphasis is kept, character for character*), which was the reversible form this is the reversal of.
+- **T2.35** (I89): a `notice` whose `spans` carry `tone: "identifier"` on one run paints that run in the identifier tone's SGR and the rest in the block's, at 24-bit; the same document at 1-bit paints the run with the tone's collapse and nothing else. A `tone` outside `TONES` is a gate error naming the span's index; `tone` on a hunk line is refused.
+- **T2.36** (I90): a `raw` block with `colormap: "viridis"` and three valued spans paints three backgrounds from the map at 8-bit, and none at 4-bit; `value: 1.5`, `value: -0`'s sign aside, and a valued span on a block with no `colormap` are each one gate error. `measure` at width 12 of `"alpha beta gamma"` with `gamma` valued is one row more than without, because the token wrapped whole.
+- **T2.37** (I91): `b.patch` over a hunk whose remove and add lines differ in one word emits `underline` spans on that word on both lines and none on the context line; the same hunk supplied as a document round-trips through `validateDocument` with its spans, and a `tone` on one of them is refused.
+- **T2.38** (I92): a `sankey` document whose edges all carry positive weights validates; one edge with no weight, a zero weight, and a weight on `form: "graph"` are each one error naming the edge's index; `sankey` without `graph` and `sankey` with both `graph` and `hierarchy` are refused on `graph`'s rule.
+- **T2.39** (I93): a GIF's bytes in `Image.data` decode to their frames and delays by signature; `measure` of a two-frame image equals `measure` of its first frame as a still, at every width.
 - **T2.34** (§3am): the same translation on a list item and on a blockquote lands the spans on the `notice`, on a heading on the `rule`'s `label`, and on a pipe-table cell on the `Cell` — the four members of I88 — and on a fenced block **does not** run: `**` inside a fence is seven characters.
 
 ### Tier 3 — edge cases

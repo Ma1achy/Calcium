@@ -266,11 +266,14 @@ export const ACTION_KINDS: ReadonlySet<Action["kind"]> = new Set<Action["kind"]>
  * already use, and the one JSON carries without a second index. Half-open:
  * `[from, to)`, `from < to`, sorted by `from`, no two overlapping (I84).
  *
- * **Three attributes and no colour, tone, `dim`, `inverse` or value** (I85).
- * A span is appearance a renderer sets from the span; it never names a palette
- * slot, so it never enters C10's ladder, floors or `MONO`. `tone` and `value`
- * are deferred with their symbols — `TextSpan.tone`, `TextSpan.value` — and
- * admitted by a consumer appearing, never by symmetry.
+ * **Three attributes, a tone and a value; no colour, `dim` or `inverse`** (I85,
+ * I89, I90). The attributes are appearance a renderer sets from the span.
+ * `tone` names a palette slot exactly as `Cell.tone` does and resolves through
+ * C10 for the run alone — its consumer is markdown's inline code, which
+ * admitted it on 2026-09-04. `value` is a number in `[0, 1]` the renderer maps
+ * through the block's `colormap` — ML-1's per-token channel, admitted the same
+ * day; a valued span is a wrap unit, so `measure` reads its boundaries and
+ * nothing else about it (I90 narrows I83 to appearance).
  *
  * **It carries no text**, which is what keeps `measure` honest by construction:
  * the member's string is unchanged and no measurer reads `spans` (I83, I86).
@@ -281,10 +284,14 @@ export type TextSpan = Readonly<{
   bold?: boolean;
   italic?: boolean;
   underline?: boolean;
+  /** A palette slot for the run, resolved by C10; replaces the block's tone inside the span (I89). */
+  tone?: Tone;
+  /** A reading in `[0, 1]`, mapped through the block's `colormap` (I90). Refused where the block has none. */
+  value?: number;
 }>;
 
-/** The members of a span, for a gate that cannot silently take a sixth (I85). */
-export const TEXT_SPAN_KEYS: ReadonlySet<string> = new Set(["from", "to", "bold", "italic", "underline"]);
+/** The members of a span, for a gate that cannot silently take an eighth (I85). */
+export const TEXT_SPAN_KEYS: ReadonlySet<string> = new Set(["from", "to", "bold", "italic", "underline", "tone", "value"]);
 
 // --- table ----------------------------------------------------------------
 
@@ -452,6 +459,8 @@ export type Notice = Readonly<{
   text: string;
   /** Styled runs inside `text`, by code-unit offset (§3am, I83). */
   spans?: readonly TextSpan[];
+  /** The map a span's `value` reads through (I90). Required the moment any span carries one. */
+  colormap?: ColormapName;
 }> & Gap & Floor;
 
 export type KeyValue = Readonly<{
@@ -1035,7 +1044,7 @@ export type PlotForm =
   | "bar" | "histogram" | "boxplot" | "forest" | "dumbbell" | "lollipop" | "dotplot" | "waffle"
   | "flame" | "icicle" | "funnel" | "gantt" | "waterfall" | "streamgraph" | "stackedarea" | "treemap"
   | "tree"
-  | "graph"
+  | "graph" | "sankey"
   | "slope" | "bubble" | "autocorrelation" | "timeline" | "bullet" | "utilisation"
   | "calendar" | "correlation" | "confusion" | "spectrogram" | "latency" | "density2d"
   | "contour" | "quiver"
@@ -1513,8 +1522,9 @@ export type Plot = Readonly<{
   treeLayout?: "auto" | "topDown" | "leftRight" | "outline";
 
   /**
-   * A graph's nodes and edges — **required** on `form: "graph"` and refused on
-   * every other form, with `hierarchy` refused on it (C04 I69, §3e).
+   * A graph's nodes and edges — **required** on `form: "graph"` and on
+   * `form: "sankey"`, refused on every other form, with `hierarchy` refused on
+   * both (C04 I69, I92, §3e). A sankey's edges all carry `weight`.
    */
   graph?: Graph;
 
@@ -1873,7 +1883,7 @@ export const ORIGIN_DEFAULT: Readonly<Record<PlotForm, Origin | null>> = Object.
   // Their own renderer (14).
   boxplot: null, flame: null, histogram: null, horizon: null, icicle: null,
   pie: null, radar: null, ridgeline: null, sparkline: null, stackedarea: null,
-  streamgraph: null, treemap: null, tree: null, graph: null, violin: null, waffle: null,
+  streamgraph: null, treemap: null, tree: null, graph: null, sankey: null, violin: null, waffle: null,
 
   // Facet containers — each facet is a `Plot` and declares its own.
   smallmultiples: null, pairplot: null,
@@ -1925,7 +1935,7 @@ export const HONOURS_AXIS_CROSS: Readonly<Record<PlotForm, boolean>> = Object.fr
   // Own renderer — a disc, a mosaic, a tree, a band, a single row.
   boxplot: false, flame: false, histogram: false, horizon: false, icicle: false,
   pie: false, radar: false, ridgeline: false, sparkline: false, stackedarea: false,
-  streamgraph: false, treemap: false, tree: false, graph: false, violin: false, waffle: false,
+  streamgraph: false, treemap: false, tree: false, graph: false, sankey: false, violin: false, waffle: false,
 
   // Facet containers — each facet is a `Plot` and declares its own.
   smallmultiples: false, pairplot: false,
@@ -1994,7 +2004,7 @@ export const HAS_Y_GUTTER: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   contour: true, quiver: true,
   // One row, or a figure that bounds itself: no gutter to put a label beside.
   sparkline: false, horizon: false, waffle: false,
-  pie: false, radar: false, flame: false, icicle: false, treemap: false, tree: false, graph: false,
+  pie: false, radar: false, flame: false, icicle: false, treemap: false, tree: false, graph: false, sankey: false,
   // Composition: the facets carry the gutters and each declares its own.
   smallmultiples: false, pairplot: false,
 });
@@ -2080,7 +2090,7 @@ export const HAS_DETAIL_RUNGS: Readonly<Record<PlotForm, boolean>> = Object.free
   // resolution — is failed by all three in the same way. The choice is
   // `treeLayout`, and this record's first new question is answered `false`.
   tree: false,
-  graph: false,
+  graph: false, sankey: false,
   autocorrelation: false, timeline: false, bullet: false, utilisation: false,
   calendar: false, correlation: false, confusion: false, spectrogram: false,
   latency: false, density2d: false, contour: false, quiver: false,
@@ -2133,7 +2143,7 @@ export const HIERARCHY_ROLE: Readonly<Record<PlotForm, "magnitude" | "structure"
   // `hierarchy` at all — it has its own shape, and this record answers a
   // question about the field a form consumes rather than about the family it
   // belongs to (C04 I69).
-  graph: null,
+  graph: null, sankey: null,
   // Everything else draws a series, a matrix or a field.
   plot3d: null,
   line: null, sparkline: null, heatmap: null, scatter: null, step: null,
@@ -2170,7 +2180,7 @@ export const HAS_X_TITLE: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   spectrogram: false, latency: false, density2d: false, utilisation: false,
   contour: false, quiver: false,
   // No abscissa to name: a disc, a polygon, a mosaic, one row, a composition.
-  pie: false, radar: false, waffle: false, treemap: false, tree: false, graph: false,
+  pie: false, radar: false, waffle: false, treemap: false, tree: false, graph: false, sankey: false,
   horizon: false, sparkline: false, smallmultiples: false, pairplot: false,
 });
 
@@ -2195,7 +2205,7 @@ export const HAS_CALLOUT: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   contour: false, quiver: false,
   // No cartesian area, or one row, or a composition.
   sparkline: false, horizon: false, waffle: false,
-  pie: false, radar: false, flame: false, icicle: false, treemap: false, tree: false, graph: false,
+  pie: false, radar: false, flame: false, icicle: false, treemap: false, tree: false, graph: false, sankey: false,
   smallmultiples: false, pairplot: false,
 });
 
@@ -2236,7 +2246,7 @@ export const IS_MATRIX: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   line: false, sparkline: false, scatter: false, step: false, ecdf: false, plot3d: false,
   density: false, bar: false, histogram: false, boxplot: false, violin: false,
   ridgeline: false, forest: false, dumbbell: false, lollipop: false,
-  dotplot: false, waffle: false, flame: false, icicle: false, treemap: false, tree: false, graph: false,
+  dotplot: false, waffle: false, flame: false, icicle: false, treemap: false, tree: false, graph: false, sankey: false,
   funnel: false, gantt: false, waterfall: false, streamgraph: false,
   stackedarea: false, smallmultiples: false, pairplot: false, pie: false,
   radar: false, horizon: false, slope: false, bubble: false,
@@ -2256,7 +2266,7 @@ export const IS_FIELD_FORM: Readonly<Record<PlotForm, boolean>> = Object.freeze(
   line: false, sparkline: false, scatter: false, step: false, ecdf: false,
   density: false, bar: false, histogram: false, boxplot: false, violin: false,
   ridgeline: false, forest: false, dumbbell: false, lollipop: false,
-  dotplot: false, waffle: false, flame: false, icicle: false, treemap: false, tree: false, graph: false,
+  dotplot: false, waffle: false, flame: false, icicle: false, treemap: false, tree: false, graph: false, sankey: false,
   funnel: false, gantt: false, waterfall: false, streamgraph: false,
   stackedarea: false, smallmultiples: false, pairplot: false, pie: false,
   radar: false, horizon: false, slope: false, bubble: false,
@@ -2314,7 +2324,7 @@ export const STYLE_ARMS: Readonly<Record<PlotForm, readonly PlotStyleArm[]>> = O
   // rather than omitted — an empty list is an answer, and the vocabulary here
   // is the form's own.
   quiver: [],
-  flame: [], icicle: [], treemap: [], tree: [], graph: [],
+  flame: [], icicle: [], treemap: [], tree: [], graph: [], sankey: [],
   sparkline: [], horizon: [],
   smallmultiples: [], pairplot: [],
 });
@@ -2428,8 +2438,14 @@ export type HierarchyNode = Readonly<{
  */
 export type GraphNode = Readonly<{ id: string; label?: string }>;
 
-/** A directed edge. Both endpoints must name a declared node (C04 I69). */
-export type GraphEdge = Readonly<{ from: string; to: string }>;
+/**
+ * A directed edge. Both endpoints must name a declared node (C04 I69).
+ *
+ * `weight` is a flow: **required on every edge of `form: "sankey"`** and refused
+ * on `form: "graph"`, which has no ribbon to widen (I92). Positive and finite —
+ * a zero flow is an edge that is not there.
+ */
+export type GraphEdge = Readonly<{ from: string; to: string; weight?: number }>;
 
 /**
  * The shape a `hierarchy` cannot express (C04 I69, §3e).
@@ -2536,6 +2552,13 @@ export type Hunk = Readonly<{
   lines: readonly Readonly<{
     kind: "add" | "remove" | "context";
     text: string;
+    /**
+     * Word-level emphasis, written by the builder's intra-line diff over a paired
+     * remove/add run and carried as `underline` (C25 I10, C04 I91). Attributes
+     * only: a `tone` or `value` here is refused, because the line's two palettes
+     * are already spoken for.
+     */
+    spans?: readonly TextSpan[];
     oldNo?: number;
     newNo?: number;
   }>[];
@@ -2736,6 +2759,8 @@ export type Raw = Readonly<{
   text: string;
   /** Styled runs inside `text`, by code-unit offset (§3am, I83). */
   spans?: readonly TextSpan[];
+  /** The map a span's `value` reads through (I90). Required the moment any span carries one. */
+  colormap?: ColormapName;
 }> &
   Gap &
   Floor;
@@ -2788,7 +2813,11 @@ export type Image = Readonly<{
   kind: "image";
   id: string;
   /**
-   * PNG bytes, base64.
+   * PNG or GIF bytes, base64 — the codec tells them apart by signature (I93).
+   *
+   * A GIF is one blob carrying its own frames and delays; the frame shown is
+   * view state on the shell's animation wake and never geometry, because
+   * `height` is declared and every frame shares the logical screen.
    *
    * **`b.image({ path })` reads into this at construction.** `node:fs` appears
    * nowhere in `src/presentation/`, and a renderer that opened a file would make

@@ -247,7 +247,7 @@ export const SVG_FAMILY = {
   // `tdWidth` measures a subtree by the widest label under it — so **the
   // topology is shared and the placement is not** (§3aj.6). This arm places by
   // slots and clips its labels, which is font-independent by construction.
-  tree: "nodes", graph: "nodes",
+  tree: "nodes", graph: "nodes", sankey: "nodes",
   // *Its own domain*: a date grid, a time span.
   // **A calendar is a matrix at a different column count, and the derivation is
   // what makes that true** (§3ak.32). Its old reason was *its own domain: a date

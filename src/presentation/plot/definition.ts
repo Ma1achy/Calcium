@@ -25,6 +25,9 @@ import type { ReactElement } from "react";
 import { paint, rows, slot, tone, type Span } from "../blocks/paint.js";
 import { cells, fitStyled, truncate } from "../text.js";
 import { SGR_RESET } from "../../terminal/escapes.js";
+
+/** The sankey renderer lands after its type (C04 I92, C12 §3d); the lane that builds it deletes this. */
+export const SANKEY_IS_NOT_BUILT = "sankeyArea";
 import { AXIS_GUTTER, FRAME_RIGHT, plotAreaRows, plotHeight } from "./height.js";
 import { columnsForAspect } from "./aspect.js";
 import {
@@ -2580,6 +2583,9 @@ const FORM_ROWS: Readonly<
   treemap: (block, width, ctx) => treemapRows(block, width, ctx),
   tree: (block, width, ctx) => treeRows(block, width, ctx),
   graph: (block, width, ctx) => graphRows(block, width, ctx),
+  sankey: () => {
+    throw new Error(SANKEY_IS_NOT_BUILT);
+  },
 
   // --- the six that had no renderer -------------------------------------
   //

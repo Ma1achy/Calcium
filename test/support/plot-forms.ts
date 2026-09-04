@@ -200,6 +200,20 @@ export const ONE_PER_FORM: Readonly<Record<PlotForm, Plot>> = Object.freeze({
   // across two layers, so a dummy node is inserted, and `render -> layout` with
   // `layout -> render` is a cycle, so the reversal pass fires and the notice row
   // has something to say (C12 §3ai).
+  // A placeholder the sankey lane replaces with a fixture shown to respond:
+  // three sources into two sinks with unequal flows, so a ribbon width differs.
+  sankey: block({
+    kind: "plot", id: "form-sankey", form: "sankey", height: 9,
+    series: [],
+    graph: {
+      nodes: [{ id: "a" }, { id: "b" }, { id: "x" }, { id: "y" }],
+      edges: [
+        { from: "a", to: "x", weight: 3 },
+        { from: "a", to: "y", weight: 1 },
+        { from: "b", to: "y", weight: 2 },
+      ],
+    },
+  }),
   graph: block({
     kind: "plot", id: "form-graph", form: "graph", height: 9,
     series: [],

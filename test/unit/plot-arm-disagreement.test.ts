@@ -225,6 +225,7 @@ const MEASURED = {
   "timeline": { silent: "0/2", "numericLabels": "2/2", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "bullet": { silent: "0/2", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "utilisation": { silent: "0/2", "numericLabels": "agree", "identityLabels": "agree", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  "sankey": "refused", // PLACEHOLDER — the sankey lane measures this row
   "graph": { silent: "0/4", "numericLabels": "agree", "identityLabels": "4/4", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "2/4" },
   "tree": { silent: "0/12", "numericLabels": "agree", "identityLabels": "8/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "6/12" },
   "treemap": { silent: "0/2", "numericLabels": "agree", "identityLabels": "2/2", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },

@@ -1407,6 +1407,20 @@ export const CATALOGUE_FORMS: Readonly<Record<PlotForm, FormVariants>> = Object.
       ],
     },
   },
+  // PLACEHOLDER — the sankey lane replaces this with the catalogue's real variants.
+  sankey: {
+    default: {
+      form: "sankey", height: 9, series: [],
+      graph: {
+        nodes: [{ id: "a" }, { id: "b" }, { id: "x" }, { id: "y" }],
+        edges: [
+          { from: "a", to: "x", weight: 3 },
+          { from: "a", to: "y", weight: 1 },
+          { from: "b", to: "y", weight: 2 },
+        ],
+      },
+    },
+  },
   graph: {
     // Five nodes, seven edges, and each variant is chosen to make one pass
     // visible: `cache` has two parents, `parse -> cache` spans two layers so a

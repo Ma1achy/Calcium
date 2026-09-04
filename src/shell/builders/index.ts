@@ -173,6 +173,7 @@ function rule(label: string, meta?: string, opts?: TextOpts): Rule {
       id: idOf(opts, "rule"),
       label,
       ...(opts?.spans === undefined ? {} : { spans: opts.spans }),
+      ...(opts?.colormap === undefined ? {} : { colormap: opts.colormap }),
       ...(meta === undefined ? {} : { meta }),
     } as Rule,
     opts,
@@ -190,6 +191,7 @@ function noticeOf(tone: Tone, text: string, glyph?: Glyph, opts?: TextOpts): Not
       text,
       ...(g === undefined ? {} : { glyph: g }),
       ...(opts?.spans === undefined ? {} : { spans: opts.spans }),
+      ...(opts?.colormap === undefined ? {} : { colormap: opts.colormap }),
     } as Notice,
     opts,
     false,
@@ -1410,7 +1412,13 @@ function group(
 
 function raw(text: string, opts?: TextOpts): Raw {
   return finish<Raw>(
-    { kind: "raw", id: idOf(opts, "raw"), text, ...(opts?.spans === undefined ? {} : { spans: opts.spans }) } as Raw,
+    {
+      kind: "raw",
+      id: idOf(opts, "raw"),
+      text,
+      ...(opts?.spans === undefined ? {} : { spans: opts.spans }),
+      ...(opts?.colormap === undefined ? {} : { colormap: opts.colormap }),
+    } as Raw,
     opts,
     false,
   );

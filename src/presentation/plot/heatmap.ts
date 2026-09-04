@@ -88,7 +88,7 @@ const MATRIX_LAYOUT: Readonly<Record<PlotForm, MatrixLayout | null>> = Object.fr
   line: null, sparkline: null, scatter: null, step: null, ecdf: null, density: null,
   bar: null, histogram: null, boxplot: null, violin: null, ridgeline: null,
   forest: null, dumbbell: null, lollipop: null, dotplot: null, waffle: null,
-  flame: null, icicle: null, treemap: null, tree: null, graph: null, funnel: null, gantt: null,
+  flame: null, icicle: null, treemap: null, tree: null, graph: null, sankey: null, funnel: null, gantt: null,
   waterfall: null, streamgraph: null, stackedarea: null,
   smallmultiples: null, pairplot: null, pie: null, radar: null, horizon: null,
   slope: null, bubble: null, autocorrelation: null, timeline: null, bullet: null,

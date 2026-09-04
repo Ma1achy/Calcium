@@ -23,6 +23,7 @@ import {
   type DocumentStatus,
   type Glyph,
   COLORMAP_NAMES,
+  TONES,
   HAS_CALLOUT,
   HAS_DETAIL_RUNGS,
   HIERARCHY_MAX_DEPTH,
@@ -106,6 +107,14 @@ const ACTION_FIELD: Readonly<Record<Action["kind"], string>> = Object.freeze({
 });
 
 const COLORMAP_SET: ReadonlySet<string> = new Set<string>(COLORMAP_NAMES);
+
+/** A text block's `colormap` — the map its valued spans read through (C04 I90). */
+function checkColormapName(b: Record<string, unknown>, e: string[], at: string): void {
+  const name = b["colormap"];
+  if (name !== undefined && (typeof name !== "string" || !COLORMAP_SET.has(name))) {
+    e.push(`${at}: "colormap" must be one of ${COLORMAP_NAMES.join(", ")} (C10 I31, C04 I90)`);
+  }
+}
 const TRANSPORTS: ReadonlySet<string> = new Set(["emulated", "fixture", "subprocess", "local"]);
 const ORIGINS: ReadonlySet<string> = new Set(["user", "action", "agent", "refresh", "defect"]);
 /** C04 I41 — the arms, named for the unit that arrives, not the unit rendered. */
@@ -378,7 +387,7 @@ function plotGraphErrors(
       e.push(`${at}: "graphLayout" must be "layered" (C04 I70)`);
       return;
     }
-    if (form !== "graph") {
+    if (form !== "graph" && form !== "sankey") {
       e.push(
         `${at}: "graphLayout" on form ${JSON.stringify(form)} (C04 I70) — only a graph takes ` +
           `a graph layout, and an ignored member reads as one not yet implemented`,
@@ -391,15 +400,15 @@ function plotGraphErrors(
   if (g === undefined) {
     // **A form whose whole subject is the shape has nothing to fall back to**,
     // which is I65's ruling for `tree` one form along.
-    if (form === "graph") {
+    if (form === "graph" || form === "sankey") {
       e.push(
-        `${at}: form "graph" with no "graph" (C04 I69) — that form draws a node set and ` +
+        `${at}: form ${JSON.stringify(form)} with no "graph" (C04 I69) — that form draws a node set and ` +
           `nothing else, so there is no figure to fall back to`,
       );
     }
     return;
   }
-  if (form !== "graph") {
+  if (form !== "graph" && form !== "sankey") {
     e.push(
       `${at}: "graph" on form ${JSON.stringify(form)} (C04 I69) — it is that form's data ` +
         `rather than a modifier, and accepted-and-ignored is worse than refused`,
@@ -408,7 +417,7 @@ function plotGraphErrors(
   }
   // **A form has one data shape**, so two is a document that means two things.
   if (b["hierarchy"] !== undefined) {
-    e.push(`${at}: both "graph" and "hierarchy" on form "graph" (C04 I69) — a form has one data shape`);
+    e.push(`${at}: both "graph" and "hierarchy" on form ${JSON.stringify(form)} (C04 I69) — a form has one data shape`);
     return;
   }
   if (typeof g !== "object" || g === null || Array.isArray(g)) {
@@ -448,9 +457,20 @@ function plotGraphErrors(
     return;
   }
   for (const [i, x] of edges.entries()) { // cells-ok — an edge index
-    const edge = x as { from?: unknown; to?: unknown } | null;
+    const edge = x as { from?: unknown; to?: unknown; weight?: unknown } | null;
     if (typeof edge !== "object" || edge === null) {
       e.push(`${at}.graph.edges[${String(i)}]: must be an object with "from" and "to" (C04 I69)`);
+      return;
+    }
+    // C04 I92 — a flow is required where there is a ribbon and refused where there is not.
+    const w = edge.weight;
+    if (form === "sankey") {
+      if (typeof w !== "number" || !Number.isFinite(w) || w <= 0) {
+        e.push(`${at}.graph.edges[${String(i)}]: "weight" must be a positive finite number on form "sankey" (C04 I92)`);
+        return;
+      }
+    } else if (w !== undefined) {
+      e.push(`${at}.graph.edges[${String(i)}]: "weight" on form "graph" (C04 I92) — no ribbon to widen, and accepted-and-ignored is refused`);
       return;
     }
     for (const end of ["from", "to"] as const) {
@@ -674,7 +694,12 @@ function checkActions(b: Record<string, unknown>, e: string[], at: string): void
  * fault on a span — so a document with nine faulty spans reports nine lines and
  * a reader can find each one.
  */
-function checkSpans(b: Record<string, unknown>, member: string, e: string[], at: string): void {
+/**
+ * `attributesOnly` is the hunk-line arm (C04 I91): bold/italic/underline and
+ * neither `tone` nor `value`, because the line's gutter and syntax palettes are
+ * already the two a row may carry (C25 §3).
+ */
+function checkSpans(b: Record<string, unknown>, member: string, e: string[], at: string, attributesOnly = false): void {
   const spans = b["spans"];
   if (spans === undefined) return;
   if (!isArray(spans)) {
@@ -715,8 +740,33 @@ function checkSpans(b: Record<string, unknown>, member: string, e: string[], at:
     }
     for (const key of Object.keys(span)) {
       if (!TEXT_SPAN_KEYS.has(key)) {
-        e.push(`${where}: unknown member "${key}" — a span carries from, to, bold, italic, underline and nothing else (C04 I85)`);
+        e.push(`${where}: unknown member "${key}" — a span carries from, to, bold, italic, underline, tone, value and nothing else (C04 I85)`);
         return;
+      }
+      if (key === "tone") {
+        if (!attributesOnly && typeof span[key] === "string" && TONE_SET.has(span[key])) continue;
+        e.push(
+          attributesOnly
+            ? `${where}: "tone" is refused on this member — its palettes are spoken for (C04 I89, I91)`
+            : `${where}: "tone" must be one of ${TONES.join(", ")} (C04 I89)`,
+        );
+        return;
+      }
+      if (key === "value") {
+        const v = span[key];
+        if (attributesOnly) {
+          e.push(`${where}: "value" is refused on this member (C04 I90, I91)`);
+          return;
+        }
+        if (typeof v !== "number" || !Number.isFinite(v) || v < 0 || v > 1) {
+          e.push(`${where}: "value" must be a finite number in [0, 1] (C04 I90)`);
+          return;
+        }
+        if (b["colormap"] === undefined) {
+          e.push(`${where}: "value" with no "colormap" on the block — a reading with no map paints nothing (C04 I90)`);
+          return;
+        }
+        continue;
       }
       if (key !== "from" && key !== "to" && typeof span[key] !== "boolean") {
         e.push(`${where}: "${key}" must be a boolean (C04 I85)`);
@@ -725,6 +775,8 @@ function checkSpans(b: Record<string, unknown>, member: string, e: string[], at:
     }
   });
 }
+
+const TONE_SET: ReadonlySet<string> = new Set<string>(TONES);
 
 /** `i` lies strictly between a high and a low surrogate — the one cluster interior L0 can see. */
 function splitsSurrogate(text: string, i: number): boolean {
@@ -747,6 +799,7 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     requireString(b, "text", e, at);
     requireString(b, "tone", e, at);
     requireGlyph(b["glyph"], e, at);
+    checkColormapName(b, e, at);
     checkSpans(b, "text", e, at);
   },
   keyValue: (b, e, at) => {
@@ -1099,6 +1152,17 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     requireString(b, "language", e, at);
     requireArray(b, "hunks", e, at);
     checkActions(b, e, at);
+    // C04 I91 — a hunk line's spans are attributes only, checked per line.
+    const hunks = b["hunks"];
+    if (isArray(hunks)) {
+      hunks.forEach((h, hi) => {
+        const lines = isRecord(h) ? h["lines"] : undefined;
+        if (!isArray(lines)) return;
+        lines.forEach((line, li) => {
+          if (isRecord(line)) checkSpans(line, "text", e, `${at} hunks[${String(hi)}].lines[${String(li)}]`, true);
+        });
+      });
+    }
     // A negative elision is not an elision, and it would render a marker claiming
     // there is content to reveal above what the block actually holds.
     const after = b["collapsedAfter"];
@@ -1136,6 +1200,7 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
   },
   raw: (b, e, at) => {
     requireString(b, "text", e, at);
+    checkColormapName(b, e, at);
     checkSpans(b, "text", e, at);
   },
   /**
@@ -2249,7 +2314,7 @@ const PLOT_FORM_MEMBERS = {
   scatter: true, step: true, ecdf: true,
   bar: true, histogram: true, boxplot: true, forest: true, dumbbell: true,
   lollipop: true, dotplot: true, waffle: true,
-  flame: true, icicle: true, funnel: true, gantt: true, waterfall: true, streamgraph: true, stackedarea: true, treemap: true, tree: true, graph: true,
+  flame: true, icicle: true, funnel: true, gantt: true, waterfall: true, streamgraph: true, stackedarea: true, treemap: true, tree: true, graph: true, sankey: true,
   slope: true, bubble: true, autocorrelation: true, timeline: true, bullet: true, utilisation: true,
   calendar: true, correlation: true, confusion: true, spectrogram: true, latency: true, density2d: true,
   density: true, violin: true, ridgeline: true,

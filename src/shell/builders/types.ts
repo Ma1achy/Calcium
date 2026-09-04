@@ -14,7 +14,7 @@
  * oversight.
  */
 
-import type { Action, Block, Cell, ErrorLike, Glyph, KeyValue, Tone, TextSpan } from "../../data/viewmodel/index.js";
+import type { Action, Block, Cell, ColormapName, ErrorLike, Glyph, KeyValue, Tone, TextSpan } from "../../data/viewmodel/index.js";
 import type { ProducerContext } from "../../data/adapters/types.js";
 
 /**
@@ -51,6 +51,8 @@ export type TextOpts = BlockOpts &
   Readonly<{
     /** Styled runs inside the text, by code-unit offset (C04 I84). */
     spans?: readonly TextSpan[];
+    /** The map a valued span reads through (C04 I90); `raw` and `notice` only. */
+    colormap?: ColormapName;
   }>;
 
 /**

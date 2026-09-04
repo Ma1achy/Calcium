@@ -152,7 +152,7 @@ export const HAS_VALUE_AXIS = {
   horizon: false, calendar: false,
   latency: false, density2d: false, utilisation: false,
   flame: false, icicle: false, treemap: false,
-  tree: false, graph: false,
+  tree: false, graph: false, sankey: false,
   // **Proportion — and the row had three subjects with one reason** (F304,
   // §3ak.26 finding 2). *An angle, a polygon's radius, a count of squares: the
   // reading is a share of a whole, which is not a position on a scale.* An angle
@@ -698,7 +698,7 @@ export const RAMP_DEFAULT: Readonly<Record<PlotForm, ColormapName | null>> = Obj
   line: null, sparkline: null, scatter: null, step: null, ecdf: null, density: null,
   bar: null, histogram: null, boxplot: null, violin: null, ridgeline: null,
   forest: null, dumbbell: null, lollipop: null, dotplot: null, waffle: null,
-  flame: null, icicle: null, treemap: null, tree: null, graph: null, funnel: null, gantt: null,
+  flame: null, icicle: null, treemap: null, tree: null, graph: null, sankey: null, funnel: null, gantt: null,
   waterfall: null, streamgraph: null, stackedarea: null,
   smallmultiples: null, pairplot: null, pie: null, radar: null,
   slope: null, bubble: null, autocorrelation: null, timeline: null, bullet: null,
