@@ -21,6 +21,7 @@
  * the clamp and the terminal wrapped every one of them.
  */
 import { sliceTokens, tokenise, type Token } from "../blocks/index.js";
+import { runsOf, sliceRuns } from "../runs.js";
 import {
   background,
   clampSpans,
@@ -31,10 +32,11 @@ import {
   spanCells,
   tone,
   withBackground,
+  withSpan,
   type Span,
 } from "../blocks/paint.js";
 import { truncateParts } from "../text.js";
-import type { Hunk, Tone } from "../../data/viewmodel/index.js";
+import type { Hunk, TextSpan, Tone } from "../../data/viewmodel/index.js";
 import type { ColourRef } from "../theme/index.js";
 import type { RenderContext } from "../blocks/types.js";
 import type { PatchLayout } from "./layout.js";
@@ -145,8 +147,23 @@ export function gutterSpans(
  * than about arithmetic — `logs` makes the same call for the same reason. The
  * tokens are sliced to the kept portion by C09's own slicer, because cutting them
  * twice in two files is how the two come to disagree about where a token ends.
+ *
+ * **Two run streams over one text, merged by slicing** (C25 I10). The syntax
+ * tokens carry colour and the line's `spans` carry an attribute — the collision
+ * C04 I88 refuses on `code` is admitted here because the channels differ. The
+ * spans become runs through `runsOf` (so a boundary inside a cluster snaps, C04
+ * I84), are cut to the kept portion, and the token stream is then sliced at each
+ * run's boundary and given the run's attributes by `withSpan`. A token cut in two
+ * keeps its slot on both halves; the truncation marker is appended after and
+ * takes no run's attributes, because it is not text the span was written over.
  */
-export function textSpans(text: string, language: string, budget: number, ctx: RenderContext): readonly Span[] {
+export function textSpans(
+  text: string,
+  language: string,
+  budget: number,
+  ctx: RenderContext,
+  lineSpans?: readonly TextSpan[],
+): readonly Span[] {
   if (budget <= 0) return [];
 
   // **`truncateParts` rather than `truncate`**, and the difference was visible only
@@ -160,11 +177,25 @@ export function textSpans(text: string, language: string, budget: number, ctx: R
   const tokens: readonly Token[] = sliceTokens(tokenise(text, language), 0, kept.length); // cells-ok
   const fallback = tone("default", ctx.theme, ctx.capabilities);
 
-  const spans: Span[] = tokens.map((token) => ({
+  const styled = (token: Token): Span => ({
     text: token.text,
     style:
       token.slot === null ? fallback : slot(`syntax.${token.slot}`, ctx.theme, ctx.capabilities),
-  }));
+  });
+
+  const spans: Span[] = [];
+  if (lineSpans === undefined || lineSpans.length === 0) { // cells-ok — a span count
+    spans.push(...tokens.map(styled));
+  } else {
+    let at = 0;
+    for (const run of sliceRuns(runsOf(text, lineSpans), 0, kept.length)) { // cells-ok
+      for (const token of sliceTokens(tokens, at, run.text.length)) { // cells-ok — a code-unit length
+        const base = styled(token);
+        spans.push(run.attrs === undefined ? base : { text: base.text, style: withSpan(base.style ?? {}, run.attrs) });
+      }
+      at += run.text.length; // cells-ok — a code-unit cursor
+    }
+  }
 
   if (suffix !== "") spans.push({ text: suffix, style: fallback });
 

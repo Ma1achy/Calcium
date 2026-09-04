@@ -18,7 +18,7 @@
 import type { ReactElement } from "react";
 import { rows } from "../blocks/paint.js";
 import { cells } from "../text.js";
-import { atLeastOne, normaliseWidth } from "../../data/viewmodel/index.js";
+import { atLeastOne, changedRuns, normaliseWidth, type ChangedRun } from "../../data/viewmodel/index.js";
 import { collapseText } from "./collapse.js";
 import { hunkRows, isCollapsed, layoutFor, patchHeight, type Layout } from "./height.js";
 import { windowRows } from "./window.js";
@@ -33,8 +33,14 @@ type Line = Hunk["lines"][number];
 /** The one cell split spends on telling the two halves apart. */
 const SEPARATOR = "\u2502";
 
-/** A run of consecutive changed lines, and the rows it pairs into. */
-type Run = Readonly<{ removes: readonly Line[]; adds: readonly Line[] }>;
+/**
+ * A run of consecutive changed lines, and the rows it pairs into. **C04's
+ * `changedRuns` and not a grouping of this file's own** (C25 I10): the builder's
+ * intra-line diff pairs the *n*th remove with the *n*th add of the same run, so
+ * the two must read one grouping or the underline on a split row's left half
+ * describes a change on some other row.
+ */
+type Run = ChangedRun;
 
 /**
  * The path header. `── path ─────` in the block's own hand, because the block
@@ -59,7 +65,7 @@ function header(block: Patch, layout: PatchLayout, ctx: RenderContext): string {
 /** Unified: both number columns, then the marker, then the text. */
 function unifiedRow(item: Line, block: Patch, layout: PatchLayout, ctx: RenderContext): string {
   return line(
-    [...gutterSpans(item, layout, ctx), ...textSpans(item.text, block.language, layout.text, ctx)],
+    [...gutterSpans(item, layout, ctx), ...textSpans(item.text, block.language, layout.text, ctx, item.spans)],
     item.kind,
     layout,
     ctx,
@@ -85,11 +91,11 @@ function splitRows(run: Run, block: Patch, layout: PatchLayout, ctx: RenderConte
     const leftSpans =
       left === undefined
         ? blankSide(layout)
-        : [...gutterSpans(left, layout, ctx, "old"), ...textSpans(left.text, block.language, layout.text, ctx)];
+        : [...gutterSpans(left, layout, ctx, "old"), ...textSpans(left.text, block.language, layout.text, ctx, left.spans)];
     const rightSpans =
       right === undefined
         ? blankSide(layout)
-        : [...gutterSpans(right, layout, ctx, "new"), ...textSpans(right.text, block.language, layout.text, ctx)];
+        : [...gutterSpans(right, layout, ctx, "new"), ...textSpans(right.text, block.language, layout.text, ctx, right.spans)];
 
     // **Each side carries its own background**, and the row carries none. A paired
     // row changed on both sides in different directions, so one colour across it
@@ -120,32 +126,6 @@ function padTo(spans: readonly Span[], layout: PatchLayout): readonly Span[] {
   return short <= 0 ? spans : [...spans, { text: " ".repeat(short) }];
 }
 
-/** A hunk's changed lines, grouped into the runs split pairs and unified does not. */
-function runsOf(lines: readonly Line[]): readonly (Line | Run)[] {
-  const out: (Line | Run)[] = [];
-  let removes: Line[] = [];
-  let adds: Line[] = [];
-
-  const flush = (): void => {
-    if (removes.length > 0 || adds.length > 0) out.push({ removes, adds }); // cells-ok — line counts
-    removes = [];
-    adds = [];
-  };
-
-  for (const item of lines) {
-    if (item.kind === "context") {
-      flush();
-      out.push(item);
-      continue;
-    }
-    if (item.kind === "remove") removes.push(item);
-    else adds.push(item);
-  }
-  flush();
-
-  return out;
-}
-
 function hunkLines(hunk: Hunk, block: Patch, layout: PatchLayout, ctx: RenderContext): readonly string[] {
   const out: string[] = [];
 
@@ -160,7 +140,7 @@ function hunkLines(hunk: Hunk, block: Patch, layout: PatchLayout, ctx: RenderCon
     return out;
   }
 
-  for (const group of runsOf(hunk.lines)) {
+  for (const group of changedRuns(hunk.lines)) {
     if ("kind" in group) {
       // A context line is one row in both layouts, and in split it is the same text
       // on both sides — which is what makes the eye track across the separator.
