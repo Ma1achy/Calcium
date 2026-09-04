@@ -78,7 +78,8 @@ describe("the plot demo", () => {
     // *argument* rather than a key: a source pattern measuring a shape the code
     // stopped having, which is the same defect as aiming a row at a path.
     expect(all, "the figures must go through the published builder").toMatch(/\bb\.plot\s*\(/);
-    expect(Object.keys(CATALOGUE), "every form the union declares").toHaveLength(47);
+    // 48 since `sankey` (C12 §3ap, 2026-09-04).
+    expect(Object.keys(CATALOGUE), "every form the union declares").toHaveLength(48);
     expect(all, "a figure reached past the builder to `block({ … })`").not.toMatch(
       /\bblock\s*\(\s*\{/,
     );
@@ -93,7 +94,8 @@ describe("the plot demo", () => {
     // contact sheet and F350's corpus, both. Four were entries naming the field
     // the published builder did not declare, and `b.plot` declares all eight now
     // (F335, C24 §4b) — so the honest assertion flipped rather than went away.
-    expect(FORMS).toHaveLength(47);
+    // 48 since `sankey` (C12 §3ap, 2026-09-04).
+    expect(FORMS).toHaveLength(48);
     expect([...refusals()].sort(), "nothing the union declares is unbuildable").toEqual([]);
 
     // **Built, not merely typed.** `b.plot` throws for a document the validator
@@ -112,7 +114,7 @@ describe("the plot demo", () => {
       }
     }
     expect(threw).toEqual([]);
-    expect(built).toBe(47);
+    expect(built, "48 since `sankey` (C12 §3ap)").toBe(48);
   });
 
   it("T-eight (C24 I30, F335): the eight `b.plot` omitted are all on it now", () => {
@@ -283,7 +285,8 @@ describe("the plot demo", () => {
     // the forms do not exercise. Three arms later the member selects three
     // things, and a caller naming one is exactly the second claim this count is
     // about (C24 I30, C12 I99 · I100 · I101).
-    expect(FORMS.length - refusals().length + everyVariant().length, "figures /all draws").toBe(123);
+    // 124 since `sankey`'s entry joined `/all` (C12 §3ap, 2026-09-04).
+    expect(FORMS.length - refusals().length + everyVariant().length, "figures /all draws").toBe(124);
   });
 });
 
