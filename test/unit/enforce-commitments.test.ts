@@ -1318,6 +1318,35 @@ describe("A03 SP4 — Seam 4 and its owners agree, both directions", () => {
     expect(v[0]?.message).toContain("F99");
   });
 
+  it("SP5: `U+F900` is a code point and not a citation of F900", () => {
+    // **The one hex form the word rule did not reach.** `0xF900` and `\uF900`
+    // were excluded from the start because `x` and `u` are word characters;
+    // `+` is not, so the Unicode form read as a citation and the rule invented
+    // one — the loud failure rather than the quiet one. It fired on a docstring
+    // naming a block of the East Asian Width property.
+    const known = new Set(["F1", "F2", "F3"]);
+    const v = checkFindings({
+      known,
+      files: ["fake.ts"],
+      read: () => "the CJK compatibility ideographs at U+F900..U+FAFF are Wide",
+    });
+    expect(v, "a code point cites nothing").toHaveLength(0);
+  });
+
+  it("SP5: and a real citation beside one still resolves — the control", () => {
+    // **Without this the narrowing is indistinguishable from one that stopped
+    // reading the line.** The same line carries a code point and a citation.
+    const known = new Set(["F1", "F2", "F3"]);
+    const v = checkFindings({
+      known,
+      files: ["fake.ts"],
+      read: () => "U+F900 is Wide, which is F99's subject",
+    });
+    expect(v, "the citation past the end still fires").toHaveLength(1);
+    expect(v[0]?.message).toContain("F99");
+    expect(v[0]?.message, "and the code point is not named").not.toContain("F900");
+  });
+
   it("SP5 fires: a gap in the middle, which is the other way to be wrong", () => {
     const v = checkFindings({
       known: new Set(["F1", "F3"]),

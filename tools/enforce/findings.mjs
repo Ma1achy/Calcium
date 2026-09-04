@@ -93,8 +93,16 @@ function declared() {
  * `FINDINGS F70`, `(F58b)`, `see F14` — a bare `F1` inside an identifier or a
  * hex string is not one, so the number must be delimited and must not be part of
  * a longer word.
+ *
+ * **`U+F900` is the one hex form the word rule does not reach**, because `+` is
+ * not a word character while the `x` of `0xF900` and the `u` of `\uF900` both
+ * are — so those two were excluded from the day this was written and the Unicode
+ * form was not. It fired on a docstring naming a block of the width property, and
+ * the failure is the loud kind rather than the quiet one: it invents a citation
+ * rather than dropping one. Named as its own lookbehind rather than by adding `+`
+ * to the class, so the exclusion says which form it is about.
  */
-const CITATION = /(?<![A-Za-z0-9_])(F\d+[a-z]?)(?![A-Za-z0-9_])/gu;
+const CITATION = /(?<![A-Za-z0-9_])(?<!U\+)(F\d+[a-z]?)(?![A-Za-z0-9_])/gu;
 
 /**
  * Its own walk, and that is the whole reason this rule works.
