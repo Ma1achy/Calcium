@@ -29101,6 +29101,9 @@ CPU-fraction assertion measures the host, not the code — the quiet-machine not
 none on a busy one*, with the number that shows it this time — the runner's ratio was already printed
 in the job, one step above the failure, by the instrument built for this reading.
 
+**The rerun, same commit, twenty minutes later: the same row, 51.14 ms.** Two of two on the runner
+against a ceiling of 50, both within 10% of it — the reading is the host's ratio, not a spike.
+
 **Where**: `test/unit/plot-performance.test.ts`; TRIAGE group 12; F262, F69, F73.
 
 ---
