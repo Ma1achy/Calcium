@@ -28,7 +28,8 @@
  * that route, and the notice below names the command so the reader has it.
  */
 
-import type { Action } from "../data/viewmodel/index.js";
+import { descendants } from "../data/viewmodel/index.js";
+import type { Action, Block, Scroll } from "../data/viewmodel/index.js";
 import type { EntryId, TranscriptStore } from "../viewport/transcript/index.js";
 
 /** The schemes an `open` action may use. Nothing else reaches the OS handler. */
@@ -80,7 +81,14 @@ export function createActionDispatcher(deps: ActionDeps) {
   return (action: Action, from: EntryId | null = null): void => {
     // C23 I18 — before the switch, because every kind is refused and putting the
     // check inside each arm is three places to forget it.
-    if (isFrozen(deps.transcript, from)) {
+    //
+    // **`expand` is the exception, and the design walk is what found it** (C04
+    // §3c S4). It reveals data the entry already holds, fills nothing and runs
+    // nothing, so D8's staleness argument has no purchase — and the surfaces it
+    // exists for (a folded reasoning panel, a tool call's folded body) are
+    // settled entries by the time anyone reads them. Refused, §9b's *expanded
+    // with the expand action, which exists* was true of the live entry only.
+    if (action.kind !== "expand" && isFrozen(deps.transcript, from)) {
       // **Every kind, including the one that only fills the prompt** (C23 I18).
       // `fill`'s command was composed against rows that may no longer exist,
       // and reading a stale identifier before running it is not the protection
@@ -181,9 +189,29 @@ export function createActionDispatcher(deps: ActionDeps) {
           return;
         }
 
-        // A target no row carries. Said rather than swallowed: an action that
-        // does nothing is indistinguishable from one that worked.
-        deps.notify(`nothing to expand — no row \`${action.target}\``);
+        // **A block declaring a collapsed form, at any depth** (C04 I98). Rows
+        // first — the shipped path above — then blocks, so a row id equalling a
+        // block id has a known answer (C04 §3c S5). The toggle is a shell-origin
+        // `replace` with the flag inverted: `op: "expand"` names a row and
+        // `patch.ts` refuses a scroll (*is a scroll, which has no rows*), which
+        // was measured before this arm was written rather than assumed.
+        const folded = [...entry.doc.blocks, ...entry.doc.blocks.flatMap((b) => [...descendants(b)])].find(
+          (b: Block): b is Scroll =>
+            b.kind === "scroll" && b.id === action.target && b.collapsed !== undefined,
+        );
+        if (folded !== undefined) {
+          const outcome = deps.transcript.patch(
+            from,
+            { op: "replace", blockId: folded.id, block: { ...folded, collapsed: folded.collapsed !== true } },
+            "shell",
+          );
+          if (outcome.ok) deps.scheduler.commit("input");
+          return;
+        }
+
+        // A target no row or block carries. Said rather than swallowed: an
+        // action that does nothing is indistinguishable from one that worked.
+        deps.notify(`nothing to expand — no row or folded block \`${action.target}\``);
         return;
       }
     }

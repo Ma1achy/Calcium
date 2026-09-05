@@ -30,7 +30,9 @@ const results = runPass({
   run,
   control: {
     file: "src/shell/actions.ts",
-    from: "    if (isFrozen(deps.transcript, from)) {",
+    // Re-anchored 2026-09-05: `expand` became C23 I18's one exception (C04 §3c S4),
+    // applied by hand and T1.17b died.
+    from: "    if (action.kind !== \"expand\" && isFrozen(deps.transcript, from)) {",
     to: "    if (false as boolean) {",
     why: "the refusal removed — execution T1.17, actions-rerun T1.17b and session-navigation T3.41 fail; a run in which a frozen entry can dispatch and stay green cannot see the gate",
   },

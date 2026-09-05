@@ -886,6 +886,12 @@ const GLYPH_TABLE: Readonly<Record<Glyph, readonly [unicode: string, ascii: stri
     // survivors is the better answer the day someone measures one, and this is
     // one. The ASCII half is `tree(1)`'s rendering of the same hook.
     continuation: ["⎿", "`"],
+    // **U+23FA is Neutral — one cell under both conventions, measured with
+    // `cells()` before this row was written** (C09 §4). Not `running`'s `●`:
+    // that is Ambiguous, and it is a *state*, where this is a position in a
+    // sequence and does not change as the step runs or settles. `@` is the one
+    // ASCII mark no other slot spends.
+    step: ["⏺", "@"],
   });
 
 /** The pairs, for the test that asserts each is 1:1 by cell count (I5). */

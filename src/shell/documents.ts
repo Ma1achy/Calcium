@@ -15,6 +15,7 @@
 
 import { block, document } from "../data/viewmodel/index.js";
 import { usageBlocks } from "../data/adapters/index.js";
+import { elapsed } from "../presentation/blocks/index.js";
 import type { ToolDef } from "../data/manifest/index.js";
 import type {
   LocalDocument,
@@ -220,6 +221,87 @@ export function noticeDoc(
         ...(glyph === undefined ? {} : { glyph }),
       }),
     ],
+    meta: metaSpec,
+  });
+}
+
+/**
+ * A tool call — `AGENT_TUI_DESIGN.md` §9c, as a composition and not a kind.
+ *
+ * **A header, a body, and the residue row the body already has.** The header is
+ * a `notice` carrying `step` — *⏺ name(args) · elapsed · outcome* — and the
+ * body is either the settled result under `continuation` (`⎿`, the same slot
+ * `noticeDoc`'s muted notices take) or the streamed output in a `scroll` that
+ * opens at its tail (C04 I97). *+N more* is **not** a fourth count string: a
+ * folded body is a `collapsed` scroll, whose residue row *⋯ 0 above, N below*
+ * is that line (C04 I98), and `⏎` on it toggles the fold through the `expand`
+ * action every one of its elements carries.
+ *
+ * **The elapsed figure goes through `elapsed()`, which is the counter's one
+ * consumer outside its driver.** `refresh.ts` ticks `elapsedMs` into a live
+ * part's `status` box once a second and asks `elapsedNeeded` whether the figure
+ * moved; nothing else in `src/` formatted a duration. A caller re-composing this
+ * header on a tick has the same guard available — compare `elapsed(a)` with
+ * `elapsed(b)` before patching — and the tick itself is C23's to drive, from the
+ * pending entry's clock (`elapsedNeeded`, owed).
+ */
+export type ToolCallSpec = Readonly<{
+  name: string;
+  args: string;
+  /** Since dispatch, in milliseconds. Below one second no figure is drawn. */
+  elapsedMs?: number;
+  /** The one-word verdict beside the elapsed figure — `exit 0`, `47 passed`. */
+  outcome?: string;
+  /** The settled result, one line, under `⎿`. */
+  result?: string;
+  /** Streamed output, in a follow scroll of `height` rows (default 6). */
+  output?: readonly Block[];
+  height?: number;
+  /** Present, either value, declares the fold (C04 I98). */
+  collapsed?: boolean;
+}>;
+
+/** The header line, without its glyph. Exported for the row that asserts it. */
+export function toolCallHeader(call: ToolCallSpec): string {
+  const parts = [`${call.name}(${call.args})`];
+  const since = call.elapsedMs === undefined ? "" : elapsed(call.elapsedMs);
+  if (since !== "") parts.push(since);
+  if (call.outcome !== undefined && call.outcome !== "") parts.push(call.outcome);
+  return parts.join(" · ");
+}
+
+export function toolCallDoc(
+  command: string,
+  call: ToolCallSpec,
+  metaSpec: MetaSpec,
+  status: DocumentStatus = "ok",
+): ViewDocument {
+  const header = toolCallHeader(call);
+  const blocks: Block[] = [
+    block({ kind: "notice", id: blockId("step"), tone: "info", glyph: "step", text: header }),
+  ];
+  if (call.result !== undefined) {
+    blocks.push(
+      block({ kind: "notice", id: blockId("result"), tone: "muted", glyph: "continuation", text: call.result }),
+    );
+  }
+  if (call.output !== undefined && call.output.length > 0) {
+    blocks.push(
+      block({
+        kind: "scroll",
+        id: blockId("output"),
+        height: call.height ?? 6,
+        follow: true,
+        children: call.output,
+        ...(call.collapsed === undefined ? {} : { collapsed: call.collapsed }),
+      }),
+    );
+  }
+  return compose({
+    command,
+    status,
+    ...(status === "error" ? { error: { message: header } } : {}),
+    blocks,
     meta: metaSpec,
   });
 }

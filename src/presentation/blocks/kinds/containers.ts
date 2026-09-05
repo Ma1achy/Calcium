@@ -213,6 +213,16 @@ function childRanges(
   return out;
 }
 
+/**
+ * The rows the box gives its content: `height`, or **zero when collapsed**
+ * (C04 I98). The residue row is chrome on top of this in both cases, which is
+ * what makes a collapsed box *the residue row and nothing else* without a second
+ * rule about what it draws.
+ */
+function interiorOf(block: Scroll): number {
+  return block.collapsed === true ? 0 : block.height; // cells-ok — a row count
+}
+
 /** The content's total height, which decides the residue row (C04 I49). */
 function contentHeight(block: Scroll, width: number, measureChild: MeasureFn): number {
   const ranges = childRanges(block, width, measureChild);
@@ -228,8 +238,17 @@ function contentHeight(block: Scroll, width: number, measureChild: MeasureFn): n
  * number this function bounds and nothing else ever sees.
  */
 function offsetOf(block: Scroll, ctx: RenderContext, content: number): number {
-  const held = ctx.scrollOffsets?.[block.id] ?? 0;
-  const most = Math.max(0, content - block.height);
+  const interior = interiorOf(block);
+  // **Collapsed, the offset is forced to zero** (C04 §3c S2): the residue row
+  // then reads *0 above, N below*, which is the fold's whole statement. A
+  // collapsed follow box has nothing to follow.
+  if (interior === 0) return 0;
+  const most = Math.max(0, content - interior);
+  const held = ctx.scrollOffsets?.[block.id];
+  // **A follow box nobody has touched opens at its tail** (C04 I97). The field
+  // is the initial preference; a held value — including the store's `∞`, which
+  // the clamp below resolves — is the reader's, and wins.
+  if (held === undefined) return block.follow === true ? most : 0;
   return Math.min(Math.max(0, Math.trunc(held)), most);
 }
 
@@ -275,12 +294,30 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
    */
   measure(block: Scroll, width: number, measureChild: MeasureFn): number {
     const w = normaliseWidth(width);
-    return block.height + (contentHeight(block, w, measureChild) > block.height ? 1 : 0);
+    const interior = interiorOf(block);
+    // Collapsed: `0 + 1`, because C04 I47 refuses an empty scroll so the content
+    // is always taller than a zero interior. The residue row is unconditional
+    // there *because* the interior is zero, not because C04 I49's condition changed.
+    return interior + (contentHeight(block, w, measureChild) > interior ? 1 : 0);
   },
 
   /** One per child, at block level — which is what makes C04 I47's refusal expressible. */
   elements(block: Scroll, width: number, measureChild: MeasureFn): readonly NavElement[] {
     const w = normaliseWidth(width);
+    // **A block declaring a collapsed form carries the toggle on every element**
+    // (C04 I98). Declared by presence: a scroll without the field has no fold
+    // and no affordance. The target is the block, because `expand`'s dispatcher
+    // searches rows first and blocks second (C04 §3c S5).
+    const activate =
+      block.collapsed === undefined
+        ? {}
+        : {
+            activate: Object.freeze({
+              kind: "expand" as const,
+              label: block.collapsed ? "expand" : "collapse",
+              target: block.id,
+            }),
+          };
     return Object.freeze(
       childRanges(block, w, measureChild).map((r) =>
         Object.freeze({
@@ -288,6 +325,7 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
           level: "block" as const,
           rows: Object.freeze({ from: r.from, to: r.to }),
           cols: Object.freeze({ from: 0, to: w }),
+          ...activate,
           // **A child with no `copy` makes `y` a silent no-op** (C26 I17).
           // `copyElement` filters undefined and empty out and returns early on
           // an empty result, so a container whose elements carried none was a
@@ -325,12 +363,13 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
 
   render(block: Scroll, ctx: RenderContext): ReactElement {
     const width = normaliseWidth(ctx.width);
+    const interior = interiorOf(block);
     const content = contentHeight(block, width, ctx.measureChild);
     const offset = offsetOf(block, ctx, content);
     const g = glyphs(ctx.capabilities);
 
     const ranges = childRanges(block, width, ctx.measureChild);
-    const shown = ranges.filter((r) => r.to > offset && r.from < offset + block.height);
+    const shown = ranges.filter((r) => r.to > offset && r.from < offset + interior);
 
     const children: ReactElement[] = shown.map((r) =>
       createElement(
@@ -344,9 +383,9 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
     // **The residue, both directions** (C04 I49). A settled container keeps the
     // offset it had, so content is hidden above as well as below — and a
     // bounded region that says neither is the empty-block class (F123).
-    if (content > block.height) {
+    if (content > interior) {
       const above = offset;
-      const below = Math.max(0, content - block.height - offset);
+      const below = Math.max(0, content - interior - offset);
       const dim = tone("dim", ctx.theme, ctx.capabilities);
       // **The separator is a comma and not a middle dot.** The first version
       // used one and C09 T4.4 caught it under unicode:"ascii" -- a literal
@@ -399,7 +438,7 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
     // class, and the remedy is a seam rather than a clip.
     const drawn = shown.reduce((n, r) => n + ctx.measureChild(r.child, width), 0);
     const pads = Array.from(
-      { length: Math.max(0, block.height - drawn) }, // cells-ok — a row count, not a width
+      { length: Math.max(0, interior - drawn) }, // cells-ok — a row count, not a width
       (_unused, i) => createElement(Text, { key: `pad-${String(i)}` }, " "),
     );
 

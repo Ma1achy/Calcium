@@ -44,8 +44,10 @@ const results = await runPass({
   run,
   control: {
     file: CONSTRUCT,
-    from: "    stores.scrollOffsets.nudge(entryId, block.id, direction * Math.max(1, height - 1));",
-    to: "    stores.scrollOffsets.nudge(entryId, block.id, -direction * Math.max(1, height - 1));",
+    // Re-anchored 2026-09-05 when the caller began passing the box (C04 I97,
+    // F770); the mutation is the same inversion and was run rather than trusted.
+    from: "    stores.scrollOffsets.nudge(entryId, block.id, direction * Math.max(1, height - 1), scrollBox(block));",
+    to: "    stores.scrollOffsets.nudge(entryId, block.id, -direction * Math.max(1, height - 1), scrollBox(block));",
     why: "T4.41 asserts paging moves the window and coming back returns it; a run where inverting the direction survives cannot see a frame",
   },
   mutations: [

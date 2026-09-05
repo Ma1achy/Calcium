@@ -1400,8 +1400,24 @@ export async function constructGraph(
     // One row of overlap, which is what lets a reader join two screens — and
     // a floor of one, so a box of a single row still moves.
     const height = built.blocks.measure(block, deps.frame.overlayRegion().width);
-    stores.scrollOffsets.nudge(entryId, block.id, direction * Math.max(1, height - 1));
+    stores.scrollOffsets.nudge(entryId, block.id, direction * Math.max(1, height - 1), scrollBox(block));
     scheduler.commit("input");
+  };
+
+  /**
+   * The box a scroll's offset is clamped against (C04 I97, §3c T2/T3/T7).
+   *
+   * The store spells *following* as `TAIL` and cannot resolve it — it does not
+   * know the width — so the caller who measured the content hands over the
+   * ceiling, and whether the block asked to follow. Without it `⇞` on a followed
+   * box is `∞ + δ`, a no-op (Lane B's T7). The sum is `childRanges`'s: every child
+   * of a scroll gets the full width, and `gapBefore` is not counted.
+   */
+  const scrollBox = (block: Block): { ceiling: number; follow?: boolean } | undefined => {
+    if (block.kind !== "scroll") return undefined;
+    const width = deps.frame.overlayRegion().width;
+    const content = block.children.reduce((n, c) => n + built.blocks.measure(c, width), 0);
+    return { ceiling: Math.max(0, content - block.height), follow: block.follow === true };
   };
 
   /**
@@ -1432,7 +1448,9 @@ export async function constructGraph(
    * anchoring reason `blockIn` gives.
    */
   const nudgeScroll = (entryId: EntryId, blockId: string, rows: number): void => {
-    stores.scrollOffsets.nudge(entryId, blockId, rows);
+    const entry = stores.transcript.entries.find((e) => e.id === entryId);
+    const block = entry === undefined ? null : blockIn(entry, blockId);
+    stores.scrollOffsets.nudge(entryId, blockId, rows, block === null ? undefined : scrollBox(block));
     scheduler.commit("input");
   };
 
@@ -1803,19 +1821,21 @@ export async function constructGraph(
     }
 
     // Recorded rather than absorbed: a second button has no key equal yet, and
-    // a modified click is the obvious next row (a shift-click extending), not
-    // a silent synonym for this one.
-    if (e.button !== "button0" || e.shift || e.meta || e.ctrl) return null;
+    // a `meta`- or `ctrl`-modified click has no `⇧↓`-shaped state to reach.
+    if (e.button !== "button0" || e.meta || e.ctrl) return null;
     const under = elementAt(hit, e.col);
     if (under === null) return null;
     const address = Object.freeze({ blockId: under.blockId, elementId: under.element.id });
     const at = focus.current;
     const inHitEntry = at.at === "liveBlock" && focusedEntryId() === hit.id;
 
-    if (e.motion) {
-      // A drag extends within the focused entry and nowhere else: the anchor
-      // shares the entry by construction (C26 §4g), and `extendRow`'s own
-      // entry-change arm is eviction's, so it is not what enforces this.
+    if (e.motion || e.shift) {
+      // A drag and a shift-click are both `⇧↓` (C16 §4a): the head lands on the
+      // element under the pointer and the anchor is placed on the first
+      // extension, so click `a` then shift-click `c` selects `a..c`. Within the
+      // focused entry and nowhere else — the anchor shares the entry by
+      // construction (C26 §4g), and **this guard is the whole of what enforces
+      // it**: `extendRow` trusts its callers with the entry (F764).
       return inHitEntry ? () => focus.extendRow(hit.id, address) : null;
     }
     const onFocused =

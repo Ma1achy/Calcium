@@ -1577,6 +1577,10 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   // that field would be a second place the projection is chosen, which is the
   // reason the entry was written with rather than a date.
   "Basis.orthographic": "project() picks the arm, and a second reader of this field would be a second place the projection is chosen",
+  // The tool-call card's streamed body (`AGENT_TUI_DESIGN.md` §9c). `toolCallDoc` reads
+  // it into a follow scroll and its consumer is `examples/agent`, which is at step 0 —
+  // the same expiry as `UNCONSUMED_FUNCTIONS.toolCallDoc`. 2026-09-05, Lane B.
+  "ToolCallSpec.output": "read by toolCallDoc into a follow scroll (C04 I97); the caller is the agent example, not yet built — remove with the toolCallDoc entry",
 
   // **`Skin` is `Basis`'s shape one carrier along**, and the same reading
   // applies: a record whose fields exist for one function, exported because
@@ -2865,6 +2869,14 @@ export const UNCONSUMED_FUNCTIONS = Object.freeze({
     "C12 — `definition.ts` computes `areaWidth` inline across a three-rung ladder with " +
     "`MIN_AREA`, and this helper states the simple case. Two expressions of one width, " +
     "and the helper is the one no renderer calls. C12's to reconcile",
+  // **The tool-call card** (`AGENT_TUI_DESIGN.md` §9c), built as a composition
+  // in `documents.ts` and verified against four frames (T2.48) — its consumer is
+  // the agent example, and agent-tui is stopped at step 0. The expiry is a
+  // symbol: the day `examples/agent` (or any `src/` route) calls `toolCallDoc`,
+  // the equality arm refuses this entry. 2026-09-05, Lane B.
+  toolCallDoc:
+    "C23 §9c's card — a producer whose consumer is `examples/agent`, which does not exist " +
+    "yet; verified against the frame rather than a caller. Remove on the first `src/` call",
 });
 
 /**

@@ -15,7 +15,15 @@
  * **Restored by no resume** (C13 I20): a resumed transcript's entries are
  * settled, and a settled container keeps the offset it had *within a session*
  * and starts a new one at zero. There is nothing here to persist.
+ *
+ * **`TAIL` is a value this store holds and never interprets** (C04 I97). It is
+ * `∞`, so the renderer's clamp at read resolves it to whatever the ceiling is
+ * *this* frame — which is how a following box stays at the bottom as its
+ * content grows with nothing written here on a patch. The store cannot resolve
+ * it itself for the reason it cannot clamp: it does not know the width.
  */
+import { atTail, TAIL } from "./tail.js";
+
 export class ScrollOffsets {
   readonly #byEntry = new Map<string, Map<string, number>>();
 
@@ -47,10 +55,41 @@ export class ScrollOffsets {
    * does not know the width, so it cannot know the content's height, and a
    * clamp taken against a guess is worse than one taken where the number is
    * known (§3c cell 4). Paging past the end leaves a value the renderer bounds.
+   *
+   * **With a `box`, the tail is a position and not a flag** (C04 I97, C14 I5).
+   * The caller holds the block and measured its content, so it hands over the
+   * ceiling — `content − height` — and whether the block opens at its tail. A
+   * held value at or past the ceiling (`TAIL` included) is resolved to it
+   * before the move, and a result at or past it is written back as `TAIL`, so a
+   * reader who pages to the bottom follows and one who pages up stops,
+   * **derived from where the box ended up and never from which way they went**.
+   *
+   * **`follow` is the default for a block nothing has touched, and the walk's
+   * own first draft got it wrong.** The store holds nothing for an untouched
+   * box and the renderer opens a follow box at its tail (C04 I97), so a page up
+   * from that state has to start from the tail the field implies and not from
+   * the `0` an absent entry reads as — or the first `⇞` on a streaming box
+   * jumps to its top. The store does not know the block; the caller does.
+   *
+   * Without a `box`, `TAIL` stays `TAIL` (`∞ + δ`), which degrades to *still
+   * following* rather than to a wrong position — C04 §3c T7, for the two
+   * callers that pass none yet.
    */
-  nudge(entryId: string, blockId: string, delta: number): void {
+  nudge(
+    entryId: string,
+    blockId: string,
+    delta: number,
+    box?: Readonly<{ ceiling: number; follow?: boolean }>,
+  ): void {
     const held = this.#byEntry.get(entryId) ?? new Map<string, number>();
-    held.set(blockId, Math.max(0, (held.get(blockId) ?? 0) + delta));
+    if (box === undefined) {
+      held.set(blockId, Math.max(0, (held.get(blockId) ?? 0) + delta));
+    } else {
+      const current = held.get(blockId) ?? (box.follow === true ? TAIL : 0);
+      const from = atTail(current, box.ceiling) ? box.ceiling : current;
+      const next = Math.max(0, from + delta);
+      held.set(blockId, atTail(next, box.ceiling) ? TAIL : next);
+    }
     this.#byEntry.set(entryId, held);
   }
 

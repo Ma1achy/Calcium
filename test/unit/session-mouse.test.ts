@@ -36,6 +36,12 @@ import { addr } from "../support/focus.js";
 
 type Mouse = Extract<InputEvent, { kind: "mouse" }>;
 
+/** A bare key press, for the rows that read a selection back through `y` or leave with `Esc`. */
+const press = (name: string): InputEvent => ({
+  kind: "key",
+  key: { name, ctrl: false, meta: false, shift: false, sequence: name },
+});
+
 /** A press at a terminal (row, col); `over` sets the fields a drag or a release differ in. */
 const mouse = (row: number, col = 0, over: Partial<Mouse> = {}): InputEvent => ({
   kind: "mouse",
@@ -333,6 +339,32 @@ describe("C16 §4a — a drag is ⇧↓", () => {
     expect(graph.router.dispatch(mouse(term(3), 2, { motion: true }))).toBe(false);
     expect(graph.focus.current).toEqual({ at: "prompt" });
   });
+
+  it("T4.69 (C16 I31, §4a shift row; C26 I16): click a, shift-click c selects a, b and c; a shift-click on another entry is nothing", async () => {
+    const { graph, settled, live, term } = await twoEntries();
+
+    // **Which three**, not that three are selected: the anchor is `a1` and the
+    // head `c1`, so `y` would copy `a1..c1`. A shift-click that focused `c1`
+    // (the plain-click arm, shift ignored) leaves `anchor: null` and passes
+    // every containment assertion.
+    graph.router.dispatch(mouse(term(2), 2)); // click a1
+    expect(graph.router.dispatch(mouse(term(4), 2, { shift: true })), "consumed").toBe(true); // shift-click c1
+    expect(graph.focus.current).toEqual(AT(settled, "c1", "t1", addr("a1", "t1")));
+    graph.router.dispatch(press("y"));
+    expect(graph.editor.killBuffer, "the three, in order").toBe("alpha-1\nbeta-1\ngamma-1");
+
+    // The anchor shares the entry (C26 §4g): a shift-click on the live entry's
+    // row is not a head for it, unconsumed, and the selection keeps its head.
+    expect(graph.router.dispatch(mouse(term(7), 2, { shift: true }))).toBe(false);
+    expect(graph.focus.current, "unchanged").toEqual(AT(settled, "c1", "t1", addr("a1", "t1")));
+    expect(graph.focusedEntryId()).not.toBe(live);
+
+    // And from the prompt a shift-click is not a way in.
+    graph.router.dispatch(press("escape"));
+    expect(graph.focus.current).toEqual({ at: "prompt" });
+    expect(graph.router.dispatch(mouse(term(3), 2, { shift: true }))).toBe(false);
+    expect(graph.focus.current).toEqual({ at: "prompt" });
+  });
 });
 
 describe("C16 §4a — the wheel scrolls the box under it, or else the transcript", () => {
@@ -355,28 +387,34 @@ describe("C16 §4a — the wheel scrolls the box under it, or else the transcrip
 
   it("T4.66 (C16 I31, §4a trace 6; C04 I48): a wheel in the box moves the box; over prose it moves the transcript", async () => {
     const { graph, boxed } = await boxAndFiller();
-    const offset = (): number => graph.scrollOffsets.get(boxed, "s");
+    // **Resolved, not raw** (C04 I97, F770). Five children in a three-row window
+    // is a ceiling of 2, and a wheel step of 3 lands past it — which the store
+    // spells as `TAIL = ∞`, resolved against the ceiling at read. The raw value
+    // was asserted here until the caller began passing the box; `3` was the
+    // unclamped write, which no frame ever showed.
+    const CEILING = BOX.children.length - BOX.height;
+    const offset = (): number => Math.min(graph.scrollOffsets.get(boxed, "s"), CEILING);
     const top = (): number => graph.viewport.scroll.topRow;
     expect([offset(), top()]).toEqual([0, 0]);
 
     // Terminal row 3 is box row 1 (region row 2, block row 1).
     expect(graph.router.dispatch(mouse(3, 2, { button: "wheelDown" }))).toBe(true);
-    expect([offset(), top()], "the box moved by the wheel step and the transcript did not").toEqual([3, 0]);
+    expect([offset(), top()], "the box moved to its ceiling and the transcript did not").toEqual([CEILING, 0]);
     expect(graph.focus.current, "focus does not move (C26 I18)").toEqual({ at: "prompt" });
 
     // Over the filler's prose (terminal row 12): the transcript moves, the box does not.
     expect(graph.router.dispatch(mouse(12, 2, { button: "wheelDown" }))).toBe(true);
-    expect([offset(), top()]).toEqual([3, 3]);
+    expect([offset(), top()]).toEqual([CEILING, 3]);
 
     // The residue row (terminal row 5) is not the box: the transcript again.
     graph.viewport.scrollToTop();
     expect(graph.router.dispatch(mouse(5, 2, { button: "wheelDown" }))).toBe(true);
-    expect([offset(), top()]).toEqual([3, 3]);
+    expect([offset(), top()]).toEqual([CEILING, 3]);
 
     // A horizontal wheel over the box does nothing at all (row j).
     graph.viewport.scrollToTop();
     expect(graph.router.dispatch(mouse(3, 2, { button: "wheelLeft" }))).toBe(false);
-    expect([offset(), top()]).toEqual([3, 0]);
+    expect([offset(), top()]).toEqual([CEILING, 0]);
   });
 
   it("T4.66b (C16 I31, §4a row c; C26 I3): inside a scrolled box the pointer is at boxRow + offset", async () => {
@@ -404,15 +442,16 @@ describe("C16 §4a — the wheel scrolls the box under it, or else the transcrip
 });
 
 describe("C16 §4a — chrome, the release and the other buttons", () => {
-  it("T4.67 (C16 I31, §4a trace 8): a click on the prompt row returns to the prompt; a release or a second button moves nothing", async () => {
+  it("T4.67 (C16 I31, §4a trace 8): a click on the prompt row returns to the prompt; a release, a second button or a ctrl-click moves nothing", async () => {
     const { graph, settled, term } = await twoEntries();
     graph.router.dispatch(mouse(term(3), 2));
     expect(graph.focus.current).toEqual(AT(settled, "b1", "t1"));
 
-    // A release over another element, then a middle button, then a shift-click.
+    // A release over another element, then a middle button, then a ctrl-click.
+    // (A shift-click here is `⇧↓` since C16 §4a's shift row — T4.69.)
     expect(graph.router.dispatch(mouse(term(2), 2, { press: false }))).toBe(false);
     expect(graph.router.dispatch(mouse(term(2), 2, { button: "button1" }))).toBe(false);
-    expect(graph.router.dispatch(mouse(term(2), 2, { shift: true }))).toBe(false);
+    expect(graph.router.dispatch(mouse(term(2), 2, { ctrl: true }))).toBe(false);
     expect(graph.focus.current, "none of the three is a gesture in the table").toEqual(AT(settled, "b1", "t1"));
 
     // The harness's region is rows 1–20; row 21 is the prompt, which is chrome.

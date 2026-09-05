@@ -1352,7 +1352,7 @@ function mosaic(
 function scroll(
   height: number,
   children: readonly Block[],
-  opts?: BlockOpts,
+  opts?: BlockOpts & { follow?: boolean; collapsed?: boolean },
 ): Scroll {
   if (!Number.isInteger(height) || height < 1) {
     throw new TypeError(
@@ -1365,8 +1365,18 @@ function scroll(
         "so an empty one is a container nobody can aim (C04 I47)",
     );
   }
+  // **`follow` opens the box at its tail and `collapsed` declares a fold by its
+  // presence** (C04 I97, C04 I98). Spread only when given: `collapsed: undefined`
+  // would still be a key, and *declared by presence* is what the renderer reads.
   return finish<Scroll>(
-    { kind: "scroll", id: idOf(opts, "scroll"), height, children } as Scroll,
+    {
+      kind: "scroll",
+      id: idOf(opts, "scroll"),
+      height,
+      children,
+      ...(opts?.follow === undefined ? {} : { follow: opts.follow }),
+      ...(opts?.collapsed === undefined ? {} : { collapsed: opts.collapsed }),
+    } as Scroll,
     opts,
     false,
   );

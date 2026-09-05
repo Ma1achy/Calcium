@@ -237,7 +237,14 @@ export type Glyph =
    * different submission's entry. C09 §4 names the two blocks in the position
    * and the two that look as though they are.
    */
-  | "continuation";
+  | "continuation"
+  /**
+   * A step in a sequence of work — a tool call's header (C09 §4,
+   * `AGENT_TUI_DESIGN.md` §9c). A *position in a sequence* and not a state, so
+   * it does not change as the step runs or settles; `running` is the state.
+   * U+23FA is `East_Asian_Width=Neutral`, one cell under both conventions.
+   */
+  | "step";
 
 /** The tones that oblige a glyph (I6, D29). */
 export const GLYPH_REQUIRED_TONES: ReadonlySet<Tone> = new Set<Tone>(["error", "warn"]);
@@ -2851,6 +2858,27 @@ export type Scroll = Readonly<{
    * live here rather than in the renderer (§3c cell 5).
    */
   children: readonly Block[];
+  /**
+   * Open at the tail, because the content grows at its end (I97).
+   *
+   * **A producer's field, and the one thing about position a producer may
+   * say.** `lineRange`, `minHeight` and `capped` describe the *view* and are
+   * refused (I82); this describes the content. Whether the reader is still at
+   * the tail is the store's — derived from where the box ended up, never from
+   * which way they scrolled (C14 I5's rule, one level down) — and `measure`
+   * never sees it: the box is `height` rows following or not.
+   */
+  follow?: boolean;
+  /**
+   * A collapsed form, declared by the field's presence (I98).
+   *
+   * Collapsed, the box has zero interior rows and draws its residue row alone —
+   * *⋯ 0 above, N below*, the design's *+N more* sharing I49's mechanism — and
+   * every element carries the `expand` action that toggles it. The toggle is a
+   * shell-origin `replace` with the flag inverted, never `op: "expand"`, whose
+   * arm names a row.
+   */
+  collapsed?: boolean;
 }> & Gap & Floor;
 
 /**

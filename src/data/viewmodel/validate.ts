@@ -85,7 +85,7 @@ const GLYPH_MEMBERS = {
   working: true, running: true, queued: true, cancelled: true,
   expand: true, collapse: true, live: true, bullet: true,
   quote: true, nested: true,
-  continuation: true,
+  continuation: true, step: true,
 } satisfies Record<Glyph, true>;
 
 const GLYPHS: ReadonlySet<Glyph> = new Set(Object.keys(GLYPH_MEMBERS) as Glyph[]);
@@ -1353,6 +1353,19 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
       e.push(
         `${at}: "height" must be a positive integer (C04 I47) — got ${JSON.stringify(height)}; ` +
           `a box of zero rows shows nothing and has no reading to fall back on`,
+      );
+    }
+    // **Present-or-boolean, for both** (C04 I97, I98). `collapsed` is declared by
+    // presence, so a non-boolean value would declare a collapsed form and then
+    // fail to say which state it is in.
+    if (b["follow"] !== undefined && typeof b["follow"] !== "boolean") {
+      e.push(
+        `${at}: "follow" must be a boolean when present (C04 I97) — got ${JSON.stringify(b["follow"])}`,
+      );
+    }
+    if (b["collapsed"] !== undefined && typeof b["collapsed"] !== "boolean") {
+      e.push(
+        `${at}: "collapsed" must be a boolean when present (C04 I98) — got ${JSON.stringify(b["collapsed"])}`,
       );
     }
   },
