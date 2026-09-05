@@ -190,11 +190,22 @@ tracking, every pointer move reported — in the slot 1002 occupies, with 1006 b
 released in the same order (`1006l` then `1003l`). xterm's *ctlseqs* lists 9, 1000, 1002 and 1003 as
 values that each *select* the terminal's one mouse-tracking mode, so a terminal holding 1003 has nothing
 1002 could add, and a release emitting `1002l` after `1003l` would be leaving a mode never entered —
-`held` says `mouse` either way and I6's lookup emits the pair that was taken. **Measured against
-ctlseqs and no emulator** — the container has none, which is how C16 §2 records the bit layout too —
-and owed under `HOVER_MODE_PAIR`: which emulators, if any, need 1002 *and* 1003 to report both drags
-and rests. The default is 1002, byte for byte what shipped, and `capabilities.mouse` false takes neither
-(I10).
+`held` says `mouse` either way and I6's lookup emits the pair that was taken. **Measured on xterm 398
+under Xvfb, 2026-09-05 (F808)** — the reference implementation of the document the paragraph above
+cites, driven by XTEST with a typed key in every capture as the control:
+
+| taken | a rest (motion, no button) | a drag | after the release |
+|---|---|---|---|
+| `1003h` alone | `<35;C;RM` per cell | `<32;C;RM` per cell, `<0…M`/`<0…m` around it | — |
+| `1002h` alone | nothing | as above | — |
+| `1002h` then `1003h`, then `1003l` | 1003's | 1003's | **nothing** — 1002 is not left behind |
+| `1003h` then `1002h`, then `1002l` | 1002's | 1002's | **nothing** — 1003 is not restored |
+
+One tracking mode, the later select wins, and either release clears it, so `1003l` alone is the
+whole release and a `1002l` after it would address a mode the terminal is not in. That answers
+`HOVER_MODE_PAIR` for xterm; Ghostty, kitty, WezTerm and iTerm2 are unmeasured and the claim for
+them rests on their documented adherence to the same document. The default is 1002, byte for byte
+what shipped, and `capabilities.mouse` false takes neither (I10).
 
 The scroll region is not acquired at startup. It is taken and released transactionally by C03 only if scroll-region acceleration is ever built (M-T6), and `held` tracks it the same way.
 

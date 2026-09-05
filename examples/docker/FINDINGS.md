@@ -28804,6 +28804,8 @@ template for `tools/enforce/` edits.
 
 - `toolCallHeader` renders `name(args)` unconditionally, so `/ps` reads `⏺ ps()`. Whether the parens drop for empty args is a grammar decision that also touches the agent card (`list_dir()`), so it is not taken here. Symbol: `toolCallHeader` in `src/shell/documents.ts`.
 
+
+**Closed 2026-09-05.** Ruled in C23 §3 and commitment 48: a bare verb is a bare header — `⏺ ps · 2s`, never `⏺ ps()` — because a parenthesis says *these are the arguments* and empty it says so about nothing. `toolCallHeader` carries the ruling for the shell's card and the agent's alike; T4.46, with T4.43 as the control that keeps its parentheses; one mutation in `c23-running-card.mjs`.
 ---
 
 ## F796 — the command row and the header say one thing twice (ruled, not fixed) ★☆☆☆☆
@@ -28866,6 +28868,8 @@ beside it, and a release of `1002l` after `1003l` would be undoing a mode never 
 **Owed** under `HOVER_MODE_PAIR`: an emulator measurement (kitty, WezTerm, Ghostty, iTerm2) that 1003
 alone reports drags *and* rests. C01 §5 records both the claim and its source.
 
+
+**Measured 2026-09-05, on xterm** — see F808. One tracking mode, the later select wins, either release clears it. The other four emulators stay unmeasured and named.
 ---
 
 ## F801 — the C16 session-mouse rows T4.62–T4.71 are declared in no spec ★★☆☆☆
@@ -28907,6 +28911,8 @@ focused plot; `orbit-wiring.test.ts` reads render counts, not ink). Symbol: `res
 
 **Fixed in the lead tail, the same round.** `reserving` tests `focus.rowId === block.id`; T1.25 constructs the session's form and holds `rowId: null` as a control that paints nothing; C26 §7's paragraph is marked landed. The catalogue has no plot-focus scene, so nothing there moved. A session-level frame row for a focused plot is still the one thing owed — `orbit-wiring.test.ts` counts renders and reads no ink.
 
+
+**The residue closed 2026-09-05.** T4.30 (`plot-focus-frame.test.ts`) reads the lid from a `buildSession` screen: muted with focus at the prompt, accent after `↓`. The first row about this frame that constructs nothing by hand.
 ---
 
 ## F803 — at 1-bit a focused `plot3d` is invisible: its frame carries a colour and no weight ★★☆☆☆
@@ -28925,6 +28931,8 @@ is `undefined` at 1-bit for `muted` and `accent` alike — there is nothing for 
 1-bit row; goes red the day the 3-D frame gains a weight channel. Not built: a `Style` channel
 through the three arms is a larger cut than a focus tone warrants on its own.
 
+
+**Closed 2026-09-05.** `Frame.ink` and `frameInkAt` carry a `Style` a cell rather than a `ColourValue`, so at 1-bit `muted` is dim and focus turns the frame bold — F34's rule reaching the 3-D frame. The data raster keeps a colour a sample and the labels keep the colour channel; the half arm has a colour floor and the question does not arise there. T1.27's 1-bit row inverted from *pinned invisible* to the F34 form; mutation `PLOT3D-COLOUR-ONLY` restores the shipped shape and dies on it.
 ---
 
 ## F804 — `SCROLL_PEEK` guarded a state that cannot occur ★★★☆☆
@@ -29017,5 +29025,55 @@ that crashes, and the asymmetry the Makefile records stays.
 gate-not-run note, unchanged since it was written. It is in `all` now, after `e2e`, about a minute.
 
 **Where**: `tools/proof.sh` `install_example`; `Makefile` `all`.
+
+---
+
+## F808 — the mouse-mode pair, measured on the reference emulator — and the probe that captured nothing until `timeout` was told to stay in the foreground ★★★☆☆
+
+*2026-09-05 · the lead, closing the arc's owed list, at c8a02357.*
+
+**The question** (`HOVER_MODE_PAIR`, C01 §5, F800): does any terminal need 1002 *and* 1003 to report
+both drags and rests, and does releasing 1003 leave 1002 in force? Lane H answered from *ctlseqs* alone
+because the container had no emulator. It has Xvfb and xdotool, and `apt-get install xterm` gives it
+the emulator whose author wrote the document.
+
+**The instrument was wrong first, and every case reported zero bytes** — the two that should have and
+the two that were the question. `timeout 3 cat > file` inside the xterm puts `cat` in its own process
+group, and a background group reading its controlling terminal stops on `SIGTTIN`; the capture never
+read a byte, and *no mouse report* is the same zero as *no reader*. Two diagnostics went to X — the
+pointer over "no window", keys reaching nothing — before the process group was suspected.
+`timeout --foreground` fixed all four at once. So the probe types a `k` into every capture, and a
+capture without it is a broken probe rather than a quiet terminal.
+
+**Measured, xterm 398, 80×24, XTEST-driven: three rests, a press, two drag motions, a release, a key.**
+
+| taken | rest | drag | after the mid-capture release |
+|---|---|---|---|
+| `1003h` | `<35;C;RM` ×3 | `<0;C;RM` `<32;C;RM` ×2 `<0;C;Rm` | — |
+| `1002h` | none | same | — |
+| `1002h` `1003h` … `1003l` | ×3 | same | **only `k`** |
+| `1003h` `1002h` … `1002l` | none | same | **only `k`** |
+
+One mouse-tracking mode: the later select wins, either release clears it, nothing is restored. C01 §5's
+release order (`1006l` then `1003l`, no `1002l`) is what the reference does; a `1002l` after would
+address a mode the terminal is not in. The bits are as C16 §2 states them — `35` is `32 + 3`, motion
+with no button; `32` a drag; `0` press and release — so the decoder's `button: "none"` (C16 I30) now has
+an emulator behind it. **Unmeasured and named**: Ghostty, kitty, WezTerm, iTerm2.
+
+The probe, for the next question of this kind (run in the devcontainer; `Xvfb :99` up, `DISPLAY=:99`):
+
+```sh
+# inner.sh — runs inside the xterm; $1 enable, $2 mid-capture change, $3 disable, $4 name
+stty raw -echo; printf "$1"
+timeout --foreground 3 cat > /tmp/hp/$4-a.bin; printf "$2"
+timeout --foreground 3 cat > /tmp/hp/$4-b.bin; printf "$3"
+# driver: xterm -geometry 80x24+0+0 -e bash inner.sh ENABLE MID DISABLE NAME &
+#   W=$(xdotool search --onlyvisible --class xterm | tail -1)
+#   xdotool mousemove --window $W 100 100 … 160 100   (rests)
+#   xdotool mousedown 1; mousemove … 240 100; mouseup 1 (a drag)
+#   xdotool type k                                       (the control)
+```
+
+**Where**: C01 §5; C16 §2; F800.
 
 ---

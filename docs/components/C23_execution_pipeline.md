@@ -181,7 +181,9 @@ The guard is checked **before the pending entry is appended**, so a refused subm
 
 **Step 3's document is `toolCallDoc`** (I54; `AGENT_TUI_DESIGN.md` §9c). One block — a `step`
 notice reading `⏺ verb(args)`, the tool being the manifest verb and the args the rest of the
-resolved argv (§18 of the design: *the tools are the manifest*) — so the header is the far side's
+resolved argv (§18 of the design: *the tools are the manifest*), **or the bare `⏺ verb` when the
+argv has nothing after the tool** (F795, ruled 2026-09-05: a parenthesis says *these are the
+arguments*, and empty it says so about nothing; `⏺ ps · 2s`, never `⏺ ps()`) — so the header is the far side's
 call where the command row above it is the user's line, and the two agree here by construction
 where in an agent transcript they would not. **Measured 2026-09-05, and the sentence above was
 false until this ruling**: the pending document was `compose({ blocks: [] })`, nothing outside
@@ -1029,7 +1031,7 @@ Per submission.
 45. An elapsed counter advances in the transcript while a first fetch is in flight, and stops writing when the figure would not change, when nobody is looking, and when the block it was armed for is gone (I52).
 46. A `view` target resolves at any depth inside its own entry and no wider, and the two sites that resolve it — the open and the live re-read behind every motion — move together (I31).
 47. A pending entry's elapsed readout advances once a second while the entry runs, on the one wake every readout shares, and stops moving when the entry settles (I53).
-48. A running verb is a card — `⏺ verb(args)` counting in whole seconds under the command row — from before the transport starts until it settles; a queued one is bare until its turn; a stream's final header carries its exit code, a cancelled one says so, and a listing's settled document has no header at all (I54).
+48. A running verb is a card — `⏺ verb(args)`, or the bare `⏺ verb` with no arguments, counting in whole seconds under the command row — from before the transport starts until it settles; a queued one is bare until its turn; a stream's final header carries its exit code, a cancelled one says so, and a listing's settled document has no header at all (I54).
 
 ---
 
@@ -1796,6 +1798,8 @@ Fake transport, fake stores.
 - **T4.42** (I54, with C16): Ctrl-C on a running stream → the header reads `· Ns · cancelled` and the entry is settled; a later wake changes nothing.
 - **T4.43** (I54): the invoke route → the card is on screen while the transport runs and the settled document is the adapter's, with no `step` block in it.
 - **T4.44** (I54, I25, with §3b): two minutes of silence → `no output for 2m` is the card's last row, under the streamed body, while the header goes on counting; a patch replaces it with `resumed after 2m` in place; `end` settles with the header's final figure above both.
+- **T4.45** (I54): the four frames — running, stalled, resumed, settled — rendered in colour and read; the `⎿` hook and its column are the same on the stall row and on the record that replaces it (F789).
+- **T4.46** (I54; F795): `/ps` with nothing after the verb → the header reads `ps`, then `ps · 2s`; T4.43 one row up is the control, where `ps(--quiet)` keeps its parentheses.
 - **T4.9** (with C14): appending while the viewport is detached does not move it (C14 I4, from this side).
 - **T4.12** (I36, entry 16 R1): the question opens on the choice marked `default`, not on the first. **A safety defect, and every navigation assertion agrees with the wrong answer** — arrows move, `⏎` resolves, accelerators fire, and a destructive verb's confirm sits on `yes`. Read from the frame: the claim is which row carries the marker.
 - **T4.13** (C09 I22, F122, entry 16 A5): the choices are a **block**, so the marker is a slot L1 resolves and no glyph is written at L4. Asserted on the ASCII rendering rather than on the type, because a file that stopped taking the capability and still spelled `•` would compile and would draw `•` on a `LANG=C` terminal.

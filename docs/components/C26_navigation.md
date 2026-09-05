@@ -1019,7 +1019,9 @@ each kind names which:
   its own tone keeps it (C12 I98 wins over focus, because a tone is data). The frame is
   `scatter3.ts`'s and not `furniture.ts`'s, so `Layout.focused` cannot carry it; the arm reads
   `ctx.focus` at the one place its frame ink is chosen. Measured before: a focused `plot3d` with
-  a camera and a focus naming it — zero rows differ at 60 columns.
+  a camera and a focus naming it — zero rows differ at 60 columns. At 1-bit the frame goes dim to
+  bold as the 2-D frame does (F34), since the frame cell carries a `Style` — F803, closed the day
+  it was filed; T1.27's 1-bit row is that arm.
 - **`notice`** — with an `action` (C04), the whole notice: glyph and text go `accent` over the
   selection ground, the `pills` head's rule and for the `pills` head's reason — `accent` is a
   legal notice `tone`, so `accent` alone would draw a focused `info` notice as an unfocused
@@ -1528,6 +1530,10 @@ where it is owed, rather than being given an invariant it would make vacuous.
 
 Named against the invariants; the tiers are the six.
 
+- **T4.30** (I21, §7; C12 I85; F802) — **the frame from a session, not from `renderToLines`.** `/plot` with a
+  camera, then `↓` from the prompt: the lid read from the screen's bytes is `muted` before and `accent`
+  after. Every earlier row about a focused plot built its own `FocusState`, and the one the session
+  writes was a different shape for three weeks while all of them were green.
 - **T1.x** (I4, I5, I6) — the four predicates, per kind, as a **generic conformance sweep**
   over every kind declaring `elements`. The shape is C09's window conformance: it walks every
   fixture rather than asserting one, because a single-element row passes against a wrong

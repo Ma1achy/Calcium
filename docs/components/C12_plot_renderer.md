@@ -8013,7 +8013,11 @@ do, and an axis carrying its own tone keeps it — I98's per-axis ink is data an
 the axis tone wins the cell. Two inks rather than one flag, because `overlay` takes the label ink
 as an argument and the callback takes the line ink, and they were one variable only while both
 were `muted`. The focus the session writes is `{ blockId, rowId: blockId }` — the element's id is
-the block's (`elements()` above) — and that is the form this arm tests for.
+the block's (`elements()` above) — and that is the form this arm tests for. **And the frame cell
+carries the `Style`, not only its colour** (F803, closed 2026-09-05): `frameInkAt` holds `slot(...)`
+whole, so at 1-bit `muted` is dim and focus turns the frame bold — F34's rule reaching the 3-D frame
+as it already reached the 2-D one. The data raster keeps a `ColourValue` a sample and the labels keep
+the colour channel alone, both as before.
 
 **C26 §4a's table gains a row rather than being corrected in passing** — *the only kind
 declaring `elements`* was true when it was written and this is what stops it being true.
