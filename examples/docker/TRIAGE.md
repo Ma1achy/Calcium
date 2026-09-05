@@ -35,11 +35,11 @@ type change.
 | **4** | [A change axis distinct from `Tone`](#4) | 4 | **4 open** | ⚠ C04 · C09 · C10 | real Calcium work · needs a ruling |
 | **5** | [The far side's shape is not the framework's contract](#5) | 10 | **2 open** | ⚠ C05 | mostly app-side · one shim |
 | **6** | [Rendered from data that has since moved](#6) | 2 | **2 open** | ⚠ C04 | real Calcium work |
-| **7** | [An artefact describes the world rather than being checked against it](#7) | 104 | **20** | — | artefact discipline — **no code**, and F164 is the first found by an instrument's *population* step rather than by a reader; **F210 is the first where the artefact is a component's own spec and the thing it contradicts is a shipped frame**, and **F233 the first where what it contradicts is a *fix*** — four present-tense statements of a repaired defect, in the two components the repair did not touch |
+| **7** | [An artefact describes the world rather than being checked against it](#7) | 106 | **20** | — | artefact discipline — **no code**, and F164 is the first found by an instrument's *population* step rather than by a reader; **F210 is the first where the artefact is a component's own spec and the thing it contradicts is a shipped frame**, and **F233 the first where what it contradicts is a *fix*** — four present-tense statements of a repaired defect, in the two components the repair did not touch |
 | **8** | [Absence indistinguishable from failure](#8) | 28 | **7 open** (7 closed) | partly | real Calcium work · **7 of 10 fixed** — F151 is the class F35 closed in the half an app-side test cannot reach, and **F167 is the class arriving in a *value*: a validator agreeing twice about two different documents** |
 | **9** | [**The instrument was wrong**](#9) | 99 | **17** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
 | **10** | [**A claim carried without a record**](#10) | 66 | **11** | — | **new at F80** · method — six findings disproved, and **F166 unblocked an entry while F168 found what the same row was silent about**; F184 is the first where the unrecorded claim was a *rule* rather than a fact, governing thirty forms from a parameter's doc comment |
-| **11** | [A gate that passes without checking](#11) | 239 | **16** | — | **105 closed · 117 open** of 223 keyed — the heading was out by 66 and this row's count column by 1, which cannot be corrected alone (§11) · four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
+| **11** | [A gate that passes without checking](#11) | 244 | **16** | — | **105 closed · 117 open** of 223 keyed — the heading was out by 66 and this row's count column by 1, which cannot be corrected alone (§11) · four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
 | **12** | [**A time-based assertion under contention**](#12) | 4 | **3** | — | **new at F80** · Calcium's own suite |
 | **13** | [Text the framework emits](#13) | 4 | **4** | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
 | **14** | [A constant, a channel or a rule that outlived its configuration](#14) | 26 | **13 open** | ⚠ C12 | **new at F492** · real Calcium work — every member reads as deliberate, which is why review found none of them |
@@ -538,6 +538,10 @@ answer is a frame-read that cannot be wrong. **Read the ladder before choosing t
 **F757** — the mouse table had no modality gate; *wheel goes to C14 regardless* lost to entry-first; C26 §6's click-to-activate refused — click-again is `⏎` on the state click reached
 
 **F760** — bit 8 is xterm's Meta and kitty's Super; a lone `⇧` needs flag 8 the design did not name — same cell on and off, chosen and stated
+
+**F763** — the alignment exported and read by both consumers; `entryAtRow`'s end guard measured dead and removed
+
+**F765** — the record said copy mode was a stub and the tree had shipped it; the real defect — `Esc` dropped on a frozen screen — ruled and landed; B7 still open, a C17 `collapse()` owed
 
 <a id="8"></a>
 
@@ -1437,6 +1441,16 @@ reads goes through the entry point a user has.
 **F759** — the PTY fixture forced the record for the renderer and re-detected for the lifecycle — first capture had no push; `make(caps)`
 
 **F761** — a plot copied nothing; ruled TSV over 38 of 48 forms and omitted for the 10 with no series; `mosaic` gains its corpus and an exact row
+
+**F762** — `elementsIn` reset every child to its **container's** top — two tables in a column group had elements overlapping exactly, and every block-level sweep passed because the defect was in the lift. Fixed with the column origin; gutter measured 1
+
+**F764** — a stopped `↓` collapsed a selection and a stale anchor widened `y` to rows never selected — both from the walk before the code; the transcript's selection is painted nowhere
+
+**F766** — T4.32's tail was a length the tracking bytes satisfied with no frame behind it; a tier-5 frame equality included a clock in row 0
+
+**F767** — the mouse through a PTY — 155 bytes re-addressing one row, 0 under the control; two guards over one condition recorded as the expected survivor
+
+**F768** — a mutation run file ran five mutations, restored the tree and printed **nothing** — `report(results);` built and dropped; exit 0 with no witness. The harness's control pair guards a pass that cannot see a kill, not one that sees and says nothing. A tail check over every run file owed
 
 <a id="12"></a>
 

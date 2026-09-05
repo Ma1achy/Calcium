@@ -28183,3 +28183,158 @@ pinned.
 `test/contract/navigation-mosaic.test.ts`.
 
 ---
+
+## F762 — `elementsIn` reset every child to its container's top — two tables in a column group had elements that overlapped exactly, and every block-level sweep passed ★★★★☆
+
+*2026-09-05 · the lead, closing arc2 (the follow-ups, the selection ruling, copy mode and the PTY mouse), at bd93056e+arc2.*
+
+**Expected**: a table inside a `panel` answers its rows where the frame draws them; two tables in a
+`column` group occupy successive rows.
+
+**Measured** by probe against `renderToLines` before any code: panel `[a]` at 80 — element `r1` at
+`rows [1, 2)`, the frame draws it at **row 2, column 1**; column group `[a, b]` at 40 — `b/r1` at
+`rows [1, 2)`, the frame at **row 4**, and both tables' `r1` shared `rows [1, 2) × cols [0, 40)`. The
+walk did `row = before` for every child of every container — written for side-by-side children and
+applied to sequences too. **Every list passed C26 §5's four predicates block by block** (T2.16), because
+the sweep runs `elementsOf` and the defect was in the lift. A click on a panelled table focused the row
+**below** the pointer; nothing in the tree had clicked inside a panel. Also: `gapBefore` on a row-group
+child added a row the renderer ignores; children past `placeable` were walked at width 4. **Fixed** with
+F756's column origin in one rewrite — `place(block, top, left, width)` with the painter's own origins
+(`insetWidth`, `childWidths` + `ROW_GUTTER`, `mosaicRects`); the second table in an 80-column row group
+answers `cols [40, 79)`, gutter measured at **1**, not the brief's assumed 2. T2.29–T2.31, T4.62d; six
+mutations each killing named rows. The `mosaic` premise of the brief had no subject — it owns its
+elements and was already right.
+
+**Where**: `src/presentation/blocks/registry.ts` `elementsIn`; C09 §2; C26 §5 predicate 1.
+
+---
+
+## F763 — the alignment is one exported function now, and `entryAtRow`'s end guard was dead ★★☆☆☆
+
+*2026-09-05 · the lead, closing arc2 (the follow-ups, the selection ruling, copy mode and the PTY mouse), at bd93056e+arc2.*
+
+`paint.ts` exports `blankRowsAbove(regionHeight, rows)`; the composer and `construct.ts`'s
+`entryAtRegionRow` read it — they had agreed by being the same expression (F755). Byte-identical output:
+407 of 407 goldens, tree clean. C14 §2 says *above* now, with the translation named; I19 gains the
+one-translation sentence; T2.11/T2.12/T3.1b/T3.1c written against the viewport directly, asserting which
+entry and which offset. **One mutation survived honestly**: removing `absolute >= totalRows` from
+`entryAtRow` fails nothing — `locate` past the end yields `index === entries.length` and the
+`undefined` check already answers `null`. A dead guard, not a weak test; **removed** with the
+measurement in its place.
+
+**Where**: `src/shell/paint.ts`, `src/shell/construct.ts`, `src/viewport/viewport/viewport.ts`; C14 §2, I19.
+
+---
+
+## F764 — a stopped `↓` collapsed a selection, and a stale anchor widened a copy to rows never selected — both found by the walk before the code ★★★★☆
+
+*2026-09-05 · the lead, closing arc2 (the follow-ups, the selection ruling, copy mode and the PTY mouse), at bd93056e+arc2.*
+
+**Selection ruled** (C26 §5c, I16): within an entry; `selectAllElements` (`⌃a` at `liveBlock`, measured
+free) is per entry; cross-entry copy out, with the consumer that would reverse it named (a transcript
+export, which belongs to copy mode or an `/export` verb). Two amendments the walk forced, each
+measured first:
+
+- **`↓ ⇧↓ ↓ y` copied two rows.** `rowDown` at the tail returned before `focusRow`, so the stop left the
+  selection standing — while C17's `move` nulls its anchor before testing the boundary. I16's *same
+  two halves fail the same two ways* was false, and `⌃a` makes it the very next keystroke (head at the
+  tail). Fixed in `rowDown`/`rowUp`.
+- **Anchor `b1`, head `c1`, far-side `replace` drops `b1`: `y` copied `alpha-1⏎gamma-1`** — `alpha-1`
+  was never selected. `copyElement` resolved the anchor through `resolveFocus`, whose stale arm lands
+  on the block's *first* element. A stale head is right (it falls where focus is highlighted); a gone
+  middle shrinks correctly; a gone **anchor** now collapses to the head.
+
+The sentinel cell: the prose's `anchor === element` was C17's number comparison; the store's is
+`anchor: null`, and nothing in `src/` compares addresses — a one-element `⌃a` is indistinguishable from
+no selection to `y`, `↓`, `⇧↓`. Ruled: no branch on the count; I16 reworded. **Owed**: the first `⇧↓`
+after an eviction drops the anchor instead of placing it (`extendRowDown/Up` should `focusRow` the
+fallen element first; then `extendRow`'s entry-changed arm loses its caller) — T3.53 is `it.fails` and
+goes red the day it lands. **Recorded**: the transcript's selection is **painted nowhere** —
+`FocusState` has `blockId` and `rowId` only; `y` is the extent's only reader. C09/C11's field.
+
+**Where**: `src/shell/keys.ts` `rowDown`/`rowUp`/`copyElement`/`selectAllElements`; C26 §5c, §6, I16.
+
+---
+
+## F765 — the record said copy mode was a stub; the tree had shipped it, and `Esc` in the mode was dropped on a frozen screen ★★★★☆
+
+*2026-09-05 · the lead, closing arc2 (the follow-ups, the selection ruling, copy mode and the PTY mouse), at bd93056e+arc2.*
+
+**Expected** (the lead's survey, two briefs): *copy mode is enterable and not leavable — `exitCopyMode`
+is `() => undefined`*.
+
+**Measured**: `session.ts:930` `#setCopyMode` ships both halves in the right order — enter commits,
+flushes, suspends, then drops tracking; exit takes tracking back **first**, then resumes; `⌥v` binds
+`enterCopyMode` at `prompt` and `liveBlock`. The `() => undefined` lives in test harnesses'
+`FrameQueries` only. C16 B1/B4/B7 said *stubbed* — the record lagging the tree — and a survey read the
+harness. Corrected with the measurement. **Then the real defect**: `Esc` in copy mode was **dropped** —
+the rung declines, no `global` `escape` row, zero bytes written on a frozen screen (measured live:
+`expected '' to contain '[?1002h…'`). I24's *a second mechanism* objection was true of a `global` row
+and was attached to a `copyMode` one, which resolves at the same moment the rung does. **Ruled**
+(C16 §5c): `Esc` exits; `⌃c` stays the ladder's — the `pushedView` pair. Landed by the lead: the
+`KeyAction`, the row, the effect, the supplier — **and a `copyMode` handler in `construct.ts`**, because the
+router registers only its own `⌃c` rung for that target and a keymap row there was bound and never
+consulted (`pushedView` has had both all along; the request's three lines left T4.68 red until the
+fourth landed); T4.68 flipped from `it.fails`; the `KeyAction` comment
+that said *entry only* retired with the reason. **Still open, B7**: nothing clears `Editor.selection`
+on entry and C17 has no member that collapses a region without moving the caret — owed as a C17
+`collapse()`.
+
+**Where**: C16 §5b/§5c, I24; `src/interaction/router/{types,keymap}.ts`; `src/shell/{keys,construct}.ts`.
+
+---
+
+## F766 — T4.32's tail was a proxy the tracking bytes satisfied, and a tier-5 frame equality included a clock ★★★☆☆
+
+*2026-09-05 · the lead, closing arc2 (the follow-ups, the selection ruling, copy mode and the PTY mouse), at bd93056e+arc2.*
+
+**Two rows that agreed with the wrong tree.** (1) Deleting `resume()` from copy mode's exit was
+expected to fail T4.32; T4.31, T4.31b and T4.32b died and **T4.32 passed** — its tail asserted
+`stdout.output.length > held.length`, which `setMouseTracking(true)`'s `1002h 1006h` satisfies with no
+frame behind it and `COPY` still in the header. Now reads the frame; all four die. (2) T5.6's
+whole-frame equality died under the *wheel* mutation once and not again: row 0 is chrome carrying
+`HH:MM:SS`, repainted by the click's frame against a baseline a second older. T5.6 and T5.8 compare
+from row 1. *The failing set under load is not stable* — and here the instability had a mechanism.
+
+**Where**: `test/integration/session.test.ts` T4.32; `test/e2e/mouse.test.ts` T5.6/T5.8; C22 T6.92.
+
+---
+
+## F767 — the mouse through a PTY: bytes in, one row re-addressed out, and nothing under a control ★★★☆☆
+
+*2026-09-05 · the lead, closing arc2 (the follow-ups, the selection ruling, copy mode and the PTY mouse), at bd93056e+arc2.*
+
+Tier 5, `test/e2e/mouse.test.ts`. First capture with `mouse` forced on: `1002h` at byte 22, `1006h` at
+30 — the fixture responds before anything is asserted (F759's lesson). Click
+`\e[<0;5;18M\e[<0;5;18m` on the first entry's second row → a **155-byte** reply re-addressing exactly
+one row (`\e[18;1H`), tone 216 where rows 16/20/21 keep 188. Wheel over prose scrolls by `WHEEL_ROWS`.
+**Control**, `FORCE_MOUSE=0`: first capture has no `1002h`/`1006h`; the same bytes → **0-byte** reply,
+every row identical. One expected survivor recorded: dropping the decoder's `capabilities.mouse` gate
+alone fails nothing, because `routeMouse` gates on the same record — two guards over one condition
+(T6.9h). And `mouseEnabled` reads the record, not the held set, so in copy mode bytes from a
+non-conforming terminal would still route — unreachable from a conforming one; C16 §5c C6.
+
+**Where**: `test/e2e/mouse.test.ts` T5.6–T5.8; `test/support/fixture.mjs` `FORCE_MOUSE`.
+
+---
+
+## F768 — a mutation run file executed five mutations, restored the tree, and printed nothing ★★★☆☆
+
+*2026-09-05 · the lead, closing arc2, at bd93056e+arc2.*
+
+**Expected**: `node tools/mutate/runs/c26-select-all.mjs` reports its kills and exits non-zero on a survivor.
+
+**Measured**: a zero-byte log, exit 0, in under a second — twice. The file's last line was
+`report(results);` — the string built and dropped, no `console.log`, no `process.exit`. So the pass
+**did** run: five mutations applied against the suite and restored (anchors clean afterwards), and
+nothing was written down. Exit 0 with no witness is the same bit as a clean pass, and a lead reading
+`EXIT=0` off a loop of four run files would have counted it — *read a green gate's counters* found it
+only because the log was opened. The harness's own control pair cannot reach this: it guards a pass
+that cannot see a kill, not a pass that sees one and says nothing. Fixed to the working form; re-run,
+four of four caught (T3.46, T3.49, T3.50, T3.47). **Owed**: `tools/mutate/anchors.mjs` already walks
+every run file — a check that each ends by printing its report and exiting on survivors would close
+the class, and today three of fourteen run files this arc would have been its corpus.
+
+**Where**: `tools/mutate/runs/c26-select-all.mjs`; `tools/mutate/anchors.mjs`.
+
+---
