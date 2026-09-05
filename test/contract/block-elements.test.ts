@@ -5,8 +5,9 @@
 // any of them held the one kind that declared a window. *An invariant is vacuous
 // until its subject exists, and a check that cannot find what it was asked about
 // passes exactly like one that is satisfied* (A03 §2, SS26). So the corpus here
-// is `TABLE_CORPUS` — `table` is the only kind declaring `elements` — and the
-// vacuity guard is asserted before the property.
+// is `TABLE_CORPUS` — `table` was the only kind declaring `elements` when this
+// was written; `pills` and `mosaic` have their own files and `plot`'s copy is the
+// last `describe` here — and the vacuity guard is asserted before the property.
 //
 // **Four fabrications, one per predicate**, because the generic sweep is the
 // whole value of the seam and a sweep nobody has watched fail is a sweep nobody
@@ -22,7 +23,11 @@ import { describe, expect, it } from "vitest";
 import { checkElements, formatElementReport } from "../../src/testing/navigation-conformance.js";
 import type { NavigableRegistry } from "../../src/testing/navigation-conformance.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
-import { TABLE_CORPUS, tableOf } from "../support/blocks.js";
+import { plotDefinition } from "../../src/presentation/plot/index.js";
+import { PLOT_CORPUS, TABLE_CORPUS, tableOf } from "../support/blocks.js";
+import { ALL_FORMS, ONE_PER_FORM } from "../support/plot-forms.js";
+import { buildGraph } from "../support/session.js";
+import type { InputEvent, Key } from "../../src/interaction/router/types.js";
 import { measurable } from "../support/render.js";
 import { block } from "../../src/data/viewmodel/index.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
@@ -232,5 +237,103 @@ describe("C26 §8b — what the three walks could not do", () => {
       new Set(found.map((f) => `${f.blockId}/${f.element.id}`)).size,
       "and the (block, element) pair does not",
     ).toBe(found.length);
+  });
+});
+
+describe("C26 §5c — a plot's `copy` is its series (C12 I85)", () => {
+  // **Measured before the rule**: `plot` declared one element with no `copy`, and
+  // `copyElement` filters `undefined` and returns early — so `y` on a focused
+  // line plot did nothing and said nothing. The empty-block class `containers.ts`
+  // closed for its children, one kind along.
+  const plotNav = (): NavigableRegistry =>
+    measurable({ definitions: [tableDefinition, plotDefinition] }).registry as unknown as NavigableRegistry;
+
+  it("T2.25 (C12 I85, C26 I17): every element a plot with series declares carries a copy, and none without", () => {
+    const r = plotNav();
+    const corpus = [...PLOT_CORPUS, ...ALL_FORMS.map((f) => ONE_PER_FORM[f])].filter(
+      (b): b is Block & { kind: "plot" } => b.kind === "plot",
+    );
+    let declared = 0;
+    let withSeries = 0;
+    for (const b of corpus) {
+      for (const width of [20, 80]) {
+        for (const e of r.elementsOf(b, width)) {
+          declared += 1;
+          if (b.series.length > 0) { // cells-ok — a series count
+            withSeries += 1;
+            expect(e.copy, `${b.id} @${String(width)} has series, so it has a copy`).toBeDefined();
+            expect(e.copy, `${b.id} @${String(width)} copies something`).not.toBe("");
+          } else {
+            expect("copy" in e, `${b.id} @${String(width)}: no series, no member`).toBe(false);
+          }
+        }
+      }
+    }
+    // **The subject, before the claim** — seven cursorable forms and the line
+    // corpus declare, so an empty sweep here would be a corpus that lost `plot`.
+    expect(declared, "elements were actually walked").toBeGreaterThan(20);
+    expect(withSeries, "and the ones with series were among them").toBeGreaterThan(20);
+
+    // **The camera arm, both ways.** `plot3d` is the one form that declares an
+    // element and carries no `series` — its data is `points3` — so the omission
+    // has a subject; a line plot with a camera keeps its copy.
+    const orbiting = block({ ...ONE_PER_FORM.plot3d, id: "orbit", camera: {} });
+    const e3 = r.elementsOf(orbiting, 80);
+    expect(e3, "the camera declares the element").toHaveLength(1);
+    expect("copy" in (e3[0] ?? {}), "and a plot3d has no flat shape to copy").toBe(false);
+    const turned = block({ ...ONE_PER_FORM.line, id: "turned", camera: {} });
+    expect(r.elementsOf(turned, 80)[0]?.copy).toBeDefined();
+  });
+
+  it("T2.26 (C12 I85): a two-series line copies as TSV — header, one row per index, blank where shorter or a gap", () => {
+    const r = plotNav();
+    const two = block({
+      kind: "plot",
+      id: "two",
+      form: "line",
+      height: 5,
+      axes: true,
+      series: [
+        { label: "loss", values: [1, 2.5, 3] },
+        { label: "val", values: [4, null] },
+      ],
+    });
+    const at80 = r.elementsOf(two, 80);
+    expect(at80).toHaveLength(1);
+    expect(at80[0]?.copy).toBe("loss\tval\n1\t4\n2.5\t\n3\t");
+    // **Source, never rendering**: the same text at a width where the frame
+    // cannot hold every sample as a separate column.
+    expect(r.elementsOf(two, 20)[0]?.copy).toBe(at80[0]?.copy);
+
+    // The header's default is the legend's own, not a blank.
+    const unlabelled = block({ ...two, id: "u", series: [{ values: [7] }, { label: "b", values: [8] }] });
+    expect(r.elementsOf(unlabelled, 80)[0]?.copy).toBe("series 1\tb\n7\t8");
+  });
+
+  it("T3.49 (C26 I17, C12 I85): `y` on a focused plot lands its series in the one clipboard", async () => {
+    // **The reader's side of the defect.** Before the member existed this
+    // sequence left the kill buffer empty and the frame unchanged — a no-op no
+    // frame assertion could see.
+    const key = (name: string): Key => ({ name, ctrl: false, meta: false, shift: false, sequence: name });
+    const press = (name: string): InputEvent => ({ kind: "key", key: key(name) });
+    const { graph } = await buildGraph();
+    graph.transcript.append({
+      schema: "tui.view/1",
+      command: "/plot",
+      status: "ok",
+      blocks: [
+        { kind: "plot", id: "p", form: "line", height: 5, axes: true, series: [{ label: "train", values: [1, 2] }] },
+      ],
+      meta: {
+        verb: "plot", adapter: "passthrough", exitCode: 0, durationMs: 0, truncated: false,
+        argv: [], stderr: "", transport: "local", origin: "user",
+      },
+    } as never);
+    graph.router.dispatch(press("down"));
+    expect(graph.focus.current.at, "↓ lands on the plot").toBe("liveBlock");
+    graph.router.dispatch(press("y"));
+    graph.router.dispatch(press("escape"));
+    graph.editor.yank();
+    expect(graph.editor.text).toBe("train\n1\n2");
   });
 });

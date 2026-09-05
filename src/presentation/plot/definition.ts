@@ -3200,14 +3200,50 @@ const CURSORABLE_FORMS: ReadonlySet<Plot["form"]> = new Set<Plot["form"]>([
  */
 function elements(block: Plot, width: number, measureChild: MeasureFn): readonly NavElement[] {
   if (block.camera === undefined && !cursorable(block)) return NO_ELEMENTS;
+  const copy = seriesCopyText(block.series);
   return [
     Object.freeze({
       id: block.id,
       level: "block" as const,
       rows: Object.freeze({ from: 0, to: measureChild(block, width) }),
       cols: Object.freeze({ from: 0, to: width }),
+      // **Absent rather than `undefined`**, so the member reads as the ruling it
+      // is — a `plot3d` is a place to stand — and `"copy" in e` answers it.
+      ...(copy === undefined ? {} : { copy }),
     }),
   ];
+}
+
+/**
+ * What `y` copies from a plot: **its series, tab-separated** (I85, C26 I17).
+ *
+ * **Source, never rendering.** A header of series labels — the legend's own
+ * default `series N` where one has none — then one row per sample index with
+ * each series' value as the block holds it, `""` where a series is shorter or
+ * holds a gap. No units, no colours, no axis furniture: the same text at 20
+ * columns and at 200. Tab-separated because a table row's `copy` already is
+ * (`rowCopyText`), so one paste convention serves both kinds.
+ *
+ * **`undefined` where `series` is empty.** Ten of forty-eight forms carry their
+ * data elsewhere and only `plot3d` among them can declare an element (through a
+ * camera); its three carriers have no one flat shape, and a shape invented here
+ * would be a second serialisation of a figure this component already draws.
+ * `copyElement` filters an undefined `copy`, which is also what made the
+ * missing member silent: `y` did nothing and said nothing.
+ */
+function seriesCopyText(series: readonly Series[]): string | undefined {
+  if (series.length === 0) return undefined; // cells-ok — a series count
+  const header = series.map((s, i) => s.label ?? `series ${String(i + 1)}`).join("\t");
+  const longest = Math.max(...series.map((s) => s.values.length)); // cells-ok — a sample count
+  const rows = Array.from({ length: longest }, (_, j) =>
+    series
+      .map((s) => {
+        const v = s.values[j];
+        return v === undefined || v === null || !Number.isFinite(v) ? "" : String(v);
+      })
+      .join("\t"),
+  );
+  return [header, ...rows].join("\n");
 }
 
 const NO_ELEMENTS: readonly NavElement[] = Object.freeze([]);
