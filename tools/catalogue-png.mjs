@@ -51,7 +51,7 @@
  *
  *     node tools/catalogue-png.mjs
  */
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import sharp from "sharp";
 import { defaultTheme, loadTheme } from "../src/presentation/theme/index.js";
@@ -486,7 +486,7 @@ export async function pngFromSvg(svg, density = 144) {
  * `removeAlpha`: dropping the channel would leave every antialiased edge
  * blended against nothing.
  */
-export async function gifFrom(pages, delays, file) {
+export async function gifFrom(pages, delays, file, comment) {
   const metas = await Promise.all(pages.map((buf) => sharp(buf).metadata()));
   const w = Math.max(...metas.map((m) => m.width ?? 0));
   const h = Math.max(...metas.map((m) => m.height ?? 0));
@@ -516,7 +516,85 @@ export async function gifFrom(pages, delays, file) {
   })
     .gif({ delay: [...delays], loop: 0 })
     .toFile(file);
+  if (comment !== undefined) writeFileSync(file, withGifComment(readFileSync(file), comment));
   return { width: w, height: h, pages: pages.length, channels };
+}
+
+/** The end of a run of data sub-blocks starting at `i`: past the zero terminator. */
+function pastSubBlocks(bytes, i) {
+  while (i < bytes.length && bytes[i] !== 0x00) i += 1 + bytes[i];
+  return i + 1;
+}
+
+/**
+ * Every top-level block of a GIF after its header, logical screen descriptor
+ * and global colour table: `{ at, kind, end }`, with `kind` the introducer
+ * (`0x21` extension, `0x2c` image, `0x3b` trailer) and `label` for extensions.
+ */
+function* gifBlocks(bytes) {
+  if (bytes.subarray(0, 3).toString("latin1") !== "GIF") throw new Error("not a GIF");
+  const packed = bytes[10];
+  let at = 13 + ((packed & 0x80) === 0 ? 0 : 3 * (1 << ((packed & 0x07) + 1)));
+  while (at < bytes.length) {
+    const kind = bytes[at];
+    if (kind === 0x3b) {
+      yield { at, kind, end: at + 1 };
+      return;
+    }
+    if (kind === 0x21) {
+      const end = pastSubBlocks(bytes, at + 2);
+      yield { at, kind, label: bytes[at + 1], end };
+      at = end;
+    } else if (kind === 0x2c) {
+      const local = bytes[at + 9];
+      const table = (local & 0x80) === 0 ? 0 : 3 * (1 << ((local & 0x07) + 1));
+      const end = pastSubBlocks(bytes, at + 10 + table + 1);
+      yield { at, kind, end };
+      at = end;
+    } else {
+      throw new Error(`unknown GIF block 0x${kind.toString(16)} at ${String(at)}`);
+    }
+  }
+}
+
+/**
+ * The same GIF with a Comment Extension (`21 FE`, sub-blocks of at most 255
+ * bytes, a zero terminator) inserted ahead of the trailer.
+ *
+ * **What it is for: a fact about the frames, carried by the file that shows
+ * them** (F820). The pixels are the rasteriser's — fonts, hinting, the platform's
+ * antialiasing — and differ by host while the frames they draw do not. A reader
+ * who wants to know whether a committed GIF is current asks the comment, not
+ * the bytes. Every decoder skips a comment, so the picture is unchanged. It goes
+ * ahead of the trailer rather than ahead of the first image so that the bytes
+ * the encoder wrote are a prefix of the file — a reader comparing headers sees
+ * the same header.
+ */
+export function withGifComment(bytes, text) {
+  const body = Buffer.from(text, "utf8");
+  const blocks = [];
+  for (let i = 0; i < body.length; i += 255) {
+    const chunk = body.subarray(i, i + 255);
+    blocks.push(Buffer.from([chunk.length]), chunk);
+  }
+  let at = bytes.length;
+  for (const b of gifBlocks(bytes)) if (b.kind === 0x3b) at = b.at;
+  return Buffer.concat([bytes.subarray(0, at), Buffer.from([0x21, 0xfe]), ...blocks, Buffer.from([0x00]), bytes.subarray(at)]);
+}
+
+/** The first Comment Extension's text, or `null` when the file carries none. */
+export function gifComment(bytes) {
+  for (const b of gifBlocks(bytes)) {
+    if (b.kind !== 0x21 || b.label !== 0xfe) continue;
+    const parts = [];
+    let i = b.at + 2;
+    while (bytes[i] !== 0x00) {
+      parts.push(bytes.subarray(i + 1, i + 1 + bytes[i]));
+      i += 1 + bytes[i];
+    }
+    return Buffer.concat(parts).toString("utf8");
+  }
+  return null;
 }
 
 // --- main ---

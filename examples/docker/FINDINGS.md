@@ -29467,3 +29467,36 @@ unit tier rather than waiting for the next hand run.
 
 ---
 
+## F820 — AP12 compared bytes that belong to the host, and was green here and red on the runner for one commit ★★★☆☆
+
+**What happened.** AP12 (F819) encoded each cited subject afresh and compared the bytes with the
+committed `docs/media/*.gif`. It passed in the devcontainer on 0fb85699 and failed on the `fast`
+CI job for the same commit — `steps-before.gif in docs/media matches a fresh encode: expected
+false to be true`. Nothing in the tree had moved between the two runs.
+
+**Why.** The *frames* are deterministic — a pure function of `(block, width, ctx)` over a seeded
+generator, which AP7 asserts by generating twice. The *pixels* are not: `pngFromSvg` goes
+through `sharp`'s SVG rasteriser and the machine's fonts (`DejaVu Sans Mono` by name, with a
+fallback stack), and the runner's freetype does not antialias as the container's does. F819
+measured determinism on one host and wrote *the encoder is deterministic* — a true observation
+promoted to a general claim, and the claim was about the wrong layer.
+
+**What holds instead.** Every terminal-arm GIF now carries a GIF Comment Extension —
+`calcium-frames sha256=…` over its frames and delay — written by `gifFrom` ahead of the
+trailer, so the picture is unchanged and the file states what it was drawn from. AP12 reads the
+comment out of the committed file and compares it to `framesDigest` of the frames the tree
+generates now: no rasterising, no font, no host in the answer. AP13 is its control — a GIF
+written without a comment reads `null`, so a file that merely fails to carry one cannot pass
+by vacancy; the round trip; and the pixels of a noted file equal the bare file's page for page.
+
+**A second fact the control found.** libvips folds two identical consecutive frames into one
+page: two copies of one page in, `pages: 1` out, and reading page 1 fails with *bad page
+number*. The first fixture used two equal pages and blamed the comment. `fromAnsi` reports
+`distinct` from the frames rather than from the file, so the catalogue's figures are unaffected,
+but a subject whose consecutive frames repeat has fewer pages than frames.
+
+**Where**: `tools/catalogue-png.mjs` `gifFrom`, `withGifComment`, `gifComment`;
+`tools/animation-proof.mjs` `framesDigest`; `test/unit/animation-proof.test.ts` AP12, AP13.
+
+---
+

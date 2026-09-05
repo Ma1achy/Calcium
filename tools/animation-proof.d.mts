@@ -28,8 +28,8 @@ export declare function animationFrames(): Record<string, Subject>;
 export declare const SUBJECT_NAMES: readonly string[];
 /** The subjects also written into `MEDIA_DIR` for the READMEs (F819). */
 export declare const CITED_NAMES: readonly string[];
-/** Encode one terminal-arm subject to `file`, as the media copy is written. */
-export declare function encodeSubject(name: string, file: string): Promise<{ pages: number; width: number; height: number }>;
+/** The GIF comment a terminal subject carries — a SHA-256 over its frames and delay (F820). */
+export declare function framesDigest(frames: readonly string[], delayMs: number): string;
 
 export declare const ANIMATION_DIR: string;
 export declare const MEDIA_DIR: string;

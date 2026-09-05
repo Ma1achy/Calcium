@@ -23,7 +23,13 @@ export declare function gifFrom(
   pages: readonly Buffer[],
   delays: readonly number[],
   file: string,
+  comment?: string,
 ): Promise<Readonly<{ width: number; height: number; pages: number; channels: number }>>;
+
+/** The GIF with a Comment Extension carrying `text` ahead of its first image (F820). */
+export declare function withGifComment(bytes: Buffer, text: string): Buffer;
+/** The first Comment Extension's text, or `null` when there is none. */
+export declare function gifComment(bytes: Buffer): string | null;
 
 export declare function parseLine(raw: string): readonly unknown[];
 export declare function unparsedSgr(raw: string): readonly number[];

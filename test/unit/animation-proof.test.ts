@@ -20,9 +20,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import sharp from "sharp";
 
-import { animationFrames, barSheetArms, CITED_NAMES, encodeSubject, MEDIA_DIR, SUBJECT_NAMES } from "../../tools/animation-proof.mjs";
+import { animationFrames, barSheetArms, CITED_NAMES, framesDigest, MEDIA_DIR, SUBJECT_NAMES } from "../../tools/animation-proof.mjs";
 import { barStyleNames, spinnerSetNames } from "../../src/presentation/blocks/index.js";
-import { gifFrom } from "../../tools/catalogue-png.mjs";
+import { gifComment, gifFrom, withGifComment } from "../../tools/catalogue-png.mjs";
 
 const ESC = String.fromCharCode(27);
 const SGR = new RegExp(`${ESC}\\[[0-9;]*m`, "gu");
@@ -252,23 +252,66 @@ describe("tools/animation-proof.mjs — the frames it assembles", () => {
     expect(arms[2]).not.toContain("█");
   });
 
-  it("AP12: every cited GIF in docs/media is the generator's current bytes (F819)", async () => {
+  it("AP12: every cited GIF in docs/media carries the digest of the generator's current frames (F819, F820)", () => {
     // **The generator is the gate and the README is its consumer**, and nothing
     // compared the two: the committed `steps-*.gif` were 1 860 pixels stale for
-    // a week. The encoder is deterministic — regenerating twice gives identical
-    // bytes — which is what makes this a test rather than a habit.
-    const dir = mkdtempSync(join(tmpdir(), "calcium-cited-"));
+    // a week (F819).
+    //
+    // **The first version compared bytes to a fresh encode, and was green in the
+    // devcontainer and red on the runner for the same commit** (F820). The frames
+    // are deterministic; the pixels are the rasteriser's and the host's fonts.
+    // So the question is asked of the frames: the committed file carries their
+    // digest as a GIF comment, and this compares it to the digest of the frames
+    // the tree generates now. No rasterising, so no host in the answer.
+    const subjects = animationFrames();
+    for (const name of CITED_NAMES) {
+      const s = subjects[name];
+      expect(s, `${name} is a subject`).toBeDefined();
+      if (s === undefined) continue;
+      expect(
+        gifComment(readFileSync(join(MEDIA_DIR, `${name}.gif`))),
+        `${name}.gif in docs/media was encoded from the current frames — run tools/animation-proof.mjs`,
+      ).toBe(framesDigest(s.frames, s.delay));
+    }
+  });
+
+  it("AP13: the digest comment survives the file and changes the picture by nothing (F820)", async () => {
+    // **The control first**: a GIF the encoder wrote without a comment reads
+    // `null`, so a file that merely fails to carry one cannot pass AP12 as a
+    // vacuous match. Then the round trip, then the pixels — a comment that
+    // shifted the image would be a stale-detector that damaged what it guarded.
+    const dir = mkdtempSync(join(tmpdir(), "calcium-comment-"));
     try {
-      for (const name of CITED_NAMES) {
-        const fresh = join(dir, `${name}.gif`);
-        await encodeSubject(name, fresh);
-        expect(
-          readFileSync(fresh).equals(readFileSync(join(MEDIA_DIR, `${name}.gif`))),
-          `${name}.gif in docs/media matches a fresh encode — run tools/animation-proof.mjs`,
-        ).toBe(true);
+      // **Two different pages, because libvips folds identical consecutive
+      // frames into one page** — measured: two copies of one page in, `pages: 1`
+      // out, and reading page 1 fails with *bad page number*. A fixture of two
+      // equal frames would have blamed the comment for that.
+      const pages = await Promise.all(
+        ["#c81e3c", "#1e78c8"].map(
+          async (hex) => await sharp({ create: { width: 8, height: 4, channels: 4, background: hex } }).png().toBuffer(),
+        ),
+      );
+      const bare = join(dir, "bare.gif");
+      const noted = join(dir, "noted.gif");
+      await gifFrom(pages, [80, 80], bare);
+      const digest = framesDigest(["a", "b"], 80);
+      await gifFrom(pages, [80, 80], noted, digest);
+      expect(gifComment(readFileSync(bare)), "no comment reads as none").toBeNull();
+      expect(gifComment(readFileSync(noted))).toBe(digest);
+      // A long comment spans sub-blocks and comes back whole.
+      const long = "x".repeat(700);
+      expect(gifComment(withGifComment(readFileSync(bare), long))).toBe(long);
+      // The pixels: both files decode to the same raster, page for page.
+      for (const i of [0, 1]) {
+        const raw = async (f: string): Promise<Buffer> =>
+          await sharp(f, { page: i, pages: 1 }).removeAlpha().raw().toBuffer();
+        expect((await raw(noted)).equals(await raw(bare)), `page ${String(i)} unchanged`).toBe(true);
       }
+      // The frames, not the delay alone, are in the digest: a changed frame is a changed digest.
+      expect(framesDigest(["a", "c"], 80)).not.toBe(digest);
+      expect(framesDigest(["a", "b"], 90)).not.toBe(digest);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
-  }, 60_000);
+  });
 });

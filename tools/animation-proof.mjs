@@ -73,6 +73,7 @@
  * three status subjects rebuild only the context — and it is the difference the
  * cache measurement below is about.
  */
+import { createHash } from "node:crypto";
 import { mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -99,19 +100,26 @@ export const MEDIA_DIR = join(import.meta.dirname, "..", "docs", "media");
 /** The subjects a finding cites, so they are tracked as well as generated. */
 /**
  * The subjects the READMEs cite, written into `docs/media/` as well as the
- * catalogue. **AP12 compares the committed file to a fresh encode**, because the
- * encoder is deterministic and the committed `steps-*.gif` were a week stale
- * against the tree before anything looked (F819).
+ * catalogue. **AP12 compares the committed file's digest to the current frames'**
+ * — the committed `steps-*.gif` were a week stale against the tree before
+ * anything looked (F819).
+ *
+ * **It compared bytes first, and the bytes are the host's** (F820). The frames
+ * are deterministic; the *pixels* go through `sharp`'s SVG rasteriser and the
+ * machine's fonts, and the runner's freetype does not antialias as the
+ * container's does — AP12 was green in the devcontainer and red on CI for the
+ * same commit. So every terminal GIF carries `framesDigest` of what it draws as
+ * a GIF comment, and currency is a question about the frames, asked of the file.
  */
 export const CITED_NAMES = Object.freeze(["steps-before", "steps-after", "spinner-sets"]);
 const CITED = new Set(CITED_NAMES);
 
-/** One terminal-arm subject encoded to `file`, exactly as `writeAnimationProof` writes it. */
-export async function encodeSubject(name, file) {
-  const s = animationFrames()[name];
-  if (s === undefined || s.arm !== "terminal") throw new Error(`${name} is not a terminal-arm subject`);
-  const pages = await Promise.all(s.frames.map((ansi) => pngFromSvg(ansiToSvg(ansi), DENSITY)));
-  return await gifFrom(pages, s.frames.map(() => s.delay), file);
+/** The GIF comment a terminal subject carries: a SHA-256 over its frames and its delay. */
+export function framesDigest(frames, delayMs) {
+  const h = createHash("sha256");
+  h.update(String(delayMs));
+  for (const frame of frames) h.update("\u0000").update(frame);
+  return `calcium-frames sha256=${h.digest("hex")}`;
 }
 /** The bar-style sheet — a still, so not a subject; written beside the GIFs and cited from the notes. */
 export const BAR_SHEET = "bar-styles.png";
@@ -328,11 +336,12 @@ const STATUS_WIDTH = 52;
  */
 async function fromAnsi(name, frames, delayMs) {
   const pages = await Promise.all(frames.map((ansi) => pngFromSvg(ansiToSvg(ansi), DENSITY)));
-  const box = await gifFrom(pages, frames.map(() => delayMs), join(ANIMATION_DIR, `${name}.gif`));
+  const digest = framesDigest(frames, delayMs);
+  const box = await gifFrom(pages, frames.map(() => delayMs), join(ANIMATION_DIR, `${name}.gif`), digest);
   writeFileSync(join(ANIMATION_DIR, `${name}.txt`), `${frames[0]}\n`);
   // **The cited pair lands in the tracked directory too**, from the same pages,
   // so the committed file and the catalogue's cannot drift apart.
-  if (CITED.has(name)) await gifFrom(pages, frames.map(() => delayMs), join(MEDIA_DIR, `${name}.gif`));
+  if (CITED.has(name)) await gifFrom(pages, frames.map(() => delayMs), join(MEDIA_DIR, `${name}.gif`), digest);
   return { name, ...box, delayMs, distinct: new Set(frames).size, arm: "terminal" };
 }
 
