@@ -15,7 +15,7 @@ import type { Run } from "../../runs.js";
 import { runLines, runsOf, sliceRuns, wrapRuns } from "../../runs.js";
 import { NO_STYLE } from "../../theme/index.js";
 import { barStyle, glyphFor, glyphCells, glyphs } from "../glyphs.js";
-import { clampSpans, pad, paint, paintRuns, rows, tone, type Span } from "../paint.js";
+import { clampSpans, pad, paint, paintRuns, rows, selectionStyle, tone, type Span } from "../paint.js";
 import type { BlockDefinition, NavElement, RenderContext, Windowed } from "../types.js";
 
 /** Chips in a `pills` row are separated by two spaces — one is too close to read. */
@@ -437,15 +437,34 @@ export const pillsDefinition: BlockDefinition<Pills> = {
 
   render(block: Pills, ctx: RenderContext): ReactElement {
     const byLabel = new Map(block.chips.map((chip) => [stripControl(chip.label), chip]));
+    // **Focus, and it read `ctx.focus` nowhere before this** (C11 I14, F764's
+    // neighbour): a focused chip drew as an unfocused one in every frame, so a
+    // reader stepping through a `pills` row saw nothing move. The head is
+    // `accent` and a selected chip is `default` over the wash — the table's rule,
+    // one kind over. Chips are addressed by position (`chip-N`, `pillsElements`),
+    // so the counter below walks the lines in the order the elements were placed.
+    const head = ctx.focus !== null && ctx.focus.blockId === block.id ? ctx.focus.rowId : null;
+    const selected = new Set(
+      (ctx.focus?.selected ?? []).filter((s) => s.blockId === block.id).map((s) => s.rowId),
+    );
+    let index = 0; // cells-ok — a chip counter, not a width
 
     return rows(
       chipRows(block, ctx.width).map((line) => {
         const spans: Span[] = [];
         for (const text of line) {
           const chip = byLabel.get(text);
+          const id = `chip-${String(index)}`;
+          index += 1;
           const name = chip?.active === true ? "accent" : (chip?.tone ?? "muted");
           if (spans.length > 0) spans.push({ text: " ".repeat(CHIP_GAP) }); // cells-ok
-          spans.push({ text, style: tone(name, ctx.theme, ctx.capabilities) });
+          const style =
+            id === head
+              ? tone("accent", ctx.theme, ctx.capabilities)
+              : selected.has(id)
+                ? { ...tone("default", ctx.theme, ctx.capabilities), ...selectionStyle(ctx.theme, ctx.capabilities) }
+                : tone(name, ctx.theme, ctx.capabilities);
+          spans.push({ text, style });
         }
         // Clamped like every other row: a single chip wider than the terminal
         // would otherwise be wrapped by Ink into rows the measurer never

@@ -73,7 +73,7 @@ export function rowSpans(
   row: TableRow,
   plan: PlannedColumns,
   ctx: RenderContext,
-  options: Readonly<{ expandable: boolean; focused: boolean }>,
+  options: Readonly<{ expandable: boolean; focused: boolean; selected?: boolean }>,
 ): readonly Span[] {
   const byKey = new Map<string, ColumnDef>(block.columns.map((c) => [c.key, c]));
   const spans: Span[] = [];
@@ -139,7 +139,10 @@ export function rowSpans(
     // is the same claim at a finer grain — a row that kept it would read as two
     // things on the one occasion it must read as one. Attributes and a value
     // are not claims about the foreground and survive.
-    const textRuns = options.focused
+    // A selected row drops them the same way (I14): its ink is `default`, the
+    // one slot C10 §4b measured over the wash, and a span's own tone would be
+    // a second claim on the one occasion the row must read as one thing.
+    const textRuns = options.focused || options.selected === true
       ? spanned.map((run) => {
           if (run.tone === undefined) return run;
           const { tone: _focusTakesIt, ...rest } = run;
@@ -170,9 +173,15 @@ export function rowSpans(
     // else — no marker, no extra row, no width. `measure` receives no focus at
     // all (C04 §5), so a focused row that occupied a different number of cells
     // or rows would be I9 broken by whichever row the user happened to be on.
+    //
+    // **Selected is the same rule, one more state** (I14): `default` ink, and
+    // the caller lays the wash over the whole row. `focused` wins where both
+    // hold — the head is painted as the head.
     const style = options.focused
       ? tone("accent", ctx.theme, ctx.capabilities)
-      : tone(cell?.tone ?? "default", ctx.theme, ctx.capabilities);
+      : options.selected === true
+        ? tone("default", ctx.theme, ctx.capabilities)
+        : tone(cell?.tone ?? "default", ctx.theme, ctx.capabilities);
 
     // The end a cell truncates from is the surface's (C04 I30) — a path keeps its
     // filename, a config key its leaf, an image its tag. C11 reads the field and

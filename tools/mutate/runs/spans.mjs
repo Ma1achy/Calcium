@@ -149,9 +149,14 @@ const MUTATIONS = [
   },
   {
     // A focused row keeps its span tones: a `38` inside the accent run.
+    //
+    // **Re-anchored when the selection joined the condition** (C11 I14, arc3
+    // Lane A): the line gained `|| options.selected === true`, and the mutation
+    // is unchanged — the whole condition to `false`. C11 T1.23 is the row that
+    // sees the selected half; this one stays on the focused half.
     name: "a focused table row keeps a span's tone",
     file: CELLS,
-    from: "    const textRuns = options.focused\n      ? spanned.map((run) => {",
+    from: "    const textRuns = options.focused || options.selected === true\n      ? spanned.map((run) => {",
     to: "    const textRuns = false\n      ? spanned.map((run) => {",
     expect: "T3.66",
   },

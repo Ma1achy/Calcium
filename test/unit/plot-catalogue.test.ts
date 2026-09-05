@@ -616,12 +616,14 @@ describe("catalogue-png — the parser that failed silently", () => {
   });
 
   it("PC11 (F227): nothing in the catalogue emits an SGR code the parser drops", () => {
-    // **The watcher on the one arm deliberately not built.** `7m` has no
-    // producer — `Style.inverse` is written nowhere in `src/` — so an arm for it
-    // would be a mechanism with nothing to exercise it. A deferral naming a
-    // condition with nothing watching it is how a simplification outlives its
-    // excuse, so the condition is asserted here rather than described in a
-    // comment: the day a renderer emits inverse, this names the number.
+    // **This was the watcher on the one arm deliberately not built, and it paid
+    // out.** `7m` had *no producer — `Style.inverse` is written nowhere in
+    // `src/`* — so no arm was built and this row named the number the day one
+    // appeared. It appeared with arc3's interaction catalogue (the transcript's
+    // selection is reverse video at 1-bit, C11 I14), the 1-bit PNG showed no
+    // selection while the bytes carried one, and the arm landed in
+    // `catalogue-png.mjs`. The row stays: it is the same watcher over the next
+    // code nobody has built an arm for.
     const unknown = new Set<number>();
     let swept = 0;
     let withSgr = 0;

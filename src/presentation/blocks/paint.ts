@@ -146,6 +146,27 @@ export function withBackground(style: Style | undefined, surface: Style): Style 
 }
 
 /**
+ * The selection wash for a transcript element, or reverse video where there is
+ * no colour to wash with (C11 I14, C10 §4b).
+ *
+ * `surface.selection` is the editor's own slot, shared rather than copied: a
+ * selected row and a selected span mean the same thing — what `y` will copy —
+ * and one slot carries one meaning. **The 1-bit rung is `inverse`, not a
+ * mark**: `resolveBackground` answers `NO_STYLE` without colour, and a wash
+ * alone would fall straight from a background to nothing; an attribute
+ * survives the depth where a colour does not, and a gutter mark would cost a
+ * cell C11 I14 forbids. `shell/paint.ts`'s `selectionStyle` is this same
+ * ladder for the prompt, written first; it should import this one.
+ *
+ * Painted **over `tone.default`** and nothing else — the one ink C10 §4b has
+ * measured against this ground (`SELECTION_SLOTS`).
+ */
+export function selectionStyle(theme: ResolvedTheme, caps: TerminalCapabilities): Style {
+  const bg = background("surface.selection", theme, caps);
+  return bg.background === undefined ? { inverse: true } : bg;
+}
+
+/**
  * A run of blank cells whose **background is the datum** (C10 §4c, C12 I29).
  *
  * **A `Span` rather than a `Style`, and that is the whole guarantee.** C10 I21

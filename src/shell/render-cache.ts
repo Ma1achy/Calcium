@@ -80,14 +80,28 @@ type Slot = Readonly<{
  * a cache that misses on every frame while every assertion about correctness
  * still passes.
  */
-export function focusKey(focus: Readonly<{ blockId: string; rowId: string | null }> | null): string {
+export function focusKey(
+  focus: Readonly<{
+    blockId: string;
+    rowId: string | null;
+    selected?: readonly Readonly<{ blockId: string; rowId: string }>[];
+  }> | null,
+): string {
   if (focus === null) return "";
+  // **The extent is in the key** (I58, C26 I16). `⌃a` at the tail moves the
+  // anchor and not the head, so it is the one keystroke that changes what is
+  // painted while `(blockId, rowId)` stands still — and a key holding the head
+  // alone served the frame from before the selection. Every `⇧↓` moves the
+  // head, so every `⇧↓` moved the key by coincidence, which is why the axis
+  // was owed and unreported (§6c row 1a). Absent and `[]` key alike, because
+  // they draw alike.
+  const extent = (focus.selected ?? []).map((s) => `${s.blockId}\u0000${s.rowId}`).join("\u0001");
   // `\u0000` written as an escape and not as the byte. SS43 caught the literal,
   // which is the rule doing exactly what its message describes: the separator
   // read as a space in every editor and was a NUL. The *value* was right — it is
   // the separator C19's engine uses to join a source id to a context key, and it
   // cannot occur in a block or row id — and only the spelling was invisible.
-  return `${focus.blockId}\u0000${focus.rowId ?? ""}`;
+  return `${focus.blockId}\u0000${focus.rowId ?? ""}\u0000${extent}`;
 }
 
 export class RenderCache {

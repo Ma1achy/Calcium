@@ -23,7 +23,7 @@ import { Box, Text } from "ink";
 import { createElement, type ReactElement } from "react";
 import { atLeastOne, insetWidth, normaliseWidth, sequenceHeight } from "../../data/viewmodel/index.js";
 import type { MeasureFn, Table, TableRow } from "../../data/viewmodel/index.js";
-import { clampSpans, paint, tone } from "../blocks/paint.js";
+import { clampSpans, paint, selectionStyle, tone, type Span } from "../blocks/paint.js";
 import type { BlockDefinition, NavElement, RenderContext, Windowed } from "../blocks/types.js";
 import { emptySpans, headerSpans, rowSpans } from "./cells.js";
 import { detailBlocks, isExpandable } from "./detail.js";
@@ -227,6 +227,20 @@ export const tableDefinition: BlockDefinition<Table> = {
     const width = normaliseWidth(ctx.width);
     const plan = planColumns(block.columns, width);
     const focused = ctx.focus !== null && ctx.focus.blockId === block.id ? ctx.focus.rowId : null;
+    // **The extent is the entry's, kept to this block** (I14). The pairs are
+    // filtered by *their* block id and not gated on `ctx.focus.blockId`, because
+    // a selection whose head sits in a sibling block still names rows here —
+    // gating on the head would paint nothing in every block but one (T6.17).
+    const selected = new Set(
+      (ctx.focus?.selected ?? []).filter((s) => s.blockId === block.id).map((s) => s.rowId),
+    );
+    // The wash is applied to the whole row — gaps, marker and data runs alike —
+    // so a selected row reads as one thing, *selected* rather than *highlighted*
+    // (C22 §6e's own distinction for the prompt). The ink under it is `default`,
+    // decided in `rowSpans`; this adds the ground.
+    const wash = selectionStyle(ctx.theme, ctx.capabilities);
+    const washed = (spans: readonly Span[]): readonly Span[] =>
+      spans.map((s) => ({ ...s, style: { ...(s.style ?? {}), ...wash } }));
 
     const lines: ReactElement[] = [];
 
@@ -256,24 +270,19 @@ export const tableDefinition: BlockDefinition<Table> = {
     // not sort at all (I8, T1.13).
     for (const row of sortedRows(block)) {
       const expandable = isExpandable(row, plan);
+      const isHead = focused !== null && focused === row.id;
+      // **The head is never washed** — it keeps `accent`, which is what makes it
+      // distinguishable inside its own extent, and what makes a one-element
+      // extent draw exactly as no selection with no branch on the count (I14).
+      const isSelected = !isHead && selected.has(row.id);
+      const spans = clampSpans(
+        rowSpans(block, row, plan, ctx, { expandable, focused: isHead, selected: isSelected }),
+        width,
+        ctx.capabilities,
+      );
 
       lines.push(
-        createElement(
-          Text,
-          { key: `row-${row.id}` },
-          textOf(
-            paint(
-              clampSpans(
-                rowSpans(block, row, plan, ctx, {
-                  expandable,
-                  focused: focused !== null && focused === row.id,
-                }),
-                width,
-                ctx.capabilities,
-              ),
-            ),
-          ),
-        ),
+        createElement(Text, { key: `row-${row.id}` }, textOf(paint(isSelected ? washed(spans) : spans))),
       );
 
       if (row.expanded !== true) continue;

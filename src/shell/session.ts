@@ -1307,9 +1307,36 @@ function focusFor(graph: Graph, entryId: string): FocusState | null {
   // two that agree — and it writes nothing, because this runs per frame.
   const elements = graph.focusedElements();
   const i = resolveFocus(stored.element, elements);
-  const found = i === null ? undefined : elements[i];
+  if (i === null) return null;
+  const found = elements[i];
   if (found === undefined) return null;
-  return Object.freeze({ blockId: found.blockId, rowId: found.element.id });
+  const head = Object.freeze({ blockId: found.blockId, rowId: found.element.id });
+
+  // **The extent, by `copyElement`'s own arithmetic** (C26 I16, §5c trace 3),
+  // so what is washed and what `y` copies are one answer. The head goes
+  // through `resolveFocus` because a stale head is where focus *is*; the
+  // anchor does not — I10's fall lands on the block's first element, which
+  // widened a copy to rows the reader never chose (F764) — so an exact match
+  // is the only honest answer and a stale anchor collapses to the head.
+  //
+  // **Measured before this**: after `↓ ⇧↓ ⇧↓` the frame showed the head in
+  // `accent` and nothing else — `y` was the extent's only reader (F764).
+  //
+  // The head alone is no selection and the field is **absent**, not `[]`
+  // (`FocusState.selected`): the two draw identically and must key
+  // identically. `keys.ts`'s `copyElement` holds the same eight lines; the
+  // shared helper is owed beside `resolveFocus` (arc3 Lane A's request).
+  const anchorAt = stored.anchor;
+  const exact =
+    anchorAt === null
+      ? -1
+      : elements.findIndex((p) => p.blockId === anchorAt.blockId && p.element.id === anchorAt.elementId);
+  const anchor = exact === -1 ? i : exact;
+  if (anchor === i) return head;
+  const selected = elements
+    .slice(Math.min(anchor, i), Math.max(anchor, i) + 1)
+    .map((p) => Object.freeze({ blockId: p.blockId, rowId: p.element.id }));
+  return Object.freeze({ ...head, selected: Object.freeze(selected) });
 }
 
 /**

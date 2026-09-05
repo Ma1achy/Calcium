@@ -64,6 +64,23 @@ export type FocusState = Readonly<{
   blockId: string;
   /** null — the block itself is focused, rather than a row inside it. */
   rowId: string | null;
+  /**
+   * The selection's extent (C26 I16), as pairs over the **entry's** element
+   * list — head included — and **absent when the extent is the head alone**.
+   *
+   * Pairs and not row ids, because a selection runs over the entry's list and
+   * a list can cross blocks: a table and a `pills` in one entry share one
+   * extent, and each renderer keeps the pairs naming itself. So a block that
+   * does not hold the head still learns which of its rows are selected, from
+   * the same value, in one pass (C11 I14).
+   *
+   * Absence is the sentinel rather than `[]`, on `scrollOffsets`' rule: the
+   * head-alone extent and no selection draw identically — the head is painted
+   * as the head — so a field that distinguished them would put two keys on one
+   * appearance (`focusKey`'s own warning, C22 I58). The store's sentinel is
+   * `anchor: null`; this is the render side of the same measurement (C26 §5c).
+   */
+  selected?: readonly Readonly<{ blockId: string; rowId: string }>[];
 }>;
 
 /**

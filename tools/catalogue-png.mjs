@@ -35,11 +35,19 @@
  * header enumerating a subset of what its own function does is the cheapest
  * possible instance. **Read the abstract against its own section.**
  *
- * **`7m` (inverse) has no arm and no producer.** `Style.inverse` is written
- * nowhere in `src/`, so an arm here would be a mechanism with nothing to
- * exercise it — this session's most-found class, in the instrument. The
- * condition is watched rather than deferred: `assertNoUnparsedSgr` below fails
- * the build if any catalogue frame ever emits one.
+ * **`7m` (inverse) gained its arm the day a catalogue frame emitted it.** The
+ * header here used to say *no arm and no producer — `Style.inverse` is written
+ * nowhere in `src/`*, and PC11 watched the catalogue for the day that changed.
+ * Two things were wrong with the sentence by then: `shell/paint.ts`'s
+ * `selectionStyle` had been writing `inverse` for the prompt's 1-bit selection
+ * all along (a producer PC11 could not see, because the prompt is in no
+ * catalogue frame), and arc3's interaction catalogue put the transcript's
+ * selection — reverse video at 1-bit, C11 I14 — into a frame PC11 sweeps. The
+ * 1-bit PNG then showed no selection while the bytes carried one, which is the
+ * instrument dropping a code it does not handle: F227's class, on the arm F227
+ * chose not to build. `7` swaps the channels and `27` restores them; the
+ * default ink and ground are the theme's, so a swapped cell at 1-bit is the
+ * theme's foreground as a fill with the ground as ink — what a terminal does.
  *
  *     node tools/catalogue-png.mjs
  */
@@ -109,17 +117,31 @@ export function parseLine(raw) {
   let colour = FG;
   let background = null;
   let bold = false;
+  // Reverse video (`7`/`27`): the channels swap, and the swap is undone by
+  // swapping back rather than by resetting — a `39` inside an inverse run must
+  // still land on the right channel. Held as a flag and applied at emit time.
+  let inverse = false;
   let pos = 0;
-  for (const m of raw.matchAll(ESC)) {
-    if (m.index > pos) {
-      spans.push({ text: raw.slice(pos, m.index), colour, background, bold });
+  const emit = (text) => {
+    if (inverse) {
+      spans.push({ text, colour: background ?? sheetBgHex(), background: colour, bold });
+    } else {
+      spans.push({ text, colour, background, bold });
     }
+  };
+  for (const m of raw.matchAll(ESC)) {
+    if (m.index > pos) emit(raw.slice(pos, m.index));
     pos = m.index + m[0].length;
     const params = m[1].split(";").map(Number);
     if (params[0] === 0) {
       colour = FG;
       background = null;
       bold = false;
+      inverse = false;
+    } else if (params[0] === 7) {
+      inverse = true;
+    } else if (params[0] === 27) {
+      inverse = false;
     } else if (params[0] === 39) {
       colour = FG;
     } else if (params[0] === 49) {
@@ -156,10 +178,14 @@ export function parseLine(raw) {
       bold = false;
     }
   }
-  if (pos < raw.length) {
-    spans.push({ text: raw.slice(pos), colour, background, bold });
-  }
+  if (pos < raw.length) emit(raw.slice(pos));
   return spans;
+}
+
+/** The sheet's ground as `rgb(...)`, for an inverse run over no background. */
+function sheetBgHex() {
+  const { r, g, b } = sheetBg();
+  return `rgb(${r},${g},${b})`;
 }
 
 /**
@@ -172,7 +198,7 @@ export function parseLine(raw) {
  * arm gets built then, against something that exercises it.
  */
 const KNOWN_SGR = new Set([
-  0, 1, 2, 22, 38, 39, 48, 49,
+  0, 1, 2, 7, 22, 27, 38, 39, 48, 49,
   30, 31, 32, 33, 34, 35, 36, 37, 90, 91, 92, 93, 94, 95, 96, 97,
   40, 41, 42, 43, 44, 45, 46, 47, 100, 101, 102, 103, 104, 105, 106, 107,
 ]);

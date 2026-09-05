@@ -96,6 +96,10 @@ const COVERED = [
   // and splitting the answer across two files is what the header argues against.
   ["tools/plot-catalogue.mjs", ["npx", "vitest", "run", "test/unit/plot-catalogue.test.ts"]],
   ["tools/catalogue-png.mjs", null], // same fixture — the catalogue pipeline
+  // The focus and selection corpus (C11 I14, arc3 Lane A). Its fixture reads the
+  // frames it writes rather than the scene table: which rows are washed, which
+  // is the head, and that the 1-bit arm carries the selection as reverse video.
+  ["tools/interaction-catalogue.mjs", ["npx", "vitest", "run", "test/unit/interaction-catalogue.test.ts"]],
   // **Its fixture is a golden row rather than a unit one**, because what this
   // instrument owes is not arithmetic — it is *the comparison responds to a
   // frame that moved*, and that can only be asked of the corpus it writes.

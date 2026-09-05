@@ -32,7 +32,7 @@
 import { renderSequenceToLines } from "../presentation/render-lines.js";
 import type { RenderScratch } from "../presentation/blocks/types.js";
 import { cells, hardWrapCells, sliceCells } from "../presentation/text.js";
-import { background, paint as paintSpans, tone } from "../presentation/blocks/paint.js";
+import { paint as paintSpans, tone, selectionStyle } from "../presentation/blocks/paint.js";
 import { SGR_RESET, sgr, toTerminalDefault } from "../terminal/escapes.js";
 import { promptFor, PROMPT_GUTTER } from "./config.js";
 import { composite } from "./composite.js";
@@ -341,7 +341,8 @@ function shows(window: PromptWindow, row: number): boolean {
  * ladder having a hole in the middle.
  */
 function washed(row: string, span: CellSpan, deps: PaintDeps): string {
-  const style = selectionStyle(deps);
+  // L1's ladder, not a private copy: the wash, else `inverse` (C11 I14; F769).
+  const style = selectionStyle(deps.theme, deps.capabilities);
   const before = sliceCells(row, 0, span.from);
   const inside = sliceCells(row, span.from, span.to);
   const after = sliceCells(row, span.to, cells(row, deps.capabilities.ambiguousWidth));
@@ -349,11 +350,6 @@ function washed(row: string, span: CellSpan, deps: PaintDeps): string {
 }
 
 /** The wash, or reverse video where there is no colour to wash with (§4b). */
-function selectionStyle(deps: PaintDeps): Style {
-  const bg = background("surface.selection", deps.theme, deps.capabilities);
-  return bg.background === undefined ? { inverse: true } : bg;
-}
-
 function promptRegion(frame: Composed, deps: PaintDeps, width: number): readonly string[] {
   const cap = frame.promptRows;
   const cursor = deps.promptCursor();
