@@ -28,8 +28,8 @@ import { PLOT_CORPUS, TABLE_CORPUS, tableOf } from "../support/blocks.js";
 import { ALL_FORMS, ONE_PER_FORM } from "../support/plot-forms.js";
 import { buildGraph } from "../support/session.js";
 import type { InputEvent, Key } from "../../src/interaction/router/types.js";
-import { measurable } from "../support/render.js";
-import { block } from "../../src/data/viewmodel/index.js";
+import { measurable, visible } from "../support/render.js";
+import { ROW_GUTTER, block, childWidths, placeable } from "../../src/data/viewmodel/index.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 import type { NavElement } from "../../src/presentation/blocks/index.js";
 
@@ -335,5 +335,154 @@ describe("C26 §5c — a plot's `copy` is its series (C12 I85)", () => {
     graph.router.dispatch(press("escape"));
     graph.editor.yank();
     expect(graph.editor.text).toBe("train\n1\n2");
+  });
+});
+
+describe("C26 §5 — the lifted list, in both axes (C09 §2)", () => {
+  // **Measured before any of this was written, by reading the frame** (F756,
+  // F757). `elementsIn` lifted rows and never columns, and reset every child to
+  // the *container's* top: two 39-wide tables in an 80-column `row` group both
+  // answered `cols [0, 39)`, a panel's table answered its rows one above where
+  // the frame drew them, and two tables in a `column` group or a `panel`
+  // overlapped exactly. Every one of those lists passed T2.16's sweep, because
+  // the sweep runs `elementsOf` block by block and the defect is in the lift.
+  const kit = () => measurable({ definitions: [tableDefinition] });
+  const plain = (lines: readonly string[]): readonly string[] => lines.map(visible);
+  const at = (
+    found: ReturnType<ReturnType<typeof kit>["registry"]["elementsIn"]>,
+    blockId: string,
+    id: string,
+  ) => {
+    const e = found.find((f) => f.blockId === blockId && f.element.id === id)?.element;
+    if (e === undefined) throw new Error(`no ${blockId}/${id}`);
+    return { rows: [e.rows.from, e.rows.to], cols: [e.cols.from, e.cols.to] };
+  };
+
+  /** A registry whose per-block answer is the lifted list, so T2.16's sweep can read it. */
+  const lifted = (): NavigableRegistry => {
+    const r = kit().registry;
+    return {
+      measure: (b, w) => r.measure(b, w),
+      get: (k) => r.get(k),
+      elementsOf: (b, w) => r.elementsIn([b], w).map((f) => f.element),
+    };
+  };
+
+  const rowGroup = (a: Block, b: Block, more: readonly Block[] = []): Block =>
+    block({ kind: "group", id: "g", direction: "row", children: [a, b, ...more] });
+  const columnGroup = (a: Block, b: Block): Block =>
+    block({ kind: "group", id: "g", direction: "column", children: [a, b] });
+  const panel = (children: readonly Block[]): Block =>
+    block({ kind: "panel", id: "p", title: "T", children: [...children] });
+
+  it("T2.29 (C26 I4, I6; C09 §2): two 39-wide tables in an 80-column row — the second sits at cols [40, 79), and the frame agrees", () => {
+    const k = kit();
+    const a = tableOf(2, "a");
+    const b = tableOf(2, "b");
+    const g = rowGroup(a, b);
+
+    // **The gutter is measured, not assumed.** `childWidths` gives 39 + 39 at 80,
+    // so the one column left is the gutter, and the second child's origin is 40.
+    expect(childWidths(g as never, 80), "the shares").toEqual([39, 39]);
+    expect(ROW_GUTTER).toBe(1);
+
+    const found = k.registry.elementsIn([g], 80);
+    expect(at(found, "a", "r1")).toEqual({ rows: [1, 2], cols: [0, 39] });
+    expect(at(found, "b", "r1"), "lifted by the first's share plus the gutter").toEqual({ rows: [1, 2], cols: [40, 79] });
+
+    // Read from the frame: the second header begins at the column the element does.
+    const frame = plain(k.renderToLines(g, 80));
+    expect(frame[0]?.indexOf("Name", 1), "the second `Name` on the header row").toBe(40);
+    expect(frame[1]?.indexOf("row 1", 1), "and the second `row 1` beneath it").toBe(40);
+  });
+
+  it("T2.30 (C26 I4, I5, I6): containment, disjointness and stability hold of the lifted list across blocks; order within each — and a fabricated old walk fails disjointness", () => {
+    const a = tableOf(2, "a");
+    const b = tableOf(2, "b");
+    const corpus: readonly Block[] = [
+      rowGroup(a, b),
+      columnGroup(a, b),
+      panel([a, b]),
+      // Nested: a panel inside a row, so both origins compose.
+      rowGroup(a, panel([b])),
+      // Three children, so `placeable` drops one at the sweep's narrowest width.
+      rowGroup(a, b, [tableOf(1, "c")]),
+    ];
+    const report = checkElements(lifted(), corpus);
+    // **Reading order is a per-block predicate.** Across blocks the lifted list
+    // is the document's order — `↓` leaves the first table's last row for the
+    // second table's first, wherever the second is drawn (C26 §4c) — so two
+    // tables side by side are listed block by block and not row by row, and the
+    // sweep's `order` is asserted within each block below rather than here.
+    const across = report.failures.filter((f) => f.predicate !== "order");
+    expect(across, formatElementReport(report)).toEqual([]);
+    expect(report.checked, "the subject, before the claim").toBeGreaterThan(20);
+    const r = kit().registry;
+    for (const container of corpus) {
+      for (const width of [20, 80]) {
+        const perBlock = new Map<string, NavElement[]>();
+        for (const f of r.elementsIn([container], width)) {
+          perBlock.set(f.blockId, [...(perBlock.get(f.blockId) ?? []), f.element]);
+        }
+        for (const [id, es] of perBlock) {
+          for (let i = 1; i < es.length; i += 1) {
+            const p = es[i - 1];
+            const e = es[i];
+            if (p === undefined || e === undefined) throw new Error("unreachable");
+            expect(
+              e.rows.from > p.rows.from || (e.rows.from === p.rows.from && e.cols.from >= p.cols.from),
+              `${id} at ${String(width)}: ${e.id} after ${p.id}`,
+            ).toBe(true);
+          }
+        }
+      }
+    }
+
+    // **The fabricated violation is the shipped walk**: columns not lifted. Both
+    // tables' `r1` then share rows [1, 2) and cols [0, 39) in the row group.
+    const unlifted: NavigableRegistry = {
+      ...lifted(),
+      elementsOf: (bl, w) =>
+        lifted()
+          .elementsOf(bl, w)
+          .map((e) => ({ ...e, cols: { from: 0, to: e.cols.to - e.cols.from } })),
+    };
+    const failing = checkElements(unlifted, [rowGroup(a, b)]);
+    expect(kinds(failing), "two blocks sharing cells is what the pointer cannot resolve").toContain("disjoint");
+  });
+
+  it("T2.31 (C26 I4; C09 §2): a panel's children start one row and one column in, a column's follow one another, an unplaced child holds nothing", () => {
+    const k = kit();
+    const a = tableOf(2, "a");
+    const b = tableOf(2, "b");
+
+    // Panel: `r1` is on the frame's row 2 (border, header, r1) at column 1.
+    const p = panel([a, b]);
+    const inPanel = k.registry.elementsIn([p], 40);
+    expect(at(inPanel, "a", "r1")).toEqual({ rows: [2, 3], cols: [1, 39] });
+    const frame = plain(k.renderToLines(p, 40));
+    expect(frame[2]?.indexOf("row 1"), "the frame draws it there").toBe(1);
+    // The second child begins where the first's measured rows end.
+    expect(at(inPanel, "b", "r1").rows, "after a's three rows").toEqual([5, 6]);
+    expect(frame[5]?.indexOf("row 1"), "the frame's second `row 1`").toBe(1);
+
+    // Below three columns the rails are dropped and the child is at column 0.
+    expect(at(k.registry.elementsIn([panel([a])], 2), "a", "r1")).toEqual({ rows: [2, 3], cols: [0, 1] });
+
+    // Column group: second table after the first's height, both at column 0.
+    const inColumn = k.registry.elementsIn([columnGroup(a, b)], 40);
+    expect(at(inColumn, "b", "r1")).toEqual({ rows: [4, 5], cols: [0, 40] });
+
+    // Row group at width 4: shares of 1, and the third child is not placed —
+    // the frame draws two, so the list holds two (C04 §3).
+    const narrow = rowGroup(a, b, [tableOf(1, "c")]);
+    expect(placeable(narrow as never, 4)).toBe(2);
+    const inNarrow = k.registry.elementsIn([narrow], 4);
+    expect(new Set(inNarrow.map((f) => f.blockId)), "the unplaced child contributes nothing").toEqual(new Set(["a", "b"]));
+    expect(at(inNarrow, "b", "r1").cols).toEqual([2, 3]);
+
+    // A `gapBefore` on a row-group child adds no row: the renderer ignores it.
+    const gapped = rowGroup(a, block({ ...b, gapBefore: true }));
+    expect(at(k.registry.elementsIn([gapped], 40), "b", "r1").rows).toEqual([1, 2]);
   });
 });

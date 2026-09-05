@@ -355,7 +355,7 @@ describe("C09 tier 3 — containment", () => {
         render: (): never => ONE_PER_KIND.rule as never,
         elements: (): unknown => {
           if (kind === "bad") throw new TypeError("elements exploded");
-          return [{ id: `${kind}-e0`, rows: { from: 0, to: 1 }, kind: "row" }];
+          return [{ id: `${kind}-e0`, rows: { from: 0, to: 1 }, cols: { from: 0, to: 1 }, level: "row" }];
         },
       } as never);
     }
@@ -384,8 +384,8 @@ describe("C09 tier 3 — containment", () => {
         measure: (): number => 2,
         render: (): never => ONE_PER_KIND.rule as never,
         elements: (): unknown => [
-          { id: "e0", rows: { from: 0, to: 1 }, kind: "row" },
-          { id: "e1", rows: { from: 1, to: 2 }, kind: "row" },
+          { id: "e0", rows: { from: 0, to: 1 }, cols: { from: 0, to: 1 }, level: "row" },
+          { id: "e1", rows: { from: 1, to: 2 }, cols: { from: 0, to: 1 }, level: "row" },
         ],
       } as never);
       registry.register({

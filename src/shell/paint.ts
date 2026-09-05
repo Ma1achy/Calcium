@@ -632,6 +632,22 @@ export function cursorFor(frame: Composed, deps: PaintDeps): Cell | null {
   return { row: frame.region.top + frame.region.height + within, col: cell.col };
 }
 
+/**
+ * The blank rows the composer draws **above** a short transcript (C14 §2, I19).
+ *
+ * Bottom-aligned: a half-full transcript sits above the prompt, not under the
+ * header, because the prompt is where the eye is and content should grow
+ * towards it. **Exported because the pointer has to undo it**: C14 addresses
+ * its rows from the top, so `construct.ts`'s `entryAtRegionRow` subtracts this
+ * from a region row before asking `entryAtRow`. The two used to agree by being
+ * the same expression written twice — the drift the frame path cannot see
+ * until a short session's click lands one row wrong (F755). One function, so a
+ * change to how the frame aligns moves the click with it.
+ */
+export function blankRowsAbove(regionHeight: number, rows: number): number {
+  return Math.max(0, regionHeight - rows);
+}
+
 /** C14 selected these at this width; they are padded, never re-measured. */
 function transcript(frame: Composed, deps: PaintDeps, width: number): readonly string[] {
   const rows = deps.transcriptRows();
@@ -655,10 +671,7 @@ function transcript(frame: Composed, deps: PaintDeps, width: number): readonly s
   }
 
   const out: string[] = [];
-  // Bottom-aligned: a half-full transcript sits above the prompt, not under the
-  // header, because the prompt is where the eye is and content should grow
-  // towards it.
-  const blank = Math.max(0, frame.region.height - rows.length);
+  const blank = blankRowsAbove(frame.region.height, rows.length);
   for (let i = 0; i < blank; i += 1) out.push(" ".repeat(width));
   for (let i = 0; i < frame.region.height - blank; i += 1) {
     out.push(exact(rows[i] ?? "", width));

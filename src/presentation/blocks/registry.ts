@@ -10,9 +10,14 @@
 import { Box, Text } from "ink";
 import { createElement, type ReactElement } from "react";
 import {
+  BORDER_INSET,
+  ROW_GUTTER,
   childWidths,
   hasChildren,
+  mosaicRects,
   normaliseWidth,
+  parseAreas,
+  placeable,
   sequenceHeight,
 } from "../../data/viewmodel/index.js";
 import type { Block, Status } from "../../data/viewmodel/index.js";
@@ -468,48 +473,106 @@ class Registry implements BlockRegistry {
     blocks: readonly Block[],
     width: number,
   ): readonly Readonly<{ blockId: string; element: NavElement }>[] => {
-    const w = normaliseWidth(width);
     const out: Readonly<{ blockId: string; element: NavElement }>[] = [];
-    let row = 0; // cells-ok — a row cursor, not a width
 
-    const walk = (seq: readonly Block[], atWidth: number): void => {
-      for (const block of seq) {
-        if (block.gapBefore === true) row += 1;
-        const top = row;
-        // **One call for both questions** (I30). Asking twice is what let the
-        // two answers disagree.
-        const own = this.#elements(block, atWidth);
-        for (const element of own.elements) {
-          out.push({
-            blockId: block.id,
-            element: Object.freeze({
-              ...element,
-              rows: Object.freeze({ from: top + element.rows.from, to: top + element.rows.to }),
-            }),
-          });
+    /**
+     * One block at `(top, left)`, `atWidth` wide — its own elements lifted in
+     * **both axes**, then its children placed where the renderer places them.
+     *
+     * **The origins are the painter's, read from the same functions** (C09 §2):
+     * `childWidths` and `ROW_GUTTER` for a `row` group, `insetWidth` and the
+     * rails for a `panel`, `mosaicRects` for a `mosaic`. The walk used to lift
+     * rows and never columns, and to reset every child to the *container's*
+     * top — so two 39-wide tables in an 80-column row both answered `cols
+     * [0, 39)` and a click at column 50 focused the first (F756), and a panel's
+     * table answered its rows one above where the frame drew them (F757).
+     * Every one of those lists passed C26 §5's predicates block by block.
+     */
+    const place = (block: Block, top: number, left: number, atWidth: number): void => {
+      // **One call for both questions** (I30). Asking twice is what let the
+      // two answers disagree.
+      const own = this.#elements(block, atWidth);
+      for (const element of own.elements) {
+        out.push({
+          blockId: block.id,
+          element: Object.freeze({
+            ...element,
+            rows: Object.freeze({ from: top + element.rows.from, to: top + element.rows.to }),
+            cols: Object.freeze({ from: left + element.cols.from, to: left + element.cols.to }),
+          }),
+        });
+      }
+      // **A container that declares its own elements owns them.** `panel` and
+      // `group` declare none, so their children's are reached here; `scroll`
+      // and `mosaic` declare one element per child (C26 §4b cell 3), and
+      // descending past them would emit each child twice. The question is
+      // asked of the **definition** rather than of a list of kinds, which is
+      // the one form that stays right when a fifth container arrives — and the
+      // arms below are reached for a container whose `elements` threw (I30,
+      // T3.37), so each places children where its renderer does.
+      if (!hasChildren(block) || own.owned) return;
+      const widths = childWidths(block, atWidth);
+      switch (block.kind) {
+        case "panel": {
+          // One row below the top border, one column in from the left rail —
+          // and no rail below three columns, where the renderer drops both
+          // sides and keeps the content (C09 §3).
+          const rail = normaliseWidth(atWidth) < 3 ? 0 : BORDER_INSET / 2;
+          sequence(block.children, top + 1, left + rail, widths[0] ?? 1);
+          return;
         }
-        // **A container that declares its own elements owns them.** `panel` and
-        // `group` declare none, so their children's are reached here; `scroll`
-        // declares one element per child (C26 §4b cell 3), and descending past
-        // it would emit each child twice and at the wrong coordinates — its
-        // children are placed in content space, not in this walk's.
-        //
-        // So the question is asked of the **definition** rather than of a list
-        // of kinds, which is the one form that stays right when a fourth
-        // container arrives: whichever answer it gives, this walk follows it.
-        if (hasChildren(block) && !own.owned) {
-          const widths = childWidths(block, atWidth);
-          const before = row;
+        case "group": {
+          if (block.direction === "column") {
+            sequence(block.children, top, left, widths[0] ?? 1);
+            return;
+          }
+          // Side by side: `childWidths` shares with `ROW_GUTTER` between each
+          // pair, the first `placeable` of them (C04 §3), and `gapBefore` is
+          // ignored here exactly as the renderer ignores it — a row has no
+          // "before" to put a gap in (C04 §3a).
+          let col = left;
+          block.children.slice(0, placeable(block, atWidth)).forEach((child, i) => {
+            const share = widths[i] ?? 1;
+            place(child, top, col, share);
+            col += share + ROW_GUTTER;
+          });
+          return;
+        }
+        case "mosaic": {
+          const parsed = parseAreas(block.areas);
+          if (!parsed.ok) return;
+          const rects = mosaicRects(parsed.grid, normaliseWidth(atWidth), block.height, block.columns, block.rows);
           block.children.forEach((child, i) => {
-            row = before;
-            walk([child], widths[i] ?? 1);
+            const rect = rects[i];
+            // A cell with no room is not drawn (C04 I72), so it holds nothing.
+            if (rect === undefined || rect.width < 1 || rect.height < 1) return;
+            place(child, top + rect.top, left + rect.left, rect.width);
           });
+          return;
         }
-        row = top + this.measure(block, atWidth);
+        case "scroll":
+          // Content rows from the box's top (C26 I3 — never the offset), which
+          // is where `childRanges` puts them.
+          sequence(block.children, top, left, widths[0] ?? 1);
+          return;
       }
     };
 
-    walk(blocks, w);
+    /**
+     * A run laid out down the screen: a document's top level, a `panel`'s
+     * children, a `column` group's. `gapBefore` is counted here and never
+     * inside a block, for `windowSequence`'s reason: the gap belongs to the run.
+     */
+    const sequence = (seq: readonly Block[], top: number, left: number, atWidth: number): void => {
+      let row = top; // cells-ok — a row cursor, not a width
+      for (const block of seq) {
+        if (block.gapBefore === true) row += 1;
+        place(block, row, left, atWidth);
+        row += this.measure(block, atWidth);
+      }
+    };
+
+    sequence(blocks, 0, 0, normaliseWidth(width));
     return Object.freeze(out);
   };
 

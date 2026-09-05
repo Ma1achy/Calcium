@@ -122,9 +122,12 @@ const MUTATIONS = [
     file: "src/presentation/blocks/registry.ts",
     // Re-anchored when the two element questions became one call (C09 I30,
     // F224). The subject is unchanged — the condition is still the definition's
-    // — and this pass was re-run rather than re-anchored blind.
-    from: "        if (hasChildren(block) && !own.owned) {",
-    to: "        if (hasChildren(block)) {",
+    // — and this pass was re-run rather than re-anchored blind. **Re-anchored
+    // again when the walk gained its column origin** (F756, F757) and the
+    // condition became an early return; the mutation was applied by hand and
+    // T2.34 died on it, the harness itself not being run in that lane.
+    from: "      if (!hasChildren(block) || own.owned) return;",
+    to: "      if (!hasChildren(block)) return;",
     expect: "T2.34",
   },
   {

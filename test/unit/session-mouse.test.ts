@@ -269,6 +269,28 @@ describe("C16 §4a — a click lands where the keys would", () => {
     graph.router.dispatch(mouse(term(10), 2));
     expect(graph.focus.current).toEqual(AT(live, "b2", "t2"));
   });
+
+  it("T4.62d (C16 I31, C26 I4; C09 §2): two tables side by side — the column decides which, and the gutter is nothing", async () => {
+    // **The shipped defect** (F756): `elementsIn` lifted rows and not columns, so
+    // both tables answered `cols [0, 39)` and a click at column 50 focused the
+    // first table's row — inside the bounds and on the wrong block.
+    const { graph, term } = await graphAt80();
+    const live = graph.transcript.append(
+      doc("/pair", [{ kind: "group", id: "g", direction: "row", children: [table("1"), table("2")] }]) as never,
+    );
+    // The geometry, from the list the keyboard walks: 39 + 1 + 39 at 80 columns.
+    const second = graph.liveElements().find((e) => e.blockId === "t2" && e.element.id === "a2")?.element.cols;
+    expect(second, "the fixture places the second table at column 40").toEqual({ from: 40, to: 79 });
+
+    // Chrome 0, header 1, `a` on transcript row 2.
+    graph.router.dispatch(mouse(term(2), 50));
+    expect(graph.focus.current, "the second table's row, by column").toEqual(AT(live, "a2", "t2"));
+    graph.router.dispatch(mouse(term(2), 2));
+    expect(graph.focus.current, "the first's, by column").toEqual(AT(live, "a1", "t1"));
+    // The gutter column belongs to neither: unconsumed, focus stays.
+    expect(graph.router.dispatch(mouse(term(3), 39)), "the gutter is one column and no element").toBe(false);
+    expect(graph.focus.current).toEqual(AT(live, "a1", "t1"));
+  });
 });
 
 describe("C16 §4a — a drag is ⇧↓", () => {

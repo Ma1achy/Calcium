@@ -87,8 +87,12 @@ const results = runPass({
     {
       name: "the frame's bottom alignment ignored — C14 is asked from the region's top",
       file: "src/shell/construct.ts",
-      from: "    return stores.viewport.entryAtRow(regionRow - Math.max(0, viewportHeight - totalRows));\n",
-      to: "    return stores.viewport.entryAtRow(regionRow + 0 * (viewportHeight - totalRows));\n",
+      // Re-anchored when the subtraction became `paint.ts`'s exported
+      // `blankRowsAbove` (C14 I19, F755) — the click side alone ignores it here,
+      // so the frame and the click disagree and T4.62c reads the difference.
+      // Applied by hand on re-anchoring; the harness was not run in that lane.
+      from: "    return stores.viewport.entryAtRow(regionRow - blankRowsAbove(viewportHeight, totalRows));\n",
+      to: "    return stores.viewport.entryAtRow(regionRow + 0 * blankRowsAbove(viewportHeight, totalRows));\n",
       expect: "T4.62c",
     },
   ],

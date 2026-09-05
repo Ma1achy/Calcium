@@ -133,7 +133,9 @@ class ViewportImpl implements Viewport {
     // has rows below the region that no pointer can be on.
     if (!Number.isInteger(row) || row < 0 || row >= Math.max(0, this.#height)) return null;
     const absolute = this.#topRow + row;
-    if (absolute >= this.#index.totalRows) return null;
+    // No `totalRows` guard: `locate` past the end yields `index === entries.length`,
+    // and the `undefined` check below already answers `null`. A guard here was
+    // measured dead — removing it failed nothing (F754's mutation M7).
     // `locate` walks past zero-height entries, so `offset` is inside an entry
     // that has rows — the same descent `visible()` starts from (T3.1c: an entry
     // that begins above the top edge answers with the rows already scrolled).
