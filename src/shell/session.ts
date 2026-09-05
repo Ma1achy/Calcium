@@ -34,7 +34,7 @@ import { focusKey } from "./render-cache.js";
 import { reserveNeeded } from "./block-faults.js";
 import { descendants } from "../data/viewmodel/index.js";
 import type { Block, Image, Plot } from "../data/viewmodel/index.js";
-import { renderSequenceToLines } from "../presentation/render-lines.js";
+import { entryLayout, renderEntryPieces, windowEntry } from "./entry-layout.js";
 import { animationIntervalOf } from "../presentation/blocks/index.js";
 import { framesOf } from "../presentation/blocks/kinds/image.js";
 import type { FocusState } from "../presentation/blocks/index.js";
@@ -1025,6 +1025,10 @@ class Session implements TuiInstance {
       // comparing them.
       promptRows: (width, gutter) =>
         graph?.editor.layout(width, gutter).length ?? 1,
+      // **The footer's height, from the same measurer C14 uses** (C22 I82).
+      // Before the graph exists nothing has a footer to measure; one row is the
+      // guess `initialRegionHeight` makes and the first frame corrects it.
+      measureSequence: (blocks, width) => graph?.blocks.measureSequence(blocks, width) ?? 1,
     });
   }
 }
@@ -1089,7 +1093,13 @@ function visibleRows(
     // only for the ones holding a kind that divides.
     const from = Math.max(0, ve.skipRows - chrome.length);
     const to = Math.max(from, ve.skipRows + ve.takeRows - chrome.length);
-    const windowed = graph.blocks.windowSequence(entry.doc.blocks, width, from, to);
+    // **Through the entry's layout, not over the document's blocks** (C22 I83,
+    // §6l.4 D). A card's body sits two cells in under the hook and is windowed,
+    // measured and rendered at `width − 2` — by the same `entryLayout` the
+    // measurer wrapper in `construct.ts` calls, so the rows C14 counted are the
+    // rows drawn here. A document that is not a card is one run at `width`.
+    const pieces = windowEntry(entryLayout(entry.doc.blocks, width), from, to, graph.blocks);
+    const windowed = { blocks: pieces.flatMap((piece) => piece.windowed.blocks) };
 
     // The key carries the range, because the cached lines are now the *window's*
     // (I58). A small entry windows to itself and its key is stable, which is the
@@ -1191,10 +1201,10 @@ function visibleRows(
     // neither half addresses anything on its own. A scope rather than a field,
     // because the render that produces the fault is one call and the caller is
     // what knows which entry it is drawing.
-    const lines =
-      held ??
-      graph.blockFaults.within(entry.id, entry.rev, () =>
-        renderSequenceToLines(graph.blocks, windowed.blocks, width, {
+    const fresh =
+      held === undefined
+        ? graph.blockFaults.within(entry.id, entry.rev, () =>
+            renderEntryPieces(graph.blocks, pieces, {
         theme: graph.theme.current,
         capabilities: graph.capabilities,
         // **The third field, and the context was shipped with two** (C16 §3).
@@ -1240,40 +1250,24 @@ function visibleRows(
           // both are right — the picture moved and the geometry did not.
           scratch: graph.scratch,
         }),
-      );
-    if (held === undefined) {
-      // **C09's rows against C09's own number, on the frame that produced them**
-      // (I70, F230). The trim below reconciles this entry's rows against C14's
-      // slot and cannot say whether it is cutting a screen that ran out or a
-      // block that over-drew — the two are the same `slice` and one of them
-      // deletes the block underneath. This is where the difference is knowable,
-      // and it is asked only on a cache miss: a hit's lines came from a miss
-      // that was already asked.
-      const expected = graph.blocks.measureSequence(windowed.blocks, width);
-      if (lines.length !== expected) {
+          )
+        : null;
+    const lines = held ?? fresh?.rows ?? [];
+    if (fresh !== null) {
+      for (const fault of fresh.faults) {
         graph.blockFaults.note(
-          `entry ${entry.id}: C09 drew ${String(lines.length)} rows where measure ` +
-            `committed ${String(expected)} (C09 I1) — the frame keeps ${String(expected)}, ` +
+          `entry ${entry.id}: C09 drew ${String(fault.drawn)} rows where measure ` +
+            `committed ${String(fault.expected)} (C09 I1) — the frame keeps ${String(fault.expected)}, ` +
             `and anything below the overflow in this entry is dropped`,
         );
       }
       graph.rendered.set(entry.id, entry.rev, width, slot, theme, lines);
     }
 
-    // **The chrome is unwindowed and the blocks are**, so the slice is taken
-    // over the chrome at its own offset and over the window's rows at theirs.
-    // `windowed.skipRows` is the slack the seam could not remove — an
-    // indivisible unit or a sticky header — and dropping it here is what makes
-    // the window invisible.
-    // **The offsets are already spent, so the slice starts at zero.** The
-    // chrome is dropped by `skipRows` directly; the blocks were windowed *from*
-    // `skipRows − chrome.length`, so their rows already begin where the viewport
-    // asked. Slicing the concatenation by `ve.skipRows` a second time — which is
-    // what the unwindowed version correctly did — takes the same offset twice
-    // and drops the top of a tall entry. T4.12 is what said so.
+    // The pieces are already the window's rows (`windowEntry` took `[from, to)`),
+    // so only the chrome is sliced here.
     const keptChrome = chrome.slice(Math.min(ve.skipRows, chrome.length));
-    const rows = [...keptChrome, ...lines.slice(windowed.skipRows)];
-    out.push(...rows.slice(0, ve.takeRows));
+    out.push(...[...keptChrome, ...lines].slice(0, ve.takeRows));
   }
   onAnimation(
     fastest === null && orbits.length === 0 && frames.length === 0

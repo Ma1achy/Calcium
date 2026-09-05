@@ -64,7 +64,10 @@ const session = (cols = COLS, rows = ROWS): InteractivePty =>
 function region(frame: readonly string[]): readonly string[] {
   const prompt = promptRow(frame);
   const at = frame.lastIndexOf(prompt);
-  return frame.slice(1, at).map((r) => r.trimEnd());
+  // Below the header and above the upper rule (C22 I81): the rule sits between
+  // the region and the prompt, and a slice that kept it captured the rule as
+  // the document's last row — equal on the first screen, so the walk was one.
+  return frame.slice(1, at - 1).map((r) => r.trimEnd());
 }
 
 /**
@@ -314,7 +317,8 @@ describe("C04 e2e — the drift tests", () => {
       // numbered, the stream's are `tail N`, so the two are told apart by what
       // is on the screen and not by a row count.
       expect(
-        before.filter((r) => /^\d{7}\b/.test(r)).length,
+        // The older entry is a card (C23 I55), its rows two cells in under the hook (C22 I83).
+        before.filter((r) => /^(⎿ |  )?\d{7}\b/.test(r)).length,
         "detached inside the older entry",
       ).toBeGreaterThan(5);
       expect(before.join("\n"), "and not at the live stream").not.toContain("tail ");

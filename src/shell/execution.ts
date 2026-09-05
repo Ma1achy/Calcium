@@ -29,7 +29,7 @@ import type { RawPatch } from "../data/transport/index.js";
 import type { Exit } from "../data/process/types.js";
 import { block } from "../data/viewmodel/index.js";
 import type { Block, ViewDocument } from "../data/viewmodel/index.js";
-import { blockId, completeLocal, compose, errorDoc, noticeDoc, toolCallDoc, toolCallHeader, usageDoc } from "./documents.js";
+import { blockId, cardOver, completeLocal, compose, errorDoc, noticeDoc, toolCallDoc, toolCallHeader, usageDoc } from "./documents.js";
 import { createActionDispatcher } from "./actions.js";
 import { createRefreshDriver } from "./refresh.js";
 import { DOCUMENT_VIEW_ID } from "./document-view.js";
@@ -777,6 +777,12 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     const { line } = settle;
     guard.take("local", verb);
     const startedAt = deps.clock();
+    // **A local verb is a call** (I55, §8g row 12; the design's §18 — *the tools
+    // are the manifest*), so it settles as a card like the adapter route: the
+    // header over the handler's blocks. `argv` here is already the arguments —
+    // the caller sliced the verb off — so it is the header's `args` as it stands.
+    const call = { name: verb, args: argv.join(" ") };
+    const carded = (doc: ViewDocument): ViewDocument => cardOver(doc, call, deps.clock() - startedAt);
     try {
       const handler = local.get(verb);
       if (handler === undefined) {
@@ -784,11 +790,11 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         // thrown because C23 I2 admits no escaping failure — including one the
         // reconciliation was supposed to have made impossible.
         appendAndCommit(
-          errorDoc(
+          carded(errorDoc(
             line,
             { message: `no handler is registered for \`${verb}\``, stage: "local" },
             { origin: "user" },
-          ),
+          )),
           settle,
         );
         return;
@@ -835,7 +841,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         argv,
         durationMs: deps.clock() - startedAt,
       });
-      appendAndCommit(doc, settle);
+      appendAndCommit(carded(doc), settle);
       // A02 Seam 4's theme row: `theme.setTheme` → `scheduler.invalidate`.
       // C10 never invalidates; the sequence is L4's, which is the seam.
       if (verb === "theme") deps.scheduler.invalidate();
@@ -843,11 +849,11 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       if (doc.meta.resultId !== undefined) deps.writes.setLastUuid(doc.meta.resultId);
     } catch (cause) {
       appendAndCommit(
-        errorDoc(
+        carded(errorDoc(
           line,
           { message: `\`${verb}\` failed: ${String(cause)}`, stage: "local" },
           { origin: "user" },
-        ),
+        )),
         settle,
       );
     } finally {
@@ -1247,7 +1253,12 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       // — and `meta` travels with it, which is what C23 I7 and `/debug` need and
       // what no block-level patch could carry.
       refresh.settled(pendingId);
-      settleWithDocument(pendingId, doc);
+      // **The replacement is composed with the card** (I55, §8g row 10): the
+      // header over the adapted blocks, the far side's verdict in it. Before
+      // this the settle replaced the card wholesale and `❯ /ps` over a table
+      // was what a finished listing read — §9c's settled state on this route
+      // was reached by no path.
+      settleWithDocument(pendingId, cardOver(doc, call, deps.clock() - startedAt));
       recordHistory(line, doc); // I29 — the app route's settlement.
 
       // C23 I7 — declared, never inferred. A verb declaring none leaves `$_`
@@ -1264,7 +1275,9 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         { message: String(cause), stage: "transport" },
         { origin: "user", verb },
       );
-      settleWithDocument(pendingId, failed);
+      // I55, §8g row 11 — the status box is the body and the verdict is the
+      // header's: two statements of one fact, and the header is the one 1-bit keeps.
+      settleWithDocument(pendingId, cardOver(failed, call, deps.clock() - startedAt));
       recordHistory(line, failed); // I29 — a failure is a settlement.
       deps.scheduler.commit("completion");
     } finally {

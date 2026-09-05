@@ -55,8 +55,8 @@ describe("C22 §6b — the write is a difference", () => {
     expect(settled[0]?.trim(), "the header is on the screen").not.toBe("");
     expect(
       settled.findIndex((r) => r.trimStart().startsWith("❯")),
-      "the prompt sits on the row above the footer",
-    ).toBe(22);
+      "the prompt sits between the two rules, above the footer (C22 I81)",
+    ).toBe(21);
     const whole = settled.join("\r\n").length;
 
     const before = stdout.chunks.length;
@@ -181,7 +181,9 @@ describe("C22 §6b — the write is a difference", () => {
 
     const rows = screen().rows;
     const prompt = rows.findIndex((r) => r.includes("❯"));
-    const menu = rows.slice(0, prompt);
+    // The row directly above the prompt is the frame's own rule (C22 I81); the
+    // menu's rows end above it.
+    const menu = rows.slice(0, prompt - 1);
     expect(menu.some((r) => /\+ \d+ more/u.test(r)), "the indicator is drawn").toBe(true);
     // **And the box closes**, which is the half a row about the indicator alone
     // does not cover: the bottom edge sits between the menu and the prompt, and
@@ -205,8 +207,8 @@ describe("C22 §6b — the write is a difference", () => {
     expect(screen().drawn, "a frame is on the screen").toBe(true);
     expect(
       screen().rows.findIndex((r) => r.trimStart().startsWith("❯")),
-      "the frame reaches the foot of the terminal",
-    ).toBe(22);
+      "the frame reaches the foot of the terminal — rule, prompt, rule, footer",
+    ).toBe(21);
 
     // The next write throws part-way — the screen keeps a prefix of a frame no
     // record describes. `throwOn` is what makes this constructible at all.
@@ -819,6 +821,40 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
     ).toBeGreaterThan(after.indexOf(LEAVE_ALT));
   });
 
+  it("T4.62 (C22 I83, §6l.2 row 12; C23 I55): a body one cell short of the width wraps once more under the indent, and the frame holds every row of it", async () => {
+    // **The wiring row.** T1.41 and T1.42 call `entryLayout` directly and would
+    // both pass with a `visibleRows` that never did, or a measurer wrapper that
+    // measured flush — the second is the one that drops a row: C14 believes the
+    // entry is two rows, the frame draws three, and the last cell is on no row.
+    const manifest: NonNullable<TuiConfig["manifest"]> = {
+      schema: "tui.manifest/1",
+      binary: "prism",
+      version: "1.0.0",
+      tools: [{ name: "wide", local: true, summary: "one notice, 99 cells", args: [], flags: [] }],
+    };
+    const localHandlers: NonNullable<TuiConfig["localHandlers"]> = {
+      wide: () => ({
+        schema: "tui.view/1",
+        command: "wide",
+        status: "ok",
+        blocks: [{ kind: "notice", id: "n", tone: "muted", text: "a".repeat(99) }],
+      }),
+    };
+    const stdin = fakeStdin();
+    const { screen } = await buildSession({ manifest, localHandlers, stdin: stdin as never });
+    await settle();
+    stdin.emit("/wide\r");
+    await settle();
+
+    const rows = screen().rows;
+    const at = rows.findIndex((r) => r.includes("⏺ wide · ok"));
+    expect(at, "the card's header is on the screen").toBeGreaterThan(0);
+    expect(rows[at + 1]?.startsWith(`⎿ ${"a".repeat(98)}`), "the body's first row: the hook and 98 cells").toBe(true);
+    expect(rows[at + 2]?.trimEnd(), "the wrapped cell, under two blanks").toBe("  a");
+    expect(/^[─-]{20,}/u.test(rows[at + 3] ?? ""), "then the upper rule — nothing dropped between").toBe(true);
+    expect(rows[at + 4]?.trimStart().startsWith("❯"), "and the prompt").toBe(true);
+  });
+
   it("T4.28 (I6a, C09 I29): a swallowed render reaches the same drain", async () => {
     // **The fourth source, and its absence was structural rather than an
     // omission** (F223). L1 cannot reach this list, so C09's containments had
@@ -878,13 +914,18 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
     // border is the evidence the height was honoured. The definition measures 3,
     // so the box is border · message · border and the rows below sit where the
     // measurement put them.
-    expect(rows[at - 1]?.trimStart().startsWith("┌"), "the box opens above it").toBe(true);
+    // The box is a card's body (C23 I55), so its first row carries the hook (C22
+    // I83) — required, not optional: a `visibleRows` that skipped the layout
+    // survived this row while the hook was `(⎿ )?`.
+    expect(/^\s*⎿ ┌/u.test(rows[at - 1] ?? ""), "the box opens above it, under the hook").toBe(true);
     expect(rows[at + 1]?.trimStart().startsWith("└"), "and closes below it").toBe(true);
     // **The prompt directly below the closing border is the height assertion.**
     // Three rows measured, three drawn, and nothing between the box and what
     // follows it — a stronger claim than a blank row, which a box one row short
     // would also satisfy.
-    expect(rows[at + 2]?.trimStart().startsWith("❯"), "the prompt follows the box").toBe(true);
+    // The rule bounding the prompt follows the box (C22 I81), and the prompt it.
+    expect(/^[─-]{20,}/u.test(rows[at + 2] ?? ""), "the upper rule follows the box").toBe(true);
+    expect(rows[at + 3]?.trimStart().startsWith("❯"), "the prompt follows the rule").toBe(true);
 
     const before = stdout.chunks.length;
     await tui.stop("exit");

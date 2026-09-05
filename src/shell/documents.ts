@@ -280,6 +280,38 @@ export function toolCallHeader(call: ToolCallSpec): string {
   return parts.join(" · ");
 }
 
+/**
+ * The one-word verdict a settled document earns (C23 I55).
+ *
+ * `exit N` for a far side's non-zero code — the adapter route's `meta.exitCode`
+ * is the subprocess's. The shell's own documents (`transport: "local"`) derive
+ * their code from `status`, so for them the code is not a second fact and the
+ * status is the word: `ok`, or `failed`.
+ */
+export function outcomeOf(doc: ViewDocument): string {
+  if (doc.meta.transport !== "local" && doc.meta.exitCode !== 0) return `exit ${String(doc.meta.exitCode)}`;
+  return doc.status === "ok" ? "ok" : "failed";
+}
+
+/**
+ * A settled document composed with its card (C23 I55, §8g rows 10–12): the
+ * `step` header — verb, elapsed, verdict — over the document's own blocks, which
+ * become the body under the hook (C22 I83). The `settle(id, doc)` routes call
+ * this so no route settles an entry that began as a card into a document
+ * without one; the header keeps the card's id so the readout that drew the
+ * running figure and the header that replaces it are one block.
+ */
+export function cardOver(doc: ViewDocument, call: ToolCallSpec, elapsedMs: number): ViewDocument {
+  const header = block({
+    kind: "notice",
+    id: call.id ?? blockId("step"),
+    tone: "info",
+    glyph: "step",
+    text: toolCallHeader({ ...call, elapsedMs, outcome: outcomeOf(doc) }),
+  });
+  return { ...doc, blocks: [header, ...doc.blocks] };
+}
+
 export function toolCallDoc(
   command: string,
   call: ToolCallSpec,

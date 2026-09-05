@@ -47,6 +47,41 @@ const results = runPass({
     why: "T4.40 asserts the header reads · 4s after four wakes; nothing registered means nothing moves — F771 at the route",
   },
   mutations: [
+    // --- C23 I55, I56 — every settlement keeps the card (T6.85, T6.86) --------
+    {
+      // **T6.85, first arm.** The invoke route settles the adapted document bare:
+      // `❯ /ps` over a table, §9c's settled state reached by no path.
+      name: "the invoke route settles the adapted document without the card",
+      file: EX,
+      from: "      settleWithDocument(pendingId, cardOver(doc, call, deps.clock() - startedAt));",
+      to: "      settleWithDocument(pendingId, doc);",
+      expect: "T4.47",
+    },
+    {
+      // **T6.85, second arm.** The error arm settles `errorDoc` bare.
+      name: "the invoke route's error arm settles the error document without the card",
+      file: EX,
+      from: "      settleWithDocument(pendingId, cardOver(failed, call, deps.clock() - startedAt));",
+      to: "      settleWithDocument(pendingId, failed);",
+      expect: "T4.47",
+    },
+    {
+      // **T6.85, third arm.** The local route appends the handler's document bare.
+      name: "the local route settles without the card",
+      file: EX,
+      from: "      appendAndCommit(carded(doc), settle);",
+      to: "      appendAndCommit(doc, settle);",
+      expect: "T4.47",
+    },
+    {
+      // **T6.86.** The composer prefixes every body row with the hook rather
+      // than the first alone — the indent doubled into the rows below.
+      name: "the hook is drawn on every body row",
+      file: "src/shell/entry-layout.ts",
+      from: '  if (row !== 0) return " ".repeat(run.indent);',
+      to: '  if (row !== 0) return `${glyphFor("continuation", options.capabilities)} `;',
+      expect: "T4.48",
+    },
     {
       // F795 as it shipped: `ps()` for a bare verb.
       name: "the header keeps its parentheses with no arguments",

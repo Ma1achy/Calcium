@@ -12,8 +12,10 @@ import { describe, expect, it } from "vitest";
 
 import { pipelineHarness, settled } from "../support/execution.js";
 import { result } from "../support/transport.js";
+import { doc } from "../support/blocks.js";
 import { b } from "../../src/shell/builders/index.js";
 import { commandRows } from "../../src/shell/paint.js";
+import { entryLayout, measureEntry, renderEntryPieces, windowEntry } from "../../src/shell/entry-layout.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
 import { DARK_THEME, FULL_CAPS, visible } from "../support/render.js";
@@ -200,7 +202,7 @@ describe("C23 I54 — the pending entry is the running card", () => {
     expect(headerOf(h.transcript.entries[0]?.doc.blocks ?? [])?.text).toBe("tail(web.log) · 3s · cancelled");
   });
 
-  it("T4.43 (C23 I54): the invoke route shows the card while the transport runs and settles with the adapter's document, no `step` in it", async () => {
+  it("T4.43 (C23 I54, I55): the invoke route shows the card while the transport runs and settles with the adapter's blocks under the card's header", async () => {
     const held: { release: (() => void) | null } = { release: null };
     const h = pipelineHarness({
       invoke: () => new Promise((r) => { held.release = () => r(result({ exitCode: 0 })); }),
@@ -219,7 +221,10 @@ describe("C23 I54 — the pending entry is the running card", () => {
     const entry = h.transcript.entries[0];
     expect(entry?.streaming).toBe(false);
     expect(entry?.doc.command, "the adapter's document replaced the card (C13 §5)").toBe("adapted");
-    expect(entry?.doc.blocks.some((blk) => blk.kind === "notice" && blk.glyph === "step"), "no header survives a replacement").toBe(false);
+    // **Reversed 2026-09-05** (C23 I55): this read *no header survives a replacement*
+    // and the card is now composed over the replacement — one header, block 0.
+    expect(headerOf(entry?.doc.blocks ?? []), "and the header is composed over it").toEqual({ glyph: "step", text: "ps(--quiet) · 2s · ok" });
+    expect((entry?.doc.blocks ?? []).filter((blk) => blk.kind === "notice" && blk.glyph === "step"), "exactly one").toHaveLength(1);
   });
 
   it("T4.46 (C23 I54; F795): a bare verb is a bare header — `ps`, not `ps()` — and grows its figure the same way", async () => {
@@ -308,12 +313,80 @@ describe("C23 I54 — the pending entry is the running card", () => {
     expect(visible(frame()[1] ?? "").trimEnd()).toBe("⏺ tail(web.log) · 2m 1s · exit 0");
   });
 
-  // The card kept on settlement — C23 §8 rulings of 2026-09-05, rows owed by
-  // the code commit (F814 for why an `it.todo` carries them).
-  it.todo(
-    "T4.47 (C23 I55): `/ps` on the invoke route, a throwing adapter, and a local verb each settle to a document whose block 0 is the `step` notice carrying `⏺ verb(args) · Ns · ok|failed`, followed by the result's own blocks in order; the persisted document at the settle change carries the same block 0 — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
-  );
-  it.todo(
-    "T4.48 (C23 I56, C22 I83): the frame after `/ps` settles shows the table's first row beginning at column 2 under `⎿ ` and the header at column 0; the entry's measured height equals its painted rows — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
-  );
+  // The card kept on settlement — C23 I55/I56, ruled 2026-09-05. Before these
+  // rows the invoke route's `settle(id, doc)` replaced the card wholesale, and
+  // `❯ /ps` over a table was what a finished listing read.
+  it("T4.47 (C23 I55): the invoke route, a throwing adapter and a local verb each settle to the card's header over the result's blocks, and the persisted document carries it", async () => {
+    // The invoke route: `ps · 2s · ok` over the adapted blocks.
+    const held: { release: (() => void) | null } = { release: null };
+    const body = [b.raw("NAME   STATUS", { id: "r1" }), b.raw("web    running", { id: "r2" })];
+    const h = pipelineHarness({
+      invoke: () => new Promise((r) => { held.release = () => r(result({ exitCode: 0 })); }),
+      adapt: () => doc({ command: "adapted", blocks: body }),
+    });
+    const atSettle: Block[][] = [];
+    h.transcript.subscribe((change) => {
+      if (change.kind === "settle") atSettle.push([...(h.transcript.entries.find((e) => e.id === change.id)?.doc.blocks ?? [])]);
+    });
+    h.pipeline.submit("/ps");
+    await settled();
+    seconds(h, 2);
+    held.release?.();
+    await settled();
+    const blocks = h.transcript.entries[0]?.doc.blocks ?? [];
+    expect(headerOf(blocks), "the header is block 0, with the verdict").toEqual({ glyph: "step", text: "ps · 2s · ok" });
+    expect(blocks.slice(1).map((blk) => blk.id), "the result's own blocks follow it, in order").toEqual(["r1", "r2"]);
+    expect(blocks.slice(1).some((blk) => blk.kind === "notice" && blk.glyph === "step"), "one header, not two").toBe(false);
+    expect(atSettle, "one settle change, and the document it wrote carries the header").toHaveLength(1);
+    expect(headerOf(atSettle[0] ?? [])?.text).toBe("ps · 2s · ok");
+
+    // A throwing adapter: `ps · failed` over the status box.
+    const h2 = pipelineHarness({ invoke: () => Promise.reject(new Error("boom")) });
+    h2.pipeline.submit("/ps --quiet");
+    await settled();
+    await settled();
+    const failed = h2.transcript.entries[0]?.doc.blocks ?? [];
+    expect(headerOf(failed)).toEqual({ glyph: "step", text: "ps(--quiet) · failed" });
+    expect(failed[1]?.kind, "the status box is the body").toBe("status");
+    expect(h2.transcript.entries[0]?.doc.status).toBe("error");
+
+    // A local verb: the header over the handler's blocks — a local verb is a call.
+    const h3 = pipelineHarness();
+    h3.pipeline.submit("/guide");
+    await settled();
+    const local = h3.transcript.entries[0]?.doc.blocks ?? [];
+    expect(headerOf(local)).toEqual({ glyph: "step", text: "guide · ok" });
+    expect(h3.transcript.entries[0]?.doc.meta.transport, "a local document's verdict is its status").toBe("local");
+  });
+
+  it("T4.48 (C23 I56, C22 I83): the frame after `/ps` settles hangs the body two cells in under `⎿` with the header flush, and the measured height is the painted height", async () => {
+    const registry = createBlockRegistry({ defaults: true });
+    const h = pipelineHarness({
+      adapt: () => doc({ command: "adapted", blocks: [b.raw("NAME   STATUS", { id: "r1" }), b.raw("web    running", { id: "r2" })] }),
+    });
+    h.pipeline.submit("/ps");
+    await settled();
+    await settled();
+    const settledDoc = h.transcript.entries[0]?.doc;
+    expect(settledDoc).toBeDefined();
+    const blocks = settledDoc?.blocks ?? [];
+    expect(headerOf(blocks)?.text).toBe("ps · ok");
+
+    // **Through the shell's layout, as `visibleRows` and C14's wrapper both do**
+    // (C22 §6l.4 D): the header at 80, the body at 78 with the hook.
+    const options = { theme: DARK_THEME, capabilities: FULL_CAPS };
+    const height = measureEntry(registry.measureSequence, blocks, 80);
+    const drawn = renderEntryPieces(registry, windowEntry(entryLayout(blocks, 80), 0, height, registry), options);
+    expect(drawn.rows, "measured rows are painted rows").toHaveLength(height);
+    expect(drawn.faults).toEqual([]);
+    const rows = drawn.rows.map((l) => visible(l).trimEnd());
+    expect(rows[0]?.startsWith("⏺ ps · ok"), "the header at column 0").toBe(true);
+    expect(rows[1]?.startsWith("⎿ "), "the body's first row under the hook, at column 2").toBe(true);
+    for (const row of rows.slice(2)) expect(row === "" || row.startsWith("  "), "every body row indented").toBe(true);
+    // **The indent is the shell's, not the document's** (I56): the blocks carry
+    // no gutter of their own, so a second composer does not indent twice.
+    expect(blocks.slice(1).every((blk) => blk.kind !== "notice" || blk.glyph !== "continuation")).toBe(true);
+    const flat = renderSequenceToLines(registry, blocks.slice(1), 78, options).map((l) => visible(l).trimEnd());
+    expect(rows[1]).toBe(`⎿ ${flat[0] ?? ""}`);
+  });
 });

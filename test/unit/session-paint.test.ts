@@ -22,6 +22,9 @@ import { SGR_RESET, sgr } from "../../src/terminal/escapes.js";
 import { resolveBase } from "../../src/presentation/theme/index.js";
 import type { SessionSnapshot } from "../../src/shell/types.js";
 
+/** C09's measurer, for the footer's height (C22 I82). */
+const MEASURE = createBlockRegistry({ defaults: true }).measureSequence;
+
 const SESSION: SessionSnapshot = Object.freeze({
   cwd: "/work",
   env: Object.freeze({}),
@@ -56,7 +59,8 @@ function deps(over: Partial<PaintDeps> = {}): PaintDeps {
 
 function frameAt(columns: number, rows: number, promptRows = 1): Composed {
   return compose({
-    chrome: { header: () => [], footer: () => [], footerRows: 1 },
+    chrome: { header: () => [], footer: () => [] },
+    measureSequence: MEASURE,
     session: () => SESSION,
     copyMode: () => false,
     now: () => 1_700_000_000_000,
@@ -163,7 +167,8 @@ describe("C22 §6 — the paint", () => {
     };
 
     const f = compose({
-      chrome: { header: () => [], footer: () => [], footerRows: 1 },
+      chrome: { header: () => [], footer: () => [] },
+      measureSequence: MEASURE,
       session: () => SESSION,
       copyMode: () => false,
       now: () => 1_700_000_000_000,
@@ -187,7 +192,7 @@ describe("C22 §6 — the paint", () => {
 
     expect(f.promptRows, "half of 24").toBe(12);
     expect(f.promptWanted, "and what it wanted is kept, so §3 can window").toBe(200);
-    expect(f.region.height, "the viewport keeps the rest").toBe(24 - 1 - 1 - 12);
+    expect(f.region.height, "the viewport keeps the rest").toBe(24 - 1 - 2 - 12 - 0); // no footer here: `[]` is zero rows (C22 I82)
 
     // **The cursor is named, and it was not** (I62, §6e.4). *The newest rows are
     // shown* was a consequence of the window being anchored on the buffer's end,
@@ -222,11 +227,16 @@ describe("C22 §6 — the paint", () => {
     // window rather than a theoretical one — a resize can arrive between the
     // gate and the frame. That is also what keeps this branch alive under I62
     // (§6e table row 6).
-    const f = frameAt(40, 3, 3);
-    expect(f.promptRows, "half of three, floored").toBe(1);
+    // **Constructed, since `compose` no longer reaches it** (C22 I81): the
+    // chrome is four rows — header, two rules, a prompt — and a cap of one needs
+    // three, so at three rows the sum is false and the fallback draws. The cap
+    // path in `promptWindow` is still code, so the frame that exercises it is
+    // built by hand with a region of zero rows, and it still sums.
+    const f: Composed = { ...frameAt(40, 4, 3), promptRows: 1, promptWanted: 3, region: { top: 1, height: 0 }, overlayRegion: { width: 40, height: 0 } };
+    expect(f.promptRows, "a cap of one").toBe(1);
 
     const lines = paint(f, deps({ promptRows: () => ["first", "second", "third"] }));
-    const prompt = lines[1 + f.region.height];
+    const prompt = lines[2 + f.region.height]; // below the upper rule (C22 I81)
 
     expect(prompt?.startsWith("❯ first"), "the cursor's row, gutter and all").toBe(true);
     expect(lines.join("").includes("⋯"), "and no marker, because there is no room for one").toBe(
@@ -259,7 +269,7 @@ describe("C22 §6 — the paint", () => {
     // glyph is two cells wide.
     const f = frameAt(80, 24, 3);
     const lines = paint(f, deps({ promptRows: () => ["one", "two", "three"] }));
-    const prompt = lines.slice(1 + f.region.height, 1 + f.region.height + 3);
+    const prompt = lines.slice(2 + f.region.height, 2 + f.region.height + 3);
 
     expect(prompt[0]?.startsWith("❯ one")).toBe(true);
     expect(prompt[1]?.startsWith("  two")).toBe(true);
@@ -400,7 +410,7 @@ describe("C22 — the selection wash (roadmap entry 23)", () => {
   };
 
   /** The painted index of prompt row `i`: header + viewport, then the prompt. */
-  const promptAt = (f: Composed, i: number): number => f.region.height + 1 + i;
+  const promptAt = (f: Composed, i: number): number => f.region.height + 2 + i; // header, region, the upper rule
 
   it("T4.22 (C11 I17, I9): the wash is appearance — no row and no cell moves", () => {
     // **The invariant at every step, not a note about this one.** A row of

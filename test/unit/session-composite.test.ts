@@ -23,6 +23,9 @@ import { anchored, registry as measurer, rows as contentRows } from "../support/
 import { DARK_THEME, FULL_CAPS, visible } from "../support/render.js";
 import type { SessionSnapshot } from "../../src/shell/types.js";
 
+/** C09's measurer, for the footer's height (C22 I82). */
+const MEASURE = createBlockRegistry({ defaults: true }).measureSequence;
+
 const SESSION: SessionSnapshot = Object.freeze({
   cwd: "/work",
   env: Object.freeze({}),
@@ -38,7 +41,8 @@ const SESSION: SessionSnapshot = Object.freeze({
 /** A frame with a recognisable base underneath, so a bleed is visible. */
 function frameAt(columns = 40, rows = 12): Composed {
   return compose({
-    chrome: { header: () => [], footer: () => [], footerRows: 1 },
+    chrome: { header: () => [], footer: () => [] },
+    measureSequence: MEASURE,
     session: () => SESSION,
     copyMode: () => false,
     now: () => 1_700_000_000_000,
@@ -56,7 +60,8 @@ function frameAt(columns = 40, rows = 12): Composed {
  */
 function frameWanting(columns: number, rows: number, wanted: number): Composed {
   return compose({
-    chrome: { header: () => [], footer: () => [], footerRows: 1 },
+    chrome: { header: () => [], footer: () => [] },
+    measureSequence: MEASURE,
     session: () => SESSION,
     copyMode: () => false,
     now: () => 1_700_000_000_000,
@@ -350,7 +355,7 @@ describe("C22 §6a — the cursor (C15 I19)", () => {
     expect(
       cursorFor(f, inert),
       "a menu that opened by itself: the prompt still holds the keys and the row",
-    ).toEqual({ row: f.region.top + f.region.height, col: 2 });
+    ).toEqual({ row: f.region.top + f.region.height + 1, col: 2 });
 
     overlays.dismiss("menu");
     overlays.push(layerWith("search", { row: 0, col: 5 }));
@@ -369,7 +374,7 @@ describe("C22 §6a — the cursor (C15 I19)", () => {
 
   it("T1.20 (C15 I19): the prompt's cursor when nothing is stacked, and hidden when focus is elsewhere", () => {
     const f = frameAt();
-    const promptRow = f.region.top + f.region.height;
+    const promptRow = f.region.top + f.region.height + 1;
 
     expect(cursorFor(f, deps(() => []))).toEqual({ row: promptRow, col: 2 });
     expect(
@@ -402,7 +407,7 @@ describe("C22 §6a — the cursor (C15 I19)", () => {
 
     for (const row of [0, 1, 2, 3]) {
       expect(cursorFor(f, windowed(row)), `row ${String(row)} is on screen`).toEqual({
-        row: f.region.top + f.region.height,
+        row: f.region.top + f.region.height + 1,
         col: 4,
       });
     }
@@ -477,7 +482,7 @@ describe("C22 §6a — the cursor (C15 I19)", () => {
       ...deps(() => [], "·", f.region.height),
       promptRows: () => ["r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8"],
       promptCursor: () => ({ row: 4, col: 2 }),
-    }).slice(1 + f.region.height, 1 + f.region.height + f.promptRows);
+    }).slice(2 + f.region.height, 2 + f.region.height + f.promptRows);
 
     expect(painted.filter((l) => l.includes("⋯")), "a marker at each end").toHaveLength(2);
     expect(painted[0]?.includes("⋯"), "above").toBe(true);
@@ -493,7 +498,7 @@ describe("C22 §6a — the cursor (C15 I19)", () => {
       ...deps(() => [], "·", f.region.height),
       promptRows: () => ["r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8"],
       promptCursor: () => ({ row: 0, col: 2 }),
-    }).slice(1 + f.region.height, 1 + f.region.height + f.promptRows);
+    }).slice(2 + f.region.height, 2 + f.region.height + f.promptRows);
 
     expect(head[0], "at the head the first row is the command").toContain("r0");
     expect(head.filter((l) => l.includes("⋯")), "and one marker, below").toHaveLength(1);
@@ -515,7 +520,7 @@ describe("C22 §6a — the cursor (C15 I19)", () => {
       promptRows: () => ["r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8"],
       promptCursor: () => ({ row: 4, col: 2 }),
       spinning: () => true,
-    }).slice(1 + f.region.height, 1 + f.region.height + f.promptRows);
+    }).slice(2 + f.region.height, 2 + f.region.height + f.promptRows);
 
     const spinner = painted.filter((l) => /[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/u.test(l));
     expect(spinner, "one row carries it").toHaveLength(1);
@@ -538,7 +543,7 @@ describe("C22 §6a — the cursor (C15 I19)", () => {
       ...deps(() => [], "·", f.region.height),
       promptRows: () => ["r0", "r1", "r2", "r3", "r4", "r5"],
       promptCursor: () => ({ row: 5, col: 2 }),
-    }).slice(1 + f.region.height, 1 + f.region.height + f.promptRows);
+    }).slice(2 + f.region.height, 2 + f.region.height + f.promptRows);
 
     expect(painted[0], "the marker above").toContain("⋯");
     expect(painted.filter((l) => l.includes("⋯")), "and only above").toHaveLength(1);

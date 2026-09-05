@@ -1555,6 +1555,11 @@ export function checkOneStorePerComponent(files, readFile = (f) => readFileSync(
 
 /** Members whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_MEMBERS = Object.freeze({
+  "EntryPiece.localFrom":
+    "C22 §6l.4 D — the run-local row a window opens at, carried from `windowEntry` to " +
+    "`renderEntryPieces` in the same file so the hook lands on the body's first row only. " +
+    "The seam is between two functions of one module; `session.ts` holds the pieces without " +
+    "reading this member, and T1.42 reads it through a window that opens inside the body",
   // **Three \`Basis\` members and five \`project3\` functions left here at once**,
   // on the commit that built \`plot3d\` — one loan, one symbol, one release,
   // which is what the equality arm makes possible and a membership check would
@@ -1946,7 +1951,6 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   "ConformanceReport.kindsCovered": "C09 §7 — measurement-conformance coverage, asserted by the harness's own row",
   "ConformanceReport.exactness": "C09 §2a — how many windows were compared row for row and how many the EXACT_ROWS bound left out. A report, so its consumer is the row that reads it: `block-window.test.ts` asserts `read`, because a bound nobody can see reads as coverage",
   "Failure.check": "C09 §7 — measurement failure record, asserted by the harness",
-  "Failure.expected": "C09 §7 — as `check`",
   "ElementFailure.predicate":
     "C26 §5 — element-conformance failure record, asserted by the harness's own row. " +
     "Same disposal as `Failure.check` above and for the same reason: a conformance " +

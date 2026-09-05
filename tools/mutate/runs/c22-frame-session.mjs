@@ -72,10 +72,10 @@ const results = runPass({
     {
       name: "frame: let the transcript height go negative",
       file: "src/shell/frame.ts",
-      // Re-anchored 2026-09-05 when the footer's budget stopped being a constant
-      // (C22 §6k): `footerRows` is the session's, `FOOTER_ROWS` no longer exists.
-      from: "  const height = Math.max(0, size.rows - HEADER_ROWS - footerRows - promptRows);",
-      to: "  const height = size.rows - HEADER_ROWS - footerRows - promptRows;",
+      // Re-anchored 2026-09-05 twice: when the footer's budget stopped being a
+      // constant (§6k), and when the two rules entered the subtraction (§6l, I81).
+      from: "  const height = Math.max(0, size.rows - HEADER_ROWS - RULE_ROWS - footerRows - promptRows);",
+      to: "  const height = size.rows - HEADER_ROWS - RULE_ROWS - footerRows - promptRows;",
       expect: "T4.9b",
     },
     // --- §4, the fallback ----------------------------------------------------

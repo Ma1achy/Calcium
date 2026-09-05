@@ -29,6 +29,7 @@ import { blankRowsAbove, commandRows } from "./paint.js";
 import { noticeDoc } from "./documents.js";
 import type { NavElement } from "../presentation/blocks/index.js";
 import { initialRegionHeight } from "./frame.js";
+import { elementsOfEntry, measureEntry } from "./entry-layout.js";
 import { createManifestStore, parseManifest, withThemeNames } from "../data/manifest/index.js";
 import type { ManifestError } from "../data/manifest/index.js";
 import { block as makeBlock, descendants } from "../data/viewmodel/index.js";
@@ -654,10 +655,13 @@ export async function constructGraph(
       // that frame exists, and an initial value in the wrong axis is the same
       // defect with a shorter life. One row of prompt is the floor, which is
       // what a session opens with.
-      // With the footer's budget (C22 I79, §6k): without it the first frame corrects
-      // the region by `footerRows − 1` rows — T1.37 measures the gap.
-      height: initialRegionHeight(size, config.chrome.footerRows),
-      measureSequence: (blocks, width) => built.blocks.measureSequence(blocks, width),
+      // The footer is guessed at one row (C22 §6l.2 row 8); the first frame
+      // corrects the region by `f − 1` — T1.37 measures the gap.
+      height: initialRegionHeight(size),
+      // **Through the entry's layout** (C22 I83, §6l.4 D): a card's body is
+      // measured at `width − 2`, by the same function `visibleRows` renders it
+      // through, so the rows C14 counts are the rows the frame draws.
+      measureSequence: (blocks, width) => measureEntry(built.blocks.measureSequence, blocks, width),
       // C14 I20 / C22 I33 — the command line is chrome the composer draws, so
       // it is part of the height the index virtualises against. **The same
       // function that draws it**, or the two arithmetics part company and the
@@ -1296,7 +1300,9 @@ export async function constructGraph(
     if (id === null) return [];
     const entry = stores.transcript.entries.find((e) => e.id === id);
     if (entry === undefined) return [];
-    return built.blocks.elementsIn(entry.doc.blocks, deps.frame.overlayRegion().width);
+    // Through the entry's layout (C22 I83): a card's body elements sit two
+    // cells in, and their rows follow the header measured at the full width.
+    return elementsOfEntry(built.blocks, entry.doc.blocks, deps.frame.overlayRegion().width);
   };
   /** The live entry's — what `↓` from the prompt enters (C16 I22). */
   const liveElements = (): readonly Readonly<{ blockId: string; element: NavElement }>[] =>

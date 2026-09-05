@@ -12,6 +12,8 @@
 // A fixture holding its own number agrees with itself forever.
 import { describe, expect, it } from "vitest";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
+import { RULE_ROWS } from "../../src/shell/config.js";
+import { block } from "../../src/data/viewmodel/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
 import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
@@ -34,6 +36,9 @@ const S01_SESSION: SessionSnapshot = Object.freeze({
   stopping: false,
 });
 import { DARK_THEME, FULL_CAPS } from "../support/render.js";
+
+/** C09's measurer, for the footer's height (C22 I82). */
+const MEASURE = createBlockRegistry({ defaults: true }).measureSequence;
 
 describe("the S-series' illustrated heights", () => {
   for (const frame of SURFACE_FRAMES) {
@@ -114,9 +119,11 @@ describe("the S-series' illustrated heights", () => {
   // unwritable, which is the failure this triage exists to prevent and is
   // indistinguishable from a row that expired correctly.
   it("S01 §2's regions are the ones §3 computes", () => {
-    // **The figure is a diagram; its three horizontal rules are not rendered**
-    // (S01 §2). `frameRows` strips them, and what is left is the frame §3
-    // describes: header, viewport, prompt, footer.
+    // **The figure is a diagram and `frameRows` strips its three horizontal
+    // rules.** Two of them are rendered now — the rules bounding the prompt
+    // (C22 I81, §6l) — and the header's underline is not, so the composed frame
+    // is the stripped figure plus `RULE_ROWS`, and what is compared is the
+    // decomposition: header, viewport, prompt, footer.
     //
     // **The assertion is the decomposition, not the row count.** A first draft
     // composed at the figure's own dimensions and asserted the paint returned
@@ -156,11 +163,13 @@ describe("the S-series' illustrated heights", () => {
     const drawnFooter = lines.length - promptRow - 1;
 
     const frame = compose({
-      chrome: { header: () => [], footer: () => [], footerRows: 1 },
+      // The figure draws one footer row, so the footer is one block (C22 I82).
+      chrome: { header: () => [], footer: () => [block({ kind: "notice", id: "f", tone: "muted", text: "keys" })] },
+      measureSequence: MEASURE,
       session: () => S01_SESSION,
       copyMode: () => false,
       now: () => 1_700_000_000_000,
-      size: () => ({ columns: width, rows }),
+      size: () => ({ columns: width, rows: rows + RULE_ROWS }),
       promptRows: () => 1,
     });
 

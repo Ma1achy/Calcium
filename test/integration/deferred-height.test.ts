@@ -116,7 +116,8 @@ describe("C22 I69 — the next frame honours the floor", () => {
     ).toBe(2);
     // **One row, because that is what a `rule` measured** — the frame that
     // discovered the throw could not have drawn more without cutting the notice.
-    expect(first.some((r) => r.includes("─") || r.includes("│")), "no border yet").toBe(false);
+    // `│` and the corners, not `─`: the frame's two rules are `─` at every size (C22 I81).
+    expect(first.some((r) => r.includes("│") || r.includes("┌")), "no border yet").toBe(false);
 
     // One more frame. Nothing else changed.
     stdin.emit("x");

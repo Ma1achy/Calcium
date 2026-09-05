@@ -31,26 +31,31 @@ export const MIN_COLUMNS = 60;
 export const MIN_ROWS = 16;
 
 /**
- * §6, §6k — the chrome's row budget. The header is one row, a constant: A02 §6
- * adds a hook when something needs it and nothing does. The footer's default
- * is one row, and an app declares more in `chrome.footerRows` (I79).
+ * §6, §6l — the chrome's rows. The header is one row, a constant: A02 §6 adds
+ * a hook when something needs it and nothing does. **Two rules bound the
+ * prompt** (I81), one above and one below, at every size the gate accepts —
+ * they are geometry, not configuration (§6l.4 F). The footer is as tall as
+ * its blocks (I82); `DEFAULT_FOOTER_ROWS` is the one-row guess the first frame
+ * opens with before any `ChromeFn` has run (§6l.2 row 8), and the default
+ * footer is one `pills` row, so the guess is right for the default session.
  *
- * **They live here rather than in `frame.ts`** because `validateConfig` has to
- * refuse a budget the frame cannot hold, and `frame.ts` already imports this
- * file — the other direction is a cycle inside L4 (MG22).
+ * **They live here rather than in `frame.ts`** because the maximum below is
+ * derived from the size gate, and `frame.ts` already imports this file — the
+ * other direction is a cycle inside L4 (MG22).
  */
 export const HEADER_ROWS = 1;
+export const RULE_ROWS = 2;
 export const DEFAULT_FOOTER_ROWS = 1;
 
 /**
- * **Derived, not chosen** (I79, §6k.2 row 2). The largest footer that leaves one
+ * **Derived, not chosen** (I80, §6l.2 row 7). The tallest footer that leaves one
  * region row at the size gate with the prompt at its cap: at `MIN_ROWS` the
- * prompt may take `⌊MIN_ROWS / 2⌋` rows (S01 §3), the header takes one, and the
- * region must keep one. Six today, and it moves when `MIN_ROWS` moves — a
- * hand-written `6` would still read as correct the day the gate changed and the
- * region went to zero at a size the gate accepted.
+ * prompt may take `⌊MIN_ROWS / 2⌋` rows (S01 §3), the header takes one, the two
+ * rules take two, and the region must keep one. Four today, and it moves when
+ * `MIN_ROWS` moves — a hand-written `4` would still read as correct the day the
+ * gate changed and the region went to zero at a size the gate accepted.
  */
-export const MAX_FOOTER_ROWS = MIN_ROWS - HEADER_ROWS - Math.floor(MIN_ROWS / 2) - 1;
+export const MAX_FOOTER_ROWS = MIN_ROWS - HEADER_ROWS - RULE_ROWS - Math.floor(MIN_ROWS / 2) - 1;
 
 /**
  * §6 — C22 owns the frame, so C22 passes the gutter; C17 must not assume one.
@@ -138,23 +143,10 @@ export function validateConfig(config: TuiConfig): void {
   if (cap !== undefined && (!Number.isInteger(cap) || cap < 1)) {
     throw new ConfigError("maxBlockRows", `must be a positive integer, got ${String(cap)}`);
   }
-  // C22 I79, T1.35 — refused here rather than at frame time, because the frame
-  // that cannot hold it is the one at the size gate with the prompt at its
-  // cap, which is exactly the frame nobody composes while developing.
   // C01 I21 — a boolean or absent; a truthy string here would turn 1003 on for
   // an app that wrote `hover: "false"`, which is the wrong direction to fail in.
   if (config.hover !== undefined && typeof config.hover !== "boolean") {
     throw new ConfigError("hover", `must be a boolean, got ${String(config.hover)}`);
-  }
-  const footerRows = config.chrome?.footerRows;
-  if (
-    footerRows !== undefined &&
-    (!Number.isInteger(footerRows) || footerRows < 1 || footerRows > MAX_FOOTER_ROWS)
-  ) {
-    throw new ConfigError(
-      "chrome.footerRows",
-      `must be an integer from 1 to ${String(MAX_FOOTER_ROWS)}, got ${String(footerRows)}`,
-    );
   }
 }
 
@@ -202,14 +194,9 @@ export function resolveConfig(config: TuiConfig, ambient: Ambient) {
     fallbackAdapter: createFallbackAdapter(),
     commandPolicy: config.commandPolicy ?? slashPolicy,
     completionSources: config.completionSources ?? [],
-    // §6k, I79 — the budget is resolved here with every other default, so
-    // `frame.ts` reads a number and never a `??`. `makeDefaultChrome` does not
-    // carry it: `chrome.ts` cannot import this file without a cycle, and the
-    // default belongs where the other defaults are.
-    chrome: Object.freeze({
-      ...(config.chrome ?? makeDefaultChrome(config.name, config.binary)),
-      footerRows: config.chrome?.footerRows ?? DEFAULT_FOOTER_ROWS,
-    }),
+    // §6l — the chrome is two functions and nothing else: the footer's height
+    // is what its blocks measure (I82), so there is no budget to resolve here.
+    chrome: config.chrome ?? makeDefaultChrome(config.name, config.binary),
     blocks: config.blocks ?? [],
     // C14 I24 — the registry's default, resolved here so there is one place
     // the value lives and one constant it is read from (C09 §2b).

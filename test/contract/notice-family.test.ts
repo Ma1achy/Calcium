@@ -46,7 +46,11 @@ const runLocal = async (line: string): Promise<readonly string[]> => {
   const h = pipelineHarness();
   h.pipeline.submit(line);
   await settled();
-  return frame(lastBlocks(h));
+  // **Without the card's header** (C23 I55): a local verb settles as a card
+  // since 2026-09-05, and block 0 is the shell's `⏺ verb · ok` — the family's
+  // bytes are the handler's, under it. The stream rows (N11, N13) keep theirs:
+  // there the header was always part of the literal.
+  return frame(lastBlocks(h).filter((blk, i) => !(i === 0 && blk.kind === "notice" && blk.glyph === "step")));
 };
 
 /** Captured at 73882a4f — the literal's frame. */

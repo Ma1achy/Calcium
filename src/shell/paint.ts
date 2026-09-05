@@ -35,9 +35,10 @@ import { cells, hardWrapCells, sliceCells } from "../presentation/text.js";
 import { paint as paintSpans, tone, selectionStyle } from "../presentation/blocks/paint.js";
 import { SGR_RESET, sgr, toTerminalDefault } from "../terminal/escapes.js";
 import { HEADER_ROWS, promptFor, PROMPT_GUTTER } from "./config.js";
+import { glyphs } from "../presentation/blocks/index.js";
 import { composite } from "./composite.js";
 import { exact, FrameError } from "./frame-error.js";
-import { gutterMatchesPrompt, heightsSum, type Composed } from "./frame.js";
+import { gutterMatchesPrompt, heightsSum, promptTop, type Composed } from "./frame.js";
 import type { Block } from "../data/viewmodel/index.js";
 import type { Placed } from "../viewport/overlay/index.js";
 import type { Cell, CellSpan } from "../interaction/editor/index.js";
@@ -150,6 +151,19 @@ function spinnerGlyph(caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWid
 // `FrameError` and `exact` live in `frame-error.ts` (A03 MG2): `composite.ts`
 // needs both and this file needs `composite`, and the cycle that made was the
 // one MG2 found on the day it was implemented.
+
+/**
+ * One rule row (C22 I81, §6l.4 A): the `horizontal` glyph across the full
+ * width, in the muted tone at every depth and **plain at 1-bit** — a rule is
+ * geometry, and one that needed colour to read would be F34's class. The glyph
+ * comes from C09's table so the ASCII tier gets `-` from the same place every
+ * other rule in the frame does.
+ */
+function rule(width: number, deps: PaintDeps): string {
+  const text = glyphs(deps.capabilities).horizontal.repeat(width);
+  if (deps.capabilities.colourDepth === 1) return text;
+  return paintSpans([{ text, style: tone("muted", deps.theme, deps.capabilities) }]);
+}
 
 /**
  * `n` rows of `blocks`, rendered at `width` and squared off.
@@ -503,7 +517,7 @@ export function paint(frame: Composed, deps: PaintDeps): readonly string[] {
     throw new FrameError(
       `frame heights do not sum to ${String(frame.size.rows)} rows: ` +
         `header ${String(HEADER_ROWS)} + viewport ${String(frame.region.height)} + ` +
-        `prompt ${String(frame.promptRows)} + footer ${String(frame.footerRows)}`,
+        `rules 2 + prompt ${String(frame.promptRows)} + footer ${String(frame.footerRows)}`,
     );
   }
 
@@ -552,10 +566,16 @@ export function paint(frame: Composed, deps: PaintDeps): readonly string[] {
     [
       ...region(frame.header, HEADER_ROWS, width, deps),
       ...transcript(frame, deps, width),
+      // **Two rules, always** (I81) — the row above the prompt and the row
+      // below it, whatever the footer holds. The lower one is drawn with a
+      // footer of zero rows too: a frame whose bottom edge moved with whether
+      // the app returned a block would flicker on content (§6l.2 row 3).
+      rule(width, deps),
       ...promptRegion(frame, deps, width),
-      // **The composed budget, not `1`** (I80). `region()` truncates to it and
-      // pads to it, so the footer's height is the session's and never its
-      // content's — and the mutation that writes `1` back here is T6.96.
+      rule(width, deps),
+      // **The composed height, not `1`** (I80, I82). `region()` truncates to it
+      // and pads to it, so a footer taller than `MAX_FOOTER_ROWS` shows its top
+      // (§6l.2 row 5) and one of zero rows takes nothing.
       ...region(frame.footer, frame.footerRows, width, deps),
     ],
     deps.overlays(),
@@ -629,7 +649,8 @@ export function cursorFor(frame: Composed, deps: PaintDeps): Cell | null {
   if (!shows(window, cell.row)) return null;
   const within = cell.row - window.first + window.offset;
 
-  return { row: frame.region.top + frame.region.height + within, col: cell.col };
+  // **Below the upper rule** (I81) — `promptTop` is the one place that adds it.
+  return { row: promptTop(frame) + within, col: cell.col };
 }
 
 /**

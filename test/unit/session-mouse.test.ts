@@ -735,14 +735,16 @@ describe("C16 §4a — the crosshair, read from the painted frame", () => {
     expect(ruleRow(), "no mark before the click").not.toContain("▲");
     expect(text().join("\n")).not.toMatch(/train: \d/u);
 
-    await type(sgrClick(areaRow, 41));
-    expect(ruleRow().indexOf("▲"), "the mark is under the pointer").toBe(41);
+    // The plot is a card's body, two cells in (C22 I83), so its tick centres sit
+    // at 24, 33, 42 … rather than 23, 32, 41; the pointer goes to a centre.
+    await type(sgrClick(areaRow, 42));
+    expect(ruleRow().indexOf("▲"), "the mark is under the pointer").toBe(42);
     expect(text().join("\n"), "and the readout names the third sample").toMatch(/train: 30/u);
 
     // A second click at the tie: the mark goes to sample 1's column, nine cells
     // left of the pointer — the mark follows the data and not the mouse.
-    await type(sgrClick(areaRow, 32));
-    expect(ruleRow().indexOf("▲")).toBe(23);
+    await type(sgrClick(areaRow, 24));
+    expect(ruleRow().indexOf("▲")).toBe(24);
     expect(text().join("\n")).toMatch(/train: 20/u);
     expect(text().join("\n")).not.toMatch(/train: 30/u);
   });
@@ -893,8 +895,8 @@ describe("C16 §4a — the hover, read from the painted frame", () => {
     expect(cursorRow(), "focus at the prompt: the cursor is on its row").toBe(promptRow);
     expect(ruleRow()).not.toContain("▲");
 
-    await type(sgrHover(areaRow, 41));
-    expect(ruleRow().indexOf("▲"), "the mark is under the pointer").toBe(41);
+    await type(sgrHover(areaRow, 42)); // a tick centre under the indent (C22 I83)
+    expect(ruleRow().indexOf("▲"), "the mark is under the pointer").toBe(42);
     expect(text().join("\n"), "and the readout names the third sample").toMatch(/train: 30/u);
     expect(cursorRow(), "and the cursor is still on the prompt row — focus did not move").toBe(promptRow);
 

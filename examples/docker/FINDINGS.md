@@ -29309,3 +29309,46 @@ convenience stops being one. This round's five rows land that way in `frame-budg
 
 ---
 
+## F815 — landing the default look: two wiring survivors, a hook made optional to pass, a cursor on the rule, and a fault report that summed two runs ★★★☆☆
+
+**What landed.** C22 §6l and C23 I55/I56 as code: two rules around the prompt, a footer as tall as
+its blocks, the card's body two cells in under `⎿`, and every settlement keeping the card. Nineteen
+rows across eight files moved, and four things came out of landing them that no row asked for.
+
+**1. The two wiring mutations survived, and one survived because a row had been softened to
+pass.** T6.100's pair — `visibleRows` bypassing `entryLayout`, and the measurer wrapper measuring
+the body flush — survived the first pass. T1.41 and T1.42 call `entryLayout` directly and are correct
+about it, so a `visibleRows` that never called it passes both: *a test that calls the mechanism misses
+the wiring*, again. The second half is the one to keep: T4.28's box-above-the-notice check had been
+loosened to `/^\s*(⎿ )?┌/` **while making the suite green**, and the optional group is exactly the
+bypass. A row edited to accept the new frame accepted the old one too. It is `⎿ ┌` now, and T4.62 is
+the row the measurer half needed — a 99-cell notice at 100 columns, whose last cell is on no row when
+C14 believes the entry is two rows and the frame draws three.
+
+**2. The cursor was placed on the rule.** `cursorFor` computed the prompt's row as `region.top +
+region.height`, which was the prompt's row for as long as nothing sat between the region and the
+prompt. Two cursor rows in `session-composite` found it (*through the padding: expected 20 to be
+18*). `promptTop(frame)` in `frame.ts` is the one implementation now, and the painter reads it.
+
+**3. The over-draw report summed the header into the body's figures.** T4.54 reads *drew 4 rows where
+measure committed 2*; with the card's header as a run of its own the report said 5 and 3, figures no
+block produced. `renderEntryPieces` reports one fault per run.
+
+**4. The plot's tick centres moved two cells and a row that clicked on them read as a defect.**
+`session-mouse` T4.70c/T4.72c click at column 41 and expect the `▲` at 41; under the indent the mark
+landed at 42. Not a writer defect — `sampleUnder` reads the element's lifted columns — but the pointer
+now sits between centres, and a mark drawn at a sample's centre is a column off from a pointer that
+is not. The rows click on the new centres. **The measured case for `elementsOfEntry` lifting
+columns**: had it not, the mark would have been two off, not one.
+
+**Also moved, and not defects**: the `S01 §2` figure test counts the two rules the helper strips
+(`rows + RULE_ROWS`); T1.5b's one-row prompt cap is reachable only by construction now — the chrome
+needs four rows and a cap of one needs three; the notice family's six local rows read the handler's
+blocks under the card's header while the two stream rows keep theirs, because there the header was
+always in the literal.
+
+**Where**: `src/shell/entry-layout.ts`; `src/shell/frame.ts` `promptTop`; `src/shell/session.ts`
+`visibleRows`; `test/integration/session.test.ts` T4.28, T4.62; `tools/mutate/runs/c22-footer-budget.mjs`.
+
+---
+

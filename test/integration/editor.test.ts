@@ -295,7 +295,8 @@ it("T4.7 (C17 §2, C22 I13): the prompt's rendered height equals displayRows, on
   const paintedRows = (): number => {
     const frame = frameRows();
     const first = frame.findIndex((r, i) => i > 0 && r.trimStart().startsWith("❯"));
-    return first === -1 ? 0 : frame.length - 1 - first;
+    // Below the prompt: the lower rule and the one-row default footer (C22 I81, §6l.4 E).
+    return first === -1 ? 0 : frame.length - 2 - first;
   };
 
   // **Three heights, because one cannot tell the two readings apart.** A prompt
