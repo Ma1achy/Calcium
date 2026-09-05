@@ -22,5 +22,7 @@ export const manifest = {
     { name: "rungs", local: true, summary: "The failure box at every height and width rung", args: [], flags: [] },
     { name: "mosaic", local: true, summary: "Layouts named as a picture", args: [], flags: [] },
     { name: "image", local: true, summary: "Eight fixtures — five about placement, three about the decoder", args: [], flags: [] },
+    { name: "spinners", local: true, summary: "Every spinner set the catalogue names, turning", args: [], flags: [] },
+    { name: "bars", local: true, summary: "Every bar style at four fills", args: [], flags: [] },
   ],
 } as const;

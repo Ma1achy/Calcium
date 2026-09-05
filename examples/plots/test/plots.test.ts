@@ -25,7 +25,7 @@ import type { Block, ViewDocument, TerminalCapabilities } from "@fmx/calcium";
 import { CATALOGUE, everyVariant, FORMS, refusals, variantsOf } from "../src/catalogue.ts";
 import type { Entry } from "../src/catalogue.ts";
 import {
-  adaptSample, compare, everyForm, faults, formFull, greetingDocument, images, liveFor, monitor, mosaics, rungs, unknown,
+  adaptSample, compare, everyForm, faults, formFull, greetingDocument, barStyles, images, liveFor, monitor, mosaics, rungs, spinners, unknown,
 } from "../src/commands.ts";
 import { manifest } from "../src/manifest.ts";
 
@@ -365,6 +365,8 @@ describe("every command composes a document the transcript would accept", () => 
     // document. A row that only held readable images would pass on the day the
     // refusal moved back onto the block.
     image: () => [as("image", [images()])],
+    spinners: () => [as("spinners", [spinners()])],
+    bars: () => [as("bars", [barStyles()])],
   };
 
   it("T-doc1: the coverage table names every command the manifest declares", () => {
@@ -388,11 +390,11 @@ describe("every command composes a document the transcript would accept", () => 
       }
     }
     expect(bad).toEqual([]);
-    // 46 forms twice, plus /all, /faults, /monitor, /rungs, /mosaic, /image
-    // and sample's two — eight singletons. The count is asserted so a document
-    // appearing or vanishing has to be attributed rather than noticed: `/image`
-    // is what moved this from seven.
-    expect(checked, "documents built").toBe(FORMS.length * 2 + 8);
+    // 46 forms twice, plus /all, /faults, /monitor, /rungs, /mosaic, /image,
+    // /spinners, /bars and sample's two — ten singletons. The count is asserted
+    // so a document appearing or vanishing has to be attributed rather than
+    // noticed: `/image` moved this from seven, the two galleries from eight.
+    expect(checked, "documents built").toBe(FORMS.length * 2 + 10);
   });
 
   it("T-doc3: an unknown form is a document too", () => {

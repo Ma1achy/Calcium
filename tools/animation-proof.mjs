@@ -1,6 +1,7 @@
 /**
- * The animation catalogue — five subjects, two arms, and the asymmetry between
- * them (C09 §4, C12 §3ak, C22 I60/I60a, F227).
+ * The animation catalogue — the subjects `SUBJECT_NAMES` lists (five at first, the
+ * spinner gallery since 2026-09-05), two arms, and the asymmetry between them
+ * (C09 §4, C12 §3ak, C22 I60/I60a, F227, C24 §6).
  *
  *     npx tsx tools/animation-proof.mjs
  *
@@ -76,7 +77,7 @@ import { mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs
 import { join } from "node:path";
 
 import { gifFrom, ansiToSvg, pngFromSvg } from "./catalogue-png.mjs";
-import { createBlockRegistry, spinnerFrames, spinnerIntervalMs } from "../src/presentation/blocks/index.js";
+import { barStyleNames, createBlockRegistry, spinnerFrames, spinnerIntervalMs, spinnerSetNames } from "../src/presentation/blocks/index.js";
 import { plotDefinition } from "../src/presentation/plot/index.js";
 import { plotToSvg } from "../src/presentation/plot/svg.js";
 import { renderSequenceToLines } from "../src/presentation/render-lines.js";
@@ -96,7 +97,24 @@ export const ANIMATION_DIR = join(import.meta.dirname, "..", "docs", "catalogue"
 export const MEDIA_DIR = join(import.meta.dirname, "..", "docs", "media");
 
 /** The subjects a finding cites, so they are tracked as well as generated. */
-const CITED = new Set(["steps-before", "steps-after"]);
+/**
+ * The subjects the READMEs cite, written into `docs/media/` as well as the
+ * catalogue. **AP12 compares the committed file to a fresh encode**, because the
+ * encoder is deterministic and the committed `steps-*.gif` were a week stale
+ * against the tree before anything looked (F819).
+ */
+export const CITED_NAMES = Object.freeze(["steps-before", "steps-after", "spinner-sets"]);
+const CITED = new Set(CITED_NAMES);
+
+/** One terminal-arm subject encoded to `file`, exactly as `writeAnimationProof` writes it. */
+export async function encodeSubject(name, file) {
+  const s = animationFrames()[name];
+  if (s === undefined || s.arm !== "terminal") throw new Error(`${name} is not a terminal-arm subject`);
+  const pages = await Promise.all(s.frames.map((ansi) => pngFromSvg(ansiToSvg(ansi), DENSITY)));
+  return await gifFrom(pages, s.frames.map(() => s.delay), file);
+}
+/** The bar-style sheet — a still, so not a subject; written beside the GIFs and cited from the notes. */
+export const BAR_SHEET = "bar-styles.png";
 
 const loaded = loadTheme(defaultTheme, "dark");
 if (!loaded.ok) throw new Error("the shipped theme does not load");
@@ -561,7 +579,103 @@ export function animationFrames() {
       delay: interval,
       frames: Array.from({ length: setFrames }, (_, tick) => ansiFor(STEPS, 34, tick)),
     },
+    // **Every set the catalogue names, turning at once** (C24 §6). One frame per
+    // tick for every set — `activityLine` indexes by `tick % frames.length` — at
+    // the C03 tick, so this is the cadence a session with several sets on screen
+    // shows and not each set's own interval; the notes carry the intervals. Forty
+    // ticks covers every set's cycle at least once (the longest is `decimal` at 10)
+    // and the `distinct` column says whether the picture moved.
+    "spinner-sets": {
+      arm: "terminal",
+      delay: 100,
+      frames: Array.from({ length: 40 }, (_, tick) => ansiFor(spinnerGallery(), 78, tick)),
+    },
   };
+}
+
+/** The `/spinners` gallery's shape, built here so the GIF needs no session (C24 §6). */
+function spinnerGallery() {
+  const names = spinnerSetNames();
+  const per = Math.ceil(names.length / 3);
+  // `⠋ loading` whatever the message says, so the name sits beside the cell.
+  const cell = (name) => ({
+    kind: "group",
+    id: `sp-row-${name}`,
+    direction: "row",
+    flex: [{ cells: 9 }, 1],
+    children: [
+      { kind: "status", id: `sp-${name}`, state: "loading", message: name, height: 1, spinner: name },
+      { kind: "notice", id: `sp-name-${name}`, tone: "muted", text: name },
+    ],
+  });
+  return {
+    kind: "group",
+    id: "spinner-sets",
+    direction: "row",
+    children: Array.from({ length: 3 }, (_, c) => ({
+      kind: "group",
+      id: `spinner-sets-${String(c)}`,
+      direction: "column",
+      children: names.slice(c * per, (c + 1) * per).map(cell),
+    })),
+  };
+}
+
+/**
+ * The bar-style sheet: every style at four fills, on three capability arms —
+ * full, `unicode: "ascii"`, and `ambiguousWidth: "wide"` (where every narrow-only
+ * style falls to ASCII and `braille`, being Neutral, does not). One ANSI text,
+ * captioned per arm, so one PNG shows the ladder rather than three files a
+ * reader has to hold side by side (C09 §4, CALCIUM_BARS.md §Degradation).
+ */
+export function barSheetArms() {
+  const names = barStyleNames();
+  const arms = [
+    ["full · colourDepth 24 · unicode full · ambiguousWidth narrow", FULL],
+    ["unicode: ascii — every style is # and .", { ...FULL, unicode: "ascii" }],
+    ["ambiguousWidth: wide — narrow-only styles fall to ASCII; braille stays", { ...FULL, ambiguousWidth: "wide" }],
+  ];
+  const per = Math.ceil(names.length / 3);
+  const cell = (name) => ({
+    kind: "group",
+    id: `bar-style-${name}`,
+    direction: "column",
+    gapBefore: true,
+    children: [0, 33, 66, 100].map((n) => ({ kind: "progress", id: `bar-${name}-${String(n)}`, label: name, current: n, total: 100, style: name })),
+  });
+  const grid = {
+    kind: "group",
+    id: "bar-styles",
+    direction: "row",
+    children: Array.from({ length: 3 }, (_, c) => ({
+      kind: "group",
+      id: `bar-styles-${String(c)}`,
+      direction: "column",
+      children: names.slice(c * per, (c + 1) * per).map(cell),
+    })),
+  };
+  return arms
+    .map(([label, caps]) =>
+      renderSequenceToLines(
+        registry,
+        [{ kind: "notice", id: `arm-${label}`, tone: "info", text: label }, grid],
+        96,
+        { theme: THEME, capabilities: caps, tick: 0 },
+      ).join("\n"),
+    );
+}
+
+/** The three arms as one ANSI text, a blank row between them. */
+export function barSheetAnsi() {
+  return barSheetArms().join("\n\n");
+}
+
+export async function writeBarSheet(dir = MEDIA_DIR) {
+  const ansi = barSheetAnsi();
+  const png = await pngFromSvg(ansiToSvg(ansi), DENSITY);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, BAR_SHEET), png);
+  return { file: join(dir, BAR_SHEET), bytes: png.length, rows: ansi.split("\n").length };
 }
 
 /**
@@ -581,6 +695,7 @@ export const SUBJECT_NAMES = Object.freeze([
   "retrying",
   "steps-before",
   "steps-after",
+  "spinner-sets",
 ]);
 
 export async function writeAnimationProof(dir = ANIMATION_DIR) {
@@ -720,6 +835,8 @@ const isMain =
   process.argv[1] !== undefined && import.meta.url === new URL(`file://${process.argv[1]}`).href;
 if (isMain) {
   const { made, cost, stale } = await writeAnimationProof();
+  const sheet = await writeBarSheet();
+  console.log(`${BAR_SHEET.padEnd(14)} still     ${String(sheet.rows).padStart(4)} rows    ${String(Math.round(sheet.bytes / 1024))} KB`);
   for (const m of made) {
     console.log(
       `${m.name.padEnd(14)} ${m.arm.padEnd(9)} ${String(m.pages).padStart(4)} frames  ` +

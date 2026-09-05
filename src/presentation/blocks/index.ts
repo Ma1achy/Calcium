@@ -19,6 +19,8 @@ export {
   glyphCells,
   spinnerFrames,
   spinnerIntervalMs,
+  spinnerSetNames,
+  barStyleNames,
   GLYPH_SUBSTITUTIONS,
   GLYPH_TOKENS,
   SUBSTITUTIONS,

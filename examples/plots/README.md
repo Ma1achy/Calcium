@@ -225,6 +225,15 @@ than the silent-teardown path fifty lines away, which is most of what F372 is ab
 
 ---
 
+### Spinners and bars — the two catalogues, live
+
+`/spinners` draws every set `spinnerSetNames()` lists as a loading line beside its name, and
+`/bars` every style `barStyleNames()` lists at four fills. Neither verb holds a list of its own:
+the manifest names the verb, the framework names the sets, and a set added to the catalogue
+appears here on the next run. The stills and the GIF are in `docs/media/` and the notes that own
+the catalogues (`docs/notes/CALCIUM_SPINNERS.md`, `CALCIUM_BARS.md`) carry them; run
+`--ambiguous-wide` to see eight of the nine bar styles fall to ASCII while `braille` stays.
+
 ## The suite
 
 `test/plots.test.ts` — four rows, and the last is the one worth reading.

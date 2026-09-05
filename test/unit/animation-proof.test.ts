@@ -15,12 +15,13 @@
 // rebuilt from intent agrees with the intent.
 import { describe, expect, it } from "vitest";
 
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import sharp from "sharp";
 
-import { animationFrames, SUBJECT_NAMES } from "../../tools/animation-proof.mjs";
+import { animationFrames, barSheetArms, CITED_NAMES, encodeSubject, MEDIA_DIR, SUBJECT_NAMES } from "../../tools/animation-proof.mjs";
+import { barStyleNames, spinnerSetNames } from "../../src/presentation/blocks/index.js";
 import { gifFrom } from "../../tools/catalogue-png.mjs";
 
 const ESC = String.fromCharCode(27);
@@ -202,4 +203,72 @@ describe("tools/animation-proof.mjs — the frames it assembles", () => {
       expect(again[name]?.frames, `${name} regenerates identically`).toEqual(frames[name]?.frames);
     }
   });
+
+  it("AP10: the spinner gallery names every set and every set moves", () => {
+    // **The set, by equality** (C24 §6): a name the gallery drops leaves every
+    // other row green. And each set's glyph changes across the forty ticks —
+    // the one property a still frame of a spinner cannot show.
+    const s = frames["spinner-sets"];
+    const first = plain(s?.frames[0] ?? "");
+    for (const name of spinnerSetNames()) expect(first, `${name} is drawn`).toContain(name);
+    expect(new Set(s?.frames.map(plain)).size, "the picture moves").toBeGreaterThan(1);
+    // The cell is nine cells and a gutter to the left of the name — `⠋ loading `
+    // — so the glyph is the first token of the eleven cells before it, and it
+    // is read per cell rather than per line so a neighbour's motion cannot
+    // stand in for a set that froze.
+    const glyphBefore = (line: string, name: string): string => {
+      const at = line.indexOf(name);
+      return at < 0 ? "" : line.slice(Math.max(0, at - 11), at).trim().split(" ")[0] ?? "";
+    };
+    for (const name of spinnerSetNames()) {
+      const glyphs = new Set(
+        s?.frames.map((f) => {
+          const line = plain(f).split("\n").find((l) => l.includes(name)) ?? "";
+          return glyphBefore(line, name);
+        }),
+      );
+      expect(glyphs.size, `${name} turns`).toBeGreaterThan(1);
+    }
+  });
+
+  it("AP11: the bar sheet carries every style at four fills on three arms, and the arms differ", () => {
+    const arms = barSheetArms().map(plain);
+    expect(arms, "three capability arms").toHaveLength(3);
+    for (const arm of arms) {
+      for (const name of barStyleNames()) {
+        // Three styles share a line, and `block` is inside `halfblock`, so the
+        // match is the name as a whole word followed by its bar.
+        // `braille` is off with a space, so its empty bar is all spaces: no
+        // non-space is demanded between the name and the percentage.
+        const own = new RegExp(`(^|\\s)${name}\\s+[^%]*\\d+%`, "u");
+        const bars = arm.split("\n").filter((l) => own.test(l));
+        expect(bars.length, `${name} at four fills`).toBe(4);
+      }
+    }
+    // The ASCII arm draws no block glyph; the full arm does; the wide arm keeps braille alone.
+    expect(arms[0]).toContain("█");
+    expect(arms[1]).not.toMatch(/[█░▐▬▪▫▮▯▰▱◼◻⣿]/u);
+    expect(arms[2]).toContain("⣿");
+    expect(arms[2]).not.toContain("█");
+  });
+
+  it("AP12: every cited GIF in docs/media is the generator's current bytes (F819)", async () => {
+    // **The generator is the gate and the README is its consumer**, and nothing
+    // compared the two: the committed `steps-*.gif` were 1 860 pixels stale for
+    // a week. The encoder is deterministic — regenerating twice gives identical
+    // bytes — which is what makes this a test rather than a habit.
+    const dir = mkdtempSync(join(tmpdir(), "calcium-cited-"));
+    try {
+      for (const name of CITED_NAMES) {
+        const fresh = join(dir, `${name}.gif`);
+        await encodeSubject(name, fresh);
+        expect(
+          readFileSync(fresh).equals(readFileSync(join(MEDIA_DIR, `${name}.gif`))),
+          `${name}.gif in docs/media matches a fresh encode — run tools/animation-proof.mjs`,
+        ).toBe(true);
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 60_000);
 });

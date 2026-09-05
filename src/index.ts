@@ -361,6 +361,14 @@ export type { TerminalCapabilities } from "./terminal/capabilities.js";
  * already has; this answers the question below it.
  */
 export { halfBlockEligible } from "./presentation/image/index.js";
+/**
+ * The two catalogues, listable by name (C24 §6). `Status.spinner` names a
+ * spinner set and `Progress.style` a bar style; a consumer drawing a gallery or
+ * a picker reads these rather than copying the list, so a set added to the
+ * catalogue arrives without the copy going stale. The plots demo's `/spinners`
+ * and `/bars` are the first consumers.
+ */
+export { barStyleNames, spinnerSetNames } from "./presentation/blocks/index.js";
 export type { Measure, MeasureFn } from "./data/viewmodel/index.js";
 export type { BlockKeymap } from "./interaction/router/types.js";
 

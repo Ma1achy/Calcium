@@ -29442,3 +29442,28 @@ that — so a walk agreeing with a wrong renderer would still fail.
 
 ---
 
+## F819 — a cited GIF regenerates only by hand, and the committed one was 1 860 pixels stale ★★★☆☆
+
+`tools/animation-proof.mjs` writes `steps-before.gif` and `steps-after.gif` into `docs/media/`
+because the README cites them. Running it for the spinner gallery rewrote both, and `git status`
+showed two files the round had not touched — the shape `read-the-diff` names as evidence about a
+mechanism nobody knew was running.
+
+**Measured rather than reverted.** Regenerating twice gives identical bytes, so the encoder is
+deterministic and the difference is content: 1 860 of 271 200 raw bytes differ, all of them in
+rows 22–31 at columns 6–9 of every page — one glyph cell on the active step's row, where the
+spinner frame draws. The committed files date from 31 August; the braille set was renamed and
+re-ordered after that (F-series in `CALCIUM_SPINNERS.md`), and the cited GIFs kept the old
+frame order for a week while the tree drew the new one.
+
+**A gate that exists and is not run, fifth form**: the generator is the gate and the README is
+its consumer, and nothing compared the two. The encoder being deterministic is what makes the
+repair a test rather than a habit — AP12 encodes each cited subject into a temporary directory
+and compares bytes with `docs/media/`, so a cited picture that drifts from the tree fails the
+unit tier rather than waiting for the next hand run.
+
+**Where**: `tools/animation-proof.mjs` `CITED_NAMES`; `test/unit/animation-proof.test.ts` AP12;
+`docs/media/steps-before.gif`, `steps-after.gif`.
+
+---
+

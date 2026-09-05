@@ -28,8 +28,8 @@
 import { createTui, defaultTheme } from "@fmx/calcium";
 import type { Adapter, Block, LocalHandler } from "@fmx/calcium";
 import {
-  adaptSample, compare, everyForm, faults, formFull, formIn, greetingDocument, images, liveFor,
-  monitor, mosaics, rungs, unknown,
+  adaptSample, barStyles, compare, everyForm, faults, formFull, formIn, greetingDocument, images, liveFor,
+  monitor, mosaics, rungs, spinners, unknown,
 } from "./src/commands.ts";
 import { faultyDefinition } from "./src/faulty.ts";
 import { manifest } from "./src/manifest.ts";
@@ -97,6 +97,8 @@ const tui = createTui({
     mosaic: ((_argv, ctx) => doc(ctx.command, [mosaics(0)])) satisfies LocalHandler,
 
     image: ((_argv, ctx) => doc(ctx.command, [images()])) satisfies LocalHandler,
+    spinners: ((_argv, ctx) => doc(ctx.command, [spinners()])) satisfies LocalHandler,
+    bars: ((_argv, ctx) => doc(ctx.command, [barStyles()])) satisfies LocalHandler,
   },
   /**
    * **`--ambiguous-wide` demotes the glyph ladder by one rung** (C09 I37).

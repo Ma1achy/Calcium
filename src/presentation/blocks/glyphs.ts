@@ -818,8 +818,11 @@ export function barStyle(
   return style.narrowOnly === true && caps.ambiguousWidth === "wide" ? BAR_ASCII : style;
 }
 
-/** The style names, for the catalogue's own row and for a consumer listing them. */
+/** The style names, for the catalogue's own row and for a consumer listing them (C24 §6). */
 export const barStyleNames = (): readonly string[] => Object.freeze(Object.keys(BAR_STYLES));
+
+/** The set names, in catalogue order — what `Status.spinner` may name (C24 §6). */
+export const spinnerSetNames = (): readonly string[] => Object.freeze(Object.keys(SPINNER_SETS));
 
 /**
  * The set's own tick, in milliseconds (roadmap 51).

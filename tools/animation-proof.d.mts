@@ -26,6 +26,10 @@ export declare function animationFrames(): Record<string, Subject>;
 
 /** The subjects in catalogue order, stated once and compared against the builder. */
 export declare const SUBJECT_NAMES: readonly string[];
+/** The subjects also written into `MEDIA_DIR` for the READMEs (F819). */
+export declare const CITED_NAMES: readonly string[];
+/** Encode one terminal-arm subject to `file`, as the media copy is written. */
+export declare function encodeSubject(name: string, file: string): Promise<{ pages: number; width: number; height: number }>;
 
 export declare const ANIMATION_DIR: string;
 export declare const MEDIA_DIR: string;
@@ -44,3 +48,11 @@ export declare function writeAnimationProof(dir?: string): Promise<{
   cost: Record<string, unknown>;
   stale: number;
 }>;
+
+/** The bar-style sheet's file name under `MEDIA_DIR` (C24 §6). */
+export declare const BAR_SHEET: string;
+/** The sheet as one ANSI text: three capability arms, separated by a blank line. */
+export declare function barSheetAnsi(): string;
+/** The three arms — full, ascii, ambiguous-wide — each one ANSI text. */
+export declare function barSheetArms(): readonly string[];
+export declare function writeBarSheet(dir?: string): Promise<{ file: string; bytes: number; rows: number }>;

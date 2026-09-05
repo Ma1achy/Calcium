@@ -13,7 +13,7 @@
  * returns blocks and touches no clock, no session and no terminal, which is
  * what makes `everyDocument()` in the suite able to validate all of them.
  */
-import { b, halfBlockEligible } from "@fmx/calcium";
+import { b, barStyleNames, halfBlockEligible, spinnerSetNames } from "@fmx/calcium";
 import type { AdapterDocument, Block, TerminalCapabilities, ViewDocument } from "@fmx/calcium";
 import os from "node:os";
 import { dirname, join } from "node:path";
@@ -944,3 +944,62 @@ export const adaptSample = (stdoutRaw: string, command: string): AdapterDocument
     meta: { adapter: "draw" },
   };
 };
+
+// --- the two catalogues, as galleries -------------------------------------------
+
+/** `n` items into `columns` columns of equal weight, filled top to bottom. */
+function columnsOf(items: readonly Block[], columns: number, id: string): Block {
+  const per = Math.ceil(items.length / columns);
+  return b.group(
+    "row",
+    Array.from({ length: columns }, (_, c) => b.group("column", items.slice(c * per, (c + 1) * per), { id: `${id}-${String(c)}` })),
+    { id },
+  );
+}
+
+/**
+ * `/spinners` — every set `spinnerSetNames()` lists, each a one-row loading
+ * status naming itself, so the frame shows the glyphs turning beside the name a
+ * producer would write into `Status.spinner` (C24 §6).
+ *
+ * **Every set advances one frame per tick**, and the session ticks at the
+ * fastest set's interval (C09 `animationIntervalOf`) — so a 120 ms set turns at
+ * the 50 ms set's cadence here. The catalogue GIF (`tools/animation-proof.mjs`)
+ * carries the same caveat; the per-set interval is honoured when a set is alone.
+ */
+export function spinners(): Block {
+  const names = spinnerSetNames();
+  // The loading line is `⠋ loading` whatever the message says (C09 §3a), so the
+  // set's name sits beside the cell rather than in it: nine cells for the line,
+  // the rest for the name.
+  const items = names.map((name) =>
+    b.group("row", [
+      { ...b.status.loading({ id: `spinner-${name}` }), spinner: name },
+      b.notice("muted", name, undefined, { id: `spinner-name-${name}` }),
+    ], { id: `spinner-row-${name}`, flex: [{ cells: 9 }, 1] }),
+  );
+  return b.group("column", [
+    caption(`${String(names.length)} spinner sets · Status.spinner names one · each carries its own ASCII fallback`),
+    columnsOf(items, 3, "spinner-sets"),
+  ], { id: "spinners" });
+}
+
+/**
+ * `/bars` — every style `barStyleNames()` lists at four fills, so a reader sees
+ * the on and off glyphs against each other rather than one bar at one fill,
+ * which is where `slant` and `posts` look alike and `beads` does not.
+ */
+export function barStyles(): Block {
+  const names = barStyleNames();
+  const cells = names.map((name) =>
+    // The label names the style on every row, so no caption: a caption above
+    // four rows that each carry the name read as a fifth, empty bar.
+    b.group("column", [0, 33, 66, 100].map((n) =>
+      b.progress({ id: `bar-${name}-${String(n)}`, label: name, current: n, total: 100, style: name }),
+    ), { id: `bar-style-${name}`, gapBefore: true }),
+  );
+  return b.group("column", [
+    caption(`${String(names.length)} bar styles · Progress.style names one · ASCII under unicode: ascii, and where the style is narrow-only under ambiguousWidth: wide`),
+    columnsOf(cells, 3, "bar-styles"),
+  ], { id: "bars" });
+}
