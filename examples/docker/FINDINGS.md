@@ -28338,3 +28338,114 @@ the class, and today three of fourteen run files this arc would have been its co
 **Where**: `tools/mutate/runs/c26-select-all.mjs`; `tools/mutate/anchors.mjs`.
 
 ---
+
+## F769 — the selection was painted nowhere — after `↓ ⇧↓ ⇧↓` the frame showed the head and nothing else — and `pills` read `ctx.focus` at all nowhere ★★★★☆
+
+*2026-09-05 · the lead, closing arc3 (the selection painted, `Scroll.follow`, the tool-call header, five owed items), at 126eddab+arc3.*
+
+**Measured** on an 80 × 24 session, foreground `38;5;N` per row: `↓` → alpha 216; `⇧↓` → bravo 216, alpha
+back to 188; `⇧↓` → charlie 216; `⌃a` → delta 216. Only the head ever moved; no `48` anywhere. The extent's
+one reader was `copyElement`. And `grep ctx.focus src/presentation` → one reader, `table/definition.ts:229`:
+a focused **chip** drew as an unfocused one. **Landed**: `FocusState.selected?` — `(blockId, rowId)` pairs
+over the entry's list, head included, absent when the extent is the head alone; `focusFor` is the writer
+by `copyElement`'s own arithmetic; `focusKey` folds the extent (without it `⌃a` at the tail wrote a
+byte-identical frame — every `⇧↓` had moved the head, so the key moved by coincidence, and the mutation
+that ignores the extent survives every row but the one that presses `⌃a`); `table` and `pills` paint
+default ink over `surface.selection`, the editor's own slot, head in accent; at 1-bit **reverse video**,
+because a gutter mark costs a cell C11 I14 forbids. Read as pictures at 24-bit and 1-bit — the 1-bit PNG
+showed **no** selection while the bytes carried `7m`, because the rasteriser had no arm for it (fixed;
+PC11 dies with it). **Recorded, not fixed**: a focused *active* chip is indistinguishable from an
+unfocused one (`accent` twice); a block-level focus paints nothing and the selection inherits it —
+IC5 pins the fact and goes red the day `plotDefinition.render`/`scrollDefinition.render` read it.
+An interaction catalogue exists: six scenes × five arms, 90 files, covered under `make instruments`.
+
+**Where**: `src/presentation/blocks/types.ts`, `src/shell/session.ts` `focusFor`, `src/shell/render-cache.ts`,
+`src/presentation/table/*`, `kinds/simple.ts`, `tools/interaction-catalogue.mjs`; C11 I14, C22 I58.
+
+---
+
+## F770 — `Scroll.follow` — a producer's field and the store's `TAIL = ∞`, and the walk's first draft was wrong about an untouched box ★★★★☆
+
+*2026-09-05 · the lead, closing arc3 (the selection painted, `Scroll.follow`, the tool-call header, five owed items), at 126eddab+arc3.*
+
+**Ruled** (C04 I97/I98, §3c): `follow` is the **producer's** — it describes the content, which grows at
+its end, the one thing about position a producer may say; `lineRange`/`minHeight`/`capped` describe the
+view and stay refused. Whether the reader is *still* there is the store's, derived from where the box ended
+up (C14 I5 one level down). The store spells *stay there* as `TAIL = ∞`, resolved at read against the
+frame's ceiling — so a following box tracks growing content with **nothing written on a patch**. The store
+cannot resolve it (it does not know the width), so `nudge(entry, block, delta, box?: { ceiling, follow })`
+takes the ceiling from the caller who measured it. **The walk's first draft was wrong**: an untouched
+follow box holds *nothing*, which the store reads as 0 — the top — so the first `⇞` on a streaming box
+would have jumped to its head; found by writing T2.39, kept as a mutation. `wasAtBottom` lifted out of
+`document-view.ts` into `src/shell/tail.ts` (`TAIL`, `atTail`, `followTail`) and both callers read it;
+C14's `topRow >= maxTop()` is the third copy, recorded. **The arc's own verification sentence was
+vacuous** — the prompt's row is fixed by layout — so T2.38 asserts the row *above* the box and the frame
+height across an append, with a control where an unbounded block grows the frame by exactly the rows
+added. The two scroll callers in `construct.ts` now pass the box (the lead), or `⇞` on a followed box
+is `∞ + δ`, a no-op — and T4.66, which had asserted the **raw** store value `3` for a five-row box in a
+three-row window, read the unclamped write no frame ever showed; it reads the resolved offset now,
+`CEILING = 2`.
+
+**Where**: `src/shell/tail.ts`, `src/shell/scroll-offsets.ts`, `src/shell/document-view.ts`,
+`src/presentation/blocks/kinds/containers.ts`, `src/shell/construct.ts`; C04 §3c, I97, I98.
+
+---
+
+## F771 — a tool call looks like a tool call — as a composition, not a kind; and `expand` was refused from every settled entry ★★★★☆
+
+*2026-09-05 · the lead, closing arc3 (the selection painted, `Scroll.follow`, the tool-call header, five owed items), at 126eddab+arc3.*
+
+`toolCallDoc`: a `step` notice (`⏺` / `@`, U+23FA measured Neutral, one cell both conventions) over a
+`continuation` notice or a follow `Scroll`; **`+N more` is the collapsed scroll's residue row** — no
+fourth count string. `Scroll.collapsed?` folds the interior to zero rows and its elements carry
+`activate: { kind: "expand" }`; `⏎ to attach` is `NavElement.activate`, not row text. `elapsed()` gets
+its first consumer outside `refresh.ts`. **Two things the design had wrong, measured against four
+frames** (80/40 × 24-bit/ASCII, written beside §9c): `exit 0` belongs in the header, not the `⎿` line;
+a following box's hidden rows are **above** it — `⋯ 392 above, 0 below` streaming, `⋯ 0 above, 392
+below` folded — where the drawing put `+392 more` below. `⎿` before a *table* (§9d) has no mechanism
+(`continuation` is a notice slot); drawn wrong by one column, recorded. **And `expand` was refused from
+every settled entry**: `actions.ts`'s `isFrozen` gate sat before the switch for every kind, so §9b's
+*expand, which exists* was true of the live entry only — every finished tool call and reasoning panel is
+settled. Ruled C23 I18's one exception: `expand` reveals data the entry already holds, fills nothing,
+runs nothing. `op: "expand"` names a row, so a fold rides a shell-origin `replace` (measured first).
+
+**Where**: `src/shell/documents.ts`, `src/shell/actions.ts`, `src/presentation/blocks/glyphs.ts`,
+`src/data/viewmodel/types.ts` `Scroll`; C09 §4, C23 I18; `docs/design/AGENT_TUI_DESIGN.md` §9c.
+
+---
+
+## F772 — five owed items: the eviction anchor, C17 `collapse()` whose one caller had to be a key, shift-click, and two spec sentences ★★★☆☆
+
+*2026-09-05 · the lead, closing arc3 (the selection painted, `Scroll.follow`, the tool-call header, five owed items), at 126eddab+arc3.*
+
+**S4** (F764): `extendRowDown/Up` `focusRow` the fallen element first when the stored entry is not the
+focused one; `extendRow`'s entry-changed arm then has **no caller** and is removed — the brief's named
+mutation *restore the arm* fails nothing (the arm is unreachable), which is the reason for removing it.
+T3.53 flipped. **B7** (F765): C17 I23, `collapse()` sets the anchor to null and nothing else — no
+snapshot, caret and undo depth unchanged. **The `session.ts` call was withdrawn by measurement**: the
+only path into copy mode is `keys.ts`'s `enterCopyMode` effect, and T2.14 requires every C17 operation
+be key-reachable — with the call in `session.ts` it failed. **Shift-click** extends within the focused
+entry (`e.motion || e.shift`), nothing on another entry; T4.67's assertion of the absence this inverts
+re-pointed at ctrl. C26 I4 gains the sequence form; §10 gains T2.29–T2.31. Roadmap 15 cited
+`editor.ts:377` and two siblings by line — one moved by `collapse()`, **two already wrong at base**.
+
+**Where**: `src/shell/keys.ts`, `src/interaction/router/focus.ts`, `src/interaction/editor/editor.ts`,
+`src/shell/construct.ts` `pointerEffect`; C17 §5b, C26 §8/§10; `CALCIUM_ROADMAP.md` entry 15.
+
+---
+
+## F773 — four of 146 run files ran and said nothing, and the sweep now reads every tail ★★★☆☆
+
+*2026-09-05 · the lead, closing arc3 (the selection painted, `Scroll.follow`, the tool-call header, five owed items), at 126eddab+arc3.*
+
+F768's class over the corpus: `anchors.mjs` reads from each run file's last `runPass(` to EOF for
+`console.log(report(` and `process.exit(`. **146 runs; 142 pass; 4 silent** — `c10-picture-cell.mjs` and
+`enforce-sp10.mjs` with F768's exact line (`report(results);`, printed nothing), `c12-origin.mjs` and
+`c12-surface3d.mjs` printing and never exiting. Repaired in one pass and `KNOWN_SILENT` emptied by its
+equality arm. MA7 is the fabricated violation (both shapes) with a `1 tails` control; stubbing the reader
+kills MA7, MA7b **and** MA4. Blind spots stated: a file printing the report of the *wrong* variable, an
+unconditional `exit(0)`, a file with no `runPass` at all.
+
+**Where**: `tools/mutate/anchors.mjs`; `test/unit/mutate-anchors.test.ts`.
+
+---
