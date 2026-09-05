@@ -297,3 +297,14 @@ describe("C09 tier 6", () => {
     expect(again, "same tick, same frame — that is what makes a golden possible").toEqual(first);
   });
 });
+
+// C04 §3 *Both axes* / C09 §2c rulings, committed spec-first (F814 for why an `it.todo`
+// carries each row until the code commit replaces it).
+describe("C09 §2c width — fail-on-revert", () => {
+  it.todo(
+    "T6.87 (C09 I43): making notice.width return the unwrapped cells → T3.67 fails on a wrapped notice — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
+  );
+  it.todo(
+    "T6.88 (C09 I44): declaring width on rule returning w → T2.111 fails on the set while T2.110 still passes — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
+  );
+});

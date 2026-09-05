@@ -138,7 +138,10 @@ type Panel    = Readonly<{ kind: "panel"; id: string; title: string;
                            footer?: string;                    // the bottom border
                            children: readonly Block[] }> & Gap;
 type Group    = Readonly<{ kind: "group"; id: string;
-                           direction: "row" | "column"; children: readonly Block[] }> & Gap;
+                           direction: "row" | "column"; children: readonly Block[];
+                           flex?: readonly Share[];              // I42–I44
+                           align?: readonly Align[];             // both axes — I100
+                           minRows?: number }> & Gap;             // the author's floor — I102
 type Raw      = Readonly<{ kind: "raw"; id: string; text: string }> & Gap;
 
 type Series   = Readonly<{ values: readonly (number | null)[];   // `null` is a gap (I46a, C12 I4)
@@ -490,6 +493,98 @@ a fact about the measurement contract, and C11 is where its consequence showed.
   measured 1 and appeared to emit a newline into a composed row. **Both were caught by reading
   the output rather than the verdict** — the first would have reported a fabricated defect in
   `raw`, and the second a fabricated one in the row.
+
+### Both axes, walked by hand — the premise I45 rested on, and the seam that removes it
+
+**I45 refused a horizontal axis, and the sentence it rested on is true**: *placing a child would mean
+knowing how wide the content is, and `measure(block, width) → height` does not answer that.* The
+sentence is about the seam that existed. It justified refusing the **axis**, when the decision it
+constrains is whether to add the **seam** — F817 records it as the MG24 shape, a correct sentence
+attached to a decision it does not reach. The seam is C09 I42: a kind may declare
+`width(block, w) → cells`, the columns its content occupies at `w`, and a kind that does not declare
+it fills. With that answered, both axes exist and the vocabulary is one field:
+
+```typescript
+type Halign = "left" | "centre" | "right";
+type Valign = "top" | "middle" | "bottom";
+/** One axis or both, vertical first: "bottom", "right", "bottom-right". Absent is "top-left". */
+type Align  = Valign | Halign | `${Valign}-${Halign}`;
+
+type Group = Readonly<{
+  kind: "group"; id: string; direction: "row" | "column";
+  children: readonly Block[];
+  flex?:    readonly Share[];    // I42–I44, unchanged
+  align?:   readonly Align[];    // one entry per child — I100
+  minRows?: number;              // the author's floor on the group's rows — I102
+}> & Gap;
+```
+
+**The rules, each stated with the one it meets.**
+
+- **R1 — a child is placed inside its cell, and the cell is the group's.** In a `row`, a child's
+  cell is its allocation (I42/I44) by the group's height — the tallest child, or `minRows` if that is
+  taller. In a `column`, the cell is the group's width by the child's *own* height, so the vertical
+  component has nothing to move inside and is **ignored**, exactly as `gapBefore` is ignored on a
+  row (§3a): the mirror of that rule, not a second one. The horizontal offset is `0`,
+  `⌊(cell − cw) / 2⌋` or `cell − cw` for `left`, `centre`, `right`, where `cw = width(child, cell)`;
+  the vertical offset is the same arithmetic over heights. Odd remainders floor, so `centre` is
+  left- and top-biased, which is I42's *unspent remainder* on a new axis.
+- **R2 — `left` renders at the allocation and moves nothing.** A `left` child is rendered at its
+  cell's width, byte for byte what a row did before this existed. `centre` and `right` render the
+  child **at its content width** and then offset it — which is what makes the alignment visible on a
+  kind that would otherwise stretch to fill (a `table` with no flex column, a `pills` row).
+- **R3 — a kind that declares no `width` fills its cell, so its horizontal component is a no-op.**
+  Stated rather than refused, and the reason is layered: validation is L0 and the registry that
+  knows which kinds answer is L1, so the builder cannot see the difference. C09 I44 names the kinds
+  that answer and why the rest fill — a `rule`, a `progress` bar or a `plot` frame *is* its width.
+  A `plot` places its own narrowed figure with its own `align` (I62) and is left to it.
+- **R4 — `minRows` is the author's floor, and it is not `minHeight`.** §3d's `minHeight` is view
+  state a layer above sets and no kind reads. `minRows` is the block's own vocabulary: the group
+  measures `max(content, minRows)`, its cells are that tall, and a **single child in a `row` group
+  with a floor can sit in any corner** — which is the primitive the corners need, since a `column`
+  pads a floor at the bottom (R1). The two compose by the registry's rule: it applies `minHeight`
+  outside the definition, so a reserved group aligns its children within its *declared* height and
+  the reserve pads below.
+- **R5 — one placement, read by both walks.** The offsets are computed once, in `measure.ts`, and
+  the renderer reads them as margins while `elementsIn` reads them to lift a child's elements.
+  **Measured before this was ruled (F816)**: at HEAD the renderer places a `bottom` child with
+  Yoga's `justifyContent` and the element walk places every child at the row's top — a `pills`
+  block drawn on row 3 of a four-row group answers `rows [0, 1)`, so a click on the chip misses and
+  a click three rows above it focuses the chip. I45 said *`measure` is untouched* and the walk
+  inherited *placement is untouched* from it. The seam-with-two-readers is the same defect
+  `entry-layout.ts` closed for the card body: two functions each right about the arithmetic and
+  free to disagree.
+- **R6 — `measure` is still a function of `(block, width)`.** `align` never changes a height (I45,
+  T3.23 stands); `minRows` does, and it is a field of the block (I18), so C14's cache key covers
+  both. A group has no `window`, so it is atomic under `windowSequence` and a child's content width
+  is always computed over a whole block — a right-aligned `raw` cannot drift as the reader scrolls.
+
+**The classification table — structural, because the kind has structure and no state.** Every row
+is a cell where two rules could both claim it; a row governed by one rule is a restatement.
+
+| # | the cell | rules meeting | ruling |
+|---|---|---|---|
+| 1 | `right` on a kind with no `width` | R2 × R3 | no-op; renders as `left`; the catalogue shows it (C09 I44) |
+| 2 | `right` on a child that is not placed | R1 × I44 placement | aligned by nobody — I45's last clause unchanged |
+| 3 | `centre` where `cw === cell` | R1 × R2 | offset 0, rendered at `cell`; byte-identical to `left` |
+| 4 | `bottom` in a `column` with `minRows` | R1 × R4 | ignored; the floor pads below; the row group is the corner primitive |
+| 5 | `minRows` shorter than the tallest child | R4 × I45 | the floor does nothing; `measure` is the tallest child |
+| 6 | `minRows` and a reserved `minHeight` on one group | R4 × §3d | cells use `minRows`; the registry pads the difference outside |
+| 7 | `centre` with an odd remainder | R1 × I42 | floors — left and top biased, remainder unspent |
+| 8 | `bottom` and a click on the child | R5 × C26 §5 | the element sits where the frame drew it — F816's repair |
+| 9 | `align` changed, `minRows` unchanged | R6 × C14 I25 | measure equal; a re-render, not a re-measure |
+| 10 | a `right` child inside a `column` group | R1 × §3a | placed against the group's width; the one axis a column has |
+| 11 | a nested `group` aligned `right` whose child declares no `width` | R3 × C09 I44 (group) | the inner group's `cw` is its cell, so nothing moves at either level |
+| 12 | `right` on a `notice` whose text wraps | R2 × C09 I43 | rendered at the longest wrapped row; every row still fits; height equal by I43 |
+| 13 | `"bottom"` alone, after both axes exist | I100 × T3.22 | legal, horizontal defaults `left`; the old frames are unchanged |
+| 14 | `"right-bottom"` | I100 × validation | refused — vertical first, as the type reads; a typo cannot become a layout |
+| 15 | `right` on a `pills` row that overflows its cell | R2 × C09 §3 clamp | `cw === cell` (clamped to the width), so it fills — row 3's shape |
+
+**What is refused, and where.** `align` of the wrong length, and any entry outside the fifteen, at
+the builder — the terms `flex` already has. `minRows` that is not a positive integer, at the builder,
+on I44's argument for `cells`. Nothing is refused by the registry: R3 is stated, not gated.
+
+---
 
 ### `patch` and `comparison` are not variants of each other
 
@@ -2847,7 +2942,7 @@ persisted document rests on.
 - **I42** — **A `row` group divides its width by declared weights, and every rule the equal split made invisible is stated with it.** The gutter comes **off the top** before any share is computed, so equal weights reproduce the current arithmetic exactly and a separator never varies with its neighbours' sizes; the remainder after flooring is **unspent**, exactly as it is under the equal split — spending it would make `flex: [1, 1]` differ from no `flex`, and C11's leftmost rule does not carry because a table's residual exists to be absorbed and a group has no child that claims it; a weight of `0` is a **construction error**, because *not placed* is expressed by omitting the child and *placed at one cell* is what `1` means; and a length that does not match the children is one too, since there is no reading to fall back on. **Placement stays left to right and never by size** (§3): with an equal split, by-position and by-cost are the same rule, and under weights they are not — dropping by size would make the rendered set depend on a number rather than on the order the author stated. **The mechanism is not C11's `flex`**, which is a boolean over a content-derived minimum: a group knows `measure(block, width) → height` and no preferred width, so there is nothing to absorb residual from and a proportion is the only expressible allocation. A weight on a `column` group is **ignored** rather than refused, on `gapBefore`'s precedent, and it is knowingly vacuous.
 - **I43** — **Weights and nested groups both express uneven allocation, and they differ where it matters.** §3 deferred weights on the grounds that *uneven allocation is expressible as nested groups*, and that equivalence holds **only while every child fits**: a nested group is one child of the outer row and is dropped whole, where flat children are dropped one at a time (§3, roadmap 38). Neither supersedes the other — nesting also expresses grouping, which a number cannot — and the 1-cell floor's boundary, measured as degenerate at `w ≤ 2n − 1`, becomes reachable at ordinary widths under weights: `[50, 1]` puts the second child at one cell in eighty columns (→ C09 §4b).
 - **I44** — **A share is a weight or a cell count, and fixed widths are satisfied before any weight is computed.** `flex` takes `number | { cells: n }`: R1 says a group cannot ask a child what width it wants, and this is the child saying so, which is the same fact from the side that holds it. **Allocation and placement answer different questions and both are stated**: fixed children take their cells off the budget first and the weighted ones divide what remains — any other order makes a cell count a suggestion — while **placement is unchanged**, left to right while the budget lasts, so a fixed child that does not fit is dropped exactly as any other is. Privileging it there would make the rendered set depend on a declaration rather than on the order the author wrote, which is I42's rule a second time. A `cells` that is not a positive integer is a construction error, on the same argument as a weight of zero (§3, roadmap 38).
-- **I45** — **A row aligns its children in its own height, and that is the only axis there is.** **Vertical placement is inside the row's height**, which a row already computes as its tallest child and otherwise discards. **A horizontal axis was ruled and refused by the build**: every renderer fits its output to the width it is handed, so a child fills its allocation and aligning a ten-cell box inside a ten-cell one is a no-op — placing it would mean knowing how wide the content *is*, and `measure(block, width) → height` does not answer that. Heights are measurable and widths are not, which is the same missing preferred width that made weights the only allocation (I44), arriving a third time. The axis that exists has a shipped consumer: the banner's wordmark carries a **blank first row** so its seven lines sit on the whale's hull, which is vertical alignment hand-written into the art exactly as the padded whale was a fixed width hand-written into it (§3, roadmap 38). It defaults to `top`, which is what a row does today, so an absent field renders byte for byte as before. **`measure` is untouched**: alignment moves rendered lines inside a box the container already sized, so the row is still the tallest child and every cache keyed on `(block, width)` is unaffected — the containment argument that made weights safe, applied to position instead of size. A child that is not placed is aligned by nobody.
+- **I45** — **A row aligns its children in its own height, and that is the only axis there is.** **Vertical placement is inside the row's height**, which a row already computes as its tallest child and otherwise discards. **A horizontal axis was ruled and refused by the build**: every renderer fits its output to the width it is handed, so a child fills its allocation and aligning a ten-cell box inside a ten-cell one is a no-op — placing it would mean knowing how wide the content *is*, and `measure(block, width) → height` does not answer that. Heights are measurable and widths are not, which is the same missing preferred width that made weights the only allocation (I44), arriving a third time. The axis that exists has a shipped consumer: the banner's wordmark carries a **blank first row** so its seven lines sit on the whale's hull, which is vertical alignment hand-written into the art exactly as the padded whale was a fixed width hand-written into it (§3, roadmap 38). It defaults to `top`, which is what a row does today, so an absent field renders byte for byte as before. **`measure` is untouched**: alignment moves rendered lines inside a box the container already sized, so the row is still the tallest child and every cache keyed on `(block, width)` is unaffected — the containment argument that made weights safe, applied to position instead of size. A child that is not placed is aligned by nobody. **Superseded in its horizontal half (2026-09-05, §3 *Both axes*, F817)**: the refusal rested on `measure` being the only seam, and C09 I42's `width` is the seam it lacked; I100–I103 carry the axis. The vertical half stands, and T3.22/T3.23 stand with it.
 
 - **I46** — **A valid document survives a JSON round trip unchanged, and the validator refuses what JSON cannot carry.** The union holds no function, `Map`, `Set` or `Date`, so `JSON.stringify` is the serialiser and `validateDocument` is the parser — which is why persistence needs no codec (F166) and why this had to be stated before something rested on it. **Where the type says `number` the validator requires a finite one, elements of numeric arrays included.** Two defects were found by writing the property rather than by the property failing: `NaN` and `Infinity` were accepted, and JSON writes them as `null`, so a document persisted and reloaded was a *different document that revalidated clean*; and `Series.values` and `Cell.spark` were never element-checked at all, so a string, a `null` or an object in a numeric array validated with or without a round trip — the wider half, and the one an untrusted document turns on. **Two inequalities are knowingly tolerated and named rather than closed**: `-0` writes as `0`, which renders identically and is not worth narrowing the type for, and an explicit `undefined` property is dropped, which no constructor can produce because `exactOptionalPropertyTypes` makes it a distinct type and every one spreads-if-present (§5a).
 - **I46a** — **A numeric array holds finite numbers and `null`, and `null` is the gap.** The one non-number a document may carry in a numeric position, chosen because it is the only spelling of *no reading* that JSON round-trips: `JSON.stringify` writes `NaN` as `null` already, so the alternative was a value the type forbids arriving from the serialiser I46 names. **The two invariants were both correct and their overlap was a hole**: C12 I4 makes a non-finite entry a gap whose position survives, I46 refuses non-finite elements, and between them absence was expressible in memory and inexpressible in a valid document — measured, not reasoned, by running the validator over the block `examples/docker` had been building since the ring began pushing one. `NaN` and `±Infinity` stay refused; the renderer still treats them as gaps, because I2 says no series input throws and a fixture reaches it without a validator. *Found by C12's heatmap walk, reading the validator arm a matrix would need — see C12 §6a for the three passes this claim survived before it was measured.*
@@ -2936,6 +3031,10 @@ persisted document rests on.
 - **I97** — **`Scroll.follow` is a producer's field and the tail is view state: the field says *start following*, the store says *still following*.** A streaming container opens at its tail because the producer said its content grows at the end — a property of the content, and the one thing about position a producer may say, where `lineRange`, `minHeight` and `capped` (I82) describe the *view* and are refused. Whether the reader is still there is derived from where the box ended up and never from which way they scrolled (C14 I5's rule, one level down): an offset at or past the ceiling **is** the tail; the store spells *stay there* as `TAIL` (`∞`) so the clamp at read keeps a following box at the bottom as its content grows **with nothing written on a patch** (§3c cell 4, C23 I47); a page up from the tail resolves the held value — `TAIL`, or the tail an untouched follow box implies, which the caller states because the store does not know the block — against the ceiling the caller measured, and the follow stops because the position is no longer the bottom; a page landing at or past the ceiling snaps to `TAIL` and it resumes, for a box that never declared `follow` too. `measure` never sees `follow` — the box is `height` rows at every offset, following or not, so the rows above it do not move when its content does. While following the hidden rows are above the box and I49's row reads *N above, 0 below*. Both `wasAtBottom` comparisons — the document view's and the store's — are one function (`atTail`), so `>=` cannot drift to `>` in one of them (§3c, the tail).
 - **I98** — **A scroll declaring `collapsed` has a collapsed form: zero interior rows and the residue row, which is the whole of what it draws.** *Declares* means the field is present, either value; a scroll without it has no collapsed form and carries no affordance. Collapsed, the box draws I49's row alone — *⋯ 0 above, N below*, the design's *+N more* sharing the residue's mechanism rather than a fourth count string — and `measure` is 1 at every width. Its elements are still one per child (I47) in content coordinates (§3c cell 8), and each carries `activate: { kind: "expand", target: <block id> }` so `⏎` on any of them toggles the fold. **The toggle is a shell-origin `replace` with `collapsed` inverted** (C13 §2) and never `op: "expand"`, whose arm names a row and refuses a scroll (C25). A block declaring a collapsed form is what `expand` widens to in the dispatcher: rows first, then blocks at any depth (§3c S5) — and from a settled entry it is C23 I18's one exception, because revealing held data is not acting on stale data (§3c S4).
 - **I99** — **`hidden` is an appearance member on `Series` and on every `Annotation` arm: a hidden series holds its rows, is not inked, keeps its legend entry, and does not move the axis — and it is refused where a series is not a layer.** `measure` is equal with and without it at every width, because `series` is structurally unreachable from the height (C12 §2). What a hidden series loses is its ink — the rasterised layer, the callout (C12 I48), the readout line (C12 I37), its point labels (I63) — and what it keeps is its name in the legend with a mark that says *not drawn* (C12 I116) and its place in the range, so the curves beside it do not move when it goes. `HAS_HIDEABLE_SERIES` is the total record that says where a series is a layer — the positional seven — and both gates refuse the member elsewhere rather than ignoring it (F207), because *hidden* on a `pie` or a `stackedarea` would mean *recomputed*, which is a different member. A non-boolean is refused on every form. An annotation's `hidden` is accepted wherever annotations are (I52). The reader's override sits above the producer's default in C22 I78's store, and nothing writes it back into the block (→ C12 I116, C22 I78, §3 *hidden*).
+- **I100** — **`align` takes both axes, and a group places each child inside its cell.** An entry is a `Valign`, a `Halign` or `"v-h"` with the vertical first; absent is `top-left`, which renders byte for byte what an unaligned group rendered. A `row` places on both axes inside its allocation by the group's height; a `column` places on the horizontal only, its vertical component ignored as `gapBefore` is on a row (§3a). An entry outside the fifteen, or a length that does not match the children, is refused at the builder (§3 *Both axes* R1, R2).
+- **I101** — **Horizontal placement is against the child's content width, and a kind that declares none fills its cell.** `cw = width(child, cell)` (C09 I42); `left` renders at the cell and moves nothing, `centre` and `right` render at `cw` and offset by `⌊(cell − cw) / 2⌋` and `cell − cw`. Where the kind declares no `width`, `cw === cell` and the component is a no-op — stated rather than refused, because the builder is L0 and cannot see which kinds answer (§3 *Both axes* R3, C09 I44).
+- **I102** — **`minRows` is the author's floor on a group, and it is not `minHeight`.** The group measures `max(content, minRows)` and its cells are that tall, so a single child in a `row` group with a floor can sit in any corner. §3d's `minHeight` is view state applied by the registry outside the definition, and the two compose: the children align within the declared height and the reserve pads below. A `minRows` that is not a positive integer is refused at the builder (§3 *Both axes* R4).
+- **I103** — **A child's placement is computed once and read by the renderer and the element walk alike.** The offsets on both axes come from one function in `measure.ts`; the renderer applies them as margins and `elementsIn` lifts the child's elements by them, so an element sits where the frame drew it. F816 measured the alternative at HEAD: a `bottom` child drawn on row 3 whose chips answered `rows [0, 1)` (§3 *Both axes* R5, C09 I30, C26 §5).
 
 
 ## 7. Commitments
@@ -3036,6 +3135,9 @@ persisted document rests on.
 92. **A series or an annotation can be declared hidden, hidden is appearance, and the member is refused where it would have to mean something else** (I99). The rows stay, the ink goes, the name stays with a mark, the axis holds; `HAS_HIDEABLE_SERIES` says where, and both gates refuse the rest.
 91. **The depth cap keeps its place on a measurement, and the clamp is marked** (I96). The recorded reason was that an unbounded indent is unreadable; measured, it is not wide but *absent*, because the wrapper eats a long run of leading spaces. The cap therefore stays, and the frame at it stops meaning two things: `nested` past the bound says *at least this deep*, which is all a bounded region ever says (→ C09 I41).
 
+93. **A group aligns on both axes, against a content width a kind may now declare** (I100, I101). I45's refusal is superseded in its horizontal half, and the reason is recorded as F817 rather than deleted: the sentence was true about the seam and not about the axis. `left` is byte-identical to the unaligned render, so no shipped frame moves.
+94. **A group carries an author's floor, distinct from the view's** (I102). `minRows` is the block's vocabulary and `minHeight` is a layer above's; the registry's rule composes them without either reading the other.
+95. **One placement, both readers** (I103). The offset arithmetic lives in `measure.ts` beside `childWidths`, for the reason `childWidths` does: two halves that each compute it are two halves free to disagree, and F816 is the disagreement measured.
 ---
 
 ## 8. Tests
@@ -3109,6 +3211,9 @@ The generic suite. **These run against every registered block kind, including ap
 - **T2.106** (I94, → C09 I40): the six ATX levels reach tiers 1, 2, 3, 3, 3, 3; the three tiers draw three distinct fills at 80 and at 40 in both alphabets while the lead and the label column are the same in all three; `level: 4` is one gate error; a rule with no `level` draws byte-for-byte what it drew before; an empty label at tier 3 draws the light unbroken line and at tier 1 the heavy one; a tier-3 rule carrying `meta` is exactly the width with the meta at its right edge; and `measure` is 1 at every tier and every width.
 - **T2.107** (I95, → C09 I41): a three-row blockquote draws the rail on **every** row and the same notice with an ordinary glyph draws it on the first only; the rail's columns are the ones `measure` reserved, so the row count is identical with the glyph and without it; `⎸` and `>` are one cell each and `cells("⎸", "wide")` is 1 where `cells("▌", "wide")` is 2; a quoted heading is the characters `# Heading` inside the rail and not a `rule`; and `quote` on a `warn` notice satisfies I6.
 - **T2.108** (I96, → C09 I41): a list five levels deep draws four indents and the mark changes at the fourth — depths 0–3 `bullet`, depths 4 and 5 `nested` — so the depth-3 and depth-4 rows are not the same frame; an ordered item past the cap carries the mark too; the ASCII rendering keeps the distinction (`-` against `~`); and the uncapped control at width 40 loses its indent, which is the measurement the cap rests on.
+- **T2.110** (I100): `align: ["bottom-right", "centre", "top"]` on a three-child row constructs; `["right-bottom"]` is refused naming the entry and the order; `["left", "top"]` on three children is refused naming both counts.
+- **T2.111** (I102): `minRows: 6` constructs and the group measures 6 with two-row children; `minRows: 0`, `-1`, `2.5` and `"6"` are each refused naming the field.
+- **T2.112** (I100, I45): every one of the fifteen entries constructs on a one-child row, and each measures the same height as no `align` at all — the vertical half of T3.23 restated over the widened vocabulary.
 - **T2.34** (§3am): the same translation on a list item and on a blockquote lands the spans on the `notice`, on a heading on the `rule`'s `label`, and on a pipe-table cell on the `Cell` — the four members of I88 — and on a fenced block **does not** run: `**` inside a fence is seven characters.
 
 ### Tier 3 — edge cases
@@ -3162,6 +3267,14 @@ The generic suite. **These run against every registered block kind, including ap
 - **T3.65** (I86): a `notice` at width 1 whose span covers a CJK glyph the wrapper substitutes with `?` paints `?` inside the span's SGR, and the row is one cell.
 - **T3.66** (I84): spans on a `Cell` are offsets into `text`, not into the glyph-prefixed body — a cell with `glyph: "ok"` and a span at `[0, 3)` styles the first three characters of `text`, not the glyph and a space.
 - **T3.68** (I99): `hidden: "yes"` on a `line` series is refused naming the series index; `hidden: true` on a `bar` series is refused naming the form and I99; `hidden: false` on `bar` is refused too, because the member is the claim and not its value; `hidden: true` on a `band` annotation of a `bar` plot is accepted. `HAS_HIDEABLE_SERIES` is asserted total over `PlotForm` and true on exactly the seven positional forms. In `test/unit/plot-hidden.test.ts`.
+- **T3.69** (I101): a one-row `pills` block `right` in a 40-cell row beside a `raw` block draws what a hand-padded `raw` of the same cells draws — the frame, compared as cells, not a count.
+- **T3.70** (I101): the same block `centre` in a cell with an odd remainder sits one cell left of the exact middle — the floor stated in R1 row 7, read from the frame.
+- **T3.71** (I101): a `rule` aligned `right` renders byte-identical to the same `rule` aligned `left` — the no-op of table row 1, asserted as equality of frames rather than as an absence.
+- **T3.72** (I102): a two-row `notice` alone in a `row` group with `minRows: 5` and `align: ["bottom-right"]` draws its two rows on rows 3–4, ending at the right edge; the frame is compared to one composed by hand.
+- **T3.73** (I100): `["bottom"]` on a `column` group with `minRows: 5` draws the child on rows 0–1 and pads below — table row 4, read from the frame.
+- **T3.74** (I103): the F816 fixture — a four-line `raw` beside a `pills` block aligned `bottom` — answers the chip's element at `rows [3, 4)`; the same block aligned `right` answers `cols` ending at the row's right edge; both compared to where the rendered frame carries the chip's label.
+- **T3.75** (I102, §3d): a group with `minRows: 4` and a reserved `minHeight: 6` measures 6 through the registry, and its `bottom` child draws on row 3, not row 5 — table row 6.
+- **T3.76** (I101, C09 I43): a `notice` whose text wraps at 40 cells, aligned `right` in a 60-cell cell, renders the same rows as at 40 shifted by the offset, and measures the same at both widths.
 - **T3.67** (I85) — **the accepted loss, asserted so a change is visible.** At 1-bit an `ok` notice (emphasised → bold) with a bold span paints a frame byte-identical to the same block without the span; at 8-bit the two differ. A row that starts failing is a compensation that has been added, and the ruling says there is none.
 
 ### Tier 4 — integration
@@ -3225,6 +3338,9 @@ The generic suite. **These run against every registered block kind, including ap
 - **T6.83** (I86): slicing wrapped spans by prefix sums of row lengths instead of by source `start` → T3.62 fails on the second row, one unit early, and T1.25 still passes — which is why T3.62 asserts bytes.
 - **T6.84** (I85): mapping `**` to a palette slot instead of to `bold` → T2.31 emits a colour parameter where `1` is asserted, and T3.67's 1-bit pair is no longer identical.
 - **T6.86** (I99): dropping the `HAS_HIDEABLE_SERIES` arm from `validateBlock` → T3.68's `bar` row fails; dropping the boolean check → its `"yes"` row fails. `tools/mutate/runs/c22-series-visibility.mjs` carries both with their anchors.
+- **T6.87** (I100): parsing the entry as horizontal-first (`"right-bottom"` accepted, `"bottom-right"` refused) → T2.110 fails on the refusal row and T3.72 draws the child at the top.
+- **T6.88** (I102): dropping `minRows` from the group's measure → T2.111 and T3.72 fail; dropping it from the render but not the measure → T3.72 fails on the frame while the height still agrees, which is why the row reads the frame.
+- **T6.89** (I103): reverting the element walk to place every child at the row's top → T3.74 fails; the render is untouched, which is F816 restored.
 - **T6.85** (§3am): reverting the translator to literal markers → T2.33 fails on `text`; adding a text-only `ViewPatch` arm → T1.26 still passes and **nothing fails**, which is the row that says the closure in I87 is by type and the day the union widens this row wants a test.
 
 ---

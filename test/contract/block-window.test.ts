@@ -412,3 +412,14 @@ describe("C09 §2a — a block reduced to a valid smaller block", () => {
     expect(Object.keys(rw?.block ?? {}).sort(), "no pin on a raw window").toEqual(["id", "kind", "text"]);
   });
 });
+
+// C04 §3 *Both axes* / C09 §2c rulings, committed spec-first (F814 for why an `it.todo`
+// carries each row until the code commit replaces it).
+describe("C09 §2c width — the registry's answer", () => {
+  it.todo(
+    "T2.110 (C09 I42): the sealed registry answers width(b, w) === normaliseWidth(w) for rule, progress, plot, image, scroll and mosaic at 40 and at 7; a definition returning w + 5 is clamped to w with onError called once naming the kind — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
+  );
+  it.todo(
+    "T2.111 (C09 I44): the set of default definitions declaring width equals {notice, raw, pills, keyValue, code, table, group, panel}, compared by equality — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
+  );
+});

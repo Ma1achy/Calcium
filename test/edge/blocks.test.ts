@@ -513,3 +513,20 @@ describe("C09 §3, I33 — C04's floor, applied by the registry", () => {
     expect(kept.skipRows, "and its rows are paid out of slack").toBe(5);
   });
 });
+
+// C04 §3 *Both axes* / C09 §2c rulings, committed spec-first (F814 for why an `it.todo`
+// carries each row until the code commit replaces it).
+describe("C09 §2c width — the answers", () => {
+  it.todo(
+    "T3.67 (C09 I43): over every block in the catalogue's corpus and widths 7…80, measure(b, width(b, w)) === measure(b, w), with the failing block and width in the message — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
+  );
+  it.todo(
+    "T3.68 (C09 I42, C09 I44): a nine-cell notice answers 9 at 40 and 7 at 7; a raw of lines 3, 12 and 5 answers 12; a pills row of two chips answers the chips plus the gap; a keyValue with a bar answers the cell; a table with a flex column answers the cell and one without answers its planned columns and gaps — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
+  );
+  it.todo(
+    "T3.69 (C09 I44): a row group of a nine-cell notice and a twelve-cell raw at 40 answers 9 + 1 + 12; a column group of the two answers 12; a panel around the column answers 14, and around a title of twenty cells answers 24 — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
+  );
+  it.todo(
+    "T3.70 (C09 I42): a row group at a width that drops its second child answers only the first child's width — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
+  );
+});

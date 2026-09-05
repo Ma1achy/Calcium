@@ -67,6 +67,10 @@ interface BlockDefinition<B extends Block = Block> {
   // later edit while a branch returning `[]` can. Pure in (block, width) and never
   // in focus, which is what keeps C11 I14 true by signature. UNBUILT.
   elements?: (block: B, width: number, measureChild: MeasureFn) => readonly NavElement[];
+  // §2c — the columns the content occupies at `width`, in [1, width]. Optional on the same
+  // argument again: a kind whose drawing is its width declares nothing, and the registry
+  // answers the width for it.
+  width?: (block: B, width: number, widthChild: WidthFn) => number;
 }
 
 type Windowed<B extends Block = Block> = Readonly<{
@@ -304,6 +308,44 @@ text whatever the window, 1 696 ms at 50 000 rows, and a `code` window opening a
 its text because nothing precedes the slice — owed here, to `kinds/code.ts`, and not built around.
 
 ---
+
+### 2c. `width` — the content width, and the two kinds of answer
+
+```typescript
+type WidthFn = (block: Block, width: number) => number;   // the registry's `width`, handed to containers
+interface BlockDefinition<B extends Block = Block> {
+  // …
+  width?: (block: B, width: number, widthChild: WidthFn) => number;
+}
+```
+
+**`width(block, w)` is the columns the block's content occupies when rendered at `w`**, in
+`[1, normaliseWidth(w)]`, pure in `(block, width)` as `measure` is (I2). It is the answer C04 I45
+said no seam gave, and C04 §3 *Both axes* is its first consumer: a group aligning a child `centre`
+or `right` renders it at this width and offsets it by the remainder.
+
+**Two kinds of answer, and the absent member is the second.** A kind whose content has an edge —
+text, chips, a table with no flex column, a bordered box around such things — answers with the
+edge. A kind whose drawing *is* its width — a `rule`, a `progress` bar, a `plot` frame, an `image`
+scaled to its cell, a `scroll` box — has nothing narrower to report, and **declares no member**:
+the registry answers `normaliseWidth(w)` for it, and every alignment of it is a no-op that C04 I101
+states. Optional on `window?`'s argument: an absent member cannot be deleted by a later edit while
+a branch returning `w` can.
+
+**The contract that makes it safe to render at**: `measure(b, width(b, w)) === measure(b, w)`
+(I43). A block is the same height at its content width, so a group that renders a child narrower
+than its cell has not changed the row the child was measured for. The kinds that answer keep it by
+construction — a `notice` reports its longest wrapped row, so every row still fits; a `raw` its
+longest line; a `pills` block its widest chip row; a `keyValue` with no bar its key column, gap and
+longest value; a `code` block its gutter and longest line; a `table` its planned columns when none
+flexes; a `column` group the widest child and a `row` group the sum of its placed children's widths
+and gutters; a `panel` two more than its widest child, or its title or footer plus their furniture,
+whichever is wider (I44). A `keyValue` with a bar and a `table` with a flex column fill, because
+the bar and the column absorb the residual and their width is the cell's.
+
+The registry's `width(block, w)` clamps whatever a definition returns into `[1, normaliseWidth(w)]`
+and reports a value outside it through `onError` (I8's shape): a definition that answers wider than
+its cell has described a block the cell cannot hold.
 
 ## 3. The nineteen kinds
 
@@ -1718,6 +1760,9 @@ next frame. MG27 is what keeps a producer from writing one (`BUILDER_OMISSIONS`)
 - **I39** — **A GIF is an image with more than one frame; the frame is view state read below the protocol arm, and on kitty the terminal animates.** The six-byte signature chooses `decodeGif` beside `decodePng` behind one front door (`decodeImage`), every frame is composited onto the logical screen before anything above the codec sees it, and delays under 20 ms are shown at 100 (§4c). **`measure` never sees the frame** (I8, C04 I93): `height` is declared and every frame shares the screen, so a GIF measures as its first frame does at every width, and the rasterising arms draw `frames[ctx.frames[id] ?? 0]` while the protocol arm ignores the field. **The kitty ruling is the measured one**: retransmitting a frame per tick would cost 75 bytes an 8x8 and 29,662 bytes a 320x240 per tick — 297 KB/s at 10 fps — where the animation protocol (`a=T` for frame 0 as raw RGBA, `a=f` per later frame with its gap, one `a=a` to start the loop) uploads once — 116,509 bytes for four 320x240 frames — and costs nothing per tick, so on that arm the shell arms **no wake**; a terminal without the extension keeps frame 0, which is the alternative ruling drawn by accident rather than a failure. **The fixtures are real and compared to a second decoder**: written by `sharp`, decoded pixel for pixel against `sharp`'s composited pages, with each blob's bytes scanned for the feature its row claims (→ C04 I93, C22 I77, C09 §4c).
 - **I40** — **A `rule`'s three tiers differ in one thing — the fill — and the row is exactly the width at every one of them.** The lead is two cells and the label's column is fixed, so the tiers differ where the eye already is; tier 3's fill is **drawn as spaces** rather than dropped, which keeps `meta` at the right edge and keeps `measure` a constant 1 (I1). **An empty label never takes the blank fill**: I21's unbroken line and tier 3's absent one meet in one cell, and a two-cell lead with nothing after it is not a rule — so the fill falls back to the tier's own weight there, heavy at 1 and light at 2 and 3. Every character is a pair the vocabulary already holds, resolved through `glyphs(ctx.capabilities)`, so nothing is authored in the renderer (→ C04 I94, A03 SS47).
 - **I41** — **A rail is a glyph drawn on every row of its notice, and it is a property of the token rather than of the block.** `GLYPH_RAIL` sits beside `GLYPH_INDENT` for the same reason: the schema learns nothing, and `measure` still receives no capability. **The geometry cannot move**, because `prefixCells` already subtracts the gutter from every row's width to hang the indent — so a rail fills columns that were reserved and blank, and I1 holds by construction rather than by an argument about it. **The frame is the only instrument that separates a rail from a glyph**: both draw the same rows at the same width with the same reserved columns, and a quotation whose mark appears once and whose remaining rows sit under a blank passes every count. `continuation`'s indent one property along, found the same way (→ C04 I95, C04 I96).
+- **I42** — **A kind may declare `width(block, w)`, the columns its content occupies at `w`, and one that does not fills.** The answer is in `[1, normaliseWidth(w)]` and pure in `(block, width)` as `measure` is (I2); the registry clamps a definition's answer into the range and reports the excursion. Absent is the second answer, not a missing one: a `rule`, a `progress`, a `plot`, an `image`, a `scroll` and a `mosaic` are their width, and the registry answers `normaliseWidth(w)` for them (§2c, → C04 I101).
+- **I43** — **A block is the same height at its content width**: `measure(b, width(b, w)) === measure(b, w)` for every block and width. This is what lets a container render a child at `width(child, cell)` inside a cell measured at `cell` without the row moving, and every declaring kind keeps it by construction — a `notice` answers its longest wrapped row, so no row re-wraps (§2c).
+- **I44** — **The kinds that answer are named, with the case in which each fills.** `notice`, `raw`, `pills`, `keyValue` (no bar), `code`, `table` (no flex column), `group` (a `row` sums its placed children's widths and gutters, a `column` takes the widest), `panel` (its widest child plus the border, or its title or footer plus their furniture). A `keyValue` with a bar and a `table` with a flex column fill because the bar and the column absorb the residual. Every other kind declares no member. The list is the record a reader checks against the registry, and a kind added to one and not the other is the SP-class disagreement between spec and tree (§2c).
 
 ## 8. Commitments
 
@@ -1767,6 +1812,9 @@ next frame. MG27 is what keeps a producer from writing one (`BUILDER_OMISSIONS`)
 42. **A rule's tiers move one thing and the empty label is the cell where two rules meet** (I40, I21). The fill carries the level and nothing else does, so `measure` is untouched and the label stays where a reader is already looking; tier 3 draws its fill as spaces rather than shortening the row, and an empty label takes the weight back because a lead with nothing after it is not a rule (→ C04 I94).
 43. **A gutter that repeats is a property of the mark, and the frame is what said so** (I41). `GLYPH_RAIL` beside `GLYPH_INDENT`: the columns are already reserved on every row for the hanging indent, so a rail costs no geometry and the block schema learns nothing — and a mark drawn once with its remaining rows blank agrees with every count there is (→ C04 I95).
 41. **A run's tone and value reach colour through the resolvers that already own them, and the one span member that is geometry is carried by the wrapper as one property** (I1, I9, → C04 I89, C04 I90, C10 I31, C10 I33). A tone replaces the block's style through the memoised `tone()` call the block made; a value paints a background through `continuousColour` and says nothing below 8-bit; `wrapCellsParts` takes atoms and `notice` measures and renders through one `noticeRows`; a focused table row drops span tones as it drops cell tones; markdown's inline code is the `identifier` tone (§5).
+42. **A block can say how wide its content is, and the seam is optional the way `window` is** (I42). The registry answers for the kinds that do not, so no consumer branches on the member's presence.
+43. **A block is the same height at its content width** (I43). The property is asserted over the catalogue's corpus rather than argued per kind, because a kind that re-wraps at its own reported width would pass every per-kind sentence.
+44. **The answering kinds are a list in the spec and a set in the registry, and the test compares them** (I44). Stated with the case in which each fills, so a reader can tell a deliberate absence from a forgotten member.
 
 ---
 
@@ -1935,6 +1983,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.21** (I26a): `tableDefinition.window` handed the registry's measurer and handed a stub returning 1 cuts in different places — `dropRows` of 2 against 1 for the same range. Asserting the signature would pass against a window that accepted the parameter and ignored it, which is how `table` came to be unwindowable for want of one (F428).
 - **T2.18** (I17, C04 I25): a sequence measures `Σ` its blocks plus one row per `gapBefore`, and renders exactly that many; a `row` group ignores the field.
 - **T2.109** (I40, I41, I1): the headline row at the two new members — a `rule` at each of the three tiers measures 1 and renders exactly 1 row of exactly the width at every width of the sweep and in both alphabets, `meta` landing at the right edge in all three; and a notice carrying a rail measures exactly what the same notice measures without it, at every width, while the rendered rows differ only in the reserved columns.
+- **T2.110** (I42): the sealed registry answers `width(b, w) === normaliseWidth(w)` for a `rule`, a `progress`, a `plot`, an `image`, a `scroll` and a `mosaic` at 40 and at 7; and a definition returning `w + 5` is clamped to `w` with `onError` called once naming the kind.
+- **T2.111** (I44): the set of default definitions declaring `width` equals `{notice, raw, pills, keyValue, code, table, group, panel}` — compared by equality, so a member added or dropped on either side fails the row.
 - **T2.10**: golden frames for every kind at four widths in both themes and both unicode modes.
 
 ### Tier 3 — edge cases
@@ -2000,6 +2050,10 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T3.65** (I19, C04 I86): the bytes rows for the same mechanisms — a span across a wrap, a span straddling a cut with the marker outside it in both directions, a boundary inside a cluster, a substituted cluster at width 1 — are C04 T3.62–T3.65 in `test/edge/spans.test.ts`, asserted on the painted row and never on a count, because every height assertion passes for a span sliced one unit early. C09's number is owed to them on T1.17's terms.
 
 - **T3.66** (I1, C04 I89, C04 I90, C10 I31): **the frames** — `"The cat sat on the mat ."` with a value per token at width 12 and at 80 paints one `48;5` background per token at 8-bit and none between them, two rows at 12 and one at 80, and the same document at 4-bit is byte-identical to the unvalued one; `"x(abcde)yz"` at 6 is two rows plain and three valued, and the valued row is the whole token; a `tone: "identifier"` span on a table cell paints the identifier colour on an unfocused row and the accent colour, unbroken, on the focused one; `measure` equals the rendered row count in every case.
+- **T3.67** (I43): over every block in the catalogue's corpus and widths 7…80, `measure(b, width(b, w)) === measure(b, w)` — the property, with the failing block and width in the message.
+- **T3.68** (I42, I44): a `notice` of nine cells answers 9 at 40 and 7 at 7; a `raw` of lines 3, 12 and 5 answers 12; a `pills` row of two chips answers the chips plus the gap; a `keyValue` with a bar answers the cell; a `table` with a flex column answers the cell and one without answers its planned columns and gaps.
+- **T3.69** (I44): a `row` group of a nine-cell `notice` and a twelve-cell `raw` at 40 answers `9 + 1 + 12`; a `column` group of the two answers 12; a `panel` around the column answers 14, and around a title of twenty cells answers 24.
+- **T3.70** (I42): a `row` group at a width that drops its second child answers only the first child's width — the unplaced child is measured by neither half and counted by neither (C04 §3).
 
 ### Tier 4 — integration
 
@@ -2044,6 +2098,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.18** (I20): dropping the skipped prefix's SGR from `sliceCells` → T1.16 fails, and a layer composited over a themed row leaves the row's tail drawn in the terminal's default colour, which reads as the layer having bled rather than as the base having lost its style.
 - **T6.19** (I20): windowing by `slice` on code units instead of by cells → T1.16 and T1.16c fail; a frame composited from three pieces measures `columns + 1` and wraps into a row nobody counted.
 - **T6.86** (I6, §5): dropping `AMBIGUOUS_RANGES` and leaving `isAmbiguous` the hand-written geometry blocks alone → **T1.27 fails on all 44 rows and T1.27c on `§` `·` `×`, while T1.27b and T1.27d pass** — the state the table shipped in, and the two that stay green are what says the row is about the property rather than about Latin-1. Admitting Latin-1 as a *block* (`cp >= 0xa0 && cp <= 0xff`) instead → **T1.27 passes and T1.27b fails**, which is the over-shooting repair the control exists for. Removing U+E0100..U+E01EF from `isZeroWidth` → T1.27e fails at two cells, and a combining mark widens every cluster that carries one.
+- **T6.87** (I43): making `notice.width` return the text's unwrapped cells → T3.67 fails on a wrapped notice, which is the case the property exists for.
+- **T6.88** (I44): declaring `width` on `rule` returning `w` → T2.111 fails on the set; the clamp and T2.110 still pass, which is why the row is an equality over names.
 - **T6.20** (I19): dropping a cluster wider than the line, as both wrappers did → T3.9d and T3.9e fail, and CJK leaves the output at a usable width of 1 with every measurement still agreeing.
 - **T6.21** (I11): the error path returning one row regardless of what `measure` committed — **the code as it shipped** — → T3.33 and T3.34 both fail. A revert row restoring a defect that happened rather than one imagined, which is the strongest form this tier takes.
 - **T6.22** (I29): a catch that swallows without calling the sink → T3.35 fails, and a run with a caught throw in it goes green.

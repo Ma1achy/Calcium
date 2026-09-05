@@ -769,3 +769,32 @@ describe("C04 §3d, §4 — the floor a layer above sets", () => {
     }
   });
 });
+
+// C04 §3 *Both axes* / C09 §2c rulings, committed spec-first (F814 for why an `it.todo`
+// carries each row until the code commit replaces it).
+describe("C04 §3 both axes — the frames", () => {
+  it.todo(
+    "T3.69 (C04 I101): a one-row pills block right in a 40-cell row beside a raw block draws what a hand-padded raw of the same cells draws, compared as cells — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
+  );
+  it.todo(
+    "T3.70 (C04 I101): the same block centre in a cell with an odd remainder sits one cell left of the exact middle, read from the frame — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
+  );
+  it.todo(
+    "T3.71 (C04 I101): a rule aligned right renders byte-identical to the same rule aligned left — equality of frames, not an absence — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
+  );
+  it.todo(
+    "T3.72 (C04 I102): a two-row notice alone in a row group with minRows 5 and bottom-right draws on rows 3-4 ending at the right edge; compared to a frame composed by hand — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
+  );
+  it.todo(
+    "T3.73 (C04 I100): bottom on a column group with minRows 5 draws the child on rows 0-1 and pads below — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
+  );
+  it.todo(
+    "T3.74 (C04 I103): the F816 fixture — a four-line raw beside a pills block aligned bottom — answers the chip's element at rows 3-4; aligned right its cols end at the row's right edge; both compared to where the frame carries the label — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
+  );
+  it.todo(
+    "T3.75 (C04 I102): a group with minRows 4 and a reserved minHeight 6 measures 6 through the registry and its bottom child draws on row 3, not row 5 — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
+  );
+  it.todo(
+    "T3.76 (C04 I101, C09 I43): a notice wrapping at 40 cells aligned right in a 60-cell cell renders the same rows as at 40 shifted by the offset, and measures the same at both widths — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
+  );
+});

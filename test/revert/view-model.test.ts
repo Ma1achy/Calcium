@@ -447,3 +447,17 @@ describe("C04 fail-on-revert", () => {
     expect(kit.renderToLines(group, 40)).toHaveLength(2);
   });
 });
+
+// C04 §3 *Both axes* / C09 §2c rulings, committed spec-first (F814 for why an `it.todo`
+// carries each row until the code commit replaces it).
+describe("C04 §3 both axes — fail-on-revert", () => {
+  it.todo(
+    "T6.87 (C04 I100): parsing the entry horizontal-first → T2.110 fails on the refusal row and T3.72 draws the child at the top — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
+  );
+  it.todo(
+    "T6.88 (C04 I102): dropping minRows from the measure → T2.111 and T3.72 fail; dropping it from the render only → T3.72 fails on the frame while the height agrees — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
+  );
+  it.todo(
+    "T6.89 (C04 I103): placing every child at the row's top in the element walk → T3.74 fails; the render is untouched, which is F816 restored — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
+  );
+});

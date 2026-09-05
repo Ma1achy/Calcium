@@ -29352,3 +29352,61 @@ always in the literal.
 
 ---
 
+## F816 — the element walk places every row child at the top, and a bottom-aligned chip answers three rows above where it is drawn ★★★★☆
+
+**Measured at 63257076**, before C04's both-axis ruling was written: a `row` group of a four-line
+`raw` and a one-row `pills` block with `align: ["top", "bottom"]` measures 4 and draws the chips on
+row 3. `elementsIn` answers both chips at `rows [0, 1)`. A click on the chip misses; a click on the
+`raw`'s first row, three rows above the chip, focuses it.
+
+**How it happened.** C04 I45 landed vertical alignment as *`measure` is untouched*: the renderer
+places the child with Yoga's `justifyContent` inside a box the container already sized, so no
+height moves and every cache keyed on `(block, width)` is safe. That is true, and the element walk
+in `registry.ts` inherited a stronger sentence from it — *placement is untouched* — because it reads
+`childWidths` and `ROW_GUTTER` for the columns and the row's top for every child's rows. The offset
+Yoga computes exists in no function the walk can call. F756 and F757 were this defect on the other
+axis and the other container, and the repair there (read the painter's numbers from the painter's
+functions) could not reach a number the painter had delegated to a layout engine.
+
+**Why the mutation pass did not find it.** T3.22 reads the frame and T3.23 the height; no row asks
+the elements of an aligned group. `c04-align.mjs`'s two mutations kill on T3.22, and the walk is
+not in either's path.
+
+**Repair** (C04 I103): the offsets on both axes are computed once in `measure.ts`, and the renderer
+applies them as margins while `elementsIn` lifts by them — `entry-layout.ts`'s shape one container
+down. T3.74 is the row; T6.89 the revert.
+
+**Where**: `src/presentation/blocks/registry.ts` `elementsIn` (`place`, the `group` arm);
+`src/presentation/blocks/kinds/containers.ts` `groupDefinition.render`; C04 §3 *Both axes* R5.
+
+---
+
+## F817 — I45 refused the horizontal axis on a sentence that was true about the seam ★★★☆☆
+
+**The sentence**: *placing a child would mean knowing how wide the content is, and
+`measure(block, width) → height` does not answer that.* True. **The decision it was attached to**:
+refuse the axis. The decision it constrains: whether to add a second seam. A reader checks whether a
+justification is true, this one is, and twenty-five components' worth of alignment went past it —
+the MG24 shape (F84), where *a type alias is structural* was true about satisfying a type and not
+about consuming a member of one.
+
+**What made it visible** was the request for corners and centring arriving as a requirement rather
+than a question. Asked *can a child be placed horizontally*, the answer reads as no; asked *what
+would it take*, the answer is one optional member on `BlockDefinition` with the registry answering
+for the kinds that do not declare it — the same optional-member shape `window?` and `elements?`
+already have, and the same argument for why absent is a legal answer.
+
+**The trace of the premise**: R1 of the weights walk (*a group has no preferred width*), I44
+(*the same fact from the side that holds it*), I45 (*arriving a third time*). Three restatements
+of one unmeasured claim, each citing the last, which is the F58 shape. None was wrong. None asked
+whether the fact was a property of blocks or of the seam.
+
+**Disposition**: superseded in the horizontal half by C04 §3 *Both axes* and C09 §2c (I42–I44);
+the vertical half of I45 stands with its rows. The refusing sentence stays in I45 with the
+superseded marker, because a deleted reason is a reason the next person re-derives.
+
+**Where**: `docs/components/C04_view_model.md` I44, I45, §3 *Weights, walked by hand* R1;
+`src/presentation/blocks/kinds/containers.ts` the `DOWN` comment.
+
+---
+

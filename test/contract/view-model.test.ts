@@ -530,3 +530,17 @@ function readIfPresent(path: string): string {
     return "";
   }
 }
+
+// C04 §3 *Both axes* / C09 §2c rulings, committed spec-first (F814 for why an `it.todo`
+// carries each row until the code commit replaces it).
+describe("C04 §3 both axes — construction", () => {
+  it.todo(
+    "T2.110 (C04 I100): align of bottom-right, centre, top on a three-child row constructs; right-bottom is refused naming the entry and the order; two entries on three children is refused naming both counts — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
+  );
+  it.todo(
+    "T2.111 (C04 I102): minRows 6 constructs and the group measures 6 with two-row children; 0, -1, 2.5 and a string are each refused naming the field — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
+  );
+  it.todo(
+    "T2.112 (C04 I100, C04 I45): every one of the fifteen entries constructs on a one-child row and each measures the same height as no align at all — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
+  );
+});
