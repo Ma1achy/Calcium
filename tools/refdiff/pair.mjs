@@ -24,7 +24,7 @@
  * sat exactly where matplotlib's did) from the frame around it (which did not
  * exist), and those are different bug lists.
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { CATALOGUE_FORMS } from "../catalogue-forms.js";
 import { EXTRA_VARIANTS, UNISOLABLE } from "./export-fixtures.js";
@@ -32,6 +32,17 @@ import { EXTRA_VARIANTS, UNISOLABLE } from "./export-fixtures.js";
 const root = join(import.meta.dirname, "..", "..");
 const work = join(root, ".refdiff");
 const outDir = join(root, "docs", "refdiff");
+/**
+ * **The reference frames are committed, and this is the only copy the gate
+ * reads.** `.refdiff/` is the throwaway work directory a second container
+ * fills, and RD5 — *every form is compared or carries a stated reason* — used
+ * to read matplotlib's output straight from it. So RD5 was green on a machine
+ * that had run `make refdiff` and reported every form missing on one that had
+ * not, which is every CI run from 2026-08-23. A comparison's reference is its
+ * record, not its scratch: `make refdiff` refreshes this directory from the
+ * work directory and the diff says which references moved.
+ */
+const referenceDir = join(outDir, "reference");
 
 /** The extent profile — the rightmost end of each distinct left-anchored band.
  *
@@ -104,7 +115,7 @@ export function disagreement(a, b, rows, cols) {
 }
 
 export function referenceRows(form) {
-  const p = join(work, "out", `${form}.txt`);
+  const p = join(referenceDir, `${form}.txt`);
   if (!existsSync(p)) return undefined;
   return readFileSync(p, "utf8").replace(/\n$/, "").split("\n").map((r) => inkMask(r));
 }
@@ -120,6 +131,14 @@ if (isMain) {
   const { cols: COLS, ours: OURS, grid: GRID } =
     JSON.parse(readFileSync(join(work, "ours.json"), "utf8"));
   mkdirSync(outDir, { recursive: true });
+  // Refresh the committed references from the work directory before reading
+  // them — clearing first, so a reference for a form that no longer renders
+  // leaves a deletion in the diff (F275's rule, one directory along).
+  mkdirSync(referenceDir, { recursive: true });
+  for (const f of readdirSync(referenceDir)) if (f.endsWith(".txt")) rmSync(join(referenceDir, f));
+  for (const f of readdirSync(join(work, "out"))) {
+    if (f.endsWith(".txt")) copyFileSync(join(work, "out", f), join(referenceDir, f));
+  }
   const report = [];
   let compared = 0, missing = 0;
   // **Keyed by `form` or `form.variant`**, because a *style* can only ever be a
@@ -172,6 +191,9 @@ if (isMain) {
     "in `export-fixtures.ts`. So this table ranks",
     `**${String(Object.keys(CATALOGUE_FORMS).length + EXTRA_VARIANTS.length)} of ${String(Object.values(CATALOGUE_FORMS).reduce((n, v) => n + Object.keys(v).length, 0))} catalogue variants**, and the rest are unread rather than passing —`,
     "adding one means adding a reference renderer beside it.", "",
+    "**The matplotlib frames are committed under `reference/`** — the record the",
+    "gate compares against, refreshed by `make refdiff`. Only the side-by-side",
+    "text beside this file is generated and ignored.", "",
     "| form | grid | ink | extent |", "|---|---|---|---|"];
   for (const r of report) {
     if (r.skipped !== undefined) { lines.push(`| ${r.form} | — | — | *${r.skipped}* |`); continue; }

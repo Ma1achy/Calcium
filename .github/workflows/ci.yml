@@ -29,6 +29,12 @@ jobs:
       # *in here rather than run by hand* — which was true of the local gate and
       # not of the enforced one. Same shape as F60 one job down: a gate that is
       # not wired is not a gate. 16 instruments, 113 rows, about ten seconds.
+      #
+      # **And two of those fixtures read `docs/catalogue/`, which is gitignored.**
+      # This job failed on it from 2026-08-23 until the target below existed —
+      # green locally on a directory a clean clone never has. The Makefile row
+      # carries the account.
+      - run: make catalogue
       - run: make instruments
 
       - run: make audit

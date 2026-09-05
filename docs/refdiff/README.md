@@ -26,6 +26,10 @@ in `export-fixtures.ts`. So this table ranks
 **48 of 193 catalogue variants**, and the rest are unread rather than passing —
 adding one means adding a reference renderer beside it.
 
+**The matplotlib frames are committed under `reference/`** — the record the
+gate compares against, refreshed by `make refdiff`. Only the side-by-side
+text beside this file is generated and ignored.
+
 | form | grid | ink | extent |
 |---|---|---|---|
 | histogram | 64x16 | 68.2% | 44.7% |
