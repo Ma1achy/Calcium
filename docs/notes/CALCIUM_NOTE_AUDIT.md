@@ -176,23 +176,23 @@ the tree* is true of the harness and not of the product.
 | B1 slider | ABSENT | zero matches | planned |
 | B2 checkbox · radio · switch · segmented · stepper · dial · text input | ABSENT | zero matches each | planned |
 | B3 button | PARTIAL | **built under another name**: `Action` (`types.ts:232-248`) on `TableRow.actions`, `Pills.actions`, `Tip.actions`, dispatched `shell/actions.ts:73-101`; `Table.actionBar` — the note does not know | built under another name — `Action` |
-| B4 series toggle, "build first" | ABSENT and the target field is missing | `Series` (`types.ts:845-885`) has no `hidden`; the legend (`plot/definition.ts:636-677`) declares no `elements` | planned — ~250 lines across C04/C12/C26; **not** the cheapest first step the note says it is |
+| B4 series toggle, "build first" | ABSENT and the target field is missing | `Series` (`types.ts:951-1001` at `de52f1da`) has no `hidden`; the legend declares no `elements` — `plot` declares them since 2026-09-03 (`plot/definition.ts:3201`), but as **the whole block**, one element and nothing to step | planned — ~250 lines across C04/C12/C26; **not** the cheapest first step the note says it is |
 | B5 XY pad · range slider | ABSENT | — | planned |
 | B5 select | PARTIAL | the popup is roadmap 16 BUILT; `ask` is a promise the app awaits, not a widget | planned |
 | B6 readout · gauge · status | BUILT | `KeyValue`, `Progress`, `Status` | — |
-| B7 value store | ABSENT, pattern exact | `RenderContext.scrollOffsets`/`cursorPositions` (`blocks/types.ts:107-108`), threaded `render-lines.ts:45`, owned by `construct.ts`, evicted — but **`cursorPositions` has a reader (`plot/definition.ts:2112`) and no writer** (`blocks/types.ts:150` says so), so the pattern is half-dead | owed now — ~120 lines, the keystone; build the writer with it |
+| B7 value store | ABSENT, pattern exact | `RenderContext.scrollOffsets`/`cursorPositions` (`blocks/types.ts:107-108`), threaded `render-lines.ts:45`, owned by `construct.ts`, evicted — but **`cursorPositions` has a reader (`plot/definition.ts:2112`) and no writer** (`blocks/types.ts:150` says so), so the pattern is half-dead — **superseded 2026-09-04, measured at `de52f1da`**: the writer exists — `CursorPositions` (`src/shell/cursor-positions.ts`), written from `←`/`→` at `shell/keys.ts:863` → `shell/construct.ts:1528`, read at `plot/definition.ts:2177`, and `blocks/types.ts:109-115` now says *written by L4's `CursorPositions`* (C22 I76). The pattern is whole for `cursorPositions`; what B7 still owes is the widget **value store** itself, on that precedent | owed now — ~120 lines, the keystone; the `cursorPositions` precedent is complete, so the store copies it rather than inventing |
 | B8 `bind:` | ABSENT | `ViewPatch` replace exists (`types.ts:2944-2947`), so the mechanism half is real | planned |
 | B9 bind-target list | 11 of 14 exist | `series[].hidden`, `annotations[].hidden` absent; `palette` **removed on a ruling** — `plot/marks.ts:56-72` *"a knob that turns nothing"*, roadmap 51 fixed the categorical set | note was wrong about `palette` — figure |
 | B10 computed binding | — | the note correctly states its own impossibility (a closure is not JSON; `Series.values` `types.ts:850-856` same reasoning) | — |
 | B11 `onChange` | ABSENT | `viewport.ts` hits are unrelated | planned |
 | B12 controls block | ABSENT | — | planned |
-| B13 "a widget is an element" | PARTIAL and thinner | `NavElement`/`ElementAddress` (`router/types.ts:84`), `resolveFocus` (`focus.ts:122`) exist; **exactly one kind declares `elements`** (`table/definition.ts:111`); `elementsIn` has **one caller**, `liveElements` (`construct.ts:1213`), reading the live entry only — so no element outside the live entry is focusable; roadmap `:3125-3128` names that by symbol | planned — widen `liveElements` first |
-| B14 `mergeBlock` | BUILT symbol, UNINHABITED | `router/keymap.ts:74`; roadmap `:3145-3155` — throws on collision with `global`/`liveBlock`; the note's key table (`:189-199`) binds up/down/pageup/pagedown/escape, all already at `liveBlock`/`pushedView`, so every widget trips the throw | planned — the collision rule must be re-ruled first |
+| B13 "a widget is an element" | PARTIAL and thinner | `NavElement`/`ElementAddress` (`router/types.ts:84`), `resolveFocus` (`focus.ts:122`) exist; **exactly one kind declares `elements`** (`table/definition.ts:111`); `elementsIn` has **one caller**, `liveElements` (`construct.ts:1213`), reading the live entry only — so no element outside the live entry is focusable; roadmap `:3125-3128` names that by symbol. **Both halves superseded 2026-09-04, measured at `de52f1da`**: **five** kinds declare `elements` — `table` (`table/definition.ts:111`), `pills` (`blocks/kinds/simple.ts:436`), `scroll` (`blocks/kinds/containers.ts:282`), `mosaic` (`containers.ts:455`), `plot` (`plot/definition.ts:3219`); `elementsIn` is reached through `elementsOf(entryId)` (`shell/construct.ts:1263`), which has **three** callers (`:1273`, `:1299`, `:1324`) and takes the focused entry — `focusedEntryId()`, 18 sites — so every entry's elements are focusable, `tab`/`⇧tab` move between entries (`CSI Z` decoded at `router/decode.ts:391`), C26 §4g, I21/I22 | planned — the widening landed 2026-09-03 (C26 §4g); what B13 still owes is a *widget* kind declaring `elements` |
+| B14 `mergeBlock` | BUILT symbol, UNINHABITED | `router/keymap.ts:74`; roadmap `:3145-3155` — throws on collision with `global`/`liveBlock`; the note's key table (`:189-199`) binds up/down/pageup/pagedown/escape, all already at `liveBlock`/`pushedView`, so every widget trips the throw — **superseded 2026-09-04**: re-ruled as C16 I27 (`router/keymap.ts:69-77`, 2026-09-03): a colliding key is merged at `interaction`, a free key at `liveBlock`, and only the same key twice in one block keymap is refused — the note's five keys all land. Still uninhabited: `BlockKeymap` has no producer in `src/` (C26 T2.6a) | planned — the collision rule is re-ruled (C16 I27); a producer is what remains |
 | B15 mouse | ABSENT | — | planned |
 | B16 degradation | ABSENT / untested | — | planned |
 | B17 refuse-at-construction | ABSENT, seam exists | `validate.ts` | planned |
 | "the popup … five consumers" (`:197`) | — | resolves to roadmap 16 BUILT; entry 10 PART's residue is the in-transcript form the note wants | definite article resolves, to a different thing |
-| "the hit test" (`:208`) | — | `focus.ts:72` returns `pushedView` before the element check; `elementsIn` reads `liveId` | definite article — half exists |
+| "the hit test" (`:208`) | — | `focus.ts:72` returns `pushedView` before the element check; `elementsIn` reads `liveId` — **the second half superseded 2026-09-04**: `elementsOf(entryId)` reads the focused entry (`shell/construct.ts:1263`, C26 §4g); the `pushedView`-first return still holds at `focus.ts:72` | definite article — half exists, and the half is now the pointer's |
 | "the legend is already the right surface" (`:60`) | — | drawn, yes; no `elements`, no field | half true |
 
 ---
@@ -304,7 +304,7 @@ in the note itself (2026-09-03).
 | what | verdict | measurement | disposition |
 |---|---|---|---|
 | 3D-1 the eleven steps | BUILT | `src/presentation/plot/project3.ts`, `axes3.ts`, `scatter3.ts`, `surface3.ts`; `plot3d` form (`types.ts:994`); `Camera` (`:941-978`); `AxisSpec3.tone` (`:828`) — the member the note's table at `:1101` called *nowhere* | — |
-| 3D-2 camera writer | BUILT | `src/shell/cameras.ts`; `construct.ts` wiring — the gate `cursorPositions` still fails, passed here | — |
+| 3D-2 camera writer | BUILT | `src/shell/cameras.ts`; `construct.ts` wiring — the gate `cursorPositions` still fails, passed here (and has since passed too: writer at `shell/keys.ts:863`, 2026-09-03) | — |
 | 3D-3 half blocks | BUILT, both paths | `scatter3.ts`; `kinds/image.ts` | — |
 | 3D-4 two channels one glyph | BUILT | `image.ts` emits `HALF_BLOCK` with `colour: cell.top, background: cell.bottom`; `HalfCell` in `halfblock.ts` | — |
 | Q1 quarter blocks | BUILT **twice** | `plot/linedraw.ts:306 QUADRANTS` (16 entries U+2596–259F, `quadrantGlyph`) and `plot/scatter3.ts:1373 QUADRANT` (the same 16, consumed `:1573`) | owed now — collapse the duplicated table; two copies drift |
@@ -401,7 +401,7 @@ small, or `owed now` and named above.
 | 3 | **the three-line footer** | 1 | §16 must first be reconciled with itself |
 | 4 | **agent-tui, the app** | 1–3; an AI SDK row in `DEPENDENCIES.md`; `ToolDef.approval`; a composite `(step, part)` address | its own package |
 | 5 | **the emulator** — `CALCIUM_LIVE_TERMINAL.md` A1 | nothing; gate is *measure `@xterm/headless`* | new component or a dependency; A2, A3, A5, A7, A9, A10, A20 follow it |
-| 6 | **the widget system** | widening `liveElements` (`construct.ts:1213`) beyond the live entry; re-ruling `mergeBlock`'s collision throw; B7's value store **with its writer** | B1–B5, B8, B11–B17 |
+| 6 | **the widget system** | **B7's value store with its writer — alone, as of 2026-09-04.** The other two are done: ~~widening `liveElements` (`construct.ts:1213`) beyond the live entry~~ landed 2026-09-03 as `elementsOf(entryId)` (`shell/construct.ts:1263`, C26 §4g); ~~re-ruling `mergeBlock`'s collision throw~~ landed 2026-09-03 as C16 I27 (`router/keymap.ts:69-77`) | B1–B5, B8, B11–B17 |
 | 7 | **cell ordering** — notebooks D5 | nothing, but it reverses C13's append-only shape | a C13 spec change first |
 | 8 | **export** — notebooks D7 | nothing | `plot/svg.ts` is the precedent |
 | 9 | **the dataframe filter** — C8 | C1 the profiler; the `presorted` trap ruled | — |
@@ -410,8 +410,8 @@ small, or `owed now` and named above.
 **Multi-day, not arcs**: ML-T tensor (roadmap 3's residue; design at `CALCIUM_ENTRY3_KICKOFF.md`);
 Q2 quarter blocks for the image arm (after Q1's table collapse); ML-2 structured diff (after 10).
 
-**Small, and `owed now` or nearly**: D3 keep flag (~80 lines); B7 value store with a writer for
-`cursorPositions` (~120); Q1 collapse the duplicated `QUADRANT` table; `pulse` spinner set (BUILT 2026-09-03 with the seven re-ruled `narrowOnly` sets — `CALCIUM_SPINNERS.md`);
+**Small, and `owed now` or nearly**: D3 keep flag (~80 lines); B7 value store with its writer (~120 —
+`cursorPositions`'s own writer landed 2026-09-03, `shell/cursor-positions.ts`, so the store has a precedent to copy); Q1 collapse the duplicated `QUADRANT` table; `pulse` spinner set (BUILT 2026-09-03 with the seven re-ruled `narrowOnly` sets — `CALCIUM_SPINNERS.md`);
 `step`/`question` glyph slots (~10); S0-2 correction to A2's drawing; ML-5b cost; ML-3 progress
 rate/eta; ML-5a lineage vocabulary; M5 role→slot Mermaid theming (~80); IM-10 Mermaid HD; D6.
 

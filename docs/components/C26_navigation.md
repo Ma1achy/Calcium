@@ -313,8 +313,11 @@ point `n`/`p` stepping hunks may be redundant.
 What does not exist is anything **asking**: `elementsIn` has exactly one caller —
 `liveElements` in `src/shell/construct.ts` — and it reads `stores.transcript.liveId`. So no
 element inside a view can be focused, and the key collision cannot occur until a second caller
-exists. The blocker is a caller, not a declaration. **That is the keymap's question and not this
-ruling's**, and it is named here so it is not later mistaken for a consequence of it (→ C16,
+exists. The blocker is a caller, not a declaration. **The caller has since been written — §4g,
+2026-09-03**: `elementsOf(entryId)` in `src/shell/construct.ts` answers for the focused entry and
+has three callers, so the measurement above is the pre-§4g state, kept as the record of what this
+ruling was reasoned against; a view's document is still no entry, so nothing walks one. **That is
+the keymap's question and not this ruling's**, and it is named here so it is not later mistaken for a consequence of it (→ C16,
 and §4's own question (b) about the outer and inner scopes binding the same keys).
 
 **`PgDn` is bound at `global` today and this ruling gives it a second meaning.**
@@ -348,7 +351,8 @@ result: **zero of four kinds fit, and the axis is wrong.**
 ### The measurement first, because it moves the subject
 
 **A block's edge is not a boundary.** `liveElements` is `elementsIn(entry.doc.blocks, width)` —
-one flat list over the **whole live entry** — so `↓` at the last element of one block steps into
+one flat list over the **whole live entry** (since §4g, `elementsOf(entryId)` — over the **focused**
+entry, which I19's wording now says) — so `↓` at the last element of one block steps into
 the first of the next, and nothing at that seam is an edge at all. T1.15 already asserts it: two
 tables, and the third `↓` lands in the second table.
 
@@ -497,9 +501,9 @@ structure, and the structural half is where it comes apart.
 | # | the sequence | ruling |
 |---|---|---|
 | 1 | enter interact on a block inside a view, then `Esc` | **The sequence cannot start** (table row 2), so this answers nothing rather than answering it one way. Recorded as unreachable, because a trace row that cannot run reads exactly like one that passes |
-| 2 | the view's document is replaced under a focused element (`fill`, `putBlock`) | I10's fall-forward re-resolves against **the live entry's** list, and a view's elements are in no list — `elementsIn` has one caller and it reads `stores.transcript.liveId`. **The re-resolution has no subject at this scope**: table row 2 arriving through an event |
+| 2 | the view's document is replaced under a focused element (`fill`, `putBlock`) | I10's fall-forward re-resolves against **the live entry's** list, and a view's elements are in no list — `elementsIn` has one caller and it reads `stores.transcript.liveId` (**superseded by §4g** on the measurement, not the conclusion: `elementsOf(entryId)` has three callers and every one takes a transcript entry; a view's document is still in no list). **The re-resolution has no subject at this scope**: table row 2 arriving through an event |
 | 3 | `⌃c` at each rung with interact open | measured, and each rung undoes the innermost thing entered: `copyMode` → `exitCopyMode`; `overlay` → pop if `dismissable`; `pushedView` → `popLayer`; `interaction` → `setMode("navigate")`, staying on the row; `liveBlock` → `toPrompt`. **The ladder is right and its interaction rung is dead** for row 5's reason |
-| 4 | the view pops while focus is inside a block in it | same as 2 — there is no *inside* to be in. Named because it is the sequence an implementation would reach for first when wiring a second caller of `elementsIn`, and it would produce a stored address into a document nothing displays |
+| 4 | the view pops while focus is inside a block in it | same as 2 — there is no *inside* to be in. Named because it is the sequence an implementation would reach for first when wiring a second caller of `elementsIn`, and it would produce a stored address into a document nothing displays. **§4g wrote that second caller** — `elementsOf(entryId)` — and it takes entries, not views, so the address it stores is into a displayed document and this row's hazard was not met |
 
 ### What (b) is actually blocked on, in order
 
@@ -524,6 +528,8 @@ Both halves need a consumer that does not exist, and **neither is waiting on a d
 - **The rung** is one line of `FOCUS_ORDER` — the spec says so, and that is deliberate. What it
   would rank is an element inside a view, and nothing produces one: `elementsIn` has a single
   caller reading `stores.transcript.liveId`. Adding the rung first would rank an empty set.
+  (**Superseded by §4g**, 2026-09-03, on the count and not the conclusion: `elementsOf(entryId)`
+  has three callers, all over transcript entries — the set inside a view is still empty.)
 - **The interact half** needs the second merge target §4f names, and `mergeBlock` has no caller
   at all, so the collision that motivates it has never been raised.
 
@@ -531,6 +537,13 @@ Both halves need a consumer that does not exist, and **neither is waiting on a d
 `mergeBlock`'s throw fires the first time an adapter wants a framework key, and a second caller
 of `elementsIn` is a grep that resolves the day someone writes it. A deferral whose condition
 nothing watches is this session's six; these two are watched by the code.
+
+**Both triggers have since fired, and neither lifted the closure — §4g, C16 I27, 2026-09-03.**
+The throw became a placement (§4f): a colliding key lands at `interaction`, so the first trigger
+now reports as a `/help` row rather than an error. The second caller of `elementsIn` was written
+— `elementsOf(entryId)` — and it walks transcript entries, not the top layer's document, so the
+grep resolves and the set the rung would rank is still empty. The closure stands on its
+conclusion; the two sentences above are kept as what it was closed against.
 
 **So the order, if it is ever picked up: producer, then rung.** Ranking a scope with nothing in
 it is how a priority list acquires an entry nobody can test — A03 §2's vacuity class, in the one
@@ -612,7 +625,8 @@ has no producer in `src/` (T2.6a still holds).
 
 ## 4g. Block-to-block focus — the ceiling lifts, walked by hand
 
-**The measurement first.** `elementsIn` had exactly one caller, `liveElements` in
+**The measurement first** (the pre-§4g state, 2026-09-03, before the change this section
+makes). `elementsIn` had exactly one caller, `liveElements` in
 `src/shell/construct.ts`, and it read `stores.transcript.liveId`. `focusFor` in `session.ts`
 answered `null` for every entry but the live one, and `focusedBlock` read `liveId` again. So
 no element outside the live entry could be focused, and the three places that would have had

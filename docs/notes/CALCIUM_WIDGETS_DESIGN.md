@@ -129,6 +129,17 @@ annotations on or off         annotations[].hidden
 recomputation, no function, nothing that cannot be serialised. **The document stays a
 document.**
 
+**Three of the fourteen are absent members the design requires — measured 2026-09-04 at
+`de52f1da`, and none exists on any type.** `series[].hidden` would be `hidden?: boolean` on
+`Series` (`src/data/viewmodel/types.ts:951-1001`; its fields today are `values`, `pointLabels`,
+`label`, `tone` and the per-form extras). `annotations[].hidden` would be `hidden?: boolean` on
+every arm of the `Annotation` union (`types.ts:1174-1208` — `line`, `band`, `confidence`,
+`whiskers`, none carries it). `palette` is not a `Plot` field at all: `Plot` (`types.ts:1209`)
+carries `colormap` (`:1326`), and `Plot.palette` was **removed on a ruling** rather than typed
+(`src/presentation/plot/marks.ts:56-72` — *a field with one legal value is not a choice*;
+roadmap 51), so binding it means reversing that ruling, not adding a member. The other eleven
+resolve (`CALCIUM_NOTE_AUDIT.md` B9).
+
 **And the patch is the mechanism that already exists** — `replace` on the target block, `rev`
 bumps, the cache misses, the row is rewritten. **Nothing new.**
 
@@ -184,6 +195,14 @@ weights do the sizing.
 **A widget is an element, and C26 already has elements.** `↑`/`↓` moves between widgets in a
 panel, exactly as it moves between table rows.
 
+**Satisfied at HEAD, measured 2026-09-04 at `de52f1da`** — this read as an assumption when
+written and is now the tree's behaviour: five kinds declare `elements` (`table`, `pills`,
+`scroll`, `mosaic`, `plot`), the focused entry's elements are one flat list across its blocks
+(C26 I19, §4g), and focus reaches every entry, not only the live one — `elementsOf(entryId)`
+(`src/shell/construct.ts:1263`), `tab`/`⇧tab` between entries (C26 I21). A `controls` block
+declaring `elements` gets `↑`/`↓` between its widgets with no new mechanism; what is missing is
+the kind.
+
 **And then the widget's own keys apply once focused:**
 
 ```
@@ -202,6 +221,14 @@ text input                  the prompt's own editing, scoped to the field
 `mergeBlock` is how those bindings arrive. **The widget system is the consumer D4 was written
 for and never had** — which is worth checking rather than assuming, because that ruling has
 been re-derived twice.
+
+**Checked, 2026-09-04.** D4 stands (C26 §4f), `mergeBlock` is the seam, and since 2026-09-03
+it **places rather than refuses**: a key `global` or `liveBlock` already binds — `↑` `↓` `PgUp`
+`PgDn` `Esc` in the table above, all five — lands at `interaction` and fires once the reader
+has entered the block; a free key lands at `liveBlock` (C16 I27,
+`src/interaction/router/keymap.ts:69-77`). This table was the consumer that forced that ruling
+(C16 §6). The assumption is satisfied; what is not is the producer — `BlockKeymap` has no
+producer in `src/` (C26 T2.6a), and the widget system would be the first.
 
 ### Mouse
 
