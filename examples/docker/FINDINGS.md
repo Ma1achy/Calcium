@@ -29077,3 +29077,31 @@ timeout --foreground 3 cat > /tmp/hp/$4-b.bin; printf "$3"
 **Where**: C01 §5; C16 §2; F800.
 
 ---
+
+## F809 — a render-cost row whose verdict was the runner's load: 54.6 ms against a 50 ms ceiling, 17–22 ms here, on a host measured at 2.7× ★★☆☆☆
+
+*2026-09-05 · the lead, on the run after the owed items landed, at c5c5d3e2.*
+
+**Measured.** `plot-performance.test.ts` *60×20 heatmap with continuous palette — the monitor load*
+failed the `fast` job at **54.578 ms** against `toBeLessThan(50)`. The push touched `scatter3.ts`,
+`documents.ts` and tests — nothing on the heatmap's path — and the two runs before it were green on
+the same row. Locally, three runs: the row's wall time 183–244 ms for eleven renders, **17–22 ms a
+render**. The runner's own `make regime` line on the previous green run: *this machine / recorded
+2.7×*. 19 × 2.7 = 51. The ceiling had no headroom on the host CI actually is, and the header above the
+rows named **16 ms** as the target — a figure no row in the file has met since the heatmap existed.
+
+**Ruled**, in F262's shape: **one ceiling, named, with both figures beside it** — `RENDER_CEILING_MS =
+150`, under three times the runner's reading, so a quadratic regression or a hang still fails and a
+busy runner does not. Five rows take it; the sixth is a ratio (F73's class, left as it is). Not a
+per-row number: a list of five stops seeing the sixth. Not a ratio against a control render: a
+CPU-fraction assertion measures the host, not the code — the quiet-machine note's finding. The header's
+16 ms is replaced by the measurement.
+
+**The group's fifth**, and the shape is F69's exactly: *thresholds have margin on an idle host and
+none on a busy one*, with the number that shows it this time — the runner's ratio was already printed
+in the job, one step above the failure, by the instrument built for this reading.
+
+**Where**: `test/unit/plot-performance.test.ts`; TRIAGE group 12; F262, F69, F73.
+
+---
+
