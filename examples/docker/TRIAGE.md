@@ -30,7 +30,7 @@ type change.
 | rank | mechanism | ids keyed | consumers | ⚠ | disposition |
 |---|---|---|---|---|---|
 | **1** | [The consumer cannot reach a fact the framework holds](#1) | 19 | **11 open** | ⚠ C07 · C24 | real Calcium work, with consumers |
-| **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 71 | **5 open** (9 closed) | ⚠ C04 · C23 | real Calcium work · **7 of 13 fixed** — and F165 is the first found by roadmap 48's residue rather than by a consumer reaching for something |
+| **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 72 | **5 open** (9 closed) | ⚠ C04 · C23 | real Calcium work · **7 of 13 fixed** — and F165 is the first found by roadmap 48's residue rather than by a consumer reaching for something |
 | **3** | [A block cannot express what the surface needs](#3) | 8 | **4 open** | ⚠ C04 | mixed — two absorbed |
 | **4** | [A change axis distinct from `Tone`](#4) | 4 | **4 open** | ⚠ C04 · C09 · C10 | real Calcium work · needs a ruling |
 | **5** | [The far side's shape is not the framework's contract](#5) | 10 | **2 open** | ⚠ C05 | mostly app-side · one shim |
@@ -39,7 +39,7 @@ type change.
 | **8** | [Absence indistinguishable from failure](#8) | 28 | **7 open** (7 closed) | partly | real Calcium work · **7 of 10 fixed** — F151 is the class F35 closed in the half an app-side test cannot reach, and **F167 is the class arriving in a *value*: a validator agreeing twice about two different documents** |
 | **9** | [**The instrument was wrong**](#9) | 99 | **17** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
 | **10** | [**A claim carried without a record**](#10) | 66 | **11** | — | **new at F80** · method — six findings disproved, and **F166 unblocked an entry while F168 found what the same row was silent about**; F184 is the first where the unrecorded claim was a *rule* rather than a fact, governing thirty forms from a parameter's doc comment |
-| **11** | [A gate that passes without checking](#11) | 251 | **16** | — | **105 closed · 117 open** of 223 keyed — the heading was out by 66 and this row's count column by 1, which cannot be corrected alone (§11) · four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
+| **11** | [A gate that passes without checking](#11) | 256 | **16** | — | **105 closed · 117 open** of 223 keyed — the heading was out by 66 and this row's count column by 1, which cannot be corrected alone (§11) · four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
 | **12** | [**A time-based assertion under contention**](#12) | 4 | **3** | — | **new at F80** · Calcium's own suite |
 | **13** | [Text the framework emits](#13) | 4 | **4** | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
 | **14** | [A constant, a channel or a rule that outlived its configuration](#14) | 26 | **13 open** | ⚠ C12 | **new at F492** · real Calcium work — every member reads as deliberate, which is why review found none of them |
@@ -222,6 +222,8 @@ mechanism.
 **F754** — C14's `entryAtRow` **did not exist** — spec'd, typed on the router's deps, supplied to production as `() => null`; the viewport rung had never fired for a pointer. Built per the spec; C14's own rows T2.11/T2.12/T3.1b/T3.1c owed
 
 **F769** — the selection was **painted nowhere** and a focused chip drew as an unfocused one; landed as `FocusState.selected` with its writer and axis, default ink over the editor's wash, reverse video at 1-bit; a focused active chip and a focused block still paint nothing — pinned, owed
+
+**F779** — C16 I19 promised a §3a route that did not exist and `bound()` dropped a block's unknown action with nobody seeing it; ruled — the union, refused at merge; the brief's own premise and its first instrument were both wrong (78 / 69 / 78)
 
 <a id="3"></a>
 
@@ -1471,6 +1473,16 @@ reads goes through the entry point a user has.
 **F776** — `hidden` validated, B7's store with a digit key as its first writer, `mergeBlock`'s first caller; the axis does not rescale; a callout-row defect fixed in passing and owed a measurement; C16 I19 describes a dispatch route that does not exist
 
 **F778** — the GIF delay clamp at two sites; removing one **survived** because the other held, on the run file's first pass through the harness. One helper, both callers
+
+**F780** — a plain overlay in the tooltip's place **steals `↓`, `⏎`, `Esc`** — the peek is a layer kind `top` never answers; a row's detail is what the column cut, 13 of 20 corpus tables at 80
+
+**F781** — fourteen notices migrated byte-identically, twelve frames; the one site disagreeing with the helper's default found by the walk where no frame could reach
+
+**F782** — the running card's one-second wake rides the part sweep — the stall timer cannot; a guard on the clock survived a fixture that never woke twice in a second
+
+**F783** — the extent's two homes and the tail's three made one each; `atTail` moved **down** to C14 because L2 cannot read L4
+
+**F784** — two new run files' sentinels vacuous by their own `why`; the harness refused both — F746's class twice more
 
 <a id="12"></a>
 

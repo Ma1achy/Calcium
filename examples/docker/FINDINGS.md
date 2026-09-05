@@ -28574,3 +28574,124 @@ file, both sites looked like the rule.
 **Where**: `src/presentation/image/gif.ts`; `tools/mutate/runs/c09-gif.mjs`.
 
 ---
+
+## F779 — C16 I19 promised a dispatch route that did not exist, and `bound()` dropped a block's unknown action with nobody seeing the refusal ★★★★☆
+
+*2026-09-05 · the lead, closing arc5 (the peek, the fourteen notices, I19, the running card's tick, two de-duplications), at 73882a4f+arc5.*
+
+**Expected** (C16 I19, §6): *block keymaps are open strings by design and dispatch through C23 §3a.*
+
+**Measured**: `construct.ts` `bound()` resolved `keys.table[binding.action as KeyAction] ?? null` — an action
+outside the built-in union was **dropped silently**; no C23 §3a route existed for a block-declared action.
+**The brief's own premise was false too**: *the plot's keymap uses nine built-in actions* — `toggleSeries1–9`
+are in the union and the effect table and **no default row binds them**; the first instrument written to
+check refused the plot's digits (T2.6a died), and the first measurement said 69 of 69 because its regex
+dropped every name with a digit. Measured properly: **78 in the union, 69 bound by default rows, 78 in the
+effect table**. **Ruled (a)**: a `BlockKeymap` names members of the union; `mergeBlock` refuses any other
+name at merge time with the key and the action; `BUILTIN_ACTIONS satisfies Record<KeyAction, true>` so a
+missing or foreign name fails to compile; nine existing test rows that bound open strings renamed. I19 and
+§6 rewritten; `blockActionRoute` owed with widgets' `bind` as its consumer — a route with no producer is a
+seam nobody crosses.
+
+**Where**: C16 I19, §6; `src/interaction/router/keymap.ts` `mergeBlock`, `BUILTIN_ACTIONS`; T2.4f.
+
+---
+
+## F780 — a plain overlay in the tooltip's place steals `↓`, `⏎` and `Esc` from the element it describes — so the peek is a layer kind the ladder never sees ★★★★☆
+
+*2026-09-05 · the lead, closing arc5 (the peek, the fourteen notices, I19, the running card's tick, two de-duplications), at 73882a4f+arc5.*
+
+**Measured before ruling**: an anchored, dismissable, empty `overlay` standing in for a peek over a focused
+table — `activeTarget` answered `overlay`, **`↓` was consumed and focus did not move**, `⏎` went to the layer,
+`Esc` dismissed the layer instead of leaving the block. `activeTarget` reads `overlayTop.kind` and nothing
+else; `dismissable` decides what `Esc` does to a layer that *has* the keys and is the wrong axis. **Ruled**
+(C15 §2a, I21–I23): `kind: "peek"` — a third layer kind that `top` never answers, sorted view < peek < overlay,
+takes no input (`takesInput` filters `placed` before the hit test), dismissed when focus leaves; the router's
+`overlayTop` is typed `KeyedLayer` and cannot see a peek without a type error, so the ladder needs no change.
+**A tooltip is the focused element's detail** (`NavElement.detail?: Block`, source-side like `copy`); the
+pointer's route is the click that focuses — hover is not buildable at mouse mode 1002 and is recorded under
+`MOUSE_ANY_EVENT` with the trade (1003 floods the decoder). A table row's detail is **what the column cut**:
+measured, **13 of 20 corpus tables cut something at 80 columns (50 of 80 rows)**; docker's real `/ps` drops
+`ports` on every row. Frame read: the peek beside a cut row, gone on a fitting one, **flipped above** near the
+bottom (C15 I17) where the first assertion had assumed below. Seven mutations, each killing named rows.
+
+**Where**: C15 §2a; `src/viewport/overlay/{types,manager,place}.ts`; `src/shell/construct.ts` `syncPeek`;
+`src/presentation/table/definition.ts` `rowDetail`; `test/integration/peek.test.ts`.
+
+---
+
+## F781 — fourteen hand-composed notices migrated byte-identically — and the walk found the one site where the helper and the literal disagreed ★★★☆☆
+
+*2026-09-05 · the lead, closing arc5 (the peek, the fourteen notices, I19, the running card's tick, two de-duplications), at 73882a4f+arc5.*
+
+Frames captured **before** touching each site through the real path, in colour (SGR kept — `visible()` strips
+exactly what a tone or glyph changes); rows written green at base, the migration, the rows green again: **12
+frames byte-identical, 11 rows**. Nothing needed widening — none of the fourteen carried `spans` or
+`colormap`. **The walk found the cell no frame could reach**: `glyphFor` gives no glyph for `ok`, and the
+view-route `finish` at `execution.ts:1271` always drew `✓` on its `ok` arm — so that site passes the glyph
+rather than taking the default, and the harness manifest has no `view` tool to render it. SS56's allow-list
+went from 16 to 12; **SS53 fired four times** with the literals gone and the entries still there — the entries
+were load-bearing. `test/support/execution.ts` gained a scripted `adaptPatch` to reach `resumed` and
+`truncated` (`sawPatch` fires only on an applied patch).
+
+**Where**: `src/shell/{confirm,execution,refresh}.ts`, `src/shell/local/handlers.ts`; SS56; `test/contract/notice-family.test.ts`.
+
+---
+
+## F782 — the running card's tick — the stall timer cannot carry a one-second figure, and a guard written on the clock survived a fixture that never woke twice in a second ★★★☆☆
+
+*2026-09-05 · the lead, closing arc5 (the peek, the fourteen notices, I19, the running card's tick, two de-duplications), at 73882a4f+arc5.*
+
+**Measured**: the stall timer re-arms at `STALL_MS / 4` = 30 s; the part sweep already arms
+`now + ELAPSED_TICK_MS` for a waiting box (I52) and a countdown (F407). **Ruled** (C23 I53): a pending entry
+with an elapsed readout re-composes on the sweep's one-second wake while it runs — **one timer for every card**
+— guarded on the rendered figure, gated by `visible`, stopped by `settled`/`release`/`dispose`/a refused
+patch. `elapsed()` draws nothing below one second, so a card reads bare at dispatch, not `0s`. **The guard on
+the clock survived its first row**: the fixture never woke twice in a second, so the mutation removing the
+same-second guard changed nothing the row could see; rebuilt with a 250 ms part and a render counter, it
+dies (`expected 3 to be 8`). **No producer in `src/`**: `toolCallDoc` is called only by its test, so
+`RefreshDriver.readout` is registered in `UNCONSUMED_MEMBERS` beside `ToolCallSpec.output`, same consumer
+(`examples/agent`), same expiry.
+
+**Where**: `src/shell/refresh.ts` `readout`; C23 I53, §3d-bis; `tools/mutate/runs/refresh-readout.mjs`.
+
+---
+
+## F783 — the extent had two homes and the tail comparison three — and the tail's home had to move down a layer ★★★☆☆
+
+*2026-09-05 · the lead, closing arc5 (the peek, the fourteen notices, I19, the running card's tick, two de-duplications), at 73882a4f+arc5.*
+
+`copyElement` and `focusFor` held the same eight-line rule (F764's fix), each commented to point at the
+other. `extentOf(stored, elements)` beside `resolveFocus`, both callers on it; a mutation collapsing a stale
+anchor to the block's first element now kills **T3.50 and T4.8 together** — the copy row and the wash row from
+one anchor, which is the point of one copy. The tail: `shell/tail.ts` (L4) could not be read by C14 (L2) —
+MG1 refuses the direction — and C14 held **three** spellings of the comparison, not one (`top >= maxTop()`,
+`topRow >= maxTop()`, `maxTop() === 0`). `atTail` moved down into `src/viewport/viewport/tail.ts`, the
+component whose invariant states the rule; `shell/tail.ts` re-exports it so its L4 readers keep one import.
+The `>=` → `>` mutation kills C14's T1.4/T1.6b/T1.7/T1.11 and the shell's T1.30/T2.40 — two layers from one
+anchor. **Recorded**: no wash row sees the extent's far end (the dropped element is the head, painted from
+`head` not the slice).
+
+**Where**: `src/interaction/router/focus.ts` `extentOf`; `src/viewport/viewport/tail.ts`; C14 I5; C26 §5c.
+
+---
+
+## F784 — two new run files' sentinels were vacuous by their own description, and the harness refused to report both ★★★☆☆
+
+*2026-09-05 · the lead, closing arc5 (the peek, the fourteen notices, I19, the running card's tick, two de-duplications), at 73882a4f+arc5.*
+
+**Measured** on the first harness run of `peek.mjs` and `refresh-readout.mjs`: `BlindHarnessError` on each — *a
+mutation that cannot survive was not caught*. The peek's control disabled the duplicate-id refusal while its
+own `why` said the rows push **distinct** ids — a change no row could see; the readout's control flipped a
+commit flag on a path T3.61 does not reach. Both lanes had killed real mutations by hand and then chose a
+*cleverer* control than any of them. F746's class, twice more: the harness's sentinel is the kill that is not
+in doubt, and the lane's hand pass had already found one in each file. Swapped to *the peek pushed as an
+overlay takes the keys* and *the readout arms no wake*; both files then report — and the readout's report had **one
+survivor**: *the readout writes off screen*. `visible` is read twice in the driver, once to decide whether any card arms
+the wake and once per card in the write loop; T3.61c hid **both** cards, so the arming gate answered for the write gate and
+removing the second changed nothing the row could see — the GIF clamp's shape (F778) inside a fixture. One card hidden and
+one visible is the cell the two gates share; the row constructs it now and the mutation dies.
+
+**Where**: `tools/mutate/runs/peek.mjs`, `tools/mutate/runs/refresh-readout.mjs`.
+
+---
