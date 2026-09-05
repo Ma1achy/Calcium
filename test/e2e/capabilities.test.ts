@@ -14,6 +14,9 @@
 import { describe, expect, it } from "vitest";
 import { interactivePty, runInPty, type PtyRun } from "../support/pty.js";
 import { displayCells } from "../../src/presentation/text.js";
+import { KITTY_KEYBOARD } from "../../src/terminal/escapes.js";
+import { createDecoder } from "../../src/interaction/router/decode.js";
+import { captureFromEmulator, emulatorMissing, sleep } from "../support/x-emulator.js";
 
 const FIXTURE = "node test/support/fixture.mjs caps";
 
@@ -183,15 +186,41 @@ describe("C02 e2e — the environment decides, and the terminal shows it", () =>
     45_000,
   );
 
-  // **Owed, and not faked** (C02 T5.7). The row above proves the bytes leave
-  // the process; nothing here proves a terminal *answers* them — that a lone
-  // `Esc` comes back as `CSI 27 u`, that Shift-Enter released carries `:3`. The
-  // container has no kitty, Ghostty, WezTerm or foot to answer, and
-  // `imageProtocol` shipped once having never run against a terminal. An
-  // `it.todo` rather than a skip — the shape TD0–TD6 collect and can expire —
-  // named so it is found by grepping the symbol or the reason, never a pass.
-  it.todo(
-    "T5.7 (owed, C02 I12): a real emulator receives KITTY_KEYBOARD.enter and answers `CSI 27 u` for Esc and `CSI 13;2:3 u` for Shift-Enter released — not deferred on a component: it needs kitty, Ghostty, WezTerm or foot installed in the container, and none is",
+  // **Was an `it.todo` for want of an emulator; the container has kitty now** (C02
+  // T5.7, F810). The row above proves the bytes leave the process; this one
+  // proves a terminal *answers* them, in its own encoding, and that the decoder
+  // reads that encoding — the wiring a graph-level row cannot see (F799). Skips
+  // by name where kitty, Xvfb or xdotool is absent, never silently: the reason
+  // is in the title. The `full` CI job and the devcontainer install all three.
+  const kittyMissing = emulatorMissing("kitty");
+  it.skipIf(kittyMissing !== null)(
+    `T5.7 (C02 I12; C16 I30): kitty receives KITTY_KEYBOARD.enter and answers \`CSI 27 u\` for a lone Esc, \`CSI 13;2:3 u\` for Shift-Enter released — and the real decoder reads both${kittyMissing === null ? "" : ` — skipped: ${kittyMissing}`}`,
+    async () => {
+      const { a } = await captureFromEmulator({
+        program: "kitty",
+        enter: KITTY_KEYBOARD.enter,
+        leave: KITTY_KEYBOARD.leave,
+        drive: async (xdo, _window, phase) => {
+          if (phase !== 1) return;
+          xdo("keydown", "Escape"); await sleep(150); xdo("keyup", "Escape"); await sleep(300);
+          xdo("keydown", "shift"); await sleep(100); xdo("keydown", "Return"); await sleep(150);
+          xdo("keyup", "Return"); await sleep(100); xdo("keyup", "shift"); await sleep(300);
+          xdo("type", "k"); // the control: a capture without it is a broken reader, not a quiet terminal
+        },
+      });
+      expect(a, "the control byte arrived, so the capture read").toContain("k");
+      expect(a, "a lone Esc is `CSI 27 u` — not a prefix").toContain("\x1b[27u");
+      expect(a, "its release carries `:3`").toContain("\x1b[27;1:3u");
+      expect(a, "Shift-Enter is `CSI 13;2 u`").toContain("\x1b[13;2u");
+      expect(a, "released, `CSI 13;2:3 u`").toContain("\x1b[13;2:3u");
+
+      // **The decoder, on the emulator's bytes** — the pair T4.72 could not see (F799).
+      const d = createDecoder({ capabilities: { bracketedPaste: true, mouse: true }, now: () => 0 });
+      const events = d.push(new TextEncoder().encode(a)).filter((e) => e.kind === "key");
+      const keys = events.map((e) => (e.kind === "key" ? `${e.key.name}${e.key.shift ? "+shift" : ""}${e.event === "release" ? "/release" : ""}` : ""));
+      expect(keys).toEqual(["escape", "escape/release", "enter+shift", "enter+shift/release", "k", "k/release"]);
+    },
+    60_000,
   );
 
   it(

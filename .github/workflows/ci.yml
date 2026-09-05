@@ -70,6 +70,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: make install
+      # **Two tier-5 rows drive a real emulator under Xvfb** (C02 T5.7 on kitty,
+      # C16 T5.9 on xterm; F808, F810). Without these they skip by name — the
+      # reason in the row's title — which is not a pass, and not the gate either.
+      - run: sudo apt-get update -q && sudo apt-get install -y -q xvfb xdotool xterm kitty
       - run: make golden
       - run: make e2e
         env:

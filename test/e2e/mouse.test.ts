@@ -17,6 +17,9 @@
 import { describe, expect, it } from "vitest";
 
 import { interactivePty } from "../support/pty.js";
+import { createDecoder } from "../../src/interaction/router/decode.js";
+import { MOUSE, MOUSE_ANY } from "../../src/terminal/escapes.js";
+import { captureFromEmulator, emulatorMissing, sleep } from "../support/x-emulator.js";
 
 const FIXTURE = "node test/support/fixture.mjs session";
 const PROMPT = /❯/;
@@ -192,5 +195,62 @@ describe("C16 e2e — the mouse through a PTY (I31, §4a)", () => {
       }
     },
     60_000,
+  );
+});
+
+describe("C16 §2 / C01 I21 — the mouse modes, answered by the reference emulator (F808)", () => {
+  // **F808's hand measurement, as a gate.** xterm is the implementation of the
+  // document C01 §5 cites; under Xvfb it answers in bytes. Three rests, a drag,
+  // a typed `k` as the control in every capture. Skips by name where xterm,
+  // Xvfb or xdotool is absent.
+  const xtermMissing = emulatorMissing("xterm");
+  const gesture = async (xdo: (...a: readonly string[]) => void, w: string): Promise<void> => {
+    for (const x of ["100", "130", "160"]) { xdo("mousemove", "--window", w, x, "100"); await sleep(200); }
+    xdo("mousedown", "1"); await sleep(150);
+    for (const x of ["200", "240"]) { xdo("mousemove", "--window", w, x, "100"); await sleep(150); }
+    xdo("mouseup", "1"); await sleep(250);
+    xdo("type", "k"); await sleep(200);
+  };
+  const count = (s: string, re: RegExp): number => (s.match(re) ?? []).length;
+  const REST = /\x1b\[<35;\d+;\d+M/gu;
+  const DRAG = /\x1b\[<32;\d+;\d+M/gu;
+
+  it.skipIf(xtermMissing !== null)(
+    `T5.9 (C01 I21, C16 I30; F808): 1003 alone reports rests and drags, 1002 alone drags only, and after \`1003l\` nothing — one tracking mode, either release clears it${xtermMissing === null ? "" : ` — skipped: ${xtermMissing}`}`,
+    async () => {
+      const only1003 = await captureFromEmulator({
+        program: "xterm", enter: MOUSE_ANY.enter, leave: MOUSE_ANY.leave,
+        drive: async (xdo, w, phase) => { if (phase === 1) await gesture(xdo, w); },
+      });
+      expect(only1003.a, "the control byte").toContain("k");
+      expect(count(only1003.a, REST), "rests are reported under 1003 — `Cb & 3 === 3`, motion with no button").toBeGreaterThan(0);
+      expect(count(only1003.a, DRAG), "and the drag").toBeGreaterThan(0);
+
+      const only1002 = await captureFromEmulator({
+        program: "xterm", enter: MOUSE.enter, leave: MOUSE.leave,
+        drive: async (xdo, w, phase) => { if (phase === 1) await gesture(xdo, w); },
+      });
+      expect(only1002.a).toContain("k");
+      expect(count(only1002.a, REST), "1002 reports no rest").toBe(0);
+      expect(count(only1002.a, DRAG), "but the drag").toBeGreaterThan(0);
+
+      // 1002 then 1003, then 1003 released: if the terminal held two modes, 1002 would still
+      // report the drag in phase b — in SGR or, with 1006 released too, in the legacy encoding;
+      // either is bytes, and the assertion is that there are none but the control. The pairs
+      // are composed from `escapes.ts`, the one owner of every mode literal (C01 T2.8).
+      const order = await captureFromEmulator({
+        program: "xterm", enter: MOUSE.enter + MOUSE_ANY.enter, mid: MOUSE_ANY.leave, leave: MOUSE.leave,
+        drive: async (xdo, w) => { await gesture(xdo, w); },
+      });
+      expect(count(order.a, REST), "1003 in force: the later select wins").toBeGreaterThan(0);
+      expect(order.b, "after `1003l`, only the control byte — 1002 was not left behind").toBe("k");
+
+      // **The decoder, on the emulator's rest byte** (C16 I30): `35` is no button.
+      const rest = /\x1b\[<35;\d+;\d+M/u.exec(only1003.a)?.[0] ?? "";
+      const d = createDecoder({ capabilities: { bracketedPaste: true, mouse: true }, now: () => 0 });
+      const ev = d.push(new TextEncoder().encode(rest))[0];
+      expect(ev?.kind === "mouse" ? ev.button : ev?.kind, "the rest decodes as `button: \"none\"`").toBe("none");
+    },
+    120_000,
   );
 });
