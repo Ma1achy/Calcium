@@ -1118,6 +1118,10 @@ gives it horizontal layout and multi-row falls out for free.
 **Decide it once, before six features each add a segment.** That is the nits' §9 with a sixth
 claimant, and this design is the one that most wants the room.
 
+> **Superseded the same day by C22 §6l** (I82): the footer is its content — `[]` is zero rows,
+> the maximum is `MAX_FOOTER_ROWS` (four, derived) — and `TuiConfig.chrome.footerRows` is removed.
+> The three lines above are three blocks. The paragraph below is kept as the ruling it replaces.
+
 **DECIDED 2026-09-05 — C22 §6k, and the footer grows; the chrome does not compose.** The
 budget is `TuiConfig.chrome.footerRows`, declared once per session, default 1, an integer up
 to `MAX_FOOTER_ROWS` — which is **derived** from the size gate as the largest footer that

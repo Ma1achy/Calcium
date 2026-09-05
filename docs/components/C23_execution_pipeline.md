@@ -207,8 +207,11 @@ accumulated, so the header is patched **before** the settle with its final figur
 verdict: `exit N` from `end`'s `RawResult.exitCode`, `cancelled`, `truncated`, `failed`. `settle(id,
 doc)` — step 6, the invoke route and its error arm, and the local route — *replaces* the document,
 and **the replacement is composed with the card**: `{ ...doc, blocks: [header(elapsed, outcome),
-...doc.blocks] }`, where `outcome` is `exit N` when the adapted result carries an exit code, `ok`
-for a document whose status is `ok`, and `failed` for one whose status is `error`. The result's
+...doc.blocks] }`, where `outcome` is `exit N` when the adapted result's exit code is **non-zero**, `ok`
+for a document whose status is `ok`, and `failed` for one whose status is `error` with no such code.
+(The first draft said *when the adapted result carries an exit code* — every adapted document does,
+the registry writes `meta.exitCode` on every route (F58), so that clause made row 10's `ok`
+unreachable. A zero exit is not a fact worth a word beside `ok`; a non-zero one is the fact.) The result's
 blocks become the card's body and hang under the hook two cells in (C22 I83). So `⏺ tail(web.log)
 · 2m 31s · exit 0` is what a finished follow reads **and `⏺ ps(--all) · 0.4s · ok` over an
 indented table is what a finished listing reads** — §9c's settled state, on every route.

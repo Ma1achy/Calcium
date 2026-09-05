@@ -65,10 +65,15 @@ The `▌` gutter marks the live block (D6). The footer has switched to row keys 
 
 ```
 headerRows   = 1
-footerRows   = 1
+ruleRows     = 2                                   — one above the prompt, one below (C22 I81)
+footerRows   = min( measureSequence(footer, width), MAX_FOOTER_ROWS )   — 0 for `[]` (C22 I82)
 promptRows   = min( editor.displayRows(width, gutter), floor(rows / 2) )
-viewportRows = max( 0, rows − headerRows − footerRows − promptRows )
+viewportRows = max( 0, rows − headerRows − ruleRows − footerRows − promptRows )
 ```
+
+**Amended 2026-09-05** (C22 §6l): the footer was a declared budget of one row and is now its
+content's height, and the two rules bounding the prompt are drawn at every size — they were the
+boxes §2's figure annotated and nothing drew.
 
 with `gutter = { first: 2, cont: 2 }` (D24a, C22 §6).
 
