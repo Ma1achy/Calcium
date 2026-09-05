@@ -318,6 +318,30 @@ describe("C04 contract", () => {
     expect(source).not.toMatch(/from\s+["'][^"']*terminal/);
   });
 
+  it("T2.11b (C04 §3, arc 6 §5): a notice's one `action` is checked by the rule a tip's are — kind, label, and the kind's field", () => {
+    const notice = (action?: unknown): unknown => ({
+      kind: "notice",
+      id: "n1",
+      tone: "error",
+      glyph: "error",
+      text: "pull failed",
+      ...(action === undefined ? {} : { action }),
+    });
+    expect(validateBlock(notice()).ok, "absent is the notice it always was").toBe(true);
+    expect(validateBlock(notice({ kind: "fill", label: "retry", command: "pull" })).ok).toBe(true);
+    expect(validateBlock(notice({ kind: "open", label: "log", url: "file:///var/log/x" })).ok).toBe(true);
+
+    const unknownKind = validateBlock(notice({ kind: "retry", label: "retry", command: "pull" }));
+    expect(unknownKind.ok).toBe(false);
+    expect(unknownKind.ok ? "" : unknownKind.error.join(" ")).toMatch(/\.action: "kind" must be one of/);
+    const noField = validateBlock(notice({ kind: "fill", label: "retry" }));
+    expect(noField.ok).toBe(false);
+    expect(noField.ok ? "" : noField.error.join(" ")).toMatch(/\.action: "command" must be a string/);
+    const notObject = validateBlock(notice("retry"));
+    expect(notObject.ok).toBe(false);
+    expect(notObject.ok ? "" : notObject.error.join(" ")).toMatch(/\.action: must be an object/);
+  });
+
   it("T2.11 (I4): validateDocument and validateBlock are total over hostile input", () => {
     const hostile: unknown[] = [
       undefined,

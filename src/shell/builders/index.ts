@@ -85,6 +85,7 @@ import type {
   BlockOpts,
   RuleOpts,
   ValuedTextOpts,
+  NoticeOpts,
   CellInput,
   ChipInput,
   ComparisonRow,
@@ -182,7 +183,7 @@ function rule(label: string, meta?: string, opts?: RuleOpts): Rule {
   );
 }
 
-function noticeOf(tone: Tone, text: string, glyph?: Glyph, opts?: ValuedTextOpts): Notice {
+function noticeOf(tone: Tone, text: string, glyph?: Glyph, opts?: NoticeOpts): Notice {
   const g = glyphFor(tone, glyph);
   return finish<Notice>(
     {
@@ -193,6 +194,9 @@ function noticeOf(tone: Tone, text: string, glyph?: Glyph, opts?: ValuedTextOpts
       ...(g === undefined ? {} : { glyph: g }),
       ...(opts?.spans === undefined ? {} : { spans: opts.spans }),
       ...(opts?.colormap === undefined ? {} : { colormap: opts.colormap }),
+      // The one button (C04 §3, arc 6 §5) — written only when supplied, so a
+      // notice without one is byte-identical to what this built before.
+      ...(opts?.action === undefined ? {} : { action: opts.action }),
     } as Notice,
     opts,
     false,
@@ -200,10 +204,10 @@ function noticeOf(tone: Tone, text: string, glyph?: Glyph, opts?: ValuedTextOpts
 }
 
 const notice = Object.assign(noticeOf, {
-  ok: (text: string, opts?: ValuedTextOpts): Notice => noticeOf("ok", text, undefined, opts),
-  warn: (text: string, opts?: ValuedTextOpts): Notice => noticeOf("warn", text, undefined, opts),
-  error: (text: string, opts?: ValuedTextOpts): Notice => noticeOf("error", text, undefined, opts),
-  info: (text: string, opts?: ValuedTextOpts): Notice => noticeOf("info", text, undefined, opts),
+  ok: (text: string, opts?: NoticeOpts): Notice => noticeOf("ok", text, undefined, opts),
+  warn: (text: string, opts?: NoticeOpts): Notice => noticeOf("warn", text, undefined, opts),
+  error: (text: string, opts?: NoticeOpts): Notice => noticeOf("error", text, undefined, opts),
+  info: (text: string, opts?: NoticeOpts): Notice => noticeOf("info", text, undefined, opts),
 });
 
 /**

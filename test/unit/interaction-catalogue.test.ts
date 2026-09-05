@@ -165,6 +165,20 @@ describe("interaction-catalogue — the corpus renders", () => {
     expect(cellOf(mono, "running").attrs).not.toContain(7);
   });
 
+  it("IC8 (C26 §7, C04 §3): the focused notice is accent over the ground and the plain notice beside it is untouched", () => {
+    const c = capsNamed("24bit");
+    const accent = params(tone("accent", theme, c));
+    const info = params(tone("info", theme, c));
+    const wash = params(selectionStyle(theme, c));
+    const lines = frameFor(scene("notice-action-focus"), c);
+    expect(cellOf(lines, "image pull failed"), "the button, focused").toEqual({ fg: accent, bg: wash, attrs: [] });
+    expect(cellOf(lines, "✗"), "its glyph too").toEqual({ fg: accent, bg: wash, attrs: [] });
+    expect(cellOf(lines, "no containers"), "the plain notice: its tone, no ground").toEqual({ fg: info, bg: "", attrs: [] });
+    const mono = frameFor(scene("notice-action-focus"), capsNamed("1bit"));
+    expect(cellOf(mono, "image pull failed").attrs).toEqual(expect.arrayContaining([1, 7]));
+    expect(cellOf(mono, "no containers").attrs).not.toContain(7);
+  });
+
   it("IC6 (C04 I49): the scrolled container mid-stream shows the residue row for both directions", () => {
     const c = capsNamed("24bit");
     const plain = frameFor(scene("scroll-midstream"), c).map((l) => l.replace(/\u001b\[[0-9;]*m/gu, ""));

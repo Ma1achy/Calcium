@@ -25,7 +25,7 @@ import { tableDefinition } from "../../src/presentation/table/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { renderToLines } from "../../src/presentation/render-lines.js";
 import { defaultTheme, loadTheme } from "../../src/presentation/theme/index.js";
-import { block } from "../../src/data/viewmodel/index.js";
+import { block, mosaicRects, parseAreas } from "../../src/data/viewmodel/index.js";
 import { sgr } from "../../src/terminal/escapes.js";
 import { focusKey } from "../../src/shell/render-cache.js";
 
@@ -335,7 +335,11 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
     const accent = params(tone("accent", theme, caps));
     const muted = params(tone("muted", theme, caps));
     const none = plotAt(null);
-    const focused = plotAt({ blockId: "p", rowId: null });
+    // **The session's form** — `focusFor` writes the element's id, and a plot's
+    // element is its block (C12 I85). This row constructed `rowId: null` for
+    // three weeks and was green while a focused plot in a session painted
+    // nothing (F802); the null form is a control below now.
+    const focused = plotAt({ blockId: "p", rowId: "p" });
 
     // **The text is byte-identical**: the frame moves no glyph and no cell (C11 I17's rule on a plot).
     expect(focused.map((l) => l.replace(SGR, ""))).toEqual(none.map((l) => l.replace(SGR, "")));
@@ -356,14 +360,16 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
     expect(textOf(focused[focused.length - 1] === undefined ? [] : cellsOf(focused, 80)[focused.length - 1]!), "the x-label row exists").toContain("0.0");
     expect(diff.some((d) => d.row === focused.length - 1), "and no cell of it moved").toBe(false);
 
-    // **The controls**: a row focus on this block, and a block focus on another, paint nothing here.
+    // **The controls**: another row's id on this block, another block's focus, and
+    // the `rowId: null` form no session writes — each paints nothing here.
     expect(plotAt({ blockId: "p", rowId: "r" })).toEqual(none);
-    expect(plotAt({ blockId: "q", rowId: null })).toEqual(none);
+    expect(plotAt({ blockId: "q", rowId: "q" })).toEqual(none);
+    expect(plotAt({ blockId: "p", rowId: null })).toEqual(none);
   });
 
   it("T1.25 (C26 §7, F34): at 1-bit the same cells go from dim to bold — a weight, not a colour", () => {
     const none = plotAt(null, 1);
-    const focused = plotAt({ blockId: "p", rowId: null }, 1);
+    const focused = plotAt({ blockId: "p", rowId: "p" }, 1);
     const diff = styleDiff(none, focused, 80);
     expect(diff.length, "the same 164 cells").toBe(164);
     for (const d of diff) {
@@ -413,5 +419,161 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
       expect(d.was.attrs).toContain(2);
       expect(d.now.attrs).toContain(1);
     }
+  });
+
+  // --- plot3d — the frame is `scatter3.ts`'s, so it is lit there (C26 §7, C12 §3al) ---
+  const PLOT3D = block({
+    kind: "plot", id: "p3", form: "plot3d", height: 8, series: [], camera: {},
+    points3: [
+      { label: "a", points: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 1, z: 1 }, { x: -1, y: 1, z: 0 }] },
+      { label: "b", points: [{ x: 1, y: -1, z: -1 }, { x: -1, y: -1, z: 1 }] },
+    ],
+  } as never);
+  const plot3dAt = (focus: FocusState | null, depth: 24 | 1 = 24) =>
+    renderToLines(registry, PLOT3D, 60, { theme, capabilities: capabilities({ colourDepth: depth }), focus });
+
+  it("T1.27 (C26 §7, C12 I85): a focused plot3d turns its frame accent — every moved cell was muted, the tick labels stay muted, no glyph moves", () => {
+    const caps = capabilities({ colourDepth: 24 });
+    const accent = params(tone("accent", theme, caps));
+    const muted = params(tone("muted", theme, caps));
+    const none = plot3dAt(null);
+    // **The id the session writes**: `focusFor` puts the element's id in `rowId`,
+    // and a plot's element is its block (C12 `elements()`). Measured before this
+    // arm existed: zero rows differed under exactly this focus.
+    const focused = plot3dAt({ blockId: "p3", rowId: "p3" });
+    expect(focused.map((l) => l.replace(SGR, ""))).toEqual(none.map((l) => l.replace(SGR, "")));
+    const diff = styleDiff(none, focused, 60);
+    expect(diff.length, "the frame has cells to carry it").toBeGreaterThan(20);
+    for (const d of diff) {
+      expect(d.ch.trim(), `cell ${String(d.row)},${String(d.col)} is a glyph, not a blank`).not.toBe("");
+      expect(d.was.fg, `${JSON.stringify(d.ch)} was muted`).toBe(muted);
+      expect(d.now.fg, `${JSON.stringify(d.ch)} is accent`).toBe(accent);
+    }
+    // The scale keeps `muted`: a tick label's digits are not in the diff.
+    const labelCells = diff.filter((d) => /[0-9.-]/u.test(d.ch));
+    expect(labelCells, "no tick-label digit moved").toEqual([]);
+    const screen = cellsOf(focused, 60);
+    const labelRow = rowContaining(screen, "0.5");
+    expect(labelRow, "the fixture has a tick label to read").not.toBeNull();
+    expect(styleAt(labelRow!, "0.5")!.fg, "the tick label keeps muted").toBe(muted);
+
+    // **The controls**: another block's focus paints nothing here — and so does
+    // `rowId: null`, the form the 2-D rows above construct and no session writes
+    // (C26 §7's recorded hole). This arm tests for the session's form only.
+    expect(plot3dAt({ blockId: "q", rowId: "q" })).toEqual(none);
+    expect(plot3dAt({ blockId: "p3", rowId: null })).toEqual(none);
+  });
+
+  it("T1.27 (C26 §7, F34): at 1-bit a focused plot3d is invisible, because its frame carries a colour and no weight — pinned with the premise", () => {
+    // **Measured, and the opposite of the 2-D frame.** `furniture.ts` paints
+    // its frame through `tone()`, so at 1-bit `muted` is `2m` and focus turns
+    // it `1m`. `scatter3.ts` carries a `ColourValue` a cell — `slot(...).colour`
+    // — and at 1-bit that is undefined for `muted` and `accent` alike: no cell of
+    // the 3-D frame is dim before focus, so there is nothing for focus to make
+    // bold. Said here rather than absorbed (F803, arc 6); the row goes red the
+    // day the 3-D frame gains a weight channel, which is the day F34's rule
+    // applies to it.
+    const none = plot3dAt(null, 1);
+    const focused = plot3dAt({ blockId: "p3", rowId: "p3" }, 1);
+    expect(focused, "byte-identical at 1-bit").toEqual(none);
+    const dimCells = cellsOf(none, 60).flatMap((row) => row.filter((c) => c.ch.trim() !== "" && c.style.attrs.includes(2)));
+    expect(dimCells, "the premise: no glyph of the 1-bit 3-D frame is dim").toEqual([]);
+    // **The control**: the 2-D frame at the same depth has dim glyphs to move.
+    const flat = cellsOf(plotAt(null, 1), 80).flatMap((row) => row.filter((c) => c.ch.trim() !== "" && c.style.attrs.includes(2)));
+    expect(flat.length, "the 2-D frame carries the weight the 3-D one does not").toBeGreaterThan(100);
+  });
+
+  // --- mosaic — no furniture of its own, so focus is invisible, and that is pinned (C26 §7) ---
+  const MOSAIC = block({
+    kind: "mosaic", id: "m", height: 4, areas: "ab/cd",
+    children: [
+      { kind: "notice", id: "a", tone: "info", text: "A" },
+      { kind: "notice", id: "b", tone: "ok", text: "B" },
+      { kind: "notice", id: "c", tone: "warn", glyph: "warn", text: "C" },
+      { kind: "notice", id: "d", tone: "error", glyph: "error", text: "D" },
+    ],
+  } as never);
+  const mosaicAt = (focus: FocusState | null) =>
+    renderToLines(registry, MOSAIC, 60, { theme, capabilities: capabilities({ colourDepth: 24 }), focus });
+  /** Non-blank cells of a frame that lie in none of the given rectangles — a mosaic's own furniture, if it had any. */
+  const outsideRects = (lines: readonly string[], rects: readonly { left: number; top: number; width: number; height: number }[]) => {
+    const screen = cellsOf(lines, 60);
+    const out: { row: number; col: number; ch: string }[] = [];
+    for (let row = 0; row < screen.length; row += 1) {
+      for (let col = 0; col < 60; col += 1) {
+        const ch = screen[row]![col]!.ch;
+        if (ch.trim() === "") continue;
+        const inside = rects.some((r) => row >= r.top && row < r.top + r.height && col >= r.left && col < r.left + r.width);
+        if (!inside) out.push({ row, col, ch });
+      }
+    }
+    return out;
+  };
+
+  it("T1.28 (C26 §7, C04 I71): a focused mosaic is byte-identical — and every non-blank cell lies inside a child's rectangle, so there is no furniture to tone", () => {
+    const none = mosaicAt(null);
+    // A mosaic's elements are its children (C26 §4b cell 3), so a focus inside it names one.
+    expect(mosaicAt({ blockId: "m", rowId: "b" }), "focus on a cell moves nothing").toEqual(none);
+    expect(mosaicAt({ blockId: "m", rowId: "d" })).toEqual(none);
+    // **The ruling's premise, pinned from the structural side.** The row goes
+    // red the day the mosaic draws a gap, a rail or a border of its own — which
+    // is the day the residue-row precedent applies and this ruling expires.
+    const parsed = parseAreas("ab/cd");
+    if (!parsed.ok) throw new Error(parsed.fault);
+    const rects = mosaicRects(parsed.grid, 60, 4, undefined, undefined);
+    expect(rects, "four cells, two by two").toHaveLength(4);
+    expect(none.map((l) => l.replace(SGR, "")).join("").trim(), "the fixture draws its children").toContain("A");
+    expect(outsideRects(none, rects), "no non-blank cell outside a child's rectangle").toEqual([]);
+    // **The instrument responds**: one glyph painted into the gap between
+    // rows — where a rail would be — is reported.
+    const narrowed = rects.map((r) => ({ ...r, width: Math.min(r.width, 29) }));
+    expect(outsideRects(none, narrowed), "the frame itself has nothing in the column the narrowing exposes").toEqual([]);
+    const forged = none.map((l, i) => (i === 1 ? `${" ".repeat(29)}│` : l));
+    expect(outsideRects(forged, narrowed)).toEqual([{ row: 1, col: 29, ch: "│" }]);
+  });
+
+  // --- notice — with an action it is a button, and a focused button is painted (C26 §7, C04 §3) ---
+  const RETRY = { kind: "fill", label: "retry", command: "pull" } as const;
+  const NOTICE = block({ kind: "notice", id: "n", tone: "error", glyph: "error", text: "pull failed", action: RETRY } as never);
+  const PLAIN = block({ kind: "notice", id: "n", tone: "error", glyph: "error", text: "pull failed" } as never);
+  const noticeAt = (b: typeof NOTICE, focus: FocusState | null, depth: 24 | 1 = 24) =>
+    renderToLines(registry, b, 40, { theme, capabilities: capabilities({ colourDepth: depth }), focus });
+
+  it("T1.29 (C26 §7, C04 §3): a focused notice with an action goes accent over the selection ground — glyph and text; one without an action declares nothing and cannot move", () => {
+    const caps = capabilities({ colourDepth: 24 });
+    const accent = params(tone("accent", theme, caps));
+    const error = params(tone("error", theme, caps));
+    const wash = params(selectionStyle(theme, caps));
+    const none = noticeAt(NOTICE, null);
+    const focused = noticeAt(NOTICE, { blockId: "n", rowId: "n" });
+    expect(focused.map((l) => l.replace(SGR, ""))).toEqual(none.map((l) => l.replace(SGR, "")));
+    const at = (lines: readonly string[], text: string) => {
+      const row = rowContaining(cellsOf(lines, 40), text);
+      if (row === null) throw new Error(`no row holds ${text}`);
+      const s = styleAt(row, text);
+      if (s === null) throw new Error(`no cell holds ${text}`);
+      return s;
+    };
+    expect(at(none, "pull failed"), "unfocused: the tone, no ground").toEqual({ fg: error, bg: "", attrs: [] });
+    expect(at(focused, "pull failed"), "focused: accent over the ground, the tone dropped").toEqual({ fg: accent, bg: wash, attrs: [] });
+    expect(at(focused, "✗"), "the glyph keeps its character and takes the same paint").toEqual({ fg: accent, bg: wash, attrs: [] });
+    expect(at(none, "✗").fg).toBe(error);
+
+    // **The element, as a count** (C09): one with an action, none without.
+    const withAction = registry.elementsIn([NOTICE], 40);
+    expect(withAction).toHaveLength(1);
+    expect(withAction[0]?.element).toMatchObject({ id: "n", level: "block", activate: RETRY, copy: "pull failed" });
+    expect(withAction[0]?.element.rows).toEqual({ from: 0, to: 1 });
+    expect(registry.elementsIn([PLAIN], 40), "no action, no element").toHaveLength(0);
+    // And the plain notice cannot be reached by focus, so no frame of it moves.
+    expect(noticeAt(PLAIN, { blockId: "n", rowId: "n" })).toEqual(noticeAt(PLAIN, null));
+    // Controls: another block's focus, and the `rowId: null` form no session writes.
+    expect(noticeAt(NOTICE, { blockId: "q", rowId: "q" })).toEqual(none);
+    expect(noticeAt(NOTICE, { blockId: "n", rowId: null })).toEqual(none);
+
+    // 1-bit: bold and reverse video, the pills head's carrier (C10 §4b).
+    const mono = noticeAt(NOTICE, { blockId: "n", rowId: "n" }, 1);
+    expect(at(mono, "pull failed").attrs).toEqual(expect.arrayContaining([1, 7]));
+    expect(at(noticeAt(NOTICE, null, 1), "pull failed").attrs).not.toContain(7);
   });
 });

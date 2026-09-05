@@ -690,12 +690,12 @@ function requireFiniteNumbers(
  * the field its kind needs are two different messages rather than one silence.
  *
  * **Known limit, stated rather than left to be discovered**: this reaches the
- * `actions` array on `patch` and `tip`, and not `TableRow.actions` or a `pills`
- * chip's `action`. Those are nested inside collections this validator walks for
- * other reasons, and widening it there is a separate change with its own row.
- * What the table guarantees is that the *union* cannot gain a sixth member
- * unnoticed; what it does not guarantee is that every site carrying an action is
- * checked.
+ * `actions` array on `patch` and `tip`, and `Notice.action` through `checkAction`
+ * (arc 6 §5), and not `TableRow.actions` or a `pills` chip's `action`. Those are
+ * nested inside collections this validator walks for other reasons, and widening
+ * it there is a separate change with its own row. What the table guarantees is
+ * that the *union* cannot gain a sixth member unnoticed; what it does not
+ * guarantee is that every site carrying an action is checked.
  */
 function checkActions(b: Record<string, unknown>, e: string[], at: string): void {
   const actions = b["actions"];
@@ -704,21 +704,27 @@ function checkActions(b: Record<string, unknown>, e: string[], at: string): void
     e.push(`${at}: "actions" must be an array`);
     return;
   }
-  actions.forEach((raw, i) => {
-    const where = `${at}.actions[${String(i)}]`;
-    if (!isRecord(raw)) {
-      e.push(`${where}: must be an object`);
-      return;
-    }
-    const kind = raw["kind"];
-    if (!isString(kind) || !ACTION_KINDS.has(kind as Action["kind"])) {
-      e.push(`${where}: "kind" must be one of ${[...ACTION_KINDS].join(", ")}`);
-      return;
-    }
-    if (!isString(raw["label"])) e.push(`${where}: "label" must be a string`);
-    const field = ACTION_FIELD[kind as Action["kind"]];
-    if (!isString(raw[field])) e.push(`${where}: "${field}" must be a string`);
-  });
+  actions.forEach((raw, i) => checkAction(raw, `${at}.actions[${String(i)}]`, e));
+}
+
+/**
+ * One action, wherever it sits — an element of `actions` or a notice's single
+ * `action`. The two sites share the body so that a notice's button cannot be
+ * refused by a different rule from a tip's (C04 §3, T2.11).
+ */
+function checkAction(raw: unknown, where: string, e: string[]): void {
+  if (!isRecord(raw)) {
+    e.push(`${where}: must be an object`);
+    return;
+  }
+  const kind = raw["kind"];
+  if (!isString(kind) || !ACTION_KINDS.has(kind as Action["kind"])) {
+    e.push(`${where}: "kind" must be one of ${[...ACTION_KINDS].join(", ")}`);
+    return;
+  }
+  if (!isString(raw["label"])) e.push(`${where}: "label" must be a string`);
+  const field = ACTION_FIELD[kind as Action["kind"]];
+  if (!isString(raw[field])) e.push(`${where}: "${field}" must be a string`);
 }
 
 /**
@@ -854,6 +860,9 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     requireGlyph(b["glyph"], e, at);
     checkColormapName(b, e, at);
     checkSpans(b, "text", e, at);
+    // The one button a notice may carry (C04 §3, arc 6 §5) — a chip's `Action`,
+    // refused by the same rule as a tip's.
+    if (b["action"] !== undefined) checkAction(b["action"], `${at}.action`, e);
   },
   keyValue: (b, e, at) => {
     requireArray(b, "rows", e, at);

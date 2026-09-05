@@ -54,11 +54,11 @@ const table = (aText = LONG_A) => ({
 const doc = (blocks: readonly unknown[]) => ({ schema: "tui.view/1", command: "/rows", status: "ok", blocks, meta: META });
 
 /** A graph with the table live, focus at the prompt, and a keyboard. */
-async function seeded() {
+async function seeded(blocks: readonly unknown[] = [table()]) {
   const built = await buildGraph();
   // Bytes reach the decoder only while acquired (C01 I18) — `completion-as-you-type`'s idiom.
   built.graph.lifecycle.acquire();
-  built.graph.transcript.append(doc([table()]) as never, { streaming: true });
+  built.graph.transcript.append(doc(blocks) as never, { streaming: true });
   built.graph.editor.clear();
   const type = (bytes: string): void => void built.stdin.emit(bytes);
   /** A lone `Esc` is delivered when its window closes (C16 §5b): advance the clock and let the wake fire. */
@@ -133,6 +133,31 @@ describe("C15 §2a — the peek beside the focused element", () => {
     // The change log is push / dismiss / push / dismiss — the peek is never
     // popped (C15 I21) and a move between two cut rows would be a `content`, not a pair.
     expect(changes.map((c) => `${c.kind}:${c.id}`)).toEqual(["push:peek", "dismiss:peek", "push:peek", "dismiss:peek"]);
+  });
+
+  it("T4.13 (C15 §2a walk, C26 §4b cell 3): no element inside a scroll box can want a peek — the premise `SCROLL_PEEK` closed on, pinned", async () => {
+    // **Measured before the guard came out.** A scroll owns its elements: one per
+    // child, block-level, and none with a `detail` — only a table *row* declares
+    // one. So the cut row the brief names is not a focus target inside a box,
+    // and the content-row → region-row translation has nothing to translate.
+    // This row goes red the day a scroll's element gains a `detail`, which is
+    // the day the translation is owed (C15's walk table names it).
+    const box = { kind: "scroll", id: "s", height: 6, children: [table()] };
+    const s = await seeded([box]);
+    const entry = s.graph.transcript.entries.find((e) => e.id === s.graph.transcript.liveId);
+    if (entry === undefined) throw new Error("no live entry");
+    const inside = s.graph.blocks.elementsIn(entry.doc.blocks, 100);
+    expect(inside.map((p) => `${p.blockId}/${p.element.id}/${p.element.level}`), "the box's one child, as the box's element").toEqual(["s/t/block"]);
+    expect(inside.filter((p) => p.element.detail !== undefined), "and no detail on any of them — asserted as a count").toHaveLength(0);
+    // **The control**: the same table outside the box declares row `a`'s detail,
+    // so the fixture is shown to carry the thing the box is shown not to.
+    const outside = s.graph.blocks.elementsIn([table()] as never, 100);
+    expect(outside.filter((p) => p.element.detail !== undefined).map((p) => p.element.id)).toEqual(["a", "c"]);
+
+    s.type(DOWN);
+    expect(s.focused(), "↓ lands on the box's element for the table, not on a row").toBe("t");
+    expect(s.peek(), "and there is no peek, because there is no detail").toBeNull();
+    expect(s.graph.overlays.stack).toEqual([]);
   });
 
   it("T4.12 (C15 I14, C23): patching the focused entry changes the peek through one content change", async () => {

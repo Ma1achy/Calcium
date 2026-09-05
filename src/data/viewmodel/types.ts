@@ -522,6 +522,14 @@ export type Notice = Readonly<{
   spans?: readonly TextSpan[];
   /** The map a span's `value` reads through (I90). Required the moment any span carries one. */
   colormap?: ColormapName;
+  /**
+   * One button, and the notice is it (§3, arc 6 §5). *Retry*, *open the log*:
+   * the same `Action` union a chip carries, validated the same way, and when
+   * present C09 declares the whole notice as one block-level element with
+   * `activate: action` — so `↓` stops on it, `⏎` fires it and a click reaches it.
+   * Absent, the notice declares nothing and is what it always was.
+   */
+  action?: Action;
 }> & Gap & Floor;
 
 export type KeyValue = Readonly<{

@@ -983,6 +983,16 @@ export function plot3dArea(
   };
 
   const frameInk = slot("tone.muted", ctx.theme, ctx.capabilities).colour;
+  // **A focused plot3d lights its frame** (C26 §7, C12 §3al). The frame is this
+  // file's and not `furniture.ts`'s, so `Layout.focused` cannot carry it; the
+  // focus is read here, where the frame's ink is chosen, and it is the id the
+  // session writes — `rowId` is the element's id and a plot's element is its
+  // block (`elements()`, `focusFor`). Two inks rather than one flag: the lines
+  // take `lineInk` and `overlay` takes `frameInk` for the labels, because the
+  // scale keeps `muted` while the enclosure lights up, as the 2-D frame's does.
+  const focus = ctx.focus;
+  const focused = focus !== null && focus.blockId === block.id && focus.rowId === block.id;
+  const lineInk = focused ? slot("tone.accent", ctx.theme, ctx.capabilities).colour : frameInk;
 
   for (const d of drawn) {
     const tier = tierOf(d.depth, nearD, farD);
@@ -1185,8 +1195,8 @@ export function plot3dArea(
     // **The axis's own tone where it has one** (C12 I98). The box and the
     // untoned axes keep `frameInk`, which is what makes a single coloured axis
     // read as one axis rather than as a recoloured frame.
-    ink[i] = axisInk ?? frameInk;
-    frameInkAt[cy * w + cx] = axisInk ?? frameInk; // cells-ok — a cell offset
+    ink[i] = axisInk ?? lineInk;
+    frameInkAt[cy * w + cx] = axisInk ?? lineInk; // cells-ok — a cell offset
     mark[i] = m;
     kind[i] = OUTLINE;
     // **And the tier code is cleared with it.** `glyphRows` reads `glyph`

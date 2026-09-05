@@ -202,13 +202,50 @@ function noticeRows(block: Notice, width: number): readonly (readonly Run[])[] {
   return wrapRuns(runsOf(block.text, block.spans), proseWidth(width, prefixCells(block.glyph)));
 }
 
+/**
+ * One block-level element — the whole notice — exactly when it carries an
+ * `action` (C04 §3, C26 §5; arc 6 §5). A notice is the button: `activate` is
+ * the action itself and `copy` the text from the data (C26 I17). Without an
+ * action the list is **empty**, not a place to stand — a reader stepping `↓`
+ * through a transcript of notices would otherwise stop on every one of them.
+ * The rows are `noticeRows`' own, so the element is where the block is drawn.
+ */
+function noticeElements(block: Notice, width: number): readonly NavElement[] {
+  if (block.action === undefined) return Object.freeze([]);
+  const w = normaliseWidth(width);
+  return Object.freeze([
+    Object.freeze({
+      id: block.id,
+      level: "block" as const,
+      rows: Object.freeze({ from: 0, to: atLeastOne(noticeRows(block, w).length) }), // cells-ok — a row count
+      cols: Object.freeze({ from: 0, to: w }),
+      activate: block.action,
+      copy: block.text,
+    }),
+  ]);
+}
+
 export const noticeDefinition: BlockDefinition<Notice> = {
   kind: "notice",
 
   measure: (block: Notice, width: number): number => atLeastOne(noticeRows(block, width).length), // cells-ok
 
+  elements: noticeElements,
+
   render(block: Notice, ctx: RenderContext): ReactElement {
-    const style = tone(block.tone, ctx.theme, ctx.capabilities);
+    // **Focused: `accent` over the selection ground, the `pills` head's rule**
+    // (C26 §7). `accent` is a legal notice tone, so `accent` alone would draw a
+    // focused `info` notice as an unfocused `accent` one; the ground is the
+    // channel no notice datum uses. The tone is dropped under focus as a table
+    // row drops its cell tones (C11 I14) and the glyph keeps its character. The
+    // id tested is the one the session writes — the element's, which is the
+    // block's (`noticeElements`, `focusFor`) — and only a notice with an action
+    // declares one, so a notice without one cannot reach this arm.
+    const focused =
+      block.action !== undefined && ctx.focus !== null && ctx.focus.blockId === block.id && ctx.focus.rowId === block.id;
+    const style = focused
+      ? { ...tone("accent", ctx.theme, ctx.capabilities), ...selectionStyle(ctx.theme, ctx.capabilities) }
+      : tone(block.tone, ctx.theme, ctx.capabilities);
     const prefix = prefixCells(block.glyph);
     const wrapped = noticeRows(block, ctx.width);
     // The block's colormap reaches the painter by name; a valued run reads it

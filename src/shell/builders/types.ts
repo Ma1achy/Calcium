@@ -83,6 +83,18 @@ export type ValuedTextOpts = TextOpts &
   }>;
 
 /**
+ * `ValuedTextOpts` for the one text member that is also a button — `notice`
+ * (C04 §3, arc 6 §5). Split on the same argument again: `action` on `b.raw`
+ * would be a member accepted and ignored (F207), so the option exists only on
+ * the builder whose block reads it (MG27).
+ */
+export type NoticeOpts = ValuedTextOpts &
+  Readonly<{
+    /** The notice's one button — `fill` for a retry, `open` for a log (C04 §3). */
+    action?: Action;
+  }>;
+
+/**
  * A cell, or the string that is one with default tone (§4).
  *
  * `{ family: "digit-classifier" }` and `{ status: b.warn("degraded") }` in the

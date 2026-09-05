@@ -146,6 +146,19 @@ export const SCENES = Object.freeze({
     focus: { blockId: "t", rowId: "a" },
     peek: true,
   },
+  /**
+   * A notice that is a button (C04 §3, arc 6 §5), focused — the whole notice
+   * `accent` over the selection ground, beside a plain notice that declares
+   * nothing and draws as it always did. The focus is the session's form: the
+   * element's id, which is the block's.
+   */
+  "notice-action-focus": {
+    blocks: [
+      notice("n-plain", "no containers match the filter"),
+      { kind: "notice", id: "n-retry", tone: "error", glyph: "error", text: "image pull failed", action: { kind: "fill", label: "retry", command: "pull" } },
+    ],
+    focus: { blockId: "n-retry", rowId: "n-retry" },
+  },
 });
 
 /**
