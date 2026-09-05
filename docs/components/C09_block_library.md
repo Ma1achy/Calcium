@@ -404,7 +404,7 @@ retrying    the far side failed and a backoff is counting down. Not a bug
 loading     no data yet, first fetch in flight. Not a failure at all
 ```
 
-**A call that fails or retries composes one of these under its head, and nothing composes a red line instead** (F827). The call grammar's states are RUNNING, WAITING, DONE, FAILED, RETRYING, DENIED and CANCELLED; the two that carry a body of their own carry this kind — the error rule, the mark, the message, at the block's committed height — and the head above it is kept, because *what ran* is the first thing a reader needs and the error is the second. The shell's composer is the one place a notice is written by hand (A03 SS58, C23), which is F406's class closed as a class rather than as twelve sites.
+**A call that fails or retries composes one of these under its head, and nothing composes a red line instead** (F827). The call grammar's states are RUNNING, WAITING, DONE, FAILED, RETRYING, DENIED and CANCELLED; the two that carry a body of their own carry this kind — the error rule, the mark, the message, at the block's committed height — and the head above it is kept, because *what ran* is the first thing a reader needs and the error is the second. The shell's composer is the one place a notice is written by hand — by literal or by builder call (A03 SS56, widened; C23), which is F406's class closed as a class rather than as twelve sites.
 
 **`error` read *the definition's renderer threw. A bug.* and that was narrower than the kind**
 (F406). `retrying`'s own line has always said *the far side failed*, so this was never scoped to

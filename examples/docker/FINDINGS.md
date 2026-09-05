@@ -29701,9 +29701,18 @@ says nothing composes a notice by hand, and a rule with nine standing violations
 preference. The frame audit — *two calls that read as different products* — is exactly what nine
 independent wordings produce.
 
-**Ruling.** A source scan over `src/shell/`: `kind: "notice"` literals and `b.notice.*` calls are
-allowed in `documents.ts` and `builders/index.ts` and nowhere else, with an allow-list every entry
-of which is exercised (SS53's discipline). The execution sites move to composer functions —
+**Corrected the same day, before anything cited it.** *No rule says they may not* was wrong by
+half: A03 SS56 exists and forbids a hand-composed `kind: "notice"` literal anywhere under `src/`,
+allowing `documents.ts` and `builders/` by name. It did not fire on these nine sites because
+every one is a **builder call** — `b.notice.warn(…)`, `b.notice.error(…)` — and SS56's pattern is
+the literal. The rule's premise was *call the family instead of composing the object*; the
+grammar's premise is one step stricter — *compose the notice in one file* — and a builder call
+outside that file is the composition the rule was written to see, in a form it could not.
+
+**Ruling.** SS56 is widened rather than doubled (a second rule on one subject keeps both sets of
+birthday clauses): its pattern gains the builder call, its scope for that arm is `src/shell/`,
+and the allow-list stays `documents.ts` and `builders/` with every entry exercised (SS53's
+discipline). The execution sites move to composer functions —
 `callStatus` for a failed or retrying call's box, one function each for the queue and stall
 notices — and the confirm question is composed where the overlay is.
 

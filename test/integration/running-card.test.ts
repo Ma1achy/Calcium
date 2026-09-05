@@ -390,3 +390,21 @@ describe("C23 I54 — the pending entry is the running card", () => {
     expect(rows[1]).toBe(`  ⎿ ${flat[0] ?? ""}`);
   });
 });
+
+describe("C23 — the call grammar's head states, owed at the spec commit", () => {
+  it.todo(
+    "T4.49 (C23 I58, §8f P9): a stream reads the spinner alone at 0 s, spinner and 1s after one wake with the frame advanced by exactly one, and the final figure with no spinner at end; ASCII draws the set's ASCII pair — not deferred on a component: the spinner slot lands with C4 of the call grammar",
+  );
+  it.todo(
+    "T4.50 (C23 I59): a listing with a row count settles to a count, one without settles to duration alone, a non-zero exit is exit N, and the string ok appears in no settled head across the seven routes — not deferred on a component: outcomeOf's count arm lands with C4 of the call grammar",
+  );
+  it.todo(
+    "T4.51 (C23 I60, §8f P10, P12; C04 §3c S4): a call needing approval reads waiting with no readout; approve pops the layer and the readout starts; deny settles the card reading denied with history 126 and no body; Enter on a running head folds and unfolds the body, an unpaged box at its tail and a paged one where it was — not deferred on a component: approvalPrompt lands with C4 of the call grammar",
+  );
+  it.todo(
+    "T4.52 (C23 I61, §8f P8, P11): a stream throw settles over a status box; a retry's box counts down while the head counts elapsed and the resuming patch replaces the box in place with the block count unchanged — not deferred on a component: callStatus lands with C4 of the call grammar",
+  );
+  it.todo(
+    "T4.53 (C23 I62, §8f P13, §8g rows 20–21): three children in dispatch order roll up 1 of 3, keep their order when the third settles first, sum same-unit counts, read 2 of 3 · 1 failed on one failure, keep the parent's wall clock, and roll up 0 of 3 · 3 cancelled on Ctrl-C — not deferred on a component: children and rollUp land with C4 of the call grammar",
+  );
+});
