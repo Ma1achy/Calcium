@@ -80,10 +80,18 @@ const BEFORE: Record<string, readonly string[]> = {
   stalled: [
     "\u001b[38;2;98;98;98m  ⎿ no output for 2m\u001b[39m",
   ],
+  // **Both halves of this row were wrong and this table recorded them** (C23 §3b,
+  // 2026-09-05). The figure was measured from the notice, not from the last patch —
+  // `1m` under a notice saying `2m`, one silence with two numbers — and the hook was
+  // dropped on replacement, so the row changed column. A snapshot records; it does
+  // not check.
   resumed: [
-    "\u001b[38;2;98;98;98mresumed after 1m\u001b[39m",
+    "\u001b[38;2;98;98;98m  ⎿ resumed after 2m\u001b[39m",
   ],
+  // C23 I54 — block 0 is the running card's header, and the verdict is in it:
+  // `truncated` and `failed` are the two error arms' one-word outcomes (§8f P8).
   truncated: [
+    "\u001b[38;2;127;174;207m⏺ tail() · truncated\u001b[39m",
     "\u001b[38;2;127;174;207mt1\u001b[39m",
     "\u001b[38;2;212;179;90m▲ output truncated: append: id \"same\" is already in the document (C04 I14) —\u001b[39m",
     "\u001b[38;2;212;179;90m  ViewPatch addresses blocks by id, so a duplicate has no correct target\u001b[39m",
@@ -94,6 +102,7 @@ const BEFORE: Record<string, readonly string[]> = {
     "",
   ],
   "stream-error": [
+    "\u001b[38;2;127;174;207m⏺ tail() · failed\u001b[39m",
     "\u001b[38;2;198;40;40m✗ stream failed: Error: socket closed\u001b[39m",
   ],
 };

@@ -344,10 +344,11 @@ export interface RefreshDriver {
    * `settled`, `release`, `dispose` or a patch the transcript refuses. One
    * timer serves every readout — `armParts`'s — so ten cards cost what one does.
    *
-   * **No producer in `src/` yet.** `toolCallDoc`'s callers are a contract test
-   * and nothing else; the pending-entry route an agent harness would append
-   * through (`AGENT_TUI_DESIGN.md` §9c) is the consumer named for this, and the
-   * call it makes is written in C23 §3d-bis.
+   * **The producer is C23's step 3** (I54): `execution.ts` appends the pending
+   * entry as a `toolCallDoc` and registers the header's id here before the
+   * transport is invoked; the route writes the final header itself, before
+   * `settle`, and `settled` below drops the readout. Until 2026-09-05 this
+   * comment said *no producer in `src/` yet* and named the agent example.
    */
   readout(id: EntryId, blockId: string, render: (elapsedMs: number) => Block): void;
   /** C22's identity loop signalling a transition worth saying out loud. */
@@ -414,13 +415,24 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
     if (state === undefined || !state.stalled) return;
     state.stalled = false;
 
-    const gap = Math.max(1, Math.round((deps.clock() - state.stalledAt) / 60_000));
+    // **From the last patch, not from the notice** (C23 §3b, F788). This read
+    // `stalledAt` — the moment the notice was posted, two minutes into the
+    // silence — so after a 2m 1s gap the entry said *no output for 2m* and
+    // then *resumed after 1m* about the same silence. `sawPatch` calls this
+    // before it moves `state.last`, so the whole gap is still readable here.
+    // Found by T4.44 asserting the figure; every earlier row matched
+    // `/resumed after/` and the number was checked by nothing.
+    const gap = Math.max(1, Math.round((deps.clock() - state.last) / 60_000));
     deps.transcript.patch(
       id,
       {
         op: "replace",
         blockId: STALL_BLOCK,
-        block: b.notice("muted", `resumed after ${String(gap)}m`, undefined, { id: STALL_BLOCK }),
+        // **Under the same hook the notice had** (C09 §4; C23 I54, §8f). This
+        // passed `undefined`, so the row moved from `  ⎿ no output for 2m` to a
+        // flush-left `resumed after 2m` on resumption — one row of the card
+        // changing column. Read off the frame (T4.45), not off the store.
+        block: b.notice("muted", `resumed after ${String(gap)}m`, "continuation", { id: STALL_BLOCK }),
       },
       "shell",
     );

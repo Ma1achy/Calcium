@@ -393,6 +393,7 @@ const MODE_OWNERS = {
   CURSOR:         "src/terminal/lifecycle.ts",
   BRACKET_PASTE:  "src/terminal/lifecycle.ts",
   MOUSE:          "src/terminal/lifecycle.ts",
+  MOUSE_ANY:      "src/terminal/lifecycle.ts",
   KITTY_KEYBOARD: "src/terminal/lifecycle.ts",
   SCROLL_REGION:  "src/terminal/frame-scheduler.ts",
   SYNC_UPDATE:    "src/terminal/frame-scheduler.ts",
@@ -1578,14 +1579,13 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   // reason the entry was written with rather than a date.
   "Basis.orthographic": "project() picks the arm, and a second reader of this field would be a second place the projection is chosen",
   // The tool-call card's streamed body (`AGENT_TUI_DESIGN.md` §9c). `toolCallDoc` reads
-  // it into a follow scroll and its consumer is `examples/agent`, which is at step 0 —
-  // the same expiry as `UNCONSUMED_FUNCTIONS.toolCallDoc`. 2026-09-05, Lane B.
-  "ToolCallSpec.output": "read by toolCallDoc into a follow scroll (C04 I97); the caller is the agent example, not yet built — remove with the toolCallDoc entry",
-  // The running card's one-second readout (C23 I53, F771). The caller is whoever
-  // appends a `toolCallDoc` as a pending entry — the agent example at step 0,
-  // the same consumer and the same expiry as the two entries above. The call it
-  // makes is written in C23 §3d-bis. 2026-09-05, Lane N.
-  "RefreshDriver.readout": "re-composes a pending entry's elapsed figure on the one-second wake (C23 I53); the caller is the agent example's pending-entry route, not yet built — remove with the toolCallDoc entry",
+  // it into a follow scroll. **Its producer landed and does not fill it** (C23 I54,
+  // 2026-09-05, Lane P): the shell's pending entry is a `toolCallDoc`, and its body is
+  // the entry's own appended blocks — a `ViewPatch` addresses the top level, and
+  // `scroll.children` is not a patch target — so the follow-scroll body's consumer is
+  // still `examples/agent`, at step 0. `toolCallDoc` and `RefreshDriver.readout` left
+  // this list on the same ruling; this one stayed because the measurement said so.
+  "ToolCallSpec.output": "read by toolCallDoc into a follow scroll (C04 I97); the shell's card body is the entry's appended blocks (C23 I54) and the caller that fills a scroll is the agent example, not yet built",
 
   // **`Skin` is `Basis`'s shape one carrier along**, and the same reading
   // applies: a record whose fields exist for one function, exported because
@@ -2869,14 +2869,9 @@ export const UNCONSUMED_FUNCTIONS = Object.freeze({
     "C12 — `definition.ts` computes `areaWidth` inline across a three-rung ladder with " +
     "`MIN_AREA`, and this helper states the simple case. Two expressions of one width, " +
     "and the helper is the one no renderer calls. C12's to reconcile",
-  // **The tool-call card** (`AGENT_TUI_DESIGN.md` §9c), built as a composition
-  // in `documents.ts` and verified against four frames (T2.48) — its consumer is
-  // the agent example, and agent-tui is stopped at step 0. The expiry is a
-  // symbol: the day `examples/agent` (or any `src/` route) calls `toolCallDoc`,
-  // the equality arm refuses this entry. 2026-09-05, Lane B.
-  toolCallDoc:
-    "C23 §9c's card — a producer whose consumer is `examples/agent`, which does not exist " +
-    "yet; verified against the frame rather than a caller. Remove on the first `src/` call",
+  // **`toolCallDoc` left here on 2026-09-05** (Lane P, C23 I54): the expiry was
+  // *the first `src/` call*, and `execution.ts` step 3 is it — the pending entry
+  // is the card. The entry was self-expiring by the equality arm, as written.
 });
 
 /**

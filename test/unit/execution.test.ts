@@ -486,7 +486,8 @@ describe("C23 §3 — the app path", () => {
     // by `seq` all reached the entry — which is the property the number exists
     // for, and the one that failed in a real session while every assertion about
     // the counter would still have been satisfiable by a well-behaved fake.
-    expect(h.transcript.entries[0]?.doc.blocks.map((b) => b.id)).toEqual(["s0", "s1", "s2"]);
+    // C23 I54 — block 0 is the card's `step` header; the stream's blocks follow it.
+    expect(h.transcript.entries[0]?.doc.blocks.slice(1).map((b) => b.id)).toEqual(["s0", "s1", "s2"]);
   });
 
   it("T1.7c (I15): one entry carries one displayed command, from first patch to settle", async () => {
@@ -1299,7 +1300,7 @@ describe("C23 tier 3 — edges", () => {
     const ok = harness();
     ok.pipeline.submit("echo hi");
     await settled();
-    expect(ok.transcript.entries[0]?.doc.blocks.filter((b) => b.kind === "notice")).toHaveLength(0);
+    expect(ok.transcript.entries[0]?.doc.blocks.filter((b) => b.kind === "notice" && b.glyph !== "step")).toHaveLength(0); // C23 I54: block 0 is the card's header
   });
 
   it("T3.20a (C07 I22): a stream that overflowed carries the notice when it settles", async () => {
@@ -1320,7 +1321,8 @@ describe("C23 tier 3 — edges", () => {
 
     const doc = h.transcript.entries[0]?.doc;
     expect(h.transcript.entries[0]?.streaming, "settled").toBe(false);
-    const notices = (doc?.blocks ?? []).filter((b) => b.kind === "notice");
+    // C23 I54 — the card's `step` header is a notice too, and it is block 0, not the row's subject.
+    const notices = (doc?.blocks ?? []).filter((b) => b.kind === "notice" && b.glyph !== "step");
     expect(notices, "one notice, after the streamed block").toHaveLength(1);
     expect(doc?.blocks.at(-1)?.kind).toBe("notice");
     expect(notices[0]).toMatchObject({ tone: "warn", glyph: "warn" });
@@ -1337,7 +1339,7 @@ describe("C23 tier 3 — edges", () => {
     });
     ok.pipeline.submit("/tail");
     await settled();
-    expect(ok.transcript.entries[0]?.doc.blocks.filter((b) => b.kind === "notice")).toHaveLength(0);
+    expect(ok.transcript.entries[0]?.doc.blocks.filter((b) => b.kind === "notice" && b.glyph !== "step")).toHaveLength(0); // C23 I54: block 0 is the card's header
   });
 
   it("T3.16 (I5): a shell route holds the guard exactly as an app verb does", async () => {

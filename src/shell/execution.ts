@@ -29,7 +29,7 @@ import type { RawPatch } from "../data/transport/index.js";
 import type { Exit } from "../data/process/types.js";
 import { block } from "../data/viewmodel/index.js";
 import type { Block, ViewDocument } from "../data/viewmodel/index.js";
-import { blockId, completeLocal, compose, errorDoc, noticeDoc, usageDoc } from "./documents.js";
+import { blockId, completeLocal, compose, errorDoc, noticeDoc, toolCallDoc, toolCallHeader, usageDoc } from "./documents.js";
 import { createActionDispatcher } from "./actions.js";
 import { createRefreshDriver } from "./refresh.js";
 import { DOCUMENT_VIEW_ID } from "./document-view.js";
@@ -1102,6 +1102,26 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
 
     // Step 3 — the pending entry. Before step 4. This is the ordering.
     //
+    // **And it is the running card** (C23 I54, `AGENT_TUI_DESIGN.md` §9c): one
+    // `step` header reading `verb(args)`, the verb being the manifest tool and
+    // the args the rest of the resolved argv (§18 of the design). This was
+    // `compose({ blocks: [] })` — nothing outside C13 reads `streaming`, so the
+    // *running indicator* §3 promised was a row nothing drew, and a slow verb
+    // was the command row and silence. The figure is I53's readout, registered
+    // below with this header's id; below one second `elapsed()` draws nothing,
+    // so the card is bare at dispatch and gains `· 1s` on the first wake.
+    const call = { name: verb, args: result.argv.slice(1).join(" "), id: blockId("step") };
+    const header = (elapsedMs: number, outcome?: string): Block =>
+      b.notice(
+        "info",
+        toolCallHeader({ ...call, elapsedMs, ...(outcome === undefined ? {} : { outcome }) }),
+        "step",
+        { id: call.id },
+      );
+    // The card's clock. C23's own (`deps.clock`, C22-injected), never `tick`:
+    // C03 coalesces and drops that under load (C04 I66, C09 I32).
+    const startedAt = deps.clock();
+
     // **A deferred submission already has one, and this is the site the compiler
     // could not check** (roadmap 33). `into` type-checks at every one of the
     // fifteen and only here does it change *when* an entry comes into being:
@@ -1109,23 +1129,60 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     // screen for ever and puts a second beneath it. The entry appended when the
     // line was typed **is** this route's pending entry — same id, same
     // `streaming`, and the settle below closes it exactly as it always did.
-    const pendingId = settle.into ?? deps.transcript.append(
-      compose({
-        command: displayed,
-        blocks: [],
-        meta: { origin: "user", verb, transport: "subprocess", argv: [...result.argv] },
-      }),
-      { streaming: true },
-    );
+    //
+    // **Its `queued behind` notice is replaced here, and the clock starts here**
+    // (I54, §8f P1/P2). `ViewPatch` has no delete, so the header takes the
+    // notice's slot by id. Before this ruling nothing replaced it: on the stream
+    // route a deferred line ran to completion and settled still reading *queued
+    // behind* — hidden on the invoke route by `settle(id, doc)`'s replacement.
+    let pendingId: EntryId;
+    if (settle.into === null) {
+      pendingId = deps.transcript.append(
+        toolCallDoc(displayed, call, { origin: "user", verb, transport: "subprocess", argv: [...result.argv] }),
+        { streaming: true },
+      );
+    } else {
+      pendingId = settle.into;
+      const waiting = deps.transcript.entries.find((e) => e.id === pendingId)?.doc.blocks[0];
+      if (waiting !== undefined) {
+        deps.transcript.patch(pendingId, { op: "replace", blockId: waiting.id, block: header(0) }, "shell");
+      }
+    }
     deps.resetFocus();
     deps.scheduler.commit("input");
     // §3b — from here the entry can go quiet, so it is watched for silence.
     refresh.watch(pendingId);
+    // I54 — the readout, before the transport is invoked (I3's order, one line
+    // over): the header's figure moves on the one-second wake and `settled`
+    // stops it. `readout` writes with `origin: "shell"`, as the shell speaking
+    // about an entry it holds.
+    refresh.readout(pendingId, call.id, (ms) => header(ms));
+    /**
+     * The verdict, into the header, **before** `settle` (I54, §8g row 6).
+     *
+     * Not because the transcript would refuse it afterwards — C13 §6's gate
+     * reads who is writing, and a `"shell"` patch lands on a settled entry — but
+     * because persistence writes the document on the `settle` change and on
+     * nothing after it (C13 §5b.2, `construct.ts`): a verdict written after the
+     * settle is on screen and absent from the record. Only the settlements that
+     * *keep* the card call this; `settle(id, doc)` replaces it, and there the
+     * document is the outcome.
+     */
+    const finishCard = (outcome: string): void => {
+      deps.transcript.patch(
+        pendingId,
+        { op: "replace", blockId: call.id, block: header(deps.clock() - startedAt, outcome) },
+        "shell",
+      );
+    };
 
     const controller = new AbortController();
     const cancelThis = (): void => {
       forgetStream(pendingId);
       controller.abort();
+      // I54 — the card survives a cancel (this settle carries no document), so
+      // the header says what happened to it. §8f P5.
+      finishCard("cancelled");
       deps.transcript.settle(pendingId);
       // I29 — the streaming route settles here rather than through
       // `appendAndCommit`, so these are the settlements the funnel does not
@@ -1159,7 +1216,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         // run for a subscription that had already finished.
         liveStreams.push({ id: pendingId, cancel: cancelThis });
         try {
-          await streamInto(pendingId, displayed, verb, transport.stream(invocation), result.validation.ok ? result.validation.args : {});
+          await streamInto(pendingId, displayed, verb, transport.stream(invocation), result.validation.ok ? result.validation.args : {}, finishCard);
         } finally {
           forgetStream(pendingId);
         }
@@ -1362,6 +1419,13 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     patches: AsyncIterable<RawPatch>,
     /** The invocation's validated flags, for `adaptPatch` (C05 I21, F39). */
     flags: Readonly<Record<string, unknown>>,
+    /**
+     * Writes the card's verdict into its header (C23 I54). Called on every
+     * ending of this route **before** the settle that ends it, because each of
+     * them is a `settle(id)` that keeps the card, and the settle change is what
+     * persistence writes (§8f P3, P8).
+     */
+    finishCard: (outcome: string) => void,
   ): Promise<void> => {
     // **The stream's own counter** (I30, C07 I15). Not decoration: C07 spends it
     // as the namespace for generated block ids *and* as the per-stream reset,
@@ -1389,6 +1453,10 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
               block: overflowNotice(held.map((b) => b.id)),
             });
           }
+          // I54 — the verdict is the stream's own exit code, into the header,
+          // before the settle. The code is the `tail` process's and is said as
+          // such — `exit 1` — not as a claim about what it was following.
+          finishCard(`exit ${String(patch.result.exitCode)}`);
           // C23 I8 — settlement flushes at `"completion"`. §8a A4: settling
           // clears the stall state, so a notice does not outlive its condition.
           refresh.settled(id);
@@ -1440,6 +1508,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
               id: blockId("truncated"),
             }),
           });
+          finishCard("truncated"); // I54, §8f P8 — the notice carries the why
           deps.transcript.settle(id);
           deps.scheduler.commit("completion");
           return;
@@ -1455,6 +1524,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         op: "append",
         block: b.notice.error(`stream failed: ${String(cause)}`, { id: blockId("stream-error") }),
       });
+      finishCard("failed"); // I54, §8f P8
       deps.transcript.settle(id);
       deps.scheduler.commit("completion");
     }

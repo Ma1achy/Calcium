@@ -242,12 +242,18 @@ export function noticeDoc(
  * part's `status` box once a second and asks `elapsedNeeded` whether the figure
  * moved; nothing else in `src/` formatted a duration. A caller re-composing this
  * header on a tick has the same guard available — compare `elapsed(a)` with
- * `elapsed(b)` before patching — and the tick itself is C23's to drive, from the
- * pending entry's clock (`elapsedNeeded`, owed).
+ * `elapsed(b)` before patching — and the tick is C23's, driven from the pending
+ * entry through `RefreshDriver.readout` (C23 I53, I54): `execution.ts` appends
+ * this document at step 3 and re-composes the header block by `id` once a second.
  */
 export type ToolCallSpec = Readonly<{
   name: string;
   args: string;
+  /**
+   * The header block's id, so a readout can replace it in place (C23 I54).
+   * Generated when absent — a caller that never re-composes need not choose one.
+   */
+  id?: string;
   /** Since dispatch, in milliseconds. Below one second no figure is drawn. */
   elapsedMs?: number;
   /** The one-word verdict beside the elapsed figure — `exit 0`, `47 passed`. */
@@ -278,7 +284,7 @@ export function toolCallDoc(
 ): ViewDocument {
   const header = toolCallHeader(call);
   const blocks: Block[] = [
-    block({ kind: "notice", id: blockId("step"), tone: "info", glyph: "step", text: header }),
+    block({ kind: "notice", id: call.id ?? blockId("step"), tone: "info", glyph: "step", text: header }),
   ];
   if (call.result !== undefined) {
     blocks.push(
