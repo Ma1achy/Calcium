@@ -36,11 +36,11 @@ type change.
 | **5** | [The far side's shape is not the framework's contract](#5) | 10 | **2 open** | ⚠ C05 | mostly app-side · one shim |
 | **6** | [Rendered from data that has since moved](#6) | 2 | **2 open** | ⚠ C04 | real Calcium work |
 | **7** | [An artefact describes the world rather than being checked against it](#7) | 112 | **20** | — | artefact discipline — **no code**, and F164 is the first found by an instrument's *population* step rather than by a reader; **F210 is the first where the artefact is a component's own spec and the thing it contradicts is a shipped frame**, and **F233 the first where what it contradicts is a *fix*** — four present-tense statements of a repaired defect, in the two components the repair did not touch |
-| **8** | [Absence indistinguishable from failure](#8) | 28 | **7 open** (7 closed) | partly | real Calcium work · **7 of 10 fixed** — F151 is the class F35 closed in the half an app-side test cannot reach, and **F167 is the class arriving in a *value*: a validator agreeing twice about two different documents** |
-| **9** | [**The instrument was wrong**](#9) | 102 | **17** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
+| **8** | [Absence indistinguishable from failure](#8) | 29 | **7 open** (7 closed) | partly | real Calcium work · **7 of 10 fixed** — F151 is the class F35 closed in the half an app-side test cannot reach, and **F167 is the class arriving in a *value*: a validator agreeing twice about two different documents** |
+| **9** | [**The instrument was wrong**](#9) | 103 | **17** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
 | **10** | [**A claim carried without a record**](#10) | 68 | **11** | — | **new at F80** · method — six findings disproved, and **F166 unblocked an entry while F168 found what the same row was silent about**; F184 is the first where the unrecorded claim was a *rule* rather than a fact, governing thirty forms from a parameter's doc comment |
 | **11** | [A gate that passes without checking](#11) | 261 | **16** | — | **105 closed · 117 open** of 223 keyed — the heading was out by 66 and this row's count column by 1, which cannot be corrected alone (§11) · four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
-| **12** | [**A time-based assertion under contention**](#12) | 5 | **3** | — | **new at F80** · Calcium's own suite |
+| **12** | [**A time-based assertion under contention**](#12) | 6 | **3** | — | **new at F80** · Calcium's own suite |
 | **13** | [Text the framework emits](#13) | 6 | **4** | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
 | **14** | [A constant, a channel or a rule that outlived its configuration](#14) | 28 | **13 open** | ⚠ C12 | **new at F492** · real Calcium work — every member reads as deliberate, which is why review found none of them |
 | — | [Singles](#singles) | 83 | 1 each | — | see each · **F176 is the one to read twice**: the instrument had the evidence in a committed snapshot and the reading step was skipped |
@@ -650,6 +650,8 @@ and the claim has to be one the producer can support.*
 
 ---
 
+**F813** — a verb submitted while the greeting's dashboard fetch is in flight loses its result: the row is echoed and nothing follows, for the life of the shot; six seconds later the same verb draws three hunks
+
 <a id="9"></a>
 
 **Keyed here by the F142 inventory sweep** — the second cohort, filed after this document's own count was last derived. Placed by mechanism from the entry; SP6 proves coverage and not placement, which is its stated limit.
@@ -831,6 +833,8 @@ says a demo of a plot should have a shape.
 **F794** — a fixture must be shown to respond — `/ps --all` is not in the fixture manifest and the error route read as a missing card
 
 **F799** — a graph-level row cannot see the decoder — folding `3` onto `button3` left T4.72 green (it constructs events) and killed the frame row T4.72c
+
+**F811** — a persisted `/theme light` recoloured the screencast and all fourteen stills recorded after the day the light shot was typed — the shell honouring a statement, the instrument mistaking its own previous shot for a user; cleared before every shot, and the row asserts the call sits inside the loop
 
 <a id="10"></a>
 
@@ -1584,6 +1588,8 @@ that fails under contention will fail eventually whether or not anyone introduce
 ---
 
 **F809** — a render-cost row red at 54.6 ms against a 50 ms ceiling on a runner measured at 2.7×, 17–22 ms locally; one named ceiling of 150 with both figures, F262's shape
+
+**F812** — the emulator gate green in the devcontainer and red on the runner: kitty answering Shift on every key, xterm with no window in eight seconds; neither reproduced on the runner's own distribution, so the fixture is hardened on every axis the failures touch and the next run is the measurement
 
 <a id="13"></a>
 ## 13 · Text the framework emits — **6**

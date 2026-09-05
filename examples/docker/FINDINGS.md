@@ -29156,3 +29156,112 @@ T5.9; C02 §10, C16 §10, C01 §5; `.devcontainer/devcontainer.json`; `.github/w
 
 ---
 
+## F811 — a persisted `/theme light` recoloured every recording made after the day it was typed ★★★☆☆
+
+*2026-09-05 · the lead, on *rebuild the plot and docker demo*, at 42a052c4.*
+
+**Read off the first frame.** The screencast re-recorded in the `docker-tui` container came back on a
+near-white ground where the committed one is dark, and so did all fourteen README stills behind it. Not
+the renderer: the `.cast` itself carries `48;2;250;250;250m` 2,228 times and the committed one carries
+none. The app started in the light variant.
+
+**Not the polarity inference either.** `COLORFGBG` is unset in the container, so C02 answers `unknown`
+and C22 §6h's search runs on nothing. The other branch is a **statement**: `/theme` persists to
+`${stateDir}/theme` (I40) and the next start honours it. `examples/docker/.calcium/theme` read `light`
+and was **born 2026-08-12 22:19** — six minutes after the directory, on the day `media.py`'s
+`theme-light` shot was first run. That shot types `/theme light`; the shell wrote it down as the user's
+choice; every capture since has opened light. The committed screencast escaped only because it was
+recorded ninety minutes earlier the same evening, before the light shot ran.
+
+**Both halves are right and the instrument is wrong.** A stated theme *should* outlive a session — that
+is what I40 is for, and a reader who chose light would be right to expect it back. A recording is not a
+reader. The instrument acquired a user's preference from its own previous shot and carried it for
+twenty-four days without anything comparing a new frame to the old one, which is F63's class from the
+other side: a stale image is a diff rather than a discovery only if someone runs the diff.
+
+**Ruled.** `capture.py` gains `forget_theme()` — it removes `.calcium/theme`, nothing else — and both
+recorders call it **before each shot**, not after the one that writes: an order-dependent cleanup is the
+same defect one crash away, and the light shot is not the only thing that could ever state a theme.
+`media.py` calls it inside the shot loop; `screencast.py` once, before its single run. Two rows in
+`capture_test.py` (forgotten; forgetting nothing is not an error) and one in `media_test.py` asserting
+**source order inside the loop** — the helper is trivially right on its own and the defect was that
+nothing called it. The README's `agg` line now carries the flags `media.py` uses, so the overview and
+the stills share one ground.
+
+**Seen alongside, not fixed here.** The dashboard's history matrix names a row `2f7b76be3058` — the
+short id of `dtui-quiet`, which had exited before the session began. `nameOf` falls back to the id when
+the container is not in the live set, and the name was in `ps -a` the whole time. The demo's own
+fixture triggers it on every recording; it wants a look at where `createRingSet` gets its keys.
+
+**Where**: `examples/docker/tools/capture.py` `forget_theme`; `media.py`, `screencast.py`;
+`capture_test.py`, `media_test.py`; `examples/docker/README.md`; `docs/media/*` and `demo.cast` /
+`demo.gif` regenerated.
+
+---
+
+## F812 — the emulator gate red on the runner: kitty reported Shift on every key, xterm opened no window in eight seconds ★★☆☆☆
+
+*2026-09-05 · the lead, reading `gh pr checks 44` after 42a052c4.*
+
+**Green here, red there, on the first run.** The `full` job's `make e2e` failed both new rows. T5.7's
+kitty answered `CSI 27;2 u` and `CSI 27;2:3 u` for a lone Esc — Shift set on a key the drive had not
+shifted, and on every key after it — while the control byte arrived and the decoder rows never ran.
+T5.9 threw *xterm opened no window on :558*. The devcontainer (Debian trixie, kitty 0.41) passes both;
+the runner is ubuntu 24.04 with kitty 0.32.2, xterm 390, xdotool 3.20160805, and an image that already
+carries Xvfb and the XKB tools.
+
+**Reproduced on the runner's distribution and it did not reproduce.** An ubuntu 24.04 container with the
+same package set, driven by a bash transcription of the fixture, returned every byte T5.7 asks for and
+xterm's window inside two seconds. Restarting Xvfb on the same display immediately after killing its
+predecessor — the race the pid-derived display number invites — also did not reproduce: the second
+server came up both with and without waiting for the first to exit. So the two failures are not the
+packages and not a deterministic race; what remains is the runner's speed and vitest running the two
+files in parallel workers, neither of which a local container reproduces.
+
+**Ruled, on asymmetry rather than a mechanism.** The fixture is hardened on every axis the failures
+touch, each change right on its own:
+- **One display per capture**, pid and a counter, so no capture can inherit or race another's server;
+  the server's exit is awaited before the call returns.
+- **Stderr kept** for both Xvfb and the emulator, and quoted in the *no window* error together with
+  whether the emulator had exited — a missing font, a failed GL context and a dead server were one
+  message before.
+- **Thirty seconds for the window, ended early by the emulator's exit**: eight was enough beside an
+  idle host and not beside llvmpipe on two cores; an emulator that cannot start still fails at once.
+- **`windowfocus --sync`, and every modifier released before the drive begins** — the fixture asserts
+  the state it needs rather than inheriting one. If the runner's Shift was stale, this ends it; if it
+  is `xdotool` shifting each key, the bytes will say so and this finding gets its second half.
+
+**What this does not claim.** That the Shift is explained. The next `full` run is the measurement, and
+this entry is written before it so the prediction is on record: rows green means a state the fixture
+now clears; `27;2u` again means the drive itself, and the reproduction has to move onto the runner.
+
+**Where**: `test/support/x-emulator.ts`; `docs/catalogue/lanes8/emu-probe.sh` (the bash transcription,
+gitignored); `gh run view 33975158167`.
+
+---
+
+## F813 — a verb submitted during the greeting's fetch loses its result, and the row reads as a command that did nothing ★★★☆☆
+
+*2026-09-05 · the lead, re-shooting `config-diff`, at 42a052c4.*
+
+**Three stills in a row showed the command and nothing under it.** `/config dtui-cfg
+/etc/nginx/conf.d/default.conf` typed at 1.5 s: the row is echoed, a hold of fourteen seconds passes,
+and no diff, no notice and no refusal ever follow. Typed at 6.0 s, the same verb against the same
+container draws three hunks, at 120×40 and at 110×34 alike. The fetch itself is fast — `docker exec …
+cat` in 0.16 s, `docker run --rm … cat` in 1.45 s — so this is not F158's slow opener arriving late. It
+is a result that does not arrive.
+
+**F158 was the same window and a different symptom.** There the greeting landed *under* a table that
+had already appended; the fix was to type later. Here the greeting's dashboard fetch is in flight when
+the local verb runs, and whatever it produces is gone — the entry appended when the line was typed is
+still on screen, so the transcript reads as a command that produced nothing, which is the empty-block
+class arriving as a timing hole. **Not diagnosed to a line**: `/config` is a local handler, the
+greeting's dashboard is a live entry that patches itself, and the candidates are the settle path and
+the patch gate. Measured and recorded; the shot moves to 6.0 s with this number as its reason, and the
+mechanism is owed.
+
+**Where**: `examples/docker/tools/media.py` `TYPE_AT`; `examples/docker/src/config.ts`;
+`src/shell/execution.ts` (the local route), `src/shell/construct.ts` (the greeting).
+
+---
+

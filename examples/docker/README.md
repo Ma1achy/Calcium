@@ -32,8 +32,9 @@ without appearing in the transcript it is clearing. That is as seamless as the
 loop gets, and saying so is better than claiming a cut nobody can see.
 
 **The recording is `demo.cast`**, an asciicast written by `tools/capture.py` — the
-same capture the frames below were read from, not a second run. `agg demo.cast
-demo.gif` re-renders it. Record a new one with `python3 tools/screencast.py
+same capture the frames below were read from, not a second run. `agg --font-size 13
+--theme asciinema demo.cast demo.gif` re-renders it — the same flags `tools/media.py`
+uses, so the overview and the stills share one ground. Record a new one with `python3 tools/screencast.py
 out/demo`, and read it back beat by beat with `tools/beats.py` before believing
 it: a screencast is a frame-read with an audience, and doing that here found
 five defects the suites could not — the fourth being that **the completion beat
