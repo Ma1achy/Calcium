@@ -59,7 +59,7 @@ describe("C22 §6 — the frame", () => {
     };
 
     compose({
-      chrome: { header: record, footer: record },
+      chrome: { header: record, footer: record, footerRows: 1 },
       session: () => SESSION,
       copyMode: () => false,
       now: tickingClock(),
@@ -78,7 +78,7 @@ describe("C22 §6 — the frame", () => {
     const size = countingSize();
 
     compose({
-      chrome: { header: () => [], footer: () => [] },
+      chrome: { header: () => [], footer: () => [], footerRows: 1 },
       session: () => SESSION,
       copyMode: () => false,
       now: () => 1000,
@@ -101,6 +101,7 @@ describe("C22 §6 — the frame", () => {
           return [];
         },
         footer: () => [],
+        footerRows: 1,
       },
       session: () => SESSION,
       copyMode: () => false,
@@ -123,7 +124,7 @@ describe("C22 §6 — the frame", () => {
   it("T4.9b: the region is rows minus chrome minus the prompt, clamped", () => {
     const at = (rows: number, promptRows: number) =>
       compose({
-        chrome: { header: () => [], footer: () => [] },
+        chrome: { header: () => [], footer: () => [], footerRows: 1 },
         session: () => SESSION,
         copyMode: () => false,
         now: () => 1000,
@@ -156,7 +157,7 @@ describe("C22 §6 — the frame", () => {
     // the sum holds at every width with every layer misplaced, and no component
     // drew a `Placed` at all. The shapes differ; the heights must not.
     const f = compose({
-      chrome: { header: () => [], footer: () => [] },
+      chrome: { header: () => [], footer: () => [], footerRows: 1 },
       session: () => SESSION,
       copyMode: () => false,
       now: () => 1000,

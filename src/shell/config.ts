@@ -31,6 +31,28 @@ export const MIN_COLUMNS = 60;
 export const MIN_ROWS = 16;
 
 /**
+ * §6, §6k — the chrome's row budget. The header is one row, a constant: A02 §6
+ * adds a hook when something needs it and nothing does. The footer's default
+ * is one row, and an app declares more in `chrome.footerRows` (I79).
+ *
+ * **They live here rather than in `frame.ts`** because `validateConfig` has to
+ * refuse a budget the frame cannot hold, and `frame.ts` already imports this
+ * file — the other direction is a cycle inside L4 (MG22).
+ */
+export const HEADER_ROWS = 1;
+export const DEFAULT_FOOTER_ROWS = 1;
+
+/**
+ * **Derived, not chosen** (I79, §6k.2 row 2). The largest footer that leaves one
+ * region row at the size gate with the prompt at its cap: at `MIN_ROWS` the
+ * prompt may take `⌊MIN_ROWS / 2⌋` rows (S01 §3), the header takes one, and the
+ * region must keep one. Six today, and it moves when `MIN_ROWS` moves — a
+ * hand-written `6` would still read as correct the day the gate changed and the
+ * region went to zero at a size the gate accepted.
+ */
+export const MAX_FOOTER_ROWS = MIN_ROWS - HEADER_ROWS - Math.floor(MIN_ROWS / 2) - 1;
+
+/**
  * §6 — C22 owns the frame, so C22 passes the gutter; C17 must not assume one.
  *
  * **A pair, and both forms are `PROMPT_GUTTER.first` cells** (C22 I52, C09 I22).
@@ -116,6 +138,19 @@ export function validateConfig(config: TuiConfig): void {
   if (cap !== undefined && (!Number.isInteger(cap) || cap < 1)) {
     throw new ConfigError("maxBlockRows", `must be a positive integer, got ${String(cap)}`);
   }
+  // C22 I79, T1.35 — refused here rather than at frame time, because the frame
+  // that cannot hold it is the one at the size gate with the prompt at its
+  // cap, which is exactly the frame nobody composes while developing.
+  const footerRows = config.chrome?.footerRows;
+  if (
+    footerRows !== undefined &&
+    (!Number.isInteger(footerRows) || footerRows < 1 || footerRows > MAX_FOOTER_ROWS)
+  ) {
+    throw new ConfigError(
+      "chrome.footerRows",
+      `must be an integer from 1 to ${String(MAX_FOOTER_ROWS)}, got ${String(footerRows)}`,
+    );
+  }
 }
 
 export type Ambient = Readonly<{
@@ -162,7 +197,14 @@ export function resolveConfig(config: TuiConfig, ambient: Ambient) {
     fallbackAdapter: createFallbackAdapter(),
     commandPolicy: config.commandPolicy ?? slashPolicy,
     completionSources: config.completionSources ?? [],
-    chrome: config.chrome ?? makeDefaultChrome(config.name, config.binary),
+    // §6k, I79 — the budget is resolved here with every other default, so
+    // `frame.ts` reads a number and never a `??`. `makeDefaultChrome` does not
+    // carry it: `chrome.ts` cannot import this file without a cycle, and the
+    // default belongs where the other defaults are.
+    chrome: Object.freeze({
+      ...(config.chrome ?? makeDefaultChrome(config.name, config.binary)),
+      footerRows: config.chrome?.footerRows ?? DEFAULT_FOOTER_ROWS,
+    }),
     blocks: config.blocks ?? [],
     // C14 I24 — the registry's default, resolved here so there is one place
     // the value lives and one constant it is read from (C09 §2b).

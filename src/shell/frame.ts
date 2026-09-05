@@ -1,8 +1,11 @@
 /**
  * C22 §6 — the frame: chrome, transcript region, prompt.
  *
- * Calcium owns the structure — one chrome row each, fixed, never scrolling —
- * and the app decides what goes in them.
+ * Calcium owns the structure — a one-row header, a footer of the session's
+ * declared budget, both fixed and never scrolling — and the app decides what
+ * goes in them. **The budget is a number from config, never a value a chrome
+ * function returns** (I79, §6k): a per-frame height would make the footer the
+ * second thing beside the prompt that pushes the transcript.
  *
  * **Two values are sampled exactly once per frame, and both have a reason with
  * a failure attached.**
@@ -21,10 +24,15 @@
  */
 
 import { cells } from "../presentation/text.js";
-import { PROMPT_GUTTER, PROMPT_SUBSTITUTION } from "./config.js";
+import {
+  DEFAULT_FOOTER_ROWS,
+  HEADER_ROWS,
+  PROMPT_GUTTER,
+  PROMPT_SUBSTITUTION,
+} from "./config.js";
 import type { TerminalSize } from "../terminal/lifecycle.js";
 import type { Block } from "../data/viewmodel/index.js";
-import type { ChromeFn, SessionSnapshot } from "./types.js";
+import type { Chrome, SessionSnapshot } from "./types.js";
 
 /** What the frame is, before anything paints it. */
 export type Composed = Readonly<{
@@ -32,6 +40,8 @@ export type Composed = Readonly<{
   now: number;
   header: readonly Block[];
   footer: readonly Block[];
+  /** Rows the footer occupies — the session's budget, carried so `heightsSum` and the painter read one number (I80). */
+  footerRows: number;
   /** Where the transcript sits — C16's `region`, `{ top, height }`. */
   region: Readonly<{ top: number; height: number }>;
   /**
@@ -48,7 +58,7 @@ export type Composed = Readonly<{
 }>;
 
 export type ComposeDeps = Readonly<{
-  chrome: Readonly<{ header: ChromeFn; footer: ChromeFn }>;
+  chrome: Chrome;
   session: () => SessionSnapshot;
   /** Copy mode, for the chrome. A frame property, like `size` (C16 §5b). */
   copyMode: () => boolean;
@@ -58,17 +68,14 @@ export type ComposeDeps = Readonly<{
   promptRows: (width: number, gutter: typeof PROMPT_GUTTER) => number;
 }>;
 
-/**
- * One chrome row top, one bottom (§6). Named rather than inlined so the
- * arithmetic below reads as a subtraction of known parts.
- */
-const HEADER_ROWS = 1;
-const FOOTER_ROWS = 1;
-
 export function compose(deps: ComposeDeps): Composed {
   // The two single reads. Everything below takes these values.
   const size = deps.size();
   const now = deps.now();
+  // The footer's budget (§6k, I79). `HEADER_ROWS` is a constant of one and this
+  // is not, which is the whole of the ruling: a number from config, validated
+  // against the size gate, and never asked of the chrome function.
+  const footerRows = deps.chrome.footerRows;
 
   const session = deps.session();
   const ctx = { session, now, columns: size.columns, copyMode: deps.copyMode() };
@@ -85,13 +92,14 @@ export function compose(deps: ComposeDeps): Composed {
   // enormous one after a subtraction somewhere downstream. The size gate
   // normally prevents this, and normally is not a guarantee — a resize can
   // arrive between the gate and the frame.
-  const height = Math.max(0, size.rows - HEADER_ROWS - FOOTER_ROWS - promptRows);
+  const height = Math.max(0, size.rows - HEADER_ROWS - footerRows - promptRows);
 
   return Object.freeze({
     size,
     now,
     header: deps.chrome.header(ctx),
     footer: deps.chrome.footer(ctx),
+    footerRows,
     region: Object.freeze({ top: HEADER_ROWS, height }),
     // **The same height as the transcript region** (I28). It was the whole
     // terminal, and nothing could see it: a layer floats above the four regions
@@ -117,9 +125,13 @@ export function compose(deps: ComposeDeps): Composed {
  *
  * A one-row prompt, which is what a session opens with — an empty buffer lays out
  * as one row.
+ *
+ * **`footerRows` is the session's budget** (§6k.2 row 5). Defaulted so the one
+ * caller that does not yet pass it still compiles; until it does, the first
+ * frame corrects this by `footerRows − 1` rows (I34), which T1.37 measures.
  */
-export function initialRegionHeight(size: TerminalSize): number {
-  return Math.max(0, size.rows - HEADER_ROWS - FOOTER_ROWS - 1);
+export function initialRegionHeight(size: TerminalSize, footerRows = DEFAULT_FOOTER_ROWS): number {
+  return Math.max(0, size.rows - HEADER_ROWS - footerRows - 1);
 }
 
 /**
@@ -137,7 +149,10 @@ export function initialRegionHeight(size: TerminalSize): number {
  * claim about the frame.
  */
 export function heightsSum(f: Composed): boolean {
-  return HEADER_ROWS + f.region.height + f.promptRows + FOOTER_ROWS === f.size.rows;
+  // **With the budget the frame was composed with** (I80), not a constant: a
+  // constant here would hold at every budget while the painter drew a footer of
+  // a different height, and the sum would agree with itself.
+  return HEADER_ROWS + f.region.height + f.promptRows + f.footerRows === f.size.rows;
 }
 
 /**

@@ -1,8 +1,11 @@
 /**
  * C22 §6 — the default header and footer, and the prompt's gutter.
  *
- * Calcium owns the frame's structure — one row each, fixed position, never
- * scrolling — and the app decides what goes in them. The default exists so that
+ * Calcium owns the frame's structure — a one-row header and a footer of the
+ * session's declared budget (`chrome.footerRows`, §6k), fixed in position and
+ * never scrolling — and the app decides what goes in them. The budget is not
+ * here: `config.ts` resolves it with every other default, and this file cannot
+ * import that one without a cycle. The default exists so that
  * `createTui({ name, binary, manifest, theme })` produces a usable shell (I17):
  * a framework that required chrome to render anything would make the four-field
  * claim false.

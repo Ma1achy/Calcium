@@ -495,6 +495,19 @@ const FABRICATED: readonly Fabrication[] = [
     source: '  { target: "prompt", key: { name: "enter", event: "release" }, action: "submit" },',
   },
   {
+    // **The shape every one of the fourteen owed sites has** (SS56): a shell
+    // surface composing its own notice rather than calling `b.notice` or
+    // `noticeDoc`. `keys.ts` is chosen because it is *not* on the allow-list —
+    // a fabrication inside an allowed file would show nothing, and the four
+    // owed files are allowed precisely so the rule can land before their
+    // migration. The glyph is present here; the sites that forgot one threw
+    // at construction and produced no entry, which is the failure the family
+    // exists to make unconstructible.
+    rule: "SS56",
+    file: "src/shell/keys.ts",
+    source: 'block({ kind: "notice", id: blockId("copied"), tone: "warn", glyph: "warn", text }),',
+  },
+  {
     // **The move the type cannot refuse.** `ladderFor("density", caps)` cannot
     // return a height ladder — the mapped type rejects it, TS2322 — but nothing
     // in the type system makes a renderer *ask*. This is the import that skips

@@ -100,6 +100,15 @@ export type ChromeContext = Readonly<{
 export type ChromeFn = (ctx: ChromeContext) => readonly Block[];
 
 /**
+ * §6k — the chrome as the frame reads it, after `resolveConfig`.
+ *
+ * `footerRows` is always present here and optional on `TuiConfig`: the default
+ * lives in `config.ts` with every other default, and a `ChromeFn` never returns
+ * a height (I79) — content is the function's, the count is the session's.
+ */
+export type Chrome = Readonly<{ header: ChromeFn; footer: ChromeFn; footerRows: number }>;
+
+/**
  * Superset of C20's `HistoryFs` (C22 §2), so the injected value passes straight
  * down with no adapter.
  *
@@ -429,7 +438,12 @@ export type TuiConfig = Readonly<{
    */
   commandPolicy?: CommandPolicy;
   completionSources?: readonly CompletionSource[];
-  chrome?: Readonly<{ header: ChromeFn; footer: ChromeFn }>;
+  /**
+   * §6 — header and footer as functions of the frame; `footerRows` is the
+   * footer's budget, an integer from 1 to `MAX_FOOTER_ROWS`, default 1 (I79,
+   * §6k). Refused at `createTui` outside that range. The header is one row.
+   */
+  chrome?: Readonly<{ header: ChromeFn; footer: ChromeFn; footerRows?: number }>;
   blocks?: readonly BlockDefinition[];
   /**
    * The most rows one block may occupy (C14 §4b, I24; C09 §2b). Default 2 000.

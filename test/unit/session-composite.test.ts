@@ -38,7 +38,7 @@ const SESSION: SessionSnapshot = Object.freeze({
 /** A frame with a recognisable base underneath, so a bleed is visible. */
 function frameAt(columns = 40, rows = 12): Composed {
   return compose({
-    chrome: { header: () => [], footer: () => [] },
+    chrome: { header: () => [], footer: () => [], footerRows: 1 },
     session: () => SESSION,
     copyMode: () => false,
     now: () => 1_700_000_000_000,
@@ -56,7 +56,7 @@ function frameAt(columns = 40, rows = 12): Composed {
  */
 function frameWanting(columns: number, rows: number, wanted: number): Composed {
   return compose({
-    chrome: { header: () => [], footer: () => [] },
+    chrome: { header: () => [], footer: () => [], footerRows: 1 },
     session: () => SESSION,
     copyMode: () => false,
     now: () => 1_700_000_000_000,

@@ -56,7 +56,7 @@ function deps(over: Partial<PaintDeps> = {}): PaintDeps {
 
 function frameAt(columns: number, rows: number, promptRows = 1): Composed {
   return compose({
-    chrome: { header: () => [], footer: () => [] },
+    chrome: { header: () => [], footer: () => [], footerRows: 1 },
     session: () => SESSION,
     copyMode: () => false,
     now: () => 1_700_000_000_000,
@@ -163,7 +163,7 @@ describe("C22 §6 — the paint", () => {
     };
 
     const f = compose({
-      chrome: { header: () => [], footer: () => [] },
+      chrome: { header: () => [], footer: () => [], footerRows: 1 },
       session: () => SESSION,
       copyMode: () => false,
       now: () => 1_700_000_000_000,

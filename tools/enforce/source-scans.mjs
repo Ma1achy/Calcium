@@ -991,6 +991,76 @@ export const SCANS = [
     allow: [],
     why: "a binding that filters on the kitty keyboard protocol's event type names, on the same line, the fallback that fires under `keyboardProtocol: \"none\"` (C02 I12) — nothing is reachable only with the protocol" },
 
+  // --- SS56 — one grammar for a notice: nothing under L4 hand-composes one ---
+  //
+  // C22 T2.40. `documents.ts` (`noticeDoc`, the document) and `builders/`
+  // (`b.notice`, the block) are the family every shell surface is meant to
+  // reach for, and the arc's rule is that no surface rolls its own — a notice
+  // written by hand chooses its own glyph, and the four sites that forgot one
+  // threw inside `appendAndCommit` and produced no entry at all (documents.ts's
+  // header records it). The rule is the literal `kind: "notice"` as an
+  // object-literal value, anywhere in `src/`.
+  //
+  // **Allow-list rather than a narrower scope**, and every entry has a reason
+  // here because the row shape holds one `why`. Sixteen files carried the
+  // literal on the day the rule landed (34 lines; 28 outside the family and the
+  // type). SS53 retires any entry the moment its file stops matching, which is
+  // what makes the *owed* group below a deferral that expires by itself.
+  //
+  //   the family — the two places a notice is meant to be composed:
+  //     src/shell/documents.ts             `noticeDoc`, `errorDoc`'s remediation
+  //     src/shell/builders/                `b.notice` and its four tones (C24 I5)
+  //   the kind itself — a declaration and a definition, not compositions:
+  //     src/data/viewmodel/types.ts        the `Notice` type's discriminant
+  //     src/presentation/blocks/kinds/simple.ts   `noticeDefinition.kind`
+  //   below L4 — the family is unreachable by A02 (imports go down only), so a
+  //   notice built here is the layer's own output and there is nothing to call:
+  //     src/data/adapters/fallback.ts      the fallback adapter's document
+  //     src/data/adapters/mapping.ts       an adapter's error notice
+  //     src/data/adapters/overflow.ts      the overflow notice (C07 §4)
+  //     src/data/adapters/registry.ts      an unmapped verb's notice
+  //     src/data/viewmodel/markdown.ts     a blockquote parses to a notice
+  //     src/viewport/transcript/cap.ts     the cap marker (C13 §5)
+  //     src/interaction/history/layers.ts  the reverse-search layer's status
+  //     src/presentation/art.ts            a figure's text fallback
+  //   **owed** — L4 surfaces that can call the family and do not. Fourteen
+  //   sites; each entry is a migration owed with its symbol, and SS53 fails the
+  //   suite the day the migration lands with the entry still here:
+  //     src/shell/confirm.ts               `render`'s question (1)
+  //     src/shell/execution.ts             `truncated`, `stream-error`, `refused`, the view-route containment, the shell-failed block (5)
+  //     src/shell/refresh.ts               `STALL_BLOCK`, twice (2)
+  //     src/shell/local/handlers.ts        `cleared`, `theme-usage`, `theme`, `theme-nobg`, `debug-none`, `exit` (6)
+  //
+  // **Stated blind spots.** A notice built through a helper this rule does not
+  // know — a local `noticeOf` in a new file — passes, as does `kind: NOTICE`
+  // with the literal held in a constant, or a spread from an object declared
+  // elsewhere. The pattern is per line and matches the discriminant only, so it
+  // cannot tell a composition from a type guard written as an object literal
+  // (`{ kind: "notice" } satisfies Pick<…>`), which errs towards reporting. And
+  // it says nothing about *which* member of the family a site should call.
+  { id: "SS56", spec: "C22 T2.40 · C24 I5",
+    pattern: /\bkind:\s*"notice"/,
+    scope: "src/",
+    allow: [
+      "src/shell/documents.ts",
+      "src/shell/builders/",
+      "src/data/viewmodel/types.ts",
+      "src/presentation/blocks/kinds/simple.ts",
+      "src/data/adapters/fallback.ts",
+      "src/data/adapters/mapping.ts",
+      "src/data/adapters/overflow.ts",
+      "src/data/adapters/registry.ts",
+      "src/data/viewmodel/markdown.ts",
+      "src/viewport/transcript/cap.ts",
+      "src/interaction/history/layers.ts",
+      "src/presentation/art.ts",
+      "src/shell/confirm.ts",
+      "src/shell/execution.ts",
+      "src/shell/refresh.ts",
+      "src/shell/local/handlers.ts",
+    ],
+    why: "one grammar for a notice — `noticeDoc` or `b.notice`, never a hand-composed `kind: \"notice\"`; a site that rolls its own chooses its own glyph and the ones that forgot produced no entry at all" },
+
   { id: "SS35", spec: "C04 §4 · C05 §2",
     pattern: /^\s*(?:export\s+)?type Result\s*[<=]/m,
     scope: "src/", allow: ["src/data/viewmodel/types.ts"],

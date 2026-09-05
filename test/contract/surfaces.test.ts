@@ -156,7 +156,7 @@ describe("the S-series' illustrated heights", () => {
     const drawnFooter = lines.length - promptRow - 1;
 
     const frame = compose({
-      chrome: { header: () => [], footer: () => [] },
+      chrome: { header: () => [], footer: () => [], footerRows: 1 },
       session: () => S01_SESSION,
       copyMode: () => false,
       now: () => 1_700_000_000_000,

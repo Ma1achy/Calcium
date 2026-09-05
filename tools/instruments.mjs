@@ -100,6 +100,11 @@ const COVERED = [
   // frames it writes rather than the scene table: which rows are washed, which
   // is the head, and that the 1-bit arm carries the selection as reverse video.
   ["tools/interaction-catalogue.mjs", ["npx", "vitest", "run", "test/unit/interaction-catalogue.test.ts"]],
+  // The key ladder as a generated table (C16 §6, arc4 Lane K). Its fixture is
+  // the drift check in both directions: the file on disk equals what the live
+  // keymap renders to, and a keymap with one binding added renders to
+  // something else that names the key.
+  ["tools/keymap-table.mjs", ["npx", "vitest", "run", "test/unit/keymap-table.test.ts"]],
   // **Its fixture is a golden row rather than a unit one**, because what this
   // instrument owes is not arithmetic — it is *the comparison responds to a
   // frame that moved*, and that can only be asked of the corpus it writes.

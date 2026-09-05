@@ -34,7 +34,7 @@ import type { RenderScratch } from "../presentation/blocks/types.js";
 import { cells, hardWrapCells, sliceCells } from "../presentation/text.js";
 import { paint as paintSpans, tone, selectionStyle } from "../presentation/blocks/paint.js";
 import { SGR_RESET, sgr, toTerminalDefault } from "../terminal/escapes.js";
-import { promptFor, PROMPT_GUTTER } from "./config.js";
+import { HEADER_ROWS, promptFor, PROMPT_GUTTER } from "./config.js";
 import { composite } from "./composite.js";
 import { exact, FrameError } from "./frame-error.js";
 import { gutterMatchesPrompt, heightsSum, type Composed } from "./frame.js";
@@ -502,7 +502,8 @@ export function paint(frame: Composed, deps: PaintDeps): readonly string[] {
   if (!heightsSum(frame)) {
     throw new FrameError(
       `frame heights do not sum to ${String(frame.size.rows)} rows: ` +
-        `header 1 + viewport ${String(frame.region.height)} + prompt ${String(frame.promptRows)} + footer 1`,
+        `header ${String(HEADER_ROWS)} + viewport ${String(frame.region.height)} + ` +
+        `prompt ${String(frame.promptRows)} + footer ${String(frame.footerRows)}`,
     );
   }
 
@@ -549,10 +550,13 @@ export function paint(frame: Composed, deps: PaintDeps): readonly string[] {
   // life of C15 no component drew one at all (S01 §3a).
   const lines = composite(
     [
-      ...region(frame.header, 1, width, deps),
+      ...region(frame.header, HEADER_ROWS, width, deps),
       ...transcript(frame, deps, width),
       ...promptRegion(frame, deps, width),
-      ...region(frame.footer, 1, width, deps),
+      // **The composed budget, not `1`** (I80). `region()` truncates to it and
+      // pads to it, so the footer's height is the session's and never its
+      // content's — and the mutation that writes `1` back here is T6.96.
+      ...region(frame.footer, frame.footerRows, width, deps),
     ],
     deps.overlays(),
     {
