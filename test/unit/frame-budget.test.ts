@@ -124,6 +124,8 @@ describe("C22 §6l — the frame's default look", () => {
     expect(Object.keys(resolved).sort()).toEqual(["footer", "header"]);
   });
 
+  it.todo("T1.47 (C22 I87, §6l.7 row 21): a default frame at 24×80 paints a rule on row HEADER_ROWS identical to the rule above the prompt; region.top is HEADER_ROWS + HEADER_RULE_ROWS and MAX_FOOTER_ROWS is three — not deferred on a component: the spec commit carries the row and the code commit replaces it");
+
   it("T1.36 (C22 I80, I82): the sum holds for every footer height at every size down to the clamp", () => {
     for (let f = 0; f <= MAX_FOOTER_ROWS; f += 1) {
       // The smallest size whose region is non-negative with the prompt at its

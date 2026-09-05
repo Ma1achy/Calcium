@@ -1944,6 +1944,22 @@ frame with both forms on it rather than two constants compared.
 Every transcript frame: one row per entry. The chrome rows of every frame at every width. The
 count is taken when the code lands, per §6l.5.
 
+### 6l.7 — the header's rule
+
+**Asked for from a frame, 2026-09-05**: the header sat directly on the region's first row, and
+with the region's first row usually a command echo or a card header, the two read as one block.
+The prompt has a rule on each side (rows 1–3); the header had none. One more cell in the table:
+
+| # | the cell | rule A | rule B | ruling |
+|---|---|---|---|---|
+| 21 | the row below the header | the header ends here | the region begins here | **a rule row** (I87): the same glyph, tone and width as rows 1–3, drawn by the same painter function; the region's first row is below it, so `region.top = HEADER_ROWS + HEADER_RULE_ROWS` and the region loses one row. `MAX_FOOTER_ROWS` is derived with it and reads three where it read four |
+
+- **K. Three rules, always** (I81, I87). The header's rule is a constant beside `RULE_ROWS`
+  rather than folded into it: `promptTop` halves `RULE_ROWS` to find the prompt, and a figure
+  that counts rules in two places is one a reader has to divide. Every consumer of the budget —
+  `compose`, `initialRegionHeight`, `heightsSum`, the painter, `MAX_FOOTER_ROWS` — names the
+  new constant, so the sum cannot be right by one place and wrong by another.
+
 ## 7. Health and identity
 
 **Identity comes from the app, through `config.identity`.** C22 owns the cadence
@@ -2190,6 +2206,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I84** — **One indentation unit, two cells, and a subordinate mark sits at its parent row's text column.** A level-0 mark is at column 0 and its text at column 2 (`PROMPT_GUTTER.first`); a mark under a row sits at that row's text column and its own text one unit further in. So the card's hook is at column 2 and its body at column 4, and the `continuation` mark drawn by C09 in a notice and drawn by the shell as a card's gutter are the same column on one screen (→ §6l.6 rows 16–17, G).
 - **I85** — **Every entry ends with one blank row, and it is the entry's.** `entryLayout` ends every layout with a blank run; C14 measures it through the wrapper `construct.ts` injects, `visibleRows` draws it, `entryAtRow` maps it to the entry above, and no composer adds spacing of its own (→ §6l.6 rows 18–19, I).
 - **I86** — **Default chrome is two clusters: the left takes the remainder, the right its content width, and the last cell of the right cluster is the frame's last column.** The header and footer `makeDefaultChrome` returns are each one `group` row, `flex: [1, { cells: right }]`, with no `align` — the cell's width is the whole mechanism, and `right` equals C09's measured width of that `pills` block, so the cluster fills its cell and the cell ends the row (→ §6l.6 row 20, J; F822 for the `align` that was there).
+- **I87** — **A rule row separates the header from the region on every frame the gate accepts.** Row `HEADER_ROWS` is the glyph table's `horizontal` at the terminal's unicode tier, full width, muted, plain at 1-bit — the same row the prompt's two rules are; `region.top` is `HEADER_ROWS + HEADER_RULE_ROWS`, the region is one row shorter for it, and `MAX_FOOTER_ROWS` is derived with it. Never configurable (→ §6l.7 row 21, K).
 
 
 ## 11. Commitments
@@ -2272,6 +2289,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 55. **One unit, and a child's mark under its parent's text** (I84). The hook at column 2, the body at column 4; the notice's `continuation` and the card's are one column, asserted by a frame that holds both.
 56. **An entry closes with one blank row** (I85). Through `entryLayout`, so what C14 measured and what the frame drew are one number.
 57. **Chrome is two clusters** (I86). Default header and footer as `group` rows; the right cluster's width is its content's, measured rather than assumed.
+58. **A rule under the header** (I87). One constant, named by every consumer of the budget; the painter draws it with the function that draws the prompt's two.
 
 41. **A frame that cannot hold what it was given complains rather than dies** (I70, F230). The per-entry trim was reconciling two components' answers in silence and taking the next block with it; it reports through the sink that already exists for a block giving way, and it does not refuse — the region check one level up can refuse only because nothing can reach it.
 
@@ -2576,6 +2594,7 @@ PTY harness.
 - **T1.44** (I84, §6l.6 row 16): a card `[step, notice]` at 40 draws its hook row as two blanks, `⎿`, a blank and the body's first row at 36; and a muted notice carrying `continuation`, rendered by C09 alone at 40, has `⎿` at the same string index as the card's hook row — the two forms compared, not two constants.
 - **T1.45** (I85, §6l.6 rows 18–19): `measureEntry` on `[notice]` is `measureSequence([notice]) + 1`; `renderEntryPieces` over the whole entry ends with one empty row; a window that stops before the blank draws no empty row and a window of the blank alone draws exactly one; `elementsOfEntry` puts no element on the blank.
 - **T1.46** (I86, §6l.6 row 20): `makeDefaultChrome`'s header rendered at 80 and at 100 columns ends with the clock, whose last cell is the last column; the footer's `cwd` ends at the last column and `/help` begins at column 0; the right cluster's `cells` equals the registry's `width` of that `pills` block at every width tried.
+- **T1.47** (I87, §6l.7 row 21): a default frame at 24×80 painted → row `HEADER_ROWS` is byte-identical to the rule above the prompt, `region.top` is `HEADER_ROWS + HEADER_RULE_ROWS`, `heightsSum` holds, and `MAX_FOOTER_ROWS` is `MIN_ROWS − HEADER_ROWS − HEADER_RULE_ROWS − RULE_ROWS − ⌊MIN_ROWS / 2⌋ − 1` — three.
 - **T1.43** (§6l.4 E): the default footer is one `pills` row naming `/help` and the snapshot's `cwd` with `$HOME` folded to `~`, gaining `stopping` when the snapshot says so and carrying no key name.
 - **T2.40** (SS56): the source scan finds no hand-composed `kind: "notice"` under `src/` outside the sixteen files the rule excuses by name — two are the family (`documents.ts`, `builders/`), two the kind's declaration and definition, eight below L4 where the family is unreachable (A02), four L4 surfaces **owed** a migration and allowed so SS53 retires each entry when its last literal goes. The rule is imported from the enforcement tool, not restated (C01 T2.10's shape), and its fabricated violation is a notice literal in `src/shell/keys.ts`.
 - **T3.38** (I80, §6k.4 F): **frame read.** At 24 rows with `footerRows: 2` and a footer returning three one-row blocks, rows 22 and 23 carry the first two blocks and the third is on no row; the region is 20 and the prompt is on row 21. With one block, row 23 is blank. And the default — `footerRows` omitted — paints byte-for-byte the frame that `footerRows: 1` paints, which is the frame HEAD painted: the golden claim, asserted here rather than by regenerating anything.
@@ -2591,6 +2610,7 @@ PTY harness.
 - **T6.103** (I84): the hook's indent set to 0 → **T1.44** fails at the column comparison, and **T4.63** shows the two forms in two columns.
 - **T6.104** (I85): the blank run dropped from `entryLayout` → **T1.45** fails on the count, and **T4.63** shows the entries touching.
 - **T6.105** (I86): the right cell two cells wider than its cluster → **T1.46** fails on the clock's last cell. The first form of this row aligned the cluster left and survived, because the cell's width placed the clock on its own (F822).
+- **T6.106** (I87): the header's rule dropped from the painter's row list → **T1.47** fails on row `HEADER_ROWS`, and `paint` is one row short of the frame.
 - **IF8** (I77): `Frames` — four advances of 25 ms and one of 100 leave the index, remainder and `due` where one of 200 does; a full loop is frame 0 and keys as `""`; a minute idle lands where the clock says; a still and a zero advance hold nothing; two blocks key sorted; `delete` empties. C09 §9 Tier 1 carries the row, in `test/edge/image-frames.test.ts`.
 - **T4.17h–j** (I76): the **writer alone** — `→` from nowhere lands on the first sample, `←` from nowhere on the last, both clamp at the ends, a table is a no-op, and two plots in one document hold different indices (equal ones would pass a store keyed on the entry alone).
 - **T4.17p** (I76): the **pair, through a frame** — `→` puts `train: 10` on the readout row, a second `→` replaces it with `train: 20`, `←` brings `10` back. Read from the screen, because the key axis is what makes the second frame differ from the first.
