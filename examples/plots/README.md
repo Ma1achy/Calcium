@@ -151,7 +151,7 @@ its neighbour — at four series with five-cell names, three ticks for four grou
 bar was the unlabelled one. And the value labels abut with no separating cell, so `4.17.4` is
 `4.1` and `7.4`.
 
-The horizontal arm of the same form gets all three right, which is why `/bars` is horizontal:
+The horizontal arm of the same form gets all three right, which is why `/form bar` closes with it — the last figure on the page, under the rungs:
 
 ![the same budget as a horizontal bar: sixteen rows, a right-hand legend naming measure, layout, paint and compose, values at each bar's end, and a final row reading "+3 more · 2560w · layout · 2560w · paint · 2560w · compose"](bars.png)
 
