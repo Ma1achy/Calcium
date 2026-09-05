@@ -288,20 +288,43 @@ export function createRouter(
         e.col < p.left + p.width,
     );
 
-    const wheel = e.button === "wheelUp" || e.button === "wheelDown";
+    // **Every direction is a wheel** (I30, §4a row j). This named two of the
+    // four, so the day the decoder produced `wheelLeft` a horizontal wheel fell
+    // through to the entry rung and was routed as a click on the block under
+    // the pointer.
+    const wheel = e.button.startsWith("wheel");
     if (covering !== undefined) {
       stages.push(`layer:${covering.layer.id}`);
       return run(covering.layer.kind === "view" ? "pushedView" : "overlay", e);
     }
-    // Wheel is directional rather than targeted, so with no layer under the
-    // pointer it goes to C14 regardless of what the point is over.
+    // **A layer that must be answered takes the mouse as it takes the keys**
+    // (I8). The point is not on the layer, so nothing beneath it may act — a
+    // click that moved focus under a confirm, or a wheel that scrolled the
+    // transcript under one, is the exact defect I8 was widened to close, and
+    // this table had no gate while the keyboard's had two. Consumed and
+    // nothing happens, which is the key path's shape.
+    const top = deps.overlayTop();
+    if (top !== null && !top.dismissable) {
+      stages.push("modal");
+      return true;
+    }
+
+    const inRegion = regionRow >= 0 && regionRow < region.height;
+    const hit = inRegion ? deps.entryAtRow(regionRow) : null;
+
     if (wheel) {
-      stages.push("viewport:wheel");
+      // **The entry under the pointer first, then C14** (§4a row i). *Directional
+      // rather than targeted* was true while nothing in the transcript could
+      // scroll on its own; a `scroll` block is a second thing a wheel can mean,
+      // and the box under the pointer outranks the transcript it sits in. An
+      // entry that declines — prose, no box — leaves the wheel to the viewport.
+      stages.push(hit === null ? "viewport:wheel" : `viewport:${hit.id}`);
+      if (hit !== null && run("liveBlock", e)) return true;
+      if (hit !== null) stages.push("viewport:wheel");
       return run("copyMode", e) || run("global", e);
     }
 
-    if (regionRow >= 0 && regionRow < region.height) {
-      const hit = deps.entryAtRow(regionRow);
+    if (inRegion) {
       stages.push(hit === null ? "viewport:miss" : `viewport:${hit.id}`);
       return hit !== null && run("liveBlock", e);
     }

@@ -953,7 +953,6 @@ class Session implements TuiInstance {
       copyMode: () => this.#copyMode,
       enterCopyMode: () => this.#setCopyMode(true),
       exitCopyMode: () => this.#setCopyMode(false),
-      entryAtRow: () => null,
       region: () => this.#composed().region,
       overlayRegion: () => this.#composed().overlayRegion,
       // From the composed frame, both numbers: the prompt starts where the

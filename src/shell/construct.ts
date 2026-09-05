@@ -211,7 +211,6 @@ export type FrameQueries = Readonly<{
   exitCopyMode: () => void;
   /** Enter it. The other half of B1's pair (C16 §5b). */
   enterCopyMode: () => void;
-  entryAtRow: (row: number) => Readonly<{ id: string; rowOffset: number }> | null;
   /**
    * Where the transcript sits, for mouse routing (C16 `RouterDeps.region`).
    *
@@ -624,6 +623,18 @@ export async function constructGraph(
   /** Roadmap 30 — the chip's display number, per session. */
   let chipCount = 0;
 
+  /**
+   * The rows the composer draws above an entry's blocks (C14 I20, C22 I33).
+   *
+   * **One function, three readers.** C14 measures `chrome ++ blocks` with it, the
+   * frame draws the same rows, and the pointer subtracts them before the element
+   * list's rows mean anything (C16 §4a row b). A second arithmetic in any of the
+   * three is a viewport describing a document the frame is not showing — or a
+   * click landing one command line below where it was made.
+   */
+  const chromeRowsOf = (entry: Readonly<{ doc: Readonly<{ command: string }> }>, width: number): number =>
+    commandRows(entry.doc.command, width, detection.capabilities).length;
+
   const stores = await (async () => {
     const transcript = createTranscriptStore(
       config.retainPayloads > 0 ? { retainPayloads: config.retainPayloads } : {},
@@ -644,7 +655,7 @@ export async function constructGraph(
       // it is part of the height the index virtualises against. **The same
       // function that draws it**, or the two arithmetics part company and the
       // viewport describes a document it is not showing.
-      chromeRows: (entry, width) => commandRows(entry.doc.command, width, detection.capabilities).length,
+      chromeRows: chromeRowsOf,
     });
 
     // **The render cache's two C13 arms, beside C14's** (I58, §6c trace rows 8
@@ -1088,7 +1099,9 @@ export async function constructGraph(
       // the nullable form answers quietly, and a quiet `null` here is Ctrl-C
       // taking a lower rung over a running verb — C23 §8a A1 restored by its
       // own fix.
-      deps: routerDeps(stores, runner, scheduler, deps.frame, () => pipeline, confirm),
+      // A thunk: `entryAtRegionRow` is declared below, with the other pointer
+      // helpers, and the router is built here. Called at dispatch, never now.
+      deps: routerDeps(stores, runner, scheduler, deps.frame, () => pipeline, confirm, (row) => entryAtRegionRow(row)),
     }),
   );
 
@@ -1392,6 +1405,112 @@ export async function constructGraph(
   };
 
   /**
+   * A block of `entry` by id, at any depth — `focusedBlock`'s walk, for the
+   * pointer (C16 §4a).
+   *
+   * **The same loop as `focusedBlock`'s rather than a shared one, on purpose**:
+   * `c22-camera.mjs` and `c22-nested-block.mjs` anchor mutations on that
+   * function's lines, and a mutation run is re-anchored only under a run of the
+   * pass (`tools/mutate`), which Lane W could not run. The duplication is
+   * recorded here so the next pass can fold the two together.
+   */
+  const blockIn = (entry: Readonly<{ doc: Readonly<{ blocks: readonly Block[] }> }>, id: string): Block | null => {
+    for (const top of entry.doc.blocks) {
+      if (top.id === id) return top;
+      for (const child of descendants(top)) if (child.id === id) return child;
+    }
+    return null;
+  };
+
+  /**
+   * Move the box under the pointer (C04 I48, C16 §4a). The store clamps at read.
+   *
+   * **Takes the entry and the block rather than reading focus**: `pageBlock`
+   * pages the focused box and the wheel pages the one under the pointer, which
+   * is why `blockPageUp/Down` could not be the wheel's effect — the walk said so
+   * before this function existed. `pageBlock` keeps its own two lines for the
+   * anchoring reason `blockIn` gives.
+   */
+  const nudgeScroll = (entryId: EntryId, blockId: string, rows: number): void => {
+    stores.scrollOffsets.nudge(entryId, blockId, rows);
+    scheduler.commit("input");
+  };
+
+  /**
+   * The entry at a **region** row (C14 I19), through the frame's alignment.
+   *
+   * **The frame bottom-aligns a short transcript** — `paint.ts` pushes
+   * `region.height − rows` blank rows above the content so it grows towards the
+   * prompt — and C14 addresses its rows from the top. The two agree exactly when
+   * the transcript fills the region, which is every long session and no short
+   * one: a click on the second visible row of a two-entry session asked C14 for
+   * a row past `totalRows` and got `null`, while every store-level row passed.
+   * **Found by reading the painted frame and by nothing else** (C16 §4a row l).
+   *
+   * The same subtraction `paint.ts` makes, over the same two numbers, and it is
+   * the frame's translation rather than C14's: the viewport does not know how
+   * it is drawn, and making it know would put a composition rule in L2.
+   */
+  const entryAtRegionRow = (regionRow: number): Readonly<{ id: EntryId; rowOffset: number }> | null => {
+    const { viewportHeight, totalRows } = stores.viewport.scroll;
+    return stores.viewport.entryAtRow(regionRow - Math.max(0, viewportHeight - totalRows));
+  };
+
+  /**
+   * The element under a pointer, and the block that declared it (C16 §4a, I31).
+   *
+   * **One `find` over the list the keyboard walks** — `elementsOf`, at the same
+   * width — so the two cannot disagree about what is there (C26 §5). What the
+   * pointer needs and the keyboard never did is geometry, and there are two
+   * translations, both measured before this was written:
+   *
+   * - `rowOffset` is in `chrome ++ blocks` (C14 I20), so the chrome comes off
+   *   first; a pointer on the command line has a negative row and hits nothing.
+   * - a `scroll`'s elements are in **content** rows (C26 I3 — never the
+   *   offset), so inside the box the pointer is at `boxRow + offset`, and the
+   *   residue row and the rows past a short content hit nothing of the box's.
+   *   A hit by `rows` alone lands on the child *above* the one under the pointer
+   *   by exactly the offset — inside the bounds and wrong.
+   *
+   * Deepest level wins (C26 §6): a cell over a row over a block.
+   */
+  const elementAt = (
+    hit: Readonly<{ id: EntryId; rowOffset: number }>,
+    col: number,
+  ): Readonly<{ blockId: string; element: NavElement; block: Block }> | null => {
+    const entry = stores.transcript.entries.find((e) => e.id === hit.id);
+    if (entry === undefined) return null;
+    const width = deps.frame.overlayRegion().width;
+    const blockRow = hit.rowOffset - chromeRowsOf(entry, width);
+    if (blockRow < 0) return null;
+
+    const placed = elementsOf(hit.id);
+    let best: Readonly<{ blockId: string; element: NavElement; block: Block }> | null = null;
+    for (const p of placed) {
+      const block = blockIn(entry, p.blockId);
+      if (block === null) continue;
+      let row = blockRow;
+      if (block.kind === "scroll") {
+        // The box's top is its first child's content row 0, lifted; its content
+        // is the last child's end. Both read off the list rather than measured
+        // again, and the offset is clamped exactly as the renderer clamps it.
+        const own = placed.filter((q) => q.blockId === block.id);
+        const top = Math.min(...own.map((q) => q.element.rows.from));
+        const content = Math.max(...own.map((q) => q.element.rows.to)) - top;
+        if (blockRow < top || blockRow >= top + block.height) continue;
+        const held = stores.scrollOffsets.get(hit.id, block.id);
+        row = blockRow + Math.min(Math.max(0, Math.trunc(held)), Math.max(0, content - block.height));
+      }
+      if (row < p.element.rows.from || row >= p.element.rows.to) continue;
+      if (col < p.element.cols.from || col >= p.element.cols.to) continue;
+      if (best === null || LEVEL_DEPTH[p.element.level] > LEVEL_DEPTH[best.element.level]) {
+        best = { blockId: p.blockId, element: p.element, block };
+      }
+    }
+    return best;
+  };
+
+  /**
    * The focused plot, or `null` (C22 I71, I75, C12 I83).
    *
    * **`pageBlock`'s shape and one difference**: the camera effects read the
@@ -1645,6 +1764,80 @@ export async function constructGraph(
     return keys.table[binding.action as KeyAction] ?? null;
   };
 
+  /**
+   * The pointer's gesture table, onto the key effects (C16 §4a, I31).
+   *
+   * **Not a second focus mechanism.** Every arm below lands in a state a key
+   * reaches, through the same `focus` calls and the same `keys.table` effects:
+   * a click is `↓`/`tab`'s state, click-again is `⏎`, a drag is `⇧↓`, and the
+   * wheel inside a box is `PgDn` on it. Nothing here can store a location the
+   * keyboard could not, which is the constitution's *every mouse affordance has
+   * a keyboard equivalent* made structural rather than remembered.
+   *
+   * Reached from the `liveBlock` handler for an event C16 routed **by position**
+   * to the entry under the pointer (C16 I3) — so `focus.current` may be at the
+   * prompt, in another entry, or in `interact` mode, and each arm says what it
+   * does with that. `null` is *no effect and unconsumed*, so the router drops
+   * the event rather than passing it lower (C16 I5).
+   */
+  const pointerEffect = (e: InputEvent): (() => void) | null => {
+    if (e.kind !== "mouse" || !e.press) return null;
+    // **One translation, and the same pull the router used.** The router
+    // translated the row for its rungs (C16 I20); a handler is handed the
+    // event alone, so L4 translates once more from the same `region()`.
+    const hit = entryAtRegionRow(e.row - deps.frame.region().top);
+    if (hit === null) return null;
+
+    if (e.button.startsWith("wheel")) {
+      // A horizontal wheel is a wheel and does nothing (§4a row j); a vertical
+      // one over a box pages **that** box, and elsewhere is declined so the
+      // transcript takes it (row i).
+      if (e.button !== "wheelUp" && e.button !== "wheelDown") return null;
+      const under = elementAt(hit, e.col);
+      if (under === null || under.block.kind !== "scroll") return null;
+      const rows = e.button === "wheelUp" ? -WHEEL_ROWS : WHEEL_ROWS;
+      return () => nudgeScroll(hit.id, under.block.id, rows);
+    }
+
+    // Recorded rather than absorbed: a second button has no key equal yet, and
+    // a modified click is the obvious next row (a shift-click extending), not
+    // a silent synonym for this one.
+    if (e.button !== "button0" || e.shift || e.meta || e.ctrl) return null;
+    const under = elementAt(hit, e.col);
+    if (under === null) return null;
+    const address = Object.freeze({ blockId: under.blockId, elementId: under.element.id });
+    const at = focus.current;
+    const inHitEntry = at.at === "liveBlock" && focusedEntryId() === hit.id;
+
+    if (e.motion) {
+      // A drag extends within the focused entry and nowhere else: the anchor
+      // shares the entry by construction (C26 §4g), and `extendRow`'s own
+      // entry-change arm is eviction's, so it is not what enforces this.
+      return inHitEntry ? () => focus.extendRow(hit.id, address) : null;
+    }
+    const onFocused =
+      inHitEntry &&
+      at.at === "liveBlock" &&
+      at.element !== null &&
+      at.element.blockId === address.blockId &&
+      at.element.elementId === address.elementId;
+    if (onFocused) {
+      // Click again is `⏎` — a state test, not a timer (C16 I9). In `interact`
+      // the block owns its keys (C26 I14) and the framework fires nothing.
+      return at.mode === "interact" ? null : keys.table.rowActivate;
+    }
+    // A click is a way in exactly as `↓` is, so from the prompt it takes the
+    // same call; from a row it is a move, and `focusRow` collapses a selection
+    // and drops the mode as every unshifted motion does (C26 I16).
+    return at.at === "prompt" ? () => focus.enterLiveBlock(hit.id, address) : () => focus.focusRow(hit.id, address);
+  };
+
+  /** A click on chrome — header, footer, the prompt row — is the reader stepping out (C16 §4a trace 8). */
+  const chromeClick = (e: InputEvent): (() => void) | null =>
+    e.kind === "mouse" && e.press && !e.motion && e.button === "button0" && !e.shift && !e.meta && !e.ctrl
+      ? keys.table.focusPrompt
+      : null;
+
   at("register", () => {
     /**
      * The prompt's own handler, named so the overlay's can call it (I51).
@@ -1784,7 +1977,10 @@ export async function constructGraph(
     // nothing, and this target had neither bindings nor a handler while §3 said
     // focus goes here.
     router.register("liveBlock", (e) => {
-      const effect = bound("liveBlock", e);
+      // Keys through the table; the pointer through its gesture table (C16
+      // §4a). `bound` answers `null` for a mouse event, so the two arms cannot
+      // both claim one.
+      const effect = bound("liveBlock", e) ?? pointerEffect(e);
       if (effect === null) return false;
       effect();
       return true;
@@ -1818,7 +2014,7 @@ export async function constructGraph(
     // `(target, key)` to resolve on. That is the boundary rather than an
     // exception to it.
     router.register("global", (e) => {
-      const effect = bound("global", e);
+      const effect = bound("global", e) ?? chromeClick(e);
       if (effect !== null) {
         effect();
         return true;
@@ -2017,6 +2213,9 @@ type Scroller = ReturnType<typeof createViewport>;
 
 const WHEEL_ROWS = 3;
 
+/** C26 §6 — deepest level wins when a pointer lands in nested elements. */
+const LEVEL_DEPTH: Readonly<Record<NavElement["level"], number>> = Object.freeze({ block: 0, row: 1, cell: 2 });
+
 function wheelAmount(e: InputEvent): ((v: Scroller) => void) | null {
   if (e.kind === "mouse" && e.press) {
     if (e.button === "wheelUp") return (v) => void v.scrollBy(-WHEEL_ROWS);
@@ -2045,6 +2244,7 @@ function routerDeps(
   frame: FrameQueries,
   pipeline: () => Pipeline | null,
   confirm: ConfirmHost,
+  entryAtRegionRow: RouterDeps["entryAtRow"],
 ): RouterDeps {
   const top = (): Readonly<{ kind: "overlay" | "view"; id: string; dismissable: boolean }> | null => {
     const layer = stores.overlays.top;
@@ -2066,7 +2266,13 @@ function routerDeps(
       const id = stores.transcript.liveId;
       return id === null ? null : { id };
     },
-    entryAtRow: frame.entryAtRow,
+    // **C14's, and only C14's** (C14 I19), through the frame's alignment. This
+    // arrived through `FrameQueries` for as long as the viewport had no such
+    // method, and the production frame answered `() => null` — so the rung
+    // below it had never fired. The seam went with the stub: a second answer to
+    // *which entry is at this row* is the two-computations defect the invariant
+    // names.
+    entryAtRow: entryAtRegionRow,
     // **Rungs 1 and 2, from C23 rather than from the runner** (C16 §5, C23 §8a
     // A1). `runner.live` is empty through the window C23 I3 opens on purpose —
     // the pending entry is appended before the transport is invoked — so a

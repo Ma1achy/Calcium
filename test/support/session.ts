@@ -119,7 +119,6 @@ export const FRAME: FrameQueries = {
   copyMode: () => false,
     enterCopyMode: () => undefined,
   exitCopyMode: () => undefined,
-  entryAtRow: () => null,
   region: () => ({ top: 1, height: 20 }),
   overlayRegion: () => ({ width: 80, height: 24 }),
   promptAnchor: () => ({ row: 21, rows: 1 }),

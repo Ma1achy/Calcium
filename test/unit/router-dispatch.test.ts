@@ -409,6 +409,106 @@ describe("C16 §4 — mouse routes by position", () => {
     expect(router.lastStages, "and the region's first row is the layer").toContain("layer:menu");
   });
 
+  it("T1.3o (I31, §4a row j): a horizontal wheel is a wheel, and nobody's click", () => {
+    // **The shipped test named two directions of four.** `wheelUp || wheelDown`
+    // was complete when the decoder produced only those; the day it produced
+    // `wheelLeft` (I30) a horizontal wheel fell through to the entry rung and
+    // was routed to `liveBlock` as a click on the block under the pointer.
+    const { router } = harness();
+    const taken: string[] = [];
+    router.register("liveBlock", (e) => {
+      if (e.kind === "mouse") taken.push(e.button);
+      return e.kind === "mouse" && !e.button.startsWith("wheel");
+    });
+
+    // The control: a click at the same row reaches the entry and is consumed.
+    expect(router.dispatch(click(3, 0, "button0"))).toBe(true);
+    expect(taken).toEqual(["button0"]);
+
+    for (const button of ["wheelLeft", "wheelRight"] as const) {
+      expect(router.dispatch(click(3, 0, button)), `${button} is consumed by nothing`).toBe(false);
+      expect(router.lastStages, `${button} is offered as a wheel, then to the viewport`).toEqual([
+        "arming",
+        "mouse",
+        "viewport:row2",
+        "viewport:wheel",
+      ]);
+    }
+    // Offered to the entry — as a wheel, which the handler declined — and not
+    // as a click: the handler saw the two wheels and consumed neither.
+    expect(taken).toEqual(["button0", "wheelLeft", "wheelRight"]);
+  });
+
+  it("T1.3p (I31, §4a row i): an uncovered wheel goes to the entry first, and to global when it declines", () => {
+    const { router, layer } = harness();
+    const seen: string[] = [];
+    let boxTakes = false;
+    router.register("liveBlock", (e) => {
+      seen.push(`liveBlock:${e.kind === "mouse" ? e.button : "key"}`);
+      return boxTakes;
+    });
+    router.register("global", (e) => {
+      seen.push(`global:${e.kind === "mouse" ? e.button : "key"}`);
+      return true;
+    });
+
+    // Over an entry that declines — prose — the transcript takes it.
+    router.dispatch(click(3, 0, "wheelDown"));
+    expect(seen).toEqual(["liveBlock:wheelDown", "global:wheelDown"]);
+
+    // Over an entry that takes it — a `scroll` under the pointer — global never runs.
+    seen.length = 0;
+    boxTakes = true;
+    router.dispatch(click(3, 0, "wheelDown"));
+    expect(seen).toEqual(["liveBlock:wheelDown"]);
+
+    // Below the transcript there is no entry to offer it to: straight to C14.
+    seen.length = 0;
+    router.dispatch(click(8, 0, "wheelDown"));
+    expect(seen).toEqual(["global:wheelDown"]);
+    expect(router.lastStages).toEqual(["arming", "mouse", "viewport:wheel"]);
+
+    // T3.12b's half, kept: a layer covering the point takes it and nothing else sees it.
+    seen.length = 0;
+    layer.placed = [
+      { layer: { id: "menu", kind: "overlay", dismissable: true }, top: 2, left: 0, height: 1, width: 40 },
+    ];
+    router.dispatch(click(3, 4, "wheelDown"));
+    expect(seen).toEqual([]);
+    expect(router.lastStages).toContain("layer:menu");
+  });
+
+  it("T1.3q (I8, §4a): a layer that must be answered takes the mouse as it takes the keys", () => {
+    // **The keyboard path had two gates and this table had none.** A click beside
+    // a confirm reached the entry under it, and a wheel scrolled the transcript
+    // beneath one — the defect I8 was widened to close, arriving by the pointer.
+    const { router, layer } = harness();
+    const seen: string[] = [];
+    router.register("liveBlock", () => (seen.push("liveBlock"), true));
+    router.register("global", () => (seen.push("global"), true));
+    layer.top = { id: "confirm", kind: "overlay", dismissable: false };
+    layer.placed = [
+      { layer: layer.top, top: 5, left: 10, height: 3, width: 20 },
+    ];
+
+    expect(router.dispatch(click(3, 0)), "consumed, and nothing happens").toBe(true);
+    expect(router.dispatch(click(3, 0, "wheelDown"))).toBe(true);
+    expect(router.dispatch(click(12, 0)), "chrome too").toBe(true);
+    expect(seen).toEqual([]);
+    expect(router.lastStages).toEqual(["arming", "mouse", "modal"]);
+
+    // On the layer itself the click is the layer's, as before.
+    router.register("overlay", () => (seen.push("overlay"), true));
+    router.dispatch(click(6, 12));
+    expect(seen).toEqual(["overlay"]);
+
+    // A dismissable layer is not modal: the entry beneath is reachable.
+    layer.top = { id: "menu", kind: "overlay", dismissable: true };
+    layer.placed = [];
+    router.dispatch(click(3, 0));
+    expect(seen).toEqual(["overlay", "liveBlock"]);
+  });
+
   it("T3.12 (I3): mouse events are dropped when the capability is absent", () => {
     const { router } = harness({ mouseEnabled: () => false });
     expect(router.dispatch(click(3))).toBe(false);
@@ -490,7 +590,10 @@ describe("C16 — the dispatch trace, run against the implementation", () => {
       "s (block keymap) → target:liveBlock,global,dropped",
       "ctrl-c (live block) → target:liveBlock",
       "click row 2 → mouse,viewport:row2",
-      "wheel → mouse,viewport:wheel",
+      // **The entry under the pointer is offered the wheel first** (§4a row i):
+      // a `scroll` block is a second thing a wheel can mean. The harness's
+      // `liveBlock` handler binds nothing, so the wheel falls to the viewport.
+      "wheel → mouse,viewport:row2,viewport:wheel",
       "f (pushed view) → target:pushedView,global,dropped",
       "ctrl-c (confirm) → target:overlay",
       "t (global, under confirm) → target:overlay,modal-blocked",

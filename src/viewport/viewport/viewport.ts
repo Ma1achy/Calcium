@@ -127,6 +127,22 @@ class ViewportImpl implements Viewport {
     });
   }
 
+  entryAtRow(row: number): Anchor | null {
+    // A region row, bounded by the viewport it is a row of. `>= height` rather
+    // than `> totalRows` alone, because a transcript taller than the viewport
+    // has rows below the region that no pointer can be on.
+    if (!Number.isInteger(row) || row < 0 || row >= Math.max(0, this.#height)) return null;
+    const absolute = this.#topRow + row;
+    if (absolute >= this.#index.totalRows) return null;
+    // `locate` walks past zero-height entries, so `offset` is inside an entry
+    // that has rows — the same descent `visible()` starts from (T3.1c: an entry
+    // that begins above the top edge answers with the rows already scrolled).
+    const { index, offset } = this.#index.locate(absolute);
+    const entry = this.#view.entries[index];
+    if (entry === undefined) return null;
+    return Object.freeze({ id: entry.id, rowOffset: offset });
+  }
+
   scrollBy(rows: number): void {
     if (rows === 0) return;
     const before = this.#topRow;
