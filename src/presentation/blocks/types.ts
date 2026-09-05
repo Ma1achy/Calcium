@@ -368,6 +368,26 @@ export type NavElement = Readonly<{
    * `activate`'s reason, and the same shape.
    */
   copy?: string;
+  /**
+   * What the rendering **could not show** of this element, shown beside it as
+   * C15's peek while it holds focus (C15 §2a, C26 §5).
+   *
+   * **Source, like `copy`, and for the same reason**: the painted cells are a
+   * rendering, and the things a rendering loses — a dropped column, a cell cut
+   * with an ellipsis — are exactly what a reader hovering a row wants. So the
+   * declarer supplies it from the data it was given: `tableElements` lists the
+   * columns this width dropped and the cells it truncated, label against full
+   * text, as a `keyValue`. Measured before it was built: 13 of 20 corpus tables
+   * cut something at 80 columns, 50 of 80 rows, docker's real `/ps` among them.
+   *
+   * **Absent when nothing was cut**, so a row that fits declares no detail and
+   * no peek appears — a peek saying *nothing to add* is furniture over a row
+   * the reader could already read. A block, not a string, so a producer's own
+   * detail (a chip's, a panel's) is themed and measured like everything else.
+   * Shown on key and on the click that focuses alike; hover is not reachable at
+   * mouse mode 1002 and is recorded under `MOUSE_ANY_EVENT` rather than built.
+   */
+  detail?: Block;
 }>;
 
 /**

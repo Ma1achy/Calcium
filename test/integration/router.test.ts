@@ -10,7 +10,7 @@
 // that would punish it if something did.
 import { describe, expect, it, vi } from "vitest";
 
-import { createOverlayManager } from "../../src/viewport/overlay/index.js";
+import { createOverlayManager, takesInput } from "../../src/viewport/overlay/index.js";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { createViewport } from "../../src/viewport/viewport/index.js";
 import { createFocusStore } from "../../src/interaction/router/focus.js";
@@ -45,7 +45,7 @@ function world() {
         : { kind: top.kind, id: top.id, dismissable: top.dismissable };
     },
     placed: () =>
-      overlays.layout({ width: 80, height: 10 }).map((p) => ({
+      overlays.layout({ width: 80, height: 10 }).filter(takesInput).map((p) => ({
         layer: { id: p.layer.id, kind: p.layer.kind, dismissable: p.layer.dismissable },
         top: p.top,
         left: p.left,

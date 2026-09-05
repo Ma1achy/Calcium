@@ -31,7 +31,7 @@ import type { NavElement } from "../presentation/blocks/index.js";
 import { initialRegionHeight } from "./frame.js";
 import { createManifestStore, parseManifest, withThemeNames } from "../data/manifest/index.js";
 import type { ManifestError } from "../data/manifest/index.js";
-import { descendants } from "../data/viewmodel/index.js";
+import { block as makeBlock, descendants } from "../data/viewmodel/index.js";
 import type { Block, Plot, Result } from "../data/viewmodel/index.js";
 import { createProcessRunner } from "../data/process/runner.js";
 import {
@@ -56,7 +56,7 @@ import { CursorPositions } from "./cursor-positions.js";
 import { SeriesVisibility } from "./series-visibility.js";
 import { RenderScratchStore } from "./render-scratch.js";
 import { ScrollOffsets } from "./scroll-offsets.js";
-import { createOverlayManager } from "../viewport/overlay/index.js";
+import { createOverlayManager, takesInput } from "../viewport/overlay/index.js";
 import { createEditor } from "../interaction/editor/index.js";
 import {
   createEngine,
@@ -64,7 +64,7 @@ import {
   frameworkSources,
   MENU_ID,
 } from "../interaction/completion/index.js";
-import { createFocusStore } from "../interaction/router/focus.js";
+import { createFocusStore, resolveFocus } from "../interaction/router/focus.js";
 import { createKeymap, defaultKeymap, keyText } from "../interaction/router/keymap.js";
 import { createRouter, type RouterDeps } from "../interaction/router/router.js";
 import { createConfirmHost, type ConfirmHost } from "./confirm.js";
@@ -1326,6 +1326,104 @@ export async function constructGraph(
     elementsOf(focusedEntryId());
 
   /**
+   * The focused element's detail, shown as C15's peek (C15 §2a, C26 §5).
+   *
+   * **A projection of focus, reconciled rather than driven.** Focus is a pull
+   * (C16 I11) and has no change stream to subscribe to, so this is called after
+   * every delivered input and on every viewport change, and each call
+   * re-derives the whole answer from three facts: the active target is
+   * `liveBlock` or `interaction`, the resolved element declares `detail`, and
+   * the element's first row is on screen. All three and one peek is on the
+   * stack, anchored at that row with that detail; any fewer and there is none.
+   * The peek therefore has no key of its own — `Esc` at `liveBlock` is
+   * `focusPrompt` exactly as before and the peek closes because focus left.
+   *
+   * **Never `top`** (C15 I21): it is `kind: "peek"`, so `↓`, `⏎` and `Esc`
+   * reach the element it describes. Measured with a plain overlay in its place,
+   * all three were taken by the layer.
+   *
+   * **The anchor is the frame's row, computed the way `entryAtRegionRow`
+   * computes its inverse**: `blankRowsAbove` for the bottom-aligned short
+   * transcript, C14's `visible()` for the entries on screen and how much of
+   * each, and the entry's chrome rows before its blocks (C14 I20). An element
+   * whose row is scrolled off has no anchor and no peek. **An element inside a
+   * `scroll` box is not peeked** — its rows are content rows (C26 I3) and the
+   * offset translation `elementAt` does is not repeated here; owed under
+   * `SCROLL_PEEK`.
+   *
+   * `update`, never pop-and-push, when the content or the row changes (C15
+   * I14, T4.12) — compared structurally, because `elementsIn` is recomputed
+   * per call and hands back fresh objects for an unchanged element.
+   */
+  const PEEK_ID = "peek";
+  const peekWanted = (): Readonly<{ key: string; row: number; detail: Block }> | null => {
+    const target = router.target;
+    if (target !== "liveBlock" && target !== "interaction") return null;
+    const at = focus.current;
+    if (at.at !== "liveBlock") return null;
+    const entryId = focusedEntryId();
+    if (entryId === null) return null;
+    const entry = stores.transcript.entries.find((e) => e.id === entryId);
+    if (entry === undefined) return null;
+    const elements = focusedElements();
+    const index = resolveFocus(at.element, elements);
+    if (index === null) return null;
+    const found = elements[index];
+    if (found === undefined || found.element.detail === undefined) return null;
+    if (blockIn(entry, found.blockId)?.kind === "scroll") return null;
+
+    const width = deps.frame.overlayRegion().width;
+    const { viewportHeight, totalRows } = stores.viewport.scroll;
+    let top = blankRowsAbove(viewportHeight, totalRows);
+    for (const ve of stores.viewport.visible().entries) {
+      if (ve.id !== entryId) {
+        top += ve.takeRows;
+        continue;
+      }
+      const within = chromeRowsOf(entry, width) + found.element.rows.from - ve.skipRows;
+      if (within < 0 || within >= ve.takeRows) return null;
+      return {
+        key: `${entryId}/${found.blockId}/${found.element.id}/${JSON.stringify(found.element.detail)}`,
+        row: top + within,
+        detail: found.element.detail,
+      };
+    }
+    return null;
+  };
+  let peekKey: string | null = null;
+  let peekRow: number | null = null;
+  const syncPeek = (): void => {
+    const want = peekWanted();
+    const have = stores.overlays.stack.some((l) => l.id === PEEK_ID);
+    if (want === null) {
+      peekKey = null;
+      peekRow = null;
+      if (have) stores.overlays.dismiss(PEEK_ID);
+      return;
+    }
+    if (have && want.key === peekKey && want.row === peekRow) return;
+    // A panel, so the peek is delimited by its rails rather than by a dim the
+    // terminal cannot draw (C15 I11). Anchored below and flipped by C15 when
+    // there is no room (I17); the width is the region's on the confirm's
+    // argument, and the height the default half of the region.
+    const content = [
+      makeBlock({ kind: "panel", id: "peek-panel", title: "Detail", children: [want.detail] }),
+    ];
+    const placement = { kind: "anchored" as const, row: want.row, prefer: "below" as const };
+    if (have) {
+      stores.overlays.update(PEEK_ID, { content, placement });
+    } else {
+      stores.overlays.push({ id: PEEK_ID, kind: "peek", placement, content, dismissable: true });
+    }
+    peekKey = want.key;
+    peekRow = want.row;
+  };
+  // Scroll, content and resize all move the element's row or the element
+  // itself (C14 emits on all three); a confirm answered from the far side does
+  // not, and the peek beneath it needs nothing.
+  stores.viewport.subscribe(() => syncPeek());
+
+  /**
    * The nearest entry in `direction` that declares an element, and its first
    * one (C26 I21, §4g row c and trace 5).
    *
@@ -1845,9 +1943,12 @@ export async function constructGraph(
     syncBlockKeymap();
     const binding = keymap.resolve(target, e.key);
     if (binding === null) return null;
-    // A block keymap's action is a surface's string and dispatches through
-    // C23 §3a; the built-in table is total over C16's union and has no entry
-    // for one (C16 I19).
+    // **Unreachable for a merged block keymap since C16 I19's ruling** (F779):
+    // `mergeBlock` refuses any action outside the union at merge time, so every
+    // binding that reaches here names a built-in and the table is total over
+    // those. The `?? null` stays as the type's honesty about `Binding.action:
+    // string` — and it is the arm that used to drop a surface's action with
+    // nobody seeing the refusal. No C23 §3a route exists; `blockActionRoute` is owed.
     return keys.table[binding.action as KeyAction] ?? null;
   };
 
@@ -2203,6 +2304,9 @@ export async function constructGraph(
     const deliver = (events: readonly InputEvent[]): void => {
       if (events.length > 0) {
         for (const e of events) router.dispatch(e);
+        // After the keys and before the frame: the peek follows the focus the
+        // keys just moved (C15 §2a).
+        syncPeek();
         stampInput();
         scheduler.commit("input");
       }
@@ -2405,7 +2509,8 @@ function routerDeps(
     overlayTop: top,
     overlayAnswerCallback: confirm.answerHandler,
     overlayRegion: frame.overlayRegion,
-    placed: () => stores.overlays.layout(frame.overlayRegion()),
+    // A peek is not hit-tested (C15 I21): a click on it reaches the row beneath.
+    placed: () => stores.overlays.layout(frame.overlayRegion()).filter(takesInput),
     popLayer: () => void stores.overlays.pop(),
     copyMode: frame.copyMode,
     exitCopyMode: frame.exitCopyMode,

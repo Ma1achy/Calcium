@@ -10,7 +10,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { checkModuleGraph } from "../../tools/enforce/module-graph.mjs";
 import { createOverlayManager, place, sortLayers } from "../../src/viewport/overlay/index.js";
 import type { Layer, Region } from "../../src/viewport/overlay/index.js";
-import { REGION, anchored, centred, placeIn, registry, rows, view } from "../support/overlay.js";
+import { REGION, anchored, centred, peek, placeIn, registry, rows, view } from "../support/overlay.js";
 
 const manager = () => createOverlayManager({ registry });
 
@@ -195,6 +195,48 @@ describe("C15 contract — the edges that are not there", () => {
 });
 
 describe("C15 contract — the stack over a history", () => {
+  it("T2.10 (I21, I23): a thousand random operations with peeks — top is never a peek and the bands hold after every step", () => {
+    const rand = lcg(23);
+    const m = manager();
+    let seq = 0;
+    let peeksSeen = 0;
+
+    for (let step = 0; step < 1000; step += 1) {
+      const ids = m.stack.map((l) => l.id);
+      const roll = rand();
+      try {
+        if (roll < 0.25) {
+          m.push(centred(`o${(seq += 1)}`, 1 + Math.floor(rand() * 4)));
+        } else if (roll < 0.5) {
+          m.push(peek(`p${(seq += 1)}`, 1 + Math.floor(rand() * 3), { row: Math.floor(rand() * REGION.height), prefer: rand() < 0.5 ? "above" : "below" }));
+        } else if (roll < 0.58) {
+          m.push(view(`v${(seq += 1)}`));
+        } else if (roll < 0.75) {
+          m.pop();
+        } else if (ids.length > 0) {
+          m.dismiss(ids[Math.floor(rand() * ids.length)]!);
+        }
+      } catch {
+        // a rejected push(view) — legitimate, and the invariants must hold across it
+      }
+
+      const kinds = m.stack.map((l) => l.kind);
+      if (kinds.includes("peek")) peeksSeen += 1;
+      // I21 — never a peek, and equal to the last keyed layer in the stack.
+      expect(m.top?.kind ?? "none").not.toBe("peek");
+      const lastKeyed = [...m.stack].reverse().find((l) => l.kind !== "peek") ?? null;
+      expect(m.top?.id ?? null).toBe(lastKeyed?.id ?? null);
+      // I23 — bands: views, then peeks, then overlays, in both the stack and the layout.
+      const band = (k: string) => (k === "view" ? 0 : k === "peek" ? 1 : 2);
+      const placedKinds = m.layout(REGION).map((p) => p.layer.kind);
+      for (const list of [kinds, placedKinds]) {
+        for (let i = 1; i < list.length; i += 1) expect(band(list[i]!)).toBeGreaterThanOrEqual(band(list[i - 1]!));
+      }
+    }
+    // The fixture responded: peeks were on the stack for a real share of the steps.
+    expect(peeksSeen).toBeGreaterThan(200); // cells-ok — a step count
+  });
+
   it("T2.4 (I1, I2, I14): a thousand random operations, asserted after every step", () => {
     const rand = lcg(15);
     const m = manager();

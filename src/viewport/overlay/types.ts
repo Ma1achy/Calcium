@@ -36,7 +36,16 @@ export type Placement =
 
 export type Layer = Readonly<{
   id: string;
-  kind: "overlay" | "view";
+  /**
+   * `overlay` and `view` take keys; a **`peek`** never does (§2a, I21).
+   *
+   * A peek is the focused element's detail drawn beside it. It is a third kind
+   * rather than a flag because C16 reads `top.kind`: measured with a plain
+   * anchored overlay standing in for one, `↓` was consumed and focus did not
+   * move, `⏎` went to the layer, and `Esc` dismissed it instead of leaving the
+   * block. A layer that is never `top` cannot reach the ladder at all.
+   */
+  kind: "overlay" | "view" | "peek";
   placement: Placement;
   /**
    * `Block[]`, never React (I4) — so a layer is themed, degrades to ASCII and
@@ -74,6 +83,26 @@ export type Layer = Readonly<{
    */
   cursor?: Readonly<{ row: number; col: number }>;
 }>;
+
+/**
+ * A layer C16 can route to — what `top` answers (I21).
+ *
+ * Typed rather than documented: `RouterDeps.overlayTop` narrows `kind` to
+ * `"overlay" | "view"`, so a `top` that could answer a peek would not compile
+ * at the one seam that matters.
+ */
+export type KeyedLayer = Layer & Readonly<{ kind: "overlay" | "view" }>;
+
+/**
+ * A placed layer that takes input — the ones C16 hit-tests a click against (I21).
+ *
+ * **A peek takes no clicks as it takes no keys**: a click on it falls through to
+ * the transcript row beneath, which is the element the peek describes. One
+ * predicate for the three `placed` seams, so the rule is stated once.
+ */
+export function takesInput(p: Placed): p is Placed & Readonly<{ layer: KeyedLayer }> {
+  return p.layer.kind !== "peek";
+}
 
 export type Placed = Readonly<{
   layer: Layer;
@@ -115,7 +144,8 @@ export type DismissReason = "explicit" | "anchorEvicted";
 export type LayerUpdate = Partial<Pick<Layer, "content" | "placement" | "width" | "cursor">>;
 
 export type OverlayChange =
-  | Readonly<{ kind: "push"; id: string; layerKind: "overlay" | "view" }>
+  | Readonly<{ kind: "push"; id: string; layerKind: Layer["kind"] }>
+  /** A peek is never popped (I21), so `pop` names only the keyed kinds. */
   | Readonly<{ kind: "pop"; id: string; layerKind: "overlay" | "view" }>
   | Readonly<{ kind: "content"; id: string }>
   | Readonly<{ kind: "dismiss"; id: string; reason: DismissReason }>;
@@ -144,9 +174,10 @@ export interface OverlayManager {
   layout(region: Region): readonly Placed[];
   subscribe(cb: (change: OverlayChange) => void): Disposable;
 
-  /** Bottom-first, and sorted: every overlay above every view (I2). */
+  /** Bottom-first, and sorted: every overlay above every peek above every view (I2, I23). */
   readonly stack: readonly Layer[];
-  readonly top: Layer | null;
+  /** The topmost layer that takes keys — never a peek (I21). */
+  readonly top: KeyedLayer | null;
   readonly hasView: boolean;
 }
 

@@ -12,7 +12,7 @@
 // and be tier 1 in a different directory.
 import { describe, expect, it } from "vitest";
 
-import { createOverlayManager } from "../../src/viewport/overlay/index.js";
+import { createOverlayManager, takesInput } from "../../src/viewport/overlay/index.js";
 import type { OverlayManager } from "../../src/viewport/overlay/index.js";
 import { MENU_ID, menuLayer } from "../../src/interaction/completion/index.js";
 import { SEARCH_ID } from "../../src/interaction/history/index.js";
@@ -39,7 +39,7 @@ function routerDeps(overlays: OverlayManager): RouterDeps {
       return top === null ? null : { kind: top.kind, id: top.id, dismissable: top.dismissable };
     },
     placed: () =>
-      overlays.layout({ width: 80, height: 24 }).map((p) => ({
+      overlays.layout({ width: 80, height: 24 }).filter(takesInput).map((p) => ({
         layer: { id: p.layer.id, kind: p.layer.kind, dismissable: p.layer.dismissable },
         top: p.top,
         left: p.left,

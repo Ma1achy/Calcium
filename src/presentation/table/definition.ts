@@ -22,7 +22,8 @@
 import { Box, Text } from "ink";
 import { createElement, type ReactElement } from "react";
 import { atLeastOne, insetWidth, normaliseWidth, sequenceHeight } from "../../data/viewmodel/index.js";
-import type { MeasureFn, Table, TableRow } from "../../data/viewmodel/index.js";
+import type { Block, MeasureFn, Table, TableRow } from "../../data/viewmodel/index.js";
+import { cells } from "../text.js";
 import { clampSpans, paint, selectionStyle, tone, type Span } from "../blocks/paint.js";
 import type { BlockDefinition, NavElement, RenderContext, Windowed } from "../blocks/types.js";
 import { emptySpans, headerSpans, rowSpans } from "./cells.js";
@@ -399,6 +400,44 @@ function rowCopyText(block: Table, r: TableRow): string {
   return block.columns.map((c) => r.cells[c.key]?.text ?? "").join("\t");
 }
 
+/**
+ * What this width could not show of a row, or `null` when it showed everything
+ * (C26 §5 `detail`, C15 §2a).
+ *
+ * **Two ways a rendering loses a cell, and both come from the plan** (C11 §3):
+ * a column the plan dropped, and a cell wider than the column it was planned
+ * into. Both are decided by `planColumns(columns, width)` — declarations and a
+ * width, never focus — so this is as pure as `elements` itself and answers the
+ * same for the frame and for the peek. A dropped column with an empty cell is
+ * nothing lost; a renderer-supplied column (`role: "expand"`) is nothing the
+ * data owns.
+ *
+ * **Known limit, stated rather than absorbed**: the cut test is `cells(text)` at
+ * the default ambiguous width against the planned width, and reads `text`
+ * alone. A cell whose glyph costs the column its last cell, or whose text is
+ * wide under the terminal's ambiguous-width setting, may be cut by the painter
+ * without declaring a detail here.
+ */
+function rowDetail(block: Table, r: TableRow, width: number): Block | null {
+  const plan = planColumns(block.columns, width);
+  const planned = new Map(plan.visible.map((v) => [v.key, v.width]));
+  const dropped = new Set(plan.dropped);
+  const rows: { label: string; value: string }[] = [];
+  for (const column of block.columns) {
+    if (column.role === "expand") continue;
+    const text = r.cells[column.key]?.text ?? "";
+    if (text === "") continue;
+    const w = planned.get(column.key);
+    // The plan's widths are declared in cells under the default convention and
+    // this compares against them; the painter's own cut is at the terminal's
+    // convention, which is the limit stated above.
+    const lost = dropped.has(column.key) || (w !== undefined && cells(text, "narrow") > w); // narrow-ok — the plan's own convention
+    if (lost) rows.push({ label: column.label === "" ? column.key : column.label, value: text });
+  }
+  if (rows.length === 0) return null; // cells-ok — a row count, not a width
+  return Object.freeze({ kind: "keyValue" as const, id: `${block.id}-${r.id}-detail`, rows: Object.freeze(rows) });
+}
+
 export function tableElements(
   block: Table,
   width: number,
@@ -413,6 +452,7 @@ export function tableElements(
   for (const r of sortedRows(block)) {
     const height = 1 + detailHeight(block, r, w, measureChild);
     const action = r.actions?.[0];
+    const detail = rowDetail(block, r, w);
     out.push(
       Object.freeze({
         id: r.id,
@@ -421,6 +461,7 @@ export function tableElements(
         cols: Object.freeze({ from: 0, to: w }),
         ...(action === undefined ? {} : { activate: action }),
         copy: rowCopyText(block, r),
+        ...(detail === null ? {} : { detail }),
       }),
     );
     row += height;

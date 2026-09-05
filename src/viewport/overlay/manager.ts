@@ -15,11 +15,12 @@
  * exists at all.
  */
 
-import { place } from "./place.js";
+import { place, sortLayers } from "./place.js";
 import { OverlayError } from "./types.js";
 import type {
   BlockRegistryLike,
   DismissReason,
+  KeyedLayer,
   Layer,
   LayerUpdate,
   OverlayChange,
@@ -44,8 +45,21 @@ class Manager implements OverlayManager {
     return this.#stack;
   }
 
-  get top(): Layer | null {
-    return this.#stack.at(-1) ?? null;
+  /**
+   * The topmost layer that takes keys (I21).
+   *
+   * **Skips peeks, and the type says so.** Everything that reads `top` is
+   * asking *who has the keys* — C16's ladder, `pop`, the confirm's handler
+   * guard, `promptUnderMenu` — and a peek's whole definition is that it never
+   * does. `push` keeps the stack sorted (I23), so the topmost keyed layer is
+   * the last one whose kind is not `peek`.
+   */
+  get top(): KeyedLayer | null {
+    for (let i = this.#stack.length - 1; i >= 0; i -= 1) {
+      const layer = this.#stack[i] as Layer;
+      if (layer.kind !== "peek") return layer as KeyedLayer;
+    }
+    return null;
   }
 
   get hasView(): boolean {
@@ -67,7 +81,12 @@ class Manager implements OverlayManager {
     }
     assertPlaceable(layer);
 
-    this.#stack = Object.freeze([...this.#stack, layer]);
+    // **Sorted on the way in** (I2, I23), so `top` and `layout` read the same
+    // order. Views and overlays already arrived sorted by construction — a view
+    // is only ever pushed onto an empty stack — and a peek is the kind that
+    // does not: it opens while a confirm or a menu may already be up, and it
+    // belongs beneath them however late it arrives.
+    this.#stack = sortLayers([...this.#stack, layer]);
     this.#emit({ kind: "push", id: layer.id, layerKind: layer.kind });
 
     let disposed = false;
@@ -103,7 +122,7 @@ class Manager implements OverlayManager {
     if (i === -1) return false;
 
     const current = this.#stack[i] as Layer;
-    const updated = Object.freeze({
+    const updated: Layer = Object.freeze({
       ...current,
       ...(next.content !== undefined && { content: next.content }),
       ...(next.placement !== undefined && { placement: next.placement }),
@@ -167,6 +186,15 @@ class Manager implements OverlayManager {
  * the tree and declared no width at all.
  */
 function assertPlaceable(layer: Layer): void {
+  // I22 — a peek is beside the thing it describes, or it is a confirm or a
+  // view wearing the wrong kind. Both entry points, on I20's argument.
+  if (layer.kind === "peek" && layer.placement.kind !== "anchored") {
+    throw new OverlayError(
+      `peek ${layer.id} is ${layer.placement.kind}: a peek is anchored to the element it ` +
+        `describes, and a centred or fill layer that takes no keys is a confirm or a view ` +
+        `nothing can answer (I22)`,
+    );
+  }
   if (layer.placement.kind !== "centred" || layer.width !== undefined) return;
   throw new OverlayError(
     `centred layer ${layer.id} declares no width: it would be placed at left 0 ` +

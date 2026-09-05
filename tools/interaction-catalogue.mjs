@@ -53,6 +53,14 @@ const ROWS = [
   { id: "d", cells: { name: { text: "delta" }, state: { text: "paused", tone: "warn", glyph: "warn" } } },
 ];
 const TABLE = { kind: "table", id: "t", columns: COLUMNS, rows: ROWS };
+/**
+ * The same table with a name the twelve-cell column cannot hold, so row `a`
+ * declares a `detail` (C26 §5) and the peek scene has something to show.
+ */
+const CUT_ROWS = ROWS.map((r) =>
+  r.id === "a" ? { ...r, cells: { ...r.cells, name: { text: "alpha-with-a-name-longer-than-its-column" } } } : r,
+);
+const TABLE_CUT = { kind: "table", id: "t", columns: COLUMNS, rows: CUT_ROWS };
 const PILLS = {
   kind: "pills",
   id: "p",
@@ -126,6 +134,18 @@ export const SCENES = Object.freeze({
     blocks: [TABLE],
     focus: { blockId: "t", rowId: null },
   },
+  /**
+   * The focused row's detail as C15's peek (C15 §2a): the cut cell on the row,
+   * the whole text in a panel directly beneath it. `peek: true` is what makes
+   * `frameFor` composite it — the catalogue has no session and no C15, so the
+   * layer is spliced in where `place()` puts it for `prefer: "below"` with
+   * room beneath, which is the only case this scene constructs.
+   */
+  "table-peek": {
+    blocks: [TABLE_CUT],
+    focus: { blockId: "t", rowId: "a" },
+    peek: true,
+  },
 });
 
 /**
@@ -136,6 +156,37 @@ export const SCENES = Object.freeze({
  * when two blocks are handed one extent.
  */
 export function frameFor(scene, caps, width = WIDTH) {
+  const lines = renderSceneLines(scene, caps, width);
+  if (scene.peek !== true) return lines;
+  return withPeek(scene, caps, width, lines);
+}
+
+/**
+ * The peek, composited as `paint.ts` composites a layer — the panel's rows
+ * replace the transcript rows beneath the focused element (C15 §4 rule 1).
+ *
+ * The detail comes from the same `elementsIn` the session walks, so the scene
+ * shows what the peek would hold and not a hand-written copy of it. Throws if
+ * the focused element declares none: a peek scene over a row that fits would be
+ * a frame of nothing labelled as the mechanism.
+ */
+function withPeek(scene, caps, width, lines) {
+  const focus = scene.focus;
+  const hit = registry
+    .elementsIn(scene.blocks, width)
+    .find((p) => p.blockId === focus.blockId && p.element.id === focus.rowId);
+  if (hit === undefined || hit.element.detail === undefined) {
+    throw new Error(`peek scene: ${focus.blockId}/${focus.rowId} declares no detail`);
+  }
+  const panel = [{ kind: "panel", id: "peek-panel", title: "Detail", children: [hit.element.detail] }];
+  const peekLines = renderSequenceToLines(registry, panel, width, { theme, capabilities: caps, focus: null });
+  const out = [...lines];
+  const top = hit.element.rows.to; // directly beneath the element's span
+  for (let i = 0; i < peekLines.length; i += 1) out[top + i] = peekLines[i];
+  return out;
+}
+
+function renderSceneLines(scene, caps, width) {
   return renderSequenceToLines(registry, scene.blocks, width, {
     theme,
     capabilities: caps,
