@@ -1960,6 +1960,42 @@ The prompt has a rule on each side (rows 1–3); the header had none. One more c
   `compose`, `initialRegionHeight`, `heightsSum`, the painter, `MAX_FOOTER_ROWS` — names the
   new constant, so the sum cannot be right by one place and wrong by another.
 
+### 6l.8 — the gutter carries the call
+
+**The call grammar's gutter, 2026-09-06** (`AGENT_TUI_DESIGN.md` §3, §6, §6b, §10): a hook on the
+body's first row, a left rule down the rest, and — where a call produces calls — the tree's own
+`├ └ │` in the parent's gutter, one unit per level and two levels deep. Measured against the tree
+before ruling: `bodyGutter` draws the hook on row 0 and `" ".repeat(indent)` on every row after;
+`isCard` reads `blocks[0]` and nothing else, so a `step` notice inside a body lays out as body text;
+no `ToolCallSpec` has children and no route emits two cards for one entry (F830). And the tree
+glyphs are all `East_Asian_Width=Ambiguous` — two cells at `wide` — reachable today only through
+the plot's `tree` form, whose `drawOutline` takes them from `glyphForMask`, which flattens to ASCII
+at `unicode: "ascii"` **and** at `ambiguousWidth: "wide"` (F293). That is the tier the `Glyph`
+vocabulary lacked until C09 I48, and it is why the gutter never enters the vocabulary.
+
+| # | the cell | rule A | rule B | ruling |
+|---|---|---|---|---|
+| 22 | a card's body rows after the first | I84: `BODY_INDENT` blanks under the hook | the design's left rule — *this belongs to the head above it* | **a rule on rows ≠ 0** (I88): `bodyGutter` draws `glyphForMask(LINE_UP \| LINE_DOWN, "sharp", caps)` at the hook's column, muted, on every body row after the first; the same `BODY_INDENT` cells, so `measure` learns nothing and I83 holds as it did. The shell draws it and not a C09 rail: a rail is per-notice (C09 I41) and a body is arbitrary blocks — the gap §9c admitted and `entry-layout.ts` closed for the hook is closed the same way for the rule |
+| 23 | a `step` notice inside a card's body | I83: a body's blocks are body text | the design's §6 — a call that produces calls indents by its gutter | **a nested card** (I89): a `group` column whose first block is a `step` notice, inside a card's body, is a card one unit further in. `entryLayout` recurses once; a `step` at depth 3 is body text and a finding, because *three levels is a composition problem wearing a rendering problem's clothes*. One child keeps `⎿` — a tree of one is a corner. N children take the tree's vocabulary from `glyphForMask`: `├─` (`UP \| DOWN \| RIGHT`) for a child with siblings after it, `└─` (`UP \| RIGHT`) for the last, `│` (`UP \| DOWN`) continuing the parent's line past a child's body, and the last child's body has no bar above it |
+| 24 | the tree gutter × `corners` | `glyphForMask` takes `"rounded" \| "sharp"` | the gutter is drawn by the function the measurer and the renderer share | **fixed `"sharp"`**. `corners` is C12's plot-theme axis (C12 I54); a gutter is chrome and not a figure, and the one function both sides call must not depend on theme. `GUTTER_UNIT` is named in `entry-layout.ts` and held to `BODY_INDENT` by a row; `tree.ts`'s `OUTLINE_INDENT = 4` is the tree form's own and stays |
+| 25 | the tree gutter at `unicode: "ascii"` | C09 I5: a substitution keeps its cell count | `linedraw`'s ASCII table | `├─` and `└─` both flatten to `+-` and the last-child distinction vanishes at ASCII — recorded here as `tree.ts` records it for the outline, not repaired. `⎿` stays `` ` ``, one character: the design's §10 writes its rung as `` `- ``, two, and I5 refuses a rung that changes the count |
+| 26 | `y` on a card's head | C09 I47: a head's `copy` is its text | the design's rule 10 — copy takes the source with the invocation | **the head copies the invocation** (I90): `elementsOfEntry` takes the entry's `command` from its one caller and overrides the head element's `copy` with it, so `y` on a head yields what ran; `⌃a y` on the card yields invocation and body copies through C26 I16's aggregator — one aggregator, and SOURCE is the whole selection rather than a second mechanism on the head |
+
+- **L. A rule down the body, drawn where the hook is drawn** (I88). One column, zero rows;
+  the geometry is I84's and the bar fills cells that were reserved and blank — C09 I41's argument
+  one layer up.
+- **M. A nested card is a card one unit in, and two is the depth** (I89). Recursion of one, so the
+  rule is structural rather than a counter; the parent's outcome and duration are the composer's
+  (C23), and the gutter only draws what the composition hands it.
+- **N. The tree gutter comes from `glyphForMask`, sharp** (I89). Because it already flattens at
+  both arms the vocabulary could not, and because a theme axis has no business in the layout
+  function.
+- **O. The head's copy is the command** (I90). The layout knows the entry; the block does not.
+
+**What this moves.** Every card body of two or more rows: a bar in a gutter cell that was blank.
+No nested card exists in any frame corpus today, so the recursion moves nothing until a producer
+does. Counted when the code lands, per §6l.5.
+
 ## 7. Health and identity
 
 **Identity comes from the app, through `config.identity`.** C22 owns the cadence
@@ -2207,6 +2243,9 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I85** — **Every entry ends with one blank row, and it is the entry's.** `entryLayout` ends every layout with a blank run; C14 measures it through the wrapper `construct.ts` injects, `visibleRows` draws it, `entryAtRow` maps it to the entry above, and no composer adds spacing of its own (→ §6l.6 rows 18–19, I).
 - **I86** — **Default chrome is two clusters: the left takes the remainder, the right its content width, and the last cell of the right cluster is the frame's last column.** The header and footer `makeDefaultChrome` returns are each one `group` row, `flex: [1, { cells: right }]`, with no `align` — the cell's width is the whole mechanism, and `right` equals C09's measured width of that `pills` block, so the cluster fills its cell and the cell ends the row (→ §6l.6 row 20, J; F822 for the `align` that was there).
 - **I87** — **A rule row separates the header from the region on every frame the gate accepts.** Row `HEADER_ROWS` is the glyph table's `horizontal` at the terminal's unicode tier, full width, muted, plain at 1-bit — the same row the prompt's two rules are; `region.top` is `HEADER_ROWS + HEADER_RULE_ROWS`, the region is one row shorter for it, and `MAX_FOOTER_ROWS` is derived with it. Never configurable (→ §6l.7 row 21, K).
+- **I88** — **A card's body rows after the first carry a left rule in the hook's column, and it costs no geometry.** `bodyGutter` draws `glyphForMask(LINE_UP | LINE_DOWN, "sharp", caps)` muted at column `HOOK_INDENT` on every body row whose run-local index is not 0, padded to `BODY_INDENT`; row 0 keeps the hook. The bar fills cells I84 reserved, so `measureEntry` is unchanged and I83 holds by construction (§6l.8 row 22).
+- **I89** — **A `group` column whose first block is a `step` notice, inside a card's body, lays out as a card one unit further in, and the layout recurses exactly once.** A single child hangs under `⎿`; with siblings the gutter draws `├─` for every child but the last, `└─` for the last, and `│` past a child's body, every glyph from `glyphForMask` with corners fixed `"sharp"`; the last child's body has no bar above it. A `step` at depth 3 is laid out as body text. `GUTTER_UNIT === BODY_INDENT` (§6l.8 rows 23–25).
+- **I90** — **A card head's `copy` is the entry's command.** `elementsOfEntry` receives `command` and overrides the `step` element's `copy` with it; every other element's `copy` is the block's own, so `⌃a y` over a card yields the invocation followed by the body's sources through C26 I16's aggregator and no second one (§6l.8 row 26).
 
 
 ## 11. Commitments
@@ -2290,6 +2329,9 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 56. **An entry closes with one blank row** (I85). Through `entryLayout`, so what C14 measured and what the frame drew are one number.
 57. **Chrome is two clusters** (I86). Default header and footer as `group` rows; the right cluster's width is its content's, measured rather than assumed.
 58. **A rule under the header** (I87). One constant, named by every consumer of the budget; the painter draws it with the function that draws the prompt's two.
+59. **A rule down the body** (I88). Drawn by the layout in the gutter it reserved, so the body of a call reads as one thing at a glance and nothing is measured differently.
+60. **Nesting is one recursion and the tree's own glyphs** (I89). The vocabulary the plot's outline already draws, from the function that already degrades at both arms; two levels by construction, sharp by ruling.
+61. **The head copies what ran** (I90). The layout supplies the command; the block library never learns it.
 
 41. **A frame that cannot hold what it was given complains rather than dies** (I70, F230). The per-entry trim was reconciling two components' answers in silence and taking the next block with it; it reports through the sink that already exists for a block giving way, and it does not refuse — the region check one level up can refuse only because nothing can reach it.
 
@@ -2595,6 +2637,9 @@ PTY harness.
 - **T1.45** (I85, §6l.6 rows 18–19): `measureEntry` on `[notice]` is `measureSequence([notice]) + 1`; `renderEntryPieces` over the whole entry ends with one empty row; a window that stops before the blank draws no empty row and a window of the blank alone draws exactly one; `elementsOfEntry` puts no element on the blank.
 - **T1.46** (I86, §6l.6 row 20): `makeDefaultChrome`'s header rendered at 80 and at 100 columns ends with the clock, whose last cell is the last column; the footer's `cwd` ends at the last column and `/help` begins at column 0; the right cluster's `cells` equals the registry's `width` of that `pills` block at every width tried.
 - **T1.47** (I87, §6l.7 row 21): a default frame at 24×80 painted → row `HEADER_ROWS` is byte-identical to the rule above the prompt, `region.top` is `HEADER_ROWS + HEADER_RULE_ROWS`, `heightsSum` holds, and `MAX_FOOTER_ROWS` is `MIN_ROWS − HEADER_ROWS − HEADER_RULE_ROWS − RULE_ROWS − ⌊MIN_ROWS / 2⌋ − 1` — three.
+- **T1.48** (I88, §6l.8 row 22): a card `[step, notice]` whose body wraps to three rows at 40 renders row 0 as `  ⎿ ` and rows 1–2 as `  │ ` before the body's text in unicode, `  | ` in ASCII and at `WIDE_CAPS`; `measureEntry` is the same number as before the bar; a body of one row draws no bar.
+- **T1.49** (I89, §6l.8 rows 23–25): a card whose body is three `group` columns each headed by a `step` renders `  ⎿ ` then `├─`, `├─`, `└─` at column `BODY_INDENT` with a `│` on the rows of the first child's body and none under the last; one child renders `⎿` alone; a `step` column at depth 3 renders as text with no gutter; at ASCII the branches are `+-`; `GUTTER_UNIT === BODY_INDENT` by equality.
+- **T1.50** (I90, §6l.8 row 26): `elementsOfEntry` with `command: "/ps --all"` yields a head element whose `copy` is `/ps --all` and body elements whose `copy` is each block's own; `copyElement` over the whole card yields the command first.
 - **T1.43** (§6l.4 E): the default footer is one `pills` row naming `/help` and the snapshot's `cwd` with `$HOME` folded to `~`, gaining `stopping` when the snapshot says so and carrying no key name.
 - **T2.40** (SS56): the source scan finds no hand-composed `kind: "notice"` under `src/` outside the sixteen files the rule excuses by name — two are the family (`documents.ts`, `builders/`), two the kind's declaration and definition, eight below L4 where the family is unreachable (A02), four L4 surfaces **owed** a migration and allowed so SS53 retires each entry when its last literal goes. The rule is imported from the enforcement tool, not restated (C01 T2.10's shape), and its fabricated violation is a notice literal in `src/shell/keys.ts`.
 - **T3.38** (I80, §6k.4 F): **frame read.** At 24 rows with `footerRows: 2` and a footer returning three one-row blocks, rows 22 and 23 carry the first two blocks and the third is on no row; the region is 20 and the prompt is on row 21. With one block, row 23 is blank. And the default — `footerRows` omitted — paints byte-for-byte the frame that `footerRows: 1` paints, which is the frame HEAD painted: the golden claim, asserted here rather than by regenerating anything.
@@ -2606,6 +2651,9 @@ PTY harness.
 - **T6.99** (I82): `compose` taking the footer's height from a constant rather than from `measureSequence` → **T1.40** fails on the 3-row footer; not clamping → **T1.40** fails on the 9-row footer with `heightsSum` false.
 - **T6.100** (I83): `visibleRows` calling `windowSequence` on the whole document rather than through `entryLayout` → **T4.28** fails on the hook and **T4.62** fails on the prefix; the measurer wrapper in `construct.ts` passing `width` for the body → **T4.62** fails on the dropped last cell, while T1.41 and T1.42 still pass — they call the functions, and the wiring is what these two mutations remove.
 - **T6.101** (I83, §6l.2 row 14): drawing the hook for a `step` header with no body → **T1.41**'s second case fails.
+- **T6.107** (I88): `bodyGutter` returning blanks on rows ≠ 0 — the code as it shipped — → **T1.48** fails on rows 1–2; drawing the bar on row 0 as well → T1.48 and **T1.44** both fail on the hook row.
+- **T6.108** (I89): `entryLayout` recursing without a depth bound → **T1.49**'s depth-3 case fails on a gutter that should not be there; `GUTTER_UNIT` set to `OUTLINE_INDENT` → T1.49's equality fails; `corners` threaded from the theme → T1.49's rounded-theme arm draws `╰` where `└` is asserted.
+- **T6.109** (I90): `elementsOfEntry` ignoring `command` → **T1.50** fails, and `y` on a head copies the head's text — the frame as it shipped.
 - **T6.102** (§6l.4 E): the default footer returning `[]` → **T1.43** fails.
 - **T6.103** (I84): the hook's indent set to 0 → **T1.44** fails at the column comparison, and **T4.63** shows the two forms in two columns.
 - **T6.104** (I85): the blank run dropped from `entryLayout` → **T1.45** fails on the count, and **T4.63** shows the entries touching.

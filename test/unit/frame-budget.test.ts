@@ -412,3 +412,15 @@ describe("C22 §6l — the frame's default look", () => {
     expect(paint(f, deps())).toHaveLength(30);
   });
 });
+
+describe("C22 §6l.8 — the gutter carries the call, owed at the spec commit", () => {
+  it.todo(
+    "T1.48 (C22 I88, §6l.8 row 22): a card whose body wraps to three rows at 40 renders row 0 as the hook and rows 1–2 as the bar before the body's text, in unicode, ASCII and at WIDE_CAPS; measureEntry is unchanged; a one-row body draws no bar — not deferred on a component: bodyGutter's bar lands with C3 of the call grammar",
+  );
+  it.todo(
+    "T1.49 (C22 I89, §6l.8 rows 23–25): three step-headed group columns in a body render branch, branch, elbow at BODY_INDENT with a bar past the first child's body and none under the last; one child renders the hook alone; depth 3 is text; ASCII branches are +-; GUTTER_UNIT === BODY_INDENT — not deferred on a component: the recursion lands with C3 of the call grammar",
+  );
+  it.todo(
+    "T1.50 (C22 I90, §6l.8 row 26): elementsOfEntry with a command yields a head element whose copy is the command and body elements whose copy is each block's own; copyElement over the card yields the command first — not deferred on a component: the override lands with C3 of the call grammar",
+  );
+});
