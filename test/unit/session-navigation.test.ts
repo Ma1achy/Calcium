@@ -323,3 +323,240 @@ describe("C26 §4g — the stored location", () => {
     expect(graph.router.target, "the live entry is where the mode lives").toBe("interaction");
   });
 });
+
+/** A three-row table, for rows where *the set* and not its first member is the claim. */
+const table3 = (suffix: string): Record<string, unknown> => ({
+  kind: "table",
+  id: `t${suffix}`,
+  columns: [{ key: "name", label: "Name", align: "left", priority: 10, minWidth: 12, sortable: false }],
+  rows: [
+    { id: `a${suffix}`, cells: { name: { text: `alpha-${suffix}` } } },
+    { id: `b${suffix}`, cells: { name: { text: `beta-${suffix}` } } },
+    { id: `c${suffix}`, cells: { name: { text: `gamma-${suffix}` } } },
+  ],
+});
+
+/** `table3` with one row replaced away — the far side's patch, for the stale-address rows. */
+const without = (suffix: string, drop: string): Record<string, unknown> => {
+  const t = table3(suffix);
+  return { ...t, rows: (t.rows as readonly { id: string }[]).filter((r) => r.id !== drop) };
+};
+
+describe("C26 §5c — select all, and the selection's edges", () => {
+  // Rows indexed by §5c's two artefacts — the classification table's rows c,
+  // d and g and the trace's rows 1 to 4 — not by key coverage. Every row here
+  // reads `killBuffer`, because the selection is painted nowhere (§5c's
+  // finding): `y` is the only reader a test can stand where a reader stands.
+
+  it("T3.46 (C26 I16, §5c): ⌃a from a non-first element selects the whole entry, and y copies every source in order", async () => {
+    const { graph } = await buildGraph();
+    const live = graph.transcript.append(doc("/rows", [table3("1")]) as never);
+
+    // **The control, before the claim** — and from the *second* element, not
+    // the first: a select-all that moved only the head would put the anchor
+    // wherever focus already was, which on the first element is the right
+    // answer for the wrong reason (`assert the set, not its first member`).
+    graph.router.dispatch(press({ name: "down" }));
+    graph.router.dispatch(press({ name: "down" }));
+    graph.router.dispatch(press({ name: "y" }));
+    expect(graph.editor.killBuffer, "one element before select-all").toBe("beta-1");
+
+    graph.router.dispatch(press({ name: "a", ctrl: true }));
+    expect(graph.focus.current, "anchor on the first, head on the last").toEqual({
+      at: "liveBlock",
+      entryId: live,
+      element: addr("c1", "t1"),
+      anchor: addr("a1", "t1"),
+      mode: "navigate",
+    });
+
+    graph.router.dispatch(press({ name: "y" }));
+    expect(graph.editor.killBuffer, "every declared source, in reading order").toBe("alpha-1\nbeta-1\ngamma-1");
+
+    // **Idempotent** (trace row 6): a second ⌃a is the same two addresses.
+    graph.router.dispatch(press({ name: "a", ctrl: true }));
+    expect(graph.focus.current).toMatchObject({ element: addr("c1", "t1"), anchor: addr("a1", "t1") });
+  });
+
+  it("T3.47 (C26 I16, §5c table row d): ⌃a on a one-element entry stores an anchor equal to the head, and y copies the one element", async () => {
+    const { graph } = await buildGraph();
+    const solo = { ...table3("1"), rows: [{ id: "s1", cells: { name: { text: "solo-1" } } }] };
+    const live = graph.transcript.append(doc("/rows", [solo]) as never);
+
+    graph.router.dispatch(press({ name: "down" }));
+    graph.router.dispatch(press({ name: "a", ctrl: true }));
+    // **No branch on the count.** The sentinel is `null`, and an anchor equal
+    // to the head is what a one-element extent looks like — the two are
+    // indistinguishable to every reader, so the effect does not special-case.
+    expect(graph.focus.current).toEqual({
+      at: "liveBlock",
+      entryId: live,
+      element: addr("s1", "t1"),
+      anchor: addr("s1", "t1"),
+      mode: "navigate",
+    });
+    graph.router.dispatch(press({ name: "y" }));
+    expect(graph.editor.killBuffer).toBe("solo-1");
+  });
+
+  it("T3.48 (C26 §5c table row c): ⌃a in a settled entry selects that entry; from the prompt it is the editor's home", async () => {
+    const { graph } = await buildGraph();
+    const settled = graph.transcript.append(doc("/rows", [table("1")]) as never);
+    graph.transcript.append(doc("/rows", [table("2")]) as never);
+
+    // From the prompt the byte is `home`: focus stays out and nothing is copied.
+    graph.editor.setText("abc");
+    graph.router.dispatch(press({ name: "a", ctrl: true }));
+    expect(graph.focus.current, "the prompt's ⌃a is not the transcript's").toEqual({ at: "prompt" });
+    expect(graph.editor.killBuffer).toBe("");
+
+    graph.router.dispatch(press({ name: "down" }));
+    graph.router.dispatch(press({ name: "tab", shift: true }));
+    expect(graph.focusedEntryId(), "in the settled entry").toBe(settled);
+    graph.router.dispatch(press({ name: "a", ctrl: true }));
+    graph.router.dispatch(press({ name: "y" }));
+    // **Liveness is not an input to the copy path**: the list is the focused
+    // entry's, and a settled entry's sources are as copyable as the live one's.
+    expect(graph.editor.killBuffer).toBe("alpha-1\nbeta-1");
+    expect(graph.focus.current).toMatchObject({ entryId: settled, element: addr("b1", "t1"), anchor: addr("a1", "t1") });
+  });
+
+  it("T3.49 (C26 I16, §5c table row g): a motion that stops still collapses — ↓ at the tail, ↑ at a settled entry's first", async () => {
+    const { graph } = await buildGraph();
+    const settled = graph.transcript.append(doc("/rows", [table("1")]) as never);
+    const live = graph.transcript.append(doc("/rows", [table("2")]) as never);
+
+    // ↓ at the tail. Before the ruling `rowDown` returned before `focusRow`,
+    // the selection stood, and `y` after `↓` copied two rows (measured).
+    graph.router.dispatch(press({ name: "down" }));
+    graph.router.dispatch(press({ name: "down", shift: true }));
+    expect(graph.focus.current, "a selection is open, head at the tail").toMatchObject({ anchor: addr("a2", "t2"), element: addr("b2", "t2") });
+    graph.router.dispatch(press({ name: "down" }));
+    expect(graph.focus.current, "stopped, and collapsed").toEqual({
+      at: "liveBlock",
+      entryId: live,
+      element: addr("b2", "t2"),
+      anchor: null,
+      mode: "navigate",
+    });
+    graph.router.dispatch(press({ name: "y" }));
+    expect(graph.editor.killBuffer, "one row, not two").toBe("beta-2");
+
+    // ↑ at a settled entry's first element stops (§4g row b) — and a stop is a
+    // collapse. Built with the anchor *below* the head, so a collapse and a
+    // no-op leave different stores.
+    graph.router.dispatch(press({ name: "tab", shift: true }));
+    graph.router.dispatch(press({ name: "down" }));
+    graph.router.dispatch(press({ name: "up", shift: true }));
+    expect(graph.focus.current, "anchor below the head").toMatchObject({ entryId: settled, anchor: addr("b1", "t1"), element: addr("a1", "t1") });
+    graph.router.dispatch(press({ name: "up" }));
+    expect(graph.focus.current, "still in the settled entry, selection gone").toEqual({
+      at: "liveBlock",
+      entryId: settled,
+      element: addr("a1", "t1"),
+      anchor: null,
+      mode: "navigate",
+    });
+    graph.router.dispatch(press({ name: "y" }));
+    expect(graph.editor.killBuffer).toBe("alpha-1");
+  });
+
+  it("T3.50 (C26 I16, I10, §5c trace rows 2–3): a patch under a selection — a gone middle shrinks, a gone anchor collapses to the head, a gone head falls as focus does", async () => {
+    const select = async (drop: string, ...keys: readonly Parameters<typeof key>[0][]) => {
+      const { graph } = await buildGraph();
+      const id = graph.transcript.append(doc("/rows", [table3("1")]) as never);
+      for (const k of keys) graph.router.dispatch(press(k));
+      const r = graph.transcript.patch(id, { op: "replace", blockId: "t1", block: without("1", drop) } as never, "shell");
+      expect(r.ok, "the fixture responds: the patch applied").toBe(true);
+      graph.router.dispatch(press({ name: "y" }));
+      return graph.editor.killBuffer;
+    };
+    const down = { name: "down" };
+    const sdown = { name: "down", shift: true };
+
+    // Anchor a1, head c1, b1 gone: both ends resolve exactly and the slice is
+    // over the new list.
+    expect(await select("b1", down, sdown, sdown), "shrinks to the survivors").toBe("alpha-1\ngamma-1");
+
+    // **Anchor b1, head c1, b1 gone.** Before the ruling C26 I10's fall took the
+    // stale anchor to the block's first element and `y` copied `alpha-1`, which
+    // was never selected (measured). A stale anchor collapses to the head.
+    expect(await select("b1", down, down, sdown), "the anchor's element went — one element, the head").toBe("gamma-1");
+
+    // Anchor a1, head c1, c1 gone: the head is where focus *is*, and it falls
+    // as C26 I10 says — to the block's first element, which is also the anchor.
+    expect(await select("c1", down, sdown, sdown), "the head fell with focus").toBe("alpha-1");
+  });
+
+  it("T3.51 (C26 §5c trace row 4): copy is not a move — the selection survives y and the next ⇧↓ continues it", async () => {
+    const { graph } = await buildGraph();
+    graph.transcript.append(doc("/rows", [table3("1")]) as never);
+
+    graph.router.dispatch(press({ name: "down" }));
+    graph.router.dispatch(press({ name: "down", shift: true }));
+    graph.router.dispatch(press({ name: "y" }));
+    expect(graph.editor.killBuffer).toBe("alpha-1\nbeta-1");
+    expect(graph.focus.current, "y touched focus nowhere").toMatchObject({ anchor: addr("a1", "t1"), element: addr("b1", "t1") });
+
+    graph.router.dispatch(press({ name: "down", shift: true }));
+    graph.router.dispatch(press({ name: "y" }));
+    expect(graph.editor.killBuffer, "three, continued from the same anchor").toBe("alpha-1\nbeta-1\ngamma-1");
+  });
+
+  it("T3.52 (C26 §5c trace row 1, table row a): the anchor is never another entry's — tab collapses, ⇧↑ at the first stops, ⇧↓ at the last stops", async () => {
+    const { graph } = await buildGraph();
+    const settled = graph.transcript.append(doc("/rows", [table3("1")]) as never);
+    const live = graph.transcript.append(doc("/rows", [table("2")]) as never);
+
+    graph.router.dispatch(press({ name: "down" }));
+    graph.router.dispatch(press({ name: "tab", shift: true }));
+    graph.router.dispatch(press({ name: "down", shift: true }));
+    graph.router.dispatch(press({ name: "down", shift: true }));
+    expect(graph.focus.current, "three selected in the settled entry").toMatchObject({ entryId: settled, anchor: addr("a1", "t1"), element: addr("c1", "t1") });
+
+    // `⇧↓` at the last element of the entry stops rather than extending into
+    // the next entry (table row a): no store call at all.
+    const before = graph.focus.current;
+    graph.router.dispatch(press({ name: "down", shift: true }));
+    expect(graph.focus.current, "the entry's end is the selection's").toBe(before);
+
+    graph.router.dispatch(press({ name: "tab" }));
+    graph.router.dispatch(press({ name: "up", shift: true }));
+    expect(graph.focus.current, "tab collapsed, ⇧↑ at the first stopped").toEqual({
+      at: "liveBlock",
+      entryId: live,
+      element: addr("a2", "t2"),
+      anchor: null,
+      mode: "navigate",
+    });
+    graph.router.dispatch(press({ name: "down", shift: true }));
+    expect(graph.focus.current, "the first extension places the anchor in this entry").toMatchObject({ entryId: live, anchor: addr("a2", "t2"), element: addr("b2", "t2") });
+  });
+
+  // **Owed, and written so it expires on its own** (§5c table row e). After an
+  // eviction both halves fall to the live entry's first element (`y` copies
+  // one), but the first `⇧↓` finds the entry changed and *drops* the anchor
+  // where it should place it on the fallen head. `it.fails` passes while the
+  // defect stands and goes red the day `extendRowDown` repairs the store
+  // before extending — at which point this becomes `it` and `extendRow`'s
+  // entry-changed arm has no caller.
+  it.fails("T3.53 (C26 §5c table row e, owed — extendRowDown/extendRow): the first ⇧↓ after an eviction starts a selection at the fallen head", async () => {
+    const { graph } = await buildGraph();
+    graph.transcript.append(doc("/rows", [table("1")]) as never);
+    const live = graph.transcript.append(doc("/rows", [table3("2")]) as never);
+    graph.focus.enterLiveBlock("evicted", addr("a9", "t9"));
+    graph.focus.extendRow("evicted", addr("b9", "t9"));
+
+    graph.router.dispatch(press({ name: "y" }));
+    expect(graph.editor.killBuffer, "both halves fell to the live entry's first element").toBe("alpha-2");
+
+    graph.router.dispatch(press({ name: "down", shift: true }));
+    expect(graph.focus.current).toEqual({
+      at: "liveBlock",
+      entryId: live,
+      element: addr("b2", "t2"),
+      anchor: addr("a2", "t2"),
+      mode: "navigate",
+    });
+  });
+});

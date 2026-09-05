@@ -882,6 +882,13 @@ switch (mode) {
       }),
     }[farSide];
 
+    const forcedCapabilities = {
+      ...(process.env["FORCE_DEPTH"] === undefined
+        ? {}
+        : { colourDepth: Number(process.env["FORCE_DEPTH"]) }),
+      ...(process.env["FORCE_MOUSE"] === undefined ? {} : { mouse: process.env["FORCE_MOUSE"] === "1" }),
+    };
+
     const tui = createTui({
       name: "prism",
       // `farside.mjs` is spawned as a single argv element, which is why it
@@ -901,9 +908,14 @@ switch (mode) {
       // the only detected route to depth 1 and it also fails C01's gate, so a
       // 1-bit *session* exists only through the override — the same variable
       // the `caps` mode above already reads.
-      ...(process.env["FORCE_DEPTH"] === undefined
-        ? {}
-        : { capabilities: { colourDepth: Number(process.env["FORCE_DEPTH"]) } }),
+      //
+      // **`FORCE_MOUSE` rides the same record** (C16 T5.8, F759). One override
+      // object rather than two spreads, because two spreads of `capabilities`
+      // would each win over the other and a row forcing both would force one.
+      // The override reaches `createTui`, which is the one path the lifecycle
+      // acquires from — forcing it anywhere else forces the renderer and leaves
+      // `1002h` on the wire, which is the shape F759 records.
+      ...(Object.keys(forcedCapabilities).length === 0 ? {} : { capabilities: forcedCapabilities }),
       stateDir: mkdtempSync(join(tmpdir(), "calcium-session-")),
       // **The manifest's two app-local verbs** (C22 I3a). C23 I27 refuses a
       // manifest verb marked `local` with no handler, and this is the route

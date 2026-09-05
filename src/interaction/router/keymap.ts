@@ -317,6 +317,12 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   { target: "liveBlock", key: { name: "up", shift: true }, action: "extendRowUp" },
   { target: "liveBlock", key: { name: "down", shift: true }, action: "extendRowDown" },
   { target: "liveBlock", key: { name: "y" }, action: "copyElement" },
+  // **`⌃a`, free at this target and measured so** (C26 §5c): dispatching it
+  // with focus on a row left the store unchanged before this row existed. At
+  // `prompt` the same byte is `home`, which is why the transcript's select-all
+  // is a different action from the editor's `⌥a`. Wire form `0x01`, the byte
+  // T2.13 already walks for `prompt c+a`.
+  { target: "liveBlock", key: { name: "a", ctrl: true }, action: "selectAllElements" },
 
   // --- copy mode (C16 §5b, entry 15 step 1) --------------------------------
   //
@@ -336,6 +342,9 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // (C26 I14) and a framework binding there shadows one — C16 §5a row A4.
   { target: "prompt", key: { name: "v", meta: true }, action: "enterCopyMode" },
   { target: "liveBlock", key: { name: "v", meta: true }, action: "enterCopyMode" },
+  // The target's own dismissal, as `viewPop` is the view's (C16 §5c). `⌃c` stays
+  // the ladder's; both exist for `pushedView` too, and I24 defends the pair.
+  { target: "copyMode", key: { name: "escape" }, action: "exitCopyMode" },
 
   { target: "global", key: { name: "pageup" }, action: "scrollPageUp" },
   { target: "global", key: { name: "pagedown" }, action: "scrollPageDown" },

@@ -49,8 +49,10 @@ const results = runPass({
     {
       name: "↑ at a settled head leaves to the prompt",
       file: "src/shell/keys.ts",
-      from: "        if (i === null || deps.focusedEntryId() === deps.liveEntryId()) deps.focus.toPrompt();",
-      to: "        deps.focus.toPrompt();",
+      // Re-anchored 2026-09-05 (Lane S): the stop became a block when a stopped
+      // `↑` learnt to collapse (C26 §5c table row g); the mutation is unchanged.
+      from: "        if (i === null || deps.focusedEntryId() === deps.liveEntryId()) {\n          deps.focus.toPrompt();\n          return;\n        }",
+      to: "        deps.focus.toPrompt();\n        return;",
       expect: "T3.40",
     },
     {

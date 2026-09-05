@@ -25,7 +25,7 @@
  */
 
 import { createAdapterRegistry } from "../data/adapters/index.js";
-import { commandRows } from "./paint.js";
+import { blankRowsAbove, commandRows } from "./paint.js";
 import { noticeDoc } from "./documents.js";
 import type { NavElement } from "../presentation/blocks/index.js";
 import { initialRegionHeight } from "./frame.js";
@@ -1447,13 +1447,15 @@ export async function constructGraph(
    * a row past `totalRows` and got `null`, while every store-level row passed.
    * **Found by reading the painted frame and by nothing else** (C16 §4a row l).
    *
-   * The same subtraction `paint.ts` makes, over the same two numbers, and it is
-   * the frame's translation rather than C14's: the viewport does not know how
-   * it is drawn, and making it know would put a composition rule in L2.
+   * **The same function `paint.ts` aligns with**, over the same two numbers —
+   * `blankRowsAbove`, exported for this one reader — and it is the frame's
+   * translation rather than C14's: the viewport does not know how it is drawn,
+   * and making it know would put a composition rule in L2. It was the same
+   * expression written twice, which agrees until one copy changes (F755).
    */
   const entryAtRegionRow = (regionRow: number): Readonly<{ id: EntryId; rowOffset: number }> | null => {
     const { viewportHeight, totalRows } = stores.viewport.scroll;
-    return stores.viewport.entryAtRow(regionRow - Math.max(0, viewportHeight - totalRows));
+    return stores.viewport.entryAtRow(regionRow - blankRowsAbove(viewportHeight, totalRows));
   };
 
   /**
@@ -1689,6 +1691,7 @@ export async function constructGraph(
     focus,
     // The entry half of B1's pair; the exit is already on the `⌃c` rung below.
     enterCopyMode: deps.frame.enterCopyMode,
+    exitCopyMode: deps.frame.exitCopyMode,
     // **One walk, and it is the registry's** (C26 §5, §8b.4). This asked C11
     // directly and tested `block.kind === "table"`, which was one of *three*
     // such walks — the two below and `focusFor` in `session.ts`. Each was a
@@ -1993,6 +1996,18 @@ export async function constructGraph(
     // transcript underneath it. Vacuous only while nothing pushed a view.
     router.register("pushedView", (e) => {
       const effect = bound("pushedView", e);
+      if (effect === null) return false;
+      effect();
+      return true;
+    });
+    // **Copy mode's keys resolve through the keymap too** (C16 §5c, I24). The
+    // router registers its own `copyMode` rung for `⌃c`; this handler is the
+    // target's table row — today exactly one, `Esc → exitCopyMode` — and without
+    // it the row is bound and never consulted: `run("copyMode")` walked the
+    // rung alone, declined, and a lone `Esc` was dropped on a frozen screen
+    // (F765). `pushedView` above has had the same pair all along.
+    router.register("copyMode", (e) => {
+      const effect = bound("copyMode", e);
       if (effect === null) return false;
       effect();
       return true;

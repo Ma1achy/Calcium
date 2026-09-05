@@ -89,6 +89,7 @@ export type KeyDeps = Readonly<{
    * together.
    */
   enterCopyMode: () => void;
+  exitCopyMode: () => void;
   /**
    * The fullscreen patch view (C25 §3b, C22 I41).
    *
@@ -745,7 +746,16 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       // the two differ, and writing the stored one back would leave the store
       // pointing at nothing while the frame highlights the live entry.
       const entry = deps.focusedEntryId();
-      if (next !== undefined && entry !== null) deps.focus.focusRow(entry, addressOf(next));
+      if (entry === null) return;
+      // **A motion that stops still collapses** (C26 I16, §5c table row g). At
+      // the tail there is no next element and there used to be no store call,
+      // so a selection stood through `↓` — while C17's `move` drops its anchor
+      // before it tests the boundary. `⌃a` puts the head at the tail, which
+      // made this the first unshifted key a reader presses to deselect. The
+      // resolved element is written back rather than `current.element`, so a
+      // stale head is repaired by the same keystroke (I10).
+      const target = next ?? elements[i];
+      if (target !== undefined) deps.focus.focusRow(entry, addressOf(target));
     },
     /**
      * **F21's whole subject: the route from a keystroke to `actions.ts`.**
@@ -803,7 +813,17 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
         // way out from every entry — the neighbour rule unchanged, over
         // neighbours that are still asymmetric. `null` — nothing to stand on —
         // leaves regardless, because there is no element to stop at.
-        if (i === null || deps.focusedEntryId() === deps.liveEntryId()) deps.focus.toPrompt();
+        if (i === null || deps.focusedEntryId() === deps.liveEntryId()) {
+          deps.focus.toPrompt();
+          return;
+        }
+        // **Stopped, so collapse** (C26 I16, §5c table row g). A settled
+        // entry's first element is an end, and an end is not a place a
+        // selection outlives an unshifted key — `rowDown`'s tail rule from the
+        // other direction. Leaving, above, is a collapse already.
+        const entry = deps.focusedEntryId();
+        const first = elements[0];
+        if (entry !== null && first !== undefined) deps.focus.focusRow(entry, addressOf(first));
         return;
       }
       const previous = elements[i - 1];
@@ -989,8 +1009,21 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       if (current.at !== "liveBlock") return;
       const head = resolveFocus(current.element, elements);
       if (head === null) return;
-      const anchor = current.anchor === null ? head : resolveFocus(current.anchor, elements);
-      if (anchor === null) return;
+      // **A stale anchor collapses to the head** (C26 I16, §5c trace 3). The
+      // head goes through `resolveFocus` because a stale head is where focus
+      // *is* — it falls as I10 says and is highlighted there. The anchor does
+      // not: I10's fall lands on the block's first element, which widened a
+      // selection to rows the reader never chose (anchor `b1` gone → `a1..c1`
+      // copied, measured). The list is the new one and the anchor's old
+      // position went with it, so an exact match is the only honest answer.
+      const anchorAt = current.anchor;
+      const exact =
+        anchorAt === null
+          ? -1
+          : elements.findIndex(
+              (p) => p.blockId === anchorAt.blockId && p.element.id === anchorAt.elementId,
+            );
+      const anchor = exact === -1 ? head : exact;
 
       const text = elements
         .slice(Math.min(anchor, head), Math.max(anchor, head) + 1)
@@ -1001,12 +1034,38 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       deps.editor.copyText(text);
     },
 
+    /**
+     * `⌃a` — every element the focused entry declares (C26 §5c, I16).
+     *
+     * **Anchor on the first, head on the last, through the two primitives the
+     * arrows use** — `focusRow` then `extendRow` — so there is no third store
+     * write that could disagree with them about what an anchor is, and no
+     * branch on the count: a one-element entry gets an anchor equal to its
+     * head, which every reader treats as `null` (§5c's sentinel measurement).
+     * Per entry and never across one (§5c's ruling): the list is the focused
+     * entry's, so the copy cannot depend on what lies between two entries.
+     *
+     * The first write repairs the entry as every move does (C26 I22), which is
+     * why it is not `extendRow` twice.
+     */
+    selectAllElements: () => {
+      const elements = deps.focusedElements();
+      if (deps.focus.current.at !== "liveBlock") return;
+      const first = elements[0];
+      const last = elements.at(-1);
+      const entry = deps.focusedEntryId();
+      if (first === undefined || last === undefined || entry === null) return;
+      deps.focus.focusRow(entry, addressOf(first));
+      deps.focus.extendRow(entry, addressOf(last));
+    },
+
     // --- copy mode (C16 §5b) -----------------------------------------------
     //
     // **Entry only. The exit is the `⌃c` rung**, which is the ladder's and not
     // this table's — a second way out here would give copy mode an order of its
     // own, which is exactly what makes it a target rather than a mode.
     enterCopyMode: () => void deps.enterCopyMode(),
+    exitCopyMode: () => void deps.exitCopyMode(),
   });
 
   /**

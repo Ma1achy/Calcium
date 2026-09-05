@@ -238,7 +238,7 @@ describe("§6 — the default table (C17 I12)", () => {
     for (const t of TARGETS) {
       expect(bound.has(t), `${t} has no binding — a name in the union and nothing else`).toBe(true);
     }
-    expect(bound.has("copyMode"), "copyMode's only key is the ladder's (§5)").toBe(false);
+    expect(bound.has("copyMode"), "copyMode binds exactly its own dismissal, `Esc` (C16 §5c, I24)").toBe(true);
   });
 
   it("T1.33 (I24): the pushed view's seven keys resolve, and Esc is viewPop", () => {
@@ -369,6 +369,9 @@ describe("§6 — the default table (C17 I12)", () => {
       "liveBlock s+up": ["\u001b[1;2A"],
       "liveBlock s+down": ["\u001b[1;2B"],
       "liveBlock y": ["y"],
+      // `⌃a` is the byte `0x01`, the same one `prompt c+a` walks above — one
+      // byte, two targets, two actions (C26 §5c).
+      "liveBlock c+a": ["\u0001"],
       // **A plain printable, and T2.13 is what said the first choice was not.**
       // The binding was written as a bare key name and this table has no default:
       // a row with no wire form fails, which is how it was found that nobody
@@ -413,6 +416,9 @@ describe("§6 — the default table (C17 I12)", () => {
       "pushedView up": ["\u001b[A", "\u001bOA"],
       "pushedView down": ["\u001b[B", "\u001bOB"],
       "pushedView escape": ["\u001b"],
+      // Copy mode's own dismissal (C16 §5c): the same lone byte, resolved when
+      // `activeTarget` answers `copyMode`.
+      "copyMode escape": ["\u001b"],
 
       // Scrolling (I23). **This is the check the ruling asked for**, and it
       // came out positive: `⌃Home` and `⌃End` reach the decoder in both of the

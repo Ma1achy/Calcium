@@ -11,6 +11,7 @@ import type { TuiConfig } from "../../src/shell/types.js";
 import { createExecutionPipeline } from "../../src/shell/execution.js";
 import { fakeStdin } from "../support/fake-terminal.js";
 import { displayCells } from "../../src/presentation/text.js";
+import { MOUSE } from "../../src/terminal/escapes.js";
 
 /** Two macrotask turns, so an ambient `setTimeout(0)` has run. */
 /**
@@ -979,5 +980,137 @@ describe("C22 — copy mode, entered and left (C16 §5b, C03 §4a)", () => {
     expect(stdout.output.length, "and resume writes the catching-up frame").toBeGreaterThan(
       held.length,
     );
+    // **The length is a proxy and the tracking pair satisfies it.** Measured
+    // 2026-09-05 with `resume()` deleted from the exit: `1002h 1006h` still
+    // arrives, the length grows, and the assertion above passed while the
+    // screen stayed frozen with `COPY` in the header. The frame is the subject,
+    // so the frame is what is read.
+    expect(screen().rows[0], "the catching-up frame took the indicator down").not.toContain("COPY");
+  });
+});
+
+describe("C22 — copy mode: the order inside the exit, and the far side under the hold (C16 §5b, §5c)", () => {
+  // Four microtasks rather than two: a settle runs through C23's continuation
+  // before the store moves, and a row reading `stdout` one tick early would
+  // report "nothing written" for a frame that had not been composed yet.
+  const typer =
+    (stdin: ReturnType<typeof fakeStdin>) =>
+    async (bytes: string): Promise<void> => {
+      stdin.emit(bytes);
+      for (let i = 0; i < 4; i += 1) await Promise.resolve();
+    };
+
+  const count = (haystack: string, needle: string): number => haystack.split(needle).length - 1;
+
+  it("T4.31b (C16 §5b B1, C01 I10): after ⌃c the tracking pair is the first thing written, before any byte of the frame", async () => {
+    const stdin = fakeStdin();
+    const { stdout, screen } = await buildSession({ stdin: stdin as never });
+    const type = typer(stdin);
+
+    await type("\u001bv");
+    expect(screen().rows[0], "in copy mode").toContain("COPY");
+
+    const before = stdout.output.length;
+    await type("\u0003");
+    const after = stdout.output.slice(before);
+
+    // **The control comes first**: a frame did follow the pair. Without it,
+    // "starts with the pair" is satisfied by a session that wrote the pair and
+    // then nothing — which is exactly what dropping `resume()` produces.
+    expect(after.length, "a catching-up frame followed").toBeGreaterThan(MOUSE.enter.length);
+    expect(screen().rows[0], "and it removed the indicator").not.toContain("COPY");
+
+    // The reader has finished selecting; the app takes the mouse back before it
+    // takes the screen. T4.31 asserts both bytes arrived and cannot see which
+    // came first — the swap passes it.
+    expect(
+      after.startsWith(MOUSE.enter),
+      `the first bytes after ⌃c are 1002h 1006h, got ${JSON.stringify(after.slice(0, 48))}`,
+    ).toBe(true);
+  });
+
+  it("T4.32b (C03 I13, C16 §5b B4): a verb settling during copy mode writes nothing; the exit's one frame carries it", async () => {
+    const stdin = fakeStdin();
+    let settle: ((doc: unknown) => void) | null = null;
+    const { stdout, screen } = await buildSession({
+      stdin: stdin as never,
+      manifest: {
+        schema: "tui.manifest/1",
+        binary: "prism",
+        version: "1.0.0",
+        tools: [{ name: "slow", local: true, summary: "settles when told", args: [], flags: [] }],
+      },
+      localHandlers: {
+        slow: () =>
+          new Promise((resolve) => {
+            settle = resolve;
+          }),
+      },
+    } as never);
+    const type = typer(stdin);
+    const TEXT = "SETTLED-UNDER-THE-HOLD";
+
+    await type("/slow\r");
+    expect(settle, "the verb is in flight").not.toBeNull();
+    expect(screen().text.join("\n"), "and has not settled").not.toContain(TEXT);
+
+    await type("\u001bv");
+    expect(screen().rows[0]).toContain("COPY");
+    const held = stdout.output;
+
+    // **The far side is not frozen.** The store moves; the screen does not.
+    settle!({ schema: "tui.view/1", status: "ok", blocks: [{ kind: "raw", id: "r1", text: TEXT }] });
+    for (let i = 0; i < 12; i += 1) await Promise.resolve();
+    expect(stdout.output, "the store moved and nothing reached the terminal").toBe(held);
+    expect(
+      screen().text.join("\n"),
+      "the screen still holds the frame the reader is selecting from",
+    ).not.toContain(TEXT);
+
+    await type("\u0003");
+    expect(stdout.output.length, "one catching-up frame").toBeGreaterThan(held.length);
+    expect(screen().text.join("\n"), "and it carries what settled under the hold").toContain(TEXT);
+  });
+
+  it("T4.32c (C16 §5c C5): ⌥v a second time in copy mode writes nothing — one 1002l, not two", async () => {
+    const stdin = fakeStdin();
+    const { stdout, screen } = await buildSession({ stdin: stdin as never });
+    const type = typer(stdin);
+
+    await type("\u001bv");
+    expect(screen().rows[0]).toContain("COPY");
+    const once = stdout.output;
+    expect(count(once, MOUSE.leave), "the leave pair, once").toBe(1);
+
+    await type("\u001bv");
+    expect(stdout.output, "the second press writes nothing at all").toBe(once);
+  });
+
+  // **RED UNTIL LANE S LANDS THE ROW — and `it.fails` is how it says so.** The
+  // ruling is C16 §5c: `Esc` leaves copy mode. It needs a `copyMode`/`escape`
+  // row in `keymap.ts`, `"exitCopyMode"` in `KeyAction`, and one effect line in
+  // `keys.ts`, none of which this lane owns. The body asserts the *ruling*; the
+  // wrapper asserts that the tree does not yet satisfy it. The day the three
+  // lines land this row goes red, which is the signal to flip it to `it` — a
+  // deferral that expires on the change it waits for, where an `it.todo` would
+  // not (`todo-expiry` is indexed by component, and every component here exists).
+  it("T4.68 (C16 §5c C1): Esc leaves copy mode — the tracking pair is the first bytes written, then the frame", async () => {
+    const stdin = fakeStdin();
+    const { stdout, screen, clock } = await buildSession({ stdin: stdin as never });
+    const type = typer(stdin);
+
+    await type("\u001bv");
+    expect(screen().rows[0]).toContain("COPY");
+    const before = stdout.output.length;
+
+    // A lone `Esc` waits C16 §2's 50 ms to be told apart from a sequence
+    // prefix; the wake is a real timer against the injected clock.
+    stdin.emit("\u001b");
+    clock.advance(80);
+    await new Promise((r) => setTimeout(r, 80));
+    for (let i = 0; i < 4; i += 1) await Promise.resolve();
+
+    expect(stdout.output.slice(before), "tracking back on Esc").toContain(MOUSE.enter);
+    expect(screen().rows[0], "the indicator goes with the mode").not.toContain("COPY");
   });
 });

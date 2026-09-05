@@ -298,6 +298,7 @@ describe("C22 §3 step 11 — the effect table", () => {
       },
       releaseView: () => undefined,
     enterCopyMode: () => undefined,
+    exitCopyMode: () => undefined,
       manifest: null,
       viewport: recordingViewport().viewport,
       anchor: () => ({ row: 10, rows: 1 }),

@@ -268,6 +268,12 @@ export type KeyAction =
   | "extendRowUp"
   | "extendRowDown"
   | "copyElement"
+  // **Every element the focused entry declares** (C26 §5c, I16) — anchor on
+  // the first, head on the last, and never across an entry: the list is the
+  // focused entry's, so the copy cannot depend on what lies between two.
+  // `⌃a` at `liveBlock`; the prompt's `⌃a` is `home` and the editor's
+  // select-all is `⌥a` (`selectAll` above), which is why this is a second name.
+  | "selectAllElements"
   // --- focus (I22) ---------------------------------------------------------
   //
   // `↓` enters through `historyNext`'s second clause rather than an action of
@@ -358,15 +364,19 @@ export type KeyAction =
   | "viewPop"
   // --- copy mode (C16 §5b) -------------------------------------------------
   //
-  // **Entry only. The exit is §5's rung and not an action**, because leaving is
-  // `⌃c` and `⌃c` resolves on the ladder rather than in this table — the same
-  // split every other target has. An `exitCopyMode` row here would be a second
-  // way out with an order of its own, which is what makes copy mode a target
-  // rather than a mode in the first place.
+  // **Entry and exit, and the exit is the target's own dismissal** (C16 §5c,
+  // 2026-09-05). This read *the exit is §5's rung and not an action* for as long
+  // as `⌃c` was the only way out — and measured, `Esc` in copy mode was dropped
+  // silently on a frozen screen. A `copyMode`-target row has no order of its own:
+  // it resolves at the moment `activeTarget` answers `copyMode`, exactly as the
+  // rung does, so I24's objection to a *second mechanism* was true of a `global`
+  // row and not of this one. `⌃c` stays the ladder's; `pushedView` has the same
+  // pair (`viewPop` and the rung).
   //
   // A mode with entry and no exit is B1; a mode with an exit and no entry is
   // the same defect inverted, and just as testable.
-  | "enterCopyMode";
+  | "enterCopyMode"
+  | "exitCopyMode";
 
 export type Binding = Readonly<{
   target: FocusTarget;
