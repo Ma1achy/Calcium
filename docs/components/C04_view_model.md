@@ -575,6 +575,7 @@ is a cell where two rules could both claim it; a row governed by one rule is a r
 | 9 | `align` changed, `minRows` unchanged | R6 × C14 I25 | measure equal; a re-render, not a re-measure |
 | 10 | a `right` child inside a `column` group | R1 × §3a | placed against the group's width; the one axis a column has |
 | 11 | a nested `group` aligned `right` whose child declares no `width` | R3 × C09 I44 (group) | the inner group's `cw` is its cell, so nothing moves at either level |
+| 11a | a nested weighted `row` aligned `right` | R2 × C09 §2c | fills — rendered at its own sum it would re-divide and be a different layout; a fixed-share row is the one that moves |
 | 12 | `right` on a `notice` whose text wraps | R2 × C09 I43 | rendered at the longest wrapped row; every row still fits; height equal by I43 |
 | 13 | `"bottom"` alone, after both axes exist | I100 × T3.22 | legal, horizontal defaults `left`; the old frames are unchanged |
 | 14 | `"right-bottom"` | I100 × validation | refused — vertical first, as the type reads; a typo cannot become a layout |

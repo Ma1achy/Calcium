@@ -337,11 +337,20 @@ a branch returning `w` can.
 than its cell has not changed the row the child was measured for. The kinds that answer keep it by
 construction — a `notice` reports its longest wrapped row, so every row still fits; a `raw` its
 longest line; a `pills` block its widest chip row; a `keyValue` with no bar its key column, gap and
-longest value; a `code` block its gutter and longest line; a `table` its planned columns when none
-flexes; a `column` group the widest child and a `row` group the sum of its placed children's widths
-and gutters; a `panel` two more than its widest child, or its title or footer plus their furniture,
-whichever is wider (I44). A `keyValue` with a bar and a `table` with a flex column fill, because
-the bar and the column absorb the residual and their width is the cell's.
+longest value; a `code` block its longest row; a `table` its planned columns and gaps when none
+flexes, it has rows, no action bar and no expanded row; a `column` group whose children are all
+`left` the widest child, and a `row` group whose shares are all `{cells}` their sum and gutters; a
+`panel` two more than its widest child, or its title or footer plus their furniture, whichever is
+wider (I44). A `keyValue` with a bar and a `table` with a flex column fill, because the bar and the
+column absorb the residual; a `table` with an action bar, an expanded row or no rows fills because
+those rows are clamped to the cell rather than to the columns.
+
+**A container answers only when its layout does not depend on the width it is given** — the
+clause the build added. A weighted `row` rendered at its own sum re-divides that sum, so its
+children land at different allocations and the picture is a different one; a `column` holding a
+`right` child would move that child when the column's cell shrank to the widest one. Both fill.
+A fixed-share `row` and an all-`left` `column` render identically at their content width, which is
+the property I43 guards on the vertical axis and this sentence guards on the horizontal.
 
 The registry's `width(block, w)` clamps whatever a definition returns into `[1, normaliseWidth(w)]`
 and reports a value outside it through `onError` (I8's shape): a definition that answers wider than
@@ -1762,7 +1771,7 @@ next frame. MG27 is what keeps a producer from writing one (`BUILDER_OMISSIONS`)
 - **I41** — **A rail is a glyph drawn on every row of its notice, and it is a property of the token rather than of the block.** `GLYPH_RAIL` sits beside `GLYPH_INDENT` for the same reason: the schema learns nothing, and `measure` still receives no capability. **The geometry cannot move**, because `prefixCells` already subtracts the gutter from every row's width to hang the indent — so a rail fills columns that were reserved and blank, and I1 holds by construction rather than by an argument about it. **The frame is the only instrument that separates a rail from a glyph**: both draw the same rows at the same width with the same reserved columns, and a quotation whose mark appears once and whose remaining rows sit under a blank passes every count. `continuation`'s indent one property along, found the same way (→ C04 I95, C04 I96).
 - **I42** — **A kind may declare `width(block, w)`, the columns its content occupies at `w`, and one that does not fills.** The answer is in `[1, normaliseWidth(w)]` and pure in `(block, width)` as `measure` is (I2); the registry clamps a definition's answer into the range and reports the excursion. Absent is the second answer, not a missing one: a `rule`, a `progress`, a `plot`, an `image`, a `scroll` and a `mosaic` are their width, and the registry answers `normaliseWidth(w)` for them (§2c, → C04 I101).
 - **I43** — **A block is the same height at its content width**: `measure(b, width(b, w)) === measure(b, w)` for every block and width. This is what lets a container render a child at `width(child, cell)` inside a cell measured at `cell` without the row moving, and every declaring kind keeps it by construction — a `notice` answers its longest wrapped row, so no row re-wraps (§2c).
-- **I44** — **The kinds that answer are named, with the case in which each fills.** `notice`, `raw`, `pills`, `keyValue` (no bar), `code`, `table` (no flex column), `group` (a `row` sums its placed children's widths and gutters, a `column` takes the widest), `panel` (its widest child plus the border, or its title or footer plus their furniture). A `keyValue` with a bar and a `table` with a flex column fill because the bar and the column absorb the residual. Every other kind declares no member. The list is the record a reader checks against the registry, and a kind added to one and not the other is the SP-class disagreement between spec and tree (§2c).
+- **I44** — **The kinds that answer are named, with the case in which each fills.** `notice`, `raw`, `pills`, `keyValue` (no bar), `code`, `table` (no flex column, rows present, no action bar, no expanded row), `group` (a `row` whose shares are all `{cells}` sums them and the gutters; a `column` whose children are all `left` takes the widest), `panel` (its widest child plus the border, or its title or footer plus their furniture). A `keyValue` with a bar and a `table` with a flex column fill because the bar and the column absorb the residual; a weighted `row` and a `column` with an aligned child fill because their layout depends on the width — rendered at their own sum they would be a different layout (§2c). Every other kind declares no member. The list is the record a reader checks against the registry, and a kind added to one and not the other is the SP-class disagreement between spec and tree (§2c).
 
 ## 8. Commitments
 
@@ -2051,8 +2060,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 
 - **T3.66** (I1, C04 I89, C04 I90, C10 I31): **the frames** — `"The cat sat on the mat ."` with a value per token at width 12 and at 80 paints one `48;5` background per token at 8-bit and none between them, two rows at 12 and one at 80, and the same document at 4-bit is byte-identical to the unvalued one; `"x(abcde)yz"` at 6 is two rows plain and three valued, and the valued row is the whole token; a `tone: "identifier"` span on a table cell paints the identifier colour on an unfocused row and the accent colour, unbroken, on the focused one; `measure` equals the rendered row count in every case.
 - **T3.67** (I43): over every block in the catalogue's corpus and widths 7…80, `measure(b, width(b, w)) === measure(b, w)` — the property, with the failing block and width in the message.
-- **T3.68** (I42, I44): a `notice` of nine cells answers 9 at 40 and 7 at 7; a `raw` of lines 3, 12 and 5 answers 12; a `pills` row of two chips answers the chips plus the gap; a `keyValue` with a bar answers the cell; a `table` with a flex column answers the cell and one without answers its planned columns and gaps.
-- **T3.69** (I44): a `row` group of a nine-cell `notice` and a twelve-cell `raw` at 40 answers `9 + 1 + 12`; a `column` group of the two answers 12; a `panel` around the column answers 14, and around a title of twenty cells answers 24.
+- **T3.68** (I42, I44): a `notice` of nine cells answers 9 at 40 and 7 at 7; a `raw` of lines 3, 12 and 5 answers 12; a `pills` row of two chips answers the chips plus the gap; a `keyValue` with a bar answers the cell; a `table` with a flex column, or with an action bar, or with no rows answers the cell, and one with none of those answers its planned columns and gaps.
+- **T3.69** (I44): a `row` group of a nine-cell `notice` and a twelve-cell `raw` with shares `{cells: 9}, {cells: 12}` at 40 answers `9 + 1 + 12`, and the same two under weights `1, 1` answers 40; a `column` group of the two answers 12, and with the `raw` aligned `right` answers 40; a `panel` around the column answers 14, and around a title of twenty cells answers 24.
 - **T3.70** (I42): a `row` group at a width that drops its second child answers only the first child's width — the unplaced child is measured by neither half and counted by neither (C04 §3).
 
 ### Tier 4 — integration
