@@ -30,19 +30,19 @@ type change.
 | rank | mechanism | ids keyed | consumers | ⚠ | disposition |
 |---|---|---|---|---|---|
 | **1** | [The consumer cannot reach a fact the framework holds](#1) | 19 | **11 open** | ⚠ C07 · C24 | real Calcium work, with consumers |
-| **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 72 | **5 open** (9 closed) | ⚠ C04 · C23 | real Calcium work · **7 of 13 fixed** — and F165 is the first found by roadmap 48's residue rather than by a consumer reaching for something |
-| **3** | [A block cannot express what the surface needs](#3) | 8 | **4 open** | ⚠ C04 | mixed — two absorbed |
-| **4** | [A change axis distinct from `Tone`](#4) | 4 | **4 open** | ⚠ C04 · C09 · C10 | real Calcium work · needs a ruling |
+| **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 76 | **5 open** (9 closed) | ⚠ C04 · C23 | real Calcium work · **7 of 13 fixed** — and F165 is the first found by roadmap 48's residue rather than by a consumer reaching for something |
+| **3** | [A block cannot express what the surface needs](#3) | 9 | **4 open** | ⚠ C04 | mixed — two absorbed |
+| **4** | [A change axis distinct from `Tone`](#4) | 5 | **4 open** | ⚠ C04 · C09 · C10 | real Calcium work · needs a ruling |
 | **5** | [The far side's shape is not the framework's contract](#5) | 10 | **2 open** | ⚠ C05 | mostly app-side · one shim |
 | **6** | [Rendered from data that has since moved](#6) | 2 | **2 open** | ⚠ C04 | real Calcium work |
-| **7** | [An artefact describes the world rather than being checked against it](#7) | 107 | **20** | — | artefact discipline — **no code**, and F164 is the first found by an instrument's *population* step rather than by a reader; **F210 is the first where the artefact is a component's own spec and the thing it contradicts is a shipped frame**, and **F233 the first where what it contradicts is a *fix*** — four present-tense statements of a repaired defect, in the two components the repair did not touch |
+| **7** | [An artefact describes the world rather than being checked against it](#7) | 112 | **20** | — | artefact discipline — **no code**, and F164 is the first found by an instrument's *population* step rather than by a reader; **F210 is the first where the artefact is a component's own spec and the thing it contradicts is a shipped frame**, and **F233 the first where what it contradicts is a *fix*** — four present-tense statements of a repaired defect, in the two components the repair did not touch |
 | **8** | [Absence indistinguishable from failure](#8) | 28 | **7 open** (7 closed) | partly | real Calcium work · **7 of 10 fixed** — F151 is the class F35 closed in the half an app-side test cannot reach, and **F167 is the class arriving in a *value*: a validator agreeing twice about two different documents** |
-| **9** | [**The instrument was wrong**](#9) | 99 | **17** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
-| **10** | [**A claim carried without a record**](#10) | 66 | **11** | — | **new at F80** · method — six findings disproved, and **F166 unblocked an entry while F168 found what the same row was silent about**; F184 is the first where the unrecorded claim was a *rule* rather than a fact, governing thirty forms from a parameter's doc comment |
-| **11** | [A gate that passes without checking](#11) | 256 | **16** | — | **105 closed · 117 open** of 223 keyed — the heading was out by 66 and this row's count column by 1, which cannot be corrected alone (§11) · four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
+| **9** | [**The instrument was wrong**](#9) | 102 | **17** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
+| **10** | [**A claim carried without a record**](#10) | 67 | **11** | — | **new at F80** · method — six findings disproved, and **F166 unblocked an entry while F168 found what the same row was silent about**; F184 is the first where the unrecorded claim was a *rule* rather than a fact, governing thirty forms from a parameter's doc comment |
+| **11** | [A gate that passes without checking](#11) | 259 | **16** | — | **105 closed · 117 open** of 223 keyed — the heading was out by 66 and this row's count column by 1, which cannot be corrected alone (§11) · four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
 | **12** | [**A time-based assertion under contention**](#12) | 4 | **3** | — | **new at F80** · Calcium's own suite |
-| **13** | [Text the framework emits](#13) | 4 | **4** | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
-| **14** | [A constant, a channel or a rule that outlived its configuration](#14) | 26 | **13 open** | ⚠ C12 | **new at F492** · real Calcium work — every member reads as deliberate, which is why review found none of them |
+| **13** | [Text the framework emits](#13) | 6 | **4** | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
+| **14** | [A constant, a channel or a rule that outlived its configuration](#14) | 28 | **13 open** | ⚠ C12 | **new at F492** · real Calcium work — every member reads as deliberate, which is why review found none of them |
 | — | [Singles](#singles) | 83 | 1 each | — | see each · **F176 is the one to read twice**: the instrument had the evidence in a committed snapshot and the reading step was skipped |
 
 **Four groups are new since F55** — 9, 10, 12, and F81's arrival in 4. Group 9 is the one
@@ -225,6 +225,14 @@ mechanism.
 
 **F779** — C16 I19 promised a §3a route that did not exist and `bound()` dropped a block's unknown action with nobody seeing it; ruled — the union, refused at merge; the brief's own premise and its first instrument were both wrong (78 / 69 / 78)
 
+**F787** — the pending entry had no running indicator at all — step 3 appended `compose({ blocks: [] })` and nothing outside C13 read `.streaming`; now `toolCallDoc` with a `readout` (C23 I54)
+
+**F790** — a queued line ran while still reading *queued behind* — no delete in `ViewPatch`, so the header takes the notice's slot by id and the clock starts at the route
+
+**F802** — a focused `plot` painted nothing in a session for three weeks — `reserving` tested `rowId === null`, `focusFor` writes the element's id; fixed, T1.25 on the session's form
+
+**F804** — `SCROLL_PEEK` guarded a state that cannot occur — a scroll owns block-level elements and only a table row carries a `detail`; closed by measurement, T4.13 pins the premise
+
 <a id="3"></a>
 
 **Keyed here by the F142 inventory sweep** — the second cohort, filed after this document's own count was last derived. Placed by mechanism from the entry; SP6 proves coverage and not placement, which is its stated limit.
@@ -263,6 +271,8 @@ together rather than patching apart.
 
 **F777** — the three-line footer was refused by a constant; ruled a per-session budget with the maximum **derived** from `MIN_ROWS`; roadmap 29 closes; SS56 over 34 sites with 14 owed a migration; the key ladder resolves 14 keys where the prose named three
 
+**F805** — a focused `mosaic` is invisible by C26 §7's own rule — no furniture to carry a tone; ruled, pinned structurally by T1.28
+
 <a id="4"></a>
 ## 4 · A change axis distinct from `Tone` — **4 open** ⚠
 
@@ -296,6 +306,8 @@ and F81 shipped a *word in a column*, which is the same answer reached independe
 surfaces solving it the same way without coordinating is worth more than either.
 
 ---
+
+**F803** — at 1-bit a focused `plot3d` is invisible — its frame carries a `ColourValue` a cell and no weight channel; pinned by T1.27's 1-bit row until the three arms take a `Style`
 
 <a id="5"></a>
 ## 5 · The far side's shape is not the framework's contract — **2 open** ⚠
@@ -551,6 +563,16 @@ answer is a frame-read that cannot be wrong. **Read the ladder before choosing t
 
 **F772** — five owed items — the eviction anchor (the named mutation fails nothing, which is why the arm goes), C17 `collapse()` whose one caller had to be a key effect (T2.14), shift-click, two spec sentences, and two roadmap line citations already wrong at base
 
+**F785** — two owed items closed by ruling: `blockActionRoute` lands with the first widget kind (a route with no producer is a seam nobody crosses); `Composed.activity` is the harness's fifth region and the arc's exclusion. F774's writer stays unnamed, one instance
+
+**F786** — the brief said every pending-entry golden moves; measured 0 of 407 — no golden constructs a pipeline, `●` is a data mark everywhere it occurs
+
+**F791** — the first-draft ordering reason was false — a `"shell"` patch lands on a settled entry; the real reason is persistence writing at the `settle` change, and T4.40 reads the document there
+
+**F797** — the brief's peek premise was the opposite of C16 §4a's first sentence — `takesInput` filters the peek out of `placed`, so a hover passes through as a click does
+
+**F800** — whether any terminal needs 1002 beside 1003 is answered from ctlseqs alone here — one tracking mode per terminal; the emulator measurement is owed under `HOVER_MODE_PAIR`
+
 <a id="8"></a>
 
 **Keyed here by the F142 inventory sweep** — the second cohort, filed after this document's own count was last derived. Placed by mechanism from the entry; SP6 proves coverage and not placement, which is its stated limit.
@@ -804,6 +826,12 @@ says a demo of a plot should have a shape.
 
 **F751** — the spec's own first row called `20` ctrl-click; it is ctrl **and** shift, and the whole-record assertion refused the author
 
+**F788** — the resume record measured from the notice, not the silence — `resumed after 1m` under a `2m` stall, and the notice-family catalogue had pinned the wrong figure
+
+**F794** — a fixture must be shown to respond — `/ps --all` is not in the fixture manifest and the error route read as a missing card
+
+**F799** — a graph-level row cannot see the decoder — folding `3` onto `button3` left T4.72 green (it constructs events) and killed the frame row T4.72c
+
 <a id="10"></a>
 
 **Keyed here by the F142 inventory sweep** — the second cohort, filed after this document's own count was last derived. Placed by mechanism from the entry; SP6 proves coverage and not placement, which is its stated limit.
@@ -969,6 +997,8 @@ authors thought about it, not evidence they got it wrong.* C15 I29 describes tex
 through a menu in as many words — as the reason the implementation writes every cell.
 
 ---
+
+**F801** — session-mouse rows T4.62c–T4.71c were declared in no spec — C16 §10's tier-4 list stopped at T4.68; reconciled by the lead
 
 <a id="11"></a>
 
@@ -1484,6 +1514,12 @@ reads goes through the entry point a user has.
 
 **F784** — two new run files' sentinels vacuous by their own `why`; the harness refused both — F746's class twice more
 
+**F789** — the resumed row dropped its `⎿` hook and changed column — invisible to every store-level assertion, read off the colour frame, caught by N8
+
+**F793** — a survivor at the wiring level — dropping `readouts.delete` in `settled` survived all seven card rows because release also drops it; dies one component down in T3.61
+
+**F806** — CI red for thirteen days on two gates that read gitignored output — PC11's `docs/catalogue/` and RD5's `.refdiff/out/` — green locally on state a clean clone never has; `make catalogue` in CI, references committed, `tsx` pinned
+
 <a id="12"></a>
 
 **Keyed here by the F142 inventory sweep** — the second cohort, filed after this document's own count was last derived. Placed by mechanism from the entry; SP6 proves coverage and not placement, which is its stated limit.
@@ -1565,6 +1601,10 @@ already made — folding it in is cheaper than making a second one.
 
 ---
 
+**F795** — owed with a symbol: `toolCallHeader` renders `ps()` for a bare verb — a grammar decision that touches the agent card too
+
+**F796** — the command row and the header say one thing twice — `❯ /tail web.log` over `⏺ tail(web.log)`; ruled in C23 §3: the far side's call over the user's line
+
 <a id="14"></a>
 ## 14 · A constant, a channel or a rule that outlived its configuration — **24** · new at F492
 
@@ -1623,6 +1663,10 @@ written as one. Every member reads as deliberate, which is why none was found by
 
 ---
 
+
+**F792** — `ToolCallSpec.output` stays unconsumed and the equality arm demanded a third exemption go — `UNCONSUMED_FUNCTIONS.toolCallDoc` expired at its first `src/` call
+
+**F798** — *any input disarms `⌃c`* met *1003 reports every move* — a resting hand would have made the double-`⌃c` exit unreachable; `button: "none"` does not disarm (T3.8d)
 
 <a id="singles"></a>
 

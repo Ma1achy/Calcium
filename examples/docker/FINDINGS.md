@@ -28695,3 +28695,286 @@ one visible is the cell the two gates share; the row constructs it now and the m
 **Where**: `tools/mutate/runs/peek.mjs`, `tools/mutate/runs/refresh-readout.mjs`.
 
 ---
+
+## F785 — two owed items closed by ruling rather than by code: `blockActionRoute` lands with its consumer, and `Composed.activity` is the harness's region, not the framework's ★★☆☆☆
+
+*2026-09-05 · the lead, closing the interaction arc, at 6b11771b+arc6.*
+
+**`blockActionRoute`** (F779): C16 I19 now says a `BlockKeymap` names members of the union and `mergeBlock`
+refuses any other name. The route for a surface-defined open string has one named consumer — the widget
+design's `bind`/`onChange` — and the arc admits no new block kind, so the consumer does not exist in this tree.
+A route with no producer is the seam nobody crosses (F779's own reason; C26 §5's *a second parallel mechanism is
+the defect to avoid*). **Ruled**: it lands with the first widget kind, as one commit with its caller, and not
+before. I19's sentence already says so; this entry is where the decision is written down rather than carried.
+
+**`Composed.activity`** (F777, K's A7): the design's activity region is a **fifth region** of the frame, not a
+footer, and the footer's budget ruling gave it nothing on purpose. It is the agent harness's surface — the
+arc's own exclusion (*not the agent-tui app; that is a consumer and comes after*) — and the frame's four-region
+sum (C22 I34) is the invariant that would have to move for it. **Ruled**: a fifth region is the consumer's
+request when it arrives, with the sum re-derived then; recorded here so the absence is not read as an oversight.
+
+**F774's writer**: `git log --diff-filter=T` shows no prior mode flip on `tools/enforce/index.mjs`; no lane
+script names the file. Unnamed, one instance, restored; the check *mode before and after* stays in the brief
+template for `tools/enforce/` edits.
+
+**Where**: C16 I19; C22 §6k, I34; F774.
+
+---
+
+## F786 — the golden count is zero, and the number is the finding ★★☆☆☆
+*2026-09-05 · Lane P (the pending entry is the running card, C23 I54), at 6b11771b+arc6.*
+
+- **Expected (brief):** every committed frame holding a pending entry changes shape; count the spinner glyphs and `loading…` first.
+- **Measured:** `loading…` occurs in 0 goldens. `●` occurs in 68 terminal-baseline files, `plot-forms.snap` ×36 and `table.snap` ×96 — every one a plot or table data mark, none a running indicator. No file under `test/golden/` and neither baseline tool constructs a pipeline or a `streaming: true` entry. Predicted movers: **0**. `make golden` after the change: **407 passed, 0 moved**.
+- **Where:** `test/golden/`, `tools/terminal-baseline.mjs`, `tools/svg-baseline.mjs`. The brief's premise was a belief with no artefact behind it; twenty seconds of grep settled it before anything was touched.
+
+---
+
+## F787 — the pending entry had no running indicator at all ★★★★☆
+*2026-09-05 · Lane P (the pending entry is the running card, C23 I54), at 6b11771b+arc6.*
+
+- **Expected (C23 §3):** *the command appears in the transcript with a running indicator before the subprocess has started.*
+- **Measured:** step 3 appended `compose({ blocks: [] })`; nothing outside `store.ts`/`cap.ts` reads `.streaming` (the one other reader, `construct.ts:947`, is persistence). The spinner the brief cites at `execution.ts:924` is the *document view's*. A slow verb was the command row and silence.
+- **Where:** `src/shell/execution.ts` step 3 (now `toolCallDoc` + `readout`); C23 §3 *The pending entry is the running card*, I54, commitment 48.
+
+---
+
+## F788 — the resume record measured from the notice, not the silence ★★★☆☆
+*2026-09-05 · Lane P (the pending entry is the running card, C23 I54), at 6b11771b+arc6.*
+
+- **Expected (C23 §3b):** the stall notice is *replaced, on resumption, by a record of the gap* — `resumed after 2m`.
+- **Measured:** `resolveStall` computed `clock − stalledAt`, the time since the notice was *posted*, so a 2m 1s silence read `no output for 2m` and then `resumed after 1m` — two figures in one entry about one gap. Every existing row matched `/resumed after/` without the number, and the notice-family catalogue (`BEFORE.resumed`) had **pinned `resumed after 1m`** — a snapshot recorded the defect through review and commit.
+- **Where:** `src/shell/refresh.ts` `resolveStall` (now `clock − state.last`; `sawPatch` moves `last` after the call so the whole gap is readable); T4.44, T6.84; `test/contract/notice-family.test.ts` BEFORE table corrected.
+
+---
+
+## F789 — the resumed row dropped its hook and changed column (frame read) ★★☆☆☆
+*2026-09-05 · Lane P (the pending entry is the running card, C23 I54), at 6b11771b+arc6.*
+
+- **Expected:** the replacement occupies the same row in the same shape: `  ⎿ resumed after 2m`.
+- **Measured (T4.45, colour frame):** `  ⎿ no output for 2m` was replaced by a flush-left `resumed after 2m` — `b.notice("muted", …, undefined, …)`. Invisible to every store-level assertion; visible only in the rendered bytes, where the notice family caught the fix (N8).
+- **Where:** `src/shell/refresh.ts` `resolveStall` (now passes `"continuation"`); N8 in the family test; mutation M8.
+
+---
+
+## F790 — a queued line ran while still reading *queued behind* (classification table, cell P2) ★★★★☆
+*2026-09-05 · Lane P (the pending entry is the running card, C23 I54), at 6b11771b+arc6.*
+
+- **Expected (roadmap 33):** the queued notice is visible while it waits and the entry becomes the running one when routed.
+- **Measured:** the route used `Settle.into` as its pending id and **nothing replaced the notice**; on the stream route the entry settled reading *queued behind /logs*. The invoke route's `settle(id, doc)` replaced the whole document, which is why it shipped. `ViewPatch` has no delete, so the card's header takes the notice's slot by id, and the readout's clock starts at the route (cell P1: registering at enqueue would count the wait).
+- **Where:** `execution.ts` step 3 `else` arm; C23 §8f P1/P2; T4.41; T6.83; mutation M4.
+
+---
+
+## F791 — my own ordering reason was wrong, and its mutation would have survived ★★★☆☆
+*2026-09-05 · Lane P (the pending entry is the running card, C23 I54), at 6b11771b+arc6.*
+
+- **Expected (first draft of §3, T6.82):** the verdict is written before `settle` *because a settled entry refuses the patch (C13 I13)*.
+- **Measured:** `store.ts:135` — the gate reads *who is writing*; a `"shell"` patch on a settled entry is **accepted**. The real reason is `construct.ts:944`: persistence writes the document on the `settle` change and *`patch` deliberately writes nothing* (C13 §5b.2). A verdict written after the settle is on screen and absent from the record. T4.40's fourth assertion now subscribes and reads the document *at* the settle change; mutation M3 (finish, then annotate) dies only there.
+- **Where:** C23 §3, §3d-bis, §8g row 6, T6.82 — all rewritten with the measured reason.
+
+---
+
+## F792 — `ToolCallSpec.output` stays unconsumed; a third exemption had to go ★★☆☆☆
+*2026-09-05 · Lane P (the pending entry is the running card, C23 I54), at 6b11771b+arc6.*
+
+- **Expected (brief):** remove both `UNCONSUMED_MEMBERS` entries.
+- **Measured:** the shell's card body is the entry's own appended blocks — a `ViewPatch` addresses the document's top level and `scroll.children` is not a patch target — so `toolCallDoc` is consumed and `RefreshDriver.readout` is consumed, but `ToolCallSpec.output` is **not** (its consumer is still the agent example). Its entry stays with the measured reason. `UNCONSUMED_FUNCTIONS.toolCallDoc`, not named in the brief, was the third entry the equality arm refused; removed.
+- **Where:** `tools/enforce/module-graph.mjs` (two removals, one rewritten reason).
+
+---
+
+## F793 — a survivor at the wiring level, killed one component down ★★☆☆☆
+*2026-09-05 · Lane P (the pending entry is the running card, C23 I54), at 6b11771b+arc6.*
+
+- **Mutation:** drop `readouts.delete(id)` from `settled`.
+- **Measured:** survives all seven rows of `running-card.test.ts` — the `settle` change also *releases* the entry host and release drops the readout (`refresh.ts:938`, I33). Two mechanisms, one observable. Dies in T3.61 (driver driven without a transcript settle). Recorded in the run file's header rather than removed.
+
+---
+
+## F794 — a fixture must be shown to respond: `/ps --all` ★☆☆☆☆
+*2026-09-05 · Lane P (the pending entry is the running card, C23 I54), at 6b11771b+arc6.*
+
+- My T4.43 typed `--all`, which the fixture manifest does not declare; the error route's document read as a missing card. `--quiet` is declared. Own error, recorded because it is the README's rule arriving in this lane.
+
+---
+
+## F795 — owed, with a symbol: `ps()` for a bare verb ★☆☆☆☆
+*2026-09-05 · Lane P (the pending entry is the running card, C23 I54), at 6b11771b+arc6.*
+
+- `toolCallHeader` renders `name(args)` unconditionally, so `/ps` reads `⏺ ps()`. Whether the parens drop for empty args is a grammar decision that also touches the agent card (`list_dir()`), so it is not taken here. Symbol: `toolCallHeader` in `src/shell/documents.ts`.
+
+---
+
+## F796 — the command row and the header say one thing twice (ruled, not fixed) ★☆☆☆☆
+*2026-09-05 · Lane P (the pending entry is the running card, C23 I54), at 6b11771b+arc6.*
+
+- `❯ /tail web.log` over `⏺ tail(web.log) · 4s`. Ruled in C23 §3: the header is the far side's call (§18: the tools are the manifest), the command row is the user's line; one composer, one grammar, and the agent transcript is where the two differ.
+
+---
+
+## F797 — the brief's premise about the peek was the opposite of the spec's first sentence ★★☆☆☆
+*2026-09-05 · Lane H (hover as an opt-in, the legend that clicks), at 6b11771b+arc6.*
+
+**Expected** (the brief): *hover over the peek (nothing — `takesInput`)*.
+**Measured**: C16 §4a's first sentence, dated 2026-09-05: *A click on a peek reaches the row beneath it —
+C15's `takesInput` filters `placed` before the hit test, so a tooltip is never a target.* `takesInput`
+removes the peek from `placed`, so it cannot cover; the pointer passes through to the entry beneath.
+**Ruling**: the hover passes through exactly as the click does and aims the plot beneath; the peek is a
+projection of focus and focus did not move, so it stays (C16 §4a classification row z). No new rule; the
+row is there because the brief assumed the opposite. Not tested — C15 I21 holds the mechanism and no
+harness here constructs a peek over a plot.
+**Where**: C16 §4a row z; the brief, item 3.
+
+---
+
+## F798 — the arming machine would have been broken by 1003, and neither walk artefact indexed it ★★★★☆
+*2026-09-05 · Lane H (hover as an opt-in, the legend that clicks), at 6b11771b+arc6.*
+
+**Expected**: a hover changes nothing but the crosshair.
+**Measured**: `observeArming` (router.ts) ends *any other input disarms — a paste is input and a click is
+input*. Under 1003 every pointer cell crossed is an event, so with a hand resting on the mouse the
+double-`⌃c` exit is unreachable: the first `⌃c` arms, the next motion report disarms, the second `⌃c`
+arms again. Found by walking *1003 reports every move* against *any input disarms* — the interaction is
+between the new mode and a rule two components away from the pointer table, which is the shape the
+gesture table cannot see.
+**Ruling**: a `button: "none"` event does not disarm (C16 §4a row t); T3.8d, with the click as its control.
+**Where**: `src/interaction/router/router.ts` `observeArming`; C16 §4a row t.
+
+---
+
+## F799 — a graph-level row cannot see the decoder, and the frame row can ★★★☆☆
+*2026-09-05 · Lane H (hover as an opt-in, the legend that clicks), at 6b11771b+arc6.*
+
+**Measured** during the mutation pass: folding `3` onto `button3` in the decoder kills T1.3r and **T4.72c**
+(SGR bytes through `buildSession`'s real decoder) and leaves **T4.72** green — it constructs `InputEvent`s
+with `button: "none"` and so tests the router against an event the decoder never produced. Both rows are
+kept and the run file says why; the memory note *a test that calls the mechanism misses the wiring* is
+this, one layer down.
+**Where**: `tools/mutate/runs/c01-hover-legend.mjs` header.
+
+---
+
+## F800 — "does any terminal need both 1002 and 1003?" is answerable from ctlseqs only, here ★★☆☆☆
+*2026-09-05 · Lane H (hover as an opt-in, the legend that clicks), at 6b11771b+arc6.*
+
+**Expected** (the brief): measure whether any terminal needs both.
+**Measured**: the container has no emulator (C16 §2 records the same limit for the bit layout). xterm's
+*ctlseqs* describes 9/1000/1002/1003 as values that each select the terminal's one mouse-tracking mode;
+xterm's implementation keeps one `mouse_mode`. On that basis 1003 is taken *in place of* 1002, never
+beside it, and a release of `1002l` after `1003l` would be undoing a mode never entered.
+**Owed** under `HOVER_MODE_PAIR`: an emulator measurement (kitty, WezTerm, Ghostty, iTerm2) that 1003
+alone reports drags *and* rests. C01 §5 records both the claim and its source.
+
+---
+
+## F801 — the C16 session-mouse rows T4.62–T4.71 are declared in no spec ★★☆☆☆
+*2026-09-05 · Lane H (hover as an opt-in, the legend that clicks), at 6b11771b+arc6.*
+
+**Measured**: `grep -rn "T4\.70\b" docs/` returns nothing; C16 §10's tier-4 numbering stops at T4.68, and
+`test/unit/session-mouse.test.ts` carries T4.62–T4.71c. The rows are real and the spec's tier-4 list does not
+know them. Mine (T4.72, T4.72b, T4.72c, T4.73, T4.73b) are declared in C16 §10; the earlier ones are
+not, and nothing in `make enforce` asks.
+**Where**: C16 §10 tier 4; `test/unit/session-mouse.test.ts`. Not fixed — the numbering is the lead's to
+reconcile.
+
+---
+
+## F802 — a focused `plot` paints nothing in a session: `reserving` tests `rowId === null`, `focusFor` writes the element's id ★★★★☆
+*2026-09-05 · Lane Q (scroll peek, 3-D focus, the notice button), at 6b11771b+arc6.*
+
+**Expected.** C26 §7 and C12 §3al: a focused plot draws its frame in `accent` — 164 cells at 80
+columns, measured; T1.25 and the catalogue's scenes hold it.
+
+**Measured.** `buildSession`, a `line` plot with `camera: {}`, `↓` from the prompt. Focus landed
+(`focus.current.element = { blockId: "p", elementId: "p" }`, the graph harness confirms). Every `─`
+of the lid stayed `38;5;241` — 143 cells, muted before and after; the session's `accent` at 256
+colours is `38;5;216` and no cell carried it.
+
+**Where.** `src/shell/session.ts` `focusFor`: `head = { blockId, rowId: ext.head.element.id }` — for a
+plot the element's id is the block's (`plot/definition.ts` `elements()`). `src/presentation/plot/
+definition.ts` `reserving`: `focus.rowId === null`. T1.25 (`render-focus.test.ts`) and
+`tools/interaction-catalogue.mjs` pass `rowId: null`, a state no session produces — C26 §7 already
+says so of `table-block-focus` and nobody read it across to the plot. **A test that calls the
+mechanism misses the wiring**, in the exact shape the memory names.
+
+**Not fixed here** — `definition.ts` is unowned by any lane. The two block-level kinds Lane Q landed
+(`plot3d`, `notice`) test for `rowId === block.id`, the session's form, and their rows carry a
+`rowId: null` control that asserts *nothing* paints — so a fix that harmonises on `null` instead
+flips two rows and says why. Owed: `reserving` → `focus.rowId === block.id`, T1.25 and the catalogue
+scenes updated to the session's form, and a session-level frame row (there is none today for a
+focused plot; `orbit-wiring.test.ts` reads render counts, not ink). Symbol: `reserving`.
+
+**Fixed in the lead tail, the same round.** `reserving` tests `focus.rowId === block.id`; T1.25 constructs the session's form and holds `rowId: null` as a control that paints nothing; C26 §7's paragraph is marked landed. The catalogue has no plot-focus scene, so nothing there moved. A session-level frame row for a focused plot is still the one thing owed — `orbit-wiring.test.ts` counts renders and reads no ink.
+
+---
+
+## F803 — at 1-bit a focused `plot3d` is invisible: its frame carries a colour and no weight ★★☆☆☆
+*2026-09-05 · Lane Q (scroll peek, 3-D focus, the notice button), at 6b11771b+arc6.*
+
+**Expected.** F34's rule — `accent`'s mono class is bold, `muted`'s is dim — so a focused frame goes
+`2m` → `1m`, as the 2-D frame and the scroll's residue row do.
+
+**Measured.** `renderToLines` at `colourDepth: 1`, focused vs not: byte-identical. The premise: no
+glyph of the unfocused 1-bit 3-D frame carries attr `2` at all (control: the 2-D frame at the same
+depth has >100 dim glyphs). `scatter3.ts` carries a `ColourValue` a cell (`slot(...).colour`), which
+is `undefined` at 1-bit for `muted` and `accent` alike — there is nothing for focus to make bold.
+
+**Where.** `scatter3.ts` `frameInk`/`lineInk`, `frameInkAt`, and the three compose arms
+(`glyphRows`, `brailleRows`, `mixedRows`) which take an ink and not a `Style`. Pinned by T1.27's
+1-bit row; goes red the day the 3-D frame gains a weight channel. Not built: a `Style` channel
+through the three arms is a larger cut than a focus tone warrants on its own.
+
+---
+
+## F804 — `SCROLL_PEEK` guarded a state that cannot occur ★★★☆☆
+*2026-09-05 · Lane Q (scroll peek, 3-D focus, the notice button), at 6b11771b+arc6.*
+
+**Expected (the brief).** A table inside a `scroll`, a cut row focused and visible in the box — no
+peek today, a translation owed.
+
+**Measured.** `elementsIn` over `scroll[ table(cut a, b, cut c) ]` at 100 columns: one element,
+`s/t/block`, `detail` undefined; the table alone answers `a` and `c` with details. A scroll owns its
+elements (C26 §4b cell 3, C09 I30, `elementsIn`'s `own.owned`), so a row inside a box is not a focus
+target, and only a table **row** declares a `detail` (`table/definition.ts` `rowDetail` — the only
+`detail:` writer in `src/presentation`). `peekWanted`'s `detail === undefined` test already returned
+`null` for every element a box declares; the `kind === "scroll"` guard after it was unreachable.
+
+**Where.** `construct.ts` `peekWanted` — guard removed, comment rewritten; C15's walk table gains the
+row; `peek.test.ts` T4.13 pins the premise with a control and goes red the day a scroll's element
+gains a `detail` (mutation `SCROLL-DETAIL` kills exactly it). **A deferral whose condition nothing
+watched**, closed by measuring the condition rather than building the remedy.
+
+---
+
+## F805 — a `mosaic` has no furniture, so a focused mosaic is invisible by C26 §7's own rule ★★☆☆☆
+*2026-09-05 · Lane Q (scroll peek, 3-D focus, the notice button), at 6b11771b+arc6.*
+
+**Measured.** `ab/cd` of four notices at 60 columns: `A` at column 0, `B` at column 30, no gap, no
+rail, no border; every non-blank cell lies inside a child's `mosaicRects` rectangle; focused
+(`m/b`, `m/d`) vs not — 0 rows differ. Ruled in C26 §7 and pinned from both sides by T1.28 (byte-
+identical **and** nothing outside the rects, with a forged-cell control on the detector).
+
+---
+
+## F806 — CI red for thirteen days on two gates that read gitignored output, and nobody read the red ★★★☆☆
+*2026-09-05 · the lead, on the user's report that the PR's pipeline was red, at 6b11771b+arc6.*
+
+**Reported by the user, not by any instrument**: *the ci pipeline on the pr has failures that need fixing.* Every push on `feat/plot-arm-unification` — twelve runs from 2026-09-04 14:17 to 2026-09-05 04:51 — and `main` itself since `097a6c39` on 2026-08-23 failed the `fast` job at `make instruments`, on the same two rows each time:
+
+| row | what it read | on the runner |
+|---|---|---|
+| PC11 (F227), `plot-catalogue.test.ts:636` | `readdirSync(docs/catalogue, {recursive})` | `ENOENT: scandir docs/catalogue` — the directory is gitignored |
+| RD5, `refdiff.test.ts:152` | `referenceRows(form)` from `.refdiff/out/` | 36 forms *with neither a reference nor a recorded reason* — the work directory is gitignored |
+
+**Both were green on every developer machine**, where `docs/catalogue/` had been generated by hand at some point and `.refdiff/` had been filled by `make refdiff` once. Neither gate says so: a sweep over a directory that happens to exist reports the same green as one over a directory the target made. This is `make check`'s own rule — *a gate that reads a generated artefact has to generate it* (F447) — one target along, and it is [[a-gate-that-exists-and-is-not-run]] in a new form: the gate ran, on state a clean clone never has.
+
+**The two halves wanted different remedies, and the difference is what kind of file each reads.** `docs/catalogue/` is *output* — ours, regenerable from source in seconds — so it gets a `catalogue` target that CI runs before `instruments` and `all` runs in the same place: `plot-catalogue`, `status-proof`, `interaction-catalogue`, the three sources PC11's own comment names. `.refdiff/out/` is a *reference* — matplotlib's frames from a second container CI does not have — so it is a record, and a record is committed: `docs/refdiff/reference/*.txt`, 31 files, 80 KB, refreshed by `make refdiff` with stale ones cleared (F275's rule), and `referenceRows` reads only that copy. Fabricated violation: the directory moved aside, RD5 reports 38 missing against 8 recorded; restored, 30 of 48 rows compared as before.
+
+**And the loader was never a dependency.** Every generator imports `../src/*.js` and runs under `tsx`, named in ten tool headers and the Makefile's `refdiff` target as `npx tsx` — whatever version `npx` had cached, 4.23.13 in the container, a fresh download on a runner. A target CI runs cannot rest on a tool no lockfile names, so `tsx` 4.23.13 is pinned as a devDependency with its row: three packages, about 11 MB, a second `esbuild` beside `vite`'s.
+
+**Where the instruments were pointed.** Seven gates, `make all` per target, exits read directly, counters read — and the runner's status was read by nobody for twelve pushes. The push line gates on the *local* chain's exit; nothing in the close-out reads `gh pr checks`. That is the residue: the local gate and the enforced one are meant to be the same targets (A04 §5, the Makefile's first line), and for thirteen days they were not, because one of them had a directory the other did not.
+
+`make catalogue` measured at 36 s in the container — 2 440 plot frames, the status set, 120 interaction files.
+
+---
