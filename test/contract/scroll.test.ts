@@ -494,3 +494,9 @@ describe("C04 §3c cell 5 — refused at parse", () => {
     ).toBe(true);
   });
 });
+
+describe("C04 §3c — the residue row's two texts, owed at the spec commit", () => {
+  it.todo(
+    "T2.113 (C04 I104): a collapsed scroll of 392 children renders exactly `⋯ +392 more` (`~ +392 more` in ASCII) at 80 and 20; expanded and paged to its middle it renders `⋯ N above, M below` with N + M + interior === 392; neither row contains ⏎ or the word expand — not deferred on a component: the text lands with C2 of the call grammar",
+  );
+});

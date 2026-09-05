@@ -155,3 +155,9 @@ describe("C10 §4e — span attributes at one bit", () => {
     expect(sgr(muted)).toBe("\x1b[1;2m");
   });
 });
+
+describe("C04 §3am.1 — `elide`, owed at the spec commit", () => {
+  it.todo(
+    "T2.114 (C04 I105): TEXT_SPAN_KEYS has eight members and admits elide; an info notice with an elide span measures and renders identically to the block without it at every width; on a step notice the marked run ends in the marker at a width that cannot hold the row and the runs outside it are byte-identical — not deferred on a component: the fitter lands with C2 of the call grammar",
+  );
+});
