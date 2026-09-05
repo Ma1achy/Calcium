@@ -81,12 +81,14 @@ enforce:            ## A03 — module graph, source scans, supply chain
 # names as the sources of what it sweeps: the plot frames, `status/`, and
 # `interaction/`, where the `7m` it exists to watch for first appeared. **36 s**
 # in the container (F806) — 2 440 plot frames, the status set, 120 interaction files.
-catalogue:          ## the frames `instruments` sweeps — generated, gitignored, so made here
+catalogue:          ## the frames `instruments` and `test` sweep — generated, gitignored, so made here
 	npx tsx tools/plot-catalogue.mjs
 	npx tsx tools/status-proof.mjs
 	npx tsx tools/interaction-catalogue.mjs
 
-instruments:        ## every instrument's own fixture, and the inventory by equality (group 9)
+# **A prerequisite, not a step in `all`** — the degraded jobs run `make test` alone
+# and PC11 lives in the suite too, so the dependency has to travel with the target.
+instruments: catalogue  ## every instrument's own fixture, and the inventory by equality (group 9)
 	node tools/instruments.mjs
 
 roadmap:            ## the Order column's claims, resolved against the tree
@@ -103,7 +105,7 @@ regime:             ## what a source-scan pass costs *here*, beside the recorded
 	@# would teach people to re-run gates, which is the opposite of the point.
 	node tools/scan-cost.mjs
 
-test:               ## tiers 1-4, and the examples' own suites
+test: catalogue               ## tiers 1-4, and the examples' own suites
 	npm run test
 	@# **The example suites were in no target at all** — `make check` type-checks
 	@# them and nothing ran them, so `examples/docker`'s 313 rows could go red
@@ -133,7 +135,10 @@ proof:              ## pack, install the tarball clean, run the example against 
 # group 9's remedy: eleven fixtures nobody runs is the fifth class in
 # `examples/docker/VERIFYING.md` — a gate nobody reports — arriving in the gate
 # built to answer it. It costs about ten seconds.
-all: check enforce audit catalogue instruments test golden e2e
+# **`proof` is in here now** (F807). It was CI-only in practice — the first instance the
+# gate-not-run note records — and it was red on an npm crash for as long as the fast job
+# hid it; the local chain never ran it. About a minute.
+all: check enforce audit instruments test golden e2e proof
 
 clean:
 	rm -rf dist node_modules

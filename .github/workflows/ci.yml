@@ -33,8 +33,7 @@ jobs:
       # **And two of those fixtures read `docs/catalogue/`, which is gitignored.**
       # This job failed on it from 2026-08-23 until the target below existed —
       # green locally on a directory a clean clone never has. The Makefile row
-      # carries the account.
-      - run: make catalogue
+      # carries the account; `catalogue` is a prerequisite of `instruments` and `test`.
       - run: make instruments
 
       - run: make audit
