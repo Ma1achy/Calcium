@@ -146,7 +146,26 @@ export type StoredFocus =
 export type InputEvent =
   | Readonly<{ kind: "key"; key: Key }>
   | Readonly<{ kind: "paste"; text: string }>
-  | Readonly<{ kind: "mouse"; row: number; col: number; button: string; press: boolean }>;
+  | Readonly<{
+      kind: "mouse";
+      /** 0-based terminal row and column. */
+      row: number;
+      col: number;
+      /**
+       * SGR 1006's `Cb` bits 0–1, 6 and 7 (C16 §2's table, I30). `button0`–`2`
+       * are the three buttons, `button8`–`11` the 128-range, and the wheel's
+       * four directions are named because bits 0–1 select them.
+       */
+      button: `button${number}` | "wheelUp" | "wheelDown" | "wheelLeft" | "wheelRight";
+      /** The final byte: `M` is a press or a motion report, `m` the release. */
+      press: boolean;
+      /** Bits 4, 8 and 16 — carried, never interpreted here (I30). */
+      shift: boolean;
+      meta: boolean;
+      ctrl: boolean;
+      /** Bit 32 — a mode-1002 drag report; `press: true, motion: true` is not a second click. */
+      motion: boolean;
+    }>;
 
 /**
  * A binding, declaratively (C16 §6).

@@ -144,6 +144,13 @@ function key(
  * bindings. In a paste it is content that would move the cursor or change the
  * colour of everything after it.
  */
+/**
+ * The wheel's four directions, indexed by `Cb & 3` when bit 64 is set (§2's
+ * table): xterm reports a horizontal wheel as buttons 6 and 7, which is 64 + 2
+ * and 64 + 3. Order is the wire encoding, not a preference.
+ */
+const WHEEL_DIRECTIONS = ["wheelUp", "wheelDown", "wheelLeft", "wheelRight"] as const;
+
 function stripControls(text: string): string {
   // eslint-disable-next-line no-control-regex
   return text.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "");
@@ -418,7 +425,19 @@ export function createDecoder(options: DecoderOptions): Decoder {
     return consumed;
   }
 
-  /** SGR mouse: `CSI < b ; x ; y M|m`. Dropped entirely when the capability is absent (I3, T3.12). */
+  /**
+   * SGR mouse: `CSI < Cb ; x ; y M|m`. Dropped entirely when the capability is
+   * absent (I3, T3.12).
+   *
+   * **`Cb` is a bit field and every bit is carried** (§2's table, I30). Bits 0–1
+   * are the button, 4/8/16 the modifiers, 32 a mode-1002 motion report, 64 the
+   * wheel with bits 0–1 selecting its four directions, 128 buttons 8–11. The
+   * line this replaces was `code >= 64 ? (code === 64 ? "wheelUp" : "wheelDown")
+   * : \`button${code & 3}\`` — two bits read of eight, so ctrl-wheel-up (80)
+   * scrolled down, shift-click was click and a drag was a stream of presses
+   * (T1.3k–T1.3n). Nothing here interprets a bit: what a modified click does is
+   * §4's and the keymap's.
+   */
   function mouse(body: string, final: string, consumed: number, out: InputEvent[]): number {
     if (!capabilities.mouse) return consumed;
 
@@ -426,7 +445,13 @@ export function createDecoder(options: DecoderOptions): Decoder {
     const code = Number(b);
     if (!Number.isFinite(code)) return consumed;
 
-    const button = code >= 64 ? (code === 64 ? "wheelUp" : "wheelDown") : `button${code & 3}`;
+    const low = code & 3;
+    const button =
+      (code & 64) !== 0
+        ? WHEEL_DIRECTIONS[low as 0 | 1 | 2 | 3]
+        : (code & 128) !== 0
+          ? (`button${8 + low}` as const)
+          : (`button${low}` as const);
     out.push(
       Object.freeze({
         kind: "mouse",
@@ -434,6 +459,10 @@ export function createDecoder(options: DecoderOptions): Decoder {
         col: Math.max(0, Number(x) - 1),
         button,
         press: final === "M",
+        shift: (code & 4) !== 0,
+        meta: (code & 8) !== 0,
+        ctrl: (code & 16) !== 0,
+        motion: (code & 32) !== 0,
       }),
     );
     return consumed;

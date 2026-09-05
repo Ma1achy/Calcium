@@ -17,12 +17,20 @@ const key = (name: string, mods: Partial<Key> = {}): InputEvent => ({
   key: { name, ctrl: false, meta: false, shift: false, sequence: name, ...mods },
 });
 const ctrlC = key("c", { ctrl: true });
-const click = (row: number, col = 0, button = "button0"): InputEvent => ({
+const click = (
+  row: number,
+  col = 0,
+  button: Extract<InputEvent, { kind: "mouse" }>["button"] = "button0",
+): InputEvent => ({
   kind: "mouse",
   row,
   col,
   button,
   press: true,
+  shift: false,
+  meta: false,
+  ctrl: false,
+  motion: false,
 });
 
 /** A `Placed` box, for the rows that ask whether a layer covers the region. */
