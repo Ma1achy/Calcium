@@ -205,6 +205,32 @@ row, and the transcript rows the peek does not cover against the same frame with
 
 That is the payoff of the block vocabulary being a vocabulary rather than a rendering of one particular thing, and it is worth defending: a component that reaches for raw React to draw an overlay has stepped outside theming and measurement at once.
 
+### 2b. Approval is a layer, and a subagent's transcript is a view
+
+**A call that needs a decision does not draw the decision in its own gutter** (`AGENT_TUI_DESIGN.md`
+§9e §8). It goes to the overlay — the surface that already carries questions, image previews and
+pasted content — because the reader is being *asked*, not shown: a body is read at the reader's
+pace and a decision is something the session is stopped on. **One surface for a reason**: a
+question, an approval, a paste to confirm and an image to look at are the same interruption with
+different content, and an inline approval would make one of the four special for no reason a
+reader can see.
+
+**What the layer carries, and none of it is new** (I24): the invocation in the head's own words,
+the consequence as a `warn` line if the caller supplied one, and the choices as the confirm host's
+own three-column table — same navigation, same selection, same dismissal — so `always allow rm` is
+a row like any other and not a checkbox. C23's `approvalPrompt` composes it; this component places
+it. It is an `overlay` and not a peek: it must be answered, so it takes the keys (C16 I25), and the
+call's head reads `⬤ rm -rf build/ · ⠋ waiting` beneath it so a transcript scrolled away from the
+layer still shows what is happening (C23 I60). On resolve the layer pops, the head updates, and a
+denied call keeps its head reading `denied`.
+
+**A subagent's transcript is a different document, not a longer block**, so `⏎` on a subagent's
+head pushes a `view` — the mechanism an attached terminal would use, for the same reason — and
+never expands in place. Ruled here and **deferred**: nothing in `src/` produces a subagent, and the
+far side's transcript type does not exist. The two-level nesting rule (C22 I89) is what this
+deferral protects; a transcript of transcripts is a composition problem wearing a rendering
+problem's clothes.
+
 ---
 
 ## 3. Stack rules
@@ -371,6 +397,7 @@ Pushing a view while overlays exist is rejected rather than reordered: it means 
 - **I21** — **A `peek` is never `top`.** `top` is the topmost layer of kind `overlay` or `view`, typed `KeyedLayer`; `pop()` reads it and so never removes a peek, and C16's `activeTarget` is unchanged by any number of peeks on the stack. A peek is removed only by its owner (`dismiss`, or the disposable).
 - **I22** — **A `peek` is anchored**, and `push` and `update` refuse a centred or `fill` one. Its meaning is *beside the thing it describes*; the other two placements are a confirm's and a view's.
 - **I23** — Every `overlay` sorts above every `peek`, and every `peek` above every `view`, regardless of push order. I2 is this invariant's `overlay`/`view` half.
+- **I24** — **A call's approval is an `overlay` of the confirm host's shape — the invocation, an optional consequence line, and the choices as the host's own table — composed by C23 and placed here; it takes the keys as every confirm does, and a subagent's transcript opens as a `view` and never as an expansion** (§2b, → C23 I60, C26 I23).
 
 ---
 
@@ -398,6 +425,7 @@ Pushing a view while overlays exist is rejected rather than reordered: it means 
 20. A peek is a third kind and never `top`, so it takes no keys, is never popped and leaves C16's ladder untouched (I21).
 21. A peek is anchored, and both entry points refuse one that is not (I22).
 22. Overlays sort above peeks, peeks above views (I23, I2).
+23. Approval is the confirm layer with a call's content, and a subagent is a pushed view (I24).
 
 ---
 
@@ -430,6 +458,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T1.13** (I14): `LayerUpdate` has no `dismissable` — a compile-level test rejects `update(id, { dismissable: true })`, which is the only form the restriction can take.
 - **T1.14** (I16): a layer declaring `width: 40` in a 120-cell region → `Placed.width` 40, and its content was measured at 40, not 120. The height differs from the region-width measurement, which is the point.
 - **T1.15** (I16, I6): a `centred` layer of width 40 in a 120-cell region → `left` 40. Odd remainders round down, deterministically (T3.12).
+- **T1.27** (I24, §2b): `approvalPrompt`'s options pushed through the confirm host produce a layer of kind `overlay` whose blocks are the invocation notice, the `warn` consequence when supplied and none when not, and the host's 3-column choice table with `always allow` as an ordinary row; `activeTarget` answers `overlay` while it is up; resolving *deny* pops it and the entry beneath reads `denied`.
 
 ### Tier 2 — contract / interface
 
@@ -519,6 +548,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.20** (I22): dropping the placement check for peeks → T1.26 fails, and a `fill` peek covers the region with nothing to answer it.
 - **T6.21** (§2a): the emitter not reconciling on the next focus move → T4.11's second row fails, and the detail of row `a` sits beside row `b`.
 - **T6.17** (I20): moving the width check into `confirm.ts` — where it lived as a comment — → T1.21 and T1.22 both fail. **The revert that reads as a tidy-up**: the comment was correct, was written after the defect, and constrained exactly one caller. The second centred layer in the tree (`clearConfirmLayer`, C20) declares no width at all.
+- **T6.22** (I24): the approval pushed as a `peek` → T1.27's `activeTarget` assertion fails and `⏎` reaches the transcript instead of the choice; the consequence line drawn when none was supplied → T1.27's block count fails.
 
 ---
 

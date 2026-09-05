@@ -49,8 +49,8 @@ The design is `planned` as a whole, and what follows is which of its *framework*
 
 | what | verdict | measurement | disposition |
 |---|---|---|---|
-| `⏺` step marker (`:524`, `:527-531`) | ABSENT | zero hits for `⏺` in `src/` and `test/`; `GLYPH_TABLE` (`src/presentation/blocks/glyphs.ts:790-813`) has 14 slots and none is a step; `running: ["●","*"]` is a homonym | planned — two glyph slots ≈10 lines, but the rendering that uses them is the app's |
-| `⏺ → *` ASCII pair (`:539`) | ABSENT | same grep | planned, with the slot |
+| `⬤` step marker (`:524`, `:527-531`) | ABSENT | zero hits for `⬤` in `src/` and `test/`; `GLYPH_TABLE` (`src/presentation/blocks/glyphs.ts:790-813`) has 14 slots and none is a step; `running: ["●","*"]` is a homonym | planned — two glyph slots ≈10 lines, but the rendering that uses them is the app's |
+| `⬤ → *` ASCII pair (`:539`) | ABSENT | same grep | planned, with the slot |
 | `⎿` continuation (`:524`, `:545`) | BUILT | `glyphs.ts:812 continuation: ["⎿","`"]`; `prefixCells` in `kinds/simple.ts`; `test/contract/continuation.test.ts` | — |
 | `▸`/`▾` collapse pair (`:541`) | BUILT | `glyphs.ts:807-808 expand/collapse`; the `expand` action `types.ts:196,236`, dispatched `shell/actions.ts` | — |
 | `⟩` open question (`:530`, `:543`) | ABSENT | no slot; the confirm draws `glyph: "warn"` (`shell/confirm.ts:193`) | planned |

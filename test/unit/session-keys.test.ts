@@ -1086,3 +1086,9 @@ describe("C26 §5c — the transcript's selection and semantic copy", () => {
     expect(focus.current.at, "still in the block").toBe("liveBlock");
   });
 });
+
+describe("C26 §5c — the call's head under ⏎ and y, owed at the spec commit", () => {
+  it.todo(
+    "T1.47 (C26 I23, §5c h1–h4): ⏎ on a running card's head toggles the body scroll's collapsed and submits nothing, twice; y on the head yields the command and ⌃a y yields the command then the body's sources; ⇧⏎ is refused while running and re-runs once settled — not deferred on a component: the head element lands with C2–C4 of the call grammar",
+  );
+});

@@ -269,7 +269,7 @@ bindings are declarative and the fields are rendering fields.**
 ```
 ❯ show me how learning rate affects the loss curve
 
-⏺ Here are three runs at different rates. Drag the slider to compare.
+⬤ Here are three runs at different rates. Drag the slider to compare.
 
   ⎿  loss
      │ ╭─╮

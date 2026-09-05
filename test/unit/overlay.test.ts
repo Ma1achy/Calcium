@@ -290,3 +290,9 @@ describe("C15 unit — one layer's geometry", () => {
     expect(m.top?.placement).toEqual({ kind: "centred" });
   });
 });
+
+describe("C15 §2b — approval is a layer, owed at the spec commit", () => {
+  it.todo(
+    "T1.27 (C15 I24, §2b): approvalPrompt's options through the confirm host produce an overlay whose blocks are the invocation notice, the warn consequence when supplied and none when not, and the host's 3-column choice table with always allow as an ordinary row; activeTarget answers overlay; deny pops it and the entry reads denied — not deferred on a component: approvalPrompt lands with C4 of the call grammar",
+  );
+});

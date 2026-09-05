@@ -119,7 +119,7 @@ the call has no progress and the drop is instant.
 ```
 ❯ /compact
 
-⏺ summarising 8 turns                              4s · 1.2k tok
+⬤ summarising 8 turns                              4s · 1.2k tok
   ⎿ ▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐▐░░░░░░  62%  31k/50k
     ▐▐▐▐▐▐░░░░░░░░░░░░░░░░░░  19%   9k/50k     ← after
     8 turns → 1 summary · 22k freed

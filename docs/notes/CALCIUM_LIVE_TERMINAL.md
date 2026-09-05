@@ -6,9 +6,9 @@ lists and its shape is decided by one question that has a measurable answer.
 ```
 ❯ can you run the unit tests please?
 
-⏺ Sure, let me run the unit tests.
+⬤ Sure, let me run the unit tests.
 
-⏺ pytest
+⬤ pytest
   ⎿ ┌───────────────────────────────────────────────────┐
     │ ============== test session starts ============== │
     │ ............................................ [2%] │
@@ -162,7 +162,7 @@ different transcript with no explanation is the surprise.
 
 ```
 detached back to the transcript
-  ⏺ 2 entries settled while attached · pytest · 47 passed
+  ⬤ 2 entries settled while attached · pytest · 47 passed
 ```
 
 **No notification while in the view.** That is an interruption in someone else's terminal, and
@@ -294,10 +294,10 @@ upward as it arrives. **In a fixed-height block the frame does not move** — th
 scrolls inside it and the prompt stays where it is. That is why Warp's blocks feel different
 from a plain terminal, and it is a bigger difference than the border is.
 
-### The chrome, and it is the `⏺`/`⎿` grammar with a bounded region under it
+### The chrome, and it is the `⬤`/`⎿` grammar with a bounded region under it
 
 ```
-⏺ pytest · 4.2s · 47 passed
+⬤ pytest · 4.2s · 47 passed
   ⎿ ┌───────────────────────────────────────────────────┐
     │ ============== test session starts ============== │
     │ ............................................ [2%] │
@@ -318,7 +318,7 @@ is six rows of chrome, which is a quarter of the screen spent on lines.
 **`⎿` plus a left rule costs one column and no rows:**
 
 ```
-⏺ pytest · 4.2s · 47 passed
+⬤ pytest · 4.2s · 47 passed
   ⎿ ============== test session starts ==============
     ............................................ [2%]
     +392 more · ⏎ to attach

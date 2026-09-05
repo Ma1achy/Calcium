@@ -121,22 +121,22 @@ entry each and settle; a conversation is turns.
 
 ▸ thinking · 4s · 312 tok
 
-⏺ I'll look at the current implementation first.
+⬤ I'll look at the current implementation first.
 
-⏺ read_file(src/interaction/parser/parse.ts)
+⬤ read_file(src/interaction/parser/parse.ts)
   ⎿ 184 lines · 6.2 KB
 
-⏺ The parser handles quotes with a single boolean. Nested quotes need a
+⬤ The parser handles quotes with a single boolean. Nested quotes need a
   depth counter instead:
 
-⏺ edit(src/interaction/parser/parse.ts)
+⬤ edit(src/interaction/parser/parse.ts)
   ⎿ ┌ parse.ts ────────────────────────────────
     │ 41 - let inQuote = false;
     │ 41 + let depth = 0;
     └───────────────────────────────────────────
 ```
 
-**`⏺` is a step the model took; `⎿` is that step's result** — four marks total with `▸` for
+**`⬤` is a step the model took; `⎿` is that step's result** — four marks total with `▸` for
 collapsed reasoning and `❯` for the reader. `⎿` is a **prefix reserving its columns**, which
 `noticeDoc` already does, so a multi-row result indents under its mark rather than sitting
 below a lone character.
@@ -151,17 +151,17 @@ frame is uniform and the content is whatever the result actually is** — which 
 differentiation against a fixed tool card.
 
 ```
-⏺ list_dir(src/interaction/)
+⬤ list_dir(src/interaction/)
   ⎿ NAME          KIND    SIZE   MODIFIED
     completion/   dir            2h ago
     parser/       dir            18m ago
 
-⏺ search("cursorCell")
+⬤ search("cursorCell")
   ⎿ FILE                       LINE  MATCH
     editor/layout.ts            134  export function cursorCell(
     shell/paint.ts              254  // until C17's cursorCell is threaded
 
-⏺ run_command(npm test)
+⬤ run_command(npm test)
   ⎿ │ 118 passed, 2 todo
     exit 0 · 4.1s
 ```
@@ -194,14 +194,14 @@ reader approves a change they cannot see.
 is mid-patch, not mid-subscription.
 
 ```
-⏺ edit(src/interaction/parser/parse.ts)
+⬤ edit(src/interaction/parser/parse.ts)
   ⎿ ┌ parse.ts ────────────────────────────────
     │ 41 + let depth = 0;
     └───────────────────────────────────────────
 
 ▲ cancelled
 
-⏺ updating the tests                              12s · 1.4k tok
+⬤ updating the tests                              12s · 1.4k tok
 ⎿ todo  3/5  ·  ◻ update the tests
 ```
 
@@ -230,9 +230,9 @@ it is doing.
 The same conversation at five depths.
 
 ```
-truecolour   ⏺  ⎿  ▸  ✻      tones, a coloured context bar, syntax
-1-bit        ⏺  ⎿  ▸  ✻      reverse video, the bar is a plain fill
-ASCII        *  -  >  *      the bar is # and ., the crest is one glyph
+truecolour   ⬤  ⎿  ▸  ✻      tones, a coloured context bar, syntax
+1-bit        ⬤  ⎿  ▸  ✻      reverse video, the bar is a plain fill
+ASCII        *  `  >  *      the bar is # and ., the crest is one glyph — the hook's rung is one character, not `-`, because a substitution keeps its cell count (C09 I5)
 ```
 
 **Markdown is the interesting one** — bold and headings go typographic at 1-bit and syntax
@@ -413,15 +413,15 @@ was run.
 
   ▸ thinking · 4s · 312 tok
 
-  ⏺ I'll look at the current implementation first.
+  ⬤ I'll look at the current implementation first.
 
-  ⏺ read_file(src/interaction/parser/parse.ts)
+  ⬤ read_file(src/interaction/parser/parse.ts)
     ⎿ 184 lines · 6.2 KB
 
-  ⏺ The parser handles quotes with a single boolean. Nested quotes need a
+  ⬤ The parser handles quotes with a single boolean. Nested quotes need a
     depth counter instead:
 
-  ⏺ edit(src/interaction/parser/parse.ts)
+  ⬤ edit(src/interaction/parser/parse.ts)
     ⎿ ┌ parse.ts ────────────────────────────────
       │ 41 - let inQuote = false;
       │ 41 + let depth = 0;
@@ -484,7 +484,7 @@ wins and the header goes**, because the footer's line 1 already carries it.
 
   ❯ refactor the parser to handle nested quotes
 
-  ⏺ Done. The parser tracks depth now and the suite passes.
+  ⬤ Done. The parser tracks depth now and the suite passes.
     ⎿ 118 passed, 2 todo · exit 0
 
 ───────────────────────────────────────────────────────────────────────────────
@@ -501,30 +501,30 @@ wins and the header goes**, because the footer's line 1 already carries it.
 information, and an empty region says nothing happened.
 
 ```
-  ⏺ edit(src/interaction/parser/parse.ts)
+  ⬤ edit(src/interaction/parser/parse.ts)
     ⎿ ┌ parse.ts ────────────────────────────────
       │ 41 + let depth = 0;
       └───────────────────────────────────────────
 
   ▲ cancelled
 
-⏺ updating the tests                                      12s · 1.4k tok
+⬤ updating the tests                                      12s · 1.4k tok
 ⎿ todo  3/5  ·  ◻ update the tests
 ───────────────────────────────────────────────────────────────────────────────
   ❯ ▌
 ```
 
-**The `✻` became `⏺`** — motion stopping is the signal, which is the one place animation
+**The `✻` became `⬤`** — motion stopping is the signal, which is the one place animation
 carries information without colour, and it is safe because **stopping is the signal, not the
 frames.**
 
 ### The two marks are two slots, and that is the ruling
 
-**`⏺` marks a step the model took. `⎿` marks that step's result.** Every part in the stream is
+**`⬤` marks a step the model took. `⎿` marks that step's result.** Every part in the stream is
 one or the other, which is why the transcript reads without any other structure:
 
 ```
-⏺   a text-delta run, or a tool-call        the model did something
+⬤   a text-delta run, or a tool-call        the model did something
 ⎿   the tool-result for the step above      here is what came back
 ▸   reasoning, collapsed                    the model's working, not its answer
 ⟩   an approval                             the app is asking
@@ -536,7 +536,7 @@ a slot and never a character, *because only the renderer can substitute* — and
 finding for authoring six marks verbatim. **Each gets an ASCII pair:**
 
 ```
-⏺ → *      the step marker
+⬤ → *      the step marker
 ⎿ → -      the result continuation
 ▸ ▾ → > v  collapsed / expanded
 ⟩ → ?      an open question
@@ -578,13 +578,13 @@ a real reasoning stream in front of it.
 ### 9c · A tool call, three states
 
 ```
-⏺ run_command(npm test)                        ← dispatched
-⏺ run_command(npm test) · 4s                   ← running, elapsed
+⬤ run_command(npm test)                        ← dispatched
+⬤ run_command(npm test) · 4s                   ← running, elapsed
   ⎿ 118 passed, 2 todo · exit 0                ← settled, the result block
 ```
 
 > **The settled state is every route's, 2026-09-05** — C23 I55/I56. The invoke route, its error
-> arm and the local route settle the header over the result, so `⏺ ps(--all) · 0.4s · ok` above an
+> arm and the local route settle the header over the result, so `⬤ ps(--all) · 0.4s · ok` above an
 > indented table is what a finished listing reads. C23 had ruled the opposite for the shell's own
 > verbs (*the card was the waiting and the document is the answer*); the reversal and its reason
 > are recorded there.
@@ -602,20 +602,20 @@ its tail (C04 I97); *+N more* is the scroll's own residue row on a `collapsed` s
 I98). Four things in the drawing were not what the frame draws, and the frame wins:
 
 ```
-⏺ run_command(npm test) · 4s                   ← running: the body streams beneath it
+⬤ run_command(npm test) · 4s                   ← running: the body streams beneath it
 line 10
 line 11
 line 12
 ⋯ 9 above, 0 below                             ← the hidden rows are ABOVE a following box
 
-⏺ run_command(npm test) · 4s · exit 0          ← settled: the outcome is in the header
+⬤ run_command(npm test) · 4s · exit 0          ← settled: the outcome is in the header
   ⎿ 118 passed, 2 todo                         ← the result under the hook, at the header's text column
 
-⏺ run_command(npm test)                        ← folded: a collapsed scroll
+⬤ run_command(npm test)                        ← folded: a collapsed scroll
 ⋯ 0 above, 392 below                           ← "+392 more" IS the residue row
 ```
 
-1. **`exit 0` moved from the `⎿` line to the header.** The grammar is *⏺ name · elapsed ·
+1. **`exit 0` moved from the `⎿` line to the header.** The grammar is *⬤ name · elapsed ·
    outcome* over a body; the outcome is the step's verdict and the result line is the body's
    text. Drawn on one line here, they were two facts in one row.
 2. **The count string is not `+392 more · ⏎ to attach`.** There is one count mechanism — the
@@ -626,10 +626,30 @@ line 12
 3. **`⏎ to attach` is not text on the row.** The affordance is `NavElement.activate` on every
    child of a folded scroll — the `expand` action, whose label the footer shows — so the row
    carries no key name (C16 I19's argument: a key named in a notice is a second keymap).
-4. **At 40 columns nothing changes**, and under ASCII the marks are `@`, `` ` `` and `~`.
-   The four frames are identical in shape; only the glyph slots move.
+4. **At 40 columns nothing changes**, and under ASCII the marks are `*`, `` ` `` and `~`.
+   The four frames are identical in shape; only the glyph slots move. (The head's rung read `@`
+   until F824; §A6 had drawn `*` all along.)
 
-**What has no mechanism, and §9d draws it:** the `⎿` hook in front of a *table* or a *logs*
+**And four more, from the call grammar (§9e), 2026-09-06:**
+
+5. **The mark is `⬤` U+2B24, not `⏺` U+23FA.** The width was measured and the presentation was
+   not: U+23FA has an emoji variation sequence and draws two cells wherever a font prefers it.
+   The check is derived from the Unicode file now and runs over both glyph tables (C09 I45, F823).
+6. **The collapsed residue reads `⋯ +N more`, not `⋯ 0 above, 392 below`.** Correction 2's one
+   mechanism stands; its collapsed text had a clause nothing could falsify — there is no *above*
+   on a box showing no row. The open box keeps `⋯ N above, M below`. Still no key name (C04 I104).
+7. **`⏎` on the head toggles the fold and never re-runs.** *`⏎` again re-runs* is an arming
+   machine; `⇧⏎`/`⌥⏎` re-run, as they did (C26 I23).
+8. **The running head carries the spinner where the duration will be** — `⬤ pytest · ⠋ 12s` —
+   and the settled head an outcome that is a count, never `ok` (C23 I58, I59). The separator is a
+   glyph slot resolved by the composer, because the frames above drew a literal `·` at the ASCII
+   arm and nobody saw it (F828).
+
+**What had no mechanism on 2026-09-05, and has one now** (C22 §6l.6, §6l.8): the `⎿` hook in
+front of a *table* or a *logs* block, and the left rule beneath it, are drawn by the shell's
+`entryLayout` in the gutter it reserves — not by C09 — so §9d's three cards are now drawn as
+they read. The paragraph is kept because the reasoning is the record of why the mechanism lives
+where it does. **Superseded:** the `⎿` hook in front of a *table* or a *logs*
 block. `continuation` is a `notice` slot (C09 §4), so a body that is a table is drawn without
 the hook and the header alone carries the frame. **§9d's three cards are therefore drawn
 wrong by one column**: the mark before `NAME KIND SIZE` and before `FILE LINE MATCH` does not
@@ -645,30 +665,255 @@ now I18's one exception (C04 §3c S4).
 ### 9d · The gallery — one tool per block kind
 
 ```
-⏺ list_dir(src/interaction/)
+⬤ list_dir(src/interaction/)
   ⎿ NAME          KIND    SIZE   MODIFIED
     completion/   dir            2h ago
     editor/       dir            2h ago
     parser/       dir            18m ago
 
-⏺ search("cursorCell")
+⬤ search("cursorCell")
   ⎿ FILE                       LINE  MATCH
     editor/layout.ts            134  export function cursorCell(
     shell/paint.ts              254  // until C17's cursorCell is threaded
 
-⏺ run_command(git status --short)
+⬤ run_command(git status --short)
   ⎿ │ M src/interaction/parser/parse.ts
     │ ?? test/contract/nested-quotes.test.ts
     exit 0 · 0.2s
 ```
 
-**Three kinds, three shapes, one mark.** The uniform `⏺`/`⎿` frame is what makes the *blocks*
+**Three kinds, three shapes, one mark.** The uniform `⬤`/`⎿` frame is what makes the *blocks*
 the visible difference — a table, a table with a code cell, a logs block — rather than three
 differently-drawn cards.
 
 **That is the differentiator stated visually**: `@ai-sdk/tui` gives every tool the same card
 with four display modes; here the frame is uniform and the content is whatever the result
 actually is.
+
+### 9e · The call grammar — what every tool call and command looks like
+
+**One shape, everywhere.** A command the reader typed, a tool an agent invoked, a job the
+platform ran — **they are the same object and they look the same.** The differences are what
+they say, not how they are drawn. **The standard is Claude Code**, and the measurement behind
+that is real: its transcript is skimmable because every call has a marked head, a gutter that
+says *this belongs above*, and a body that is bounded rather than poured.
+
+Written 2026-09-06 as the design of record; where a rule below was reversed by a walk against
+the tree, the reversal is marked **Ruled** and the component that holds it is named. The
+rulings: C09 I45–I49, C04 I104–I105, C22 I88–I90, C23 I58–I62, C26 I23, C15 I24.
+
+#### 1 · The shape
+
+```
+⬤ pytest tests/unit
+  ⎿ ============== test session starts ==============
+  │ ............................................ [2%]
+  │ ...............ssss..........................[4%]
+  │ ⋯ +392 more
+```
+
+```
+THE HEAD      ⬤ and what ran. One line, always present, always the same shape
+THE GUTTER    ⎿ and a left rule — this belongs to the head above it
+THE BODY      bounded, scrollable, with a residue row saying what is hidden
+```
+
+**Nothing else.** No box by default, no title bar, no separator, no blank line above or below
+inside the call. **The gutter is the grouping and it costs one column.**
+
+#### 2 · The head, in three fields
+
+```
+⬤ pytest tests/unit · 4.2s · 47 passed
+  │       │            │      └── the OUTCOME, once known
+  │       │            └── the DURATION, once known
+  │       └── the ARGUMENT, truncated from the tail
+  └── the VERB
+```
+
+**The verb is what was invoked** — a command name, a tool name, a job kind. Never a sentence,
+never a gerund. `pytest`, not `Running pytest`. **The argument is the shortest thing that
+distinguishes this call from the next one**, truncated from the tail with the ellipsis the glyph
+table gives, because a cut head reads as a different word — `petal_leng…` is not a word (C09 I46,
+C04 I105). **The duration appears when the call ends.** **The outcome is one clause and it is the
+reader's summary, not the tool's exit code**: `47 passed`, `3 files changed`, `no matches`. A
+number, not a status word — *succeeded* says nothing a green tone does not (C23 I59).
+
+The running head: `⬤ pytest tests/unit · ⠋ 12s`. **The spinner sits where the duration will
+be**, so nothing moves when the call finishes, and the elapsed counter is the number that matters
+— a spinner at 47s says *this is wrong* (C23 I58). The separator between fields is a glyph slot,
+resolved by the composer (C09 I49).
+
+#### 3 · The gutter, and why it is not a box
+
+`⎿` marks the first body row; the rest carry the left rule (C22 I88). One column, zero rows. **A
+box costs two columns and two rows** — three calls on a 24-row terminal is six rows of chrome. The
+border earns its place at exactly one moment: an attached session, where keystrokes are going
+somewhere other than the prompt. Out of this round; no attach mechanism exists.
+
+#### 4 · The body is bounded, always
+
+A 400-line result is eight rows and a residue line, and the reader opens it if they care. **The
+residue row is the existing one, not a third count string** — one mechanism for *what is hidden*
+everywhere it appears. **Ruled**: the collapsed box reads `⋯ +N more` and the open box `⋯ N above,
+M below`; no key name on either, because the footer already shows the `expand` label and a key
+named in a notice is a second keymap (C04 I104, C16 I19). **Live output does not move the frame**:
+streaming into a fixed-height block scrolls inside the block; tail-follow is on until the reader
+pages up and back on at the bottom (C04 §3c).
+
+#### 5 · States use the state kind, and nothing hand-rolls a notice
+
+```
+RUNNING      the head's spinner and elapsed; the body streams
+WAITING      the head reads · ⠋ waiting; the decision is the overlay's (§8)
+DONE         the head's duration and outcome; the body is bounded
+FAILED       the status block — the ERROR rule, the mark, the message
+RETRYING     the same, plus the countdown and the attempt
+DENIED       the head reads · denied; nothing ran
+```
+
+**`status` is the kind and it is one implementation.** A surface that composes its own red line
+of text is the defect this grammar exists to remove — and A03 SS56, widened to the builder call,
+says so. **A failed call keeps its head**: `⬤ pytest · 4.2s · failed` above the error box, because
+*what ran* is the first thing a reader needs (C23 I61).
+
+#### 6 · Nesting, and the gutter is what carries it
+
+```
+⬤ make all · 67.7s · 4 of 4
+  ⎿ ⬤ check · 8.1s
+    ⬤ enforce · 12.4s · 324 files
+    ⬤ test · 41.0s · 5127 rows
+    ⬤ golden · 6.2s · 407 frames
+```
+
+**One column per level and no more.** Two levels is the working depth; three is a signal the
+composition is wrong rather than a rendering to support (C22 I89). **A nested call's outcome rolls
+up**: the parent's is derived from its children, never restated by hand (C23 I62).
+
+#### 6b · Many calls at once, and subagents
+
+**Sequential** calls happened one after another and the transcript's order is the whole answer.
+**Concurrent** calls — parallel tools, a fan-out, N subagents — need a container, and the
+container is the parent call's gutter. `⎿` is a corner, so a single child reads correctly and a set
+does not: with N children the gutter is the tree's own vocabulary, from the same glyph table
+(`glyphForMask`, C22 I89).
+
+```
+⬤ search · 3.1s · 41 matches
+  ├─ ⬤ grep "elementsIn" · 6 files
+  │  ⎿ construct.ts:1263
+  │  │ keys.ts:863
+  │  │ ⋯ +4 more
+  ├─ ⬤ grep "focusedEntryId" · 18 files
+  └─ ⬤ grep "liveId" · 17 files
+```
+
+```
+⎿   one child, or a call's own body      the corner
+├─  a child with siblings after it
+└─  the last child
+│   the parent's line, continued past a child's body; and the left rule
+```
+
+**The parent's outcome is derived** — `41 matches` is the sum — **and its duration is the wall
+clock, not the total.** Three calls taking 2s each in parallel took 2s. The children's durations do
+not add up to the parent's and are not made to. **While they run, the children do not each
+stream**: one line per child, head only; a child's body appears when it settles, bounded, and only
+the focused child expands. The parent's head carries `k of N`. **Children appear in the order they
+were started and never reorder** — completion is carried by the head, not by position. Where one
+child failed, the parent says `2 of 3 · 1 failed` and does not adopt the child's error.
+
+**Subagents are a fan-out whose children are transcripts.** A subagent's own calls are not drawn
+in the parent; the parent shows what it was asked and what came back. **Opening a subagent is a
+pushed view, not an expansion** — a nested transcript is a different document (C15 §2b). Ruled and
+deferred: no producer exists.
+
+#### 7 · The reader can act on a call
+
+**Every call is an element** (C09 I47).
+
+```
+⏎          expand or collapse the body
+y          copy — the SOURCE, never the rendering: the head copies its invocation,
+           ⌃a y the invocation with the output
+⇧⏎ / ⌥⏎    re-run, where the entry knows its invocation and the far side permits it
+⌃c         cancel, while running
+```
+
+**Ruled**: the draft had `⏎` again re-run. A key that toggles on one press and re-runs on the next
+is an arming machine, and re-run already has its own key (C26 I23). Copy copies the invocation
+with the output, because a result without its command is unattributable six months later.
+
+#### 8 · Approval is a layer, not a body
+
+**A call that needs a decision does not draw the decision in its own gutter.** It goes to the
+overlay — the same surface that carries questions, image previews and pasted content — because
+the reader is being asked, not shown.
+
+```
+⬤ rm -rf build/ · ⠋ waiting
+
+    ┌────────────────────────────────────────┐
+    │  rm -rf build/                         │
+    │  ▲ this will delete 1,204 files        │
+    │                                        │
+    │  › approve                             │
+    │    deny                                │
+    │    always allow rm                     │
+    └────────────────────────────────────────┘
+```
+
+The head says it is waiting, so the transcript still shows what is happening when the overlay is
+dismissed or scrolled away from. The overlay carries the invocation, the consequence if supplied,
+and the choices as the existing choice list — `always allow` is a row like any other. On resolve
+the overlay closes and the head updates; **a denied call settles as denied and keeps its head**
+(C15 I24, C23 I60).
+
+#### 9 · What differs between a command and a tool call
+
+**Almost nothing.** A command the reader typed, a tool an agent invoked, a job the platform ran:
+same head, same gutter, same bounded body, same states, same actions. The only difference is
+attribution, and the transcript already carries it.
+
+#### 10 · Glyphs, and every one has an ASCII rung
+
+```
+⬤   the head mark          ASCII: *   — U+2B24, NOT U+23FA (emoji form; C09 I45)
+⎿   the gutter mark        ASCII: `   — one character, because a substitution keeps its count
+├─  a child, more follow   ASCII: +-  — from glyphForMask; the last-child distinction vanishes at ASCII
+└─  the last child         ASCII: +-
+│   the parent's line      ASCII: |
+│   the left rule          ASCII: |
+▲   the warning mark       ASCII: !   — ▲ in this tree, not ⚠
+⠋   the spinner            ASCII: the set's own pair
+…   the truncation mark    ASCII: ~
+·   the separator          ASCII: -
+```
+
+**From the glyph table, never as literals**, and every one measured for ambiguous width *and*
+emoji presentation before it ships (C09 I45, I48). Ten of the vocabulary's seventeen members were
+two cells at `wide` on the day this was written (F825).
+
+#### 11 · The rules, restated as rules
+
+```
+1   one head, one gutter, one bounded body — for every call, everywhere
+2   the verb is a name, not a sentence
+3   the outcome is a number, not a status word
+4   the argument truncates from the tail
+5   borderless by default; a border means "your keys go here now"
+6   a bounded body and a residue row, always — never a poured result
+7   live output scrolls inside the block and never moves the frame
+8   states come from the status kind and nothing composes a notice by hand
+9   a call is an element: focusable, copyable, actionable
+10  copy takes the source with the invocation
+11  two levels of nesting, and the parent's outcome is derived
+12  every glyph from the table, with its ASCII rung
+```
+
+**The audit is reading frames.** A transcript where two calls read as different products is a
+defect, **and no assertion in this repository can see it.**
 
 ---
 
@@ -759,8 +1004,9 @@ arrives** before any of them is built to.
 
 ## 13 · The spinner, and the marks that animate
 
-**`❯` is always the reader. `⏺` is always the agent.** That is the frame's whole grammar, and
-it means the animated cell is `⏺` itself rather than something beside it — **one cell,
+**`❯` is always the reader. `⬤` is always the agent.** That is the frame's whole grammar, and
+it means the animated cell is beside the mark, in the head's duration slot (§9e §2, C23 I58) —
+the mark itself never changes — **one cell,
 reserved always, occupied whether the step is running or settled.** No reflow, which is the
 same rule as the scrollbar gutter and the focus gutter.
 
@@ -791,7 +1037,11 @@ safe (EA=Narrow, no emoji form)
 
 **Assert it rather than remembering it**: every spinner frame is one cell by `cells()` **and**
 has no emoji presentation form. One row, and it is the row that stops the seventh frame
-someone adds from being `❇`.
+someone adds from being `❇`. **And derive the check rather than remembering the list** — the
+row above was a seventeen-character list from memory, it opened with `·`, which is Ambiguous
+and has no emoji form, and it never looked at the glyph tables, which is how `⏺` U+23FA shipped
+as the head mark with a variation sequence in the very file the list was recalling (F823). C09
+I45 reads `emoji-variation-sequences.txt` and runs over every table.
 
 ### They pulse, they do not rotate
 
@@ -829,20 +1079,20 @@ and the meaning is *something is happening*.
 
 ### State, and why colour cannot carry it
 
-**Roadmap ruling: animation is decoration, never information.** So `⏺` may change colour with
+**Roadmap ruling: animation is decoration, never information.** So `⬤` may change colour with
 state and **the state must be legible without it**:
 
 ```
 running    animated, accent tone         and the step line says `· 4s`
-ok         static ⏺, default tone        the result block is the evidence
-failed     static ⏺, error tone          AND the result line names the failure
+ok         static ⬤, default tone        the result block is the evidence
+failed     static ⬤, error tone          AND the result line names the failure
 ```
 
 **F34's rule, applied to a marker**: a distinction must not be carried by colour alone. **The
 result text carries it**; the tone reinforces. At 1-bit the tone is gone and the sentence is
 still there.
 
-**And a `⏺` that is still animating is itself a state** — it says *this step has not settled*,
+**And a `⬤` that is still animating is itself a state** — it says *this step has not settled*,
 which is information the animation genuinely carries without colour. That is the one case
 where motion is not decoration, and it is safe because **stopping is the signal, not the
 frames.**
@@ -1478,7 +1728,7 @@ were competing for the same job and now they are not:
 
 ```
 during    ✻ editing the parser's quote handling   4s · 312 tok    ← the region
-after     ⏺ edit(src/interaction/parser/parse.ts)                 ← the transcript
+after     ⬤ edit(src/interaction/parser/parse.ts)                 ← the transcript
           ⎿ [the diff]
 ```
 
@@ -1619,7 +1869,7 @@ model's tools and the app's verbs are the same list.**
 
 ```
 /read_file src/interaction/parser/parse.ts     ← the reader calls it
-⏺ read_file(src/interaction/parser/parse.ts)   ← the model calls it
+⬤ read_file(src/interaction/parser/parse.ts)   ← the model calls it
   ⎿ [the same code block, through the same adapter]
 ```
 
@@ -1693,7 +1943,7 @@ tone, and **the model sees it too** — that is the loop working: the tool faile
 reads the failure and tries something else. **Do not intercept it.**
 
 ```
-⏺ run_command(npm test)
+⬤ run_command(npm test)
   ⎿ │ 3 failed, 115 passed
     exit 1 · 4.1s
 ```
@@ -1741,9 +1991,9 @@ happens without it.**
 
   Ask it something, or try:
 
-    ⏺ /tools              what it can do
-    ⏺ /model              what else this endpoint serves
-    ⏺ read the README and tell me what this project is
+    ⬤ /tools              what it can do
+    ⬤ /model              what else this endpoint serves
+    ⬤ read the README and tell me what this project is
 
 ───────────────────────────────────────────────────────────────────────────────
   ❯ ▌
@@ -1923,7 +2173,7 @@ it means a reader debugging a bad session cannot see that the model has been pro
 JSON all along. **A dim line under the step, not a notice** — it succeeded, it is not an error,
 and it is worth knowing.
 
-    ⏺ edit(src/parser.ts)
+    ⬤ edit(src/parser.ts)
       ⎿ repaired · the model's arguments did not parse
       ⎿ ┌ parse.ts ─────
 

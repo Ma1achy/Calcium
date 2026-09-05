@@ -980,6 +980,19 @@ cannot make across an entry is one the pointer cannot make either, and I8's *one
 what makes that structural rather than two rules agreeing. A click, shifted or not, is a move and
 collapses (I16); a shifted click extending is recorded as the obvious next row, not built.
 
+### The call's head — `⏎` toggles, `y` copies what ran, and re-run is not `⏎`
+
+**The call grammar makes every head an element** (`AGENT_TUI_DESIGN.md` §9e rule 9; C09 I47), and
+three keys meet there. Walked against the keymap before ruling:
+
+| # | the rules that meet | ruling |
+|---|---|---|
+| h1 | *`⏎` dispatches the focused element's `activate`* (I14) × the design's *`⏎` again re-runs* | **`⏎` toggles the body's fold and never re-runs** (I23). A key that toggles on one press and re-runs on the next is an arming machine — C16's measured defect class, three of seven pre-code defects — and `rerunEntry` already has `⇧⏎`/`⌥⏎` at `liveBlock` (C16 I29, C23 I18). No keymap row moves; the design's sentence is reversed and says so |
+| h2 | *`activate` is the block's `action`* × a head with no body | the head's element has no `activate`, so `⏎` is silent (I14's *silent otherwise*); the composer sets `{kind: "expand", target}` only when a body scroll exists (C23) |
+| h3 | *`y` copies the element's source* (I17) × the design's *copy takes the invocation with the output* | **the head's `copy` is the entry's command** (C22 I90) and the body elements' are their own, so `⌃a y` over the card yields invocation then output through §5c's aggregator — one aggregator, SOURCE as the selection, no second mechanism on the head |
+| h4 | *`⇧⏎` re-runs from a frozen entry* (C23 I18) × a running entry | refused by C23 I5's submit guard while a submission is in flight; *where permitted* is that guard and no new rule |
+| h5 | *`⏎` on a subagent's head* × *a nested transcript is a different document* | pushes a `view` (C15 §2b), not an expansion — ruled and deferred with C15, because no producer exists |
+
 ---
 
 ## 7. Focus is rendered, never owned
@@ -1185,6 +1198,10 @@ notice here.
   and the key side, so an evicted entry's highlight and its next arrow land in the same place.
   The fall is to the live entry's **first** element — I10's block-went clause one scope up —
   because nothing about an evicted entry's position survives to name a nearer neighbour.
+- **I23** — **A call's head is an element whose `⏎` toggles its body's fold and never re-runs the
+  entry, whose `y` copies the invocation, and `⇧⏎`/`⌥⏎` remain the only re-run** (§5c, →
+  C09 I47, C22 I90, C23 I18). A head with no body has no `activate` and `⏎` is silent there; a
+  subagent's head pushes a view rather than expanding (→ C15 §2b).
 
 ---
 
@@ -1518,6 +1535,7 @@ is the shape a spec commit should have.
 14. **A fall-forward lands in navigation** — restoration moves focus to a different element, and a mode belongs to the element it was entered on (I20, I10). Vacuous until interaction mode has bindings, and stated now because it is cheap to rule and expensive to reopen.
 15. **Focus reaches every entry, not only the live one** — the stored location carries the entry, `tab`/`⇧tab` move between entries and the sequence stays the entry's (I21, §4g).
 16. **An evicted entry's focus falls to the live entry**, through the one pull the render side and the key side share (I22, §4g).
+17. **`⏎` on a head is a toggle and `y` on it is the invocation** — re-run stays on its own key, because a key with two meanings by count is an arming machine (I23, §5c).
 
 **The four-kind validation of §4 is not here, and SP1 is why.** *If it is none of those, it
 is a § detail rather than a commitment* — it is a step the implementation takes, and no
@@ -1540,6 +1558,7 @@ Named against the invariants; the tiers are the six.
   implementation. **Two fabrications confirm it is live**, as F134's did.
 - **T1.42, T1.43** (I17, §5c) — an element's `copy` carries **every declared column**, including the ones the width dropped, is the same text at 60 columns and at 200, and is untruncated. The control is `planColumns(...).dropped` being non-empty at that width: without it the row passes for a table that drops nothing. The expand column contributes its **cell**, not the marker a renderer puts there.
 - **T1.44, T1.45, T1.46** (I16, §5c) — `⇧↓` twice leaves the anchor where it was and `y` copies the range newline-joined; an unshifted motion collapses, so `y` afterwards copies one row; and `⇧↑` at the first element stays in the block, where unshifted `↑` leaves. **Two extensions in the first, because one passes whichever end moved** — C17 T1.23's argument one level up.
+- **T1.47** (I23, §5c h1–h4) — `⏎` on a running card's head toggles the body scroll's `collapsed` and leaves `doc.command` unsubmitted; a second `⏎` toggles back and submits nothing; `y` on the head yields the command and `⌃a y` yields the command followed by the body's sources; `⇧⏎` on the running entry is refused by the guard and on the settled one re-runs.
 - **T2.29, T2.30, T2.31** (I4, I5, I6; C09 §2) — **the lifted list, in sequence form.** Two 39-wide tables in an 80-column `row` group: the second's elements sit at cols `[40, 79)` and the frame's second header begins at column 40 — the gutter is measured through `childWidths`, not assumed. Containment, disjointness and stability hold of the lifted list **across** blocks and order within each, **and a fabricated old walk — rows lifted, columns not — fails disjointness**, which is what shows the sweep is live. A `panel`'s children start one row and one column in, a `column` group's follow one another, and an unplaced child holds nothing. Three rows because the two lifts fail separately: F756 was the column, F757 the origin.
 - **T1.18** (I19, §4c) — **the tail stops and the head leaves, asserted at the entry's ends rather than a block's.** T1.15 already carries the other half: two tables, and `↓` at the first's last element steps into the second, so a block's edge is not an end. The row that was missing is the tail — `↓` at the entry's last element leaves focus where it is — and its absence is why the asymmetry read as `table`'s for as long as it did. The fixture holds **two** blocks, because one block makes the entry's ends and the block's ends the same cells and every reading agrees.
 - **T2.x** (I2) — the ladder still derives from `FOCUS_ORDER` with the mode present:
@@ -1602,6 +1621,7 @@ Named against the invariants; the tiers are the six.
 - **T6.x** (I21) — `focusedEntryId()` answering `liveId` unconditionally, which is the ceiling
   restored → the `⇧tab` row fails. `rowActivate` taking `liveId` as the origin → the refusal
   row fails, because the action fires against the wrong entry and is not refused at all.
+- **T6.x** (I23) — `rowActivate` submitting `doc.command` on a second `⏎` at a head → T1.47's no-submission assertion fails; the head's `copy` left as its text → T1.47's `y` assertion copies the head line.
 
 **The mutation pass is scheduled, not optional.** Every module mutated on landing; a mutation
 that fails nothing indicts the tests or the prose, and §5's vacuity note is the sentence most
