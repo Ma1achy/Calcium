@@ -27,7 +27,7 @@
 import { block, hasChildren } from "../data/viewmodel/index.js";
 import type { Block, ErrorLike, Panel, Status } from "../data/viewmodel/index.js";
 import { countdown, elapsed } from "../presentation/blocks/index.js";
-import { framedStatus } from "./builders/index.js";
+import { b, framedStatus } from "./builders/index.js";
 import type { ProducerContext } from "../data/adapters/types.js";
 import type { EntryId, TranscriptStore } from "../viewport/transcript/index.js";
 
@@ -334,6 +334,22 @@ export interface RefreshDriver {
   watch(id: EntryId): void;
   /** C23 §8a A4 — settlement removes a stall notice that is present. */
   settled(id: EntryId): void;
+  /**
+   * C23 I53 — a pending entry's elapsed readout rides the one-second wake.
+   *
+   * `render` is given the milliseconds since registration and returns the
+   * block that replaces `blockId`. The driver compares `elapsed()` of that
+   * figure with the one last written and patches only when the string moves
+   * (I52's guard), only while someone is looking (I46), and never after
+   * `settled`, `release`, `dispose` or a patch the transcript refuses. One
+   * timer serves every readout — `armParts`'s — so ten cards cost what one does.
+   *
+   * **No producer in `src/` yet.** `toolCallDoc`'s callers are a contract test
+   * and nothing else; the pending-entry route an agent harness would append
+   * through (`AGENT_TUI_DESIGN.md` §9c) is the consumer named for this, and the
+   * call it makes is written in C23 §3d-bis.
+   */
+  readout(id: EntryId, blockId: string, render: (elapsedMs: number) => Block): void;
   /** C22's identity loop signalling a transition worth saying out loud. */
   identityNotice(text: string): void;
   /**
@@ -404,12 +420,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
       {
         op: "replace",
         blockId: STALL_BLOCK,
-        block: block({
-          kind: "notice",
-          id: STALL_BLOCK,
-          tone: "muted",
-          text: `resumed after ${String(gap)}m`,
-        }),
+        block: b.notice("muted", `resumed after ${String(gap)}m`, undefined, { id: STALL_BLOCK }),
       },
       "shell",
     );
@@ -819,6 +830,31 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
     if (counted) deps.commit("stream");
     if (ticked) deps.commit("stream");
 
+    // **The running cards, on the same wake** (C23 I53). A third loop rather than
+    // a third timer: the figure moves once a second for every card at once, and
+    // `armParts` already wakes at that cadence for a waiting box. A refused
+    // patch — the entry evicted or cleared underneath — drops the readout, as
+    // `put` tolerates a released host (I21, §5).
+    let read = false;
+    for (const [id, r] of [...readouts]) {
+      if (!deps.visible({ kind: "entry", id })) continue;
+      const since = now - r.startedAt;
+      const figure = elapsed(since);
+      if (figure === r.last) continue;
+      const outcome = deps.transcript.patch(
+        id,
+        { op: "replace", blockId: r.blockId, block: r.render(since) },
+        "shell",
+      );
+      if (!outcome.ok) {
+        readouts.delete(id);
+        continue;
+      }
+      r.last = figure;
+      read = true;
+    }
+    if (read) deps.commit("stream");
+
     // **Through `release`, for the reason `/clear` was** (I32). A host whose parts
     // are all finished is dropped here, and dropping the map entry directly
     // leaves every one of its parts still in its source's referring set — so the
@@ -882,7 +918,24 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
    * because settlement releases and re-declares in one synchronous pair and a
    * source destroyed between them takes its accumulated fold with it.
    */
+  /**
+   * The running cards (C23 I53): one entry, the block the figure lives in, how to
+   * draw it for a duration, when it started, and the figure last written.
+   *
+   * `last` is the rendered string and not the clock, for I52's reason: below a
+   * second `elapsed()` draws nothing and past ninety-nine it draws minutes, so
+   * *the clock moved* and *the header would change* are different questions and
+   * only the second justifies a `rev` bump.
+   */
+  const readouts = new Map<
+    EntryId,
+    { blockId: string; render: (elapsedMs: number) => Block; startedAt: number; last: string }
+  >();
+
   const release = (host: RefreshHost): void => {
+    // A released entry host takes its readout with it (I53) — the same five
+    // triggers, through the same one path (I32).
+    if (host.kind === "entry") readouts.delete(host.id);
     const key = keyOf(host);
     const entry = hosts.get(key);
     if (entry === undefined) return;
@@ -912,7 +965,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
   const armParts = (): void => {
     partTimer?.[Symbol.dispose]();
     partTimer = null;
-    if (stopped || sources.size === 0) return;
+    if (stopped || (sources.size === 0 && readouts.size === 0)) return;
 
     const now = deps.clock();
     let soonest = Infinity;
@@ -978,6 +1031,12 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
     );
     if (counting) soonest = Math.min(soonest, now + ELAPSED_TICK_MS);
 
+    // **A running card wakes the sweep too, once for all of them** (C23 I53).
+    // Gated the way its write is: a card nobody is looking at arms no timer, and
+    // `visibilityChanged` re-arms it when it is back on screen (I46).
+    const reading = [...readouts.keys()].some((id) => deps.visible({ kind: "entry", id }));
+    if (reading) soonest = Math.min(soonest, now + ELAPSED_TICK_MS);
+
     if (!Number.isFinite(soonest)) return;
 
     partTimer = deps.schedule(() => {
@@ -1041,13 +1100,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
       // its command chrome is on screen above, and the notice reports what the
       // *entry* is doing rather than anything the far side emitted. `muted`
       // obliges no glyph (C04 I6), so the slot was free.
-      const notice = block({
-        kind: "notice",
-        id: STALL_BLOCK,
-        tone: "muted",
-        glyph: "continuation",
-        text: `no output for ${String(quiet)}m`,
-      });
+      const notice = b.notice("muted", `no output for ${String(quiet)}m`, "continuation", { id: STALL_BLOCK });
       // Append the first time and replace after: the row is the entry's one
       // stall block for its whole life, and it says whichever thing is true now.
       deps.transcript.patch(
@@ -1105,6 +1158,13 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
       // true and can never be replaced.
       resolveStall(id);
       watched.delete(id);
+      // C23 I53 — a settled card keeps its final figure; the readout stops here.
+      readouts.delete(id);
+    },
+
+    readout: (id, blockId, render) => {
+      readouts.set(id, { blockId, render, startedAt: deps.clock(), last: elapsed(0) });
+      armParts();
     },
 
     identityNotice: (text) => {
@@ -1270,6 +1330,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
       for (const t of timers) t[Symbol.dispose]();
       timers.length = 0;
       watched.clear();
+      readouts.clear();
       hosts.clear();
       sources.clear();
       partTimer?.[Symbol.dispose]();

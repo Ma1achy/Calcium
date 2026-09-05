@@ -1004,8 +1004,9 @@ export const SCANS = [
   // **Allow-list rather than a narrower scope**, and every entry has a reason
   // here because the row shape holds one `why`. Sixteen files carried the
   // literal on the day the rule landed (34 lines; 28 outside the family and the
-  // type). SS53 retires any entry the moment its file stops matching, which is
-  // what makes the *owed* group below a deferral that expires by itself.
+  // type); twelve do now. SS53 retires any entry the moment its file stops
+  // matching, which is what made the *owed* group below a deferral that expired
+  // by itself.
   //
   //   the family — the two places a notice is meant to be composed:
   //     src/shell/documents.ts             `noticeDoc`, `errorDoc`'s remediation
@@ -1023,13 +1024,15 @@ export const SCANS = [
   //     src/viewport/transcript/cap.ts     the cap marker (C13 §5)
   //     src/interaction/history/layers.ts  the reverse-search layer's status
   //     src/presentation/art.ts            a figure's text fallback
-  //   **owed** — L4 surfaces that can call the family and do not. Fourteen
-  //   sites; each entry is a migration owed with its symbol, and SS53 fails the
-  //   suite the day the migration lands with the entry still here:
-  //     src/shell/confirm.ts               `render`'s question (1)
-  //     src/shell/execution.ts             `truncated`, `stream-error`, `refused`, the view-route containment, the shell-failed block (5)
-  //     src/shell/refresh.ts               `STALL_BLOCK`, twice (2)
-  //     src/shell/local/handlers.ts        `cleared`, `theme-usage`, `theme`, `theme-nobg`, `debug-none`, `exit` (6)
+  //   **the owed group is gone** (F777, 2026-09-05). Four L4 files carried
+  //   fourteen sites — `confirm.ts` (1), `execution.ts` (5), `refresh.ts` (2),
+  //   `local/handlers.ts` (6) — and every one now calls `b.notice`. SS53 did
+  //   what it was kept for: with the literals gone and the entries still here it
+  //   failed four times, which is the proof the entries were load-bearing.
+  //   `test/contract/notice-family.test.ts` holds the frames the literals drew
+  //   and asserts the family draws the same bytes; the one site where the
+  //   helper's default and the literal disagreed (`ok` takes no default glyph,
+  //   the view route's `finish` always drew one) passes its glyph explicitly.
   //
   // **Stated blind spots.** A notice built through a helper this rule does not
   // know — a local `noticeOf` in a new file — passes, as does `kind: NOTICE`
@@ -1054,10 +1057,6 @@ export const SCANS = [
       "src/viewport/transcript/cap.ts",
       "src/interaction/history/layers.ts",
       "src/presentation/art.ts",
-      "src/shell/confirm.ts",
-      "src/shell/execution.ts",
-      "src/shell/refresh.ts",
-      "src/shell/local/handlers.ts",
     ],
     why: "one grammar for a notice — `noticeDoc` or `b.notice`, never a hand-composed `kind: \"notice\"`; a site that rolls its own chooses its own glyph and the ones that forgot produced no entry at all" },
 

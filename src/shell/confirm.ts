@@ -21,6 +21,7 @@
  */
 
 import { block } from "../data/viewmodel/construct.js";
+import { b } from "./builders/index.js";
 import type { Block } from "../data/viewmodel/types.js";
 import type { InputEvent } from "../interaction/router/types.js";
 import type { Layer, OverlayManager, Placement } from "../viewport/overlay/index.js";
@@ -190,7 +191,7 @@ function truncated(deps: ConfirmDeps): boolean {
  */
 function render(opts: AskOptions, selected: number, cut = false): readonly Block[] {
   const children: Block[] = [
-    block({ kind: "notice", id: "confirm-question", tone: "warn", glyph: "warn", text: opts.question }),
+    b.notice.warn(opts.question, { id: "confirm-question" }),
   ];
   // Ruling C's payload — what the answer will affect, shown with the question
   // rather than in the entry that follows it.

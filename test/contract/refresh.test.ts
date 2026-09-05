@@ -21,6 +21,8 @@ import { block } from "../../src/data/viewmodel/index.js";
 import type { Block, ViewDocument } from "../../src/data/viewmodel/index.js";
 
 import { producerContext } from "../support/producer-context.js";
+import { b } from "../../src/shell/builders/index.js";
+import { toolCallHeader } from "../../src/shell/documents.js";
 const SWEEP = STALL_MS / 4;
 
 const raw = (id: string, text: string): Block => block({ kind: "raw", id, text });
@@ -1377,5 +1379,126 @@ describe("C23 I52 — the elapsed counter, and every rule the walk put on it", (
     h.driver.visibilityChanged();
     await h.tick(1_000);
     expect(elapsedOf(h, id), "and the figure is the whole wait, not the watched part").toBe(5_000);
+  });
+});
+
+describe("C23 I53 — the running card's readout rides the one-second wake", () => {
+  /**
+   * A pending entry whose first block is a tool call's header (`AGENT_TUI_DESIGN`
+   * §9c), registered through `readout` with the same `render` the consumer would
+   * write. **Through the sweep and the clock, never by calling the writer** —
+   * a row that computed a duration itself would pass on the day nothing armed a
+   * timer, which is F227's class and the reason T3.56 drives the clock too.
+   */
+  const call = { name: "run_command", args: "npm test" };
+  const header = (ms: number): Block =>
+    b.notice("info", toolCallHeader({ ...call, elapsedMs: ms }), "step", { id: "step" });
+  const running = (h: ReturnType<typeof harness>): string => {
+    const id = h.transcript.append(docWith([header(0)]), { streaming: true });
+    h.driver.readout(id, "step", header);
+    return id;
+  };
+  /**
+   * Whether a wake is armed inside the next second. **Not `nextTimer() === null`**:
+   * the stall detector's thirty-second re-arm is always live, and the first
+   * draft of these rows asserted against it and read the stall timer as a leak.
+   */
+  const wakeWithinASecond = (h: ReturnType<typeof harness>): boolean => {
+    const next = h.nextTimer();
+    return next !== null && next - h.at() <= 1_000;
+  };
+  const headerOf = (h: ReturnType<typeof harness>, id: string): string | undefined => {
+    const blk = h.transcript.entries.find((e) => e.id === id)?.doc.blocks.find((x) => x.id === "step");
+    return blk?.kind === "notice" ? blk.text : undefined;
+  };
+
+  it("T3.61 (I53): bare at dispatch, `· 4s` after four seconds and a wake, and still `· 4s` after settle", async () => {
+    const h = harness();
+    const id = running(h);
+    await h.tick(0);
+    expect(headerOf(h, id), "below one second no figure is drawn (T2.46)").toBe("run_command(npm test)");
+    expect(h.nextTimer(), "the wake is armed a second out, by the readout alone").toBe(1_000);
+
+    await h.tick(4_000);
+    expect(headerOf(h, id)).toBe("run_command(npm test) · 4s");
+    const commits = h.commits.length;
+
+    h.driver.settled(id);
+    await h.tick(10_000);
+    expect(headerOf(h, id), "a settled card keeps its final figure").toBe("run_command(npm test) · 4s");
+    expect(h.commits.length, "and nothing is committed for it").toBe(commits);
+    expect(wakeWithinASecond(h), "the last readout gone, no one-second wake is armed").toBe(false);
+  });
+
+  it("T3.61b (I53, I52): a wake inside the same second renders nothing, and the guard is the figure", async () => {
+    // **The state has to be constructed** — `armParts` re-arms a whole second
+    // from *now*, so a readout alone never wakes twice in one second and a row
+    // ticking 400 ms fires no sweep at all; the first draft of this passed with
+    // the guard written on the clock. A live part at 250 ms supplies the
+    // sub-second sweeps, and the instrument is `render`'s call log: the correct
+    // guard renders once per figure, the clock guard renders at every sweep.
+    const h = harness();
+    const rendered: number[] = [];
+    const counting = (ms: number): Block => {
+      rendered.push(ms);
+      return header(ms);
+    };
+    const id = h.transcript.append(docWith([header(0), panel("a", "containers", raw("a-c", "x"))]), {
+      streaming: true,
+    });
+    h.driver.declare({ kind: "entry", id }, [part({ id: "a", intervalMs: 250 })]);
+    h.driver.readout(id, "step", counting);
+    for (let i = 0; i < 8; i += 1) await h.tick(250);
+
+    expect(headerOf(h, id)).toBe("run_command(npm test) · 2s");
+    expect(rendered.length, "sweeps ran every quarter second and the figure moved twice").toBeGreaterThanOrEqual(2);
+    const figures = rendered.map((ms) => Math.floor(ms / 1000));
+    expect(new Set(figures).size, `one render per figure, never one per sweep: ${String(rendered)}`).toBe(
+      rendered.length,
+    );
+  });
+
+  it("T3.61c (I53, I46): two cards share one timer, and a card nobody is looking at arms none", async () => {
+    const h = harness();
+    const a = running(h);
+    const b2 = running(h);
+    await h.tick(0);
+    expect(h.nextTimer(), "one wake for both").toBe(1_000);
+    await h.tick(3_000);
+    expect(headerOf(h, a)).toBe("run_command(npm test) · 3s");
+    expect(headerOf(h, b2), "written in the same sweep").toBe("run_command(npm test) · 3s");
+
+    // **One hidden, one visible — the cell the two gates share.** `visible` is
+    // read twice in the driver: once to decide whether any card arms the wake,
+    // once per card in the write loop. Hiding *both* cards made the first gate
+    // answer for the second: nothing armed, so nothing wrote, and a mutation
+    // that dropped the per-card gate survived (F784's neighbour, the GIF clamp's
+    // shape). With one card still visible the wake arms, and only the write
+    // gate keeps the hidden card's header where it was.
+    h.hidden.add(`entry:${a}`);
+    h.driver.visibilityChanged();
+    await h.tick(2_000);
+    expect(headerOf(h, a), "hidden while its sibling is not: no write").toBe("run_command(npm test) · 3s");
+    expect(headerOf(h, b2), "the visible sibling keeps counting").toBe("run_command(npm test) · 5s");
+    expect(wakeWithinASecond(h), "the wake stays armed for the visible one").toBe(true);
+
+    h.hidden.add(`entry:${b2}`);
+    h.driver.visibilityChanged();
+    await h.tick(2_000);
+    expect(headerOf(h, a), "off screen, no write").toBe("run_command(npm test) · 3s");
+    expect(wakeWithinASecond(h), "and no one-second wake armed").toBe(false);
+
+    h.hidden.clear();
+    h.driver.visibilityChanged();
+    await h.tick(1_000);
+    expect(headerOf(h, a), "back on screen, the figure catches up").toBe("run_command(npm test) · 8s");
+  });
+
+  it("T3.61d (I53, I21): an entry evicted underneath its readout drops it on the refused patch", async () => {
+    const h = harness();
+    running(h);
+    h.transcript.clear();
+    await h.tick(1_000);
+    expect(wakeWithinASecond(h), "the readout is gone with the entry").toBe(false);
   });
 });

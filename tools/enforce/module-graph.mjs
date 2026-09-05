@@ -1581,6 +1581,11 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   // it into a follow scroll and its consumer is `examples/agent`, which is at step 0 —
   // the same expiry as `UNCONSUMED_FUNCTIONS.toolCallDoc`. 2026-09-05, Lane B.
   "ToolCallSpec.output": "read by toolCallDoc into a follow scroll (C04 I97); the caller is the agent example, not yet built — remove with the toolCallDoc entry",
+  // The running card's one-second readout (C23 I53, F771). The caller is whoever
+  // appends a `toolCallDoc` as a pending entry — the agent example at step 0,
+  // the same consumer and the same expiry as the two entries above. The call it
+  // makes is written in C23 §3d-bis. 2026-09-05, Lane N.
+  "RefreshDriver.readout": "re-composes a pending entry's elapsed figure on the one-second wake (C23 I53); the caller is the agent example's pending-entry route, not yet built — remove with the toolCallDoc entry",
 
   // **`Skin` is `Basis`'s shape one carrier along**, and the same reading
   // applies: a record whose fields exist for one function, exported because

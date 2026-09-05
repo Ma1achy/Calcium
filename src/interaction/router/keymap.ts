@@ -14,7 +14,7 @@
  * apart, and identity is what makes that checkable.
  */
 
-import type { Binding, BlockKeymap, BuiltinBinding, FocusTarget, Key } from "./types.js";
+import type { Binding, BlockKeymap, BuiltinBinding, FocusTarget, Key, KeyAction } from "./types.js";
 
 export class KeymapError extends Error {
   override readonly name = "KeymapError";
@@ -450,6 +450,105 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
 ];
 
 /**
+ * The union, as a value (I19).
+ *
+ * **Not "the actions the default rows bind", which was the first cut and was
+ * wrong by nine.** `toggleSeries1` … `toggleSeries9` are in `KeyAction` and in
+ * L4's effect table, and no default row binds them: they reach the keymap only
+ * through the plot's `mergeBlock` (C12 I116). Measured with the digits counted —
+ * 78 in the union, 69 bound by a default row, 78 in the effect table — after a
+ * first measurement whose `[A-Za-z]+` silently excluded every name with a digit
+ * and reported 69 of 69. A check against the rows refused the plot's own digits.
+ *
+ * **Total by type, so it cannot drift**: `satisfies Record<KeyAction, true>`
+ * fails to compile on a missing member and on a name outside the union, which is
+ * the same guarantee `keys.ts`'s table carries for the executors. L3 still holds
+ * no copy of L4's *table* — this is the vocabulary, which is C16's own (I19).
+ */
+const BUILTIN_ACTIONS: ReadonlySet<string> = new Set(
+  Object.keys({
+    insertNewline: true,
+    complete: true,
+    acceptGhostOrForward: true,
+    menuNext: true,
+    menuPrev: true,
+    menuAccept: true,
+    dismiss: true,
+    historyPrev: true,
+    historyNext: true,
+    reverseSearch: true,
+    searchOlder: true,
+    backspace: true,
+    delete: true,
+    killWordLeft: true,
+    killWordRight: true,
+    killToStart: true,
+    killToEnd: true,
+    yank: true,
+    undo: true,
+    redo: true,
+    wordLeft: true,
+    wordRight: true,
+    home: true,
+    end: true,
+    left: true,
+    extendCharLeft: true,
+    extendCharRight: true,
+    extendWordLeft: true,
+    extendWordRight: true,
+    extendLineStart: true,
+    extendLineEnd: true,
+    selectAll: true,
+    copySelection: true,
+    extendRowUp: true,
+    extendRowDown: true,
+    copyElement: true,
+    selectAllElements: true,
+    focusPrompt: true,
+    rowUp: true,
+    rowDown: true,
+    entryPrev: true,
+    entryNext: true,
+    cursorLeft: true,
+    cursorRight: true,
+    rerunEntry: true,
+    orbitLeft: true,
+    orbitRight: true,
+    tiltDown: true,
+    tiltUp: true,
+    dollyIn: true,
+    dollyOut: true,
+    cameraReset: true,
+    orbitToggle: true,
+    toggleSeries1: true,
+    toggleSeries2: true,
+    toggleSeries3: true,
+    toggleSeries4: true,
+    toggleSeries5: true,
+    toggleSeries6: true,
+    toggleSeries7: true,
+    toggleSeries8: true,
+    toggleSeries9: true,
+    blockPageDown: true,
+    blockPageUp: true,
+    rowActivate: true,
+    scrollPageUp: true,
+    scrollPageDown: true,
+    scrollTop: true,
+    scrollBottom: true,
+    viewNextHunk: true,
+    viewPrevHunk: true,
+    viewTop: true,
+    viewBottom: true,
+    viewPageUp: true,
+    viewPageDown: true,
+    viewPop: true,
+    enterCopyMode: true,
+    exitCopyMode: true,
+  } satisfies Readonly<Record<KeyAction, true>>),
+);
+
+/**
  * Construction-time duplicate detection (I10, T2.4).
  *
  * **This is not the same check as `mergeBlock`'s, and the two are deliberately
@@ -509,6 +608,17 @@ export function createKeymap(bindings: readonly Binding[]): Keymap {
         // (`⏎`, C26 I14), while a free key stays at `liveBlock` and works from
         // the first `↓` (A01 D4). Neither half is shadowed and nothing is
         // silent: `/help` lists both, at their targets.
+        // **An action no built-in row binds is refused, not placed** (I19). The
+        // sentence this implements used to promise a C23 §3a route for an open
+        // string, and there is none: the binding would resolve and then execute
+        // nothing, silently, at every press.
+        if (!BUILTIN_ACTIONS.has(entry.action)) {
+          throw new KeymapError(
+            `block keymap binds ${entry.key.name} to "${entry.action}", which names no built-in action ` +
+              `(C16 I19). L4's effect table has no entry for it, so the key would resolve and do nothing; ` +
+              `refused here, where the block's author can see it.`,
+          );
+        }
         const collides =
           bySlot.has(slot("global", entry.key)) || bySlot.has(slot("liveBlock", entry.key));
         const target: FocusTarget = collides ? "interaction" : "liveBlock";

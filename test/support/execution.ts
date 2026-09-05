@@ -31,7 +31,7 @@ import { result } from "./transport.js";
 import type { RefreshHost } from "../../src/shell/refresh.js";
 import type { Pipeline, PipelineDeps } from "../../src/shell/types.js";
 import type { RawPatch, RawResult } from "../../src/data/transport/index.js";
-import type { ViewDocument } from "../../src/data/viewmodel/index.js";
+import type { ViewDocument, ViewPatch } from "../../src/data/viewmodel/index.js";
 import type { HistoryEntry } from "../../src/interaction/history/types.js";
 import type { Exit } from "../../src/data/process/types.js";
 
@@ -40,6 +40,8 @@ export type PipelineScript = Readonly<{
   invoke?: () => Promise<RawResult>;
   stream?: () => AsyncIterable<RawPatch>;
   adapt?: () => ViewDocument;
+  /** A scripted patch adapter, as the unit harness has; `null` drops the patch (C07). */
+  adaptPatch?: () => ViewPatch | null;
   spawnShell?: (command: string) => {
     stdout: AsyncIterable<string>;
     exited: Promise<{ code: number | null }>;
@@ -150,7 +152,7 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
     },
     adapters: {
       adapt: () => (script.adapt === undefined ? doc({ command: "adapted" }) : script.adapt()),
-      adaptPatch: () => null,
+      adaptPatch: () => (script.adaptPatch === undefined ? null : script.adaptPatch()),
       register: () => undefined,
       seal: () => undefined,
       sealed: true,

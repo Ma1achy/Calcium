@@ -37,6 +37,7 @@ import type { ProducerContext } from "../data/adapters/types.js";
 import { overflowNotice, withOverflowNotice } from "../data/adapters/overflow.js";
 import { isViewInvocation } from "../data/manifest/index.js";
 import type { ValidationResult } from "../data/manifest/index.js";
+import { b } from "./builders/index.js";
 import { liveDeclarations } from "./builders/live.js";
 import type { LiveSpec } from "./builders/types.js";
 import { shippedHandlers } from "./local/handlers.js";
@@ -653,13 +654,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
           blocks: withOverflowNotice(
             failed
               ? [
-                  block({
-                    kind: "notice",
-                    id: blockId("shell-failed"),
-                    tone: "error",
-                    glyph: "error",
-                    text: message,
-                  }),
+                  b.notice.error(message, { id: blockId("shell-failed") }),
                   ...(out === "" ? [] : [block({ kind: "raw", id: blockId("raw"), text: out })]),
                   ...(err === "" ? [] : [block({ kind: "raw", id: blockId("raw-err"), text: err })]),
                 ]
@@ -1263,12 +1258,13 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
      * Only the wording differs, so only the wording is a parameter.
      */
     const finish = (text: string, tone: "ok" | "warn" | "error", id: string): void => {
-      // C04 I6 — a toned notice carries a glyph, or `block()` throws and the
-      // containment path leaves the reader with a view that simply stopped.
-      // F29 is what happens when this is forgotten one layer down.
+      // **The glyph is passed, not defaulted** (C04 I6). `b.notice` supplies one
+      // for `warn` and `error` and none for `ok`, and this site has always drawn
+      // `✓` on the `ok` arm — the one of the fourteen where the family's default
+      // and the literal disagreed, found by the walk and not by the frame.
       deps.documentView.patch({
         op: "append",
-        block: block({ kind: "notice", id: blockId(id), tone, glyph: tone, text }),
+        block: b.notice(tone, text, tone, { id: blockId(id) }),
       });
       // The stall machinery is per host and this one has stopped producing, so
       // `settled` still fires — it is only `transcript.settle` that has no
@@ -1440,14 +1436,8 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
           // process on output nothing can consume (§8a A3).
           deps.transcript.patch(id, {
             op: "append",
-            block: block({
-              kind: "notice",
+            block: b.notice.warn(`output truncated: ${outcome.error.message}`, {
               id: blockId("truncated"),
-              tone: "warn",
-              // C04 I6 — a toned notice carries a glyph, or `block()` throws and
-              // the containment path produces no entry at all.
-              glyph: "warn",
-              text: `output truncated: ${outcome.error.message}`,
             }),
           });
           deps.transcript.settle(id);
@@ -1463,13 +1453,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     } catch (cause) {
       deps.transcript.patch(id, {
         op: "append",
-        block: block({
-          kind: "notice",
-          id: blockId("stream-error"),
-          tone: "error",
-          glyph: "error",
-          text: `stream failed: ${String(cause)}`,
-        }),
+        block: b.notice.error(`stream failed: ${String(cause)}`, { id: blockId("stream-error") }),
       });
       deps.transcript.settle(id);
       deps.scheduler.commit("completion");
@@ -1682,13 +1666,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         from,
         {
           op: "append",
-          block: block({
-            kind: "notice",
-            id: blockId("refused"),
-            tone: "warn",
-            glyph: "warn",
-            text,
-          }),
+          block: b.notice.warn(text, { id: blockId("refused") }),
         },
         // **The whole of why this works now.** A refusal notice *is* data, so a
         // gate reading the operation refused it on every settled entry — which
