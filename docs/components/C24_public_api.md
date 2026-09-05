@@ -741,6 +741,17 @@ A block is data at every instant (C04 I1). A consumer callback returning frames 
 
 **Animation and liveness are orthogonal.** A spinner inside a `b.live` part animates at C03's spinner cadence while its data refreshes at `every`, and neither knows about the other.
 
+**The two catalogues are listable, by name, from the surface.** `Status.spinner` names a
+`SPINNER_SETS` entry and `Progress.style` a `BAR_STYLES` entry, and until 2026-09-05 a consumer
+could name one only by knowing it — the catalogues lived in `docs/notes/CALCIUM_SPINNERS.md`
+and `CALCIUM_BARS.md` and nowhere the code could read. `spinnerSetNames()` and `barStyleNames()`
+are exported for that: a consumer that draws a gallery, a picker or a setting reads the list
+rather than copying it, so a set added to the catalogue arrives without the copy going stale
+(the fixtures rule, `test/support/README.md`). The first consumer is the plots demo's
+`/spinners` and `/bars`, whose frames are the gallery `docs/media/spinner-sets.gif` and
+`docs/media/bar-styles.png` show. Unknown names still resolve to the defaults rather than
+throwing (C09 §4), so the lists are an affordance and not a gate.
+
 ---
 
 ## 7. `@fmx/calcium/testing`
