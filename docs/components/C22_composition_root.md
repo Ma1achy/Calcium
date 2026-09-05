@@ -1800,7 +1800,7 @@ nothing to switch on.
   reached from the other side.
 - **`MIN_ROWS = 16` and the prompt caps at ⌊rows/2⌋ = 8.** Two rule rows leave `16 − 1 − 2 − 8 = 5`
   for region plus footer; one region row leaves **4** as the largest footer the gate can hold,
-  where §6k derived 6 without the rules.
+  where §6k derived 6 without the rules. (Three since §6l.7 took a row for the header's rule.)
 - **`heightsSum` is asserted in two places** — `frame.ts` and `paint.ts`'s `FrameError` — and
   `initialRegionHeight` is the pre-frame guess `compose` corrects (I34). Every one of them spells
   the subtraction, so the rules are two terms added in one place and checked in three.
@@ -1822,7 +1822,7 @@ nothing to switch on.
 | 4 | footer blocks measuring `f` rows | the footer is its content | `heightsSum` | footer = `min(f, MAX_FOOTER_ROWS)`, region = `R − 1 − 2 − p − footer` (I82); `f` is measured by `measureSequence` on the footer's blocks at the frame's width, so the height and the rows are one measurement |
 | 5 | footer content taller than `MAX_FOOTER_ROWS` | the footer is its content | the size gate | clamped to the maximum and truncated top-down by `region()` — §6k.2 row 3's cell, now reached only past the cap; the app returned more than the frame can hold and the frame says so by drawing the top of it |
 | 6 | footer returns `[]` | the footer is its content | one blank row was the default | **zero rows.** The default footer is no longer `[]`: it returns one muted row naming `/help` and the session's `cwd` (§6l.4 E), so a default session still has a footer and an app that wants none returns nothing |
-| 7 | `MIN_ROWS` with the prompt at its cap and the footer at its maximum | the size gate | the two rules | `16 − 1 − 2 − 8 − 4 = 1` region row — **`MAX_FOOTER_ROWS = MIN_ROWS − HEADER_ROWS − RULE_ROWS − ⌊MIN_ROWS/2⌋ − 1 = 4`**, derived as §6k.4 B derived 6, and T1.35 asserts the derivation |
+| 7 | `MIN_ROWS` with the prompt at its cap and the footer at its maximum | the size gate | the rules | `16 − 1 − 1 − 2 − 8 − 3 = 1` region row — **`MAX_FOOTER_ROWS = MIN_ROWS − HEADER_ROWS − HEADER_RULE_ROWS − RULE_ROWS − ⌊MIN_ROWS/2⌋ − 1 = 3`**, derived as §6k.4 B derived 6 (4 before the header's rule, §6l.7), and T1.35 asserts the derivation |
 | 8 | the first frame, before any `ChromeFn` has run | `initialRegionHeight` | the footer is its content | the guess uses `DEFAULT_FOOTER_ROWS = 1` and the rules; `compose` corrects by the difference on the first frame (I34), which is §6k.2 row 5 with the guess named |
 | 9 | a click on a rule row | C16 §4a trace 8 | the rule is chrome | chrome — `chromeClick` reads *no entry here*, and a rule row has no entry |
 | 10 | a layer's box against a rule | I28 | the rule is chrome | `overlayRegion.height` is the region's; a layer cannot cover a rule |

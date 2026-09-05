@@ -47,6 +47,12 @@ At 80 × 14, mid-session, with the live block navigable:
 ↑↓ rows   ⏎ drill in   ␣ expand   f filter   s sort   ⌃↑ prev   esc prompt
 ```
 
+> **Superseded 2026-09-05** — C22 §6l ruled the prompt's two rules real (I81) and §6l.7 the
+> header's (I87): all three horizontal rules in the fence are now drawn, and §3 below counts them.
+> The paragraph and the three reasons stay as the record of why they were not, and of what moved:
+> the fixed overhead the first reason guards is now four rows of chrome plus the footer, and
+> `MAX_FOOTER_ROWS` is derived from it — four with two rules, three with the header's.
+
 **The fence is a diagram of the four regions, and its box-drawing marks their boundaries rather than depicting rows.** The three horizontal rules are not rendered: the frame is header, viewport, prompt, footer and nothing between them, which is exactly §3's arithmetic. Counting them gives a fifteen-row frame from a fourteen-row terminal, and a frame one row over scrolls the alternate screen.
 
 Stated because the picture invites the other reading and C22 took it — the deferral asserting this figure could not be written for two commits while §2 and §3 disagreed, and nothing said which was the artefact. Three reasons the rules are not real:
@@ -65,15 +71,17 @@ The `▌` gutter marks the live block (D6). The footer has switched to row keys 
 
 ```
 headerRows   = 1
+headerRule   = 1                                   — under the header (C22 I87)
 ruleRows     = 2                                   — one above the prompt, one below (C22 I81)
 footerRows   = min( measureSequence(footer, width), MAX_FOOTER_ROWS )   — 0 for `[]` (C22 I82)
 promptRows   = min( editor.displayRows(width, gutter), floor(rows / 2) )
-viewportRows = max( 0, rows − headerRows − ruleRows − footerRows − promptRows )
+viewportRows = max( 0, rows − headerRows − headerRule − ruleRows − footerRows − promptRows )
 ```
 
 **Amended 2026-09-05** (C22 §6l): the footer was a declared budget of one row and is now its
 content's height, and the two rules bounding the prompt are drawn at every size — they were the
-boxes §2's figure annotated and nothing drew.
+boxes §2's figure annotated and nothing drew. **And again the same day** (C22 §6l.7, I87): the
+header's rule is drawn too, so the frame carries the fence's three.
 
 with `gutter = { first: 2, cont: 2 }` (D24a, C22 §6).
 
