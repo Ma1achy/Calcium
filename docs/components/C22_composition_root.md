@@ -1915,7 +1915,7 @@ the reference surface draws them the same way.
 | # | the cell | rule A | rule B | ruling |
 |---|---|---|---|---|
 | 16 | a card's hook and a muted notice's `continuation` mark on one screen | I83 as ruled in §6l.4 — the hook at column 0 | C09 §4's lead for `continuation` — column 2, held to the prompt gutter by T2.99 | **one column, 2** (I84). The hook is the same mark, so it sits where the mark sits; the body's rows are one unit in from it, column 4, and `entryLayout`'s body run is `width − 4`. The two forms are asserted against each other by a frame that holds both |
-| 17 | the body's first block declares `gapBefore` — a `table` by C24 §4's default | C04 §3a: a leading gap is a blank row | the hook marks the body's first row | the hook would mark a blank. **The shell clears the leading gap when it composes the card** (C23 I57) — on the document, where the shell is already the writer — so C04's rule holds of every document as composed and the hook marks the table's header |
+| 17 | the body's first block declares `gapBefore` — a `table` by C24 §4's default | C04 §3a: a leading gap is a blank row | the hook marks the body's first row | the hook would mark a blank. **`entryLayout` drops the leading gap from the body run** (C23 I57) — a per-frame copy read by the measurer and the renderer, never the stored document — so C04's rule holds of the document as stored and the hook marks the table's header. It was ruled *on the document, in `cardOver`* first, and that copy dropped the live part declared by the block's identity (F821) |
 | 18 | the row after an entry's last row | the next entry's command row | the entry's own rows | **one blank row, the entry's** (I85). `entryLayout` ends every entry with a blank run, so C14 measures it through the wrapper and `visibleRows` draws it through the same function; `entryAtRow` maps it to the entry above |
 | 19 | the last entry's blank row | the upper rule | I85 | the blank sits above the rule, which is the design's frame idle and in flight. A one-row region scrolled to an entry's end shows the blank — the tail anchor's own behaviour, and the size gate makes it the reader's choice |
 | 20 | the header's clock, the footer's `cwd` | one `pills` row, flush left | the design's right edge | **two clusters** (I86): a `group` row with `flex: [1, { cells: right }]`, the left cluster taking the remainder and the right its own content width, aligned `top-right`. Facts that name the session sit at the left edge; facts that change sit at the right, where a reader glancing down finds them |
@@ -1930,8 +1930,10 @@ frame with both forms on it rather than two constants compared.
   body at column 4; `entryLayout`'s body run is `width − 4` with a four-cell gutter, and the
   `continuation` mark C09 draws in a notice and the one the shell draws as a card's gutter are one
   column on one screen.
-- **H. The body's leading gap is the hook's** (C23 I57). Cleared by the shell when it composes the
-  card, on the composed document; no renderer drops it.
+- **H. The body's leading gap is the hook's** (C23 I57). Dropped by `entryLayout` in the body run
+  it hands both the measurer and the renderer; the stored document keeps its blocks by identity.
+  Ruled on the document first and moved here by F821 — a live part is declared by object identity,
+  and a copy on `cardOver` lost it.
 - **I. An entry closes with one blank row** (I85). Through `entryLayout`, measured and drawn as one.
 - **J. Chrome is two clusters** (I86). The default header: `[name, binary, COPY]` left, `[clock]`
   right. The default footer: `[/help, stopping]` left, `[cwd]` right. The right cluster's `cells`
