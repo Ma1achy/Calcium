@@ -22,6 +22,7 @@ const ROOT = process.cwd();
 const CMD = "npx vitest run test/integration/running-card.test.ts test/contract/notice-family.test.ts";
 const EX = "src/shell/execution.ts";
 const RF = "src/shell/refresh.ts";
+const DOC = "src/shell/documents.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -46,6 +47,14 @@ const results = runPass({
     why: "T4.40 asserts the header reads · 4s after four wakes; nothing registered means nothing moves — F771 at the route",
   },
   mutations: [
+    {
+      // F795 as it shipped: `ps()` for a bare verb.
+      name: "the header keeps its parentheses with no arguments",
+      file: DOC,
+      from: "  const parts = [call.args === \"\" ? call.name : `${call.name}(${call.args})`];",
+      to: "  const parts = [`${call.name}(${call.args})`];",
+      expect: "T4.46",
+    },
     {
       // The tree's state until 2026-09-05: a pending entry with no blocks.
       name: "step 3 appends compose({ blocks: [] }) — the old pending entry",

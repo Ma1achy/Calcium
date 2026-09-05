@@ -14,7 +14,7 @@
  */
 import type { AxisSpec3, Plot, Point3, Surface3, Tone } from "../../data/viewmodel/index.js";
 import type { RenderContext } from "../blocks/types.js";
-import type { ColourValue } from "../theme/types.js";
+import type { ColourValue, Style } from "../theme/types.js";
 import { assertPictureGlyph } from "../theme/picture.js";
 // **`HALF_BLOCK` is gone from this file and that is the finding, not the
 // tidy-up** (C12 I104). `▀` was the area raster; it is now one of sixteen
@@ -915,8 +915,8 @@ export function plot3dArea(
    * Merging them would make that decision unmakeable.
    */
   const frameBits: number[] = new Array<number>(w * rows).fill(0); // cells-ok — a cell count
-  const frameInkAt: (ColourValue | undefined)[] =
-    new Array<ColourValue | undefined>(w * rows).fill(undefined); // cells-ok — a cell count
+  const frameInkAt: (Style | undefined)[] =
+    new Array<Style | undefined>(w * rows).fill(undefined); // cells-ok — a cell count
 
   const at = (target: number[], cx: number, cy: number, b: number): void => {
     if (cx < 0 || cy < 0 || cx >= w || cy >= rows) return; // cells-ok — a bound
@@ -982,7 +982,8 @@ export function plot3dArea(
     return null;
   };
 
-  const frameInk = slot("tone.muted", ctx.theme, ctx.capabilities).colour;
+  const frameStyle: Style = slot("tone.muted", ctx.theme, ctx.capabilities);
+  const frameInk = frameStyle.colour;
   // **A focused plot3d lights its frame** (C26 §7, C12 §3al). The frame is this
   // file's and not `furniture.ts`'s, so `Layout.focused` cannot carry it; the
   // focus is read here, where the frame's ink is chosen, and it is the id the
@@ -992,7 +993,8 @@ export function plot3dArea(
   // scale keeps `muted` while the enclosure lights up, as the 2-D frame's does.
   const focus = ctx.focus;
   const focused = focus !== null && focus.blockId === block.id && focus.rowId === block.id;
-  const lineInk = focused ? slot("tone.accent", ctx.theme, ctx.capabilities).colour : frameInk;
+  const lineStyle: Style = focused ? slot("tone.accent", ctx.theme, ctx.capabilities) : frameStyle;
+  const lineInk = lineStyle.colour;
 
   for (const d of drawn) {
     const tier = tierOf(d.depth, nearD, farD);
@@ -1196,7 +1198,7 @@ export function plot3dArea(
     // untoned axes keep `frameInk`, which is what makes a single coloured axis
     // read as one axis rather than as a recoloured frame.
     ink[i] = axisInk ?? lineInk;
-    frameInkAt[cy * w + cx] = axisInk ?? lineInk; // cells-ok — a cell offset
+    frameInkAt[cy * w + cx] = axisInk === undefined ? lineStyle : { ...lineStyle, colour: axisInk }; // cells-ok — a cell offset
     mark[i] = m;
     kind[i] = OUTLINE;
     // **And the tier code is cleared with it.** `glyphRows` reads `glyph`
@@ -1638,7 +1640,14 @@ function mixedRows(
  */
 type Frame = Readonly<{
   bits: readonly number[];
-  ink: readonly (ColourValue | undefined)[];
+  /**
+   * The whole `Style` a cell, not its colour (F803). At 1-bit a slot resolves to
+   * a weight and no colour — `muted` is dim, `accent` bold — and a frame that
+   * kept only `.colour` had nothing for focus to change there while the 2-D
+   * frame went dim to bold (F34). The data raster keeps a `ColourValue` a
+   * sample: a mark is a colour or nothing, and the half arm has a colour floor.
+   */
+  ink: readonly (Style | undefined)[];
   corners: "rounded" | "sharp";
 }>;
 
@@ -1810,7 +1819,7 @@ function brailleRows(
         line.push(colour === undefined ? { text: solid } : { text: solid, style: { colour } });
       } else if (framed !== undefined) {
         const fi = frame.ink[cell]; // cells-ok — a cell offset
-        line.push(fi === undefined ? { text: framed } : { text: framed, style: { colour: fi } });
+        line.push(fi === undefined ? { text: framed } : { text: framed, style: fi });
       } else {
         line.push({ text: " " });
       }
@@ -1878,8 +1887,18 @@ function glyphRows(
         // rung the precedence gained, in the place the old shared array put it.
         const shaded = mark[i];
         if (shaded !== undefined) {
+          // **A frame cell arrives here too** — the frame callback writes its glyph
+          // into `mark` and clears `glyph`, so on this arm the box and axes are
+          // drawn by this branch and not by `frameGlyph` below. Where the frame
+          // owns the cell its `Style` wins, weight and all (F803); a density glyph
+          // keeps the sample's colour.
+          const fi = frame.ink[i]; // cells-ok — one sample a cell on this arm
           const colour = ink[i];
-          line.push(colour === undefined ? { text: shaded } : { text: shaded, style: { colour } });
+          line.push(
+            fi !== undefined ? { text: shaded, style: fi }
+            : colour === undefined ? { text: shaded }
+            : { text: shaded, style: { colour } },
+          );
           continue;
         }
         const framed = frameGlyph(frame, i, ctx);
@@ -1887,7 +1906,7 @@ function glyphRows(
         line.push(
           framed === undefined ? { text: " " }
           : fi === undefined ? { text: framed }
-          : { text: framed, style: { colour: fi } },
+          : { text: framed, style: fi },
         );
         continue;
       }

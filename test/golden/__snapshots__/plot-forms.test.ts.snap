@@ -1215,21 +1215,21 @@ exports[`golden frames — every form > pie · full · 80 1`] = `
 exports[`golden frames — every form > plot3d · ascii-1bit-wide · 40 1`] = `
 "── plot3d · measured 6 · rendered 6
 
-               1--------|
-              0.5  .@  |+
-              -0.5||||||
-               -1||||||-1
-                y ||0.5"
+               1[2m--------|[22m
+              0.5  .@  [2m|[22m+
+              -0.5[2m||||||[22m
+               -1[2m||||||[22m-1
+                y [2m||[22m0.5"
 `;
 
 exports[`golden frames — every form > plot3d · ascii-1bit-wide · 80 1`] = `
 "── plot3d · measured 6 · rendered 6
 
-                                   1|||||||||
-                                  0.5   @  |+
-                                  -0.5||||||
-                                   -1||||||-1
-                                    y ||0.5"
+                                   1[2m|||||||||[22m
+                                  0.5   @  [2m|[22m+
+                                  -0.5[2m||||||[22m
+                                   -1[2m||||||[22m-1
+                                    y [2m||[22m0.5"
 `;
 
 exports[`golden frames — every form > plot3d · full · 40 1`] = `

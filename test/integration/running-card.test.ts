@@ -222,6 +222,21 @@ describe("C23 I54 — the pending entry is the running card", () => {
     expect(entry?.doc.blocks.some((blk) => blk.kind === "notice" && blk.glyph === "step"), "no header survives a replacement").toBe(false);
   });
 
+  it("T4.46 (C23 I54; F795): a bare verb is a bare header — `ps`, not `ps()` — and grows its figure the same way", async () => {
+    const held: { release: (() => void) | null } = { release: null };
+    const h = pipelineHarness({
+      invoke: () => new Promise((r) => { held.release = () => r(result({ exitCode: 0 })); }),
+    });
+    h.pipeline.submit("/ps");
+    await settled();
+    expect(headerOf(h.transcript.entries[0]?.doc.blocks ?? []), "no arguments, no parentheses").toEqual({ glyph: "step", text: "ps" });
+    seconds(h, 2);
+    expect(headerOf(h.transcript.entries[0]?.doc.blocks ?? [])?.text).toBe("ps · 2s");
+    // The control is T4.43 above: `ps(--quiet)` keeps its parentheses.
+    held.release?.();
+    await settled();
+  });
+
   it("T4.44 (C23 I54, I25, with §3b): the stall notice is the card's last row while the header counts on; a patch resumes it in place; `end` finishes above both", async () => {
     const gate = gatedStream();
     const h = pipelineHarness({ stream: gate.stream, adaptPatch: appender() });

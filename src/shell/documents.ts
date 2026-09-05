@@ -269,7 +269,11 @@ export type ToolCallSpec = Readonly<{
 
 /** The header line, without its glyph. Exported for the row that asserts it. */
 export function toolCallHeader(call: ToolCallSpec): string {
-  const parts = [`${call.name}(${call.args})`];
+  // **A bare verb has no parentheses** (C23 §3, F795): `⏺ ps`, not `⏺ ps()`. The
+  // parentheses say *these are the arguments*, and with none they say it about
+  // nothing. One grammar for the shell's card and the agent's, decided here
+  // because both compose their header through this function.
+  const parts = [call.args === "" ? call.name : `${call.name}(${call.args})`];
   const since = call.elapsedMs === undefined ? "" : elapsed(call.elapsedMs);
   if (since !== "") parts.push(since);
   if (call.outcome !== undefined && call.outcome !== "") parts.push(call.outcome);

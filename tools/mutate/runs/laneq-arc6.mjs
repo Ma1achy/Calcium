@@ -51,10 +51,18 @@ const results = runPass({
       expect: "T4.13",
     },
     {
-      name: "PLOT3D-MUTED: the 3-D frame keeps `frameInk` under focus — the frame as it shipped",
+      // F803 as it shipped: the frame cell keeps only the colour, so at 1-bit there is no weight.
+      name: "PLOT3D-COLOUR-ONLY: the frame cell carries a colour and no weight",
       file: "src/presentation/plot/scatter3.ts",
-      from: "    ink[i] = axisInk ?? lineInk;\n    frameInkAt[cy * w + cx] = axisInk ?? lineInk; // cells-ok — a cell offset\n",
-      to: "    ink[i] = axisInk ?? frameInk;\n    frameInkAt[cy * w + cx] = axisInk ?? frameInk; // cells-ok — a cell offset\n",
+      from: "    frameInkAt[cy * w + cx] = axisInk === undefined ? lineStyle : { ...lineStyle, colour: axisInk }; // cells-ok — a cell offset",
+      to: "    frameInkAt[cy * w + cx] = { colour: axisInk ?? lineInk }; // cells-ok — a cell offset",
+      expect: "T1.27",
+    },
+    {
+      name: "PLOT3D-MUTED: the frame's lines keep `frameStyle` under focus — the frame as it shipped before focus",
+      file: "src/presentation/plot/scatter3.ts",
+      from: "  const lineStyle: Style = focused ? slot(\"tone.accent\", ctx.theme, ctx.capabilities) : frameStyle;",
+      to: "  const lineStyle: Style = frameStyle;",
       expect: "T1.27",
     },
     {

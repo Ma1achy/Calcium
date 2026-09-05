@@ -464,23 +464,26 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
     expect(plot3dAt({ blockId: "p3", rowId: null })).toEqual(none);
   });
 
-  it("T1.27 (C26 §7, F34): at 1-bit a focused plot3d is invisible, because its frame carries a colour and no weight — pinned with the premise", () => {
-    // **Measured, and the opposite of the 2-D frame.** `furniture.ts` paints
-    // its frame through `tone()`, so at 1-bit `muted` is `2m` and focus turns
-    // it `1m`. `scatter3.ts` carries a `ColourValue` a cell — `slot(...).colour`
-    // — and at 1-bit that is undefined for `muted` and `accent` alike: no cell of
-    // the 3-D frame is dim before focus, so there is nothing for focus to make
-    // bold. Said here rather than absorbed (F803, arc 6); the row goes red the
-    // day the 3-D frame gains a weight channel, which is the day F34's rule
-    // applies to it.
+  it("T1.27 (C26 §7, F34): at 1-bit a focused plot3d goes from dim to bold on exactly its frame — a weight, not a colour — and the tick labels do not move", () => {
+    // **The 3-D frame carries a `Style` a cell** (F803, closed the day it was
+    // filed): `frameInkAt` holds `slot(...)` whole rather than its `.colour`, so
+    // at 1-bit `muted` is `2m` and focus turns the frame `1m`, as `furniture.ts`
+    // does for the 2-D frame. The row this replaces pinned the opposite — a frame
+    // with no dim glyph to move — and its premise assertion is inverted below.
     const none = plot3dAt(null, 1);
     const focused = plot3dAt({ blockId: "p3", rowId: "p3" }, 1);
-    expect(focused, "byte-identical at 1-bit").toEqual(none);
+    expect(focused.map((l) => l.replace(SGR, ""))).toEqual(none.map((l) => l.replace(SGR, "")));
+    const diff = styleDiff(none, focused, 60);
+    expect(diff.length, "the frame's cells at 60 columns").toBeGreaterThan(20);
+    for (const d of diff) {
+      expect(d.was.attrs, `${JSON.stringify(d.ch)} was dim`).toContain(2);
+      expect(d.now.attrs, `${JSON.stringify(d.ch)} is bold`).toContain(1);
+      expect(d.now.attrs).not.toContain(2);
+      expect(/\d/u.test(d.ch), "no tick label moved").toBe(false);
+    }
     const dimCells = cellsOf(none, 60).flatMap((row) => row.filter((c) => c.ch.trim() !== "" && c.style.attrs.includes(2)));
-    expect(dimCells, "the premise: no glyph of the 1-bit 3-D frame is dim").toEqual([]);
-    // **The control**: the 2-D frame at the same depth has dim glyphs to move.
-    const flat = cellsOf(plotAt(null, 1), 80).flatMap((row) => row.filter((c) => c.ch.trim() !== "" && c.style.attrs.includes(2)));
-    expect(flat.length, "the 2-D frame carries the weight the 3-D one does not").toBeGreaterThan(100);
+    expect(dimCells.length, "the unfocused frame is dim — the weight is there to move").toBeGreaterThan(20);
+    expect(plot3dAt({ blockId: "q", rowId: "q" }, 1), "another block's focus paints nothing here").toEqual(none);
   });
 
   // --- mosaic — no furniture of its own, so focus is invisible, and that is pinned (C26 §7) ---

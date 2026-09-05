@@ -39,8 +39,8 @@ const results = await runPass({
     file: SCATTER,
     // The frame's own colour, which AT5 asserts every frame cell carries by
     // default and AT1 counts exactly.
-    from: '  const frameInk = slot("tone.muted", ctx.theme, ctx.capabilities).colour;',
-    to: '  const frameInk = slot("tone.accent", ctx.theme, ctx.capabilities).colour;',
+    from: '  const frameStyle: Style = slot("tone.muted", ctx.theme, ctx.capabilities);',
+    to: '  const frameStyle: Style = slot("tone.accent", ctx.theme, ctx.capabilities);',
     why: "AT5 asserts no accent appears by default and AT1 counts the muted cells exactly; a run where recolouring the whole frame survives cannot see a kill",
   },
   mutations: [
