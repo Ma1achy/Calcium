@@ -162,6 +162,47 @@ export function resolveFocus(
 }
 
 /**
+ * The selection's extent — the head and every element between it and the
+ * anchor, inclusive (C26 I16, §5c trace 3).
+ *
+ * **The head goes through `resolveFocus`; the anchor does not.** A stale head is
+ * where focus *is* — it falls as I10 says and is highlighted there. I10's fall
+ * lands on the block's first element, which for an anchor widened a selection to
+ * rows the reader never chose (anchor `b1` gone → `a1..c1` copied, F764,
+ * measured). The list is the new one and the anchor's old position went with
+ * it, so an exact match is the only honest answer and a stale anchor collapses
+ * to the head.
+ *
+ * **One function for the render side and the key side, on `resolveFocus`'s own
+ * argument.** `focusFor` washes the extent and `copyElement` copies it; the same
+ * eight lines sat in both files, each with a comment pointing at the other,
+ * which is C26 §8b.4's hazard — two instances read as a pair and part the first
+ * time one is edited. `extent` always holds the head, so an extent of one is
+ * *no selection*: the store's `anchor === element` sentinel, one step resolved.
+ *
+ * `null` exactly when `resolveFocus` is — the list is empty.
+ */
+export function extentOf<P extends PlacedElement>(
+  stored: Readonly<{ element: ElementAddress | null; anchor: ElementAddress | null }>,
+  elements: readonly P[],
+): Readonly<{ head: P; extent: readonly P[] }> | null {
+  const head = resolveFocus(stored.element, elements);
+  if (head === null) return null;
+  const headElement = elements[head];
+  if (headElement === undefined) return null;
+  const anchorAt = stored.anchor;
+  const exact =
+    anchorAt === null
+      ? -1
+      : elements.findIndex((p) => p.blockId === anchorAt.blockId && p.element.id === anchorAt.elementId);
+  const anchor = exact === -1 ? head : exact;
+  return Object.freeze({
+    head: headElement,
+    extent: Object.freeze(elements.slice(Math.min(anchor, head), Math.max(anchor, head) + 1)), // graphemes-ok: element indices, not text
+  });
+}
+
+/**
  * The one piece of stored focus state in the system (§3).
  *
  * A location rather than a bit: when focus is in the live block, which row holds

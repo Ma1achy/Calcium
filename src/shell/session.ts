@@ -40,7 +40,7 @@ import { framesOf } from "../presentation/blocks/kinds/image.js";
 import type { FocusState } from "../presentation/blocks/index.js";
 import { contextAt } from "../interaction/completion/index.js";
 import { selectionSpans, type CellSpan } from "../interaction/editor/index.js";
-import { resolveFocus } from "../interaction/router/focus.js";
+import { extentOf } from "../interaction/router/focus.js";
 import { PROMPT_GUTTER } from "./config.js";
 import { cursorStyleFor, steadyWhileTyping } from "./cursor-style.js";
 import { createIdentityLoop } from "./identity.js";
@@ -1314,40 +1314,22 @@ function focusFor(graph: Graph, entryId: string): FocusState | null {
   // **And it manufactured the block half of the address by searching for the
   // first element whose id matched** (C26 §8b.7), so with two tables each
   // carrying `r1` the highlight drew on the first while focus was on the second.
-  // `resolveFocus` is the same function the key effects use, which is what makes
-  // *what is highlighted* and *where the next arrow goes* one answer rather than
-  // two that agree — and it writes nothing, because this runs per frame.
-  const elements = graph.focusedElements();
-  const i = resolveFocus(stored.element, elements);
-  if (i === null) return null;
-  const found = elements[i];
-  if (found === undefined) return null;
-  const head = Object.freeze({ blockId: found.blockId, rowId: found.element.id });
-
-  // **The extent, by `copyElement`'s own arithmetic** (C26 I16, §5c trace 3),
-  // so what is washed and what `y` copies are one answer. The head goes
-  // through `resolveFocus` because a stale head is where focus *is*; the
-  // anchor does not — I10's fall lands on the block's first element, which
-  // widened a copy to rows the reader never chose (F764) — so an exact match
-  // is the only honest answer and a stale anchor collapses to the head.
+  // `extentOf` is the same function `copyElement` reads, which is what makes
+  // *what is highlighted*, *what `y` copies* and *where the next arrow goes* one
+  // answer rather than three that agree — and it writes nothing, because this
+  // runs per frame. The stale-anchor rule (C26 I16, F764) lives there.
   //
   // **Measured before this**: after `↓ ⇧↓ ⇧↓` the frame showed the head in
   // `accent` and nothing else — `y` was the extent's only reader (F764).
-  //
+  const ext = extentOf(stored, graph.focusedElements());
+  if (ext === null) return null;
+  const head = Object.freeze({ blockId: ext.head.blockId, rowId: ext.head.element.id });
+
   // The head alone is no selection and the field is **absent**, not `[]`
   // (`FocusState.selected`): the two draw identically and must key
-  // identically. `keys.ts`'s `copyElement` holds the same eight lines; the
-  // shared helper is owed beside `resolveFocus` (arc3 Lane A's request).
-  const anchorAt = stored.anchor;
-  const exact =
-    anchorAt === null
-      ? -1
-      : elements.findIndex((p) => p.blockId === anchorAt.blockId && p.element.id === anchorAt.elementId);
-  const anchor = exact === -1 ? i : exact;
-  if (anchor === i) return head;
-  const selected = elements
-    .slice(Math.min(anchor, i), Math.max(anchor, i) + 1)
-    .map((p) => Object.freeze({ blockId: p.blockId, rowId: p.element.id }));
+  // identically.
+  if (ext.extent.length === 1) return head; // graphemes-ok: an element count, not text
+  const selected = ext.extent.map((p) => Object.freeze({ blockId: p.blockId, rowId: p.element.id }));
   return Object.freeze({ ...head, selected: Object.freeze(selected) });
 }
 

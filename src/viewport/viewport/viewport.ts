@@ -16,6 +16,7 @@
 
 import { HeightCache } from "./cache.js";
 import { HeightIndex } from "./index-tree.js";
+import { atTail } from "./tail.js";
 import type {
   Anchor,
   ScrollState,
@@ -123,7 +124,7 @@ class ViewportImpl implements Viewport {
       entries: Object.freeze(out),
       topRow: top,
       atTop: top === 0,
-      atBottom: top >= this.#maxTop(),
+      atBottom: atTail(top, this.#maxTop()),
     });
   }
 
@@ -153,8 +154,9 @@ class ViewportImpl implements Viewport {
     // I5 — `followTail` is on iff the viewport is at the bottom. Derived from
     // where the viewport ended up, never from which way the user scrolled: a
     // scroll up that clamps at the bottom because the transcript is shorter than
-    // the screen has not detached anything.
-    this.#followTail = this.#topRow >= this.#maxTop();
+    // the screen has not detached anything. `atTail` is the one comparison the
+    // shell's tail helpers read too (C04 I97), so `>=` cannot drift in one copy.
+    this.#followTail = atTail(this.#topRow, this.#maxTop());
     if (!this.#followTail) this.#captureAnchor();
     else this.#anchor = null;
 
@@ -163,7 +165,9 @@ class ViewportImpl implements Viewport {
 
   scrollToTop(): void {
     this.#setTop(0);
-    this.#followTail = this.#maxTop() === 0;
+    // The same derivation as `scrollBy`: at the top, following iff the whole
+    // transcript fits — `maxTop() === 0`, spelled as the comparison it is.
+    this.#followTail = atTail(this.#topRow, this.#maxTop());
     this.#captureAnchor();
     this.#emit({ kind: "scroll" });
   }

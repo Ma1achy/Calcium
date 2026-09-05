@@ -19,6 +19,9 @@ import { report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const CMD = "npx vitest run test/unit/session-navigation.test.ts test/unit/session-keys.test.ts";
 const KEYS = "src/shell/keys.ts";
+// The extent moved out of `copyElement` into `extentOf` (arc5 Lane E, C26 §5c);
+// the stale-anchor mutation follows it and now reaches `focusFor` too.
+const FOCUS = "src/interaction/router/focus.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -62,9 +65,9 @@ const results = runPass({
       // The shipped state at bd93056e: the anchor through `resolveFocus`, whose
       // fall lands on the block's first element and widens the copy.
       name: "a stale anchor falls to the block's first element",
-      file: KEYS,
-      from: "      const anchor = exact === -1 ? head : exact;",
-      to: "      const anchor =\n        exact === -1 ? (anchorAt === null ? head : (resolveFocus(anchorAt, elements) ?? head)) : exact;",
+      file: FOCUS,
+      from: "  const anchor = exact === -1 ? head : exact;",
+      to: "  const anchor =\n    exact === -1 ? (anchorAt === null ? head : (resolveFocus(anchorAt, elements) ?? head)) : exact;",
       expect: "T3.50",
     },
     {

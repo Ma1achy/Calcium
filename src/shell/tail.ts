@@ -1,20 +1,20 @@
 /**
  * The tail — one comparison, written once (C04 I97, C-view I48, C14 I5).
  *
- * **Three places asked *are we at the bottom* and two of them were in this
- * layer.** `document-view.ts` compared a block offset against the last offset
- * from which the tail still fills the region; `ScrollOffsets` needed the same
+ * **Three places ask *are we at the bottom*, and two of them are in this
+ * layer.** `document-view.ts` compares a block offset against the last offset
+ * from which the tail still fills the region; `ScrollOffsets` asks the same
  * question in rows, against a ceiling the renderer clamps to; and C14's
- * viewport holds `#followTail = topRow >= maxTop()`. The drift between them is
- * `>=` becoming `>` in one copy — a box that stops following one row early, and
+ * viewport sets `followTail` from it (I5). The drift between them is `>=`
+ * becoming `>` in one copy — a box that stops following one row early, and
  * nothing that reads the three files together.
  *
- * **In `shell/` (L4) and not `viewport/` (L2), and the reason is who calls it.**
- * Both callers are L4, and the one L2 candidate is C14's own invariant with its
- * own `topRow`/`maxTop` pair — folding it in is C14's edit, recorded here as the
- * third instance rather than made from outside. A loose file under
- * `src/viewport/` would also sit beside three component directories without
- * being one, which is how a helper gets mistaken for a component.
+ * **The comparison itself is C14's** (`viewport/viewport/tail.ts`), because
+ * imports go down only: this file is L4 and C14 is L2, so the one place all
+ * three readers can reach is the component whose invariant states the rule.
+ * `atTail` is re-exported here so the two L4 readers keep one import beside
+ * `TAIL` and `followTail`, which are this layer's — they spell what the store
+ * holds and how a reader moves, and C14 has no use for either.
  *
  * **`TAIL` is `∞`, and that is a mechanism rather than a flag.** The scroll
  * offset is clamped at read (C04 §3c cell 4), so a held value past every
@@ -23,17 +23,12 @@
  * writer on every append; the number needs none.
  */
 
+import { atTail } from "../viewport/viewport/tail.js";
+
+export { atTail };
+
 /** *Stay at the bottom.* Past every ceiling, so the clamp at read resolves it. */
 export const TAIL = Number.POSITIVE_INFINITY;
-
-/**
- * Whether `offset` is the bottom, against the last offset from which the tail
- * still fills the region. `>=` and not `>`: a value the caller left past the end
- * is the bottom too (C04 §3c cell 4).
- */
-export function atTail(offset: number, last: number): boolean {
-  return offset >= last;
-}
 
 /**
  * Where a reader goes when the tail moves under them: the new bottom if they

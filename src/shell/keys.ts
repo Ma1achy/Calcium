@@ -40,7 +40,7 @@ import type {
 import type { LineEditor } from "../interaction/editor/index.js";
 import type { HistoryStore } from "../interaction/history/index.js";
 import type { ElementAddress, KeyAction } from "../interaction/router/types.js";
-import { resolveFocus } from "../interaction/router/focus.js";
+import { extentOf, resolveFocus } from "../interaction/router/focus.js";
 import type { Action } from "../data/viewmodel/index.js";
 import type { NavElement } from "../presentation/blocks/index.js";
 import type { EntryId } from "../viewport/transcript/index.js";
@@ -1046,26 +1046,14 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       const elements = deps.focusedElements();
       const current = deps.focus.current;
       if (current.at !== "liveBlock") return;
-      const head = resolveFocus(current.element, elements);
-      if (head === null) return;
-      // **A stale anchor collapses to the head** (C26 I16, §5c trace 3). The
-      // head goes through `resolveFocus` because a stale head is where focus
-      // *is* — it falls as I10 says and is highlighted there. The anchor does
-      // not: I10's fall lands on the block's first element, which widened a
-      // selection to rows the reader never chose (anchor `b1` gone → `a1..c1`
-      // copied, measured). The list is the new one and the anchor's old
-      // position went with it, so an exact match is the only honest answer.
-      const anchorAt = current.anchor;
-      const exact =
-        anchorAt === null
-          ? -1
-          : elements.findIndex(
-              (p) => p.blockId === anchorAt.blockId && p.element.id === anchorAt.elementId,
-            );
-      const anchor = exact === -1 ? head : exact;
+      // **The extent `focusFor` washes, from the one function** (C26 I16, §5c
+      // trace 3): the head through `resolveFocus`, the anchor by exact match, a
+      // stale anchor collapsed to the head (F764). What `y` copies is what the
+      // frame shows selected, by construction rather than by two copies agreeing.
+      const ext = extentOf(current, elements);
+      if (ext === null) return;
 
-      const text = elements
-        .slice(Math.min(anchor, head), Math.max(anchor, head) + 1)
+      const text = ext.extent
         .map((p) => p.element.copy)
         .filter((c): c is string => c !== undefined && c !== "")
         .join("\n");
