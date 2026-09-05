@@ -29845,3 +29845,43 @@ range by construction and says why.
 
 ---
 
+## F833 — SS57's first run found eleven, and the walk had named two ★★★☆☆
+
+**Symptom.** The emoji-presentation scan (C09 I45, A03 SS57) was written for `⏺` U+23FA (F823)
+and, once the table existed, for `ℹ` U+2139 (F832). Run over every string literal under `src/`
+for the first time, it reported **eleven** code points at nine sites in three families the walk
+had not named — and a fourth family, four more code points, once it decoded escapes:
+
+| family | file | characters | why nothing saw it |
+|---|---|---|---|
+| the `arrow` spinner set | `glyphs.ts` | `↖ ↗ ↘ ↙` U+2196–2199 | T2.71 scanned every spinner frame against a 17-character list from memory, and the diagonals were not on it; the cardinals `← ↑ → ↓` have no emoji form, so the set passed as a whole |
+| the `beads` and `squares` bar styles | `glyphs.ts` | `▪ ▫ ◼ ◻` U+25AA/25AB/25FC/25FB | the bar table's docstring measured **width** — all eleven styles Ambiguous, `narrowOnly` set — and width is the question that cannot see this class (F823) |
+| the fixtures provenance report | `src/data/fixtures/provenance.ts` | `⚠` U+26A0 | L0-data, two layers below the glyph vocabulary; no glyph rule reaches it, and `text.test.ts` uses the same character to prove `cells()` promotes the FE0F form to two |
+| the quiver's arrow ring | `src/presentation/plot/field.ts` | `↖ ↗ ↘ ↙` again, as `\u2196`… | spelled as escapes **because SS47 forbids a bare mark**, so the first draft of SS57, reading the literal's bytes, saw eight ASCII escape sequences and no arrows — a matcher that sees one encoding reports absence when the value changes form. Found on the second run, after the scan learned to decode `\u` |
+
+**Why it matters.** The rule's prose, drafted before it ran, said *its first run found `⏺` and
+`ℹ` and nothing else*, and A03's section scoped it to *both glyph tables and every spinner set
+in `glyphs.ts`*. That scope would have found seven of the eleven and left the report's `⚠` — the
+one instance outside the vocabulary — in place with a green gate over it. This is CLAUDE.md's
+*one new rule that found three further instances in shipped code on its first run* at three
+families; and it is the second time in one component that a hand list read as a check (T2.71,
+F823): a list is a recollection, and the two things it did not recall were the four diagonals
+and the class of small squares.
+
+**Ruling.** All fifteen move, none is allow-listed. The quiver's ring is the double arrows
+U+21D0–21D9 — the one complete eight-direction ring in one weight with no emoji form; the black
+arrows U+2B05–2B07 are emoji and the white arrows U+2B00–2B03 have no cardinals — and its
+golden frames are the expected movers, where the plan had said zero (F829 was about `⏺`). `arrow` keeps the cardinal four at 200 ms —
+the eight's rate of turn — because a ring of mixed weights (`⇖` beside `↑`) reads as two
+spinners; `beads` is `• ◦` U+2022/25E6 and `squares` is `■ □` U+25A0/25A1, the bullets and the
+plain squares, neither an emoji base, both still Ambiguous so `narrowOnly` stands; the report's
+mark is `!`, `warn`'s ASCII rung, because `data/` cannot import the glyph table. SS57's scope is
+stated as every literal under `src/`, and the *first run* sentences in `text.ts`, the scan and
+A03 are corrected to the measured count. T2.71 gains the diagonals as controls.
+
+**Where**: `src/presentation/blocks/glyphs.ts` `arrow`, `beads`, `squares`;
+`src/data/fixtures/provenance.ts`; `test/contract/spinners.test.ts` T2.71;
+`test/unit/animation-proof.test.ts`; `docs/notes/CALCIUM_BARS.md`; A03 SS57.
+
+---
+

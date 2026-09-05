@@ -14,7 +14,8 @@ import { SCAN_BUDGET_MS } from "../support/budget.js";
 import { checkAsciiParity, checkMeasurement, formatReport, uncoveredKinds } from "../../src/testing/measurement-conformance.js";
 import { ADVERSARIAL, CORPUS, ONE_PER_KIND } from "../support/blocks.js";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LIGHT_THEME, measurable, visible } from "../support/render.js";
-import { cells } from "../../src/presentation/text.js";
+import { cells, hasEmojiForm } from "../../src/presentation/text.js";
+import { SPINNER_SETS } from "../../src/presentation/blocks/glyphs.js";
 import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
 import { patchDefinition } from "../../src/presentation/patch/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
@@ -24,6 +25,7 @@ import {
   GLYPH_TOKENS,
   glyphCells,
   glyphFor,
+  glyphs,
   SUBSTITUTIONS,
 } from "../../src/presentation/blocks/index.js";
 import { checkModuleGraph } from "../../tools/enforce/module-graph.mjs";
@@ -346,14 +348,72 @@ function srcFiles(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-describe("C09 §4 — the call grammar's glyph rows, owed at the spec commit", () => {
-  it.todo(
-    "T2.112 (C09 I45): every character in GLYPH_TABLE's unicode column, UNICODE's slots and every spinner set's frames is absent from the derived emoji-variation set; the control asserts U+23FA is in it — not deferred on a component: the derived table lands with C1 of the call grammar",
-  );
-  it.todo(
-    "T2.115 (C09 I48): T2.5b at both ambiguousWidth arms through glyphFor at WIDE_CAPS; the eleven Ambiguous members resolve to ASCII at wide and the six Neutral ones do not, by equality against the two named sets — not deferred on a component: glyphFor's width tier lands with C1 of the call grammar",
-  );
-  it.todo(
-    "T2.116 (C09 I49): glyphs(caps).separator is one cell at both arms and both alphabets, and no ` · ` literal remains in src/shell/ — not deferred on a component: the separator slot lands with C1 of the call grammar",
-  );
+describe("C09 §4 — the call grammar's glyph rows", () => {
+  const WIDE_CAPS = { ...FULL_CAPS, ambiguousWidth: "wide" as const };
+
+  it("T2.112 (C09 I45): no non-ASCII character in either glyph table or any spinner set has an emoji presentation form", () => {
+    // **The check C09 §4 could not run when `step` was chosen** (F823): `cells()`
+    // measured `⏺` at one cell under both conventions and it is a base of an
+    // emoji variation sequence all the same. Over the derived table, with the
+    // ASCII range excluded by construction (F832).
+    const offenders: string[] = [];
+    const seen = (label: string, text: string): void => {
+      for (const c of text) {
+        const cp = c.codePointAt(0) ?? 0;
+        if (cp >= 0x80 && hasEmojiForm(cp)) offenders.push(`${label}: ${c} U+${cp.toString(16)}`);
+      }
+    };
+    for (const token of GLYPH_TOKENS) seen(`Glyph ${token}`, glyphFor(token, FULL_CAPS));
+    for (const [slot, ch] of Object.entries(glyphs(FULL_CAPS))) seen(`GlyphSet ${slot}`, ch);
+    for (const [name, set] of Object.entries(SPINNER_SETS)) for (const f of set.frames) seen(`spinner ${name}`, f);
+    expect(offenders).toEqual([]);
+    // **The controls, so an empty table cannot pass the row**: the two marks
+    // the table found on its first run are in it, and the keycap base `*` —
+    // `step`'s and `running`'s ASCII rung — is excluded by the row's own guard.
+    expect(hasEmojiForm(0x23fa), "⏺ U+23FA, the mark F823 is about").toBe(true);
+    expect(hasEmojiForm(0x2139), "ℹ U+2139, the mark F832 found").toBe(true);
+    expect(hasEmojiForm(0x2b24), "⬤ U+2B24, the mark that replaced it").toBe(false);
+    expect(hasEmojiForm(0x2a), "* is a keycap base in the Unicode file and excluded by construction (F832)").toBe(false);
+    expect(glyphFor("step", ASCII_CAPS), "so the ASCII rung is still *").toBe("*");
+  });
+
+  it("T2.115 (C09 I48): every `Glyph` is 1:1 by cell count at BOTH conventions, through `glyphFor`", () => {
+    // T2.5b asserted the rule at `narrow` alone, and ten of seventeen members
+    // broke it at `wide` while it was green (F825). The two named sets are
+    // compared by equality so a member moving between them fails the row.
+    const AMBIGUOUS = new Set(["warn", "info", "pending", "working", "running", "queued", "cancelled", "expand", "collapse", "live", "bullet"]);
+    const NEUTRAL = new Set(["ok", "error", "quote", "nested", "continuation", "step"]);
+    expect(new Set([...AMBIGUOUS, ...NEUTRAL])).toEqual(new Set(GLYPH_TOKENS));
+    const tiered: string[] = [];
+    const steady: string[] = [];
+    for (const token of GLYPH_TOKENS) {
+      const narrow = glyphFor(token, FULL_CAPS);
+      const wide = glyphFor(token, WIDE_CAPS);
+      const ascii = glyphFor(token, ASCII_CAPS);
+      expect(cells(narrow, "narrow"), `${token} narrow`).toBe(1);
+      expect(cells(wide, "wide"), `${token} at wide, through glyphFor`).toBe(1);
+      expect(cells(ascii, "wide"), `${token} ascii`).toBe(1);
+      if (wide === ascii && narrow !== ascii) {
+        tiered.push(token);
+      } else {
+        steady.push(token);
+        expect(cells(narrow, "wide"), `${token} is Neutral`).toBe(1);
+      }
+    }
+    expect(new Set(tiered)).toEqual(AMBIGUOUS);
+    expect(new Set(steady)).toEqual(NEUTRAL);
+  });
+
+  it("T2.116 (C09 I49): the separator slot is one cell at both arms and both alphabets", () => {
+    // The head joined its fields with a literal `·` — non-ASCII at the ASCII arm
+    // and two cells at wide — and the contract row asserted it under ASCII
+    // (F828). A slot, so the composer resolves it where the capability is.
+    expect(glyphs(FULL_CAPS).separator).toBe("·");
+    expect(glyphs(ASCII_CAPS).separator).toBe("-");
+    expect(glyphs(WIDE_CAPS).separator, "the internal set collapses at wide (C02 I9)").toBe("-");
+    for (const caps of [FULL_CAPS, WIDE_CAPS, ASCII_CAPS]) {
+      const sep = glyphs(caps).separator;
+      expect(cells(sep, caps.ambiguousWidth), `separator at ${caps.unicode}/${caps.ambiguousWidth}`).toBe(1);
+    }
+  });
 });

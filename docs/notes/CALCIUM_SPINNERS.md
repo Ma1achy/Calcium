@@ -158,7 +158,7 @@ every one is legal on the `narrow` arm and every one now ships as a `narrowOnly`
 | `triangle` `◢◣◤◥` | all four ambiguous | `narrowOnly`, **120 ms and not the catalogue's 50** — 50 is below the per-frame floor T2.72 asserts for a short set |
 | `circleHalves` `◐◓◑◒` | all four ambiguous (the row said two) | `narrowOnly`, **120 ms and not the catalogue's 50**, same reason |
 | `pipe` `┤┘┴└├┌┬┐` | all eight ambiguous — box drawing is ambiguous throughout | `narrowOnly`, 100 ms — 800 ms, in band |
-| `arrow` `←↖↑↗→↘↓↙` | all eight ambiguous | `narrowOnly`, 100 ms — 800 ms, in band |
+| `arrow` `←↑→↓` | all four ambiguous; the diagonals `↖↗↘↙` were emoji bases and left with F833 | `narrowOnly`, 200 ms — 800 ms, in band |
 
 **Three rows undercounted their own ambiguity** — `noise`, `boxBounce2` and `circleHalves` each
 named a subset of frames as ambiguous and every frame is — which changed nothing about the

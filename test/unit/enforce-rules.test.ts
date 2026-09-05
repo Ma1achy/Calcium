@@ -42,11 +42,14 @@ import {
   allowListCoverage,
   checkAllowLists,
   checkControlBytes,
+  checkEmojiBases,
   checkMarks,
   checkSourceScans,
+  parseEmojiBases,
   RAMP_VOCABULARIES,
   SCANS,
 } from "../../tools/enforce/source-scans.mjs";
+import { hasEmojiForm } from "../../src/presentation/text.js";
 import type { Scan } from "../../tools/enforce/source-scans.d.mts";
 import {
   checkRefusals,
@@ -648,7 +651,7 @@ const scanIds = SCANS.map((s) => s.id);
  * list: a rule invisible to `implemented` is a rule the fabrication check does not
  * demand a violation for, which is A03 §2 arriving in the mechanism against it.
  */
-const STANDALONE_SCANS = ["SS47", "SS52", "SS53", "SS54"];
+const STANDALONE_SCANS = ["SS47", "SS52", "SS53", "SS54", "SS57"];
 
 const implemented = [
   ...scanIds,
@@ -705,6 +708,10 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       // SS54 likewise: the register is the subject, and the fabrication is a
       // register row whose `absent` symbol exists. Its own rows below.
       "SS54",
+      // SS57 likewise: its subject is a literal's contents against a table
+      // parsed from `text.ts`, and its control is that the table is not empty.
+      // Its own rows below.
+      "SS57",
       // MG2 likewise: a cycle is two files by definition, and `FABRICATED` is
       // one file's text. Its own rows below.
       "MG2",
@@ -1113,6 +1120,40 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       s.cleared + s.candidates.length + s.testOnly,
       "every member lands in exactly one bucket",
     ).toBe(s.members);
+  });
+
+  it("SS57 fires: the shipped head mark, the info glyph, and not the keycap bases", () => {
+    // **The fabricated violation is the character that shipped** (C09 I45,
+    // F823): `step: ["⏺", "*"]` restored is the genuine defect, not a string
+    // engineered to match. The second row is F832's — found by this table on
+    // its first run — and the third is the exclusion stated with its reason:
+    // `*` and `#` are keycap bases and the alphabet the tables degrade to.
+    const real = readFileSync("src/presentation/text.ts", "utf8");
+    const ranges = parseEmojiBases(real);
+    expect(ranges.length, "the table parsed out of text.ts has members").toBeGreaterThan(300);
+    // **The parse agrees with the module**, on the characters the rule is for
+    // and on their neighbours — two copies would drift, so the one copy is
+    // read two ways and compared.
+    for (const cp of [0x23fa, 0x2139, 0x2b24, 0x25cf, 0xb7, 0x2a, 0x23, 0x2705, 0x1f600, 0x2196, 0x25aa, 0x26a0]) {
+      const parsed = ranges.some((_, i) => i % 2 === 0 && cp >= ranges[i]! && cp <= ranges[i + 1]!);
+      expect(parsed, `U+${cp.toString(16)} — parsed table vs hasEmojiForm`).toBe(hasEmojiForm(cp));
+    }
+    const read = (f: string): string =>
+      f.endsWith("shipped.ts")
+        ? 'const T = { step: ["⏺", "*"], info: ["ℹ", "i"], ok: ["✓", "+"] };'
+        : f.endsWith("ascii.ts")
+          ? 'const RAMP = ".:-=+*#@"; const MARK = "*"; // ⏺ in a comment is prose about the rule'
+          : 'const G = ["⬤", "*"];';
+    const fired = checkEmojiBases(["src/shipped.ts", "src/ascii.ts", "src/clean.ts"], read, ranges);
+    expect(fired.map((v) => v.file)).toEqual(["src/shipped.ts", "src/shipped.ts"]);
+    expect(fired.every((v) => v.rule === "SS57")).toBe(true);
+    expect(fired[0]?.message).toContain("U+23FA");
+    expect(fired[1]?.message).toContain("U+2139");
+    // The control against vacuity: an empty table is itself a violation, so a
+    // parse that silently found nothing cannot read as a clean tree.
+    const empty = checkEmojiBases(["src/shipped.ts"], read, []);
+    expect(empty).toHaveLength(1);
+    expect(empty[0]?.message).toContain("parsed to nothing");
   });
 
   it("SS47 fires: a mark in framework text, and the exemption list expires", () => {

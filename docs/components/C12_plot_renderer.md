@@ -2485,7 +2485,7 @@ meeting the fork will assume it carries over.
 
 ### The quiver — direction is the glyph, magnitude is the colour
 
-    →  ↗  ↑  ↖  ←  ↙  ↓  ↘        eight directions, U+2190–2199
+    ⇒  ⇗  ⇑  ⇖  ⇐  ⇙  ⇓  ⇘        eight directions, U+21D0–21D9 — the doubles, since the singles' diagonals are emoji bases (F833)
     >  /  ^  \  <  /  v  \        the ASCII arm, diagonals reused
 
 **The ASCII arm is required at `unicode: "ascii"` *and* at `ambiguousWidth: "wide"`**, and the

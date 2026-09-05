@@ -183,10 +183,24 @@ export type GlyphSet = Readonly<{
    * second time by a rule rather than by an author.
    */
   residue: string;
+  /**
+   * The separator between a call head's fields — `verb · args · duration ·
+   * outcome` (C09 I49, `AGENT_TUI_DESIGN.md` §9e).
+   *
+   * **A slot because it was a literal, and the literal was wrong at two arms
+   * of four** (F828). `·` U+00B7 is non-ASCII and `East_Asian_Width=Ambiguous`:
+   * the composer joined with it holding no capabilities, and the contract row
+   * asserted it under `unicode: "ascii"`. The residue row chose a comma and the
+   * status box parentheses for the same reason, each with its reason beside it;
+   * this is the third answer to the same question, and it is a slot because the
+   * head is the one place a reader sees the character twice on every line.
+   */
+  separator: string;
 }>;
 
 const UNICODE: GlyphSet = Object.freeze({
   residue: "\u22ef",
+  separator: "\u00b7",
   horizontal: "─",
   vertical: "│",
   dashedVertical: "┊",
@@ -230,6 +244,7 @@ const UNICODE: GlyphSet = Object.freeze({
 
 const ASCII: GlyphSet = Object.freeze({
   residue: "~",
+  separator: "-",
   horizontal: "-",
   vertical: "|",
   dashedVertical: ":",
@@ -549,9 +564,14 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
     ascii: TURN_ASCII,
     narrowOnly: true,
   }),
+  // **The cardinal four, since F833.** The set shipped as eight, and the four
+  // diagonals `↖ ↗ ↘ ↙` U+2196–2199 are bases of emoji variation sequences
+  // where `← ↑ → ↓` are not — SS57's first run over the tree found them, and
+  // T2.71's hand list never had them. Four frames at 200 ms is the eight's rate
+  // of turn; a mixed-weight ring (`⇖` beside `↑`) reads as two spinners.
   arrow: Object.freeze({
-    frames: Object.freeze(["←", "↖", "↑", "↗", "→", "↘", "↓", "↙"]),
-    intervalMs: 100,
+    frames: Object.freeze(["←", "↑", "→", "↓"]),
+    intervalMs: 200,
     ascii: TURN_ASCII,
     narrowOnly: true,
   }),
@@ -742,7 +762,7 @@ export function markers3(
  * `off` — the drift the spinner table's pairing exists to prevent.
  *
  * **`narrowOnly` on six of the seven unicode styles, measured rather than
- * inferred.** `▐ ░ ▬ ▪ ▫ ▮ ▯ ▰ ▱ ◼ ◻` are `East_Asian_Width=Ambiguous` every
+ * inferred.** `▐ ░ ▬ • ◦ ▮ ▯ ▰ ▱ ■ □` are `East_Asian_Width=Ambiguous` every
  * one, so a terminal declaring `wide` draws them at double and a bar whose
  * glyphs double is not a bar. **`braille` is the only width-stable unicode
  * style**, which `CALCIUM_BARS.md` did not say and its determinate table read
@@ -788,10 +808,14 @@ const BAR_STYLES: Readonly<Record<string, BarStyle>> = Object.freeze({
   block: Object.freeze({ on: "█", off: "░", narrowOnly: true }),
   halfblock: Object.freeze({ on: "▐", off: "░", narrowOnly: true }),
   rectangle: Object.freeze({ on: "▬", off: "░", narrowOnly: true }),
-  beads: Object.freeze({ on: "▪", off: "▫", narrowOnly: true }),
+  // **`• ◦` and `■ □` since F833**: `▪ ▫ ◼ ◻` U+25AA/25AB/25FC/25FB are emoji
+  // variation bases — the small and medium squares have emoji forms where the
+  // plain squares U+25A0/25A1 and the bullets U+2022/25E6 do not. Both pairs
+  // stay Ambiguous, so `narrowOnly` stands.
+  beads: Object.freeze({ on: "•", off: "◦", narrowOnly: true }),
   posts: Object.freeze({ on: "▮", off: "▯", narrowOnly: true }),
   slant: Object.freeze({ on: "▰", off: "▱", narrowOnly: true }),
-  squares: Object.freeze({ on: "◼", off: "◻", narrowOnly: true }),
+  squares: Object.freeze({ on: "■", off: "□", narrowOnly: true }),
   // **No `narrowOnly`, and it is the only one.** Braille is `Neutral`, so it is
   // one cell under both conventions — which is what makes it the style a wide
   // terminal keeps rather than the one it loses.
@@ -855,7 +879,14 @@ const GLYPH_TABLE: Readonly<Record<Glyph, readonly [unicode: string, ascii: stri
     ok: ["✓", "+"],
     warn: ["▲", "!"],
     error: ["✗", "x"],
-    info: ["ℹ", "i"],
+    // **`ⓘ` U+24D8, since F832.** `ℹ` U+2139 is a base of an emoji variation
+    // sequence — the same class as the head mark F823 was written about — and
+    // the derived table found it on its first run over the tree. U+24D8 has no
+    // emoji form; it is Ambiguous, so `glyphFor` resolves it to `i` at
+    // `ambiguousWidth: "wide"` (I48). Nineteen Neutral candidates were measured
+    // and none reads as *information*; a mark a reader has to learn is a worse
+    // trade than one the tier already covers.
+    info: ["\u24d8", "i"],
     pending: ["◌", "."],
     working: ["◐", "%"],
     running: ["●", "*"],
@@ -889,12 +920,19 @@ const GLYPH_TABLE: Readonly<Record<Glyph, readonly [unicode: string, ascii: stri
     // survivors is the better answer the day someone measures one, and this is
     // one. The ASCII half is `tree(1)`'s rendering of the same hook.
     continuation: ["⎿", "`"],
-    // **U+23FA is Neutral — one cell under both conventions, measured with
-    // `cells()` before this row was written** (C09 §4). Not `running`'s `●`:
-    // that is Ambiguous, and it is a *state*, where this is a position in a
-    // sequence and does not change as the step runs or settles. `@` is the one
-    // ASCII mark no other slot spends.
-    step: ["⏺", "@"],
+    // **`⬤` U+2B24 BLACK LARGE CIRCLE: Neutral under both conventions, and no
+    // emoji presentation form** (C09 I45, F823). The row carried `⏺` U+23FA,
+    // measured with `cells()` before it was written — and the measurement
+    // answered the wrong question: U+23FA is a base in
+    // `emoji-variation-sequences.txt`, so a font that prefers the emoji form
+    // draws it two cells wide in a slot every width table calls one. `⬤` has the
+    // same width status by every table in `text.ts` and no variation sequence;
+    // `hasEmojiForm` is what says so, and T2.112 is what asks. Not `running`'s
+    // `●`: that is Ambiguous, and it is a *state*, where this is a position in a
+    // sequence and does not change as the step runs or settles. The ASCII half
+    // is the design's `*` (§A6), shared with `running` — I5 is about cell count,
+    // not uniqueness, and `@`'s claim to be unspent was already false (F824).
+    step: ["\u2b24", "*"],
   });
 
 /** The pairs, for the test that asserts each is 1:1 by cell count (I5). */
@@ -907,12 +945,35 @@ export const GLYPH_TOKENS: readonly Glyph[] = Object.freeze(
 );
 
 /**
+ * The tokens whose Unicode half is `East_Asian_Width=Ambiguous` — two cells on a
+ * terminal that says wide, against a one-cell ASCII half (C09 I48, F825).
+ *
+ * **Derived from the table by measurement, not listed**, so a row added or
+ * changed is classified by `cells()` rather than by whoever wrote it. Eleven of
+ * seventeen on the day the tier landed: the ten F825 counted and `info`'s `ⓘ`
+ * (F832). The internal `GlyphSet` collapses to ASCII wholesale at `wide` (C02
+ * I9) and the spinner sets carry `narrowOnly`; this table had neither, and
+ * T2.5b asserted the 1:1 rule at one arm while more than half its members broke
+ * it at the other.
+ */
+const AMBIGUOUS_TOKENS: ReadonlySet<Glyph> = new Set(
+  (Object.keys(GLYPH_TABLE) as Glyph[]).filter(
+    (token) => cells(GLYPH_TABLE[token][0], "wide") !== cells(GLYPH_TABLE[token][1], "wide"), // ambiguousWidth "wide" for both halves: the one arm where they can differ
+  ),
+);
+
+/**
  * A block's glyph slot, resolved against capabilities. The single place either
  * character enters a frame.
+ *
+ * **Reads both fields** (C09 I48). An Ambiguous member resolves to its ASCII
+ * half at `ambiguousWidth: "wide"`, so the two renderings of every slot are one
+ * cell at either arm and `glyphCells` still needs no capability.
  */
-export function glyphFor(token: Glyph, caps: Pick<TerminalCapabilities, "unicode">): string {
+export function glyphFor(token: Glyph, caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">): string {
   const pair = GLYPH_TABLE[token];
-  return caps.unicode === "ascii" ? pair[1] : pair[0];
+  if (caps.unicode === "ascii") return pair[1];
+  return caps.ambiguousWidth === "wide" && AMBIGUOUS_TOKENS.has(token) ? pair[1] : pair[0];
 }
 
 /**
@@ -924,10 +985,12 @@ export function glyphFor(token: Glyph, caps: Pick<TerminalCapabilities, "unicode
  * trusting the two columns above to stay in step.
  */
 export function glyphCells(token: Glyph): number {
-  // narrow-ok — the two renderings of one slot are compared against each
-  // other, and the comparison holds under either convention: an ambiguous
-  // pair is 1:1 at narrow and 2:2 at wide. Passing a capability here would
-  // make a property of the table depend on the terminal reading it.
+  // narrow-ok — the two renderings of one slot are one cell at either arm:
+  // an Ambiguous member resolves to its ASCII half at wide (I48), so the
+  // narrow measurement of the Unicode half is the width at both. The comment
+  // this replaces said *2:2 at wide*, which assumed both halves Ambiguous;
+  // none of the ASCII halves is (F825). Passing a capability here would make a
+  // property of the table depend on the terminal reading it.
   return cells(GLYPH_TABLE[token][0]); // narrow-ok
 }
 

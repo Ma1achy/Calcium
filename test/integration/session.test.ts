@@ -857,8 +857,8 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
     await settle();
 
     const rows = screen().rows.map((r) => r.trimEnd());
-    const ps = rows.findIndex((r) => r.includes("⏺ ps · ok"));
-    const note = rows.findIndex((r) => r.includes("⏺ note · ok"));
+    const ps = rows.findIndex((r) => r.includes("⬤ ps · ok"));
+    const note = rows.findIndex((r) => r.includes("⬤ note · ok"));
     expect(ps, "the first card").toBeGreaterThan(0);
     expect(note, "the second card").toBeGreaterThan(ps);
     // Row 17: the hook marks content, not the leading gap the block carried.
@@ -899,7 +899,7 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
     await settle();
 
     const rows = screen().rows;
-    const at = rows.findIndex((r) => r.includes("⏺ wide · ok"));
+    const at = rows.findIndex((r) => r.includes("⬤ wide · ok"));
     expect(at, "the card's header is on the screen").toBeGreaterThan(0);
     expect(rows[at + 1]?.startsWith(`  ⎿ ${"a".repeat(96)}`), "the body's first row: the hook at 2 and 96 cells").toBe(true);
     expect(rows[at + 2]?.trimEnd(), "the wrapped cells, under four blanks").toBe("    aaa");

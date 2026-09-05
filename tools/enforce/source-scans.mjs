@@ -1241,6 +1241,101 @@ export function checkMarks(files, readFile = (f) => readFileSync(f, "utf8"), exe
 }
 
 /**
+ * SS57 — a glyph with an emoji presentation form (C09 I45, F823, F832).
+ *
+ * **The class `cells()` cannot see.** A code point can be `East_Asian_Width=
+ * Neutral` — one cell by every table — and still be a base of an emoji
+ * variation sequence, so a font that prefers the emoji form draws it two cells
+ * wide. `⏺` U+23FA shipped as the head mark that way, measured before its row
+ * was written; the measurement answered the wrong question.
+ *
+ * **One source of truth, read lexically.** The set lives in `text.ts` as
+ * `EMOJI_VARIATION_BASES`, derived from the Unicode file with its version named;
+ * this tool cannot import TypeScript, so it parses that array's hex literals out
+ * of the source it is handed. Two copies of the ranges would be the birthday-
+ * clause problem; a parse of the one copy is not, and the meta-test asserts the
+ * parsed set agrees with the module's `hasEmojiForm` on the characters the rule
+ * exists for.
+ *
+ * **Scope is `src/` string literals, comments blanked, non-ASCII only.** The
+ * file also lists `#`, `*` and the digits as keycap bases, and those are the
+ * alphabet the tables degrade to (F832). Its first run found `⏺`, `info`'s `ℹ`
+ * U+2139, and nine more the walk had not named — `↖ ↗ ↘ ↙` in the `arrow`
+ * spinner, `▪ ▫ ◼ ◻` in two bar styles, `⚠` in the fixtures report (F833). All
+ * eleven moved; the scope has no allow-list.
+ *
+ * **Escapes are decoded before the literal is read.** `field.ts` spells the
+ * quiver's ring as `"\u2192\u2197…"` because SS47 forbids a bare mark in a
+ * `src/` literal, and a scan that read the source bytes saw eight ASCII escape
+ * sequences and no arrows — four of which are emoji bases. A matcher that sees
+ * one encoding reports absence when the value changes form (F833).
+ *
+ * **Stated blind spot**: a mark that reaches a frame as text — a far side's
+ * string, a producer's label — is outside every glyph rule, this one included;
+ * and a mark built by `String.fromCodePoint` or held in a variable passes, as
+ * it does SS47.
+ */
+export function parseEmojiBases(textSource) {
+  const start = textSource.indexOf("const EMOJI_VARIATION_BASES: readonly number[] = [");
+  if (start < 0) return [];
+  const end = textSource.indexOf("\n];", start);
+  const body = textSource.slice(start, end);
+  return [...body.matchAll(/0x([0-9a-f]+)/gu)].map((m) => Number.parseInt(m[1], 16));
+}
+
+/** `\uXXXX` and `\u{X…}` in a literal's body, as the characters they spell. */
+function decodeEscapes(body) {
+  return body.replaceAll(/\\u\{([0-9a-fA-F]+)\}|\\u([0-9a-fA-F]{4})/gu, (_, braced, plain) =>
+    String.fromCodePoint(Number.parseInt(braced ?? plain, 16)),
+  );
+}
+
+function inEmojiRanges(cp, ranges) {
+  for (let i = 0; i + 1 < ranges.length; i += 2) {
+    if (cp >= ranges[i] && cp <= ranges[i + 1]) return true;
+  }
+  return false;
+}
+
+export function checkEmojiBases(
+  files,
+  readFile = (f) => readFileSync(f, "utf8"),
+  ranges = parseEmojiBases(readFileSync("src/presentation/text.ts", "utf8")),
+) {
+  const violations = [];
+  if (ranges.length === 0) {
+    violations.push({
+      rule: "SS57", file: "src/presentation/text.ts", line: 1,
+      message: "`EMOJI_VARIATION_BASES` parsed to nothing — an empty table passes every glyph, which is the vacuity the rule exists to refuse (C09 I45)",
+      spec: "C09 I45",
+    });
+    return violations;
+  }
+  for (const file of files) {
+    const f = file.replaceAll("\\", "/");
+    if (!f.startsWith("src/")) continue;
+    const code = codeOnly(readFile(file));
+    for (const m of code.matchAll(LITERALS)) {
+      const body = decodeEscapes(m[0].slice(1, -1));
+      for (const c of body) {
+        const cp = c.codePointAt(0) ?? 0;
+        if (cp < 0x80 || !inEmojiRanges(cp, ranges)) continue;
+        violations.push({
+          rule: "SS57",
+          file: f,
+          line: code.slice(0, m.index).split("\n").length,
+          message:
+            `\`${c}\` U+${cp.toString(16).toUpperCase().padStart(4, "0")} has an emoji presentation form: a font that prefers it ` +
+            `draws two cells where every width table says one. Not a glyph the framework may draw (C09 I45)`,
+          spec: "C09 I45 · A03 SS57",
+        });
+      }
+    }
+  }
+  return violations;
+}
+
+/**
  * `readFile` is injected for the same reason the module graph injects it: a rule
  * is only known to work when it has been shown to fire, and showing that means
  * a fabricated violation at a path that does not exist on disk. A03 commitment

@@ -247,7 +247,7 @@ describe("tools/animation-proof.mjs — the frames it assembles", () => {
     }
     // The ASCII arm draws no block glyph; the full arm does; the wide arm keeps braille alone.
     expect(arms[0]).toContain("█");
-    expect(arms[1]).not.toMatch(/[█░▐▬▪▫▮▯▰▱◼◻⣿]/u);
+    expect(arms[1]).not.toMatch(/[█░▐▬•◦▮▯▰▱■□⣿]/u);
     expect(arms[2]).toContain("⣿");
     expect(arms[2]).not.toContain("█");
   });

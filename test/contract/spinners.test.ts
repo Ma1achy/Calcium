@@ -13,7 +13,7 @@ import { glyphs, spinnerFrames, spinnerIntervalMs } from "../../src/presentation
 // so the rows can walk every set rather than a list they keep themselves, which
 // would be a coverage set drawn from the test's own table.
 import { SPINNER_SETS } from "../../src/presentation/blocks/glyphs.js";
-import { cells } from "../../src/presentation/text.js";
+import { cells, hasEmojiForm } from "../../src/presentation/text.js";
 import { ASCII_CAPS, FULL_CAPS } from "../support/render.js";
 
 const WIDE_CAPS = { ...FULL_CAPS, ambiguousWidth: "wide" as const };
@@ -44,20 +44,34 @@ describe("roadmap 51 — the spinner sets", () => {
     expect(failures).toEqual([]);
   });
 
-  it("T2.71: no frame has an emoji presentation, which no capability can answer", () => {
+  it("T2.71 (C09 I45): no frame has an emoji presentation, which no capability can answer", () => {
     // The second way a frame fails, and it is not the ambiguous one: an emoji
     // form is two cells wherever the font prefers it, whatever the locale says.
     // `❄` and `✳` are why `fullramp` ships shorter than it was drawn.
-    const EMOJI_FORMS = new Set([..."·✽✳✴❄❈☀☁☂★☆♠♣♥♦⚡⚠"]);
+    //
+    // **Over the derived table, not a list from memory** (F823, F833). The list
+    // this row carried opened with `·`, which is Ambiguous and has no emoji
+    // form, and it never held `↖ ↗ ↘ ↙` — so the `arrow` set shipped four
+    // emoji bases through a green row, and `⏺` shipped as the head mark one
+    // table over.
     const offenders: string[] = [];
 
     for (const name of NAMES) {
       for (const frame of SPINNER_SETS[name]?.frames ?? []) {
-        if (EMOJI_FORMS.has(frame)) offenders.push(`${name}: ${frame}`);
+        for (const c of frame) {
+          if (hasEmojiForm(c.codePointAt(0) ?? 0)) offenders.push(`${name}: ${frame}`);
+        }
       }
     }
 
     expect(offenders).toEqual([]);
+    // The controls: the characters the old list named for the right reason
+    // are in the table, the diagonals it missed are in it — and **four of the
+    // seventeen it named are not emoji bases at all**: `·` is Ambiguous, and
+    // `❈ ★ ☆` are Dingbat and Miscellaneous Symbols with no variation
+    // sequence. A list from memory is wrong in both directions.
+    for (const c of "✳✴❄☀☁☂♠♣♥♦⚡⚠↖↗↘↙") expect(hasEmojiForm(c.codePointAt(0) ?? 0), c).toBe(true);
+    for (const c of "·❈★☆") expect(hasEmojiForm(c.codePointAt(0) ?? 0), `${c} was on the list and has no emoji form`).toBe(false);
   });
 
   it("T2.72: the interval belongs to the set, and the product lands in the band", () => {

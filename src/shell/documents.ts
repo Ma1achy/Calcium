@@ -229,7 +229,7 @@ export function noticeDoc(
  * A tool call — `AGENT_TUI_DESIGN.md` §9c, as a composition and not a kind.
  *
  * **A header, a body, and the residue row the body already has.** The header is
- * a `notice` carrying `step` — *⏺ name(args) · elapsed · outcome* — and the
+ * a `notice` carrying `step` — *⬤ name(args) · elapsed · outcome* — and the
  * body is either the settled result under `continuation` (`⎿`, the same slot
  * `noticeDoc`'s muted notices take) or the streamed output in a `scroll` that
  * opens at its tail (C04 I97). *+N more* is **not** a fourth count string: a

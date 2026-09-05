@@ -439,9 +439,9 @@ describe("QV — the quiver (C12 I50)", () => {
   it("QV3 (C12 I50): a zero-magnitude cell draws no arrow, and the field beneath still reads", () => {
     const cells = qarea({});
     // Row `c` is [2,0] · [0,0] · [4,0] · null — the still cell is blank…
-    expect(cells[2]).toMatch(/[→>]\s+[→>]/u);
+    expect(cells[2]).toMatch(/[⇒>]\s+[⇒>]/u);
     // …and it is *not* an eastward arrow, which is what atan2(0, 0) would give.
-    const eastRun = /^[→]+$/u.test(cells[2] ?? "");
+    const eastRun = /^[⇒]+$/u.test(cells[2] ?? "");
     expect(eastRun).toBe(false);
   });
 
@@ -459,7 +459,7 @@ describe("QV — the quiver (C12 I50)", () => {
     for (const depth of [4, 1] as const) {
       const caps = { ...FULL_CAPS, colourDepth: depth };
       const cells = qarea({}, 60, caps).join("");
-      expect(/[→↗↑↖←↙↓↘]/u.test(cells)).toBe(true);
+      expect(/[⇒⇗⇑⇖⇐⇙⇓⇘]/u.test(cells)).toBe(true);
       const colours = new Set([...qrows({}, 60, caps).join("").matchAll(/38;2;(\d+;\d+;\d+)/gu)]);
       expect(colours.size, `depth ${String(depth)}: no rgb magnitude`).toBe(0); // cells-ok — a colour count
     }
@@ -472,7 +472,7 @@ describe("QV — the quiver (C12 I50)", () => {
     // no visible seam.
     const wide = { ...FULL_CAPS, unicode: "full" as const, ambiguousWidth: "wide" as const };
     expect(arrowsFor(wide).join("")).toBe(">/^\\</v\\");
-    expect(/[→↗↑↖←↙↓↘]/u.test(qarea({}, 60, wide).join(""))).toBe(false);
+    expect(/[⇒⇗⇑⇖⇐⇙⇓⇘]/u.test(qarea({}, 60, wide).join(""))).toBe(false);
   });
 
   it("QV7 (C12 I50): a null vector is a gap and draws nothing", () => {

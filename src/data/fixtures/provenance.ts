@@ -129,7 +129,9 @@ export function formatRatio(rows: readonly VerbRatio[]): readonly string[] {
     .filter((r) => r.flagged)
     .map(
       (r) =>
-        `  ⚠ ${r.verb} is majority-authored — ${String(r.authored)}/${String(r.total)}`,
+        // `!` and not `⚠`: U+26A0 is an emoji variation base (SS57, F833), and
+        // L0-data cannot reach C09's glyph table for `warn`'s form.
+        `  ! ${r.verb} is majority-authored — ${String(r.authored)}/${String(r.total)}`,
     );
 
   return [head, ...flagged];

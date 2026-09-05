@@ -2873,6 +2873,13 @@ export const UNCONSUMED_FUNCTIONS = Object.freeze({
     "C12 — `definition.ts` computes `areaWidth` inline across a three-rung ladder with " +
     "`MIN_AREA`, and this helper states the simple case. Two expressions of one width, " +
     "and the helper is the one no renderer calls. C12's to reconcile",
+
+  // --- a refusal that runs at test time by design --------------------------
+  hasEmojiForm:
+    "C09 I45 — a test-time refusal and never a measurement: `cells()` must not count " +
+    "presentation (terminals disagree about it), so no renderer may call this. Its consumers " +
+    "are T2.112, T2.71 and A03 SS57, which parses the same table out of `text.ts` lexically. " +
+    "The day a `src/` caller appears is the day I45's *never a runtime branch* was broken",
   // **`toolCallDoc` left here on 2026-09-05** (Lane P, C23 I54): the expiry was
   // *the first `src/` call*, and `execution.ts` step 3 is it — the pending entry
   // is the card. The entry was self-expiring by the equality arm, as written.

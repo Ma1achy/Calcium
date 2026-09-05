@@ -25,10 +25,11 @@ const frame = (blocks: readonly Block[], width: number, ascii = false): readonly
     .map((l) => visible(l).trimEnd());
 
 describe("C09 §4 — the `step` glyph", () => {
-  it("T2.45 (C09 I5): `step` is in the vocabulary, `⏺` under unicode and `@` under ASCII, one cell each", () => {
+  it("T2.45 (C09 I5, I45): `step` is in the vocabulary, `⬤` under unicode and `*` under ASCII, one cell each and neither an emoji base", () => {
     expect(GLYPH_TOKENS).toContain("step");
-    expect(glyphFor("step", FULL_CAPS)).toBe("⏺");
-    expect(glyphFor("step", ASCII_CAPS)).toBe("@");
+    expect(glyphFor("step", FULL_CAPS)).toBe("⬤");
+    expect(glyphFor("step", { ...FULL_CAPS, ambiguousWidth: "wide" }), "Neutral: no tier at wide").toBe("⬤");
+    expect(glyphFor("step", ASCII_CAPS)).toBe("*");
     expect(glyphCells("step")).toBe(1);
   });
 });
@@ -87,7 +88,7 @@ describe("§9c — the header, the body, and the row the body already has", () =
 
     const captured: string[] = [];
     for (const [width, ascii] of [[80, false], [40, false], [80, true], [40, true]] as const) {
-      const mark = ascii ? "@" : "⏺";
+      const mark = ascii ? "*" : "⬤";
       const hook = ascii ? "`" : "⎿";
       const more = ascii ? "~" : "⋯";
 

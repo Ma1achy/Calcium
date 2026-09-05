@@ -49,10 +49,10 @@ contradicts the framing of the determinate table:
 ```
 halfblock  ▐ ░   narrow 1 1   wide 2 2   AMBIGUOUS
 rectangle  ▬ ░   narrow 1 1   wide 2 2   AMBIGUOUS
-beads      ▪ ▫   narrow 1 1   wide 2 2   AMBIGUOUS
+beads      • ◦   narrow 1 1   wide 2 2   AMBIGUOUS   (▪ ▫ until F833 — emoji bases)
 posts      ▮ ▯   narrow 1 1   wide 2 2   AMBIGUOUS
 slant      ▰ ▱   narrow 1 1   wide 2 2   AMBIGUOUS
-squares    ◼ ◻   narrow 1 1   wide 2 2   AMBIGUOUS
+squares    ■ □   narrow 1 1   wide 2 2   AMBIGUOUS   (◼ ◻ until F833 — emoji bases)
 comet      ▬▪▫░  narrow 1111  wide 2222  AMBIGUOUS
 braille    ⣿ ␠   narrow 1 1   wide 1 1   stable
 ascii      # -   narrow 1 1   wide 1 1   stable
@@ -81,10 +81,10 @@ about the glyph it names, generalised to the set it sits in.
 |---|---|---|---|
 | `halfblock` | `▐` | `░` | `▐` is the only narrow half block. Reads as a striped bar |
 | `rectangle` | `▬` | `░` | reads as a solid line — the closest thing to a filled bar |
-| `beads` | `▪` | `▫` | dotted and quiet |
+| `beads` | `•` | `◦` | dotted and quiet — `▪ ▫` until F833, which are emoji variation bases |
 | `posts` | `▮` | `▯` | heavier beads |
 | `slant` | `▰` | `▱` | distinctive, and it reads as motion at rest |
-| `squares` | `◼` | `◻` | the same pair as the todo checkbox — one vocabulary, two uses |
+| `squares` | `■` | `□` | the plain squares — `◼ ◻` until F833; the medium squares have emoji forms and the plain ones do not |
 | `braille` | `⣿` | ` ` | `⡇` is the left column, so **half-cell resolution — the finest available** |
 | `ascii` | `#` | `-` | wrapped in `[ ]`. The fallback, and it needs no substitution |
 | `arrow` | `=` | ` ` | with a `>` head. ASCII, and it reads as travelling |

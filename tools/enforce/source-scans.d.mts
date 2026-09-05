@@ -85,6 +85,16 @@ export declare function checkAllowLists(
   scans?: readonly Scan[],
 ): Violation[];
 
+/** SS57 — the hex ranges of `EMOJI_VARIATION_BASES`, parsed out of `text.ts`'s source (C09 I45). */
+export declare function parseEmojiBases(textSource: string): number[];
+
+/** SS57 — a non-ASCII emoji variation base inside a `src/` string literal, escapes decoded (C09 I45). */
+export declare function checkEmojiBases(
+  files: readonly string[],
+  readFile?: (file: string) => string,
+  ranges?: readonly number[],
+): (Violation & { line: number })[];
+
 /** SS47 — a mark the framework draws and cannot substitute (C09 I22). */
 export declare function checkMarks(
   files: readonly string[],

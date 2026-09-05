@@ -97,7 +97,7 @@ const BEFORE: Record<string, readonly string[]> = {
   truncated: [
     // `tail`, not `tail()`: F795 ruled a bare verb a bare header (C23 §3), the one
     // deliberate byte change in this table since it was captured.
-    "\u001b[38;2;127;174;207m⏺ tail · truncated\u001b[39m",
+    "\u001b[38;2;127;174;207m⬤ tail · truncated\u001b[39m",
     "\u001b[38;2;127;174;207mt1\u001b[39m",
     "\u001b[38;2;212;179;90m▲ output truncated: append: id \"same\" is already in the document (C04 I14) —\u001b[39m",
     "\u001b[38;2;212;179;90m  ViewPatch addresses blocks by id, so a duplicate has no correct target\u001b[39m",
@@ -108,7 +108,7 @@ const BEFORE: Record<string, readonly string[]> = {
     "",
   ],
   "stream-error": [
-    "\u001b[38;2;127;174;207m⏺ tail · failed\u001b[39m",
+    "\u001b[38;2;127;174;207m⬤ tail · failed\u001b[39m",
     "\u001b[38;2;198;40;40m✗ stream failed: Error: socket closed\u001b[39m",
   ],
 };

@@ -14,7 +14,7 @@ import {
   nameExactnessSignal,
   publicSurfaceUseSignal,
 } from "./module-graph.mjs";
-import { checkSourceScans, checkMarks, checkControlBytes, checkAllowLists } from "./source-scans.mjs";
+import { checkSourceScans, checkMarks, checkControlBytes, checkAllowLists, checkEmojiBases } from "./source-scans.mjs";
 import { checkDependencies, checkPhantomImports } from "./dependencies.mjs";
 import { checkRefusals, REFUSALS, unverifiableRefusals } from "./refusals.mjs";
 import {
@@ -159,6 +159,10 @@ const violations = [
   // literal's contents, its exemptions carry reasons, and it has the
   // bidirectional arm a path allow-list cannot express.
   ...checkMarks(files),
+  // SS57 — a glyph with an emoji presentation form. Its own function for the
+  // reason SS47 is: the subject is a literal's contents against a table parsed
+  // out of `text.ts`, not a line against a regex.
+  ...checkEmojiBases(files),
   ...checkDependencies(),
   ...checkPhantomImports(files),
   // The specs are enforced too. A03 governs the source; SP1 governs the

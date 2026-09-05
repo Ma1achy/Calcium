@@ -491,8 +491,16 @@ export function glyphLayerOrder(block: Pick<Plot, "form" | "layers">): readonly 
  * `ramp.ts` spells its ladders the same way. **The comment said this before the
  * code did**, which is the class the scan exists to catch: a literal that reads
  * as compliant because the sentence beside it is.
+ *
+ * **The double-arrow ring U+21D0–21D9, since F833.** The single arrows' four
+ * diagonals `↖ ↗ ↘ ↙` are bases of emoji variation sequences — a font that
+ * prefers the emoji form draws them two cells wide in a one-cell field — and
+ * the cardinals are not, so a ring of singles cannot be made safe. The doubles
+ * are the one complete eight-direction ring in one weight with no emoji form:
+ * the black arrows U+2B05–2B07 are emoji, and the white ones U+2B00–2B03 have
+ * no cardinals. SS57 found the escapes once it decoded them.
  */
-const ARROWS_UNICODE = "\u2192\u2197\u2191\u2196\u2190\u2199\u2193\u2198";
+const ARROWS_UNICODE = "\u21d2\u21d7\u21d1\u21d6\u21d0\u21d9\u21d3\u21d8";
 
 /**
  * The ASCII arm — `> / ^ \ < / v \`, **and the diagonals reuse**.

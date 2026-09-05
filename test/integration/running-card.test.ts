@@ -310,7 +310,7 @@ describe("C23 I54 — the pending entry is the running card", () => {
     capture("settled · exit 0");
 
     console.log(`LANEP-FRAMES\n${captured.join("\n")}\nLANEP-FRAMES-END`);
-    expect(visible(frame()[1] ?? "").trimEnd()).toBe("⏺ tail(web.log) · 2m 1s · exit 0");
+    expect(visible(frame()[1] ?? "").trimEnd()).toBe("⬤ tail(web.log) · 2m 1s · exit 0");
   });
 
   // The card kept on settlement — C23 I55/I56, ruled 2026-09-05. Before these
@@ -380,7 +380,7 @@ describe("C23 I54 — the pending entry is the running card", () => {
     expect(drawn.rows, "measured rows are painted rows").toHaveLength(height);
     expect(drawn.faults).toEqual([]);
     const rows = drawn.rows.map((l) => visible(l).trimEnd());
-    expect(rows[0]?.startsWith("⏺ ps · ok"), "the header at column 0").toBe(true);
+    expect(rows[0]?.startsWith("⬤ ps · ok"), "the header at column 0").toBe(true);
     expect(rows[1]?.startsWith("  ⎿ "), "the body's first row under the hook, the hook at column 2").toBe(true);
     for (const row of rows.slice(2)) expect(row === "" || row.startsWith("    "), "every body row indented").toBe(true);
     // **The indent is the shell's, not the document's** (I56): the blocks carry
