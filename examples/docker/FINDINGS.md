@@ -29813,3 +29813,35 @@ time is an arming machine, C16's measured class.
 
 ---
 
+## F832 — the derived emoji table's first run: `info`'s `ℹ` is a variation base too, and so are `*`, `#` and the digits ★★★☆☆
+
+**What happened.** Building the table C09 I45 asks for — every base of an emoji variation
+sequence, from `emoji-variation-sequences.txt` 17.0.0 — and checking the glyph tables against it
+before writing a line of the rule: 371 bases, 183 ranges, and **two members of the block
+vocabulary are in it**. `⏺` U+23FA, the one F823 was written about, and `ℹ` U+2139, the `info`
+glyph, which nobody had asked about. Both are `Emoji=Yes` with a default text presentation, so
+both draw two cells wherever a font prefers the emoji form, and `cells()` reports one for each.
+The table also holds `#` U+0023, `*` U+002A and `0`–`9` — the keycap bases — which sit in the
+ASCII ramps and in `step`'s and `running`'s ASCII rung.
+
+**Why it matters.** A rule that found one instance on its first run has earned its place; this is
+CLAUDE.md's *one new rule that found three further instances in shipped code on its first run*,
+at one instance. And the keycap bases are the rule's own blind spot arriving on the same day: the
+ASCII range is drawn from the primary font by every terminal, `*` has never rendered as an emoji
+without its `U+20E3` keycap, and a rule that refused it would refuse the alphabet the tables
+degrade to. **So the rule is over non-ASCII bases**, stated with the reason rather than as an
+exemption discovered later.
+
+**Ruling.** `info` becomes `ⓘ` U+24D8 CIRCLED LATIN SMALL LETTER I over `i`: the one mark that
+reads as information, not in the emoji set, and `East_Asian_Width=Ambiguous` — two cells at
+`wide`, which I48's tier resolves to `i`. Measured before choosing, against nineteen Neutral
+candidates that are not emoji bases (`› ⁍ ⦿ ⁝ ⁞ ⟐ ⌕ ⌖ ⏵ ⯈ » ⌂ ⌘ ⎔ ⏣ ⧉ ⧫ ⬥ ⯁`): none reads
+as *information*, and a mark a reader has to learn is a worse trade than one the tier already
+covers. I45 reads *no non-ASCII character*; the derived table in `text.ts` excludes the ASCII
+range by construction and says why.
+
+**Where**: `src/presentation/blocks/glyphs.ts` `info`; `src/presentation/text.ts`
+`EMOJI_VARIATION_BASES`; C09 I45, §4; A03 SS57.
+
+---
+
