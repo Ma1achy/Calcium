@@ -739,6 +739,15 @@ what makes it cacheable on the key `shell/render-cache.ts` already uses.
 — which is the roadmap's constraint on the mouse work, satisfied structurally rather than by
 two mechanisms agreeing.
 
+**The search needs two translations the walk never did, and both are the list's own
+coordinates rather than a second geometry** (C16 §4a). C14 answers a region row as
+`chrome ++ blocks` (C14 I20), so the pointer subtracts the entry's chrome rows before the
+list's rows apply; and a `scroll`'s elements are in **content** rows by I3 — they cannot depend
+on the offset — so a pointer inside the box is at `boxRow + offset`, and the residue row is no
+element. The second is a structural interaction between two correct rules, and a hit test
+taken from the signature alone focuses the child above the one under the pointer by exactly
+the offset. Measured on a five-child, three-row box before the code was written.
+
 `focusableRowIds` (`presentation/table/definition.ts:230`) is this, at one level for one kind.
 **C26 generalises it and does not sit beside it.** A second parallel mechanism is the defect
 to avoid, and it is named here so the implementation cannot reach for one quietly.
@@ -848,16 +857,29 @@ is written.
 
 **The plumbing is built.** SGR decoding (`decode.ts:393`), a `mouse` capability that is off
 under tmux, and a routing table that hit-tests layers by `Placed` and falls through to the
-viewport (`router.ts:254`). Wheel scrolling works. What is missing is **cell → element
-resolution**, which is §5's declaration and nothing else.
+viewport (`router.ts:254`). Wheel scrolling works. **The viewport rung had never fired**: the
+router's `entryAtRow` dep was supplied as `() => null` by the production frame while C14 §2
+declared the method and C14 I19 owned it — so *the plumbing is built* was true of every piece
+and false of the joint. Built in C14 where the spec puts it (C16 §4a).
 
 The constitution it ships with is the constraint: *"every mouse affordance has a keyboard
 equivalent, so nothing is lost — only convenience"* (`capabilities.ts:67`). Clicking is *jump
 directly to this scope*; the keyboard is *walk there*. Same target set, two routes.
 
-**Deepest level wins**, which is what makes click-to-focus and click-to-activate one rule
-rather than a per-block decision: a click resolves to the innermost element containing the
-cell, and an element carrying `activate` is invoked while one without it takes focus.
+**Deepest level wins**: a click resolves to the innermost element containing the cell.
+
+**And a click focuses; a click on the focused element activates** (C16 §4a, C16 I31). This
+sentence used to say *an element carrying `activate` is invoked while one without it takes
+focus*, and that is refused: a single click that runs a `fill` gives the pointer no way to
+merely land on a row that has an action, and its key equal would be `↓` and `⏎` fused into one
+gesture — while every row without an action would take two states to reach one. *Click again*
+is `⏎` on the state the first click reached, with no timer, because C16 reads no clock (C16 I9)
+and the second click is a state test rather than a timing one. In `interact` mode the second
+click does nothing — the block owns its keys there (I14) and the framework does not fire its own
+`⏎` through the mode built to keep the framework's keys out.
+
+**Cell → element resolution is now built** (C16 §4a): one `find` over `elementsIn`'s list,
+which is §5's declaration and nothing else — as this section said it would be.
 
 **One translation, used by both rungs** — C16 I20 already records what it costs to
 have two: a layer's box and C14's entry map are both region-relative, and comparing a

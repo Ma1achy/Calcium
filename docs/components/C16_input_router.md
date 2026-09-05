@@ -34,7 +34,8 @@ type Key = Readonly<{
 }>;
 
 type InputEvent =
-  | Readonly<{ kind: "key";   key: Key }>
+  | Readonly<{ kind: "key";   key: Key;
+               event?: "press" | "repeat" | "release" }>   // only under C02 `keyboardProtocol`
   | Readonly<{ kind: "paste"; text: string }>
   | Readonly<{
       kind:   "mouse";
@@ -88,7 +89,7 @@ of consistent. One constant, one behaviour, one bug report.
 
 `reset()` discards the pending bytes, the paste buffer and the escape window, and **emits nothing**: the flush rule that turns accumulated printables into keys (§7) is about a window closing, and this window did not close, it stopped mattering. The call is the shell's, on resume, because C01 delivers bytes and interprets none and C16 owns no timer — neither of them knows a suspension ended. That makes it C22's orchestration, and §4's ordering is where it is written down.
 
-Terminals send no key-up events and repeat held keys as fresh presses, so there is no chord support beyond modifiers. Saying so prevents someone designing a keymap that cannot work.
+**Most terminals send no key-up events and repeat held keys as fresh presses**, so there is no chord support beyond modifiers, and a keymap must not be designed around one. Under C02's `keyboardProtocol: "kitty"` (C01 pushes `CSI > 3 u`) a key arrives as `CSI code ; mods : event u` and the decoder carries the event type as an **optional** `event` field on the `kind: "key"` record — `"press"`, `"repeat"` or `"release"` when the sequence says, **absent** otherwise, so every consumer that ignores it is unchanged and `toEqual` records written before it exist unchanged. **Nothing may be reachable only through that field** (C02 I12): a binding that names an `event` filter without a fallback that fires under `"none"` is A03 SS55's violation, and the rule is vacuous today because no binding names one. The same arm decodes `CSI 27 u` as `escape` **whole** — under the protocol a lone `Esc` is never a prefix and the 50 ms window never runs — and names the modifier key codes `57441`–`57452` (`shift`, `ctrl`, `alt`, `super`) so a terminal that sends them produces a named key rather than a private-use glyph, though the flags C01 pushes do not ask for them (C02 §3's table). The arm's modifier bits are kitty's: shift 1, alt 2, ctrl 4; **bit 8 is folded into nothing** — it is xterm's Meta and kitty's Super, and `⌘` arriving as `Alt` is the live-binding class below — and kitty's meta, bit 32, joins alt in `meta` as the `CSI 1;m X` arm already folds them. Stated blind spot: an xterm at `formatOtherKeys=1` loses a Meta modifier through this arm; its default format keeps it.
 
 ### `modifiersOf` read three bits of four, and the fourth collapsed onto a live binding
 
@@ -296,13 +297,85 @@ A click is positional. Sending it through focus priority would deliver a click o
 4  otherwise                               → dropped
 ```
 
-Wheel events are the exception: they are directional rather than targeted, and go to C14 unless a layer covers the pointer.
+Wheel events go to the layer covering the pointer if there is one; otherwise **to the entry under the pointer first, and to C14 when that entry declines** (§4a). The rung used to send every uncovered wheel straight to C14 as *directional rather than targeted*, and that was true for exactly as long as nothing in the transcript could scroll on its own — a `scroll` block (C04 I48) is a second thing the wheel can mean, and a wheel that always moved the transcript would move the box's frame while leaving the box's content where it was.
+
+A **horizontal** wheel (`wheelLeft`/`wheelRight`, I30) is a wheel for this table's purpose and nothing consumes it. The test was `button === "wheelUp" || button === "wheelDown"` when the decoder could only produce those two, so the day the decoder named the other two directions a horizontal wheel fell through to the entry rung **and was routed as a click on the block under the pointer** — a focus move from a gesture that means *scroll sideways*. `startsWith("wheel")` is the test, so a fifth direction could not do it again.
 
 "Covers the point" is both axes, and C15's `Placed` carries `top`, `left`, `height` and `width` for this reason — a centred confirm's horizontal extent is not recoverable from the region and the layer alone (C15 I6, F3 of that spec's interface pass). Nothing here computes a layer's position; it reads the one C15 placed.
 
 **Both rungs test a region row, and the event carries a terminal row** (I20). A decoded mouse event is 0-based and absolute; rung 2 subtracts the region's top before asking C14, and rung 1 must subtract it before comparing against `Placed.top`, because a layer's box is placed relative to the viewport region (S01 §3a, C15 I6). The two ran in different coordinate systems — adjacent lines of one function, one of them translating and one not — and the symptom is a click near a layer's edge resolving to the row above the one it landed on, which reads as a placement error in C15 rather than as a missing subtraction here. Neither rung recomputes anything: one number is translated once, and both rungs use it.
 
 Mouse events are dropped entirely when `capabilities.mouse` is false, before decoding (T3.12).
+
+## 4a. The pointer's gesture table — a table onto the key effects
+
+**Every mouse affordance has a keyboard equivalent** (C02 `capabilities.ts`), and C26 §5 rules the shape: *the keyboard walks the list; the pointer searches it. One source, so they cannot disagree.* So the pointer is **not a second focus mechanism**. It is a table from gestures onto states the keys already reach, through the same `focus` calls and the same `keys.table` effects — a click lands where `↓`/`tab` would land, a drag where `⇧↓` would, and nothing here can produce a `StoredFocus` a key could not. The mouse arm sits beside `bound()` in L4 (`construct.ts`), for I19's reason one gesture over: C16 routes and executes nothing.
+
+**The pointer → element resolution is one `find` over the same `elementsIn` list the keyboard walks**, at the same width, and it is the one place the two differ in what they need: the keyboard needs reading order and the pointer needs geometry. Two geometric facts the keyboard never had to know, both measured rather than assumed:
+
+- **`rowOffset` is in the entry's height including its chrome** (C14 I20): the command line is drawn above the blocks and is part of the row the index answers with, so the pointer subtracts `chromeRows(entry)` before the element list's rows mean anything. A pointer on the command line has a negative block row and hits no element.
+- **A `scroll`'s elements are in content rows, not box rows** (C26 I3 — elements never depend on the offset), so a pointer inside the box is at content row `boxRow + offset`, and a pointer on the residue row or outside the box hits nothing of the box's. This is a structural interaction between two correct rules — *elements are offset-free* meets *the pointer is in screen space* — and a hit test by `rows` alone selects the child **above** the one under the pointer by exactly the offset, a wrong answer inside the bounds.
+
+**Deepest level wins** (C26 §6): a `cell` inside a `row` inside a `block` resolves to the cell. Per-level disjointness (C26 §5 predicate 3) is what makes the answer single-valued within a level.
+
+### The gesture table
+
+Gesture is `button0` unless said otherwise; `press: false` is the release (I30). *Entry* is the entry C14 names for the region row; *element* is the deepest element containing `(blockRow, col)`.
+
+| gesture | where | effect | the key it equals |
+|---|---|---|---|
+| click | an element, not the focused one | **focus it**: `enterLiveBlock(entry, address)` from the prompt, `focusRow(entry, address)` from a row — one stored shape either way, `anchor: null`, `mode: "navigate"`. The entry may be settled (C26 I21) | `↓` / `↑` / `tab` / `⇧tab` |
+| click | the focused element, in `navigate` | **`rowActivate`** — the element's `activate`, dispatched from the focused entry (C23 I37); a settled entry's reaches C23 I18's refusal. No double-click timer: C16 reads no clock (I9) and the terminal has none to offer here; *click again* is a state test, not a timing one | `⏎` |
+| click | the focused element, in `interact` | **nothing.** The block owns its keys there (C26 I14) and there is no block pointer vocabulary, so the framework does not fire its own `⏎` through a mode built to keep the framework's keys out | — (a block key) |
+| click | an entry row that is no element — chrome, gap, a `scroll`'s residue row, blank space beside a short block | **nothing**, and the event is unconsumed. `element: null` is a location the keys never produce and the frame never highlights, so a click that stored it would change state invisibly — the class the frame-read exists for. I22's third clause one level down: a row with nothing focusable is not entered | — |
+| press + `motion` | an element in the **focused** entry | **`extendRow(entry, address)`** — the head moves, the anchor is placed on the first extension and never moved (C26 I16). Motion onto the anchor's own element collapses to `anchor === element`, which is no selection, exactly as `⇧↑` back to the start does | `⇧↓` / `⇧↑` |
+| press + `motion` | an element in **another** entry, a non-element row, a layer, chrome | **nothing** — the selection keeps its head. A selection cannot straddle two entries (C26 §4g) and the pointer does not get a wider one than the keys | — |
+| wheel | inside a `scroll`'s box | **that box scrolls** by the wheel step, through the same `scrollOffsets` store `blockPageUp/Down` write — clamped at read (C04 I48). Focus does not move (C26 I18). The scroll under the **pointer**, not the focused one, because a wheel is positional like a click and unlike a key | `PgUp`/`PgDn` on the focused box |
+| wheel | anywhere else in the region, chrome, the prompt | **the transcript scrolls**, as before (C14) | `PgUp`/`PgDn`/`⌃Home`/`⌃End` at the prompt |
+| click | header, footer, the prompt row | **`focusPrompt`** — the reader stepping out (C26 I13) | `Esc` |
+| release (`press: false`) | anywhere | **nothing**, and it is unconsumed. The press did the work; a release that also acted would be a second click | — |
+| `button1`, `button2`, `button8`–`11`; any modifier held | anywhere | **nothing in this table**, recorded rather than absorbed: a shift-click that extended would be one gesture for `⇧↓`'s state and is the obvious next row; a right-click has no key equal and needs one before it can have an effect | — |
+
+**Where a ruling named an operation, the operation was checked before the row was written.** *Scroll the box under the pointer* needs a per-block nudge that takes an entry and a block id — `scrollOffsets.nudge(entryId, blockId, delta)` exists and clamps at read; `blockPageUp/Down` act on the **focused** block and could not be the effect, so the wheel row does not go through `keys.table` and says so. *Focus a settled entry from the prompt* needs `enterLiveBlock` to take an entry — it does (C26 I21) — because `focusRow` is a deliberate no-op at the prompt and a click is a way in exactly as `↓` is.
+
+### The classification table — structural, at rest
+
+Indexed by the cells where two rules both hold with nothing happening in between. A row governed by one rule is a restatement and is left out.
+
+| | the two rules that meet | ruling |
+|---|---|---|
+| **a** | *a layer covers the point* (rung 1) meets *the point is over an element* | the layer, and the element never sees it — C15's box is the outer scope. No new rule: rung order already says so, and the row is here because a reader of the gesture table alone would not see that its first column is conditional on rung 1 |
+| **b** | *rowOffset is in `chrome ++ blocks`* (C14 I20) meets *element rows are block-sequence-relative* (C09 `elementsIn`) | subtract the chrome, once, before the find. The keys never met this because they never held a row; a version that forgot it hits the row **below** the one under the pointer by exactly the command line's height, on every entry, and reads as an off-by-one in C14 |
+| **c** | *a `scroll`'s elements are in content rows* (C26 I3) meets *the pointer is a box row* | translate through the offset for elements the box owns, and require the row to be inside the box's `height` — the residue row and the rows past a short content are no element. Found by measuring `elementsIn` on a five-child, three-row box: `n4` at rows 3–4, `n5` at 4–5, both outside the box the pointer can be in |
+| **d** | *two children of a `row` group sit side by side* (C04 `groupChildWidths`) meets *`elementsIn` lifts rows and not cols* | **a defect in C09, recorded and not worked around here** (FINDINGS, Lane W): both tables in an 80-column row group answer `cols {0, 39}`, so a click at column 10 matches both and a click at column 50 matches neither. The pointer helper compares cols honestly and the second child is unreachable until the walk carries a column origin. Working around it here would be a second geometry, which is the drift C26 §5 exists to forbid |
+| **e** | *a `cell` sits inside a `row`* (C26 §5 predicate 3, per-level disjointness) meets *the pointer wants one answer* | deepest level wins. Vacuous today — no kind declares both a row and cells over the same area — and said so, because it is the rule that will decide the first table with a column cursor (C26 §11) |
+| **f** | *click focuses* meets *the entry is settled* | focus moves to the settled entry (C26 I21; `tab` is the equal). A click cannot enter `interact` there — D4 withdrew the mode from settled entries and `enterLiveBlock`/`focusRow` both land in `navigate` |
+| **g** | *click focuses* meets *a selection is open* | `focusRow` collapses it (C26 I16): an unshifted gesture drops the region, exactly as `↓` does |
+| **h** | *wheel over a `scroll`* meets *the box is in a settled entry* | the box scrolls: offsets are view state, not data, and a frozen entry's view state is the reader's (C23 I47). Same as `PgDn` on a focused box in a settled entry (T4.59) |
+| **i** | *wheel is directional* (old §4 sentence) meets *a `scroll` under the pointer can scroll* | the old sentence loses: the entry is offered the wheel first and the transcript takes what it declines. Both are scrolls; the inner one is under the pointer |
+| **j** | *`wheelLeft`/`wheelRight` exist* (I30) meets *the wheel test names two directions* | the horizontal wheel was a click. `startsWith("wheel")`, and T1.3o holds it |
+| **k** | *a layer that must be answered blocks everything beneath it* (I8) meets *the mouse routes by position* | the mouse table had no modality gate while the keyboard's had two: a click beside a confirm moved focus under it and a wheel scrolled the transcript under one — I8's own example, arriving by the pointer. With a non-dismissable top layer, an event not on that layer is consumed and nothing happens, which is the key path's shape. T1.3q |
+| **l** | *C14 addresses rows from the region's top* (C14 §2, I19) meets *the frame bottom-aligns a short transcript* (`paint.ts`: *content should grow towards the prompt*) | **found by reading the painted frame, and reachable by nothing else.** Every store-level row passed; the first click at a visible `beta-1` in a real session asked C14 for region row 12 of a 12-row transcript and got `null`. C14 §2's own sentence — *a short transcript leaves rows below the last entry* — describes a frame the composer does not draw. The translation is the frame's: L4 subtracts `max(0, height − totalRows)` before asking C14, over the same two numbers `paint.ts` pads with, and C14 stays ignorant of how it is drawn |
+
+### The sequence trace — event-mediated
+
+| | sequence | what is left behind, and the ruling |
+|---|---|---|
+| **1** | press on element 1 → motion on element 2 → motion on element 3 → release | `{element: 3, anchor: 1}`: three selected. The release leaves nothing. A version that moved the anchor is right after the first motion and wrong after the second (C26 I16), which is why the row has three elements and not two |
+| **2** | click on a settled entry's row → `⏎` | C23 I18's refusal, **patched into the settled entry** — its `rev` moves and the live entry's does not. The origin is the focused entry, which the click set; with `liveId` as the origin the action would fire against the live entry's document and be refused by nothing (C26 §4g row e). This is the row that says a click and `tab` are the same state |
+| **3** | `↓` into the live entry → a block enters `interact` → click on another element | `navigate`, on the clicked element. `focusRow` drops the mode as `↓` does: a mode belongs to the element it was entered on. Click on the **same** element instead → nothing changes (table row 3) |
+| **4** | press on element 1 → motion **off the region** (chrome, or a layer) → motion back onto element 2 | the excursion leaves nothing — chrome and layers ignore a drag — and the return extends from the anchor still at 1. No state is kept between motion reports; each is resolved on its own, which is I1's *derived on every dispatch* for the pointer |
+| **5** | press on element 1 in entry A → motion onto an element in entry B | `{element: 1, anchor: null}` unchanged: another entry's element is not a head for A's anchor (table row 6). `extendRow` would drop the anchor on an entry change (eviction's arm) — and it is never called, so the arm is not what enforces this |
+| **6** | wheel over a `scroll` × n → wheel over prose | the box's offset moves n steps, the transcript's `topRow` does not; then the transcript moves and the box does not. Two stores, and the pointer decides which one per event — the row asserts **both** counters after each step, because a version that moved both passes either half |
+| **7** | click on element → click again → click a third time | focus, activate, activate. There is no toggle and no timer: the third click is the same state test as the second. A `fill` action's third press fills again, which is what `⏎ ⏎` does |
+| **8** | click at the prompt row while focus is in a row | `{at: "prompt"}` — `focusPrompt`. The click on chrome is the one gesture that leaves the transcript, and it is the `Esc` route rather than `↑`'s so a settled entry is left the same way (C26 §4g row b) |
+| **9** | mouse disabled → any of the above | dropped before decoding (I3, T3.12). No row here is reachable and no state moves |
+
+### What the walk found before the code
+
+Three things, none visible from the gesture table alone. **(b)** the chrome offset — the brief asked *what `rowOffset` is relative to* and the answer is the entry including its command line, which no key ever needed. **(c)** the scroll's content space — a hit test written from `elementsIn`'s signature alone is wrong inside every scrolled box by exactly the offset, and every assertion about a *row being focused* passes. **(d)** the side-by-side columns — a defect in the walk the pointer reads, found by measuring the walk rather than by reading it. **(l)** the frame's alignment — the only one of the four found after the code, by the frame read the brief scheduled: the store said the settled entry's second row was focused in every graph-level row, and the painted session's click landed on blank rows the viewport did not know were there. And one thing the brief's own premise had wrong: **C14's `entryAtRow` did not exist.** The spec declares it (C14 §2, I19, T2.11/T2.12/T3.1b/T3.1c), the router's dep is named for it, and the production `FrameQueries` supplied `() => null` — so rung 2 had never once resolved an entry, `run("liveBlock", e)` had never been reached by a mouse, and *complete skeleton* was true of the router and false of the system. Built in C14 where the spec puts it, and the seam through `FrameQueries` removed rather than kept as a second answer to *which entry is at this row* (C14 I19).
+
+---
 
 **Exactly one handler consumes a key.** No broadcast, no bubbling past the first consumer. Multiple handlers on one target are tried in registration order.
 
@@ -723,6 +796,8 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 - **I29** — **`⇧⏎` and `⌥⏎` at `liveBlock` re-run the focused entry's recorded command through C23 §2's submit, and nothing else fires from a frozen entry** (→ C23 I18). Not an action kind: the five kinds fire against a document's data, which a frozen entry's is stale; the command text is not. An entry with an empty command is a silent no-op and declares no element to be focused on anyway.
 - **I30** — **A mouse event carries every bit the terminal sent; nothing is masked.** SGR 1006's `Cb` is a bit field (§2's table): button in bits 0–1, shift 4, meta 8, ctrl 16, motion 32, wheel 64 with bits 0–1 selecting up/down/left/right, buttons 8–11 at 128; press or release is the final byte. The decoder names each bit and interprets none — what a modified click or a drag *does* is §4's. A masked bit is one no consumer can recover: ctrl-wheel-up decoded as `wheelDown` and a drag as a stream of clicks, and both read as correct events to everything above.
 
+- **I31** — **A pointer gesture reaches only states a key reaches, through the same calls** (§4a). A click on an element is `enterLiveBlock`/`focusRow` on that entry and address — the settled entry included; a click on the focused element in `navigate` is `rowActivate` and in `interact` is nothing; a drag is `extendRow` within the focused entry and nothing across entries; a wheel inside a `scroll`'s box moves that box's offset and elsewhere the transcript's; a click on chrome is `focusPrompt`; a release, a horizontal wheel, a second button and a modified click do nothing and are unconsumed. Resolution is one `find` over the list the keyboard walks, after the entry's chrome rows are subtracted and a `scroll`'s offset is added, and the deepest level wins. `StoredFocus` therefore has no pointer-only value, and the table above is the whole of what the pointer can do.
+
 **And a question outranks rungs 1 and 2, which is the one place newest-first is not enough on its own.** A local verb awaiting `ctx.ask` is `inFlight` for the whole time its question is on screen, so `⌃c` was taken by the cancel rung and the question never saw it — two rungs with a claim, and the older one higher. Ruling A's own argument decides it: `Esc` and `⌃c` collapse *because* declining and cancelling produce the same outcome, and when two paths produce the same outcome the one that leaves a record is the one to keep. Cancellation discards the entry; declining settles one saying nothing changed. **Found by a frame-read and reachable by nothing else** — the container was untouched and the layer was gone, which is everything a test asserts, and the frame showed that the submitted line had disappeared. The suite agreed throughout, because every harness reported `inFlight: null` and that is the one arrangement where both readings agree.
 
 ---
@@ -759,6 +834,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 27. `⇧⏎`/`⌥⏎` at `liveBlock` re-run the focused entry's recorded command, and that is the whole of what fires from a frozen entry (I29, → C23 I18).
 28. `CSI Z` decodes as `⇧tab`, bare form only (I17, §2).
 29. An SGR mouse event carries button, shift, meta, ctrl, motion and press/release as the terminal sent them; the wheel has four directions and buttons 8–11 have names (I30, §2).
+30. The pointer is a gesture table onto the key effects — click focuses, click-again activates, drag extends, wheel scrolls the box under it or else the transcript, chrome returns to the prompt — resolved by one find over the list the keyboard walks, and it can reach no state a key cannot (I31, §4a). A region row becomes an entry in C14 and nowhere else (→ C14 I19).
 
 ---
 
@@ -841,6 +917,8 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T3.11b**: during a *pass-through* child C16 receives no input at all — a spy on `dispatch` records nothing between `lifecycle.suspend()` and `resume()`, which is why that case is not a rung. Asserts the absence the §5 table now records.
 - **T3.12** (I3): a mouse event with mouse disabled → dropped before decoding, never surfaced as keys.
 - **T3.12b** (I3): a wheel event with an overlay under the pointer → goes to the overlay; with none → goes to C14.
+- **T1.3o** (I31, §4a row j): `wheelLeft` over an entry's row is offered as a wheel — `viewport:wheel` in the stages, never `viewport:<entry>` — and consumed by nothing; the control is `button0` at the same row reaching the entry.
+- **T1.3p** (I31, §4a row i): an uncovered `wheelUp` inside the region is offered to the entry under it before `global`, and reaches `global` when the entry declines; with a layer covering the point it goes to the layer and nowhere else (T3.12b's half, kept).
 - **T3.13**: a malformed escape sequence → discarded; the next valid key decodes normally.
 - **T3.14**: a multi-byte UTF-8 character split across two stdin chunks → one key event, correct codepoint.
 - **T3.15**: a handler that throws → contained; the event is treated as unconsumed and the session survives.
@@ -858,6 +936,14 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T4.7** (with C19): `Tab` reaches completion only when the prompt has focus.
 - **T4.8** (with C06): Ctrl-C during a real invocation triggers the escalation ladder.
 - **T4.9** (with L4): `/help` renders the keymap from the same table dispatch uses.
+- **T4.62** (I31, §4a row 1 of the gesture table; C26 I21): in a session with two entries of two rows each, a click at the settled entry's **second** row focuses `{entry: settled, element: b1}` — asserted as the whole stored location and read back from the frame, where the settled entry's probe saw the focus and the live entry's saw none. Containment is not correctness: the row names which element, not that one was focused.
+- **T4.62b** (I31, §4a row b): the same click one row higher lands on the settled entry's **first** row, and a click on the command line above it changes nothing — the chrome subtraction, held from both sides.
+- **T4.63** (I31, §4a row c): a click at the live entry's first row from the prompt enters `liveBlock` there; the column matters — over a `pills` block, a click at the second chip's columns focuses `chip-1` and not `chip-0` on the same row.
+- **T4.64** (I31, §4a trace 7; C23 I18): click on a row, click again → the row's `fill` action runs; on a **settled** entry the second click reaches the refusal, which is patched into that entry — its `rev` moves and the live entry's does not.
+- **T4.65** (I31, §4a trace 1; C26 I16): press on row 1, motion onto row 2, motion onto row 3 → `{element: 3, anchor: 1}`; the release leaves it; motion onto another entry's row leaves it too (trace 5).
+- **T4.66** (I31, §4a trace 6; C04 I48): a wheel inside a `scroll`'s box moves that box's offset and leaves the transcript's `topRow` where it was; a wheel over prose in the same session moves `topRow` and leaves the offset. Both counters asserted after each step.
+- **T4.66b** (I31, §4a row c): with the box scrolled by two, a click at its first box row focuses the **third** child, not the first — the offset translation, and the row a `rows`-only hit test fails.
+- **T4.67** (I31, §4a trace 8): a click on the prompt row from a focused row → `{at: "prompt"}`; a release and a `button1` press over an element move nothing.
 - **T4.9b** (I23, with L4): the four scroll bindings appear in what `/help` renders. The row that says the ruling changed anything a user can see — before it, three of the four keys worked and none of them could be found, and the fourth pair did not work at all.
 
 ### Tier 5 — e2e
@@ -902,6 +988,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T6.9d** (I17): dropping the CSI-u and `modifyOtherKeys` branches → T1.3d and T2.13 fail, and Shift-Enter is unreachable on every terminal that sends it.
 - **T6.9e** (I17): dropping bit 8 from `modifiersOf`'s `meta` → T1.3e fails, and `⌥⇧←` arrives as `⇧←` on every terminal that sends Option as Meta — a **live** binding rather than a dead one, which is why no row above the decoder fails with it.
 - **T6.9f** (I30): restoring `code === 64` as the only wheel-up → T1.3k fails, and ctrl-scroll-up scrolls down. Masking the modifiers back out with `& 3` → T1.3l fails. Dropping the motion bit → T1.3m fails and a drag is a stream of clicks. All three in `tools/mutate/runs/c16-mouse-decode.mjs`.
+- **T6.9g** (I31): the pointer's `find` by rows alone, ignoring cols → T4.63 fails and the second chip is unreachable. `focusRow` with `liveId` in place of the hit entry → T4.62 fails, the settled entry's probe never sees focus, and T4.64's refusal is not reached. The click-again branch dropped → T4.64 fails and a row can be reached and never acted on, which is F21 for the pointer. The chrome subtraction dropped → T4.62b fails one row low. The offset translation dropped → T4.66b focuses the first child. The frame's bottom alignment ignored — C14 asked from the region's top — → T4.62c fails on the painted frame and every graph-level click row with it, because a short transcript's rows are ten rows lower than the viewport says (§4a row l). The wheel test restored to `wheelUp || wheelDown` → T1.3o fails and a horizontal wheel is a click. All in `tools/mutate/runs/c16-mouse-wiring.mjs`, with the wheel line as the control; each was run by hand on 2026-09-05 and every one killed the row it names.
 
 ---
 

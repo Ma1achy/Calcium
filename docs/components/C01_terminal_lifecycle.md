@@ -105,10 +105,10 @@ shell:  lifecycle.suspend() → runner.handoff(argv) → lifecycle.resume()
 **The keys are named, not counted.**
 
 ```
-held ⊆ { stdout, altScreen, cursor, rawMode, bracketedPaste, mouse, scrollRegion }
+held ⊆ { stdout, altScreen, cursor, rawMode, bracketedPaste, mouse, keyboardProtocol, scrollRegion }
 ```
 
-Seven possible; six ever taken at startup, because `scrollRegion` is transactional and C03's (§5). Two of them are not escape sequences at all — `stdout` is the redirection and `rawMode` is a termios call — which is exactly why I8 can release the first while emitting nothing. And `mouse` is one key that emits two sequences, released as two in reverse.
+Eight possible; seven ever taken at startup, because `scrollRegion` is transactional and C03's (§5). Two of them are not escape sequences at all — `stdout` is the redirection and `rawMode` is a termios call — which is exactly why I8 can release the first while emitting nothing. And `mouse` is one key that emits two sequences, released as two in reverse.
 
 An earlier draft counted six in three places and meant a different six each time: §5's six acquisition steps, T2.8's six mode sequences, and this row. I6 cannot be implemented against three sets, so the set is now written out.
 
@@ -172,11 +172,20 @@ precisely because it looks simpler at the call site.
 4  raw mode                setRawMode(true)
 5  bracketed paste         CSI ? 2004 h     if capability
 6  mouse tracking          CSI ? 1002 h, CSI ? 1006 h    if capability
+7  keyboard protocol       CSI > 3 u        if capability — C02 `keyboardProtocol: "kitty"`
 ```
+
+**Step 7 is a push and its release is a pop, `CSI < u`, never `CSI = 0 u`.** The kitty keyboard
+protocol keeps a stack of flag sets per screen, so the pop returns the terminal to whatever it held
+before we arrived — a user's own configuration, or a parent program's push — where a reset would
+overwrite it (C02 §3, `KITTY_KEYBOARD`). Taken last so it is released **first**: the terminal is back
+to legacy key reporting before the mouse and paste modes leave, and a byte the user types into the
+gap between our release and the shell's next read arrives in the encoding the shell expects. The
+flags are `0b11` — disambiguate and event types — and C02 §3 says which bits are not pushed and why.
 
 The scroll region is not acquired at startup. It is taken and released transactionally by C03 only if scroll-region acceleration is ever built (M-T6), and `held` tracks it the same way.
 
-Release is steps 6 → 1, emitting only what `held` contains.
+Release is steps 7 → 1, emitting only what `held` contains.
 
 **A failure at step 2 unwinds before `onFatal`.** Step 1 is already held by then, and `onFatal` returns `never`, so nothing runs after it. Releasing first is not a courtesy: otherwise the only fatal case in the system is the one case that leaves state behind. The general rule is T3.7's — partial acquisition never leaves partial state — and the fatal path is not an exception to it.
 
@@ -319,8 +328,9 @@ Six tiers. Behaviour is not a seventh — it cross-cuts scope and is carried by 
 
 Fabricated `TerminalCapabilities`, a fake `WriteStream` capturing bytes. No real terminal.
 
-- **T1.1** (I6, C5): full acquisition emits the six sequences in documented order.
-  *Given* a record with every capability true. *When* `acquire()`. *Then* all six acquisitions occur exactly once; `1049h` is **first**; `setRawMode(true)` precedes any mouse or paste sequence. Relative order of `2004h`, `1002h` and `1006h` is unasserted — it is arbitrary, and pinning it would break on a harmless refactor.
+- **T1.1** (I6, C5): full acquisition emits the seven sequences in documented order.
+  *Given* a record with every capability true. *When* `acquire()`. *Then* all seven acquisitions occur exactly once; `1049h` is **first**; `setRawMode(true)` precedes any mouse or paste sequence; `CSI > 3 u` is **last**, after the mouse pair. Relative order of `2004h`, `1002h` and `1006h` is unasserted — it is arbitrary, and pinning it would break on a harmless refactor.
+- **T1.28** (I10, C02 I12): with `keyboardProtocol: "none"` no `CSI > … u` or `CSI < u` byte appears in either direction; with `"kitty"` the push is `ESC [ > 3 u` exactly and the pop is `ESC [ < u` exactly — **the pop form, not `CSI = 0 u`**, asserted on the byte because the two are indistinguishable from every other assertion in this file.
 
 - **T1.2** (I6): release emits the exact inverse in reverse order.
 
@@ -335,7 +345,7 @@ Fabricated `TerminalCapabilities`, a fake `WriteStream` capturing bytes. No real
 - **T1.17** (I19): `cursorSequence({row, col})` is a hide, then a move to that cell, then a show, **in that order within the one string**; `cursorSequence(null)` is a hide and no move. The order is the assertion, not the members: all three present in any order passes a set comparison and still drags a visible cursor across the frame on a terminal without synchronised update, which is a capability rather than a guarantee.
 - **T1.16** (I18, C20): bytes reach an `onInput` subscriber only while acquired. Written across the whole transition rather than as four cases, because the subject is the transition: before `acquire()` nothing arrives; after it, a chunk does; after `suspend()` the same chunk does not; after `resume()` it does again; after `release()` it does not. The chunk written during suspension is asserted **absent from the subscriber and not buffered**, which is the half a per-state test would pass while queueing.
 - **T1.16b** (I18a): the fake stdin models Node's `flowing`, so the resumption after `suspend()` is a claim about a stream that can be stopped. `pause()` sets it false, `resume()` true, adding a `data` listener resumes only when it is not already false, and `emit` delivers to nobody while paused. Written as a property of the double rather than as a fifth case of T1.16, because the defect it exposes is one T1.16 already claimed to cover and could not: the double had no state the source could get wrong (§5).
-  *Given* an acquired instance. *When* `release()`. *Then* captured bytes are `1006l · 1002l · 2004l · 25h · 1049l` and `setRawMode(false)` was called once.
+  *Given* an acquired instance. *When* `release()`. *Then* captured bytes are `CSI < u · 1006l · 1002l · 2004l · 25h · 1049l` and `setRawMode(false)` was called once.
 
 - **T1.3** (I10, C8): absent capabilities emit nothing.
   *Given* a record with `mouse: false, bracketedPaste: false`. *When* `acquire()` then `release()`. *Then* no `2004`, `1002` or `1006` byte appears in either direction.
