@@ -29500,3 +29500,61 @@ but a subject whose consecutive frames repeat has fewer pages than frames.
 
 ---
 
+## F821 — clearing a card's leading gap on the document dropped the live part it copied ★★★★☆
+
+**What happened.** The indentation ruling (C23 I57) said the shell clears `gapBefore` on a card's
+first body block *when it composes the card* — in `cardOver`, on the stored document. `cardOver`
+copies the block to drop the field. Execution T1.40 then failed: a live `status` inside a
+`/ps` card's first block came back `state: loading, height: 1` where the driver should have
+advanced it to `retrying, attempt: 1`. The card frame was right; the part never ticked.
+
+**Why.** A live part is declared by *object identity*: `builders/live.ts` holds a `WeakMap`
+(`declarations`) keyed by the block, and `liveDeclarations` walks the document calling
+`declarations.get(b)`. `cardOver`'s copy is a new object, absent from the map, so its declaration
+is lost and the refresh driver never drives it. The ruling named an operation — *clear the gap on
+the document* — and did not ask what the operation left behind, which is the C13 §8a class: a
+decision that mutates the document graph two components away from the registry that indexes it.
+
+**What holds instead.** The clearing moves into `entryLayout` (C22 §6l.6, I57 amended). The stored
+document keeps its blocks by identity, so the WeakMap declaration survives and the driver drives
+the original; the body run holds a per-frame copy with the gap cleared, read by the measurer and
+the renderer — neither of which consults the identity map. `entryLayout` is rebuilt from the
+current `doc.blocks` every frame, so a part the driver patches by id is re-copied and shows.
+
+**How it was found.** Not by the walk, which ruled the shape, and not by a frame read, which
+showed the card correctly. By the whole suite: a live-part unit row two components from the
+change. The walk's own rule — *when a ruling names an operation, ask what it leaves behind* —
+reaches this in hindsight, and the thing left behind was an entry in a WeakMap nobody holding
+either half was looking at.
+
+**Where**: `src/shell/entry-layout.ts` `cardBody`; `src/shell/documents.ts` `cardOver`/`toolCallDoc`
+reverted; `src/shell/builders/live.ts` `declarations`; `test/contract/tool-call.test.ts` C23 T1.50.
+
+---
+
+## F822 — two mechanisms for one edge, and a mutation of either survives on the other ★★★☆☆
+
+**What happened.** C22 I86 said the right chrome cluster sits at the frame's last column because
+its `group` cell is exactly its content width *and* the cell is `align: top-right`. The mutation
+run for T6.105 aligned the cluster left; T1.46 held. Retargeted at the cell width — two cells
+wider than the cluster — T1.46 held again. A probe rendering both forms at 60 columns showed why:
+with the cell at content width the clock ends at the last column whichever way it is aligned, and
+with the cell widened the `align` walks the clock to the cell's right edge, which is the row's.
+Either mechanism alone is sufficient, and each masks a mutation of the other.
+
+**Why it matters.** Not vacuity — both statements are true and both constrain the frame. It is the
+[[two-hazards-that-are-one]] shape in code: one edge held by two independent joints, so the pass
+that asks *can this be violated* is answered *no* for the wrong reason. A reader deleting either
+would see every row stay green, and the spec's sentence named both as though the pair were the
+mechanism. The pass is the only instrument that reached it, and it reached it twice before the
+probe read the frame.
+
+**Ruling.** The cell width carries the weight: it is what hands the left cluster the remainder,
+and a content-width cell has nothing to align. The `align` goes; I86, §6l.6 row 20 and T6.105
+name one mechanism, and the run's T6.105 widens the cell, which now kills T1.46 alone.
+
+**Where**: `src/shell/chrome.ts` `clusters`; `tools/mutate/runs/c22-indent.mjs` T6.105;
+`test/unit/frame-budget.test.ts` T1.46.
+
+---
+
