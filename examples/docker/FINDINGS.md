@@ -29568,3 +29568,239 @@ name one mechanism, and the run's T6.105 widens the cell, which now kills T1.46 
 
 ---
 
+## F823 — the head mark U+23FA has an emoji presentation, and nothing in the tree measures emoji presentation ★★★★☆
+
+**What happened.** `step`'s Unicode half is `⏺` U+23FA BLACK CIRCLE FOR RECORD, chosen because it
+is `East_Asian_Width=Neutral` — one cell under both conventions, measured with `cells()` before the
+row was written (C09 §4). The measurement is right and it answers the wrong question. U+23FA is a
+base in `emoji-variation-sequences.txt` (Unicode 17.0.0, file dated 2025-01-30): `23FA FE0E ; text
+style` and `23FA FE0F ; emoji style`. A terminal whose font prefers the emoji form draws it two cells
+wide whatever the locale says, and `cells()` reports one. That is the second way a glyph fails,
+which T2.71 names — *an emoji form is two cells wherever the font prefers it* — and T2.71 checks it
+over spinner frames only, against a seventeen-character list written from memory. The list opens
+with `·` U+00B7, which is Ambiguous and has no emoji form at all: the instrument conflates the two
+failure classes it was written to separate, and it never sees `GLYPH_TABLE`.
+
+**Why it matters.** Every other width defect in this project has been catchable by `cells()`, and
+this one is invisible to it by construction: the East Asian Width property is silent about
+presentation. So the one place a width was measured *before* the row was written is the one place
+the measurement could not reach the defect. `⬤` U+2B24 BLACK LARGE CIRCLE is Neutral, outside
+`AMBIGUOUS_RANGES`, outside `DRAWN_AS_GEOMETRY` (which stops at U+2B1F), and absent from the
+variation-sequences file — the same width status as `⏺` by every table in `text.ts`, so the case for
+it rests on presentation alone, and a check that can see presentation has to exist for the
+argument to be more than a sentence. `●` U+25CF is not the answer: Ambiguous, two cells at wide
+(F825). A variation selector is not either: `cells()` would have to count U+FE0E, and a grapheme
+that is two code points to say *draw me plainly* is a workaround for choosing a character with
+the problem.
+
+**Ruling.** The mark is `⬤` U+2B24 with `*` as its ASCII rung (F824). The check is derived from the
+Unicode data, not written from recollection: a table of variation-sequence bases lands in
+`text.ts` beside `AMBIGUOUS_RANGES` with its file version named, exported for a test-time refusal
+over both glyph tables and every spinner set. Never a runtime branch — terminals disagree about
+presentation, and `cells()` counting it would be a guess dressed as a measurement.
+
+**Where**: `src/presentation/blocks/glyphs.ts` `step`; `test/contract/spinners.test.ts` T2.71;
+`src/presentation/text.ts`. The design wrote it: *the head mark — U+2B24, NOT U+23FA (emoji form)*.
+
+---
+
+## F824 — `step`'s ASCII rung is `@` in the code and `*` in the design, and the reason given for `@` was already false ★★☆☆☆
+
+**What happened.** `glyphs.ts` gives `step` the pair `["⏺", "@"]` with the note *`@` is the one ASCII
+mark no other slot spends*, and C09 §4's table repeats it: *the ASCII half is unused by any other
+slot*. `AGENT_TUI_DESIGN.md` §A6 draws the ASCII rung of the same mark as `*`. Neither document
+records that the other disagrees. And the uniqueness the note rests on was never a property of the
+table: `>` is spent twice already, by `expand` and by `quote`, so *no slot shares an ASCII mark*
+was not a rule the table kept, only a sentence one row believed about itself.
+
+**Why it matters.** C09 I5 is about cell count — a substitution may not change how many cells a
+glyph occupies — and says nothing about uniqueness. A justification that is true and irrelevant
+survives careful reading (CLAUDE.md, *a correct sentence justifying the wrong decision*), and this
+one had the extra cover of being false as well. `*` is what the design drew and what a reader of an
+ASCII frame expects a bullet-shaped head to degrade to; `@` reads as an address.
+
+**Ruling.** `step: ["⬤", "*"]`. `running` keeps its `*`; the two are a state and a position and never
+share a row. The uniqueness note goes from both files, replaced by the measurement I5 is actually
+about.
+
+**Where**: `src/presentation/blocks/glyphs.ts:892-897`; `docs/components/C09_block_library.md` §4
+`step` row; `docs/design/AGENT_TUI_DESIGN.md` §A6.
+
+---
+
+## F825 — the block-facing glyph vocabulary has no width tier, and ten of its seventeen members are two cells at `wide` against a one-cell ASCII half ★★★☆☆
+
+**What happened.** `glyphFor(token, caps)` reads `caps.unicode` alone and never `ambiguousWidth`,
+where the internal `GlyphSet` collapses wholesale to ASCII at `wide` (C02 I9) and the spinner sets
+carry a per-set `narrowOnly` tier. Measured 2026-09-06 with `cells()` at both arms over
+`GLYPH_SUBSTITUTIONS`:
+
+| members | 2:1 at `wide` |
+|---|---|
+| 17 | **10** — `▲ ◌ ◐ ● ○ ⊘ ▸ ▾ ▌ •` |
+
+The seven that hold are the ones chosen *for* being Neutral — `✓ ✗ ℹ ⎸ ⁃ ⎿ ⏺`. C09 I5 says the two
+renderings of a slot are 1:1 by cell; T2.5b asserts it at the default `narrow` arm only, so it
+passes over a table where more than half the members break it under the other convention.
+`glyphCells`'s comment says *an ambiguous pair is 1:1 at narrow and 2:2 at wide*, which assumes
+both halves are Ambiguous; none of the ASCII halves is.
+
+**Why it matters.** `measure` takes no capability record (C04 §5), so a block's height is computed
+from `glyphCells`, which answers 1, while a wide-convention terminal draws 2 and the row wraps —
+the one failure that scrolls the alternate screen. The survey that raised this named `warn` alone;
+the count was taken before the finding was written, and it moved from one to ten. The class is the
+finding, not the instance.
+
+**Ruling.** The vocabulary gains the tier the spinner sets already have: a member measured
+Ambiguous resolves to its ASCII half at `ambiguousWidth: "wide"`, so I5 holds at both arms.
+`glyphFor`'s parameter widens from `Pick<…, "unicode">`, and T2.5b runs at both conventions.
+
+**Where**: `src/presentation/blocks/glyphs.ts` `glyphFor`, `glyphCells`; `test/contract/blocks.test.ts`
+T2.5b.
+
+---
+
+## F826 — the design's `+N more · ⏎ to expand` collides with two rulings §9c already recorded, and the collapsed residue's `0 above` is a vacuous half ★★☆☆☆
+
+**What happened.** The call grammar draws the bounded body's last row as `+N more · ⏎ to expand`.
+§9c's own corrections, taken from frames on 2026-09-05, ruled both halves out: *the count string is
+not `+392 more · ⏎ to attach` — there is one count mechanism, the residue row `⋯ N above, M below`
+(C04 I49)*, and *`⏎ to attach` is not text on the row — a key named in a notice is a second keymap
+(C16 I19)*. The design and the corrections were written a day apart and neither cites the other.
+Meanwhile the collapsed form the corrections settled on, `⋯ 0 above, 392 below`, names a direction
+on a box that shows nothing — there is no *above* when zero rows are visible, so the first half is a
+sentence that cannot be false.
+
+**Why it matters.** The one-mechanism ruling is right and the design's *one mechanism for what is
+hidden* agrees with it; only the text differs, and the text of a residue row is exactly where a
+fourth count string would drift back in. The key name is the harder rule: the footer already shows
+the `expand` label for the focused element, and a second place naming the key is the defect C16
+I19 exists for.
+
+**Ruling.** One mechanism, two texts by state. An open box keeps `⋯ N above, M below` — C04's T6
+trace measured the direction mattering. A collapsed box reads `⋯ +N more`, which is the design's
+count without its key name. No key on either row.
+
+**Where**: `src/presentation/blocks/kinds/containers.ts:400-426`; C04 §3c I49; `AGENT_TUI_DESIGN.md`
+§9c corrections 2–3.
+
+---
+
+## F827 — nine shell sites compose a failure or refusal notice by hand beside the one composer, and no rule says they may not ★★★☆☆
+
+**What happened.** `documents.ts` is the shell's composer: `noticeDoc`, `toolCallDoc`, `cardOver`.
+Around it, `grep 'b\.notice\.' src/shell` outside `documents.ts` and `builders/` returns nine
+sites: `execution.ts` ×4 (a failed shell command, output truncated, stream failed, a refused
+action), `local/handlers.ts` ×3 (usage errors), `confirm.ts` ×1 (the question), `document-view.ts`
+×1. Each chooses its own tone, its own wording, its own id scheme. F406 recorded the same shape for
+the failure *box* — twelve call sites built error documents out of `notice` where `status` was the
+kind — and closed the instances without closing the class.
+
+**Why it matters.** The call grammar's rule 8 says states come from the `status` kind and rule 9
+says nothing composes a notice by hand, and a rule with nine standing violations and no gate is a
+preference. The frame audit — *two calls that read as different products* — is exactly what nine
+independent wordings produce.
+
+**Ruling.** A source scan over `src/shell/`: `kind: "notice"` literals and `b.notice.*` calls are
+allowed in `documents.ts` and `builders/index.ts` and nowhere else, with an allow-list every entry
+of which is exercised (SS53's discipline). The execution sites move to composer functions —
+`callStatus` for a failed or retrying call's box, one function each for the queue and stall
+notices — and the confirm question is composed where the overlay is.
+
+**Where**: `src/shell/execution.ts:657,1520,1538,1752`; `src/shell/local/handlers.ts:195,226,268`;
+`src/shell/confirm.ts:194`; `src/shell/document-view.ts:248`; `tools/enforce/source-scans.mjs`.
+
+---
+
+## F828 — the card's head joins its fields with a literal middle dot and no capabilities in hand, so the shipped head is wrong at two of four arms ★★★★☆
+
+**What happened.** `toolCallHeader` (`documents.ts:271-282`) joins verb, elapsed and outcome with
+`" · "`. U+00B7 is non-ASCII and `East_Asian_Width=Ambiguous` — `cells()` reports 2 at `wide`
+(measured 2026-09-06). The function takes no capabilities, so it cannot resolve the character, and
+T2.48 asserts `@ run_command(npm test) · 4s` **at the ASCII arm**: the test enshrines a non-ASCII
+mark in the frame written to keep marks out of the source. `status.ts:215` chose parentheses over
+the dot for exactly this reason after C09 T4.4 caught it, and `containers.ts:416` chose a comma
+for the residue row with the reason written beside it. The head was composed after both and
+learnt from neither.
+
+**Why it matters.** F6's class — a literal one token to the right of where the rule was watching.
+And it is structural for the grammar: every head in the transcript carries two of these, so at
+`wide` every card is two cells wider than measured, and at ASCII every card draws a character the
+terminal cannot.
+
+**Ruling.** The separator is a `GlyphSet` slot (`·` / `-`), and the composer takes capabilities — it
+needs them for the spinner and the elision anyway. T2.48's ASCII rows assert the ASCII form.
+
+**Where**: `src/shell/documents.ts` `toolCallHeader`; `test/contract/tool-call.test.ts` T2.48;
+`src/presentation/blocks/glyphs.ts`.
+
+---
+
+## F829 — two surveys said golden frames and media carry the head mark; the count is zero and zero ★☆☆☆☆
+
+**What happened.** Planning the glyph change, two independent read-only surveys reported that
+`test/golden` snapshots and `docs/media` captures hold `⏺` and would move. `grep -rl '⏺' test/golden
+docs/media` returns nothing. The literal appears in four test files (eleven sites), four specs and
+five notes, and nowhere a regeneration would touch.
+
+**Why it matters.** The sixth blind spot in its cheapest form: a claim about what a corpus contains
+was repeated by two readers and checked by neither, and it would have set the expected-mover count
+for a golden regeneration — a number that, wrong in this direction, licenses regenerating frames
+that should not have moved. Twenty seconds to check.
+
+**Ruling.** Expected golden movers for the mark change: **0**. A golden that moves is a finding
+before it is a regeneration.
+
+**Where**: `test/golden/`, `docs/media/`; the test sites are `test/contract/tool-call.test.ts`,
+`test/contract/notice-family.test.ts`, `test/integration/running-card.test.ts`,
+`test/integration/session.test.ts`.
+
+---
+
+## F830 — nesting has no mechanism: the card layout recognises a `step` at block 0 only, and nothing in `src/` produces a concurrent call ★★☆☆☆
+
+**What happened.** The call grammar's §6 and §6b nest calls in the parent's gutter — one column per
+level, two levels, the tree's `├ └ │` for a fan-out, the parent's outcome derived from its children.
+`isCard` (`entry-layout.ts:69`) tests `blocks[0]`; `entryLayout` splits into a header run and one
+body run; `bodyGutter` draws the hook on row 0 and blanks after. A `step` notice inside a body is
+laid out as body text. No `ToolCallSpec` has children, no route emits more than one card per entry,
+and the tree glyphs are reached only by the plot's `tree` form through `glyphForMask`.
+
+**Why it matters.** Not a defect in what ships — a missing mechanism named so the design does not
+read as describing one. The gutter glyphs are the interesting half: `├ └ │` are all Ambiguous, and
+they are safe in the tree form only because `glyphForMask` flattens to ASCII at `wide` (F293). A
+gutter that reached them through new `Glyph` tokens would inherit F825.
+
+**Ruling.** `ToolCallSpec.children`; a nested card is a `group` column whose first block is a `step`
+notice inside a body; `entryLayout` recurses once; `bodyGutter` draws every gutter cell through
+`glyphForMask` with corners fixed sharp; `rollUp` in the composer derives the parent's outcome.
+Subagents as pushed views are ruled and deferred: no producer, no far-side transcript type.
+
+**Where**: `src/shell/entry-layout.ts`; `src/shell/documents.ts`; `src/presentation/plot/linedraw.ts`
+`glyphForMask`; `src/presentation/plot/tree.ts` `drawOutline`.
+
+---
+
+## F831 — a card's head is not an element, so a call cannot be focused, expanded, copied or re-run from the line that names it ★★★☆☆
+
+**What happened.** `noticeElements` (`simple.ts:213`) returns `[]` for a notice without an `action`.
+The card's header is a `step` notice with none, so `⏎`, `y` and the focus ring all pass over the
+head and land on the body's scroll children. The grammar's rule 9 says a call is an element; what
+ships is a body that is and a head that is not, and a reader who focuses *the call* is focusing a
+line of its output.
+
+**Why it matters.** The gate is right for transcripts of notices — a muted *resumed after 2
+attempts* should not be a focus stop. It is wrong for the one notice token that names a thing the
+reader acts on. C09 I41's shape applies: a property of the token, not of the block.
+
+**Ruling.** `GLYPH_ELEMENT = {"step"}` beside `GLYPH_RAIL` and `GLYPH_INDENT`: a `step` notice is one
+block-level element whether or not it carries an `action`; `activate` is the block's `action` when
+present, and the shell overrides `copy` with the entry's invocation so `y` on a head yields what ran.
+`⏎` toggles and never re-runs — `⇧⏎` re-runs, and a key that toggles once and re-runs the second
+time is an arming machine, C16's measured class.
+
+**Where**: `src/presentation/blocks/kinds/simple.ts` `noticeElements`, `GLYPH_RAIL`;
+`src/shell/entry-layout.ts` `elementsOfEntry`.
+
+---
+

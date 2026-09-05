@@ -39,7 +39,7 @@ type change.
 | **8** | [Absence indistinguishable from failure](#8) | 29 | **7 open** (7 closed) | partly | real Calcium work · **7 of 10 fixed** — F151 is the class F35 closed in the half an app-side test cannot reach, and **F167 is the class arriving in a *value*: a validator agreeing twice about two different documents** |
 | **9** | [**The instrument was wrong**](#9) | 103 | **17** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
 | **10** | [**A claim carried without a record**](#10) | 68 | **11** | — | **new at F80** · method — six findings disproved, and **F166 unblocked an entry while F168 found what the same row was silent about**; F184 is the first where the unrecorded claim was a *rule* rather than a fact, governing thirty forms from a parameter's doc comment |
-| **11** | [A gate that passes without checking](#11) | 270 | **16** | — | **105 closed · 117 open** of 223 keyed — the heading was out by 66 and this row's count column by 1, which cannot be corrected alone (§11) · four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
+| **11** | [A gate that passes without checking](#11) | 279 | **16** | — | **105 closed · 117 open** of 223 keyed — the heading was out by 66 and this row's count column by 1, which cannot be corrected alone (§11) · four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
 | **12** | [**A time-based assertion under contention**](#12) | 6 | **3** | — | **new at F80** · Calcium's own suite |
 | **13** | [Text the framework emits](#13) | 6 | **4** | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
 | **14** | [A constant, a channel or a rule that outlived its configuration](#14) | 28 | **13 open** | ⚠ C12 | **new at F492** · real Calcium work — every member reads as deliberate, which is why review found none of them |
@@ -1546,6 +1546,24 @@ reads goes through the entry point a user has.
 
 **F821** — the indentation ruling cleared a card's leading gap on the stored document; the copy dropped the live part keyed by object identity in a WeakMap, and it never ticked. Clearing moved into the per-frame layout, which the identity-keyed driver never reads.
 **F822** — the right chrome cluster's edge was held by two mechanisms, a content-width cell and an `align` on it; a mutation of either survived on the other and the pass read as green for the wrong reason. The `align` went; the cell width is the one mechanism.
+
+**F823** — the head mark U+23FA carries an emoji variation sequence and nothing in the tree measures presentation; T2.71 is a hand list that conflates Ambiguous with emoji. The mark is `⬤` U+2B24 and the check is derived from the Unicode data.
+
+**F824** — `step`'s ASCII rung is `@` in code and `*` in the design; the uniqueness reason for `@` was already false (`>` is spent twice). `*`.
+
+**F825** — the block-facing glyph vocabulary has no width tier: ten of seventeen members are 2:1 at `wide`, and T2.5b checks one arm. A per-member tier, as the spinner sets have.
+
+**F826** — `+N more · ⏎ to expand` collides with §9c's one-mechanism and no-key-name rulings; the collapsed `0 above` is vacuous. Open box keeps `⋯ N above, M below`; collapsed reads `⋯ +N more`.
+
+**F827** — nine shell sites hand-compose notices beside the composer, F406's class with no gate. A source scan confines `kind: "notice"` and `b.notice.*` to `documents.ts` and the builders.
+
+**F828** — the card's head joins with a literal `·` and no capabilities: non-ASCII at the ASCII arm, two cells at `wide`, and T2.48 asserts the dot under ASCII. A `separator` slot; the composer takes caps.
+
+**F829** — two surveys said goldens and media carry `⏺`; measured zero and zero. Expected golden movers for the mark change: 0.
+
+**F830** — nesting has no mechanism: `isCard` reads block 0 only, no spec has children, and the tree glyphs are Ambiguous — safe only through `glyphForMask`'s flattening. Ruled: children, one recursion, `rollUp`, subagent views deferred.
+
+**F831** — a card's head is not an element: `noticeElements` returns `[]` without an `action`. `GLYPH_ELEMENT = {step}`; `y` copies the invocation; `⏎` toggles and never re-runs.
 
 <a id="12"></a>
 
