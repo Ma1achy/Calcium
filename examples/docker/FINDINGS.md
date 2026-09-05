@@ -29076,6 +29076,8 @@ timeout --foreground 3 cat > /tmp/hp/$4-b.bin; printf "$3"
 
 **Where**: C01 §5; C16 §2; F800.
 
+
+**Now a gate, the same day (F810).** C16 T5.9 runs this capture under `test/support/x-emulator.ts` wherever xterm, Xvfb and xdotool are installed; the devcontainer and the `full` CI job install them.
 ---
 
 ## F809 — a render-cost row whose verdict was the runner's load: 54.6 ms against a 50 ms ceiling, 17–22 ms here, on a host measured at 2.7× ★★☆☆☆
@@ -29105,6 +29107,52 @@ in the job, one step above the failure, by the instrument built for this reading
 against a ceiling of 50, both within 10% of it — the reading is the host's ratio, not a spike.
 
 **Where**: `test/unit/plot-performance.test.ts`; TRIAGE group 12; F262, F69, F73.
+
+---
+
+## F810 — the tier-5 row owed for want of an emulator becomes a gate: kitty and xterm under Xvfb, and the skip carries its reason ★★★☆☆
+
+*2026-09-05 · the lead, on the user's *double check nothing is left*, at 9427564b.*
+
+**Found by the sweep, not the list.** `test/e2e/capabilities.test.ts` carried an `it.todo` titled *T5.7
+(owed, C02 I12)*: a real emulator receives `KITTY_KEYBOARD.enter` and answers `CSI 27 u` for a lone Esc
+and `CSI 13;2:3 u` for Shift-Enter released — *not deferred on a component: it needs kitty, Ghostty, WezTerm
+or foot installed in the container, and none is*. The todo named its blocker exactly, and the blocker had
+just been lifted by F808's probe: the container has Xvfb and xdotool, and `apt-get install kitty` gives it
+kitty 0.41.1, which opens under Xvfb with `LIBGL_ALWAYS_SOFTWARE=1`.
+
+**Measured, kitty 0.41.1, XTEST-driven, `CSI > 3 u` taken.** Esc down/up, Shift held, Return down/up,
+Shift released, then `k`:
+
+```
+ESC[27u  ESC[27;1:3u  ESC[13;2u  ESC[13;2:3u  k  ESC[107;1:3u
+```
+
+Every byte the row asked for, plus the release of the printable key. **The first probe missed the
+Shift-Enter release**: `xdotool key shift+Return` releases Return and Shift together and kitty reported
+neither — explicit `keydown`/`keyup` with a gap between them showed `ESC[13;2:3u`. A fixture that types
+too fast is F320's shape from the other side.
+
+**Ruled.** The todo becomes a row, and F808's hand measurement becomes one beside it:
+- `test/support/x-emulator.ts` — spawns Xvfb on a per-process display, the emulator running a two-phase
+  capture script (`timeout --foreground`, F808's lesson), drives it through `xdotool`, returns the bytes.
+- C02 **T5.7** — kitty, the six events above, **and the real decoder reading the capture back** as
+  `escape`, `escape/release`, `enter+shift`, `enter+shift/release`, `k`, `k/release` — the pair a
+  graph-level row cannot see (F799).
+- C16 **T5.9** — xterm: 1003 reports rests and drags, 1002 drags only, `1003l` after both leaves only the
+  control byte; the rest byte decodes to `button: "none"` (I30).
+- **Skip by name, never silently**: `emulatorMissing()` returns the missing packages and the row's title
+  carries them — a skip reads *skipped: kitty not installed*, not *passed*. The devcontainer's
+  `onCreateCommand` and the `full` CI job install `xvfb xdotool xterm kitty`, so on both the row runs.
+- **Fabricated violation**: the helper without `--foreground` → T5.7 fails on *the control byte arrived*,
+  before any assertion about the protocol. Restored.
+
+**What this closes.** The last *owed* in the tree that named a blocker rather than a component, and the
+one the deferral note warned about — a condition written where the deferral is, satisfied somewhere else,
+with nothing watching. It was satisfied by an `apt-get` in the same session, an hour before it was read.
+
+**Where**: `test/support/x-emulator.ts`; `test/e2e/capabilities.test.ts` T5.7; `test/e2e/mouse.test.ts`
+T5.9; C02 §10, C16 §10, C01 §5; `.devcontainer/devcontainer.json`; `.github/workflows/ci.yml` `full`.
 
 ---
 

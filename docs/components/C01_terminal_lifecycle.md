@@ -203,7 +203,8 @@ cites, driven by XTEST with a typed key in every capture as the control:
 
 One tracking mode, the later select wins, and either release clears it, so `1003l` alone is the
 whole release and a `1002l` after it would address a mode the terminal is not in. That answers
-`HOVER_MODE_PAIR` for xterm; Ghostty, kitty, WezTerm and iTerm2 are unmeasured and the claim for
+`HOVER_MODE_PAIR` for xterm — and C16 T5.9 runs the same capture as a gate wherever xterm, Xvfb and
+xdotool are installed, which the devcontainer and the `full` CI job now do; Ghostty, kitty, WezTerm and iTerm2 are unmeasured and the claim for
 them rests on their documented adherence to the same document. The default is 1002, byte for byte
 what shipped, and `capabilities.mouse` false takes neither (I10).
 
