@@ -1135,6 +1135,8 @@ describe("C22 — copy mode: the order inside the exit, and the far side under t
   // lines land this row goes red, which is the signal to flip it to `it` — a
   // deferral that expires on the change it waits for, where an `it.todo` would
   // not (`todo-expiry` is indexed by component, and every component here exists).
+  it.todo("T4.63 (C22 I84, I85; C23 I57; §6l.6 rows 16–19): frame read — a continuation notice and a settled card with a default-gap table put both hooks at column 2, the card's hook row carries the table header, one blank row between the entries and one above the upper rule — not deferred on a component: the same round's code commit replaces this row");
+
   it("T4.68 (C16 §5c C1): Esc leaves copy mode — the tracking pair is the first bytes written, then the frame", async () => {
     const stdin = fakeStdin();
     const { stdout, screen, clock } = await buildSession({ stdin: stdin as never });

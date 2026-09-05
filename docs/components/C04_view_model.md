@@ -330,6 +330,12 @@ sequence is a leading blank row, because the alternative — silently dropping i
 makes the field mean two things depending on position, and a document assembled
 by concatenating two others would then render differently from either.
 
+**One composer clears it deliberately, on the document rather than in a renderer.** The shell's
+card (C23 I57) puts a hook on the body's first row, so a leading gap there would be a blank row
+under the mark; `cardOver` clears the first body block's `gapBefore` when it composes the card,
+and the sentence above still holds of every document as rendered. Ruled 2026-09-05 from a
+`/ps --all` frame whose hook marked nothing (C22 §6l.6 row 17).
+
 **Who sets it is C24's problem, not an adapter's.** `b.*` supplies defaults per
 kind (C24 §4): a `table` or a `plot` following anything gets one, a second
 `pills` row does not. An adapter that wants a different rhythm sets the field;

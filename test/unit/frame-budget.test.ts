@@ -285,6 +285,10 @@ describe("C22 §6l — the frame's default look", () => {
     expect(strip(tail.rows[1] ?? "").startsWith("  ")).toBe(true);
   });
 
+  it.todo("T1.44 (C22 I84, §6l.6 row 16): a card's hook sits at column 2 under the header's text, the body at 36 of 40, and C09's own continuation notice puts the mark at the same index — not deferred on a component: the same round's code commit replaces this row");
+  it.todo("T1.45 (C22 I85, §6l.6 rows 18–19): measureEntry is measureSequence + 1, the rendered entry ends with one empty row, a window short of it draws none and a window of it alone draws one, and no element lands on it — not deferred on a component: the same round's code commit replaces this row");
+  it.todo("T1.46 (C22 I86, §6l.6 row 20): the default header and footer are two clusters — the clock and the cwd end at the last column, /help begins at 0, and the right cluster's cells equals the registry's width of the pills — not deferred on a component: the same round's code commit replaces this row");
+
   it("T1.43 (C22 §6l.4 E): the default footer is one muted pills row — `/help`, the cwd with $HOME as `~`, and `stopping` when the session says so — and no key name", () => {
     const chrome = makeDefaultChrome("t", "t");
     const f = frameAt(24, chrome);

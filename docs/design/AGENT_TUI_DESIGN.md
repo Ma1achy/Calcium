@@ -454,7 +454,7 @@ was run.
 
 **The boxes are annotation, not chrome.** Only the two rules around the prompt are drawn.
 
-> **Ruled the default, 2026-09-05** — C22 §6l, I81–I83. The two rules are on every frame of every Calcium app and nothing switches them off; the footer is as tall as the blocks it returns, zero to `MAX_FOOTER_ROWS`, one row by default; a card's body hangs two cells in under `⎿`. The frame above is therefore not the agent surface's — it is Calcium's, and `docker-tui` draws it too.
+> **Ruled the default, 2026-09-05** — C22 §6l, I81–I83. The two rules are on every frame of every Calcium app and nothing switches them off; the footer is as tall as the blocks it returns, zero to `MAX_FOOTER_ROWS`, one row by default; a card's body hangs under `⎿` at the header's text column, four cells in, as this drawing has it (C22 §6l.6, I84 — two cells and the hook under the mark until the frame was read against the drawing); one blank row closes every entry (I85); the header and footer are two clusters with the clock at the right edge (I86). The frame above is therefore not the agent surface's — it is Calcium's, and `docker-tui` draws it too.
 
 ### What each region is for, and the split that decides it
 
@@ -609,7 +609,7 @@ line 12
 ⋯ 9 above, 0 below                             ← the hidden rows are ABOVE a following box
 
 ⏺ run_command(npm test) · 4s · exit 0          ← settled: the outcome is in the header
-  ⎿ 118 passed, 2 todo                         ← the result under the hook, indented two
+  ⎿ 118 passed, 2 todo                         ← the result under the hook, at the header's text column
 
 ⏺ run_command(npm test)                        ← folded: a collapsed scroll
 ⋯ 0 above, 392 below                           ← "+392 more" IS the residue row

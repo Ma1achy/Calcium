@@ -33,6 +33,8 @@ describe("C09 §4 — the `step` glyph", () => {
 });
 
 describe("§9c — the header, the body, and the row the body already has", () => {
+  it.todo("C23 T1.50 (C23 I57): cardOver and toolCallDoc clear gapBefore on the body's first block, keep the second's, and leave the input document untouched — not deferred on a component: the same round's code commit replaces this row");
+
   it("T2.46: the header is `name(args) · elapsed · outcome`, and below one second no figure is drawn", () => {
     expect(toolCallHeader({ name: "run_command", args: "npm test", elapsedMs: 4_200, outcome: "exit 0" })).toBe(
       "run_command(npm test) · 4s · exit 0",
