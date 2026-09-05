@@ -28034,3 +28034,152 @@ once and had never run.
 **Where**: C16 §2.
 
 ---
+
+## F754 — C14's `entryAtRow` did not exist — spec'd, named by the router's deps, and supplied to production as `() => null` ★★★★★
+
+*2026-09-05 · the lead, closing arc1 (steps 2b, 3 and 4 of the interaction arc), at 9dc22701+arc1.*
+
+**Expected**: C14 §2 declares `entryAtRow(row): { id, rowOffset } | null`, I19 owns it (*the only place a
+region row becomes an entry*), T2.11/T2.12/T3.1b/T3.1c name it, and C16's `RouterDeps.entryAtRow` is
+typed for it. The arc's plan called the router's viewport rung *a complete skeleton*.
+
+**Measured** at `9dc22701`: `grep -rn entryAtRow src` — two hits, the `RouterDeps` type and
+`src/shell/session.ts:956`: `entryAtRow: () => null`. No method on `Viewport`, nothing in `viewport.ts`,
+no test; seven harnesses stub it and `router-dispatch.test.ts` fakes it. So for as long as the mouse
+could be decoded, `routeMouse`'s rung 2 answered `viewport:miss` and `run("liveBlock", e)` had never
+once been reached by a pointer. **The router was complete; the system was not** — a seam-level row
+passes on the day nothing calls it. Built per C14 §2/I19 (~25 lines, the spec was right and the code
+was missing); the `FrameQueries.entryAtRow` stub deleted at its three sites. **Owed**: C14's own rows
+T2.11, T2.12, T3.1b, T3.1c in a C14 test file — `session-mouse.test.ts` reaches the method only through
+the router.
+
+**Where**: `src/viewport/viewport/{types,viewport}.ts`; `src/shell/session.ts`; C14 §2, I19.
+
+---
+
+## F755 — the frame bottom-aligns a short transcript and C14 addresses rows from the top; every graph-level row passed and the click landed one row off ★★★★☆
+
+*2026-09-05 · the lead, closing arc1 (steps 2b, 3 and 4 of the interaction arc), at 9dc22701+arc1.*
+
+**Expected** (C14 §2): *a short transcript leaves rows **below** the last entry.*
+
+**Measured**: a real 80 × 24 session with two 6-row entries paints them at screen rows 10–21 with rows
+1–9 blank — `paint.ts:658`, *content should grow towards the prompt*. A click at `beta-1`'s screen row
+asked C14 for region row 12 of a 12-row transcript and got `null`. Every graph-level row passed; only the
+painted frame disagreed. Fixed in L4: `entryAtRegionRow` subtracts `max(0, viewportHeight − totalRows)`
+over the same two numbers `paint.ts` pads with, before asking C14. **Owed**: C14 §2's sentence says
+*below* and the frame says *above*; and the alignment should be one exported function read by both
+`paint.ts` and `construct.ts` — today they agree by being the same expression.
+
+**Where**: `src/shell/construct.ts` `entryAtRegionRow`; `src/shell/paint.ts:658`; C14 §2 line 82.
+
+---
+
+## F756 — `elementsIn` lifts rows and not columns, so side-by-side children answer `cols` from zero ★★★☆☆
+
+*2026-09-05 · the lead, closing arc1 (steps 2b, 3 and 4 of the interaction arc), at 9dc22701+arc1.*
+
+**Measured**: two tables in an 80-column row `group` both answer `cols {0, 39}` — the registry's walk
+adds each block's top to `rows` and passes `childWidths` for width only, never a column origin. Invisible
+to every keyboard path (the keys walk the list in order) and to C26 §5's containment predicate (which
+is per block). The pointer helper compares columns, so a click at column 50 over the second table
+resolves to the first. **Recorded, not worked around** — the fix belongs in C09's walk (`registry.ts:467`)
+with the containment predicate re-read over the *sequence*, and a row: a click at column 50 focuses
+`t2/a2`. C26 §4a table row d.
+
+**Where**: `src/presentation/blocks/registry.ts` `elementsIn`.
+
+---
+
+## F757 — the mouse table had no modality gate, and C26 §6's click-to-activate sentence was refused ★★★☆☆
+
+*2026-09-05 · the lead, closing arc1 (steps 2b, 3 and 4 of the interaction arc), at 9dc22701+arc1.*
+
+**Modality**: C16 I8 says a modal layer consumes what it does not bind; the mouse routes by position and
+had no rung saying so, so a click outside a modal layer would have reached the transcript underneath.
+Ruled *consumed and nothing* (C16 §4a row k). **Wheel over a settled entry's `Scroll`**: the sentence
+*wheel is directional, so it goes to C14 regardless of what the point is over* lost — the entry is
+offered first and C14 takes the decline, using `scrollOffsets.nudge` (exists, clamps at read) rather
+than `blockPageUp/Down`, which act on the *focused* block. **Refused**: C26 §6's *an element carrying
+`activate` is invoked on click* — a single click that runs a `fill` gives the pointer no way to land on
+an actionable row; click-again is `⏎` on the state click reached. **Amended**: a click on a non-element
+row is nothing, not `element: null` — a location the keys never produce and the frame never highlights,
+so storing it changes state invisibly. Every gesture maps to a state a key reaches (C02's rule made
+structural); seven by-hand mutations, each killing a different named row.
+
+**Where**: C16 §4a, I31; C26 §5, §6; `src/interaction/router/router.ts`; `src/shell/construct.ts`.
+
+---
+
+## F758 — a `CSI u` arm already existed for Shift-Enter, and `Number("2:3")` is NaN — every kitty repeat and release arrived as a bare Enter ★★★★☆
+
+*2026-09-05 · the lead, closing arc1 (steps 2b, 3 and 4 of the interaction arc), at 9dc22701+arc1.*
+
+**Expected** (the lane brief): no keyboard-protocol decoding exists anywhere in `src/`.
+
+**Measured**: one shipped in `c729e653` for Shift-Enter, reading `params[1]` whole. Under the kitty
+protocol a typed event is `CSI 13;2:3 u`; `Number("2:3")` is `NaN`, `Math.max(0, NaN − 1)` is `NaN`,
+`NaN & 1` is `0` — so every modifier was dropped on every event that carried a type, and a Shift-Enter
+**release** decoded as a bare `enter`, which is a live binding: **submit**. Latent rather than shipped,
+because nothing pushed flag 2 until C01 did — and C01 now does (C02 `keyboardProtocol`, `CSI > 3 u`), so
+it is the first thing the push would have exposed. Fixed: sub-parameters split, `KITTY_EVENT`, the
+lone-modifier codes 57441–57452 named; `event` is *absent* on legacy records. Mutation *event read
+whole* kills T1.3p and T1.3r.
+
+**Where**: `src/interaction/router/decode.ts`, the `u` arm; C16 §2, C02 §3.
+
+---
+
+## F759 — the PTY fixture forced the capability record for the renderer and re-detected for the lifecycle — the first capture had no push in it ★★★☆☆
+
+*2026-09-05 · the lead, closing arc1 (steps 2b, 3 and 4 of the interaction arc), at 9dc22701+arc1.*
+
+**Expected**: `FORCE_KEYBOARD=kitty` puts `ESC [ > 3 u` on the wire at startup.
+
+**Measured** on the first run of T5.6: `\x1b[?1049h \x1b[?25l \x1b[?2004h \x1b[?1002h \x1b[?1006h` then
+the frame — no push. `fixture.mjs`'s `caps` mode built its forced record for `renderSequenceToLines`
+and then called `make()`, which re-detected from the environment without overrides: every existing
+override in that mode reached the renderer and none reached C01, and T5.5 could not see it because
+colour depth is not a mode. Fixed with `make(caps)`; the row then captured the push after the mouse and
+the pop before it, from the kernel device. *A fixture must be shown to respond to the thing under test*
+found it on the first run.
+
+**Where**: `test/support/fixture.mjs`; `test/e2e/capabilities.test.ts` T5.6.
+
+---
+
+## F760 — one final byte, two modifier encodings: bit 8 is xterm's Meta and kitty's Super, and a lone Shift needs a flag the design did not name ★★☆☆☆
+
+*2026-09-05 · the lead, closing arc1 (steps 2b, 3 and 4 of the interaction arc), at 9dc22701+arc1.*
+
+`CSI k ; m u` is emitted by xterm's `formatOtherKeys=1` and by the kitty protocol with different
+meanings for bit 8 (Meta versus Super). Ruled: bit 8 folds to nothing and bit 32 to `meta`, with the
+xterm blind spot stated (T1.3q, with the xterm arm as control). And the arc's *`⇧` alone is visible*
+needs flag 8 (report all keys as escape codes), which the chosen flags `0b11` do not push — so a lone
+Shift is the **same cell** under the protocol on and off; chosen, stated in C02 §3, and the modifier
+key codes are still named so the decoder is ready the day the flag is. **Owed**: T5.7, the real-emulator
+row, an `it.todo` naming `KITTY_KEYBOARD` — the container has none.
+
+**Where**: `src/interaction/router/decode.ts` `kittyModifiersOf`; C02 §3.
+
+---
+
+## F761 — a plot copied nothing, and the form set says which forms can copy at all ★★☆☆☆
+
+*2026-09-05 · the lead, closing arc1 (steps 2b, 3 and 4 of the interaction arc), at 9dc22701+arc1.*
+
+`plot`'s one element carried no `copy`, so `y` on a focused plot was the silent no-op the containers had
+already fixed. Ruled (C12 I85): the series as tab-separated rows — a header of labels, one row per
+sample index, `String(v)`, `""` where a series is shorter. **Measured first**: 48 forms, 38 with
+`series` and 10 with `series: []` (plot3d, quiver, boxplot, forest, waffle, pie, sankey, graph, tree,
+treemap) — so `copy` is **omitted** where there is no series rather than a shape invented for ten
+carriers; `plot3d` with a camera is the one such form a fixture gives an element. T2.25/T2.26/T3.49;
+five mutations, each killing its named rows. Also: `mosaic`, the one 2-D `elements` implementer, gains
+its conformance corpus and an exact 2 × 2 row where the frame agrees at the column boundary
+(T2.27–T2.30); `parseAreas` returning `[]` is the same decision `render` makes for the same fault,
+pinned.
+
+**Where**: `src/presentation/plot/definition.ts`; `test/contract/block-elements.test.ts`,
+`test/contract/navigation-mosaic.test.ts`.
+
+---

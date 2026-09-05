@@ -30,16 +30,16 @@ type change.
 | rank | mechanism | ids keyed | consumers | ⚠ | disposition |
 |---|---|---|---|---|---|
 | **1** | [The consumer cannot reach a fact the framework holds](#1) | 19 | **11 open** | ⚠ C07 · C24 | real Calcium work, with consumers |
-| **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 69 | **5 open** (9 closed) | ⚠ C04 · C23 | real Calcium work · **7 of 13 fixed** — and F165 is the first found by roadmap 48's residue rather than by a consumer reaching for something |
+| **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 70 | **5 open** (9 closed) | ⚠ C04 · C23 | real Calcium work · **7 of 13 fixed** — and F165 is the first found by roadmap 48's residue rather than by a consumer reaching for something |
 | **3** | [A block cannot express what the surface needs](#3) | 7 | **4 open** | ⚠ C04 | mixed — two absorbed |
 | **4** | [A change axis distinct from `Tone`](#4) | 4 | **4 open** | ⚠ C04 · C09 · C10 | real Calcium work · needs a ruling |
 | **5** | [The far side's shape is not the framework's contract](#5) | 10 | **2 open** | ⚠ C05 | mostly app-side · one shim |
 | **6** | [Rendered from data that has since moved](#6) | 2 | **2 open** | ⚠ C04 | real Calcium work |
-| **7** | [An artefact describes the world rather than being checked against it](#7) | 102 | **20** | — | artefact discipline — **no code**, and F164 is the first found by an instrument's *population* step rather than by a reader; **F210 is the first where the artefact is a component's own spec and the thing it contradicts is a shipped frame**, and **F233 the first where what it contradicts is a *fix*** — four present-tense statements of a repaired defect, in the two components the repair did not touch |
+| **7** | [An artefact describes the world rather than being checked against it](#7) | 104 | **20** | — | artefact discipline — **no code**, and F164 is the first found by an instrument's *population* step rather than by a reader; **F210 is the first where the artefact is a component's own spec and the thing it contradicts is a shipped frame**, and **F233 the first where what it contradicts is a *fix*** — four present-tense statements of a repaired defect, in the two components the repair did not touch |
 | **8** | [Absence indistinguishable from failure](#8) | 28 | **7 open** (7 closed) | partly | real Calcium work · **7 of 10 fixed** — F151 is the class F35 closed in the half an app-side test cannot reach, and **F167 is the class arriving in a *value*: a validator agreeing twice about two different documents** |
 | **9** | [**The instrument was wrong**](#9) | 99 | **17** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
 | **10** | [**A claim carried without a record**](#10) | 66 | **11** | — | **new at F80** · method — six findings disproved, and **F166 unblocked an entry while F168 found what the same row was silent about**; F184 is the first where the unrecorded claim was a *rule* rather than a fact, governing thirty forms from a parameter's doc comment |
-| **11** | [A gate that passes without checking](#11) | 234 | **16** | — | **105 closed · 117 open** of 223 keyed — the heading was out by 66 and this row's count column by 1, which cannot be corrected alone (§11) · four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
+| **11** | [A gate that passes without checking](#11) | 239 | **16** | — | **105 closed · 117 open** of 223 keyed — the heading was out by 66 and this row's count column by 1, which cannot be corrected alone (§11) · four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
 | **12** | [**A time-based assertion under contention**](#12) | 4 | **3** | — | **new at F80** · Calcium's own suite |
 | **13** | [Text the framework emits](#13) | 4 | **4** | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
 | **14** | [A constant, a channel or a rule that outlived its configuration](#14) | 26 | **13 open** | ⚠ C12 | **new at F492** · real Calcium work — every member reads as deliberate, which is why review found none of them |
@@ -218,6 +218,8 @@ class expressed as an API.
 mechanism.
 
 ---
+
+**F754** — C14's `entryAtRow` **did not exist** — spec'd, typed on the router's deps, supplied to production as `() => null`; the viewport rung had never fired for a pointer. Built per the spec; C14's own rows T2.11/T2.12/T3.1b/T3.1c owed
 
 <a id="3"></a>
 
@@ -532,6 +534,10 @@ answer is a frame-read that cannot be wrong. **Read the ladder before choosing t
 **F749** — a roadmap residue cell is watched by nothing — a fabricated symbol passes `roadmap-status` — and a control against the evidence cell was vacuous because the identifier resolved against a sibling citation
 
 **F753** — the mouse bit table is xterm's *ctlseqs* and no emulator was measured — owed under `WHEEL_DIRECTIONS`
+
+**F757** — the mouse table had no modality gate; *wheel goes to C14 regardless* lost to entry-first; C26 §6's click-to-activate refused — click-again is `⏎` on the state click reached
+
+**F760** — bit 8 is xterm's Meta and kitty's Super; a lone `⇧` needs flag 8 the design did not name — same cell on and off, chosen and stated
 
 <a id="8"></a>
 
@@ -1421,6 +1427,16 @@ reads goes through the entry point a user has.
 **F750** — the SGR mouse arm read two bits of eight — shift-click a click, ctrl+wheel-up **down**, a drag a click — and every row asserted `button` alone, which a decoder dropping the modifiers satisfies. Fixed, C16 I30, whole-record rows
 
 **F752** — a correct decoder fix made a horizontal wheel **click** the block under the pointer — the router's wheel test names two directions and had no row for a third. Open until the router lane lands
+
+**F755** — the frame bottom-aligns a short transcript and C14 addresses rows from the top — every graph row passed, the click landed one row off; C14 §2 says *below* and the frame says *above*
+
+**F756** — `elementsIn` lifts rows and not columns — two tables in a row group both answer `cols {0, 39}`; invisible to the keys, wrong for the pointer. Recorded for C09
+
+**F758** — a `CSI u` arm already existed and read `"2:3"` whole — `NaN & 1` is `0`, so a Shift-Enter **release** was a bare `enter`, a live submit; latent until C01 pushed flag 2, which it now does
+
+**F759** — the PTY fixture forced the record for the renderer and re-detected for the lifecycle — first capture had no push; `make(caps)`
+
+**F761** — a plot copied nothing; ruled TSV over 38 of 48 forms and omitted for the 10 with no series; `mosaic` gains its corpus and an exact row
 
 <a id="12"></a>
 
