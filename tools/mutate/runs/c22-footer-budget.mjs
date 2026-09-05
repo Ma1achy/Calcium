@@ -39,8 +39,8 @@ const MUTATIONS = [
     // them: false at every size, and the fallback draws where a frame should.
     name: "heightsSum drops RULE_ROWS",
     file: FRAME,
-    from: "  return HEADER_ROWS + f.region.height + RULE_ROWS + f.promptRows + f.footerRows === f.size.rows;",
-    to: "  return HEADER_ROWS + f.region.height + f.promptRows + f.footerRows === f.size.rows;",
+    from: "    HEADER_ROWS + HEADER_RULE_ROWS + f.region.height + RULE_ROWS + f.promptRows + f.footerRows === f.size.rows",
+    to: "    HEADER_ROWS + HEADER_RULE_ROWS + f.region.height + f.promptRows + f.footerRows === f.size.rows",
     expect: "T1.36",
   },
   {
@@ -49,8 +49,8 @@ const MUTATIONS = [
     // `paint` throws `FrameError` on the frame T1.38 reads.
     name: "compose drops RULE_ROWS from the subtraction",
     file: FRAME,
-    from: "  const height = Math.max(0, size.rows - HEADER_ROWS - RULE_ROWS - footerRows - promptRows);",
-    to: "  const height = Math.max(0, size.rows - HEADER_ROWS - footerRows - promptRows);",
+    from: "  const height = Math.max(0, size.rows - HEADER_ROWS - HEADER_RULE_ROWS - RULE_ROWS - footerRows - promptRows);",
+    to: "  const height = Math.max(0, size.rows - HEADER_ROWS - HEADER_RULE_ROWS - footerRows - promptRows);",
     expect: "T1.38",
   },
   {
@@ -139,7 +139,7 @@ const results = await runPass({
   run,
   control: {
     file: FRAME,
-    from: "  const height = Math.max(0, size.rows - HEADER_ROWS - RULE_ROWS - footerRows - promptRows);",
+    from: "  const height = Math.max(0, size.rows - HEADER_ROWS - HEADER_RULE_ROWS - RULE_ROWS - footerRows - promptRows);",
     to: "  const height = 0;",
     why:
       "the region is always empty — if this survives, no row in the set composes a frame and " +

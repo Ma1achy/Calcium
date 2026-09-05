@@ -1,7 +1,7 @@
 /**
  * C22 §6 — the default header and footer, and the prompt's gutter.
  *
- * Calcium owns the frame's structure — a one-row header, two rules around the
+ * Calcium owns the frame's structure — a one-row header with a rule under it, two rules around the
  * prompt, and a footer as tall as its blocks (§6l) — and the app decides what
  * goes in the header and the footer. The default exists so that
  * `createTui({ name, binary, manifest, theme })` produces a usable shell (I17):

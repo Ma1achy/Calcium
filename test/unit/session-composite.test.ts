@@ -162,9 +162,10 @@ describe("C22 §6a — compositing", () => {
     expect(f.overlayRegion.height, "the same height as the transcript").toBe(f.region.height);
     expect(f.overlayRegion.width).toBe(f.size.columns);
 
-    // And a layer at the region's first row draws on the frame's second, so the
-    // header survives. This is the conversion where a region row and a terminal
-    // row differ by exactly the header's height.
+    // And a layer at the region's first row draws on the frame's third — below
+    // the header and its rule (C22 I87) — so the header survives. This is the
+    // conversion where a region row and a terminal row differ by exactly the
+    // chrome above the region.
     const overlays = createOverlayManager({ registry: measurer });
     // Anchored to the region's second row and preferring above, so it lands on
     // the region's first — `below` of row 0 is row 1, which would test the
@@ -175,7 +176,8 @@ describe("C22 §6a — compositing", () => {
 
     const lines = paint(f, deps(() => placed));
     expect(lines[0], "the header is untouched").not.toContain("top row 0");
-    expect(lines[1], "and the layer is on the frame's second row").toContain("top row 0");
+    expect(lines[1], "and so is its rule").not.toContain("top row 0");
+    expect(lines[f.region.top], "and the layer is on the region's first row").toContain("top row 0");
   });
 
   it("T1.12b (C22 I29): the lower of two overlapping layers keeps the cells the upper does not cover", () => {
@@ -482,7 +484,7 @@ describe("C22 §6a — the cursor (C15 I19)", () => {
       ...deps(() => [], "·", f.region.height),
       promptRows: () => ["r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8"],
       promptCursor: () => ({ row: 4, col: 2 }),
-    }).slice(2 + f.region.height, 2 + f.region.height + f.promptRows);
+    }).slice(f.region.top + f.region.height + 1, f.region.top + f.region.height + 1 + f.promptRows);
 
     expect(painted.filter((l) => l.includes("⋯")), "a marker at each end").toHaveLength(2);
     expect(painted[0]?.includes("⋯"), "above").toBe(true);
@@ -498,7 +500,7 @@ describe("C22 §6a — the cursor (C15 I19)", () => {
       ...deps(() => [], "·", f.region.height),
       promptRows: () => ["r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8"],
       promptCursor: () => ({ row: 0, col: 2 }),
-    }).slice(2 + f.region.height, 2 + f.region.height + f.promptRows);
+    }).slice(f.region.top + f.region.height + 1, f.region.top + f.region.height + 1 + f.promptRows);
 
     expect(head[0], "at the head the first row is the command").toContain("r0");
     expect(head.filter((l) => l.includes("⋯")), "and one marker, below").toHaveLength(1);
@@ -520,7 +522,7 @@ describe("C22 §6a — the cursor (C15 I19)", () => {
       promptRows: () => ["r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8"],
       promptCursor: () => ({ row: 4, col: 2 }),
       spinning: () => true,
-    }).slice(2 + f.region.height, 2 + f.region.height + f.promptRows);
+    }).slice(f.region.top + f.region.height + 1, f.region.top + f.region.height + 1 + f.promptRows);
 
     const spinner = painted.filter((l) => /[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/u.test(l));
     expect(spinner, "one row carries it").toHaveLength(1);
@@ -543,7 +545,7 @@ describe("C22 §6a — the cursor (C15 I19)", () => {
       ...deps(() => [], "·", f.region.height),
       promptRows: () => ["r0", "r1", "r2", "r3", "r4", "r5"],
       promptCursor: () => ({ row: 5, col: 2 }),
-    }).slice(2 + f.region.height, 2 + f.region.height + f.promptRows);
+    }).slice(f.region.top + f.region.height + 1, f.region.top + f.region.height + 1 + f.promptRows);
 
     expect(painted[0], "the marker above").toContain("⋯");
     expect(painted.filter((l) => l.includes("⋯")), "and only above").toHaveLength(1);

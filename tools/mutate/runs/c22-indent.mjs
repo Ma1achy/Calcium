@@ -1,6 +1,7 @@
 /**
  * C22 §6l.6 — the mutation pass for the indentation language: C22 I84–I86
- * (C22 T6.103–T6.105) and C23 I57 (C23 T6.87), and the rows they name.
+ * (C22 T6.103–T6.105), the header's rule (I87, T6.106) and C23 I57 (C23 T6.87),
+ * and the rows they name.
  *
  * Every anchor is a line the landing round wrote. The control empties the one
  * layout function both the measurer and the renderer read — a green control
@@ -17,6 +18,7 @@ const CMD =
   "test/integration/session.test.ts";
 const LAYOUT = "src/shell/entry-layout.ts";
 const CHROME = "src/shell/chrome.ts";
+const PAINT = "src/shell/paint.ts";
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
 const run = () => {
@@ -62,6 +64,14 @@ const MUTATIONS = [
     from: "    flex: [1, { cells: clusterCells(right) }],",
     to: "    flex: [1, { cells: clusterCells(right) + 2 }],",
     expect: "T1.46",
+  },
+  {
+    // C22 T6.106 (I87) — the header's rule dropped from the painter's row list.
+    name: "header rule not painted",
+    file: PAINT,
+    from: "      rule(width, deps),\n      ...transcript(frame, deps, width),",
+    to: "      ...transcript(frame, deps, width),",
+    expect: "T1.47",
   },
   {
     // C23 T6.87 (I57) — the leading gap kept: the hook marks a blank row.

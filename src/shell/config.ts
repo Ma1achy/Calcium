@@ -44,18 +44,27 @@ export const MIN_ROWS = 16;
  * other direction is a cycle inside L4 (MG22).
  */
 export const HEADER_ROWS = 1;
+/**
+ * The rule under the header (I87, §6l.7). Its own constant rather than a third
+ * counted into `RULE_ROWS`: `promptTop` halves that figure to find the prompt's
+ * first row, and a count that means "the prompt's pair" in one place and "every
+ * rule" in another is one a reader has to divide.
+ */
+export const HEADER_RULE_ROWS = 1;
 export const RULE_ROWS = 2;
 export const DEFAULT_FOOTER_ROWS = 1;
 
 /**
  * **Derived, not chosen** (I80, §6l.2 row 7). The tallest footer that leaves one
  * region row at the size gate with the prompt at its cap: at `MIN_ROWS` the
- * prompt may take `⌊MIN_ROWS / 2⌋` rows (S01 §3), the header takes one, the two
- * rules take two, and the region must keep one. Four today, and it moves when
- * `MIN_ROWS` moves — a hand-written `4` would still read as correct the day the
+ * prompt may take `⌊MIN_ROWS / 2⌋` rows (S01 §3), the header takes one and its
+ * rule one more (I87), the prompt's two rules take two, and the region must keep
+ * one. Three today, and it moves when
+ * `MIN_ROWS` moves — a hand-written `3` would still read as correct the day the
  * gate changed and the region went to zero at a size the gate accepted.
  */
-export const MAX_FOOTER_ROWS = MIN_ROWS - HEADER_ROWS - RULE_ROWS - Math.floor(MIN_ROWS / 2) - 1;
+export const MAX_FOOTER_ROWS =
+  MIN_ROWS - HEADER_ROWS - HEADER_RULE_ROWS - RULE_ROWS - Math.floor(MIN_ROWS / 2) - 1;
 
 /**
  * §6 — C22 owns the frame, so C22 passes the gutter; C17 must not assume one.

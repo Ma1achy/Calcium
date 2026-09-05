@@ -139,11 +139,11 @@ describe("C22 §6 — the frame", () => {
         promptRows: () => promptRows,
       });
 
-    // 30 − header 1 − rules 2 − prompt 1 − footer 0 (`[]`, C22 I82).
-    expect(at(30, 1).region).toEqual({ top: 1, height: 26 });
+    // 30 − header 1 − its rule 1 (C22 I87) − rules 2 − prompt 1 − footer 0 (`[]`, C22 I82).
+    expect(at(30, 1).region).toEqual({ top: 2, height: 25 });
     expect(at(30, 4).region, "a wrapped prompt takes the rows from the transcript").toEqual({
-      top: 1,
-      height: 23,
+      top: 2,
+      height: 22,
     });
 
     // Clamped, not negative. The size gate normally prevents this and normally
@@ -174,8 +174,8 @@ describe("C22 §6 — the frame", () => {
       promptRows: () => 1,
     });
 
-    expect(f.overlayRegion).toEqual({ width: 100, height: 26 });
-    expect(f.region).toEqual({ top: 1, height: 26 });
+    expect(f.overlayRegion).toEqual({ width: 100, height: 25 });
+    expect(f.region).toEqual({ top: 2, height: 25 });
     expect(f.overlayRegion.height, "one number, not two").toBe(f.region.height);
   });
 });

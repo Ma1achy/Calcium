@@ -34,7 +34,7 @@ import type { RenderScratch } from "../presentation/blocks/types.js";
 import { cells, hardWrapCells, sliceCells } from "../presentation/text.js";
 import { paint as paintSpans, tone, selectionStyle } from "../presentation/blocks/paint.js";
 import { SGR_RESET, sgr, toTerminalDefault } from "../terminal/escapes.js";
-import { HEADER_ROWS, promptFor, PROMPT_GUTTER } from "./config.js";
+import { HEADER_ROWS, HEADER_RULE_ROWS, promptFor, PROMPT_GUTTER } from "./config.js";
 import { glyphs } from "../presentation/blocks/index.js";
 import { composite } from "./composite.js";
 import { exact, FrameError } from "./frame-error.js";
@@ -153,7 +153,7 @@ function spinnerGlyph(caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWid
 // one MG2 found on the day it was implemented.
 
 /**
- * One rule row (C22 I81, §6l.4 A): the `horizontal` glyph across the full
+ * One rule row (C22 I81, I87, §6l.4 A, §6l.7): the `horizontal` glyph across the full
  * width, in the muted tone at every depth and **plain at 1-bit** — a rule is
  * geometry, and one that needed colour to read would be F34's class. The glyph
  * comes from C09's table so the ASCII tier gets `-` from the same place every
@@ -516,7 +516,7 @@ export function paint(frame: Composed, deps: PaintDeps): readonly string[] {
   if (!heightsSum(frame)) {
     throw new FrameError(
       `frame heights do not sum to ${String(frame.size.rows)} rows: ` +
-        `header ${String(HEADER_ROWS)} + viewport ${String(frame.region.height)} + ` +
+        `header ${String(HEADER_ROWS)} + rule ${String(HEADER_RULE_ROWS)} + viewport ${String(frame.region.height)} + ` +
         `rules 2 + prompt ${String(frame.promptRows)} + footer ${String(frame.footerRows)}`,
     );
   }
@@ -565,6 +565,9 @@ export function paint(frame: Composed, deps: PaintDeps): readonly string[] {
   const lines = composite(
     [
       ...region(frame.header, HEADER_ROWS, width, deps),
+      // **The header's rule** (I87, §6l.7) — the same row the prompt's two are,
+      // so the header and the region's first row do not read as one block.
+      rule(width, deps),
       ...transcript(frame, deps, width),
       // **Two rules, always** (I81) — the row above the prompt and the row
       // below it, whatever the footer holds. The lower one is drawn with a

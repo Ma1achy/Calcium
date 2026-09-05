@@ -17,6 +17,7 @@ import { paint, type PaintDeps } from "../../src/shell/paint.js";
 import {
   DEFAULT_FOOTER_ROWS,
   HEADER_ROWS,
+  HEADER_RULE_ROWS,
   MAX_FOOTER_ROWS,
   MIN_ROWS,
   RULE_ROWS,
@@ -108,13 +109,15 @@ const strip = (s: string): string => s.replace(/\x1b\[[0-9;]*m/g, "").trimEnd();
 const hasSgr = (s: string): boolean => /\x1b\[[0-9;]*m/.test(s);
 
 describe("C22 §6l — the frame's default look", () => {
-  it("T1.35 (C22 I80; I79 retired, §6l.2 row 7): the maximum footer is derived from the gate, the rules and the prompt's cap — four today", () => {
-    // **The derivation, not the figure** (§6l.4 C). Four is what the constants
-    // give today; the row moves when `MIN_ROWS` moves and a hand-written `4`
-    // would still read as correct the day the gate changed.
-    expect(MAX_FOOTER_ROWS).toBe(MIN_ROWS - HEADER_ROWS - RULE_ROWS - Math.floor(MIN_ROWS / 2) - 1);
-    expect(MAX_FOOTER_ROWS, "and the figure, so a reader has it").toBe(4);
+  it("T1.35 (C22 I80; I79 retired, §6l.2 row 7): the maximum footer is derived from the gate, the rules and the prompt's cap — three today", () => {
+    // **The derivation, not the figure** (§6l.4 C). Three is what the constants
+    // give today — four until the header's rule (I87) took a row; the figure
+    // moves when `MIN_ROWS` moves and a hand-written `3` would still read as
+    // correct the day the gate changed.
+    expect(MAX_FOOTER_ROWS).toBe(MIN_ROWS - HEADER_ROWS - HEADER_RULE_ROWS - RULE_ROWS - Math.floor(MIN_ROWS / 2) - 1);
+    expect(MAX_FOOTER_ROWS, "and the figure, so a reader has it").toBe(3);
     expect(HEADER_ROWS).toBe(1);
+    expect(HEADER_RULE_ROWS).toBe(1);
     expect(RULE_ROWS).toBe(2);
     expect(DEFAULT_FOOTER_ROWS).toBe(1);
     // At MIN_ROWS with the prompt at its cap the tallest footer leaves one row.
@@ -124,20 +127,37 @@ describe("C22 §6l — the frame's default look", () => {
     expect(Object.keys(resolved).sort()).toEqual(["footer", "header"]);
   });
 
-  it.todo("T1.47 (C22 I87, §6l.7 row 21): a default frame at 24×80 paints a rule on row HEADER_ROWS identical to the rule above the prompt; region.top is HEADER_ROWS + HEADER_RULE_ROWS and MAX_FOOTER_ROWS is three — not deferred on a component: the spec commit carries the row and the code commit replaces it");
+  it("T1.47 (C22 I87, §6l.7 row 21): a default frame paints a rule on row HEADER_ROWS, byte-identical to the rule above the prompt, and the region starts below it", () => {
+    for (const columns of [80, 100, 60]) {
+      const f = frameAt(24, makeDefaultChrome("plots-tui", "/usr/local/bin/plots"), 1, columns);
+      expect(f.region.top).toBe(HEADER_ROWS + HEADER_RULE_ROWS);
+      expect(heightsSum(f)).toBe(true);
+      const lines = paint(f, deps());
+      expect(lines).toHaveLength(24);
+      const headerRule = lines[HEADER_ROWS] ?? "";
+      const promptRule = lines[f.region.top + f.region.height] ?? "";
+      // **The same row, not a row that looks the same**: a rule of the wrong
+      // glyph or tone under the header would read as a third kind of line.
+      expect(headerRule, `${String(columns)}: the header's rule is the prompt's`).toBe(promptRule);
+      expect(strip(headerRule)).toMatch(/^─+$/);
+      expect(displayCells(strip(headerRule))).toBe(columns);
+      // The region's first row is content, not the rule.
+      expect(strip(lines[f.region.top] ?? "")).not.toMatch(/^─+$/);
+    }
+  });
 
   it("T1.36 (C22 I80, I82): the sum holds for every footer height at every size down to the clamp", () => {
     for (let f = 0; f <= MAX_FOOTER_ROWS; f += 1) {
       // The smallest size whose region is non-negative with the prompt at its
-      // cap: `rows − 3 − f − ⌊rows/2⌋ ≥ 0`, which is `2f + 5`.
-      for (let rows = 2 * f + 5; rows <= 60; rows += 1) {
+      // cap: `rows − 4 − f − ⌊rows/2⌋ ≥ 0`, which is `2f + 7`.
+      for (let rows = 2 * f + 7; rows <= 60; rows += 1) {
         for (const wanted of [1, 200]) {
           const frame = frameAt(rows, FOOTER(f), wanted);
           const promptRows = Math.max(1, Math.min(wanted, Math.floor(rows / 2)));
           expect(heightsSum(frame), `f=${String(f)} rows=${String(rows)} wanted=${String(wanted)}`).toBe(true);
           expect(frame.footerRows).toBe(f);
-          expect(frame.region.top).toBe(HEADER_ROWS);
-          expect(frame.region.height).toBe(rows - HEADER_ROWS - RULE_ROWS - promptRows - f);
+          expect(frame.region.top).toBe(HEADER_ROWS + HEADER_RULE_ROWS);
+          expect(frame.region.height).toBe(rows - HEADER_ROWS - HEADER_RULE_ROWS - RULE_ROWS - promptRows - f);
           expect(frame.overlayRegion.height, "C22 I28 — one number, not two").toBe(frame.region.height);
         }
       }
@@ -149,8 +169,8 @@ describe("C22 §6l — the frame's default look", () => {
     expect(short.region.height).toBe(0);
     expect(heightsSum(short)).toBe(false);
 
-    // The design's numbers: 24 rows, a three-line footer, a two-row prompt → 16.
-    expect(frameAt(24, FOOTER(3), 2).region.height).toBe(24 - 1 - 2 - 2 - 3);
+    // The design's numbers: 24 rows, a three-line footer, a two-row prompt → 15 (16 before the header's rule, C22 I87).
+    expect(frameAt(24, FOOTER(3), 2).region.height).toBe(24 - 1 - 1 - 2 - 2 - 3);
   });
 
   it("T1.37 (C22 I34, §6l.2 row 8): the pre-frame height guesses one footer row and the first frame corrects it by f − 1", () => {
@@ -168,7 +188,7 @@ describe("C22 §6l — the frame's default look", () => {
 
   it("T1.38 (C22 I81): two rules bound the prompt — the `horizontal` glyph across the width, muted at 24-bit, plain at 1-bit, `-` at ascii", () => {
     const f = frameAt(24, FOOTER(1));
-    expect(f.region.height).toBe(19);
+    expect(f.region.height).toBe(24 - 1 - 1 - 2 - 1 - 1);
     const lines = paint(f, deps());
     expect(lines).toHaveLength(24);
     const upper = 24 - 1 - 1 - 2; // rows − footer − prompt − 2
@@ -198,7 +218,7 @@ describe("C22 §6l — the frame's default look", () => {
   it("T1.39 (C22 I81, §6l.2 row 3): a footer returning `[]` is zero rows, and the lower rule is the frame's last row", () => {
     const f = frameAt(24, FOOTER(0));
     expect(f.footerRows).toBe(0);
-    expect(f.region.height).toBe(24 - 1 - 2 - 1);
+    expect(f.region.height).toBe(24 - 1 - 1 - 2 - 1);
     const lines = paint(f, deps());
     expect(lines).toHaveLength(24);
     expect(strip(lines[23] ?? ""), "the rule, not a blank").toBe("─".repeat(80));
@@ -372,7 +392,7 @@ describe("C22 §6l — the frame's default look", () => {
     const f3 = frameAt(24, FOOTER(3));
     const lines = paint(f3, deps());
     expect(lines).toHaveLength(24);
-    expect(f3.region.height).toBe(24 - 1 - 2 - 1 - 3);
+    expect(f3.region.height).toBe(24 - 1 - 1 - 2 - 1 - 3);
     expect(lines.slice(21).map(strip)).toEqual(["footer 1", "footer 2", "footer 3"]);
     expect(strip(lines[20] ?? ""), "the lower rule directly above the footer").toBe("─".repeat(80));
     expect(strip(lines[19] ?? "")).toBe("❯");
@@ -388,7 +408,7 @@ describe("C22 §6l — the frame's default look", () => {
   it("T3.39 (C22 I28, §6l.2 row 10): with a three-row footer the layer region is the transcript region and paint returns rows lines", () => {
     const f = frameAt(30, FOOTER(3));
     expect(f.overlayRegion.height).toBe(f.region.height);
-    expect(f.region.height).toBe(30 - 1 - 2 - 1 - 3);
+    expect(f.region.height).toBe(30 - 1 - 1 - 2 - 1 - 3);
     expect(paint(f, deps())).toHaveLength(30);
   });
 });

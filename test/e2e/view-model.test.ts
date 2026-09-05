@@ -64,10 +64,11 @@ const session = (cols = COLS, rows = ROWS): InteractivePty =>
 function region(frame: readonly string[]): readonly string[] {
   const prompt = promptRow(frame);
   const at = frame.lastIndexOf(prompt);
-  // Below the header and above the upper rule (C22 I81): the rule sits between
-  // the region and the prompt, and a slice that kept it captured the rule as
-  // the document's last row — equal on the first screen, so the walk was one.
-  return frame.slice(1, at - 1).map((r) => r.trimEnd());
+  // Below the header and its rule (C22 I87), above the upper rule (I81): a rule
+  // sits between the region and the prompt, and a slice that kept it captured
+  // the rule as the document's last row — equal on the first screen, so the
+  // walk was one.
+  return frame.slice(2, at - 1).map((r) => r.trimEnd());
 }
 
 /**
@@ -148,7 +149,7 @@ describe("C04 e2e — the drift tests", () => {
       await pty.waitFor(PROMPT, 20_000);
 
       // A document far taller than the region, from the real far side. 400 rows
-      // against a 21-row region is nineteen screenfuls, which is enough for a
+      // against a 20-row region is nineteen screenfuls, which is enough for a
       // per-page off-by-one to accumulate into something unmistakable.
       pty.type("/ps --limit 400\r");
       await pty.waitForFrame((f) => region(f).some((r) => r.includes("0000399")), 30_000);

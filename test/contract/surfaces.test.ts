@@ -12,7 +12,7 @@
 // A fixture holding its own number agrees with itself forever.
 import { describe, expect, it } from "vitest";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
-import { RULE_ROWS } from "../../src/shell/config.js";
+import { HEADER_RULE_ROWS, RULE_ROWS } from "../../src/shell/config.js";
 import { block } from "../../src/data/viewmodel/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
@@ -120,10 +120,10 @@ describe("the S-series' illustrated heights", () => {
   // indistinguishable from a row that expired correctly.
   it("S01 §2's regions are the ones §3 computes", () => {
     // **The figure is a diagram and `frameRows` strips its three horizontal
-    // rules.** Two of them are rendered now — the rules bounding the prompt
-    // (C22 I81, §6l) — and the header's underline is not, so the composed frame
-    // is the stripped figure plus `RULE_ROWS`, and what is compared is the
-    // decomposition: header, viewport, prompt, footer.
+    // rules.** All three are rendered now — the rules bounding the prompt (C22
+    // I81, §6l) and the header's rule (I87, §6l.7) — so the composed frame is
+    // the stripped figure plus `RULE_ROWS + HEADER_RULE_ROWS`, and what is
+    // compared is the decomposition: header, viewport, prompt, footer.
     //
     // **The assertion is the decomposition, not the row count.** A first draft
     // composed at the figure's own dimensions and asserted the paint returned
@@ -169,7 +169,7 @@ describe("the S-series' illustrated heights", () => {
       session: () => S01_SESSION,
       copyMode: () => false,
       now: () => 1_700_000_000_000,
-      size: () => ({ columns: width, rows: rows + RULE_ROWS }),
+      size: () => ({ columns: width, rows: rows + RULE_ROWS + HEADER_RULE_ROWS }),
       promptRows: () => 1,
     });
 
