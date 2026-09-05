@@ -551,20 +551,69 @@ mode in which the app deliberately has none.
 
 | # | Sequence | What happens now | Ruling |
 |---|---|---|---|
-| B1 | Enter copy mode, press `⌃c` | `activeTarget` answers `copyMode`; the rung calls `deps.exitCopyMode()`, which is `() => undefined` (`session.ts:548`). The key is **consumed** and the mode does not end | **The producer and the exit are one piece of state or neither ships.** A mode reachable and not leavable is worse than one that is unreachable, and the tree currently has the second stub as well as the first |
+| B1 | Enter copy mode, press `⌃c` | **Ships — measured 2026-09-05, and this row said otherwise for some time after it stopped being true.** `activeTarget` answers `copyMode`; the rung calls `deps.exitCopyMode()`, which is `#setCopyMode(false)` (`session.ts:930-950`): mouse tracking comes back **first** (`1002h 1006h`), then `resume()` writes the catching-up frame. Entry is `⌥v` at `prompt` and `liveBlock` (`keymap.ts:321`). The `() => undefined` this row used to cite survives only in test harnesses' `FrameQueries` | **The producer and the exit are one piece of state or neither ships** — and they do: C22 T4.30/T4.31 assert the pair, T4.31b the order inside the exit. The stub was recorded here for the length of C26 *after* it was gone, which is F86/F89/F92's class — the record lagging the tree — and it let a survey read a working mode as a defect |
 | B2 | Enter copy mode while a verb is in flight | rungs 1–2 dominate: `⌃c` cancels the verb and copy mode stays | **Correct and kept.** Cancelling the work outranks leaving a viewing mode; the reader presses `⌃c` twice, which is the ladder's shape |
 | B3 | A confirm is raised while in copy mode | rung 4 dominates copy mode (T1.12b) — the confirm takes the key | **Correct and kept**, and it is the interaction the original ladder pass got wrong in the other direction |
-| B4 | Output arrives while in copy mode | C13 appends, C14 scrolls, the terminal's selection now covers different text | **The mode must suspend the scroll or say it did not.** A selection that silently comes to mean other text is the failure this feature exists to avoid, and it has no owner yet — the open question this trace leaves |
+| B4 | Output arrives while in copy mode | **Measured 2026-09-05.** C13 appends and C14 follows as it always does — the far side is **not** frozen — but `#setCopyMode(true)` has suspended the scheduler (`session.ts:940`, C03 I13), so no frame is written: the screen holds the frame the reader is selecting from, and the catching-up frame arrives on exit (C22 T4.32, T4.32b). A resize is the one thing that paints through the hold — a contaminated write is never held (C03 I13) — and that is right, because the terminal has already destroyed the selection | **The mode suspends the *screen* and says so (`COPY` in the header); it does not suspend the far side.** The selection cannot come to mean other text because the text under it does not move, and what the reader missed is drawn the moment they leave. The open question this row carried has an owner — C22's `#setCopyMode` — and C03 §4a is the mechanism |
 | B5 | `y` on a focused element, then `⌃y` at the prompt | `⌃y` yanks the kill buffer (C17 §5) — which `y` did not write | **One clipboard.** See C17 §5a |
 | B6 | `⌃k` fills the kill buffer, then `y` copies an element, then `⌃y` | under one clipboard, `⌃y` yanks the element | **Intended.** Copy is another way to fill the same buffer, and it inherits C17 §5's no-rewind ruling rather than needing a second one |
-| B7 | Entering copy mode with a selection open in the prompt | the prompt's region is still stored; the terminal now owns the screen selection | **Two selections visible, one live.** The prompt's must be dropped on entry, or the reader sees a highlight that no key acts on |
+| B7 | Entering copy mode with a selection open in the prompt | **Still open — measured 2026-09-05.** `#setCopyMode(true)` touches the scheduler and the lifecycle and nothing else (`session.ts:936-942`); `keys.ts`'s `enterCopyMode` effect is `void deps.enterCopyMode()`. Nothing clears `Editor.selection`, and C17 exposes no member that would: `move` collapses a region only by moving the caret, and `#apply` does so only on undo (C17 I22) | **Two selections visible, one live — and the frozen frame makes it worse, not better**: the prompt's highlight is painted into the frame the hold keeps, beside the terminal's live one. **Owed, with a symbol**: a C17 member that collapses the region without moving the caret, called from `#setCopyMode(true)` before the indicator's frame. Not a `move`, because the caret is a statement the reader made |
 
 ### What it found
 
-B1 is the tree's state and not a hypothetical. B4 has no owner in any component and
-is the question this trace exists to raise. B7 is the interaction between the two
-surviving scopes and it only appears because A1 and A5 were written down as
-separate rows first.
+B1 was the tree's state when this trace was written and is not now; the row above
+records the measurement and the date, because a row that said *stub* for some time
+after the stub was gone is what let a survey read a shipped mode as a defect. B4 has
+an owner — C22's `#setCopyMode`, on C03 §4a — and the answer is *the screen is held,
+the far side is not*. B7 is the interaction between the two surviving scopes, it
+only appears because A1 and A5 were written down as separate rows first, and it is
+the one row of the three still open.
+
+## 5c. Leaving copy mode — `Esc`, walked and ruled
+
+**A sequence trace, because every row is an event landing on a mode.** Indexed by the
+rules that meet in the cell, not by the keys a reader might press; a row governed by one
+rule restates it and finds nothing. Measured at HEAD on 2026-09-05 through `dispatch`'s
+`lastStages`.
+
+| # | Sequence | What happens now | Rules meeting | Ruling |
+|---|---|---|---|---|
+| C1 | Enter copy mode, press `Esc` | `dispatch`: not `⌃c`, so the pre-dispatch rungs are skipped; `activeTarget` answers `copyMode`; the rung declines (it takes `⌃c` only); no layer is up; the `global` fallback has no `escape` row → **dropped**, and `lastStages` ends `dropped`. The scheduler is suspended, so the drop has no frame either: the header still says `COPY` and the reader has been told nothing | I24's exemption — *its only key is `⌃c`* — meets §3's shape, in which `Esc` is every other target's own way out: `liveBlock` → `focusPrompt`, `pushedView` → `viewPop`, `overlay` → `dismiss` | **`Esc` exits copy mode.** The reasoning is below the table |
+| C2 | Enter copy mode, a confirm is raised, `Esc` | `overlay` sits above `copyMode` in `FOCUS_ORDER`; `dismiss` respects `dismissable`, so a confirm refuses it and copy mode stays; a dismissable layer pops and copy mode stays beneath it | B3's rule at `Esc` instead of `⌃c` | **Correct and unchanged by the ruling.** A `copyMode` row resolves only when `activeTarget` answers `copyMode`, so no layer can be reached past — the same structural fact that puts the `⌃c` rung where it is |
+| C3 | Enter, the far side settles an entry, exit | no frame while held; `resume()` writes one diffed frame carrying the new text (C22 T4.32b) | B4 | Recorded at B4 |
+| C4 | Enter, resize, exit | `commit("resize")` sets `contaminated`; C03's gate is `suspended && !contaminated`, so the repaint is written *through* the hold (C03 I13); exit then resumes onto a model that is still true | C03 I13 meets C03 §4a's hold | **Correct.** The terminal has already destroyed the selection on a resize, and holding a wrapped line is the one corruption the app cannot see. Mutated in `tools/mutate/runs/c22-copy-mode.mjs` (*suspension holds a contaminated write too*) |
+| C5 | Enter, `⌥v` again | `activeTarget` answers `copyMode`; the `prompt` and `liveBlock` rows never resolve; `global` has no `⌥v` → dropped. `#setCopyMode(true)` would have refused anyway (`this.#copyMode === on`) | the entry rows' targets meet the mode being its own target | A no-op by two independent guards; C22 T4.32c asserts one `1002l` and nothing written for the second press |
+| C6 | Enter, SGR mouse bytes arrive anyway | tracking is off (`1006l 1002l`), so a conforming terminal sends none. Were bytes to arrive, the decoder still decodes them — `capabilities.mouse` is C02's *record*, not C01's *held set* — and `routeMouse` runs: a wheel reaches `run("copyMode") \|\| run("global")` and scrolls the viewport under a held screen | C02's record meets C01's held set | **Not reachable from a conforming terminal; noted, not fixed.** A `mouseEnabled` that read the held set would close it and lives in `construct.ts` |
+
+### The ruling, and why I24's sentence did not constrain it
+
+I24 exempted `copyMode` from having bindings because *a binding there would be the second
+mechanism I23 objects to*. I23 objects to a key handled **outside the table** — a `switch`
+in L4 that `/help` cannot render. A `copyMode`-target row is *in* the table, and it
+resolves at exactly the moment the `⌃c` rung does, because both hang off `activeTarget`:
+there is no order of its own to drift. The sentence is true of a `global` row and was
+attached to a decision about a `copyMode` row. `types.ts`, `keys.ts` and `keymap.ts` each
+repeat it, and three restatements are one claim.
+
+**The pattern every other target already has is the one copy mode lacks.** `Esc` is a
+target's own dismissal and `⌃c` is the ladder's cancel; `pushedView` has both, they do
+the same thing (`viewPop` / `popLayer`), and I24 itself defends the pair. Copy mode is the
+one target where the key a reader has learnt at every other level does nothing — and does
+it silently, on a frozen screen, which is the *keys going somewhere invisible* failure §1
+calls close to undebuggable.
+
+So: `defaultKeymap` gains `{ target: "copyMode", key: { name: "escape" }, action:
+"exitCopyMode" }`; `KeyAction` gains `"exitCopyMode"`; L4's effect table gains
+`exitCopyMode: () => void deps.exitCopyMode()`, over a dep that already exists on
+`RouterDeps` and `FrameQueries`. **The `⌃c` rung stays**: the ladder's shape — undo the
+innermost thing — still needs it, exactly as `pushedView` keeps both. I24's exemption is
+withdrawn below, and T1.32's `copyMode` clause inverts with it. Cost: one union member, one
+row, one effect line, and a test clause.
+
+**T4.68 asserts the ruling and is written `it.fails` until the three lines land** — it
+constructs the state, asserts what the ruling says, and goes red the day the row exists,
+which is the signal to flip it. A todo cannot do that here: `todo-expiry` is indexed by
+component, and every component this needs already exists.
 
 ---
 
@@ -787,7 +836,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 - **I21** — **C17's public surface is the action vocabulary for editing.** Every editing operation the editor exposes is named by exactly one `KeyAction`, and every editing `KeyAction` names exactly one of them. Totality over the union is what makes `/help` honest (I19), and totality over an incomplete union is honest about nothing: the union held no editing action at all while C17 implemented word motion, kill, yank and undo, so backspace did nothing at a real prompt and every check in the chain passed. Derived from the interface rather than maintained beside it, so a method added to C17 with no action fails rather than going unbound in silence.
 - **I22** — `↓` enters the live block only from the bottom of history, `Esc` and `↑`-from-the-first-row leave it, and an entry with no focusable row cannot be entered at all. One binding with two effects in order rather than two bindings competing for a keystroke: C20's navigation has a defined bottom, so entering is what `↓` does after that end. The three halves are one invariant because any one alone is a defect — entry with no exit is a session whose prompt is unreachable, exit with no entry is what shipped, and entry into a block with no rows drops every key silently.
 - **I23** — **Every key that scrolls is a binding in the table.** The four scroll operations C14 exposes are named by `global` bindings — `pageup`, `pagedown`, `⌃home`, `⌃end` — rather than read out of an `InputEvent` in L4. Two mechanisms for one target's key handling is the inverse of the defect I19 exists to prevent: a binding outside the table is one `/help` cannot render, so a key that works is one no user can discover, and two of the four were reachable by nothing while looking exactly like the two that worked. A wheel event is not a key, has no `(target, key)` to resolve on, and stays out — that is the boundary rather than an exception to it. `Home` and `End` remain the line's, so the document's extremes take the modified pair every editor uses, and both of its wire forms were pressed through the real decoder before being written down (I17).
-- **I24** — Every target that receives ordinary keys has bindings, and a target with none is a defect rather than a default. `pushedView` was in the union and in `focus.ts` from the start with no row anywhere in `defaultKeymap`, so every key at that target fell through step 3 — vacuous only for as long as nothing pushed a view. **`copyMode` is the one exemption and it is named rather than skipped**: its only key is Ctrl-C, which §5's ladder owns by construction and the keymap deliberately does not, so a binding there would be the second mechanism I23 objects to rather than the missing one this invariant is about. `Esc` at a view is the view's own dismissal and is not the Ctrl-C rung under another name (§5, A01 D7).
+- **I24** — Every target that receives ordinary keys has bindings, and a target with none is a defect rather than a default. `pushedView` was in the union and in `focus.ts` from the start with no row anywhere in `defaultKeymap`, so every key at that target fell through step 3 — vacuous only for as long as nothing pushed a view. **`copyMode` was the one exemption, and §5c withdraws it** (ruled 2026-09-05): its `escape` row is the target's own dismissal, as `viewPop` is the view's, and `⌃c` stays the ladder's. The exemption's reason — *a binding there would be the second mechanism I23 objects to* — was true of a `global` row and was attached to a `copyMode` one, which resolves at the same moment the rung does and has no order of its own. `Esc` at a view is the view's own dismissal and is not the Ctrl-C rung under another name (§5, A01 D7).
 - **I25** — **A layer that must be answered gets its keys before the ladder does.** When the top layer carries an answer callback, rung 4 offers it every key — accelerators, `Enter`, `Esc` and `⌃c` — and consumes what it takes, **before both of the rung's existing clauses** — and it is two clauses rather than one, which the mutation pass had to establish because the first wording said "before the `⌃c` clause" and a reordering satisfied it. They fail differently: the `isCtrlC` bail-out returns false for every key that is not `⌃c`, so an accelerator, `Enter`, `Esc` and an arrow are **dropped**; the `!top.dismissable` clause returns *consumed, and nothing happens* (I8), so `⌃c` **hangs** — the key vanishes and the handler awaiting it waits forever. One ordering, two defects, and a wording naming only the second reads as satisfied while the first is live. **The rung was written when no layer could be answered, so "nothing happens" was the whole truth; a question makes it a hang.** `Esc` and `⌃c` are routed rather than special-cased here, because what they mean is the question's business — C23 I36 resolves both with the default choice — and a router that knew that would hold half of a rule whose other half lives two layers away. The callback is read from the top layer only, never searched down the stack, for C15 `pop()`'s reason: a question raised over a completion menu must not be answered by the menu.
 - **I26** — **`enter` is bound on `liveBlock`, and `rowActivate` is in `KeyAction`.** I22 gave the target entry and exit and three bindings — `escape`, `down`, `up` — which is a cursor with nothing to press. The effect is C23's (C23 I37); what C16 owns is that the key resolves from the table like every other, so `/help` renders it and a consumer can rebind it. **The union's gap was the whole of F21 from this side**: an action with no `KeyAction` cannot be bound, and a binding that does not exist reads exactly like one that is unused. It is the same key `overlay` accepts a menu item with, which is the consistency a reader has already learnt before reaching a row.
 
@@ -828,7 +877,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 21. Scrolling is bound in the table like everything else that is a key: `pageup`, `pagedown`, `⌃home`, `⌃end` on the `global` target, so `/help` can render them and a scroll key cannot exist outside the vocabulary. The wheel is not a key and stays out (I23).
 22. Step 3 is skipped when the top layer must be answered **or covers the region**; the two are different properties and neither implies the other, and coverage is read from the layer's box rather than from its kind (I8).
 24. A top layer that must be answered receives every key at rung 4 before **both** of the rung's existing clauses, and a question outranks the cancel rungs above it — so `Esc` and `⌃c` reach the question rather than being dropped, consumed into silence, or cancelling the verb that asked. The callback comes from the top layer only (I25).
-23. Every focus target that takes ordinary keys has bindings, with `copyMode` exempted by name because its only key is the ladder's. `pushedView` gets `n`/`p`, `g`/`G`, paging and `Esc`, and its `Esc` is the view's own dismissal rather than §5's cancellation rung (I24).
+23. Every focus target that takes ordinary keys has bindings; `copyMode`'s is `Esc` (§5c, ruled 2026-09-05 — until the row lands, T4.68 is `it.fails` and says so) and its `⌃c` is the ladder's. `pushedView` gets `n`/`p`, `g`/`G`, paging and `Esc`, and its `Esc` is the view's own dismissal rather than §5's cancellation rung (I24).
 25. A colliding block key is placed at `interaction` and a free one at `liveBlock`; only a key bound twice in one block keymap is refused (I27).
 26. `←`/`→` at `liveBlock` are built-ins for the horizontal axis, the crosshair first (I28).
 27. `⇧⏎`/`⌥⏎` at `liveBlock` re-run the focused entry's recorded command, and that is the whole of what fires from a frozen entry (I29, → C23 I18).
@@ -944,6 +993,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T4.66** (I31, §4a trace 6; C04 I48): a wheel inside a `scroll`'s box moves that box's offset and leaves the transcript's `topRow` where it was; a wheel over prose in the same session moves `topRow` and leaves the offset. Both counters asserted after each step.
 - **T4.66b** (I31, §4a row c): with the box scrolled by two, a click at its first box row focuses the **third** child, not the first — the offset translation, and the row a `rows`-only hit test fails.
 - **T4.67** (I31, §4a trace 8): a click on the prompt row from a focused row → `{at: "prompt"}`; a release and a `button1` press over an element move nothing.
+- **T4.68** (§5c C1): `Esc` in copy mode leaves it — tracking back (`1002h`), the indicator gone. **Written `it.fails` until the keymap row, the union member and the effect land** (Lane S's files); it turns red the day they do, which is the signal to flip it to `it`. The body asserts the ruling, not the current drop.
 - **T4.9b** (I23, with L4): the four scroll bindings appear in what `/help` renders. The row that says the ruling changed anything a user can see — before it, three of the four keys worked and none of them could be found, and the fourth pair did not work at all.
 
 ### Tier 5 — e2e
@@ -953,6 +1003,9 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T5.3**: the full Ctrl-C ladder in one session — cancel a verb, exit copy mode, pop a view, clear input, then double-tap to the exit confirm.
 - **T5.4**: navigating from prompt into a live table, expanding a row, and returning, with focus visible and correct at every step.
 - **T5.5**: a session under `bracketedPaste: false` → the heuristic works, and the notice appears once.
+- **T5.6** (I31, §4a row 1): **the mouse through a PTY — bytes in, frame out, no fake decoder.** The shell under `node-pty` with the detected record (mouse on), two `/ps --mine` entries of two rows each; the first capture is checked for `1002h` and `1006h` **before** any byte is written (F759 — an instrument written before its subject), then the SGR bytes `CSI < 0 ; COL ; ROW M` for the **first** entry's **second** row are written and the highlight is read back from `styledFrame`: that row's pen changes and the other three rows' pens do not. Every other test of this path fed the decoder from a string; this one feeds the process.
+- **T5.7** (I31, §4a row i): `CSI < 64 ; COL ; ROW M` over a notice — prose, no box — moves the transcript by `WHEEL_ROWS`: the line under the pointer is three rows lower afterwards and no longer where it was. The transcript is made taller than the region first, and the row asserts the frame moved by the constant rather than that it moved.
+- **T5.8** (I31, C02 I10): **the control.** The same session with `mouse` forced **off** through the fixture (`FORCE_MOUSE=0`, the same override path `FORCE_DEPTH` takes, so the *lifecycle's* record is what is forced): the first capture carries no `1002h`, and the same click and wheel bytes leave `styledFrame` byte-identical — the decoder consumes them (`decode.ts:512`) and nothing downstream sees a gesture.
 
 ### Tier 6 — fail-on-revert
 
@@ -988,6 +1041,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T6.9d** (I17): dropping the CSI-u and `modifyOtherKeys` branches → T1.3d and T2.13 fail, and Shift-Enter is unreachable on every terminal that sends it.
 - **T6.9e** (I17): dropping bit 8 from `modifiersOf`'s `meta` → T1.3e fails, and `⌥⇧←` arrives as `⇧←` on every terminal that sends Option as Meta — a **live** binding rather than a dead one, which is why no row above the decoder fails with it.
 - **T6.9f** (I30): restoring `code === 64` as the only wheel-up → T1.3k fails, and ctrl-scroll-up scrolls down. Masking the modifiers back out with `& 3` → T1.3l fails. Dropping the motion bit → T1.3m fails and a drag is a stream of clicks. All three in `tools/mutate/runs/c16-mouse-decode.mjs`.
+- **T6.9h** (I31, F759): the decoder's row translation `Number(y) - 1` → `Number(y)` → T5.6 highlights the row *below* the pointer, and every fake-decoder row still passes because the fake never went through the translation. `WHEEL_DIRECTIONS` with its first pair swapped → T5.7 moves the wrong way. **A mutation that survives, and the finding is the survivor**: dropping the decoder's `capabilities.mouse` gate alone leaves T5.8 green, because `routeMouse` has a second gate over the same record — two guards over one condition, and either alone is invisible to every row. Anchors in `tools/mutate/runs/c16-mouse-pty.mjs`; each run by hand on 2026-09-05.
 - **T6.9g** (I31): the pointer's `find` by rows alone, ignoring cols → T4.63 fails and the second chip is unreachable. `focusRow` with `liveId` in place of the hit entry → T4.62 fails, the settled entry's probe never sees focus, and T4.64's refusal is not reached. The click-again branch dropped → T4.64 fails and a row can be reached and never acted on, which is F21 for the pointer. The chrome subtraction dropped → T4.62b fails one row low. The offset translation dropped → T4.66b focuses the first child. The frame's bottom alignment ignored — C14 asked from the region's top — → T4.62c fails on the painted frame and every graph-level click row with it, because a short transcript's rows are ten rows lower than the viewport says (§4a row l). The wheel test restored to `wheelUp || wheelDown` → T1.3o fails and a horizontal wheel is a click. All in `tools/mutate/runs/c16-mouse-wiring.mjs`, with the wheel line as the control; each was run by hand on 2026-09-05 and every one killed the row it names.
 
 ---

@@ -82,6 +82,10 @@ interface BlockRegistry {
   render(block: Block, ctx: RenderContext): ReactElement;
   measureSequence(blocks: readonly Block[], width: number): number;
   renderSequence(blocks: readonly Block[], ctx: RenderContext): ReactElement;
+  // C26 §5 — one block's elements, block-local; and a sequence's, lifted in BOTH axes.
+  elementsOf(block: Block, width: number): readonly NavElement[];
+  elementsIn(blocks: readonly Block[], width: number):
+    readonly Readonly<{ blockId: string; element: NavElement }>[];
   readonly kinds: readonly string[];
   readonly sealed: boolean;
 }
@@ -101,6 +105,24 @@ the registry, because every composer needs the same arithmetic and a composer
 that inserted spacing of its own would make a document's height unknowable from
 the document (C23 §2). A `row` group is not a sequence: its children sit side by
 side, so a gap before one of them is ignored rather than being an error.
+
+**`elementsIn` lifts a block's elements into the sequence's coordinates in both axes, and the
+origins are the painter's.** `elementsOf` answers block-local `rows` and `cols` (C26 §5);
+`elementsIn` adds each block's top row **and left column**, then descends into a container that
+declares no elements of its own (I30). The origins are read from the functions the renderers
+place children with, never restated: a `panel`'s children begin one row below its top border
+and one column in from its left rail — none when the width is under three and the rails are
+dropped — at `insetWidth`; a `column` group's follow one another down at column 0, `gapBefore`
+counted as `measureSequence` counts it; a `row` group's sit side by side at `childWidths` plus
+`ROW_GUTTER` between each pair, only the first `placeable` of them, and a `gapBefore` there is
+ignored as the renderer ignores it; a `mosaic`'s cells are `mosaicRects`' `left` and `top`, and
+a `scroll`'s children are content rows from its top (C26 I3). **Measured before the rule** (F756,
+F757): the walk lifted rows and never columns, so two 39-wide tables in an 80-column `row` group
+both answered `cols [0, 39)` and a click at column 50 focused the first; and it reset every
+child of a container to the *container's* top, so a `panel`'s table answered its rows one above
+where the frame drew them and a second table in a `column` group overlapped the first. Every
+one of those lists satisfied C26 §5's four predicates block by block, which is why the
+predicates are also asserted over the lifted list (C26 §5, T2.29–T2.31).
 
 **`renderChild` and `measureChild` are Seam 1 on the render side, and the registry passes itself for both.** A container renders children whose kind it does not know, for the same reason it measures them, and neither may import the registry (I7). `measureChild` is on the context because a container's *frame* has to be as tall as its contents: `panel` draws a border column of `measureChild(child, w - 2)` rows beside children rendered at that width, and the title lives in the top border (S13), which is why the border is drawn rather than delegated to a box-drawing option. That makes I1 visible instead of silent in the one place a violation would otherwise hide — a `panel` whose measurer and renderer disagree draws a border that does not close. **`footer` sits in the bottom border for the same reason `title` sits in the top**, and changes nothing about measurement: the row is drawn either way, so this is a use for a row that already exists rather than a new one. S12 §2 and S13 §2 both draw it, and neither can put those keys in the frame's footer — a pushed view leaves header and footer untouched (C15 T4.4).
 

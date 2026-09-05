@@ -715,6 +715,7 @@ type NavElement = Readonly<{
   arrow?: ArrowPolicy;
   escape?: EscapePolicy;
   activate?: Action;
+  copy?: string;                                   // §5c — the element's source, never its rendering
 }>;
 ```
 
@@ -765,6 +766,17 @@ subject is A03 §2's vacuity class, and C11 I17 is the measured instance of it.
 1. **Containment.** Every element's `rows` lies within `[0, measure(block, width))` and its
    `cols` within `[0, width)`. Catches an implementation whose positions are derived from
    something other than the block it was handed — F134's drift class in the navigation axis.
+   **And the same predicate holds of the lifted list.** `elementsIn(blocks, width)` places every
+   element within `[0, measureSequence(blocks, width))` × `[0, width)` of the *sequence*, the
+   block's top row **and left column** added (C09 §2): a table's rows inside a `panel` begin one
+   row and one column in, and the second of two tables in a `row` group begins after the first's
+   `childWidths` share plus the gutter. Per level, the lifted list is disjoint **across blocks**
+   as well as within one, or the pointer is not single-valued where two blocks share a row.
+   **Reading order stays a per-block predicate**: across blocks the lifted list is the
+   document's order, which `↓` walks (§4c), so two tables side by side are listed block by
+   block and not row by row. Both containment and disjointness were false while every
+   block-level list passed (F756, F757): the walk lifted rows and not columns, and lifted them
+   to the container's top rather than the child's.
 2. **Reading order.** The list is non-decreasing by `(rows.from, cols.from)`. Needed because
    the keyboard *walks* it: "next" has to mean "next on screen" or `↓` is arbitrary.
 3. **Disjointness per level.** Two elements at the same `level` share no cell. This is what
@@ -851,6 +863,67 @@ is written.
 
 **And MG24 cannot see this field**, which is measured rather than assumed: removing its only consumer leaves `make enforce` green, because `LineEditor.copy()` carries the same name. F160's blind spot on a published field of the block vocabulary, and the third instance of it. Recorded here so a later reader does not take the gate's silence as coverage.
 
+### Across an entry's boundary the selection does not reach — and `⌃a` selects the entry
+
+**The ruling.** A selection is a set of elements from **one** entry's list. `selectAllElements`
+(`⌃a` at `liveBlock`) places the anchor on the focused entry's first element and the head on its
+last; cross-entry copy is **not built**. Two rules meet here — *the sequence is the entry's* (§4g
+row a, I19) and *a selection is which elements* (above) — and the second stays inside the first.
+
+**The reasons, in the order they decide it.** A cross-entry selection needs an anchor naming a
+different entry from the head, and the stored location carries one `entryId` for both (§4g). Between
+two entries there can be entries with no elements, and `neighbourOf` skips them — so the copied set
+would depend on what lies between, which is the one property a copy must not have (I17's argument
+one scope up). And the reading a reader wants from *select across* is *the whole of the next entry*,
+which is two keys with one rule each: `tab`, then `⌃a`.
+
+**Reversible the day a consumer wants it, and the consumer is named**: a transcript **export** — the
+whole session's tables as text — is the only surface that has asked for more than one entry's data,
+and it belongs to copy mode (`⌥v`, C16 §5b), which copies the screen, or to a `/export` verb; neither
+is a selection. If one of them turns out to need element sources across entries, this section is where
+the anchor gains an entry of its own.
+
+**Measured 2026-09-05, before the code.** `⌃a` at `liveBlock` was bound to nothing: dispatching
+`{name: "a", ctrl: true}` with focus on a row left the store unchanged and the target `liveBlock`.
+At `prompt` it is `home` (`keymap.ts:198`) and stays so. Its wire form is `0x01`, the byte T2.13
+already walks for `prompt c+a`, and the same byte is why `⌃⇧a` cannot be a second binding.
+
+**The sentinel, measured against a one-element select-all.** I16 said *`anchor === element` is no
+selection* — C17's sentence, where anchor and head are numbers. The store's sentinel is **`anchor:
+null`**, and `extendRow` never compares addresses. `selectAllElements` on a one-element entry
+therefore stores an anchor equal to the head's address, and nothing distinguishes that from `null`:
+`y` copies one element either way, `↓` collapses either way, `⇧↓` has nowhere to go either way. So
+the effect has **no branch on the count** — a branch would be right for small `n` by construction and
+tested by nothing — and I16 is reworded to say what the sentinel is a statement *of*: extent.
+
+#### The classification table — structural, at rest
+
+| # | the two rules that meet | ruling |
+|---|---|---|
+| **a** | `⇧↓` at the last element of entry A: *extending is a gesture inside the block* (`⇧↑` stops) meets *the sequence is the entry's* (I19) | **Stops**, symmetric with `⇧↑` at the first. Measured: `extendRowDown` finds `next === undefined` and issues no store call. Extending into B's first would need an anchor in another entry; collapsing would make a shifted key a move |
+| **b** | `⇧tab` with a selection open: *a move is a move* (§4g trace 6) meets *an extension never moves the anchor* (I16) | **Collapses**, as today. *Extend to the whole of the next entry* is `tab` then `⌃a` — two keys, one rule each, rather than one key with two |
+| **c** | `⌃a` in the live entry / in a settled entry / from the prompt / in `interact`: *a selection is which elements* meets *interaction is live-only* (I2) and *the prompt's `⌃a` is the editor's* | Live and settled are **identical** — the list is the focused entry's and liveness is not an input to it, so `y` in a settled entry copies from it. From the prompt the binding does not resolve: `prompt c+a` is `home`. In `interact` the target is `interaction`, where a block's own `⌃a` wins (C16 §5a row A4) |
+| **d** | `⌃a` on a one-element entry: *`anchor === element` is no selection* meets *anchor → first, head → last* | **No branch on the count.** The store holds an anchor equal to the head; every reader treats it as `null` would be treated (the measurement above). I16 reworded |
+| **e** | a selection is open and the focused entry is **evicted**: *the anchor shares the entry* (§4g) meets *resolution falls to the live entry* (§4g trace 3) | Both halves resolve through the same fall-forward to the live entry's first element, so `y` copies **one** element — the one highlighted — and points at no ghost. The first `⇧↓` after the fall finds the entry changed and **drops** the anchor (`extendRow`'s entry-changed arm) rather than placing it on the fallen head, so a reader's first extension after an eviction selects nothing. **Owed**, with the symbols: `extendRowDown`/`extendRowUp` should repair the store before extending, and `extendRow`'s arm then has no caller — not landed here because the repair belongs in the key effects, and the row that would find it is written first |
+| **f** | a selection is open and the entry **gains a notice and settles** (§4g trace 2) | **Survives.** Focus stays on its element in the now-settled entry (trace 2), the anchor rides on the same location, and nothing in the copy path reads liveness — row c's measurement from the other side |
+| **g** | `↓` at the tail with a selection open: *an unshifted motion collapses* (I16) meets *at an end a movement key stops* (I19) | **FINDING.** `rowDown` returned before `focusRow`, so the selection stood and `y` after `↓` copied two rows — while C17's `move` nulls the anchor **before** it tests the boundary, so the two halves I16 says fail the same way did not. `⌃a` makes this the very next keystroke, because the head is at the tail. Ruling: **a motion that stops still collapses** — `rowDown` at the tail and `rowUp` at a settled entry's first element call `focusRow` on the resolved element. `↑` at the live entry's first already leaves, and leaving is a collapse |
+
+#### The sequence trace — event-mediated
+
+| # | what happens in between | ruling |
+|---|---|---|
+| **1** | select three elements in A, `tab`, `⇧↑` | `tab` collapses and lands in B (trace 6); `⇧↑` at B's first element stops and the anchor stays `null`; the first `⇧↓` places it on B's first. The anchor is never A's, and there is no keystroke from which it could be |
+| **2** | select, then the far side **patches** the entry so an element *between* anchor and head goes (I10's fall-forward) | **Shrinks to the survivors.** Anchor `a1`, head `c1`, `b1` replaced away: `y` copies `alpha-1⏎gamma-1`. Both ends resolve exactly, and the slice is over the new list |
+| **3** | select, then the **anchor's** element goes | **FINDING.** Anchor `b1`, head `c1`, `b1` replaced away: I10's fall took the stale anchor to the block's **first** element and `y` copied `alpha-1⏎gamma-1` — `alpha-1` was never selected. Ruling: **a stale anchor collapses the extent to the head.** The list is the new one and the anchor's old position went with it (`resolveFocus`'s own argument), so shrinking to survivors has no index to count from, and widening is the one answer that is wrong about what the reader chose. The **head** is different: a stale head is where focus *is* — it falls as I10 says and is highlighted there — so anchor `a1`, head `c1`, `c1` gone copies `alpha-1`, one element, the one on screen |
+| **4** | select, `y`, then `⇧↓` | **Copy is not a move.** `copyElement` writes the kill buffer and touches focus nowhere, so the selection survives and the extension continues it; a second `y` copies three |
+| **5** | `⌃a`, then `⇧↑` | Shrinks from the tail — anchor on the first, head on the last but one. The anchor placed by select-all is the same anchor `⇧↓` would have placed |
+| **6** | `⌃a` twice; `⌃a` from *in the block on no element yet* (`element: null`) | Idempotent; and from `null` it lands both halves on real addresses, which is one more way the store is repaired by a keystroke (I10) |
+
+**What the rows leave behind.** Row g's ruling and trace 3's are edits to `rowDown`, `rowUp` and
+`copyElement` — effects that predate this section — and both are landed with it because `⌃a` is what
+makes each reachable on the first keystroke: it puts the head at the tail, and it selects a streaming
+table's whole list on the frame before a row of it is replaced.
+
 ---
 
 ## 6. Pointer
@@ -884,6 +957,12 @@ which is §5's declaration and nothing else — as this section said it would be
 **One translation, used by both rungs** — C16 I20 already records what it costs to
 have two: a layer's box and C14's entry map are both region-relative, and comparing a
 terminal row to one of them directly resolved clicks to the row above.
+
+**A drag extends within the focused entry and nowhere else** (§5c's entry rule, `construct.ts`'s
+`onMouse`). A motion event over another entry issues no `extendRow` — the selection the keyboard
+cannot make across an entry is one the pointer cannot make either, and I8's *one declaration* is
+what makes that structural rather than two rules agreeing. A click, shifted or not, is a move and
+collapses (I16); a shifted click extending is recorded as the obvious next row, not built.
 
 ---
 
@@ -974,7 +1053,7 @@ notice here.
   no subject and the second is `liveBlock`'s existing exit. The day a block declares keys,
   both levels are first tested for real.
 - **I15** — Policies resolve global → kind → per-node override, and **an override naming a
-- **I16** — **The transcript's selection is an anchor plus the focused element**, and the focused element is the head. `anchor === element` is no selection; an extending motion moves the head and never the anchor; an unshifted motion collapses. C17 I21 at the level above, and the same two halves fail the same two ways.
+- **I16** — **The transcript's selection is an anchor plus the focused element**, and the focused element is the head. `anchor: null` is no selection and is the store's sentinel; an anchor resolving to the head is a one-element extent, and every reader treats the two alike (§5c). An extending motion moves the head and never the anchor; an unshifted motion collapses **whether or not it moved** — `↓` at the tail and `↑` at a settled entry's first element collapse as C17's `move` does at a boundary. A stale anchor collapses the extent to the head rather than falling to the block's first element. **A selection never crosses an entry**, and `⌃a` selects the focused entry's whole list. C17 I21 at the level above, and the same two halves fail the same two ways.
 - **I17** — **An element's `copy` is its source, never its rendering.** The declarer supplies it from the data, at no width, so a dropped column and a truncation are absent from it and the text is the same at every terminal size. A copy assembled from painted cells satisfies every assertion about the painted frame, which is why this is an invariant rather than a preference.
   level the kind reports no element at is a construction error**, the way a duplicate
   binding is (→ C16 I10). An override for an absent level is unreachable and reads as

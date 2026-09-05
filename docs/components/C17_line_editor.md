@@ -87,7 +87,7 @@ A word motion **skips whitespace in the direction of travel, then consumes one m
 
 Enter submits; a newline is inserted by a separate binding (`j22` #11).
 
-**Shift-Enter is not reliably detectable.** Most terminals send a bare `\r` for both Enter and Shift-Enter unless they implement `modifyOtherKeys` or the Kitty keyboard protocol, and neither is common enough to depend on. Committing to Shift-Enter alone would leave multi-line input silently unavailable on a majority of terminals.
+**Shift-Enter is reliably detectable only where the terminal says which key it is.** Where C02 reports `keyboardProtocol: "kitty"` — C01 pushes `CSI > 3 u` on entry — or the terminal sends xterm's `modifyOtherKeys` form (C16's decoder reads both), Shift-Enter arrives distinguishably; everywhere else it is a bare `\r`, identical to Enter. Committing to Shift-Enter alone would leave multi-line input silently unavailable on the terminals that send the bare byte, so Alt-Enter and Ctrl-J remain the guarantee.
 
 So three bindings, all always available:
 
