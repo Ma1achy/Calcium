@@ -583,6 +583,20 @@ The suite governs the source. **SP1 governs the documents the source is written 
 
 They run in `make enforce` and their fire-tests are `test/unit/enforce-commitments.test.ts`.
 
+**SP9 meets the spec-first rule at every new invariant, and the two rulings commits before the
+rule was written down resolved the meeting by landing red.** A spec commit lands alone, before
+code (CLAUDE.md §The spec is the contract); SP9 wants each invariant named by a test row on the
+day it exists. The commits `f818fbaf` and `35589052` both added invariants with no row and both
+pass `make enforce` only at the tree the *following* code commit produced — re-running
+`checkInvariantCoverage` against their own trees reports six and four uncited (F814). CI never saw
+either, because a push carries both commits. **The ruling**: a spec-first commit carries each new
+invariant's test row as an `it.todo` titled with the row and the marker *not deferred on a
+component*, and the code commit of the same round replaces the todo with the test. The citation
+exists on the day the invariant does; the body is owed to a named commit rather than to a
+condition; and the todo-expiry guard already reads the marker. Adding the invariants to
+`UNCITED_INVARIANTS` is not the route — that list may only shrink, and a debt list that grows for
+convenience stops being a debt list.
+
 **SP7 is SP2's argument applied to the numbers tests actually cite, and it was missing for the
 whole build.** SP2 makes invariant ids unique because *"C13 I17 is the cap"* locates something
 only if the numbers do. A test row is cited by more readers than an invariant is — every test name in

@@ -29265,3 +29265,47 @@ mechanism is owed.
 
 ---
 
+## F814 — two rulings commits landed red on SP9 at their own trees, and the gate's conflict with spec-first was never written down ★★★★☆
+
+**Found while gating this round's rulings.** `make enforce` on the C22/C23 spec edits reported
+SP9 — *5 invariant(s) named by no test row and not on the list — C22 I81, I82, I83, C23 I55, I56*
+— which is what SP9 should say about a spec-first commit: the invariants exist and their rows are
+owed to the code commit. The question was how the previous spec-first commits had passed.
+
+**They had not.** Running `checkInvariantCoverage` against the trees at `f818fbaf` (the footer
+budget, the pointer half, hidden series) and `35589052` (the running card, three focus kinds)
+with `git show` as the reader:
+
+| tree | SP9 verdict | uncited and not listed |
+|---|---|---|
+| `f818fbaf^` | red | C23 I10 |
+| `f818fbaf` | red | C04 I99 · C12 I116 · C22 I78 · C22 I79 · C22 I80 · C23 I10 |
+| `35589052` | red | C01 I21 · C12 I117 · C23 I10 · C23 I54 |
+| `HEAD` before this round | green | — |
+
+Both commits are spec-only. The pre-commit hook is `exec make enforce` and `core.hooksPath` is set,
+so either the hook was bypassed or its host `make` did not run the check — the record does not say
+which, and the two readings have the same consequence. **CI never saw either tree**: a push carried
+the spec commit and its code commit together, and at the code commit's tree the rows exist. So a
+gate that is green on every pushed tree was red on two committed ones, which is F806's shape
+(*a gate that exists and is not run*) in a fifth form: **the gate ran on trees the rule was never
+about, and the trees the rule was about were never gated.**
+
+**The conflict is structural, not a lapse.** SP9 says an invariant is named by a test row on the
+day it exists. The spec-first rule says the spec lands alone. Any new invariant satisfies at most
+one of them at the spec commit, and nothing in A03 §7a or CLAUDE.md said which gives. The `C23 I10`
+row is the tell — red at `f818fbaf^`, before either rulings commit, and cleared later by a test
+that cited it — so the gate had been red on the branch at least once before and nobody read it,
+because the only readers were the hook and CI, and neither ran at a spec-only tree.
+
+**Ruled** (A03 §7a): a spec-first commit carries each new invariant's row as an `it.todo` titled
+with the row and marked *not deferred on a component*; the same round's code commit replaces the
+todo with the test. Not the exemption list — it may only shrink, and a debt list that grows for
+convenience stops being one. This round's five rows land that way in `frame-budget.test.ts` and
+`running-card.test.ts`.
+
+**Where**: `tools/enforce/commitments.mjs` `checkInvariantCoverage`; `.githooks/pre-commit`;
+`docs/architecture/A03_enforcement_suite.md` §7a.
+
+---
+

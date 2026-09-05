@@ -217,3 +217,31 @@ describe("C22 §6k — the footer's row budget", () => {
     expect(paint(f, deps())).toHaveLength(30);
   });
 });
+
+describe("C22 §6l — the frame's default look", () => {
+  // Rows written at the spec commit and filled by the code commit of the same
+  // round. SP9 wants every invariant named by a test row on the day the
+  // invariant exists; the spec-first rule wants the spec to land alone. Both
+  // are right, and the two rulings commits before this one (f818fbaf,
+  // 35589052) resolved the conflict by landing red on SP9 at their own trees
+  // — F814. An `it.todo` naming the row is the reconciliation: the citation
+  // exists, the body is owed, and the expiry guard reads the marker.
+  it.todo(
+    "T1.38 (C22 I81): `compose` at 24 rows with a one-row prompt and a one-row footer gives a region of 19, and `paint` puts the `horizontal` glyph across the full width on rows `rows − footer − prompt − 2` and `rows − footer − 1`, in the muted tone at 24-bit and with no SGR at 1-bit; under `unicode: 'ascii'` both rows are `-` repeated — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
+  );
+  it.todo(
+    "T1.39 (C22 I81, §6l.2 row 3): a footer returning `[]` composes to zero footer rows and the lower rule is the frame's last row — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
+  );
+  it.todo(
+    "T1.40 (C22 I82): footers of 0, 1, 3 and 9 rows compose to 0, 1, 3 and `MAX_FOOTER_ROWS` footer rows respectively, each frame's `heightsSum` true, and the 9-row footer paints its first `MAX_FOOTER_ROWS` rows — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
+  );
+  it.todo(
+    "T1.41 (C22 I83): `entryLayout` on `[step, notice]` at width 40 returns the header's rows unchanged and the notice's rows as rendered at 38 with `⎿ ` before the first and two blanks before each other; on `[step]` alone, the header only; on `[notice, notice]`, the sequence as `renderSequenceToLines` gives it — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
+  );
+  it.todo(
+    "T1.42 (C22 I83, §6l.2 row 12): for a body whose prose wraps once more at `width − 2` than at `width`, `measureSequence` through the injected wrapper and `entryLayout`'s row count agree, and both exceed the flush-left count by one — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
+  );
+  it.todo(
+    "T1.43 (C22 §6l.4 E): the default footer is one `pills` row naming `/help` and the snapshot's `cwd` with `$HOME` folded to `~`, gaining `stopping` when the snapshot says so and carrying no key name — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
+  );
+});

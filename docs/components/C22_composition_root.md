@@ -622,7 +622,7 @@ Nothing else lives here. The candidates I expected — verb concurrency, exit ar
 
 ## 6. Chrome
 
-The header and footer are **app-supplied functions from a chrome context to blocks** (hook 5, F5). Calcium owns the frame's structure — a header of one row and a footer of `footerRows` (default one, at most `MAX_FOOTER_ROWS`), both fixed in position and never scrolling — and the app decides what goes in them. **The footer's height is declared once per session in config and never returned by a `ChromeFn`** (I79, §6k): a chrome function answers *what is in the rows*, and the session answers *how many there are*.
+The header and footer are **app-supplied functions from a chrome context to blocks** (hook 5, F5). Calcium owns the frame's structure — a header of one row, **two rules bounding the prompt**, and a footer **as tall as the blocks it returns** (zero to `MAX_FOOTER_ROWS`), all fixed in position and never scrolling — and the app decides what goes in the header and the footer. **The rules and the footer's height are not configuration** (§6l, ruled 2026-09-05): the frame's look is Calcium's, the same for every app, and an app changes what the rows say rather than whether they exist. **The footer's height is declared once per session in config and never returned by a `ChromeFn`** (I79, §6k): a chrome function answers *what is in the rows*, and the session answers *how many there are*.
 
 ```typescript
 type ChromeFn = (ctx: ChromeContext) => readonly Block[];
@@ -633,8 +633,8 @@ type ChromeContext = Readonly<{
   columns: number;      // handed down from C01, never read
 }>;
 
-// Resolved: `footerRows` is always present after `resolveConfig` (§6k, I79).
-type Chrome = Readonly<{ header: ChromeFn; footer: ChromeFn; footerRows: number }>;
+// The footer's height is what its blocks measure, per frame (§6l, I82) — no budget field.
+type Chrome = Readonly<{ header: ChromeFn; footer: ChromeFn }>;
 ```
 
 **It took a snapshot alone, and could not render what it is specified to render.** Two more of the same class as §3a's and §8a's, both structural, and both found by writing the default:
@@ -1713,6 +1713,13 @@ protocol hold at rest (the table); a wake, a scroll, an eviction and a stop are 
 
 ## 6k. The footer's row budget, walked by hand — roadmap entry 29
 
+> **Superseded by §6l on 2026-09-05.** The walk below is kept as the measurement it was: its
+> table is still right about every cell, and its trace is right about what a per-frame height
+> does. What changed is the ruling's premise — *no reader asked for the transcript to move* was
+> true until the reader did, and §6l records the reversal beside the trace it reverses rather
+> than deleting the reasoning that would otherwise be re-derived. `TuiConfig.chrome.footerRows`
+> is gone; I79 is retired; I80's sum has two more terms.
+
 Two rules meet. *The four regions sum to `rows`* — S01 §3, `heightsSum`, and the reason C01 §5 gives: a frame one row over scrolls the alternate screen, the failure the application cannot see. And *a harness needs more than one footer row* — `AGENT_TUI_DESIGN.md` §16 draws three, and roadmap entries 35, 37 and 15 each want a row the footer has not got. At HEAD `FOOTER_ROWS = 1` was a constant in `frame.ts`, so the three-line footer was **refused by construction rather than unbuilt** (F739). Both artefacts, because the component has structure (which rule owns a row) and a history (what happens when the count changes).
 
 ### 6k.1 — measured before ruling
@@ -1768,6 +1775,115 @@ The option on the table was the one the brief for this walk offered — a `Chrom
 - **§16's three lines are agent-tui's to draw** with `footerRows: 3`; the default chrome's footer stays empty for the reason `chrome.ts` gives.
 
 ---
+
+
+## 6l. The frame's default look, walked by hand — the rules, the footer that follows its content, and the body under the hook
+
+`AGENT_TUI_DESIGN.md` §9a draws the frame and says which of its lines are chrome: *the boxes are
+annotation, not chrome — only the two rules around the prompt are drawn.* §9c draws a settled
+tool call as `⏺ name · elapsed · outcome` over a body indented under `⎿`. Neither was ruled the
+default: the shell painted no rule, the footer's height was a per-session budget (§6k), and a
+settled entry read `❯ /ps` over a table (C23 §*The pending entry is the running card*). **Ruled
+2026-09-05, on the reader's instruction that this is how Calcium looks rather than an option**:
+the rules, the content-following footer and the indented body are the frame, for every app, with
+nothing to switch on.
+
+### 6l.1 — measured before ruling
+
+- **Every demo frame was flush-left and unruled.** `examples/docker/demo.gif` regenerated at
+  b8cfa17a: header row, transcript, `❯` prompt, one blank footer row; no line separates the
+  prompt from the transcript above or the footer below, and a finished `/ps` is the command row
+  over a table. The design's frame was drawn 2026-08 and no ruling had carried it into C22.
+- **The footer's default content is nothing.** `makeDefaultChrome`'s footer returns `[]`, and
+  §6k.1 recorded that the default session spends a transcript row on a blank. With a
+  content-following height that row is 0 — which is the *zero is not offered* cell of §6k.4 E,
+  reached from the other side.
+- **`MIN_ROWS = 16` and the prompt caps at ⌊rows/2⌋ = 8.** Two rule rows leave `16 − 1 − 2 − 8 = 5`
+  for region plus footer; one region row leaves **4** as the largest footer the gate can hold,
+  where §6k derived 6 without the rules.
+- **`heightsSum` is asserted in two places** — `frame.ts` and `paint.ts`'s `FrameError` — and
+  `initialRegionHeight` is the pre-frame guess `compose` corrects (I34). Every one of them spells
+  the subtraction, so the rules are two terms added in one place and checked in three.
+- **The hook glyph exists and has one consumer.** `continuation` is `⎿` / `` ` `` in the glyph
+  table, drawn by `noticeDoc` for a result line; nothing indents a *block* under it, which is
+  what §9c's *no mechanism in front of a table* recorded.
+- **`visibleRows` and C14's `measureSequence` both take `(blocks, width)`.** An indent that
+  narrows body blocks by two must reach both through one function or the viewport's heights
+  and the frame's rows disagree by the wrapped rows two cells cost — C09 I1's divergence, one
+  layer up, and the reason §6l.4 D is one function rather than two edits.
+
+### 6l.2 — the classification table: which rule owns a row
+
+| # | the cell | rule A | rule B | ruling |
+|---|---|---|---|---|
+| 1 | the row above the prompt | the region ends here | the prompt begins here | **a rule row**, the region's last row is above it and the prompt's first below; muted tone, `─` at `full`/`bmp`, `-` at `ascii`, full width (I81) |
+| 2 | the row below the prompt, footer present | the prompt ends here | the footer begins here | **a rule row** — the same glyph, the same tone; the footer's first row is below it |
+| 3 | the row below the prompt, footer of zero rows | the prompt ends here | the frame ends here | **still a rule row.** The lower rule is the prompt's edge, not the footer's head; a frame whose bottom line moves with whether the app returned a block is a frame that flickers on content |
+| 4 | footer blocks measuring `f` rows | the footer is its content | `heightsSum` | footer = `min(f, MAX_FOOTER_ROWS)`, region = `R − 1 − 2 − p − footer` (I82); `f` is measured by `measureSequence` on the footer's blocks at the frame's width, so the height and the rows are one measurement |
+| 5 | footer content taller than `MAX_FOOTER_ROWS` | the footer is its content | the size gate | clamped to the maximum and truncated top-down by `region()` — §6k.2 row 3's cell, now reached only past the cap; the app returned more than the frame can hold and the frame says so by drawing the top of it |
+| 6 | footer returns `[]` | the footer is its content | one blank row was the default | **zero rows.** The default footer is no longer `[]`: it returns one muted row naming `/help` and the session's `cwd` (§6l.4 E), so a default session still has a footer and an app that wants none returns nothing |
+| 7 | `MIN_ROWS` with the prompt at its cap and the footer at its maximum | the size gate | the two rules | `16 − 1 − 2 − 8 − 4 = 1` region row — **`MAX_FOOTER_ROWS = MIN_ROWS − HEADER_ROWS − RULE_ROWS − ⌊MIN_ROWS/2⌋ − 1 = 4`**, derived as §6k.4 B derived 6, and T1.35 asserts the derivation |
+| 8 | the first frame, before any `ChromeFn` has run | `initialRegionHeight` | the footer is its content | the guess uses `DEFAULT_FOOTER_ROWS = 1` and the rules; `compose` corrects by the difference on the first frame (I34), which is §6k.2 row 5 with the guess named |
+| 9 | a click on a rule row | C16 §4a trace 8 | the rule is chrome | chrome — `chromeClick` reads *no entry here*, and a rule row has no entry |
+| 10 | a layer's box against a rule | I28 | the rule is chrome | `overlayRegion.height` is the region's; a layer cannot cover a rule |
+| 11 | an entry whose first block is a `step` notice, body block `k ≥ 1` | the document's blocks render in order at `width` | §9c's body is indented under the hook | **rendered at `width − 2` and prefixed**: `⎿ ` on the body's first row, two blanks on every row after, the hook in the muted tone (I83). The header is block 0 and renders at full width as it does today |
+| 12 | the same entry, measured by C14 | `measureSequence(blocks, width)` | row 11 | `measure(header, width) + measureSequence(body, width − 2)` — through the **same** function the render uses (`entryLayout`, I83), so a body that wraps one more row at the narrower width wraps it in both |
+| 13 | an entry whose first block is not a `step` notice | row 11 | — | unchanged: the greeting, a notice, an error with no card. The indent is the card's, and a document without a card has no body to hang |
+| 14 | a `step` header with **no** body | row 11 | the hook marks a body | no hook row is drawn — a hook over nothing is the empty-block class as chrome |
+| 15 | the card's body contains a `scroll` (the stream route) | row 11 | the scroll's residue row *⋯ N above, M below* | the scroll renders at `width − 2` like any body block and its residue row sits under the two-cell indent; §9c's *"+392 more" is the residue row* is unchanged in mechanism and moved two cells right |
+
+Rows 3, 7 and 12 are the cells a reader checking one rule at a time cannot see: a frame edge that
+follows content, a gate whose number is right and a maximum whose number is right and together
+leave no region, and a measurer and a renderer that both take `(blocks, width)` and would each be
+correct while disagreeing.
+
+### 6l.3 — the sequence trace: what the next frame draws
+
+| # | frame `n` | frame `n + 1` | what moves | ruling |
+|---|---|---|---|---|
+| 1 | footer answers one block of one row | the app's footer answers three rows | the region loses two rows; I34 pushes the height; C14 keeps the bottom anchored | **legal, and now chosen.** §6k.3 row 1 refused this as *the transcript moved because the footer chose to*. The reader's ruling is that the footer's height is the app's content and the transcript is anchored at its tail exactly as it is when the prompt grows — one mechanism, two pushers, and the second costs nothing the first did not |
+| 2 | footer answers three rows | footer answers `[]` | three rows return to the region; the lower rule stays where the prompt ends | the frame's bottom edge is the rule (6l.2 row 3), so the only thing that moves is the region's height, which is the prompt's own case |
+| 3 | no frame yet | the first frame | the guess (6l.2 row 8) meets the measured footer | corrected by `f − 1` rows on the first frame, as §6k.2 row 5 already tolerated for a declared budget |
+| 4 | a card's body streams a row | the body wraps at `width − 2` where it fits at `width` | one more row than a flush-left body | the viewport measured the same row (6l.2 row 12); the frame and the heights agree, which is what makes this a trace row rather than a defect |
+| 5 | the prompt grows past one row | its cap | two rules stay one row each | the rules are not the prompt's; the prompt's window (§6e) is bounded by them and windows inside them |
+| 6 | a resize to `R < 1 + 2 + p + footer + 1` | the clamp in `compose` | region clamps at 0, `heightsSum` is false, the fallback draws | the path §6k.2 row 6 named, reached two rows earlier |
+
+### 6l.4 — the rulings
+
+- **A. Two rules, always** (I81). `RULE_ROWS = 2`: one row above the prompt, one below, at every
+  size the gate accepts, whatever the footer holds. The glyph is the `horizontal` entry of the
+  glyph table at the terminal's unicode tier, painted in the muted tone at every depth and plain at
+  1-bit — a rule is geometry, and a rule that needed colour to read would be F34's class.
+- **B. The footer is its content** (I82). `compose` measures the footer's blocks through
+  `measureSequence` at the frame's width and takes `min(f, MAX_FOOTER_ROWS)`; `[]` is zero rows.
+  `TuiConfig.chrome.footerRows` is **removed**, and `Chrome` loses `footerRows`. §6k.4 A–E are
+  retired with it and I79 is retired; the `T1.35` row moves to the derivation of the new maximum.
+- **C. The maximum, derived again** (I80). `MAX_FOOTER_ROWS = MIN_ROWS − HEADER_ROWS − RULE_ROWS −
+  ⌊MIN_ROWS/2⌋ − 1`, **4** today; `heightsSum` asserts `HEADER_ROWS + region.height + RULE_ROWS +
+  promptRows + footerRows === rows`, and the footer occupies the last `footerRows` rows above the
+  bottom edge with the lower rule directly above it.
+- **D. The body under the hook, through one function** (I83). `entryLayout(blocks, width)` in the
+  shell answers, for a document whose first block is a `step` notice, the header at `width` and the
+  remaining blocks at `width − 2` with a two-cell gutter — `⎿ ` on the body's first row, blanks on
+  the rest, hook in the muted tone — and both C14's measurer (`measureSequence`, through the
+  wrapper `construct.ts` injects) and `visibleRows`' `windowSequence` call it. A document whose
+  first block is anything else is laid out as today. **No C09 change**: the hook is a prefix the
+  shell draws in the gutter it reserved, which is the mechanism §9c said C09 does not have, put
+  where the entry is composed rather than in the block library.
+- **E. The default footer has one row.** `makeDefaultChrome`'s footer returns one `pills` block,
+  muted: `/help`, the session's `cwd` with the home directory as `~`, and `stopping` while the
+  snapshot says so — every one a field `SessionSnapshot` already carries, so the footer adds no
+  writer. Verbs and facts, never key names — a key named in chrome is C16 I19's second keymap.
+  An app that wants no footer returns `[]` and gets none.
+- **F. The rows above are not configuration.** No `TuiConfig` field turns a rule off or fixes
+  the footer's height. The one thing an app decides is what its footer returns.
+
+### 6l.5 — what this moves, counted before it is regenerated
+
+Every golden frame with a prompt moves by two rows, and every settled tool-call frame gains a
+header and an indent; the terminal baseline is plot frames rendered outside a session and does
+not move. The count is taken when the code lands and recorded in the commit, per
+*expected movers named as a number before regenerating*.
 
 ## 7. Health and identity
 
@@ -2007,8 +2123,11 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I76** — **The crosshair is view state in `CursorPositions`, its writer is the `←`/`→` pair at `liveBlock`, and it is the render key's seventh axis — landed together, on I71's own rule.** `RenderContext.cursorPositions` was I71's counter-example: read in one place (C12's `positionalForm`), written by nothing in `src/`, in no key — correct and unobservable, for as long as the plot-interaction suite supplied the field itself. The store is `Cameras`' shape keyed `(entryId, blockId)`, dropped on `rendered`'s subscription with the other two, threaded into the context by `visibleRows`. **The value is an index into the data, not a column** (C12 I37), so a resize keeps the cursor on its sample; **absent is not zero** — no entry is no crosshair and `0` is the first sample — so unlike `ScrollOffsets` the key omits nothing. **The ceiling is the sample count and the effect holds it**, not the store: `cursorBlock` clamps to `[0, n)` and the store records, which is `dollyBlock`'s seam (I75); a first `→` lands on the first sample and a first `←` on the last. **The writer gates on C12's `cursorable`** (C12 I85) — the predicate `elements()` declares the focus stop on — so a form that draws no crosshair stores no cursor; the residue this sentence used to name (*a cursor set on a form that draws none is stored and unread*) closed when the writer asked the renderer the question the renderer answers, rather than keeping a second list of forms here, which is the two-copies hazard (→ C12 §3s, I37; C16 I28).
 - **I77** — **An animated image's frame is view state in `Frames`, advanced on the orbit's wake by elapsed time, keyed as the render key's eighth axis with zero omitted, and gathered only on the arms that rasterise.** A GIF declares its cadence where the orbit has none, so the ticker is armed for the earliest frame change on screen (`Frames.due`) and floored at the orbit's rate — a 100/200 ms GIF wakes six times in 990 ms, a still arms nothing — and one stamp (`#motionAt`) serves both motions because both are `f(Δt)` from one wake and a second stamp is a second place for the reset on stop to miss (I74). **The index is walked by whole delays with the remainder kept**, so a spinner's wake beside it moves nothing and a minute idle lands where the clock says; **zero is omitted from the key** on `ScrollOffsets`' rule and not `Cameras`', because frame 0 after a loop draws what frame 0 drew and the absent state is exactly zero. **Not gathered at `kitty`**: the terminal holds every frame from one transmission and runs the loop (C09 I39), so there an animation costs the session what a still does. The store joins `rendered`'s eviction subscription as the fourth entry, which is the count the argument was written to survive (→ C04 I93, C09 I39, I71, I74).
 - **I78** — **A series' visibility is view state in `SeriesVisibility`, overriding `Series.hidden` per entry and block; its writer is the plot's own `BlockKeymap` of digits, merged at `liveBlock` when focus lands on the plot and withdrawn when it leaves; and it is the render key's ninth axis with every override in it — landed together, on I71's rule.** The store is `CursorPositions`' shape keyed `(entryId, blockId)`, holding an explicit boolean per series index rather than a set of hidden indices, because the override has to be able to say *shown* over a producer's *hidden* (C04 I99); `forEntry` carries the entry's record into the context and `key` carries every override sorted, because absent is the block's own default and `false` is not absent. `toggleSeriesBlock` reads the effective state — override, else the member, else shown — and writes its negation; it clamps nothing beyond *the index exists*, which is `dollyBlock`'s seam (I75). The keymap is the plot's (`plotDefinition.keymap(block)`, C12 I116): `syncBlockKeymap` compares the focused block to the last merged one before every key is resolved and merges or withdraws through `Keymap.mergeBlock` (C16 I27) — a pull, because focus has none of its own to subscribe to. **This is `mergeBlock`'s first production caller and `BlockKeymap`'s first producer** (C26 T2.6a, inverted). An override for an index the block no longer has is kept and inert (C23 I47), and named as the residue. The store joins `rendered`'s eviction subscription as the fifth entry (→ C04 I99, C12 I116, C16 I27, I71, I76).
-- **I79** — **The footer's row budget is declared once per session and never returned by a `ChromeFn`.** `TuiConfig.chrome.footerRows` is an integer in `[1, MAX_FOOTER_ROWS]`, defaulted to 1 and refused at `createTui` otherwise, naming the field; `MAX_FOOTER_ROWS` is **derived** from `MIN_ROWS` as the largest budget that leaves one region row at the size gate with the prompt at its cap (§6k.2 row 2), so it moves when the gate moves and cannot be set past it by hand. A chrome function answers what is in the rows and the session answers how many there are — geometry is a property of the session, not of a frame, and a per-frame height would make the footer the second thing beside the prompt that pushes the transcript (§6k.3) (→ §6k, I34, A02 §6).
-- **I80** — **`heightsSum` asserts the sum with the budget the frame was composed with, and the footer occupies exactly that many rows above the bottom edge.** `HEADER_ROWS + region.height + promptRows + footerRows === rows`; the footer's blocks are truncated to the budget when taller and padded when shorter, so chrome never scrolls and never grows with its content. The sum holds for every prompt height at `rows ≥ 2·footerRows + 1` and for a one-row prompt at `rows ≥ footerRows + 2`; below that the region clamps, the sum is false and the fallback draws — the path that existed at three rows, reached `footerRows − 1` rows earlier (→ §6k.2 rows 1, 3, 6; S01 §3; C01 §5).
+- **I79** — *Retired 2026-09-05 (§6l).* It read: the footer's row budget is declared once per session and never returned by a `ChromeFn`. The footer's height is now what its blocks measure (I82); the reasoning that produced I79 is kept in §6k.
+- **I80** — **`heightsSum` asserts `HEADER_ROWS + region.height + RULE_ROWS + promptRows + footerRows === rows` with the footer height the frame was composed with, and the footer occupies exactly that many rows above the bottom edge, the lower rule directly above it.** `MAX_FOOTER_ROWS = MIN_ROWS − HEADER_ROWS − RULE_ROWS − ⌊MIN_ROWS/2⌋ − 1` — 4 today — is derived, not chosen, and T1.35 asserts the derivation (→ §6l.2 row 7, §6l.4 C).
+- **I81** — **Two rule rows bound the prompt on every frame the gate accepts** — one directly above the prompt's first row, one directly below its last — full width, the glyph table's `horizontal` at the terminal's unicode tier, muted tone, plain at 1-bit; drawn whether the footer has rows or none, and never configurable (→ §6l.2 rows 1–3, §6l.4 A, F).
+- **I82** — **The footer's height is the measured height of the blocks its `ChromeFn` returns, clamped to `[0, MAX_FOOTER_ROWS]`, measured per frame through the same `measureSequence` that renders it.** `[]` is zero rows; content past the cap is truncated top-down. No config field sets it (→ §6l.2 rows 4–6, 8; §6l.3 rows 1–3; §6l.4 B).
+- **I83** — **A document whose first block is a `step` notice lays out its remaining blocks two cells narrower under a hook, and the viewport's measurer and the frame's renderer reach that layout through one function.** `entryLayout(blocks, width)`: block 0 at `width`, blocks 1… at `width − 2` prefixed `⎿ ` on the body's first row and two blanks after, the hook muted; a `step` header with no body draws no hook; any other first block leaves the document as it was (→ §6l.2 rows 11–15, §6l.3 row 4, §6l.4 D).
 
 
 ## 11. Commitments
@@ -2084,7 +2203,10 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 49. **A series toggle is view state with a block-declared writer, and the ninth key axis carries every override** (I78). The plot declares its digits, L4 merges them with focus, the store records what the effect decided, and the frame misses the cache the moment a series is hidden or shown (→ C04 I99, C12 I116, C16 I27).
 48. **An animated image rides the orbit's wake, its frame is the eighth key axis, and the protocol arm hands the loop to the terminal** (I77). The cadence comes from the file and the timer is armed for it rather than for the floor; one stamp serves the orbit and the frames; a still arms nothing, and at `kitty` so does an animation (→ C09 I39, C04 I93).
 50. **The footer's row budget is config, bounded by a derived maximum, and the frame's sum is asserted against it** (I79, I80). `footerRows` defaults to 1 and is refused outside `[1, MAX_FOOTER_ROWS]`; the maximum is `MIN_ROWS − HEADER_ROWS − ⌊MIN_ROWS/2⌋ − 1` and a test asserts the derivation, not the figure (§6k.4 B).
-51. **A `ChromeFn` returns content and never a height** (I79). The per-frame alternative was walked and refused (§6k.3): it makes the pre-frame region a permanent guess and the footer a second pusher of the transcript.
+51. **A `ChromeFn` returns content, and the footer's height is that content's** (I82). The per-frame height §6k.3 walked and refused is the ruling now, with the reversal and its reason in §6l; `chrome.footerRows` is gone and nothing replaces it.
+52. **Two rules bound the prompt, on every frame, for every app** (I81). Not a config field; the frame's look is Calcium's.
+53. **`heightsSum` carries the two rule rows, and the footer's maximum is derived from them** (I80). Four today, and T1.35 asserts the derivation rather than the figure.
+54. **A card's body hangs under its hook, two cells in, and the measurer and the renderer share the layout** (I83). `entryLayout` is the one function; a document without a `step` header is untouched.
 
 41. **A frame that cannot hold what it was given complains rather than dies** (I70, F230). The per-entry trim was reconciling two components' answers in silence and taking the next block with it; it reports through the sink that already exists for a block giving way, and it does not refuse — the region check one level up can refuse only because nothing can reach it.
 
@@ -2376,15 +2498,26 @@ PTY harness.
 - **T6.44** (I59): deleting T4.19 → nothing fails, and that is the point of the row: it is the only executable statement that this stage leaves the first frame alone.
 - **T6.81** (I71): dropping the camera from the slot string → **T4.17e** fails and **T4.17f** passes. T4.17g fails too, which is why it is not the row this cites: the mutation that removes the key must be separable from the one that removes the writer, or the two are one assertion wearing two names.
 - **T1.31, T3.35** (I76): `CursorPositions` keeps zero in its key and answers an empty record for an entry nothing aimed; `delete` takes one entry and `clear` all.
-- **T1.35** (I79): `validateConfig` refuses `chrome.footerRows` of `0`, `7`, `1.5` and `NaN`, naming the field, and accepts every integer in `[1, MAX_FOOTER_ROWS]`; `MAX_FOOTER_ROWS` equals `MIN_ROWS − HEADER_ROWS − ⌊MIN_ROWS/2⌋ − 1`, asserted as the derivation over the exported constants rather than as `6`, so the row moves with the gate. Absent, the resolved budget is 1 and the default chrome carries it.
+- **T1.35** (I80): `MAX_FOOTER_ROWS === MIN_ROWS − HEADER_ROWS − RULE_ROWS − Math.floor(MIN_ROWS / 2) − 1`, asserted as the derivation and not the figure, and a frame at `MIN_ROWS` with the prompt at its cap and a footer at the maximum has a region of exactly one row.
 - **T1.36** (I80, §6k.4 D): the sweep — for every budget in `[1, MAX_FOOTER_ROWS]`, every `rows` from `2b + 1` to 60 and a wanted prompt of 1 and of 200, `heightsSum` holds, `region.height` is `rows − 1 − promptRows − b`, `footerRows` on the composed frame is `b` and `region.top` is 1. At `rows = 2b` with the prompt at its cap the region clamps to 0 and the sum is **false** — the boundary asserted from both sides. Control: at `b = 1` every figure is HEAD's.
-- **T1.37** (I34, §6k.2 row 5): `initialRegionHeight(size, 3)` equals the first composed frame's region with a one-row prompt and `footerRows: 3`; called with one argument it overstates that frame by two rows — the correction the first frame makes until `construct.ts` passes the budget.
+- **T1.37** (I34, §6l.2 row 8): `initialRegionHeight(size)` equals `rows − HEADER_ROWS − RULE_ROWS − 1 − DEFAULT_FOOTER_ROWS`, and the first composed frame with a footer of three rows corrects the region by exactly two.
+- **T1.38** (I81): `compose` at 24 rows with a one-row prompt and a one-row footer gives a region of 19, and `paint` puts the `horizontal` glyph across the full width on rows `rows − footer − prompt − 2` and `rows − footer − 1`, in the muted tone at 24-bit and with no SGR at 1-bit; under `unicode: "ascii"` both rows are `-` repeated.
+- **T1.39** (I81, §6l.2 row 3): a footer returning `[]` composes to zero footer rows and the lower rule is the frame's last row.
+- **T1.40** (I82): footers of 0, 1, 3 and 9 rows compose to 0, 1, 3 and `MAX_FOOTER_ROWS` footer rows respectively, each frame's `heightsSum` true, and the 9-row footer paints its first `MAX_FOOTER_ROWS` rows.
+- **T1.41** (I83): `entryLayout` on `[step, notice]` at width 40 returns the header's rows unchanged and the notice's rows as rendered at 38 with `⎿ ` before the first and two blanks before each other; on `[step]` alone, the header only; on `[notice, notice]`, the sequence as `renderSequenceToLines` gives it.
+- **T1.42** (I83, §6l.2 row 12): for a body whose prose wraps once more at `width − 2` than at `width`, `measureSequence` through the injected wrapper and `entryLayout`'s row count agree, and both exceed the flush-left count by one.
+- **T1.43** (§6l.4 E): the default footer is one `pills` row naming `/help` and the snapshot's `cwd` with `$HOME` folded to `~`, gaining `stopping` when the snapshot says so and carrying no key name.
 - **T2.40** (SS56): the source scan finds no hand-composed `kind: "notice"` under `src/` outside the sixteen files the rule excuses by name — two are the family (`documents.ts`, `builders/`), two the kind's declaration and definition, eight below L4 where the family is unreachable (A02), four L4 surfaces **owed** a migration and allowed so SS53 retires each entry when its last literal goes. The rule is imported from the enforcement tool, not restated (C01 T2.10's shape), and its fabricated violation is a notice literal in `src/shell/keys.ts`.
 - **T3.38** (I80, §6k.4 F): **frame read.** At 24 rows with `footerRows: 2` and a footer returning three one-row blocks, rows 22 and 23 carry the first two blocks and the third is on no row; the region is 20 and the prompt is on row 21. With one block, row 23 is blank. And the default — `footerRows` omitted — paints byte-for-byte the frame that `footerRows: 1` paints, which is the frame HEAD painted: the golden claim, asserted here rather than by regenerating anything.
 - **T3.39** (I28, §6k.2 row 8): with `footerRows: 3`, `overlayRegion.height` equals `region.height` and `paint` returns exactly `rows` lines.
 - **T6.95** (I80): `heightsSum` reading a constant `1` for the footer instead of `f.footerRows` → **T1.36** fails at every budget above one. Anchor in `tools/mutate/runs/c22-footer-budget.mjs`.
 - **T6.96** (I80): `paint` drawing the footer on one row regardless of the budget → **T3.38** fails: the line count is short by `b − 1`, and before that row 22 is not the footer's first block. Same run file.
-- **T6.97** (I79): `validateConfig` dropping the upper bound → **T1.35** fails on `7`; `compose` subtracting `1` for the footer instead of the budget → **T1.36** fails, and so does T1.37, which is the row that shows the two implementations of the subtraction had diverged. Same run file.
+- **T6.97** (I80): `compose` dropping `RULE_ROWS` from the subtraction → **T1.38** fails on the region height and `paint` throws `FrameError` on the sum; `MAX_FOOTER_ROWS` written as the figure `4` → **T1.35** still passes, which is the vacuity the row states — so T1.35 also asserts that changing `MIN_ROWS` to 18 in a fixture moves the maximum to 5.
+- **T6.98** (I81): `paint` emitting the lower rule only when `footerRows > 0` → **T1.39** fails; painting the rules in the accent tone → **T1.38** fails on the SGR at 24-bit.
+- **T6.99** (I82): `compose` taking the footer's height from a constant rather than from `measureSequence` → **T1.40** fails on the 3-row footer; not clamping → **T1.40** fails on the 9-row footer with `heightsSum` false.
+- **T6.100** (I83): `visibleRows` calling `windowSequence` on the whole document rather than through `entryLayout` → **T1.41** fails on the prefix; the measurer wrapper passing `width` for the body → **T1.42** fails on the count.
+- **T6.101** (I83, §6l.2 row 14): drawing the hook for a `step` header with no body → **T1.41**'s second case fails.
+- **T6.102** (§6l.4 E): the default footer returning `[]` → **T1.43** fails.
 - **IF8** (I77): `Frames` — four advances of 25 ms and one of 100 leave the index, remainder and `due` where one of 200 does; a full loop is frame 0 and keys as `""`; a minute idle lands where the clock says; a still and a zero advance hold nothing; two blocks key sorted; `delete` empties. C09 §9 Tier 1 carries the row, in `test/edge/image-frames.test.ts`.
 - **T4.17h–j** (I76): the **writer alone** — `→` from nowhere lands on the first sample, `←` from nowhere on the last, both clamp at the ends, a table is a no-op, and two plots in one document hold different indices (equal ones would pass a store keyed on the entry alone).
 - **T4.17p** (I76): the **pair, through a frame** — `→` puts `train: 10` on the readout row, a second `→` replaces it with `train: 20`, `←` brings `10` back. Read from the screen, because the key axis is what makes the second frame differ from the first.

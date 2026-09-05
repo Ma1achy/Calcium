@@ -307,4 +307,13 @@ describe("C23 I54 — the pending entry is the running card", () => {
     console.log(`LANEP-FRAMES\n${captured.join("\n")}\nLANEP-FRAMES-END`);
     expect(visible(frame()[1] ?? "").trimEnd()).toBe("⏺ tail(web.log) · 2m 1s · exit 0");
   });
+
+  // The card kept on settlement — C23 §8 rulings of 2026-09-05, rows owed by
+  // the code commit (F814 for why an `it.todo` carries them).
+  it.todo(
+    "T4.47 (C23 I55): `/ps` on the invoke route, a throwing adapter, and a local verb each settle to a document whose block 0 is the `step` notice carrying `⏺ verb(args) · Ns · ok|failed`, followed by the result's own blocks in order; the persisted document at the settle change carries the same block 0 — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
+  );
+  it.todo(
+    "T4.48 (C23 I56, C22 I83): the frame after `/ps` settles shows the table's first row beginning at column 2 under `⎿ ` and the header at column 0; the entry's measured height equals its painted rows — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
+  );
 });

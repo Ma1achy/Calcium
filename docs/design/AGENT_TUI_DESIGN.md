@@ -454,6 +454,8 @@ was run.
 
 **The boxes are annotation, not chrome.** Only the two rules around the prompt are drawn.
 
+> **Ruled the default, 2026-09-05** — C22 §6l, I81–I83. The two rules are on every frame of every Calcium app and nothing switches them off; the footer is as tall as the blocks it returns, zero to `MAX_FOOTER_ROWS`, one row by default; a card's body hangs two cells in under `⎿`. The frame above is therefore not the agent surface's — it is Calcium's, and `docker-tui` draws it too.
+
 ### What each region is for, and the split that decides it
 
 | region | scrolls | present | answers |
@@ -580,6 +582,12 @@ a real reasoning stream in front of it.
 ⏺ run_command(npm test) · 4s                   ← running, elapsed
   ⎿ 118 passed, 2 todo · exit 0                ← settled, the result block
 ```
+
+> **The settled state is every route's, 2026-09-05** — C23 I55/I56. The invoke route, its error
+> arm and the local route settle the header over the result, so `⏺ ps(--all) · 0.4s · ok` above an
+> indented table is what a finished listing reads. C23 had ruled the opposite for the shell's own
+> verbs (*the card was the waiting and the document is the answer*); the reversal and its reason
+> are recorded there.
 
 **The elapsed time is entry 35's mechanism** — the refresh driver's tick, and what
 distinguishes *slow* from *stuck*. **The step marker does not change**; the result appears
