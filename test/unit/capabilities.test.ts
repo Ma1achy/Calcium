@@ -207,6 +207,41 @@ describe("C02 detection", () => {
     expect(NAMES.some((n) => src.includes(n)), "the names are in the file at all").toBe(true);
   });
 
+  it("T1.13 (I11, I12): the keyboard protocol is the identification's second column, gated with it", () => {
+    for (const env of [
+      { TERM: "xterm-kitty" },
+      { TERM: "xterm-ghostty" },
+      { TERM: "xterm-256color", TERM_PROGRAM: "WezTerm" },
+      { TERM: "foot" },
+      { TERM: "foot-extra" },
+    ]) {
+      expect(caps(env).keyboardProtocol, JSON.stringify(env)).toBe("kitty");
+    }
+    // `none` where the table says so — iTerm2 unmeasured, Windows Terminal
+    // absent — and where nothing is identified at all.
+    expect(caps({ TERM: "xterm", TERM_PROGRAM: "iTerm.app" }).keyboardProtocol).toBe("none");
+    expect(caps({ TERM: "xterm", TERM_PROGRAM: "WindowsTerminal" }).keyboardProtocol).toBe("none");
+    expect(caps({ TERM: "xterm-256color" }).keyboardProtocol).toBe("none");
+
+    // **The tmux arm, beside `imageProtocol` in one assertion.** A gate applied
+    // to one column and not the other is the state T1.12b was written against;
+    // a row naming this column alone passes against a copy of the gate.
+    const inside = caps({ TERM: "xterm-kitty", TMUX: "/tmp/x" });
+    expect([inside.keyboardProtocol, inside.imageProtocol]).toEqual(["none", "none"]);
+    const outside = caps({ TERM: "xterm-kitty" });
+    expect([outside.keyboardProtocol, outside.imageProtocol]).toEqual(["kitty", "kitty"]);
+
+    // Declarable over the top (I4), and the domain is closed (T3.5's shape).
+    expect(caps({ TERM: "xterm" }, { keyboardProtocol: "kitty" }).keyboardProtocol).toBe("kitty");
+    const rejected = detectCapabilities(
+      { TERM: "xterm-kitty" },
+      { keyboardProtocol: "sixel" as unknown as "none" },
+    );
+    expect(rejected.capabilities.keyboardProtocol).toBe("kitty");
+    expect(rejected.warnings).toHaveLength(1);
+    expect(rejected.warnings[0]).toContain("keyboardProtocol");
+  });
+
   it("T1.8: alt screen needs TERM present and not dumb", () => {
     expect(caps({ TERM: "xterm" }).altScreen).toBe(true);
     expect(caps({ TERM: "dumb" }).altScreen).toBe(false);
@@ -248,6 +283,7 @@ describe("C02 detection", () => {
       bracketedPaste: true,
       mouse: true,
       imageProtocol: "kitty",
+      keyboardProtocol: "kitty",
       altScreen: true,
     };
     // TERM=dumb detects every field at its floor; the overrides must win anyway.
@@ -264,6 +300,7 @@ describe("C02 detection", () => {
       bracketedPaste: false,
       mouse: false,
       imageProtocol: "none",
+      keyboardProtocol: "none",
     } as const;
 
     expect(isUsable({ ...worst, altScreen: true })).toBe(true);
@@ -280,6 +317,7 @@ describe("C02 detection", () => {
         bracketedPaste: true,
         mouse: true,
         imageProtocol: "kitty",
+        keyboardProtocol: "kitty",
         altScreen: false,
       }),
     ).toBe(false);

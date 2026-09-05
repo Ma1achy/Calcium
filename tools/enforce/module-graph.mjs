@@ -393,6 +393,7 @@ const MODE_OWNERS = {
   CURSOR:         "src/terminal/lifecycle.ts",
   BRACKET_PASTE:  "src/terminal/lifecycle.ts",
   MOUSE:          "src/terminal/lifecycle.ts",
+  KITTY_KEYBOARD: "src/terminal/lifecycle.ts",
   SCROLL_REGION:  "src/terminal/frame-scheduler.ts",
   SYNC_UPDATE:    "src/terminal/frame-scheduler.ts",
 };

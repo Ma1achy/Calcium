@@ -119,21 +119,76 @@ function modifiersOf(param: string | undefined): Pick<Key, "ctrl" | "meta" | "sh
   };
 }
 
+/**
+ * kitty's modifier field, for the `u` arm alone (C02 §3, C16 §2).
+ *
+ * Plus one, like xterm's, and the low three bits agree — shift 1, alt 2, ctrl 4.
+ * **Bit 8 is folded into nothing**: it is xterm's Meta and kitty's Super, and
+ * `⌘a` arriving as `Alt-a` is the live-binding class `modifiersOf`'s comment
+ * records, one encoding over. kitty's own meta is bit 32 and joins alt in
+ * `meta`, the pair the `CSI 1;m X` arm already folds. Stated blind spot: an
+ * xterm at `formatOtherKeys=1` loses a Meta modifier here; its default format is
+ * `CSI 27;m;k ~`, which `modifiersOf` keeps.
+ */
+function kittyModifiersOf(param: string | undefined): Pick<Key, "ctrl" | "meta" | "shift"> {
+  const bits = param === undefined || param === "" ? 0 : Math.max(0, Number(param) - 1);
+  // Written as `=== bit` rather than `!== 0` so these three lines do not
+  // duplicate `modifiersOf`'s: `tools/mutate/runs/c16-modifiers.mjs` anchors on
+  // that function's text, and an anchor matching twice is a run that edits the
+  // wrong function (MA4).
+  return {
+    shift: (bits & 1) === 1,
+    meta: (bits & 2) === 2 || (bits & 32) === 32,
+    ctrl: (bits & 4) === 4,
+  };
+}
+
+/** `:1` press, `:2` repeat, `:3` release; anything else is no event field at all. */
+const KITTY_EVENT: Readonly<Record<string, "press" | "repeat" | "release">> = Object.freeze({
+  "1": "press",
+  "2": "repeat",
+  "3": "release",
+});
+
+/**
+ * The modifier keys' functional codes, so a terminal that reports a lone `⇧`
+ * yields a named key rather than a private-use glyph inserted into the prompt.
+ * The flags C01 pushes do not ask for these (C02 §3's table, bit 8); a terminal
+ * configured to send them regardless still gets a name.
+ */
+const KITTY_MODIFIER_KEYS: Readonly<Record<number, string>> = Object.freeze({
+  57441: "shift",
+  57442: "ctrl",
+  57443: "alt",
+  57444: "super",
+  57445: "hyper",
+  57446: "meta",
+  57447: "shift",
+  57448: "ctrl",
+  57449: "alt",
+  57450: "super",
+  57451: "hyper",
+  57452: "meta",
+});
+
 function key(
   name: string,
   sequence: string,
   mods: Partial<Pick<Key, "ctrl" | "meta" | "shift">> = {},
+  event?: "press" | "repeat" | "release",
 ): InputEvent {
-  return Object.freeze({
-    kind: "key",
-    key: Object.freeze({
-      name,
-      ctrl: mods.ctrl ?? false,
-      meta: mods.meta ?? false,
-      shift: mods.shift ?? false,
-      sequence,
-    }),
+  const k = Object.freeze({
+    name,
+    ctrl: mods.ctrl ?? false,
+    meta: mods.meta ?? false,
+    shift: mods.shift ?? false,
+    sequence,
   });
+  // The field is *absent*, not `undefined`, when the sequence carried no event
+  // type: `toStrictEqual` tells the two apart and every record above is legacy.
+  return event === undefined
+    ? Object.freeze({ kind: "key", key: k })
+    : Object.freeze({ kind: "key", key: k, event });
 }
 
 /**
@@ -364,10 +419,25 @@ export function createDecoder(options: DecoderOptions): Decoder {
     // `CSI 27;2;13~` to `CSI_TILDE_KEYS["27"]`, both undefined, both discarded
     // as well-formed-but-unknown. Shift-Enter was unreachable in every terminal
     // that sends it, which is every terminal that has it.
+    // **`CSI code[:alt] ; mods[:event] [; text] u`**, which is both xterm's
+    // `formatOtherKeys=1` and the kitty keyboard protocol C01 pushes (C02 §3,
+    // C16 §2). Sub-parameters are split on `:` and the first of each is what
+    // this arm reads: the alternate key code and the associated text are bits
+    // C01 does not push, and the event type is carried as an optional field.
+    //
+    // The line this replaces read `params[1]` whole, so `13;2:3` — Shift-Enter
+    // released — went through `Number("2:3")`, which is `NaN`, and every
+    // modifier was lost on every repeat and release. Under the protocol a lone
+    // `Esc` is `CSI 27 u` and reaches here as a complete sequence: it is never
+    // a prefix and the 50 ms window above never runs for it.
     if (final === "u") {
-      const name = otherKeyName(params[0]);
+      const codeParam = (params[0] ?? "").split(":")[0];
+      const [modParam, eventParam] = (params[1] ?? "").split(":");
+      const code = Number(codeParam);
+      const name = KITTY_MODIFIER_KEYS[code] ?? otherKeyName(codeParam);
       if (name === null) return consumed;
-      return out.push(key(name, sequence, mods)), consumed;
+      const event = eventParam === undefined ? undefined : KITTY_EVENT[eventParam];
+      return out.push(key(name, sequence, kittyModifiersOf(modParam), event)), consumed;
     }
 
     if (final === "~") {

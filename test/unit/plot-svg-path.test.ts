@@ -967,7 +967,7 @@ const stripSgr = stripSgrRaw as (s: string) => string;
 /** The terminal arm at 24-bit, for the one row that reads a grid rather than a document. */
 const TERM_CAPS = {
   colourDepth: 24, unicode: "full", ambiguousWidth: "narrow", synchronisedUpdate: true,
-  bracketedPaste: true, mouse: true, imageProtocol: "none", altScreen: true,
+  bracketedPaste: true, mouse: true, imageProtocol: "none", keyboardProtocol: "none", altScreen: true,
 } as const;
 
 describe("G12 — the last two of the eleven", () => {

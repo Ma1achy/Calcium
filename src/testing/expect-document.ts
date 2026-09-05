@@ -206,6 +206,7 @@ const TRUECOLOUR: TerminalCapabilities = Object.freeze({
   bracketedPaste: true,
   mouse: true,
   imageProtocol: "none",
+  keyboardProtocol: "none",
   altScreen: true,
 });
 

@@ -40,11 +40,19 @@ const makeScheduler = (lifecycle, render) =>
 /** One JSON line, after release, so it never lands in the frame stream. */
 const report = (data) => process.stdout.write(`\nSCHEDULER_RESULT ${JSON.stringify(data)}\n`);
 
-const make = () =>
+/**
+ * `caps` is the record the lifecycle acquires from. **Defaulted from the
+ * environment, and the `caps` mode passes its forced record in** — the first
+ * version of C02 T5.6 forced `keyboardProtocol` and captured no push, because
+ * the override reached the renderer (T5.5's subject) and this constructor
+ * re-detected without it. A fixture has to be shown to respond to the thing
+ * under test before it is asserted against (`test/support/README.md`).
+ */
+const make = (caps = detectCapabilities(process.env).capabilities) =>
   createTerminalLifecycle({
     stdout: process.stdout,
     stdin: process.stdin,
-    capabilities: detectCapabilities(process.env).capabilities,
+    capabilities: caps,
     onFatal: (err) => {
       process.stderr.write(`fatal: ${String(err)}\n`);
       process.exit(2);
@@ -134,12 +142,16 @@ switch (mode) {
   // not that the application wires it that way. The wiring is C22's own T4.5.
 
   case "caps": {
-    const { capabilities } = detectCapabilities(
-      process.env,
-      process.env["FORCE_DEPTH"] === undefined
-        ? undefined
-        : { colourDepth: Number(process.env["FORCE_DEPTH"]) },
-    );
+    const { capabilities } = detectCapabilities(process.env, {
+      ...(process.env["FORCE_DEPTH"] === undefined
+        ? {}
+        : { colourDepth: Number(process.env["FORCE_DEPTH"]) }),
+      // C02 T5.6: the PTY is no kitty, so the protocol is declared over the top
+      // (I4) and the bytes C01 writes are what the row reads.
+      ...(process.env["FORCE_KEYBOARD"] === undefined
+        ? {}
+        : { keyboardProtocol: process.env["FORCE_KEYBOARD"] }),
+    });
 
     // C02 I7 — `altScreen` alone decides whether a shell can open. A terminal
     // that cannot take the alternate screen gets help on the primary screen and
@@ -152,7 +164,7 @@ switch (mode) {
       process.exit(0);
     }
 
-    const lifecycle = make();
+    const lifecycle = make(capabilities);
     lifecycle.acquire();
 
     const registry = createBlockRegistry();

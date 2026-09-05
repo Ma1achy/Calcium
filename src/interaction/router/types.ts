@@ -144,7 +144,18 @@ export type StoredFocus =
     }>;
 
 export type InputEvent =
-  | Readonly<{ kind: "key"; key: Key }>
+  | Readonly<{
+      kind: "key";
+      key: Key;
+      /**
+       * The kitty keyboard protocol's event type, when the sequence carried
+       * one (C16 §2, C02 I12). **Optional and absent under legacy reporting**,
+       * so every consumer that ignores it is unchanged and every `toEqual`
+       * record written before it exists unchanged. Nothing may be reachable
+       * only through it — A03 SS55 is the rule and it is vacuous today.
+       */
+      event?: "press" | "repeat" | "release";
+    }>
   | Readonly<{ kind: "paste"; text: string }>
   | Readonly<{
       kind: "mouse";

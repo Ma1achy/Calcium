@@ -150,6 +150,51 @@ describe("C02 e2e — the environment decides, and the terminal shows it", () =>
   );
 
   it(
+    "T5.6 (C02 I12, C01 I6): the keyboard protocol forced on puts `ESC [ > 3 u` and `ESC [ < u` on the wire, in C01's positions",
+    async () => {
+      // **Bytes read from the PTY, not reconstructed from the record.** Every
+      // tier-1 row asserts what C01 handed a fake stream; this asserts what a
+      // kernel device received, which is the claim a user's terminal depends on.
+      const forced = await runInPty(FIXTURE, { env: { TERM: "xterm-256color", FORCE_KEYBOARD: "kitty" } });
+      const push = forced.bytes.indexOf("\x1b[>3u");
+      const pop = forced.bytes.indexOf("\x1b[<u");
+      const frame = forced.bytes.indexOf("FRAME-START");
+      const mouseOff = forced.bytes.indexOf("\x1b[?1006l");
+      expect(push, `push present in ${JSON.stringify(forced.bytes.slice(0, 80))}`).toBeGreaterThanOrEqual(0);
+      expect(pop, "pop present").toBeGreaterThanOrEqual(0);
+      // Pushed after the mouse pair and before the frame; popped first, before
+      // the mouse leaves (C01 §5 step 7).
+      expect(push).toBeGreaterThan(forced.bytes.indexOf("\x1b[?1006h"));
+      expect(push).toBeLessThan(frame);
+      expect(pop).toBeGreaterThan(frame);
+      expect(pop).toBeLessThan(mouseOff);
+      // The pop form and never a reset: no `CSI = … u` anywhere in the run.
+      expect(forced.bytes).not.toMatch(/\x1b\[=[0-9;]*u/);
+      // Exactly one of each — a re-push on some path would show here.
+      expect(forced.bytes.match(/\x1b\[[<>][0-9;]*u/g)).toEqual(["\x1b[>3u", "\x1b[<u"]);
+
+      // **The unforced arm**, so the bytes are attributable to the capability and
+      // not to a lifecycle that pushes regardless: `xterm-256color` is unidentified
+      // and the record says `none`.
+      const detected = await runInPty(FIXTURE, { env: { TERM: "xterm-256color" } });
+      expect(detected.bytes).not.toMatch(/\x1b\[[<>=][0-9;]*u/);
+      expect(detected.bytes).toContain('"keyboardProtocol":"none"');
+    },
+    45_000,
+  );
+
+  // **Owed, and not faked** (C02 T5.7). The row above proves the bytes leave
+  // the process; nothing here proves a terminal *answers* them — that a lone
+  // `Esc` comes back as `CSI 27 u`, that Shift-Enter released carries `:3`. The
+  // container has no kitty, Ghostty, WezTerm or foot to answer, and
+  // `imageProtocol` shipped once having never run against a terminal. An
+  // `it.todo` rather than a skip — the shape TD0–TD6 collect and can expire —
+  // named so it is found by grepping the symbol or the reason, never a pass.
+  it.todo(
+    "T5.7 (owed, C02 I12): a real emulator receives KITTY_KEYBOARD.enter and answers `CSI 27 u` for Esc and `CSI 13;2:3 u` for Shift-Enter released — not deferred on a component: it needs kitty, Ghostty, WezTerm or foot installed in the container, and none is",
+  );
+
+  it(
     "T5.4b: inside tmux, keyboard navigation of a table works end to end",
     async () => {
       // **Three gaps deep, and each was invisible until the one in front of it

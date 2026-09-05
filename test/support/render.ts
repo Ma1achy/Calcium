@@ -35,6 +35,7 @@ export const FULL_CAPS: TerminalCapabilities = Object.freeze({
   bracketedPaste: true,
   mouse: true,
   imageProtocol: "none",
+  keyboardProtocol: "none",
   altScreen: true,
 });
 

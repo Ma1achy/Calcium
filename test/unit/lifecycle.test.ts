@@ -178,9 +178,19 @@ describe("C01 acquisition and release", () => {
     lifecycle.acquire();
 
     const out = stdout.output;
-    for (const m of [MODES.altScreenOn, MODES.cursorHide, MODES.pasteOn, MODES.mouseOn, MODES.mouseSgrOn]) {
+    for (const m of [
+      MODES.altScreenOn,
+      MODES.cursorHide,
+      MODES.pasteOn,
+      MODES.mouseOn,
+      MODES.mouseSgrOn,
+      MODES.keyboardOn,
+    ]) {
       expect(out.split(m).length - 1, m).toBe(1); // exactly once
     }
+    // Step 7 is last: the protocol is pushed after the mouse pair, so it is the
+    // first thing popped at release (C01 §5).
+    expect(out.indexOf(MODES.keyboardOn)).toBeGreaterThan(out.indexOf(MODES.mouseSgrOn));
 
     // 1049h is first — asserted on the first chunk rather than on byte 0, since
     // MODES carries the mode without its ESC prefix on purpose.
@@ -207,6 +217,7 @@ describe("C01 acquisition and release", () => {
 
     const released = stdout.chunks.slice(acquired).join("");
     const order = [
+      MODES.keyboardOff,
       MODES.mouseOff,
       MODES.mouseSgrOff,
       MODES.pasteOff,
@@ -215,8 +226,9 @@ describe("C01 acquisition and release", () => {
     ];
     // Mouse leaves as 1006l then 1002l inside one key; the key itself is last
     // in, first out. Assert positions rather than a joined string so the
-    // within-key order is checked too.
+    // within-key order is checked too. The keyboard pop is first of all.
     const positions = [
+      released.indexOf(MODES.keyboardOff),
       released.indexOf(MODES.mouseSgrOff),
       released.indexOf(MODES.mouseOff),
       released.indexOf(MODES.pasteOff),
@@ -228,6 +240,30 @@ describe("C01 acquisition and release", () => {
 
     expect(stdin.rawModeCalls).toEqual([true, false]);
     expect(lifecycle.acquired).toBe(false);
+  });
+
+  it("T1.28 (I10, C02 I12): the keyboard protocol is pushed only when the record says so, and popped rather than reset", () => {
+    // The off arm: not a byte of it in either direction. `>` and `<` finals with
+    // `u` are the whole family, so the assertion is on the family rather than on
+    // the two members C01 writes — a reset written as `CSI = 0 u` would pass a
+    // check for the two known strings.
+    const off = harness({ keyboardProtocol: "none" });
+    off.lifecycle.acquire();
+    off.lifecycle.release();
+    expect(off.stdout.output).not.toMatch(/\x1b\[[<>=][0-9;]*u/);
+
+    // The on arm, on the exact bytes: `ESC [ > 3 u` and `ESC [ < u`. The pop
+    // form is asserted by equality because a reset — `ESC [ = 0 u` — passes
+    // every position and count assertion T1.2 makes and is the wrong claim
+    // about the terminal's prior state (C02 §3).
+    const on = harness({ keyboardProtocol: "kitty" });
+    on.lifecycle.acquire();
+    const pushed = on.stdout.output.match(/\x1b\[[<>=][0-9;]*u/g);
+    expect(pushed).toEqual(["\x1b[>3u"]);
+    const before = on.stdout.output.length;
+    on.lifecycle.release();
+    const popped = on.stdout.output.slice(before).match(/\x1b\[[<>=][0-9;]*u/g);
+    expect(popped).toEqual(["\x1b[<u"]);
   });
 
   it("T1.3 (I10, C8): absent capabilities emit nothing, in either direction", () => {

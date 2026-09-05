@@ -485,6 +485,16 @@ const FABRICATED: readonly Fabrication[] = [
     source: "const short = width - cells(text);",
   },
   {
+    // **A binding reachable only with the keyboard protocol** (C02 I12). Under
+    // `keyboardProtocol: "none"` no event ever carries `event`, so this row is
+    // dead on every terminal but four and reads as a binding. The rule is
+    // vacuous in the tree today — `Binding.key` has no `event` member — and this
+    // fabrication is the one thing that shows it can fire at all.
+    rule: "SS55",
+    file: "src/interaction/router/keymap.ts",
+    source: '  { target: "prompt", key: { name: "enter", event: "release" }, action: "submit" },',
+  },
+  {
     // **The move the type cannot refuse.** `ladderFor("density", caps)` cannot
     // return a height ladder — the mapped type rejects it, TS2322 — but nothing
     // in the type system makes a renderer *ask*. This is the import that skips

@@ -958,6 +958,39 @@ export const SCANS = [
     scope: "src/", allow: ["src/presentation/plot/ramp.ts"],
     why: "a renderer names the axis it draws and never a vocabulary (C12 I21) — `ladderFor` is the door, and reading a ramp constant is the move that produced the heatmap's density-for-height defect" },
 
+  // --- SS55 — the keyboard protocol's ladder: no binding reachable only with it ---
+  //
+  // C02 I12: `keyboardProtocol` makes interaction better and never possible. The
+  // one place that could break it is a binding in `keymap.ts` filtering on the
+  // `event` field the kitty arm sets — `event: "release"` — since under `"none"`
+  // no event ever carries the field and the binding is dead on every terminal
+  // but four. So a binding line that names an event filter must, on the same
+  // line, name the fallback that fires without one: `// none-fallback: <action>`.
+  //
+  // **Vacuous on the day it lands, and this comment is where that is said.**
+  // `Binding.key` has no `event` member today and no row in `defaultKeymap` names
+  // one, so the pattern matches nothing in the tree. That is A03 §2's class —
+  // a rule with nothing to be wrong about passes exactly like a satisfied one —
+  // and the fabricated violation in `enforce-rules.test.ts` is what shows the
+  // rule *can* fire; the scope-reach test shows the file exists. The rule is
+  // landed ahead of its subject deliberately: the day someone adds the member
+  // and the first release binding, the check is already in the default path
+  // rather than owed (CLAUDE.md § a gate that exists and is not run).
+  //
+  // **Stated blind spots.** Textual: the annotation names a fallback and the
+  // rule does not resolve it — a `none-fallback:` naming an action nothing
+  // implements passes. A filter spelled another way (`when:`, `on:`) passes. A
+  // binding split across lines with `event:` on its own line still fires — the
+  // pattern is per line and the annotation must be on that line — which errs
+  // towards reporting. And it watches one file: a `BlockKeymap` an adapter
+  // attaches (C26) is outside it, on the argument SS40 makes for allow-lists
+  // over scopes — a second file wants its own row, not a wider glob.
+  { id: "SS55", spec: "C02 I12 · C16 §2",
+    pattern: /\bevent:\s*"(?:press|repeat|release)"(?!.*\/\/ *none-fallback:)/,
+    scope: "src/interaction/router/keymap.ts",
+    allow: [],
+    why: "a binding that filters on the kitty keyboard protocol's event type names, on the same line, the fallback that fires under `keyboardProtocol: \"none\"` (C02 I12) — nothing is reachable only with the protocol" },
+
   { id: "SS35", spec: "C04 §4 · C05 §2",
     pattern: /^\s*(?:export\s+)?type Result\s*[<=]/m,
     scope: "src/", allow: ["src/data/viewmodel/types.ts"],

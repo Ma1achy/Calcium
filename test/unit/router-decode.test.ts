@@ -106,6 +106,73 @@ describe("C16 §2 — key decoding", () => {
     ]);
   });
 
+  it("T1.3p (C16 §2, C02 I12): the kitty `CSI u` arm — whole records, event type optional", () => {
+    // **Every row asserts the whole record with `toStrictEqual`**, because the
+    // field under test is optional: `toEqual` treats `event: undefined` and no
+    // `event` as the same record, and the claim here is that legacy sequences
+    // carry *no* field, not an undefined one.
+    const { d } = decoder();
+    const k = (name: string, sequence: string, over: Partial<{ ctrl: boolean; meta: boolean; shift: boolean }> = {}) =>
+      ({ name, ctrl: false, meta: false, shift: false, sequence, ...over });
+
+    // Shift-Enter pressed — the row T1.3j already has, unchanged in shape.
+    expect(feed(d, "\x1b[13;2u")).toStrictEqual([{ kind: "key", key: k("enter", "\x1b[13;2u", { shift: true }) }]);
+    // Esc under the protocol: a complete sequence, so no window and no prefix.
+    expect(feed(d, "\x1b[27u")).toStrictEqual([{ kind: "key", key: k("escape", "\x1b[27u") }]);
+    // A repeat and a release, with the modifier intact on both. **This is the
+    // line that was wrong**: `Number("2:3")` is NaN, so `13;2:3` used to arrive
+    // as a bare `enter` with every modifier gone — the live-binding class.
+    expect(feed(d, "\x1b[13;2:2u")).toStrictEqual([
+      { kind: "key", key: k("enter", "\x1b[13;2:2u", { shift: true }), event: "repeat" },
+    ]);
+    expect(feed(d, "\x1b[13;2:3u")).toStrictEqual([
+      { kind: "key", key: k("enter", "\x1b[13;2:3u", { shift: true }), event: "release" },
+    ]);
+    // An explicit press carries the field; an absent sub-parameter does not.
+    expect(feed(d, "\x1b[97;1:1u")).toStrictEqual([{ kind: "key", key: k("a", "\x1b[97;1:1u"), event: "press" }]);
+    // ctrl+shift+a: 1 + (1 | 4) = 6.
+    expect(feed(d, "\x1b[97;6u")).toStrictEqual([
+      { kind: "key", key: k("a", "\x1b[97;6u", { ctrl: true, shift: true }) },
+    ]);
+    // An alternate key code (`97:65`, flag 4) is ignored in favour of the base.
+    expect(feed(d, "\x1b[97:65;2u")).toStrictEqual([{ kind: "key", key: k("a", "\x1b[97:65;2u", { shift: true }) }]);
+  });
+
+  it("T1.3q (C16 §2): the `u` arm's modifier bits are kitty's — bit 8 folds into nothing, bit 32 into meta", () => {
+    const { d } = decoder();
+    const only = (s: string) => {
+      const [e] = feed(d, s);
+      return e?.kind === "key" ? { ctrl: e.key.ctrl, meta: e.key.meta, shift: e.key.shift } : e;
+    };
+    // alt: 1 + 2 = 3 → meta. kitty meta: 1 + 32 = 33 → meta. Both, 35 → meta.
+    expect(only("\x1b[97;3u")).toEqual({ ctrl: false, meta: true, shift: false });
+    expect(only("\x1b[97;33u")).toEqual({ ctrl: false, meta: true, shift: false });
+    // super: 1 + 8 = 9 → **no modifier**. `⌘a` is not `Alt-a`.
+    expect(only("\x1b[97;9u")).toEqual({ ctrl: false, meta: false, shift: false });
+    // And the control the row needs: the same bit *is* meta through the xterm
+    // arm, so a decoder that shared one function between the two would fail one
+    // of the two rows rather than passing both.
+    expect(only("\x1b[1;9D")).toEqual({ ctrl: false, meta: true, shift: false });
+  });
+
+  it("T1.3r (C16 §2, C02 §3): a lone modifier key arrives named, never as a private-use glyph", () => {
+    // The flags C01 pushes do not ask for these (bit 8 is not pushed); a terminal
+    // configured to send them anyway must not insert U+E061 into the prompt.
+    const { d } = decoder();
+    expect(names(feed(d, "\x1b[57441u"))).toEqual(["shift"]);
+    expect(names(feed(d, "\x1b[57442;5u"))).toEqual(["ctrl"]);
+    expect(names(feed(d, "\x1b[57447;2:3u"))).toEqual(["shift"]);
+    expect(feed(d, "\x1b[57447;2:3u")[0]).toMatchObject({ event: "release" });
+  });
+
+  it("T1.3s (C16 §2): a `CSI u` sequence is decoded whatever the record says — the decoder takes no keyboard capability", () => {
+    // xterm's `formatOtherKeys=1` sends the same bytes with no protocol pushed,
+    // and the decoder has no way to know which encoder sent them. So the arm is
+    // not gated, and a terminal that sends `CSI u` unasked still produces the key.
+    const { d } = decoder({ bracketedPaste: false, mouse: false });
+    expect(names(feed(d, "\x1b[13;2u"))).toEqual(["enter"]);
+  });
+
   it("T1.3e (C16 §2, I17): xterm's Meta bit is read, so 1;10D and 1;16D are different keys", () => {
     // **The row that failed before `modifiersOf` read bit 8**, and the reason it
     // needed fabricating rather than finding. xterm's modifier parameter is

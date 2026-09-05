@@ -10,7 +10,15 @@
  * to stay acyclic (§2, A03 MG3).
  */
 
-import { ALT_SCREEN, BRACKET_PASTE, CURSOR, CURSOR_SHAPE, MOUSE, cursorTo } from "./escapes.js";
+import {
+  ALT_SCREEN,
+  BRACKET_PASTE,
+  CURSOR,
+  CURSOR_SHAPE,
+  KITTY_KEYBOARD,
+  MOUSE,
+  cursorTo,
+} from "./escapes.js";
 import type { CursorStyle } from "./escapes.js";
 import type { TerminalCapabilities } from "./capabilities.js";
 
@@ -148,7 +156,14 @@ function sameStyle(a: CursorStyle | null, b: CursorStyle | null): boolean {
  * C01 never acquires it, and adding it before there is a caller would be an
  * export nothing consumes.
  */
-type HeldKey = "stdout" | "altScreen" | "cursor" | "rawMode" | "bracketedPaste" | "mouse";
+type HeldKey =
+  | "stdout"
+  | "altScreen"
+  | "cursor"
+  | "rawMode"
+  | "bracketedPaste"
+  | "mouse"
+  | "keyboardProtocol";
 
 /**
  * §5's transition table, as data. Every cell, including the nine that throw.
@@ -371,6 +386,7 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
     rawMode: () => setRawMode(true),
     bracketedPaste: () => emit(BRACKET_PASTE.enter),
     mouse: () => emit(MOUSE.enter),
+    keyboardProtocol: () => emit(KITTY_KEYBOARD.enter),
   });
 
   const RELEASE: Readonly<Record<Exclude<HeldKey, "stdout">, () => void>> = Object.freeze({
@@ -379,6 +395,10 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
     rawMode: () => setRawMode(false),
     bracketedPaste: () => emit(BRACKET_PASTE.leave),
     mouse: () => emit(MOUSE.leave),
+    // The pop, never `CSI = 0 u`: the terminal's prior flag set comes back
+    // (C02 §3). Last taken and so first released — the terminal is on legacy
+    // key reporting before the mouse and paste modes leave.
+    keyboardProtocol: () => emit(KITTY_KEYBOARD.leave),
   });
 
   function setRawMode(on: boolean): void {
@@ -619,6 +639,7 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
       take("rawMode");
       if (capabilities.bracketedPaste) take("bracketedPaste"); // I10
       if (capabilities.mouse) take("mouse"); // I10
+      if (capabilities.keyboardProtocol === "kitty") take("keyboardProtocol"); // I10, C02 I12
     } catch (err) {
       // T3.7 — partial acquisition never leaves partial state.
       unwind();

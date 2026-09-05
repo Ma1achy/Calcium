@@ -54,6 +54,17 @@ export type TerminalCapabilities = Readonly<{
   bracketedPaste: boolean;
   mouse: boolean;
   imageProtocol: "none" | "iterm2" | "kitty" | "sixel";
+  /**
+   * Whether C01 may push the kitty keyboard protocol (C02 §3, I12).
+   *
+   * **The identification's second column**, detected the way `imageProtocol`
+   * is and gated by `TMUX` with it. `"kitty"` means C01 pushes `CSI > 3 u` at
+   * step 7 and pops with `CSI < u` first at release; `"none"` means the
+   * terminal's legacy key reporting and nothing else changes — which is why
+   * the field can be wrong in the `none` direction at no cost, and why I12
+   * says nothing may be reachable only with it.
+   */
+  keyboardProtocol: "none" | "kitty";
   altScreen: boolean;
 }>;
 
@@ -118,6 +129,11 @@ export const DEGRADATION: Readonly<
     behaviour:
       "Nothing renders an image in v1, so its absence costs nothing; blocks that would carry one render their text form",
     owner: "C09",
+  }),
+  keyboardProtocol: Object.freeze({
+    behaviour:
+      "The OS owns auto-repeat, `Esc` is a prefix resolved by C16's 50 ms window, Shift alone is invisible, Shift-Enter arrives as `\\r`; every affordance still works, because nothing may be bound to an event the protocol alone can produce",
+    owner: "C01 C16",
   }),
   altScreen: Object.freeze({
     behaviour: "The shell refuses to open, prints help, exits 0",
@@ -270,12 +286,19 @@ function detectBackgroundPolarity(
  * pass an agreement test and are still three copies. It is that **there is one
  * list**, which is a property a scan can see (T1.12, T6.11).
  */
-type TerminalName = "kitty" | "ghostty" | "iterm2" | "wezterm" | "windowsterminal";
+type TerminalName = "kitty" | "ghostty" | "iterm2" | "wezterm" | "foot" | "windowsterminal";
 
-/** `TERM` is rewritten by a multiplexer; `TERM_PROGRAM` survives one. Both, therefore. */
+/**
+ * `TERM` is rewritten by a multiplexer; `TERM_PROGRAM` survives one. Both, therefore.
+ *
+ * foot sets no `TERM_PROGRAM` and ships two terminfo names, so it is known by
+ * `TERM` alone and by both names.
+ */
 const BY_TERM: Readonly<Record<string, TerminalName>> = {
   "xterm-kitty": "kitty",
   "xterm-ghostty": "ghostty",
+  foot: "foot",
+  "foot-extra": "foot",
 };
 const BY_PROGRAM: Readonly<Record<string, TerminalName>> = {
   "iterm.app": "iterm2",
@@ -320,6 +343,34 @@ const IMAGE_PROTOCOL: Readonly<Record<TerminalName, TerminalCapabilities["imageP
   ghostty: "kitty",
   iterm2: "iterm2",
   wezterm: "none",
+  // foot speaks sixel and Calcium encodes none; `none` is unmeasured, not absent.
+  foot: "none",
+  windowsterminal: "none",
+};
+
+/**
+ * The identification's second column (C02 §3, I12).
+ *
+ * **`kitty` here means the terminal documents the kitty keyboard protocol**, not
+ * that it has been measured answering it: the container has none of the four,
+ * and C02 T5.7 is the named skip that says so. The error runs in the safe
+ * direction — a terminal wrongly at `none` behaves exactly as every terminal
+ * did before this column existed, and a terminal wrongly at `kitty` receives a
+ * `CSI > 3 u` it ignores, which is what *progressive enhancement* means.
+ *
+ * **iTerm2 is `none` on the same terms WezTerm's image row is**: 3.5 documents
+ * the protocol and nothing here has run against it. Windows Terminal does not
+ * implement it. Both rows carry the expiry the image table's does — run a
+ * terminal, read the bytes, move the row.
+ */
+const KEYBOARD_PROTOCOL: Readonly<
+  Record<TerminalName, TerminalCapabilities["keyboardProtocol"]>
+> = {
+  kitty: "kitty",
+  ghostty: "kitty",
+  iterm2: "none",
+  wezterm: "kitty",
+  foot: "kitty",
   windowsterminal: "none",
 };
 
@@ -371,6 +422,9 @@ function detect(env: Readonly<NodeJS.ProcessEnv>): TerminalCapabilities {
     bracketedPaste: usable,
     mouse: usable && !inTmux,
     imageProtocol: terminal === null ? "none" : IMAGE_PROTOCOL[terminal],
+    // The same `terminal`, so the same gate (I11): inside tmux this is `none`
+    // because the identification is, not because this line remembered to ask.
+    keyboardProtocol: terminal === null ? "none" : KEYBOARD_PROTOCOL[terminal],
     altScreen: usable,
   };
 }
@@ -399,6 +453,7 @@ const VALIDATORS: Readonly<Record<keyof TerminalCapabilities, (v: unknown) => bo
     bracketedPaste: isBoolean,
     mouse: isBoolean,
     imageProtocol: oneOf("none", "iterm2", "kitty", "sixel"),
+    keyboardProtocol: oneOf("none", "kitty"),
     altScreen: isBoolean,
   });
 

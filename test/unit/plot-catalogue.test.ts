@@ -66,7 +66,7 @@ describe("plot-catalogue — the corpus renders", () => {
     // thirty-two of the wide ones were committed catalogue files nobody read.
     const base = { colourDepth: 1, unicode: "ascii", ambiguousWidth: "narrow",
       synchronisedUpdate: true, bracketedPaste: true, mouse: true,
-      imageProtocol: "none", altScreen: true } as const;
+      imageProtocol: "none", keyboardProtocol: "none", altScreen: true } as const;
 
     const offenders: string[] = [];
     let rendered = 0; // cells-ok — a frame count
@@ -103,7 +103,7 @@ describe("plot-catalogue — the corpus renders", () => {
     // day caller text is degraded this row moves rather than quietly agreeing.
     const base = { colourDepth: 1, unicode: "ascii", ambiguousWidth: "narrow",
       synchronisedUpdate: true, bracketedPaste: true, mouse: true,
-      imageProtocol: "none", altScreen: true } as const;
+      imageProtocol: "none", keyboardProtocol: "none", altScreen: true } as const;
     const leaks = (spec: Record<string, unknown>): boolean =>
       [...frame(spec, base, 60).map(strip).join("\n")].some((c) => (c.codePointAt(0) ?? 0) > 127);
 
@@ -134,7 +134,7 @@ describe("plot-catalogue — the corpus renders", () => {
     };
     const ascii = { colourDepth: 1, unicode: "ascii", ambiguousWidth: "narrow",
       synchronisedUpdate: true, bracketedPaste: true, mouse: true,
-      imageProtocol: "none", altScreen: true } as const;
+      imageProtocol: "none", keyboardProtocol: "none", altScreen: true } as const;
 
     const body = frame(spec, ascii, 60).map(strip).join("\n");
     expect(body).toContain("+");
@@ -161,7 +161,7 @@ describe("plot-catalogue — the corpus renders", () => {
     // terminal and fail on another for a reason the author cannot act on.
     const ascii = { colourDepth: 1, unicode: "ascii", ambiguousWidth: "narrow",
       synchronisedUpdate: true, bracketedPaste: true, mouse: true,
-      imageProtocol: "none", altScreen: true } as const;
+      imageProtocol: "none", keyboardProtocol: "none", altScreen: true } as const;
 
     const cases = {
       "violin braille": {

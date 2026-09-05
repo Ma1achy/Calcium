@@ -14,6 +14,9 @@ export const ALL_CAPABILITIES: TerminalCapabilities = Object.freeze({
   bracketedPaste: true,
   mouse: true,
   imageProtocol: "none",
+  // At its best like every other field: C01's T1.1 and T1.2 assert the push and
+  // the pop from this record, and T1.28 turns it off by hand.
+  keyboardProtocol: "kitty",
   altScreen: true,
 });
 
@@ -216,6 +219,9 @@ export const MODES = {
   mouseSgrOn: "[?1006h",
   mouseOff: "[?1002l",
   mouseSgrOff: "[?1006l",
+  // The kitty keyboard protocol: a push and a pop, not a DECSET pair (C02 §3).
+  keyboardOn: "[>3u",
+  keyboardOff: "[<u",
   // C03's, and the only pair here C01 never emits (C01 T6.12).
   syncOn: "[?2026h",
   syncOff: "[?2026l",

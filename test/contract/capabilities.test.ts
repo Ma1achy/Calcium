@@ -23,6 +23,7 @@ const FIELDS: readonly (keyof TerminalCapabilities)[] = [
   "bracketedPaste",
   "mouse",
   "imageProtocol",
+  "keyboardProtocol",
   "altScreen",
 ];
 
@@ -45,7 +46,7 @@ const FIXTURES: readonly NodeJS.ProcessEnv[] = [
 ];
 
 describe("C02 contract", () => {
-  it("T2.1 (I1): exactly the nine documented keys, all present, for every fixture", () => {
+  it("T2.1 (I1): exactly the ten documented keys, all present, for every fixture", () => {
     for (const env of FIXTURES) {
       const { capabilities } = detectCapabilities(env);
       expect(Object.keys(capabilities).sort(), JSON.stringify(env)).toEqual([...FIELDS].sort());

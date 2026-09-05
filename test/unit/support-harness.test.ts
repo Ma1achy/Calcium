@@ -75,6 +75,7 @@ describe("harness parameters — fake-terminal", () => {
       bracketedPaste: false,
       mouse: false,
       imageProtocol: "sixel",
+      keyboardProtocol: "none",
       altScreen: false,
     });
     expect(all).toEqual({
@@ -86,6 +87,7 @@ describe("harness parameters — fake-terminal", () => {
       bracketedPaste: false,
       mouse: false,
       imageProtocol: "sixel",
+      keyboardProtocol: "none",
       altScreen: false,
     });
     // And the defaults are not the override values, or the assertion above
