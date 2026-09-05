@@ -181,6 +181,7 @@ Structural, at rest — cells where two rules both hold:
 | the element is on a settled entry | allowed — a detail is data, not an affordance | C26 §4g: focus reaches settled entries |
 | the region edge | `prefer: "below"`, C15 flips above when there is no room | I17, existing arithmetic |
 | the element's row scrolled off screen | no anchor → no peek | I17's anchor is a region row |
+| the element is inside a `scroll` box | **uninhabited** — a scroll owns its elements (C09 I30, C26 §4b cell 3): one per child, block-level, and none carries a `detail`, because only a table **row** declares one (`table/definition.ts`, `rowDetail`). So no element inside a box can want a peek, and the content-row → region-row translation the pointer does (`elementAt`, F757 row c) has nothing to translate | measured: `elementsIn` over a scroll holding a cut table answers two elements, `detail` on neither, against the same table alone answering row `a` with one. `peekWanted` carried a guard for this state for as long as it was owed under `SCROLL_PEEK`; the guard was unreachable and is gone, and `test/integration/peek.test.ts` T4.13 pins the premise — it goes red the day a scroll's element gains a `detail`, which is the day the translation is owed |
 | a `view` push | rejected as today; unreachable from a focused element | every view is pushed from the prompt |
 | `Esc` | `focusPrompt` (today's binding); the peek follows focus out | no `Esc` reaches a layer that is not `top` |
 

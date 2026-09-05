@@ -332,7 +332,7 @@ What SS42 buys is that a **second** live reader cannot appear quietly beside the
 | # | Forbidden | Where | Declared |
 |---|---|---|---|
 | SS14 | `\x1b`, `\u001b` | outside `terminal/escapes.ts`, allowing `interaction/router/decode.ts` | C01 I1, T2.5 |
-| SS15 | Mode numbers `1049 25 2004 1002 1006 2026` | outside `terminal/escapes.ts` | C01 I1, T2.8 |
+| SS15 | Mode numbers `1049 25 2004 1002 1003 1006 2026` | outside `terminal/escapes.ts` | C01 I1, T2.8 |
 | SS16 | Hex, ANSI code, colour name | `viewmodel/` | C04 T2.7 |
 | SS17 | Hex, ANSI, named colour | `blocks/` | C09 T2.8 |
 | SS18 | Hex literal | the modules that construct blocks — `src/data/adapters/`, `src/data/fixtures/`, `src/shell/` — the third population beside SS16's types and SS17's renderers. Pending on "the block-producing module list" for the whole life of C10 | C10 I14, T2.9 |

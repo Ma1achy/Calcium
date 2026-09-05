@@ -1475,6 +1475,16 @@ else is saying *waiting* — and the region is better placed for it, because **t
 scrolls and the region does not.** Scroll up to re-read something mid-turn and the pending
 entry goes with it; the activity region stays.
 
+**In Calcium's own shell the pending entry *is* the §9c card, and the two rulings do not meet**
+(C23 I54, 2026-09-05). A shell has no turn — one verb runs at a time and the transcript is the
+only surface — so there is nothing for a region to say that the card under the command row does
+not, and the entry was measured as `blocks: []` with no indicator at all before this. Here, with
+a turn in flight, the region says *what is happening* and each tool call's card says *what
+happened to this call*: the card is a record of one call and the region is the turn, which is
+exactly the split the paragraph above draws. What C23 built is the card's producer — `toolCallDoc`
+appended at step 3, `readout` for the figure, the outcome written where settlement keeps the
+header — and it is the code this app's pending-entry route will call rather than a second one.
+
 ### The checkbox glyphs, and the obvious pair is the unsafe one
 
 ```

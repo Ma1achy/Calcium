@@ -93,7 +93,8 @@ type HeadingLevel = 1 | 2 | 3;
 type Rule     = Readonly<{ kind: "rule"; id: string; label: string;
                            level?: HeadingLevel;    // absent is 2 — the form every rule already drew (I94)
                            meta?: string }> & Gap;
-type Notice   = Readonly<{ kind: "notice"; id: string; tone: Tone; glyph?: Glyph; text: string }> & Gap;
+type Notice   = Readonly<{ kind: "notice"; id: string; tone: Tone; glyph?: Glyph; text: string;
+                           action?: Action }> & Gap;   // one button, the whole notice (arc 6 §5)
 type KeyValue = Readonly<{ kind: "keyValue"; id: string;
                            rows: readonly Readonly<{ label: string; value: string; tone?: Tone }>[] }> & Gap;
 type Steps    = Readonly<{ kind: "steps"; id: string;
@@ -1378,6 +1379,20 @@ type Action =
 ```
 
 `fill` is the default; `exec` is the exception. Populating the prompt lets the dev read and edit before running, which matters when the command is `production cancel <uuid>`. Only filter pills use `exec`, because a filter is trivially reversible (A01 D8).
+
+**A `Notice` carries at most one `action`, and the notice is the button** (arc 6 §5). *Retry*, *open the
+log*, *dismiss* — a notice that says something went wrong is where a reader wants the thing to do about
+it, and `pills` chips were the only element with an `activate`. No new kind: `action?: Action`, the same
+union a chip carries, validated at the gate exactly as `Tip.actions` and `Patch.actions` are — `kind`
+one of the five and the kind's own field a string — so a far side may send one. When present, C09's
+`notice` declares **one block-level element**, the whole notice, with `activate: action` and `copy:
+text`; absent, it declares none and the notice is what it was — `↓` does not stop on it and no frame of
+it changes. **Which of the five**: any at the gate, as a chip's. In use, `fill` is the retry — the
+command lands in the prompt for the reader to read before running — and `open` is the log; `exec` stays
+the filter pills' by D8's argument, which a notice does not have. On a **settled** entry C23 I18 refuses
+`fill`, `exec`, `open` and `view` and patches the refusal — a `warn` notice — into the entry the action
+came from, so a stale retry is answered beside the notice that offered it; `expand` is I18's one exception
+and fires. `b.notice(...)` and its four tone arms take `{ action }` (C24 I18, MG27).
 
 #### `view` is the fifth, and `target` is the half that needed a ruling
 

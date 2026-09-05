@@ -177,6 +177,52 @@ The guard is checked **before the pending entry is appended**, so a refused subm
 
 **Step 3 before step 4** is what makes a slow verb feel responsive. The command appears in the transcript with a running indicator before the subprocess has started; without it, three hundred milliseconds of interpreter startup look like a dropped keystroke.
 
+### The pending entry is the running card
+
+**Step 3's document is `toolCallDoc`** (I54; `AGENT_TUI_DESIGN.md` §9c). One block — a `step`
+notice reading `⏺ verb(args)`, the tool being the manifest verb and the args the rest of the
+resolved argv (§18 of the design: *the tools are the manifest*) — so the header is the far side's
+call where the command row above it is the user's line, and the two agree here by construction
+where in an agent transcript they would not. **Measured 2026-09-05, and the sentence above was
+false until this ruling**: the pending document was `compose({ blocks: [] })`, nothing outside
+C13 reads `streaming`, and the *running indicator* was a row nothing drew — a slow verb was the
+command row and silence, which is the dropped-keystroke reading with a different cause. The
+figure is I53's readout, registered at step 3 with the header's id and stopped by `settled`
+(§3d-bis); below one second `elapsed()` draws nothing, so the card reads `⏺ ps(--all)` at dispatch
+and gains `· 1s` on the first wake.
+
+**The body is the entry's own blocks.** Step 4's patches append after the header (C13 `patch`,
+`op: "append"`) and §3b's stall notice appends after them, so `⎿ no output for 2m` lands as the
+card's last row and `resumed after 2m` replaces it in place (§8a A4). **Not `ToolCallSpec.output`'s
+follow scroll**: a `ViewPatch` addresses the document's top level and `scroll.children` is not a
+patch target, so the streamed body on this route is what it always was, one row under the header
+— and `ToolCallSpec.output` keeps its consumer where it was, in the agent example.
+
+**The outcome goes into the header exactly where settlement keeps the card, and nowhere else.**
+Two settlements exist (C13 §5). `settle(id, doc)` — step 6, the invoke route and its error arm —
+*replaces* the document: the adapted result is the outcome, the transcript draws its `status`
+and `error` as it always has, and no header survives to write into. `settle(id)` — step 7, the
+stream route's `end`, its two error arms, and Ctrl-C — keeps what accumulated, so the header is
+patched **before** the settle, with its final figure and a one-word verdict: `exit N` from
+`end`'s `RawResult.exitCode`, `cancelled`, `truncated`, `failed`. **Before and not after, and the
+reason is not refusal.** The first draft of this paragraph said a settled entry refuses the patch;
+measured, it does not — C13 §6's gate reads *who is writing*, and the header is the shell's
+(`origin: "shell"`), so the patch would land either way. What forces the order is the record:
+persistence writes the document **on the `settle` change and on nothing after it** (C13 §5b.2,
+`construct.ts`), so a verdict written after the settle is on screen and absent from the file. §8g
+row 6 is the cell, and T4.40's fourth assertion reads the document *at* the settle change. So `⏺ tail(web.log) · 2m 31s ·
+exit 0` is what a finished follow reads, and `❯ /ps --all` over a table is what a finished
+listing reads: the card was the waiting and the document is the answer, which is §17's
+*the transcript records what happened* arriving on the shell's own route.
+
+**A queued entry is waiting, not running** (roadmap 33, I53). Its `queued behind …` notice is
+`streaming: true` so the queue is visible, and the readout's clock starts at registration — so
+registering at enqueue would count the wait as the run. The header *replaces* the queued notice
+when the route takes the entry (`Settle.into`) and the clock starts there. **Found by §8f's P2
+and measured before the fix**: nothing replaced the notice, so a deferred submission on the
+stream route ran to completion and settled reading *queued behind /logs* — the invoke route's
+wholesale replacement is what hid it.
+
 **Validation is not recomputed.** C18 already ran it (C18 I6) and the result travels on the `ParseResult`. Running it twice would let the two disagree.
 
 ### Streaming
@@ -258,7 +304,7 @@ Adapters are pure and read no clock (C07 I1); C15's layout is pure (C15 I5). **A
 Three cases. **Two patch an existing host and one appends**, and that distinction
 is what §3b was missing rather than a detail of it.
 
-**Stall detection.** A streaming entry that has received no patch for **120 s** gets a synthetic notice patch — `no output for 2m` in muted tone — **replaced, on resumption, by a record of the gap**. The earlier wording said *replaced on the next real patch and removed if output resumes*, which is one event described twice and only the first half is expressible: `ViewPatch` has no delete, and it should not. **A transcript is a record.** C13 has exactly one path that removes anything — the cap — and it leaves a marker so the removal is visible (C13 §5). A patch that made a block vanish would leave a document whose earlier state cannot be reconstructed from its own history, and `rev` is a counter rather than a log, so nothing would say a block had ever been there. What resumption wants is not removal anyway: the notice said *this stream has gone quiet*, and then the stream spoke. That is a state change on a thing that still exists. **So the row is spent, and it says something true** — `resumed after 2m` rather than a blank. The entry did go quiet, and that is part of its record. A zero-height replacement is not available and should not be: C09's floor is one row for any block that is present, which is the constraint that makes measurement honest. It is not an error: a build pulling a large base layer is silent for minutes, and the honest reading of a motionless block is usually "working". Saying how long it has been quiet is better than implying a fault or saying nothing.
+**Stall detection.** A streaming entry that has received no patch for **120 s** gets a synthetic notice patch — `no output for 2m` in muted tone — **replaced, on resumption, by a record of the gap**. The earlier wording said *replaced on the next real patch and removed if output resumes*, which is one event described twice and only the first half is expressible: `ViewPatch` has no delete, and it should not. **A transcript is a record.** C13 has exactly one path that removes anything — the cap — and it leaves a marker so the removal is visible (C13 §5). A patch that made a block vanish would leave a document whose earlier state cannot be reconstructed from its own history, and `rev` is a counter rather than a log, so nothing would say a block had ever been there. What resumption wants is not removal anyway: the notice said *this stream has gone quiet*, and then the stream spoke. That is a state change on a thing that still exists. **So the row is spent, and it says something true** — `resumed after 2m` rather than a blank. **And the figure is the silence, measured from the last patch** — not from the notice, which is posted two minutes into it. Measured 2026-09-05 (T4.44): the record read *resumed after 1m* under a notice that had said *no output for 2m*, two figures in one entry about one gap, and every row before it matched `/resumed after/` without the number. The entry did go quiet, and that is part of its record. A zero-height replacement is not available and should not be: C09's floor is one row for any block that is present, which is the constraint that makes measurement honest. It is not an error: a build pulling a large base layer is silent for minutes, and the honest reading of a motionless block is usually "working". Saying how long it has been quiet is better than implying a fault or saying nothing.
 
 **A part is declared wherever a document reaches the transcript, which is two
 calls and not one** (I33a). A document arrives by `append(doc)` on the local and
@@ -620,13 +666,17 @@ host, on `dispose`, and on a patch the transcript refuses — an entry evicted o
 it. Below one second `elapsed()` draws nothing (T2.46), so the card reads *name(args)* at dispatch
 and gains `· 1s` on the first wake — the row's first assertion is the bare header, not `0s`.
 
-**It has no producer in `src/`.** `toolCallDoc`'s callers are `test/contract/tool-call.test.ts`
-and nothing else; the pending-entry route an agent harness would append through
-(`AGENT_TUI_DESIGN.md` §9c, entry 35) does not exist yet. The seam is built where the ruling puts
-it and the owed consumer is named by its symbol: whoever appends a `toolCallDoc` as a pending
-entry calls `refresh.readout(id, stepId, (ms) => b.notice("info", toolCallHeader({ …call,
-elapsedMs: ms }), "step", { id: stepId }))`. A row is the only caller today, which T2.6a's method
-— count producers over `src/`, not over the tree — reports as zero, correctly.
+**Its producer is step 3** (I54, §3). `execution.ts` composes the pending entry through
+`toolCallDoc` and registers `readout(pendingId, stepId, (ms) => b.notice("info",
+toolCallHeader({ …call, elapsedMs: ms }), "step", { id: stepId }))` before the transport is
+invoked; the stream route's `end`, its two error arms and the canceller write the final header
+themselves, before `settle` — not because the transcript would refuse it afterwards (a `"shell"`
+patch on a settled entry is accepted, C13 §6) but because the `settle` change is what persistence
+writes and nothing after it is (C13 §5b.2). Until 2026-09-05
+this paragraph read *it has no producer in `src/`* and named the agent example as the owed
+consumer — while the pending entry was that producer in everything but its drawing: appended
+`streaming` at step 3, patched through step 4, settled at 6 or 7, which is `start / delta / end`
+under other names. T2.6a's count over `src/` went from zero to one on this ruling.
 
 #### The shape this was chosen over
 
@@ -887,7 +937,7 @@ Per submission.
 - **I15** — The displayed command and the spawned argv correspond exactly (D24). **The displayed command is now displayed** — C22 I33 draws it above each entry — which is what makes this invariant constrain anything: it was written about a `doc.command` no render path read, so it forbade nothing while reading as though it forbade the drift it names. The two forms stay distinct on purpose: the transcript shows `/ps --search=… --open-mr` as typed, and `meta.argv` carries `widget ps --search=… --open-mr --json` for `/debug`. D24's one-token mapping is the correspondence between them. **One entry carries one displayed command, from the first patch to the settle** — the streaming route passed the raw typed line while step 5 passed the resolved argv, so the transcript changed what it said a command was mid-stream, with no event to explain it. `$_` is resolved in both, because the resolved form is what ran.
 - **I16** — C23 is the sole supplier of the action dispatcher: `pipeline.onAction`, reached by C16 through `KeyDeps.onAction` (I37), is constructed here and nowhere else, and no component below L4 dispatches an action. **The member this used to name — C09's `RenderContext.onAction` — no longer exists** (C09 §2): every real frame rendered against a no-op default, so the clause was exclusive about a field nothing read while the working route ran beside it.
 - **I17** — `open` actions go through the injected opener with an `http`/`https` scheme check, never through a shell.
-- **I18** — Actions originating from a frozen entry are refused, and **the refusal patches the source entry rather than appending**. An append would freeze the block the action came from, refusing the next action for a different reason and clearing the selection A01 D7 preserves — C23 §4's pop row, one section over. **All five kinds, and the notice names the entry's recorded command; the one thing that fires from a frozen entry is a re-run of that command through §2's submit** (`rerunEntry`, → C16 I29) — which is not an action, fires against the command text and never the document's data, and is what both named consumers (a notebook's re-run, an agent harness's retry) actually need. Reachable from a keyboard since C26 §4g, which is when the ruling had to be finished. **`expand` is the one exception, and it was found by walking the design against this rule** (C04 §3c S4): it reveals data the entry already holds, fills nothing and runs nothing, so A01 D8's staleness argument has no purchase on it — and the surfaces it exists for (a folded reasoning panel, a tool call's folded body; `AGENT_TUI_DESIGN.md` §9b–c) are settled entries by the time anyone reads them. *Five kinds refused* is therefore four: `fill`, `exec`, `open` and `view` stay refused; `expand` toggles a fold on a frozen entry through a shell-origin patch, which C13 §2 admits.
+- **I18** — Actions originating from a frozen entry are refused, and **the refusal patches the source entry rather than appending**. An append would freeze the block the action came from, refusing the next action for a different reason and clearing the selection A01 D7 preserves — C23 §4's pop row, one section over. **All five kinds, and the notice names the entry's recorded command; the one thing that fires from a frozen entry is a re-run of that command through §2's submit** (`rerunEntry`, → C16 I29) — which is not an action, fires against the command text and never the document's data, and is what both named consumers (a notebook's re-run, an agent harness's retry) actually need. Reachable from a keyboard since C26 §4g, which is when the ruling had to be finished. **`expand` is the one exception, and it was found by walking the design against this rule** (C04 §3c S4): it reveals data the entry already holds, fills nothing and runs nothing, so A01 D8's staleness argument has no purchase on it — and the surfaces it exists for (a folded reasoning panel, a tool call's folded body; `AGENT_TUI_DESIGN.md` §9b–c) are settled entries by the time anyone reads them. *Five kinds refused* is therefore four: `fill`, `exec`, `open` and `view` stay refused; `expand` toggles a fold on a frozen entry through a shell-origin patch, which C13 §2 admits. **A `notice`'s `action` (C04, arc 6) arrives at the same dispatcher and takes the same refusal**, and the notice that names it is patched beside the notice that offered it — T4.16 measures both, the entry count unchanged.
 - **I19** — Stall detection, part refresh and the identity notice are C23's — the first two on C22's injected clock, the third on C22's signal. No adapter, view, layer or entry reads a clock, and no component but C23 appends.
 - **I20** — Refresh offsets are assigned so no two declared parts fire in the same tick.
 - **I21** — A failing refresh is contained to its declared part, backs off to a 5-minute cap, and resets on success. **Two failures do not retry at all**: a `render` that throws is deterministic, so retrying burns cycles and flickers (A02 §7 rule 2), and a part declaring no interval is one-shot, so re-attempting it is a surprise the user did not ask for (rule 3). Both are decided from the declaration rather than from the failure, which is what makes them answerable at the moment one arrives. And a patch refused with `"unknown"` or `"settled"` is not a failure in this sense — the host is gone, so the part is released rather than backed off.
@@ -926,6 +976,7 @@ Per submission.
 - **I51** — **The two framework defaults construct a `status`, and its state is decided by whether a retry is coming.** `b.live`'s placeholder is `loading`; a failed fetch is `retrying` when the driver has a countdown to show and **`error` when it has not**, because §3d rule 3 makes `retryIn` `null` for every one-shot and a `retrying` box without `retryInMs` draws no activity line **and therefore no spinner** — a blank row where the one moving thing goes. The state union already carries the distinction, so the fallback reads it rather than asserting a state it has not observed (C09 §3a). **Their heights are 3, 2 and 1, they are *framed*, and only a frame says so.** The first ruling was 2, 2 and 1 on a measurement that still holds — both land inside `livePanel`, which already draws a border and carries the title, so at 3 the box spent a row on a second border inside the first and at 4 it bought the ERROR tag at two nested borders (F234). **What that ruling could not choose is the figure**, because C09's ladder coupled the tag to the border and every option was one of those two: a box that reads as a red line, or two nested frames. C09 §3a's `framed` ladder is the third, and it is the one this layer wanted — no border, because the panel has one, and the rows spent on the tag and the content instead. So `retrying` takes **3** (tag, message, activity line), `error` takes **2** (tag, message), and `loading` stays **1**: it has no tag to gain and its whole content is the line that moves. A declared height with nothing to put in it is still a blank row, which is I31 working and a defect only where this layer picks the number (F406).
 - **I52** — **The elapsed counter is written here, only when the figure changes, only while someone is looking, and never into a block this layer did not put there.** The clock is C23's — C04 I66 and C09 I32 forbid deriving a duration from `tick`, which C03 coalesces and drops under load, and L1 may not read one — so `resolveStall`'s shape is the precedent. **The guard is on the rendered string and not on the clock**, and its argument is hygiene rather than throughput: measured, the counter beside its own spinner costs **0.4 frames a second**, because C03 folds six writes in ten into a frame already scheduled — but a write that changes nothing observable is still a `rev` bump, and it invalidates C14's height cache and says a document changed when it did not (F234). **`anyoneLooking` gates it, the same gate the poll uses** (I46): C22's ticker disarms when nothing on screen animates and this driver cannot see the viewport, so off screen the spinner stops while the counter would go on writing — at one whole frame each rather than 0.4, which is the condition the cost measurement was taken under and could not itself name. And the target is **the block currently in place**, never one remembered at declaration, because a fetch can fail between the arm and the fire; `attempt` is `src.failures` and therefore consecutive, reset by any success and shared by every part behind one source (§8d D6).
 - **I53** — **A pending entry's elapsed readout re-composes on the one-second wake while it runs and stops when it settles**, through `readout(id, blockId, render)`: the figure is compared as a rendered string (I52's guard), written only while someone is looking (I46), and never after `settled`, `release` or a refused patch. One timer serves every readout — it is `armParts`'s wake, armed to `now + ELAPSED_TICK_MS` while any visible readout is live — and the stall detector's thirty-second re-arm is not the cadence, measured. The block the readout replaces is whatever `render` returns for the elapsed milliseconds, so the driver knows nothing of tool calls; `toolCallHeader` is the consumer's.
+- **I54** — **The pending entry is the running card.** Step 3 appends `toolCallDoc` — one `step` header reading `verb(args)` — and registers its readout with the header's id before the transport is invoked; a queued entry's `queued behind` notice is *replaced* by the header when its route takes it and never before, so no figure counts a wait. The outcome is written into the header, with its final figure, exactly where settlement keeps the card — `settle(id)`: `exit N`, `cancelled`, `truncated`, `failed`, each patched **before** the settle — and not where settlement replaces it (`settle(id, doc)`), because there the document is the outcome and no header survives. The body is the entry's own appended blocks and the stall notice is a row of it; the card is drawn by nothing that reads `streaming`.
 ---
 
 ## 8. Commitments
@@ -978,6 +1029,7 @@ Per submission.
 45. An elapsed counter advances in the transcript while a first fetch is in flight, and stops writing when the figure would not change, when nobody is looking, and when the block it was armed for is gone (I52).
 46. A `view` target resolves at any depth inside its own entry and no wider, and the two sites that resolve it — the open and the live re-read behind every motion — move together (I31).
 47. A pending entry's elapsed readout advances once a second while the entry runs, on the one wake every readout shares, and stops moving when the entry settles (I53).
+48. A running verb is a card — `⏺ verb(args)` counting in whole seconds under the command row — from before the transport starts until it settles; a queued one is bare until its turn; a stream's final header carries its exit code, a cancelled one says so, and a listing's settled document has no header at all (I54).
 
 ---
 
@@ -1543,6 +1595,87 @@ after the terminal is restored (I48). The second one is the one that survives ro
 
 ---
 
+## 8f. The classification table — the pending entry's states × the card's parts
+
+Indexed by rule interaction: each cell is where a state rule (C13 §2, roadmap 33, §3b, §6) meets
+a part rule (§9c's grammar, I53, C13 I13). A cell governed by one rule restates it and is left
+blank.
+
+| state | header | figure | outcome | body | stall row |
+|---|---|---|---|---|---|
+| dispatched, < 1 s | `verb(args)` | none drawn (`elapsed()` < 1 s → `""`) | — | none | — |
+| running | same | `· Ns`, on the shared wake | — | appended blocks, under the header | — |
+| queued, waiting | **P2** `queued behind X` — a `notice`, not a `step` | **P1** none: the clock has not started | — | — | — |
+| queued, routed | **P2** header *replaces* the notice, same entry | starts here | — | — | — |
+| stalled | same, still counting | same | — | same | **P4** `⎿ no output for 2m`, appended after the body |
+| resumed | same | same | — | same | replaced in place: `resumed after 2m` |
+| settled by `settle(id, doc)` | **P3** gone — the document replaced it | gone | the document's `status`/`error` | the document's | gone |
+| settled by `end` | kept | final figure | **P3** `exit N`, written before the settle | kept | kept (A4: already `resumed after`) |
+| cancelled (Ctrl-C) | kept | final figure | **P5** `cancelled`, before the settle | kept | kept |
+| evicted or cleared under the route | **P7** the readout's patch is refused → it drops itself | — | the route's own patch is refused → `unknown` arm, it returns | — | — |
+| malformed patch / stream throw | kept | final figure | **P8** `truncated` / `failed`, before the settle | kept + the warn/error notice | kept |
+
+### P1 — a queued entry is `streaming` and the readout counts from registration
+
+Roadmap 33 made the queued notice `streaming: true` so the queue is visible; I53 starts the clock
+when `readout` is called. Both correct, and registering where the entry is appended — the
+natural place, since that is where the fresh pending entry does it — counts the wait as the run.
+The readout is registered where the route takes the entry.
+
+### P2 — the queued notice has no delete, and nothing replaced it
+
+`ViewPatch` has no delete, so the header must *replace* the queued notice's block. **The table
+asked what replaced it today and the answer was nothing**: the route used `Settle.into` as its
+pending id and left the notice in place, so on the stream route the entry settled reading
+*queued behind /logs*. Not visible on the invoke route, where `settle(id, doc)` throws the whole
+document away — which is why it shipped.
+
+### P3 — the outcome has a home on one settlement and not the other
+
+C13 §5: `settle(id, doc)` replaces, `settle(id)` keeps. The design's *outcome in the header*
+holds on the second and cannot on the first, because after step 6 there is no header. The ruling
+follows the store rather than the drawing: the document is the outcome where it replaces the
+card, and only a route whose settle keeps the card writes into it.
+
+### P5 — the canceller settles without a document, so the card survives it
+
+`cancelThis` calls `transcript.settle(pendingId)` — no document — on both routes, so the header
+outlives a cancel and must say so. On the invoke route the aborted transport then rejects into
+the catch, whose `settleWithDocument` finds a settled entry and is refused (§8a row 7): the card
+stands with `cancelled` and the error document never lands, which is what T3.4 already asserted
+of the entry and now asserts of the header.
+
+### P7 — a refused patch is the same answer twice
+
+An entry evicted under a running route refuses the readout's patch (it drops itself, I53) and
+refuses the route's body patch (`unknown`, §8a A2's third arm). Two mechanisms, one store answer,
+no coordination needed — confirmed rather than found.
+
+### P8 — the error arms already appended a notice and settle without a document
+
+Malformed patch and stream throw both `append` a notice and `settle(id)`. The header takes a
+verdict before that settle for the same reason `end` does; the appended notice carries the why.
+
+## 8g. The sequence trace — one card from dispatch to settle
+
+`/tail web.log` on a real transcript with the harness clock (T4.40, T4.44). **Indexed by rule
+interaction**; the events are the mechanism and the cells are where two rules meet.
+
+| # | Sequence | Rules meeting | Outcome |
+|---|---|---|---|
+| 1 | submit → guard → append card → `readout` → `watch` → `stream` | I3 × I53 × §3b | header bare; a 1 s wake armed; stall clock started. Order: I3 puts the card before the transport, I53 puts the readout before the first wake can fire |
+| 2 | 1 s wake | I53 × I52 | `· 1s` written once, `rev` moves once; the guard is the string |
+| 3 | patch → `append` body | step 4 × §9c body | the block lands *after* the header — C13 `append` is positional and the header is block 0 |
+| 4 | 120 s silent → stall notice | I25 × §9c body | `⎿ no output for 2m` appended after the body; the header is `· 2m 0s` on the same frame — two writers, two block ids, one entry |
+| 5 | patch → `sawPatch` | A4 × I53 | stall row → `resumed after 2m` in place; the readout untouched |
+| 6 | `end` → **final header** → `settled` → `settle(id)` | I54 × C13 §6 × C13 §5b.2 | **the order is the ruling**: header patched with `· 2m 31s · exit 0` first; `settled` drops the readout; `settle` freezes it and persistence writes what it sees. Reversed, the patch still lands — the shell may write to a settled entry — and the persisted row has no verdict (T6.82) |
+| 7 | a wake after 6 | I53 × C13 I13 | the readout is gone, nothing is written — a settled card keeps its final figure |
+| 8 | Ctrl-C at 3 instead | C16 rung 1 × I54 × §8a row 7 | header `· Ns · cancelled` then `settle(id)`; the abort's rejection reaches a settled entry and is refused |
+| 9 | `/ps` queued behind 1, routed at 6 | roadmap 33 × I53 × P2 | the notice is replaced by `ps()`'s header, same id; its clock starts at 6 not at enqueue |
+
+**What the trace confirmed rather than found**: rows 2, 5 and 7 are I53's own rows (T3.61) seen
+from the route — the driver's contract held without change once the producer existed.
+
 ## 9. Tests
 
 Six tiers. Every cell of the §6 table is covered.
@@ -1658,6 +1791,11 @@ Fake transport, fake stores.
 - **T4.7** (with C16): Ctrl-C during a verb cancels; during a piped shell child forwards `SIGINT`.
 - **T4.7b** (with C16, C13): a submission made while focus is in the live block calls `router.resetFocus` after `transcript.append` and before `commit` — asserted on the call order, since a reset issued before the append would be undone by nothing and a reset issued after the commit paints one frame with focus in a frozen block.
 - **T4.8** (with C22): `cd` updates session state and the next spawn lands there.
+- **T4.40** (I54, with C13, §3d-bis): through `submit` and a real transcript, a streaming verb's entry reads `tail(web.log)` at t=0, `tail(web.log) · 4s` after four one-second wakes, holds the streamed blocks *under* the header, and reads `· 4s · exit 0` after `end` — unchanged by any wake after it. Driven through the pipeline's own route, never by calling `readout`: *a test that calls the mechanism misses the wiring*.
+- **T4.41** (I54): a line queued behind a running verb reads `queued behind tail` while it waits, gains no figure however far the clock advances, and reads `tail(web.log)` — the same entry id — the moment it is routed, its figure counting from there and not from the enqueue. Before the fix the entry settled still reading *queued behind*.
+- **T4.42** (I54, with C16): Ctrl-C on a running stream → the header reads `· Ns · cancelled` and the entry is settled; a later wake changes nothing.
+- **T4.43** (I54): the invoke route → the card is on screen while the transport runs and the settled document is the adapter's, with no `step` block in it.
+- **T4.44** (I54, I25, with §3b): two minutes of silence → `no output for 2m` is the card's last row, under the streamed body, while the header goes on counting; a patch replaces it with `resumed after 2m` in place; `end` settles with the header's final figure above both.
 - **T4.9** (with C14): appending while the viewport is detached does not move it (C14 I4, from this side).
 - **T4.12** (I36, entry 16 R1): the question opens on the choice marked `default`, not on the first. **A safety defect, and every navigation assertion agrees with the wrong answer** — arrows move, `⏎` resolves, accelerators fire, and a destructive verb's confirm sits on `yes`. Read from the frame: the claim is which row carries the marker.
 - **T4.13** (C09 I22, F122, entry 16 A5): the choices are a **block**, so the marker is a slot L1 resolves and no glyph is written at L4. Asserted on the ASCII rendering rather than on the type, because a file that stopped taking the capability and still spelled `•` would compile and would draw `•` on a `LANG=C` terminal.
@@ -1743,6 +1881,11 @@ Fake transport, fake stores.
 - **T6.49** (I48, with C22): draining the diagnostics **before** `lifecycle.release()` rather than after → T4.27 fails on its second half. The revert that reads as an ordering preference: the lines are written, to the alternate screen, and discarded with it — a flash and an empty shell, which is C22 I6's own argument arriving at a third source.
 - **T6.50** (I49): restoring the catch that skips `resetFocus` → T1.47 fails. Nothing crashes and no frame is wrong at the moment; focus sits in a frozen block from then on, which is T4.7b's failure without T4.7b's bound.
 - **T6.52** (I30, C07 I15): pinning `seq` to a constant in `streamInto` → T1.7b fails on both halves. This was the tree's state: the second `data` patch of every stream collided with the first under C04 I14, so a streaming verb could render exactly one block, and the per-stream reset fired on every patch. Found by the first tier-5 row to drive a `streams: true` verb through a real session; the unit suite passed throughout, because its `adaptPatch` double took no arguments and so could not see the one that was wrong.
+- **T6.80** (I54): appending `compose({ blocks: [] })` at step 3, as the tree did → T4.40 fails at its first assertion. The revert that is the whole of the old behaviour, and every other C23 row stays green because none read the pending document's blocks.
+- **T6.81** (I54): dropping the `readout` call at step 3 → T4.40 fails at its second: the header is composed once and never moves, F771 exactly, one component over from T6.53.
+- **T6.82** (I54): writing the final header **after** `transcript.settle` rather than before → T4.40 fails at its fourth: the document carried by the `settle` change — the one persistence writes (C13 §5b.2) — reads `· 4s` with no verdict, while the store's final state reads `· 4s · exit 0`. **Invisible to any assertion on the final state**, because a `"shell"` patch on a settled entry is accepted (C13 §6); the first draft of this row claimed a refusal and would have survived its own mutation. The natural order to write — *finish, then annotate* — is the wrong one.
+- **T6.84** (I25, §3b): measuring the resume record from `stalledAt` rather than from the last patch → T4.44 fails at its resumed frame: `resumed after 1m` under `no output for 2m`. This was the tree's state, and T1.30 and the §3b rows all match the phrase without the figure.
+- **T6.83** (I54): registering the readout at enqueue, or leaving the queued notice in place at the route → T4.41 fails on one half each: a queued line counts its wait as its run, or runs reading *queued behind*.
 - **T6.53** (I53): dropping the readout's arming clause from `armParts` → T3.61 fails at its second assertion — the figure never moves because no wake is armed, F227's class one row over — while every `elapsedNeeded` row stays green. Dropping the `settled` deletion → T3.61 fails at its third: the settled header keeps counting.
 
 ---

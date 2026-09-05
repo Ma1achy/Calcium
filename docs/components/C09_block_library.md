@@ -312,7 +312,7 @@ Each is a `measure`/`render` pair. The measurement column restates C04 §3 as an
 | Kind | Measure | Notes on render |
 |---|---|---|
 | `rule` | 1 | Label, optional meta, then a fill to `width`. **An empty label draws an unbroken line** (I21) |
-| `notice` | `ceil(cells(text) / w)` | Glyph, then wrapped text; `error`/`warn` require the glyph (C04 I5) |
+| `notice` | `ceil(cells(text) / w)` | Glyph, then wrapped text; `error`/`warn` require the glyph (C04 I5). **Declares one block-level element — the whole notice, `activate: action`, `copy: text` — exactly when `action` is present** (C04, C26 §5), none otherwise; under focus the glyph and text go `accent` over the selection ground (C26 §7) |
 | `keyValue` | rows | Two columns; key column sized to the longest key, capped at 20 |
 | `table` | delegated to C11 | Registered by C11, not here |
 | `steps` | steps | Spinner frame while active; tick or cross when settled |

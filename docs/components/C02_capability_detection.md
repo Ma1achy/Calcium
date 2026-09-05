@@ -70,6 +70,17 @@ Environment-based. **C02 never queries the terminal and never awaits a reply.** 
 | `imageProtocol` | From the identification, and `none` when `TMUX` is set. Measured: tmux consumes an unwrapped APC transmission. The DCS-wrapped form does reach the emulator at tmux's default, which is the fix — in `escapes.ts`, not here (F432) |
 | `imageProtocol` | The identification's own column (below): iTerm2 → `iterm2`; kitty and Ghostty → `kitty`; WezTerm, foot and Windows Terminal → `none`, **unmeasured rather than absent**; unidentified → `none` |
 | `keyboardProtocol` | The identification's second column (below): kitty, Ghostty, WezTerm and foot → `kitty`; iTerm2 and Windows Terminal → `none`, **unmeasured rather than absent**; unidentified → `none`; and `none` when `TMUX` is set, through the same gate every reader of the identification goes through (I11) — tmux 3.3's `extended-keys` can pass the sequences and is off by default, and nothing here has measured it |
+
+**Hover — DECSET 1003 — has no row here, and the absence is a ruling rather than a gap** (C01 I21,
+2026-09-05). A row in this table is a *rule*: an environment fact that predicts what the terminal can
+do. Nothing in the environment predicts 1003 separately from 1002 — every xterm-family emulator that
+honours button-event tracking honours any-event tracking, so the rule would read `hover: mouse`, a
+constant restated under a second name. What differs is not what the terminal *can* do but what the
+application *wants*: 1003 reports a sequence for every cell the pointer crosses, and only an
+application with a live readout under the pointer has a use for that stream. So the switch is
+`TuiConfig.hover` (C22) reaching C01 as an option, and `mouse` stays the one mouse fact this record
+holds — `mouse: false` still takes neither mode (C01 I10). The rule above the table is unchanged by it:
+everything the hover sets, `←`/`→` on a focused plot set too (C16 §4a).
 | `backgroundPolarity` | `COLORFGBG`'s **last** `;`-separated field: 0–6 or 8 → `dark`; 7 or 9–15 → `light`; absent, non-numeric or outside 0–15 → `unknown`. Not gated by `dumb` — the rule is derived from `COLORFGBG` and not from `TERM` |
 | `altScreen` | `TERM` present and ≠ `dumb` |
 

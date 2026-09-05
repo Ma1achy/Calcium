@@ -1007,6 +1007,26 @@ each kind names which:
   to carry it; the y-labels keep `muted`, so the enclosure lights up and the scale does not.
   Measured at 80 columns: seven rows differ (the x-label row does not), 164 cells, every one a
   frame glyph, and only in their SGR; every glyph and every cell's position is byte-identical.
+  **Measured in a session, none of it reached the screen for three weeks** (F802, arc 6):
+  `focusFor` writes `rowId: element.id`, and a plot's element id is its block id — while
+  `reserving` lit the frame on `rowId === null`, a state the catalogue's scenes and T1.25
+  constructed and no session produces. `↓` onto a plot with a camera left every `─` of its lid
+  `38;5;241` — 143 cells, muted before and after. **Fixed the same round**: `reserving` tests the
+  block's id, T1.25 constructs the session's form and holds the null form as a control that
+  paints nothing, and the two kinds below were written against the session's form from the start.
+- **`plot3d`** — its frame too: the box, the three axes and their ticks, in `accent` where they
+  were `muted`; the tick labels keep `muted` as the 2-D plot's y-labels do, and an axis carrying
+  its own tone keeps it (C12 I98 wins over focus, because a tone is data). The frame is
+  `scatter3.ts`'s and not `furniture.ts`'s, so `Layout.focused` cannot carry it; the arm reads
+  `ctx.focus` at the one place its frame ink is chosen. Measured before: a focused `plot3d` with
+  a camera and a focus naming it — zero rows differ at 60 columns.
+- **`notice`** — with an `action` (C04), the whole notice: glyph and text go `accent` over the
+  selection ground, the `pills` head's rule and for the `pills` head's reason — `accent` is a
+  legal notice `tone`, so `accent` alone would draw a focused `info` notice as an unfocused
+  `accent` one. The tone is dropped under focus as a table row drops its cell tones (C11 I14);
+  the glyph keeps its character, so `▲` still says *warn* while the colour says *focused*. A
+  notice without an `action` declares no element and cannot be focused, so no frame of one
+  moves (C09's row, T1.29's byte-identical arm).
 - **`scroll`** — the residue row, in `accent` where it was `dim`. It is the box's only chrome and
   it is present exactly when there is something scrolled out of view; a box whose content fits
   has no residue row and under focus draws as it did. That is the rule's consequence and is said
@@ -1026,10 +1046,18 @@ each kind names which:
 and the head chip adds reverse video. Whether a terminal renders a bold box-drawing glyph heavier
 is the terminal's; the residue row's text and the chip's are ordinary glyphs and read either way.
 
-**What still paints nothing, each owed under its own component**: a `table` under block-level
-focus (`rowId: null`, which the catalogue's `table-block-focus` scene constructs and no session
-reaches), a `plot3d` (its frame is `scatter3.ts`'s and not `furniture.ts`'s, so `Layout.focused`
-does not reach it), and a `mosaic`'s cell.
+**What still paints nothing**: a `table` under block-level focus (`rowId: null`, which the
+catalogue's `table-block-focus` scene constructs and no session reaches — owed under C11), and a
+`mosaic`'s cell — **and the second is a ruling rather than a remainder.** The rule above is *a
+tone on furniture the data draws*, and a mosaic draws none: measured at 60 columns, a two-by-two
+grid of notices puts `A` at column 0 and `B` at column 30 with no gap, no rail and no border
+between them, and every non-blank cell of the frame lies inside a child's rectangle
+(`mosaicRects`). There is no cell of the mosaic's own to tone, and toning the *child* would be a
+second focus rule living in every kind a mosaic can hold. So a focused mosaic is invisible, said
+here rather than absorbed, and `render-focus.test.ts` T1.28 pins it from both sides: the focused
+frame is byte-identical, **and** no non-blank cell lies outside a child's rectangle — the row
+that goes red the day the mosaic gains a gap or a border, which is the day this ruling expires
+and the residue-row precedent applies.
 
 **The chrome says the mode, the block says the focus** — `NAV` / `EDIT`, the way vim shows
 `-- INSERT --`. **This spec does not decide the chrome row.** Chrome is one row each by

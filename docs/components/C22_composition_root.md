@@ -36,6 +36,7 @@ type TuiConfig = Readonly<{
   commandPolicy?:     CommandPolicy;
   completionSources?: readonly CompletionSource[];
   chrome?:            Readonly<{ header: ChromeFn; footer: ChromeFn; footerRows?: number }>;   // §6k — 1..MAX_FOOTER_ROWS, default 1
+  hover?:             boolean;   // C01 I21 — mouse mode 1003 in 1002's place; config, not a capability (C02 §3); default off; `capabilities.mouse` false still takes neither
   blocks?:            readonly BlockDefinition[];
   transport?:         TransportRouter;
 
