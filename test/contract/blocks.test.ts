@@ -345,3 +345,15 @@ function srcFiles(dir: string, out: string[] = []): string[] {
   }
   return out;
 }
+
+describe("C09 §4 — the call grammar's glyph rows, owed at the spec commit", () => {
+  it.todo(
+    "T2.112 (C09 I45): every character in GLYPH_TABLE's unicode column, UNICODE's slots and every spinner set's frames is absent from the derived emoji-variation set; the control asserts U+23FA is in it — not deferred on a component: the derived table lands with C1 of the call grammar",
+  );
+  it.todo(
+    "T2.115 (C09 I48): T2.5b at both ambiguousWidth arms through glyphFor at WIDE_CAPS; the ten Ambiguous members resolve to ASCII at wide and the seven Neutral ones do not, by equality against the two named sets — not deferred on a component: glyphFor's width tier lands with C1 of the call grammar",
+  );
+  it.todo(
+    "T2.116 (C09 I49): glyphs(caps).separator is one cell at both arms and both alphabets, and no ` · ` literal remains in src/shell/ — not deferred on a component: the separator slot lands with C1 of the call grammar",
+  );
+});

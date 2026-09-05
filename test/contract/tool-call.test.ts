@@ -111,3 +111,12 @@ describe("§9c — the header, the body, and the row the body already has", () =
     console.log(`LANEB-FRAMES\n${captured.join("\n")}\nLANEB-FRAMES-END`);
   });
 });
+
+describe("C09 §4 — the head is fitted and is an element, owed at the spec commit", () => {
+  it.todo(
+    "T2.113 (C09 I46): a step notice whose text overflows measures 1 and renders 1 row at 80, 40 and 20 in both alphabets; with the argument span marked elide the argument ends in the marker and verb, duration and outcome are intact; the control under info wraps to two rows — not deferred on a component: the fitter lands with C2 of the call grammar",
+  );
+  it.todo(
+    "T2.114 (C09 I47): elementsIn over a step notice with no action yields one element with copy equal to the text and no activate; with an action, activate is that action; an info notice with no action yields none — not deferred on a component: GLYPH_ELEMENT lands with C2 of the call grammar",
+  );
+});
