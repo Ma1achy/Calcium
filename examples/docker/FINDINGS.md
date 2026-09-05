@@ -29263,6 +29263,16 @@ mechanism is owed.
 **Where**: `examples/docker/tools/media.py` `TYPE_AT`; `examples/docker/src/config.ts`;
 `src/shell/execution.ts` (the local route), `src/shell/construct.ts` (the greeting).
 
+**Addendum, 2026-09-05 21:27 — the default typing time fell into the window on every shot.**
+Regenerating the stills after the indentation round, with seven containers and the load generator
+up, the greeting's dashboard landed at 3.0 s (probe: cast frames at 0.9 s, then 3.0 s). Every
+still typed at the 1.5 s default and every still lost its verb — `/ps` never echoed, and
+`s3-live`'s command sat in the prompt unsubmitted. The same probe typing at 4.0 s drew the table by
+7 s. `TYPE_AT_DEFAULT` is 4.0 with the measurement beside it, and the after-keys now fire two
+seconds after the Enter rather than at a fixed 8.0 s, because `config-diff`'s first page-up had
+landed in the same instant as its Enter. The finding's mechanism is still owed; this is the
+number moving, not the fix.
+
 ---
 
 ## F814 — two rulings commits landed red on SP9 at their own trees, and the gate's conflict with spec-first was never written down ★★★★☆
