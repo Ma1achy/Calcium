@@ -1119,7 +1119,7 @@ gives it horizontal layout and multi-row falls out for free.
 claimant, and this design is the one that most wants the room.
 
 > **Superseded the same day by C22 §6l** (I82): the footer is its content — `[]` is zero rows,
-> the maximum is `MAX_FOOTER_ROWS` (four, derived) — and `TuiConfig.chrome.footerRows` is removed.
+> the maximum is `MAX_FOOTER_ROWS` (derived: four then, three since §6l.7's header rule) — and `TuiConfig.chrome.footerRows` is removed.
 > The three lines above are three blocks. The paragraph below is kept as the ruling it replaces.
 
 **DECIDED 2026-09-05 — C22 §6k, and the footer grows; the chrome does not compose.** The
