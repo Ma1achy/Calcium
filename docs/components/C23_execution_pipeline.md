@@ -601,6 +601,33 @@ Four rules, and each one exists because the walk found something:
 **A patch landing on a released host is tolerated silently**, as everywhere else here: `put`
 already returns `outcome.ok` and `unknown` is not a failure (I21, §5).
 
+#### The running card's readout
+
+**A pending entry's elapsed figure rides the same one-second wake, and nothing else could carry
+it** (I53, F771). `toolCallDoc`'s header consumes `elapsed()` once at composition, so a running
+card's `· 4s` is stale the moment it is drawn. Measured 2026-09-05: the stall detector re-arms at
+`STALL_MS / 4` — thirty seconds, thirty times too coarse for a figure that moves every second —
+and the part sweep already arms itself to `now + ELAPSED_TICK_MS` while a loading box is waiting
+(I52) or a backoff is counting down (F407). The readout is a third condition on that arming and a
+third loop in that sweep: `readout(id, blockId, render)` records the clock at registration, and
+every sweep compares `elapsed(now − startedAt)` with the figure last written and, only when they
+differ and only while `visible` says someone is looking, replaces the block through
+`transcript.patch(…, "shell")` with `render(since)`. **One wake for every running card, not one
+per card** — the timer is `armParts`'s, so ten cards cost the same timer as one. Time is C22's:
+`deps.clock` and `deps.schedule` come from `session.ts`, and C03's coalescing is why the figure is
+never derived from `tick` (C04 I66, C09 I32). It stops on `settled(id)`, on `release` of the entry
+host, on `dispose`, and on a patch the transcript refuses — an entry evicted or cleared underneath
+it. Below one second `elapsed()` draws nothing (T2.46), so the card reads *name(args)* at dispatch
+and gains `· 1s` on the first wake — the row's first assertion is the bare header, not `0s`.
+
+**It has no producer in `src/`.** `toolCallDoc`'s callers are `test/contract/tool-call.test.ts`
+and nothing else; the pending-entry route an agent harness would append through
+(`AGENT_TUI_DESIGN.md` §9c, entry 35) does not exist yet. The seam is built where the ruling puts
+it and the owed consumer is named by its symbol: whoever appends a `toolCallDoc` as a pending
+entry calls `refresh.readout(id, stepId, (ms) => b.notice("info", toolCallHeader({ …call,
+elapsedMs: ms }), "step", { id: stepId }))`. A row is the only caller today, which T2.6a's method
+— count producers over `src/`, not over the tree — reports as zero, correctly.
+
 #### The shape this was chosen over
 
 **Moving both defaults into this file**, so the framework's fallbacks live in one place rather
@@ -898,6 +925,7 @@ Per submission.
 - **I50** — **The `shell` route's failure is a document like any other: `error` filled, and the shell's own stderr in it.** A non-zero exit composed `status: "error"` with no `error` field, which C04 I3 forbids in both directions, so `transcript.append` refused every one of them (C13 I10) and the route produced **no entry at all** — the user seeing F15's fault notice cite two invariant numbers instead of the command they typed. This is the **third instance of the class `documents.ts` closed at `noticeDoc`**, and the argument recorded there — *filling the field here rather than at the two call sites is the class rather than the instances* — is why it recurred: the class was closed at one composer, and this route does not go through it. **Closing a class means checking the class has one member.** The second half is `stderr`: `ChildHandle` delivers it separately (C21 I3) and the route read only `stdout`, so a failing command's one explanatory sentence was produced, delivered and dropped — leaving a raw block that was empty as well as unappendable. §3's verb route already reads it, which is both the precedent and the proof it was reachable. **A bare word is the likeliest thing an unfamiliar reader types**, and it is the input this route exists for.
 - **I51** — **The two framework defaults construct a `status`, and its state is decided by whether a retry is coming.** `b.live`'s placeholder is `loading`; a failed fetch is `retrying` when the driver has a countdown to show and **`error` when it has not**, because §3d rule 3 makes `retryIn` `null` for every one-shot and a `retrying` box without `retryInMs` draws no activity line **and therefore no spinner** — a blank row where the one moving thing goes. The state union already carries the distinction, so the fallback reads it rather than asserting a state it has not observed (C09 §3a). **Their heights are 3, 2 and 1, they are *framed*, and only a frame says so.** The first ruling was 2, 2 and 1 on a measurement that still holds — both land inside `livePanel`, which already draws a border and carries the title, so at 3 the box spent a row on a second border inside the first and at 4 it bought the ERROR tag at two nested borders (F234). **What that ruling could not choose is the figure**, because C09's ladder coupled the tag to the border and every option was one of those two: a box that reads as a red line, or two nested frames. C09 §3a's `framed` ladder is the third, and it is the one this layer wanted — no border, because the panel has one, and the rows spent on the tag and the content instead. So `retrying` takes **3** (tag, message, activity line), `error` takes **2** (tag, message), and `loading` stays **1**: it has no tag to gain and its whole content is the line that moves. A declared height with nothing to put in it is still a blank row, which is I31 working and a defect only where this layer picks the number (F406).
 - **I52** — **The elapsed counter is written here, only when the figure changes, only while someone is looking, and never into a block this layer did not put there.** The clock is C23's — C04 I66 and C09 I32 forbid deriving a duration from `tick`, which C03 coalesces and drops under load, and L1 may not read one — so `resolveStall`'s shape is the precedent. **The guard is on the rendered string and not on the clock**, and its argument is hygiene rather than throughput: measured, the counter beside its own spinner costs **0.4 frames a second**, because C03 folds six writes in ten into a frame already scheduled — but a write that changes nothing observable is still a `rev` bump, and it invalidates C14's height cache and says a document changed when it did not (F234). **`anyoneLooking` gates it, the same gate the poll uses** (I46): C22's ticker disarms when nothing on screen animates and this driver cannot see the viewport, so off screen the spinner stops while the counter would go on writing — at one whole frame each rather than 0.4, which is the condition the cost measurement was taken under and could not itself name. And the target is **the block currently in place**, never one remembered at declaration, because a fetch can fail between the arm and the fire; `attempt` is `src.failures` and therefore consecutive, reset by any success and shared by every part behind one source (§8d D6).
+- **I53** — **A pending entry's elapsed readout re-composes on the one-second wake while it runs and stops when it settles**, through `readout(id, blockId, render)`: the figure is compared as a rendered string (I52's guard), written only while someone is looking (I46), and never after `settled`, `release` or a refused patch. One timer serves every readout — it is `armParts`'s wake, armed to `now + ELAPSED_TICK_MS` while any visible readout is live — and the stall detector's thirty-second re-arm is not the cadence, measured. The block the readout replaces is whatever `render` returns for the elapsed milliseconds, so the driver knows nothing of tool calls; `toolCallHeader` is the consumer's.
 ---
 
 ## 8. Commitments
@@ -949,6 +977,7 @@ Per submission.
 44. The framework's loading and failure boxes are `status` blocks whose state is read from whether a retry is coming, at the heights a frame chose rather than the ladder's preferred figure (I51).
 45. An elapsed counter advances in the transcript while a first fetch is in flight, and stops writing when the figure would not change, when nobody is looking, and when the block it was armed for is gone (I52).
 46. A `view` target resolves at any depth inside its own entry and no wider, and the two sites that resolve it — the open and the live re-read behind every motion — move together (I31).
+47. A pending entry's elapsed readout advances once a second while the entry runs, on the one wake every readout shares, and stops moving when the entry settles (I53).
 
 ---
 
@@ -1019,6 +1048,15 @@ into answers (F234).
 **C1 is a structural finding and no sequence could reach it** — nothing happens between *a
 one-shot declares no interval* and *the fallback picks a state*. It is two correct statements
 overlapping in a cell, which is the only place either artefact has ever found anything.
+
+#### The readout — the rows the trace adds (I53)
+
+| # | sequence | rules that meet | ruling |
+|---|---|---|---|
+| R1 | readout armed → the entry **settles** → the wake fires | `settled` × the sweep | `settled(id)` deletes the readout before the wake, so the settled header keeps its final figure. Without the deletion the settled entry would keep counting — the running card's defect, inverted |
+| R2 | readout armed → the entry is **evicted** → the wake fires | C13's cap × `transcript.patch` | the patch returns `{ok:false}` and the readout is dropped on the refusal, as `put` tolerates a released host (I21, §5) |
+| R3 | two readouts on two entries → one wake | I53's one timer × I52's arming | `armParts` arms once to `now + ELAPSED_TICK_MS`; both are written in one sweep and one `commit("stream")` |
+| R4 | readout armed → the host **scrolls off screen** → the wake fires | I46 × the readout | no write and no arming — the counter's gate; `visibilityChanged` re-arms when it is back |
 
 ### A1 — the cancellation window, and the ladder that cannot see it
 
@@ -1607,6 +1645,7 @@ Fake transport, fake stores.
 - **T3.36** (I35): `staleAfter` below the interval → warned at declaration; staleness would otherwise fire on every tick.
 - **T3.37** (I48, §8b B1): a swallow while `stopping` → recorded in `faults`, **no notice appended**. B1's ruling reaching a fourth non-submission append rather than a fourth exception to it.
 - **T3.38** (§5a): a transcript whose `append` throws **unconditionally** → the fault notice cannot land either, and `faults` still carries the reason. The end of the ladder, fabricated rather than stated: the frozen shape is a claim about a construction path, and the glyph defect is how F15 was found.
+- **T3.61** (I53): a readout registered on a pending entry → the header reads `name(args)` at t=0, `name(args) · 4s` once the clock has advanced four seconds and the wake has fired, and the same string after `settled` however far the clock advances. Two readouts share one armed timer, and a hidden host arms none.
 
 ### Tier 4 — integration
 
@@ -1704,6 +1743,7 @@ Fake transport, fake stores.
 - **T6.49** (I48, with C22): draining the diagnostics **before** `lifecycle.release()` rather than after → T4.27 fails on its second half. The revert that reads as an ordering preference: the lines are written, to the alternate screen, and discarded with it — a flash and an empty shell, which is C22 I6's own argument arriving at a third source.
 - **T6.50** (I49): restoring the catch that skips `resetFocus` → T1.47 fails. Nothing crashes and no frame is wrong at the moment; focus sits in a frozen block from then on, which is T4.7b's failure without T4.7b's bound.
 - **T6.52** (I30, C07 I15): pinning `seq` to a constant in `streamInto` → T1.7b fails on both halves. This was the tree's state: the second `data` patch of every stream collided with the first under C04 I14, so a streaming verb could render exactly one block, and the per-stream reset fired on every patch. Found by the first tier-5 row to drive a `streams: true` verb through a real session; the unit suite passed throughout, because its `adaptPatch` double took no arguments and so could not see the one that was wrong.
+- **T6.53** (I53): dropping the readout's arming clause from `armParts` → T3.61 fails at its second assertion — the figure never moves because no wake is armed, F227's class one row over — while every `elapsedNeeded` row stays green. Dropping the `settled` deletion → T3.61 fails at its third: the settled header keeps counting.
 
 ---
 

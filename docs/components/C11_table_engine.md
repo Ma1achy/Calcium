@@ -143,6 +143,13 @@ Detail is indented by 2 cells, so it measures at `width − 2`. Detail blocks ar
 
 **Measured before this landed** (F764, arc3 Lane A): after `↓ ⇧↓ ⇧↓` the frame showed the head in `accent` and the two rows above it in `default` — the extent had one reader, `y`. And `pills` read `ctx.focus` nowhere: `render` consulted `active` and `tone` only, so a focused chip was invisible in every frame. Both are the same omission — `FocusState` carried the head and nothing painted anything but a table row — and both close here: a chip is painted `accent` when it is the head and washed when it is selected, on the rule above.
 
+**A row declares a `detail` iff the plan lost something a reader would want back** (C26 §5, C15 §2a; 2026-09-05):
+a non-empty cell's column was dropped by the plan, or a visible cell is wider than its planned width and was
+cut. The detail is a `keyValue` of column label → full text, and it is **absent** when nothing was lost — a
+peek over a row that fits would say nothing. Measured over the corpus at 80 columns: **13 of 20 tables cut
+something, 50 of 80 rows**; docker's real `/ps` drops `ports` on every row. Width is measured with
+`cells(text, "narrow")` — the stated limit, because the plan's own measure is the one the detail answers to.
+
 ### The action bar (I17)
 
 A trailing row carrying the **focused row's** actions — `⏎ detail  ␣ expand  ≡ logs  ⚡ events` in S03 §2, and the equivalent in S02, S05, S06 and S14.

@@ -64,6 +64,10 @@ no component to land them in yet. Neither is authoritative, and the distinction 
 in one direction: reading a scratchpad tells you why a spec says what it says, and
 reading a note tells you what nobody has decided.
 
+**[`KEYS.md`](KEYS.md)** — the key ladder as one table, **generated** by `npx tsx tools/keymap-table.mjs`
+from `defaultKeymap` (C16 §6) and drift-checked by `test/unit/keymap-table.test.ts`. Not edited by
+hand: regenerate it when a binding changes, and the test says when the file and the keymap disagree.
+
 ---
 
 ## Build order

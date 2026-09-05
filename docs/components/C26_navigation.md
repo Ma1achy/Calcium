@@ -721,8 +721,19 @@ type NavElement = Readonly<{
   escape?: EscapePolicy;
   activate?: Action;
   copy?: string;                                   // §5c — the element's source, never its rendering
+  detail?: Block;                                  // what the rendering could not show; shown as C15's peek (C15 §2a)
 }>;
 ```
+
+**`detail?` is source, like `copy`, and it is shown rather than copied.** The declarer supplies it
+from the data it was given, never from the painted cells: `tableElements` lists the columns this
+width dropped and the cells it truncated — label against full text, as a `keyValue` — and omits
+the field when nothing was cut, so a row that fits declares no detail and no peek appears. Measured
+before it was built: 13 of 20 corpus tables cut something at 80 columns, 50 of 80 rows, and docker's
+real `/ps` drops `ports` on every row. L4 shows it beside the focused element as a `kind: "peek"`
+layer, on key and on the click that focuses alike (C15 §2a). **Known limit**: the cut test uses
+`cells()` at the default ambiguous width and reads `text` alone, so a cell whose glyph column or
+ambiguous-width text overflows by that one cell may be cut without declaring a detail.
 
 **`arrow?` and `escape?` are drawn here and have no value to carry** (§4d). They were withheld
 from the tree by MG24 for having no reader; both vocabularies have since been checked against
@@ -830,7 +841,7 @@ inherits the property rather than being the component that breaks it.
 
 ### The anchor is the only new state, one level up
 
-`StoredFocus.anchor` beside `element`, and **`element` is the head** — there is not a second position to keep in step with where focus is. `anchor === element` is no selection. `extendRow` places the anchor on the **first** extension and never touches it again; `focusRow` collapses. That is C17 I21 restated at the level above, and the defect it forbids is the same one: an extension that moves the anchor is right on the first keystroke and wrong on the second, and every assertion about *a row being selected* passes either way.
+`StoredFocus.anchor` beside `element`, and **`element` is the head** — there is not a second position to keep in step with where focus is. `anchor === element` is no selection. `extendRow` places the anchor on the **first** extension and never touches it again; `focusRow` collapses. That is C17 I21 restated at the level above, and the defect it forbids is the same one: an extension that moves the anchor is right on the first keystroke and wrong on the second, and every assertion about *a row being selected* passes either way. **The extent has one home**: `extentOf` beside `resolveFocus` resolves the head through I10, matches the anchor exactly and collapses a stale anchor to the head (I16), and `copyElement` and `focusFor` both read it — what `y` copies and what the frame washes are one answer, not two copies of eight lines that agree until one is edited (§8b.4's hazard).
 
 **`⇧↑` stops at the first element rather than leaving the block.** Unshifted `↑` exits to the prompt — the reader stepping out (I13) — and extending is a gesture *inside* the block; one that walked out would take the selection with it and leave nothing to copy.
 

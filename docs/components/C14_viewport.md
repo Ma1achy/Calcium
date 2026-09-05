@@ -415,7 +415,7 @@ Copy mode remembers whether it was following, so leaving it resumes the tail rat
 - **I2** — `topRow` is always in `[0, max(0, totalRows − viewportHeight)]`.
 - **I3** — A cached height is valid iff its entry's `rev` and the current `width` both match the ones it was measured at. Theme, colour depth and unicode mode are excluded by construction. **This is a validity predicate over one slot per entry, not a composite map key**, so the cache holds at most one height per entry and a stale revision has nowhere to accumulate: after any number of patches, `cache.size ≤ entries.length`.
 - **I4** — Content growing above the viewport never moves the visible rows while detached.
-- **I5** — `followTail` is on iff the viewport is at the bottom.
+- **I5** — `followTail` is on iff the viewport is at the bottom — `atTail(topRow, maxTop)`, derived from where the viewport ended up and never from which way the reader scrolled. `atTail` is C14's one export of the comparison, and the shell's tail helpers (C04 I97) read it rather than holding a copy, so `>=` cannot drift to `>` in one of the three places that ask.
 - **I6** — The anchor is an `EntryId` plus a row offset, never an index, so eviction cannot shift it.
 - **I7** — A row offset exceeding its entry's height after remeasure clamps to that entry's last row, never spilling into the next.
 - **I8** — Width changes invalidate the whole cache; height changes invalidate nothing.
