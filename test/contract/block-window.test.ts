@@ -13,6 +13,9 @@ import { checkMeasurement, formatReport } from "../../src/testing/measurement-co
 import { tableDefinition } from "../../src/presentation/table/index.js";
 import { measurable, visible } from "../support/render.js";
 import type { Block, TableRow } from "../../src/data/viewmodel/index.js";
+import type { BlockFault } from "../../src/presentation/blocks/index.js";
+import { plotDefinition } from "../../src/presentation/plot/index.js";
+import { ONE_PER_KIND } from "../support/blocks.js";
 
 const logs = (n: number): Block =>
   ({
@@ -413,13 +416,33 @@ describe("C09 §2a — a block reduced to a valid smaller block", () => {
   });
 });
 
-// C04 §3 *Both axes* / C09 §2c rulings, committed spec-first (F814 for why an `it.todo`
-// carries each row until the code commit replaces it).
-describe("C09 §2c width — the registry's answer", () => {
-  it.todo(
-    "T2.110 (C09 I42): the sealed registry answers width(b, w) === normaliseWidth(w) for rule, progress, plot, image, scroll and mosaic at 40 and at 7; a definition returning w + 5 is clamped to w with onError called once naming the kind — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
-  );
-  it.todo(
-    "T2.111 (C09 I44): the set of default definitions declaring width equals {notice, raw, pills, keyValue, code, table, group, panel}, compared by equality — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
-  );
+describe("C09 §2c width — the registry's answer (I42, I44)", () => {
+  const FILLING = ["rule", "progress", "plot", "image", "scroll", "mosaic"] as const;
+  const DECLARING = ["notice", "raw", "pills", "keyValue", "code", "table", "group", "panel"];
+
+  it("T2.110 (C09 I42): a kind declaring no width answers the width, and an answer outside the range is clamped and reported", () => {
+    const kit = measurable({ definitions: [plotDefinition as never, tableDefinition as never] });
+    for (const kind of FILLING) {
+      const b = ONE_PER_KIND[kind];
+      expect(kit.registry.width(b, 40), `${kind} at 40`).toBe(40);
+      expect(kit.registry.width(b, 7), `${kind} at 7`).toBe(7);
+    }
+
+    const faults: BlockFault[] = [];
+    const wide = {
+      kind: "wide",
+      measure: (): number => 1,
+      width: (_b: unknown, w: number): number => w + 5,
+      render: (): never => { throw new Error("never rendered"); },
+    };
+    const loud = measurable({ definitions: [wide as never], onError: (f) => faults.push(f) });
+    expect(loud.registry.width({ kind: "wide", id: "w" } as unknown as Block, 40), "clamped to the cell").toBe(40);
+    expect(faults.map((f) => [f.member, f.kind]), "reported once, naming the member and the kind").toEqual([["width", "wide"]]);
+  });
+
+  it("T2.111 (C09 I44): the set of default kinds declaring width equals the spec's list, by equality", () => {
+    const kit = measurable({ definitions: [tableDefinition as never] });
+    const declaring = kit.kinds.filter((k) => kit.registry.get(k)?.width !== undefined);
+    expect(new Set(declaring)).toEqual(new Set(DECLARING));
+  });
 });

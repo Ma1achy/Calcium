@@ -44,6 +44,9 @@ export type {
   Scroll,
   Status,
   Valign,
+  Halign,
+  Align,
+  WidthFn,
   Share,
   Patch,
   PatchResult,
@@ -109,6 +112,13 @@ export {
   groupChildWidths,
   insetWidth,
   normaliseWidth,
+  ALIGN_ENTRIES,
+  axesOf,
+  groupPlacements,
+  groupRows,
+  offsetIn,
+  type Axes,
+  type Placement,
 } from "./measure.js";
 
 export {

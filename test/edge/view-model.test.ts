@@ -770,31 +770,131 @@ describe("C04 §3d, §4 — the floor a layer above sets", () => {
   });
 });
 
-// C04 §3 *Both axes* / C09 §2c rulings, committed spec-first (F814 for why an `it.todo`
-// carries each row until the code commit replaces it).
-describe("C04 §3 both axes — the frames", () => {
-  it.todo(
-    "T3.69 (C04 I101): a one-row pills block right in a 40-cell row beside a raw block draws what a hand-padded raw of the same cells draws, compared as cells — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
-  );
-  it.todo(
-    "T3.70 (C04 I101): the same block centre in a cell with an odd remainder sits one cell left of the exact middle, read from the frame — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
-  );
-  it.todo(
-    "T3.71 (C04 I101): a rule aligned right renders byte-identical to the same rule aligned left — equality of frames, not an absence — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
-  );
-  it.todo(
-    "T3.72 (C04 I102): a two-row notice alone in a row group with minRows 5 and bottom-right draws on rows 3-4 ending at the right edge; compared to a frame composed by hand — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
-  );
-  it.todo(
-    "T3.73 (C04 I100): bottom on a column group with minRows 5 draws the child on rows 0-1 and pads below — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
-  );
-  it.todo(
-    "T3.74 (C04 I103): the F816 fixture — a four-line raw beside a pills block aligned bottom — answers the chip's element at rows 3-4; aligned right its cols end at the row's right edge; both compared to where the frame carries the label — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
-  );
-  it.todo(
-    "T3.75 (C04 I102): a group with minRows 4 and a reserved minHeight 6 measures 6 through the registry and its bottom child draws on row 3, not row 5 — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
-  );
-  it.todo(
-    "T3.76 (C04 I101, C09 I43): a notice wrapping at 40 cells aligned right in a 60-cell cell renders the same rows as at 40 shifted by the offset, and measures the same at both widths — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
-  );
+describe("C04 §3 both axes — the frames (I100–I103)", () => {
+  const trim = (lines: readonly string[]): string[] => lines.map((l) => visible(l).replace(/\s+$/u, ""));
+  const chips = (id = "chips"): Block =>
+    block({ kind: "pills", id, chips: [{ id: `${id}-one`, label: "one" }, { id: `${id}-two`, label: "two" }] });
+
+  it("T3.69 (C04 I101): a pills block aligned right draws what a hand-padded raw draws", () => {
+    // "one  two" is eight cells; in a nineteen-cell allocation `right` puts it at
+    // column 11 of the cell, which is column 32 of the row (20 + gutter + 11).
+    const kit = measurable({});
+    const tall = b.raw("a\nb\nc");
+    const shares = [{ cells: 20 }, { cells: 19 }];
+    const byContainer = kit.renderToLines(
+      b.group("row", [tall, chips()], { flex: shares, align: ["top", "right"] }),
+      40,
+    );
+    const byHand = kit.renderToLines(
+      b.group("row", [tall, b.raw(`${" ".repeat(11)}one  two`)], { flex: shares }),
+      40,
+    );
+    expect(trim(byContainer)).toEqual(trim(byHand));
+    expect(visible(byContainer[0] ?? "").indexOf("one"), "the chip's column, read from the frame").toBe(32);
+
+    // **A kind that pads its rows to the width**, because `pills` does not and
+    // the first mutation pass showed the row above cannot tell a child rendered
+    // at its cell from one rendered at its content width (F818). A `raw` pads,
+    // so rendered at nineteen cells it would spill past its eight-cell box.
+    const rawRight = kit.renderToLines(
+      b.group("row", [tall, b.raw("ab")], { flex: shares, align: ["top", "right"] }),
+      40,
+    );
+    const rawHand = kit.renderToLines(b.group("row", [tall, b.raw(`${" ".repeat(17)}ab`)], { flex: shares }), 40);
+    expect(trim(rawRight)).toEqual(trim(rawHand));
+    expect(visible(rawRight[0] ?? "").indexOf("ab")).toBe(38);
+  });
+
+  it("T3.70 (C04 I101): centre with an odd remainder floors — one cell left of the middle", () => {
+    // Slack of 11 in the nineteen-cell cell: the exact middle is 5.5 and the
+    // chip sits at 5, which is column 26 of the row (table row 7).
+    const kit = measurable({});
+    const frame = kit.renderToLines(
+      b.group("row", [b.raw("a"), chips()], { flex: [{ cells: 20 }, { cells: 19 }], align: ["top", "centre"] }),
+      40,
+    );
+    expect(visible(frame[0] ?? "").indexOf("one")).toBe(26);
+  });
+
+  it("T3.71 (C04 I101): a kind declaring no width fills, so right renders byte-identical to left", () => {
+    // Equality of frames, not an absence (table row 1): a `rule` is its width.
+    const kit = measurable({});
+    const rule = block({ kind: "rule", id: "r", label: "x" });
+    const right = kit.renderToLines(b.group("row", [rule], { align: ["right"] }), 40);
+    const left = kit.renderToLines(b.group("row", [rule], { align: ["left"] }), 40);
+    expect(right).toEqual(left);
+    expect(right.map(visible).join("\n"), "and it is a full-width rule").toMatch(/^[^\s].{38}[^\s]$/u);
+  });
+
+  it("T3.72 (C04 I102): a two-row notice alone in a floored row sits in the bottom-right corner", () => {
+    // The corner primitive: one child, a `row` group, a floor of five. The
+    // notice's two rows land on rows 3–4 and end at the right edge; compared to
+    // a frame composed by hand rather than to counts.
+    const kit = measurable({});
+    const notice = b.notice("info", "hello\nworld");
+    const group = b.group("row", [notice], { minRows: 5, align: ["bottom-right"] });
+    expect(kit.measure(group, 30)).toBe(5);
+    const frame = trim(kit.renderToLines(group, 30));
+    expect(frame).toEqual(["", "", "", `${" ".repeat(25)}hello`, `${" ".repeat(25)}world`]);
+  });
+
+  it("T3.73 (C04 I100): bottom on a column group is ignored and the floor pads below", () => {
+    // Table row 4: a column's cell is the child's own height, so there is
+    // nothing to move inside; the floor is paid at the bottom.
+    const kit = measurable({});
+    const group = b.group("column", [b.raw("a\nb")], { minRows: 5, align: ["bottom"] });
+    expect(kit.measure(group, 20)).toBe(5);
+    expect(trim(kit.renderToLines(group, 20))).toEqual(["a", "b", "", "", ""]);
+  });
+
+  it("T3.74 (C04 I103): the F816 fixture — an element sits where the frame drew it, on both axes", () => {
+    // A four-line raw beside a bottom-aligned pills block: the chips draw on
+    // row 3 and used to answer `rows [0, 1)`. The assertion reads the frame for
+    // the row and column that carry the label and compares the element to that,
+    // so a walk that agreed with the wrong renderer would still fail.
+    const kit = measurable({});
+    const tall = b.raw("a\nb\nc\nd");
+    const bottom = b.group("row", [tall, chips()], { align: ["top", "bottom"] });
+    const frame = kit.renderToLines(bottom, 40).map(visible);
+    const drawnRow = frame.findIndex((l) => l.includes("one"));
+    expect(drawnRow, "the frame's row").toBe(3);
+    const elements = kit.registry.elementsIn([bottom], 40).filter((e) => e.blockId === "chips");
+    expect(elements.map((e) => e.element.rows)).toEqual([{ from: 3, to: 4 }, { from: 3, to: 4 }]);
+    const oneCol = frame[drawnRow]?.indexOf("one") ?? -1;
+    expect(elements[0]?.element.cols.from, "the chip's column, read from the frame").toBe(oneCol);
+
+    const right = b.group("row", [tall, chips()], { align: ["top", "right"] });
+    const rightFrame = kit.renderToLines(right, 40).map(visible);
+    const two = kit.registry.elementsIn([right], 40).filter((e) => e.blockId === "chips")[1];
+    // The cell's right edge, not the row's: equal weights at 40 give 19 + 1 + 19
+    // and the remainder is unspent (I42), so the edge is 39.
+    const widths = childWidths(right, 40);
+    expect(two?.element.cols.to, "the last chip ends at its cell's right edge").toBe((widths[0] ?? 0) + 1 + (widths[1] ?? 0));
+    expect(two?.element.cols.to).toBe(39);
+    expect(two?.element.cols.from).toBe(rightFrame[0]?.indexOf("two"));
+  });
+
+  it("T3.75 (C04 I102, §3d): the author's floor and the view's compose — cells use minRows, the reserve pads below", () => {
+    // Table row 6: `minHeight` is applied by the registry outside the
+    // definition, so a bottom child is placed within the declared four rows
+    // and the two reserved rows come after it.
+    const kit = measurable({});
+    const declared = b.group("row", [b.raw("x")], { minRows: 4, align: ["bottom"] });
+    const reserved = { ...declared, minHeight: 6 } as Group;
+    expect(kit.measure(reserved, 20)).toBe(6);
+    const frame = trim(kit.renderToLines(reserved, 20));
+    expect(frame).toHaveLength(6);
+    expect(frame.findIndex((l) => l === "x"), "row 3, not row 5").toBe(3);
+  });
+
+  it("T3.76 (C04 I101, C09 I43): a wrapping notice aligned right is its own render at its content width, shifted", () => {
+    const kit = measurable({});
+    const notice = b.notice("info", "the quick brown fox jumps over the lazy dog and keeps on running far");
+    const cw = kit.registry.width(notice, 60);
+    expect(cw, "it wraps, so the content is narrower than the cell").toBeLessThan(60);
+    expect(kit.measure(notice, cw), "I43").toBe(kit.measure(notice, 60));
+    const aligned = trim(kit.renderToLines(b.group("row", [notice], { align: ["right"] }), 60));
+    const own = trim(kit.renderToLines(notice, cw)).map((l) => `${" ".repeat(60 - cw)}${l}`.replace(/\s+$/u, ""));
+    expect(aligned).toEqual(own);
+  });
 });

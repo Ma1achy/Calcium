@@ -56,7 +56,7 @@ import type {
   Glyph,
   Group,
   Share,
-  Valign,
+  Align,
   Hunk,
   KeyValue,
   Logs,
@@ -1389,7 +1389,7 @@ function scroll(
 function group(
   direction: "row" | "column",
   children: readonly Block[],
-  opts?: BlockOpts & { flex?: readonly Share[]; align?: readonly Valign[] },
+  opts?: BlockOpts & { flex?: readonly Share[]; align?: readonly Align[]; minRows?: number },
 ): Group {
   const flex = opts?.flex;
   if (flex !== undefined) {
@@ -1418,6 +1418,10 @@ function group(
       `b.group: ${String(align.length)} alignments for ${String(children.length)} children`,
     );
   }
+  const minRows = opts?.minRows;
+  if (minRows !== undefined && (!Number.isInteger(minRows) || minRows < 1)) {
+    throw new TypeError(`b.group: minRows is a whole number of rows above zero — got ${JSON.stringify(minRows)}`);
+  }
 
   return finish<Group>(
     {
@@ -1427,6 +1431,7 @@ function group(
       children,
       ...(flex === undefined ? {} : { flex: [...flex] }),
       ...(align === undefined ? {} : { align: [...align] }),
+      ...(minRows === undefined ? {} : { minRows }),
     } as Group,
     opts,
     false,

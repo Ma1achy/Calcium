@@ -19,6 +19,7 @@ import {
   type ViewDocument,
 } from "../../src/data/viewmodel/index.js";
 import { CORPUS, doc, ONE_PER_KIND, tableOf } from "../support/blocks.js";
+import { axesOf } from "../../src/data/viewmodel/index.js";
 import { ASCII_CAPS, FULL_CAPS, measurable } from "../support/render.js";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { createViewport } from "../../src/viewport/viewport/index.js";
@@ -448,16 +449,44 @@ describe("C04 fail-on-revert", () => {
   });
 });
 
-// C04 §3 *Both axes* / C09 §2c rulings, committed spec-first (F814 for why an `it.todo`
-// carries each row until the code commit replaces it).
 describe("C04 §3 both axes — fail-on-revert", () => {
-  it.todo(
-    "T6.87 (C04 I100): parsing the entry horizontal-first → T2.110 fails on the refusal row and T3.72 draws the child at the top — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
-  );
-  it.todo(
-    "T6.88 (C04 I102): dropping minRows from the measure → T2.111 and T3.72 fail; dropping it from the render only → T3.72 fails on the frame while the height agrees — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
-  );
-  it.todo(
-    "T6.89 (C04 I103): placing every child at the row's top in the element walk → T3.74 fails; the render is untouched, which is F816 restored — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
-  );
+  it("T6.87 (C04 I100): parsing the entry horizontal-first → T2.110 fails on the refusal and T3.72 draws at the top", () => {
+    expect(axesOf("bottom-right")).toEqual({ v: "bottom", h: "right" });
+    expect(axesOf("right"), "one axis, horizontal").toEqual({ v: "top", h: "right" });
+    expect(axesOf(undefined), "absent is top-left").toEqual({ v: "top", h: "left" });
+    const outcome = validateBlock({
+      kind: "group", id: "g", direction: "row", children: [{ kind: "raw", id: "r", text: "x" }], align: ["right-bottom"],
+    });
+    expect(outcome.ok, "the swapped order is refused").toBe(false);
+  });
+
+  it("T6.88 (C04 I102): dropping minRows from the measure or from the render → T3.72 fails; both halves are asserted", () => {
+    // The render-only revert keeps the height agreeing while the frame is
+    // wrong, which is why the row reads the frame and not the count.
+    const kit = measurable({});
+    const group = block({
+      kind: "group", id: "g", direction: "row", children: [{ kind: "raw", id: "r", text: "x" }], minRows: 5, align: ["bottom"],
+    });
+    expect(kit.measure(group, 20)).toBe(5);
+    const frame = kit.renderToLines(group, 20).map((l) => l.replace(/\s+$/u, ""));
+    expect(frame, "five rows drawn").toHaveLength(5);
+    expect(frame[4], "the child on the last row").toBe("x");
+  });
+
+  it("T6.89 (C04 I103): placing every child at the row's top in the element walk → T3.74 fails; the render is untouched", () => {
+    const kit = measurable({});
+    const group = block({
+      kind: "group", id: "g", direction: "row",
+      children: [
+        { kind: "raw", id: "tall", text: "a\nb\nc\nd" },
+        { kind: "pills", id: "chips", chips: [{ id: "one", label: "one" }] },
+      ],
+      align: ["top", "bottom"],
+    });
+    const frame = kit.renderToLines(group, 40);
+    const drawn = frame.findIndex((l) => l.includes("one"));
+    const element = kit.registry.elementsIn([group], 40).find((e) => e.blockId === "chips");
+    expect(element?.element.rows.from, "the walk agrees with the frame").toBe(drawn);
+    expect(drawn, "and the frame is F816's").toBe(3);
+  });
 });

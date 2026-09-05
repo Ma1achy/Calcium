@@ -298,13 +298,22 @@ describe("C09 tier 6", () => {
   });
 });
 
-// C04 §3 *Both axes* / C09 §2c rulings, committed spec-first (F814 for why an `it.todo`
-// carries each row until the code commit replaces it).
 describe("C09 §2c width — fail-on-revert", () => {
-  it.todo(
-    "T6.87 (C09 I43): making notice.width return the unwrapped cells → T3.67 fails on a wrapped notice — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
-  );
-  it.todo(
-    "T6.88 (C09 I44): declaring width on rule returning w → T2.111 fails on the set while T2.110 still passes — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
-  );
+  it("T6.87 (C09 I43): notice.width answering the unwrapped cells → T3.67 fails on a wrapped notice", () => {
+    // The unwrapped text is 66 cells; at 40 the answer is the longest wrapped
+    // row, inside the cell, and no fault is reported — a revert to the raw
+    // length would be clamped and reported, which LOUD turns into a throw.
+    const kit = measurable({});
+    const notice = block({ kind: "notice", id: "n", tone: "info", text: "the quick brown fox jumps over the lazy dog and keeps on running far" });
+    const cw = kit.registry.width(notice, 40);
+    expect(cw).toBeLessThanOrEqual(40);
+    expect(cw).toBeLessThan(cells("the quick brown fox jumps over the lazy dog and keeps on running far"));
+    expect(kit.measure(notice, cw)).toBe(kit.measure(notice, 40));
+  });
+
+  it("T6.88 (C09 I44): declaring width on rule → T2.111 fails on the set while the clamp still passes", () => {
+    const kit = measurable({});
+    expect(kit.registry.get("rule")?.width, "a rule is its width and declares no member").toBeUndefined();
+    expect(kit.registry.width(block({ kind: "rule", id: "r", label: "x" }), 40)).toBe(40);
+  });
 });

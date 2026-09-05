@@ -13,6 +13,7 @@ import {
   BORDER_INSET,
   ROW_GUTTER,
   childWidths,
+  groupPlacements,
   hasChildren,
   mosaicRects,
   normaliseWidth,
@@ -421,6 +422,33 @@ class Registry implements BlockRegistry {
   measure = (block: Block, width: number): number => this.#measured(block, normaliseWidth(width)).rows;
 
   /**
+   * A block's content width at `width` (§2c, I42) — the definition's answer,
+   * clamped to `[1, width]`, or `width` for a kind that declares none.
+   *
+   * **Asked of the capped form**, as `measure` is: the rows the cap kept are
+   * the rows that draw, and a longest line in a dropped row would have the
+   * block answer wider than anything it renders. A definition answering outside
+   * the range has described a block its cell cannot hold, and that is reported
+   * through `onError` rather than silently clamped — the clamp still happens,
+   * because a width is needed either way.
+   */
+  width = (block: Block, width: number): number => {
+    const w = normaliseWidth(width);
+    const form = this.#formContained(block, w) ?? this.#resolve(block);
+    const answer = form.definition.width;
+    if (answer === undefined) return w;
+    try {
+      const got = answer(form.block, w, this.width);
+      if (Number.isInteger(got) && got >= 1 && got <= w) return got;
+      this.#report(block, "width", new RangeError(`${block.kind}.width answered ${String(got)} at ${String(w)}`));
+      return Number.isFinite(got) ? Math.max(1, Math.min(w, Math.trunc(got))) : w;
+    } catch (error) {
+      this.#report(block, "width", error);
+      return w;
+    }
+  };
+
+  /**
    * A sequence's rows: the blocks' heights plus one per `gapBefore` (C04 §3a).
    *
    * The gap belongs to the sequence and never to the block, so this is the only
@@ -522,8 +550,24 @@ class Registry implements BlockRegistry {
           return;
         }
         case "group": {
+          // **The placements are the renderer's, from the one function that
+          // computes them** (C04 I103). F816 is the alternative measured: the
+          // renderer placed a `bottom` child with Yoga and this walk placed
+          // every child at the row's top, so a chip drawn on row 3 answered
+          // `rows [0, 1)`. A child is placed at its content width when it is
+          // aligned off `left` (C04 I101) — the width the renderer draws it at.
+          const placements = groupPlacements(block, atWidth, this.measure, this.width);
           if (block.direction === "column") {
-            sequence(block.children, top, left, widths[0] ?? 1);
+            // A sequence still — the gap is the run's (C04 §3a) and the step is
+            // the child's height at the column's width, which its content width
+            // agrees with (C09 I43).
+            let row = top; // cells-ok — a row cursor, not a width
+            block.children.forEach((child, i) => {
+              if (child.gapBefore === true) row += 1;
+              const at = placements[i];
+              place(child, row + (at?.top ?? 0), left + (at?.left ?? 0), at?.width ?? widths[0] ?? 1);
+              row += this.measure(child, widths[0] ?? 1);
+            });
             return;
           }
           // Side by side: `childWidths` shares with `ROW_GUTTER` between each
@@ -533,7 +577,8 @@ class Registry implements BlockRegistry {
           let col = left;
           block.children.slice(0, placeable(block, atWidth)).forEach((child, i) => {
             const share = widths[i] ?? 1;
-            place(child, top, col, share);
+            const at = placements[i];
+            place(child, top + (at?.top ?? 0), col + (at?.left ?? 0), at?.width ?? share);
             col += share + ROW_GUTTER;
           });
           return;
@@ -729,6 +774,7 @@ class Registry implements BlockRegistry {
       ...ctx,
       width,
       measureChild: this.measure,
+      widthChild: this.width,
       renderChild: (child: Block, childWidth: number): ReactElement =>
         this.render(child, { ...ctx, width: childWidth }),
     };

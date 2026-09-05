@@ -111,6 +111,28 @@ export const tableDefinition: BlockDefinition<Table> = {
 
   elements: tableElements,
 
+  /**
+   * C09 §2c — the planned columns and their gaps, when that is what every row
+   * is. The action bar, the empty message and an expanded row's detail are
+   * clamped to the width rather than to the columns — so a table with any of
+   * those fills, and only a table that is columns all the way down answers
+   * narrower. An overflowed plan (the last kept column truncated) is the width
+   * by construction. **A flex column is the plan's business, not a guard
+   * here**: the plan hands it the residual, so an uncapped flex column sums to
+   * the width on its own, and a `maxWidth`-capped one sums to less — which is
+   * the truth, and a guard returning the width for it would have lied. The
+   * mutation pass found the guard redundant on its first run (F818).
+   */
+  width(block: Table, width: number): number {
+    const w = normaliseWidth(width);
+    if (!hasBody(block) || hasActionBar(block) || block.rows.some((row) => row.expanded === true)) return w;
+    const plan = planColumns(block.columns, w);
+    if (plan.overflowed) return w;
+    let total = 0;
+    plan.visible.forEach((column, i) => { total += column.width + (i > 0 ? plan.gap : 0); });
+    return Math.max(1, Math.min(w, total));
+  },
+
   measure(block: Table, width: number, measureChild: MeasureFn): number {
     const w = normaliseWidth(width);
     const header = hasHeader(block) ? 1 : 0;

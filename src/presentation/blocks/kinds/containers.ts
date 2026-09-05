@@ -23,11 +23,11 @@ import {
   ROW_GUTTER,
   sequenceHeight,
 } from "../../../data/viewmodel/index.js";
-import type { Block, Group, MeasureFn, Mosaic, Panel, Scroll } from "../../../data/viewmodel/index.js";
-import { mosaicRects, parseAreas } from "../../../data/viewmodel/index.js";
+import type { Block, Group, MeasureFn, Mosaic, Panel, Scroll, WidthFn } from "../../../data/viewmodel/index.js";
+import { BORDER_INSET, axesOf, groupPlacements, groupRows, mosaicRects, parseAreas } from "../../../data/viewmodel/index.js";
 import type { NavElement } from "../types.js";
 import { cells, stripControl, truncate } from "../../text.js";
-import { glyphFor, glyphs } from "../glyphs.js";
+import { glyphCells, glyphFor, glyphs } from "../glyphs.js";
 import { clampSpans, paint, tone } from "../paint.js";
 import type { BlockDefinition, RenderContext } from "../types.js";
 
@@ -52,6 +52,30 @@ export const panelDefinition: BlockDefinition<Panel> = {
     // The border, one row each side. An empty panel is still two rows: the
     // border is content, unlike an empty group (C04 I17).
     return atLeastOne(total) + 2;
+  },
+
+  /**
+   * C09 §2c — the widest child plus the border, or the title or footer plus
+   * their furniture, whichever is wider. The furniture is five: `railPart`
+   * truncates to `inner − 3` and wraps the text in a space each side, so a
+   * title of `n` cells needs `n + 5` columns to draw untruncated with one
+   * horizontal glyph beside it; a live title carries its glyph and a space.
+   * Children are asked at the inset width they are rendered at.
+   */
+  width(block: Panel, width: number, widthChild: WidthFn): number {
+    const w = normaliseWidth(width);
+    const inner = insetWidth(w);
+    let widest = 1;
+    for (const child of block.children) widest = Math.max(widest, widthChild(child, inner));
+    const rail = (text: string | undefined, live: boolean): number => {
+      const shown = stripControl(text ?? "");
+      if (shown === "") return 0;
+      return cells(shown) + (live ? glyphCells("live") + 1 : 0) + 5; // narrow-ok — `width` is pure in (block, width) as `measure` is (C09 I42), and narrow is the measurer's convention
+    };
+    return Math.max(
+      1,
+      Math.min(w, Math.max(widest + BORDER_INSET, rail(block.title, block.live === true), rail(block.footer, false))),
+    );
   },
 
   render(block: Panel, ctx: RenderContext): ReactElement {
@@ -174,19 +198,13 @@ export const panelDefinition: BlockDefinition<Panel> = {
 
 // --- group -----------------------------------------------------------------
 
-/**
- * C04's vocabulary to Ink's, **down the row's height only** (C04 I45).
- *
- * There is no horizontal table because there is no horizontal axis: every
- * renderer fits its output to the width it is handed, so a child fills its
- * allocation and has nothing to be placed within. Heights are measurable and
- * widths are not.
- */
-const DOWN = {
-  top: "flex-start",
-  middle: "center",
-  bottom: "flex-end",
-} as const;
+// The vertical axis used to be a table from `Valign` to Yoga's `justifyContent`,
+// with a comment saying there was no horizontal table because there was no
+// horizontal axis: every renderer fits its output to the width it is handed.
+// That was true of the seam that existed — `measure(block, width) → height` —
+// and C09 §2c's `width` is the seam it lacked (F817). Both axes are now
+// `groupPlacements` in `measure.ts`, read here as margins and by the registry's
+// element walk as offsets (C04 I103), because the two used to disagree (F816).
 
 // --- scroll -----------------------------------------------------------------
 
@@ -588,47 +606,84 @@ export const groupDefinition: BlockDefinition<Group> = {
       // side by side have no "before" to put a gap in, so the field is ignored
       // there rather than being an error — which is why the two branches do not
       // share this line.
-      return atLeastOne(sequenceHeight(block.children, widths[0] ?? width, measureChild));
+      return atLeastOne(groupRows(block, sequenceHeight(block.children, widths[0] ?? width, measureChild)));
     }
 
     let tallest = 0;
     for (const height of heights) tallest = Math.max(tallest, height);
-    return atLeastOne(tallest);
+    // The author's floor (C04 I102): the row is its tallest child, or `minRows`
+    // if that is taller — and the cells are that tall, which is what lets a
+    // single child sit in a corner.
+    return atLeastOne(groupRows(block, tallest));
+  },
+
+  /**
+   * C09 §2c — a container answers only when its layout does not depend on the
+   * width it is given. A `row` whose shares are all `{cells}` sums them and the
+   * gutters; a `column` whose children are all `left` takes the widest. Every
+   * other group fills: a weighted row rendered at its own sum would re-divide
+   * that sum and land its children elsewhere, and a column holding a `right`
+   * child would move it when the column's cell shrank (C04 §3 table row 11a).
+   */
+  width(block: Group, width: number, widthChild: WidthFn): number {
+    const w = normaliseWidth(width);
+    if (block.direction === "column") {
+      if (block.children.some((_child, i) => axesOf(block.align?.[i]).h !== "left")) return w;
+      let widest = 1;
+      for (const child of block.children) widest = Math.max(widest, widthChild(child, w));
+      return Math.min(w, widest);
+    }
+    const shares = block.flex;
+    if (shares === undefined || shares.some((share) => typeof share !== "object")) return w;
+    const widths = childWidths(block, w);
+    const placed = placeable(block, w);
+    let total = 0;
+    for (let i = 0; i < placed; i += 1) total += (widths[i] ?? 1) + (i > 0 ? ROW_GUTTER : 0);
+    return Math.max(1, Math.min(w, total));
   },
 
   render(block: Group, ctx: RenderContext): ReactElement {
     const width = normaliseWidth(ctx.width);
     const widths = childWidths(block, width);
+    // **One placement, read here as margins** (C04 I103). `left` renders at the
+    // cell and moves nothing, so an unaligned row is byte for byte what it was;
+    // `centre` and `right` render the child at its content width and offset it
+    // (C04 I101). The vertical offset is against the row's height — the tallest
+    // child or `minRows` — and zero in a column, where the cell is the child's own
+    // height and there is nothing to move inside.
+    const placements = groupPlacements(block, width, ctx.measureChild, ctx.widthChild);
 
     const children = block.children
       .slice(0, placeable(block, width))
       .flatMap((child, index) => {
-        // **One axis, and it is not a measurement** (C04 I45). The child's Box
-        // is already the width the container computed and already stretches to
-        // the row's height, so `justifyContent` places its lines down inside a
-        // box that was sized before it was read. Absent is `top`, which is what
-        // a row did before this existed.
-        const align = block.align?.[index];
+        const at = placements[index] ?? { left: 0, top: 0, width: widths[index] ?? 1 };
+        // The cell — the allocation wide, stretched to the row's height by the
+        // row's default `alignItems` — and inside it the child at its placement.
+        // **No height is stated on the cell, and a dead guard is why that is
+        // written down.** A first version passed the row's height here; the row
+        // leaves `alignItems` at stretch, so every cell is already the row's
+        // height and the arithmetic changed nothing. It was added while
+        // diagnosing a consumer's failing frame that turned out to be a stale
+        // `dist/`, which is how a guard comes to be justified by a sentence that
+        // is true and not about the decision it is attached to.
         const drawn = createElement(
           Box,
           {
             key: child.id === "" ? String(index) : child.id,
             width: widths[index] ?? 1,
             flexDirection: "column",
-            // **No height is stated, and a dead guard is why that is written
-            // down.** A first version passed the row's height here, reasoning
-            // that `justifyContent` places content along a box's main axis and
-            // a box with no height is as tall as its content. The reasoning is
-            // sound and the premise is false: the row leaves `alignItems` at
-            // its default stretch — for the reason given below — so every child
-            // is already the row's height and the arithmetic changed nothing.
-            // **It was added while diagnosing a consumer's failing frame that
-            // turned out to be a stale `dist/`**, which is how a guard comes to
-            // be justified by a sentence that is true and not about the
-            // decision it is attached to.
-            ...(align === undefined ? {} : { justifyContent: DOWN[align] }),
           },
-          ctx.renderChild(child, widths[index] ?? 1),
+          createElement(
+            Box,
+            {
+              width: at.width,
+              flexDirection: "column",
+              flexShrink: 0,
+              ...(at.left === 0 ? {} : { marginLeft: at.left }),
+              ...(at.top === 0 ? {} : { marginTop: at.top }),
+            },
+            ctx.renderChild(child, at.width),
+          ),
         );
         return block.direction === "column" && child.gapBefore === true
           ? [createElement(Text, { key: `gap-${index}` }, " "), drawn]
@@ -656,6 +711,9 @@ export const groupDefinition: BlockDefinition<Group> = {
         // row, present at every width and invisible until something counts.
         columnGap: block.direction === "row" ? ROW_GUTTER : 0,
         overflowX: "hidden",
+        // The author's floor (C04 I102) — `minHeight`, never `height`, on §3d's
+        // measured argument: an over-full fixed box drops its first row.
+        ...(block.minRows === undefined ? {} : { minHeight: block.minRows }),
       },
       children,
     );

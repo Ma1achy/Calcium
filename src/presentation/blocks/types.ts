@@ -6,7 +6,7 @@
  * renderer (C09 §1).
  */
 import type { ReactElement } from "react";
-import type { Action, Block, Camera, Measure, MeasureFn } from "../../data/viewmodel/index.js";
+import type { Action, Block, Camera, Measure, MeasureFn, WidthFn } from "../../data/viewmodel/index.js";
 import type { ResolvedTheme } from "../theme/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 
@@ -38,7 +38,7 @@ export type BlockFault = Readonly<{
    */
   id: string;
   /** Which half gave way. Three, and the fourth was folded into `elements` (I30). */
-  member: "measure" | "render" | "elements";
+  member: "measure" | "render" | "elements" | "width";
   /**
    * The rows the error box needs for the text it is about to draw (I34, C22 I69).
    *
@@ -223,6 +223,8 @@ export type RenderContext = Readonly<{
    * to compile rather than failing to matter (C09 §2, C23 §3a). 2026-09-03.
    */
   measureChild: MeasureFn;
+  /** The registry's `width` (§2c) — a container asks a child's content width through this and never imports the registry. */
+  widthChild: WidthFn;
   renderChild: (block: Block, width: number) => ReactElement;
 }>;
 
@@ -245,7 +247,7 @@ export type RenderContext = Readonly<{
  * honours three — which is what says it generalises past one surface.
  * FINDINGS F85.
  */
-export type RenderContextInput = Omit<RenderContext, "measureChild" | "renderChild">;
+export type RenderContextInput = Omit<RenderContext, "measureChild" | "widthChild" | "renderChild">;
 
 /**
  * A block reduced to a smaller one, plus the leading rows of it the caller drops
@@ -465,6 +467,15 @@ export interface BlockDefinition<B extends Block = Block> {
    *
    * The first producer is `plot`'s digits (C12 I116).
    */
+  /**
+   * §2c — the columns the block's content occupies at `width`, in `[1, width]`,
+   * pure in `(block, width)` as `measure` is (I42). Optional on `window?`'s
+   * argument: a kind whose drawing *is* its width — a `rule`, a `progress`, a
+   * `plot` — declares nothing, and the registry answers `width` for it. The
+   * contract that makes it safe to render at is I43: the block is the same
+   * height at this width as at `width`.
+   */
+  width?: (block: B, width: number, widthChild: WidthFn) => number;
   keymap?: (block: B) => readonly BlockKeyBinding[];
 }
 
@@ -473,6 +484,8 @@ export interface BlockRegistry {
   get(kind: string): BlockDefinition | undefined;
   seal(): void;
   measure(block: Block, width: number): number;
+  /** §2c — a block's content width at `width`, clamped to `[1, width]`; the width itself for a kind declaring none (I42). */
+  width(block: Block, width: number): number;
   render(block: Block, ctx: RenderContextInput): ReactElement;
   /** A run of blocks laid out down the screen, `gapBefore` included (C04 §3a). */
   measureSequence(blocks: readonly Block[], width: number): number;

@@ -36,6 +36,8 @@ import {
   formatReport,
 } from "../../src/testing/measurement-conformance.js";
 import { ASCII_CAPS, measurable } from "../support/render.js";
+import { ALIGN_ENTRIES, block as blockOf } from "../../src/data/viewmodel/index.js";
+import type { Block as AnyBlock } from "../../src/data/viewmodel/index.js";
 
 /**
  * Every member of the union, listed. The annotation is the assertion: adding a
@@ -531,16 +533,44 @@ function readIfPresent(path: string): string {
   }
 }
 
-// C04 §3 *Both axes* / C09 §2c rulings, committed spec-first (F814 for why an `it.todo`
-// carries each row until the code commit replaces it).
-describe("C04 §3 both axes — construction", () => {
-  it.todo(
-    "T2.110 (C04 I100): align of bottom-right, centre, top on a three-child row constructs; right-bottom is refused naming the entry and the order; two entries on three children is refused naming both counts — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
-  );
-  it.todo(
-    "T2.111 (C04 I102): minRows 6 constructs and the group measures 6 with two-row children; 0, -1, 2.5 and a string are each refused naming the field — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
-  );
-  it.todo(
-    "T2.112 (C04 I100, C04 I45): every one of the fifteen entries constructs on a one-child row and each measures the same height as no align at all — not deferred on a component: the component exists, and the row is owed by this round's code commit, which replaces this `it.todo` with the test (A03 §7a, SP9 under a spec-first commit)",
-  );
+describe("C04 §3 both axes — construction (I100, I102)", () => {
+  const raws = (n: number): AnyBlock[] =>
+    Array.from({ length: n }, (_, i) => ({ kind: "raw", id: `c${String(i)}`, text: "x\ny" }) as AnyBlock);
+  const errors = (over: Record<string, unknown>): string => {
+    const outcome = validateBlock({ kind: "group", id: "g", direction: "row", children: raws(3), ...over });
+    return outcome.ok ? "" : outcome.error.join(" ");
+  };
+
+  it("T2.110 (C04 I100): both axes construct, vertical first, one entry per child", () => {
+    expect(errors({ align: ["bottom-right", "centre", "top"] })).toBe("");
+    // **Vertical first, as the type reads** (table row 14): a typo that parsed
+    // either way round would be a layout nobody asked for.
+    const swapped = errors({ align: ["right-bottom", "top", "top"] });
+    expect(swapped).toContain("align[0]");
+    expect(swapped).toContain("bottom-right");
+    const short = errors({ align: ["left", "top"] });
+    expect(short).toContain("2 entries for 3 children");
+  });
+
+  it("T2.111 (C04 I102): minRows is a positive whole number, and the group measures it", () => {
+    expect(errors({ minRows: 6 })).toBe("");
+    const kit = measurable();
+    const floored = blockOf({ kind: "group", id: "g", direction: "row", children: raws(2), minRows: 6 });
+    expect(kit.measure(floored, 40), "two-row children under a floor of six").toBe(6);
+    for (const bad of [0, -1, 2.5, "6"]) {
+      expect(errors({ minRows: bad }), JSON.stringify(bad)).toContain("minRows");
+    }
+  });
+
+  it("T2.112 (C04 I100, C04 I45): every one of the fifteen entries constructs and none moves a height", () => {
+    expect(ALIGN_ENTRIES, "the vocabulary").toHaveLength(15);
+    const kit = measurable();
+    const plain = blockOf({ kind: "group", id: "g", direction: "row", children: raws(1) });
+    for (const entry of ALIGN_ENTRIES) {
+      const aligned = blockOf({ kind: "group", id: "g", direction: "row", children: raws(1), align: [entry] });
+      for (const width of [7, 40, 120]) {
+        expect(kit.measure(aligned, width), `${entry} at ${String(width)}`).toBe(kit.measure(plain, width));
+      }
+    }
+  });
 });

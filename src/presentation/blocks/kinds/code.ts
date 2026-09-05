@@ -35,7 +35,7 @@ import xml from "highlight.js/lib/languages/xml";
 import yaml from "highlight.js/lib/languages/yaml";
 import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
 import type { Code } from "../../../data/viewmodel/index.js";
-import { expandTabs, hardWrapCells, stripControl, truncateParts } from "../../text.js";
+import { cells, expandTabs, hardWrapCells, stripControl, truncateParts } from "../../text.js";
 import { sliceRuns } from "../../runs.js";
 import { paint, rows, slot, tone, type Span } from "../paint.js";
 import type { BlockDefinition, RenderContext, Windowed } from "../types.js";
@@ -306,6 +306,16 @@ export const codeDefinition: BlockDefinition<Code> = {
   // what lets a language ship tomorrow without reflowing yesterday's transcript.
   measure: (block: Code, width: number): number =>
     atLeastOne(codeRows(block, width).length), // cells-ok
+
+  // C09 §2c — the longest row the block draws at this width. Wrapped rows are
+  // already cut to the width, and a truncated row is exactly the width, so the
+  // answer is the width whenever anything did not fit.
+  width: (block: Code, width: number): number => {
+    const w = normaliseWidth(width);
+    let longest = 0;
+    for (const row of codeRows(block, w)) longest = Math.max(longest, cells(row.text)); // narrow-ok — `width` is pure in (block, width) as `measure` is (C09 I42), and narrow is the measurer's convention
+    return Math.max(1, Math.min(w, longest));
+  },
 
   /**
    * C09 I25 — rows `[from, to)`, as a smaller `code` (C14 §4a, C04 I82).

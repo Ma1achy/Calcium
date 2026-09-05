@@ -157,7 +157,8 @@ const MUTATIONS = [
     // renderer fits its output to the width it is handed.
     name: "the vertical axis is never applied",
     file: CONTAINERS,
-    from: "            ...(align === undefined ? {} : { justifyContent: DOWN[align] }),",
+    // Re-anchored 2026-09-05 (C04 I103): the axis is a margin now.
+    from: "              ...(at.top === 0 ? {} : { marginTop: at.top }),",
     to: "",
     expect: "T3.22",
   },
@@ -165,9 +166,10 @@ const MUTATIONS = [
     // **The vertical default moved to the bottom**, which would move every
     // short child in every existing row group without anything asking.
     name: "the vertical axis defaults to bottom",
-    file: CONTAINERS,
-    from: "        const align = block.align?.[index];",
-    to: "        const align = block.align?.[index] ?? \"bottom\";",
+    // Re-anchored 2026-09-05: the default is read where the placement is computed.
+    file: MEASURE,
+    from: "    const axes = axesOf(block.align?.[i]);",
+    to: "    const axes = axesOf(block.align?.[i] ?? \"bottom\");",
     expect: "T3.22",
   },
 ];

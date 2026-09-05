@@ -29410,3 +29410,35 @@ superseded marker, because a deleted reason is a reason the next person re-deriv
 
 ---
 
+## F818 — landing both axes: what the build and the mutation pass took off the walk ★★★☆☆
+
+The ruling (C04 §3 *Both axes*, C09 §2c) was walked with a fifteen-row classification table before
+any code. Landing it moved seven things, and the instrument that found each is the reusable part.
+
+| what moved | found by | shape |
+|---|---|---|
+| a weighted `row` cannot answer a content width — rendered at its own sum it re-divides and is a different layout | reading the group's `width` against `divideShares` before writing it | the implementation falsifies the walk |
+| a `table` with an action bar, an expanded row or no rows fills — those rows are clamped to the cell, not to the columns | the same read, one kind over | same |
+| the panel's furniture is five cells, not the walk's four — `railPart` truncates to `inner − 3` and pads a space each side | T3.69 asserting the border *carries the title* at the answered width and not one cell narrower, rather than trusting either count | the arithmetic is not the ceiling |
+| the panel answered **3 at every width** — a `Math.min` where a `Math.max` belonged | a five-line probe before the tests were written | a probe at the extremes runs once |
+| a `column` group's measure missed the floor — the `row` arm had it and the early return above it did not | T3.73's frame: 2 rows where 5 were owed | reading the frame |
+| an aligned child's right edge is its **cell's**, 39 at 40 under equal weights — the remainder is unspent (I42) | T3.74 expecting 40 | a test that constructs the state it claims |
+| the flex guard in `table.width` was redundant — the plan hands a flex column the residual, and for a `maxWidth`-capped one the guard would have answered the width where the plan answers the truth | the mutation pass: *table width ignores flex* survived | a mutation can indict its subject |
+
+**The mutation pass ran thirteen mutations and two survived on the first pass.** One indicted the
+fixture: *aligned child rendered at the cell width* survived because the row's subject was a
+`pills` block, and `pills` does not pad its rows — rendered at nineteen cells or at eight it emits
+the same eight, so R2's *render at the content width* was unobservable on the kind chosen to show
+it. A `raw` pads, and the row now carries one. The other indicted the code, above; the mutation is
+deleted with the guard rather than kept against a clause that no longer exists.
+
+**F816's repair held under its own revert**: *element walk ignores the vertical placement* is killed
+by T3.74, which reads the frame for the row carrying the chip's label and compares the element to
+that — so a walk agreeing with a wrong renderer would still fail.
+
+**Where**: `src/data/viewmodel/measure.ts` `groupPlacements`; `src/presentation/blocks/kinds/containers.ts`
+`groupDefinition`, `panelDefinition.width`; `src/presentation/table/definition.ts` `width`;
+`tools/mutate/runs/c04-both-axes.mjs`; C04 T3.69, T3.73, T3.74; C09 T3.69.
+
+---
+

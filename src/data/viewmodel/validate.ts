@@ -45,6 +45,7 @@ import {
   type ViewDocument,
 } from "./types.js";
 import { parseAreas } from "./mosaic.js";
+import { ALIGN_ENTRIES } from "./measure.js";
 import { overlayFault } from "./overlay.js";
 import { parseStartDate } from "../dates.js";
 import { isContainerKind } from "./tree.js";
@@ -1260,6 +1261,7 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     }
     checkFlex(b, e, at);
     checkAlign(b, e, at);
+    checkMinRows(b, e, at);
   },
   raw: (b, e, at) => {
     requireString(b, "text", e, at);
@@ -1476,7 +1478,7 @@ function checkFlex(b: Record<string, unknown>, e: string[], at: string): void {
 }
 
 /**
- * A `row` group's per-child vertical alignment (C04 I45).
+ * A group's per-child alignment, both axes (C04 I100; I45 for the vertical half).
  *
  * Refused on the same terms as `flex`: a length that does not match the children
  * has no reading, and a value outside the vocabulary would be silently ignored
@@ -1500,9 +1502,26 @@ function checkAlign(b: Record<string, unknown>, e: string[], at: string): void {
   }
 
   for (const [i, entry] of align.entries()) {
-    if (entry !== "top" && entry !== "middle" && entry !== "bottom") {
-      e.push(`${at}.align[${String(i)}]: one of top, middle, bottom`);
+    if (typeof entry !== "string" || !(ALIGN_ENTRIES as readonly string[]).includes(entry)) {
+      // Vertical first in the paired form — `bottom-right`, never `right-bottom`
+      // (I100 table row 14): the order is the type's, and an entry that parsed
+      // either way round would be a typo that became a layout.
+      e.push(
+        `${at}.align[${String(i)}]: one of top, middle, bottom, left, centre, right, or vertical-horizontal such as bottom-right`,
+      );
     }
+  }
+}
+
+/**
+ * The author's floor on a group (C04 I102), on I44's argument for `cells`: a
+ * floor of zero or a fraction of a row names something the grid cannot draw.
+ */
+function checkMinRows(b: Record<string, unknown>, e: string[], at: string): void {
+  const minRows = b["minRows"];
+  if (minRows === undefined) return;
+  if (typeof minRows !== "number" || !Number.isInteger(minRows) || minRows < 1) {
+    e.push(`${at}: "minRows" is a whole number of rows above zero`);
   }
 }
 

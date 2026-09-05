@@ -2814,9 +2814,19 @@ export type Group = Readonly<{
    * carry a position. Two is the limit — a third parallel array is a record per
    * child, and this one is not it.
    *
-   * Ignored on a `column` group, on `flex`'s precedent and for its reason.
+   * The vertical component is ignored on a `column` group, on `flex`'s precedent
+   * and for its reason; the horizontal applies there too (I100). Both axes since
+   * 2026-09-05 — the paired form is vertical first, `bottom-right`.
    */
-  align?: readonly Valign[];
+  align?: readonly Align[];
+  /**
+   * The author's floor on the group's rows (I102): the group measures
+   * `max(content, minRows)` and its cells are that tall, so a single child in a
+   * `row` group with a floor can sit in any corner. Not `Floor.minHeight`, which
+   * is view state a layer above sets and no kind reads (§3d); the registry
+   * applies that one outside the definition and the two compose.
+   */
+  minRows?: number;
 }> & Gap & Floor;
 
 /**
@@ -2866,8 +2876,26 @@ export type Share = number | Readonly<{ cells: number }>;
  * habit is to grep from the satisfier rather than to watch from the deferral.
  *
  * Absent is `top`, which is what a row did before this existed.
+ *
+ * **Superseded in its horizontal claim (2026-09-05, C04 §3 *Both axes*, F817).**
+ * The sentence above about widths was true of the seam that existed —
+ * `measure(block, width) → height` — and not of blocks. C09 §2c's `width` is
+ * the seam it lacked, `Halign` is the axis, and `Align` is the one field that
+ * carries both. The vertical half stands, and so does its consumer.
  */
 export type Valign = "top" | "middle" | "bottom";
+
+/** Where a child's content sits in its cell's width (C04 I100, I101). */
+export type Halign = "left" | "centre" | "right";
+
+/**
+ * One entry of a group's `align` (C04 I100): one axis, or both with the
+ * vertical first — `"bottom"`, `"right"`, `"bottom-right"`. Fifteen values;
+ * absent is `"top-left"`, which renders byte for byte what an unaligned group
+ * rendered. `"right-bottom"` is refused at the builder, because a typo that
+ * parsed would become a layout nobody asked for (I100 table row 14).
+ */
+export type Align = Valign | Halign | `${Valign}-${Halign}`;
 
 /** The escape hatch, and load-bearing: the vocabulary never has to be complete. */
 export type Raw = Readonly<{
@@ -3272,6 +3300,14 @@ export type Result<T, E> = Readonly<{ ok: true; value: T }> | Readonly<{ ok: fal
  * what it is measuring (A02 Seam 1).
  */
 export type MeasureFn = (block: Block, width: number) => number;
+
+/**
+ * The registry's `width`, as a container receives it (C09 §2c, I42): the columns
+ * a block's content occupies at `width`, in `[1, width]`. A kind that declares
+ * no `width` answers `width` through this — the second kind of answer, not a
+ * missing one.
+ */
+export type WidthFn = (block: Block, width: number) => number;
 
 /**
  * C04 declares this and implements none of it. The measurers live in C09, C11,

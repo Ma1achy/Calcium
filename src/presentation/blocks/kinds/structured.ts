@@ -101,6 +101,19 @@ export const keyValueDefinition: BlockDefinition<KeyValue> = {
 
   measure: (block: KeyValue): number => atLeastOne(block.rows.length), // cells-ok
 
+  // C09 §2c — the key column, the gap and the longest value; a row carrying a
+  // bar fills, because the bar absorbs the residual. The floor of `keyWidth + 4`
+  // is `keyColumn`'s own: it caps the key column at `width − 4`, so a narrower
+  // answer would shrink the column and draw a different block.
+  width: (block: KeyValue, width: number): number => {
+    const w = normaliseWidth(width);
+    if (block.rows.some((row) => row.bar !== undefined)) return w;
+    const keyWidth = block.keyWidth ?? keyColumn(block, w);
+    let longest = 0;
+    for (const row of block.rows) longest = Math.max(longest, cells(stripControl(row.value))); // narrow-ok — `width` is pure in (block, width) as `measure` is (C09 I42), and narrow is the measurer's convention
+    return Math.max(1, Math.min(w, Math.max(keyWidth + 4, keyWidth + COLUMN_GAP + longest)));
+  },
+
   /**
    * C09 I25 — rows `[from, to)`, as a smaller `keyValue` with its key column
    * pinned.

@@ -3273,9 +3273,9 @@ The generic suite. **These run against every registered block kind, including ap
 - **T3.71** (I101): a `rule` aligned `right` renders byte-identical to the same `rule` aligned `left` — the no-op of table row 1, asserted as equality of frames rather than as an absence.
 - **T3.72** (I102): a two-row `notice` alone in a `row` group with `minRows: 5` and `align: ["bottom-right"]` draws its two rows on rows 3–4, ending at the right edge; the frame is compared to one composed by hand.
 - **T3.73** (I100): `["bottom"]` on a `column` group with `minRows: 5` draws the child on rows 0–1 and pads below — table row 4, read from the frame.
-- **T3.74** (I103): the F816 fixture — a four-line `raw` beside a `pills` block aligned `bottom` — answers the chip's element at `rows [3, 4)`; the same block aligned `right` answers `cols` ending at the row's right edge; both compared to where the rendered frame carries the chip's label.
+- **T3.74** (I103): the F816 fixture — a four-line `raw` beside a `pills` block aligned `bottom` — answers the chip's element at `rows [3, 4)`; the same block aligned `right` answers `cols` ending at its **cell's** right edge, which at 40 under equal weights is 39 and not 40 because the remainder is unspent (I42); both compared to where the rendered frame carries the chip's label.
 - **T3.75** (I102, §3d): a group with `minRows: 4` and a reserved `minHeight: 6` measures 6 through the registry, and its `bottom` child draws on row 3, not row 5 — table row 6.
-- **T3.76** (I101, C09 I43): a `notice` whose text wraps at 40 cells, aligned `right` in a 60-cell cell, renders the same rows as at 40 shifted by the offset, and measures the same at both widths.
+- **T3.76** (I101, C09 I43): a `notice` whose text wraps in a 60-cell cell, aligned `right`, renders exactly its own render at its content width shifted by the offset, and measures the same at both widths.
 - **T3.67** (I85) — **the accepted loss, asserted so a change is visible.** At 1-bit an `ok` notice (emphasised → bold) with a bold span paints a frame byte-identical to the same block without the span; at 8-bit the two differ. A row that starts failing is a compensation that has been added, and the ruling says there is none.
 
 ### Tier 4 — integration

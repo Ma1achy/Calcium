@@ -12,7 +12,7 @@ import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
 import type { Glyph, Notice, Pills, Progress, Raw, Rule, Tip } from "../../../data/viewmodel/index.js";
 import { cells, stripControl, truncate, truncateParts, wrapCells } from "../../text.js";
 import type { Run } from "../../runs.js";
-import { runLines, runsOf, sliceRuns, wrapRuns } from "../../runs.js";
+import { runLines, runsOf, runsText, sliceRuns, wrapRuns } from "../../runs.js";
 import { NO_STYLE } from "../../theme/index.js";
 import { barStyle, glyphFor, glyphCells, glyphs } from "../glyphs.js";
 import { clampSpans, pad, paint, paintRuns, rows, selectionStyle, tone, type Span } from "../paint.js";
@@ -229,6 +229,15 @@ export const noticeDefinition: BlockDefinition<Notice> = {
   kind: "notice",
 
   measure: (block: Notice, width: number): number => atLeastOne(noticeRows(block, width).length), // cells-ok
+
+  // C09 §2c — the hanging indent plus the longest wrapped row. Every row still
+  // fits at that width, so the wrap is the same wrap and the height holds (I43).
+  width: (block: Notice, width: number): number => {
+    const w = normaliseWidth(width);
+    let longest = 0;
+    for (const row of noticeRows(block, w)) longest = Math.max(longest, cells(runsText(row))); // narrow-ok — `width` is pure in (block, width) as `measure` is (C09 I42), and narrow is the measurer's convention
+    return Math.max(1, Math.min(w, prefixCells(block.glyph) + longest));
+  },
 
   elements: noticeElements,
 
@@ -470,6 +479,19 @@ export const pillsDefinition: BlockDefinition<Pills> = {
   measure: (block: Pills, width: number): number =>
     atLeastOne(chipRows(block, width).length), // cells-ok
 
+  // C09 §2c — the widest chip row: its chips and the gaps between them. A row
+  // that overflows the width is clamped to it by the renderer, so it fills.
+  width: (block: Pills, width: number): number => {
+    const w = normaliseWidth(width);
+    let widest = 0;
+    for (const row of chipRows(block, w)) {
+      let used = 0;
+      row.forEach((text, i) => { used += cells(text) + (i > 0 ? CHIP_GAP : 0); }); // narrow-ok — `width` is pure in (block, width) as `measure` is (C09 I42), and narrow is the measurer's convention
+      widest = Math.max(widest, used);
+    }
+    return Math.max(1, Math.min(w, widest));
+  },
+
   elements: pillsElements,
 
   render(block: Pills, ctx: RenderContext): ReactElement {
@@ -535,6 +557,15 @@ export const rawDefinition: BlockDefinition<Raw> = {
   kind: "raw",
 
   measure: (block: Raw): number => atLeastOne(rawLines(block).length), // cells-ok
+
+  // C09 §2c — the longest line. A line wider than the width is truncated to it
+  // by the renderer, which is what the clamp says.
+  width: (block: Raw, width: number): number => {
+    const w = normaliseWidth(width);
+    let longest = 0;
+    for (const line of rawLines(block)) longest = Math.max(longest, cells(line)); // narrow-ok — `width` is pure in (block, width) as `measure` is (C09 I42), and narrow is the measurer's convention
+    return Math.max(1, Math.min(w, longest));
+  },
 
   /**
    * C09 I25 — rows `[from, to)`, as a smaller `raw` (C14 §4a).
