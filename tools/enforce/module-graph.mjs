@@ -1784,11 +1784,6 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   //
   // This is the same disposal `ACKNOWLEDGED_BACKLOG` uses and it costs a
   // sentence apiece for the same reason.
-  "Keymap.mergeBlock":
-    "C16 §6, I10 — a surface's `BlockKeymap` merges into `liveBlock` while the block " +
-    "is live, so `s` sorts a `/ps` table. Nothing commits a block keymap, so `s` does " +
-    "not sort a `/ps` table. The producer is complete: `mergeBlock` refuses collisions " +
-    "and withdraws on freeze, all of it tested",
   "ThemeStore.applyOverrides":
     "C10 §4 — theme overrides. C10 validates and applies them and `TuiConfig` has no " +
     "field to carry any, so nothing can reach it. Unspecified at the shell rather than " +

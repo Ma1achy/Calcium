@@ -107,15 +107,62 @@ describe("interaction-catalogue — the corpus renders", () => {
     expect(alpha?.background, "an inverse run is drawn with a filled cell").not.toBeNull();
   });
 
-  it("IC5 (C26 §7): a block-level focus paints nothing today, and the frame records it", () => {
-    // **Recorded, not approved.** `focusFor` names the block with `rowId: null`
-    // and no kind reads that state; a plot, a scroll or a mosaic under focus is
-    // indistinguishable from one without. The row pins the fact so the day a
-    // renderer draws it, this frame moves and the ruling is written down.
+  it("IC5 (C26 §7): a focus inside the scrolled container turns exactly the residue row accent — and a table under block focus still paints nothing", () => {
+    // **Flipped from byte-identical** (F769's recorded residue, ruled in C26
+    // §7): the scroll's residue row is the one set of cells the box reserves
+    // whether or not a reader is in it, and it now carries the focus. Asserted
+    // as *which cells*, because a frame that merely differs would pass with the
+    // highlight on a child. The scene is the catalogue's own, under a focus
+    // naming one of its children — a scroll's elements are its children.
     const c = capsNamed("24bit");
+    const accent = params(tone("accent", theme, c));
+    const dim = params(tone("dim", theme, c));
+    const none = frameFor(scene("scroll-midstream"), c);
+    const focused = frameFor({ ...scene("scroll-midstream"), focus: { blockId: "s", rowId: "n4" } }, c);
+    const plain = (lines: readonly string[]) => lines.map((l) => l.replace(/\u001b\[[0-9;]*m/gu, ""));
+    expect(plain(focused), "no glyph moves").toEqual(plain(none));
+    const a = styled(none);
+    const b = styled(focused);
+    const moved: { row: number; ch: string; was: string; now: string }[] = [];
+    for (let row = 0; row < a.length; row += 1) {
+      for (let col = 0; col < WIDTH; col += 1) {
+        const x = a[row]![col]!;
+        const y = b[row]![col]!;
+        if (JSON.stringify(x.style) !== JSON.stringify(y.style)) moved.push({ row, ch: x.ch, was: x.style.fg, now: y.style.fg });
+      }
+    }
+    expect(moved.length).toBeGreaterThan(0);
+    expect(new Set(moved.map((m) => m.row)), "the residue row and no other").toEqual(new Set([3]));
+    expect(moved.map((m) => m.ch).join("").trim()).toBe("⋯ 2 above, 1 below");
+    for (const m of moved) {
+      expect(m.was).toBe(dim);
+      expect(m.now).toBe(accent);
+    }
+
+    // **Still recorded, not approved**: a table under `rowId: null` paints
+    // nothing. The scene is the catalogue's and the remainder is C11's (C26 §7
+    // names it), so the row keeps pinning it until that renderer reads it.
     const blockFocus = frameFor(scene("table-block-focus"), c);
-    const none = frameFor({ ...scene("table-block-focus"), focus: null }, c);
-    expect(blockFocus).toEqual(none);
+    const tableNone = frameFor({ ...scene("table-block-focus"), focus: null }, c);
+    expect(blockFocus).toEqual(tableNone);
+  });
+
+  it("IC7 (C26 §7, F769): the focused inactive chip and the active chip beside it are no longer one colour", () => {
+    // **The frame F769 recorded**: `pills-focus-24bit` drew `running` (active)
+    // and `exited` (the head) both `38;2;232;168;124`. The head now carries the
+    // selection ground and the active chip does not.
+    const c = capsNamed("24bit");
+    const accent = params(tone("accent", theme, c));
+    const wash = params(selectionStyle(theme, c));
+    const lines = frameFor(scene("pills-focus"), c);
+    expect(cellOf(lines, "exited"), "the head: accent over the ground").toEqual({ fg: accent, bg: wash, attrs: [] });
+    expect(cellOf(lines, "running"), "the active chip: accent, no ground").toEqual({ fg: accent, bg: "", attrs: [] });
+    expect(cellOf(lines, "all").bg, "an ordinary chip has no ground").toBe("");
+    // At 1-bit: the head is bold and inverse, the active chip bold alone.
+    const mono = frameFor(scene("pills-focus"), capsNamed("1bit"));
+    expect(cellOf(mono, "exited").attrs).toEqual(expect.arrayContaining([1, 7]));
+    expect(cellOf(mono, "running").attrs).toContain(1);
+    expect(cellOf(mono, "running").attrs).not.toContain(7);
   });
 
   it("IC6 (C04 I49): the scrolled container mid-stream shows the residue row for both directions", () => {

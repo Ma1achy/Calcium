@@ -22,6 +22,7 @@ import { measurable } from "../support/render.js";
 import type { FocusState } from "../../src/presentation/blocks/index.js";
 import { selectionStyle, tone } from "../../src/presentation/blocks/paint.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
+import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { renderToLines } from "../../src/presentation/render-lines.js";
 import { defaultTheme, loadTheme } from "../../src/presentation/theme/index.js";
 import { block } from "../../src/data/viewmodel/index.js";
@@ -241,7 +242,7 @@ describe("C11 I14 — the renderer, handed the extent directly", () => {
     expect(styleAt(alphaRow, "running")!.attrs).toContain(7);
   });
 
-  it("T1.24 (C11 I14): pills paint the focused chip accent and a selected chip washed", () => {
+  it("T1.24 (C11 I14, C26 §7): pills paint the focused chip accent over the ground, and a selected chip default over it", () => {
     const caps = capabilities({ colourDepth: 24 });
     const accent = params(tone("accent", theme, caps));
     const muted = params(tone("muted", theme, caps));
@@ -260,14 +261,29 @@ describe("C11 I14 — the renderer, handed the extent directly", () => {
     const none = paint(null);
     expect(cellOf(none, "exited")).toEqual({ fg: muted, bg: "", attrs: [] });
 
+    // **The head is accent over the selection ground, not accent alone** (C26
+    // §7). `active` already spends `accent` as data — the assertion two lines
+    // down — so a head in `accent` alone was the F769 frame: `running` and
+    // `exited` in one colour. The ground is a channel no chip datum uses.
     const focused = paint({ blockId: "p", rowId: "chip-1" });
-    expect(cellOf(focused, "exited"), "the head chip is accent").toEqual({ fg: accent, bg: "", attrs: [] });
+    expect(cellOf(focused, "exited"), "the head chip is accent over the ground").toEqual({ fg: accent, bg: wash, attrs: [] });
     expect(cellOf(focused, "all"), "its neighbour is not").toEqual({ fg: muted, bg: "", attrs: [] });
+    const withActive = block({ kind: "pills", id: "p", chips: [{ label: "all" }, { label: "exited" }, { label: "dead", active: true }] } as never);
+    const activeFrame = renderToLines(registry, withActive, 60, { theme, capabilities: caps, focus: { blockId: "p", rowId: "chip-1" } });
+    expect(cellOf(activeFrame, "dead"), "an active chip is accent with no ground — the datum").toEqual({ fg: accent, bg: "", attrs: [] });
+    expect(cellOf(activeFrame, "exited"), "and the head beside it differs by the ground alone").toEqual({ fg: accent, bg: wash, attrs: [] });
+    expect(cellOf(activeFrame, "dead")).not.toEqual(cellOf(activeFrame, "exited"));
 
     const selected = paint({ blockId: "p", rowId: "chip-2", selected: [pair("p", "chip-0"), pair("p", "chip-1"), pair("p", "chip-2")] });
     expect(cellOf(selected, "all"), "chip-0 washed").toEqual({ fg: plain, bg: wash, attrs: [] });
     expect(cellOf(selected, "exited"), "chip-1 washed").toEqual({ fg: plain, bg: wash, attrs: [] });
-    expect(cellOf(selected, "dead"), "chip-2 is the head").toEqual({ fg: accent, bg: "", attrs: [] });
+    expect(cellOf(selected, "dead"), "chip-2 is the head: accent ink over the same ground").toEqual({ fg: accent, bg: wash, attrs: [] });
+    // At 1-bit the ground is reverse video and the head is bold as well.
+    const mono = renderToLines(registry, pills, 60, { theme, capabilities: capabilities({ colourDepth: 1 }), focus: { blockId: "p", rowId: "chip-1" } });
+    const monoCells = styledScreenFrom([mono.join("\r\n")], { columns: 60, rows: mono.length });
+    const monoHead = styleAt(rowContaining(monoCells, "exited")!, "exited")!;
+    expect(monoHead.attrs, "1-bit head: bold and inverse").toEqual(expect.arrayContaining([1, 7]));
+    expect(styleAt(rowContaining(monoCells, "all")!, "all")!.attrs).not.toContain(7);
 
     // Another block's focus leaves every chip in its own tone.
     expect(paint({ blockId: "t", rowId: "chip-1", selected: [pair("t", "chip-0"), pair("t", "chip-1")] })).toEqual(none);
@@ -285,5 +301,117 @@ describe("C22 I58 — the key carries the extent", () => {
     const other = { ...head, selected: [{ blockId: "t", rowId: "b" }, { blockId: "t", rowId: "c" }, { blockId: "t", rowId: "d" }] };
     expect(focusKey(other)).not.toBe(focusKey(all));
     expect(focusKey(null)).toBe("");
+  });
+});
+
+/** The frame glyphs a plot's furniture draws — what a block-level focus is allowed to move (C26 §7). */
+const FRAME_GLYPHS = new Set([..."┌─┐│┤├└┬┴┘"]);
+const SGR = /\u001b\[[0-9;]*m/gu;
+
+describe("C26 §7 — a block-level focus paints the cells the block already reserves", () => {
+  const registry = measurable({ definitions: [tableDefinition, plotDefinition] }).registry;
+  const cellsOf = (lines: readonly string[], columns: number) => styledScreenFrom([lines.join("\r\n")], { columns, rows: lines.length });
+  /** Every (row, col) whose style differs between two frames of one text, with the glyph and both styles. */
+  const styleDiff = (a: readonly string[], b: readonly string[], columns: number) => {
+    const ca = cellsOf(a, columns);
+    const cb = cellsOf(b, columns);
+    const out: { row: number; col: number; ch: string; was: CellStyle; now: CellStyle }[] = [];
+    for (let row = 0; row < ca.length; row += 1) {
+      for (let col = 0; col < columns; col += 1) {
+        const x = ca[row]![col]!;
+        const y = cb[row]![col]!;
+        if (JSON.stringify(x.style) !== JSON.stringify(y.style)) out.push({ row, col, ch: x.ch, was: x.style, now: y.style });
+      }
+    }
+    return out;
+  };
+
+  const PLOT = block({ kind: "plot", id: "p", form: "line", height: 5, axes: true, series: [{ label: "train", values: [10, 20, 30, 40, 50] }] } as never);
+  const plotAt = (focus: FocusState | null, depth: 24 | 1 = 24) =>
+    renderToLines(registry, PLOT, 80, { theme, capabilities: capabilities({ colourDepth: depth }), focus });
+
+  it("T1.25 (C26 §7, C12 I85): a focused plot turns exactly its frame accent — 164 cells, seven rows, no glyph and no label moves", () => {
+    const caps = capabilities({ colourDepth: 24 });
+    const accent = params(tone("accent", theme, caps));
+    const muted = params(tone("muted", theme, caps));
+    const none = plotAt(null);
+    const focused = plotAt({ blockId: "p", rowId: null });
+
+    // **The text is byte-identical**: the frame moves no glyph and no cell (C11 I17's rule on a plot).
+    expect(focused.map((l) => l.replace(SGR, ""))).toEqual(none.map((l) => l.replace(SGR, "")));
+    const diff = styleDiff(none, focused, 80);
+    // **Which cells, not how many alone.** Every differing cell is a frame glyph,
+    // and every one went from `muted` to `accent`; the y-labels `60` and `0`, the
+    // x-labels and the curve are untouched. Measured: 164 at this width — the
+    // lid (77), five side-rule pairs (10), the bottom rule with its ticks (77).
+    expect(diff.length, "the frame's cells at 80 columns").toBe(164);
+    expect(new Set(diff.map((d) => d.row)).size, "the lid, five area rows, the bottom rule — not the x-label row").toBe(7);
+    for (const d of diff) {
+      expect(FRAME_GLYPHS.has(d.ch), `cell ${String(d.row)},${String(d.col)} holds ${JSON.stringify(d.ch)} — not a frame glyph`).toBe(true);
+      expect(d.was.fg, "was muted").toBe(muted);
+      expect(d.now.fg, "now accent").toBe(accent);
+    }
+    const labelRow = rowContaining(cellsOf(focused, 80), "60")!;
+    expect(styleAt(labelRow, "60")!.fg, "the y-label keeps muted: the enclosure lights up, not the scale").toBe(muted);
+    expect(textOf(focused[focused.length - 1] === undefined ? [] : cellsOf(focused, 80)[focused.length - 1]!), "the x-label row exists").toContain("0.0");
+    expect(diff.some((d) => d.row === focused.length - 1), "and no cell of it moved").toBe(false);
+
+    // **The controls**: a row focus on this block, and a block focus on another, paint nothing here.
+    expect(plotAt({ blockId: "p", rowId: "r" })).toEqual(none);
+    expect(plotAt({ blockId: "q", rowId: null })).toEqual(none);
+  });
+
+  it("T1.25 (C26 §7, F34): at 1-bit the same cells go from dim to bold — a weight, not a colour", () => {
+    const none = plotAt(null, 1);
+    const focused = plotAt({ blockId: "p", rowId: null }, 1);
+    const diff = styleDiff(none, focused, 80);
+    expect(diff.length, "the same 164 cells").toBe(164);
+    for (const d of diff) {
+      expect(d.was.attrs, `${JSON.stringify(d.ch)} was dim`).toContain(2);
+      expect(d.now.attrs, `${JSON.stringify(d.ch)} is bold`).toContain(1);
+      expect(d.now.attrs).not.toContain(2);
+    }
+  });
+
+  const SCROLL = (n: number) => block({
+    kind: "scroll",
+    id: "s",
+    height: 3,
+    children: Array.from({ length: n }, (_, i) => ({ kind: "notice", id: `n${String(i + 1)}`, tone: "info", text: `line ${String(i + 1)}` })),
+  } as never);
+  const scrollAt = (n: number, focus: FocusState | null, depth: 24 | 1 = 24, offset = 2) =>
+    renderToLines(registry, SCROLL(n), 40, { theme, capabilities: capabilities({ colourDepth: depth }), focus, scrollOffsets: { s: offset } });
+
+  it("T1.26 (C26 §7, C04 I49): a focused scroll turns its residue row accent and nothing else; a box whose content fits paints nothing", () => {
+    const caps = capabilities({ colourDepth: 24 });
+    const accent = params(tone("accent", theme, caps));
+    const dim = params(tone("dim", theme, caps));
+    const none = scrollAt(6, null);
+    // A scroll's elements are its children, so a focus inside it names a child.
+    const focused = scrollAt(6, { blockId: "s", rowId: "n3" });
+    expect(focused.map((l) => l.replace(SGR, ""))).toEqual(none.map((l) => l.replace(SGR, "")));
+    const residueRow = none.findIndex((l) => /2 above, 1 below/u.test(l));
+    expect(residueRow, "the fixture has a residue row, and it is the last").toBe(3);
+    const diff = styleDiff(none, focused, 40);
+    expect(diff.length, "exactly the residue text's cells").toBeGreaterThan(0);
+    expect(new Set(diff.map((d) => d.row)), "and only on the residue row").toEqual(new Set([residueRow]));
+    for (const d of diff) {
+      expect(d.was.fg).toBe(dim);
+      expect(d.now.fg).toBe(accent);
+    }
+    expect(diff.map((d) => d.ch).join("").trim(), "the whole residue text and nothing beside it").toBe("⋯ 2 above, 1 below");
+
+    // **The consequence, said rather than absorbed**: three children in a
+    // three-row box have no residue row, so focus paints nothing there.
+    expect(scrollAt(3, { blockId: "s", rowId: "n2" }, 24, 0)).toEqual(scrollAt(3, null, 24, 0));
+    // Another block's focus leaves the residue dim.
+    expect(scrollAt(6, { blockId: "t", rowId: "n3" })).toEqual(none);
+    // 1-bit: dim to bold on the residue row.
+    const monoDiff = styleDiff(scrollAt(6, null, 1), scrollAt(6, { blockId: "s", rowId: "n3" }, 1), 40);
+    expect(new Set(monoDiff.map((d) => d.row))).toEqual(new Set([residueRow]));
+    for (const d of monoDiff) {
+      expect(d.was.attrs).toContain(2);
+      expect(d.now.attrs).toContain(1);
+    }
   });
 });

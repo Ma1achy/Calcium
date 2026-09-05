@@ -144,6 +144,8 @@ export function measurable(
     cursorPositions?: RenderOptions["cursorPositions"];
     /** Per-plot live cameras (C12 I83), so a row can move one without rebuilding the block. */
     cameras?: RenderOptions["cameras"];
+    /** Per-plot series overrides (C22 I78), so a row can hide one without rebuilding the block. */
+    seriesVisibility?: RenderOptions["seriesVisibility"];
     /**
      * Caller-owned scratch (C12 I107). A row that supplies a counting one reads
      * the **build count** off it, which is what PR10 asserts instead of a time.
@@ -183,6 +185,7 @@ export function measurable(
     ...(options.focus === undefined ? {} : { focus: options.focus }),
     ...(options.cursorPositions === undefined ? {} : { cursorPositions: options.cursorPositions }),
     ...(options.cameras === undefined ? {} : { cameras: options.cameras }),
+    ...(options.seriesVisibility === undefined ? {} : { seriesVisibility: options.seriesVisibility }),
     ...(options.scratch === undefined ? {} : { scratch: options.scratch }),
   };
 

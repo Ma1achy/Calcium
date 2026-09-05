@@ -151,6 +151,28 @@ describe("C22 I76 — the writer alone", () => {
     expect(graph.cursorPositions.forEntry(id)).toEqual({ p1: 1, p2: 0 });
   });
 
+  it("T4.17k (C16 §4a, C22 I76): the pointer is the second writer of the same store, and the key's clamp holds after it", async () => {
+    const { graph } = await buildGraph({}, { columns: 80, rows: 30 });
+    graph.viewport.resize({ width: 80, height: 20 });
+    const id = graph.transcript.append(doc([plot("p", [10, 20, 30, 40, 50])]) as never);
+    // The harness's region starts at terminal row 1 and bottom-aligns a short
+    // transcript (session-mouse T4.62): nine rows in twenty puts transcript row
+    // 3 — an area row of the plot — at terminal row 1 + 11 + 3.
+    expect(graph.viewport.scroll.totalRows).toBe(9);
+    const click = (col: number): InputEvent => ({
+      kind: "mouse", row: 1 + 11 + 3, col, button: "button0", press: true, shift: false, meta: false, ctrl: false, motion: false,
+    });
+    expect(graph.router.dispatch(click(41))).toBe(true);
+    expect(graph.cursorPositions.get(id, "p"), "the pointer wrote the store").toBe(2);
+    graph.router.dispatch(press("right"));
+    expect(graph.cursorPositions.get(id, "p"), "→ continues from the pointer's index").toBe(3);
+    graph.router.dispatch(click(78));
+    expect(graph.cursorPositions.get(id, "p")).toBe(4);
+    graph.router.dispatch(press("right"));
+    expect(graph.cursorPositions.get(id, "p"), "and the key's clamp still holds at the last sample").toBe(4);
+    expect(graph.cursorPositions.key(id), "one axis in the render key, whoever wrote it").toBe("p=4");
+  });
+
   it("T4.18f (C22 §6c): the store joins the eviction subscription — clear takes it", async () => {
     // The `evict` arm is not drivable through the graph (render-cache T4.18a's
     // note: the cap is 100,000 blocks); `clear` runs the same callback.

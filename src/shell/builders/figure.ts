@@ -23,6 +23,17 @@ function makeSeries(values: readonly (number | null)[], opts?: SeriesOpts): Seri
     values,
     ...(opts?.label !== undefined ? { label: opts.label } : {}),
     ...(opts?.tone !== undefined ? { tone: opts.tone } : {}),
+    ...(opts?.hidden !== undefined ? { hidden: opts.hidden } : {}),
+  };
+}
+
+/** An annotation's shared options, spread-if-present (C04 I46's `undefined` clause). */
+type AnnotationTone = Exclude<Annotation["tone"], undefined>;
+type AnnotationOpts = { tone?: AnnotationTone; hidden?: boolean };
+function annotationOpts(opts?: AnnotationOpts): { tone?: AnnotationTone; hidden?: boolean } {
+  return {
+    ...(opts?.tone !== undefined ? { tone: opts.tone } : {}),
+    ...(opts?.hidden !== undefined ? { hidden: opts.hidden } : {}),
   };
 }
 
@@ -59,6 +70,8 @@ type FigureOpts = {
 type SeriesOpts = {
   label?: string;
   tone?: Series["tone"];
+  /** Not drawn, still held — appearance, and refused where a series is not a layer (C04 I99). */
+  hidden?: boolean;
 };
 
 export class FigureBuilder {
@@ -125,34 +138,26 @@ export class FigureBuilder {
     return this;
   }
 
-  threshold(value: number, opts?: { label?: string; tone?: Annotation["tone"] }): this {
-    const a: Annotation = opts?.tone !== undefined
-      ? { kind: "line", value, tone: opts.tone }
-      : { kind: "line", value };
+  threshold(value: number, opts?: AnnotationOpts & { label?: string }): this {
+    const a: Annotation = { kind: "line", value, ...annotationOpts(opts) };
     this.annotationList.push(a);
     return this;
   }
 
-  band(from: number, to: number, opts?: { tone?: Annotation["tone"] }): this {
-    const a: Annotation = opts?.tone !== undefined
-      ? { kind: "band", from, to, tone: opts.tone }
-      : { kind: "band", from, to };
+  band(from: number, to: number, opts?: AnnotationOpts): this {
+    const a: Annotation = { kind: "band", from, to, ...annotationOpts(opts) };
     this.annotationList.push(a);
     return this;
   }
 
-  confidence(upper: readonly number[], lower: readonly number[], opts?: { tone?: Annotation["tone"] }): this {
-    const a: Annotation = opts?.tone !== undefined
-      ? { kind: "confidence", upper, lower, tone: opts.tone }
-      : { kind: "confidence", upper, lower };
+  confidence(upper: readonly number[], lower: readonly number[], opts?: AnnotationOpts): this {
+    const a: Annotation = { kind: "confidence", upper, lower, ...annotationOpts(opts) };
     this.annotationList.push(a);
     return this;
   }
 
-  whiskers(points: readonly Readonly<{ x: number; y: number; err: number }>[], opts?: { tone?: Annotation["tone"] }): this {
-    const a: Annotation = opts?.tone !== undefined
-      ? { kind: "whiskers", points, tone: opts.tone }
-      : { kind: "whiskers", points };
+  whiskers(points: readonly Readonly<{ x: number; y: number; err: number }>[], opts?: AnnotationOpts): this {
+    const a: Annotation = { kind: "whiskers", points, ...annotationOpts(opts) };
     this.annotationList.push(a);
     return this;
   }

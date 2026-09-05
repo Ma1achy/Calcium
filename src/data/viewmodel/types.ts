@@ -994,6 +994,17 @@ export type Series = Readonly<{
   pointLabels?: readonly (string | null)[];
   label?: string;
   tone?: Tone;
+  /**
+   * Not drawn, still held (C04 I99, C12 I116).
+   *
+   * **Appearance, never geometry**: the rows stay, the ink goes, the legend
+   * keeps the name under a *not drawn* mark, and the axis is measured over this
+   * series too, so the curves beside it do not move when it goes. **Refused
+   * where a series is not a layer** — `HAS_HIDEABLE_SERIES` says where — because
+   * *hidden* on a `pie` or a `stackedarea` would mean *recomputed*, which is a
+   * different member. The reader's override in C22 I78's store reads first.
+   */
+  hidden?: boolean;
   /*
    * **No `marker`** (C04 I76's last clause). An undocumented `marker?: string`
    * sat here from the figure builder's first commit (127f19b1) with no reader:
@@ -1179,13 +1190,17 @@ export type PlotForm =
  * it fires before any render state exists.
  */
 export type Annotation =
-  | Readonly<{ kind: "line"; value: number; tone?: Tone; label?: string }>
-  | Readonly<{ kind: "band"; from: number; to: number; tone?: Tone; label?: string }>
+  // `hidden` on every arm (C04 I99): an annotation is already a layer drawn
+  // behind the data, so removing it moves nothing, and the member is accepted
+  // wherever annotations are. Its legend row stays, under the *not drawn* mark.
+  | Readonly<{ kind: "line"; value: number; tone?: Tone; label?: string; hidden?: boolean }>
+  | Readonly<{ kind: "band"; from: number; to: number; tone?: Tone; label?: string; hidden?: boolean }>
   | Readonly<{
       kind: "confidence";
       upper: readonly number[];
       lower: readonly number[];
       tone?: Tone;
+      hidden?: boolean;
       /**
        * Whether the area between the edges is shaded (C12 §3e, I52).
        *
@@ -1211,6 +1226,7 @@ export type Annotation =
        */
       points: readonly Readonly<{ x: number; y: number; err: number }>[];
       tone?: Tone;
+      hidden?: boolean;
     }>;
 
 export type Plot = Readonly<{
@@ -2243,6 +2259,38 @@ export const HAS_X_TITLE: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   // No abscissa to name: a disc, a polygon, a mosaic, one row, a composition.
   pie: false, radar: false, waffle: false, treemap: false, tree: false, graph: false, sankey: false,
   horizon: false, sparkline: false, smallmultiples: false, pairplot: false,
+});
+
+/**
+ * Where a series is a **layer** — removing one moves nothing else — and so
+ * where `Series.hidden` is accepted (C04 I99, C12 §3aq).
+ *
+ * **A record of its own and not a reuse of `HAS_CALLOUT`**, on I61's rule: a
+ * total record is a complete answer to *its* question. The two happen to name
+ * the same seven forms today — everything `positionalForm` composites into
+ * shared cells — and they answer different questions (*is the last sample drawn
+ * at its own value* against *does removing a series move the rest*), so a form
+ * that joins one need not join the other.
+ *
+ * `false` where a series is a row (`bar`), a slice (`pie`), a band
+ * (`stackedarea`), a matrix row (`heatmap`) or not the carrier at all
+ * (`plot3d`): hiding one there would mean recomputing the figure, and a member
+ * that means *not inked* on one form and *recomputed* on another is one member
+ * with two meanings. Refused at both gates rather than ignored (F207).
+ */
+export const HAS_HIDEABLE_SERIES: Readonly<Record<PlotForm, boolean>> = Object.freeze({
+  line: true, scatter: true, step: true, ecdf: true, density: true, slope: true, bubble: true,
+  plot3d: false,
+  stackedarea: false, streamgraph: false, ridgeline: false,
+  bar: false, histogram: false, boxplot: false, violin: false,
+  forest: false, dumbbell: false, lollipop: false, dotplot: false, funnel: false,
+  gantt: false, waterfall: false, timeline: false, bullet: false, autocorrelation: false,
+  heatmap: false, calendar: false, correlation: false, confusion: false,
+  spectrogram: false, latency: false, density2d: false, utilisation: false,
+  contour: false, quiver: false,
+  sparkline: false, horizon: false, waffle: false,
+  pie: false, radar: false, flame: false, icicle: false, treemap: false, tree: false, graph: false, sankey: false,
+  smallmultiples: false, pairplot: false,
 });
 
 export const HAS_CALLOUT: Readonly<Record<PlotForm, boolean>> = Object.freeze({

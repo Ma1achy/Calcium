@@ -207,6 +207,15 @@ export type KeyDeps = Readonly<{
   /** Start or stop the focused plot turning (C22 I72). Off is the default. */
   toggleOrbit: () => void;
   /**
+   * Hide or show series `n` (1-based) of the focused plot (C22 I78, C12 I116).
+   *
+   * A seam for `pageBlock`'s reason: the effective state — the reader's
+   * override, else the block's `hidden` — is known only where the block is, and
+   * the store records what this decides. A no-op where the focused block is not
+   * a plot or has no series `n`.
+   */
+  toggleSeries: (n: number) => void;
+  /**
    * C23's dispatcher (C23 I16). Supplied, never constructed here — an action is
    * a submission by another route, and L4's routing component owns routes.
    */
@@ -885,6 +894,18 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // plot's crosshair and is a no-op on a kind with no horizontal interior.
     cursorLeft: () => void deps.cursorBlock(-1),
     cursorRight: () => void deps.cursorBlock(1),
+    // **The digits, and the first writer of `seriesVisibility`** (C22 I78, C12
+    // I116). Nine effects because an effect takes no key; bound by no default
+    // row — the plot's own `keymap` declares the ones it has.
+    toggleSeries1: () => void deps.toggleSeries(1),
+    toggleSeries2: () => void deps.toggleSeries(2),
+    toggleSeries3: () => void deps.toggleSeries(3),
+    toggleSeries4: () => void deps.toggleSeries(4),
+    toggleSeries5: () => void deps.toggleSeries(5),
+    toggleSeries6: () => void deps.toggleSeries(6),
+    toggleSeries7: () => void deps.toggleSeries(7),
+    toggleSeries8: () => void deps.toggleSeries(8),
+    toggleSeries9: () => void deps.toggleSeries(9),
     // **Re-run the focused entry, through the prompt's own route** (C23 I18).
     // Not an action: the five kinds are refused from a frozen entry because a
     // document's data is stale, and the recorded command is not.

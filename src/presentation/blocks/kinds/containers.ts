@@ -386,7 +386,15 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
     if (content > interior) {
       const above = offset;
       const below = Math.max(0, content - interior - offset);
-      const dim = tone("dim", ctx.theme, ctx.capabilities);
+      // **`accent` while focus is inside the box, `dim` otherwise** (C26 §7).
+      // The residue row is the box's only chrome and the one set of cells the
+      // data reserves whether or not a reader is in it, so it is what carries
+      // a focus that would otherwise paint nothing (F769). A scroll's elements
+      // are its children, so the head's `blockId` is this box and `rowId` is a
+      // child — the test is on the block alone. A box whose content fits has no
+      // residue row, and under focus draws as it did; §7 says so.
+      const held = ctx.focus !== null && ctx.focus.blockId === block.id;
+      const dim = tone(held ? "accent" : "dim", ctx.theme, ctx.capabilities);
       // **The separator is a comma and not a middle dot.** The first version
       // used one and C09 T4.4 caught it under unicode:"ascii" -- a literal
       // non-ASCII character in the very row written to keep the *mark* out of

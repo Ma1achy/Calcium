@@ -1258,8 +1258,12 @@ describe("A03 SP4 — Seam 4 and its owners agree, both directions", () => {
     // The pair below is what discriminates: under the old pattern **both** read
     // as `3a` and both resolved.
     const at = "docs/architecture/A01_fabricated.md";
-    const bad = checkSectionReferences([at], citing(at, "As C12 §3aq settles it."));
-    expect(bad.violations.map((x) => x.message).join(" "), "C12 has no §3aq").toContain("§3aq");
+    // **`§3aq` was the fabricated id until 2026-09-05, when C12 wrote a §3aq**
+    // (the hidden series, I116) and the probe stopped being fabricated — the
+    // row failed, which is the probe doing its job. `§3zq` is a two-letter id
+    // no document is likely to reach; if it ever does, move again.
+    const bad = checkSectionReferences([at], citing(at, "As C12 §3zq settles it."));
+    expect(bad.violations.map((x) => x.message).join(" "), "C12 has no §3zq").toContain("§3zq");
     const ok = checkSectionReferences([at], citing(at, "As C12 §3ag settles it."));
     expect(ok.violations, "and C12 does have §3ag").toEqual([]);
   });

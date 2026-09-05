@@ -1141,6 +1141,13 @@ function visibleRows(
     // report as *the GIF does not animate*. Zero omitted, as the offsets are:
     // frame 0 after a loop draws what frame 0 drew.
     const framesKey = graph.frames.key(entry.id);
+    // **The ninth axis** (C22 I78, C04 I99). A series hidden or shown changes
+    // what is inked and moves none of the other eight; without this the toggle
+    // is served the frame from before it — the `⌃a` class (F769), a key that
+    // does nothing. Every override is in it, `false` included, because an
+    // override to *shown* over a producer's *hidden* is a different frame from
+    // no override.
+    const seriesKey = graph.seriesVisibility.key(entry.id);
 
     // **Containers are walked, and it is C04's `descendants` rather than a
     // copy** (C22 I73). `animationIntervalOf` learned this from the mutation
@@ -1177,7 +1184,7 @@ function visibleRows(
     const cadence = animationIntervalOf(windowed.blocks);
     if (cadence !== null && (fastest === null || cadence < fastest)) fastest = cadence;
     const animated = cadence === null ? "" : `\u0000${String(tick)}`;
-    const slot = `${key}\u0000${range}\u0000${offsets}\u0000${orbitKey}\u0000${cursorKey}\u0000${framesKey}${animated}`;
+    const slot = `${key}\u0000${range}\u0000${offsets}\u0000${orbitKey}\u0000${cursorKey}\u0000${framesKey}\u0000${seriesKey}${animated}`;
     const held = graph.rendered.get(entry.id, entry.rev, width, slot, theme);
     // **Faults from here are this entry's** (I69). A `BlockFault` names a block
     // and ids are unique within a document and not across entries (C04 I14), so
@@ -1220,6 +1227,11 @@ function visibleRows(
           // C04 I93). `Frames` in `shell/`, advanced on the wake above, keyed by
           // `framesKey` — the three halves I71 says land together.
           frames: graph.frames.forEntry(entry.id),
+          // **The reader's series overrides, with their writer and their axis**
+          // (C22 I78, C12 I116). `toggleSeriesBlock` in `construct.ts` writes
+          // it from the plot's own digits, the store joins the eviction
+          // callback, and `seriesKey` above is its axis.
+          seriesVisibility: graph.seriesVisibility.forEntry(entry.id),
           // **The field and its writer land together, again** (C12 I107, §6o
           // row 9). One store per session and no key of its own here: the
           // scratch is keyed on the caller's arrays inside C12, which is what

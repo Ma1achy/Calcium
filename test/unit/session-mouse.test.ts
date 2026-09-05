@@ -33,6 +33,11 @@ import { rows as inkRows } from "../../src/presentation/blocks/paint.js";
 import type { BlockDefinition, FocusState } from "../../src/presentation/blocks/index.js";
 import type { InputEvent } from "../../src/interaction/router/types.js";
 import { addr } from "../support/focus.js";
+import { capabilities } from "../support/fake-terminal.js";
+import { measurable, DARK_THEME } from "../support/render.js";
+import { plotDefinition } from "../../src/presentation/plot/index.js";
+import { renderToLines } from "../../src/presentation/render-lines.js";
+import { block } from "../../src/data/viewmodel/index.js";
 
 type Mouse = Extract<InputEvent, { kind: "mouse" }>;
 
@@ -551,5 +556,194 @@ describe("C16 §4a — the frame side", () => {
     // The row above, in the same frame's coordinates, is the first row.
     await type(sgrClick(betaRow - 1, 3));
     expect(lastFocus(w.seen(), "q1")).toEqual({ blockId: "t1", rowId: "a1" });
+  });
+});
+
+/**
+ * A line plot with five samples, which is what makes it cursorable (C12 I85).
+ *
+ * **The geometry, measured on the frame before any row was written** (C12 §3s):
+ * at 80 columns the gutter is `60 ┤` — four cells — and the area is 75 wide, so
+ * the five samples sit at block columns 4, 23, 41, 60 and 78. Column 32 is nine
+ * cells from 23 and nine from 41, a tie the lower index wins. The plot measures
+ * eight rows: the lid, five area rows, the bottom rule and the x-labels.
+ */
+const PLOT = (id = "p", values: readonly number[] = [10, 20, 30, 40, 50]): Record<string, unknown> => ({
+  kind: "plot",
+  id,
+  form: "line",
+  height: 5,
+  axes: true,
+  series: [{ label: "train", values }],
+});
+/**
+ * Seventy-five samples in a 75-cell area: one per column, so an offset error
+ * shows at every column. **The values stay under 100 on purpose**: `0..74`
+ * niced the axis to `100`, a three-cell label, a five-cell gutter and a 74-cell
+ * area — the premise the row states was false of the first fixture, and T4.70b
+ * asserts it on the frame before asserting anything through it.
+ */
+const DENSE = Array.from({ length: 75 }, (_, i) => i % 50);
+
+describe("C16 §4a — the pointer sets the crosshair (C12 §3s, C22 I76)", () => {
+  it("T4.70 (C16 I31, C12 §3s): a click at a sample's column focuses the plot and sets that index; the gutter focuses and sets nothing", async () => {
+    const { graph, term } = await graphAt80();
+    const live = graph.transcript.append(doc("/plot", [PLOT()]) as never);
+    const el = graph.liveElements();
+    expect(el.map((e) => e.element.id), "one block-level element").toEqual(["p"]);
+    expect(el[0]?.element.cols, "spanning the block — the area inside it is narrower").toEqual({ from: 0, to: 80 });
+    expect(el[0]?.element.rows).toEqual({ from: 0, to: 8 });
+
+    // Chrome 0; transcript row 3 is an area row of the plot.
+    expect(graph.cursorPositions.get(live, "p"), "no crosshair before the click").toBeUndefined();
+    expect(graph.router.dispatch(mouse(term(3), 41))).toBe(true);
+    expect(graph.focus.current, "focus lands on the plot").toEqual(AT(live, "p", "p"));
+    expect(graph.cursorPositions.get(live, "p"), "and the sample under column 41 is the third").toBe(2);
+
+    // Every sample's own column, exactly — a version reading `e.col` as an area
+    // column is four cells off and lands inside the bounds on every one.
+    for (const [col, idx] of [[4, 0], [23, 1], [60, 3], [78, 4]] as const) {
+      graph.router.dispatch(mouse(term(3), col));
+      expect(graph.cursorPositions.get(live, "p"), `column ${String(col)}`).toBe(idx);
+    }
+    // The tie: nine cells either way, and the lower index wins (§3s).
+    graph.router.dispatch(mouse(term(3), 32));
+    expect(graph.cursorPositions.get(live, "p"), "column 32 — equidistant from samples 1 and 2").toBe(1);
+    // Inside the area past the last sample: the nearest — the clamp is the nearest-sample rule.
+    graph.router.dispatch(mouse(term(3), 77));
+    expect(graph.cursorPositions.get(live, "p")).toBe(4);
+
+    // **The gutter is nothing for the cursor**: the click is consumed — it is a
+    // click on the block — focus stays, and the crosshair does not move. Same
+    // for the right border and beyond it.
+    for (const col of [0, 2, 3, 79]) {
+      expect(graph.router.dispatch(mouse(term(3), col)), `column ${String(col)} is the block's`).toBe(true);
+      expect(graph.focus.current).toEqual(AT(live, "p", "p"));
+      expect(graph.cursorPositions.get(live, "p"), `column ${String(col)} left the crosshair at 4`).toBe(4);
+    }
+    // The command line above the plot is chrome and no element (row b).
+    expect(graph.router.dispatch(mouse(term(0), 41))).toBe(false);
+    expect(graph.cursorPositions.get(live, "p")).toBe(4);
+  });
+
+  it("T4.70b (C16 §4a row n): with one sample per column the index is the column less the gutter, at every column", async () => {
+    // **The premise, read off the frame**: a four-cell gutter and a 75-cell area,
+    // so 75 samples sit one per column from 4 to 78.
+    const frame = renderToLines(measurable({ definitions: [plotDefinition] }).registry, block(PLOT("d", DENSE) as never), 80, {
+      theme: DARK_THEME, capabilities: capabilities({ colourDepth: 24 }), focus: null,
+    }).map((l) => l.replace(/\u001b\[[0-9;]*m/gu, ""));
+    const rule = frame.find((l) => l.includes("└")) ?? "";
+    expect(rule.indexOf("└"), "the corner is at column 3 — a four-cell gutter").toBe(3);
+    expect(rule.indexOf("┘"), "the right corner at 79 — a 75-cell area").toBe(79);
+
+    const { graph, term } = await graphAt80();
+    const live = graph.transcript.append(doc("/plot", [PLOT("d", DENSE)]) as never);
+    graph.router.dispatch(mouse(term(3), 4));
+    expect(graph.cursorPositions.get(live, "d")).toBe(0);
+    for (const col of [5, 17, 40, 41, 63, 78]) {
+      graph.router.dispatch(mouse(term(3), col));
+      expect(graph.cursorPositions.get(live, "d"), `column ${String(col)}`).toBe(col - 4);
+    }
+  });
+
+  it("T4.71 (C16 §4a rows m and o, trace 10): the second click moves the crosshair, a drag sets it on every motion, and → continues from the pointer", async () => {
+    const { graph, term } = await graphAt80();
+    const live = graph.transcript.append(doc("/plot", [PLOT()]) as never);
+    graph.router.dispatch(mouse(term(3), 41));
+    expect(graph.cursorPositions.get(live, "p")).toBe(2);
+    // Click again on the focused plot: not `⏎` — the crosshair (row m).
+    graph.router.dispatch(mouse(term(3), 60));
+    expect(graph.cursorPositions.get(live, "p"), "the second click aims").toBe(3);
+    expect(graph.focus.current, "and focus stays on the plot, anchor null").toEqual(AT(live, "p", "p"));
+    // Motion (trace 10): 32 is the tie, so the mark moves nine cells left of the pointer.
+    graph.router.dispatch(mouse(term(4), 32, { motion: true }));
+    expect(graph.cursorPositions.get(live, "p")).toBe(1);
+    graph.router.dispatch(mouse(term(4), 78, { motion: true }));
+    expect(graph.cursorPositions.get(live, "p")).toBe(4);
+    expect(graph.focus.current, "a drag on the focused plot extends nothing").toEqual(AT(live, "p", "p"));
+    // The release leaves nothing and is unconsumed.
+    expect(graph.router.dispatch(mouse(term(4), 78, { press: false }))).toBe(false);
+    expect(graph.cursorPositions.get(live, "p")).toBe(4);
+    // **Two writers, one store**: `←` continues from where the pointer left it.
+    graph.router.dispatch(press("left"));
+    expect(graph.cursorPositions.get(live, "p"), "← from the pointer's 4").toBe(3);
+    graph.router.dispatch(mouse(term(3), 4));
+    graph.router.dispatch(press("right"));
+    expect(graph.cursorPositions.get(live, "p"), "→ from the pointer's 0").toBe(1);
+  });
+
+  it("T4.71b (C16 §4a row p; C23 I47): a click on a settled entry's plot sets that entry's crosshair, and the live entry's is untouched", async () => {
+    const { graph, term } = await graphAt80();
+    const settled = graph.transcript.append(doc("/plot", [PLOT()]) as never);
+    const live = graph.transcript.append(doc("/plot", [PLOT()]) as never);
+    // Two eight-row plots with their command lines: entry 1 is rows 0–8, entry 2 rows 9–17.
+    expect(graph.viewport.entryAtRow(9)).toEqual({ id: live, rowOffset: 0 });
+    graph.router.dispatch(mouse(term(3), 23));
+    expect(graph.focus.current).toEqual(AT(settled, "p", "p"));
+    expect(graph.cursorPositions.get(settled, "p")).toBe(1);
+    expect(graph.cursorPositions.forEntry(live), "nothing written for the live entry").toEqual({});
+    // From the settled plot, a click on the live one moves focus and aims there — two stores by entry.
+    graph.router.dispatch(mouse(term(12), 60));
+    expect(graph.focus.current).toEqual(AT(live, "p", "p"));
+    expect(graph.cursorPositions.get(live, "p")).toBe(3);
+    expect(graph.cursorPositions.get(settled, "p"), "the settled entry keeps its own").toBe(1);
+  });
+
+  it("T4.71c (C12 I85): a plot with a camera and no cursor takes the click as focus and nothing else", async () => {
+    const { graph, term } = await graphAt80();
+    const live = graph.transcript.append(
+      doc("/cloud", [{ kind: "plot", id: "c", form: "plot3d", height: 8, series: [], camera: {}, points3: [{ label: "cloud", points: [{ x: 1, y: 2, z: 3 }, { x: 2, y: 1, z: 0 }] }] }]) as never,
+    );
+    expect(graph.liveElements().map((e) => e.element.id), "focusable through the camera").toEqual(["c"]);
+    expect(graph.router.dispatch(mouse(term(3), 41))).toBe(true);
+    expect(graph.focus.current).toEqual(AT(live, "c", "c"));
+    expect(graph.cursorPositions.forEntry(live), "orbit is keys only; no crosshair").toEqual({});
+  });
+});
+
+describe("C16 §4a — the crosshair, read from the painted frame", () => {
+  it("T4.70c (C12 I37, §3s): after the click the ▲ is under the pointer's column and the readout names that sample", async () => {
+    const stdin = fakeStdin();
+    const s = await buildSession(
+      {
+        stdin: stdin as never,
+        manifest: {
+          schema: "tui.manifest/1",
+          binary: "prism",
+          version: "1.0.0",
+          tools: [{ name: "plot", local: true, summary: "a plot", args: [], flags: [] }],
+        },
+        localHandlers: {
+          plot: () => ({ schema: "tui.view/1", status: "ok", blocks: [PLOT()] }),
+        },
+      } as never,
+      { columns: 80, rows: 24 },
+    );
+    const type = async (bytes: string): Promise<void> => {
+      stdin.emit(bytes);
+      for (let i = 0; i < 4; i += 1) await Promise.resolve();
+    };
+    await type("/plot\r");
+    await Promise.resolve();
+
+    // **Where the plot is, read from the frame**: the top label row is an area
+    // row, and the rule row below the area carries the mark.
+    const text = () => s.screen().text;
+    const areaRow = text().findIndex((line) => line.includes("60 ┤"));
+    expect(areaRow, "the plot's first area row is on screen").toBeGreaterThan(0);
+    const ruleRow = () => text().find((line) => line.includes("└")) ?? "";
+    expect(ruleRow(), "no mark before the click").not.toContain("▲");
+    expect(text().join("\n")).not.toMatch(/train: \d/u);
+
+    await type(sgrClick(areaRow, 41));
+    expect(ruleRow().indexOf("▲"), "the mark is under the pointer").toBe(41);
+    expect(text().join("\n"), "and the readout names the third sample").toMatch(/train: 30/u);
+
+    // A second click at the tie: the mark goes to sample 1's column, nine cells
+    // left of the pointer — the mark follows the data and not the mouse.
+    await type(sgrClick(areaRow, 32));
+    expect(ruleRow().indexOf("▲")).toBe(23);
+    expect(text().join("\n")).toMatch(/train: 20/u);
+    expect(text().join("\n")).not.toMatch(/train: 30/u);
   });
 });

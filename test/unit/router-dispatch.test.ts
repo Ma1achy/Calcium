@@ -7,7 +7,9 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 
 import { createFocusStore } from "../../src/interaction/router/focus.js";
-import { createKeymap } from "../../src/interaction/router/keymap.js";
+import { createKeymap, defaultKeymap } from "../../src/interaction/router/keymap.js";
+import { plotDefinition } from "../../src/presentation/plot/index.js";
+import { block, type Plot } from "../../src/data/viewmodel/index.js";
 import { createRouter, type Placed, type RouterDeps } from "../../src/interaction/router/router.js";
 import type { InputEvent, Key } from "../../src/interaction/router/types.js";
 import { addr } from "../support/focus.js";
@@ -607,22 +609,27 @@ describe("C16 — the dispatch trace, run against the implementation", () => {
 
 describe("C26 §8b.8 — interaction mode is vacuous, and this is the row that says so", () => {
   /**
-   * **The premise the ⏎ ruling rests on, asserted rather than described.**
+   * **The premise the ⏎ ruling rests on, asserted rather than described — and
+   * inverted once.**
    *
    * §8b.8 rules that `⏎` does not enter interaction, because the mode has
-   * nothing in it: no block declares keys, and the target carries one binding.
-   * Both halves are facts about the tree today, and a premise recorded in prose
-   * and checked by nothing is a premise that goes quiet — F102's disposal, and
-   * T2.17's shape for the `window` × `elements` agreement.
+   * nothing in it. This row used to assert the first of two facts behind that:
+   * *no block declares keys* — `mergeBlock` had no caller in `src/`. **It fired
+   * on 2026-09-05**, when `construct.ts`'s `syncBlockKeymap` became the first
+   * caller for the plot's digit keymap (C12 I116, C22 I78), which is exactly
+   * what it was written to do. So it now asserts the other fact, the one the
+   * ruling actually needs: **merging the one producer's keymap leaves
+   * `interaction` with no binding**, because no digit collides with a built-in
+   * (C16 I27) and every one lands at `liveBlock`.
    *
-   * **This row fails the day either fact changes**, which is exactly when `⏎`'s
-   * second effect and I14's first level go live and it should be inverted.
+   * **This row fails the day a producer's key lands at `interaction`**, which is
+   * when `⏎`'s second effect and I14's first level go live and it is inverted
+   * again.
    */
-  it("T2.6a (C26 §8b.8): nothing merges a block keymap, so the mode has no bindings", () => {
-    // `mergeBlock` is the only route a `BlockKeymap` reaches the router by, and
-    // `src/index.ts` §3 records it as interior and dropped — "not public, not
-    // finished". Counted over `src/` and not over the tree, because a test
-    // calling it is not a producer.
+  it("T2.6a (C26 §8b.8, C22 I78): one caller merges a block keymap, and it puts nothing at interaction", () => {
+    // `mergeBlock` is the only route a `BlockKeymap` reaches the router by.
+    // Counted over `src/` and not over the tree, because a test calling it is
+    // not a producer.
     const callers = ["keymap.ts", "router.ts", "construct.ts", "session.ts", "keys.ts"]
       .map((f) => {
         for (const dir of ["src/interaction/router/", "src/shell/"]) {
@@ -642,8 +649,33 @@ describe("C26 §8b.8 — interaction mode is vacuous, and this is the row that s
       .filter((l) => !l.trimStart().startsWith("//") && !l.trimStart().startsWith("*"));
 
     expect(
-      callers,
-      "a block now declares keys — C26 §8b.8's premise is gone, ⏎'s second effect is owed, and this row should be inverted",
+      callers.map((l) => l.trim()),
+      "exactly one production caller — `syncBlockKeymap` in construct.ts (C22 I78)",
+    ).toEqual(["withdrawBlockKeymap = keymap.mergeBlock(declared);"]);
+
+    // **The half the ruling rests on now.** The one producer is the plot's
+    // digits; merged over the real default table they collide with nothing, so
+    // the mode is still empty and `⏎`'s second effect is still uncommitted.
+    const plot = block({
+      kind: "plot", id: "p", form: "line", height: 5,
+      series: Array.from({ length: 9 }, (_, i) => ({ values: [i, i + 1] })),
+    }) as Plot;
+    const declared = plotDefinition.keymap?.(plot) ?? [];
+    expect(declared.map((b) => b.key.name), "nine digits, one per series").toEqual(
+      ["1", "2", "3", "4", "5", "6", "7", "8", "9"],
+    );
+    const map = createKeymap(defaultKeymap);
+    const before = map.entries().length;
+    map.mergeBlock(declared);
+    const merged = map.entries().slice(before);
+    expect(merged.map((b) => b.target), "every digit at liveBlock — none collides").toEqual(
+      Array.from({ length: 9 }, () => "liveBlock"),
+    );
+    // `⌃c` on the mode is a router handler, not a keymap row (T2.6b), so the
+    // table has **zero** rows at this target before and after the merge.
+    expect(
+      map.entries().filter((b) => b.target === "interaction").map((b) => b.action),
+      "the mode has no bindings",
     ).toEqual([]);
   });
 

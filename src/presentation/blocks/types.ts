@@ -161,6 +161,21 @@ export type RenderContext = Readonly<{
    */
   frames?: Readonly<Record<string, number>>;
   /**
+   * The reader's overrides of `Series.hidden`, by plot block id and then by
+   * series index (C04 I99, C12 I116, C22 I78).
+   *
+   * **Written by L4's `SeriesVisibility`** (`shell/series-visibility.ts`) from
+   * the plot's own digit keymap; read by C12, which asks `seriesHidden` and
+   * owns nothing about who toggles it. An explicit boolean per index rather
+   * than a set, because *shown* has to be able to override a producer's
+   * *hidden*. Absent is the block's own member. `measure` never receives it
+   * (I8): a hidden series still holds its rows.
+   *
+   * **Arrived with its writer and its key axis in one commit**, on C22 I71's
+   * rule and `cursorPositions`' counter-example two fields up.
+   */
+  seriesVisibility?: Readonly<Record<string, Readonly<Record<number, boolean>>>>;
+  /**
    * Caller-owned scratch for work a renderer would otherwise repeat (C12 I107).
    *
    * **An input, which is what keeps I11 satisfied.** C12 I11 forbids state that
@@ -355,6 +370,18 @@ export type NavElement = Readonly<{
   copy?: string;
 }>;
 
+/**
+ * One key a block binds while it holds focus (A01 D4, C16 I27).
+ *
+ * **L1's spelling of C16's `BlockKeymap` element**, structurally identical and
+ * declared here because imports go down: a block definition cannot name a type
+ * in `interaction/`. L4 hands the array to `Keymap.mergeBlock` unchanged.
+ */
+export type BlockKeyBinding = Readonly<{
+  key: Readonly<{ name: string; ctrl?: boolean; meta?: boolean; shift?: boolean }>;
+  action: string;
+}>;
+
 export interface BlockDefinition<B extends Block = Block> {
   kind: string;
   measure: Measure<B>;
@@ -405,6 +432,20 @@ export interface BlockDefinition<B extends Block = Block> {
    * parameter here, so the violation is unrepresentable rather than forbidden.
    */
   elements?: (block: B, width: number, measureChild: MeasureFn) => readonly NavElement[];
+  /**
+   * The keys this block binds while focus is on it (A01 D4, C16 I27, C22 I78).
+   *
+   * **Optional on `elements?`'s argument, and it is the same decision**: an
+   * absent member cannot be deleted by a later edit while a branch returning
+   * `[]` can, so a kind with no keys omits it. **The block and nothing else** —
+   * no width, no context — because a key table that varied with the frame would
+   * be one a reader could not learn. L4 merges it when focus lands on the block
+   * and withdraws it when focus leaves; a key `global` or `liveBlock` already
+   * binds lands at `interaction` (C16 I27) and the rest at `liveBlock`.
+   *
+   * The first producer is `plot`'s digits (C12 I116).
+   */
+  keymap?: (block: B) => readonly BlockKeyBinding[];
 }
 
 export interface BlockRegistry {

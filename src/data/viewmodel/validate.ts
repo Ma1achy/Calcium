@@ -25,6 +25,7 @@ import {
   COLORMAP_NAMES,
   TONES,
   HAS_CALLOUT,
+  HAS_HIDEABLE_SERIES,
   HAS_DETAIL_RUNGS,
   HIERARCHY_MAX_DEPTH,
   HIERARCHY_ROLE,
@@ -532,6 +533,39 @@ function plotHierarchyErrors(
   if (fault !== null) e.push(`${fault} (C04 I64)`);
 }
 
+/**
+ * A series' `hidden` (C04 I99): a boolean, and only where a series is a layer.
+ *
+ * **The form gate is `HAS_HIDEABLE_SERIES` and not `HAS_CALLOUT`**, though the
+ * two name the same seven forms today — the record answers *does removing a
+ * series move the rest*, which is the question this member turns on (C04 §3
+ * *hidden*). **Both values are refused off those forms**, because the member is
+ * the claim and not its value: `hidden: false` on a `bar` is a document saying
+ * something about a channel the form does not have.
+ */
+function checkSeriesHidden(
+  s: Record<string, unknown>,
+  e: string[],
+  at: string,
+  index: number,
+  form: unknown,
+): void {
+  const hidden = s["hidden"];
+  if (hidden === undefined) return;
+  const where = `${at}: series[${String(index)}].hidden`;
+  if (typeof hidden !== "boolean") {
+    e.push(`${where} must be a boolean (C04 I99) — a series is drawn or it is not`);
+    return;
+  }
+  if (typeof form === "string" && HAS_HIDEABLE_SERIES[form as PlotForm] === false) {
+    e.push(
+      `${where} is set on form "${form}" (C04 I99) — a series is a layer only where removing ` +
+        `one moves nothing else, and on this form it is a row, a slice, a band or a matrix row; ` +
+        `hiding it would mean recomputing the figure, which is a different member`,
+    );
+  }
+}
+
 function checkAnnotations(
   annotations: unknown,
   e: string[],
@@ -548,6 +582,11 @@ function checkAnnotations(
     const label = a["label"];
     if (label !== undefined && !isString(label)) {
       e.push(`${at}: annotation "label" must be a string (C04 I52)`);
+    }
+    // C04 I99 — accepted on every arm, because an annotation is already a layer
+    // behind the data; only the type is checked.
+    if (a["hidden"] !== undefined && typeof a["hidden"] !== "boolean") {
+      e.push(`${at}: annotation "hidden" must be a boolean (C04 I99) — a reference is drawn or it is not`);
     }
     // **`confidence` and `whiskers` carry no label**, because both are drawn
     // across the whole abscissa: one string would name the band as a whole on
@@ -945,6 +984,7 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
       for (const [i, s] of b["series"].entries()) {
         if (isRecord(s)) requireFiniteNumbers(s["values"], e, at, `series[${String(i)}].values`);
         if (isRecord(s)) checkPointLabels(s, e, at, i, b["form"]);
+        if (isRecord(s)) checkSeriesHidden(s, e, at, i, b["form"]);
       }
       // **I50a — refused, not cycled** (roadmap 51). The categorical palette
       // distinguishes eight, and a ninth series used to reuse the first's

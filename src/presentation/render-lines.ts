@@ -46,6 +46,8 @@ export type RenderOptions = Readonly<{
   cameras?: RenderContext["cameras"];
   /** Per-image frame indices (C04 I93, C22 I77). Absent is frame 0. */
   frames?: RenderContext["frames"];
+  /** Per-plot series overrides (C04 I99, C22 I78). Absent is each block's own `hidden`. */
+  seriesVisibility?: RenderContext["seriesVisibility"];
   /**
    * Caller-owned scratch (C12 I107). Absent is a miss on every lookup, which is
    * the same frame at the same cost — a cache whose absence changes a picture
@@ -78,6 +80,7 @@ export function renderToLines(
     ...(options.cursorPositions === undefined ? {} : { cursorPositions: options.cursorPositions }),
     ...(options.cameras === undefined ? {} : { cameras: options.cameras }),
     ...(options.frames === undefined ? {} : { frames: options.frames }),
+    ...(options.seriesVisibility === undefined ? {} : { seriesVisibility: options.seriesVisibility }),
     ...(options.scratch === undefined ? {} : { scratch: options.scratch }),
     tick: options.tick ?? 0,
   };
@@ -129,6 +132,7 @@ export function renderSequenceToLines(
     ...(options.cursorPositions === undefined ? {} : { cursorPositions: options.cursorPositions }),
     ...(options.cameras === undefined ? {} : { cameras: options.cameras }),
     ...(options.frames === undefined ? {} : { frames: options.frames }),
+    ...(options.seriesVisibility === undefined ? {} : { seriesVisibility: options.seriesVisibility }),
     ...(options.scratch === undefined ? {} : { scratch: options.scratch }),
     tick: options.tick ?? 0,
   };

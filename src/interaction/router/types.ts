@@ -319,6 +319,23 @@ export type KeyAction =
   | "dollyOut"
   | "cameraReset"
   | "orbitToggle"
+  // --- the series toggle (C22 I78, C12 I116) ----------------------------------
+  //
+  // **Nine names, because an effect takes no key.** `KeyEffect` is `() => void`
+  // and a block keymap's action must reach `keys.table` by name (`construct.ts`'s
+  // `bound`), so the digit is in the action. Bound by no row of `defaultKeymap`:
+  // the plot declares them itself (`plotDefinition.keymap`) and L4 merges them
+  // while the plot holds focus — the first `BlockKeymap` producer, and the reason
+  // I19's "an action nobody binds" clause is read over the merged table too.
+  | "toggleSeries1"
+  | "toggleSeries2"
+  | "toggleSeries3"
+  | "toggleSeries4"
+  | "toggleSeries5"
+  | "toggleSeries6"
+  | "toggleSeries7"
+  | "toggleSeries8"
+  | "toggleSeries9"
   | "blockPageDown"
   | "blockPageUp"
   // `enter` on a focused row, and the union's gap was the whole of F21: a row

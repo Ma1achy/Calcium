@@ -157,7 +157,15 @@ const MEASURED = {
   // **110 → 114 with `line/log` and `line/whiskers-placed`** (C04 I81, I52) —
   // two cells each; both carry the bucket's standing `numericLabels`
   // disposition and the second its `identityLabels` one.
-  "line": { silent: "0/114", "numericLabels": "79/114", "identityLabels": "30/114", "border": "8/114", "interiorRules": "16/114", "legend": "14/114", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  // **`line.legend` 14 → 10 when the cursor's frame stopped dropping the legend**
+  // (C12 §3s, arc4 Lane R). `axedWithCursor` composed the area rows and the
+  // furniture and skipped the legend column `axed` composites, so the four
+  // cursor variants (`cursor`, `cursor-flipped`, at two widths each) drew no
+  // legend on the terminal arm while the SVG arm drew one — a disagreement
+  // that was a defect and not a decision. Folded into `axed` with the cursor as
+  // a parameter; the four cells now agree, and the direction *is* the pass's
+  // direction this time, which is why the figure is stated and not implied.
+  "line": { silent: "0/114", "numericLabels": "79/114", "identityLabels": "30/114", "border": "8/114", "interiorRules": "16/114", "legend": "10/114", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "sparkline": { silent: "0/8", "numericLabels": "agree", "identityLabels": "2/8", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "scatter": { silent: "0/12", "numericLabels": "5/12", "identityLabels": "2/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "step": { silent: "0/6", "numericLabels": "1/6", "identityLabels": "2/6", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },

@@ -40,8 +40,9 @@ import { candleColumn, candlesOf } from "./candles.js";
 import { AXIS_GUTTER, FRAME_RIGHT } from "./height.js";
 import { FACING_DEFAULT, facingOf } from "./scale.js";
 import type { Plot } from "../../data/viewmodel/index.js";
-import type { ColourRef } from "../theme/index.js";
+import type { ColourRef, Style } from "../theme/index.js";
 import { SHARES_CELLS, markOf } from "./marks.js";
+import { seriesHidden } from "./visibility.js";
 import { identityOf, legendSlots, type FrameStyle } from "./figure.js";
 import type { RenderContext } from "../blocks/types.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
@@ -112,7 +113,30 @@ export type Layout = Readonly<{
    * number is small and the bug it prevents is not.
    */
   reserved?: number;
+  /**
+   * Whether the block this frame encloses holds a block-level focus (C26 §7,
+   * C12 §3's element paragraph).
+   *
+   * **On the layout for `style`'s reason**: the frame's four painters take a
+   * layout and not a block, and `reserving` is the one place a layout meets the
+   * block and the context — so the flag is set there once rather than threaded
+   * through nine call sites. What it changes is a tone on cells the frame draws
+   * regardless (`frameTone`); it can change no glyph and no width, which is
+   * C11 I17's rule applied to a plot.
+   */
+  focused?: boolean;
 }>;
+
+/**
+ * The frame's ink: `accent` under block-level focus, `muted` otherwise (C26 §7).
+ *
+ * One function for the lid, the two side rules and the bottom rule, so the four
+ * cannot disagree about whether the block is focused. At 1-bit the difference is
+ * the mono class — bold where the frame was dim — a weight and not a colour (F34).
+ */
+function frameTone(layout: Layout, ctx: RenderContext): Style {
+  return tone(layout.focused === true ? "accent" : "muted", ctx.theme, ctx.capabilities);
+}
 
 /**
  * One row of spans, clamped and painted.
@@ -144,7 +168,11 @@ export function line(spans: readonly Span[], layout: Layout, ctx: RenderContext)
 function leftGutterSpans(label: string, layout: Layout, ctx: RenderContext): readonly Span[] {
   if (layout.gutter === 0) return [];
   const g = glyphs(ctx.capabilities);
+  // **The label is `muted` and the edge is the frame's** (C26 §7): a focus turns
+  // the enclosure `accent` and leaves the scale's numbers as they were, so what
+  // lights up is the box around the data and not the data's own captions.
   const muted = tone("muted", ctx.theme, ctx.capabilities);
+  const edgeTone = frameTone(layout, ctx);
   // `"corners"` has no side edges either — the label still sits where it does in
   // every other style, so the column the data starts in never moves with the
   // style. That is what makes these four interchangeable at a glance.
@@ -171,7 +199,10 @@ function leftGutterSpans(label: string, layout: Layout, ctx: RenderContext): rea
     // question about the row: the same conflation, a third time, in the fix
     // for the first two.
     { text: layout.labelColumn === 0 ? "" : padStart(label, layout.labelColumn, ctx.capabilities.ambiguousWidth), style: muted },
-    { text: ` ${edge}`, style: muted },
+    // The blank between label and edge is nobody's: kept out of the edge's span
+    // so a focus moves exactly the frame's glyphs and not the cell beside them.
+    { text: " ", style: muted },
+    { text: edge, style: edgeTone },
   ];
 }
 
@@ -194,9 +225,10 @@ function rightGutterSpans(
   const column = layout.rightColumn ?? 0;
   const bare = BARE_RIGHT_EDGE.has(layout.style ?? "box");
   const muted = tone("muted", ctx.theme, ctx.capabilities);
+  const edgeTone = frameTone(layout, ctx);
   if (column === 0) {
     if (layout.frame !== true) return [];
-    return [{ text: bare ? " " : glyphs(ctx.capabilities).vertical, style: muted }];
+    return [{ text: bare ? " " : glyphs(ctx.capabilities).vertical, style: edgeTone }];
   }
   const g = glyphs(ctx.capabilities);
   const amb = ctx.capabilities.ambiguousWidth;
@@ -208,7 +240,8 @@ function rightGutterSpans(
   if (callout !== undefined) {
     const text = callout.shared ? `${callout.text}+` : callout.text;
     return [
-      { text: `${bare ? " " : g.calloutTee} `, style: muted },
+      { text: bare ? " " : g.calloutTee, style: edgeTone },
+      { text: " ", style: muted },
       {
         text: pad(truncate(text, column, ctx.capabilities), column, amb),
         // Bold **and** the mark, in that order of reliance: the mark is what
@@ -222,7 +255,8 @@ function rightGutterSpans(
   // drawing `tick_right` on a left border is this rule read from the other end.
   const edge = bare ? " " : label === "" ? g.vertical : g.teeLeft;
   return [
-    { text: `${edge} `, style: muted },
+    { text: edge, style: edgeTone },
+    { text: " ", style: muted },
     { text: pad(truncate(label, column, ctx.capabilities), column, amb), style: muted },
   ];
 }
@@ -412,7 +446,7 @@ function topGlyphs(style: FrameStyle, g: ReturnType<typeof glyphs>): EdgeGlyphs 
 
 export function frameTop(layout: Layout, ctx: RenderContext): string {
   const g = glyphs(ctx.capabilities);
-  const muted = tone("muted", ctx.theme, ctx.capabilities);
+  const muted = frameTone(layout, ctx);
   const edge = topGlyphs(layout.style ?? "box", g);
   // **The row is still emitted when the style draws nothing in it**, because
   // `plotHeight` counted it and a style cannot change a block's height — that is
@@ -451,7 +485,7 @@ export function frameBottom(
   cursorAt: number | null = null,
 ): string {
   const g = glyphs(ctx.capabilities);
-  const muted = tone("muted", ctx.theme, ctx.capabilities);
+  const muted = frameTone(layout, ctx);
   const style = layout.style ?? "box";
   // **`"corners"` draws no ticks**, which is I26's own clause: a tick is a mark
   // *on* an edge, and there is no edge here for it to sit on. Every other style
@@ -810,7 +844,7 @@ const POSITIONAL_STACKS: Readonly<Record<string, boolean>> = Object.freeze({
  * the same error one layer up: it means little where colour leads and it is the
  * *only* thing that means anything where colour does not.
  */
-export function legendEntries(block: Plot, ctx: RenderContext): readonly LegendEntry[] {
+export function legendEntries(block: Plot, ctx: Pick<RenderContext, "capabilities" | "seriesVisibility">): readonly LegendEntry[] {
   const g = glyphs(ctx.capabilities);
   // **One table, keyed by the role the shared layer named** (C12 I62, §3ak.7 C8).
   //
@@ -831,9 +865,15 @@ export function legendEntries(block: Plot, ctx: RenderContext): readonly LegendE
   // it is actually drawn with, at every depth (C04 I23) — a swatch naming a glyph
   // that appears nowhere is this function's own recorded defect, and it is why
   // these are roles rather than a fall-through to `markOf`.
+  // **A hidden entry keeps its label and its slot and takes `hollow`** (C12
+  // I116, §3aq): an outline for a curve with no ink. A mark and not a tone,
+  // because colour is never the only channel (I6) and one bit is where the
+  // toggle must still read — the swatch is exactly the column that survives.
   return legendSlots(block).map((slot) => ({
     mark:
-      slot.role === "rising" ? g.candleHollow
+      (slot.role === "series" && seriesHidden(block, slot.seriesIndex ?? 0, ctx)) || slot.hidden === true
+        ? g.hollow
+      : slot.role === "rising" ? g.candleHollow
       : slot.role === "falling" ? g.candleFilled
       : slot.role === "annotation" ? g.dashedHorizontal
       : markOf(slot.seriesIndex ?? 0, ctx.capabilities),
@@ -858,7 +898,7 @@ function entryText(e: LegendEntry): string {
 export function legendWidth(
   entries: readonly LegendEntry[],
   width: number,
-  ctx: RenderContext,
+  ctx: Pick<RenderContext, "capabilities">,
   /**
    * **A left legend needs a blank on *both* sides and a right legend on one.**
    *

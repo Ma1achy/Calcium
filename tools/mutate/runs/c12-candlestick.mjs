@@ -167,8 +167,10 @@ const results = runPass({
       // picture.
       name: "the readout hand-rolls its rounding again",
       file: DEFN,
-      from: "    return `${label}: ${formatReadout(v, block.yFormat)}`;",
-      to: "    return `${label}: ${String(Math.round(v * 100) / 100)}`;",
+      // Re-anchored 2026-09-05: the readout is a `flatMap` since C04 I99 (a hidden
+      // series contributes nothing), so each arm returns a one-element array.
+      from: "    return [`${label}: ${formatReadout(v, block.yFormat)}`];",
+      to: "    return [`${label}: ${String(Math.round(v * 100) / 100)}`];",
       expect: "CS7",
     },
     {

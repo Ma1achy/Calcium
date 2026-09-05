@@ -43,7 +43,7 @@ import type { ProcessRunner } from "../data/process/types.js";
 import { createBlockRegistry, type BlockDefinition } from "../presentation/blocks/index.js";
 import { BlockFaultLog } from "./block-faults.js";
 import { tableDefinition } from "../presentation/table/index.js";
-import { cursorable, plotDefinition } from "../presentation/plot/index.js";
+import { cursorable, plotDefinition, sampleIndexAt } from "../presentation/plot/index.js";
 import { patchDefinition } from "../presentation/patch/index.js";
 import { loadTheme, type ThemeStore } from "../presentation/theme/index.js";
 import { createTranscriptStore } from "../viewport/transcript/index.js";
@@ -53,6 +53,7 @@ import { RenderCache } from "./render-cache.js";
 import { Cameras } from "./cameras.js";
 import { Frames } from "./frames.js";
 import { CursorPositions } from "./cursor-positions.js";
+import { SeriesVisibility } from "./series-visibility.js";
 import { RenderScratchStore } from "./render-scratch.js";
 import { ScrollOffsets } from "./scroll-offsets.js";
 import { createOverlayManager } from "../viewport/overlay/index.js";
@@ -282,6 +283,8 @@ export type Graph = Readonly<{
   resetCamera: () => void;
   /** C22 I72 — start or stop it turning. Off is the default and nothing declares it. */
   toggleOrbit: () => void;
+  /** C22 I78 — hide or show series `n` of the focused plot. A no-op elsewhere. */
+  toggleSeries: (n: number) => void;
   /** Is the prompt answering keys under the top layer (I51, C19 I20)? */
   promptUnderMenu: () => boolean;
   /** Past the blink threshold since the last key (C22 I64). */
@@ -337,6 +340,8 @@ export type Graph = Readonly<{
   frames: Frames;
   /** C22 I76 — the crosshair of each plot, keyed like the two above and dropped with them. */
   cursorPositions: CursorPositions;
+  /** C22 I78 — the reader's series overrides per plot, keyed like the three above and dropped with them. */
+  seriesVisibility: SeriesVisibility;
   /**
    * Caller-owned render scratch (C12 I107). One per session, keyed on the
    * caller's own arrays, so nothing evicts it and nothing subscribes.
@@ -649,7 +654,9 @@ export async function constructGraph(
       // that frame exists, and an initial value in the wrong axis is the same
       // defect with a shorter life. One row of prompt is the floor, which is
       // what a session opens with.
-      height: initialRegionHeight(size),
+      // With the footer's budget (C22 I79, §6k): without it the first frame corrects
+      // the region by `footerRows − 1` rows — T1.37 measures the gap.
+      height: initialRegionHeight(size, config.chrome.footerRows),
       measureSequence: (blocks, width) => built.blocks.measureSequence(blocks, width),
       // C14 I20 / C22 I33 — the command line is chrome the composer draws, so
       // it is part of the height the index virtualises against. **The same
@@ -683,6 +690,10 @@ export async function constructGraph(
     // shape, same subscription, same reason — and the fourth store to join it,
     // which is the count the argument was written to survive.
     const frames = new Frames();
+    // **And the series overrides — the fifth** (C22 I78). Same key shape, same
+    // subscription, same reason; the first store whose writer is a keymap the
+    // block declares rather than a row of the default table.
+    const seriesVisibility = new SeriesVisibility();
     // **This one does not join the subscription, and the difference is the
     // point** (C12 I107, §6o.1). The two stores above are keyed by entry id and
     // must be told when an entry goes; this is keyed on the caller's own
@@ -699,6 +710,7 @@ export async function constructGraph(
           cameras.delete(id);
           cursorPositions.delete(id);
           frames.delete(id);
+          seriesVisibility.delete(id);
         }
       } else if (change.kind === "clear") {
         rendered.clear();
@@ -706,6 +718,7 @@ export async function constructGraph(
         cameras.clear();
         cursorPositions.clear();
         frames.clear();
+        seriesVisibility.clear();
       }
     });
 
@@ -944,6 +957,7 @@ export async function constructGraph(
       scrollOffsets,
       cameras,
       cursorPositions,
+      seriesVisibility,
       frames,
       scratch,
       overlays,
@@ -1672,6 +1686,31 @@ export async function constructGraph(
   };
 
   /**
+   * Hide or show series `n` (1-based) of the focused plot (C22 I78, C12 I116).
+   *
+   * **The effective state is read here and its negation recorded**, which is
+   * `dollyBlock`'s seam: the store clamps nothing and knows no block, and only
+   * this side holds the block whose `hidden` is the default under the override.
+   * The one bound is *the series exists*; the keymap the plot declares already
+   * binds no digit past its series count, so the guard is for a `replace` that
+   * shortened the list between the merge and the key (C12 §3aq B4).
+   *
+   * **Not gated on `cursorable`**: a plot with a camera is focusable and can have
+   * series, and hiding one of those is as legal as hiding a curve's.
+   */
+  const toggleSeriesBlock = (n: number): void => {
+    const found = focusedBlock();
+    if (found === null || found.block.kind !== "plot") return;
+    const plot = found.block as Plot;
+    const index = n - 1;
+    if (index < 0 || index >= plot.series.length) return; // cells-ok — a series count
+    const held = stores.seriesVisibility.get(found.entryId, plot.id, index);
+    const hiddenNow = held ?? plot.series[index]?.hidden === true;
+    stores.seriesVisibility.set(found.entryId, plot.id, index, !hiddenNow);
+    scheduler.commit("input");
+  };
+
+  /**
    * Re-run the focused entry's **recorded command** (C23 I18, C16 §6).
    *
    * **Not an action, and the distinction is the ruling.** The five `Action`
@@ -1732,6 +1771,7 @@ export async function constructGraph(
     focusedEntryId,
     neighbourEntry: neighbourOf,
     cursorBlock: moveCursor,
+    toggleSeries: toggleSeriesBlock,
     rerunEntry: rerunFocused,
     pageBlock,
     orbitBlock,
@@ -1774,9 +1814,35 @@ export async function constructGraph(
   const promptUnderMenu = (): boolean =>
     stores.overlays.top?.id === MENU_ID && keys.selected === null;
 
+  /**
+   * Merge the focused block's own keymap, and withdraw the last one (A01 D4,
+   * C16 I27, C22 I78).
+   *
+   * **A pull before every resolution rather than a subscription**, because
+   * `FocusStore` has none and C26 §5 rules that resolution is a pull. The cost
+   * is one identity comparison per dispatched key; the state is the block
+   * whose keymap is merged, and a `replace` that rebuilds the block is a new
+   * identity and a fresh merge. **`mergeBlock`'s first production caller**, and
+   * the one C26 T2.6a was written to detect.
+   */
+  let mergedFor: Block | null = null;
+  let withdrawBlockKeymap: (() => void) | null = null;
+  const syncBlockKeymap = (): void => {
+    const blk = focusedBlock()?.block ?? null;
+    if (blk === mergedFor) return;
+    withdrawBlockKeymap?.();
+    withdrawBlockKeymap = null;
+    mergedFor = blk;
+    if (blk === null) return;
+    const declared = built.blocks.get(blk.kind)?.keymap?.(blk);
+    if (declared === undefined || declared.length === 0) return; // cells-ok — a binding count
+    withdrawBlockKeymap = keymap.mergeBlock(declared);
+  };
+
   /** A bound action, or `null` when the key is not bound at this target. */
   const bound = (target: FocusTarget, e: InputEvent): (() => void) | null => {
     if (e.kind !== "key") return null;
+    syncBlockKeymap();
     const binding = keymap.resolve(target, e.key);
     if (binding === null) return null;
     // A block keymap's action is a surface's string and dispatches through
@@ -1828,8 +1894,30 @@ export async function constructGraph(
     const address = Object.freeze({ blockId: under.blockId, elementId: under.element.id });
     const at = focus.current;
     const inHitEntry = at.at === "liveBlock" && focusedEntryId() === hit.id;
+    const onFocused =
+      inHitEntry &&
+      at.at === "liveBlock" &&
+      at.element !== null &&
+      at.element.blockId === address.blockId &&
+      at.element.elementId === address.elementId;
+    // **The crosshair, where the pointer is over a cursorable plot's area**
+    // (C16 §4a, C12 §3s, C22 I76). Resolved once for every arm below, because
+    // three of them want it: a click focuses the plot *and* aims, a click on
+    // the focused plot aims where a row would activate (row m), and a drag on
+    // the focused plot aims where a row would extend (row o).
+    const sample = sampleUnder(under, e.col);
+    const aim = sample === null
+      ? null
+      : (): void => {
+          stores.cursorPositions.set(hit.id, under.block.id, sample);
+          scheduler.commit("input");
+        };
 
     if (e.motion || e.shift) {
+      // **Over the focused plot, motion is the crosshair's** (§4a row o): the
+      // anchor and the head would be one block-level element, which is no
+      // selection in any case, so nothing is lost by not calling `extendRow`.
+      if (onFocused && aim !== null) return aim;
       // A drag and a shift-click are both `⇧↓` (C16 §4a): the head lands on the
       // element under the pointer and the anchor is placed on the first
       // extension, so click `a` then shift-click `c` selects `a..c`. Within the
@@ -1838,13 +1926,10 @@ export async function constructGraph(
       // it**: `extendRow` trusts its callers with the entry (F764).
       return inHitEntry ? () => focus.extendRow(hit.id, address) : null;
     }
-    const onFocused =
-      inHitEntry &&
-      at.at === "liveBlock" &&
-      at.element !== null &&
-      at.element.blockId === address.blockId &&
-      at.element.elementId === address.elementId;
     if (onFocused) {
+      // **A plot's second click moves the crosshair** (§4a row m): its element
+      // carries no `activate`, so there is no `⏎` for the click to be.
+      if (aim !== null) return aim;
       // Click again is `⏎` — a state test, not a timer (C16 I9). In `interact`
       // the block owns its keys (C26 I14) and the framework fires nothing.
       return at.mode === "interact" ? null : keys.table.rowActivate;
@@ -1852,7 +1937,34 @@ export async function constructGraph(
     // A click is a way in exactly as `↓` is, so from the prompt it takes the
     // same call; from a row it is a move, and `focusRow` collapses a selection
     // and drops the mode as every unshifted motion does (C26 I16).
-    return at.at === "prompt" ? () => focus.enterLiveBlock(hit.id, address) : () => focus.focusRow(hit.id, address);
+    const land = at.at === "prompt" ? () => focus.enterLiveBlock(hit.id, address) : () => focus.focusRow(hit.id, address);
+    // **Focus first, then the crosshair, in one effect** — so the readout row
+    // and the highlight arrive in the same frame (§4a's plot row). The store is
+    // per entry and a settled entry's view state is the reader's (row p).
+    return aim === null ? land : () => { land(); aim(); };
+  };
+
+  /**
+   * The sample under the pointer on a cursorable plot, or `null` (C16 §4a,
+   * C12 §3s) — the crosshair's second writer, sharing `moveCursor`'s store.
+   *
+   * **The renderer inverts its own placement.** The element spans the block and
+   * the plot area does not (gutter, legend, alignment pad), so the column is
+   * handed to C12 relative to the element's origin and at the element's width,
+   * and `sampleIndexAt` answers through the layout the frame was drawn with —
+   * never a second copy of it here (§4a row n). `null` is *outside the area*:
+   * the click is then the click row's alone and the crosshair stays.
+   *
+   * No clamp here, on purpose: every index the inverse returns is one the
+   * readout can print (nearest sample inside the area), so a clamp would be a
+   * second statement of a bound the renderer already holds.
+   */
+  const sampleUnder = (under: Readonly<{ element: NavElement; block: Block }>, col: number): number | null => {
+    if (under.block.kind !== "plot") return null;
+    const plot = under.block as Plot;
+    if (!cursorable(plot)) return null;
+    const { from, to } = under.element.cols;
+    return sampleIndexAt(plot, to - from, { capabilities: detection.capabilities }, col - from);
   };
 
   /** A click on chrome — header, footer, the prompt row — is the reader stepping out (C16 §4a trace 8). */
@@ -2178,6 +2290,7 @@ export async function constructGraph(
     dollyBlock,
     resetCamera,
     toggleOrbit,
+    toggleSeries: toggleSeriesBlock,
     capabilities: detection.capabilities,
     /**
      * C22 I6a — construction, then the session, then what the session contained.

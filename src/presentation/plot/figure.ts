@@ -431,6 +431,8 @@ export type LegendSlot = Readonly<{
   ref: ColourRef;
   /** Present for `role: "series"` — the palette slot the swatch must match. */
   seriesIndex?: number;
+  /** Present for `role: "annotation"` — the block's own `hidden` (C04 I99); a series asks `seriesHidden`. */
+  hidden?: boolean;
   /**
    * **The reading beside the name** — `65%` — as a string, and `ValueAxis.labels`
    * is the precedent (§3ak.26 finding 5).
@@ -945,6 +947,9 @@ export function calloutOf(block: Plot): readonly (string | null)[] | null {
   const mode = block.yCallout;
   if (mode !== "last" && mode !== "name" && mode !== "both") return null;
   return block.series.map((s, i) => {
+    // A hidden series has no callout (C04 I99): the number of a curve that is
+    // not on the page is not on the page. Its slot stays, so the others do not move.
+    if (s.hidden === true) return null;
     const name = s.label ?? `series ${String(i + 1)}`;
     if (mode === "name") return name;
     const v = lastFinite(s.values);
@@ -1022,7 +1027,7 @@ export function legendSlots(block: Plot): readonly LegendSlot[] {
     if (label === undefined) return [];
     const tone = a.tone;
     const ref: ColourRef = tone === undefined ? "tone.muted" : `tone.${tone}`;
-    return [{ role: "annotation" as const, label, ref }];
+    return [{ role: "annotation" as const, label, ref, ...(a.hidden === true ? { hidden: true } : {}) }];
   });
   return [
     ...candles,
@@ -1178,6 +1183,7 @@ function annotationMarks(
     ref,
   });
   return (block.annotations ?? []).flatMap((a): readonly Drawn[] => {
+    if (a.hidden === true) return []; // C04 I99 — the legend row stays, the reference goes
     const ref: ColourRef = a.tone === undefined ? "tone.muted" : `tone.${a.tone}`;
     switch (a.kind) {
       case "line": {
@@ -3406,6 +3412,10 @@ export function curveFigure(block: Plot): Figure {
     const bars = candlesOf(block);
     if (bars !== undefined) marks.push(...candleMarks(bars, value.range));
     block.series.forEach((series, seriesIndex) => {
+      // **The SVG arm honours the member and cannot see the store** (C12 I116):
+      // the index is kept so the slot colours do not shift, and the range was
+      // measured over this series too, so nothing else moves.
+      if (series.hidden === true) return;
       for (const points of runsOf(series.values, value.range)) {
         marks.push({ mark: { kind: "polyline", points }, layer: "series", seriesIndex });
       }

@@ -458,9 +458,17 @@ export const pillsDefinition: BlockDefinition<Pills> = {
           index += 1;
           const name = chip?.active === true ? "accent" : (chip?.tone ?? "muted");
           if (spans.length > 0) spans.push({ text: " ".repeat(CHIP_GAP) }); // cells-ok
+          // **The head is `accent` over the selection ground** (C26 §7), where
+          // the table's head is `accent` alone. `active` already spends
+          // `accent` as data, so a focused inactive chip beside an active one
+          // was the same colour twice (F769: `pills-focus-24bit`, `running`
+          // and `exited` both `38;2;232;168;124`); the ground is a channel no
+          // chip datum uses. A selected chip is `default` over the same ground,
+          // so head and extent differ by ink; at 1-bit both are reverse video
+          // and the head is bold.
           const style =
             id === head
-              ? tone("accent", ctx.theme, ctx.capabilities)
+              ? { ...tone("accent", ctx.theme, ctx.capabilities), ...selectionStyle(ctx.theme, ctx.capabilities) }
               : selected.has(id)
                 ? { ...tone("default", ctx.theme, ctx.capabilities), ...selectionStyle(ctx.theme, ctx.capabilities) }
                 : tone(name, ctx.theme, ctx.capabilities);

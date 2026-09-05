@@ -86,10 +86,11 @@ import { lineDrawRows, type Interpolation } from "./linedraw.js";
 import { pieRender, pieAsciiRows, radarRender, radarAsciiRows, type MarkedText, segmentLegend, LEGEND_GAP } from "./circle.js";
 import { horizonGrid, horizonIsSigned, horizonLegendSpans, horizonSpans } from "./horizon.js";
 import { smallMultiplesRows } from "./facet.js";
+import { seriesHidden } from "./visibility.js";
 import { stripHeights } from "./strips.js";
 import type { Annotation, OHLC, QuartileSummary, Plot, PlotForm, Series } from "../../data/viewmodel/index.js";
 import type { ColourRef, Style } from "../theme/index.js";
-import type { BlockDefinition, NavElement, RenderContext } from "../blocks/types.js";
+import type { BlockDefinition, BlockKeyBinding, NavElement, RenderContext } from "../blocks/types.js";
 import type { MeasureFn } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 
@@ -634,6 +635,22 @@ function axed(
   layout: Layout,
   ctx: RenderContext,
   xaxis: XAxis,
+  /**
+   * The crosshair, when one is set (C12 I37, §3s): its index for the readout and
+   * its area column for the mark on the bottom rule.
+   *
+   * **A parameter and not a sibling function, and the frame is why.** This
+   * was `axedWithCursor`, a second composition beside this one that took the
+   * area rows and the furniture and skipped everything else here — the legend
+   * column, the left indent, the horizontal legend. Measured before it was
+   * folded: a two-series line plot, whose right legend is auto-enabled
+   * (`SHARES_CELLS`), lost the legend the moment a cursor was set, and its rows
+   * stayed narrowed for a column nothing drew; with a left legend the frame was
+   * eight cells left of where its own rows started. The pointer (C16 §4a) makes
+   * a cursor one click away on every such plot, which is what made a latent
+   * frame a prominent one.
+   */
+  cursor: Readonly<{ idx: number; at: number | null }> | null = null,
 ): readonly string[] {
   const placement = legendPlacement(block, ctx.capabilities);
   const entries = placement === null ? [] : legendEntries(block, ctx);
@@ -683,40 +700,24 @@ function axed(
   // furniture here and styled the layout twenty lines up, which was one
   // decision in two places; `frameOf` is that decision and the second arm
   // makes the same call.
-  const furniture = frameOf(block) !== "none" ? furnitureFor(layout, xaxis, ctx, null, block.xTitle) : null;
+  const furniture = frameOf(block) !== "none" ? furnitureFor(layout, xaxis, ctx, cursor?.at ?? null, block.xTitle) : null;
   const top = furniture === null ? [] : [indent(furniture.top)];
-  const bottom = furniture === null ? [] : furniture.bottom.map(indent);
+  // **The readout replaces the label row and never the title** (§3s): one names
+  // a position the reader asked about, the other names the axis it is on. So
+  // with a cursor the second furniture row — the x-labels — is swapped for the
+  // readout, and the rule above it and the title below it stand.
+  const bottom = furniture === null
+    ? []
+    : (cursor === null
+        ? furniture.bottom
+        : [furniture.bottom[0] ?? "", cursorReadout(block, cursor.idx, layout, ctx), ...furniture.bottom.slice(2)]
+      ).map(indent);
   return composeRows(
     plotHeight(block),
     placement === "above" ? [...horizontal, ...top] : top,
     withColumn(area),
     placement === "below" ? [...bottom, ...horizontal] : bottom,
   );
-}
-
-/**
- * The same, with the cursor's readout where the x-labels would be.
- *
- * The readout replaces the label row rather than joining it — both name the
- * abscissa, and the reader asked about one position by putting a cursor on it.
- */
-function axedWithCursor(
-  block: Plot,
-  cursorIdx: number,
-  at: number | null,
-  area: readonly string[],
-  layout: Layout,
-  ctx: RenderContext,
-  xaxis: XAxis,
-): readonly string[] {
-  const furniture = furnitureFor(layout, xaxis, ctx, at);
-  return composeRows(plotHeight(block), [furniture.top], area, [
-    furniture.bottom[0] ?? "",
-    // The readout replaces the label row and never the title: one names a
-    // position the reader asked about, the other names the axis it is on.
-    cursorReadout(block, cursorIdx, layout, ctx),
-    ...(block.xTitle === undefined ? [] : [xTitleRow(block.xTitle, layout, ctx)]),
-  ]);
 }
 
 /**
@@ -780,17 +781,20 @@ function cursorReadout(
   layout: Layout,
   ctx: RenderContext,
 ): string {
-  const values = block.series.map((s) => {
+  const values = block.series.flatMap((s, index) => {
+    // C04 I99 §3 row 4: the readout omits a hidden series — a number for a curve
+    // that is not on screen is not on screen.
+    if (seriesHidden(block, index, ctx)) return [];
     const v = s.values[cursorIdx];
     const label = s.label ?? "";
-    if (v === null || v === undefined || !Number.isFinite(v)) return `${label}: —`; // cells-ok — label formatting
+    if (v === null || v === undefined || !Number.isFinite(v)) return [`${label}: —`]; // cells-ok — label formatting
     // **`formatReadout`, not a hand-rolled round** (F175). The old line was
     // `String(Math.round(v * 100) / 100)` — it ignored `yFormat` entirely, so a
     // percentage, a byte count and a duration all read as bare numbers at the
     // one place a reader reads the number rather than the picture. `axes.ts`
     // records two ramps and `categorical.ts` records the bar as the fourth;
     // **this was the fifth and the last in `src/`.**
-    return `${label}: ${formatReadout(v, block.yFormat)}`;
+    return [`${label}: ${formatReadout(v, block.yFormat)}`];
   });
   // **The candles first**, because they are what the block is about and the
   // series are the overlay — the same order the legend takes (§6b B4).
@@ -1050,8 +1054,13 @@ function stackedRows(
   // before the first row is drawn and a strip's callout row is only known once
   // its band is rasterised.
   const strips = series.map((s, index) => ({
+    // **A hidden strip keeps its band and its gutter label and draws no ink**
+    // (C12 I116, §3aq A5): the band is geometry (I7), the ink is appearance.
+    hidden: seriesHidden(block, index, ctx),
     layer: {
-      glyphRows: curveRows(s, range, layout.areaWidth, heights[index] ?? 0, ctx.capabilities, facingOf(block, FACING_DEFAULT)),
+      glyphRows: seriesHidden(block, index, ctx)
+        ? []
+        : curveRows(s, range, layout.areaWidth, heights[index] ?? 0, ctx.capabilities, facingOf(block, FACING_DEFAULT)),
       ref: refOf(s, index),
       kind: "curve" as const,
     },
@@ -1061,7 +1070,7 @@ function stackedRows(
     // needs it spelled out.* A strip is one series in its own band, so it gets
     // its own collision grid — strips share no rows — and no mark prefix, since
     // the gutter beside it already names the series.
-    names: s.pointLabels === undefined
+    names: s.pointLabels === undefined || seriesHidden(block, index, ctx)
       ? null
       : {
           glyphRows: pointLabelRows(
@@ -1076,7 +1085,7 @@ function stackedRows(
   const callouts = new Map<number, Callout>();
   let base = 0; // cells-ok — a row index
   strips.forEach((strip, index) => {
-    calloutInto(callouts, block, strip.layer.glyphRows, index, layout, true, base);
+    if (!strip.hidden) calloutInto(callouts, block, strip.layer.glyphRows, index, layout, true, base);
     base += strip.rows; // cells-ok — a row count
   });
   const withRight = withCallouts(layout, callouts);
@@ -1195,21 +1204,31 @@ function overlaidRows(
   const names = pointLabelRows(
     block.series, range, layout.areaWidth, layout.areaRows, ctx.capabilities, facing,
   );
-  const layers: readonly Layer[] = [
-    ...block.series.flatMap((s, index) =>
-      s.pointLabels === undefined
-        ? []
-        : [{ glyphRows: names[index] ?? [], ref: refOf(s, index), kind: "label" as const }]),
-    ...block.series.map((s, index) => ({
+  // **A hidden series is a layer that is not rasterised, with its index kept**
+  // (C12 I116, C04 I99). `refOf(s, index)` is what colours the rest, so the
+  // list is filtered and never re-indexed; its names go with it, because they
+  // name samples that are not there.
+  const drawn = block.series.flatMap((s, index) =>
+    seriesHidden(block, index, ctx) ? [] : [{ s, index }]);
+  const curves = drawn.map(({ s, index }) => ({
+    index,
+    layer: {
       glyphRows: rasterise(s, range, layout.areaWidth, layout.areaRows, ctx.capabilities, facing),
       ref: refOf(s, index),
       kind: "curve" as const,
-    })),
+    },
+  }));
+  const layers: readonly Layer[] = [
+    ...drawn.flatMap(({ s, index }) =>
+      s.pointLabels === undefined
+        ? []
+        : [{ glyphRows: names[index] ?? [], ref: refOf(s, index), kind: "label" as const }]),
+    ...curves.map((c) => c.layer),
     // **The candles sit between**, because layers resolve first-non-blank: the
     // overlay series must win a shared cell (§3r — a moving average is drawn
     // *over* the candles) and the annotations must lose it (C04 I52).
     ...under,
-    ...(block.annotations ?? []).map((a) => ({
+    ...(block.annotations ?? []).filter((a) => a.hidden !== true).map((a) => ({
       glyphRows: annotationRows(a, range, layout.areaWidth, layout.areaRows, ctx.capabilities, facing, positionDomainOf(block)?.range ?? null),
       ref: `tone.${a.tone ?? "muted"}` as ColourRef,
       // An annotation is a reference drawn behind the data (C04 I52), so the
@@ -1219,10 +1238,11 @@ function overlaidRows(
   ];
 
   const callouts = new Map<number, Callout>();
-  block.series.forEach((_s, index) => {
-    const rows = layers[index]?.glyphRows;
-    if (rows !== undefined) calloutInto(callouts, block, rows, index, layout, false);
-  });
+  // **The curve's own rows, by the series' own index** (I48). This read
+  // `layers[index]`, and the label layers sit *first* in that list — so a plot
+  // with `pointLabels` on any series placed every callout from a label layer's
+  // ink rather than its curve's (F-W1, found by the hidden filter's re-shape).
+  for (const c of curves) calloutInto(callouts, block, c.layer.glyphRows, c.index, layout, false);
   const withRight = withCallouts(layout, callouts);
 
   const cursor = cursorRule(cursorAt, layout, ctx);
@@ -1310,24 +1330,48 @@ function seriesLabelWidth(series: readonly Series[], ambiguous: AmbiguousWidth):
  * supposed to be explaining. Both look like the legend working until you read a
  * frame whose curve reaches the right edge.
  */
-function reservedFor(block: Plot, width: number, ctx: RenderContext): number {
+/**
+ * What laying a plot out needs of a context — the capabilities, and the focus
+ * where a caller has one (C12 §3s).
+ *
+ * **Narrower than `RenderContext` because one caller has no frame to render
+ * into**: `sampleIndexAt` is L4's inverse of the placement, called from a mouse
+ * event with a block and a column, and a full context there would mean
+ * inventing `measureChild` and `renderChild` to satisfy a type (F85's shape).
+ * `focus` is optional for the same caller: the pointer's inverse does not care
+ * whether the plot is focused, and a layout laid out for it carries no
+ * `focused` flag.
+ */
+type LayoutContext = Pick<RenderContext, "capabilities"> & Partial<Pick<RenderContext, "focus">>;
+
+function reservedFor(block: Plot, width: number, ctx: LayoutContext): number {
   const placement = legendPlacement(block, ctx.capabilities);
   if (placement !== "left" && placement !== "right") return 0; // cells-ok — a cell width
   return Math.min(width - 1, legendWidth(legendEntries(block, ctx), width, ctx, placement)); // cells-ok — a cell width
 }
 
-function usableWidth(block: Plot, width: number, ctx: RenderContext): number {
+function usableWidth(block: Plot, width: number, ctx: LayoutContext): number {
   return Math.max(1, width - reservedFor(block, width, ctx)); // cells-ok — a cell width
 }
 
 /** A layout, with what the legend held back recorded on it. */
-function reserving(layout: Layout, block: Plot, width: number, ctx: RenderContext): Layout {
+function reserving(layout: Layout, block: Plot, width: number, ctx: LayoutContext): Layout {
   const reserved = reservedFor(block, width, ctx);
   // The frame's shape rides along, because every layout is built by one of two
   // functions and neither takes the block — threading it here is one place
   // rather than nine.
   const styled = block.plotFrame === undefined ? layout : { ...layout, style: block.plotFrame };
-  return reserved === 0 ? styled : { ...styled, reserved }; // cells-ok — a cell width
+  // **And so does the focus** (C26 §7, §3's element paragraph), for the same
+  // reason: the frame's painters take a layout, and this is where a layout
+  // meets the block and the context. A block-level focus — `rowId: null` on
+  // this block — turns the frame `accent`; a row focus cannot exist here
+  // (a plot declares one block-level element, I85), so the null test is a
+  // statement rather than a guard.
+  const focus = ctx.focus ?? null;
+  const focused = focus !== null && focus.blockId === block.id && focus.rowId === null
+    ? { ...styled, focused: true }
+    : styled;
+  return reserved === 0 ? focused : { ...focused, reserved }; // cells-ok — a cell width
 }
 
 /**
@@ -2112,12 +2156,21 @@ function ownRun(
   return null;
 }
 
-function positionalForm(
+/**
+ * The layout a positional plot is drawn in, and the decisions it was cut from
+ * (C12 §3s).
+ *
+ * **One function, two callers, and the second is why it exists.** `positionalForm`
+ * has always computed this on its way to the rows; `sampleIndexAt` — the pointer's
+ * inverse of the crosshair's placement — needs the same `areaWidth` and `gutter`
+ * for the same block at the same width, and a copy of these lines would agree
+ * with them until either moved. The layout is the frame's; the inverse borrows it.
+ */
+function positionalLayout(
   block: Plot,
   width: number,
-  ctx: RenderContext,
-  rasterise: Rasteriser,
-): readonly string[] {
+  ctx: LayoutContext,
+): Readonly<{ stacked: boolean; bars: readonly OHLC[] | undefined; axis: Axis | null; layout: Layout }> {
   const stacked = stacksAtOneBit(block, ctx.capabilities); // cells-ok — a series count
   const bars = candlesOf(block);
   // **The decisions are read back rather than made here** (C12 I59, §3ak.7).
@@ -2159,6 +2212,16 @@ function positionalForm(
       ?? { areaRows: plotAreaRows(block), width: usable, gutter: 0, labelColumn: 0, areaWidth: usable },
     block, width, ctx,
   );
+  return { stacked, bars, axis, layout };
+}
+
+function positionalForm(
+  block: Plot,
+  width: number,
+  ctx: RenderContext,
+  rasterise: Rasteriser,
+): readonly string[] {
+  const { stacked, bars, axis, layout } = positionalLayout(block, width, ctx);
   // **A pinned range is not a reading.** `seriesRange` answers *what are the
   // bounds*, and with `yMin`/`yMax` given it answers even for an empty series —
   // so `ecdf`, which pins 0..1 to build its block, drew bare axes where every
@@ -2184,11 +2247,8 @@ function positionalForm(
   const xaxis = xRowFor(block, layout.areaWidth, ctx);
   const area = stacked
     ? stackedRows(block, range, layout, ctx)
-    : overlaidRows(block, axis, layout, ctx, xaxis, rasterise, candleLayers(bars, range, layout, ctx, figure.facing), at);
-  if (marked) {
-    return axedWithCursor(block, cursorIdx, at, area, layout, ctx, xaxis);
-  }
-  return axed(block, area, layout, ctx, xaxis);
+    : overlaidRows(block, axis, layout, ctx, xaxis, rasterise, candleLayers(bars, range, layout, ctx, positionalDecisions(block).facing), at);
+  return axed(block, area, layout, ctx, xaxis, marked ? { idx: cursorIdx, at } : null);
 }
 
 
@@ -3176,6 +3236,59 @@ const CURSORABLE_FORMS: ReadonlySet<Plot["form"]> = new Set<Plot["form"]>([
 ]);
 
 /**
+ * **The sample under a block column, or `null`** (C12 §3s, C16 §4a) — the
+ * pointer's half of the crosshair's writer.
+ *
+ * **An inversion by search through the forward map, not a second formula.**
+ * `cursorColumn` is what places the `▲` for an index; this lays the plot out
+ * exactly as `positionalForm` does (`positionalLayout`, one function for both),
+ * takes the pad, a left legend's column and the gutter off the block column to
+ * reach an area column, and answers the index whose mark is nearest to it —
+ * the lower index on a tie. A candlestick's buckets and a left-facing axis are
+ * then right for free, because the function being inverted is the one that drew
+ * them; a formula here would agree with `cursorColumn` until either moved.
+ *
+ * **Outside the plot area is `null`**: the gutter, a legend, the alignment pad
+ * and anything right of the frame. Inside it every column answers, so a column
+ * past the last sample's lands on the last sample — the clamp C22 I76 puts in
+ * the effect is here the nearest-sample rule, and no index this returns is one
+ * the readout cannot print.
+ *
+ * `col` and `width` are the **block's**: the element `elements()` declares
+ * spans the block (I85), so L4 hands over the column relative to the element's
+ * own origin and the element's width, which is also what puts a plot inside a
+ * row group at the right column.
+ */
+export function sampleIndexAt(
+  block: Plot,
+  width: number,
+  ctx: Pick<RenderContext, "capabilities">,
+  col: number,
+): number | null {
+  if (!cursorable(block)) return null;
+  const frame = Math.max(1, Math.floor(width)); // cells-ok — a cell width
+  const cut = drawnWidth(block, frame);
+  const pad = alignPad(block, frame, cut);
+  const { layout } = positionalLayout(block, cut, ctx);
+  const legend = legendPlacement(block, ctx.capabilities) === "left" ? (layout.reserved ?? 0) : 0; // cells-ok — a cell width
+  const x = Math.floor(col) - pad - legend - layout.gutter; // cells-ok — an area column
+  if (x < 0 || x >= layout.areaWidth) return null; // cells-ok — an area column
+  const n = block.series.reduce((most, sr) => Math.max(most, sr.values.length), 0); // cells-ok — a sample count
+  let best: number | null = null;
+  let nearest = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < n; i += 1) { // cells-ok — a sample index
+    const at = cursorColumn(block, i, layout.areaWidth);
+    if (at === null) continue;
+    const distance = Math.abs(at - x); // cells-ok — a cell count
+    if (distance < nearest) {
+      nearest = distance;
+      best = i;
+    }
+  }
+  return best;
+}
+
+/**
  * One block-level element, **when the block declares a camera or can take a
  * cursor** (I85).
  *
@@ -3248,9 +3361,32 @@ function seriesCopyText(series: readonly Series[]): string | undefined {
 
 const NO_ELEMENTS: readonly NavElement[] = Object.freeze([]);
 
+/**
+ * The digits that toggle a series (C12 I116, §3aq; C22 I78; A01 D4).
+ *
+ * `1` … `min(9, n)` → `toggleSeries1` … `toggleSeries9`, one per series the
+ * block has and none for a series it does not — so `2` on a one-series plot is
+ * *unbound* rather than a no-op, and `/help` lists exactly the digits the plot
+ * has. **Measured against `defaultKeymap`**: no digit is bound at `global` or
+ * `liveBlock`, so every one lands at `liveBlock` (C16 I27) and fires from the
+ * first `↓`, with no `⏎`. L4 merges and withdraws it with focus.
+ *
+ * **The first `BlockKeymap` producer**, which C26 T2.6a was written to detect.
+ * The block and nothing else, per `BlockDefinition.keymap`'s contract.
+ */
+function keymap(block: Plot): readonly BlockKeyBinding[] {
+  const n = Math.min(SERIES_KEYS, block.series.length); // cells-ok — a series count
+  return Array.from({ length: n }, (_, i) =>
+    Object.freeze({ key: Object.freeze({ name: String(i + 1) }), action: `toggleSeries${String(i + 1)}` }));
+}
+
+/** Nine digits, nine actions — C16 I19's closed union has exactly these. */
+const SERIES_KEYS = 9;
+
 export const plotDefinition: BlockDefinition<Plot> = {
   kind: "plot",
   measure,
   render,
   elements,
+  keymap,
 };

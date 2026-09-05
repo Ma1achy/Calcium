@@ -268,6 +268,7 @@ describe("C22 §3 step 11 — the effect table", () => {
       dollyBlock: graph.dollyBlock,
       resetCamera: graph.resetCamera,
       toggleOrbit: graph.toggleOrbit,
+      toggleSeries: graph.toggleSeries,
       completion: graph.completion,
       overlays: graph.overlays,
       history: graph.history,
