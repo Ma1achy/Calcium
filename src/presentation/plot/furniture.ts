@@ -935,12 +935,83 @@ export function legendColumn(
   const e = entries[row];
   if (e === undefined) return [{ text: " ".repeat(columnWidth) }];
   const ambiguous = ctx.capabilities.ambiguousWidth;
-  const text = truncate(` ${entryText(e)}`, columnWidth, ctx.capabilities);
+  const text = legendCell(e, columnWidth, ctx.capabilities);
   const pad = Math.max(0, columnWidth - cells(text, ambiguous)); // cells-ok — a cell count
   return [
     { text, style: slot(e.ref, ctx.theme, ctx.capabilities) },
     ...(pad > 0 ? [{ text: " ".repeat(pad) }] : []),
   ];
+}
+
+/**
+ * One vertical legend row's text — the leading blank, the swatch, a blank, the
+ * label — cut to the column (C12 I117). **Shared by the writer and its inverse**:
+ * `legendColumn` paints this and `legendEntryAt` measures it, so a change to
+ * what a row says moves where a click on it lands.
+ */
+function legendCell(e: LegendEntry, columnWidth: number, caps: TerminalCapabilities): string {
+  return truncate(` ${entryText(e)}`, columnWidth, caps);
+}
+
+/**
+ * Where a horizontal legend puts each entry — the forward map `legendRow` paints
+ * from and `legendEntryAt` searches (C12 I117). `from` is the entry's first
+ * visible cell (past the two-cell separator), `to` one past its last; `rest`
+ * is how many did not fit, for the ` +n` tail.
+ */
+function legendRowLayout(
+  entries: readonly LegendEntry[],
+  width: number,
+  ambiguous: AmbiguousWidth,
+): Readonly<{ placed: readonly Readonly<{ index: number; from: number; to: number; text: string }>[]; rest: number }> {
+  const placed: Readonly<{ index: number; from: number; to: number; text: string }>[] = [];
+  let used = 0; // cells-ok — a cell count
+  for (const [index, e] of entries.entries()) {
+    const gap = placed.length === 0 ? 0 : 2; // cells-ok — a cell count
+    const text = `${" ".repeat(gap)}${entryText(e)}`;
+    const w = cells(text, ambiguous);
+    // Leave room for the notice, or the count itself gets truncated away.
+    const reserve = placed.length < entries.length - 1 ? 6 : 0; // cells-ok — a cell count
+    if (used + w + reserve > width) break;
+    placed.push({ index, from: used + gap, to: used + w, text });
+    used += w;
+  }
+  return { placed, rest: entries.length - placed.length }; // cells-ok — an entry count
+}
+
+/**
+ * The entry under a block cell of a legend, or `null` (C12 I117, §3aq; C16 §4a).
+ *
+ * **The placement inverted by search, not a second formula** (F775's method).
+ * `box` is where the caller composited the legend — a vertical legend's column
+ * origin, its first row and its width; a horizontal legend's row, its first
+ * column and its width — and the entries are laid out here with `legendCell`
+ * and `legendRowLayout`, the same two the writers use. The swatch and the label
+ * hit; the leading blank, the two-cell separator and the ` +n` tail do not,
+ * because none of them names an entry. Answers the **entry index**; whether
+ * that entry is a series the caller can toggle is `legendHitAt`'s question.
+ */
+export function legendEntryAt(
+  entries: readonly LegendEntry[],
+  placement: "left" | "right" | "above" | "below",
+  box: Readonly<{ col: number; row: number; width: number }>,
+  caps: TerminalCapabilities,
+  col: number,
+  row: number,
+): number | null {
+  if (entries.length === 0 || box.width <= 0) return null; // cells-ok — an entry count
+  const x = col - box.col; // cells-ok — a cell offset
+  if (x < 0 || x >= box.width) return null; // cells-ok — a cell offset
+  if (placement === "left" || placement === "right") {
+    const i = row - box.row; // cells-ok — a row offset
+    const e = entries[i];
+    if (e === undefined) return null;
+    // Offset 0 is the leading blank `legendCell` writes; the swatch is at 1.
+    return x >= 1 && x < cells(legendCell(e, box.width, caps), caps.ambiguousWidth) ? i : null;
+  }
+  if (row !== box.row) return null;
+  const hit = legendRowLayout(entries, box.width, caps.ambiguousWidth).placed.find((p) => x >= p.from && x < p.to);
+  return hit === undefined ? null : hit.index;
 }
 
 /**
@@ -957,21 +1028,13 @@ export function legendRow(
   ctx: RenderContext,
 ): string {
   if (entries.length === 0) return ""; // cells-ok — an entry count
-  const ambiguous = ctx.capabilities.ambiguousWidth;
-  const spans: Span[] = [];
-  let used = 0; // cells-ok — a cell count
-  let shown = 0; // cells-ok — an entry count
-  for (const e of entries) {
-    const text = `${shown === 0 ? "" : "  "}${entryText(e)}`; // cells-ok — an entry count
-    const w = cells(text, ambiguous);
-    // Leave room for the notice, or the count itself gets truncated away.
-    const reserve = shown < entries.length - 1 ? 6 : 0; // cells-ok — a cell count
-    if (used + w + reserve > width) break;
-    spans.push({ text, style: slot(e.ref, ctx.theme, ctx.capabilities) });
-    used += w;
-    shown += 1; // cells-ok — an entry count
-  }
-  const rest = entries.length - shown; // cells-ok — an entry count
+  // **Painted from the layout `legendEntryAt` searches** (C12 I117): one placement,
+  // read twice, so the row cannot say one thing and the click land on another.
+  const { placed, rest } = legendRowLayout(entries, width, ctx.capabilities.ambiguousWidth);
+  const spans: Span[] = placed.map((p) => ({
+    text: p.text,
+    style: slot(entries[p.index]!.ref, ctx.theme, ctx.capabilities),
+  }));
   if (rest > 0) {
     spans.push({ text: ` +${String(rest)}`, style: tone("muted", ctx.theme, ctx.capabilities) });
   }

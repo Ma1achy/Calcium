@@ -510,6 +510,20 @@ export type TuiConfig = Readonly<{
    * (FINDINGS F53). Fixed here because this is the field with a consumer.
    */
   capabilities?: Partial<TerminalCapabilities> | undefined;
+  /**
+   * Hover — mouse mode 1003 in 1002's place, so the pointer *resting* over a
+   * cursorable plot moves its readout without a click and without moving
+   * focus (C01 I21, C16 §4a, C12 §3s).
+   *
+   * **Config and not a capability**, and the reason is written where the
+   * capability row would have gone (C02 §3): nothing in the environment
+   * predicts 1003 apart from 1002, so a detection rule would be a constant;
+   * what differs is what the application *wants*, and 1003 is a sequence per
+   * cell the pointer crosses. Default **off** for that cost. `capabilities.mouse`
+   * false still takes neither mode. Everything a hover sets, `←`/`→` on the
+   * focused plot set too — C02's rule that the mouse is never the only way.
+   */
+  hover?: boolean;
   /** The session's starting directory. Defaults to the process's. */
   cwd?: string;
   clock?: () => number;

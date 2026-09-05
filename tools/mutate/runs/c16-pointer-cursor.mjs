@@ -87,7 +87,7 @@ const MUTATIONS = [
     // The layout never learns about focus, so the frame stays muted.
     name: "reserving drops the focused flag",
     file: DEFINITION,
-    from: "  const focused = focus !== null && focus.blockId === block.id && focus.rowId === null",
+    from: "  const focused = focus !== null && focus.blockId === block.id && focus.rowId === block.id",
     to: "  const focused = false",
     expect: "T1.25",
   },
@@ -100,11 +100,11 @@ const MUTATIONS = [
     expect: "T1.25",
   },
   {
-    // A row focus on the block would light the frame too — C12 I85 says none can
-    // exist, and this is the row that would notice a plot growing rows.
+    // Any focus on the block would light the frame — a row's id, or the
+    // `rowId: null` form no session writes (F802). T1.25 holds both as controls.
     name: "a row focus on the plot lights the frame",
     file: DEFINITION,
-    from: "  const focused = focus !== null && focus.blockId === block.id && focus.rowId === null",
+    from: "  const focused = focus !== null && focus.blockId === block.id && focus.rowId === block.id",
     to: "  const focused = focus !== null && focus.blockId === block.id",
     expect: "T1.25",
   },

@@ -10,7 +10,7 @@
  * Nothing else. The grid, the Bresenham walker, the scaling core and the strip
  * arithmetic are internal; the block shapes are C04's.
  */
-export { plotDefinition, cursorable, sampleIndexAt } from "./definition.js";
+export { plotDefinition, cursorable, legendHitAt, sampleIndexAt } from "./definition.js";
 /**
  * **`cursorable` is published for L4's cursor writer** (C12 I85, C22 I76).
  * `moveCursor` must ask *can this block take a cursor* with the renderer's own

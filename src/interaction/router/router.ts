@@ -185,7 +185,10 @@ export function createRouter(
       return "arm";
     }
     // Any other *input* disarms — a paste is input and a click is input, which
-    // "any other key" did not answer for.
+    // "any other key" did not answer for. **A hover is not** (§4a row t): under
+    // mode 1003 a hand resting on the mouse reports every cell, and a window
+    // it closed would make the double-`⌃c` exit unreachable while it rests.
+    if (e.kind === "mouse" && e.button === "none") return null;
     armedAt = null;
     return null;
   }

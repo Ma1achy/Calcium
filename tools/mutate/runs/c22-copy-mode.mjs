@@ -78,8 +78,8 @@ const MUTATIONS = [
     // idempotence check answer from a stale set. One record, or two that drift.
     name: "the mouse toggle does not update `held`",
     file: LIFE,
-    from: "    emit(MOUSE.leave);\n    held.delete(\"mouse\");",
-    to: "    emit(MOUSE.leave);",
+    from: "    emit(mouseMode.leave);\n    held.delete(\"mouse\");",
+    to: "    emit(mouseMode.leave);",
     expect: "T1.23",
   },
   {

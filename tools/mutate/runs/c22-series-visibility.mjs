@@ -40,7 +40,7 @@ const results = runPass({
   run,
   control: {
     file: CONSTRUCT,
-    from: "    stores.seriesVisibility.set(found.entryId, plot.id, index, !hiddenNow);",
+    from: "    stores.seriesVisibility.set(entryId, plot.id, index, !hiddenNow);",
     to: "    void hiddenNow;",
     why: "the writer removed — T4.17r, T4.17s and T4.18g fail; a run in which the store can lose its only writer and stay green cannot see the seam at all",
   },

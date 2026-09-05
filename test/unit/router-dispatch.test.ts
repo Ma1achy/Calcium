@@ -708,3 +708,26 @@ describe("C26 §8b.8 — interaction mode is vacuous, and this is the row that s
     );
   });
 });
+
+describe("C16 §4a row t — a hover is not an input that disarms", () => {
+  it("T3.8d: a hover between two Ctrl-Cs leaves the window armed; a click in its place disarms", () => {
+    const hover: InputEvent = { ...(click(2) as Extract<InputEvent, { kind: "mouse" }>), button: "none", motion: true };
+    {
+      const { router, calls, advance } = harness();
+      router.dispatch(ctrlC);
+      router.dispatch(hover);
+      advance(10);
+      router.dispatch(ctrlC);
+      expect(calls, "a hand resting on the mouse did not close the window").toEqual(["exitConfirm"]);
+    }
+    {
+      // The control, by the same clock: the click that T3.8b already asserts.
+      const { router, calls, advance } = harness();
+      router.dispatch(ctrlC);
+      router.dispatch(click(2));
+      advance(10);
+      router.dispatch(ctrlC);
+      expect(calls, "a click disarms").toEqual([]);
+    }
+  });
+});

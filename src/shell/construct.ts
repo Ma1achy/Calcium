@@ -43,7 +43,7 @@ import type { ProcessRunner } from "../data/process/types.js";
 import { createBlockRegistry, type BlockDefinition } from "../presentation/blocks/index.js";
 import { BlockFaultLog } from "./block-faults.js";
 import { tableDefinition } from "../presentation/table/index.js";
-import { cursorable, plotDefinition, sampleIndexAt } from "../presentation/plot/index.js";
+import { cursorable, legendHitAt, plotDefinition, sampleIndexAt } from "../presentation/plot/index.js";
 import { patchDefinition } from "../presentation/patch/index.js";
 import { loadTheme, type ThemeStore } from "../presentation/theme/index.js";
 import { createTranscriptStore } from "../viewport/transcript/index.js";
@@ -996,6 +996,9 @@ export async function constructGraph(
       stdout: config.stdout,
       stdin: config.stdin,
       capabilities: detection.capabilities,
+      // C01 I21 — 1003 in 1002's place when the app asked; resolved to a boolean
+      // by `resolveConfig`, so C01 never sees an absent field.
+      hover: config.hover,
       onFatal: deps.onFatal,
       beforeRelease: makeBeforeRelease(runner, stores.history, [stores.transcriptWriter]),
       ...(deps.debug === undefined ? {} : { debug: deps.debug }),
@@ -1346,10 +1349,19 @@ export async function constructGraph(
    * computes its inverse**: `blankRowsAbove` for the bottom-aligned short
    * transcript, C14's `visible()` for the entries on screen and how much of
    * each, and the entry's chrome rows before its blocks (C14 I20). An element
-   * whose row is scrolled off has no anchor and no peek. **An element inside a
-   * `scroll` box is not peeked** — its rows are content rows (C26 I3) and the
-   * offset translation `elementAt` does is not repeated here; owed under
-   * `SCROLL_PEEK`.
+   * whose row is scrolled off has no anchor and no peek.
+   *
+   * **No element inside a `scroll` box can want a peek, and this used to carry
+   * a guard for the case** (`SCROLL_PEEK`, closed in arc 6). A scroll owns its
+   * elements — one per child, block-level (C26 §4b cell 3, C09 I30) — and none
+   * of them carries a `detail`, because only a table *row* declares one. So the
+   * `detail === undefined` test above already answers `null` for every element a
+   * box declares, and the content-row → region-row translation `elementAt` does
+   * for the pointer has nothing to translate here. Measured: `elementsIn` over a
+   * scroll holding a cut table answers two elements with no detail, against the
+   * table alone answering row `a` with one. `peek.test.ts` T4.13 pins the
+   * premise; the day a scroll's element gains a `detail` it goes red, and the
+   * translation — through `elementAt`'s arithmetic, one copy — is owed then.
    *
    * `update`, never pop-and-push, when the content or the row changes (C15
    * I14, T4.12) — compared structurally, because `elementsIn` is recomputed
@@ -1370,7 +1382,6 @@ export async function constructGraph(
     if (index === null) return null;
     const found = elements[index];
     if (found === undefined || found.element.detail === undefined) return null;
-    if (blockIn(entry, found.blockId)?.kind === "scroll") return null;
 
     const width = deps.frame.overlayRegion().width;
     const { viewportHeight, totalRows } = stores.viewport.scroll;
@@ -1609,7 +1620,7 @@ export async function constructGraph(
   const elementAt = (
     hit: Readonly<{ id: EntryId; rowOffset: number }>,
     col: number,
-  ): Readonly<{ blockId: string; element: NavElement; block: Block }> | null => {
+  ): Readonly<{ blockId: string; element: NavElement; block: Block; row: number }> | null => {
     const entry = stores.transcript.entries.find((e) => e.id === hit.id);
     if (entry === undefined) return null;
     const width = deps.frame.overlayRegion().width;
@@ -1617,7 +1628,7 @@ export async function constructGraph(
     if (blockRow < 0) return null;
 
     const placed = elementsOf(hit.id);
-    let best: Readonly<{ blockId: string; element: NavElement; block: Block }> | null = null;
+    let best: Readonly<{ blockId: string; element: NavElement; block: Block; row: number }> | null = null;
     for (const p of placed) {
       const block = blockIn(entry, p.blockId);
       if (block === null) continue;
@@ -1636,7 +1647,9 @@ export async function constructGraph(
       if (row < p.element.rows.from || row >= p.element.rows.to) continue;
       if (col < p.element.cols.from || col >= p.element.cols.to) continue;
       if (best === null || LEVEL_DEPTH[p.element.level] > LEVEL_DEPTH[best.element.level]) {
-        best = { blockId: p.blockId, element: p.element, block };
+        // `row` is the pointer's row inside the element — the legend's inverse
+        // needs it (C12 I117) as the crosshair's needs the column.
+        best = { blockId: p.blockId, element: p.element, block, row: row - p.element.rows.from };
       }
     }
     return best;
@@ -1799,12 +1812,18 @@ export async function constructGraph(
   const toggleSeriesBlock = (n: number): void => {
     const found = focusedBlock();
     if (found === null || found.block.kind !== "plot") return;
-    const plot = found.block as Plot;
-    const index = n - 1;
+    toggleSeriesIn(found.entryId, found.block as Plot, n - 1);
+  };
+  /**
+   * The toggle itself, shared by the digit key and the legend click (C16 §4a's
+   * legend row, C12 I117) — **one definition of what a toggle is**, so the two
+   * writers cannot disagree about the effective state they invert.
+   */
+  const toggleSeriesIn = (entryId: EntryId, plot: Plot, index: number): void => {
     if (index < 0 || index >= plot.series.length) return; // cells-ok — a series count
-    const held = stores.seriesVisibility.get(found.entryId, plot.id, index);
+    const held = stores.seriesVisibility.get(entryId, plot.id, index);
     const hiddenNow = held ?? plot.series[index]?.hidden === true;
-    stores.seriesVisibility.set(found.entryId, plot.id, index, !hiddenNow);
+    stores.seriesVisibility.set(entryId, plot.id, index, !hiddenNow);
     scheduler.commit("input");
   };
 
@@ -1970,6 +1989,25 @@ export async function constructGraph(
    */
   const pointerEffect = (e: InputEvent): (() => void) | null => {
     if (e.kind !== "mouse" || !e.press) return null;
+    // **A hover aims and does nothing else** (§4a's hover row; C01 I21). Mode
+    // 1003's motion with no button held: the crosshair follows the pointer and
+    // focus stays where the keys left it — the readout half of `←`/`→` without
+    // the focus half. An unchanged index is a no-op, which is what makes a
+    // sequence per cell affordable; outside the area is `null` and the cursor
+    // stays, because a readout that vanished with the pointer has no key equal.
+    if (e.button === "none") {
+      if (!e.motion) return null;
+      const over = entryAtRegionRow(e.row - deps.frame.region().top);
+      if (over === null) return null;
+      const under = elementAt(over, e.col);
+      if (under === null) return null;
+      const sample = sampleUnder(under, e.col);
+      if (sample === null || stores.cursorPositions.get(over.id, under.block.id) === sample) return null;
+      return () => {
+        stores.cursorPositions.set(over.id, under.block.id, sample);
+        scheduler.commit("input");
+      };
+    }
     // **One translation, and the same pull the router used.** The router
     // translated the row for its rungs (C16 I20); a handler is handed the
     // event alone, so L4 translates once more from the same `region()`.
@@ -2007,12 +2045,20 @@ export async function constructGraph(
     // the focused plot aims where a row would activate (row m), and a drag on
     // the focused plot aims where a row would extend (row o).
     const sample = sampleUnder(under, e.col);
-    const aim = sample === null
-      ? null
-      : (): void => {
+    // **The legend, where the pointer is over an entry of it** (§4a's legend row,
+    // C12 I117): `seriesVisibility`'s third writer, the digit key's own lines.
+    // Disjoint from the area by construction — the column and the area are
+    // complementary cells of one layout — so at most one of `sample` and
+    // `series` answers, and the focus call below is shared by both.
+    const series = sample === null ? legendUnder(hit.id, under, e.col) : null;
+    const aim = sample !== null
+      ? (): void => {
           stores.cursorPositions.set(hit.id, under.block.id, sample);
           scheduler.commit("input");
-        };
+        }
+      : series !== null
+        ? (): void => toggleSeriesIn(hit.id, under.block as Plot, series)
+        : null;
 
     if (e.motion || e.shift) {
       // **Over the focused plot, motion is the crosshair's** (§4a row o): the
@@ -2066,6 +2112,25 @@ export async function constructGraph(
     if (!cursorable(plot)) return null;
     const { from, to } = under.element.cols;
     return sampleIndexAt(plot, to - from, { capabilities: detection.capabilities }, col - from);
+  };
+
+  /**
+   * The series whose legend entry is under the pointer, or `null` (C16 §4a's
+   * legend row, C12 I117) — `sampleUnder`'s twin for the legend, and the same
+   * translation: the column relative to the element's origin, at the element's
+   * width, and the row `elementAt` handed back. C12 inverts its own placement;
+   * nothing here knows where a legend is drawn.
+   */
+  const legendUnder = (entryId: EntryId, under: Readonly<{ element: NavElement; block: Block; row: number }>, col: number): number | null => {
+    if (under.block.kind !== "plot") return null;
+    const { from, to } = under.element.cols;
+    return legendHitAt(
+      under.block as Plot,
+      to - from,
+      { capabilities: detection.capabilities, seriesVisibility: stores.seriesVisibility.forEntry(entryId) },
+      col - from,
+      under.row,
+    );
   };
 
   /** A click on chrome — header, footer, the prompt row — is the reader stepping out (C16 §4a trace 8). */

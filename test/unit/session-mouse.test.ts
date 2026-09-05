@@ -747,3 +747,248 @@ describe("C16 §4a — the crosshair, read from the painted frame", () => {
     expect(text().join("\n")).not.toMatch(/train: 30/u);
   });
 });
+
+/** A 1003 motion report with no button held — the hover (C16 §2, `Cb = 35`). */
+const hover = (row: number, col: number): InputEvent => mouse(row, col, { button: "none", motion: true });
+const sgrHover = (row0: number, col0: number): string => `\x1b[<35;${String(col0 + 1)};${String(row0 + 1)}M`;
+
+/** Two series, a right legend auto-enabled (`SHARES_CELLS`); five area rows, eight in all. */
+const TWO = (id = "p"): Record<string, unknown> => ({
+  kind: "plot",
+  id,
+  form: "line",
+  height: 5,
+  axes: true,
+  series: [
+    { label: "train", values: [10, 20, 30, 40, 50] },
+    { label: "val", values: [90, 80, 70, 60, 55] },
+  ],
+});
+
+/** The legend's second entry, located in the painted frame rather than computed: block (row, swatch col). */
+function secondEntryAt(width: number): { row: number; col: number; frame: readonly string[] } {
+  const frame = renderToLines(measurable({ definitions: [plotDefinition] }).registry, block(TWO() as never), width, {
+    theme: DARK_THEME,
+    capabilities: capabilities(),
+  }).map((l) => l.replace(/\x1b\[[0-9;]*m/gu, ""));
+  const row = frame.findIndex((l) => l.includes(" val"));
+  expect(row, "the legend names the second series").toBeGreaterThan(0);
+  const col = frame[row]!.indexOf(" val") - 1; // the swatch precedes ` val`
+  return { row, col, frame };
+}
+
+describe("C16 §4a — a hover aims and moves nothing else (C01 I21, C12 §3s)", () => {
+  it("T4.72 (C16 I31, §4a hover row, rows q and s): the crosshair follows the pointer over an unfocused plot; focus stays at the prompt; the gutter, the chrome and a table leave both", async () => {
+    const { graph, term } = await graphAt80();
+    const live = graph.transcript.append(doc("/plot", [PLOT()]) as never);
+    expect(graph.focus.current).toEqual({ at: "prompt" });
+
+    // Area row 3 of the plot (chrome 0), sample columns 4 23 41 60 78.
+    expect(graph.router.dispatch(hover(term(3), 41)), "consumed: the index moved").toBe(true);
+    expect(graph.cursorPositions.get(live, "p"), "the sample under column 41").toBe(2);
+    expect(graph.focus.current, "and focus did not move — row q").toEqual({ at: "prompt" });
+
+    // Inside one sample's span: a no-op, unconsumed, no frame — what makes 1003 affordable.
+    for (const col of [40, 42, 43]) {
+      expect(graph.router.dispatch(hover(term(3), col)), `column ${String(col)} is still sample 2`).toBe(false);
+    }
+    expect(graph.cursorPositions.get(live, "p")).toBe(2);
+
+    // The tie goes to the lower index, as the click's does (C12 §3s).
+    graph.router.dispatch(hover(term(3), 32));
+    expect(graph.cursorPositions.get(live, "p")).toBe(1);
+
+    // The gutter and the command line are nothing for the cursor, and leaving
+    // the area leaves the cursor where it was (row u).
+    expect(graph.router.dispatch(hover(term(3), 1))).toBe(false);
+    expect(graph.router.dispatch(hover(term(0), 41))).toBe(false);
+    expect(graph.cursorPositions.get(live, "p"), "still 1").toBe(1);
+    expect(graph.focus.current).toEqual({ at: "prompt" });
+
+    // `↓` then `→` continues from where the hover left it: one store, three writers.
+    graph.router.dispatch(press("down"));
+    expect(graph.focus.current).toEqual(AT(live, "p", "p"));
+    graph.router.dispatch(press("right"));
+    expect(graph.cursorPositions.get(live, "p")).toBe(2);
+  });
+
+  it("T4.72 (cont., row s; C23 I47): a hover over a settled entry's plot writes that entry's store and not the live one's", async () => {
+    const { graph, term } = await graphAt80();
+    const settled = graph.transcript.append(doc("/plot", [PLOT()]) as never);
+    const live = graph.transcript.append(doc("/plot", [PLOT()]) as never);
+    // Two eight-row plots with their command lines: entry 1 is rows 0–8, entry 2 rows 9–17.
+    expect(graph.router.dispatch(hover(term(3), 23))).toBe(true);
+    expect(graph.cursorPositions.get(settled, "p")).toBe(1);
+    expect(graph.cursorPositions.forEntry(live)).toEqual({});
+    expect(graph.focus.current, "a settled entry's view state is the reader's; focus is untouched").toEqual({ at: "prompt" });
+  });
+
+  it("T4.72 (cont.; C01 I21): the lifecycle takes 1003 when asked and 1002 by default — read from the bytes a session writes", async () => {
+    const on = await buildSession({ hover: true } as never, { columns: 80, rows: 24 });
+    const out = on.stdout.output;
+    expect(out).toContain("\x1b[?1003h");
+    expect(out).toContain("\x1b[?1006h");
+    expect(out, "one tracking mode, not two").not.toContain("\x1b[?1002h");
+    const off = await buildSession({}, { columns: 80, rows: 24 });
+    expect(off.stdout.output).toContain("\x1b[?1002h");
+    expect(off.stdout.output, "the default is byte for byte what shipped").not.toContain("1003");
+  });
+
+  it("T4.72b (C16 I31, §4a row r; C26 I16): a selection open in a table entry survives a hover over the plot entry", async () => {
+    const { graph, term } = await graphAt80();
+    const t = graph.transcript.append(doc("/rows", [table("1")]) as never);
+    const p = graph.transcript.append(doc("/plot", [PLOT()]) as never);
+    // Entry 1: rows 0–4 (command line, header, a b c); entry 2: rows 5–13.
+    graph.router.dispatch(mouse(term(2), 2));
+    graph.router.dispatch(mouse(term(4), 2, { shift: true }));
+    const before = graph.focus.current;
+    expect(before, "a..c selected — head c1, anchor a1 (T4.69)").toEqual(AT(t, "c1", "t1", addr("a1", "t1")));
+
+    expect(graph.router.dispatch(hover(term(5 + 1 + 3), 41)), "the plot's cursor moves").toBe(true);
+    expect(graph.cursorPositions.get(p, "p")).toBe(2);
+    expect(graph.focus.current, "anchor and head untouched — a hover is not extendRow's gesture").toEqual(before);
+  });
+});
+
+describe("C16 §4a — the hover, read from the painted frame", () => {
+  it("T4.72c (C16 I31, §4a trace 11; C12 I37): the ▲ and the readout follow the pointer while the terminal cursor stays on the prompt row; a click moves it off", async () => {
+    const stdin = fakeStdin();
+    const s = await buildSession(
+      {
+        stdin: stdin as never,
+        hover: true,
+        manifest: {
+          schema: "tui.manifest/1",
+          binary: "prism",
+          version: "1.0.0",
+          tools: [{ name: "plot", local: true, summary: "a plot", args: [], flags: [] }],
+        },
+        localHandlers: {
+          plot: () => ({ schema: "tui.view/1", status: "ok", blocks: [PLOT()] }),
+        },
+      } as never,
+      { columns: 80, rows: 24 },
+    );
+    const type = async (bytes: string): Promise<void> => {
+      stdin.emit(bytes);
+      for (let i = 0; i < 4; i += 1) await Promise.resolve();
+    };
+    await type("/plot\r");
+    await Promise.resolve();
+
+    const text = () => s.screen().text;
+    const areaRow = text().findIndex((line) => line.includes("60 ┤"));
+    expect(areaRow, "the plot's first area row is on screen").toBeGreaterThan(0);
+    const ruleRow = () => text().find((line) => line.includes("└")) ?? "";
+    /** Where the frame's final cursor move points: the prompt row while the prompt has focus, or nowhere. */
+    const cursorRow = (): number | null => {
+      const frame = [...s.stdout.chunks].reverse().find((c) => c.includes("\x1b[?25"));
+      const m = /\x1b\[(\d+);(\d+)H\x1b\[\?25h$/u.exec(frame ?? "");
+      return m === null ? null : Number(m[1]) - 1;
+    };
+    // The prompt is the **last** row carrying the marker: the transcript's
+    // command lines carry it too, above.
+    const promptRow = s.screen().rows.reduce((last, line, i) => (line.includes("❯") ? i : last), -1);
+    expect(promptRow, "the prompt is on screen").toBeGreaterThan(0);
+    expect(cursorRow(), "focus at the prompt: the cursor is on its row").toBe(promptRow);
+    expect(ruleRow()).not.toContain("▲");
+
+    await type(sgrHover(areaRow, 41));
+    expect(ruleRow().indexOf("▲"), "the mark is under the pointer").toBe(41);
+    expect(text().join("\n"), "and the readout names the third sample").toMatch(/train: 30/u);
+    expect(cursorRow(), "and the cursor is still on the prompt row — focus did not move").toBe(promptRow);
+
+    await type(sgrHover(areaRow, 60));
+    expect(ruleRow().indexOf("▲")).toBe(60);
+    expect(text().join("\n")).toMatch(/train: 40/u);
+    expect(cursorRow()).toBe(promptRow);
+
+    // The control: a click at the same cell focuses the plot, and the frame's
+    // cursor leaves the prompt row — which is what the two arms above rule out.
+    await type(sgrClick(areaRow, 60));
+    expect(cursorRow(), "a focused block hides the prompt's cursor").toBeNull();
+  });
+});
+
+describe("C16 §4a — the legend clicks (C12 I117, C22 I78)", () => {
+  it("T4.73 (C16 I31, §4a legend row, rows w and x): a click on the swatch hides the series and the frame says so; the label shows it again; the blank beside is nothing; `2` shares the store", async () => {
+    const stdin = fakeStdin();
+    const s = await buildSession(
+      {
+        stdin: stdin as never,
+        manifest: {
+          schema: "tui.manifest/1",
+          binary: "prism",
+          version: "1.0.0",
+          tools: [{ name: "plot", local: true, summary: "a plot", args: [], flags: [] }],
+        },
+        localHandlers: {
+          plot: () => ({ schema: "tui.view/1", status: "ok", blocks: [TWO()] }),
+        },
+      } as never,
+      { columns: 80, rows: 24 },
+    );
+    const type = async (bytes: string): Promise<void> => {
+      stdin.emit(bytes);
+      for (let i = 0; i < 4; i += 1) await Promise.resolve();
+    };
+    await type("/plot\r");
+    await Promise.resolve();
+
+    const text = () => s.screen().text;
+    // The legend is located in the frame, not computed: the row naming `val`.
+    const legendRow = text().findIndex((line) => line.includes(" val"));
+    expect(legendRow, "the legend's second entry is on screen").toBeGreaterThan(0);
+    const swatch = text()[legendRow]!.indexOf(" val") - 1;
+    expect(text()[legendRow]!.charAt(swatch), "the swatch precedes the label").toBe("█");
+    /** The plot's rows — lid to x-labels — so a footer hint changing with focus is not what is compared. */
+    const plotRows = () => {
+      const t = text();
+      const lid = t.findIndex((l) => l.includes("┐") || l.includes("┬"));
+      const labels = t.findIndex((l, i) => i > lid && l.includes("└")) + 1;
+      return t.slice(lid, labels + 1).join("\n");
+    };
+    const before = plotRows();
+    expect(before).toMatch(/█ val/u);
+    expect(before).not.toMatch(/○/u);
+    const inkCells = (str: string) => [...str.replace(/○/gu, "█")].filter((c) => c !== " " && c !== "\n").length; // cells-ok — a count
+
+    // The swatch: hidden, and the frame lost ink outside the one legend cell.
+    await type(sgrClick(legendRow, swatch));
+    const hidden = plotRows();
+    expect(hidden, "the legend marks the hidden series").toMatch(/○ val/u);
+    expect(hidden).toMatch(/█ train/u);
+    expect(inkCells(hidden)).toBeLessThan(inkCells(before));
+
+    // The leading blank is the gap, not the entry: nothing changes.
+    await type(sgrClick(legendRow, swatch - 1));
+    expect(plotRows(), "a click in the gap toggles nothing").toBe(hidden);
+
+    // The label's last column: shown again — row x, the hollow swatch's entry is the same entry.
+    await type(sgrClick(legendRow, swatch + 4));
+    expect(plotRows(), "back, byte for byte").toBe(before);
+
+    // The first click focused the plot (a click is a click first), so the digit
+    // reaches it: the third writer and the first share one store.
+    await type("2");
+    expect(plotRows()).toBe(hidden);
+  });
+
+  it("T4.73b (C16 §4a row y; C23 I47): through the graph — a settled entry's legend writes that entry's store; the live entry's is untouched", async () => {
+    const { graph, term } = await graphAt80();
+    const { row, col } = secondEntryAt(80);
+    const settled = graph.transcript.append(doc("/plot", [TWO()]) as never);
+    const live = graph.transcript.append(doc("/plot", [TWO()]) as never);
+    // Entry 1: command line at row 0, block rows 1–8; the legend's rows are the area's.
+    expect(graph.router.dispatch(mouse(term(1 + row), col))).toBe(true);
+    expect(graph.seriesVisibility.get(settled, "p", 1), "series 2 of the settled plot hidden").toBe(true);
+    expect(graph.seriesVisibility.forEntry(live), "nothing written for the live entry").toEqual({});
+    expect(graph.focus.current, "and the click focused the settled plot, as any click does").toEqual(AT(settled, "p", "p"));
+    // Again on the same cell — the plot is focused, so this is row m's shape: a toggle, not `⏎`.
+    graph.router.dispatch(mouse(term(1 + row), col));
+    expect(graph.seriesVisibility.get(settled, "p", 1)).toBe(false);
+    // A hover over the legend is nothing (the hover row): no sample, no toggle.
+    expect(graph.router.dispatch(hover(term(1 + row), col))).toBe(false);
+    expect(graph.seriesVisibility.get(settled, "p", 1)).toBe(false);
+  });
+});

@@ -47,6 +47,7 @@ import {
   frameBottom,
   legendColumn,
   legendEntries,
+  legendEntryAt,
   legendPlacement,
   legendRow,
   legendWidth,
@@ -62,6 +63,7 @@ import {
   type Layout,
 } from "./furniture.js";
 import { annotationRows } from "./annotate.js";
+import { legendSlots } from "./figure.js";
 import { FACING_DEFAULT, facingOf, rowOf, seriesRange, type Facing, type Range } from "./scale.js";
 import { bandRows, ganttBars, stackBands, stackRange, waterfallBars } from "./stack.js";
 import { ROW_IS_AN_IDENTITY, markOf, partSeparator, refOf as slotOf, seriesRefOf } from "./marks.js";
@@ -89,6 +91,7 @@ import { smallMultiplesRows } from "./facet.js";
 import { seriesHidden } from "./visibility.js";
 import { stripHeights } from "./strips.js";
 import type { Annotation, OHLC, QuartileSummary, Plot, PlotForm, Series } from "../../data/viewmodel/index.js";
+import { HAS_HIDEABLE_SERIES } from "../../data/viewmodel/index.js";
 import type { ColourRef, Style } from "../theme/index.js";
 import type { BlockDefinition, BlockKeyBinding, NavElement, RenderContext } from "../blocks/types.js";
 import type { MeasureFn } from "../../data/viewmodel/index.js";
@@ -1363,12 +1366,16 @@ function reserving(layout: Layout, block: Plot, width: number, ctx: LayoutContex
   const styled = block.plotFrame === undefined ? layout : { ...layout, style: block.plotFrame };
   // **And so does the focus** (C26 §7, §3's element paragraph), for the same
   // reason: the frame's painters take a layout, and this is where a layout
-  // meets the block and the context. A block-level focus — `rowId: null` on
-  // this block — turns the frame `accent`; a row focus cannot exist here
-  // (a plot declares one block-level element, I85), so the null test is a
-  // statement rather than a guard.
+  // meets the block and the context. The focus a session writes is the
+  // element's id (`focusFor`, C22), and a plot's one element carries the
+  // block's own id (I85, `elements` below) — so `rowId === block.id` is the
+  // focused plot. **This tested `rowId === null` for its first three weeks**
+  // (F802, arc 6): a form the type admits, T1.25 and the catalogue construct,
+  // and no session produces, so a focused plot in a session painted nothing
+  // while every row about it was green. The null form paints nothing now, and
+  // T1.25 says so beside the id the session writes.
   const focus = ctx.focus ?? null;
-  const focused = focus !== null && focus.blockId === block.id && focus.rowId === null
+  const focused = focus !== null && focus.blockId === block.id && focus.rowId === block.id
     ? { ...styled, focused: true }
     : styled;
   return reserved === 0 ? focused : { ...focused, reserved }; // cells-ok — a cell width
@@ -3286,6 +3293,55 @@ export function sampleIndexAt(
     }
   }
   return best;
+}
+
+/**
+ * **The series whose legend entry is under a block cell, or `null`** (I117,
+ * §3aq; C16 §4a's legend row) — `seriesVisibility`'s third writer asks this.
+ *
+ * `sampleIndexAt`'s shape for the legend: the block is laid out as `axed`
+ * composes it — `drawnWidth` and `alignPad` for the pad, `positionalLayout`
+ * for the narrowed row and the reserved column, `frameOf` for the lid above
+ * the area rows — and the legend's origin falls out of those. A right legend
+ * sits at `pad + layout.width`; a left one at `pad`; both start on the first
+ * area row. A horizontal legend is row 0 (`above`) or the last row (`below`),
+ * indented by the gutter as `axed` indents it. `legendEntryAt` then searches
+ * the cells the writers write (furniture.ts), and only a `series` slot is an
+ * answer: a candle's or an annotation's entry is `null`, and so is every entry
+ * of a form whose series cannot be hidden (C04 `HAS_HIDEABLE_SERIES`) — there
+ * *hidden* would mean *recomputed*, a member this toggle does not have.
+ *
+ * `col` and `row` are the **block's**, as `sampleIndexAt`'s column is.
+ */
+export function legendHitAt(
+  block: Plot,
+  width: number,
+  ctx: Pick<RenderContext, "capabilities" | "seriesVisibility">,
+  col: number,
+  row: number,
+): number | null {
+  if (!HAS_HIDEABLE_SERIES[block.form]) return null;
+  const placement = legendPlacement(block, ctx.capabilities);
+  if (placement === null) return null;
+  const entries = legendEntries(block, ctx);
+  const frame = Math.max(1, Math.floor(width)); // cells-ok — a cell width
+  const cut = drawnWidth(block, frame);
+  const pad = alignPad(block, frame, cut);
+  const { layout } = positionalLayout(block, cut, ctx);
+  const lid = frameOf(block) !== "none" ? 1 : 0; // cells-ok — `axed`'s `top`
+  const box =
+    placement === "right" ? { col: pad + layout.width, row: lid, width: layout.reserved ?? 0 }
+    : placement === "left" ? { col: pad, row: lid, width: layout.reserved ?? 0 }
+    : placement === "above" ? { col: pad + layout.gutter, row: 0, width: layout.areaWidth }
+    : { col: pad + layout.gutter, row: plotHeight(block) - 1, width: layout.areaWidth }; // cells-ok
+  // A vertical legend's rows are the area's; a click below the last area row
+  // is on the rule or the labels, which no entry occupies.
+  if ((placement === "left" || placement === "right") && (row < lid || row >= lid + layout.areaRows)) return null; // cells-ok
+  const i = legendEntryAt(entries, placement, box, ctx.capabilities, Math.floor(col), Math.floor(row));
+  if (i === null) return null;
+  const slot = legendSlots(block)[i];
+  if (slot === undefined || slot.role !== "series" || slot.seriesIndex === undefined) return null;
+  return slot.seriesIndex < block.series.length ? slot.seriesIndex : null; // cells-ok — a series count
 }
 
 /**

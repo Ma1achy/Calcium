@@ -141,6 +141,11 @@ export function validateConfig(config: TuiConfig): void {
   // C22 I79, T1.35 — refused here rather than at frame time, because the frame
   // that cannot hold it is the one at the size gate with the prompt at its
   // cap, which is exactly the frame nobody composes while developing.
+  // C01 I21 — a boolean or absent; a truthy string here would turn 1003 on for
+  // an app that wrote `hover: "false"`, which is the wrong direction to fail in.
+  if (config.hover !== undefined && typeof config.hover !== "boolean") {
+    throw new ConfigError("hover", `must be a boolean, got ${String(config.hover)}`);
+  }
   const footerRows = config.chrome?.footerRows;
   if (
     footerRows !== undefined &&
@@ -223,6 +228,9 @@ export function resolveConfig(config: TuiConfig, ambient: Ambient) {
     // "the app said nothing" expressible, which is the state that was
     // indistinguishable from "nothing can say anything" for two whole steps.
     capabilities: config.capabilities,
+    // C01 I21 — off unless asked for; resolved here so C22 hands C01 a boolean
+    // and the default lives with the other defaults.
+    hover: config.hover ?? false,
     cwd: config.cwd ?? ambient.cwd,
     clock: config.clock ?? ambient.clock,
     schedule: ambient.schedule,

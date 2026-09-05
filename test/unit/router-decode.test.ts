@@ -533,6 +533,21 @@ describe("C16 §2 — the SGR mouse arm carries every bit (I30)", () => {
     ]);
   });
 
+  it("T1.3r (I30, C01 I21): bits 0–1 reading 3 outside the wheel and 128 ranges is `none` — a 1003 hover", () => {
+    const { d } = decoder();
+    // 35 = 32 (motion) + 3 (no button): what mode 1003 sends for a pointer moving with nothing held.
+    expect(feed(d, "\x1b[<35;42;4M")).toEqual([mouse({ row: 3, col: 41, button: "none", motion: true })]);
+    // With shift: 32 + 4 + 3.
+    expect(feed(d, "\x1b[<39;42;4M")).toEqual([mouse({ row: 3, col: 41, button: "none", motion: true, shift: true })]);
+    // `3` alone, no motion bit — the bits are named, not interpreted.
+    expect(feed(d, "\x1b[<3;1;1M")).toEqual([mouse({ button: "none" })]);
+    // The controls: a held button's motion keeps its name, and `3` inside the
+    // wheel and 128 ranges is still the fourth of each — `none` is not a mask.
+    expect(feed(d, "\x1b[<34;1;1M")).toEqual([mouse({ button: "button2", motion: true })]);
+    expect(feed(d, "\x1b[<67;1;1M")).toEqual([mouse({ button: "wheelRight" })]);
+    expect(feed(d, "\x1b[<131;1;1M")).toEqual([mouse({ button: "button11" })]);
+  });
+
   it("T1.3n (I30): horizontal wheel and buttons 8–11 have their own names", () => {
     const { d } = decoder();
     expect(feed(d, "[<66;1;1M")).toEqual([mouse({ button: "wheelLeft" })]);

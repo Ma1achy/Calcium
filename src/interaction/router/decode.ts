@@ -521,7 +521,12 @@ export function createDecoder(options: DecoderOptions): Decoder {
         ? WHEEL_DIRECTIONS[low as 0 | 1 | 2 | 3]
         : (code & 128) !== 0
           ? (`button${8 + low}` as const)
-          : (`button${low}` as const);
+          // `3` in bits 0–1 outside the wheel and 128 ranges is *no button* —
+          // what 1003 sends for a pointer moving with nothing held (C01 I21).
+          // Named, not folded onto `button3`: that is a button nobody pressed.
+          : low === 3
+            ? "none"
+            : (`button${low}` as const);
     out.push(
       Object.freeze({
         kind: "mouse",

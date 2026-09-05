@@ -168,7 +168,7 @@ export const SCANS = [
   // meaning, and a mode number that is not in it does nothing on its own: it
   // still needs an escape prefix, which SS14 catches.
   { id: "SS15", spec: "C01 I1 · C01 T2.8",
-    pattern: /\?(?:1049|25|2004|1002|1006|2026)[hl]/,
+    pattern: /\?(?:1049|25|2004|1002|1003|1006|2026)[hl]/,
     scope: "src/", allow: ["src/terminal/escapes.ts"],
     why: "mode literals live in one module; C01 owns what they mean" },
 

@@ -532,3 +532,75 @@ describe("C01 mouse tracking, toggled (copy mode)", () => {
     expect(stdout.output, "nothing is written into a child's terminal").toBe(before);
   });
 });
+
+describe("C01 hover — 1003 in 1002's slot, never both (I21)", () => {
+  /** `harness()` with the one option it does not take. */
+  function hovering(caps: Partial<TerminalCapabilities> = {}, hover = true) {
+    const stdout = fakeStdout();
+    const lifecycle = createTerminalLifecycle({
+      stdout,
+      stdin: fakeStdin(),
+      capabilities: capabilities(caps),
+      onFatal: ((err: unknown) => {
+        throw err;
+      }) as (err: unknown) => never,
+      debug: fakeDebug(),
+      hover,
+    });
+    live.push(lifecycle);
+    return { lifecycle, stdout };
+  }
+
+  it("T1.29 (I21, I6): hover takes 1003h and 1006h and no 1002h; release is 1006l then 1003l and no 1002l", () => {
+    const { lifecycle, stdout } = hovering();
+    lifecycle.acquire();
+    const on = stdout.output;
+    expect(on, "1003 in the slot").toContain(MODES.hoverOn);
+    expect(on, "1006 beside it").toContain(MODES.mouseSgrOn);
+    expect(on, "and never 1002 — one tracking mode, not two").not.toContain(MODES.mouseOn);
+    // Same slot: after raw mode's neighbours and before the keyboard push (T1.1's order).
+    expect(on.indexOf(MODES.keyboardOn)).toBeGreaterThan(on.indexOf(MODES.hoverOn));
+
+    lifecycle.release();
+    const off = stdout.output.slice(on.length);
+    expect(off).toContain(MODES.hoverOff);
+    expect(off).not.toContain(MODES.mouseOff);
+    expect(off.indexOf(MODES.mouseSgrOff), "1006l first, then 1003l — I6 inside the key").toBeLessThan(off.indexOf(MODES.hoverOff));
+  });
+
+  it("T1.29 (cont., I6): the copy-mode toggle leaves and re-takes the pair that was chosen", () => {
+    const { lifecycle, stdout } = hovering();
+    lifecycle.acquire();
+    const before = stdout.output;
+    lifecycle.setMouseTracking(false);
+    const off = stdout.output.slice(before.length);
+    expect(off).toContain(MODES.hoverOff);
+    expect(off, "a toggle reading MOUSE while acquisition took MOUSE_ANY would write this").not.toContain(MODES.mouseOff);
+    const mid = stdout.output;
+    lifecycle.setMouseTracking(true);
+    const on = stdout.output.slice(mid.length);
+    expect(on).toContain(MODES.hoverOn);
+    expect(on).not.toContain(MODES.mouseOn);
+  });
+
+  it("T1.29 (cont., I10): hover with `mouse: false` takes neither mode — the record wins", () => {
+    const { lifecycle, stdout } = hovering({ mouse: false });
+    lifecycle.acquire();
+    lifecycle.setMouseTracking(true);
+    lifecycle.release();
+    const all = stdout.output;
+    expect(all).not.toContain("1003");
+    expect(all).not.toContain("1002");
+    expect(all).not.toContain("1006");
+  });
+
+  it("T1.29 (control): without hover the pair is 1002 + 1006 and no 1003 byte is written", () => {
+    // A lifecycle that took 1003 unconditionally passes every arm above this one.
+    const { lifecycle, stdout } = hovering({}, false);
+    lifecycle.acquire();
+    lifecycle.release();
+    expect(stdout.output).toContain(MODES.mouseOn);
+    expect(stdout.output).toContain(MODES.mouseOff);
+    expect(stdout.output).not.toContain("1003");
+  });
+});

@@ -219,6 +219,9 @@ export const MODES = {
   mouseSgrOn: "[?1006h",
   mouseOff: "[?1002l",
   mouseSgrOff: "[?1006l",
+  // C01 I21 — 1003 in 1002's place when `hover` is on; the same 1006 beside it.
+  hoverOn: "[?1003h",
+  hoverOff: "[?1003l",
   // The kitty keyboard protocol: a push and a pop, not a DECSET pair (C02 §3).
   keyboardOn: "[>3u",
   keyboardOff: "[<u",

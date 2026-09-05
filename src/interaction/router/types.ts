@@ -167,14 +167,20 @@ export type InputEvent =
        * are the three buttons, `button8`–`11` the 128-range, and the wheel's
        * four directions are named because bits 0–1 select them.
        */
-      button: `button${number}` | "wheelUp" | "wheelDown" | "wheelLeft" | "wheelRight";
+      button: `button${number}` | "wheelUp" | "wheelDown" | "wheelLeft" | "wheelRight" | "none";
       /** The final byte: `M` is a press or a motion report, `m` the release. */
       press: boolean;
       /** Bits 4, 8 and 16 — carried, never interpreted here (I30). */
       shift: boolean;
       meta: boolean;
       ctrl: boolean;
-      /** Bit 32 — a mode-1002 drag report; `press: true, motion: true` is not a second click. */
+      /**
+       * Bit 32 — a motion report; `press: true, motion: true` is not a second
+       * click. With a button held it is a 1002 drag; with `button: "none"` it
+       * is a 1003 hover — bits 0–1 read `3`, which is *no button*, and a string
+       * rather than `null` so `startsWith("wheel")` and `!== "button0"` stay
+       * true of it without a consumer changing (I30, C01 I21).
+       */
       motion: boolean;
     }>;
 

@@ -49,6 +49,17 @@ export const BRACKET_PASTE = mode("\x1b[?2004h", "\x1b[?2004l");
 export const MOUSE = mode("\x1b[?1002h\x1b[?1006h", "\x1b[?1006l\x1b[?1002l");
 
 /**
+ * DECSET 1003 + 1006 — any-event tracking: every pointer move, button held or
+ * not (C01 I21). **Taken in place of `MOUSE`, never beside it**: ctlseqs'
+ * 9/1000/1002/1003 each *select* the terminal's one tracking mode, so a release
+ * emitting `1002l` after `1003l` would be leaving a mode never entered, and
+ * `held` would be lying about one key. Same shape and leave order as `MOUSE`,
+ * one digit apart — and the digit is here because SS15 says where digits live.
+ * Chosen by the application (`TuiConfig.hover`), not detected: C02 §3 says why.
+ */
+export const MOUSE_ANY = mode("\x1b[?1003h\x1b[?1006h", "\x1b[?1006l\x1b[?1003l");
+
+/**
  * The kitty keyboard protocol, pushed and popped (C02 §3, C02 I12, C01 §5 step 7).
  *
  * **A push and a pop, not a set and a reset.** `CSI > flags u` pushes a flag set
