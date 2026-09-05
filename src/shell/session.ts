@@ -1094,10 +1094,12 @@ function visibleRows(
     const from = Math.max(0, ve.skipRows - chrome.length);
     const to = Math.max(from, ve.skipRows + ve.takeRows - chrome.length);
     // **Through the entry's layout, not over the document's blocks** (C22 I83,
-    // §6l.4 D). A card's body sits two cells in under the hook and is windowed,
-    // measured and rendered at `width − 2` — by the same `entryLayout` the
-    // measurer wrapper in `construct.ts` calls, so the rows C14 counted are the
-    // rows drawn here. A document that is not a card is one run at `width`.
+    // I84, I85; §6l.4 D, §6l.6). A card's body sits four cells in under a hook at
+    // the header's text column and is windowed, measured and rendered at
+    // `width − 4`; every entry closes with one blank row — both by the same
+    // `entryLayout` the measurer wrapper in `construct.ts` calls, so the rows C14
+    // counted are the rows drawn here. A document that is not a card is one run
+    // at `width` and the blank.
     const pieces = windowEntry(entryLayout(entry.doc.blocks, width), from, to, graph.blocks);
     const windowed = { blocks: pieces.flatMap((piece) => piece.windowed.blocks) };
 

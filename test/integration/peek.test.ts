@@ -245,15 +245,14 @@ describe("C15 §2a — the frame", () => {
     await s.type(DOWN); // c — cut again
     const again = s.screen().rows;
     expect(again.join("\n")).toContain(LONG_C);
-    // **Read off the frame, not assumed**: below row c are the gap and the
-    // action bar — two rows, and the panel is three — so C15 flips it above
-    // (I17): the bottom rail sits directly above row c and the title three
-    // rows up. The frame's row 15 is the command line, 16–18 the peek, 19 row c.
-    // The cut cell, ellipsis included — the peek's own row holds the full text
-    // and would match a shorter needle first.
+    // **Read off the frame, not assumed**: the card's body is four cells in (C22
+    // I84) and every entry closes with a blank (C22 I85), so row c is high enough
+    // that the three-row peek fits *below* it before the prompt's rule — C15
+    // places below and does not flip (I17). The cut cell, ellipsis included — the
+    // peek's own row holds the full text and would match a shorter needle first.
     const rowC = rowOf(again, "charlie-als…");
-    expect(again[rowC - 1]?.startsWith("└"), "the bottom rail is directly above row c").toBe(true);
-    expect(rowOf(again, "Detail")).toBe(rowC - 3);
+    expect(again[rowC + 1]?.startsWith("┌"), "the panel's top border is directly below row c").toBe(true);
+    expect(rowOf(again, "Detail")).toBe(rowC + 1);
     expect(again[rowC]?.includes("charlie-als…"), "row c itself is not covered").toBe(true);
   });
 });

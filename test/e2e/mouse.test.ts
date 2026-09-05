@@ -116,7 +116,11 @@ describe("C16 e2e — the mouse through a PTY (I31, §4a)", () => {
         // asserting that nothing moved because nothing could.
         for (let i = 0; i < 6; i += 1) {
           pty.type("/ps --mine\r");
-          await pty.waitForFrame((f) => uuidRows(f).length >= Math.min(2 * (i + 1), 8), 15_000);
+          // A card entry is six rows now (command, step header, hooked header,
+          // two uuid rows, the closing blank — C22 I84/I85), so at most a few fit
+          // the region at once; the cap gates each submit without needing more
+          // uuid rows on screen than a card-tall transcript can show.
+          await pty.waitForFrame((f) => uuidRows(f).length >= Math.min(2 * (i + 1), 4), 15_000);
           await beat(100);
         }
         // The prose: the bare verb answers with a notice and no rows (C02 T5.4b).

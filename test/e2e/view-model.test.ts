@@ -79,6 +79,9 @@ function region(frame: readonly string[]): readonly string[] {
  * nothing here has to know the document's height, which is the quantity under
  * test.
  */
+/** The region's last non-empty row: its true tail sits above the entry's closing blank (C22 I85). */
+const lastContent = (rows: readonly string[]): string => [...rows].reverse().find((r) => r.trim() !== "") ?? "";
+
 async function walk(pty: InteractivePty, lastRow: string): Promise<(readonly string[])[]> {
   // To the top by paging, since `Home` cannot get there (see `KEY`). Paged
   // rather than jumped, so the walk starts from a position reached the way a
@@ -97,7 +100,7 @@ async function walk(pty: InteractivePty, lastRow: string): Promise<(readonly str
   for (let guard = 0; guard <= 200; guard += 1) {
     const here = region(pty.frame);
     screens.push(here);
-    if (here[here.length - 1] === lastRow) return screens;
+    if (lastContent(here) === lastRow) return screens;
 
     pty.type(KEY.pageDown);
     // The frame after the key, not the stream: the bytes for the previous frame
@@ -119,7 +122,7 @@ async function walk(pty: InteractivePty, lastRow: string): Promise<(readonly str
  */
 function expectCoherent(screens: (readonly string[])[], lastRow: string, at: string): void {
   expect(screens.length, `${at}: a tall document is many screenfuls`).toBeGreaterThan(3);
-  expect(screens[screens.length - 1]?.at(-1), `${at}: the last row is reachable`).toBe(lastRow);
+  expect(lastContent(screens[screens.length - 1] ?? []), `${at}: the last row is reachable`).toBe(lastRow);
 
   // Between every consecutive pair rather than on the total: a compensating pair
   // of errors sums correctly. The final pair is exempt — the bottom clamps, so
@@ -156,7 +159,7 @@ describe("C04 e2e — the drift tests", () => {
       // computing it means the assertion does not depend on knowing the
       // document's height.
       const tail = region(pty.frame);
-      const lastRow = tail[tail.length - 1] ?? "";
+      const lastRow = [...tail].reverse().find((r) => r.trim() !== "") ?? ""; // last content row — the final region row is the entry's closing blank (C22 I85)
       expect(lastRow, "the tail is content, not padding").not.toBe("");
 
       const screens = await walk(pty, lastRow);
@@ -169,7 +172,7 @@ describe("C04 e2e — the drift tests", () => {
       pty.type(KEY.pageDown);
       pty.type(KEY.pageDown);
       await new Promise((r) => setTimeout(r, 300));
-      expect(region(pty.frame).at(-1), "the bottom is the bottom").toBe(lastRow);
+      expect(lastContent(region(pty.frame)), "the bottom is the bottom").toBe(lastRow);
     } finally {
       pty.kill();
     }
@@ -188,7 +191,7 @@ describe("C04 e2e — the drift tests", () => {
       await pty.waitForFrame((f) => region(f).some((r) => r.includes("0000399")), 30_000);
 
       const tail = region(pty.frame);
-      const lastRow = tail[tail.length - 1] ?? "";
+      const lastRow = [...tail].reverse().find((r) => r.trim() !== "") ?? ""; // last content row — the final region row is the entry's closing blank (C22 I85)
       expect(lastRow, "the tail is content, not padding").not.toBe("");
 
       // One jump, where the walk needs a page per screenful.
@@ -204,8 +207,8 @@ describe("C04 e2e — the drift tests", () => {
       expect(top.join("\n"), "and the document's earliest data row is on it").toContain("0000000");
 
       pty.type(KEY.scrollBottom);
-      await pty.waitForFrame((f) => region(f).at(-1) === lastRow, 20_000);
-      expect(region(pty.frame).at(-1), "⌃End reaches its last").toBe(lastRow);
+      await pty.waitForFrame((f) => lastContent(region(f)) === lastRow, 20_000);
+      expect(lastContent(region(pty.frame)), "⌃End reaches its last").toBe(lastRow);
 
       // **The control, and it is what makes the ruling a ruling.** Unmodified
       // `Home` must still be the *line's* start: it moves the cursor inside the
@@ -262,7 +265,7 @@ describe("C04 e2e — the drift tests", () => {
         await new Promise((r) => setTimeout(r, 300));
 
         const tail = region(pty.frame);
-        const lastRow = tail[tail.length - 1] ?? "";
+        const lastRow = [...tail].reverse().find((r) => r.trim() !== "") ?? ""; // last content row — the final region row is the entry's closing blank (C22 I85)
         expect(lastRow, `${String(cols)}: the tail is content`).not.toBe("");
         expect(region(pty.frame).join("\n"), `${String(cols)}: and it is the document's end`).toContain("0000199");
 
@@ -317,8 +320,8 @@ describe("C04 e2e — the drift tests", () => {
       // numbered, the stream's are `tail N`, so the two are told apart by what
       // is on the screen and not by a row count.
       expect(
-        // The older entry is a card (C23 I55), its rows two cells in under the hook (C22 I83).
-        before.filter((r) => /^(⎿ |  )?\d{7}\b/.test(r)).length,
+        // The older entry is a card (C23 I55), its rows four cells in under the hook (C22 I83, I84).
+        before.filter((r) => /^(  ⎿ |    )?\d{7}\b/.test(r)).length,
         "detached inside the older entry",
       ).toBeGreaterThan(5);
       expect(before.join("\n"), "and not at the live stream").not.toContain("tail ");

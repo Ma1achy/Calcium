@@ -359,7 +359,7 @@ describe("C23 I54 — the pending entry is the running card", () => {
     expect(h3.transcript.entries[0]?.doc.meta.transport, "a local document's verdict is its status").toBe("local");
   });
 
-  it("T4.48 (C23 I56, C22 I83): the frame after `/ps` settles hangs the body two cells in under `⎿` with the header flush, and the measured height is the painted height", async () => {
+  it("T4.48 (C23 I56, C22 I83, I84): the frame after `/ps` settles hangs the body four cells in under a `⎿` at the header's text column, the header flush, and the measured height is the painted height", async () => {
     const registry = createBlockRegistry({ defaults: true });
     const h = pipelineHarness({
       adapt: () => doc({ command: "adapted", blocks: [b.raw("NAME   STATUS", { id: "r1" }), b.raw("web    running", { id: "r2" })] }),
@@ -373,7 +373,7 @@ describe("C23 I54 — the pending entry is the running card", () => {
     expect(headerOf(blocks)?.text).toBe("ps · ok");
 
     // **Through the shell's layout, as `visibleRows` and C14's wrapper both do**
-    // (C22 §6l.4 D): the header at 80, the body at 78 with the hook.
+    // (C22 §6l.4 D, §6l.6): the header at 80, the body at 76 with the hook at 2.
     const options = { theme: DARK_THEME, capabilities: FULL_CAPS };
     const height = measureEntry(registry.measureSequence, blocks, 80);
     const drawn = renderEntryPieces(registry, windowEntry(entryLayout(blocks, 80), 0, height, registry), options);
@@ -381,12 +381,12 @@ describe("C23 I54 — the pending entry is the running card", () => {
     expect(drawn.faults).toEqual([]);
     const rows = drawn.rows.map((l) => visible(l).trimEnd());
     expect(rows[0]?.startsWith("⏺ ps · ok"), "the header at column 0").toBe(true);
-    expect(rows[1]?.startsWith("⎿ "), "the body's first row under the hook, at column 2").toBe(true);
-    for (const row of rows.slice(2)) expect(row === "" || row.startsWith("  "), "every body row indented").toBe(true);
+    expect(rows[1]?.startsWith("  ⎿ "), "the body's first row under the hook, the hook at column 2").toBe(true);
+    for (const row of rows.slice(2)) expect(row === "" || row.startsWith("    "), "every body row indented").toBe(true);
     // **The indent is the shell's, not the document's** (I56): the blocks carry
     // no gutter of their own, so a second composer does not indent twice.
     expect(blocks.slice(1).every((blk) => blk.kind !== "notice" || blk.glyph !== "continuation")).toBe(true);
-    const flat = renderSequenceToLines(registry, blocks.slice(1), 78, options).map((l) => visible(l).trimEnd());
-    expect(rows[1]).toBe(`⎿ ${flat[0] ?? ""}`);
+    const flat = renderSequenceToLines(registry, blocks.slice(1), 76, options).map((l) => visible(l).trimEnd());
+    expect(rows[1]).toBe(`  ⎿ ${flat[0] ?? ""}`);
   });
 });

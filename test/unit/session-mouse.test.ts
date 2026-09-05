@@ -151,10 +151,11 @@ describe("C16 §4a — a click lands where the keys would", () => {
     const { graph, settled, live, term } = await twoEntries();
     expect(graph.focus.current).toEqual({ at: "prompt" });
 
-    // Ten transcript rows in a twenty-row region: ten blank rows above, and a
-    // click on them is on nothing (row l).
-    expect(graph.viewport.scroll.totalRows).toBe(10);
-    expect(term(0), "the first transcript row is ten rows down the region").toBe(11);
+    // Twelve transcript rows in a twenty-row region — each entry closes with a
+    // blank (C22 I85) — so eight blank rows above, and a click on them is on
+    // nothing (row l).
+    expect(graph.viewport.scroll.totalRows).toBe(12);
+    expect(term(0), "the first transcript row is eight rows down the region").toBe(9);
     expect(graph.router.dispatch(mouse(REGION.top + 3, 2)), "a blank row above the transcript").toBe(false);
     expect(graph.focus.current).toEqual({ at: "prompt" });
 
@@ -171,7 +172,8 @@ describe("C16 §4a — a click lands where the keys would", () => {
     expect(graph.focus.current).toEqual(AT(settled, "c1", "t1"));
 
     // A click on the live entry's third row moves the outer scope, as `tab` does.
-    graph.router.dispatch(mouse(term(9), 2));
+    // Entry 2 starts at row 6 (entry 1 is six rows with its blank), so `c2` is row 10.
+    graph.router.dispatch(mouse(term(10), 2));
     expect(graph.focus.current).toEqual(AT(live, "c2", "t2"));
   });
 
@@ -230,12 +232,13 @@ describe("C16 §4a — a click lands where the keys would", () => {
     const { graph, settled, live, term } = await twoEntries(true);
 
     // **A table with an action is two rows taller** — the action hint below the
-    // body — so entry 2 starts at transcript row 7 and its `a2` is row 9. The
+    // body — and every entry closes with a blank (C22 I85), so entry 1 is eight
+    // rows, entry 2 starts at transcript row 8 and its `a2` is row 10. The
     // fixture is shown to have that shape before it is asserted against
     // (`test/support/README.md`).
-    expect(graph.viewport.entryAtRow(7)).toEqual({ id: live, rowOffset: 0 });
-    expect(graph.viewport.entryAtRow(6)).toEqual({ id: settled, rowOffset: 6 });
-    const a2 = term(9);
+    expect(graph.viewport.entryAtRow(8)).toEqual({ id: live, rowOffset: 0 });
+    expect(graph.viewport.entryAtRow(7)).toEqual({ id: settled, rowOffset: 7 });
+    const a2 = term(10);
     const a1 = term(2);
 
     // Live entry, row `a2`: focus, then activate — the `fill` lands in the prompt.
@@ -267,17 +270,17 @@ describe("C16 §4a — a click lands where the keys would", () => {
 
   it("T4.64b (C16 I31, §4a trace 3; C26 I14): in interaction the second click is the block's, and the framework fires nothing", async () => {
     const { graph, live, term } = await twoEntries(true);
-    graph.router.dispatch(mouse(term(9), 2)); // `a2` — T4.64's geometry
+    graph.router.dispatch(mouse(term(10), 2)); // `a2` — T4.64's geometry
     expect(graph.focus.current).toEqual(AT(live, "a2", "t2"));
     graph.focus.setMode("interact");
     expect(graph.router.target).toBe("interaction");
 
-    expect(graph.router.dispatch(mouse(term(9), 2)), "unconsumed: no block pointer vocabulary exists").toBe(false);
+    expect(graph.router.dispatch(mouse(term(10), 2)), "unconsumed: no block pointer vocabulary exists").toBe(false);
     expect(graph.editor.text, "no fill").toBe("");
     expect(graph.focus.current.at === "liveBlock" && graph.focus.current.mode).toBe("interact");
 
     // A click on another element is a move, and a move leaves the mode (C26 I16).
-    graph.router.dispatch(mouse(term(10), 2));
+    graph.router.dispatch(mouse(term(11), 2));
     expect(graph.focus.current).toEqual(AT(live, "b2", "t2"));
   });
 
@@ -546,7 +549,8 @@ describe("C16 §4a — the frame side", () => {
     expect(lastFocus(w.seen(), "q1"), "nothing is highlighted before the click").toBeNull();
     expect(lastFocus(w.seen(), "q2")).toBeNull();
 
-    await type(sgrClick(betaRow, 3));
+    // Column 5, inside the table: it is a card's body, four cells in (C22 I84).
+    await type(sgrClick(betaRow, 5));
     expect(lastFocus(w.seen(), "q1"), "the settled entry's second row, on screen").toEqual({
       blockId: "t1",
       rowId: "b1",
@@ -554,7 +558,7 @@ describe("C16 §4a — the frame side", () => {
     expect(lastFocus(w.seen(), "q2"), "and the live entry drew no highlight").toBeNull();
 
     // The row above, in the same frame's coordinates, is the first row.
-    await type(sgrClick(betaRow - 1, 3));
+    await type(sgrClick(betaRow - 1, 5));
     expect(lastFocus(w.seen(), "q1")).toEqual({ blockId: "t1", rowId: "a1" });
   });
 });
@@ -676,8 +680,9 @@ describe("C16 §4a — the pointer sets the crosshair (C12 §3s, C22 I76)", () =
     const { graph, term } = await graphAt80();
     const settled = graph.transcript.append(doc("/plot", [PLOT()]) as never);
     const live = graph.transcript.append(doc("/plot", [PLOT()]) as never);
-    // Two eight-row plots with their command lines: entry 1 is rows 0–8, entry 2 rows 9–17.
-    expect(graph.viewport.entryAtRow(9)).toEqual({ id: live, rowOffset: 0 });
+    // Two eight-row plots with their command lines, each closing with a blank
+    // (C22 I85): entry 1 is rows 0–9, entry 2 rows 10–19.
+    expect(graph.viewport.entryAtRow(10)).toEqual({ id: live, rowOffset: 0 });
     graph.router.dispatch(mouse(term(3), 23));
     expect(graph.focus.current).toEqual(AT(settled, "p", "p"));
     expect(graph.cursorPositions.get(settled, "p")).toBe(1);
@@ -735,16 +740,17 @@ describe("C16 §4a — the crosshair, read from the painted frame", () => {
     expect(ruleRow(), "no mark before the click").not.toContain("▲");
     expect(text().join("\n")).not.toMatch(/train: \d/u);
 
-    // The plot is a card's body, two cells in (C22 I83), so its tick centres sit
-    // at 24, 33, 42 … rather than 23, 32, 41; the pointer goes to a centre.
-    await type(sgrClick(areaRow, 42));
-    expect(ruleRow().indexOf("▲"), "the mark is under the pointer").toBe(42);
+    // The plot is a card's body, four cells in (C22 I83, I84), so its tick
+    // centres sit at 26, 43, 61, 78 (measured from the frame); the pointer goes
+    // to a centre.
+    await type(sgrClick(areaRow, 43));
+    expect(ruleRow().indexOf("▲"), "the mark is under the pointer").toBe(43);
     expect(text().join("\n"), "and the readout names the third sample").toMatch(/train: 30/u);
 
-    // A second click at the tie: the mark goes to sample 1's column, nine cells
-    // left of the pointer — the mark follows the data and not the mouse.
-    await type(sgrClick(areaRow, 24));
-    expect(ruleRow().indexOf("▲")).toBe(24);
+    // A second click at sample 1's centre, seventeen cells left — the mark
+    // follows the data and not the mouse.
+    await type(sgrClick(areaRow, 26));
+    expect(ruleRow().indexOf("▲")).toBe(26);
     expect(text().join("\n")).toMatch(/train: 20/u);
     expect(text().join("\n")).not.toMatch(/train: 30/u);
   });
@@ -895,19 +901,19 @@ describe("C16 §4a — the hover, read from the painted frame", () => {
     expect(cursorRow(), "focus at the prompt: the cursor is on its row").toBe(promptRow);
     expect(ruleRow()).not.toContain("▲");
 
-    await type(sgrHover(areaRow, 42)); // a tick centre under the indent (C22 I83)
-    expect(ruleRow().indexOf("▲"), "the mark is under the pointer").toBe(42);
+    await type(sgrHover(areaRow, 43)); // a tick centre under the indent (C22 I83, I84)
+    expect(ruleRow().indexOf("▲"), "the mark is under the pointer").toBe(43);
     expect(text().join("\n"), "and the readout names the third sample").toMatch(/train: 30/u);
     expect(cursorRow(), "and the cursor is still on the prompt row — focus did not move").toBe(promptRow);
 
-    await type(sgrHover(areaRow, 60));
-    expect(ruleRow().indexOf("▲")).toBe(60);
+    await type(sgrHover(areaRow, 61));
+    expect(ruleRow().indexOf("▲")).toBe(61);
     expect(text().join("\n")).toMatch(/train: 40/u);
     expect(cursorRow()).toBe(promptRow);
 
     // The control: a click at the same cell focuses the plot, and the frame's
     // cursor leaves the prompt row — which is what the two arms above rule out.
-    await type(sgrClick(areaRow, 60));
+    await type(sgrClick(areaRow, 61));
     expect(cursorRow(), "a focused block hides the prompt's cursor").toBeNull();
   });
 });

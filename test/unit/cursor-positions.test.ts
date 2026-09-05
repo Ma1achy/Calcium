@@ -156,11 +156,12 @@ describe("C22 I76 — the writer alone", () => {
     graph.viewport.resize({ width: 80, height: 20 });
     const id = graph.transcript.append(doc([plot("p", [10, 20, 30, 40, 50])]) as never);
     // The harness's region starts at terminal row 1 and bottom-aligns a short
-    // transcript (session-mouse T4.62): nine rows in twenty puts transcript row
-    // 3 — an area row of the plot — at terminal row 1 + 11 + 3.
-    expect(graph.viewport.scroll.totalRows).toBe(9);
+    // transcript (session-mouse T4.62): the plot entry closes with a blank (C22
+    // I85), so ten rows in twenty put transcript row 3 — an area row of the plot
+    // — at terminal row 1 + 10 + 3.
+    expect(graph.viewport.scroll.totalRows).toBe(10);
     const click = (col: number): InputEvent => ({
-      kind: "mouse", row: 1 + 11 + 3, col, button: "button0", press: true, shift: false, meta: false, ctrl: false, motion: false,
+      kind: "mouse", row: 1 + 10 + 3, col, button: "button0", press: true, shift: false, meta: false, ctrl: false, motion: false,
     });
     expect(graph.router.dispatch(click(41))).toBe(true);
     expect(graph.cursorPositions.get(id, "p"), "the pointer wrote the store").toBe(2);

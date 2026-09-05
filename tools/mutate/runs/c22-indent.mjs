@@ -1,0 +1,92 @@
+/**
+ * C22 §6l.6 — the mutation pass for the indentation language: C22 I84–I86
+ * (C22 T6.103–T6.105) and C23 I57 (C23 T6.87), and the rows they name.
+ *
+ * Every anchor is a line the landing round wrote. The control empties the one
+ * layout function both the measurer and the renderer read — a green control
+ * would mean nothing in the set reaches `entryLayout`, and every kill below is
+ * unearned.
+ */
+import { readFileSync, writeFileSync } from "node:fs";
+import { execSync } from "node:child_process";
+import { report, runPass } from "../mutate.mjs";
+
+const ROOT = process.cwd();
+const CMD =
+  "npx vitest run test/unit/frame-budget.test.ts test/contract/tool-call.test.ts " +
+  "test/integration/session.test.ts";
+const LAYOUT = "src/shell/entry-layout.ts";
+const CHROME = "src/shell/chrome.ts";
+const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
+const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
+const run = () => {
+  try {
+    return execSync(`${CMD} 2>&1`, { cwd: ROOT, encoding: "utf8" });
+  } catch (e) {
+    return `${e.stdout ?? ""}${e.stderr ?? ""}`;
+  }
+};
+
+const MUTATIONS = [
+  {
+    // C22 T6.103 (I84) — the hook back under the header's mark: two forms, two columns.
+    name: "hook indent set to 0",
+    file: LAYOUT,
+    from: "export const HOOK_INDENT = 2;",
+    to: "export const HOOK_INDENT = 0;",
+    expect: "T1.44",
+  },
+  {
+    // C22 T6.104 (I85) — the closing blank dropped from every non-card entry.
+    name: "blank run dropped from a plain entry",
+    file: LAYOUT,
+    from: "    return [Object.freeze({ blocks, width, indent: 0, blank: false }), gap];",
+    to: "    return [Object.freeze({ blocks, width, indent: 0, blank: false })];",
+    expect: "T1.45",
+  },
+  {
+    // C22 T6.104's other half — the blank dropped from a card while a plain entry keeps it.
+    name: "blank run dropped from a card",
+    file: LAYOUT,
+    from: "    gap,\n  ];\n}",
+    to: "  ];\n}",
+    expect: "T4.63",
+  },
+  {
+    // C22 T6.105 (I86) — the right cell two cells wider than its cluster: the clock
+    // leaves the last column. The cell's width is the whole mechanism; an `align`
+    // on it survived this pass because a cell its content's width has nothing to
+    // align (F822).
+    name: "right cell wider than its cluster",
+    file: CHROME,
+    from: "    flex: [1, { cells: clusterCells(right) }],",
+    to: "    flex: [1, { cells: clusterCells(right) + 2 }],",
+    expect: "T1.46",
+  },
+  {
+    // C23 T6.87 (I57) — the leading gap kept: the hook marks a blank row.
+    name: "cardBody returns its input unconditionally",
+    file: LAYOUT,
+    from: "  if (first === undefined || first.gapBefore !== true) return blocks;",
+    to: "  if (first === undefined || first.gapBefore !== true || true) return blocks;",
+    expect: "T1.50",
+  },
+];
+
+const results = await runPass({
+  read,
+  write,
+  run,
+  control: {
+    file: LAYOUT,
+    from: "  const gap = Object.freeze({ blocks: [], width, indent: 0, blank: true });",
+    to: "  const gap = Object.freeze({ blocks: [], width, indent: 0, blank: true });\n  if (width >= 0) throw new Error(\"control\");",
+    why:
+      "no entry can lay out at all — if this survives, nothing in the set reaches " +
+      "`entryLayout` and every kill below is unearned",
+  },
+  mutations: MUTATIONS,
+});
+console.log(report(results));
+const unexpected = results.filter((r) => !r.killed);
+process.exit(unexpected.length > 0 ? 1 : 0);

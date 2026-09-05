@@ -23,13 +23,8 @@ import {
   resolveConfig,
   type Ambient,
 } from "../../src/shell/config.js";
-import { foldHome, makeDefaultChrome } from "../../src/shell/chrome.js";
-import {
-  entryLayout,
-  measureEntry,
-  renderEntryPieces,
-  windowEntry,
-} from "../../src/shell/entry-layout.js";
+import { clusterCells, foldHome, formatClock, makeDefaultChrome } from "../../src/shell/chrome.js";
+import { BODY_INDENT, ENTRY_GAP, HOOK_INDENT, elementsOfEntry, entryLayout, measureEntry, renderEntryPieces, windowEntry } from "../../src/shell/entry-layout.js";
 import type { Chrome, SessionSnapshot, TuiConfig } from "../../src/shell/types.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
@@ -240,37 +235,103 @@ describe("C22 §6l — the frame's default look", () => {
       return renderEntryPieces(REGISTRY, windowEntry(layout, 0, total, REGISTRY), options).rows;
     };
 
-    // Row 11: header at 40, body at 38, `⎿ ` on the body's first row.
+    // Row 11: header at 40, body at 36, two blanks and `⎿ ` on the body's first
+    // row (§6l.6 row 16 — the hook at the header's text column). Every entry
+    // ends with its blank row (C22 I85), so the rendered set is one longer.
     const card = rows([step, body, other], 40);
     const header = renderSequenceToLines(REGISTRY, [step], 40, options);
-    const bodyAt38 = renderSequenceToLines(REGISTRY, [body, other], 38, options);
-    expect(card).toHaveLength(header.length + bodyAt38.length);
+    const bodyAt36 = renderSequenceToLines(REGISTRY, [body, other], 36, options);
+    expect(card).toHaveLength(header.length + bodyAt36.length + ENTRY_GAP);
     expect(card.slice(0, header.length)).toEqual(header);
-    expect(strip(card[header.length] ?? "")).toBe(`⎿ ${strip(bodyAt38[0] ?? "")}`);
-    expect(strip(card[header.length + 1] ?? "")).toBe(`  ${strip(bodyAt38[1] ?? "")}`);
+    expect(strip(card[header.length] ?? "")).toBe(`  ⎿ ${strip(bodyAt36[0] ?? "")}`);
+    expect(strip(card[header.length + 1] ?? "")).toBe(`    ${strip(bodyAt36[1] ?? "")}`);
     const hookRow = card[header.length] ?? "";
     expect(hasSgr(hookRow.slice(0, hookRow.indexOf("⎿"))), "the hook is muted — an SGR opens before it").toBe(true);
     // Rendered lines are not squared off — `paint`'s `exact` does that — so the
     // claim is the bound: nothing the layout prefixes overruns the width.
     for (const line of card) expect(displayCells(line)).toBeLessThanOrEqual(40);
 
-    // Row 14: a header with no body hangs no hook.
-    expect(rows([step], 40)).toEqual(header);
-    expect(entryLayout([step], 40)).toHaveLength(1);
+    // Row 14: a header with no body hangs no hook — the header and the blank.
+    expect(rows([step], 40)).toEqual([...header, ""]);
+    expect(entryLayout([step], 40).filter((run) => !run.blank)).toHaveLength(1);
 
     // Row 13: a document whose first block is not a `step` notice is one run.
-    expect(rows([body, other], 40)).toEqual(renderSequenceToLines(REGISTRY, [body, other], 40, options));
+    expect(rows([body, other], 40)).toEqual([...renderSequenceToLines(REGISTRY, [body, other], 40, options), ""]);
     expect(entryLayout([body, other], 40)[0]?.indent).toBe(0);
+  });
+
+  it("T1.44 (C22 I84, §6l.6 row 16): the card's hook and C09's continuation mark are one column — compared as two rendered forms, not two constants", () => {
+    const step = block({ kind: "notice", id: "h", tone: "info", glyph: "step", text: "ps · ok" });
+    const body = block({ kind: "notice", id: "b", tone: "muted", text: "the body row" });
+    const queued = block({ kind: "notice", id: "q", tone: "muted", glyph: "continuation", text: "queued behind /logs" });
+    const options = { theme: DARK_THEME, capabilities: FULL_CAPS };
+    const layout = entryLayout([step, body], 40);
+    const total = measureEntry(REGISTRY.measureSequence, [step, body], 40);
+    const card = renderEntryPieces(REGISTRY, windowEntry(layout, 0, total, REGISTRY), options).rows.map(strip);
+    const notice = renderSequenceToLines(REGISTRY, [queued], 40, options).map(strip);
+    const hookAt = card[1]?.indexOf("⎿") ?? -1;
+    expect(hookAt, "the hook at the header's text column").toBe(HOOK_INDENT);
+    expect(notice[0]?.indexOf("⎿"), "C09's own lead for the same mark").toBe(hookAt);
+    expect(card[1], "two blanks, the hook, a space, the body at 36").toBe(
+      `  ⎿ ${strip(renderSequenceToLines(REGISTRY, [body], 36, options)[0] ?? "")}`,
+    );
+    expect(layout.find((run) => run.indent > 0)?.width).toBe(40 - BODY_INDENT);
+  });
+
+  it("T1.45 (C22 I85, §6l.6 rows 18–19): every entry ends with one blank row — measured, drawn, windowed and element-free", () => {
+    const note = block({ kind: "notice", id: "n", tone: "muted", text: "one row" });
+    const chips = block({ kind: "pills", id: "p", chips: [{ label: "a" }, { label: "b" }] });
+    const options = { theme: DARK_THEME, capabilities: FULL_CAPS };
+    const total = measureEntry(REGISTRY.measureSequence, [note], 40);
+    expect(total, "the sequence plus the entry's blank").toBe(REGISTRY.measureSequence([note], 40) + ENTRY_GAP);
+    const layout = entryLayout([note], 40);
+    const whole = renderEntryPieces(REGISTRY, windowEntry(layout, 0, total, REGISTRY), options);
+    expect(whole.rows).toHaveLength(total);
+    expect(whole.rows.at(-1), "the last row is the blank").toBe("");
+    expect(whole.faults).toEqual([]);
+    const short = renderEntryPieces(REGISTRY, windowEntry(layout, 0, total - 1, REGISTRY), options);
+    expect(short.rows, "a window short of the blank draws none").toHaveLength(total - 1);
+    expect(short.rows.every((r) => strip(r) !== "")).toBe(true);
+    const onlyBlank = renderEntryPieces(REGISTRY, windowEntry(layout, total - 1, total, REGISTRY), options);
+    expect(onlyBlank.rows, "a window of the blank alone draws exactly one").toEqual([""]);
+    const elements = elementsOfEntry(REGISTRY, [chips], 40);
+    const chipsTotal = measureEntry(REGISTRY.measureSequence, [chips], 40);
+    expect(elements.length).toBeGreaterThan(0);
+    for (const { element } of elements) expect(element.rows.to, "no element on the blank").toBeLessThanOrEqual(chipsTotal - ENTRY_GAP);
+  });
+
+  it("T1.46 (C22 I86, §6l.6 row 20): default chrome is two clusters — the clock and the cwd end at the last column, /help begins at 0, and the right cluster's cells is the registry's own width", () => {
+    const chrome = makeDefaultChrome("plots-tui", "/usr/local/bin/plots");
+    for (const columns of [80, 100, 60]) {
+      const f = frameAt(24, chrome, 1, columns);
+      const lines = paint(f, deps());
+      const header = strip(lines[0] ?? "");
+      const footer = strip(lines[23] ?? "");
+      expect(header.startsWith("plots-tui"), `${String(columns)}: the name at column 0`).toBe(true);
+      expect(displayCells(header), `${String(columns)}: the clock's last cell is the last column`).toBe(columns);
+      expect(header.endsWith(formatClock(NOW, columns))).toBe(true);
+      expect(footer.startsWith("/help"), `${String(columns)}: /help at column 0`).toBe(true);
+      expect(displayCells(footer), `${String(columns)}: the cwd ends at the last column`).toBe(columns);
+      expect(footer.endsWith("~/work")).toBe(true);
+    }
+    // The figure the group is told, against the figure C09 measures — at widths
+    // the cluster fits and one it does not.
+    for (const chips of [[{ label: "12:34:56" }], [{ label: "~/work" }], [{ label: "a" }, { label: "bb" }, { label: "COPY" }]]) {
+      const pills = block({ kind: "pills", id: "x", chips });
+      const wanted = clusterCells(chips);
+      expect(REGISTRY.width(pills, 200), JSON.stringify(chips)).toBe(wanted);
+      expect(REGISTRY.width(pills, wanted), "and at exactly its own width").toBe(wanted);
+    }
   });
 
   it("T1.42 (C22 I83, §6l.2 row 12): a body that wraps once more at width − 2 is measured and rendered with the same extra row", () => {
     const step = block({ kind: "notice", id: "h", tone: "info", glyph: "step", text: "ps" });
-    // 39 cells of prose: one row at 40, two at 38.
+    // 39 cells of prose: one row at 40, two at 36.
     const body = block({ kind: "notice", id: "b", tone: "muted", text: "a".repeat(39) });
     const options = { theme: DARK_THEME, capabilities: FULL_CAPS };
     const flush = REGISTRY.measureSequence([step, body], 40);
     const measured = measureEntry(REGISTRY.measureSequence, [step, body], 40);
-    expect(measured, "the measurer sees the wrap").toBe(flush + 1);
+    expect(measured, "the measurer sees the wrap, and the entry's blank (C22 I85)").toBe(flush + 1 + ENTRY_GAP);
     const drawn = renderEntryPieces(
       REGISTRY,
       windowEntry(entryLayout([step, body], 40), 0, measured, REGISTRY),
@@ -281,13 +342,9 @@ describe("C22 §6l — the frame's default look", () => {
     // A window into the body alone: no header, the hook still on the body's first row.
     const tail = renderEntryPieces(REGISTRY, windowEntry(entryLayout([step, body], 40), 1, measured, REGISTRY), options);
     expect(tail.rows).toHaveLength(measured - 1);
-    expect(strip(tail.rows[0] ?? "").startsWith("⎿ ")).toBe(true);
-    expect(strip(tail.rows[1] ?? "").startsWith("  ")).toBe(true);
+    expect(strip(tail.rows[0] ?? "").startsWith("  ⎿ ")).toBe(true);
+    expect(strip(tail.rows[1] ?? "").startsWith("    a")).toBe(true);
   });
-
-  it.todo("T1.44 (C22 I84, §6l.6 row 16): a card's hook sits at column 2 under the header's text, the body at 36 of 40, and C09's own continuation notice puts the mark at the same index — not deferred on a component: the same round's code commit replaces this row");
-  it.todo("T1.45 (C22 I85, §6l.6 rows 18–19): measureEntry is measureSequence + 1, the rendered entry ends with one empty row, a window short of it draws none and a window of it alone draws one, and no element lands on it — not deferred on a component: the same round's code commit replaces this row");
-  it.todo("T1.46 (C22 I86, §6l.6 row 20): the default header and footer are two clusters — the clock and the cwd end at the last column, /help begins at 0, and the right cluster's cells equals the registry's width of the pills — not deferred on a component: the same round's code commit replaces this row");
 
   it("T1.43 (C22 §6l.4 E): the default footer is one muted pills row — `/help`, the cwd with $HOME as `~`, and `stopping` when the session says so — and no key name", () => {
     const chrome = makeDefaultChrome("t", "t");

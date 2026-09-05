@@ -821,6 +821,58 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
     ).toBeGreaterThan(after.indexOf(LEAVE_ALT));
   });
 
+  it("T4.63 (C22 I84, I85; C23 I57; §6l.6 rows 16–19): frame read — two settled cards: both hooks at column 2, the first hook row carries the table's header over its default gap, one blank row between the entries and one above the upper rule", async () => {
+    const manifest: NonNullable<TuiConfig["manifest"]> = {
+      schema: "tui.manifest/1",
+      binary: "prism",
+      version: "1.0.0",
+      tools: [
+        { name: "ps", local: true, summary: "a table with a leading gap", args: [], flags: [] },
+        { name: "note", local: true, summary: "one notice", args: [], flags: [] },
+      ],
+    };
+    const localHandlers: NonNullable<TuiConfig["localHandlers"]> = {
+      ps: () => ({
+        schema: "tui.view/1",
+        command: "ps",
+        status: "ok",
+        // A leading `gapBefore`, as C24 §4 gives a `table` by default — the card
+        // clears it so the hook marks content, not a blank (C23 I57). The kind
+        // does not matter to the clearing; the default's own mechanism is C23 T1.50.
+        blocks: [{ kind: "notice", id: "row", tone: "muted", text: "web running", gapBefore: true }],
+      }),
+      note: () => ({
+        schema: "tui.view/1",
+        command: "note",
+        status: "ok",
+        blocks: [{ kind: "notice", id: "n", tone: "muted", text: "done" }],
+      }),
+    };
+    const stdin = fakeStdin();
+    const { screen } = await buildSession({ manifest, localHandlers, stdin: stdin as never });
+    await settle();
+    stdin.emit("/ps\r");
+    await settle();
+    stdin.emit("/note\r");
+    await settle();
+
+    const rows = screen().rows.map((r) => r.trimEnd());
+    const ps = rows.findIndex((r) => r.includes("⏺ ps · ok"));
+    const note = rows.findIndex((r) => r.includes("⏺ note · ok"));
+    expect(ps, "the first card").toBeGreaterThan(0);
+    expect(note, "the second card").toBeGreaterThan(ps);
+    // Row 17: the hook marks content, not the leading gap the block carried.
+    expect(rows[ps + 1]?.indexOf("⎿"), "the first hook at column 2").toBe(2);
+    expect(rows[ps + 1], "and it carries the body's content").toContain("web running");
+    expect(rows[note + 1]?.indexOf("⎿"), "the second hook at column 2").toBe(2);
+    // Rows 18–19: one blank closes entry 1 (before entry 2's `❯ /note` echo),
+    // one closes entry 2 above the upper rule.
+    expect(rows[note - 1]?.startsWith("❯ /note"), "entry 2's command echo").toBe(true);
+    expect(rows[note - 2], "one blank row closing entry 1").toBe("");
+    expect(rows[note + 2], "the blank closing entry 2").toBe("");
+    expect(/^[─-]{20,}/u.test(rows[note + 3] ?? ""), "then the upper rule").toBe(true);
+  });
+
   it("T4.62 (C22 I83, §6l.2 row 12; C23 I55): a body one cell short of the width wraps once more under the indent, and the frame holds every row of it", async () => {
     // **The wiring row.** T1.41 and T1.42 call `entryLayout` directly and would
     // both pass with a `visibleRows` that never did, or a measurer wrapper that
@@ -849,10 +901,11 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
     const rows = screen().rows;
     const at = rows.findIndex((r) => r.includes("⏺ wide · ok"));
     expect(at, "the card's header is on the screen").toBeGreaterThan(0);
-    expect(rows[at + 1]?.startsWith(`⎿ ${"a".repeat(98)}`), "the body's first row: the hook and 98 cells").toBe(true);
-    expect(rows[at + 2]?.trimEnd(), "the wrapped cell, under two blanks").toBe("  a");
-    expect(/^[─-]{20,}/u.test(rows[at + 3] ?? ""), "then the upper rule — nothing dropped between").toBe(true);
-    expect(rows[at + 4]?.trimStart().startsWith("❯"), "and the prompt").toBe(true);
+    expect(rows[at + 1]?.startsWith(`  ⎿ ${"a".repeat(96)}`), "the body's first row: the hook at 2 and 96 cells").toBe(true);
+    expect(rows[at + 2]?.trimEnd(), "the wrapped cells, under four blanks").toBe("    aaa");
+    expect(rows[at + 3]?.trim(), "the entry's blank row (I85)").toBe("");
+    expect(/^[─-]{20,}/u.test(rows[at + 4] ?? ""), "then the upper rule — nothing dropped between").toBe(true);
+    expect(rows[at + 5]?.trimStart().startsWith("❯"), "and the prompt").toBe(true);
   });
 
   it("T4.28 (I6a, C09 I29): a swallowed render reaches the same drain", async () => {
@@ -923,9 +976,11 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
     // Three rows measured, three drawn, and nothing between the box and what
     // follows it — a stronger claim than a blank row, which a box one row short
     // would also satisfy.
-    // The rule bounding the prompt follows the box (C22 I81), and the prompt it.
-    expect(/^[─-]{20,}/u.test(rows[at + 2] ?? ""), "the upper rule follows the box").toBe(true);
-    expect(rows[at + 3]?.trimStart().startsWith("❯"), "the prompt follows the rule").toBe(true);
+    // The entry closes with its blank row (C22 I85), then the rule bounding the
+    // prompt (C22 I81), then the prompt.
+    expect(rows[at + 2]?.trim(), "the entry's blank row").toBe("");
+    expect(/^[─-]{20,}/u.test(rows[at + 3] ?? ""), "the upper rule follows the box").toBe(true);
+    expect(rows[at + 4]?.trimStart().startsWith("❯"), "the prompt follows the rule").toBe(true);
 
     const before = stdout.chunks.length;
     await tui.stop("exit");
@@ -1135,8 +1190,6 @@ describe("C22 — copy mode: the order inside the exit, and the far side under t
   // lines land this row goes red, which is the signal to flip it to `it` — a
   // deferral that expires on the change it waits for, where an `it.todo` would
   // not (`todo-expiry` is indexed by component, and every component here exists).
-  it.todo("T4.63 (C22 I84, I85; C23 I57; §6l.6 rows 16–19): frame read — a continuation notice and a settled card with a default-gap table put both hooks at column 2, the card's hook row carries the table header, one blank row between the entries and one above the upper rule — not deferred on a component: the same round's code commit replaces this row");
-
   it("T4.68 (C16 §5c C1): Esc leaves copy mode — the tracking pair is the first bytes written, then the frame", async () => {
     const stdin = fakeStdin();
     const { stdout, screen, clock } = await buildSession({ stdin: stdin as never });

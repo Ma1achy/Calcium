@@ -6,7 +6,8 @@
 // and not a redrawing from intent.
 import { describe, expect, it } from "vitest";
 
-import { validateDocument } from "../../src/data/viewmodel/index.js";
+import { block, validateDocument } from "../../src/data/viewmodel/index.js";
+import { cardBody, entryLayout } from "../../src/shell/entry-layout.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { GLYPH_TOKENS, glyphCells, glyphFor } from "../../src/presentation/blocks/glyphs.js";
@@ -33,7 +34,31 @@ describe("C09 §4 — the `step` glyph", () => {
 });
 
 describe("§9c — the header, the body, and the row the body already has", () => {
-  it.todo("C23 T1.50 (C23 I57): cardOver and toolCallDoc clear gapBefore on the body's first block, keep the second's, and leave the input document untouched — not deferred on a component: the same round's code commit replaces this row");
+  it("C23 T1.50 (C23 I57, F821): entryLayout clears the body's first leading gap in the body run, keeps the rest, and the stored document keeps its blocks by identity", () => {
+    const first = block({ kind: "notice", id: "a", tone: "muted", text: "first", gapBefore: true });
+    const second = block({ kind: "notice", id: "b", tone: "muted", text: "second", gapBefore: true });
+    const step = block({ kind: "notice", id: "h", tone: "info", glyph: "step", text: "ps · ok" });
+
+    // The body run: the first block's gap is dropped, the second keeps its gap.
+    const body = cardBody([first, second]);
+    expect(body[0]?.gapBefore, "the first body block's gap is cleared").toBeUndefined();
+    expect(body[0]?.id).toBe("a");
+    expect(body[1]?.gapBefore, "the second keeps its gap").toBe(true);
+
+    // **The stored document is untouched — clearing is per-frame, in the layout**
+    // (F821): the card's blocks are the very objects handed in, so a live part
+    // declared by identity survives. entryLayout's body run holds the cleared copy.
+    const card = [step, first, second];
+    const runs = entryLayout(card, 40);
+    const bodyRun = runs.find((r) => r.indent > 0);
+    expect(card[1], "the document keeps the original object").toBe(first);
+    expect(first.gapBefore, "and the original still carries its gap").toBe(true);
+    expect(bodyRun?.blocks[0]?.gapBefore, "only the run's copy has it cleared").toBeUndefined();
+
+    // A body whose first block has no leading gap is returned by identity.
+    const plain = block({ kind: "notice", id: "c", tone: "muted", text: "plain" });
+    expect(cardBody([plain, second])[0], "no gap: the same object").toBe(plain);
+  });
 
   it("T2.46: the header is `name(args) · elapsed · outcome`, and below one second no figure is drawn", () => {
     expect(toolCallHeader({ name: "run_command", args: "npm test", elapsedMs: 4_200, outcome: "exit 0" })).toBe(
