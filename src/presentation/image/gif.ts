@@ -38,6 +38,16 @@ export const MIN_DELAY_MS = 20;
 /** What a clamped delay becomes — the figure browsers use. */
 export const DEFAULT_DELAY_MS = 100;
 
+/**
+ * The floor, applied once. The scanner's descriptor and the decoder's delay list
+ * both clamped with the same expression, and a mutation removing the scanner's
+ * copy survived IF3 because the decoder's still held — a rule with two copies is
+ * tested against one of them (F778). One function, both callers.
+ */
+function clampDelay(ms: number): number {
+  return ms < MIN_DELAY_MS ? DEFAULT_DELAY_MS : ms;
+}
+
 const TRAILER = 0x3b;
 const EXTENSION = 0x21;
 const IMAGE = 0x2c;
@@ -212,7 +222,7 @@ export function decodeGif(bytes: Uint8Array): GifDecoded {
         control = {
           disposal: (flags >> 2) & 7,
           transparent: (flags & 1) !== 0 ? (bytes[at + 4] ?? -1) : -1,
-          delay: ms < MIN_DELAY_MS ? DEFAULT_DELAY_MS : ms,
+          delay: clampDelay(ms),
         };
       }
       at = skipSubBlocks(bytes, at);
@@ -282,7 +292,7 @@ export function decodeGif(bytes: Uint8Array): GifDecoded {
     }
     frames.push({ width, height, data: canvas.slice() });
     // A frame with no control block before it has no delay: read as unspecified.
-    delays.push(control.delay < MIN_DELAY_MS ? DEFAULT_DELAY_MS : control.delay);
+    delays.push(clampDelay(control.delay));
     previous = { left, top, w, h, disposal: control.disposal, saved };
     control = { disposal: 0, transparent: -1, delay: 0 };
   }

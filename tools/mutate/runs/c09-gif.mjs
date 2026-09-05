@@ -83,10 +83,14 @@ const results = runPass({
     },
     {
       // **The clamp removed.** A 0 or 10 ms delay reaches the store as written.
+      // Re-anchored 2026-09-05 at the one clamp: this mutation used to remove the
+      // scanner's copy alone and **survived** — the decoder's copy at the delay
+      // list still clamped, and IF3 reads that list (F778). Two copies of one rule,
+      // found by the pass rather than by reading.
       name: "short delays are not clamped",
       file: GIF,
-      from: "          delay: ms < MIN_DELAY_MS ? DEFAULT_DELAY_MS : ms,",
-      to: "          delay: ms,",
+      from: "  return ms < MIN_DELAY_MS ? DEFAULT_DELAY_MS : ms;",
+      to: "  return ms;",
       expect: "IF3",
     },
     {
@@ -131,8 +135,9 @@ const results = runPass({
       // axis along (C22 I71).
       name: "the frame key is not in the render slot",
       file: SESSION,
-      from: "\\u0000${cursorKey}\\u0000${framesKey}${animated}`;",
-      to: "\\u0000${cursorKey}${animated}`;",
+      // Re-anchored 2026-09-05: the ninth axis (`seriesKey`, C22 I78) follows `framesKey`.
+      from: "\\u0000${cursorKey}\\u0000${framesKey}\\u0000${seriesKey}${animated}`;",
+      to: "\\u0000${cursorKey}\\u0000${seriesKey}${animated}`;",
       expect: "T4.17o",
     },
     {

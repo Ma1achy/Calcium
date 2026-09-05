@@ -28449,3 +28449,128 @@ unconditional `exit(0)`, a file with no `runPass` at all.
 **Where**: `tools/mutate/anchors.mjs`; `test/unit/mutate-anchors.test.ts`.
 
 ---
+
+## F774 — a file no lane owned appeared in the diff as a mode change only — `tools/enforce/index.mjs` lost its exec bit under a shebang ★★☆☆☆
+
+*2026-09-05 · the lead, closing arc3, at 8bd6a1bb.*
+
+**Measured**: after five commits the tree was not clean — `tools/enforce/index.mjs`, `old mode 100755 / new
+mode 100644`, no content change, mtime 03:41 during the arc3 lanes; no lane listed the file, no diff touched
+its text, and the file opens `#!/usr/bin/env node`. The gated push refused on it. Restored with `chmod 755`
+and pushed. **The mechanism is not yet named**: a rewrite through a temp-and-rename drops the mode; a
+`writeFileSync` on the path keeps it; `npm` chmods a `bin` target (F56's class). CLAUDE.md names this
+exact shape — *a file you did not touch appearing in a diff is evidence about a mechanism you did not know
+was running* — and the evidence here is one bit. **Open** until the writer is found: the next lane that
+touches `tools/enforce/` should check the mode before and after its edit script.
+
+**Where**: `tools/enforce/index.mjs`.
+
+---
+
+## F775 — the cursor's frame dropped every vertical legend and kept its rows narrowed for a column nothing drew — latent until the pointer put a cursor one click away ★★★★☆
+
+*2026-09-05 · the lead, closing arc4 (the readout's pointer half, the widget gate, the chrome ruling), at 8bd6a1bb+arc4.*
+
+**Expected**: a two-series line plot auto-enables a right legend; setting a cursor draws the same frame with
+the dashed vertical, the `▲` and the readout row.
+
+**Measured** at 80 columns before the fix: the frame lost `█ train` / `█ test`, the right border sat at column
+71 and the eight cells beyond it were blank — the layout reserved the legend's column and nothing composited
+it. With `legend: "left"` the lid started at column 0 and every area row at column 9: the crosshair's frame
+eight cells left of its own rows. `axedWithCursor` was a **second composition** beside `axed` that skipped
+`withColumn` and `indent`. Shipped in twelve committed baselines, which agreed with it. Folded into `axed` as a
+`cursor` parameter; **12 of 2 440 frames move**, every `line-cursor-*`, each gaining its legend column —
+read: the 40-column frame's widest row measures exactly 40 cells, so a lane's warning that the legend sat
+past the frame was a mis-read. `plot-arm-disagreement` AD1's `line.legend` moved 14/114 → 10/114 because the
+terminal arm now draws what the SVG arm always had.
+
+**The pointer half** (C12 §3s, C16 §4a): a click or drag over a cursorable plot sets `cursorPositions` for
+that plot — the store's **second writer**, no new store — by **searching the forward map**: `sampleIndexAt`
+lays the plot out with the same `positionalLayout` the renderer uses and returns the nearest `cursorColumn`
+(lower on a tie), so candles and facing come free and there is no second formula. Measured at 80 columns
+with five samples: marks at 4, 23, 41, 60, 78; click 41 → 2; click 32 → tie → 1; gutter → `null`. Eleven
+mutations, eleven killed. A focused **block** now paints: a plot's frame glyphs in `accent` (164 cells, text
+byte-identical — the first cut lit the y-labels because the gutter's label and edge shared one span), a
+scroll's residue row in `accent`; a focused *active* chip takes the selection ground, the one free channel.
+
+**Where**: `src/presentation/plot/definition.ts` `axed`, `sampleIndexAt`; `plot/furniture.ts`;
+`src/shell/construct.ts` `pointerEffect`; C12 §3s, C16 §4a, C26 §7.
+
+---
+
+## F776 — `hidden` as a validated member, B7's store with a key as its first writer, and `mergeBlock`'s first caller — the widget gate without a widget ★★★★☆
+
+*2026-09-05 · the lead, closing arc4 (the readout's pointer half, the widget gate, the chrome ruling), at 8bd6a1bb+arc4.*
+
+`Series.hidden?` and `hidden?` on all four annotation arms (C04 I99): appearance — `measure` never sees them,
+asserted. Accepted on a new record `HAS_HIDEABLE_SERIES` (seven forms), refused elsewhere for either value —
+**not** a reuse of `HAS_CALLOUT`, which names the same seven by coincidence of membership (I61's rule). C12
+I116: a hidden series is not drawn, its legend entry stays with a **hollow swatch** (`○`, a mark not a tone,
+so the toggle still reads at 1-bit), callout and readout withhold it, **the axis does not rescale** — a
+toggle that rescales moves the curves being compared; matplotlib's `set_visible` does not `relim`, stated
+from the library's docs because the repo's prior-art note has zero lines on visibility. Both hidden: the
+frame, gutter and legend draw and the area is blank — the legend is the only thing on screen naming which
+digit undoes it. **The store** `seriesVisibility` (per entry, per block, explicit boolean per index, `false`
+in the key because *shown* must override a producer's *hidden*) with C22 I78's axis and one writer: the
+plot's own `BlockKeymap` — `1`…`min(9, n)` toggling series N, merged by `mergeBlock` at `liveBlock` (no digit
+was bound there or at `global`; the reader `↓`s into the plot and presses `2`, no `⏎`). `mergeBlock` has its
+first production caller and `BlockKeymap` its first producer; C26 T2.6a inverted. Through a real session:
+`↓ 2` → `○ val`; `2` → byte-identical restore; `↑ 1` → `1` at the prompt. **Fixed in passing and then measured on a worktree at `8bd6a1bb`**: the callout row was read from `layers[index]` where label layers preceded curve
+layers. A two-series line with `pointLabels` on series 0 and `yCallout: "last"` at `yAxis: "both"`, 80 columns: the old
+tree drew **`┣ 90+` on row 5** — `val`'s 90 on `train`'s row, `train`'s 40 gone, and the `+` announcing a collision
+that did not exist; the new tree draws `┣ 90` on row 2 and `┣ 40` on row 5. Shipped, with zero corpus instances
+only because no fixture carried both fields. **Owed**: `legendHit` (the design drew a legend that clicks, not
+digits); `blockActionRoute` — C16 I19 says block keymaps dispatch open strings through C23 §3a and `bound()`
+drops any action not in the built-in union, so the sentence describes a route that does not exist.
+
+**Where**: `src/data/viewmodel/{types,validate}.ts`, `src/shell/series-visibility.ts`, `src/presentation/plot/{definition,visibility,furniture,figure}.ts`,
+`src/shell/{construct,keys,session}.ts`; C04 I99, C12 I116, C22 I78, C26 §4f.
+
+---
+
+## F777 — the three-line footer was refused by a constant nobody could configure — and the budget is per session, because a per-frame height is a second pusher of the transcript ★★★★☆
+
+*2026-09-05 · the lead, closing arc4 (the readout's pointer half, the widget gate, the chrome ruling), at 8bd6a1bb+arc4.*
+
+**Measured**: `HEADER_ROWS = FOOTER_ROWS = 1` and `frame.ts:140`'s four-region sum made the design's
+three-line footer and fifth region unbuildable by construction (F739). At 24 rows a three-line footer, a
+one-row header and a two-row prompt leave **18** for the region — the trade §16 drew; at 12 rows nothing
+composes, the size gate holds at `MIN_ROWS` 16. **Ruled** (C22 §6k, I79/I80): `TuiConfig.chrome.footerRows`,
+declared once per session, default 1, `[1, MAX_FOOTER_ROWS]` — and **the maximum is derived**, not chosen:
+`16 − 1 − 8 − b ≥ 1 ⇒ b ≤ 6` at `MIN_ROWS` with the prompt at its cap. Not a `ChromeFn` return per frame,
+for three reasons the trace found: a footer changing height between frames moves the transcript because the
+footer chose to (a second pusher beside the prompt); `initialRegionHeight` has no snapshot to hand a
+`ChromeFn`, so the pre-frame region would be a permanent guess; §16's own line puts applicability on the
+session and values on the frame. The header stays a constant of one. A7's activity region is a **fifth
+region, not a footer**, and gets nothing here (`Composed.activity` absent). Default byte-identical (T3.38);
+the sum swept over `b ∈ [1, 6]`, `R ∈ [2b+1, 60]`, prompt ∈ {1, 200}. Roadmap 29 **closes** as a budget —
+35, 37 and 15 wanted a row and have one; 46 re-filed at container scope. **SS56**: no hand-composed notice
+outside `documents.ts`'s family — 34 lines in 16 files measured, 13 below L4 where the family is unreachable,
+1 definitional, **14 in four L4 surfaces owed a migration** (`confirm.ts` 1, `execution.ts` 5, `refresh.ts` 2,
+`local/handlers.ts` 6), allow-listed by name with the reason and expiring through SS53. **The key ladder as a
+generated table**: `docs/KEYS.md` from `defaultKeymap` — 83 bindings, 60 keys, **14 resolved by the ladder**
+where C16's prose named three; drift-checked against the live keymap.
+
+**Where**: `src/shell/{frame,config,chrome,paint,types}.ts`; C22 §6k; `tools/enforce/source-scans.mjs` SS56;
+`tools/keymap-table.mjs`, `docs/KEYS.md`.
+
+---
+
+## F778 — the GIF delay clamp lived at two sites, and the mutation that removed one survived because the other held ★★★☆☆
+
+*2026-09-05 · the lead, closing arc4, at 8bd6a1bb+arc4.*
+
+**Expected**: `c09-gif.mjs`'s *short delays are not clamped* — the scanner's `ms < MIN_DELAY_MS ? DEFAULT_DELAY_MS : ms`
+replaced by `ms` — kills IF3.
+
+**Measured** on the first harness run of the file since it was written (`56a8efd9`): **SURVIVED**. IF3 asserts
+`framesAndDelays(B).delays`, which the *decoder* fills at `gif.ts:285` with the same expression over
+`control.delay`; the scanner's descriptor at `:215` is a second copy nobody's assertion reads for this
+property. A rule with two copies is tested against one of them (SS30's class; `a-mutation-can-indict-its-subject`).
+Not Lane W's re-anchor — that was the render key's line and it was caught. **Fixed**: one `clampDelay(ms)`,
+both callers, the mutation anchored at the helper; re-run, caught. The finding is the pass's — reading the
+file, both sites looked like the rule.
+
+**Where**: `src/presentation/image/gif.ts`; `tools/mutate/runs/c09-gif.mjs`.
+
+---
