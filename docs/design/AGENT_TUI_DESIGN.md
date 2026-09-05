@@ -1110,6 +1110,21 @@ gives it horizontal layout and multi-row falls out for free.
 **Decide it once, before six features each add a segment.** That is the nits' §9 with a sixth
 claimant, and this design is the one that most wants the room.
 
+**DECIDED 2026-09-05 — C22 §6k, and the footer grows; the chrome does not compose.** The
+budget is `TuiConfig.chrome.footerRows`, declared once per session, default 1, an integer up
+to `MAX_FOOTER_ROWS` — which is **derived** from the size gate as the largest footer that
+leaves one transcript row at 16 rows with the prompt at its cap (six today), not chosen. The
+three lines above are `footerRows: 3`, and a `ChromeFn` still returns blocks: the height is
+the session's and never the function's, because a per-frame height makes the footer the
+second thing beside the prompt that pushes the transcript (§6k.3). `b.row` already gives the
+horizontal layout inside a row, so *chrome-as-blocks* was the half of the option this design
+already had. **Measured for this section**: at 24 rows the three lines plus a one-row header
+and a two-row prompt leave 18 for the transcript, which is the trade the drawing under
+*The three lines* accepts; at 12 rows nothing composes — the size gate holds at 16 and the
+fallback says so. **What it does not give this design is A7**: the activity region is
+variable-height and *between* the transcript and the prompt, which is a fifth region and not
+a footer, and §23's sentence that a fixed row cannot satisfy it still stands.
+
 ### What transfers unchanged
 
 **Themes recolour everything**, which is C10's job here and already ruled — a theme declares

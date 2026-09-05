@@ -141,7 +141,8 @@ type Group    = Readonly<{ kind: "group"; id: string;
 type Raw      = Readonly<{ kind: "raw"; id: string; text: string }> & Gap;
 
 type Series   = Readonly<{ values: readonly (number | null)[];   // `null` is a gap (I46a, C12 I4)
-                           label?: string; tone?: Tone }>;      // and no `marker` — I76's last clause
+                           label?: string; tone?: Tone;         // and no `marker` — I76's last clause
+                           hidden?: boolean }>;                  // appearance, never geometry (I99)
 type PlotForm = "line" | "sparkline" | "heatmap";
 type Plot     = Readonly<{ kind: "plot"; id: string;
                            form: PlotForm;
@@ -242,6 +243,55 @@ type BarSpec = Readonly<{
 A *sequence* of blocks — a document's top level, a `panel`'s children, a `column`
 group's children — occupies `Σ` of the above **plus one row for each block
 declaring `gapBefore`** (§3a). No block's own height includes its gap.
+
+### `hidden` — an appearance member, on a series and on every annotation arm
+
+`Series.hidden?: boolean`, and `hidden?: boolean` on each of `Annotation`'s four arms (I99). The
+widget design (`docs/notes/CALCIUM_WIDGETS_DESIGN.md` §3a) bound `series[].hidden` and
+`annotations[].hidden` on **no type** — F748, measured 2026-09-04 — and this is the member it
+was binding to.
+
+**It is appearance, on §5's axis.** A hidden series still holds its rows: `measure` reads the
+block's geometry and `series` is structurally unreachable from it (C12 §2), so `measure(block, w)`
+is equal with and without the member at every width (T1.27), and the same holds for an
+annotation. What changes is what is *inked* — the series' layer is not rasterised, its callout
+(C12 I48), its readout line (C12 I37) and its point labels (I63) are not written, and its legend
+entry is **kept**, with a mark that says *not drawn* (C12 I116). **The axis does not move**: the
+range is measured over every series, hidden ones included, for C12 §3aq's reason — a toggle that
+rescaled would move the curves the reader is comparing the hidden one against, and the gutter
+sized from that range would move the plot area with it.
+
+**Refused, at both gates, where a series is not a layer.** `HAS_HIDEABLE_SERIES` is a new total
+record over `PlotForm` and **not** a reuse of `HAS_CALLOUT` or `SHARES_CELLS`, on I61's rule — a
+total record is a complete answer to *its* question and to no other. The question here is *does
+removing one series move nothing else*: true where `positionalForm` composites series into
+shared cells (`line`, `scatter`, `step`, `ecdf`, `density`, `slope`, `bubble` — the same seven
+`HAS_CALLOUT` names, by coincidence of membership rather than of meaning), false where a series is
+a row, a slice, a band or a stack layer — a `bar`'s categories, a `pie`'s shares and a
+`stackedarea`'s cumulative heights all change geometry or meaning when one goes, so *hidden*
+would mean *recomputed* there and that is a different member. `hidden` on such a form is refused
+rather than ignored (F207), and a non-boolean is refused on any form. An annotation's `hidden` is
+accepted wherever annotations are, because an annotation is already a layer drawn behind the data
+(I52) and removing it moves nothing.
+
+**The producer's default, with the reader's override above it.** `hidden` is what the document
+says; C22 I78's `SeriesVisibility` is what the reader has since done, per entry and block, and
+the renderer reads the override first — `scrollOffsets` over `follow` (§3c) is the same
+relationship, and for the same reason: view state is never written back into the block.
+
+#### The walk — a classification table, because the member has no events of its own
+
+| # | cell | rules meeting | ruling |
+|---|---|---|---|
+| 1 | `hidden: true` on the block × the store says *shown* | I99 × C22 I78 | the store wins and the block is untouched; a `replace` patch carrying `hidden: true` again is a new default under an override that still holds |
+| 2 | every series hidden | I99 × C12 I2's *No data.* | **not** *No data.* — the frame, the axis, the gutter and the legend draw and the area is blank. `hasSamples` is a question about the data, and the legend is how the toggle is undone by eye |
+| 3 | hidden × `yCallout: "last"` | I99 × C12 I48 | no callout for that series; the right column keeps the width it had, because the column is sized from every series (geometry) and the callout is ink |
+| 4 | hidden × a crosshair | I99 × C12 I37 | the readout omits that series' `label: value` — a number for a curve that is not on screen is not on screen |
+| 5 | hidden × `pointLabels` | I99 × I63 | not drawn; they name samples that are not there |
+| 6 | hidden × the 1-bit stacked arm | I99 × C12 §5 | the strip keeps its band and its gutter label and draws no ink — the band is geometry, the ink is appearance |
+| 7 | `hidden` on `bar` | I99 × `HAS_HIDEABLE_SERIES` | refused at both gates, with the form named |
+| 8 | `hidden: "yes"` | I99 × I46 | refused; JSON carries a boolean and a document says one |
+| 9 | an annotation `hidden` with a `label` | I99 × I52 | the legend row keeps the label with the *not drawn* mark; the line is not drawn |
 
 ### 3a. `gapBefore` — the one field that is vertical rhythm
 
@@ -2870,6 +2920,7 @@ persisted document rests on.
 - **I96** — **The list indent is bounded at three levels and `Glyph.nested` says which side of the bound an item is on.** The bound stays on a measurement rather than on its first reason: with the cap removed, at width 40 an item past about depth 15 loses its indent entirely — the leading spaces are the wrapper's break, the first row is the mark alone, and a deep item reads as depth 0 having spent a row saying nothing. A width-scaled cap is not available, because the indent is computed where no width exists and none may be read. **What the cap cost is a document that means two things**, so depth 0–3 take `bullet` and everything deeper takes `nested`; past it the frame says *at least this deep* and no more, which is what a bounded region says — a residue marker does not report how many characters it dropped either (I49). **The ordered arm takes the mark too**, because a number says which item and never how deep. `⁃` (U+2043) is Neutral where `◦`, `‣` and `▪` are Ambiguous; the ASCII half is `~`, §5's own bounded-region mark, and not `-`, which is `bullet`'s and would spend the distinction at the rung that needs it (→ C09 I41, §3an).
 - **I97** — **`Scroll.follow` is a producer's field and the tail is view state: the field says *start following*, the store says *still following*.** A streaming container opens at its tail because the producer said its content grows at the end — a property of the content, and the one thing about position a producer may say, where `lineRange`, `minHeight` and `capped` (I82) describe the *view* and are refused. Whether the reader is still there is derived from where the box ended up and never from which way they scrolled (C14 I5's rule, one level down): an offset at or past the ceiling **is** the tail; the store spells *stay there* as `TAIL` (`∞`) so the clamp at read keeps a following box at the bottom as its content grows **with nothing written on a patch** (§3c cell 4, C23 I47); a page up from the tail resolves the held value — `TAIL`, or the tail an untouched follow box implies, which the caller states because the store does not know the block — against the ceiling the caller measured, and the follow stops because the position is no longer the bottom; a page landing at or past the ceiling snaps to `TAIL` and it resumes, for a box that never declared `follow` too. `measure` never sees `follow` — the box is `height` rows at every offset, following or not, so the rows above it do not move when its content does. While following the hidden rows are above the box and I49's row reads *N above, 0 below*. Both `wasAtBottom` comparisons — the document view's and the store's — are one function (`atTail`), so `>=` cannot drift to `>` in one of them (§3c, the tail).
 - **I98** — **A scroll declaring `collapsed` has a collapsed form: zero interior rows and the residue row, which is the whole of what it draws.** *Declares* means the field is present, either value; a scroll without it has no collapsed form and carries no affordance. Collapsed, the box draws I49's row alone — *⋯ 0 above, N below*, the design's *+N more* sharing the residue's mechanism rather than a fourth count string — and `measure` is 1 at every width. Its elements are still one per child (I47) in content coordinates (§3c cell 8), and each carries `activate: { kind: "expand", target: <block id> }` so `⏎` on any of them toggles the fold. **The toggle is a shell-origin `replace` with `collapsed` inverted** (C13 §2) and never `op: "expand"`, whose arm names a row and refuses a scroll (C25). A block declaring a collapsed form is what `expand` widens to in the dispatcher: rows first, then blocks at any depth (§3c S5) — and from a settled entry it is C23 I18's one exception, because revealing held data is not acting on stale data (§3c S4).
+- **I99** — **`hidden` is an appearance member on `Series` and on every `Annotation` arm: a hidden series holds its rows, is not inked, keeps its legend entry, and does not move the axis — and it is refused where a series is not a layer.** `measure` is equal with and without it at every width, because `series` is structurally unreachable from the height (C12 §2). What a hidden series loses is its ink — the rasterised layer, the callout (C12 I48), the readout line (C12 I37), its point labels (I63) — and what it keeps is its name in the legend with a mark that says *not drawn* (C12 I116) and its place in the range, so the curves beside it do not move when it goes. `HAS_HIDEABLE_SERIES` is the total record that says where a series is a layer — the positional seven — and both gates refuse the member elsewhere rather than ignoring it (F207), because *hidden* on a `pie` or a `stackedarea` would mean *recomputed*, which is a different member. A non-boolean is refused on every form. An annotation's `hidden` is accepted wherever annotations are (I52). The reader's override sits above the producer's default in C22 I78's store, and nothing writes it back into the block (→ C12 I116, C22 I78, §3 *hidden*).
 
 
 ## 7. Commitments
@@ -2967,6 +3018,7 @@ persisted document rests on.
 88. **An image's carrier takes a GIF, and the frame is view state** (I93). The signature decides the codec; the declared height keeps every frame the same geometry.
 89. **A heading is three tiers and the type carries three** (I94). Six ATX levels had one form and the fix is a member, but a member the renderer draws identically is the defect it was meant to close — so the fill is the axis, the forms were chosen against frames at 80 and 40 in both alphabets, and the collapse of `###` through `######` moves to the translator where it can be read (→ C09 I40).
 90. **A quote's gutter is a rail rather than a mark, and the character was measured rather than reached for** (I95). A glyph draws on the first row and a quotation needs every row, which no count of assertions would have said and one frame did; `▌` was the obvious character and is two cells on a terminal that draws ambiguous wide, where `⎸` is one under both. And a quoted heading is text, because one notice has one glyph and three of the kinds a body could hold have none (→ C09 I41).
+92. **A series or an annotation can be declared hidden, hidden is appearance, and the member is refused where it would have to mean something else** (I99). The rows stay, the ink goes, the name stays with a mark, the axis holds; `HAS_HIDEABLE_SERIES` says where, and both gates refuse the rest.
 91. **The depth cap keeps its place on a measurement, and the clamp is marked** (I96). The recorded reason was that an unbounded indent is unreadable; measured, it is not wide but *absent*, because the wrapper eats a long run of leading spaces. The cap therefore stays, and the frame at it stops meaning two things: `nested` past the bound says *at least this deep*, which is all a bounded region ever says (→ C09 I41).
 
 ---
@@ -3003,6 +3055,7 @@ Six tiers. No state machine, so no transition table.
 - **T1.23** (I84): a `notice` whose `spans` are sorted, non-overlapping, integer and in range validates clean, and the same document with `spans` absent validates clean — the accept half, so T1.24's refusals are not a validator that refuses everything.
 - **T1.24** (I84): each malformation is refused with **one error naming the span's index** — a non-integer `from`, a negative `from`, `from === to`, `from > to`, `to` past `text.length`, two spans out of `from` order, two spans that overlap by one unit, a boundary between the two halves of a surrogate pair, and an unknown attribute — nine documents, nine errors, and a tenth carrying all nine faults reports nine.
 - **T1.25** (I83): for every width in the golden sweep, `measure` of a `raw`, a `notice`, a `rule` and a one-column `table` is the **same number** with `spans` and with the same block stripped of them — the assertion is on the pair, so a measurer that started reading `spans` fails here before any frame does.
+- **T1.27** (I99): a two-series line plot measures the same height with `hidden: true` on one series, on both, and on neither, at widths 20, 40 and 80; an annotation `hidden` likewise. In `test/unit/plot-hidden.test.ts`.
 - **T1.26** (I87): a document carrying spans on all four members satisfies §5a's round trip: `validateDocument(JSON.parse(JSON.stringify(d)))` is valid and structurally equal.
 
 ### Tier 2 — contract / interface
@@ -3093,6 +3146,7 @@ The generic suite. **These run against every registered block kind, including ap
 - **T3.64** (I84): a span whose `to` falls between the base and the combining mark of `é` (decomposed) snaps to the cluster's end — the painted row composes the same glyph, and `cells()` of the painted row's text equals `cells()` of the plain text; the same for a boundary inside a ZWJ family emoji.
 - **T3.65** (I86): a `notice` at width 1 whose span covers a CJK glyph the wrapper substitutes with `?` paints `?` inside the span's SGR, and the row is one cell.
 - **T3.66** (I84): spans on a `Cell` are offsets into `text`, not into the glyph-prefixed body — a cell with `glyph: "ok"` and a span at `[0, 3)` styles the first three characters of `text`, not the glyph and a space.
+- **T3.68** (I99): `hidden: "yes"` on a `line` series is refused naming the series index; `hidden: true` on a `bar` series is refused naming the form and I99; `hidden: false` on `bar` is refused too, because the member is the claim and not its value; `hidden: true` on a `band` annotation of a `bar` plot is accepted. `HAS_HIDEABLE_SERIES` is asserted total over `PlotForm` and true on exactly the seven positional forms. In `test/unit/plot-hidden.test.ts`.
 - **T3.67** (I85) — **the accepted loss, asserted so a change is visible.** At 1-bit an `ok` notice (emphasised → bold) with a bold span paints a frame byte-identical to the same block without the span; at 8-bit the two differ. A row that starts failing is a compensation that has been added, and the ruling says there is none.
 
 ### Tier 4 — integration
@@ -3155,6 +3209,7 @@ The generic suite. **These run against every registered block kind, including ap
 - **T6.82** (I84): dropping the overlap check from the gate → T1.24's overlap document validates and the row fails on its count; dropping the surrogate check → the surrogate document validates and the row fails.
 - **T6.83** (I86): slicing wrapped spans by prefix sums of row lengths instead of by source `start` → T3.62 fails on the second row, one unit early, and T1.25 still passes — which is why T3.62 asserts bytes.
 - **T6.84** (I85): mapping `**` to a palette slot instead of to `bold` → T2.31 emits a colour parameter where `1` is asserted, and T3.67's 1-bit pair is no longer identical.
+- **T6.86** (I99): dropping the `HAS_HIDEABLE_SERIES` arm from `validateBlock` → T3.68's `bar` row fails; dropping the boolean check → its `"yes"` row fails. `tools/mutate/runs/c22-series-visibility.mjs` carries both with their anchors.
 - **T6.85** (§3am): reverting the translator to literal markers → T2.33 fails on `text`; adding a text-only `ViewPatch` arm → T1.26 still passes and **nothing fails**, which is the row that says the closure in I87 is by type and the day the union widens this row wants a test.
 
 ---

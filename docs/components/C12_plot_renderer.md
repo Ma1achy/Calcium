@@ -7978,19 +7978,33 @@ declares** (C26 §4a row 1 says so in as many words). So a plot could never be f
 binding could never fire, and the store could never be written: **`cursorPositions` again in a
 different coat**, with every reference present and the seam broken.
 
-**So a `plot` declares one block-level element, and exactly when it has a camera.**
+**So a `plot` declares one block-level element, when it has a camera or can take a cursor**
+(I85 — the second arm arrived with the crosshair's writer, C22 I76, and this paragraph said
+*exactly when it has a camera* for a release after the invariant stopped saying so).
 
 ```
-block.camera === undefined   →  no elements. The block is atomic, as it has always been
-block.camera !== undefined   →  one element, level "block", the whole plot
+no camera, not cursorable   →  no elements. The block is atomic, as it has always been
+a camera, or cursorable     →  one element, level "block", the whole plot
 ```
 
-**Gated on the member rather than on the form**, and the reason is what an element *is*: a thing
-a reader can act on. A plot with no camera affords nothing — there is no view to turn — and
-`table` already declares elements only when it has rows. **It is also what makes the blast
-radius nil**: no block in the tree declares a camera, so no document gains a focus stop and no
-shipped frame moves. A rule that changed every plot would be a navigation change smuggled in
-under a rendering one.
+**Gated on what a reader can act on rather than on the form**: a plot with no view to turn and
+no sample to point at affords nothing, and `table` already declares elements only when it has
+rows. **The element spans the block and the plot area does not**, and that gap is the whole of
+the pointer's problem: a click carries a block column, the crosshair is an index into the data,
+and `sampleIndexAt` (§3s) is how one becomes the other — through the same layout the frame was
+drawn with, never a second copy of it.
+
+**And a focused plot draws its frame in `accent`** (C26 §7). The frame's cells — lid, side rules,
+bottom rule, corners — are reserved by the data whether or not focus is on the block, and the
+element exists only where the frame does (I85 gates on `plotFrame !== "none"`), so there is
+always something to carry it and the tone is the only thing that moves: no row, no cell, no
+gutter changes, and the y-labels keep `muted` — the enclosure lights up, not the scale. Measured
+at 80 columns: seven rows differ (the lid, five area rows, the bottom rule; the x-label row does
+not), 164 cells, every one a frame glyph — the blank between a label and its edge is
+kept out of the edge's span — and only in their SGR. At 1-bit the
+carrier is `accent`'s mono class — bold where the frame was dim — a weight rather than a colour
+(F34). `Layout.focused` is how the furniture learns it, set in `reserving` from `ctx.focus`, which
+is the one place a layout already meets the block.
 
 **C26 §4a's table gains a row rather than being corrected in passing** — *the only kind
 declaring `elements`* was true when it was written and this is what stops it being true.
@@ -9342,6 +9356,103 @@ than furniture beside it.
 
 ---
 
+## 3aq. A hidden series — not drawn, still named, and the axis does not move
+
+C04 I99 gives a series and an annotation a `hidden` member and rules it appearance; this section
+is what the renderer does with it, and with the reader's override that arrives beside it in
+`RenderContext.seriesVisibility` (C22 I78). Four decisions, each measured before it was made.
+
+**What a hidden series is: a layer that is not rasterised.** `overlaidRows` builds one `Layer`
+per series and merges them per cell (§3u); a hidden series contributes no layer, and *its index
+is kept* — `refOf(s, index)` is what colours the others, so filtering the list would recolour every
+series after the hidden one. The 1-bit stacked arm keeps the strip's band and its gutter label
+and rasterises nothing into it, because the band is geometry (I7) and the ink is not. The callout
+(I48), the readout (I37) and the point labels (I55) are ink about that series and go with it.
+`hidden` on an annotation removes its rows from the `context` layer and nothing else.
+
+**The legend keeps the entry, and the mark is `glyphs.hollow`.** Measured: a legend entry is
+`${mark} ${label}` where `mark` is `markOf(seriesIndex, caps)` — the series' own glyph, descending
+the capability ladder with the figure (§3g, I29). A hidden series keeps its label and its slot
+colour and takes `hollow` (`○`, `o` at ASCII) in the swatch — an outline for a curve with no ink.
+**A mark rather than a tone**, on I6's rule: colour is never the only channel, and at one bit
+the tone is gone while the swatch is exactly the column that survives. The design note drew the
+toggle as *a legend that clicks* (`CALCIUM_WIDGETS_DESIGN.md` §8 step 2); what this lands is the
+keyboard half C02 requires of every pointer affordance, and the click is owed under the symbol
+`legendHit`. **The entry must stay nameable or the toggle cannot be undone by eye** — a legend
+that dropped the row would leave the reader pressing digits at a list that no longer numbers the
+way the keys do.
+
+**The axis does not rescale, and that is a ruling rather than an omission.** Three reasons, in
+order of weight. *Comparability*: the reason a reader hides a series is to look at the others
+against the scale they shared with it, and a range recomputed without it moves every remaining
+curve on the toggle. *Geometry*: `layoutFor` sizes the gutter from the range, so a rescale can
+change the gutter width, move the plot area and the legend column, and change which x ticks fit —
+appearance that reads as a different plot. *Parity*: matplotlib's `Artist.set_visible(False)`
+does not `relim`, so a toggled legend there leaves the axes where they were unless the caller
+asks for an autoscale — stated from the library's documented behaviour rather than a measurement
+in this repository, because `docs/notes/CALCIUM_PLOT_PRIOR_ART.md` has no line on visibility
+(grepped `visible`, `hidden`, `set_visible` — 0 hits, 2026-09-05). So `seriesRange` is called
+over every series, and a hidden one still pins the extent.
+
+**Every series hidden is not *No data.*** `hasSamples` asks about the data and the data is
+there; the frame, gutter, axis and legend draw and the area is blank. *No data.* would take the
+legend with it, and the legend is the only thing on screen that says which digit brings a series
+back.
+
+### The digits — `keymap(block)` and the first `BlockKeymap` producer
+
+`plotDefinition.keymap(block)` declares `1` … `min(9, series.length)` → `toggleSeries1` …
+`toggleSeries9`, and L4 merges it through `Keymap.mergeBlock` when focus lands on the plot and
+withdraws it when focus leaves (C16 I27, C22 I78). **Measured against `defaultKeymap`**: no digit
+is bound at `global` or `liveBlock` (76 rows, none named `1`–`9`), so every digit lands at
+`liveBlock` and fires from the first `↓` — the reader steps into the plot and presses `2`, with
+no `⏎` (A01 D4). A one-series plot declares `1` alone, so `2` on it is *unbound* rather than a
+no-op — `/help` lists exactly the digits the plot has. **This is `mergeBlock`'s first production
+caller and `BlockKeymap`'s first producer**, which is what C26 T2.6a was written to detect; the
+digits collide with nothing, so `interaction` still carries no binding and C26 §8b.8's ruling
+stands on the placement fact rather than on the no-producer fact.
+
+**`keymap?` on `BlockDefinition`, beside `elements?`, with `elements?`'s own argument**: an absent
+member cannot be deleted by a later edit while a branch returning `[]` can, so a kind with no keys
+omits it. The declaration takes the block and nothing else — no width, no context — because a key
+table that varied with the frame would be one the reader could not learn.
+
+### The walk — both artefacts, because the member has structure and the store has events
+
+Classification, at rest (rules that both hold):
+
+| # | cell | rules meeting | ruling |
+|---|---|---|---|
+| A1 | block `hidden: true` × store `shown` | C04 I99 × C22 I78 | drawn; the override reads first |
+| A2 | every series hidden | I99 × I2 | frame, axis, legend; blank area (above) |
+| A3 | hidden × `yCallout: "last"` | I99 × I48 | no callout; the right column keeps its width |
+| A4 | hidden × a crosshair | I99 × I37 | the readout omits that series; the cursor still marks the column |
+| A5 | hidden × 1-bit stacked | I99 × §5 | band and label kept, no ink |
+| A6 | the plot's `1` × `defaultKeymap` | I27 × the measured table | no collision, `liveBlock`, fires without `⏎` |
+| A7 | a one-series plot × `2` | `keymap(block)` × I27 | unbound — nothing is declared for a series that does not exist |
+| A8 | a hidden annotation × its `label` | I99 × I52 | the legend row stays with `hollow`; the line is gone |
+
+Trace, event-mediated:
+
+| # | sequence | ruling |
+|---|---|---|
+| B1 | focus a two-series plot → `2` | series 2 not drawn, legend row 2 reads `○ val`, the frame's other ink is byte-identical |
+| B2 | B1 → `2` | back to the frame before B1, byte for byte |
+| B3 | B1 → `tab` away → `tab` back | still hidden — the override is per entry and block and focus is not in it |
+| B4 | B1 → the far side `replace`s the block with one series | the override for index 1 is **kept** and inert; the frame is the one-series frame. C23 I47's rule: a store corrected on every patch is one that accumulates, so it is ignored where read and never fixed up where written. If a second series returns, the override resumes — named as the residue this leaves |
+| B5 | B1 → `←` | the crosshair appears and the readout names series 1 alone |
+| B6 | B1 → `↑` out of the plot → `1` | nothing: the keymap was withdrawn with focus, and `1` at the prompt is a character |
+
+### Tests — the rows are declared in §9; this is what each asserts
+
+- T1.126 (I116): `keymap(block)` on a three-series plot declares `1`, `2`, `3` and nothing else; on a one-series plot `1` alone; on a twelve-series plot nine; on `series: []` nothing.
+- T1.127 (I116, C04 I99): a two-series line plot rendered with `hidden: true` on the second — the frame differs from the unhidden frame, the gutter labels are identical (the axis held), the legend's second row carries `hollow` and the label, and the callout for the second series is absent while the right column's width is unchanged.
+- T1.128 (I116): every series hidden draws the frame and the legend and no curve ink; the same block through the store override (`seriesVisibility`) rather than the member draws the same frame; a block with `hidden: true` and an override of `false` draws the unhidden frame.
+- T3.20 (I116): at `colourDepth: 1` a hidden series' strip keeps its band and label and draws no ink; a hidden annotation's line is gone and its legend row remains.
+- T6.93 (I116): removing the hidden filter from `overlaidRows` → T1.127 fails; removing the `hollow` arm from `legendEntries` → T1.127's legend row fails; removing the override read → T1.128's override row fails; removing `keymap` from `plotDefinition` → T1.126 fails. `tools/mutate/runs/c22-series-visibility.mjs`.
+
+---
+
 ## 3s. The cursor's column — what C12 owns of a crosshair, and what it does not
 
 A readout naming four values says *what this mark is*. It does not say **which** mark, and
@@ -9412,6 +9523,38 @@ bars.length⌋` — but it is the *pitch and the left-alignment* that make one r
 
 Out of range — a cursor past the data — draws **neither** mark, which is the same statement the
 readout's four dashes make.
+
+### The pointer half — the second writer, and the mapping inverted rather than copied
+
+**A click or a drag over a cursorable plot sets the same store** (`CursorPositions.set`, C22 I76;
+C16 §4a's gesture table): the pointer is the second writer and there is no second store. What the
+pointer has that a key does not is a column, and the column is in the **block's** coordinates — the
+element `elements()` declares spans the whole block (I85) — while the crosshair indexes the
+**data**. Between the two sit the alignment pad (§3ab), a left legend's reserved column, the gutter
+and the area's own placement rule, and every one of them is already computed once for the frame.
+
+**So the inverse is a search through the forward map, not a second formula.** `sampleIndexAt(block,
+width, ctx, col)` lays the plot out exactly as `positionalForm` does — `positionalLayout` is one
+function both call — subtracts the pad, the legend column and `layout.gutter` to reach an area
+column, and answers the index whose `cursorColumn` is nearest to it, the lower index on a tie. A
+candlestick's bucketed placement and a left-facing axis are then right for free, because the
+function being inverted is the one that placed the mark; a second copy of the arithmetic would
+agree until either moved, and the table above is what a copy would have had to track.
+**Measured at 80 columns, five samples, a two-digit gutter**: the samples sit at block columns 4,
+23, 41, 60 and 78; a click at 41 answers 2 and the `▲` lands under the pointer; a click at 32 — nine cells from
+23 and nine from 41, a tie — answers 1 and the mark moves to 23, the lower index and the column
+the readout's value was drawn at. The mark follows the data and not the mouse.
+
+**Outside the area is nothing for the cursor**: a column in the gutter, under a legend, in the
+alignment pad or right of the frame answers `null` and the crosshair stays where it was — the
+click still focuses the plot (C16 §4a), because the element is the block. Inside the area every
+column answers, so a click past the last sample's column lands on the last sample: the clamp
+C22 I76 puts in the effect is here the nearest-sample rule, and nothing stores an index the
+readout cannot print.
+
+**The pointer changes nothing about what is drawn.** I37's two marks, the readout row and
+`cursorColumn` are untouched; the writer differs and the frame does not. §10's row now defers
+zoom and hover only.
 
 ---
 
@@ -10523,6 +10666,7 @@ would have to be re-run rather than extended.
 - **I113** — **The right margin is grown to fit what is drawn in it, and a glyph's advance is a bound rather than an estimate.** The callout (I48, I81) and the right-hand value labels (I47) share one column in the SVG arm, so `rightRoom` reserves the **maximum** of the two — `definition.ts`'s `right = sides.right ? max(wanted, calloutWidth(...)) : 0` in pixels — grown from `width · pad`, capped at `width / 3`, and **zero where neither is drawn**, so a figure with nothing to reserve for does not move. Past the cap the string is cut with an ellipsis by `fitLabel`, which is the half §3ak.41 wrote with no instance and `line-both-axes-narrow` supplies: 36 characters wanting 281 px in a 25.6 px margin, of which **two were on the page**. **Measured before the rule**: 13 strings in 7 of 244 committed frames past their own `viewBox`, the worst 240.5 px — 38% of the figure — and the right-hand `100` among them, which is why the reserve is not the callout's alone. **`SVG_EM_MAX = 0.65` is an upper bound over measured faces and not one font's metric**: `font-family="monospace"` is generic, so the face is the renderer's choice, and the advance measured over six of them runs 0.6001 (Courier New, Andale Mono, Monaco) to 0.6182 (SF Mono) — every one of them **above** the 0.6 the constant carried, in the one direction that clips. It is used for reserving and for fitting, both of which want the bound; the cost is 4.6 px of blank on the corpus's widest string and the falsification is stated — a face above 0.65 clips again. **The room takes no theme**, because `area()` is called from the marks walk and from the axis emitter and a room that differed between them would draw the data against a different box than the furniture, silently and with every arithmetic assertion passing (→ I47, I48, I81, §3ak.41, §3ak.49).
 - **I114** — **In the SVG arm too, a callout displaces the right-hand value label it lands on and never the left's — and the row it lands on is carried out of the walk rather than derived a second time.** I48's first two clauses carry across the change of units unchanged, because their reason is what a reader needs and not what a cell is; its third — *two on one row, the later wins and a one-cell `+`* — does **not**, because both alternatives it rejected were rejected for reasons a fixed `viewBox` does not have (`+N` needs the width being sized; a second row *changes the count and breaks I1*). **A row is `|y₁ − y₂| < SVG_FONT_SIZE`**, a bound rather than a measurement on `SVG_EM_MAX`'s own argument: a glyph's ink is inside its em box, so baselines a full em apart cannot overlap and anything closer may — erring by at most half a glyph, in the direction that suppresses a number a reader can still get off the axis rather than smearing two into `90012`. **The row is ink and therefore carried, not shared.** `rightRoom` is the precedent for the column's *width* and the wrong precedent for its *rows*: the width is a pure function of the figure and the row is the last point of the last non-annotation polyline taken through `projected`, which exists only inside `walk` — so `walk` fills a second mutable collector at the site where the text is pushed, past both `continue`s, and the axis emitter reads it. The cost is stated rather than hidden: two functions gain a parameter, and `plotToSvg`'s call order stops being incidental. **A second pure derivation was refused**, because that is exactly the mechanism §3ak.49 records for `fitLabel` — one product written twice, disagreeing at equality. **The gridline of a suppressed label is still drawn**, which is what the decision leaves behind and is a cell neither walk artefact indexes. **Measured before the rule**: 10 overprinting pairs in 6 of 212 drawn frames, every one of them a callout on a right-hand tick label, and every one of them inside its own `viewBox` — so `RM1` agreed with all ten. **Stated blind spots, two**: a callout against a *legend* row is real and not ruled here (4 pairs in 2 frames, F726), because I48's own *a callout does not replace the legend* makes that the legend's placement question; and two callouts against each other keeps I81's blind spot, with zero instances measured and the pixel-only third option named as `calloutNudge` (→ I47, I48, I55, I81, I113, §3ak.50).
 - **I115** — **The right margin is a band with three writers, ordered outward from the box, and each anchors on the previous one's outer edge rather than on the box's.** `area()` takes the value column's reserve **and** the legend's band off one edge, and every writer in the band was anchored to that edge — so the value labels and the callout were drawn on top of the legend while the reserve grown for them stood empty at the canvas: 180.8 px taken on `line-callout-multiseries`, 52.8 px of it unreachable, with `99.12` painted through `alpha`. **The order is the column and then the legend**, because a value label names a tick and has to stay beside it while a legend names identities rather than coordinates. So the labels and the callout keep `box.right + LABEL_GAP` and the legend's `originX` becomes `box.right + rightRoom(figure, layout) + 12` — which is `box.right + 12` unchanged wherever there is no column, and that is **81 of the 83 frames** in the corpus that carry a right-placed legend. **The cut moves with the anchor**: a right-hand label and a callout are `fitLabel`-cut to the column's outer edge and no longer to the page, which is *the same number* on every figure with no legend beyond the column (`box.right = width − rightRoom` whenever the cap binds) and is what stops a capped callout writing across the band the legend was just moved out of. **This is not I48's clause and does not need it**: the ruling displaces nothing, so it is licensed under both readings of *a callout does not replace the legend*, and a sentence that licenses a decision either way is not the sentence that decided it. **Measured before the rule**: 2 overprinting pairs in 2 of 244 frames — F726 recorded four in two, and the other two were a right-hand tick `100` **I114 does not draw**, 2.415 px from the callout that suppresses it. **Measured after it**: 2 frames move, nothing leaves the `viewBox`, and the widest text ends at 640.00 on a frame that does not move. **Stated blind spot**: the legend has **no `fitLabel` at either anchor**, so an entry wider than its band runs off the page — the tightest slack in the corpus is 18.80 px, and the missing verb is owed under the name `legendFit`. *The tick-against-legend half is not instanced and is not absent: I114's suppression is what hides it, so it returns the day a callout is short enough to leave the top tick drawn* (→ I47, I48, I113, I114, §3ak.50f).
+- **I116** — **A hidden series is a layer that is not rasterised, with its index kept, its legend entry kept under `glyphs.hollow`, its callout, readout and point labels withheld, and the axis unmoved — and the plot declares the digits that toggle it.** `overlaidRows` and the stacked arm skip the layer and keep the slot (`refOf(s, index)` colours the rest); the legend keeps the label and the slot colour and puts `hollow` in the swatch, a mark rather than a tone because colour is never the only channel (I6) and one bit is where the toggle must still read. `seriesRange` runs over every series so the remaining curves do not move on the toggle and the gutter does not resize. Every series hidden draws the frame, axis and legend with a blank area, never *No data.*. `RenderContext.seriesVisibility` is read before `Series.hidden` (C22 I78). `keymap(block)` declares `1` … `min(9, n)` → `toggleSeriesN`, merged at `liveBlock` because no digit is a built-in — measured — and withdrawn with focus (C16 I27, A01 D4); the SVG arm honours the member and cannot see the store (→ C04 I99, C22 I78, §3aq).
 
 ## 8. Commitments
 
@@ -10643,6 +10787,7 @@ would have to be re-run rather than extended.
 111. **The ribbon's interior is the shade, chosen on the one-bit frame rather than the 24-bit one** (I111). Both candidates were drawn; the one that carried bar-against-ribbon in an attribute lost it where attributes are dropped, and the one that carries it in the glyph is also the half-opacity fill the references draw (§3ap.2).
 113. **The SVG arm sizes its right margin the way the terminal sizes its right column, and its glyph advance is a bound** (I113). Both arms now answer *does the callout fit* before the layout exists; the margin serves the value labels drawn in it as well as the callout, past the cap the string is marked, and `SVG_EM_MAX` is the widest advance measured over six monospace faces rather than a guess at one (§3ak.49).
 114. **The right column's *width* was one question and its *rows* are another, and only the first could be answered by a shared pure function** (I114). The callout displaces the right-hand value label it overlaps and never the left's — I48's clause in this arm's units, with the third clause's conclusion refused because its reason was I1's row count and there is no row count here. What made it look unfixable is that the row is **ink**: `rightRoom` could be shared because a width is a function of the figure, and the row is the last point of a polyline inside the marks walk, so it is handed out through a collector rather than derived again. Ten overprints in six frames, all inside their own `viewBox`, so the geometric row that exists could not see one and `RC1` is the row that can (§3ak.50).
+116. **A hidden series keeps its slot, its name and its place in the range, and loses only its ink; the plot itself declares the digits that toggle it** (I116). The mark is a glyph and not a tone, the axis holds, an empty plot is a frame and a legend, and the keymap is the first `BlockKeymap` producer.
 115. **A conflict with nothing to decide it usually has nothing to decide** (I115). F726 read the callout striking the legend as two invariants that cannot both hold, and the remedy it named — *the legend's placement* — was recorded and not given. The frame says otherwise: `area()` subtracts the column's reserve **and** the legend's band from one edge, and then the column, the callout and the legend all anchor on that edge, so 52.8 px of reserved canvas stands empty outside a legend the column is drawn on top of. Nothing has to give. Ordering the band outward from the box moves **2 of 244** frames, and F726's fourth interaction — a right-hand tick colliding with the legend on its own — **is not drawn at all**, because I114 suppresses that tick 2.415 px from the callout (§3ak.50f).
 
 ## 9. Tests
@@ -10868,6 +11013,7 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T1.121** (I57): `TR8` — a single-node tree draws one name, no edge and no notice, **and the three layouts produce identical frames** — the row exists to keep a fixture honest, since a single node discriminates no layout at all.
 - **T1.122** (I57, C04 I64): `TR9` — `value` changes no frame — two trees differing only in it are byte-identical — **and `label: "gc (2.1s)"` does change it**, which asserts the workaround rather than describing it.
 - **T1.123** (I57): `TR10` — every node drawn is named once, no name twice, and every parent sits over the span of its own children — on an asymmetric tree where a midpoint and a first-child position differ, so the two placements are not satisfied by one assertion.
+- **T1.126–T1.128** (I116, C04 I99): §3aq's rows — the declaration, the hidden frame, and the empty-and-overridden frames. In `test/unit/plot-hidden.test.ts`.
 - **T1.125** (I57): `TR13` — the outline's *last child* glyph is read from the **real** sibling list: a node whose later siblings were truncated still draws `├──`, and the last one drawn keeps its `╰──` where the claim is true. **Found by reading the overflow frame** (§3ah.8a), and the row records the arm it could not have been found on — at `unicode: "ascii"` both forms substitute to `+`, so no frame there distinguishes them.
 - **T1.124** (I57): `TR11` — a wide codepoint in a label is measured with `cells()`, and the cell behind it is not written into (§3n, T1.104).
 - **T2.9** (I56): **`HAS_X_TITLE` is re-measured rather than trusted** — every `true` renders its title and keeps `measure === rendered`, every `false` is refused at the gate, and the count of drawing forms is asserted at 26 so the sweep cannot pass against an all-`false` record. This is the row that makes the record safe to edit.
@@ -10957,6 +11103,7 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T3.13**: a series of exactly `width × 2` points → one point per dot column, no downsampling, no interpolation.
 - **T3.17** (I24): on a terminal reporting `ambiguousWidth: "wide"`, a label carrying an ambiguous-width character leaves every row's border in the **same cell column**, across all four gutter paths — positional, categorical, banded, matrix. Asserted by *measuring the rows against each other* rather than by matching a border at a fixed offset, which would pass on a frame where every row is wrong by the same amount. The fixture is shown to respond first: `a→b` is 3 cells narrow and 4 wide, and a label with no ambiguous character passes against a renderer that ignores the capability entirely.
 - **T3.18** (I55): a label wider than the whole plot area is dropped at both candidate positions and marks nothing — there is no survivor to carry a `+`, and a rule that emitted one would be pointing at a label that does not exist.
+- **T3.20** (I116): the 1-bit strip and the hidden annotation — §3aq. In `test/unit/plot-hidden.test.ts`.
 - **T3.19** (I57, I2): `form: "tree"` with no `hierarchy` — refused at both gates, and the renderer called directly draws `emptyRows` at the declared height rather than throwing. The third path is the row, because a refusal at two gates reads as a guarantee at three.
 
 ### Tier 4 — integration
@@ -11070,6 +11217,7 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T6.86** (I110, K2): slices stacked in declaration order rather than by the far end's centre → **SK1 fails** on `a`'s slice order, with every bar height and every crossing count of the ordering pass unchanged. The control for the run is the gap ladder collapsed to none, which restacks every layer and moves SK1's walked positions and every sankey golden.
 - **T6.90** (I113, §3ak.49): six mutations in `c12-svg-right-margin.mjs`, run by hand and each producing the row it names — the shipped state restored, the fixed right margin **and** no cut at the drawing site (→ `RM1`, and `line-callout-both` reads `alp` again); the reserve alone removed (→ `RM2`, `RM3`, `RM4`, `RM5`, and **`RM1` survives**, which is the finding: the fit contains what the missing reserve overran); `SVG_EM_MAX` back to the 0.6 it replaced (→ **`RM1`**, and `G6c5` on the other side of the box, because 0.6 is below every one of the six faces measured); the exact-fit tolerance dropped (→ `RM5`, and `G11a`, which is how the defect was found — `100` rendered as `1…` in a margin sized for `100`); the marks walk given a different room than the axis emitter (→ `RM3`); and the cap removed (→ `RM4`). The control is the advance at 0.2.
 - **T6.91** (I114, §3ak.50): five mutations in `c12-svg-callout-row.mjs`, **run by hand and reported as measured rather than as predicted** — the displacement removed entirely (→ `RC1` `RC2` `RC3` `RC4` `RC5`, and **`RM1` survives**, which is the whole finding: an overprint is inside its own `viewBox`); the threshold widened from `SVG_FONT_SIZE` to four times it (→ **`RC3` alone** — over-suppression leaves no overprint for `RC1` to see, which is what a row asserting only *no collision* accepts); the test *inverted* so the **left** label is suppressed (→ `RC1` `RC2` `RC3` `RC4`); the suppression moved above the `gridded` branch (→ `RC2` `RC3` `RC4`, and **not `RC1`** — the figure loses a gridline and every collision assertion agrees); and the collector detached from the walk, which is the ordering mutation (→ `RC1` `RC2` `RC3` `RC4` `RC5`). **The control is `<` widened to `<=`**, which nothing sees because the corpus's closest contended pair is 2.415 px and its closest uncontested pair 15.29. **Two predictions were wrong and running it is what said so**: the inversion was expected to leave `RC1` standing and does not, and the four-times widening was expected to kill `RC3` at the sparse fixture and did not — at `height: 8` the right column's pitch is 137.6 px, so four times a glyph reaches nothing. `RC3` gained its dense fixture from that survival, which is the mutation pass indicting a fixture rather than a rule.
+- **T6.93** (I116, §3aq): four mutations — the layer filter, the `hollow` arm, the override read, the `keymap` member — each named with the row it kills, in `tools/mutate/runs/c22-series-visibility.mjs`.
 - **T6.92** (I115, §3ak.50f): four mutations in `c12-svg-legend-column.mjs`, **run by hand twice and reported as measured** — the legend's anchor reverted to `box.right + 12`, the shipped defect (→ **`RC7` alone**, and **`RM1` and `RC1` both survive**, which is the finding restated: an overprint between two *different* writers is invisible to a row about one of them); the anchor pushed out unconditionally by `LEGEND_SHARE · width` (→ `RC7` on its no-column half, **and `RM1`**, because 81 uncontended legends move toward the edge and strings leave the page — four rows in all); the right label's cut returned to `layout.width` (→ `RC7`); and the callout's cut returned to `layout.width` at the walk's call site (→ `RC7`). **The last two survived the first pass**, because no frame in the catalogue has a right legend *and* a writer past the cap — the clause was not vacuous, the corpus was — and `RC7` gained two constructed fixtures from that survival: a 48-character `yCallout: "name"` at the default width, cut to 27 characters against 42, and a `0.000123` readout at `svgLayout(160, 200)`, cut to `0.000…` against standing whole. The second fixture is narrow because a **numeric** right-hand label cannot reach the cap at the default width: `formatReadout` writes ~18 characters at worst, 140 px against 213.3. **Two controls, one slot.** The harness's `control` is the mutation whose kill is not in doubt — the shipped defect — because its job is to prove the pass can see a kill; the *survivor* control widens the column's edge by `1e-9`, inside `fitLabel`'s own tolerance, and was run by hand (`+ 12` → `+ 13` on the legend's gap was rejected for it because `RC7` asserts positions and sees a pixel). The run's first version put the survivor in the harness's slot and the harness refused to report (`BlindHarnessError`) — the instrument catching its own misuse, which is what the control pair is for.
 
 ## 10. Out of scope
@@ -11078,7 +11226,7 @@ Six tiers. No state machine — C12 is pure over the block.
 |---|---|
 | Where the numbers come from | C07 adapters, the S-series |
 | Terminal image protocols for real charts | Phase 1B — C02 detects them, nothing uses them |
-| Interactive plots — zoom, hover, the mouse column | Phase 2 · the key writer landed with C22 I76; the index is set by `←`/`→` on a focused plot (§3s) |
+| Interactive plots — zoom, hover | Phase 2 · the key writer landed with C22 I76 and the pointer's with C16 §4a; the index is set by `←`/`→` on a focused plot, and by a click or a drag over its area (§3s) |
 | Axis tick density beyond max/mid/min | Phase 1B |
 | Tone → colour | C10 |
 | Column planning around a sparkline cell | C11 |

@@ -35,7 +35,7 @@ type TuiConfig = Readonly<{
   localHandlers?:     Readonly<Record<string, LocalHandler>>;   // §2a
   commandPolicy?:     CommandPolicy;
   completionSources?: readonly CompletionSource[];
-  chrome?:            Readonly<{ header: ChromeFn; footer: ChromeFn }>;
+  chrome?:            Readonly<{ header: ChromeFn; footer: ChromeFn; footerRows?: number }>;   // §6k — 1..MAX_FOOTER_ROWS, default 1
   blocks?:            readonly BlockDefinition[];
   transport?:         TransportRouter;
 
@@ -621,7 +621,7 @@ Nothing else lives here. The candidates I expected — verb concurrency, exit ar
 
 ## 6. Chrome
 
-The header and footer are **app-supplied functions from a chrome context to blocks** (hook 5, F5). Calcium owns the frame's structure — one row each, fixed position, never scrolling — and the app decides what goes in them.
+The header and footer are **app-supplied functions from a chrome context to blocks** (hook 5, F5). Calcium owns the frame's structure — a header of one row and a footer of `footerRows` (default one, at most `MAX_FOOTER_ROWS`), both fixed in position and never scrolling — and the app decides what goes in them. **The footer's height is declared once per session in config and never returned by a `ChromeFn`** (I79, §6k): a chrome function answers *what is in the rows*, and the session answers *how many there are*.
 
 ```typescript
 type ChromeFn = (ctx: ChromeContext) => readonly Block[];
@@ -631,6 +631,9 @@ type ChromeContext = Readonly<{
   now:     number;      // C22's injected clock, sampled once per frame
   columns: number;      // handed down from C01, never read
 }>;
+
+// Resolved: `footerRows` is always present after `resolveConfig` (§6k, I79).
+type Chrome = Readonly<{ header: ChromeFn; footer: ChromeFn; footerRows: number }>;
 ```
 
 **It took a snapshot alone, and could not render what it is specified to render.** Two more of the same class as §3a's and §8a's, both structural, and both found by writing the default:
@@ -897,6 +900,24 @@ indistinguishably, and **its first observable behaviour would arrive with whatev
 orbit** — which is the day a reader reports a hang. **The counter-example has since been closed
 by I76**, on the same rule it was cited for: `CursorPositions` in `shell/cursor-positions.ts`,
 `←`/`→` at `liveBlock`, and the seventh axis landed together.
+
+**The ninth axis arrived the same way, and it is the first with a block-declared writer** (I78).
+`SeriesVisibility` in `shell/series-visibility.ts` holds, per entry and block, the reader's
+overrides of `Series.hidden` (C04 I99) — an explicit boolean per index, so *shown* can override
+a producer's *hidden* as well as the reverse; `RenderContext.seriesVisibility` carries the entry's
+record; `seriesKey` is the slot's ninth field with **every override in it**, because absent is the
+block's own default and an override to `false` is a different frame from no override. The writer
+is `toggleSeriesBlock` in `construct.ts`, reached through nine `toggleSeriesN` effects from a
+`BlockKeymap` the plot itself declares (`plotDefinition.keymap`, C12 I116) — merged by
+`syncBlockKeymap` at `bound()` before a key is resolved, when the focused block has changed since
+the last merge, and withdrawn the same way. A pull rather than a subscription, because focus has
+no subscription and C26 §5 rules that resolution is a pull; the cost is one identity comparison per
+dispatched key. The store joins `rendered`'s eviction subscription as the fifth entry.
+
+```
+                   read by                    written by                          in a key
+seriesVisibility   plot/definition.ts         construct.ts's toggleSeriesBlock    yes  ← I78
+```
 
 **The pair is the invariant, not the axis** (I71). Either `RenderContext` gains the camera *and*
 something in `src/` can move it, or neither lands. This is I60's own ruling one component along:
@@ -1689,6 +1710,62 @@ protocol hold at rest (the table); a wake, a scroll, an eviction and a stop are 
 - **A frame boundary is observed one `stream` window late** (table row 9), which is C03's window
   doing what it is for and is stated so a reader measuring 133 for 100 knows where the 33 went.
 
+## 6k. The footer's row budget, walked by hand — roadmap entry 29
+
+Two rules meet. *The four regions sum to `rows`* — S01 §3, `heightsSum`, and the reason C01 §5 gives: a frame one row over scrolls the alternate screen, the failure the application cannot see. And *a harness needs more than one footer row* — `AGENT_TUI_DESIGN.md` §16 draws three, and roadmap entries 35, 37 and 15 each want a row the footer has not got. At HEAD `FOOTER_ROWS = 1` was a constant in `frame.ts`, so the three-line footer was **refused by construction rather than unbuilt** (F739). Both artefacts, because the component has structure (which rule owns a row) and a history (what happens when the count changes).
+
+### 6k.1 — measured before ruling
+
+- **24 rows, three-line footer, one-line header, two-line prompt: the region is 18.** §16 accepts that trade by drawing it; at a one-row prompt it is 19.
+- **12 rows: the design says nothing, and nothing here needs to.** The size gate composes no frame below `MIN_ROWS` (16, §4); the fallback says `Needs 60x16`. *What is on screen when it reports* is the fallback, for every budget.
+- **An empty footer today is one blank row.** `makeDefaultChrome`'s footer returns `[]` and `paint.ts`'s `region()` pads to the count it is given, so the default session already spends a transcript row on nothing. Unchanged by this ruling; a budget of zero is not offered (6k.4 E).
+- **A region whose height changes between frames is not a new class for C14.** The prompt already does it on every keystroke and I34 pushes the height from each frame. What would be new is a *second* thing pushing it, and that is what 6k.3 is about.
+- **Two consumers can see the footer's geometry and neither reads the constant.** `chromeClick` (`construct.ts`) classifies any row no entry occupies as chrome, and `overlayRegion` (I28) is the region's own height — so a wider footer is chrome to the mouse and out of reach of a layer with no edit to either.
+
+### 6k.2 — the classification table: which rule owns a row
+
+| # | the cell | rule A | rule B | ruling |
+|---|---|---|---|---|
+| 1 | a budget `b` at `R` rows with a `p`-row prompt | the sum | the budget | region = `R − 1 − p − b`; `b` is a term of the subtraction **and** of `heightsSum`, so the sum holds wherever the region does not clamp |
+| 2 | the budget at `MIN_ROWS` with the prompt at its cap | the size gate (§4) | the budget | region = `16 − 1 − 8 − b ≥ 1` ⇒ `b ≤ 6`, which is `MAX_FOOTER_ROWS` — **derived**, not chosen, and refused at `createTui` rather than at frame time |
+| 3 | footer content taller than its budget | *chrome never scrolls* | the budget | truncated top-down by `region()`, exactly as a one-row footer given two blocks has always been. Geometry never follows content — the rule CLAUDE.md states for `measure`, one row up |
+| 4 | footer content shorter than its budget | the same | the same | padded with blank rows; the default footer at `b = 1` is this cell |
+| 5 | the region before the first frame exists | I34 — compose is the authority | the budget | `initialRegionHeight(size, footerRows)` takes the budget. **`construct.ts` still calls it with one argument** (owed — see 6k.5) and until it passes the budget the first frame corrects the height by `b − 1` rows, which T1.37 measures |
+| 6 | a resize below `2b + 1` between the gate and the frame | the clamp in `compose` | the budget | region clamps at 0, `heightsSum` is false, `render-frame.ts` draws the fallback — the path that exists today at `R < 3`, reached `b − 1` rows earlier |
+| 7 | a click on a footer row | C16 §4a trace 8 | the budget | chrome, for any `b` — `chromeClick` reads *no entry here*, not a row number |
+| 8 | a layer's box against the footer | I28 | the budget | `overlayRegion.height` is the region's, so a layer shrinks with it and cannot cover the footer at any `b` |
+
+Row 2 is the one a reader checking rules one at a time cannot see: the gate's number and the footer's number are correct separately and together they can produce a region of no rows at a size the gate accepted.
+
+### 6k.3 — the sequence trace: what a per-frame height would do
+
+The option on the table was the one the brief for this walk offered — a `ChromeFn` returns `rows` beside its blocks. The trace is what decides against it:
+
+| # | frame `n` | frame `n + 1` | what moves | ruling |
+|---|---|---|---|---|
+| 1 | footer answers 1 | footer answers 3 | the region loses two rows; I34 pushes the height; C14 keeps the bottom anchored and two rows leave the top | legal — the prompt does this — **and the transcript moved because the footer chose to**, which no reader asked for |
+| 2 | footer answers 3 | footer answers 0 | three rows appear; the footer becomes the second thing beside the prompt that pushes the transcript | a second pusher is a second layout system, which is the objection §Chrome in the roadmap raised to growing chrome at all |
+| 3 | no frame yet | the first frame | `initialRegionHeight` has no `SessionSnapshot` to hand a `ChromeFn`, so a per-frame height makes the pre-frame region a **permanent guess** | a declared number makes it exact (row 5 above) |
+| 4 | any | any | every `ChromeFn` in every test and example changes its return shape | cost with no consumer asking for the thing it buys |
+
+**Ruled: declared per session, in config.** §16's own sentence draws the line — *applicability resolves per session; values change per frame* — and a footer's height is applicability, where a segment that vanishes on a priced far side is a value. The one claimant that wanted variable height is A7, the activity region, and it is not a footer: it is a **fifth region**, and this ruling gives it nothing (6k.5).
+
+### 6k.4 — the rulings
+
+- **A.** `TuiConfig.chrome.footerRows?: number` — default 1, an integer in `[1, MAX_FOOTER_ROWS]`, refused by `validateConfig` otherwise, naming the field (I79).
+- **B.** `MAX_FOOTER_ROWS = MIN_ROWS − HEADER_ROWS − ⌊MIN_ROWS / 2⌋ − 1` — 6 today. The largest budget that leaves one region row at the size gate with the prompt at its cap (row 2). It moves with `MIN_ROWS` and T1.35 asserts the derivation rather than the figure.
+- **C.** `heightsSum` re-asserts with the composed budget (I80) and paint draws the footer on rows `R − b … R − 1`. `HEADER_ROWS` stays a constant of one: A02 §6 adds a hook when something needs it, and the design's header is one line.
+- **D. The minimum, stated.** For every prompt height the sum holds at `R ≥ 2b + 1` — 7 for the design's three lines — and for a one-row prompt at `R ≥ b + 2`. `MIN_ROWS` is 16, above both for every accepted budget, and leaves a region of at least `16 − 1 − 8 − 6 = 1` row. Below `2b + 1` with the prompt at its cap the region clamps and the fallback draws (row 6).
+- **E. Zero is not offered.** A budget of 0 removes a region; the mouse and the layers would still be right (rows 7, 8), and the default footer being one blank row is a density cost §16 names — but no consumer asked, and a change to the default frame is a golden move for every consumer. Owed as `footerRows: 0`, with its own row 4 (the padding) re-walked, not slipped in here.
+- **F. Default unchanged, byte for byte.** With `footerRows` absent every frame this component composes is the frame it composed before: T3.38 asserts the 24-row default frame is identical with the field omitted and with `footerRows: 1`, and the terminal baseline does not move.
+
+### 6k.5 — what the rulings leave behind
+
+- **A7, the activity region** — variable height, capped, present only in flight. A fifth region between the transcript and the prompt, and nothing here is one. Symbol: `Composed.activity` is absent from `src/`; the design's §23 is right that it cannot be satisfied by winning the argument about a footer.
+- **`construct.ts:652`** calls `initialRegionHeight(size)` and should pass `config.chrome.footerRows`. Not this component's file to edit in this pass; a request is filed and I34 makes the omission a first-frame correction rather than a defect.
+- **Roadmap 29** — closed as a *budget*: 35, 37 and 15 each have the row they wanted and each still owes its content; 46 is a scrollbar at container scope and is re-filed there. `footerRows: 0` and A7 are the residue, named.
+- **§16's three lines are agent-tui's to draw** with `footerRows: 3`; the default chrome's footer stays empty for the reason `chrome.ts` gives.
+
 ---
 
 ## 7. Health and identity
@@ -1928,6 +2005,9 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I75** — **The manual scheme is the bracket family; the distance control is multiplicative and the elevation control has no clamp.** The design note's `← → ↑ ↓ + − r` does not survive the keymap: `↑` and `↓` at `liveBlock` are `rowUp` and `rowDown` and a duplicate is refused at construction, and `←` `→` were unbound at `liveBlock` (dropped, not passed to the prompt — C16 I28 measured it: `dispatch` runs the target's handlers and then `global`, never `prompt`) and are now the horizontal pair (I76), so claiming them would take two keys from **every** focused block for a feature one kind has — the argument `[` and `]` were already chosen on (I71). So `[` `]` turn, `{` `}` tilt, `+` `−` dolly, `r` restores the block's declared view and `o` toggles the orbit. **Distance scales rather than steps**, because a multiplicative control cannot reach the one degenerate value: measured, `distance: 0` inks nothing and is the only such value — `0.01` inks 1776 cells, `−1` inks 1742, and `−6` inks the same 297 as `+6` because it is the antipodal view. The hazard is passing *through* a blank frame, not landing on a wrong one. **Elevation needs no clamp**, because the pole is unreachable: `cos(π/2)` is `6.123e-17`, so `cross(forward, ẑ)` is tiny rather than zero and elevation exactly `π/2` draws a plan view of 289 inked cells — F464's figure and F464's mechanism, one function along, and `basisOf`'s comment claiming the figure collapses to a line describes a case its own arithmetic cannot produce (F467). The store still clamps nothing and normalises nothing; the effect computes the step and the store records it, which is `pageBlock`'s seam (→ C12 I85, C26 I2).
 - **I76** — **The crosshair is view state in `CursorPositions`, its writer is the `←`/`→` pair at `liveBlock`, and it is the render key's seventh axis — landed together, on I71's own rule.** `RenderContext.cursorPositions` was I71's counter-example: read in one place (C12's `positionalForm`), written by nothing in `src/`, in no key — correct and unobservable, for as long as the plot-interaction suite supplied the field itself. The store is `Cameras`' shape keyed `(entryId, blockId)`, dropped on `rendered`'s subscription with the other two, threaded into the context by `visibleRows`. **The value is an index into the data, not a column** (C12 I37), so a resize keeps the cursor on its sample; **absent is not zero** — no entry is no crosshair and `0` is the first sample — so unlike `ScrollOffsets` the key omits nothing. **The ceiling is the sample count and the effect holds it**, not the store: `cursorBlock` clamps to `[0, n)` and the store records, which is `dollyBlock`'s seam (I75); a first `→` lands on the first sample and a first `←` on the last. **The writer gates on C12's `cursorable`** (C12 I85) — the predicate `elements()` declares the focus stop on — so a form that draws no crosshair stores no cursor; the residue this sentence used to name (*a cursor set on a form that draws none is stored and unread*) closed when the writer asked the renderer the question the renderer answers, rather than keeping a second list of forms here, which is the two-copies hazard (→ C12 §3s, I37; C16 I28).
 - **I77** — **An animated image's frame is view state in `Frames`, advanced on the orbit's wake by elapsed time, keyed as the render key's eighth axis with zero omitted, and gathered only on the arms that rasterise.** A GIF declares its cadence where the orbit has none, so the ticker is armed for the earliest frame change on screen (`Frames.due`) and floored at the orbit's rate — a 100/200 ms GIF wakes six times in 990 ms, a still arms nothing — and one stamp (`#motionAt`) serves both motions because both are `f(Δt)` from one wake and a second stamp is a second place for the reset on stop to miss (I74). **The index is walked by whole delays with the remainder kept**, so a spinner's wake beside it moves nothing and a minute idle lands where the clock says; **zero is omitted from the key** on `ScrollOffsets`' rule and not `Cameras`', because frame 0 after a loop draws what frame 0 drew and the absent state is exactly zero. **Not gathered at `kitty`**: the terminal holds every frame from one transmission and runs the loop (C09 I39), so there an animation costs the session what a still does. The store joins `rendered`'s eviction subscription as the fourth entry, which is the count the argument was written to survive (→ C04 I93, C09 I39, I71, I74).
+- **I78** — **A series' visibility is view state in `SeriesVisibility`, overriding `Series.hidden` per entry and block; its writer is the plot's own `BlockKeymap` of digits, merged at `liveBlock` when focus lands on the plot and withdrawn when it leaves; and it is the render key's ninth axis with every override in it — landed together, on I71's rule.** The store is `CursorPositions`' shape keyed `(entryId, blockId)`, holding an explicit boolean per series index rather than a set of hidden indices, because the override has to be able to say *shown* over a producer's *hidden* (C04 I99); `forEntry` carries the entry's record into the context and `key` carries every override sorted, because absent is the block's own default and `false` is not absent. `toggleSeriesBlock` reads the effective state — override, else the member, else shown — and writes its negation; it clamps nothing beyond *the index exists*, which is `dollyBlock`'s seam (I75). The keymap is the plot's (`plotDefinition.keymap(block)`, C12 I116): `syncBlockKeymap` compares the focused block to the last merged one before every key is resolved and merges or withdraws through `Keymap.mergeBlock` (C16 I27) — a pull, because focus has none of its own to subscribe to. **This is `mergeBlock`'s first production caller and `BlockKeymap`'s first producer** (C26 T2.6a, inverted). An override for an index the block no longer has is kept and inert (C23 I47), and named as the residue. The store joins `rendered`'s eviction subscription as the fifth entry (→ C04 I99, C12 I116, C16 I27, I71, I76).
+- **I79** — **The footer's row budget is declared once per session and never returned by a `ChromeFn`.** `TuiConfig.chrome.footerRows` is an integer in `[1, MAX_FOOTER_ROWS]`, defaulted to 1 and refused at `createTui` otherwise, naming the field; `MAX_FOOTER_ROWS` is **derived** from `MIN_ROWS` as the largest budget that leaves one region row at the size gate with the prompt at its cap (§6k.2 row 2), so it moves when the gate moves and cannot be set past it by hand. A chrome function answers what is in the rows and the session answers how many there are — geometry is a property of the session, not of a frame, and a per-frame height would make the footer the second thing beside the prompt that pushes the transcript (§6k.3) (→ §6k, I34, A02 §6).
+- **I80** — **`heightsSum` asserts the sum with the budget the frame was composed with, and the footer occupies exactly that many rows above the bottom edge.** `HEADER_ROWS + region.height + promptRows + footerRows === rows`; the footer's blocks are truncated to the budget when taller and padded when shorter, so chrome never scrolls and never grows with its content. The sum holds for every prompt height at `rows ≥ 2·footerRows + 1` and for a one-row prompt at `rows ≥ footerRows + 2`; below that the region clamps, the sum is false and the fallback draws — the path that existed at three rows, reached `footerRows − 1` rows earlier (→ §6k.2 rows 1, 3, 6; S01 §3; C01 §5).
 
 
 ## 11. Commitments
@@ -2000,7 +2080,10 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 45. **Both animations are functions of elapsed time** (I74). One timer at the fastest cadence on screen cannot be a cadence for two, and a step per firing makes each animation's speed depend on the other's presence — in both directions.
 47. **The crosshair has a writer, a store and a key axis, landed together** (I76). `cursorPositions` stops being the counter-example I71 was written against; `←`/`→` at `liveBlock` move it, `CursorPositions` holds it beside the offsets and the cameras, and the seventh axis keys it — zero included, because absent and zero draw differently (→ C12 §3s).
 46. **The manual camera scheme is the bracket family, the dolly is multiplicative and the tilt is unclamped** (I75). The arrows collide with row navigation and with the prompt; scaling the distance cannot reach the only degenerate value; the pole is unreachable in floating point, and the comment that says otherwise is corrected. **And the block a key acts on is resolved through the tree**, because `elementsIn` walks into a container and every effect here used a top-level `find` — F470, found by the orbit's own gathering pass rather than by a test (→ C26 I2).
+49. **A series toggle is view state with a block-declared writer, and the ninth key axis carries every override** (I78). The plot declares its digits, L4 merges them with focus, the store records what the effect decided, and the frame misses the cache the moment a series is hidden or shown (→ C04 I99, C12 I116, C16 I27).
 48. **An animated image rides the orbit's wake, its frame is the eighth key axis, and the protocol arm hands the loop to the terminal** (I77). The cadence comes from the file and the timer is armed for it rather than for the floor; one stamp serves the orbit and the frames; a still arms nothing, and at `kitty` so does an animation (→ C09 I39, C04 I93).
+50. **The footer's row budget is config, bounded by a derived maximum, and the frame's sum is asserted against it** (I79, I80). `footerRows` defaults to 1 and is refused outside `[1, MAX_FOOTER_ROWS]`; the maximum is `MIN_ROWS − HEADER_ROWS − ⌊MIN_ROWS/2⌋ − 1` and a test asserts the derivation, not the figure (§6k.4 B).
+51. **A `ChromeFn` returns content and never a height** (I79). The per-frame alternative was walked and refused (§6k.3): it makes the pre-frame region a permanent guess and the footer a second pusher of the transcript.
 
 41. **A frame that cannot hold what it was given complains rather than dies** (I70, F230). The per-entry trim was reconciling two components' answers in silence and taking the next block with it; it reports through the sink that already exists for a block giving way, and it does not refuse — the region check one level up can refuse only because nothing can reach it.
 
@@ -2292,10 +2375,24 @@ PTY harness.
 - **T6.44** (I59): deleting T4.19 → nothing fails, and that is the point of the row: it is the only executable statement that this stage leaves the first frame alone.
 - **T6.81** (I71): dropping the camera from the slot string → **T4.17e** fails and **T4.17f** passes. T4.17g fails too, which is why it is not the row this cites: the mutation that removes the key must be separable from the one that removes the writer, or the two are one assertion wearing two names.
 - **T1.31, T3.35** (I76): `CursorPositions` keeps zero in its key and answers an empty record for an entry nothing aimed; `delete` takes one entry and `clear` all.
+- **T1.35** (I79): `validateConfig` refuses `chrome.footerRows` of `0`, `7`, `1.5` and `NaN`, naming the field, and accepts every integer in `[1, MAX_FOOTER_ROWS]`; `MAX_FOOTER_ROWS` equals `MIN_ROWS − HEADER_ROWS − ⌊MIN_ROWS/2⌋ − 1`, asserted as the derivation over the exported constants rather than as `6`, so the row moves with the gate. Absent, the resolved budget is 1 and the default chrome carries it.
+- **T1.36** (I80, §6k.4 D): the sweep — for every budget in `[1, MAX_FOOTER_ROWS]`, every `rows` from `2b + 1` to 60 and a wanted prompt of 1 and of 200, `heightsSum` holds, `region.height` is `rows − 1 − promptRows − b`, `footerRows` on the composed frame is `b` and `region.top` is 1. At `rows = 2b` with the prompt at its cap the region clamps to 0 and the sum is **false** — the boundary asserted from both sides. Control: at `b = 1` every figure is HEAD's.
+- **T1.37** (I34, §6k.2 row 5): `initialRegionHeight(size, 3)` equals the first composed frame's region with a one-row prompt and `footerRows: 3`; called with one argument it overstates that frame by two rows — the correction the first frame makes until `construct.ts` passes the budget.
+- **T2.40** (SS56): the source scan finds no hand-composed `kind: "notice"` under `src/` outside the sixteen files the rule excuses by name — two are the family (`documents.ts`, `builders/`), two the kind's declaration and definition, eight below L4 where the family is unreachable (A02), four L4 surfaces **owed** a migration and allowed so SS53 retires each entry when its last literal goes. The rule is imported from the enforcement tool, not restated (C01 T2.10's shape), and its fabricated violation is a notice literal in `src/shell/keys.ts`.
+- **T3.38** (I80, §6k.4 F): **frame read.** At 24 rows with `footerRows: 2` and a footer returning three one-row blocks, rows 22 and 23 carry the first two blocks and the third is on no row; the region is 20 and the prompt is on row 21. With one block, row 23 is blank. And the default — `footerRows` omitted — paints byte-for-byte the frame that `footerRows: 1` paints, which is the frame HEAD painted: the golden claim, asserted here rather than by regenerating anything.
+- **T3.39** (I28, §6k.2 row 8): with `footerRows: 3`, `overlayRegion.height` equals `region.height` and `paint` returns exactly `rows` lines.
+- **T6.95** (I80): `heightsSum` reading a constant `1` for the footer instead of `f.footerRows` → **T1.36** fails at every budget above one. Anchor in `tools/mutate/runs/c22-footer-budget.mjs`.
+- **T6.96** (I80): `paint` drawing the footer on one row regardless of the budget → **T3.38** fails: the line count is short by `b − 1`, and before that row 22 is not the footer's first block. Same run file.
+- **T6.97** (I79): `validateConfig` dropping the upper bound → **T1.35** fails on `7`; `compose` subtracting `1` for the footer instead of the budget → **T1.36** fails, and so does T1.37, which is the row that shows the two implementations of the subtraction had diverged. Same run file.
 - **IF8** (I77): `Frames` — four advances of 25 ms and one of 100 leave the index, remainder and `due` where one of 200 does; a full loop is frame 0 and keys as `""`; a minute idle lands where the clock says; a still and a zero advance hold nothing; two blocks key sorted; `delete` empties. C09 §9 Tier 1 carries the row, in `test/edge/image-frames.test.ts`.
 - **T4.17h–j** (I76): the **writer alone** — `→` from nowhere lands on the first sample, `←` from nowhere on the last, both clamp at the ends, a table is a no-op, and two plots in one document hold different indices (equal ones would pass a store keyed on the entry alone).
 - **T4.17p** (I76): the **pair, through a frame** — `→` puts `train: 10` on the readout row, a second `→` replaces it with `train: 20`, `←` brings `10` back. Read from the screen, because the key axis is what makes the second frame differ from the first.
 - **T4.18f** (I76): `clear` empties the store through the same subscription that drops the rendered rows.
+- **T1.32, T3.36** (I78): `SeriesVisibility` — absent is an empty record and `""`; `false` is in the key; two blocks key sorted; `delete` drops one entry and `clear` all. In `test/unit/series-visibility.test.ts`.
+- **T4.17r** (I78, C16 I27): the **writer alone** — `↓` onto a two-series plot then `2` writes `{1: true}`; `2` again writes `{1: false}` and not an absence; `2` on a one-series plot writes nothing because the plot declared no `2`; `1` from the prompt writes nothing because the keymap is withdrawn with focus; `→` after a toggle still moves the crosshair.
+- **T4.17s** (I78, C12 I116): the **pair, through a frame** — `↓` then `2` on a two-series plot removes the second series' ink and puts `hollow` in the legend's second row while the gutter labels stay where they were; `2` again restores the first frame byte for byte. Read from the screen.
+- **T4.18g** (I78): `clear` empties the store through the same subscription that drops the rendered rows.
+- **T6.94** (I78): `seriesKey` dropped from the slot → **T4.17s** fails on a frame served from before the toggle while T4.17r passes (the `⌃a` class, F769); the `syncBlockKeymap` call removed → T4.17r and T4.17s fail; the store's `forEntry` not threaded into the context → T4.17s fails and T4.17r passes. `tools/mutate/runs/c22-series-visibility.mjs`.
 - **T6.89** (I76): the writer removed → T4.17h–j and T4.17p fail **and `plot-interaction` still passes**, which is the measured reason nothing noticed for as long as it did — that suite injects `cursorPositions` itself. The key axis removed → T4.17p alone fails, on a frame served from before the cursor moved.
 - **T6.82** (I71): removing the binding that nudges the store → **T4.17f** fails and **T4.17e** passes. The mirror of T6.81, and the pair of rows is the check that the pair of mutations is not asserting one thing. **A field with a key axis and no writer is `cursorPositions`** — correct, complete and unobservable — so the row that fails here is the one that says somebody can move it.
 - **T6.45** (I58): removing the `clear` arm from the subscription → T4.18b fails. **It did not fail the row this replaced**, which asserted a render count: the mutation was applied, the suite stayed green, and the survivor is what said the assertion was about the wrong thing.

@@ -129,12 +129,13 @@ annotations on or off         annotations[].hidden
 recomputation, no function, nothing that cannot be serialised. **The document stays a
 document.**
 
-**Three of the fourteen are absent members the design requires — measured 2026-09-04 at
-`de52f1da`, and none exists on any type.** `series[].hidden` would be `hidden?: boolean` on
-`Series` (`src/data/viewmodel/types.ts:951-1001`; its fields today are `values`, `pointLabels`,
-`label`, `tone` and the per-form extras). `annotations[].hidden` would be `hidden?: boolean` on
-every arm of the `Annotation` union (`types.ts:1174-1208` — `line`, `band`, `confidence`,
-`whiskers`, none carries it). `palette` is not a `Plot` field at all: `Plot` (`types.ts:1209`)
+**Three of the fourteen were absent members the design requires — measured 2026-09-04 at
+`de52f1da`, and none existed on any type. Two of the three landed 2026-09-05 (C04 I99).**
+`series[].hidden` is `hidden?: boolean` on `Series` and `annotations[].hidden` is
+`hidden?: boolean` on every arm of the `Annotation` union — appearance members, refused where a
+series is not a layer (`HAS_HIDEABLE_SERIES`), honoured by both arms, with the reader's override in
+C22 I78's `SeriesVisibility` and the digits `1`–`9` as the first writer (C12 §3aq). **The legend
+that clicks is still owed** under the symbol `legendHit`; what shipped is its keyboard half. `palette` is not a `Plot` field at all: `Plot` (`types.ts:1209`)
 carries `colormap` (`:1326`), and `Plot.palette` was **removed on a ruling** rather than typed
 (`src/presentation/plot/marks.ts:56-72` — *a field with one legal value is not a choice*;
 roadmap 51), so binding it means reversing that ruling, not adding a member. The other eleven

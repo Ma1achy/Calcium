@@ -601,8 +601,12 @@ The two named consumers forced the ruling before either existed — the widget d
 `↓` `PgUp` `PgDn` `Esc`, and the plot's cursor keys are the arrows — so the first adapter to
 attach a keymap would have met the throw on every key it had. The condition §8b.8 named is
 therefore answered by a mechanism rather than reported by an error, and `⏎`'s second effect is
-still not committed: the mode has a *route* now and still no *inhabitant*, since `BlockKeymap`
-has no producer in `src/` (T2.6a still holds).
+still not committed: the mode has a *route* now and still no *inhabitant*. **`BlockKeymap` has
+a producer since 2026-09-05** — `plotDefinition.keymap` declares `1`–`9` for the series toggle
+(C12 I116, C22 I78), merged from `construct.ts`'s `syncBlockKeymap` — and T2.6a is **inverted**
+rather than deleted: it now asserts the one caller and that the plot's digits collide with
+nothing, so `interaction` still carries no binding and the mode is still empty. The ruling above
+rests on that placement fact now, not on the absence of a producer.
 
 ### The disposition, and it is not a deferral
 
@@ -616,10 +620,11 @@ has no producer in `src/` (T2.6a still holds).
   **until a block needs a key `liveBlock` or `global` already binds.** That condition has a
   trigger in the code: `mergeBlock`'s throw. A deferral whose condition is a `throw` someone
   will hit is one that reports itself, which is the opposite of this session's six.
-- **No consumer has ever needed it.** `mergeBlock` has no caller, so the collision that would
-  require the mode has never been raised — the purpose is real, expressible, and uninhabited.
-  Recorded that way rather than as *the mode has no purpose*, because the two disagree about
-  what happens the first time an adapter wants `⏎`.
+- **No consumer has needed it yet.** `mergeBlock` has one caller (C22 I78's `syncBlockKeymap`)
+  and its one producer binds digits, which collide with nothing — so the collision that would
+  require the mode has still never been raised. The purpose is real, expressible, and
+  uninhabited. Recorded that way rather than as *the mode has no purpose*, because the two
+  disagree about what happens the first time an adapter wants `⏎`.
 
 ---
 
@@ -979,6 +984,41 @@ follows the data and its *content* follows focus. Every C26 affordance resolves 
 the space a focus ring would occupy is reserved by the data or it does not exist.
 
 Background and reverse video are free. Anything that changes size is not.
+
+**A block-level focus paints the cells the block already reserves, and three kinds now do**
+(F769's recorded residue, ruled here). The rule above bounds the answer — no ring, no marker, no
+row — so the affordance is a tone on furniture the data draws whether or not focus is on it, and
+each kind names which:
+
+- **`plot`** — the frame: its lid, its side rules, its bottom rule and the corners, in `accent`
+  where they were `muted` (C12 §3's element paragraph). The frame exists exactly when the plot is
+  focusable — C12 I85 gates the element on `plotFrame !== "none"` — so there is always something
+  to carry it; the y-labels keep `muted`, so the enclosure lights up and the scale does not.
+  Measured at 80 columns: seven rows differ (the x-label row does not), 164 cells, every one a
+  frame glyph, and only in their SGR; every glyph and every cell's position is byte-identical.
+- **`scroll`** — the residue row, in `accent` where it was `dim`. It is the box's only chrome and
+  it is present exactly when there is something scrolled out of view; a box whose content fits
+  has no residue row and under focus draws as it did. That is the rule's consequence and is said
+  here rather than absorbed — the cost falls on the one box that has nothing to scroll to.
+- **`pills`** — the head chip is `accent` **over the selection ground** (`surface.selection`, or
+  reverse video at 1-bit), where the table's head is `accent` alone. The reason is the data:
+  `active` already spends `accent` (C04 §3), so a focused inactive chip beside an active one was
+  indistinguishable from it — the catalogue's `pills-focus-24bit` frame shows `running` and
+  `exited` in one colour, `38;2;232;168;124` twice. The head needs a channel no chip datum uses,
+  and the two channels this section names as free are the two the data never touches. A selected
+  chip stays `default` over the ground, so the head and the extent differ by ink; an active chip
+  that is neither stays `accent` with no ground; and the table keeps its rule because no table
+  datum is drawn in `accent` by the framework.
+
+**At 1-bit the carrier is the weight, not a colour** (F34): `accent`'s mono class is bold and
+`muted`'s and `dim`'s is dim, so a focused frame and a focused residue row go from `2m` to `1m`,
+and the head chip adds reverse video. Whether a terminal renders a bold box-drawing glyph heavier
+is the terminal's; the residue row's text and the chip's are ordinary glyphs and read either way.
+
+**What still paints nothing, each owed under its own component**: a `table` under block-level
+focus (`rowId: null`, which the catalogue's `table-block-focus` scene constructs and no session
+reaches), a `plot3d` (its frame is `scatter3.ts`'s and not `furniture.ts`'s, so `Layout.focused`
+does not reach it), and a `mosaic`'s cell.
 
 **The chrome says the mode, the block says the focus** — `NAV` / `EDIT`, the way vim shows
 `-- INSERT --`. **This spec does not decide the chrome row.** Chrome is one row each by
@@ -1476,11 +1516,14 @@ Named against the invariants; the tiers are the six.
   fall-forward taking the first element rather than the nearest forward → the `putBlock` row
   fails.
 - **T3.x** (I13) — `reset()` and `toPrompt()` produce different locations.
-- **T2.x** (§8b.8, I14) — **the vacuity of interaction mode, asserted rather than described.**
-  `Keymap.mergeBlock` has no caller in `src/` and `interaction` carries one binding, so the
-  mode has nothing in it and `⏎`'s second effect is not committed. The row asserts both facts,
-  and it **fails the day either changes** — which is when the second effect and I14's first
-  level go live and this row is inverted. A premise recorded and unchecked is a premise that
+- **T2.6a** (§8b.8, I14, C22 I78) — **the vacuity of interaction mode, asserted rather than
+  described — inverted once.** It asserted that `Keymap.mergeBlock` had no caller in `src/`,
+  and it fired on 2026-09-05 when `construct.ts`'s `syncBlockKeymap` became the first. It now
+  asserts the one caller **and** that merging the plot's keymap (`plotDefinition.keymap`, C12
+  I116) leaves `interaction` with no binding, because no digit collides with a built-in. The
+  ruling that `⏎` does not enter the mode rests on that second fact, and the row **fails the day
+  a producer's key lands at `interaction`** — which is when the second effect and I14's first
+  level go live and this row is inverted again. A premise recorded and unchecked is a premise that
   goes quiet (F102's disposal, and T2.17's shape for the `window` × `elements` agreement).
 - **T3.x** (I18, §4b) — stepping past the window's bottom edge: focus advances by one **and**
   the window moves to hold it. **The control is a step that stays inside the window**, where
