@@ -128,4 +128,5 @@ const results = runPass({
   ],
 });
 
-report(results);
+console.log(report(results));
+process.exit(results.some((r) => !r.killed) ? 1 : 0);

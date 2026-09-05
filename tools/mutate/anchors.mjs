@@ -111,6 +111,52 @@ const KNOWN_AMBIGUOUS = {
   "c12-value-bar.mjs": 1,
 };
 
+/**
+ * Run files whose tail **runs and says nothing** (F768), by the shape of the
+ * silence — a debt list on `KNOWN_STALE`'s terms, compared by equality both
+ * ways, so a repaired tail still on the list is a failure.
+ *
+ * `report(results)` returns a string; a tail that does not `console.log` it
+ * prints nothing, and one that does not `process.exit` on a survivor exits 0
+ * whatever it found. Either way the pass ran — mutations applied, tree restored
+ * — and the exit status is the same bit as a clean pass. `c26-select-all.mjs`
+ * did this for five mutations before anyone opened the log.
+ *
+ * **Four of 146 on the sweep's first run** (2026-09-05): two of F768's exact
+ * shape (`report(results);` alone) and two that print and do not exit. Listed
+ * rather than repaired here, for the reason at the head of `KNOWN_STALE`: the
+ * repair is one line and belongs to whoever runs the pass, because a tail
+ * fixed without a run is a claim about what the run reports made by someone
+ * who has not read it.
+ */
+// **Empty since 2026-09-05**, when the four it listed were repaired in one pass —
+// two printed nothing (`report(results);` alone, F768's line) and two printed
+// and never exited. Compared by equality both ways, so a new silent tail fails
+// here and a repaired one must leave.
+const KNOWN_SILENT = {};
+
+/**
+ * How a run's tail ends — `null` when it prints its report **and** exits on a
+ * survivor, else the shape of the silence.
+ *
+ * Read from the last `runPass(` to the end of the file, because that is where
+ * the results exist to be dropped. **The blind spots, stated**: a tail printing
+ * the report of the *wrong* variable — `console.log(report(other))` — passes,
+ * and so does an unconditional `process.exit(0)`; both are the citation-
+ * resolves-against-the-wrong-thing class this tool declines to build for. And
+ * a file with no `runPass(` at all is not a run and is not checked, which is
+ * what lets a mutations-only fixture through MA1.
+ */
+function silenceOf(src) {
+  const at = src.lastIndexOf("runPass(");
+  if (at === -1) return null;
+  const tail = src.slice(at);
+  const printed = tail.includes("console.log(report(");
+  const exits = tail.includes("process.exit(");
+  if (printed && exits) return null;
+  return printed ? "no exit" : exits ? "unprinted" : "unprinted, no exit";
+}
+
 const KNOWN_STALE = {
   // **Re-anchoring is not always the fix, and this one shows both halves.**
   // `summaryLine(live)` gained a `unicode` argument, so the statement is still
@@ -336,6 +382,10 @@ const missing = {};
 const ambiguous = [];
 const ambiguousBy = {};
 const unresolvable = [];
+/** Runs whose tail runs and says nothing (F768), by run — see `silenceOf`. */
+const silent = {};
+/** Runs whose tail was read at all — the counter, so a reader matching nothing shows. */
+let tails = 0;
 
 // **Two roots, because a run cwds to the package it mutates.** The docker runs
 // address `src/ps.ts` and mean `examples/docker/src/ps.ts`; resolving against
@@ -345,6 +395,13 @@ const rootsFor = (file) => [`${ROOT}/${file}`, `${ROOT}/examples/docker/${file}`
 
 for (const run of runs) {
   const src = readFileSync(`${RUNS_AT}/${run}`, "utf8");
+  // **Does the run say what it found?** (F768). Checked before the anchors,
+  // because a run that cannot report is a run whose anchors do not matter.
+  if (src.includes("runPass(")) {
+    tails += 1;
+    const how = silenceOf(src);
+    if (how !== null) silent[run] = how;
+  }
   for (const path of testPathsOf(src)) {
     suites += 1;
     if (rootsFor(path).some((p) => existsSync(p))) continue;
@@ -404,11 +461,32 @@ const total = Object.values(missing).reduce((a, n) => a + n, 0);
 console.log(
   `mutation anchors — ${String(runs.length)} runs · ${String(checked)} anchors · ` +
     `${String(suites)} test paths · ${String(expectations)} expectations · ` +
+    `${String(tails)} tails · ` +
     `${String(total)} missing across ${String(runsWith)} run(s)` +
-    `${ambiguous.length > 0 ? ` · ${String(ambiguous.length)} ambiguous` : ""}`,
+    `${ambiguous.length > 0 ? ` · ${String(ambiguous.length)} ambiguous` : ""}` +
+    `${Object.keys(silent).length > 0 ? ` · ${String(Object.keys(silent).length)} silent` : ""}`,
 );
 
 const problems = [...unresolvable, ...unreachable];
+
+// **The silence arm** (F768), on the same equality terms as the others: a tail
+// that says nothing and is not on the list fails; one on the list for a
+// different silence fails; one on the list that now speaks fails.
+const SILENT = OWN ? KNOWN_SILENT : {};
+for (const [run, how] of Object.entries(silent)) {
+  const known = SILENT[run];
+  if (known === undefined) {
+    problems.push(`${run}: runs and says nothing — its tail is ${how}: ` +
+      "print `console.log(report(results))` and `process.exit` on a survivor (F768)");
+  } else if (known !== how) {
+    problems.push(`${run}: its tail is ${how}, the list says ${known}`);
+  }
+}
+for (const [run, how] of Object.entries(SILENT)) {
+  if (silent[run] === undefined) {
+    problems.push(`${run}: the list says its tail is ${how} and it now prints and exits — remove it`);
+  }
+}
 
 // The ambiguity arm, on the same equality terms as the stale one below.
 const AMBIG = OWN ? KNOWN_AMBIGUOUS : {};

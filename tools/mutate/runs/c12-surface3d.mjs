@@ -284,3 +284,4 @@ const results = await runPass({
 });
 
 console.log(report(results));
+process.exit(results.some((r) => !r.killed) ? 1 : 0);

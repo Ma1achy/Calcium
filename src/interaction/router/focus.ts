@@ -212,9 +212,16 @@ export interface FocusStore {
    */
   focusRow(entryId: string, element: ElementAddress | null): void;
   /**
-   * The same movement with the anchor held (C26 §5c) — **unless the entry
-   * changed**, in which case the anchor belonged to an entry that is gone and
-   * is dropped. Extension never crosses an entry by key; this arm is eviction's.
+   * The same movement with the anchor held (C26 §5c).
+   *
+   * **The entry is the callers' to keep, and this trusts them.** This used to
+   * carry an entry-changed arm that dropped the anchor — eviction's case — and
+   * it was the defect (F764): after an eviction the first `⇧↓` arrived with the
+   * live entry, the arm fired, and the reader's first extension selected
+   * nothing. `keys.ts` now repairs the store through `focusRow` before it
+   * extends, and `pointerEffect` extends only inside the focused entry, so no
+   * caller reaches here with a changed entry and the arm had become a sentence.
+   * An arm nothing reaches is removed rather than kept as a guard.
    */
   extendRow(entryId: string, element: ElementAddress | null): void;
   /**
@@ -275,12 +282,11 @@ export function createFocusStore(): FocusStore {
      */
     extendRow(entryId, element) {
       if (stored.at !== "liveBlock") return;
-      const same = entryId === stored.entryId;
       stored = Object.freeze({
         at: "liveBlock",
         entryId,
         element,
-        anchor: same ? (stored.anchor ?? stored.element) : null,
+        anchor: stored.anchor ?? stored.element,
         mode: "navigate",
       });
     },

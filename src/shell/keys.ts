@@ -962,29 +962,47 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // are the store call. No second notion of *which element is next* — the
     // list and the resolver are the ones the unshifted motions use, so a word
     // this pair disagreed about could not exist.
+    //
+    // **After an eviction the store is repaired before it is extended** (C26
+    // I22, §5c table row e; F764). Both halves of a stale selection fall to the
+    // live entry's first element — `y` copies one — and the first `⇧↓` used to
+    // find `stored.entryId !== focusedEntryId()` and hand the store a changed
+    // entry, which `extendRow` answered by dropping the anchor: the reader's
+    // first extension selected nothing. So when the entry changed, `focusRow`
+    // writes the resolved head first — the state the frame already shows — and
+    // the extension then places its anchor there as any first extension does.
+    // `focusRow`, not a third store write, for `selectAllElements`'s reason.
     extendRowDown: () => {
       const elements = deps.focusedElements();
       const current = deps.focus.current;
       if (current.at !== "liveBlock") return;
       const i = resolveFocus(current.element, elements);
       if (i === null) return;
-      const next = elements[i + 1];
       const entry = deps.focusedEntryId();
-      if (next !== undefined && entry !== null) deps.focus.extendRow(entry, addressOf(next));
+      const head = elements[i];
+      if (entry === null || head === undefined) return;
+      if (current.entryId !== entry) deps.focus.focusRow(entry, addressOf(head));
+      const next = elements[i + 1];
+      if (next !== undefined) deps.focus.extendRow(entry, addressOf(next));
     },
     extendRowUp: () => {
       const elements = deps.focusedElements();
       const current = deps.focus.current;
       if (current.at !== "liveBlock") return;
       const i = resolveFocus(current.element, elements);
+      if (i === null) return;
+      const entry = deps.focusedEntryId();
+      const head = elements[i];
+      if (entry === null || head === undefined) return;
+      if (current.entryId !== entry) deps.focus.focusRow(entry, addressOf(head));
       // **Stops at the first element rather than leaving.** `↑` unshifted exits
       // to the prompt (C26 I13, the reader stepping out); extending is a
       // gesture *inside* the block, and one that walked out of it would take
-      // the selection with it and leave nothing to copy.
-      if (i === null || i === 0) return;
+      // the selection with it and leave nothing to copy. The repair above still
+      // ran: a stopped extension is not a reason to leave the store half-fixed.
+      if (i === 0) return;
       const prev = elements[i - 1];
-      const entry = deps.focusedEntryId();
-      if (prev !== undefined && entry !== null) deps.focus.extendRow(entry, addressOf(prev));
+      if (prev !== undefined) deps.focus.extendRow(entry, addressOf(prev));
     },
 
     /**
@@ -1064,7 +1082,18 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // **Entry only. The exit is the `⌃c` rung**, which is the ladder's and not
     // this table's — a second way out here would give copy mode an order of its
     // own, which is exactly what makes it a target rather than a mode.
-    enterCopyMode: () => void deps.enterCopyMode(),
+    //
+    // **The prompt's region goes first** (C17 I23; F765). Copy mode hands the
+    // screen to the terminal's own selection, and a prompt still washing a
+    // region under it is two selections at once. `collapse()` rather than a
+    // motion, because the caret must stay where the reader left it — and here
+    // rather than in `#setCopyMode`, because this effect is the only way in
+    // (`⌥v` at the prompt and in the block) and T2.14 asks that every C17
+    // operation be reachable from a key.
+    enterCopyMode: () => {
+      deps.editor.collapse();
+      deps.enterCopyMode();
+    },
     exitCopyMode: () => void deps.exitCopyMode(),
   });
 

@@ -533,14 +533,15 @@ describe("C26 §5c — select all, and the selection's edges", () => {
     expect(graph.focus.current, "the first extension places the anchor in this entry").toMatchObject({ entryId: live, anchor: addr("a2", "t2"), element: addr("b2", "t2") });
   });
 
-  // **Owed, and written so it expires on its own** (§5c table row e). After an
+  // **Was owed, and expired as written** (§5c table row e; F764). After an
   // eviction both halves fall to the live entry's first element (`y` copies
-  // one), but the first `⇧↓` finds the entry changed and *drops* the anchor
-  // where it should place it on the fallen head. `it.fails` passes while the
-  // defect stands and goes red the day `extendRowDown` repairs the store
-  // before extending — at which point this becomes `it` and `extendRow`'s
-  // entry-changed arm has no caller.
-  it.fails("T3.53 (C26 §5c table row e, owed — extendRowDown/extendRow): the first ⇧↓ after an eviction starts a selection at the fallen head", async () => {
+  // one). The first `⇧↓` used to find the entry changed and *drop* the anchor
+  // where it should place it on the fallen head; `extendRowDown` now repairs
+  // the store through `focusRow` before extending, and `extendRow`'s
+  // entry-changed arm — which nothing reached afterwards — is gone. The
+  // load-bearing mutation is dropping the repair, not restoring the arm: with
+  // the repair in place the arm is unreachable and restoring it fails nothing.
+  it("T3.53 (C26 §5c table row e, I22 — extendRowDown): the first ⇧↓ after an eviction starts a selection at the fallen head", async () => {
     const { graph } = await buildGraph();
     graph.transcript.append(doc("/rows", [table("1")]) as never);
     const live = graph.transcript.append(doc("/rows", [table3("2")]) as never);
