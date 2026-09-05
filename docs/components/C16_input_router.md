@@ -36,7 +36,17 @@ type Key = Readonly<{
 type InputEvent =
   | Readonly<{ kind: "key";   key: Key }>
   | Readonly<{ kind: "paste"; text: string }>
-  | Readonly<{ kind: "mouse"; row: number; col: number; button: string; press: boolean }>;
+  | Readonly<{
+      kind:   "mouse";
+      row:    number;                   // 0-based terminal row
+      col:    number;                   // 0-based terminal column
+      button: `button${number}` | "wheelUp" | "wheelDown" | "wheelLeft" | "wheelRight";
+      press:  boolean;                  // final byte `M`; `false` is the release, final `m`
+      shift:  boolean;                  // bit 4
+      meta:   boolean;                  // bit 8
+      ctrl:   boolean;                  // bit 16
+      motion: boolean;                  // bit 32 — a 1002 drag report, not a fresh press
+    }>;
 ```
 
 **`CSI Z` is `⇧tab`, and it was discarded until a binding needed it** (C26 §4g row c, I17). Every
@@ -103,6 +113,44 @@ The fix includes bit 8 in `meta`: the `Key` shape has one alt/meta flag and both
 Four mutations, all caught: the defect restored, bit 8 read *instead of* bit 2 (the careless fix, which breaks the Alt-sending majority every existing test was written against), `shift` claiming bit 8, and the plus-one dropped from the encoding.
 
 **And the ESC-prefixed CSI form is shredded.** `ESC ESC [ 1 ; 2 D` decodes as `m+escape` followed by six printable keys — `[`, `1`, `;`, `2`, `D` — which are text an editor would insert. The roadmap names this as a wire form `⌥⇧←` may arrive in; **no terminal has been measured emitting it**, so this is recorded as an owed check rather than a second defect. The measurement is of the decoder, which is what was run.
+
+### The SGR mouse arm read two bits of eight
+
+**Measured 2026-09-05 by pressing sequences through the built decoder**, the same instrument as the row above; the table is the state it was found in. One line decided everything the event carried:
+
+    const button = code >= 64 ? (code === 64 ? "wheelUp" : "wheelDown") : `button${code & 3}`;
+
+xterm's *ctlseqs* (§Mouse Tracking) lays the SGR 1006 button parameter `Cb` out as a bit field, and the same field is what mode 1002 and the wheel extend:
+
+| bits | value | means | carried as |
+|---|---|---|---|
+| 0–1 | `Cb & 3` | button 1, 2, 3 — `0`, `1`, `2` | `button0` · `button1` · `button2` |
+| 2 | `& 4` | Shift held | `shift` |
+| 3 | `& 8` | Meta held | `meta` |
+| 4 | `& 16` | Control held | `ctrl` |
+| 5 | `& 32` | motion while a button is held (mode 1002) | `motion` |
+| 6 | `& 64` | wheel; bits 0–1 select `up 0`, `down 1`, `left 2`, `right 3` | `wheelUp` · `wheelDown` · `wheelLeft` · `wheelRight` |
+| 7 | `& 128` | buttons 8–11; bits 0–1 select which | `button8` … `button11` |
+| final | `M` / `m` | press or motion report / release | `press: true` / `press: false` |
+
+SGR release carries the *button* in bits 0–1 and the release in the final byte — X10 encoding's `3 = release` value does not occur here. A motion report has the `M` final, so `press: true, motion: true` is a drag and not a second click. The wheel sends no release. What the shipped line did with each:
+
+| sent | xterm means | decoder emitted |
+|---|---|---|
+| `CSI < 4;10;5 M` | Shift-click | **`button0`**, every modifier gone — shift-click was click |
+| `CSI < 16;1;1 M` | Ctrl-click | **`button0`** — the same |
+| `CSI < 80;10;5 M` | Ctrl-wheel-up | **`wheelDown`** — `code === 64` was the only wheel-up, so **ctrl-scroll-up scrolled down** |
+| `CSI < 66;1;1 M`, `67` | wheel left, wheel right | **`wheelDown`**, both |
+| `CSI < 128;1;1 M` | button 8 | **`wheelDown`** |
+| `CSI < 32;2;1 M` | drag, button 1 held | **`button0`, `press: true`** — a fresh click at every cell the pointer crossed |
+
+The third row is the live-binding class again, and it is the one a user meets: a wheel with a modifier held reverses. The last is the one nothing downstream could repair — a drag arrived as a stream of presses, so no consumer could tell a drag from a click, and the two fields that would have said so were masked in the line that built the event.
+
+**I30 — a mouse event carries every bit the terminal sent; nothing is masked.** The decoder names each bit and interprets none of them: what a shift-click *does* is §4's and the keymap's. `press` is the final byte and is the release; no second field restates it, because two fields that must agree are a place for two readers to disagree. Horizontal wheel and buttons 8–11 are carried for the same reason the modifiers are — a bit the decoder drops is one no lane above it can put back.
+
+**No terminal emulator has been measured.** The container this was measured in has no Ghostty, kitty or WezTerm; the bit layout is *ctlseqs*' and the four sequences are the decoder's. Which emulators send `66`/`67` for a horizontal wheel and `32` under 1002 is an owed check, recorded here rather than assumed.
+
+**The test rows assert the whole event, not one field.** T1.3k–T1.3n each `toEqual` the full record, because a row asserting `button` alone is satisfied by a decoder that still drops the modifiers — the shipped line passes every `button`-only row for the shift-click. Two mutations, both caught, in `tools/mutate/runs/c16-mouse-decode.mjs`: `code === 64` restored (T1.3k dies) and `& 3` masking the modifiers back out (T1.3l dies).
 
 ---
 
@@ -673,6 +721,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 - **I27** — **A block key that collides with a `global` or `liveBlock` built-in is merged at `interaction`; a free key is merged at `liveBlock`; the same key twice in one block keymap is a construction error.** The throw this replaces was correct about the hazard — a silent shadow — and wrong about the remedy, because its first consumer needs exactly the keys it refused: widgets bind the arrows, paging and `Esc` (§6). Placement at `interaction` is the mode's purpose made mechanical (C26 §4f): the built-ins are out of scope there by `FOCUS_ORDER`, so nothing is shadowed and `/help` lists both halves at their targets. Withdrawal on freeze takes both.
 - **I28** — **`←` and `→` at `liveBlock` are the horizontal pair, and they are built-ins.** They resolve to `cursorLeft`/`cursorRight`; the effect moves a focused plot's crosshair (C22 I76) and is a no-op on a kind with no horizontal interior. They were dropped at this target, not passed to the prompt as two rulings said — and a claim about where a key goes is settled by `dispatch`'s three steps, which never include `prompt` from `liveBlock`.
 - **I29** — **`⇧⏎` and `⌥⏎` at `liveBlock` re-run the focused entry's recorded command through C23 §2's submit, and nothing else fires from a frozen entry** (→ C23 I18). Not an action kind: the five kinds fire against a document's data, which a frozen entry's is stale; the command text is not. An entry with an empty command is a silent no-op and declares no element to be focused on anyway.
+- **I30** — **A mouse event carries every bit the terminal sent; nothing is masked.** SGR 1006's `Cb` is a bit field (§2's table): button in bits 0–1, shift 4, meta 8, ctrl 16, motion 32, wheel 64 with bits 0–1 selecting up/down/left/right, buttons 8–11 at 128; press or release is the final byte. The decoder names each bit and interprets none — what a modified click or a drag *does* is §4's. A masked bit is one no consumer can recover: ctrl-wheel-up decoded as `wheelDown` and a drag as a stream of clicks, and both read as correct events to everything above.
 
 **And a question outranks rungs 1 and 2, which is the one place newest-first is not enough on its own.** A local verb awaiting `ctx.ask` is `inFlight` for the whole time its question is on screen, so `⌃c` was taken by the cancel rung and the question never saw it — two rungs with a claim, and the older one higher. Ruling A's own argument decides it: `Esc` and `⌃c` collapse *because* declining and cancelling produce the same outcome, and when two paths produce the same outcome the one that leaves a record is the one to keep. Cancellation discards the entry; declining settles one saying nothing changed. **Found by a frame-read and reachable by nothing else** — the container was untouched and the layer was gone, which is everything a test asserts, and the frame showed that the submitted line had disappeared. The suite agreed throughout, because every harness reported `inFlight: null` and that is the one arrangement where both readings agree.
 
@@ -709,6 +758,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 26. `←`/`→` at `liveBlock` are built-ins for the horizontal axis, the crosshair first (I28).
 27. `⇧⏎`/`⌥⏎` at `liveBlock` re-run the focused entry's recorded command, and that is the whole of what fires from a frozen entry (I29, → C23 I18).
 28. `CSI Z` decodes as `⇧tab`, bare form only (I17, §2).
+29. An SGR mouse event carries button, shift, meta, ctrl, motion and press/release as the terminal sent them; the wheel has four directions and buttons 8–11 have names (I30, §2).
 
 ---
 
@@ -734,6 +784,10 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T1.3i** (I17): `ESC \r` decodes to `{name: "enter", meta: true}` — the name the keymap uses, not the byte.
 - **T1.3j** (I17): `CSI 13;2u` and `CSI 27;2;13~` both decode to `{name: "enter", shift: true}`. Both forms, because a terminal sends one or the other and a rule satisfied by either is satisfied on half the terminals.
 - **T1.3e** (I17, §2): xterm's Meta bit is read. `CSI 1;10D` and `CSI 1;2D` decode to **different** keys, and `CSI 1;10D` and `CSI 1;4D` to the **same** one — the two wire forms of `⌥⇧←`. The pair is the assertion: either form alone passes with bit 8 unread, which `CSI 1;16D` shows by being correct in the broken state. Fabricated rather than found, because the defect produces a well-formed key and nothing above the decoder can see it.
+- **T1.3k** (I30, §2): `CSI < 80;10;5 M` decodes to the **whole** record `{wheelUp, ctrl: true, press: true}` at row 4, col 9 — the ctrl-wheel-up that scrolled down. `CSI < 64` beside it as the unmodified control, and `65` as `wheelDown`.
+- **T1.3l** (I30, §2): `CSI < 4;10;5 M` is `button0` **with `shift: true`**, `16` is `button0` with `ctrl`, `8` with `meta`, and `29` is `button1` with all three. Asserted as full records: a row on `button` alone passes with the modifiers masked — and the first draft of this row wrote ctrl-click as `20`, which is `16 + 4`, and the whole-record assertion refused it.
+- **T1.3m** (I30, §2): a drag — `CSI < 0;1;1 M`, `CSI < 32;2;1 M`, `CSI < 0;3;1 m` — is press, **motion**, release, each a full record; the middle one is `press: true, motion: true` and not a second click.
+- **T1.3n** (I30, §2): `66` and `67` are `wheelLeft` and `wheelRight`, `128`–`131` are `button8`–`button11`, and `130` and `2` are **different** buttons — the 128 bit is read, not folded onto bits 0–1.
 - **T1.4**: `CSI 200~` enters buffering.
 - **T1.5** (I12): bytes during buffering emit no key events.
 - **T1.6** (I6): `CSI 201~` emits exactly one `paste` carrying the buffered text.
@@ -847,6 +901,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T6.9c** (I17): passing the meta path's character through unnamed → T1.3c and C17 T4.2 fail, and Alt-Enter inserts nothing on every terminal.
 - **T6.9d** (I17): dropping the CSI-u and `modifyOtherKeys` branches → T1.3d and T2.13 fail, and Shift-Enter is unreachable on every terminal that sends it.
 - **T6.9e** (I17): dropping bit 8 from `modifiersOf`'s `meta` → T1.3e fails, and `⌥⇧←` arrives as `⇧←` on every terminal that sends Option as Meta — a **live** binding rather than a dead one, which is why no row above the decoder fails with it.
+- **T6.9f** (I30): restoring `code === 64` as the only wheel-up → T1.3k fails, and ctrl-scroll-up scrolls down. Masking the modifiers back out with `& 3` → T1.3l fails. Dropping the motion bit → T1.3m fails and a drag is a stream of clicks. All three in `tools/mutate/runs/c16-mouse-decode.mjs`.
 
 ---
 
