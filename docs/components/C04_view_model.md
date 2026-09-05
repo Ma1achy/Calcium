@@ -235,7 +235,7 @@ type BarSpec = Readonly<{
 | `tip` | text with fill actions | `ceil(len / w)` |
 | `panel` | title, footer, children | children measured at `w - 2`, + 2 |
 | `group` | direction, children | `column` → `Σ` children at `w`; `row` → `max` of children at the split width |
-| `scroll` | declared `height`, children | `height`, plus one residue row where the content overflows (I47, I49). **Absent from this table until F228**, which found the same gap in C09's |
+| `scroll` | declared `height`, children, `follow`, `collapsed` | `height`, plus one residue row where the content overflows (I47, I49); **1** when collapsed (I98). `follow` changes no height (I97). **Absent from this table until F228**, which found the same gap in C09's |
 | `status` | state, message, optional `retryInMs` / `attempt` / `elapsedMs` / `spinner` | `height` — the box is bound by what `measure` committed (C09 I31) |
 | `raw` | pre-formatted text | lines |
 
@@ -1421,6 +1421,20 @@ export type Scroll = Readonly<{
   /** Interior rows. A positive integer, and the content may exceed it. */
   height: number;
   children: readonly Block[];
+  /**
+   * Open at the tail, because the content grows at its end (I97). A producer's
+   * field — the one thing about position a producer may say, where `lineRange`,
+   * `minHeight` and `capped` describe the *view* and are refused (I82). Whether
+   * the reader is still there is the store's, derived from where the box ended
+   * up (C14 I5's rule, one level down).
+   */
+  follow?: boolean;
+  /**
+   * A collapsed form, declared by the field's presence (I98). Collapsed, the box
+   * draws its residue row and nothing else — *⋯ 0 above, N below* — and every
+   * element carries the `expand` action that toggles it.
+   */
+  collapsed?: boolean;
 }>;
 ```
 
@@ -1462,6 +1476,63 @@ how the structural half goes unexamined.
 | 4 | a resize | children re-measure and every element's rows move. **The offset is a row count, not an element index** — so it is re-interpreted rather than re-derived, and a reader who scrolled halfway stays halfway instead of jumping to whichever element used to be at that index. This is the ruling an obvious implementation gets wrong, and no cell of the table reaches it |
 | 5 | the entry is evicted or the transcript cleared | the offsets drop **on `rendered`'s own subscription** — same arm, same place in `construct.ts`, so a future eviction path cannot drop one and keep the other |
 | 6 | the entry settles | table cell 6. The offset is kept, and movable again once focused (C26 I21) |
+
+### The tail — the field says *start following*, the store says *still following*
+
+**Two rules meet and the ruling is that each owns half.** *View state is the shell's and never
+the producer's* (I82 refuses `lineRange`, `minHeight`, `capped`) and *a streaming block wants to
+open at its tail*. `follow` is a **producer's field** because it describes the content — it grows
+at the end — and not the reader; where the reader is *now* is the store's, and C14 I5 already
+rules how that is known: **derived from where the viewport ended up, never from which way the
+user scrolled.** So the field is the initial preference and the store's `TAIL` is the state.
+
+**`TAIL` is `∞`, and that is the mechanism rather than a flag.** The offset is clamped at read
+(cell 4), so a held value at or past the ceiling *is* the bottom — and a value that is past every
+ceiling stays at the bottom however the content grows, **with nothing written on a patch**, which
+is what C23 I47 requires of view state. `document-view.ts` asks *were we at the bottom before
+this arrived* against the old list and moves the offset to the new bottom; both call `atTail`
+(`shell/tail.ts`) so the comparison is written once. **The store cannot resolve `TAIL` on its
+own** — it does not know the width, so it does not know the ceiling — which is why `nudge` takes
+the ceiling from the caller who measured it, and without one a followed box stays followed.
+
+**Indexed by rule interaction** (C26 §8a's rule; a row governed by one rule finds nothing):
+
+| # | the rules that meet | ruling |
+|---|---|---|
+| T1 | *following* × *a child is appended* | the ceiling grows; `TAIL` clamps to the new ceiling at read. **Nothing writes**, and the box is `height` rows before and after — so the rows above the box do not move. *Live output does not move the frame* is this row |
+| T2 | *following* × *the reader pages up* | `nudge(−page, { ceiling, follow })` resolves the held value to the ceiling first, then moves. **The follow stops because the position is no longer the bottom**, not because a flag was cleared. **And the held value can be *nothing*** — an untouched follow box has no entry, and the store would read that as `0`, the top: the first `⇞` on a streaming box would jump to its head. The caller says `follow`, because it holds the block and the store does not; the walk's first draft resolved `TAIL` only and this row is what caught it |
+| T3 | *not following* × *a page lands at or past the ceiling* | snapped to `TAIL`. The reader is at the bottom, so the box follows — C14 I5 verbatim, and it holds for a box that never declared `follow` |
+| T4 | *following* × *the entry settles* | the flag is inert: nothing appends, so `TAIL` resolves to the same ceiling every frame. Cell 6's offset-is-kept is unchanged |
+| T5 | *following* × *a resize* | children re-measure and the ceiling moves; `TAIL` is past every ceiling so the box is still at the bottom. Trace 4's *a row count is re-interpreted* has nothing to re-interpret here |
+| T6 | *following* × *I49's residue* | the hidden rows are **above** the box, so the row reads *⋯ N above, 0 below*. The design drew *+N more* below (§9c) and the frame corrects it |
+| T7 | *`TAIL` held* × *no ceiling supplied to `nudge`* | `∞ + δ` is `∞`: the box stays followed and the page is a no-op. Stated because the two shipped callers (`pageBlock`, `nudgeScroll` in `construct.ts`) pass none yet — the arithmetic degrades to *still following* rather than to a wrong position |
+| T8 | *`TAIL`* × *the cache key* (C22 I58) | `Infinity` keys as a non-zero, so a follow box nobody touched (no entry, key `""`) and one snapped to `TAIL` render the same frame under two keys. One extra slot, once, for a reader who leaves the tail and returns; recorded rather than fixed, because the store does not know `follow` and omitting `TAIL` would key a paged-away box as untouched |
+
+### The collapsed form, and what `expand` toggles
+
+**`+N more` is I49's row and not a fourth count string.** A scroll declaring `collapsed` (the
+field present, either value) has a collapsed form: **zero interior rows, and the residue row is
+the whole of what it draws** — *⋯ 0 above, N below*, `measure` 1 at every width. Expanded again
+it is an ordinary box. The design's §9b reasoning panel and §9c tool call are both this shape:
+a one-line header over a folded body.
+
+**The toggle rides `replace`, because `op: "expand"` names a row.** `patch.ts`'s arm refuses any
+block without `rows` (*is a scroll, which has no rows*), so widening the action without
+checking the mechanism would have dispatched a patch that fails on every press. A shell-origin
+`replace` of the block with `collapsed` inverted passes C13 §2's gate on a settled entry and
+reaches a nested block (T2.31). **The affordance is `NavElement.activate`**, which exists: every
+element of a collapsed-form scroll carries `{ kind: "expand", target: <block id> }`, so `⏎` on a
+child — reachable through cell 8's content-coordinate elements even when no row is drawn —
+toggles the fold. The pointer lands on the residue row, which is content row 0 at offset 0, so a
+click on *⋯ 0 above, N below* addresses the first child and expands (C16 §4a's hit-test, unchanged).
+
+| # | the rules that meet | ruling |
+|---|---|---|
+| S1 | *collapsed* × *I49's condition on `(block, width)`* | content `> 0` interior, always; the row is unconditional **because** the interior is zero, not because the rule changed. A collapsed scroll is never *⋯ 0 above, 0 below* since I47 refuses an empty one |
+| S2 | *collapsed* × *`follow`* | the offset is forced to 0 while collapsed so the residue reads *0 above, N below*; expanded, `follow` applies. A collapsed follow box has nothing to follow |
+| S3 | *collapsed* × *cell 8, elements outside `measure`* | every element lies outside `[0, 1)`; cell 8 already rules that legal. Focus can reach a child of a folded box, which is what makes `⏎` reach it |
+| S4 | *`expand` action* × *C23 I18, every kind refused from a frozen entry* | **the interaction the design did not see.** §9b's *expanded with the expand action, which exists* was true of the live entry only, and every past tool call is settled. `expand` reveals data the entry already holds, fills nothing and runs nothing, so D8's staleness argument has no purchase: it is I18's exception (→ C23 I18) |
+| S5 | *`expand` target* × *a row id and a block id* | rows are searched first (the shipped path), then blocks at any depth. I14 keeps block ids unique but says nothing about a row id equalling a block id; the order is recorded so a collision is a known answer rather than a surprise |
 
 ### The residue, and the row it costs
 
@@ -2797,6 +2868,8 @@ persisted document rests on.
 - **I94** — **`Rule.level` names one of three drawn forms, absent is the second, and the six ATX levels collapse at the translator rather than in the type.** The axis is the **fill** and nothing else: heavy at tier 1, light at 2, blank at 3, with the lead at two cells and the label in the same column throughout — so `measure` is one row at every tier and no geometry is at stake. Case is not an axis, because upper-casing changes cell count for scripts that have no case and puts a capability decision inside a transform that cannot see one; indentation is not one either, because it moves the label off the column the rule exists to mark. **`HeadingLevel = 1 | 2 | 3` rather than `1..6`**: a fourth tier would be accepted and drawn as a third, which is F207's member one layer up from where that finding usually lives, and the type is where it is cheapest to refuse. **An empty label never takes the blank fill** — tier 3 falls back to tier 2's light rule there, because a rule with no label and no line is not a rule (I21) — and the fill is drawn as **spaces** rather than dropped, so `meta` stays right-aligned and the row is exactly the width at every tier (→ C09 I40, §3an).
 - **I95** — **`Glyph.quote` is a rail — drawn on every row of its block rather than on the first — and a blockquote's body is prose.** The reserved columns are `prefixCells`' own, so the geometry does not move and `measure` still needs no capability; only what fills rows 1..n changes, which is a property of the **token** exactly as `continuation`'s indent is, and the block schema learns nothing. **Not `live`'s `▌`**, on F161's argument about a shared mark and on a second the argument does not reach: `▌` and every box-drawing vertical are `East_Asian_Width=Ambiguous` — 1 narrow, 2 wide by the framework's own `cells()` — where `⎸` (U+23B8) is one cell under both, which is `continuation`'s measurement reaching a decision rather than a footnote. The ASCII half is `>`, plain text's own quotation mark. **The rail takes the block's tone**, since a second tone would be a colour distinction and colour is gone at 1-bit where the rail is not. **A quoted heading and a quoted list item are text**, and that is unexpressible rather than deferred: re-parsing a body would want a rail on a `rule`, a `code` and a `table`, and none of the three has a slot to hold one (→ C09 I41, §3an).
 - **I96** — **The list indent is bounded at three levels and `Glyph.nested` says which side of the bound an item is on.** The bound stays on a measurement rather than on its first reason: with the cap removed, at width 40 an item past about depth 15 loses its indent entirely — the leading spaces are the wrapper's break, the first row is the mark alone, and a deep item reads as depth 0 having spent a row saying nothing. A width-scaled cap is not available, because the indent is computed where no width exists and none may be read. **What the cap cost is a document that means two things**, so depth 0–3 take `bullet` and everything deeper takes `nested`; past it the frame says *at least this deep* and no more, which is what a bounded region says — a residue marker does not report how many characters it dropped either (I49). **The ordered arm takes the mark too**, because a number says which item and never how deep. `⁃` (U+2043) is Neutral where `◦`, `‣` and `▪` are Ambiguous; the ASCII half is `~`, §5's own bounded-region mark, and not `-`, which is `bullet`'s and would spend the distinction at the rung that needs it (→ C09 I41, §3an).
+- **I97** — **`Scroll.follow` is a producer's field and the tail is view state: the field says *start following*, the store says *still following*.** A streaming container opens at its tail because the producer said its content grows at the end — a property of the content, and the one thing about position a producer may say, where `lineRange`, `minHeight` and `capped` (I82) describe the *view* and are refused. Whether the reader is still there is derived from where the box ended up and never from which way they scrolled (C14 I5's rule, one level down): an offset at or past the ceiling **is** the tail; the store spells *stay there* as `TAIL` (`∞`) so the clamp at read keeps a following box at the bottom as its content grows **with nothing written on a patch** (§3c cell 4, C23 I47); a page up from the tail resolves the held value — `TAIL`, or the tail an untouched follow box implies, which the caller states because the store does not know the block — against the ceiling the caller measured, and the follow stops because the position is no longer the bottom; a page landing at or past the ceiling snaps to `TAIL` and it resumes, for a box that never declared `follow` too. `measure` never sees `follow` — the box is `height` rows at every offset, following or not, so the rows above it do not move when its content does. While following the hidden rows are above the box and I49's row reads *N above, 0 below*. Both `wasAtBottom` comparisons — the document view's and the store's — are one function (`atTail`), so `>=` cannot drift to `>` in one of them (§3c, the tail).
+- **I98** — **A scroll declaring `collapsed` has a collapsed form: zero interior rows and the residue row, which is the whole of what it draws.** *Declares* means the field is present, either value; a scroll without it has no collapsed form and carries no affordance. Collapsed, the box draws I49's row alone — *⋯ 0 above, N below*, the design's *+N more* sharing the residue's mechanism rather than a fourth count string — and `measure` is 1 at every width. Its elements are still one per child (I47) in content coordinates (§3c cell 8), and each carries `activate: { kind: "expand", target: <block id> }` so `⏎` on any of them toggles the fold. **The toggle is a shell-origin `replace` with `collapsed` inverted** (C13 §2) and never `op: "expand"`, whose arm names a row and refuses a scroll (C25). A block declaring a collapsed form is what `expand` widens to in the dispatcher: rows first, then blocks at any depth (§3c S5) — and from a settled entry it is C23 I18's one exception, because revealing held data is not acting on stale data (§3c S4).
 
 
 ## 7. Commitments

@@ -81,6 +81,10 @@ interface BlockRegistry {
   measure(block: Block, width: number): number;
   render(block: Block, ctx: RenderContext): ReactElement;
   measureSequence(blocks: readonly Block[], width: number): number;
+  // C14 §4b — the slice of a sequence that fills rows [from, to), on block boundaries
+  // where a kind declares no `window`; the rows skipped before the first kept block.
+  windowSequence(blocks: readonly Block[], width: number, from: number, to: number):
+    Readonly<{ blocks: readonly Block[]; skipRows: number }>;
   renderSequence(blocks: readonly Block[], ctx: RenderContext): ReactElement;
   // C26 §5 — one block's elements, block-local; and a sequence's, lifted in BOTH axes.
   elementsOf(block: Block, width: number): readonly NavElement[];
@@ -92,6 +96,12 @@ interface BlockRegistry {
 
 function createBlockRegistry(opts: { defaults?: boolean }): BlockRegistry;
 ```
+
+**`FocusState.selected` is the selection's extent** (C26 I16) as `(blockId, rowId)` pairs over the
+*entry's* element list, head included, **absent** when the extent is the head alone. Every block in the
+entry is handed the same list and keeps the pairs naming itself, so a block that does not hold the head
+still paints its selected rows from one value (C11 I14). Absent and `[]` draw alike and key alike
+(C22 I58). Added 2026-09-05 with the writer (`focusFor`) and the axis, per C22 I71.
 
 `measure` on the registry is the dispatcher, and it passes **itself** as each definition's `measureChild`. That is how `panel`, `group` and a table's expanded detail measure children whose kind they do not know, without any kind importing the registry.
 
@@ -799,6 +809,7 @@ C09 owns both renderings of every glyph a block can name (C04 §5). A block name
 | `quote` | `⎸` | `>` | A quotation's gutter — a **rail**, drawn on every row (C04 I95) |
 | `nested` | `⁃` | `~` | A list item nested deeper than the indent shows (C04 I96) |
 | `continuation` | `⎿` | `` ` `` | A line subordinate to the one above — the entry's own state, under its command |
+| `step` | `⏺` | `@` | A step in a sequence of work — a tool call's header (`AGENT_TUI_DESIGN.md` §9c). **U+23FA is `East_Asian_Width=Neutral`**, one cell under both conventions, measured with `cells()` before the row was written; `running`'s `●` is Ambiguous and is a *state*, where this names a *position in a sequence* and does not change as the step runs or settles. The ASCII half is unused by any other slot |
 
 **Why this is a closed union and not a string.** While the field was free, C09 emitted a block-supplied character verbatim — so the 1:1 guarantee held for the glyphs C09 chose and silently did not hold for the ones an adapter wrote. That is a guarantee that is mostly-true, and mostly-true fails only under `LANG=C`, only for the users least able to describe what they are seeing. It also drifted immediately: before tokenisation the tree carried `✗`, `✖`, `*`, `+` and `▲` in glyph positions, across five files, for three rôles.
 

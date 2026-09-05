@@ -139,6 +139,10 @@ Detail is indented by 2 cells, so it measures at `width − 2`. Detail blocks ar
 
 **Focus is rendered, not owned.** `ctx.focus` names the focused row; C11 renders it distinctly and surfaces its actions. Which row has focus, and what the arrow keys do, is C16's. C11 exposes `focusableRowIds` so the router has something to move between.
 
+**The selection is rendered the same way, and it is one more state of the same rule.** `ctx.focus.selected` names the extent (C26 I16) as `(blockId, rowId)` pairs over the *entry's* element list: every block in the entry is handed the same list and keeps the pairs naming itself, so a table holding three selected rows paints three from one pass and a table holding none of them — the head being in a sibling block — paints nothing. A selected row that is not the head is painted `tone.default` over `surface.selection`, the editor's own wash (C10 §4b), because it is the same meaning — the rows `y` will copy — and one slot carries one meaning. The head keeps focus's `accent`, which is what makes it distinguishable inside its own extent; the wash is *selected*, the accent is *here*. **A one-element extent is therefore drawn exactly as no selection, with no branch on the count**: the head is painted as the head and there is nothing else to paint, which is I16's sentinel measured on the render side. Where the wash has no colour (`colourDepth: 1`) the row is reverse video — the rung `shell/paint.ts`'s `selectionStyle` already takes for the prompt: an attribute survives the depth where a colour does not, and a gutter mark would cost a cell I14 forbids and I15 refuses to reserve.
+
+**Measured before this landed** (F764, arc3 Lane A): after `↓ ⇧↓ ⇧↓` the frame showed the head in `accent` and the two rows above it in `default` — the extent had one reader, `y`. And `pills` read `ctx.focus` nowhere: `render` consulted `active` and `tone` only, so a focused chip was invisible in every frame. Both are the same omission — `FocusState` carried the head and nothing painted anything but a table row — and both close here: a chip is painted `accent` when it is the head and washed when it is selected, on the rule above.
+
 ### The action bar (I17)
 
 A trailing row carrying the **focused row's** actions — `⏎ detail  ␣ expand  ≡ logs  ⚡ events` in S03 §2, and the equivalent in S02, S05, S06 and S14.
@@ -211,7 +215,7 @@ derived, and a hand-built table setting either would assert something its own ro
 - **I11** — C11 owns no state. Sort order, expansion and focus all arrive as data.
 - **I12** — Column priority is declared by the surface, never inferred by C11. A table engine guessing which column matters would guess differently as data changed, and the drop order would stop being reviewable.
 - **I13** — Missing values sort last in both directions. Not first when ascending and last when descending — last either way, because a null is an absence of rank rather than the bottom of one, and a reader sorting to find the worst case should not find blanks.
-- **I14** — Focus is rendered by C11 and owned by C16. C11 holds no focus state; it draws what it is handed, which is what keeps I11 true for the one piece of state a table most looks like it should own.
+- **I14** — Focus is rendered by C11 and owned by C16. C11 holds no focus state; it draws what it is handed, which is what keeps I11 true for the one piece of state a table most looks like it should own. **The selection is the same rule with one more state**: a row named in `ctx.focus.selected` and not the head is painted `default` over the selection wash — reverse video at 1-bit — and the head stays `accent`; a one-element extent draws byte-identical to no selection, with no branch on the count; a block whose id no pair names paints nothing. Focus and selection change tone and nothing else: no marker, no extra row, no width (§5).
 - **I15** — The expand marker is drawn only into a column declaring `role: "expand"`, and `planColumns` never reads `role`. A table declaring no such column shows no marker; C11 neither synthesises a column nor reserves a gutter, because either would change width arithmetic the surfaces already state.
 - **I16** — C11 registers through C09's public `register`; it is not privileged.
 - **I17** — The action bar's **presence** depends on the data and never on focus: a blank separator and a label row whenever any row declares `actions`, with the labels blank when nothing is focused. A height that varied with focus would move without `rev` moving, so C14's cache could not invalidate it — I9 broken in the one way measurement cannot catch, since `measure` never sees focus at all.
@@ -232,7 +236,7 @@ derived, and a hand-built table setting either would assert something its own ro
 7. Sort is stable, type-aware, height-neutral, and pairs details with parents (I8).
 8. Missing values sort last in both directions (I13).
 9. Expansion is block state; detail measures through `measureChild` (I9).
-10. Focus is rendered here and owned by C16 (I14).
+10. Focus is rendered here and owned by C16, and the selection is painted the same way as one more state (I14).
 11. C11 holds no state and registers through the public mechanism (I11, I16).
 12. Golden frames at 80 / 100 / 120 / 160 pin the layouts (D39) (→ A01 §3).
 13. The expand marker fills a column the surface declared, and planning ignores `role` (I15).
@@ -271,6 +275,8 @@ Six tiers. No state machine — C11 is pure over the block.
 - **T1.20** (I19): the whole block sorts to `bravo · alpha · charl` because one cell reads `abc`; the window `[0, 3)` renders the same two rows in the same order, and **the same window with `presorted` cleared renders them reversed** — same count, same height, same `skipRows`. The control is the row: without it the assertion passes against an implementation that never pinned anything.
 - **T1.21** (I18): a window covering the bar declares `actionBar: true` although its slice holds no `actions`, and a mid-table window whose slice **does** hold the row with `actions` declares `false`. Both directions, because a pin asserted in one is satisfied by a renderer that always says yes.
 - **T1.22** (I20): `[0, 1)` keeps a row and charges it to `dropRows`, and renders the header rather than the empty message; `[n−1, n)` keeps a row and charges it to `skipRows`, with `showHeader: false`. Neither end of a table is a row, and the two are paid at opposite ends.
+- **T1.23** (I14): a table handed `selected` naming `a`, `b`, `c` with the head on `c` paints `a` and `b` in `default` over the selection wash — a span carrying its own tone inside `b` included, because the mutation that kept span tones on a selected row failed nothing until a fixture had one — and `c` in `accent`, and the row above `a` unwashed — **which rows, not how many**, because a wash on the wrong three rows satisfies every count. Handed the same pairs under a block id that is not its own it paints exactly what it paints with no focus. And `selected` naming the head alone is **byte-identical** to `selected` absent: the sentinel, measured. At `colourDepth: 1` the two washed rows carry `7` (reverse video) and the head does not.
+- **T1.24** (I14): `pills` paints the focused chip `accent`, a selected one washed, and the same chip under another block's focus in its own tone. The control is the frame at HEAD, where a focused chip drew as an unfocused one.
 - **T1.19** (I17): the bar carries the focused row's action labels; with focus on a different row it carries that row's; with no focus it is blank and the height is unchanged. The blank case is what stops the row being conditional in the renderer while looking unconditional in the measurer.
 
 ### Tier 2 — contract / interface
@@ -318,6 +324,7 @@ Six tiers. No state machine — C11 is pure over the block.
 - **T4.5** (with C14): sorting does not change scroll position, because height is invariant.
 - **T4.6** (with C16): `focusableRowIds` matches the rendered rows in order, so arrow navigation lands where the user sees focus.
 - **T4.7** (with C04): expanding patches the document rather than mutating external state; the frozen block records its expansion.
+- **T4.8** (with C22, C26 I16): in a painting session, `↓ ⇧↓ ⇧↓` over a four-row table leaves `alpha` and `bravo` washed, `charlie` in `accent` and `delta` in `default` — read from the screen, per row, against the tones the theme resolves. Then `↓` collapses: `delta` is the head and nothing is washed. **The row this seam exists for**: T1.23 passes with `focusFor` returning the head alone, because the renderer is handed the list by the test; only a frame from a session can say whether anything writes it (C22 I58's pairing rule).
 
 ### Tier 5 — e2e
 
@@ -343,6 +350,7 @@ Six tiers. No state machine — C11 is pure over the block.
 - **T6.13** (I15): recognising the expand column by `key === "expand"` rather than by `role` → T3.19 fails, and a far side returning a field of that name loses it.
 - **T6.14** (I15): letting `planColumns` widen or reserve for a `role: "expand"` column → T2.9 fails, and every drop table in the S-series is off by the same two cells.
 - **T6.15** (I11): memoising `planColumns` on `(columns, width)` → T2.7 fails, and T2.6's scan finds the cache.
+- **T6.17** (I14): `focusFor` returning the head alone → **T4.8**'s three-row assertion fails and T1.23 passes, which is the split that says the field had no writer. Washing the head as well → T1.23's head assertion fails and its byte-identical control fails with it, because a one-element extent now differs from none. Comparing `selected` against the block's id before filtering → a selection whose head sits in a sibling block paints nothing in the table, and T1.23's sibling arm fails.
 - **T6.16** (I17): drawing the bar only when a row is focused → T1.18's three-way equality fails. The revert is the plausible one — a blank row looks like waste, and removing it is correct in every frame the reader is looking at. What it breaks is a frame after a keystroke that changed no data, which is where C14 answers from a cache `rev` never invalidated.
 
 ---

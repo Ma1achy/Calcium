@@ -1012,7 +1012,14 @@ notice here.
   rows**, which is §4b's *the window is a rendering consequence* restated as an addressing
   rule, and the pointer resolves through it (I8). **Found by the compiler rather than by
   either walk artefact**: neither indexes one component's invariant against a kind that did
-  not exist when it was written.
+  not exist when it was written. **And the same holds of the lifted list** (§5 predicate 1):
+  `registry.elementsIn(blocks, width)` places every element within
+  `[0, registry.measureSequence(blocks, width))` × `[0, width)` of the *sequence*, each block's
+  top row **and left column** added (C09 §2) — a table's rows inside a `panel` begin one row and
+  one column in, and the second of two tables in a `row` group begins after the first's
+  `childWidths` share plus the gutter. Both halves were false while every block-level list
+  passed (F756, F757), which is why the sequence form is stated beside the block form rather
+  than left to follow from it.
 - **I5** — The element list is in reading order, non-decreasing by `(rows.from, cols.from)`.
 - **I6** — Two elements at the same `level` share no cell. Nesting across levels is the
   structure and is not a violation.
@@ -1448,6 +1455,7 @@ Named against the invariants; the tiers are the six.
   implementation. **Two fabrications confirm it is live**, as F134's did.
 - **T1.42, T1.43** (I17, §5c) — an element's `copy` carries **every declared column**, including the ones the width dropped, is the same text at 60 columns and at 200, and is untruncated. The control is `planColumns(...).dropped` being non-empty at that width: without it the row passes for a table that drops nothing. The expand column contributes its **cell**, not the marker a renderer puts there.
 - **T1.44, T1.45, T1.46** (I16, §5c) — `⇧↓` twice leaves the anchor where it was and `y` copies the range newline-joined; an unshifted motion collapses, so `y` afterwards copies one row; and `⇧↑` at the first element stays in the block, where unshifted `↑` leaves. **Two extensions in the first, because one passes whichever end moved** — C17 T1.23's argument one level up.
+- **T2.29, T2.30, T2.31** (I4, I5, I6; C09 §2) — **the lifted list, in sequence form.** Two 39-wide tables in an 80-column `row` group: the second's elements sit at cols `[40, 79)` and the frame's second header begins at column 40 — the gutter is measured through `childWidths`, not assumed. Containment, disjointness and stability hold of the lifted list **across** blocks and order within each, **and a fabricated old walk — rows lifted, columns not — fails disjointness**, which is what shows the sweep is live. A `panel`'s children start one row and one column in, a `column` group's follow one another, and an unplaced child holds nothing. Three rows because the two lifts fail separately: F756 was the column, F757 the origin.
 - **T1.18** (I19, §4c) — **the tail stops and the head leaves, asserted at the entry's ends rather than a block's.** T1.15 already carries the other half: two tables, and `↓` at the first's last element steps into the second, so a block's edge is not an end. The row that was missing is the tail — `↓` at the entry's last element leaves focus where it is — and its absence is why the asymmetry read as `table`'s for as long as it did. The fixture holds **two** blocks, because one block makes the entry's ends and the block's ends the same cells and every reading agrees.
 - **T2.x** (I2) — the ladder still derives from `FOCUS_ORDER` with the mode present:
   exhaustive over the target union, not over a hand-written list.

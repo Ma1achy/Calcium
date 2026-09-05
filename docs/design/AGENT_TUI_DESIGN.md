@@ -585,6 +585,55 @@ a real reasoning stream in front of it.
 distinguishes *slow* from *stuck*. **The step marker does not change**; the result appears
 beneath it.
 
+### What the frame changed about §9c — four captures beside the drawing
+
+**Built as a composition and rendered at 80 and 40 columns, 24-bit and ASCII** (2026-09-05,
+`toolCallDoc` in `src/shell/documents.ts`, T2.48 prints the frames). The card is a `notice`
+carrying the new `step` glyph over either a `continuation` notice or a `scroll` that opens at
+its tail (C04 I97); *+N more* is the scroll's own residue row on a `collapsed` scroll (C04
+I98). Four things in the drawing were not what the frame draws, and the frame wins:
+
+```
+⏺ run_command(npm test) · 4s                   ← running: the body streams beneath it
+line 10
+line 11
+line 12
+⋯ 9 above, 0 below                             ← the hidden rows are ABOVE a following box
+
+⏺ run_command(npm test) · 4s · exit 0          ← settled: the outcome is in the header
+  ⎿ 118 passed, 2 todo                         ← the result under the hook, indented two
+
+⏺ run_command(npm test)                        ← folded: a collapsed scroll
+⋯ 0 above, 392 below                           ← "+392 more" IS the residue row
+```
+
+1. **`exit 0` moved from the `⎿` line to the header.** The grammar is *⏺ name · elapsed ·
+   outcome* over a body; the outcome is the step's verdict and the result line is the body's
+   text. Drawn on one line here, they were two facts in one row.
+2. **The count string is not `+392 more · ⏎ to attach`.** There is one count mechanism — the
+   residue row *⋯ N above, M below* (C04 I49) — and a fourth string beside it would drift. A
+   folded body reads *⋯ 0 above, 392 below*; a body that is streaming and followed reads *⋯
+   392 above, 0 below*, because the hidden rows of a box showing its tail are above it, not
+   below. The drawing had them below.
+3. **`⏎ to attach` is not text on the row.** The affordance is `NavElement.activate` on every
+   child of a folded scroll — the `expand` action, whose label the footer shows — so the row
+   carries no key name (C16 I19's argument: a key named in a notice is a second keymap).
+4. **At 40 columns nothing changes**, and under ASCII the marks are `@`, `` ` `` and `~`.
+   The four frames are identical in shape; only the glyph slots move.
+
+**What has no mechanism, and §9d draws it:** the `⎿` hook in front of a *table* or a *logs*
+block. `continuation` is a `notice` slot (C09 §4), so a body that is a table is drawn without
+the hook and the header alone carries the frame. **§9d's three cards are therefore drawn
+wrong by one column**: the mark before `NAME KIND SIZE` and before `FILE LINE MATCH` does not
+exist, and putting it there would need a gutter mechanism on arbitrary blocks that C09 does
+not have. Recorded here rather than redrawn, because the gallery's point — one frame, three
+block kinds — survives without it.
+
+**And one rule the walk found that the drawing could not show**: `expand` was refused from
+every settled entry (C23 I18, *all five kinds*), and every past tool call is a settled entry.
+*Expanded with the expand action, which exists* was true of the live entry only. `expand` is
+now I18's one exception (C04 §3c S4).
+
 ### 9d · The gallery — one tool per block kind
 
 ```

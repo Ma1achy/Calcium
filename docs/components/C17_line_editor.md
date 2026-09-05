@@ -167,6 +167,12 @@ Each shifted form is *move, and leave the anchor where it is*. There is no secon
 
 **An unshifted motion collapses the region.** So the model is invisible until someone holds Shift, which is what lets it land under every existing test unchanged.
 
+### `collapse()` — the region goes and nothing else moves
+
+**A collapse that is not a motion** (I23). Every collapse above happens *because* something else moved — `move` collapses by moving the caret, an edit by replacing the region, `undo` by restoring text. Copy mode (C16 §5b) needs the region gone with the caret **where it is**: the terminal's own selection is about to take over the screen, and a prompt still washing a region under it shows two selections at once. Measured (F765): `#setCopyMode(true)` did not clear `Editor.selection`, and C17 exposed no member that could — the only collapsing operations all move or edit.
+
+So `collapse()` drops the anchor and touches **nothing** else: the caret stays, the text is unchanged, and the undo history is untouched — no unit recorded, no open unit closed, the kill run left as it was. It is not an edit (nothing to restore) and not a motion (nothing moved), so it takes neither's bookkeeping; a version that closed the open unit would make the next keystroke after copy mode a new undo unit for no edit the reader made. `anchor === head` already reads as no region, so on a bare caret it is a no-op with nothing to observe.
+
 ### An edit replaces the region, as one unit
 
 `insert`, `deleteBackward`, `deleteForward` and `yank` remove the region first and record **one** undo unit for the pair. The kind is `structural`: a replacement is not typing that should coalesce with what follows, and it is not a paste that should stand alone for its own reason.
@@ -396,6 +402,7 @@ the space at index 77; `--seed=1234` does not fit and moves whole.
 - **I20** — Rows are produced by walking clusters. A cluster that does not fit moves whole and leaves the cell behind it blank; a cluster wider than `usable` takes a row of its own and **overflows** it. C09 I9 may drop or substitute a glyph a block cannot draw and C17 may not: a block renders someone's data, an editor holds what the user typed.
 - **I21** — **A selection is an anchor plus the cursor**, in the buffer's own grapheme indices, and the cursor **is** the head. `anchor === head` is no selection rather than an empty one, so the caret has one spelling. An extending motion moves the head and never the anchor; an unshifted motion collapses. Both halves are load-bearing and fail differently: a motion that moves the anchor is right on the first keystroke and wrong on the second, and a motion that does not collapse leaves a region nobody can see the end of.
 - **I22** — **An edit over a region replaces it, in one undo unit.** `insert`, `deleteBackward`, `deleteForward` and `yank` remove the region and apply themselves as a single `structural` unit; `killTo` collapses rather than cutting, because a kill already names where to cut to and a region would be a second answer. Selection is not undo state: `undo` and `redo` collapse it, which is I16's rule inverted — a clipboard survives an undo and a statement about where the caret is does not.
+- **I23** — **`collapse()` leaves the caret where it is, the text unchanged and the undo history untouched; only the region goes.** Not a motion and not an edit, so it takes neither's bookkeeping. The distinction from `move` is the caret: a collapse implemented as a motion is right about the region and wrong about where the caret is, which a test reading `selection` alone cannot see.
 
 ---
 
@@ -422,6 +429,7 @@ the space at index 77; `--seed=1234` does not fit and moves whole.
 19. A cluster that cannot fit moves whole and one wider than the row overflows rather than being dropped: an editor never alters what the user typed (I20).
 20. Selection is one anchor plus the cursor, and an extending motion never moves the anchor. The defect that does is right on the first keystroke and wrong on the second (I21).
 21. An edit over a region replaces it in one undo unit; `killTo` collapses rather than cutting; and a region does not survive an undo (I22).
+22. `collapse()` drops the region without moving the caret, changing the text or touching the undo history — the one collapse that is neither a motion nor an edit, for copy mode (I23).
 
 ---
 
@@ -473,6 +481,7 @@ test rather than as its steps: the sequence is what the invariants do not constr
 - **T1.28** (I22): typing over a region replaces it, in **one** undo unit — `undoDepth` rises by one and `undo` restores the whole original text including the region.
 - **T1.29** (I22): `deleteBackward` over a region removes the region and **not** an extra character. The off-by-one is the natural implementation, and a region of one grapheme makes the two indistinguishable — so the row uses three.
 - **T1.30** (I22): `killTo("wordLeft")` with a region open cuts by the motion and collapses, rather than cutting the region. The kill buffer holds the motion's text, which is what says which of the two answers was taken.
+- **T1.42** (I23): a region open, `collapse()` → `selection === null`, the cursor **where the head was** (not where `charLeft` would put it — the control that tells a collapse from a motion), the text unchanged, `undoDepth` unchanged; and on a bare caret it is a no-op.
 - **T1.31** (I22): a region open, `undo` → no region afterwards. The control is the kill buffer in the same row, which **does** survive — I16 and I22 in opposite directions, asserted together so neither can be satisfied by a rule that collapses everything or nothing.
 
 ### Tier 2 — contract / interface
@@ -554,6 +563,7 @@ All five need a running shell and are deferred on L4, in the form `todo-expiry` 
 - **T6.17** (I18): `displayRows` computing its own count rather than `layout().length` → T2.9b fails, and the prompt L4 draws stops being the prompt C17 measured.
 - **T6.18** (I19): `ceil(cells / usable)` in place of the position count → T3.8b fails, and the cursor at the end of a full command has no row to sit on.
 - **T6.19** (I20): dropping a cluster wider than the row, as C09's wrap does → T3.6 fails and the editor deletes what the user typed.
+- **T6.20** (I23): `collapse()` implemented as `move("charLeft")` → T1.42 fails on the cursor; implemented as a recorded `structural` edit → T1.42 fails on `undoDepth`.
 
 ---
 
