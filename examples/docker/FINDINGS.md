@@ -27912,3 +27912,125 @@ row 13 reads 4 and row 14 reads 26.
 **Where**: `tools/mutate/runs/c12-svg-legend-column.mjs`; C12 T6.92.
 
 ---
+
+## F747 — four sentences in the note audit described a ceiling that had lifted the day before the arc was written ★★★☆☆
+
+*2026-09-04 · the lead, closing arc1 (the interaction arc, steps 1 and 2a), at de52f1da+arc1.*
+
+**Expected** (`CALCIUM_NOTE_AUDIT.md` B13/B14/B7 and the hit-test row, and the interaction-arc direction
+built on them): *exactly one kind declares `elements`; `elementsIn` has one caller reading `liveId`;
+`mergeBlock` throws on collision and every widget trips it; `cursorPositions` has no writer.*
+
+**Measured at `de52f1da`**: **five** kinds declare `elements` (`table/definition.ts:111`,
+`kinds/simple.ts:436`, `containers.ts:282` and `:455`, `plot/definition.ts:3219`); `elementsOf(entryId)`
+at `construct.ts:1263` with three callers over the *focused* entry, `focusedEntryId` at 18 sites, `CSI Z`
+decoded (`082030a0`, 2026-09-03, C26 §4g); `mergeBlock` places at `interaction` (C16 I27,
+`keymap.ts:69-77`) — still with **0** producers of `BlockKeymap` in `src/`; `cursorPositions` written at
+`keys.ts:863` → `construct.ts:1528`. **The arc's §0 was these four sentences**, and its whole order rested
+on them. Each kept and marked superseded with the measurement; the remaining widget blocker is B7's
+value store alone.
+
+**Where**: `docs/notes/CALCIUM_NOTE_AUDIT.md`; `docs/components/C26_navigation.md` §4b/§4c/§4e markers.
+
+---
+
+## F748 — the widget design's first three bind targets are on no type, and one was removed on a ruling ★★★☆☆
+
+*2026-09-04 · the lead, closing arc1 (the interaction arc, steps 1 and 2a), at de52f1da+arc1.*
+
+**Expected** (`CALCIUM_WIDGETS_DESIGN.md:110-127`): `series[].hidden`, `annotations[].hidden` and
+`Plot.palette` as binding targets — *every one of those is a field on `Plot`*.
+
+**Measured**: `Series` (`types.ts:951-1001`; the note's `845-885` had moved) has no `hidden`;
+`Annotation` (`:1174-1208`), four arms, none; `palette?:` occurs **zero** times — `marks.ts:56-72` records
+`Plot.palette` **removed** under roadmap 51, *a field with one legal value is not a choice*. So the
+design leads with two absent members and one **reversed ruling**, which want different remedies: a
+type change for two, and an argument against a standing ruling for the third. Recorded in the note
+beside the table.
+
+**Where**: `docs/notes/CALCIUM_WIDGETS_DESIGN.md`; `src/data/viewmodel/types.ts`; `src/presentation/plot/marks.ts`.
+
+---
+
+## F749 — a roadmap residue cell is watched by nothing, and one control against it was vacuous ★★☆☆☆
+
+*2026-09-04 · the lead, closing arc1 (the interaction arc, steps 1 and 2a), at de52f1da+arc1.*
+
+**Measured**: `FrobnicatePolicy` written into entry 7's residue cell → `roadmap-status` **exit 0**
+(`roadmap-status.mjs:153-154`: only the evidence cell is resolved). Control 1 — `types.ts:84` →
+`focus.ts:84` in the evidence cell — **exit 0 too**: `focus.ts:84` is a real line and the identifier
+resolves against a sibling citation in the same cell, the blind spot the tool's header states.
+Controls 2 and 3 (`nonesuch.ts`, `:99999`) exit 1 with the named reason. No rule proposed: a residue
+resolver fires on every absent thing the cell is *for* naming (F94's shape). The measurement beside
+each sentence is the defence, which is why every one this pass wrote carries one. Also: roadmap 7's
+residue owed *the boundary*, which C26 §4c ruled on 2026-08-15 — now names the MG24 withholding of
+`ArrowPolicy`/`EscapePolicy` and nothing else.
+
+**Where**: `CALCIUM_ROADMAP.md` entry 7; `tools/roadmap-status.mjs`.
+
+---
+
+## F750 — the SGR mouse arm read two bits of eight — three defects in one line, none visible to a row asserting one field ★★★★☆
+
+*2026-09-04 · the lead, closing arc1 (the interaction arc, steps 1 and 2a), at de52f1da+arc1.*
+
+**Expected**: a decoded mouse event says what the terminal sent.
+
+**Measured through the built decoder**: `decode.ts:429` was
+`code >= 64 ? (code === 64 ? "wheelUp" : "wheelDown") : \`button${code & 3}\``. Shift-click (`4`) and
+ctrl-click (`16`) → bare `button0`; ctrl+wheel-up (`80`) → **`wheelDown`**, so ctrl+scroll-up scrolled
+down; horizontal wheel (`66`, `67`) and the 128 range → `wheelDown`; a drag report (`32`) →
+`button0, press: true`, indistinguishable from a click. The only correct field was `press` from the
+final byte. **Every existing row asserted `button` alone**, which a decoder that drops the modifiers
+satisfies. **Fixed** — C16 I30, the full bit table, `WHEEL_DIRECTIONS` indexed by the low bits;
+T1.3k–n on the whole record; three fabricated violations each killing a different named row. No
+`release` field: `press: false` is the release, and a second boolean that must agree with the first is
+a place for two readers to disagree.
+
+**Where**: `src/interaction/router/decode.ts` `mouse()`; C16 §2; `test/unit/router-decode.test.ts`.
+
+---
+
+## F751 — the whole-record assertion refused the spec author's own row: 20 is ctrl and shift, not ctrl ★★☆☆☆
+
+*2026-09-04 · the lead, closing arc1 (the interaction arc, steps 1 and 2a), at de52f1da+arc1.*
+
+**Expected** (the first draft of C16 §2's table): `CSI < 20` is ctrl-click. **Measured**: 20 = 16 + 4,
+ctrl *and* shift; the decoder set both and `toEqual` on the full record failed. Ctrl-click is `16`.
+Recorded because it is the brief's own argument landing on the author of the row rather than on the
+code — a row asserting `button` alone would have passed. Corrected before anything shipped.
+
+**Where**: C16 §2; `test/unit/router-decode.test.ts` T1.3l.
+
+---
+
+## F752 — a horizontal wheel now reaches the router as a click on the block under the pointer ★★★☆☆
+
+*2026-09-04 · the lead, closing arc1 (the interaction arc, steps 1 and 2a), at de52f1da+arc1.*
+
+**Measured**: `router.ts:291` classifies with `e.button === "wheelUp" || e.button === "wheelDown"`.
+Before F750, `66`/`67` decoded as `wheelDown` and scrolled the viewport down — wrong direction, right
+kind. After it they decode as `wheelLeft`/`wheelRight`, fall past the `wheel` test, and reach
+`entryAtRow` → `liveBlock`: a horizontal scroll gesture over the transcript **clicks the block under the
+pointer**. `wheelAmount` (`construct.ts:2020`) already answers `null` for the two new names, correctly.
+A correct fix in one component changed what an adjacent one does, and the adjacent one had no row
+for it. **Open** until the router lane lands `e.button.startsWith("wheel")` with a row sending
+`wheelLeft` over an entry and asserting nothing was focused.
+
+**Where**: `src/interaction/router/router.ts:291`.
+
+---
+
+## F753 — the mouse bit table is cited from xterm's ctlseqs and measured against no emulator ★★☆☆☆
+
+*2026-09-04 · the lead, closing arc1 (the interaction arc, steps 1 and 2a), at de52f1da+arc1.*
+
+**Measured**: the container has no Ghostty, kitty or WezTerm and no PTY to one, so the four sequences
+were pressed through the decoder and nothing else. Which emulators send `66`/`67` and the 1002 motion
+bit is written into C16 §2 as **owed**, under the symbol `WHEEL_DIRECTIONS` (the array whose indices
+2 and 3 the check would confirm). `imageProtocol`'s lesson stands beside it: an arm that shipped
+once and had never run.
+
+**Where**: C16 §2.
+
+---

@@ -35,11 +35,11 @@ type change.
 | **4** | [A change axis distinct from `Tone`](#4) | 4 | **4 open** | ⚠ C04 · C09 · C10 | real Calcium work · needs a ruling |
 | **5** | [The far side's shape is not the framework's contract](#5) | 10 | **2 open** | ⚠ C05 | mostly app-side · one shim |
 | **6** | [Rendered from data that has since moved](#6) | 2 | **2 open** | ⚠ C04 | real Calcium work |
-| **7** | [An artefact describes the world rather than being checked against it](#7) | 98 | **20** | — | artefact discipline — **no code**, and F164 is the first found by an instrument's *population* step rather than by a reader; **F210 is the first where the artefact is a component's own spec and the thing it contradicts is a shipped frame**, and **F233 the first where what it contradicts is a *fix*** — four present-tense statements of a repaired defect, in the two components the repair did not touch |
+| **7** | [An artefact describes the world rather than being checked against it](#7) | 102 | **20** | — | artefact discipline — **no code**, and F164 is the first found by an instrument's *population* step rather than by a reader; **F210 is the first where the artefact is a component's own spec and the thing it contradicts is a shipped frame**, and **F233 the first where what it contradicts is a *fix*** — four present-tense statements of a repaired defect, in the two components the repair did not touch |
 | **8** | [Absence indistinguishable from failure](#8) | 28 | **7 open** (7 closed) | partly | real Calcium work · **7 of 10 fixed** — F151 is the class F35 closed in the half an app-side test cannot reach, and **F167 is the class arriving in a *value*: a validator agreeing twice about two different documents** |
-| **9** | [**The instrument was wrong**](#9) | 98 | **17** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
+| **9** | [**The instrument was wrong**](#9) | 99 | **17** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
 | **10** | [**A claim carried without a record**](#10) | 66 | **11** | — | **new at F80** · method — six findings disproved, and **F166 unblocked an entry while F168 found what the same row was silent about**; F184 is the first where the unrecorded claim was a *rule* rather than a fact, governing thirty forms from a parameter's doc comment |
-| **11** | [A gate that passes without checking](#11) | 232 | **16** | — | **105 closed · 117 open** of 223 keyed — the heading was out by 66 and this row's count column by 1, which cannot be corrected alone (§11) · four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
+| **11** | [A gate that passes without checking](#11) | 234 | **16** | — | **105 closed · 117 open** of 223 keyed — the heading was out by 66 and this row's count column by 1, which cannot be corrected alone (§11) · four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
 | **12** | [**A time-based assertion under contention**](#12) | 4 | **3** | — | **new at F80** · Calcium's own suite |
 | **13** | [Text the framework emits](#13) | 4 | **4** | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
 | **14** | [A constant, a channel or a rule that outlived its configuration](#14) | 26 | **13 open** | ⚠ C12 | **new at F492** · real Calcium work — every member reads as deliberate, which is why review found none of them |
@@ -525,6 +525,14 @@ answer is a frame-read that cannot be wrong. **Read the ladder before choosing t
 
 **F740** — 37 ruled unverifiable (taste and negative-existence with no carrier — three candidates at 0, 0, 1-in-a-comment); 32's F89 retraction reached the clause and gained `defaultRoute` as a gate
 
+**F747** — four sentences in the note audit — *one kind declares `elements`; `elementsIn` reads `liveId`; `mergeBlock` throws; `cursorPositions` has no writer* — described a ceiling that lifted on 2026-09-03; an interaction arc was written on them the next day. Each marked with its measurement
+
+**F748** — the widget design's first three bind targets: `series[].hidden` and `annotations[].hidden` are on no type; `Plot.palette` was **removed on a ruling** — two absent members and one reversed ruling wanting different remedies
+
+**F749** — a roadmap residue cell is watched by nothing — a fabricated symbol passes `roadmap-status` — and a control against the evidence cell was vacuous because the identifier resolved against a sibling citation
+
+**F753** — the mouse bit table is xterm's *ctlseqs* and no emulator was measured — owed under `WHEEL_DIRECTIONS`
+
 <a id="8"></a>
 
 **Keyed here by the F142 inventory sweep** — the second cohort, filed after this document's own count was last derived. Placed by mechanism from the entry; SP6 proves coverage and not placement, which is its stated limit.
@@ -775,6 +783,8 @@ says a demo of a plot should have a shape.
 ---
 
 **F746** — a mutation run put the *survivor* control in the harness's *sentinel* slot; the harness threw `BlindHarnessError` rather than report four kills off a pass that could not see one — the instrument catching its own misuse
+
+**F751** — the spec's own first row called `20` ctrl-click; it is ctrl **and** shift, and the whole-record assertion refused the author
 
 <a id="10"></a>
 
@@ -1407,6 +1417,10 @@ reads goes through the entry point a user has.
 **F744** — F30 keyed in two groups made a truthful column and SP6's sum mutually exclusive; ruled one owner per id, column rewritten from the reader's count, figure recorded beside the limit
 
 **F745** — group 13 declared 6 and keyed 0 — its ids sat under §14's heading and `**F55.**` hid its own id from the reader; four rows moved home
+
+**F750** — the SGR mouse arm read two bits of eight — shift-click a click, ctrl+wheel-up **down**, a drag a click — and every row asserted `button` alone, which a decoder dropping the modifiers satisfies. Fixed, C16 I30, whole-record rows
+
+**F752** — a correct decoder fix made a horizontal wheel **click** the block under the pointer — the router's wheel test names two directions and had no row for a third. Open until the router lane lands
 
 <a id="12"></a>
 
