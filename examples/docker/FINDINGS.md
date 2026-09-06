@@ -30707,3 +30707,53 @@ terminal")`, both of which pass over this.
 
 ---
 
+## F860 — `main` has been red for fifteen days, and the close-out habit cannot see it ★★★★☆
+
+Asked to fix the red CI. PR #44's checks were green — six jobs SUCCESS, `publish` SKIPPED by its own
+`refs/tags/v` condition, `mergeStateStatus: CLEAN`. The red is on **`main`**, and it has been red
+since the merge of PR #43 on **2026-08-23**:
+
+```
+completed  failure  Merge pull request #43 …  ci  main  push  32609169943  1m4s  2026-08-23
+```
+
+`fast` failed at `make instruments` with `30 instruments … 381 rows · 2 FAILING`, and both failures
+are one cause:
+
+    Error: ENOENT: no such file or directory, scandir '…/Calcium/docs/catalogue'
+      test/unit/plot-catalogue.test.ts:572   PC11 (F227)
+      test/unit/refdiff.test.ts:147          tools/refdiff/pair.mjs
+
+**`docs/catalogue/` is generated and gitignored**, so it exists on every developer machine and on no
+fresh checkout. `main`'s Makefile declares `instruments:` with no prerequisite; this branch declares
+`instruments: catalogue`. The fix has existed on the branch for two weeks, `ci.yml`'s own comment
+describes the breakage in the past tense — *this job failed on it from 2026-08-23 until the target
+below existed* — and the sentence is true of the branch and false of the default branch it was
+written about.
+
+**And it was already known — which is the actual finding.** The gitignored-output failure was found
+on 2026-09-05, recorded with the remedy, and the record even names the ref: *`ENOENT` and 36 missing
+forms on every CI run from 2026-08-23, **`main` included***. The remedy landed — `instruments:
+catalogue` — **on the branch**. So this is not *nobody looked*. Somebody looked, diagnosed it
+correctly, fixed it, and the fix went to a ref that was not the one the finding named.
+
+**A finding is closed against a ref, and nothing records which one.** The close-out rule is *read
+`gh pr checks 44` after every push*, and it was followed: the branch has been green throughout. What
+no habit does is ask whether the ref the failure was *reported on* is still failing — and for a
+default branch the answer changes only at a merge, which is the one moment nobody is running the
+close-out. Fifteen days, with the fix sitting one merge away the whole time.
+
+**The tell is a comment in the past tense about a present state.** `ci.yml` reads *this job failed on
+it from 2026-08-23 until the target below existed* — true of the branch it is written on, false of
+`main`, and unfalsifiable from inside a session because every signal a working session reads is the
+branch's.
+
+**Not fixed by a commit.** `main` goes green when #44 merges, because `main` is an ancestor of this
+branch and the branch carries the prerequisite. The residue is the habit, and it is one command run
+at the one moment nobody runs it: after a merge, read the run on the ref that was merged **into**.
+
+**Where**: `Makefile` `instruments:` on `origin/main` against this branch's `instruments: catalogue`;
+`.github/workflows/ci.yml`'s comment above `make instruments`; run 32609169943.
+
+---
+
