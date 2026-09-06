@@ -31,11 +31,26 @@ const results = runPass({
   run,
   control: {
     file: GLYPHS,
-    from: '    step: ["\\u2b24", "*"],',
-    to: '    step: ["\\u23fa", "*"],',
-    why: "T2.45 asserts the head mark is ⬤ and T2.112 that no table member has an emoji form; ⏺ U+23FA fails both — F823, the character the tree shipped",
+    from: '    step: ["\\u23fa\\ufe0e", "*"],',
+    to: '    step: ["\\u2b24", "*"],',
+    why:
+      "T2.45 asserts the head mark's bytes and T2.113 reads them out of a rendered head; `\u2b24` is a " +
+      "different character, so a pass where this survives is a pass that saw no kill",
   },
   mutations: [
+    {
+      // **The remedy, removed** (C09 I45, F854). U+23FA is a base of an emoji
+      // variation sequence and is drawn as text because U+FE0E follows it; the
+      // bare character is what SS57 refuses and what a font may draw two cells
+      // wide. The selector is zero-width, so this mutation is invisible in a
+      // diff read as glyphs — which is the argument for the rule being
+      // mechanical rather than a review note.
+      name: "the head mark loses its text presentation selector",
+      file: GLYPHS,
+      from: '    step: ["\\u23fa\\ufe0e", "*"],',
+      to: '    step: ["\\u23fa", "*"],',
+      expect: "T2.112",
+    },
     {
       // C09 I49 (T2.116), F834 — the rung the tree carried for one commit.
       name: "the ASCII separator is the turn spinner's frame again",

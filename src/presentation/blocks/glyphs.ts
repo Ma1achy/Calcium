@@ -922,19 +922,17 @@ const GLYPH_TABLE: Readonly<Record<Glyph, readonly [unicode: string, ascii: stri
     // survivors is the better answer the day someone measures one, and this is
     // one. The ASCII half is `tree(1)`'s rendering of the same hook.
     continuation: ["⎿", "`"],
-    // **`⬤` U+2B24 BLACK LARGE CIRCLE: Neutral under both conventions, and no
-    // emoji presentation form** (C09 I45, F823). The row carried `⏺` U+23FA,
-    // measured with `cells()` before it was written — and the measurement
-    // answered the wrong question: U+23FA is a base in
-    // `emoji-variation-sequences.txt`, so a font that prefers the emoji form
-    // draws it two cells wide in a slot every width table calls one. `⬤` has the
-    // same width status by every table in `text.ts` and no variation sequence;
-    // `hasEmojiForm` is what says so, and T2.112 is what asks. Not `running`'s
-    // `●`: that is Ambiguous, and it is a *state*, where this is a position in a
-    // sequence and does not change as the step runs or settles. The ASCII half
-    // is the design's `*` (§A6), shared with `running` — I5 is about cell count,
-    // not uniqueness, and `@`'s claim to be unspent was already false (F824).
-    step: ["\u2b24", "*"],
+    // **`⏺` U+23FA BLACK CIRCLE FOR RECORD, followed by U+FE0E** (C09 I45,
+    // F854). The base has an emoji presentation form, which is why it left this
+    // slot under F823 — and refusing the character was the wrong remedy. The
+    // selector says *draw the preceding character as text*, `cells()` counts it
+    // zero (measured, not assumed), and the mark is one cell by every table.
+    //
+    // It is the character the slot means: Miscellaneous Technical, beside ⏵
+    // PLAY and ⏸ PAUSE, and a call in progress is a recording. `⬤` U+2B24, which
+    // held the slot between F823 and this, is a circle of the right size and
+    // nothing else.
+    step: ["\u23fa\ufe0e", "*"],
   });
 
 /** The pairs, for the test that asserts each is 1:1 by cell count (I5). */

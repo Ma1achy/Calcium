@@ -1259,13 +1259,29 @@ export function checkMarks(files, readFile = (f) => readFileSync(f, "utf8"), exe
 }
 
 /**
- * SS57 — a glyph with an emoji presentation form (C09 I45, F823, F832).
+ * SS57 — a glyph with an emoji presentation form (C09 I45, F823, F832, F854).
  *
  * **The class `cells()` cannot see.** A code point can be `East_Asian_Width=
  * Neutral` — one cell by every table — and still be a base of an emoji
  * variation sequence, so a font that prefers the emoji form draws it two cells
  * wide. `⏺` U+23FA shipped as the head mark that way, measured before its row
  * was written; the measurement answered the wrong question.
+ *
+ * **The rule refused the characters, and refusing them was the wrong remedy**
+ * (F854). Unicode has an answer to *this glyph, in text style*: U+FE0E, the
+ * text presentation selector. `cells()` already counts it zero — measured, not
+ * assumed — so `⏺\ufe0e` is one cell by every table and one cell on a terminal
+ * that honours the selector. Refusing the base instead cost the vocabulary its
+ * best marks: eleven characters moved under F832 and F833, including the head
+ * mark, whose replacement `⬤` U+2B24 is a circle of the right size and nothing
+ * else. U+23FA sits in Miscellaneous Technical beside ⏵ PLAY and ⏸ PAUSE, and a
+ * call in progress is a recording.
+ *
+ * So the rule inverts: **a base must carry the selector**, and a bare one is the
+ * violation. The hazard it named is unchanged and the remedy is now the one that
+ * keeps the character. **The residual risk, stated**: a terminal that ignores
+ * U+FE0E draws the emoji form anyway and the head is one cell wide of C09 I5.
+ * Nothing on this side can measure that, which is why the ASCII rung exists.
  *
  * **One source of truth, read lexically.** The set lives in `text.ts` as
  * `EMOJI_VARIATION_BASES`, derived from the Unicode file with its version named;
@@ -1280,7 +1296,9 @@ export function checkMarks(files, readFile = (f) => readFileSync(f, "utf8"), exe
  * alphabet the tables degrade to (F832). Its first run found `⏺`, `info`'s `ℹ`
  * U+2139, and nine more the walk had not named — `↖ ↗ ↘ ↙` in the `arrow`
  * spinner, `▪ ▫ ◼ ◻` in two bar styles, `⚠` in the fixtures report (F833). All
- * eleven moved; the scope has no allow-list.
+ * eleven moved, and under the inverted rule each is spelled with `\ufe0e`
+ * instead. The scope has no allow-list and needs none: the remedy is available
+ * to every character the rule names.
  *
  * **Escapes are decoded before the literal is read.** `field.ts` spells the
  * quiver's ring as `"\u2192\u2197…"` because SS47 forbids a bare mark in a
@@ -1300,6 +1318,9 @@ export function parseEmojiBases(textSource) {
   const body = textSource.slice(start, end);
   return [...body.matchAll(/0x([0-9a-f]+)/gu)].map((m) => Number.parseInt(m[1], 16));
 }
+
+/** U+FE0E — *draw the preceding character as text, not as an emoji*. */
+const TEXT_PRESENTATION = "\ufe0e";
 
 /** `\uXXXX` and `\u{X…}` in a literal's body, as the characters they spell. */
 function decodeEscapes(body) {
@@ -1338,13 +1359,19 @@ export function checkEmojiBases(
       for (const c of body) {
         const cp = c.codePointAt(0) ?? 0;
         if (cp < 0x80 || !inEmojiRanges(cp, ranges)) continue;
+        // **The character after it, in code points, not units.** A base spelled
+        // as a surrogate pair is two units and one character, and an index into
+        // units would read half of it.
+        const at = [...body].indexOf(c);
+        if ([...body][at + 1] === TEXT_PRESENTATION) continue;
         violations.push({
           rule: "SS57",
           file: f,
           line: code.slice(0, m.index).split("\n").length,
           message:
-            `\`${c}\` U+${cp.toString(16).toUpperCase().padStart(4, "0")} has an emoji presentation form: a font that prefers it ` +
-            `draws two cells where every width table says one. Not a glyph the framework may draw (C09 I45)`,
+            `\`${c}\` U+${cp.toString(16).toUpperCase().padStart(4, "0")} has an emoji presentation form and is written bare: ` +
+            `a font that prefers that form draws two cells where every width table says one. Follow it with ` +
+            `\\ufe0e, the text presentation selector, which \`cells()\` counts as zero (C09 I45)`,
           spec: "C09 I45 · A03 SS57",
         });
       }

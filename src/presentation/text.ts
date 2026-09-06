@@ -1216,6 +1216,19 @@ const EMOJI_VARIATION_BASES: readonly number[] = [
   0x1f6cd, 0x1f6cf, 0x1f6e0, 0x1f6e5, 0x1f6e9, 0x1f6e9, 0x1f6f0, 0x1f6f0, 0x1f6f3, 0x1f6f3,
 ];
 
+/**
+ * U+FE0E — *draw the preceding character as text, not as an emoji* (C09 I45).
+ *
+ * **The remedy rather than the refusal** (F854). A base written bare is drawn
+ * two cells wide by a font that prefers the emoji form; qualified by this
+ * selector it is drawn as a glyph, and `cells()` counts the selector zero — so
+ * the pair measures what every width table says the base measures.
+ *
+ * Exported because it is the answer the rule points at: SS57 names it in its
+ * message, and `blocks.test.ts` reads it rather than spelling a second copy.
+ */
+export const TEXT_PRESENTATION = "\ufe0e";
+
 /** Whether `cp` has an emoji presentation form — see `EMOJI_VARIATION_BASES`. */
 export function hasEmojiForm(cp: number): boolean {
   return inRanges(cp, EMOJI_VARIATION_BASES);

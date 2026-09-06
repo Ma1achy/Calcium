@@ -445,7 +445,7 @@ describe("C22 §6l.8 — the gutter carries the call", () => {
     expect(measureEntry(REGISTRY.measureSequence, blocks, 40)).toBe(1 + 3 + ENTRY_GAP);
     // A one-row body draws the hook and no bar.
     const one = draw([head("h", "ps · ok"), body("b", "one row")], 40);
-    expect(one).toEqual(["⬤ ps · ok", "  ⎿ one row", ""]);
+    expect(one).toEqual(["⏺︎ ps · ok", "  ⎿ one row", ""]);
   });
 
   it("T1.49 (C22 I89, §6l.8 rows 23–25): three nested cards draw branch, branch, elbow; the bar runs past a child's body and stops under the last; one child keeps the hook; depth 3 is text; ASCII is +-", () => {
@@ -456,11 +456,11 @@ describe("C22 §6l.8 — the gutter carries the call", () => {
       card("c3", "third · 3s · exit 1", body("c3b", "third body")),
     ];
     expect(draw(three, 60)).toEqual([
-      "⬤ parent · 8s · 2 of 3",
-      "  ├─⬤ first · 2s · 41 matches",
+      "⏺︎ parent · 8s · 2 of 3",
+      "  ├─⏺︎ first · 2s · 41 matches",
       "  │   ⎿ first body",
-      "  ├─⬤ second · 1s · exit 0",
-      "  └─⬤ third · 3s · exit 1",
+      "  ├─⏺︎ second · 1s · exit 0",
+      "  └─⏺︎ third · 3s · exit 1",
       "      ⎿ third body",
       "",
     ]);
@@ -479,8 +479,8 @@ describe("C22 §6l.8 — the gutter carries the call", () => {
     ]);
     // One child: the hook alone, and its body one unit further in.
     expect(draw([head("p", "parent"), card("c", "only child", body("cb", "its body"))], 60)).toEqual([
-      "⬤ parent",
-      "  ⎿ ⬤ only child",
+      "⏺︎ parent",
+      "  ⎿ ⏺︎ only child",
       "      ⎿ its body",
       "",
     ]);
@@ -489,14 +489,14 @@ describe("C22 §6l.8 — the gutter carries the call", () => {
     // third gutter column.
     const deep = [head("p", "parent"), card("c", "child", card("gc", "grandchild", body("gcb", "deep body")))];
     const rows = draw(deep, 60);
-    expect(rows[1]).toBe("  ⎿ ⬤ child");
-    expect(rows[2]?.startsWith("      ⎿ ⬤ grandchild"), "the grandchild's head is the child's body text").toBe(true);
+    expect(rows[1]).toBe("  ⎿ ⏺︎ child");
+    expect(rows[2]?.startsWith("      ⎿ ⏺︎ grandchild"), "the grandchild's head is the child's body text").toBe(true);
     expect(entryLayout(deep, 60).every((run) => run.gutter.length <= 2), "two gutter columns at most").toBe(true);
     // Plain body before and after a nested card: the hook, then a **branch** —
     // the elbow closes the body, not the child list (C22 I89), so a child followed
     // by text takes `├─` and the bar runs past it.
     const mixed = [head("p", "parent"), body("a", "before"), card("c", "child"), body("z", "after")];
-    expect(draw(mixed, 60)).toEqual(["⬤ parent", "  ⎿ before", "  ├─⬤ child", "  │ after", ""]);
+    expect(draw(mixed, 60)).toEqual(["⏺︎ parent", "  ⎿ before", "  ├─⏺︎ child", "  │ after", ""]);
   });
 
   it("T1.50 (C22 I90, §6l.8 row 26): with a command the head element copies the invocation and body elements copy their own text", () => {

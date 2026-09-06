@@ -52,7 +52,7 @@ describe("roadmap 51 — the spinner sets", () => {
     // **Over the derived table, not a list from memory** (F823, F833). The list
     // this row carried opened with `·`, which is Ambiguous and has no emoji
     // form, and it never held `↖ ↗ ↘ ↙` — so the `arrow` set shipped four
-    // emoji bases through a green row, and `⏺` shipped as the head mark one
+    // emoji bases through a green row, and `⏺︎` shipped as the head mark one
     // table over.
     const offenders: string[] = [];
 

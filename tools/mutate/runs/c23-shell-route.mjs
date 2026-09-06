@@ -119,8 +119,8 @@ const results = runPass({
       // the only thing that would have rendered it.
       name: "the readout registration is dropped",
       file: FILE,
-      from: "    refresh.readout(pendingId, scrollId, () => {",
-      to: "    if (false as boolean) refresh.readout(pendingId, scrollId, () => {",
+      from: "    refresh.readout(pendingId, scrollId, () => snapshot());",
+      to: "    void snapshot;",
       expect: "T1.53",
     },
     {
@@ -142,12 +142,17 @@ const results = runPass({
       expect: "T2.47",
     },
     {
-      // **The resize order reversed** (C23 I65): the child's SIGWINCH names a
-      // width the emulator has not taken, and its repaint lands on the old grid.
-      name: "the emulator is resized before the child",
+      // **The child told a width the emulator does not have** (C23 I65).
+      //
+      // The rule here was an ordering claim twice, and three mutations of the
+      // order survived a row written to catch them — a repaint reaches the
+      // emulator through the write queue, so no write can land between the two
+      // calls however they are sequenced (F852). What can be wrong is the
+      // figure: the region is four columns wider than the body.
+      name: "the child is told the region's width rather than the body's",
       file: FILE,
-      from: "          resizeChild?.(next, rows);\n          emulator.resize(next, rows);",
-      to: "          emulator.resize(next, rows);\n          resizeChild?.(next, rows);",
+      from: "          resizeChild?.(next, rows);",
+      to: "          resizeChild?.(deps.region().width, rows);",
       expect: "T4.64",
     },
     {

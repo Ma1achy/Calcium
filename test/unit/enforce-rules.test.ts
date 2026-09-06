@@ -1133,7 +1133,7 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
 
   it("SS57 fires: the shipped head mark, the info glyph, and not the keycap bases", () => {
     // **The fabricated violation is the character that shipped** (C09 I45,
-    // F823): `step: ["⏺", "*"]` restored is the genuine defect, not a string
+    // F823): `step: ["⏺︎", "*"]` restored is the genuine defect, not a string
     // engineered to match. The second row is F832's — found by this table on
     // its first run — and the third is the exclusion stated with its reason:
     // `*` and `#` are keycap bases and the alphabet the tables degrade to.
@@ -1147,17 +1147,32 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       const parsed = ranges.some((_, i) => i % 2 === 0 && cp >= ranges[i]! && cp <= ranges[i + 1]!);
       expect(parsed, `U+${cp.toString(16)} — parsed table vs hasEmojiForm`).toBe(hasEmojiForm(cp));
     }
+    // **The bases are spelled as escapes here on purpose.** The fixture's job is
+    // to be a bare base, and a bare base is invisible in source next to a
+    // qualified one — the two differ by a zero-width character. F854 broke this
+    // row exactly that way: a sweep appending the selector reached the fixture,
+    // the fabricated violation stopped firing, and the rule read as clean.
     const read = (f: string): string =>
       f.endsWith("shipped.ts")
-        ? 'const T = { step: ["⏺", "*"], info: ["ℹ", "i"], ok: ["✓", "+"] };'
-        : f.endsWith("ascii.ts")
-          ? 'const RAMP = ".:-=+*#@"; const MARK = "*"; // ⏺ in a comment is prose about the rule'
-          : 'const G = ["⬤", "*"];';
-    const fired = checkEmojiBases(["src/shipped.ts", "src/ascii.ts", "src/clean.ts"], read, ranges);
+        ? 'const T = { step: ["\\u23fa", "*"], info: ["\\u2139", "i"], ok: ["\\u2713", "+"] };'
+        : f.endsWith("qualified.ts")
+          ? 'const T = { step: ["\\u23fa\\ufe0e", "*"], info: ["\\u2139\\ufe0e", "i"] };'
+          : f.endsWith("ascii.ts")
+            ? 'const RAMP = ".:-=+*#@"; const MARK = "*"; // \\u23fa in a comment is prose about the rule'
+            : 'const G = ["\\u2b24", "*"];';
+    const fired = checkEmojiBases(
+      ["src/shipped.ts", "src/qualified.ts", "src/ascii.ts", "src/clean.ts"],
+      read,
+      ranges,
+    );
     expect(fired.map((v) => v.file)).toEqual(["src/shipped.ts", "src/shipped.ts"]);
     expect(fired.every((v) => v.rule === "SS57")).toBe(true);
     expect(fired[0]?.message).toContain("U+23FA");
     expect(fired[1]?.message).toContain("U+2139");
+    // **The remedy's own control** (F854): the same two characters, qualified,
+    // are admitted. Without it the rule reads as a refusal of the character and
+    // a tree that fixed nothing would look the same as one that fixed it.
+    expect(fired.some((v) => v.file === "src/qualified.ts"), "the selector is the way through").toBe(false);
     // The control against vacuity: an empty table is itself a violation, so a
     // parse that silently found nothing cannot read as a clean tree.
     const empty = checkEmojiBases(["src/shipped.ts"], read, []);

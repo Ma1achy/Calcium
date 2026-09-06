@@ -242,7 +242,7 @@ export type Glyph =
    * A step in a sequence of work — a tool call's header (C09 §4,
    * `AGENT_TUI_DESIGN.md` §9c). A *position in a sequence* and not a state, so
    * it does not change as the step runs or settles; `running` is the state.
-   * `⬤` U+2B24 is `East_Asian_Width=Neutral`, one cell under both conventions, and has no emoji presentation form — `⏺` U+23FA, which this token carried until F823, has one (C09 I45).
+   * `⏺` U+23FA is written with U+FE0E after it — the base has an emoji presentation form and the selector says to draw it as text, which `cells()` counts as zero cells (C09 I45, F823, F854).
    */
   | "step";
 

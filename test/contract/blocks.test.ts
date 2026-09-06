@@ -14,7 +14,7 @@ import { SCAN_BUDGET_MS } from "../support/budget.js";
 import { checkAsciiParity, checkMeasurement, formatReport, uncoveredKinds } from "../../src/testing/measurement-conformance.js";
 import { ADVERSARIAL, CORPUS, ONE_PER_KIND } from "../support/blocks.js";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LIGHT_THEME, measurable, visible } from "../support/render.js";
-import { cells, hasEmojiForm } from "../../src/presentation/text.js";
+import { cells, hasEmojiForm, TEXT_PRESENTATION } from "../../src/presentation/text.js";
 import { SPINNER_SETS } from "../../src/presentation/blocks/glyphs.js";
 import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
 import { patchDefinition } from "../../src/presentation/patch/index.js";
@@ -353,16 +353,23 @@ function srcFiles(dir: string, out: string[] = []): string[] {
 describe("C09 §4 — the call grammar's glyph rows", () => {
   const WIDE_CAPS = { ...FULL_CAPS, ambiguousWidth: "wide" as const };
 
-  it("T2.112 (C09 I45): no non-ASCII character in either glyph table or any spinner set has an emoji presentation form", () => {
+  it("T2.112 (C09 I45): every emoji base drawn by a glyph table or a spinner set carries the text selector", () => {
     // **The check C09 §4 could not run when `step` was chosen** (F823): `cells()`
-    // measured `⏺` at one cell under both conventions and it is a base of an
-    // emoji variation sequence all the same. Over the derived table, with the
-    // ASCII range excluded by construction (F832).
+    // measured `⏺︎` at one cell under both conventions and it is a base of an
+    // emoji variation sequence all the same.
+    //
+    // **The rule inverted under F854**: refusing the base cost eleven marks, and
+    // U+FE0E says *draw the preceding character as text* — counted zero by
+    // `cells()`, so the qualified mark is still one cell. A base is admitted
+    // when it carries the selector and is a violation when it is bare.
     const offenders: string[] = [];
     const seen = (label: string, text: string): void => {
-      for (const c of text) {
+      const chars = [...text];
+      for (const [i, c] of chars.entries()) {
         const cp = c.codePointAt(0) ?? 0;
-        if (cp >= 0x80 && hasEmojiForm(cp)) offenders.push(`${label}: ${c} U+${cp.toString(16)}`);
+        if (cp < 0x80 || !hasEmojiForm(cp)) continue;
+        if (chars[i + 1] === TEXT_PRESENTATION) continue;
+        offenders.push(`${label}: ${c} U+${cp.toString(16)} written bare`);
       }
     };
     for (const token of GLYPH_TOKENS) seen(`Glyph ${token}`, glyphFor(token, FULL_CAPS));
@@ -372,9 +379,17 @@ describe("C09 §4 — the call grammar's glyph rows", () => {
     // **The controls, so an empty table cannot pass the row**: the two marks
     // the table found on its first run are in it, and the keycap base `*` —
     // `step`'s and `running`'s ASCII rung — is excluded by the row's own guard.
-    expect(hasEmojiForm(0x23fa), "⏺ U+23FA, the mark F823 is about").toBe(true);
+    expect(hasEmojiForm(0x23fa), "⏺︎ U+23FA, the mark F823 is about").toBe(true);
     expect(hasEmojiForm(0x2139), "ℹ U+2139, the mark F832 found").toBe(true);
-    expect(hasEmojiForm(0x2b24), "⬤ U+2B24, the mark that replaced it").toBe(false);
+    expect(hasEmojiForm(0x2b24), "⬤ U+2B24, which held the slot between F823 and F854").toBe(false);
+    // **The arm that says the row can still fail**: the head mark without its
+    // selector is what the rule refuses, and it is the shipped character.
+    const bare: string[] = [];
+    for (const c of ["\u23fa"]) {
+      const cp = c.codePointAt(0) ?? 0;
+      if (hasEmojiForm(cp)) bare.push(c);
+    }
+    expect(bare, "a bare base is still a violation — the remedy is the selector, not the exemption").toEqual(["\u23fa"]);
     expect(hasEmojiForm(0x2a), "* is a keycap base in the Unicode file and excluded by construction (F832)").toBe(false);
     expect(glyphFor("step", ASCII_CAPS), "so the ASCII rung is still *").toBe("*");
   });

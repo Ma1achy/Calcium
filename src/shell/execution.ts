@@ -681,16 +681,20 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
      * is C03's own `pending`.
      *
      * A chunk that arrives while a frame is already waiting to be drawn adds
-     * nothing a reader can see, so it marks the emulator dirty and returns; the
-     * next chunk after the frame lands carries everything accumulated. No second
-     * timer, and no per-chunk write of a two-thousand-line value into the store —
-     * which is the cost C03 exists to prevent.
+     * nothing a reader can see, so it goes into the emulator and returns without
+     * drawing; the next chunk after the frame lands carries everything
+     * accumulated, because the emulator is the accumulator. No second timer, and
+     * no per-chunk write of a two-thousand-line value into the store — which is
+     * the cost C03 exists to prevent.
+     *
+     * **There was a `dirty` flag here and nothing read it.** It looked like the
+     * mechanism and the emulator was already doing the work; a flag that
+     * constrains nothing reads exactly like one that does.
      *
      * The 1 Hz readout is the backstop for the tail: a child that writes and
      * then goes quiet would otherwise show its last chunk one frame late for as
      * long as it stayed quiet.
      */
-    let dirty = false;
     /**
      * **The emulator outlives the writes that were in flight when it settled.**
      *
@@ -703,14 +707,10 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     let finished = false;
     const draw = (): void => {
       if (finished) return;
-      dirty = false;
       deps.transcript.patch(pendingId, { op: "replace", blockId: scrollId, block: snapshot() }, "shell");
       deps.scheduler.commit("stream");
     };
-    refresh.readout(pendingId, scrollId, () => {
-      dirty = false;
-      return snapshot();
-    });
+    refresh.readout(pendingId, scrollId, () => snapshot());
     // The readout is dropped by `settled(id)` in the driver; this is the same
     // window `draw` guards, for the same reason.
 
@@ -733,7 +733,6 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       if (finished) return;
       writes = writes.then(async () => {
         await emulator.write(chunk);
-        dirty = true;
         if (!deps.scheduler.pending) draw();
       });
     };
@@ -761,20 +760,27 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
        */
       const env = { TERM: "xterm-256color", COLORTERM: "truecolor" };
       /**
-       * **The child is resized first, the emulator second** (I65).
+       * **One width, told to both** (I65, F852).
        *
-       * A SIGWINCH for a width the emulator has not taken means the child's
-       * repaint lands on the old grid, and one frame is drawn from a screen
-       * described two ways. Registered per arm because only the PTY arm has a
-       * child that can be told; the pipe arm reflows the emulator alone.
+       * `next` is computed once and handed to the emulator and the child, so
+       * they cannot disagree. Registered per arm because only the PTY arm has a
+       * child that can be told; the pipe arm reflows alone.
+       *
+       * **This was an ordering rule twice and neither version was falsifiable.**
+       * A child's repaint arrives as bytes on the write queue, which resolves
+       * after both calls have returned — so no write lands between them however
+       * they are sequenced, and three mutations of the order survived a row
+       * written to catch them. What can actually be wrong is the number:
+       * `deps.region().width` where the body's inner width belongs is four
+       * columns of drift and every wrapped line in the wrong place.
        */
       const onResize = (resizeChild: ((c: number, r: number) => void) | null): (() => void) => {
         const listener = (): void => {
           const next = Math.max(20, deps.region().width - BODY_INDENT);
           if (next === lastCols) return;
           lastCols = next;
-          resizeChild?.(next, rows);
           emulator.resize(next, rows);
+          resizeChild?.(next, rows);
         };
         resizeListeners.add(listener);
         return () => resizeListeners.delete(listener);
@@ -806,9 +812,6 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         pipeOverflowed = child.overflowed;
       }
 
-      // The last chunk is in the emulator but not necessarily on screen: a
-      // child that wrote and exited inside one frame window leaves `dirty` set.
-      void dirty;
       const failed = cancelled || exit.code !== 0 || exit.signal !== null;
       const message = cancelled
         ? "Cancelled."

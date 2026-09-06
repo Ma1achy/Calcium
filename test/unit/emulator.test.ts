@@ -423,9 +423,18 @@ describe("C23 — the shell route as a live screen, spec-first rows", () => {
     expect(h.calls, "falling back would hide it behind a duller child").not.toContain("spawnShell");
   });
 
-  it("T4.64 (C23 I65): a resize reaches the child before the emulator", async () => {
-    const order: string[] = [];
+  it("T4.64 (C23 I65): the child and the emulator are told the same width", async () => {
+    // **Two spies, because one cannot see an agreement.** The first version of
+    // this row watched only the child's call and asserted its position in a
+    // list; every ordering mutation survived it, and chasing that survivor is
+    // what showed the ordering itself to be unfalsifiable here — a repaint
+    // reaches the emulator through the write queue, which resolves after both
+    // calls have returned (F852).
+    //
+    // What is left is the figure, and it is the one that can be wrong: the
+    // region is 60 and the body's inner width is 56.
     let width = 80;
+    const told: number[] = [];
     let emit: ((c: string) => void) | null = null;
     let done: ((e: { code: number | null; signal: string | null }) => void) | null = null;
     const h = pipelineHarness({
@@ -441,24 +450,30 @@ describe("C23 — the shell route as a live screen, spec-first rows", () => {
           emit = cb;
         },
         write: () => undefined,
-        resize: (c: number) => void order.push(`child:${String(c)}`),
+        resize: (c: number) => void told.push(c),
         signal: () => true,
       }),
     });
     h.pipeline.submit("top");
     await settled();
-    (emit as unknown as (c: string) => void)("x".repeat(100));
-    for (let i = 0; i < 40; i += 1) await new Promise((r) => void setTimeout(r, 0));
+
+    const quiet = async (): Promise<void> => {
+      for (let i = 0; i < 40; i += 1) await new Promise((r) => void setTimeout(r, 0));
+    };
+    (emit as unknown as (c: string) => void)("first\r\n");
+    await quiet();
 
     width = 60;
     h.pipeline.resized();
-    expect(order[0], "the child is told first").toBe("child:56");
+    await quiet();
 
-    // The emulator took the same width: the reflow is visible in the snapshot's
-    // own `cols`, which is the only witness on this side.
-    for (let i = 0; i < 40; i += 1) await new Promise((r) => void setTimeout(r, 0));
     (done as unknown as (e: { code: number | null; signal: string | null }) => void)({ code: 0, signal: null });
     await settled(h.pipeline);
+
     const scroll = h.transcript.entries[0]?.doc.blocks[0] as { children: readonly Block[] };
-    expect((scroll.children[0] as { cols: number }).cols, "the emulator followed").toBe(56);
-  });});
+    const screen = scroll.children[0] as { cols: number };
+    expect(told, "the child was told once").toEqual([56]);
+    expect(screen.cols, "and the emulator holds the same number").toBe(56);
+    expect(screen.cols, "which is the body's inner width, not the region's").toBe(60 - 4);
+  });
+});

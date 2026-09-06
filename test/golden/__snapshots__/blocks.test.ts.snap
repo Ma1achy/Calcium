@@ -5,6 +5,9 @@ exports[`C09 T2.10 — golden frames > dark-ascii at 40 1`] = `
 [38;2;138;138;138m-- [38;2;232;168;124mDeployments[38;2;138;138;138m ----------------[38;2;184;156;210m 3 active[39m
 ── notice · measured 1 · rendered 1
 [38;2;127;174;207mNothing to do.[39m
+── terminal · measured 2 · rendered 2
+=== test session starts ===
+[32m.....[39m [ 4%][7m [27m
 ── keyValue · measured 2 · rendered 2
 [38;2;98;98;98mRegion  [39m  [38;2;212;212;212meu-west-1[39m
 [38;2;98;98;98mReplicas[39m  [38;2;212;212;212m3[39m
@@ -73,6 +76,9 @@ exports[`C09 T2.10 — golden frames > dark-ascii at 60 1`] = `
 [38;2;138;138;138m-- [38;2;232;168;124mDeployments[38;2;138;138;138m ------------------------------------[38;2;184;156;210m 3 active[39m
 ── notice · measured 1 · rendered 1
 [38;2;127;174;207mNothing to do.[39m
+── terminal · measured 2 · rendered 2
+=== test session starts ===
+[32m.....[39m [ 4%][7m [27m
 ── keyValue · measured 2 · rendered 2
 [38;2;98;98;98mRegion  [39m  [38;2;212;212;212meu-west-1[39m
 [38;2;98;98;98mReplicas[39m  [38;2;212;212;212m3[39m
@@ -141,6 +147,9 @@ exports[`C09 T2.10 — golden frames > dark-ascii at 80 1`] = `
 [38;2;138;138;138m-- [38;2;232;168;124mDeployments[38;2;138;138;138m --------------------------------------------------------[38;2;184;156;210m 3 active[39m
 ── notice · measured 1 · rendered 1
 [38;2;127;174;207mNothing to do.[39m
+── terminal · measured 2 · rendered 2
+=== test session starts ===
+[32m.....[39m [ 4%][7m [27m
 ── keyValue · measured 2 · rendered 2
 [38;2;98;98;98mRegion  [39m  [38;2;212;212;212meu-west-1[39m
 [38;2;98;98;98mReplicas[39m  [38;2;212;212;212m3[39m
@@ -209,6 +218,9 @@ exports[`C09 T2.10 — golden frames > dark-ascii at 120 1`] = `
 [38;2;138;138;138m-- [38;2;232;168;124mDeployments[38;2;138;138;138m ------------------------------------------------------------------------------------------------[38;2;184;156;210m 3 active[39m
 ── notice · measured 1 · rendered 1
 [38;2;127;174;207mNothing to do.[39m
+── terminal · measured 2 · rendered 2
+=== test session starts ===
+[32m.....[39m [ 4%][7m [27m
 ── keyValue · measured 2 · rendered 2
 [38;2;98;98;98mRegion  [39m  [38;2;212;212;212meu-west-1[39m
 [38;2;98;98;98mReplicas[39m  [38;2;212;212;212m3[39m
@@ -277,6 +289,9 @@ exports[`C09 T2.10 — golden frames > dark-unicode at 40 1`] = `
 [38;2;138;138;138m── [38;2;232;168;124mDeployments[38;2;138;138;138m ────────────────[38;2;184;156;210m 3 active[39m
 ── notice · measured 1 · rendered 1
 [38;2;127;174;207mNothing to do.[39m
+── terminal · measured 2 · rendered 2
+=== test session starts ===
+[32m.....[39m [ 4%][7m [27m
 ── keyValue · measured 2 · rendered 2
 [38;2;98;98;98mRegion  [39m  [38;2;212;212;212meu-west-1[39m
 [38;2;98;98;98mReplicas[39m  [38;2;212;212;212m3[39m
@@ -345,6 +360,9 @@ exports[`C09 T2.10 — golden frames > dark-unicode at 60 1`] = `
 [38;2;138;138;138m── [38;2;232;168;124mDeployments[38;2;138;138;138m ────────────────────────────────────[38;2;184;156;210m 3 active[39m
 ── notice · measured 1 · rendered 1
 [38;2;127;174;207mNothing to do.[39m
+── terminal · measured 2 · rendered 2
+=== test session starts ===
+[32m.....[39m [ 4%][7m [27m
 ── keyValue · measured 2 · rendered 2
 [38;2;98;98;98mRegion  [39m  [38;2;212;212;212meu-west-1[39m
 [38;2;98;98;98mReplicas[39m  [38;2;212;212;212m3[39m
@@ -413,6 +431,9 @@ exports[`C09 T2.10 — golden frames > dark-unicode at 80 1`] = `
 [38;2;138;138;138m── [38;2;232;168;124mDeployments[38;2;138;138;138m ────────────────────────────────────────────────────────[38;2;184;156;210m 3 active[39m
 ── notice · measured 1 · rendered 1
 [38;2;127;174;207mNothing to do.[39m
+── terminal · measured 2 · rendered 2
+=== test session starts ===
+[32m.....[39m [ 4%][7m [27m
 ── keyValue · measured 2 · rendered 2
 [38;2;98;98;98mRegion  [39m  [38;2;212;212;212meu-west-1[39m
 [38;2;98;98;98mReplicas[39m  [38;2;212;212;212m3[39m
@@ -481,6 +502,9 @@ exports[`C09 T2.10 — golden frames > dark-unicode at 120 1`] = `
 [38;2;138;138;138m── [38;2;232;168;124mDeployments[38;2;138;138;138m ────────────────────────────────────────────────────────────────────────────────────────────────[38;2;184;156;210m 3 active[39m
 ── notice · measured 1 · rendered 1
 [38;2;127;174;207mNothing to do.[39m
+── terminal · measured 2 · rendered 2
+=== test session starts ===
+[32m.....[39m [ 4%][7m [27m
 ── keyValue · measured 2 · rendered 2
 [38;2;98;98;98mRegion  [39m  [38;2;212;212;212meu-west-1[39m
 [38;2;98;98;98mReplicas[39m  [38;2;212;212;212m3[39m
@@ -549,6 +573,9 @@ exports[`C09 T2.10 — golden frames > light-ascii at 40 1`] = `
 [38;2;105;108;119m-- [38;2;31;96;240mDeployments[38;2;105;108;119m ----------------[38;2;166;38;164m 3 active[39m
 ── notice · measured 1 · rendered 1
 [38;2;1;115;165mNothing to do.[39m
+── terminal · measured 2 · rendered 2
+=== test session starts ===
+[32m.....[39m [ 4%][7m [27m
 ── keyValue · measured 2 · rendered 2
 [38;2;148;149;156mRegion  [39m  [38;2;56;58;66meu-west-1[39m
 [38;2;148;149;156mReplicas[39m  [38;2;56;58;66m3[39m
@@ -617,6 +644,9 @@ exports[`C09 T2.10 — golden frames > light-ascii at 60 1`] = `
 [38;2;105;108;119m-- [38;2;31;96;240mDeployments[38;2;105;108;119m ------------------------------------[38;2;166;38;164m 3 active[39m
 ── notice · measured 1 · rendered 1
 [38;2;1;115;165mNothing to do.[39m
+── terminal · measured 2 · rendered 2
+=== test session starts ===
+[32m.....[39m [ 4%][7m [27m
 ── keyValue · measured 2 · rendered 2
 [38;2;148;149;156mRegion  [39m  [38;2;56;58;66meu-west-1[39m
 [38;2;148;149;156mReplicas[39m  [38;2;56;58;66m3[39m
@@ -685,6 +715,9 @@ exports[`C09 T2.10 — golden frames > light-ascii at 80 1`] = `
 [38;2;105;108;119m-- [38;2;31;96;240mDeployments[38;2;105;108;119m --------------------------------------------------------[38;2;166;38;164m 3 active[39m
 ── notice · measured 1 · rendered 1
 [38;2;1;115;165mNothing to do.[39m
+── terminal · measured 2 · rendered 2
+=== test session starts ===
+[32m.....[39m [ 4%][7m [27m
 ── keyValue · measured 2 · rendered 2
 [38;2;148;149;156mRegion  [39m  [38;2;56;58;66meu-west-1[39m
 [38;2;148;149;156mReplicas[39m  [38;2;56;58;66m3[39m
@@ -753,6 +786,9 @@ exports[`C09 T2.10 — golden frames > light-ascii at 120 1`] = `
 [38;2;105;108;119m-- [38;2;31;96;240mDeployments[38;2;105;108;119m ------------------------------------------------------------------------------------------------[38;2;166;38;164m 3 active[39m
 ── notice · measured 1 · rendered 1
 [38;2;1;115;165mNothing to do.[39m
+── terminal · measured 2 · rendered 2
+=== test session starts ===
+[32m.....[39m [ 4%][7m [27m
 ── keyValue · measured 2 · rendered 2
 [38;2;148;149;156mRegion  [39m  [38;2;56;58;66meu-west-1[39m
 [38;2;148;149;156mReplicas[39m  [38;2;56;58;66m3[39m
@@ -821,6 +857,9 @@ exports[`C09 T2.10 — golden frames > light-unicode at 40 1`] = `
 [38;2;105;108;119m── [38;2;31;96;240mDeployments[38;2;105;108;119m ────────────────[38;2;166;38;164m 3 active[39m
 ── notice · measured 1 · rendered 1
 [38;2;1;115;165mNothing to do.[39m
+── terminal · measured 2 · rendered 2
+=== test session starts ===
+[32m.....[39m [ 4%][7m [27m
 ── keyValue · measured 2 · rendered 2
 [38;2;148;149;156mRegion  [39m  [38;2;56;58;66meu-west-1[39m
 [38;2;148;149;156mReplicas[39m  [38;2;56;58;66m3[39m
@@ -889,6 +928,9 @@ exports[`C09 T2.10 — golden frames > light-unicode at 60 1`] = `
 [38;2;105;108;119m── [38;2;31;96;240mDeployments[38;2;105;108;119m ────────────────────────────────────[38;2;166;38;164m 3 active[39m
 ── notice · measured 1 · rendered 1
 [38;2;1;115;165mNothing to do.[39m
+── terminal · measured 2 · rendered 2
+=== test session starts ===
+[32m.....[39m [ 4%][7m [27m
 ── keyValue · measured 2 · rendered 2
 [38;2;148;149;156mRegion  [39m  [38;2;56;58;66meu-west-1[39m
 [38;2;148;149;156mReplicas[39m  [38;2;56;58;66m3[39m
@@ -957,6 +999,9 @@ exports[`C09 T2.10 — golden frames > light-unicode at 80 1`] = `
 [38;2;105;108;119m── [38;2;31;96;240mDeployments[38;2;105;108;119m ────────────────────────────────────────────────────────[38;2;166;38;164m 3 active[39m
 ── notice · measured 1 · rendered 1
 [38;2;1;115;165mNothing to do.[39m
+── terminal · measured 2 · rendered 2
+=== test session starts ===
+[32m.....[39m [ 4%][7m [27m
 ── keyValue · measured 2 · rendered 2
 [38;2;148;149;156mRegion  [39m  [38;2;56;58;66meu-west-1[39m
 [38;2;148;149;156mReplicas[39m  [38;2;56;58;66m3[39m
@@ -1025,6 +1070,9 @@ exports[`C09 T2.10 — golden frames > light-unicode at 120 1`] = `
 [38;2;105;108;119m── [38;2;31;96;240mDeployments[38;2;105;108;119m ────────────────────────────────────────────────────────────────────────────────────────────────[38;2;166;38;164m 3 active[39m
 ── notice · measured 1 · rendered 1
 [38;2;1;115;165mNothing to do.[39m
+── terminal · measured 2 · rendered 2
+=== test session starts ===
+[32m.....[39m [ 4%][7m [27m
 ── keyValue · measured 2 · rendered 2
 [38;2;148;149;156mRegion  [39m  [38;2;56;58;66meu-west-1[39m
 [38;2;148;149;156mReplicas[39m  [38;2;56;58;66m3[39m

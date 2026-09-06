@@ -27,10 +27,10 @@ const frame = (blocks: readonly Block[], width: number, ascii = false): readonly
     .map((l) => visible(l).trimEnd());
 
 describe("C09 §4 — the `step` glyph", () => {
-  it("T2.45 (C09 I5, I45): `step` is in the vocabulary, `⬤` under unicode and `*` under ASCII, one cell each and neither an emoji base", () => {
+  it("T2.45 (C09 I5, I45): `step` is in the vocabulary, `⏺︎` under unicode and `*` under ASCII, one cell each and neither an emoji base", () => {
     expect(GLYPH_TOKENS).toContain("step");
-    expect(glyphFor("step", FULL_CAPS)).toBe("⬤");
-    expect(glyphFor("step", { ...FULL_CAPS, ambiguousWidth: "wide" }), "Neutral: no tier at wide").toBe("⬤");
+    expect(glyphFor("step", FULL_CAPS)).toBe("⏺︎");
+    expect(glyphFor("step", { ...FULL_CAPS, ambiguousWidth: "wide" }), "Neutral: no tier at wide").toBe("⏺︎");
     expect(glyphFor("step", ASCII_CAPS)).toBe("*");
     expect(glyphCells("step")).toBe(1);
   });
@@ -109,7 +109,7 @@ describe("§9c — the header, the body, and the row the body already has", () =
       const running = toolCallDoc("run_command", { name: "run_command", args: "npm test", elapsedMs: 4_000, output: out(12), height: 3 }, META, caps).blocks;
       const settled = toolCallDoc("run_command", { name: "run_command", args: "npm test", elapsedMs: 4_200, outcome: "exit 0", result: "118 passed, 2 todo" }, META, caps).blocks;
       const folded = toolCallDoc("run_command", { name: "run_command", args: "npm test", output: out(392), height: 3, collapsed: true }, META, caps).blocks;
-      const mark = ascii ? "*" : "⬤";
+      const mark = ascii ? "*" : "⏺︎";
       const hook = ascii ? "`" : "⎿";
       const more = ascii ? "~" : "⋯";
       const sep = ascii ? ":" : "·";
@@ -153,7 +153,7 @@ describe("C09 §4 — the head is fitted and is an element", () => {
         expect(cells(visible(rows(plain, width, ascii)[0] ?? ""), "narrow"), "and it fits").toBeLessThanOrEqual(width);
 
         const marked = rows(head([{ ...ARGS, elide: true }]), width, ascii)[0] ?? "";
-        expect(marked.startsWith(`${ascii ? "*" : "⬤"} run_command(`), `the verb is intact at ${String(width)}`).toBe(true);
+        expect(marked.startsWith(`${ascii ? "*" : "⏺︎"} run_command(`), `the verb is intact at ${String(width)}`).toBe(true);
         expect(cells(visible(marked), "narrow"), `and the marked row fits at ${String(width)}`).toBeLessThanOrEqual(width);
         if (width >= 40) {
           // The row can hold verb, marker, duration and outcome: the argument
@@ -161,7 +161,7 @@ describe("C09 §4 — the head is fitted and is an element", () => {
           expect(marked.endsWith(") · 4s · exit 0"), `duration and outcome are intact at ${String(width)}`).toBe(true);
           if (width < 80) expect(marked, `the argument ends in the marker at ${String(width)}`).toContain(`${marker}) · 4s · exit 0`);
         } else {
-          // Twenty cells cannot hold `⬤ run_command(…) · 4s · exit 0` (29), so
+          // Twenty cells cannot hold `⏺︎ run_command(…) · 4s · exit 0` (29), so
           // the whole row is cut last — after the argument is down to its marker.
           expect(marked, "the argument is its marker before the row is cut").toContain(`(${marker}`);
         }
