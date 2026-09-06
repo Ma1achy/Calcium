@@ -388,6 +388,30 @@ should be reported together rather than one picked:
 
 ---
 
+## 13 · The substrate-arc drop, reconciled — 2026-09-06 at `bde15f6d`
+
+The drop (`README_SUBSTRATE_ARC.md`, eight notes) arrived after the interaction arc and the call
+grammar had landed, and four of its eight files were older than HEAD's copy of the same note. The
+method is the one above: for each file, which copy carries the later measurement.
+
+| file | verdict | the fact that decided it |
+|---|---|---|
+| `CALCIUM_DATAFRAME_IDEA.md` | identical | byte-equal |
+| `CALCIUM_LIVE_TERMINAL.md` | HEAD kept | the drop draws `⏺` at six sites; HEAD has `⬤` (F823). The §4 attach correction is in both copies |
+| `CALCIUM_MERMAID_THEMING.md` | HEAD kept | HEAD carries §8's 2026-09-03 answers; the drop's *blocked on one measurement nobody has run* predates them |
+| `CALCIUM_ML_BLOCKS.md` | HEAD kept | the drop says `raw` has no per-span channel; `TextSpan` landed 2026-09-04 and HEAD says so |
+| `CALCIUM_WIDGETS_DESIGN.md` | HEAD kept | the drop says `series[].hidden` is on no type; two of three landed 2026-09-05 (C04 I99), measured in HEAD's copy |
+| `CALCIUM_CALL_GRAMMAR.md` | new, with preface | implemented; nine sentences where the tree ruled differently are tabled in the preface (rule 3's `ok`, `⏎` re-run, the key name in the residue, the `⎿` rung) |
+| `CALCIUM_INK_RAMPS.md` | new, with preface | the drop's copy over the shorter upload; §9's prerequisite (spans) is met; six named mechanisms checked, `RAMP_EXTENT` is the one in no file |
+| `CALCIUM_INTERACTION_ARC.md` | new, with preface | landed 2026-09-03 → 09-05 in seven rounds; §0 describes the state it corrected |
+| `README_SUBSTRATE_ARC.md` | new, with preface | its sequence starts one item late — spans is built — and its widget premise is stale on C04 I99 |
+
+**What the drop got right that this file had not yet said**: the tensor half of the ML package has
+no design at all (roadmap 3's residue is the only reference), and the dataframe previewer should be
+measured against `visidata` rather than dismissed. Both stand as written there.
+
+---
+
 ## Arcs, sequenced
 
 An **arc** is a piece of work that is its own campaign — it changes a public type or adds a
