@@ -17,6 +17,7 @@
 > | `CALCIUM_CALL_GRAMMAR.md`, `CALCIUM_INK_RAMPS.md`, `CALCIUM_INTERACTION_ARC.md` | new; landed with prefaces saying where the tree ruled differently |
 > | *spans — THE LAST BIG ONE* | **landed 2026-09-04** as `TextSpan` (C04 §3am), with inline emphasis, inline code, the intra-line diff and the per-token `value` as its consumers — four, not one. The README's sequence starts one item later than it says: ink ramps is the next substrate item and its prerequisite is met |
 > | *the interaction arc — seven steps, planned against HEAD* | landed 2026-09-05; step 6 is the call grammar, landed 2026-09-06 |
+> | *ink ramps — the gradient and animation set. Needs spans* | **landed 2026-09-06, round one**: a text run and the progress bar, three fills, five loops; design `CALCIUM_INK_RAMPS_DESIGN.md`, contract C04 §3am.2 · C09 §5 *Ramps* · C10 §4h. One-shots, position effects, plot series, borders and colormap text are deferred with symbols (design §7). Next in the sequence: the live terminal |
 
 # Calcium — the substrate arc
 

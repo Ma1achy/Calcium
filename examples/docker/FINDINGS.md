@@ -29977,12 +29977,73 @@ second categorical vocabulary beside the theme's — the picture I16 exists to r
 sentence *already do it* was a citation read as coverage: the mechanism named exists, is used by
 the two forms named, and is not the mechanism it was cited for.
 
-**Ruling.** `palette` takes no name. Cluster `i` is `categorical.c((i mod 8) + 1)`, and
+**Ruling.** `palette` takes no name. The *i*-th ramped span of a member — the identity, on text — is
+`categorical.c((i mod 8) + 1)` (per cluster would be confetti, and the first frame read showed it), and
 `refOf` moves down into `theme/` so C09 can call it without importing C12 (design Q6, Q11).
 `QUALITATIVE_PALETTES` stays data for the plot arm, which is where its one reader is.
 
 **Where**: `docs/notes/CALCIUM_INK_RAMPS.md` §2; `src/presentation/plot/marks.ts:42-77`;
 `src/data/colormaps/qualitative/index.ts`; C10 I16.
+
+---
+
+## F838 — a design measurement disproved by the row written to assert it ★★★☆☆
+
+**What.** `CALCIUM_INK_RAMPS_DESIGN.md` M12 measured *`blocks/**` imports nothing from `plot/`*,
+and Q11 built a ruling on it: `refOf` had to move from C12 to C10 because C09 *could not* import
+C12 without closing a cycle. C10 T2.30 was written to assert the measurement and failed on its
+first run: `blocks/kinds/image.ts` imports `plot/aspect.ts` and `structured.ts` imports
+`plot/bar.ts`, both at run time, and the file graph is acyclic because `marks.ts` imports nothing
+of C09's. The grep behind M12 looked one directory deep — `blocks/*.ts` and `blocks/kinds/*.ts` with
+a pattern for `../plot/` — and the two files use `../../plot/`.
+
+**Why it matters.** The ruling was right and its stated reason was false, which is the shape the
+tree has learnt to watch for (F66, F58): a reason that would have been falsified by any file
+importing across the two directories, standing in front of a reason that holds — a slot table is
+C10's, and two components now read it. Had the row not been written, the design note, C10 §4h,
+I37 and two code comments would have carried the false reason indefinitely, each citing the
+other. **The instrument that reached it is the test row written from the measurement, run before
+the measurement was trusted** — the same discipline as the fabricated violation, applied to a
+design's premise rather than to a rule.
+
+**Ruling.** The move stands on the homing reason and says so in every place the cycle reason
+stood; M12 is corrected in place rather than deleted, with the grep's blind spot named; T2.30
+asserts the direction that *would* be a cycle — `theme/` importing `blocks/` or `plot/` — which is
+the claim the ruling actually needs.
+
+**Where**: `docs/notes/CALCIUM_INK_RAMPS_DESIGN.md` M12, Q11; C10 §4h, I37, T2.30;
+`src/presentation/theme/categorical.ts`; `src/presentation/plot/marks.ts`.
+
+---
+
+## F839 — T5.7 fails on the runner with two different shapes, and the guard for the first does not reach either ★★★☆☆
+
+**What.** `test/e2e/capabilities.test.ts` T5.7 drives kitty under Xvfb through `xdotool` and asserts
+a lone Esc arrives as `CSI 27 u`. Green in the devcontainer. On the runner, two consecutive runs of
+the same commit (`034c881e`, run 34007480654 and its rerun) failed with **different bytes**:
+
+| run | received for the Esc press | reading |
+|---|---|---|
+| first | `ESC [ 27 ; 2 u` | Shift held when nothing had pressed it — the shape F812 recorded and `x-emulator.ts:131` guards against with `keyup shift/ctrl/alt` before the drive |
+| rerun | a bare `ESC` | the legacy encoding: kitty had **not yet enabled** the protocol when the key arrived, or the key was delivered before the inner program's `enter` sequence was processed |
+
+**Why it matters.** The guard written for the first shape (F812) was in place and the first shape
+happened anyway, so the guard does not reach the mechanism — *a fix that changes nothing indicts
+the diagnosis*. And the second shape is not a modifier problem at all: it is an ordering between
+the emulator processing `CSI > 3 u` and XTEST delivering the key, which a 200 ms sleep after focus
+assumes and nothing verifies. Two runs, two symptoms, one row — **two blockers read as one**, and a
+retry that happens to pass would read as a flake having cleared.
+
+**Ruling.** Recorded here, not fixed in this arc: the fixture is the keyboard-protocol arc's, the
+runner is the only place it reproduces, and a repair written blind is the speculative guard the
+tree refuses. The shape of the repair, for whoever picks it up: the drive should wait for
+*evidence* that the protocol is on — a probe key whose bytes come back in the new encoding —
+rather than for a duration; and the modifier state should be read (`xdotool` has no query, so
+`xset q` or an XTEST release-all through `xdotool keyup` of both Shift keycodes by number, not
+by the `shift` keysym, which maps to one of them). `full` is red on PR 44 for this row alone.
+
+**Where**: `test/e2e/capabilities.test.ts` T5.7; `test/support/x-emulator.ts:127-135`; F812;
+runs 34007480654 and its rerun, 2026-09-06.
 
 ---
 

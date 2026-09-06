@@ -3,9 +3,14 @@
 > preface is what the tree says where the note and the tree differ. A `file:line` is where the
 > symbol was on the day — grep the symbol.
 >
-> **Status: designed, not built.** The next arc after the call grammar. Every mechanism the note
-> names was checked for existence before this was filed — the drop's own warning is that a definite
-> article is the tell.
+> **Status: built 2026-09-06, round one** — a text run (grapheme extent) and the progress bar (axis
+> extent), the three fills, five of the nine loops. Design and both walks in
+> `CALCIUM_INK_RAMPS_DESIGN.md`; contract in C04 §3am.2, C09 §5 *Ramps*, C10 §4h. **Three departures
+> from this note, each with its reason there**: text ramps take slot pairs and palettes while colormaps
+> stay on the bar (C10 I26's floor is per slot); 1-bit resolves to `from`, not a midpoint; `palette`
+> takes no name (F837). The one-shots and the position effects are deferred with symbols (design §7).
+> Every mechanism the note names was checked for existence before this was filed — the drop's own
+> warning is that a definite article is the tell.
 >
 > | the note says | the tree, measured |
 > |---|---|
@@ -13,9 +18,10 @@
 > | `continuousColour(map, t)` | exists — `src/presentation/theme/colormap.ts:71`; `COLORMAPS` at `:30`, `viridis`/`inferno` present; `okabe-ito` in `src/data/colormaps/qualitative/` |
 > | `ANIMATES` *is the per-kind record* | exists — `src/presentation/blocks/animation.ts:18`, `Record<BlockKind, boolean>`, with `animationIntervalOf`/`tickIntervalOf` beside it |
 > | `#armSpinner`, `spinnerIntervalMs` | both exist — `src/shell/session.ts:740`, `src/presentation/blocks/glyphs.ts:858` |
-> | `RAMP_EXTENT` | proposed here; in no file. It is this note's to introduce |
-> | §1, *a plot line is `refOf(i)` once* | unverified as a symbol; the series colour path is `figure.ts`'s and is measured when the arc is planned, not assumed from this line |
-> | §3, *the render cache carries the tick axis* | unverified here; C09 §3a's `tick` is what `status`/`steps` render through — measure the cache key before building on it |
+> | `RAMP_EXTENT` | **built** — `src/presentation/blocks/ramp.ts`, an exhaustive `Record<BlockKind, "none" | "clusters" | "axis">` (C09 I50) |
+> | §1, *a plot line is `refOf(i)` once* | measured: a polyline `Mark` carries **one** `ref` (`plot/marks.ts`), so a line coloured along its length is a mark-shape change and not a per-point call; deferred with the symbol `Mark.refs` (design §7) |
+> | §3, *the render cache carries the tick axis* | measured **true**: `session.ts:1196` keys the slot on the tick when `animationIntervalOf` is non-null (C22 I60, F233). The comment in `render-cache.ts` said the opposite and was F836 |
+> | §2, *the waffle and the pie already cycle a palette* | they cycle the theme's categorical slots through `refOf`; `QUALITATIVE_PALETTES` has no consumer in `src/` — F837, and why `palette` takes no name |
 > | §6b, one colour per cell, two stops through a block glyph | consistent with C10/C09 as built; `TextSpan.value` already paints a **background** through the block's `colormap` (C04 I90), which is the first per-grapheme colour channel and the seam a ramp would share |
 
 # Ink ramps — a colour that varies over an extent
