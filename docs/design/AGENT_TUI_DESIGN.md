@@ -21,12 +21,10 @@ seconds of a turn before anything else arrives.** Every drawing here was made ag
 as an aside.
 
 **The question primitive is built.** `ctx.ask()` takes a choice list, resolves a promise, and
-entry 16 generalised it: `AskOptions` carries `placement`, `dismissable` and `onSelect`, with
-`resolve(text)` for free-text answers. **The sketch's highest-value gap — A3 — is now *use it*
+entry 16 generalised it — **but not into the shape this sentence used to claim.** Measured 2026-09-03: `AskOptions` (`src/shell/local/registry.ts:32-52`) carries `question`, `detail`, `choices` and `placement` only; `onSelect` occurs nowhere in `src/`; `dismissable` is a `Layer` field (`viewport/overlay/types.ts:51`) that the registry's own comment says is *deliberately absent* from `ask`; and `ask` resolves a choice key, so there is no `resolve(text)` and a free-text answer is still owed. **The sketch's highest-value gap — A3 — is now *use it*
 rather than *find it*.**
 
-**Markdown is still absent.** It is roadmap #11, confirmed OPEN, and it is the only hard gate
-left. A6 waits on it; A1 renders prose as `raw` until it lands.
+**Markdown is half built.** Measured 2026-09-03: `markdownBlocks` (`src/data/viewmodel/markdown.ts`), exported from the barrel and reachable as `b.markdown` (`src/shell/builders/index.ts`), with `test/contract/markdown.test.ts` — roadmap #11 is PART, the block half landed and inline emphasis is entry 50. A6 can render prose as blocks today; only inline spans stay literal.
 
 **And `b.live`'s `stream` arm was removed, not filled.** F78 deleted it — *a declared option
 with no implementation is the disease; two throws guarding the choice was the symptom.* So the
@@ -123,22 +121,22 @@ entry each and settle; a conversation is turns.
 
 ▸ thinking · 4s · 312 tok
 
-⏺ I'll look at the current implementation first.
+⬤ I'll look at the current implementation first.
 
-⏺ read_file(src/interaction/parser/parse.ts)
+⬤ read_file(src/interaction/parser/parse.ts)
   ⎿ 184 lines · 6.2 KB
 
-⏺ The parser handles quotes with a single boolean. Nested quotes need a
+⬤ The parser handles quotes with a single boolean. Nested quotes need a
   depth counter instead:
 
-⏺ edit(src/interaction/parser/parse.ts)
+⬤ edit(src/interaction/parser/parse.ts)
   ⎿ ┌ parse.ts ────────────────────────────────
     │ 41 - let inQuote = false;
     │ 41 + let depth = 0;
     └───────────────────────────────────────────
 ```
 
-**`⏺` is a step the model took; `⎿` is that step's result** — four marks total with `▸` for
+**`⬤` is a step the model took; `⎿` is that step's result** — four marks total with `▸` for
 collapsed reasoning and `❯` for the reader. `⎿` is a **prefix reserving its columns**, which
 `noticeDoc` already does, so a multi-row result indents under its mark rather than sitting
 below a lone character.
@@ -153,17 +151,17 @@ frame is uniform and the content is whatever the result actually is** — which 
 differentiation against a fixed tool card.
 
 ```
-⏺ list_dir(src/interaction/)
+⬤ list_dir(src/interaction/)
   ⎿ NAME          KIND    SIZE   MODIFIED
     completion/   dir            2h ago
     parser/       dir            18m ago
 
-⏺ search("cursorCell")
+⬤ search("cursorCell")
   ⎿ FILE                       LINE  MATCH
     editor/layout.ts            134  export function cursorCell(
     shell/paint.ts              254  // until C17's cursorCell is threaded
 
-⏺ run_command(npm test)
+⬤ run_command(npm test)
   ⎿ │ 118 passed, 2 todo
     exit 0 · 4.1s
 ```
@@ -196,14 +194,14 @@ reader approves a change they cannot see.
 is mid-patch, not mid-subscription.
 
 ```
-⏺ edit(src/interaction/parser/parse.ts)
+⬤ edit(src/interaction/parser/parse.ts)
   ⎿ ┌ parse.ts ────────────────────────────────
     │ 41 + let depth = 0;
     └───────────────────────────────────────────
 
 ▲ cancelled
 
-⏺ updating the tests                              12s · 1.4k tok
+⬤ updating the tests                              12s · 1.4k tok
 ⎿ todo  3/5  ·  ◻ update the tests
 ```
 
@@ -232,9 +230,9 @@ it is doing.
 The same conversation at five depths.
 
 ```
-truecolour   ⏺  ⎿  ▸  ✻      tones, a coloured context bar, syntax
-1-bit        ⏺  ⎿  ▸  ✻      reverse video, the bar is a plain fill
-ASCII        *  -  >  *      the bar is # and ., the crest is one glyph
+truecolour   ⬤  ⎿  ▸  ✻      tones, a coloured context bar, syntax
+1-bit        ⬤  ⎿  ▸  ✻      reverse video, the bar is a plain fill
+ASCII        *  `  >  *      the bar is # and ., the crest is one glyph — the hook's rung is one character, not `-`, because a substitution keeps its cell count (C09 I5)
 ```
 
 **Markdown is the interesting one** — bold and headings go typographic at 1-bit and syntax
@@ -285,7 +283,7 @@ are the claim.
 | **markdown** | agent output is markdown; today it is `raw` | **#11, the only hard gate** |
 | **a thinking treatment** | reasoning is neither prose nor a tool result. Muted? Collapsible? Its own kind? **A real design question with a real source** | not on the roadmap |
 | auto-collapse by age | old tool calls at full height forever, or evicted — nothing between | in the nits |
-| scrollable containers | a long tool result inside a conversation | #46, blocked on C26 |
+| scrollable containers | a long tool result inside a conversation | #46, **BUILT** — `Scroll` kind, `src/shell/scroll-offsets.ts` (measured 2026-09-03; this row said *blocked on C26*) |
 
 **The thinking treatment is the one worth designing rather than deferring.** It has a
 mechanism now — `reasoning` is a first-class stream part with its own parser — and no block
@@ -408,22 +406,22 @@ was run.
 ┌ header ─────────────────────────────────────────────────────────────────────┐
   agent-tui   ✦ qwen3-coder-next   effort high        localhost:8000   22:13
 └─────────────────────────────────────────────────────────────────────────────┘
-
+───────────────────────────────────────────────────────────────────────────────
 ┌ transcript · scrolls · what HAPPENED ───────────────────────────────────────┐
 
   ❯ refactor the parser to handle nested quotes
 
   ▸ thinking · 4s · 312 tok
 
-  ⏺ I'll look at the current implementation first.
+  ⬤ I'll look at the current implementation first.
 
-  ⏺ read_file(src/interaction/parser/parse.ts)
+  ⬤ read_file(src/interaction/parser/parse.ts)
     ⎿ 184 lines · 6.2 KB
 
-  ⏺ The parser handles quotes with a single boolean. Nested quotes need a
+  ⬤ The parser handles quotes with a single boolean. Nested quotes need a
     depth counter instead:
 
-  ⏺ edit(src/interaction/parser/parse.ts)
+  ⬤ edit(src/interaction/parser/parse.ts)
     ⎿ ┌ parse.ts ────────────────────────────────
       │ 41 - let inQuote = false;
       │ 41 + let depth = 0;
@@ -456,6 +454,8 @@ was run.
 
 **The boxes are annotation, not chrome.** Only the two rules around the prompt are drawn.
 
+> **Ruled the default, 2026-09-05** — C22 §6l, I81–I83. The two rules are on every frame of every Calcium app and nothing switches them off; the footer is as tall as the blocks it returns, zero to `MAX_FOOTER_ROWS`, one row by default; a card's body hangs under `⎿` at the header's text column, four cells in, as this drawing has it (C22 §6l.6, I84 — two cells and the hook under the mark until the frame was read against the drawing); one blank row closes every entry (I85); the header and footer are two clusters with the clock at the right edge (I86); a rule separates the header from the transcript, so the frame carries three (I87, §6l.7). The frame above is therefore not the agent surface's — it is Calcium's, and `docker-tui` draws it too.
+
 ### What each region is for, and the split that decides it
 
 | region | scrolls | present | answers |
@@ -484,7 +484,7 @@ wins and the header goes**, because the footer's line 1 already carries it.
 
   ❯ refactor the parser to handle nested quotes
 
-  ⏺ Done. The parser tracks depth now and the suite passes.
+  ⬤ Done. The parser tracks depth now and the suite passes.
     ⎿ 118 passed, 2 todo · exit 0
 
 ───────────────────────────────────────────────────────────────────────────────
@@ -501,30 +501,30 @@ wins and the header goes**, because the footer's line 1 already carries it.
 information, and an empty region says nothing happened.
 
 ```
-  ⏺ edit(src/interaction/parser/parse.ts)
+  ⬤ edit(src/interaction/parser/parse.ts)
     ⎿ ┌ parse.ts ────────────────────────────────
       │ 41 + let depth = 0;
       └───────────────────────────────────────────
 
   ▲ cancelled
 
-⏺ updating the tests                                      12s · 1.4k tok
+⬤ updating the tests                                      12s · 1.4k tok
 ⎿ todo  3/5  ·  ◻ update the tests
 ───────────────────────────────────────────────────────────────────────────────
   ❯ ▌
 ```
 
-**The `✻` became `⏺`** — motion stopping is the signal, which is the one place animation
+**The `✻` became `⬤`** — motion stopping is the signal, which is the one place animation
 carries information without colour, and it is safe because **stopping is the signal, not the
 frames.**
 
 ### The two marks are two slots, and that is the ruling
 
-**`⏺` marks a step the model took. `⎿` marks that step's result.** Every part in the stream is
+**`⬤` marks a step the model took. `⎿` marks that step's result.** Every part in the stream is
 one or the other, which is why the transcript reads without any other structure:
 
 ```
-⏺   a text-delta run, or a tool-call        the model did something
+⬤   a text-delta run, or a tool-call        the model did something
 ⎿   the tool-result for the step above      here is what came back
 ▸   reasoning, collapsed                    the model's working, not its answer
 ⟩   an approval                             the app is asking
@@ -536,7 +536,7 @@ a slot and never a character, *because only the renderer can substitute* — and
 finding for authoring six marks verbatim. **Each gets an ASCII pair:**
 
 ```
-⏺ → *      the step marker
+⬤ → *      the step marker
 ⎿ → -      the result continuation
 ▸ ▾ → > v  collapsed / expanded
 ⟩ → ?      an open question
@@ -578,36 +578,116 @@ a real reasoning stream in front of it.
 ### 9c · A tool call, three states
 
 ```
-⏺ run_command(npm test)                        ← dispatched
-⏺ run_command(npm test) · 4s                   ← running, elapsed
+⬤ run_command(npm test)                        ← dispatched
+⬤ run_command(npm test) · 4s                   ← running, elapsed
   ⎿ 118 passed, 2 todo · exit 0                ← settled, the result block
 ```
+
+> **The settled state is every route's, 2026-09-05** — C23 I55/I56. The invoke route, its error
+> arm and the local route settle the header over the result, so `⬤ ps(--all) · 0.4s · 3 rows` above an
+> indented table is what a finished listing reads (the count since I59, 2026-09-06 — `ok` was the
+> placeholder for *no count*). C23 had ruled the opposite for the shell's own
+> verbs (*the card was the waiting and the document is the answer*); the reversal and its reason
+> are recorded there.
 
 **The elapsed time is entry 35's mechanism** — the refresh driver's tick, and what
 distinguishes *slow* from *stuck*. **The step marker does not change**; the result appears
 beneath it.
 
+### What the frame changed about §9c — four captures beside the drawing
+
+**Built as a composition and rendered at 80 and 40 columns, 24-bit and ASCII** (2026-09-05,
+`toolCallDoc` in `src/shell/documents.ts`, T2.48 prints the frames). The card is a `notice`
+carrying the new `step` glyph over either a `continuation` notice or a `scroll` that opens at
+its tail (C04 I97); *+N more* is the scroll's own residue row on a `collapsed` scroll (C04
+I98). Four things in the drawing were not what the frame draws, and the frame wins:
+
+```
+⬤ run_command(npm test) · 4s                   ← running: the body streams beneath it
+line 10
+line 11
+line 12
+⋯ 9 above, 0 below                             ← the hidden rows are ABOVE a following box
+
+⬤ run_command(npm test) · 4s                   ← settled: a zero exit is no outcome (correction 9)
+  ⎿ 118 passed, 2 todo                         ← the result under the hook, at the header's text column
+
+⬤ run_command(npm test)                        ← folded: a collapsed scroll
+⋯ 0 above, 392 below                           ← "+392 more" IS the residue row
+```
+
+1. **`exit 0` moved from the `⎿` line to the header.** The grammar is *⬤ name · elapsed ·
+   outcome* over a body; the outcome is the step's verdict and the result line is the body's
+   text. Drawn on one line here, they were two facts in one row.
+2. **The count string is not `+392 more · ⏎ to attach`.** There is one count mechanism — the
+   residue row *⋯ N above, M below* (C04 I49) — and a fourth string beside it would drift. A
+   folded body reads *⋯ 0 above, 392 below*; a body that is streaming and followed reads *⋯
+   392 above, 0 below*, because the hidden rows of a box showing its tail are above it, not
+   below. The drawing had them below.
+3. **`⏎ to attach` is not text on the row.** The affordance is `NavElement.activate` on every
+   child of a folded scroll — the `expand` action, whose label the footer shows — so the row
+   carries no key name (C16 I19's argument: a key named in a notice is a second keymap).
+4. **At 40 columns nothing changes**, and under ASCII the marks are `*`, `` ` `` and `~`.
+   The four frames are identical in shape; only the glyph slots move. (The head's rung read `@`
+   until F824; §A6 had drawn `*` all along.)
+
+**And four more, from the call grammar (§9e), 2026-09-06:**
+
+5. **The mark is `⬤` U+2B24, not `⏺` U+23FA.** The width was measured and the presentation was
+   not: U+23FA has an emoji variation sequence and draws two cells wherever a font prefers it.
+   The check is derived from the Unicode file now and runs over both glyph tables (C09 I45, F823).
+6. **The collapsed residue reads `⋯ +N more`, not `⋯ 0 above, 392 below`.** Correction 2's one
+   mechanism stands; its collapsed text had a clause nothing could falsify — there is no *above*
+   on a box showing no row. The open box keeps `⋯ N above, M below`. Still no key name (C04 I104).
+7. **`⏎` on the head toggles the fold and never re-runs.** *`⏎` again re-runs* is an arming
+   machine; `⇧⏎`/`⌥⏎` re-run, as they did (C26 I23).
+8. **The running head carries the spinner where the duration will be** — `⬤ pytest · ⠋ 12s` —
+   and the settled head an outcome that is a count, never `ok` (C23 I58, I59). The separator is a
+   glyph slot resolved by the composer, because the frames above drew a literal `·` at the ASCII
+   arm and nobody saw it (F828).
+9. **A zero exit is no outcome, and the ASCII separator is `:`.** `exit 0` was `ok` with a number
+   on it: the settled head reads `⬤ run_command(npm test) · 4s` and the tone carries success
+   (C23 I59). The separator's first ASCII rung, `-`, was the turn spinner's first frame, and a
+   dispatched head at that arm read `* verb - -`; read in the frame, ruled `:` (F834, C09 I49).
+
+**What had no mechanism on 2026-09-05, and has one now** (C22 §6l.6, §6l.8): the `⎿` hook in
+front of a *table* or a *logs* block, and the left rule beneath it, are drawn by the shell's
+`entryLayout` in the gutter it reserves — not by C09 — so §9d's three cards are now drawn as
+they read. The paragraph is kept because the reasoning is the record of why the mechanism lives
+where it does. **Superseded:** the `⎿` hook in front of a *table* or a *logs*
+block. `continuation` is a `notice` slot (C09 §4), so a body that is a table is drawn without
+the hook and the header alone carries the frame. **§9d's three cards are therefore drawn
+wrong by one column**: the mark before `NAME KIND SIZE` and before `FILE LINE MATCH` does not
+exist, and putting it there would need a gutter mechanism on arbitrary blocks that C09 does
+not have. Recorded here rather than redrawn, because the gallery's point — one frame, three
+block kinds — survives without it.
+
+**And one rule the walk found that the drawing could not show**: `expand` was refused from
+every settled entry (C23 I18, *all five kinds*), and every past tool call is a settled entry.
+*Expanded with the expand action, which exists* was true of the live entry only. `expand` is
+now I18's one exception (C04 §3c S4).
+
 ### 9d · The gallery — one tool per block kind
 
 ```
-⏺ list_dir(src/interaction/)
+⬤ list_dir(src/interaction/)
   ⎿ NAME          KIND    SIZE   MODIFIED
     completion/   dir            2h ago
     editor/       dir            2h ago
     parser/       dir            18m ago
 
-⏺ search("cursorCell")
+⬤ search("cursorCell")
   ⎿ FILE                       LINE  MATCH
     editor/layout.ts            134  export function cursorCell(
     shell/paint.ts              254  // until C17's cursorCell is threaded
 
-⏺ run_command(git status --short)
+⬤ run_command(git status --short)
   ⎿ │ M src/interaction/parser/parse.ts
     │ ?? test/contract/nested-quotes.test.ts
     exit 0 · 0.2s
 ```
 
-**Three kinds, three shapes, one mark.** The uniform `⏺`/`⎿` frame is what makes the *blocks*
+**Three kinds, three shapes, one mark.** The uniform `⬤`/`⎿` frame is what makes the *blocks*
 the visible difference — a table, a table with a code cell, a logs block — rather than three
 differently-drawn cards.
 
@@ -615,12 +695,237 @@ differently-drawn cards.
 with four display modes; here the frame is uniform and the content is whatever the result
 actually is.
 
+### 9e · The call grammar — what every tool call and command looks like
+
+**One shape, everywhere.** A command the reader typed, a tool an agent invoked, a job the
+platform ran — **they are the same object and they look the same.** The differences are what
+they say, not how they are drawn. **The standard is Claude Code**, and the measurement behind
+that is real: its transcript is skimmable because every call has a marked head, a gutter that
+says *this belongs above*, and a body that is bounded rather than poured.
+
+Written 2026-09-06 as the design of record; where a rule below was reversed by a walk against
+the tree, the reversal is marked **Ruled** and the component that holds it is named. The
+rulings: C09 I45–I49, C04 I104–I105, C22 I88–I90, C23 I58–I62, C26 I23, C15 I24.
+
+#### 1 · The shape
+
+```
+⬤ pytest tests/unit
+  ⎿ ============== test session starts ==============
+  │ ............................................ [2%]
+  │ ...............ssss..........................[4%]
+  │ ⋯ +392 more
+```
+
+```
+THE HEAD      ⬤ and what ran. One line, always present, always the same shape
+THE GUTTER    ⎿ and a left rule — this belongs to the head above it
+THE BODY      bounded, scrollable, with a residue row saying what is hidden
+```
+
+**Nothing else.** No box by default, no title bar, no separator, no blank line above or below
+inside the call. **The gutter is the grouping and it costs one column.**
+
+#### 2 · The head, in three fields
+
+```
+⬤ pytest tests/unit · 4.2s · 47 passed
+  │       │            │      └── the OUTCOME, once known
+  │       │            └── the DURATION, once known
+  │       └── the ARGUMENT, truncated from the tail
+  └── the VERB
+```
+
+**The verb is what was invoked** — a command name, a tool name, a job kind. Never a sentence,
+never a gerund. `pytest`, not `Running pytest`. **The argument is the shortest thing that
+distinguishes this call from the next one**, truncated from the tail with the ellipsis the glyph
+table gives, because a cut head reads as a different word — `petal_leng…` is not a word (C09 I46,
+C04 I105). **The duration appears when the call ends.** **The outcome is one clause and it is the
+reader's summary, not the tool's exit code**: `47 passed`, `3 files changed`, `no matches`. A
+number, not a status word — *succeeded* says nothing a green tone does not (C23 I59).
+
+The running head: `⬤ pytest tests/unit · ⠋ 12s`. **The spinner sits where the duration will
+be**, so nothing moves when the call finishes, and the elapsed counter is the number that matters
+— a spinner at 47s says *this is wrong* (C23 I58). The separator between fields is a glyph slot,
+resolved by the composer (C09 I49).
+
+#### 3 · The gutter, and why it is not a box
+
+`⎿` marks the first body row; the rest carry the left rule (C22 I88). One column, zero rows. **A
+box costs two columns and two rows** — three calls on a 24-row terminal is six rows of chrome. The
+border earns its place at exactly one moment: an attached session, where keystrokes are going
+somewhere other than the prompt. Out of this round; no attach mechanism exists.
+
+#### 4 · The body is bounded, always
+
+A 400-line result is eight rows and a residue line, and the reader opens it if they care. **The
+residue row is the existing one, not a third count string** — one mechanism for *what is hidden*
+everywhere it appears. **Ruled**: the collapsed box reads `⋯ +N more` and the open box `⋯ N above,
+M below`; no key name on either, because the footer already shows the `expand` label and a key
+named in a notice is a second keymap (C04 I104, C16 I19). **Live output does not move the frame**:
+streaming into a fixed-height block scrolls inside the block; tail-follow is on until the reader
+pages up and back on at the bottom (C04 §3c).
+
+#### 5 · States use the state kind, and nothing hand-rolls a notice
+
+```
+RUNNING      the head's spinner and elapsed; the body streams
+WAITING      the head reads · ⠋ waiting; the decision is the overlay's (§8)
+DONE         the head's duration and outcome; the body is bounded
+FAILED       the status block — the ERROR rule, the mark, the message
+RETRYING     the same, plus the countdown and the attempt
+DENIED       the head reads · denied; nothing ran
+```
+
+**`status` is the kind and it is one implementation.** A surface that composes its own red line
+of text is the defect this grammar exists to remove — and A03 SS56, widened to the builder call,
+says so. **A failed call keeps its head**: `⬤ pytest · 4.2s · failed` above the error box, because
+*what ran* is the first thing a reader needs (C23 I61).
+
+#### 6 · Nesting, and the gutter is what carries it
+
+```
+⬤ make all · 67.7s · 4 of 4
+  ⎿ ⬤ check · 8.1s
+    ⬤ enforce · 12.4s · 324 files
+    ⬤ test · 41.0s · 5127 rows
+    ⬤ golden · 6.2s · 407 frames
+```
+
+**One column per level and no more.** Two levels is the working depth; three is a signal the
+composition is wrong rather than a rendering to support (C22 I89). **A nested call's outcome rolls
+up**: the parent's is derived from its children, never restated by hand (C23 I62).
+
+#### 6b · Many calls at once, and subagents
+
+**Sequential** calls happened one after another and the transcript's order is the whole answer.
+**Concurrent** calls — parallel tools, a fan-out, N subagents — need a container, and the
+container is the parent call's gutter. `⎿` is a corner, so a single child reads correctly and a set
+does not: with N children the gutter is the tree's own vocabulary, from the same glyph table
+(`glyphForMask`, C22 I89).
+
+```
+⬤ search · 3.1s · 41 matches
+  ├─ ⬤ grep "elementsIn" · 6 files
+  │  ⎿ construct.ts:1263
+  │  │ keys.ts:863
+  │  │ ⋯ +4 more
+  ├─ ⬤ grep "focusedEntryId" · 18 files
+  └─ ⬤ grep "liveId" · 17 files
+```
+
+```
+⎿   one child, or a call's own body      the corner
+├─  a child with siblings after it
+└─  the last child
+│   the parent's line, continued past a child's body; and the left rule
+```
+
+**The parent's outcome is derived** — `41 matches` is the sum — **and its duration is the wall
+clock, not the total.** Three calls taking 2s each in parallel took 2s. The children's durations do
+not add up to the parent's and are not made to. **While they run, the children do not each
+stream**: one line per child, head only; a child's body appears when it settles, bounded, and only
+the focused child expands. The parent's head carries `k of N`. **Children appear in the order they
+were started and never reorder** — completion is carried by the head, not by position. Where one
+child failed, the parent says `2 of 3 · 1 failed` and does not adopt the child's error.
+
+**Subagents are a fan-out whose children are transcripts.** A subagent's own calls are not drawn
+in the parent; the parent shows what it was asked and what came back. **Opening a subagent is a
+pushed view, not an expansion** — a nested transcript is a different document (C15 §2b). Ruled and
+deferred: no producer exists.
+
+#### 7 · The reader can act on a call
+
+**Every call is an element** (C09 I47).
+
+```
+⏎          expand or collapse the body
+y          copy — the SOURCE, never the rendering: the head copies its invocation,
+           ⌃a y the invocation with the output
+⇧⏎ / ⌥⏎    re-run, where the entry knows its invocation and the far side permits it
+⌃c         cancel, while running
+```
+
+**Ruled**: the draft had `⏎` again re-run. A key that toggles on one press and re-runs on the next
+is an arming machine, and re-run already has its own key (C26 I23). Copy copies the invocation
+with the output, because a result without its command is unattributable six months later.
+
+#### 8 · Approval is a layer, not a body
+
+**A call that needs a decision does not draw the decision in its own gutter.** It goes to the
+overlay — the same surface that carries questions, image previews and pasted content — because
+the reader is being asked, not shown.
+
+```
+⬤ rm -rf build/ · ⠋ waiting
+
+    ┌────────────────────────────────────────┐
+    │  rm -rf build/                         │
+    │  ▲ this will delete 1,204 files        │
+    │                                        │
+    │  › approve                             │
+    │    deny                                │
+    │    always allow rm                     │
+    └────────────────────────────────────────┘
+```
+
+The head says it is waiting, so the transcript still shows what is happening when the overlay is
+dismissed or scrolled away from. The overlay carries the invocation, the consequence if supplied,
+and the choices as the existing choice list — `always allow` is a row like any other. On resolve
+the overlay closes and the head updates; **a denied call settles as denied and keeps its head**
+(C15 I24, C23 I60).
+
+#### 9 · What differs between a command and a tool call
+
+**Almost nothing.** A command the reader typed, a tool an agent invoked, a job the platform ran:
+same head, same gutter, same bounded body, same states, same actions. The only difference is
+attribution, and the transcript already carries it.
+
+#### 10 · Glyphs, and every one has an ASCII rung
+
+```
+⬤   the head mark          ASCII: *   — U+2B24, NOT U+23FA (emoji form; C09 I45)
+⎿   the gutter mark        ASCII: `   — one character, because a substitution keeps its count
+├─  a child, more follow   ASCII: +-  — from glyphForMask; the last-child distinction vanishes at ASCII
+└─  the last child         ASCII: +-
+│   the parent's line      ASCII: |
+│   the left rule          ASCII: |
+▲   the warning mark       ASCII: !   — ▲ in this tree, not ⚠
+⠋   the spinner            ASCII: the set's own pair
+…   the truncation mark    ASCII: ~
+·   the separator          ASCII: :   — not `-`, which is the turn spinner's frame (F834)
+```
+
+**From the glyph table, never as literals**, and every one measured for ambiguous width *and*
+emoji presentation before it ships (C09 I45, I48). Ten of the vocabulary's seventeen members were
+two cells at `wide` on the day this was written (F825).
+
+#### 11 · The rules, restated as rules
+
+```
+1   one head, one gutter, one bounded body — for every call, everywhere
+2   the verb is a name, not a sentence
+3   the outcome is a number, not a status word
+4   the argument truncates from the tail
+5   borderless by default; a border means "your keys go here now"
+6   a bounded body and a residue row, always — never a poured result
+7   live output scrolls inside the block and never moves the frame
+8   states come from the status kind and nothing composes a notice by hand
+9   a call is an element: focusable, copyable, actionable
+10  copy takes the source with the invocation
+11  two levels of nesting, and the parent's outcome is derived
+12  every glyph from the table, with its ASCII rung
+```
+
+**The audit is reading frames.** A transcript where two calls read as different products is a
+defect, **and no assertion in this repository can see it.**
+
 ---
 
 ## 10 · Commands
 
 **Slash verbs are the framework's shape and prose is the exception** — which is the
-prefix-*out* question (#27): a shell sends an unrecognised line to `sh`; an agent harness
+prefix-*out* question (#32 — this used to say #27, which is syntax highlighting): a shell sends an unrecognised line to `sh`; an agent harness
 sends it to the model. **That inversion is the one thing the manifest cannot express today**,
 and it is this example's first framework finding rather than a surprise.
 
@@ -684,8 +989,7 @@ re-dispatches it — which is `/retry` at a smaller scope and the same mechanism
 docker-tui built for `/drift` renders two model answers side by side with no new work.**
 
 **And the paste chip.** A pasted file becomes `[#1 parse.ts · 184L]` in the prompt and reaches
-the model as content rather than as a wall of text. **Designed, unbuilt** — nits §5, and this
-is its most natural consumer.
+the model as content rather than as a wall of text. **The prompt half is built** — `CHIP_LINES` in `src/shell/construct.ts` turns a paste of five or more lines into `[#n pasted · N lines]`; roadmap 30 is PART because the transcript half is not (measured 2026-09-03; this said *designed, unbuilt*) — and this is its most natural consumer.
 
 ---
 
@@ -705,8 +1009,9 @@ arrives** before any of them is built to.
 
 ## 13 · The spinner, and the marks that animate
 
-**`❯` is always the reader. `⏺` is always the agent.** That is the frame's whole grammar, and
-it means the animated cell is `⏺` itself rather than something beside it — **one cell,
+**`❯` is always the reader. `⬤` is always the agent.** That is the frame's whole grammar, and
+it means the animated cell is beside the mark, in the head's duration slot (§9e §2, C23 I58) —
+the mark itself never changes — **one cell,
 reserved always, occupied whether the step is running or settled.** No reflow, which is the
 same rule as the scrollbar gutter and the focus gutter.
 
@@ -737,7 +1042,11 @@ safe (EA=Narrow, no emoji form)
 
 **Assert it rather than remembering it**: every spinner frame is one cell by `cells()` **and**
 has no emoji presentation form. One row, and it is the row that stops the seventh frame
-someone adds from being `❇`.
+someone adds from being `❇`. **And derive the check rather than remembering the list** — the
+row above was a seventeen-character list from memory, it opened with `·`, which is Ambiguous
+and has no emoji form, and it never looked at the glyph tables, which is how `⏺` U+23FA shipped
+as the head mark with a variation sequence in the very file the list was recalling (F823). C09
+I45 reads `emoji-variation-sequences.txt` and runs over every table.
 
 ### They pulse, they do not rotate
 
@@ -775,20 +1084,20 @@ and the meaning is *something is happening*.
 
 ### State, and why colour cannot carry it
 
-**Roadmap ruling: animation is decoration, never information.** So `⏺` may change colour with
+**Roadmap ruling: animation is decoration, never information.** So `⬤` may change colour with
 state and **the state must be legible without it**:
 
 ```
 running    animated, accent tone         and the step line says `· 4s`
-ok         static ⏺, default tone        the result block is the evidence
-failed     static ⏺, error tone          AND the result line names the failure
+ok         static ⬤, default tone        the result block is the evidence
+failed     static ⬤, error tone          AND the result line names the failure
 ```
 
 **F34's rule, applied to a marker**: a distinction must not be carried by colour alone. **The
 result text carries it**; the tone reinforces. At 1-bit the tone is gone and the sentence is
 still there.
 
-**And a `⏺` that is still animating is itself a state** — it says *this step has not settled*,
+**And a `⬤` that is still animating is itself a state** — it says *this step has not settled*,
 which is information the animation genuinely carries without colour. That is the one case
 where motion is not decoration, and it is safe because **stopping is the signal, not the
 frames.**
@@ -971,8 +1280,7 @@ one-line summary or a diff.
 A paste chip's peek shows three lines of a 47-line JSON blob; `⏎` opens it in C17's editor in
 a pushed view. **Same shape: the popup shows what fits, and an action reaches the rest.**
 
-**Entry 46 — scrollable containers — is the general answer** and it is blocked on C26. Until
-it lands, *open it somewhere with room* is the escape, and it is a better one than scrolling
+**Entry 46 — scrollable containers — is the general answer** and it is BUILT (measured 2026-09-03; this said *blocked on C26*). Where it is not wired, *open it somewhere with room* is the escape, and it is a better one than scrolling
 a popup would be: **a reader approving a change wants the whole diff, not four rows of it at
 a time.**
 
@@ -1034,13 +1342,11 @@ is drawn with `▌`:
 
 ```
 ▌ █ ▀ ▄ ▒ ▓ │ ┃ ▁▂▃▄▅▆▇     EA=Ambiguous — two cells in a CJK locale
-▐ ░                          narrow
+▐ ░                          ALSO Ambiguous — this row used to say narrow; see below
 ```
 
 **So the gradient bar doubles in width wherever ambiguous is treated as wide**, and the
-right-alignment the README promises breaks. **`▐` (right half block) is narrow and `▌` is
-not**, which is an inconsistency in Unicode's own table rather than anything either project
-did — but it means the bar can be built from `▐` and `░` at no cost.
+right-alignment the README promises breaks. **This section used to say `▐` is narrow and `▌` is not.** Measured 2026-09-03 against `src/presentation/blocks/glyphs.ts:685-690`: `▐ ░ ▬ ▪ ▫ ▮ ▯ ▰ ▱ ◼ ◻` are `East_Asian_Width=Ambiguous` every one, and **`braille` is the only width-stable unicode bar style** — so a bar built from `▐` and `░` doubles exactly where this paragraph said it would not, and the `narrowOnly` flag on those styles is what the renderer does about it.
 
 **This is the class this project has now found a dozen times**: a correct narrower claim
 standing in for a broader one, where only the broader one is what the code needs.
@@ -1066,6 +1372,25 @@ gives it horizontal layout and multi-row falls out for free.
 
 **Decide it once, before six features each add a segment.** That is the nits' §9 with a sixth
 claimant, and this design is the one that most wants the room.
+
+> **Superseded the same day by C22 §6l** (I82): the footer is its content — `[]` is zero rows,
+> the maximum is `MAX_FOOTER_ROWS` (derived: four then, three since §6l.7's header rule) — and `TuiConfig.chrome.footerRows` is removed.
+> The three lines above are three blocks. The paragraph below is kept as the ruling it replaces.
+
+**DECIDED 2026-09-05 — C22 §6k, and the footer grows; the chrome does not compose.** The
+budget is `TuiConfig.chrome.footerRows`, declared once per session, default 1, an integer up
+to `MAX_FOOTER_ROWS` — which is **derived** from the size gate as the largest footer that
+leaves one transcript row at 16 rows with the prompt at its cap (six today), not chosen. The
+three lines above are `footerRows: 3`, and a `ChromeFn` still returns blocks: the height is
+the session's and never the function's, because a per-frame height makes the footer the
+second thing beside the prompt that pushes the transcript (§6k.3). `b.row` already gives the
+horizontal layout inside a row, so *chrome-as-blocks* was the half of the option this design
+already had. **Measured for this section**: at 24 rows the three lines plus a one-row header
+and a two-row prompt leave 18 for the transcript, which is the trade the drawing under
+*The three lines* accepts; at 12 rows nothing composes — the size gate holds at 16 and the
+fallback says so. **What it does not give this design is A7**: the activity region is
+variable-height and *between* the transcript and the prompt, which is a fifth region and not
+a footer, and §23's sentence that a fixed row cannot satisfy it still stands.
 
 ### What transfers unchanged
 
@@ -1408,7 +1733,7 @@ were competing for the same job and now they are not:
 
 ```
 during    ✻ editing the parser's quote handling   4s · 312 tok    ← the region
-after     ⏺ edit(src/interaction/parser/parse.ts)                 ← the transcript
+after     ⬤ edit(src/interaction/parser/parse.ts)                 ← the transcript
           ⎿ [the diff]
 ```
 
@@ -1417,12 +1742,22 @@ else is saying *waiting* — and the region is better placed for it, because **t
 scrolls and the region does not.** Scroll up to re-read something mid-turn and the pending
 entry goes with it; the activity region stays.
 
+**In Calcium's own shell the pending entry *is* the §9c card, and the two rulings do not meet**
+(C23 I54, 2026-09-05). A shell has no turn — one verb runs at a time and the transcript is the
+only surface — so there is nothing for a region to say that the card under the command row does
+not, and the entry was measured as `blocks: []` with no indicator at all before this. Here, with
+a turn in flight, the region says *what is happening* and each tool call's card says *what
+happened to this call*: the card is a record of one call and the region is the turn, which is
+exactly the split the paragraph above draws. What C23 built is the card's producer — `toolCallDoc`
+appended at step 3, `readout` for the figure, the outcome written where settlement keeps the
+header — and it is the code this app's pending-entry route will call rather than a second one.
+
 ### The checkbox glyphs, and the obvious pair is the unsafe one
 
 ```
-◻  U+25FB  WHITE MEDIUM SQUARE   narrow    pending
-◼  U+25FC  BLACK MEDIUM SQUARE   narrow    done
-⋅  U+22C5  DOT OPERATOR          narrow    did not happen
+◻  U+25FB  WHITE MEDIUM SQUARE   AMBIGUOUS pending      ← this column said narrow
+◼  U+25FC  BLACK MEDIUM SQUARE   AMBIGUOUS done
+⋅  U+22C5  DOT OPERATOR          AMBIGUOUS did not happen
 ✻                                narrow    in progress — the spinner, in the box position
 ```
 
@@ -1436,8 +1771,7 @@ next — both mean *this did not get done* — and **the reason is in the transc
 where a reason belongs. A second glyph would split a distinction the reader cannot act on
 differently.
 
-**`·` is ambiguous width**; `⋅` (dot operator) is the narrow one, which is the same trap the
-full ramp hit.
+**`·` is ambiguous width — and so is `⋅`.** This paragraph used to call the dot operator the narrow one. Measured 2026-09-03: `src/presentation/blocks/glyphs.ts:400-402` records U+22C5, U+2218 and U+25E6 as `East_Asian_Width=Ambiguous`, *exactly like the character they were chosen to replace*, and `glyphs.ts:685` measures `◼ ◻` the same. **The width claim in the table above is wrong in all three rows**, so the checkbox-glyph decision has to be re-taken with the terminal's `ambiguousWidth` in hand rather than assumed — which is the same trap the full ramp hit.
 
 **Filled against outline, not a tick in a box.** `☑` puts a small check inside a frame, and at
 terminal font sizes that is a fine distinction where **`◼` against `◻` is unmissable** — the
@@ -1540,7 +1874,7 @@ model's tools and the app's verbs are the same list.**
 
 ```
 /read_file src/interaction/parser/parse.ts     ← the reader calls it
-⏺ read_file(src/interaction/parser/parse.ts)   ← the model calls it
+⬤ read_file(src/interaction/parser/parse.ts)   ← the model calls it
   ⎿ [the same code block, through the same adapter]
 ```
 
@@ -1614,7 +1948,7 @@ tone, and **the model sees it too** — that is the loop working: the tool faile
 reads the failure and tries something else. **Do not intercept it.**
 
 ```
-⏺ run_command(npm test)
+⬤ run_command(npm test)
   ⎿ │ 3 failed, 115 passed
     exit 1 · 4.1s
 ```
@@ -1627,10 +1961,18 @@ a runtime one, if the tools are the manifest.
 partial stays with a notice.* **The transcript keeps what arrived** because losing it removes
 the only record of what the model was doing.
 
-**A stall is C23 §3b's**, and the mechanism exists — the driver fires a notice when a stream
-goes quiet past a threshold. **The local-model case is the one worth tuning**: a 4-bit 30B
-model on a warm cache can be quiet for ten seconds legitimately, so the threshold is the far
-side's rather than the framework's.
+**A stall is C23 §3b's, and the mechanism exists** (C23 I25): the driver patches a muted notice
+onto a stream that has been quiet past a threshold, and replaces it with a record of the gap when
+output resumes — never removes it, because `ViewPatch` has no delete. `src/shell/refresh.ts`
+holds it (`STALL_MS`, a per-entry watched map, a re-arming tick, `resolveStall`), `execution.ts`
+wires `watch`/`sawPatch`/`settled`, and `tools/mutate/runs/c23-refresh.mjs` mutates it. **This
+paragraph said the opposite for a few hours on 2026-09-03**, on a measurement that does not
+reproduce — `grep -rni stall src/` returns fifteen hits — and the correction is recorded in
+`docs/notes/CALCIUM_NOTE_AUDIT.md` §1f. **The one real residue is the threshold**: `STALL_MS` is a
+constant of the framework's, not a setting of the far side's. **The local-model case is the one
+worth tuning**: a 4-bit 30B model on a warm cache can be quiet for ten seconds legitimately, so
+the threshold should be the far side's rather than the framework's — a roadmap item, not a
+missing mechanism.
 
 **And the budget exhausting must say so**, which is §16's whole argument for `calls n/max` on
 screen. **The turn ends with a notice naming the budget**, not with silence that reads as a
@@ -1654,9 +1996,9 @@ happens without it.**
 
   Ask it something, or try:
 
-    ⏺ /tools              what it can do
-    ⏺ /model              what else this endpoint serves
-    ⏺ read the README and tell me what this project is
+    ⬤ /tools              what it can do
+    ⬤ /model              what else this endpoint serves
+    ⬤ read the README and tell me what this project is
 
 ───────────────────────────────────────────────────────────────────────────────
   ❯ ▌
@@ -1766,12 +2108,11 @@ check**, and it belongs to whoever builds A5.
 **The activity region is variable-height and the footer is three lines.** Neither fits, and
 **the activity region is the claimant a fixed row cannot satisfy at all.**
 
-**So roadmap #28 — the chrome row budget — is this design's blocker**, and the option it wants
+**So roadmap #29 — the chrome row budget — is this design's blocker** (this said #28, which is prompt cursor-following and BUILT), and the option it wants
 is **chrome-as-blocks**: multi-row falls out, `b.row` gives horizontal layout, and both regions
 become chrome the app supplies rather than regions the framework grows.
 
-**Seven features now want that decision.** This is the one that most wants the room, and it is
-the only one that cannot be satisfied by winning the argument about a single row.
+**The claimants are counted once, in roadmap 29, and not here.** This paragraph said seven where §16 said six and the roadmap said four, five and six in three places; reconciled 2026-09-03 to **four roadmap consumers plus this design's two regions** — see roadmap 29. The activity region is the one that most wants the room, and it is the only one that cannot be satisfied by winning the argument about a single row.
 
 ---
 
@@ -1782,7 +2123,7 @@ rulings, the tools are the manifest, the errors are ruled, and the empty state i
 
 **The two open things are named rather than hidden:**
 
-- **the chrome seam** — Calcium's, roadmap #28, and it gates A7 and A8
+- **the chrome seam** — Calcium's, roadmap #29 (not #28), and it gates A7 and A8
 - **compaction mid-turn** — a design question with no ruling, belonging to A5
 
 **And the drawings owe what every drawing in this project has owed**: every field name, every
@@ -1837,7 +2178,7 @@ it means a reader debugging a bad session cannot see that the model has been pro
 JSON all along. **A dim line under the step, not a notice** — it succeeded, it is not an error,
 and it is worth knowing.
 
-    ⏺ edit(src/parser.ts)
+    ⬤ edit(src/parser.ts)
       ⎿ repaired · the model's arguments did not parse
       ⎿ ┌ parse.ts ─────
 

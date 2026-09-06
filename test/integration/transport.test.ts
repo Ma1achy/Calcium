@@ -1,7 +1,7 @@
 // C06 tier 4 — integration. What transport is *for*: a manifest deciding
 // whether a verb is spawned at all, and a result that C07 can adapt.
 //
-// Most of this tier waits on components that do not exist, and says which. What
+// Most of this tier waited on components that did not exist, and says which (all built at 2026-09-03). What
 // does not wait is C05: `local` and `streams` are manifest facts, they are read
 // by whoever calls the transport, and both are testable today.
 import { mkdtempSync, readFileSync } from "node:fs";
@@ -275,7 +275,7 @@ describe("C06 with C05", () => {
     h.pipeline.submit("/ps");
     await new Promise((r) => setTimeout(r, 0));
     h.pipeline.submit("/tail");
-    await settled();
+    await settled(h.pipeline);
 
     const refusal = h.transcript.entries.at(-1);
     const text = JSON.stringify(refusal?.doc.blocks);
@@ -286,7 +286,7 @@ describe("C06 with C05", () => {
     ).toHaveLength(1);
 
     release?.();
-    await settled();
+    await settled(h.pipeline);
   });
   it("T4.6 (with C23): a cd built-in followed by a verb spawns in the new directory", async () => {
     // **`cwd` is a function, read at spawn** (C21 I10, C22 I12). A value
@@ -296,11 +296,11 @@ describe("C06 with C05", () => {
     const h = pipelineHarness();
 
     h.pipeline.submit("echo before");
-    await settled();
+    await settled(h.pipeline);
     h.pipeline.submit("cd /tmp");
-    await settled();
+    await settled(h.pipeline);
     h.pipeline.submit("echo after");
-    await settled();
+    await settled(h.pipeline);
 
     expect(h.spawned.map((x) => x.cwd), "the cd moved the second, not the first").toEqual([
       "/work",

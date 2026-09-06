@@ -18,6 +18,9 @@ const ROOT = process.cwd();
 const CAL = "src/presentation/plot/calendar.ts";
 const DATES = "src/data/dates.ts";
 const HEAT = "src/presentation/plot/heatmap.ts";
+// `calendarRows` moved to `derive.ts` with F322 — the derivation is the block's,
+// not the terminal renderer's, and the second arm could not reach it here.
+const DERIVE = "src/presentation/plot/derive.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -116,7 +119,7 @@ const results = runPass({
       // two-series block draws a calendar the caller never asked for, from the
       // first series, and silently discards the second.
       name: "the renderer derives a grid from the first of several series",
-      file: HEAT,
+      file: DERIVE,
       from: "  const only = raw.series.length === 1 ? raw.series[0] : undefined; // cells-ok — a series count",
       to: "  const only = raw.series[0]; // cells-ok — a series count",
       expect: "CL7a",

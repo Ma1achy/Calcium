@@ -352,6 +352,19 @@ a user may override them* — so a variant is a set of foregrounds chosen to pai
 with a terminal, not a skin that repaints one. The image above is rendered on a
 light terminal for that reason.
 
+### Spinners and bars, every one
+
+The two glyph catalogues the framework ships, drawn rather than listed — and generated from the
+same tables the renderer reads, so neither picture can go stale against the code.
+
+![Twenty-six spinner sets in three columns, each turning beside its name](docs/media/spinner-sets.gif)
+
+![Nine bar styles at four fills on three capability arms: full, ASCII, and ambiguous-wide](docs/media/bar-styles.png)
+
+A block names a set (`Status.spinner`) or a style (`Progress.style`); the terminal decides what
+is drawn. `spinnerSetNames()` and `barStyleNames()` list them for a consumer building a picker,
+and the plots demo's `/spinners` and `/bars` are the first two.
+
 ---
 
 ## The reference application

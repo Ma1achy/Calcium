@@ -37,9 +37,16 @@ const MUTATIONS = [
     // where a short child lives, which is why that suite is in the command.
     name: "the residue row is drawn whether or not anything is hidden",
     file: SRC,
-    from: "    if (content > block.height) {",
+    // Re-anchored 2026-09-05: `block.height` became `interior` (C04 I98's
+    // collapsed form). **Applied by hand, and T2.25 did not die — T2.28 did.**
+    // T2.25 asserts `measure` and this mutates `render`, so the row named here
+    // could never see it; the expectation was stale from the day the golden
+    // suite left this file's command, and re-anchoring by hand is what asked.
+    // T2.28 reads the frame of an under-filled box and is the row that sees an
+    // unconditional marker.
+    from: "    if (content > interior) {",
     to: "    if (true) {",
-    expect: "T2.25",
+    expect: "T2.28",
   },
   {
     // **`measure` conditioned on the offset rather than on the block.** The
@@ -48,8 +55,9 @@ const MUTATIONS = [
     // forbids and the reason I49's condition is on `(block, width)`.
     name: "the residue row is counted only when something is below",
     file: SRC,
-    from: "    return block.height + (contentHeight(block, w, measureChild) > block.height ? 1 : 0);",
-    to: "    return block.height;",
+    // Re-anchored 2026-09-05 (`interior`), applied by hand and T2.20 died.
+    from: "    return interior + (contentHeight(block, w, measureChild) > interior ? 1 : 0);",
+    to: "    return interior;",
     expect: "T2.20",
   },
   {
@@ -84,13 +92,20 @@ const MUTATIONS = [
     // row could not be written until the store did.
     name: "the render cache key ignores the scroll offset",
     file: "src/shell/session.ts",
-    // **Re-pointed when the tick axis joined the slot** (F227). The line used to
-    // end at `${offsets}` and now carries `${animated}` after it, so the old
-    // anchor named a string that no longer exists. The mutation is unchanged —
-    // it still drops the offsets and leaves everything else — and the pass was
-    // re-run on the commit that moved it (F219).
-    from: "\\u0000${offsets}${animated}`;",
-    to: "${animated}`;",
+    // **Re-pointed twice, and the second time by a rule rather than by
+    // luck.** It first ended at `${offsets}`; the tick axis appended
+    // `${animated}` (F227); the camera axis then inserted `${orbits}` between
+    // them (C22 I71). The second move was caught by `anchors.mjs` on the commit
+    // that made it — 24 missing where there had been 23 — which is that
+    // instrument's whole purpose and the third recorded instance of it.
+    //
+    // The mutation is unchanged: it still drops the offsets and leaves every
+    // other axis alone, and the pass was re-run on the commit that moved it.
+    // **Never re-anchor without running the pass** — a re-pointed anchor can sit
+    // on a line that has changed meaning, which is the one thing this instrument
+    // cannot see.
+    from: "\\u0000${offsets}\\u0000${orbitKey}${animated}`;",
+    to: "\\u0000${orbitKey}${animated}`;",
     expect: "T4.41",
   },
   {
@@ -115,9 +130,12 @@ const MUTATIONS = [
     file: "src/presentation/blocks/registry.ts",
     // Re-anchored when the two element questions became one call (C09 I30,
     // F224). The subject is unchanged — the condition is still the definition's
-    // — and this pass was re-run rather than re-anchored blind.
-    from: "        if (hasChildren(block) && !own.owned) {",
-    to: "        if (hasChildren(block)) {",
+    // — and this pass was re-run rather than re-anchored blind. **Re-anchored
+    // again when the walk gained its column origin** (F756, F757) and the
+    // condition became an early return; the mutation was applied by hand and
+    // T2.34 died on it, the harness itself not being run in that lane.
+    from: "      if (!hasChildren(block) || own.owned) return;",
+    to: "      if (!hasChildren(block)) return;",
     expect: "T2.34",
   },
   {
@@ -126,7 +144,8 @@ const MUTATIONS = [
     // is unchanged by it, which is why eighteen rows and a frame-read missed it.
     name: "the box does not pad to its declared height",
     file: SRC,
-    from: "{ length: Math.max(0, block.height - drawn) }, // cells-ok",
+    // Re-anchored 2026-09-05 (`interior`), applied by hand and T2.28 died.
+    from: "{ length: Math.max(0, interior - drawn) }, // cells-ok",
     to: "{ length: 0 }, // cells-ok",
     expect: "T2.28",
   },
@@ -188,7 +207,8 @@ const results = await runPass({
   run,
   control: {
     file: SRC,
-    from: "    const shown = ranges.filter((r) => r.to > offset && r.from < offset + block.height);",
+    // Re-anchored 2026-09-05 (`interior`), applied by hand; T2.27 and T2.29 died.
+    from: "    const shown = ranges.filter((r) => r.to > offset && r.from < offset + interior);",
     to: "    const shown = ranges;",
     why:
       "every child is drawn and the box is not bounded at all — if this survives, no row reads " +

@@ -9,7 +9,11 @@ import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
-const CAT = "src/presentation/plot/categorical.ts";
+// **`binValues` moved to `derive.ts` when the seam grew a caller** (C12 I70,
+// C12 §3ak.27). A histogram's binning is a derivation of its series, so it sits
+// below both arms with `ecdfSeries` and `densitySeries` rather than inside the
+// terminal's bar rasteriser — and these three anchors moved with it.
+const DERIVE = "src/presentation/plot/derive.ts";
 const DEFN = "src/presentation/plot/definition.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
@@ -28,7 +32,7 @@ const results = runPass({
   write,
   run,
   control: {
-    file: CAT,
+    file: DERIVE,
     from: "  const per = series.map((vs) => vs.filter((v): v is number => v !== null && Number.isFinite(v)));",
     to: "  const per = series.slice(0, 1).map((vs) => vs.filter((v): v is number => v !== null && Number.isFinite(v)));",
     why: "binning only the first series returns one count array where the caller expects one per series, so every row about a second series fails; a run that cannot see that cannot see any row below",
@@ -37,7 +41,7 @@ const results = runPass({
     {
       // **The shipped defect.** Edges from `series[0]` and nothing else.
       name: "the edges come from the first series alone",
-      file: CAT,
+      file: DERIVE,
       from: "  const finite = per.flat();",
       to: "  const finite = per[0] ?? [];",
       expect: "HS1",
@@ -51,7 +55,7 @@ const results = runPass({
     // because the next reader will reach for the same expression.
     {
       name: "a series with nothing in it is dropped rather than kept at zero",
-      file: CAT,
+      file: DERIVE,
       from: "  const counts: number[][] = per.map(() => new Array(binCount).fill(0) as number[]);",
       to: "  const counts: number[][] = per.filter((vs) => vs.length > 0).map(() => new Array(binCount).fill(0) as number[]);",
       expect: "HS1",
@@ -86,6 +90,38 @@ const results = runPass({
       from: '        categories: cats.flatMap((c) => block.series.map((_sr, k) => (k === 0 ? c : ""))),',
       to: '        categories: cats.flatMap((c) => block.series.map((sr, k) => `${c} · ${sr.label ?? String(k + 1)}`)),',
       expect: "HS4",
+    },
+    {
+      // **The shipped defect, restored** (C12 I8, F319). One `slice` and a bin
+      // past the last row is gone with nothing on the page saying so — which is
+      // what the corpus held while the series branch beside it spent twenty
+      // lines avoiding exactly that.
+      name: "a category past the last row is dropped in silence again",
+      file: DEFN,
+      from: "  const short = cats.length > areaRows; // cells-ok — a category count",
+      to: "  const short = false; // cells-ok — a category count",
+      expect: "HS8",
+    },
+    {
+      // **The notice grows the plot instead of costing a row.** I1 is the other
+      // half of the rule: a form taller than its declaration scrolls whatever a
+      // caller reserved space for, so a fix that added a row would trade one
+      // silent failure for another.
+      name: "the notice is added to the height rather than spent from it",
+      file: DEFN,
+      from: "  const shown = short ? Math.max(0, areaRows - 1) : areaRows; // cells-ok — a row count",
+      to: "  const shown = areaRows; // cells-ok — a row count",
+      expect: "HS8",
+    },
+    {
+      // **The count goes and the names stay.** A reader can see that names were
+      // listed; nothing tells them the list is itself truncated at a narrow
+      // width, which is where `+N` is the only surviving fact.
+      name: "the notice names the withheld bins without counting them",
+      file: DEFN,
+      from: '        `+${String(omitted.length)} more${sep}${omitted.join(sep)}`, // cells-ok — a category count',
+      to: '        `${omitted.join(sep)}`, // cells-ok — a category count',
+      expect: "HS8",
     },
   ],
 });

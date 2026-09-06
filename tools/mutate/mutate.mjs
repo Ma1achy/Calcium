@@ -43,7 +43,15 @@ export function killed(output) {
  * start; this catches one that goes blind in the middle, which is what happened:
  * a suite piped into `grep -q` under `pipefail`, the writer taking SIGPIPE, exit
  * 141 and a buffer cut before the summary. Every mutation after it would have
- * reported a survivor. */
+ * reported a survivor.
+ *
+ * **The second cause is output volume, and it looks identical.** `c11-table-window`
+ * went blind on three of nine: a mutation that makes *every* window wrong emits a
+ * conformance report with thousands of failure rows, `execSync`'s 1 MiB default
+ * `maxBuffer` cuts the child off, and the throw carries a truncated `stdout` with
+ * the summary sheared away. Same symptom, no signal involved — and it is worse
+ * than the SIGPIPE case, because it strikes exactly the mutations that break the
+ * most. A run whose subject is a sweep sets `maxBuffer` explicitly. */
 export function ran(output) {
   return /Tests\s+\d+ (failed|passed)/.test(strip(output)) || timedOut(output);
 }
@@ -155,7 +163,24 @@ export function runPass({ mutations, control, read, write, run }) {
   };
 
   restore();
-  if (killed(run())) {
+  // **Two ways for a clean tree to be unusable, and `killed` only sees one.**
+  // A suite that does not compile produces no summary, so `killed` is `false`
+  // and this gate passes — then the control produces no summary either, and the
+  // pass throws naming the *control*. Measured: a syntax error in a fixture
+  // (`-(x) ** 2`, which esbuild refuses) sent two runs' diagnosis to their
+  // control mutations, where the tree was what would not build. `ran` is the
+  // predicate this file already defines for exactly the distinction, and the
+  // preamble above says why — *a run that never finished and a run that
+  // finished green are the same `false`, and they mean opposite things*.
+  const clean = run();
+  if (!ran(clean)) {
+    throw new BlindHarnessError(
+      "the unmutated suite did not reach a summary — it did not compile, did not start, or was " +
+        "cut off. Nothing below can mean anything, and the fault is in the tree rather than in " +
+        "any mutation: fix the build first",
+    );
+  }
+  if (killed(clean)) {
     throw new BlindHarnessError("the unmutated suite already fails, so no row below means anything");
   }
 

@@ -99,6 +99,8 @@ export function plotAreaRows(plot: PlotGeometry): number {
 const heightOrOne = (plot: PlotGeometry): number => Math.max(1, Math.floor(plot.height ?? 1));
 const AREA_ROWS: Readonly<Record<PlotForm, (plot: PlotGeometry) => number>> = {
   sparkline: () => 1,
+  // The declared rows are the sample grid's halves (C12 I84).
+  plot3d: heightOrOne,
   waffle: () => 10,
   contour: heightOrOne, quiver: heightOrOne,
   line: heightOrOne,
@@ -109,7 +111,7 @@ const AREA_ROWS: Readonly<Record<PlotForm, (plot: PlotGeometry) => number>> = {
   lollipop: heightOrOne, dotplot: heightOrOne,
   flame: heightOrOne, icicle: heightOrOne, funnel: heightOrOne,
   gantt: heightOrOne, waterfall: heightOrOne, streamgraph: heightOrOne,
-  stackedarea: heightOrOne, treemap: heightOrOne, tree: heightOrOne, graph: heightOrOne,
+  stackedarea: heightOrOne, treemap: heightOrOne, tree: heightOrOne, graph: heightOrOne, sankey: heightOrOne,
   slope: heightOrOne, bubble: heightOrOne, autocorrelation: heightOrOne, timeline: heightOrOne, bullet: heightOrOne, utilisation: heightOrOne,
   calendar: heightOrOne, correlation: heightOrOne, confusion: heightOrOne,
   spectrogram: heightOrOne, latency: heightOrOne, density2d: heightOrOne,
@@ -139,6 +141,11 @@ const axedFurniture = (plot: PlotGeometry): number =>
   plot.axes === true ? AXIS_ROWS + FRAME_ROWS : 0;
 const FURNITURE_ROWS: Readonly<Record<PlotForm, (plot: PlotGeometry) => number>> = {
   sparkline: () => 0,
+  // **No frame, no rule, no x-labels** — `axes` is refused on this form
+  // (C04 I76) and its three axis names are billboarded in the scene rather
+  // than written under it. A horizontal legend still costs its row, and that
+  // is `legendRows`' term, added centrally.
+  plot3d: () => 0,
   waffle: () => 0,
   line: axedFurniture,
   heatmap: () => AXIS_ROWS,
@@ -148,7 +155,7 @@ const FURNITURE_ROWS: Readonly<Record<PlotForm, (plot: PlotGeometry) => number>>
   lollipop: axedFurniture, dotplot: axedFurniture,
   flame: axedFurniture, icicle: axedFurniture, funnel: axedFurniture,
   gantt: axedFurniture, waterfall: axedFurniture, streamgraph: axedFurniture,
-  stackedarea: axedFurniture, treemap: () => 0, tree: () => 0, graph: () => 0,
+  stackedarea: axedFurniture, treemap: () => 0, tree: () => 0, graph: () => 0, sankey: () => 0,
   slope: axedFurniture, bubble: axedFurniture, autocorrelation: axedFurniture,
   timeline: axedFurniture, bullet: axedFurniture, utilisation: () => AXIS_ROWS,
   calendar: () => AXIS_ROWS, correlation: () => AXIS_ROWS, confusion: () => AXIS_ROWS,

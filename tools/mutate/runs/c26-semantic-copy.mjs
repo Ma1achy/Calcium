@@ -89,10 +89,12 @@ const MUTATIONS = [
     // **The head alone, ignoring the anchor.** A range is selected, drawn and
     // extended, and `y` copies one row of it — which looks like a copy that
     // worked.
+    // The slice lives in `extentOf` since arc5 Lane E (C26 §5c), so this now
+    // also empties the wash `focusFor` paints; T1.43 still reads the copy.
     name: "the copy takes the focused element rather than the range",
-    file: KEYS,
-    from: "        .slice(Math.min(anchor, head), Math.max(anchor, head) + 1)",
-    to: "        .slice(head, head + 1)",
+    file: FOCUS,
+    from: "    extent: Object.freeze(elements.slice(Math.min(anchor, head), Math.max(anchor, head) + 1)),",
+    to: "    extent: Object.freeze(elements.slice(head, head + 1)),",
     expect: "T1.43",
   },
 ];

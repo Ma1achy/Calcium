@@ -35,13 +35,15 @@ import { clampSpans, pad, padStart, paint, slot, tone, type Span } from "../bloc
 import { cells, truncate, type AmbiguousWidth } from "../text.js";
 import { xAxis, xTickRow } from "./axes.js";
 import type { XAxis } from "./axes.js";
-import { HAS_POSITION_AXIS } from "./marks.js";
+import { legendOf, positionAxisOf, positionDomainOf, valueLabelsOf } from "./figure.js";
 import { candleColumn, candlesOf } from "./candles.js";
 import { AXIS_GUTTER, FRAME_RIGHT } from "./height.js";
 import { FACING_DEFAULT, facingOf } from "./scale.js";
-import type { Annotation, Plot } from "../../data/viewmodel/index.js";
-import type { ColourRef } from "../theme/index.js";
-import { SHARES_CELLS, markOf, refOf } from "./marks.js";
+import type { Plot } from "../../data/viewmodel/index.js";
+import type { ColourRef, Style } from "../theme/index.js";
+import { SHARES_CELLS, markOf } from "./marks.js";
+import { seriesHidden } from "./visibility.js";
+import { identityOf, legendSlots, type FrameStyle } from "./figure.js";
 import type { RenderContext } from "../blocks/types.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 
@@ -111,7 +113,30 @@ export type Layout = Readonly<{
    * number is small and the bug it prevents is not.
    */
   reserved?: number;
+  /**
+   * Whether the block this frame encloses holds a block-level focus (C26 §7,
+   * C12 §3's element paragraph).
+   *
+   * **On the layout for `style`'s reason**: the frame's four painters take a
+   * layout and not a block, and `reserving` is the one place a layout meets the
+   * block and the context — so the flag is set there once rather than threaded
+   * through nine call sites. What it changes is a tone on cells the frame draws
+   * regardless (`frameTone`); it can change no glyph and no width, which is
+   * C11 I17's rule applied to a plot.
+   */
+  focused?: boolean;
 }>;
+
+/**
+ * The frame's ink: `accent` under block-level focus, `muted` otherwise (C26 §7).
+ *
+ * One function for the lid, the two side rules and the bottom rule, so the four
+ * cannot disagree about whether the block is focused. At 1-bit the difference is
+ * the mono class — bold where the frame was dim — a weight and not a colour (F34).
+ */
+function frameTone(layout: Layout, ctx: RenderContext): Style {
+  return tone(layout.focused === true ? "accent" : "muted", ctx.theme, ctx.capabilities);
+}
 
 /**
  * One row of spans, clamped and painted.
@@ -143,7 +168,11 @@ export function line(spans: readonly Span[], layout: Layout, ctx: RenderContext)
 function leftGutterSpans(label: string, layout: Layout, ctx: RenderContext): readonly Span[] {
   if (layout.gutter === 0) return [];
   const g = glyphs(ctx.capabilities);
+  // **The label is `muted` and the edge is the frame's** (C26 §7): a focus turns
+  // the enclosure `accent` and leaves the scale's numbers as they were, so what
+  // lights up is the box around the data and not the data's own captions.
   const muted = tone("muted", ctx.theme, ctx.capabilities);
+  const edgeTone = frameTone(layout, ctx);
   // `"corners"` has no side edges either — the label still sits where it does in
   // every other style, so the column the data starts in never moves with the
   // style. That is what makes these four interchangeable at a glance.
@@ -170,7 +199,10 @@ function leftGutterSpans(label: string, layout: Layout, ctx: RenderContext): rea
     // question about the row: the same conflation, a third time, in the fix
     // for the first two.
     { text: layout.labelColumn === 0 ? "" : padStart(label, layout.labelColumn, ctx.capabilities.ambiguousWidth), style: muted },
-    { text: ` ${edge}`, style: muted },
+    // The blank between label and edge is nobody's: kept out of the edge's span
+    // so a focus moves exactly the frame's glyphs and not the cell beside them.
+    { text: " ", style: muted },
+    { text: edge, style: edgeTone },
   ];
 }
 
@@ -193,9 +225,10 @@ function rightGutterSpans(
   const column = layout.rightColumn ?? 0;
   const bare = BARE_RIGHT_EDGE.has(layout.style ?? "box");
   const muted = tone("muted", ctx.theme, ctx.capabilities);
+  const edgeTone = frameTone(layout, ctx);
   if (column === 0) {
     if (layout.frame !== true) return [];
-    return [{ text: bare ? " " : glyphs(ctx.capabilities).vertical, style: muted }];
+    return [{ text: bare ? " " : glyphs(ctx.capabilities).vertical, style: edgeTone }];
   }
   const g = glyphs(ctx.capabilities);
   const amb = ctx.capabilities.ambiguousWidth;
@@ -207,7 +240,8 @@ function rightGutterSpans(
   if (callout !== undefined) {
     const text = callout.shared ? `${callout.text}+` : callout.text;
     return [
-      { text: `${bare ? " " : g.calloutTee} `, style: muted },
+      { text: bare ? " " : g.calloutTee, style: edgeTone },
+      { text: " ", style: muted },
       {
         text: pad(truncate(text, column, ctx.capabilities), column, amb),
         // Bold **and** the mark, in that order of reliance: the mark is what
@@ -221,7 +255,8 @@ function rightGutterSpans(
   // drawing `tick_right` on a left border is this rule read from the other end.
   const edge = bare ? " " : label === "" ? g.vertical : g.teeLeft;
   return [
-    { text: `${edge} `, style: muted },
+    { text: edge, style: edgeTone },
+    { text: " ", style: muted },
     { text: pad(truncate(label, column, ctx.capabilities), column, amb), style: muted },
   ];
 }
@@ -248,8 +283,10 @@ export function rightGutterWidth(rightColumn: number): number {
 }
 
 /** Which sides of the plot area carry y labels (I47). */
-export function yAxisSides(block: Pick<Plot, "yAxis">): { left: boolean; right: boolean } {
-  const y = block.yAxis ?? "left";
+export function yAxisSides(block: Pick<Plot, "axes" | "form" | "yAxis">): { left: boolean; right: boolean } {
+  // **Read back** (C12 I67, §3ak.19): `false` is *no labels, keep the frame*,
+  // which `frame` cannot say and `gutter` must not.
+  const y = valueLabelsOf(block) ?? false;
   return { left: y === "left" || y === "both", right: y === "right" || y === "both" };
 }
 
@@ -381,7 +418,12 @@ export function bandLayout(
  * against an edge that is not there, which is I26's own clause and the one place
  * the styles are not interchangeable.
  */
-export type FrameStyle = NonNullable<Plot["plotFrame"]>;
+// **`FrameStyle` lives in `figure.ts` now** (C12 §3ak.1 finding 5). This file
+// is what reads a figure back, so the figure importing a shape from here
+// while this imports the figure is a cycle inside L1 — A02 §1, MG1 and MG22.
+// Re-exported rather than moved out of sight: eleven call sites name it from
+// here and none of them is about where a type is declared.
+export type { FrameStyle };
 
 /** One edge's glyphs: the two corners and the run between them. */
 type EdgeGlyphs = Readonly<{ left: string; run: string; right: string }>;
@@ -404,7 +446,7 @@ function topGlyphs(style: FrameStyle, g: ReturnType<typeof glyphs>): EdgeGlyphs 
 
 export function frameTop(layout: Layout, ctx: RenderContext): string {
   const g = glyphs(ctx.capabilities);
-  const muted = tone("muted", ctx.theme, ctx.capabilities);
+  const muted = frameTone(layout, ctx);
   const edge = topGlyphs(layout.style ?? "box", g);
   // **The row is still emitted when the style draws nothing in it**, because
   // `plotHeight` counted it and a style cannot change a block's height — that is
@@ -443,7 +485,7 @@ export function frameBottom(
   cursorAt: number | null = null,
 ): string {
   const g = glyphs(ctx.capabilities);
-  const muted = tone("muted", ctx.theme, ctx.capabilities);
+  const muted = frameTone(layout, ctx);
   const style = layout.style ?? "box";
   // **`"corners"` draws no ticks**, which is I26's own clause: a tick is a mark
   // *on* an edge, and there is no edge here for it to sit on. Every other style
@@ -568,15 +610,6 @@ export type Furniture = Readonly<{ top: string; bottom: readonly string[] }>;
  * `null` where there is nothing to span — no samples, or one, which has no
  * extent and would give a zero-width domain to divide by.
  */
-function xDomain(block: Plot): { min: number; max: number } | null {
-  const declared = block.xMin !== undefined || block.xMax !== undefined;
-  const n = sampleCount(block);
-  if (!declared && n < 2) return null; // cells-ok — a sample count
-  const min = block.xMin ?? 0;
-  const max = block.xMax ?? n - 1; // cells-ok — a sample count
-  return max > min ? { min, max } : null;
-}
-
 /**
  * How many positions the abscissa has.
  *
@@ -607,11 +640,21 @@ export function xRowFor(block: Plot, areaWidth: number, ctx: RenderContext): XAx
   // class arriving in a guard rather than in a sentence.
   const facing = facingOf(block, FACING_DEFAULT);
   if (block.xLabels !== undefined) return xAxis(block.xLabels, areaWidth, ctx.capabilities, facing);
-  if (block.axes !== true || !HAS_POSITION_AXIS[block.form]) {
+  // **One answer, and `xLabels` is inside it** (C12 I67, §3ak.19). The early
+  // return above short-circuits on the same field, so the two clauses were one
+  // condition split across four lines; `positionAxisOf` carries both.
+  if (!positionAxisOf(block)) {
     return xAxis(undefined, areaWidth, ctx.capabilities);
   }
-  const domain = xDomain(block);
-  if (domain === null) return xAxis(undefined, areaWidth, ctx.capabilities);
+  // **`positionDomainOf` and not a second copy** (C12 I78, §3ak.44). This held
+  // its own `xDomain`, and the seam's arrived beside it — two derivations of the
+  // same three block fields, which is the thing the ruling is written against.
+  // **The mutation pass is what said so**: `XA1` and `XA2` mutate the shared
+  // one, and both survived, because the terminal was still reading its own. A
+  // survivor here is not a finding about the test.
+  const pos = positionDomainOf(block);
+  if (pos === null) return xAxis(undefined, areaWidth, ctx.capabilities);
+  const domain = pos.range;
   // **The form owns which column a position lands in** (C12 I37, §3d.1). Every
   // other row of that table is a rule meeting a boundary; this one is two
   // correct mappings from the same index, and the frame would have looked right
@@ -729,15 +772,18 @@ export function legendPlacement(
   block: Plot,
   caps?: Pick<TerminalCapabilities, "colourDepth">,
 ): "above" | "below" | "left" | "right" | null {
-  if (block.legend === false) return null;
-  if (block.legend !== undefined) return block.legend;
-  // **A name at the line's end *is* the legend** (C12 I55, §3ag A2). C12 I48
-  // ruled that a callout does not replace one — *it names a value where a legend
-  // names an identity* — and that sentence selects rather than excludes: the
-  // arms that write the identity answer the question the legend answers, and
-  // `"last"` still does not. Same shape as the 1-bit strip suppression below,
-  // arriving for a second reason; an explicit `legend:` has already won above.
-  if (block.yCallout === "name" || block.yCallout === "both") return null;
+  // **Read back** (C12 I67, §3ak.19). These two lines were the whole of what
+  // `Figure.legend` could not express, which is why an arm consuming the old
+  // member drew a legend the author had refused (F295).
+  const placed = legendOf(block);
+  if (placed === null) return null;
+  if (placed.placement !== null) return placed.placement;
+  // **The name-at-the-line's-end clause is `legendOf`'s now** (C12 I81,
+  // §3ak.47). It lived here and not in the crossed resolver, which is how the
+  // second arm came to draw a legend this one removes — and once `legendOf`
+  // carried it, the copy here was dead: `placed` is `null` before this line is
+  // reached. **The mutation pass is what said so**, by removing this clause and
+  // catching nothing.
   // **Labelled annotations count, or the field lands in the state its deferral
   // refused** (C04 I52, C12 §3g). The case I52 was written about is *one line,
   // one reference line*: counting series alone answers `null` there, so the
@@ -747,7 +793,14 @@ export function legendPlacement(
   // a one-series plot need the row exactly as two series do.
   const labelled = (block.annotations ?? [])
     .filter((a) => (a as { label?: string }).label !== undefined).length; // cells-ok — an annotation count
-  const count = (block.segments?.length ?? 0) || block.series.length; // cells-ok — a series count
+  // **`identityOf` rather than a second copy of its rule** (C12 I89). This read
+  // `(segments?.length ?? 0) || series.length`, which is that function's body
+  // spelled again — behaviour-identical on every form that has only those two
+  // carriers, and **one form short** the day a third arrived. A 3D scatter's
+  // identities are its clouds and only under `colourBy: "series"`, so the
+  // legend's presence and its contents now fall out of one rule and cannot
+  // disagree, which is I81's mechanism avoided rather than repaired.
+  const count = identityOf(block).length; // cells-ok — a series count
   // **A labelled annotation earns the row on any form that draws annotations**,
   // and it does not join `count`. `SHARES_CELLS` partitions forms by whether
   // *categories* share cells; an annotation's label is not a category, so
@@ -791,57 +844,42 @@ const POSITIONAL_STACKS: Readonly<Record<string, boolean>> = Object.freeze({
  * the same error one layer up: it means little where colour leads and it is the
  * *only* thing that means anything where colour does not.
  */
-export function legendEntries(block: Plot, ctx: RenderContext): readonly LegendEntry[] {
-  const segs = block.segments;
-  const source = segs !== undefined && segs.length > 0 // cells-ok — a segment count
-    ? segs.map((sg) => sg.label)
-    : block.series.map((sr, i) => sr.label ?? `series ${String(i + 1)}`);
-  // **Through `refOf`, not by indexing the table** — the legend was a second
-  // door to the palette, and the mutation harness proved it: forcing every
-  // series to slot one left the legend drawing four distinct colours, so the
-  // control survived and the harness reported itself blind. A legend whose
-  // swatch is a different colour from the thing it names is the exact defect
-  // this function's own comment warns about.
+export function legendEntries(block: Plot, ctx: Pick<RenderContext, "capabilities" | "seriesVisibility">): readonly LegendEntry[] {
   const g = glyphs(ctx.capabilities);
-  // **A candlestick names both directions, and the candles come first**
-  // (C12 §6b B4). The overlays are what `source` already holds — a moving
-  // average is a series like any other — and the candles are what the block is
-  // about, so they lead. Their marks are the body glyphs rather than `markOf`'s
-  // ladder: a legend whose swatch is not the glyph it names is this function's
-  // own recorded defect, one category along.
-  const candles: readonly LegendEntry[] =
-    block.plotStyle === "candlestick" && block.ohlc !== undefined
-      ? [
-          { mark: g.candleHollow, label: "rising", ref: "tone.ok" },
-          { mark: g.candleFilled, label: "falling", ref: "tone.error" },
-        ]
-      : [];
-  // **The third source, and it comes last** (C04 I52, C12 §3ag). An annotation
-  // is a claim *about* the data, so it reads after the things it is a claim
-  // about — the same order `mergedRow` draws them in, one layer along.
+  // **One table, keyed by the role the shared layer named** (C12 I62, §3ak.7 C8).
   //
-  // **The swatch is the dash the line is actually drawn with**, not `markOf`'s
-  // ladder: this function's own comment records what a swatch naming a glyph
-  // that appears nowhere cost, and an annotation is dashed at every depth
-  // (C04 I23), so the dash is available on every arm rather than only below the
-  // colour floor.
-  const annotations: readonly LegendEntry[] = (block.annotations ?? [])
-    .flatMap((a) => {
-      const label = (a as { label?: string }).label;
-      if (label === undefined) return [];
-      const t = (a as Annotation).tone;
-      const ref: ColourRef = t === undefined ? "tone.muted" : `tone.${t}`;
-      return [{ mark: g.dashedHorizontal, label, ref }];
-    });
-  return [
-    ...candles,
-    ...source.map((label, i) => ({
-      mark: markOf(i, ctx.capabilities),
-      label,
-      ref: refOf(i),
-    })),
-    ...annotations,
-  ];
+  // The composition — which entries, in what order, from which of the three
+  // sources — is `legendSlots`', and both arms read it. What is left here is the
+  // part that cannot cross the seam: **the swatch descends the capability ladder
+  // with the figure** (I29), so `markOf` is uniform where colour separates the
+  // categories and a distinct mark where it does not, and the SVG arm has no
+  // ladder to descend.
+  //
+  // **The two things this file used to decide twice are now decided once.**
+  // `refOf` was called here *and* by the renderer, which the mutation harness
+  // caught: forcing every series to slot one left the legend drawing four
+  // distinct colours, so the control survived and the harness reported itself
+  // blind. The slot now arrives on the entry.
+  //
+  // A candlestick's swatches are the body glyphs and an annotation's is the dash
+  // it is actually drawn with, at every depth (C04 I23) — a swatch naming a glyph
+  // that appears nowhere is this function's own recorded defect, and it is why
+  // these are roles rather than a fall-through to `markOf`.
+  // **A hidden entry keeps its label and its slot and takes `hollow`** (C12
+  // I116, §3aq): an outline for a curve with no ink. A mark and not a tone,
+  // because colour is never the only channel (I6) and one bit is where the
+  // toggle must still read — the swatch is exactly the column that survives.
+  return legendSlots(block).map((slot) => ({
+    mark:
+      (slot.role === "series" && seriesHidden(block, slot.seriesIndex ?? 0, ctx)) || slot.hidden === true
+        ? g.hollow
+      : slot.role === "rising" ? g.candleHollow
+      : slot.role === "falling" ? g.candleFilled
+      : slot.role === "annotation" ? g.dashedHorizontal
+      : markOf(slot.seriesIndex ?? 0, ctx.capabilities),
+    label: slot.label,
+    ref: slot.ref,
+  }));
 }
 
 /** `swatch label`, measured in cells. */
@@ -860,7 +898,7 @@ function entryText(e: LegendEntry): string {
 export function legendWidth(
   entries: readonly LegendEntry[],
   width: number,
-  ctx: RenderContext,
+  ctx: Pick<RenderContext, "capabilities">,
   /**
    * **A left legend needs a blank on *both* sides and a right legend on one.**
    *
@@ -897,12 +935,83 @@ export function legendColumn(
   const e = entries[row];
   if (e === undefined) return [{ text: " ".repeat(columnWidth) }];
   const ambiguous = ctx.capabilities.ambiguousWidth;
-  const text = truncate(` ${entryText(e)}`, columnWidth, ctx.capabilities);
+  const text = legendCell(e, columnWidth, ctx.capabilities);
   const pad = Math.max(0, columnWidth - cells(text, ambiguous)); // cells-ok — a cell count
   return [
     { text, style: slot(e.ref, ctx.theme, ctx.capabilities) },
     ...(pad > 0 ? [{ text: " ".repeat(pad) }] : []),
   ];
+}
+
+/**
+ * One vertical legend row's text — the leading blank, the swatch, a blank, the
+ * label — cut to the column (C12 I117). **Shared by the writer and its inverse**:
+ * `legendColumn` paints this and `legendEntryAt` measures it, so a change to
+ * what a row says moves where a click on it lands.
+ */
+function legendCell(e: LegendEntry, columnWidth: number, caps: TerminalCapabilities): string {
+  return truncate(` ${entryText(e)}`, columnWidth, caps);
+}
+
+/**
+ * Where a horizontal legend puts each entry — the forward map `legendRow` paints
+ * from and `legendEntryAt` searches (C12 I117). `from` is the entry's first
+ * visible cell (past the two-cell separator), `to` one past its last; `rest`
+ * is how many did not fit, for the ` +n` tail.
+ */
+function legendRowLayout(
+  entries: readonly LegendEntry[],
+  width: number,
+  ambiguous: AmbiguousWidth,
+): Readonly<{ placed: readonly Readonly<{ index: number; from: number; to: number; text: string }>[]; rest: number }> {
+  const placed: Readonly<{ index: number; from: number; to: number; text: string }>[] = [];
+  let used = 0; // cells-ok — a cell count
+  for (const [index, e] of entries.entries()) {
+    const gap = placed.length === 0 ? 0 : 2; // cells-ok — a cell count
+    const text = `${" ".repeat(gap)}${entryText(e)}`;
+    const w = cells(text, ambiguous);
+    // Leave room for the notice, or the count itself gets truncated away.
+    const reserve = placed.length < entries.length - 1 ? 6 : 0; // cells-ok — a cell count
+    if (used + w + reserve > width) break;
+    placed.push({ index, from: used + gap, to: used + w, text });
+    used += w;
+  }
+  return { placed, rest: entries.length - placed.length }; // cells-ok — an entry count
+}
+
+/**
+ * The entry under a block cell of a legend, or `null` (C12 I117, §3aq; C16 §4a).
+ *
+ * **The placement inverted by search, not a second formula** (F775's method).
+ * `box` is where the caller composited the legend — a vertical legend's column
+ * origin, its first row and its width; a horizontal legend's row, its first
+ * column and its width — and the entries are laid out here with `legendCell`
+ * and `legendRowLayout`, the same two the writers use. The swatch and the label
+ * hit; the leading blank, the two-cell separator and the ` +n` tail do not,
+ * because none of them names an entry. Answers the **entry index**; whether
+ * that entry is a series the caller can toggle is `legendHitAt`'s question.
+ */
+export function legendEntryAt(
+  entries: readonly LegendEntry[],
+  placement: "left" | "right" | "above" | "below",
+  box: Readonly<{ col: number; row: number; width: number }>,
+  caps: TerminalCapabilities,
+  col: number,
+  row: number,
+): number | null {
+  if (entries.length === 0 || box.width <= 0) return null; // cells-ok — an entry count
+  const x = col - box.col; // cells-ok — a cell offset
+  if (x < 0 || x >= box.width) return null; // cells-ok — a cell offset
+  if (placement === "left" || placement === "right") {
+    const i = row - box.row; // cells-ok — a row offset
+    const e = entries[i];
+    if (e === undefined) return null;
+    // Offset 0 is the leading blank `legendCell` writes; the swatch is at 1.
+    return x >= 1 && x < cells(legendCell(e, box.width, caps), caps.ambiguousWidth) ? i : null;
+  }
+  if (row !== box.row) return null;
+  const hit = legendRowLayout(entries, box.width, caps.ambiguousWidth).placed.find((p) => x >= p.from && x < p.to);
+  return hit === undefined ? null : hit.index;
 }
 
 /**
@@ -919,21 +1028,13 @@ export function legendRow(
   ctx: RenderContext,
 ): string {
   if (entries.length === 0) return ""; // cells-ok — an entry count
-  const ambiguous = ctx.capabilities.ambiguousWidth;
-  const spans: Span[] = [];
-  let used = 0; // cells-ok — a cell count
-  let shown = 0; // cells-ok — an entry count
-  for (const e of entries) {
-    const text = `${shown === 0 ? "" : "  "}${entryText(e)}`; // cells-ok — an entry count
-    const w = cells(text, ambiguous);
-    // Leave room for the notice, or the count itself gets truncated away.
-    const reserve = shown < entries.length - 1 ? 6 : 0; // cells-ok — a cell count
-    if (used + w + reserve > width) break;
-    spans.push({ text, style: slot(e.ref, ctx.theme, ctx.capabilities) });
-    used += w;
-    shown += 1; // cells-ok — an entry count
-  }
-  const rest = entries.length - shown; // cells-ok — an entry count
+  // **Painted from the layout `legendEntryAt` searches** (C12 I117): one placement,
+  // read twice, so the row cannot say one thing and the click land on another.
+  const { placed, rest } = legendRowLayout(entries, width, ctx.capabilities.ambiguousWidth);
+  const spans: Span[] = placed.map((p) => ({
+    text: p.text,
+    style: slot(entries[p.index]!.ref, ctx.theme, ctx.capabilities),
+  }));
   if (rest > 0) {
     spans.push({ text: ` +${String(rest)}`, style: tone("muted", ctx.theme, ctx.capabilities) });
   }

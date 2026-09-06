@@ -626,8 +626,34 @@ like.
 **A log axis picks differently again** — decade boundaries, or `1 2 5 10 20 50`. Linear ticks on
 a log axis are unreadable rather than merely ugly.
 
-Neither has a consumer in the tree, and each would be a second `niceAxis` rather than an argument
-to this one. Named so the next reader knows they were weighed.
+**Both are built, and the paragraph above is kept as the reason they were separate algorithms.**
+*Neither has a consumer in the tree, and each would be a second `niceAxis`* was true when written
+and is false at HEAD (corrected 2026-09-03): `niceLogAxis`, `niceSymlogAxis` and `niceTimeAxis`
+are in `src/presentation/plot/axes.ts`, `axisFor` chooses among them, and C04 I81 carries the
+scale on `PinnedRange` so a tick and the sample it names go through one transform (§3ak, §3al).
+They are second algorithms beside `niceAxis` rather than arguments to it, which is what this
+section predicted; what it did not predict was the consumer arriving.
+
+**Sankey — named 2026-09-03, and it is not a fold over `graph`.** The refusal it carried in
+`docs/notes/CALCIUM_PLOT_PRIOR_ART.md` and the roadmap — *edge routing, the Mermaid problem, wants
+a real layout engine* — expired twice: `graph` ships a layered router (§3ai,
+`src/presentation/plot/graph.ts`, 511 lines) and `elkjs` is in the tree under `beautiful-mermaid`.
+Measured against `graph` rather than re-refused on the stale reason. Passes 1–5 transfer as
+`graphLayers` — cycle removal, deduplication, layering, dummy nodes, ordering — and nothing after
+them does: `GraphEdge` is `{ from, to }` with no weight (C04); a `graph` node is a one-row label
+and a sankey node is a bar whose extent is its flow; a `graph` edge is a one-cell line in the
+box-drawing mask and a sankey edge is a ribbon whose width is its weight — a **fill**, which is
+`halfBlockRows`'s territory and not `paint`'s; and `graph` layers top-down at `rows × 2 − 1` rows
+where a sankey layers left-to-right, because its bars need the vertical extent. So a sankey is
+`graphLayers` plus a new placement and a new drawing — a new form, `sankeyArea`, over the shared
+layering, not an option on `graph` — and the carrier change is a weighted edge on C04's `Graph`.
+**Built 2026-09-04, and the paragraph above is kept as the ruling it was** (§3ap). The consumer
+arrived as C04 I92 — `GraphEdge.weight`, required on `sankey` and refused on `graph` — and the
+form is exactly the shape this paragraph predicted: `graphLayers` untouched, a placement
+(`sankeyLayout`) and a drawing (`sankeyArea`, `sankeyMarks`) over it. SS54 R20 watched
+`sankeyArea(` absent and expired the day the symbol appeared, which is what it was for; R21
+(`graphLayers` present) stays, retargeted, because the form now rests on the premise the refusal
+did.
 
 ## 3e. Annotations — one feature, and the one that shares a name and not a mechanism
 
@@ -754,6 +780,65 @@ usual.
 Ruled: **the edge check dispatches per kind and is total over `Annotation["kind"]`**, so a fifth
 member does not compile without a row. A `switch` rather than a ternary, for the reason every
 total record in this component exists.
+
+### The four kinds cross to the second arm, and the mark each becomes is named
+
+**Nothing in this section ruled `band`, `confidence` or `whiskers` terminal-only, and the second
+arm drew none of them.** `annotationMarks` opened `if (a.kind !== "line") return []`; the table
+above lists what is *not built* and omits the three that are; and the paragraph that follows it
+says they *arrived with a renderer and without a ruling*, which was true of the terminal and did
+not notice the SVG. Measured: a `line` block with and without a `band` rendered **byte-identical**
+SVG, `line/confidence` and `line/confidence-unfilled` were one document — recorded in the sweep as
+a collision on `annotations.fill`, which blamed the member when the whole kind was missing — and
+the legend filtered `role !== "annotation"` under a comment reading *this arm does not draw
+annotations*, false from the day `line` crossed and outliving its reason unread.
+
+**Ruled (I109): all four kinds cross, each as a mark the type already had, and no mark kind is
+added.** The test is §3ak.26's — *does the form already have a coordinate* — and every annotation
+sits on the ordinate the figure already normalises.
+
+| kind | the marks | the terminal rule it inherits |
+|---|---|---|
+| `line` | one dashed full-width `polyline` | an out-of-range value is **dropped, never clamped** — this arm clamped it to the ceiling before |
+| `band` | one shaded `rect` for the interior, plus one dashed `polyline` per **in-range** edge | the interior clamps where the edge is dropped |
+| `confidence` | one shaded closed `polyline` where `fill` is on (the default), plus dashed upper and lower edges **broken** at every out-of-range sample | `confidenceRows`: the fill reaches the ceiling, an edge sample off the scale is not inked |
+| `whiskers` | one two-point `polyline` per point, **not** dashed | `whiskersRows`: placed by **index**, clamped as a sample is |
+
+**Three things the walk of the first draft found, and each is a rule rather than a fix.**
+
+- **The dash is the mark's, not the layer's.** The emitter dashed every annotation-layer polyline,
+  which was right while a reference line was the only one that reached it and wrong the day a
+  whisker did — a dash breaks a one-sample vertical into dots. `Mark.polyline.dashed` says which
+  strokes are claims, and a whisker is not one.
+- **An interior has no stroke of its own.** Drawn as one closed dashed path, `line/confidence`'s
+  outline ran along the ceiling for the four samples whose upper edge was above it — a dashed line
+  saying *the edge is here* about a place it is not, the clamped-threshold lie this section was
+  written against, arriving on a region. So the edges are separate marks, present exactly where the
+  terminal inks them, and the shade carries `stroke="none"`.
+- **Behind the data, in this arm too.** The terminal appends annotations last and resolves
+  first-non-blank, so *last* means *behind*; this arm paints in order, so *last* meant *on top*,
+  and a shaded band drawn after the series would have covered the curve it is compared against.
+  The emitter partitions claims first. **The one exemption is counted**: `violinFigure` puts its
+  IQR box on `layer: "annotation"` *for the width* — the layer is what escapes `SLOT_SHARE` — and
+  it carries a `seriesIndex`, which no claim about the data does. Drawn behind its density and
+  shaded, the box vanished into the body it sits on and nineteen violin baselines moved under a
+  change to annotations. A claim has no series; that predicate is the exemption's count, and the
+  box being a datum on an annotation's layer is a finding in its own right.
+
+**And the legend names what the arm draws.** `legendSlots` composes one list — candles, series,
+annotations — and both arms now draw all of it: `line/annotation-label`'s SVG carries `budget` and
+`warm-up` beside the reference line and band they name.
+
+**A whisker's `x` is where it sits, and both arms read it now** (C04 I52). It was read by neither —
+`whiskersRows` spread the points evenly by index and this arm agreed rather than ruled — and the
+ruling is that `x` is a value on the abscissa's domain (`positionDomainOf`: `xMin..xMax` when
+declared, the sample index otherwise), placed through the shared coordinate. The catalogue's
+`line/whiskers` puts `x: i` on twelve samples, which *is* the index lattice, so that frame did not
+move and could not have shown the member was dead; `whiskers-placed` puts three at `2 · 3 · 9` and
+is the fixture that responds. **Stated blind spot.** An edge exactly on the range boundary is drawn by both arms, since
+`drawn` is inclusive; a sample a hair above it is dropped by both, so a confidence edge that
+grazes the ceiling flickers between drawn and not as the data moves. That is the terminal's rule
+crossing faithfully, and it is recorded rather than smoothed.
 
 ### How a band is filled, and the alphabet is the whole ruling
 
@@ -2400,7 +2485,7 @@ meeting the fork will assume it carries over.
 
 ### The quiver — direction is the glyph, magnitude is the colour
 
-    →  ↗  ↑  ↖  ←  ↙  ↓  ↘        eight directions, U+2190–2199
+    ⇒  ⇗  ⇑  ⇖  ⇐  ⇙  ⇓  ⇘        eight directions, U+21D0–21D9 — the doubles, since the singles' diagonals are emoji bases (F833)
     >  /  ^  \  <  /  v  \        the ASCII arm, diagonals reused
 
 **The ASCII arm is required at `unicode: "ascii"` *and* at `ambiguousWidth: "wide"`**, and the
@@ -3560,6 +3645,35 @@ about a *callout* — so a reader indexing by label kind never reaches it.
   arc that wrote it: the finding's own remedy, one commit old, over-applied I8 to a case I8 does not
   reach.
 
+### `pointLabels` — the strings cross, the pass does not, and the arm is terminal-only by ruling
+
+`Series.pointLabels` is read by the terminal alone — `pointlabels.ts`, and the two sites in
+`definition.ts` that hand it the names — and I55 is written in cells: a free-cell single pass, a
+one-cell `+` at a survivor. The second arm reads none of it, and until now nothing said whether that
+was a decision. I81 already made the split this needs, for `yCallout`: *three things were in one
+function and one of them crosses*. The same split, applied:
+
+| the part | crosses? | why |
+|---|---|---|
+| the strings — which sample carries which name | **yes** | decided from the data, like `calloutOf`'s |
+| the two-position flip — right of the sample, else left, else dropped | **yes** | a rule about the sample's place in the range, which the figure normalises |
+| the free-cell pass and the `+` | **no** | the second arm has no cell to be free: a label there is text at a pixel, its footprint is a glyph box the figure cannot measure (§3aj hazard 4), and a one-cell mark is a cell |
+
+**So `pointLabels` is terminal-only by ruling, and this paragraph is the measured reason** rather
+than a guard somebody wrote and nobody re-read — the shape §3e's four annotation kinds had, where an
+`if` did the deciding and no sentence could be checked against it. **The owed half has a name**:
+`pointLabelMarks`, a shared-layer function returning, per series, the strings and their anchor
+side, which the second arm would place at the sample and the terminal would feed into I55's pass.
+The name is chosen so the deferral expires rather than lingers: `grep pointLabelMarks src/` returns
+nothing today, and the day it returns something this section is stale and says so. It is **not
+built here** because building the strings without the placement gives the second arm labels that
+overprint each other and their samples, which is the collision I81's blind spot already records for
+callouts — a second copy of an open question is not progress on it.
+
+**Stated blind spot, inherited from I81**: nothing here says what the second arm does when two
+labels want one place. I55 answers it in cells and the answer does not cross; the day `pointLabelMarks`
+exists, that is the question its consumer owes.
+
 ---
 
 ## 3ah. `tree` — three layouts of one drawing, and the ladder the plan brought is not one
@@ -4224,9 +4338,20 @@ finding rather than a judgement call:
 | | |
 |---|---|
 | antialiasing | an SVG curve is smooth and a braille curve is dots. Same colour, different edge — resolution, not styling |
-| stroke width | a cell is one unit wide; an SVG stroke is a **ratio of the box**, never a constant, or it changes with the output size |
+| stroke width | a cell is one unit wide; an SVG stroke is a **constant in user units**, which is the ratio — a `viewBox` maps those units onto whatever the output size is (F339) |
 | font | the terminal's is the reader's and SVG names a family. **The metrics differ and the colour does not** |
 | no ladder | **the SVG arm does not degrade at all.** It pins truecolour, so there is one rung and nothing below it |
+
+**The first row is about extent as much as about edges, and `boxplot` is the measured instance.** An
+outlier is `◌` — one whole cell, because a cell is the smallest thing a glyph arm can occupy —
+against `r="1.8"` in a 640-unit box. Same position, same colour, same role, **different extent**, and
+a mark present in both. It is this row and not a fifth entry.
+
+**And the row above it says *never a constant* while every `stroke-width` in `svg.ts` is one.** All
+twelve — 0.75, 1, 1.5, 2 — and all twelve are right: user units are what a `viewBox` scales, so a
+constant there already **is** a ratio of the box, and a reader obeying the sentence literally would
+multiply by `layout.width` and draw a facet's strokes thinner than the panel beside it. The sentence
+named the property correctly and forbade the only implementation that has it (F339).
 
 **The last is the one with a consequence.** A form whose terminal rendering leans on a degradation
 rung — stacked strips at 1-bit, `CATEGORY_MARKS` where colour cannot carry a category — draws the
@@ -4333,6 +4458,4669 @@ family later. **And the depth-0 representatives are the sharper one**: a row ove
 for flame or icicle exercises a hierarchy with no nesting, so *it draws something* and `G7b` passes
 while the figure is a single strip. **A guard that a claimed form puts ink on the page is satisfied
 by one rectangle.**
+
+## 3ak. One figure, two renderers — the seam moves up a level
+
+**§3aj built two rasterisers over one geometry. Measured against what shipped, what is shared is
+*coordinates*** — `normalisedOf`, `normalisedSummary`, `flatten`, `graphLayers` — **and everything
+above them is decided twice.**
+
+**The measurement is the specification, and it is `test/unit/plot-arm-disagreement.test.ts`.** Every
+form, every variant, both widths, at 24-bit: **73 of 135 cells over the 27 forms the SVG arm claims
+disagree, 59 of them everywhere.** Not three defects found by building — five decisions found by
+looking, disagreeing almost universally:
+
+```
+numericLabels   which ticks, how many, and how they are formatted   ALL on every ticked form
+identityLabels  the categories, rows, series and nodes named        ALL on matrix · tiles · bar · distribution
+border          the terminal frames the area; the SVG draws none    ALL on every ticked form
+interiorRules   the SVG rules every tick; the terminal rules none   ALL on every ticked form
+legend          the terminal has one; the SVG has none at all       partial, where the terminal draws it
+```
+
+**And the sharpest one is not in that table**, because no single decision holds it: the terminal
+rasterises against the **niced** range and the SVG against the **raw** one. A `line` of `1 3 2 5 4`
+spans 0–6 in the terminal and 1–5 in SVG, so the first sample sits on the bottom edge in one arm
+and floats in the other. The same data at two different scales, which is not a rasterisation
+difference.
+
+**Three families reached the same wrong answer separately**, which is the seam being in the wrong
+place stated as plainly as it can be: `matrix`, `tiles` and `nodes` each furnished a value axis out
+of `seriesRange([]) ?? {0, 1}` over a figure whose readings are colours, areas and positions. Three
+renderers, three commits, one defect.
+
+### 3ak.1 — What the sketch got right, and the six things measuring changed
+
+`CALCIUM_ARM_UNIFICATION.md` §3 sketches `Mark`, `Drawn` and `GlyphRole` *to be measured against
+what the two renderers actually need rather than adopted as written*. Measured, four of its rulings
+hold and six things change.
+
+**Holds**: positions normalised and uninverted, with the inversion applied twice from one decision;
+`GlyphRole` rather than a glyph, as an exhaustive `Record` so a missing rung is a compile error;
+`ref` unresolved, so each arm calls `resolve()` at its own depth; and one emitter per family rather
+than per form.
+
+**1 · `arc` has no consumer, so it is not in the type.** `pie` and `radar` are refused by
+`SVG_FAMILY` and nothing else draws one. A member nothing draws is the class MG25 refuses and the
+class §3e's deferral was avoiding — it arrives with the proportion family or not at all.
+
+**2 · `circle` is not a mark the terminal has.** A terminal point is *one cell*; there is no radius
+to give it. So `circle` collapses into `point`, carrying a `GlyphRole` and an optional **normalised
+`size`** — because a bubble's radius is *data* and must cross the seam, while a scatter dot's radius
+is the SVG's own rasterisation and must not.
+
+**3 · `role` is two different things wearing one name.** The sketch puts
+`role: "series" | "furniture" | "annotation" | "label"` on `Drawn` **and** `GlyphRole` on the glyph
+mark. One is *which layer this belongs to*; the other is *which shape this is*. That is MG24's own
+collision class, in the type built to end a class of collision. The first becomes `layer`.
+
+**4 · Two operations the ruling names do not exist in the form it needs.** `Axis` is
+`{ range, ticks, step }` and carries **no formatted strings** — the strings come from `yLabels`,
+which also takes the row count, so *the numbers* and *how they print* are computed in different
+places from different inputs. And `LegendEntry` is `{ mark: string; label; ref }`, where `mark` is
+an **already-resolved terminal glyph**: precisely what must not cross the seam. Both are named here
+before the ruling is written down, which is C23 §8a A4's own finding: *an artefact can be
+correct about the interaction it found and wrong about a mechanism it assumed existed.*
+
+**5 · The types the figure needs live in the terminal's own module, and taking them would make a
+cycle.** `FrameStyle` and `LegendEntry` are exported by `furniture.ts`, and `furniture.ts` is what
+reads the figure back. `figure.ts` importing them while `furniture.ts` imports `figure.ts` is a
+cycle **inside L1**, which is what A02 §1 forbids and MG1 and MG22 implement. So the shared shapes
+move down into `figure.ts` and `furniture.ts` imports them, rather than the reverse.
+
+**6 · §2's *the same labels dropped* and §3aj hazard 4 cannot both hold, and hazard 4 wins.** The
+terminal drops a label by measuring it with `cells()`; the SVG cannot measure text at all, which is
+the whole reason its layout is fractions. So the two arms cannot agree about *which* labels fit.
+What they can agree about is **how much room a label has**, stated in normalised units — the
+threshold is shared and the outcome is each arm's. Measured: a `treemap` where the terminal names
+five tiles and the SVG names eight. **§2 overstates, and the type expresses the threshold rather
+than the outcome.**
+
+### 3ak.2 — The type
+
+```ts
+type GlyphRole = "point" | "median" | "mean" | "outlier" | "cap" | "target" | "absent";
+
+type Mark =
+  | { kind: "polyline"; points: readonly Pt[]; closed?: boolean }
+  | { kind: "rect"; x: number; y: number; w: number; h: number; fill?: boolean; depth?: number }
+  | { kind: "point"; x: number; y: number; role: GlyphRole; size?: number }
+  | { kind: "text"; x: number; y: number; text: string; anchor: Anchor; room: number };
+
+type Drawn = Readonly<{
+  mark: Mark;
+  layer: "series" | "furniture" | "annotation" | "label";
+  seriesIndex?: number;   // the CATEGORICAL slot, unresolved
+  ref?: ColourRef;        // or an explicit slot, unresolved
+}>;
+
+type Figure = Readonly<{
+  value: ValueAxis | null;              // niced range, ticks, AND the formatted strings
+  identity: readonly string[];          // categories, rows, series or nodes, in order
+  orientation: "horizontal" | "vertical";
+  facing: Facing;                       // decided once, applied twice
+  frame: FrameStyle;
+  legend: readonly LegendSlot[];        // { role | seriesIndex, label, ref } — never a glyph
+  marks: readonly Drawn[];              // normalised, uninverted, refs unresolved
+}>;
+```
+
+**`value: null` is the three-families fix and it is the member doing the most work.** A `matrix`
+reads its values as colours, a `tiles` figure reads them as areas and a `nodes` figure reads them as
+structure. None has readings on an axis, so none gets one — and saying that once is what stops a
+fourth renderer furnishing a fifth false axis out of `{0, 1}`.
+
+**`room` on a text mark is normalised, and it is finding 6 in one field.** The shared layer says
+*this label has this fraction of the figure*; the terminal turns that into cells and truncates, the
+SVG turns it into a `clipPath`. Neither arm decides the allowance and neither shares the outcome.
+
+**`depth` on a rect is the same shape one mark along, and F278 is why it exists.** A treemap's
+nesting is drawn by insetting a child inside its parent so the parent shows as a ring — that ring is
+*the only thing that says which tiles belong together*, and `tiles`' own comment says so: *filling the
+parent exactly is arithmetically right and draws a mosaic; the leaves are correct, the siblings are
+adjacent, and nothing says which ones belong together.*
+
+**The ring's width is one unit of the output and the two arms have different units** — one cell,
+`1 / max(width, areaRows)`, against one pixel, `1 / max(w, h)` — and the terminal's is a *runtime*
+width, so no constant the figure could hold is either arm's. So the pad cannot cross the seam, and a
+partition emitted already-padded would be one arm's picture.
+
+**What crosses is the depth; the inset is each arm's.** The figure carries the true partition — areas
+proportional to the data before anything is taken off for legibility — and a renderer insets a rect by
+`depth + 1` of whatever its own smallest unit is. That reproduces the compounding a layout-time pad
+produces, and it keeps the areas true rather than approximately true.
+
+> **A uniform inset is not a substitute, and measuring it is what found this.** Insetting every rect
+> by one unit separates *siblings* and leaves a child's shared edge exactly on its parent's, so the
+> ring vanishes at every depth: the frame showed tiles cleanly outlined and nesting gone. The terminal
+> draws the ring, so shipping that would have been **a new disagreement introduced by a refactor** —
+> the one thing this pass forbids — and it would have been announced by nothing, because separation
+> and nesting look alike in a diff of rectangles.
+
+**Absent means *not a partition member*, not depth zero — and that wording is F280's correction.**
+It first read *absent means not nested*, with a flame's strips carrying none, because tiles were the
+member's only subject and there was one plausible reading of the absent case. The bar family arrived
+and there were two:
+
+| the rect is | `depth` | what a renderer does |
+|---|---|---|
+| a tile nested in a partition | its nesting depth | comes off `depth + 1` units on every side, so the parent shows as a ring |
+| a strip in a partition, enclosing nothing | `0` | comes off one unit, so the bands do not touch |
+| a **measurement** — a bar's length *is* its value | absent | drawn exactly, and inset only **across** the identity axis so two categories do not touch |
+
+**The third row is the one the member was silently getting wrong.** A bar carries no `depth`, and
+under the first wording that put it in the same case as a strip: one unit off every side, including
+the ends. Measured on `bar-default`, whose data is `[10, 25, 15, 30, 20]` against a `0 … 40` axis —
+the bar of 20 ended at `x=351` and its own gridline is at `352`. Every bar a pixel short of the tick
+it is read against, and the vertical arm the same at both ends.
+
+**A length and an area are read differently and the inset has to know which it is looking at.** A
+tile's area is read by comparison with its neighbours, so a unit off every side costs nothing; a
+bar's length is read against a labelled axis, so a unit off the end is the figure lying about its
+own number.
+
+### 3ak.3 — The rungs are decided after the figure, and that is where a diamond becomes a comma
+
+**`Figure` is capability-independent by design and the terminal's rendering is not.** Every rung
+below is a decision the terminal makes *on* a figure, in its projection, and every one is a place
+where *the shared layer now says a diamond* can quietly become a different character:
+
+| rung | what it changes | where it lives after the pass |
+|---|---|---|
+| the glyph per `GlyphRole` per **alphabet** | `◈` · `+` · `*` | `roleGlyphs(caps)` — §3ak.21 |
+| `CATEGORY_MARKS` below the colour floor | identity carried by shape | `markOf` at projection |
+| stacked strips at 1-bit | the whole answer for a multi-series plot | `stackedRows`, untouched |
+| the truncation ladder | which labels fit `room` | `labelAllowance` at projection |
+| the `+N` notices | the count and the wording | `calloutInto` at projection |
+| the `ambiguousWidth` arms | narrow-only sets falling to their ASCII pair | `glyphs()` at projection |
+
+**This row said *the terminal walker's `Record`* and there was no walker and no record** (F289). It
+was true about this arm and described a terminal that did not exist, which is what a table of names
+is satisfied by. §3ak.21 measures what a role does determine — and *per unicode rung* was wrong twice
+over: the alphabet has **two** rungs and the predicate reads `ambiguousWidth` as well.
+
+**The SVG arm has none of them**, which is §3aj hazard 5 restated: it is always 24-bit and always
+`unicode: "full"`. So a form whose terminal answer *is* a rung — a 1-bit stacked strip — draws the
+24-bit answer in SVG and never the fallback, and the two arms are **not byte-comparable below
+24-bit**. Every cross-arm assertion compares at 24-bit or compares the figure.
+
+### 3ak.4 — Both walk artefacts, and they cover different halves
+
+CLAUDE.md's rule is that a **table** finds structural interactions — two rules holding at rest — and
+a **trace** finds event-mediated ones. This component has both kinds and therefore owes both.
+
+- **Artefact A is the disagreement matrix**, and it is a table: every cell is *this form is a bar
+  chart* meeting *this decision is which way the value axis runs*, true standing still, with no
+  event between them. Committed as `test/unit/plot-arm-disagreement.test.ts`, 135 cells.
+- **Artefact B is the rung ladder**, and it is a trace: the capability set supplies the events, and
+  the question is which decisions survive a rung and which change. It is U6, and it doubles as the
+  degradation audit this component has never had.
+
+**Taking the table alone because the type is the obvious thing is how the rung half goes
+unexamined**, which is the mistake C19 §8a records: a trace indexed by events cannot reach a
+structural interaction however many rows it has, and C18's table was already in the repository.
+
+### 3ak.5 — What a refusal leaves behind
+
+**`figureOf` is total and never throws.** I2 says no series input throws, and a figure is one level
+above the rasteriser it feeds — a throw here would abandon a half-built figure in a component whose
+whole claim is that both arms read the same one.
+
+**A refusal is a figure with no marks**, which is F259's ruling arriving as a type: *refuse a false
+figure, record an incomplete one*. `plotToSvg` already returns `null` on an empty body and keeps
+doing so; the terminal already draws its empty rows and keeps doing that. **The two arms refuse
+differently and that is legitimate** — what must be identical is *whether there was anything to
+draw*, and after this pass there is one answer to that question instead of two.
+### 3ak.6 — `autocorrelation` was going to be refused, and the escape clause is what stopped it
+
+**The largest disagreement in the corpus is that `autocorrelation` is two different charts.** The
+terminal draws horizontal bars, one per lag, signed about a zero rule, with two dashed significance
+bands. The SVG draws a polyline of the same numbers. That is not a rasterisation difference and
+nothing in the five measured decisions holds it, because both arms draw *something* and the cells
+compare labels and furniture rather than shape.
+
+**The tie-break plus F259 gives an immediate answer: refuse.** The terminal is right by default, a
+polyline that reads as a chart of something is the plausible wrong figure the `null` arm exists for,
+so `autocorrelation` becomes `null` in `SVG_FAMILY` and is recorded as owed.
+
+**That answer is wrong, and what found it was treating the escape clause as a claim.** The clause
+was *unless the curve family's emitter reaches the lag figure without new geometry* — the kind of
+sentence that reads as a hedge and gets skipped. Checked instead:
+
+```
+the bar        `lagRow` fills from the zero column to `value / magnitude`, signed
+the zero rule  one solid vertical at the centre column — furniture
+the bands      `block.annotations` filtered to `kind: "line"` — §3e's own mechanism
+the rows       `categoricalForm({ ...block, categories: cats })`, one row per lag
+```
+
+**Every one is a mechanism the shared layer already needs, and the composer is `bar`'s own.**
+`categoricalForm` is what `bar` and `histogram` are drawn through; the bands are not autocorrelation
+machinery but the annotation mechanism §3e already specifies; and this document's own comment on the
+form says it in five words: *one bar per lag, with a confidence band. `barRow` plus the band.*
+
+> **The ruling: `autocorrelation` is not refused, it is misfiled.** `SVG_FAMILY` says
+> `autocorrelation: "curve"` and the figure is a **bar** — horizontally oriented, over a categorical
+> axis of lags, with line annotations. D14's cause is one word, not a missing capability.
+
+**Recording it as owed would have recorded a debt that does not exist**, and it would have removed a
+claimed form from the SVG arm on a wrong diagnosis — the deferral-naming-a-condition-already-met
+class, arriving in the same commit that would have created it.
+
+**The reusable part is about the mechanism that was supposed to prevent this.** `SVG_FAMILY` is
+`satisfies Record<PlotForm, SvgFamily | null>`, and that record has done real work: it is why adding
+a form fails to compile until someone decides. But **an exhaustive record forces an answer for every
+member and cannot check a single one of them.** Totality is a guarantee about *coverage*, never
+about *correctness*, and a wrong entry in a total record reads exactly like a right one — which is
+`a-step-can-name-an-effect-and-have-no-mechanism` one level along: a table of names is satisfied by
+names.
+
+**And the correction does not land here.** Reclassifying to `"bar"` today draws *vertical bars over
+sample index*, which is a different wrong figure — the orientation is a `Figure` member and the
+emitter does not exist yet. So the entry stays `"curve"` until step 4 moves it, with the reason
+recorded rather than the symptom fixed.
+
+### 3ak.7 — The curve family's walk, and D14's shape a second time
+
+**Artefact A's shape at one family's scale**: the cells where two rules both hold at rest, over the
+six forms `SVG_FAMILY` calls `curve`. Nine of them, and the first is a finding.
+
+| # | one rule | the other | where they meet | what it settles |
+|---|---|---|---|---|
+| **C1** | the figure describes the block's series | `ecdf` and `density` draw a **derived** series | those two forms | **F268** — two charts of one block, again |
+| **C2** | a figure is capability-independent (§3ak.3) | at 1 bit a stacked plot rasterises against **raw** bounds | `line`, 1 bit, two series | `value` is the niced axis always; the raw-bounds object is a *projection* |
+| **C3** | `HAS_VALUE_AXIS.line` is `true` | at 1 bit that gutter holds **names** | the same cell | consistent, and the reason the record answers *readings on a scale* rather than *what the gutter holds* |
+| **C4** | `identity` is the series' labels | `segments` replace the series in the legend | a curve with `segments` | one list, or the legend names a set the gutter does not |
+| **C5** | the figure carries the facing (I61) | the SVG refuses a non-default `origin` | `origin: "top-left"` | the refusal is the arm's; the figure decides regardless, and step 4 removes the refusal |
+| **C6** | the range is `seriesRange(series, block, bars)` | candles contribute bars | `line` with `ohlc` | the bars are in the range, or the terminal moves |
+| **C7** | a refusal is a figure with no marks (I64) | pinned bounds make `seriesRange` non-null with no samples | `ecdf` with `yMin`/`yMax` and no data | the refusal is `hasSamples`, never the axis |
+| **C8** | one legend slot per series | a labelled annotation earns one (C04 I52) | one series, one annotation | slots are series, then candles, then annotations — `legendEntries`' own order |
+| **C9** | curve is `orientation: "vertical"` | a sparkline is one row with no axis | `sparkline` | vacuous, and recorded so it is not later mistaken for a decision |
+
+**C1 is D14's shape found by walking a family rather than a form.** `ecdf` sorts its samples and
+replaces them with a cumulative fraction; `density` replaces five samples with a hundred kernel
+estimates. Both derivations happen in the terminal's dispatch table, *above* the renderer, so the
+SVG arm has nowhere to read them from and draws the raw series:
+
+```
+              terminal                                    SVG
+ecdf          [0.2, 0.4, 0.6, 0.8, 1.0] over 0…1          5 1 4 2 3 over 1…5
+density       100 kernel estimates over 0…0.19            5 1 4 2 3 over 1…5
+```
+
+**An ECDF that descends is not an ECDF**, and `curvePath` steps it, so it reads as one. The density
+plot is worse: there is no density in it. Both are the plausible wrong figure the `null` arm exists
+to refuse — and neither is refused, because `svgFamilyOf` is **right**. They *are* curves. The
+family is correct and the *datum* is wrong, which is why the total record could not catch this one
+either (§3ak.6): the entry it holds is not the entry that is wrong.
+
+> **The ruling: the derivation moves into the shared layer, and it is not a refusal.** §3ak.6's
+> escape clause, applied to the second family that needed it — check whether the emitter reaches the
+> figure without new geometry *before* writing a `null`. It does. `ecdfSeries` and `densitySeries`
+> are pure functions of the samples, already written, already in L1, and neither calls `cells()` nor
+> takes a capability.
+
+**What is wrong is where they live.** `ecdfSeries` is in `scatter.ts` and `densitySeries` in
+`kde.ts`, both rasteriser modules, because the terminal was the only arm that ever needed them. **A
+derivation living inside a rasteriser is the seam in the wrong place, stated in the file tree.**
+
+**And the move has a direction. The first reason given for it was false, and the code is what said
+so** — which is this section's own subject one level up: a walk can be right about the interaction it
+found and wrong about a mechanism it assumed existed (C23 §8a A4).
+
+> *`figure.ts` must not import `kde.ts`: that module calls `cells()`, and the shared layer reaching a
+> cell measurement through an import is §3aj hazard 3 arriving in the module graph.*
+
+**Withdrawn.** Measured at the commit that wrote it: `figure.ts → axes.ts → text.ts` and
+`svg.ts → tree.ts → text.ts` both already exist, so the property the sentence forbids was true of
+both arms before `kde.ts` was ever a candidate. **Hazard 3 is a rule about what a shared *function*
+does** — `G1` and `G1b` assert it by *arity*, that `niceAxis`, `seriesRange` and `pinnedRange` take
+no width — and a module is not a function. A rule stated over the wrong unit forbids things it was
+never about and permits the thing it was.
+
+**What is true is smaller and checkable.** `kde.ts` and `scatter.ts` are the **terminal's
+rasterisers** for two of the seven families, and an edge into them from the shared layer makes the
+SVG arm load braille, the dot grid, the glyph ladder and the strip renderers — measured, **10
+modules and 3,874 lines** — to reach five lines of arithmetic over samples.
+
+**And the number that undercuts the argument, since an unreported one is how a figure becomes a
+threshold**: `figure.ts`'s closure is *already* 92 modules and 28,268 lines, so this is +11% and
++14% rather than a clean layer being spoiled. The force is not size. It is that **arithmetic over
+samples is below both arms and is sitting inside one arm's rasteriser for no reason but who needed it
+first** — the same direction §3ak.1 finding 5 gives for `FrameStyle` and `LegendEntry`, and there the
+reason *was* a cycle. Here a cycle is a **prediction** — those two modules are where families 2 and 5
+read their figure back — and it is written as one.
+
+**C2 is what keeps §3ak.3 honest.** `positionalForm` chooses between a niced axis and the raw bounds
+by asking `stacksAtOneBit`, which reads `colourDepth` — so the axis the terminal rasterises against
+is capability-dependent, and a figure member cannot be. The figure's `value` is therefore the niced
+axis at every rung, and the raw-bounds object stays in the terminal's projection beside the
+`stackedRows` call it exists for. This is the rung table's *stacked strips at 1 bit* row read
+forwards: what changes below the colour floor is not the figure but what is done to it.
+
+#### C1 also says something about artefact A, and two instances is the minimum for saying it
+
+§3ak already records that the disagreement matrix cannot see D14 — *both arms draw something, and
+the cells compare labels and furniture rather than shape*. `ecdf` and `density` are that blind spot
+a second time, and the second instance is what makes it a rule rather than a coincidence:
+
+> **The matrix's cells are not independent, and closing one alone can make the figure worse.**
+
+`ecdf`'s recorded disagreement is `numericLabels 2/2`: the terminal ticks 0 to 1, the SVG ticks 1 to
+5. Closing *that cell* gives the SVG the terminal's 0-to-1 gutter over a path of the raw samples —
+**a chart labelled as a cumulative distribution drawing something that is not one**, which is
+strictly worse than today's honestly mismatched pair. A reader can see that two charts disagree; a
+reader cannot see that one chart's axis belongs to a different chart.
+
+So a cell's disposition is a claim about *that decision* and never a licence to fix it alone. **It
+is also why the emitters land per family rather than per decision** — a family is the smallest unit
+in which the cells are jointly satisfiable, and the plan's step 3 was already shaped that way for a
+reason this walk has now measured.
+
+### 3ak.8 — Agreement is not correctness, and the tie-break has one measured counterexample
+
+**The pass's tie-break is *if the arms disagree, the terminal is right by default*.** It is the right
+default — the terminal arm is fourteen thousand lines with a golden corpus, a capability ladder and
+five years of frames read — and §3ak.7 found the case where it is wrong.
+
+`ecdfSeries` returns `(i + 1) / n` for every index and reads its own `sort` only for `.length`. It is
+a **function of the sample count and of nothing else**, and `x` comes from the sample index, so the
+terminal draws one fixed staircase for every dataset of a given size. Measured at 44 × 8, full
+capabilities: `[5, 1, 4, 2, 3]` and `[1, 1, 1, 1, 100]` are byte-identical frames (F269).
+
+**Unifying on the default would have propagated a chart of nothing into the second arm.** That is
+what makes this the tie-break's counterexample rather than another defect: the rule is about which
+arm to copy, and here neither is right.
+
+> **And the ruling does not change.** After unification both arms draw the *same* wrong figure and
+> one repair fixes both; today they draw two different wrong figures, so a repair must be made twice
+> and still leaves them disagreeing. **Closing the class beats closing the instance even when the
+> class is currently wrong** — what unification buys is that there is one figure to correct, which is
+> the whole claim of the pass stated against its least flattering case.
+
+**Two defects, each sufficient, and the mutation pass is what separated them.** Making `ecdfSeries`
+plainly data-dependent moved no frame and failed no row, because the dispatch entry pins
+`yMin: 0, yMax: 1` and any real value clamps to the ceiling. *Two blockers read as one, and a correct
+fix changing nothing observable is the signal.* The complete repair — the empirical CDF on a uniform
+grid over the data range, which keeps `y` a fraction and makes the pin right — is `densitySeries`'
+own mechanism one form along, and it is a decision about what `ecdf` **draws** rather than a line to
+be patched.
+
+**`density` has the milder half of the same mechanism.** It resamples to 100 points and the x axis
+reads `0 … 99` where the data spans `10 … 90`: **a derived series changes what `x` means and nothing
+tells the axis.** One mechanism, two severities, and both owed as a C12 ruling after the pass — the unification pass
+freezes the terminal arm for its duration.
+
+**The instrument is `DS1`–`DS4`, and its exemption split is 15 of 16.** Swept over 178 catalogue
+form·variant pairs: 16 frames did not move when their numbers did, and **fifteen had no number to
+perturb** — the `empty` variants, and `tree` and `graph`, whose data is structure. Those rows were
+never asked a question and read exactly like passes; without the count the sweep would have reported
+sixteen offenders and been wrong about fifteen. `G7b` asks whether a claimed form puts ink on the
+page and `ecdf` passes it; **this is the next rung, and it is the rung no other instrument here can
+reach** — a golden frame records whatever is drawn, artefact A compares labels and furniture, and a
+mutation on dead code fails nothing by construction.
+
+
+### 3ak.9 — The tie-break has three counterexamples, and the answer was the same each time
+
+**§3ak.8 recorded the first as *the* counterexample. It is the first of three**, and three instances
+is where a pattern stops being a coincidence and becomes something to state once:
+
+| | the terminal draws | the SVG draws | which is right |
+|---|---|---|---|
+| **F269** `ecdf` | one fixed staircase for every dataset of a given size | the raw samples, stepped | **neither** — the ECDF wants a uniform grid over the data range |
+| **F271** `bubble` | the size channel as a second bubble series, named in the legend | one series, sized | **the SVG** |
+| **F272** `bar`, signed | every bar from the range floor, so no negative bars | zero-anchored, growing both ways | **the SVG** |
+
+**The tie-break is still right.** *The terminal is right by default* is a claim about where to look
+first, not a guarantee — it is fourteen thousand lines with a golden corpus, a capability ladder and
+years of read frames against a thousand-line arm with none of that. Three exceptions in seven
+families is what a good default looks like.
+
+**What matters is that the response was identical each time, and it is not the obvious one.** In all
+three the figure reproduces the terminal's answer, *including where the terminal is wrong*:
+
+> **Correcting inside a refactor is the one move this pass forbids.** No frame moves, so no gate
+> fires; the two arms disagree at step 4 for a reason nothing announced; and the frame-read that
+> found the defect is buried in a commit about something else.
+
+**Landing the wrong answer in both arms is worth more than fixing one.** Unified, there is one figure
+to repair and one repair fixes both; today each defect would have to be fixed twice and the arms
+would still disagree afterwards. That is the pass's whole claim, stated against the three cases where
+it is least flattering — and it is why every one of the three is **asserted** rather than described:
+`FS3`, `FB4` and `DS1`/`DS4` fail the day the defect is fixed, which closes each finding by failing
+rather than by anyone remembering.
+
+**The instrument, across all three: none was found by a test written to look for it.** F269 came
+from reading a function while moving it, F271 from a mutation that survived because its fixture was
+degenerate, F272 from writing a test that asserted what a bar chart does and watching it fail. That
+is the same table CLAUDE.md keeps — *every instrument that found something is a way of looking rather
+than a thing asserted* — arriving inside one component in one pass.
+
+
+### 3ak.10 — Step 4's walk: what the second arm still decides, and where two rules meet
+
+**A table rather than a trace**, and the choice is deliberate: rewriting a renderer to read a figure
+is a set of structural interactions — *this member* meeting *this mark kind* — with no event between
+them. §3ak.4's rung ladder is the trace half and it is U6's, not this step's.
+
+| # | one rule | the other | where they meet | what it settles |
+|---|---|---|---|---|
+| **S1** | `value.labels[i]` is `value.ticks[i]` | the SVG takes every tick, the terminal picks | any ticked form | both are indexed together or the pairing breaks — **no `String(tick)` may survive anywhere** |
+| **S2** | `valueOnX` is scoped to `distribution` | four families carry `orientation` | a horizontal `bar` | **F274** — **closed** at §3ak.12: `figure.orientation` replaces the expression, so the clause has nowhere to live |
+| **S3** | `value === null` means *no axis* (I60) | empty `marks` means *a refusal* (I64) | `nodes`, which has both | **two refusals with different meanings**, and conflating them draws a tree as *No data.* |
+| **S4** | `Drawn.layer` orders the drawing | the ground is painted, then marks, then furniture | any annotated form | the layer decides among marks; the ground and the frame stay the arm's |
+| **S5** | `seriesIndex` is a categorical slot | `ref` is an explicit one | an annotation beside a series | a mark carries one or the other, never both — the resolver needs both paths and a default |
+| **S6** | `rect.value` colours a matrix cell | `rect.fill` fills a bar | one mark kind, two families | **the colour source is whichever member is present**, which is why `value` is optional rather than `-1` |
+| **S7** | `point.size` is a bubble's datum | a scatter dot has none | `scatter` against `bubble` | absent means *the renderer chooses its own radius*, never *zero* |
+| **S8** | the nodes family has decisions and no marks | `plotToSvg` returns `null` on empty marks | `tree`, `graph` | the nodes arm **keeps its own mark loop** and takes only the decisions — S3's trap in the one family that walks into it |
+
+**S2 is the finding and it is the argument for the whole step.** `plotToSvg` decides its axis
+direction with `svgFamilyOf(block.form) === "distribution" && block.orientation !== "vertical"`.
+Measured on a `bar` at the terminal's default orientation — which is horizontal — the gridlines run
+**across** with the numbers down the gutter, and `orientation: "vertical"` gives byte-identical
+output. So a horizontal bar chart is drawn vertical *and* labelled on the wrong axis, which is the
+defect the distribution family's own comment records being fixed for (F274).
+
+> **It is closed by construction rather than repaired.** `figure.orientation` replaces the whole
+> expression, and every family's emitter already decides it — so the scoping clause has nowhere to
+> live and the defect stops being expressible. **A class of defect that cannot be written down does
+> not need a gate**, and this one had survived every frame read of every other family.
+
+**S3 and S8 are the traps, and they are one trap seen twice.** `plotToSvg` refuses on an empty body
+today, which is F259's ruling and stays. But after this step a `nodes` figure has **no marks by
+design** (§3aj.6), so a naive walk would refuse `tree` and `graph` — two forms the arm currently
+draws — and the refusal would look exactly like the one F259 introduced on purpose. The nodes arm
+keeps its own loop over `flatten` and `graphLayers` and takes the decisions from the figure; that is
+what `nodesDecisions` returning `Omit<Figure, "marks">` is *for*, and it is why `marks: []` was
+refused as its shape.
+
+**The gate inverts for this step, and it did not exist** (F275). The sentence above read *the phase
+digest moves on every commit and every move is read*, on F264's *the 66 `phase*` frames are the SVG
+arm's own output*. **Measured: `digestOf` hashes `.txt` only and zero of those 66 contain `<svg`** —
+the `phase3-*` files are `-cells.txt`, terminal renderings of the forms this arm **refuses**. No
+golden snapshot holds SVG. Changing the axis for every ticked form moved **0 of 382 golden rows** and
+neither digest.
+
+What *did* fire is `AD1`, and it is a **cell** gate: five decisions, blind to shape, which is §3ak's
+own recorded blind spot arriving at the instrument built on top of it. It reported one cell moving and
+could not report that the axis a reader looks at had changed on seventy variants.
+
+> **So T2 lands before the rest of the step.** `test/golden/svg-baseline/` — 178 `.svg` frames,
+> `SB1`–`SB5`, T1's mirror for the opposite reason: T1 gates an arm that must not move, this gates an
+> arm that is supposed to. **No capability axis**, because this arm has no ladder and five identical
+> copies would report five times the coverage; **a refusal is a frame**, because 86 of the 178 are
+> `null` and a claimed form must not be able to stop drawing quietly.
+
+**The terminal half of the gate is unchanged and holds**: 890 frames at `64b8845e6408c819`, 1780
+baseline frames unmoved, on every commit of this step.
+
+---
+
+### 3ak.11 — The projector: the whole of what the second arm does with a figure's two directions
+
+**The walk reads `orientation` and `facing` in one function and nothing else reads either.** That is
+what makes S2 close by construction rather than by repair: `valueOnX` was a *third* answer to which
+way the value axis runs, beside `positionalDecisions`' fixed `"vertical"` and `orientationOf`'s read
+of the block, and a scoping clause can only be wrong where there is a clause.
+
+| the figure says | the page does |
+|---|---|
+| `orientation: "vertical"` | the identity axis is the abscissa, the value axis the ordinate |
+| `orientation: "horizontal"` | the two swap |
+| `facing.x: "left"` | the identity axis is mirrored, on whichever axis it occupies |
+| `facing.y: "up"` | the value axis **inverts on the ordinate and does not on the abscissa** |
+
+**The asymmetry in the last row is the page's, not the figure's.** SVG's `y` grows downward and its
+`x` does not, so the same `up` that makes a vertical figure's values run bottom to top makes a
+horizontal figure's run left to right — one member, two applications, which is what `facing` was
+separated into two independent directions for (§3ac).
+
+**A rect projects by its two corners and never by a corner and a size.** Mapping the size separately
+would need the walk to know which way each axis runs — the second copy of `facing` the function
+exists to remove — so it maps both corners and takes the bounding box, and every flip falls out.
+
+**Three reads of the form survive in this arm and all three are rasterisation** (§3aj hazard 1):
+
+| read | why it is not the figure's |
+|---|---|
+| `step`/`ecdf` take a square polyline joint | the terminal picks `stepRows` off the same member; the *points* are shared and the joint is which rasteriser draws them |
+| a matrix cell reads `block.colormap` | the ramp is a palette, and `rect.value` — the reading itself — is what crosses |
+| a bubble's radius is `2 + 5·size` | the terminal spends the same normalised number on 0 to 2 dots; the floor is what its radius-0 single dot is, *a sample with no size still draws* |
+
+**`absent` draws nothing, and that is the role's entire content here** (I62). The terminal has a
+character for *no estimate was reported*; this arm's equivalent of that character is not a circle at
+the fallback position, which is the plausible wrong figure the role exists to refuse.
+
+**The extraction is byte-identical where it should be, and that is the measurement.** Migrating
+`curve`, `scatter` and `matrix` into the walk moved **4 of 178 SVG frames**, and all four moved for
+reasons that are additions rather than differences:
+
+| frame | what appeared | why |
+|---|---|---|
+| `line-annotated`, `line-annotation-label`, `autocorrelation-default` | one dashed rule each | the arm drew **no annotations at all**; `annotationMarks` is in the figure and the walk reads it |
+| `bubble-default` | radii from `2.714` to `7` where every circle was `r="3"` | the size channel crosses the seam now (§3ak.1 finding 2) |
+
+Every other curve, scatter and matrix frame is **unchanged to the byte**, which is the claim
+*`svgPoints` + `curvePath` and the matrix loop are the projector at three call sites* asserted rather
+than hoped: the projector reproduces three hand-written loops exactly, including the one whose
+coordinate is spent on colour instead of position.
+
+**And the bubble frame is F271 visible in the second arm.** Both series carry the same radii, because
+`positionalForm` hands `block.series[1]` to `bubbleRows` as the sizes *for every series* — so the size
+channel is drawn as a series sized by itself, in its own colour, in both arms now. One wrong figure
+rather than two different ones, which is the tie-break's whole argument.
+
+---
+
+### 3ak.12 — The tiles and bar families: what the walk found that the type did not say
+
+**Two families crossed and each falsified a sentence written when it had one subject.** That is the
+section's whole content, and both sentences read as settled when they were written.
+
+**`facing` for the tiles family (F276).** `tilesFigure`'s doc said *a flame grows up from its root and
+an icicle hangs down from it, which is one decision applied twice* — and passed `FACING_DEFAULT` for
+all three forms, so the member said `up` for both and the growth direction stayed written in two
+renderers. Every clause of the justification is true; none of it constrains the decision it is
+attached to, which is MG24's class. **It was unfalsifiable until something read the member**, and the
+projector is what reads it. Measured in the terminal before deciding: `definition.ts` maps
+`t.y0 * areaRows` to a row index, so a **treemap** faces down too — two of the three, and only the
+flame grows up.
+
+**`depth`'s absent case (F280).** Written for tiles, where there were two subjects — nesting tiles and
+stacked strips — and one reading fitted both. The bar family made it three:
+
+| the rect is | `depth` | the inset |
+|---|---|---|
+| a tile nested in a partition | its depth | `depth + 1` units, every side |
+| a strip in a partition, enclosing nothing | `0` | one unit, every side |
+| a **measurement**, whose length *is* its value | absent | none along the value axis; a fraction of the slot across the identity axis |
+
+**A length and an area are read differently.** A tile's area is read against its neighbours, so a unit
+off every side costs nothing; a bar's length is read against a labelled axis, so a unit off the end is
+the figure lying about its own number — measured at `x=351` against a `20` gridline at `352`.
+
+**D11 and F274 close here, by construction.** `valueOnX` was a third answer to which way the values
+run — beside `positionalDecisions`' fixed `"vertical"` and `orientationOf`'s read of the block — and
+scoped to the family the defect was noticed in. It is `figure.orientation` now, so the scoping clause
+has nowhere to live.
+
+**The family's four forms are not one figure.** Measured in the terminal rather than assumed:
+`lollipopRow` fills `0 … pos` and puts `●` at `pos`; `dotplotRow` writes `●` alone. So the emitter
+carries a stem, a head, or both, and a walk drawing rects for all four turns a dot plot into a bar
+chart — the plausible wrong figure, since both encode the same number.
+
+**One slot fraction where the arm had two.** `0.6` in `slotOf` and `0.7` in the bar loop, one arm and
+two answers to *how wide is a categorical figure*, which is the duplication this pass removes one
+layer up. Now `SLOT_SHARE`.
+
+**What the rows were measuring, and stopped being able to.** `svgPoints` lost its last caller and was
+deleted: the arm no longer turns values into pixels, it projects marks the shared layer normalised.
+Three rows moved onto the seam and the drawn document, and two of them **had been reporting coverage
+they did not have** —
+
+> `G6`'s clamp row called `svgPoints` with the samples directly, which answers for any list of numbers
+> whether or not the arm ever asks it that question. For the `matrix`, `tiles` and `nodes` families it
+> never does: they have no value axis, so there is no bound to clamp against. The row now says so.
+>
+> And it asked the *position* of a bar, which agreed for exactly as long as every form was vertical.
+> A bar encodes by length; after D11 the row was reading the page's ordinate for a figure whose values
+> run along the abscissa.
+
+**`G6b` reversed and it was right both times.** It asserted this arm's zero baseline, which the
+terminal does not have in either orientation (F272). The tie-break resolves it the terminal's way, so
+the row now asserts the defect and **fails the day a bar hangs below zero** — which is the repair
+landing.
+
+---
+
+### 3ak.13 — The distribution family: seven roles, six characters, and the range the gutter shows
+
+**This is the family `GlyphRole` was written for, and it is the first to use all of it.** A median is
+`┃` at full unicode, `|` in ASCII and a distinct mark below the colour floor; a mean is a different
+character again; an outlier a third. The terminal picks all three off its own ladder and this arm
+draws none of them — it draws a bar, a diamond, a circle. **What both agree about is which of the
+seven things this is**, and that is the whole content of the seam here.
+
+**Seven things and six characters, which the heading said the other way round until it was
+measured.** The terminal draws `◆` for `mean` *and* for `target`, so *which of the seven this is* is
+not recoverable from the frame — and the sentence read as the seam's central claim while being false.
+It is legitimate: measured over the catalogue the two never share a figure, because the forest branch
+returns before a mean can be added. **The claim that survives being checked is co-occurrence-scoped**
+— two roles that can appear in one figure are drawn differently by each arm — and that is I68 and
+§3ak.21 finding 4.
+
+| role | terminal | SVG |
+|---|---|---|
+| `median` | `┃` per rung | a 2px bar across the slot |
+| `cap` | `┬`/`┴`, a tee | a 1px bar, half the slot — a cap as wide as its box reads as a second box edge |
+| `mean` | a distinct glyph | a diamond, edged in the furniture tone |
+| `outlier` | a dot | a smaller circle |
+| `target` | `g.diamond` — *this one is the answer* | a diamond, sized by weight |
+| `point` | `ch.filled` | a circle |
+| `absent` | **nothing** — and by accident until §3ak.22 | **nothing** |
+
+**`absent` drawing nothing is the role's entire content.** A forest row with no estimate is a real
+state; a circle at the fallback position is the plausible wrong figure it would otherwise become.
+**This table said the terminal draws a character there and it draws none** — `row[NaN]`, not a
+decision — and no catalogue variant constructs the state at all (§3ak.22, F299).
+
+**Three facts the figure was dropping, all of which the terminal draws.** The emitter was written
+against `boxplotBand` and `boxplotColumn` and missed what `forestRow` does one function along:
+
+- **the tees.** `row[xLower] = ch.whiskerLeft` — *a plain `─` at the end of a run does not say the
+  interval stops there.* This arm drew them from its own loop and the terminal from the record; one
+  of the two was going to stop.
+- **the pooled estimate.** `q.pooled === true ? g.diamond : ch.filled`. The seventh role, `target`,
+  had no subject until now.
+- **the weight** (I31). *A wide interval drawn small contributed little and a narrow one drawn large
+  carried the result.* It crosses as a `size`, exactly as a bubble's radius does — one normalised
+  number, spent on cells in one arm and a radius in the other.
+
+**F282 — the figure carried two ranges and the marks were on the wrong one.** `distributionFigure`
+normalised against the raw `extent` while publishing the **niced** axis over it, so a boxplot spanning
+2–9 was drawn against 2–9 and ticked `0 · 2 · 4 · 6 · 8 · 10`. It is F272b's ruling arriving late —
+*the range the figure is drawn against is the range the gutter is labelled from* (F210) — and the same
+asymmetry hid it: the terminal's horizontal boxplot is `bandedForm`, whose gutter holds **categories**,
+so there is no label for the fraction to disagree with, and the vertical arm is not the default.
+
+> **Nothing could see it while nothing read the marks.** `FD1`–`FD5` assert normalised numbers against
+> the same `extent` the emitter used, which agrees with itself whichever range that is. The walk is
+> what made the two visible in one picture, and reading the frame is what caught it: `forest-default`'s
+> interval moved `299.52 … 509.44` → `283.97 … 594.96` in a commit whose only intended changes were
+> colour and shape.
+
+**A mark list is a paint order, so a composition ruling belongs in the emitter.** The arm this walk
+replaces drew *whiskers, then their caps, then the box over both, then the median over that* — the
+glyph tables' own order, "so a cap coincident with an edge reads the way it reads in the terminal" —
+and the emitter had the box first. Invisible on an ordinary summary, where the whiskers abut the box
+rather than crossing it; `boxplot-flat-whisker` is the fixture where they do not.
+
+**And the whiskers are the series' colour, not the furniture's.** This arm drew them muted; the
+terminal rasterises a summary into glyph rows and colours the row by its category, so every part of
+one summary is one colour. The split was this arm's invention and the figure never had it.
+
+**`range` leaves `marks()`' signature here.** Every family that walks takes its coordinate from the
+marks, already normalised; the last caller needing a range of its own was the distribution branch.
+What is left is the nodes family, whose placement is topology and slots and no scale at all.
+
+---
+
+### 3ak.14 — `autocorrelation`, and a deferral whose stated condition was not its real one
+
+**F266 deferred this to *once the bar family walks*, and that condition was met a commit early.**
+Reclassifying `SVG_FAMILY.autocorrelation` from `"curve"` to `"bar"` is one word, the blocker had
+been named as a symbol, and grepping the symbol said *done*. Reading `lagRow` said otherwise:
+
+| what `lagRow` does | what `barFigure` did |
+|---|---|
+| ranges over `±max(1, |v|)` — symmetric, floored at one | `{ min(0, dataMin), dataMax }` |
+| grows a bar from a **centre zero**, `[zero, end]` or `[end, zero]` by sign | fills from the range floor (F272) |
+| writes `g.vertical` at zero, before and after the run | no zero rule |
+| draws every bound at **`±|b|`**, both signs | one line per annotation, at its value |
+
+**Landing the word alone would have drawn a different chart** — D14's shape, in the family that was
+supposed to end it: positive lags only, no zero to measure them against, and half of every
+significance band.
+
+**The escape clause held, and checking it is what this step is for.** §3ak's ruling on D14 is *refuse
+a false figure, record an incomplete one*, with the refusal conditional on the emitter not reaching
+the lag figure **without new geometry**. All four rows above are expressible in the marks that already
+exist — a range is a decision, a bar from zero is a `rect`, a zero rule is a `polyline` on the
+`furniture` layer, a mirrored bound is two `polyline`s — so the refusal was unnecessary and the work
+was an arm rather than a table entry.
+
+**Three of the four are the terminal's computation moved, and the fourth is not F272's repair.** A lag
+bar growing from zero is *this form's own behaviour*, which `lagRow` has always had; making the rest
+of the family grow from zero would be correcting the terminal inside a refactor, which is the one
+thing this pass forbids. The branch is on the form, in the family's function, for the same reason the
+stem and the head are: **the family is the unit and the forms inside it differ in what is drawn at a
+position the shared decisions gave.**
+
+**The magnitude has a floor of one and that is not arithmetic.** A correlation lives in `[-1, 1]`, so
+an axis that shrank to fit a weakly correlated series would make noise look like signal. `max(1, …)`
+is what says *this is a correlation* rather than *these are the numbers I happened to get* — and it
+reads the **raw** values, so a pinned `yMin`/`yMax` does not reach it, exactly as in the terminal.
+
+**A significance bound is one number and two claims.** A correlation of `-0.4` is as significant as
+one of `+0.4`, so a band drawn on one side only says the opposite of what it means. The caller asks
+for the mirror rather than every annotation acquiring one it has no meaning for.
+
+> **The clamp row met the same wall the bar family's position row did.** *Far below clamps to no
+> length* is true of a bar filled from a floor and false of one measured from a centre — the floor
+> sample is a lag's **longest** bar. Third instance in this pass of a claim that held while every form
+> in a family behaved one way.
+
+### 3ak.15 — Walk artefact B: the rung ladder, and why the array order is not one
+
+**Artefact A is a table and this is the trace** (§3ak.4). The events are capability transitions and
+the question is which decisions survive one. Both artefacts were owed; taking the table alone
+because the type is the obvious thing is the mistake C19 §8a records, and this is the other half.
+
+**The edges are not the array's neighbours, and getting that wrong attributes a move to the wrong
+rung.** `CAPS` is written for a catalogue reader, so its order is presentation order:
+`24bit · 8bit · ascii · wide · 1bit`. But `ASCII` is `{ ...FULL, unicode: "ascii", colourDepth: 1 }`
+— **two** capabilities away from full — so the adjacent pair `8bit → ascii` moves the unicode
+repertoire and the colour depth together, which is precisely the confound `CAPS`' own comment says
+the five sets exist to avoid. A trace walking neighbours would report a colour change under the
+unicode rung. The isolating edges are:
+
+| edge | what it isolates | holds fixed |
+|---|---|---|
+| `24bit → 8bit` | colour depth, 24 to 8 | unicode full, narrow |
+| `8bit → 1bit` | colour depth, 8 to 1 — **the colour floor** | unicode full, narrow |
+| `1bit → ascii` | the unicode repertoire | both 1-bit |
+| `24bit → wide` | `ambiguousWidth` | unicode full, 24-bit |
+
+Two of the five sets pair with `24bit` and two pair with each other, which is a fact about the sets
+rather than about the ladder, and it is why the edge list is written down instead of derived.
+
+**What each edge does, measured over 46 forms at width 60**, classified on raw frames — `same`,
+`colour` (identical once SGR is stripped), `glyph` (the inked cells are identical and the characters
+are not), `layout` (the inked set moved):
+
+| edge | same | colour | glyph | layout |
+|---|---|---|---|---|
+| colour 24 → 8 | 1 | 45 | 0 | 0 |
+| colour 8 → 1 | 1 | 21 | 3 | 21 |
+| unicode full → ascii | 0 | 0 | 37 | 9 |
+| `ambiguousWidth` narrow → wide | 1 | 0 | 36 | 9 |
+
+**The colour floor is the only edge that moves geometry**, and the 21 `layout` cells are the stacked
+strips: below the floor `positionalForm` stops overlaying and stacks into labelled strips, so the
+value gutter is replaced by series names and the legend disappears into the gutter. The 3 `glyph`
+cells beside them are `CATEGORY_MARKS` — identity carried by shape where the layout can hold. Both
+are rungs the table already names, and the split between them is per form rather than per family.
+
+**`layout` at the two unicode-ish edges is the rasteriser and not the geometry.** A braille curve
+falling to `-` inks a different set of cells for the same figure, which is §2's legitimate column.
+The classifier cannot tell that from a moved coordinate, and rather than pretend otherwise the
+record states it: `layout` means *more than the character vocabulary changed*, and which of the two
+it is per form is read from the frame.
+
+**`tree` is the control, and it is a measured one.** It is `same` at both colour edges because it
+draws no SGR at all at 24-bit — three of its six variants emit not one escape, and the other three
+emit two, for the `+N more` notice. A tree's reading is its structure; there is no series colour to
+lose. That is the one form the colour ladder does not reach, and it is what makes the other 45 cells
+evidence rather than a tautology about frames differing.
+
+**The instrument that could not be used, and the second reason a matrix compares at 24-bit.**
+`terminalDecisions` reads decisions out of a frame and `test/support/arm-decisions.ts` records its
+blind spots — but every one of them is about *what a label means*, and the ladder breaks it in a
+different place: its **character classes are calibrated at 24-bit**. `+` is the ASCII corner and
+also the ASCII tick junction, so a two-sided rule reads as a border; a braille curve falling to `-`
+reads as interior rules. Measured, it reports `interiorRules` moving across the rungs for 45 of 111
+variants and `border` for 8, and the moves are the parser's. §3ak's disagreement matrix says it
+compares at 24-bit because the arms are not comparable below it. That is true and it is not the only
+reason: **the reader is not comparable below it either**, and a trace built on that reader would have
+reported a degradation audit made entirely of its own alphabet (F285).
+
+### 3ak.16 — The seam's consumers, measured — and three members nothing reads
+
+**U1a's claim is that a decision mutated inside `figureOf` moves both arms.** Measured per member,
+against a fixture chosen to construct that member's state, it holds for five of eight:
+
+| member | terminal | SVG | |
+|---|---|---|---|
+| `value` | moves | moves | |
+| `extent` | moves | moves | the terminal below the colour floor, the SVG where `value` is `null` |
+| `orientation` | moves | moves | |
+| `facing` | moves | moves | |
+| `marks` | moves | moves | |
+| `identity` | moves | **still** | **D10** — the SVG draws no identity axis |
+| `frame` | moves | **still** | **D9** — the SVG draws no frame |
+| `legend` | moves | **still** | **D13** — the SVG draws no legend |
+
+**The three are not arbitrary: they are exactly the three terminal features the second arm has never
+been given**, and they were on the sixteen-decision list from the first measurement. So the type is
+ahead of the arm by precisely the amount the disagreement list says is outstanding, which is the
+honest reading — and it is still F84's class, because a member every emitter writes and no renderer
+takes is a decision made once and consulted never.
+
+**Measured rather than argued**: over 92 drawn documents not one `legend` label appears as `<text>`,
+and over the 83 documents of the five families with a gutter in the terminal, not one `identity`
+string does. `plotFrame: "none"` against `plotFrame: "box"` produces byte-identical SVG.
+
+**MG24 is silent on all three, and the reason is its recorded blind spot arriving three times at
+once.** The rule counts a member as consumed when its *name* is read anywhere in `src/`, without
+regard to owner — the mechanism that let `NavigableRegistry.elementsOf` sit satisfied by C09's
+`BlockRegistry.elementsOf`. `frame`, `identity` and `legend` are three of the most heavily reused
+member names in the tree; `furniture.ts` alone reads `layout.frame` four times. A three-member hole
+in a type the whole pass is built on was invisible to the rule that exists to find exactly that
+(F286).
+
+**And the mutation run's stated survivor named one of them.** `c12-arm-seam.mjs` said `Figure.frame`
+is not mutated because nothing reads it, and that **it closes when the SVG walks the figure**. The
+SVG walks the figure. The member is still unread — the condition was met and the thing it promised
+did not happen, because *walking a figure* and *reading every member of one* are different events
+and the deferral named the one that was easy to check. The habit found it in the twenty minutes it
+is supposed to cost; what it could not do is fire on its own.
+
+**The row's blind spot, stated because an unrecorded limit reads as strength.** A block perturbation
+that moves an arm does not prove the arm read the *figure member* — it may read the block field.
+`definition.ts` applies `block.plotFrame` to its layout directly, so the terminal's `frame: moves`
+is exactly that case. **The negative direction is sound and the positive is not**: an arm that did
+not move read neither. So the record's `still` cells are findings and its `moves` cells are the
+mutation run's subject, which is why `c12-arm-seam.mjs` must run a suite from each arm (F287).
+
+### 3ak.17 — Three of the six U rows had nothing to be wrong about
+
+**A03 §2's vacuity class, in the rows the pass is measured by.** U1 was re-founded during step 2
+because *the same block yields an identical `Drawn[]` for both arms* is `f(x) === f(x)` once one
+emitter serves both. The same question asked of the rest finds two more, and they fail for a
+different reason — not a tautology but a **missing parameter**:
+
+- **U5** — *the SVG arm's figure is identical at every capability set.* `plotToSvg(block, theme,
+  layout)` takes no capabilities and `svg.ts` imports no `Caps`. There is nothing to vary, so the
+  row cannot fail, and it reads as though it were guarding the ladder out of the second arm.
+- **U6's first half** — *the terminal's figure is identical at every capability set.* The emitters
+  take `block` alone; `plotAreaRows(block)` is a block fact. Same shape, same answer.
+- **U2–U3** inherited U1's subject and cross it over the corpus, which is one vacuity 178 times.
+
+**They are kept, and what they assert changes.** U5 and U6a become **structural** guards — the
+signature is the guarantee, so the assertion is on the signature: no capability reaches either
+figure path, checked on the module rather than on a frame, and stated as structural rather than
+behavioural so nobody reads a green run as a measurement. U2 and U3 take **U1b's** subject instead
+of U1's — the projection, crossed over every form and every variant — which is what the sentence was
+reaching for and could not say while U1's own subject was vacuous.
+
+**The distinction worth keeping.** A tautological row and an unfalsifiable-by-signature row read
+identically from a green suite, and they want opposite repairs: the first needs a different claim,
+the second needs a different *instrument*. Mutation is what tells them apart, and CLAUDE.md's own
+note — that a mutation failing nothing can indict the spec rather than the test — is the general
+case of which these are three instances (F288).
+
+**A fourth, which is the rung table rather than a U row.** §3ak.3's first row places *the glyph per
+`GlyphRole` per unicode rung* in "the terminal walker's `Record`". `GlyphRole` is read in one file,
+`figure.ts`, and the terminal picks its median, mean and outlier characters inside its own
+rasterisers as it always has. The table names an effect and there is no mechanism — the row is true
+about what the SVG does and describes a terminal that does not exist (F289).
+
+---
+
+### 3ak.18 — Reading the trace's `layout` cells, which is the audit U6 was for
+
+§3ak.15 records the tally and states its own limit: `layout` means *more than the character
+vocabulary changed*, and the classifier cannot separate a coarser rasteriser from a moved
+coordinate. **Eighteen cells were left owed a reading. Reading them found two things.**
+
+**A third kind of rung: substitution.** `pie` and `radar` at `unicode: "ascii"` do not degrade —
+they are **replaced**. A pie becomes four labelled `#` runs; a radar becomes a grouped bar table with
+its axis names down the left. Both preserve the *reading* — a share of a whole, a value per axis —
+where a blocky ASCII circle would not, so the substitution is right. It is not a rasteriser change,
+and filing it beside braille-falling-to-`-` is the classifier flattening two different events. The
+discriminator is the per-row ink **span**: a coarser rasteriser keeps it, a substitution does not.
+
+*And the ink-density measure that looked like a discriminator is not one.* `violin` reads
+`1234 → 550` and is the same figure throughout — blank braille, U+2800, is not a space, so a braille
+frame's density is inflated by every empty cell it fills.
+
+**The other thing is F292, and it is a corruption rather than a classification.** The `wide` frames
+mix ASCII furniture with box-drawing content — `glyphs()` falls the frame back and the rasterisers do
+not — which is what prompted measuring the rendered width. Measured with `cells()` at each set's own
+ambiguity: **29 rows of 1841 are 61 cells wide at `ambiguousWidth: "wide"`, and zero at the other
+four sets.** A row wider than the terminal wraps, and a wrapped line scrolls the alternate screen.
+
+`truncate` budgets `limit - 1` for its marker; `…` is East-Asian Ambiguous and takes two cells at
+that rung. Every overflow is exactly one cell, every overflowing row ends in the marker, and
+`unicode: "ascii"` — whose marker is `~` — is correct. **The defect is C09's**, with 50 call sites
+across 14 files; this corpus is simply the only one rendered at `wide`.
+
+**Why the audit reached it and no gate did.** Every gate here compares bytes — the golden frames, both
+baselines, the catalogue digest — and the bytes are stable: a 61-cell frame is 61 cells every run.
+`cells()` is the measurer and **nothing runs it over rendered output**. An instrument that measures
+what it renders finds what an instrument comparing output to itself cannot.
+
+`U6e` asserts the exemption **by equality**, so a new overflow cannot hide behind an old one, and
+`U6e2` proves the mechanism by direct call so the finding does not rest on inferring a cause from a
+frame.
+
+**The fix landed alone, and the residue was the same defect at its boundary.** Measuring the marker
+closed 27 of 29; the two that remained were `contour/style-line`, and instrumenting `truncate`
+during that render showed the caller asking it to fit `╭` — two cells at this rung — into a limit of
+**1**. `budget <= 0` then returned the marker regardless of whether the marker fitted, which is the
+same overflow one character smaller and predates the fix. A marker too wide for its slot is not a
+marker: the answer is `" ".repeat(limit)`, on this module's own rule for a double-width glyph refused
+at a boundary — blank rather than absent, because the row still has to be the width it was measured
+at. Fuzzed over 32,000 truncations of ambiguous-width content at eight limits: **zero over.**
+
+**What moved, read.** 28 baseline frames, **every one of them `-wide-`**, 231 lines changed for 231
+— no row gained or lost, and the change in each is `…` becoming a blank or one content cell handed
+back to a marker that now measures two. Nothing at the other four rungs moved, which is the control
+the mechanism predicts. **The catalogue's terminal digest moves with it: `64b8845e6408c819` →
+`d06687b479814a56`**, the first terminal move of this campaign and the reason it is a commit of its
+own. The statements elsewhere in this document that report the frozen digest are reports about *those*
+commits and stay as written.
+
+**And the fix makes the frames width-correct, not figure-correct** — F293. A radar still truncates
+mid-shape at `wide` and a contour still loses a cell to a blank, because the **rasterisers** keep
+emitting ambiguous-width glyphs where `glyphs()` falls the frame's own furniture back to ASCII. One
+row at `wide` therefore mixes two alphabets. That is the `ambiguousWidth` rung in §3ak.3's table and
+it is the degradation pass's, not this one's: what this fix removes is the wrap, which is a
+correctness failure the application cannot see, and what it leaves is a legibility failure it can.
+
+---
+### 3ak.19 — F286's three members are incomplete, not merely unconsumed
+
+**The shortest path to the largest number, walked before it was wired.** `identity`, `frame` and
+`legend` are written by every emitter and read by neither arm, and they are exactly D10, D9 and D13
+— 40 of the disagreement matrix's 73 open cells. That reads as consumption: the decisions are
+computed, so an arm need only take them.
+
+**Measured, four of the six block fields that govern this furniture never reach the seam.**
+
+| block field | what it decides | in the figure? |
+|---|---|---|
+| `plotFrame` | which of I26's four shapes | **yes** — `frame` |
+| `axes: false` | whether there is **any** furniture | no — `frame` still says `"box"` |
+| `yAxis: false` | drop the value labels, keep the frame and the position axis | no |
+| `yAxis: "left" \| "right" \| "both"` | which side, and whether both | no |
+| `legend: false` | no legend at all | no — the slot list is unchanged |
+| `legend: "above" \| "below" \| "left" \| "right"` | where it goes | no — all four give one list |
+| `xLabels` | the position axis's three strings, given rather than derived | no |
+| `xTitle` | the position axis's caption | no |
+
+**Five of six, and the first version of this table said four of six — with a row for `xAxis:
+false`, which is not a field.** `Plot` has `axes`, `xLabels`, `xTitle`, `legend`, `plotFrame` and
+`yAxis`; there is no `xAxis`. The invented row was plausible because `yAxis` exists and the pair
+reads as symmetric, and it went in beside two real fields the same sentence had missed. **A table
+of *what governs this* is worth grepping in full rather than filling out from the one member you
+came for**, which is the audit's own rule turned on the audit.
+
+So an arm consuming these members as they stand draws **a box on a plot that asked for no furniture,
+value labels on one that asked for none, and a legend on one that explicitly suppressed it**, in a
+placement the author did not choose. Every one of those is a *worse* answer than drawing nothing,
+which is what the arm does today.
+
+**This is the class §3ak.5's neighbour records**: a ruling can be right about the interaction it
+found and wrong about a mechanism it assumed existed. *Consume `figure.legend`* names an operation,
+and the operation as specified cannot express *no legend*.
+
+**And the decisions are still made twice — in one arm.** The terminal reads `block.axes` eight
+times, `block.plotFrame` seven, `block.legend` twice and `block.yAxis` once, inside its own
+renderer. That is the pattern I59 exists to end, surviving in the one place the matrix cannot see it:
+a decision made once is indistinguishable from a decision made twice when only one arm draws it.
+
+#### What each member needs
+
+- **`frame` absorbs `axes`.** One member answering *what furniture is drawn*, with `"none"` as a
+  fifth value. **This does not contradict C04's ruling that the block needs two fields** — that
+  argument is *`axes: false, plotFrame: "box"` would be expressible and meaningless*, and it is about
+  an **author's** surface, where two independent questions want two fields. After resolution there is
+  one answer, and a figure carrying both would let a renderer pick the wrong one. The block splits;
+  the figure collapses. **The direction is the ruling.**
+- **The gutter and the position axis are resolved facts, not flags** — and this is where the first
+  ruling was too coarse. *One member answering what furniture is drawn* is what §3ak.19 said before
+  the call sites were read; measured, **`axes` governs three different things and each has a per-form
+  override**:
+
+  | site | what it gates | the override beside it |
+  |---|---|---|
+  | `height.ts` `axedFurniture` | the **rows reserved** for axis and frame | `FURNITURE_ROWS` is per form |
+  | `definition.ts` `axed` | the **gutter and label column** | `\|\| block.form === "heatmap"` — a matrix's row labels *are* its ordinate, so `axes: false` is refused rather than honoured (C04 I50b) |
+  | `furniture.ts` | the **position axis row** | `&& HAS_POSITION_AXIS[block.form]`, and `xLabels` short-circuits both |
+
+  So a single `"none"` cannot carry it: a heatmap with `axes: false` still guts its rows. The figure
+  carries **`gutter`** and **`positionAxis`** as resolved booleans — each already computed, each with
+  its override applied — and `frame` carries the border shape alone. **`frame: "none"` therefore
+  means *no border*, not *no furniture*, which is a narrower claim than the one first written down.
+- **`legend` becomes placed or absent** — `Readonly<{ slots, placement }> | null`, where `null` is
+  `legend: false`. **`null` rather than an empty list**, because an empty list already means *this
+  figure has nothing to name* — a single-series curve — and *the author refused a legend* is a
+  different fact. Collapsing them is F280's shape one member along: an absent case given its meaning
+  from the only family that had one.
+
+#### The cell where two rules meet, and it is the one to check first
+
+`"grid"` **is** gridlines — the terminal draws a `┄` rule at every value tick and a `┊` at every
+position tick, and draws none at the other three styles. **So D6 is not a ruling and never was.**
+The record reads *the terminal draws no gridlines by default and the SVG draws one per tick*, which
+is true and frames the repair as a choice; the type already made the choice. The SVG's unconditional
+rules are `"grid"` applied to every plot, and the repair is `frame === "grid"` — **both ways**, since
+the second axis is half of what the style means and the arm draws neither.
+
+**That folds D6 into D9**: one member, two decisions, **32 cells**, no ruling required. The
+remaining ruling is D7/D8 — how many value labels, and whether a position axis is drawn — which
+`valueLabels` and `positionLabels` make expressible and do not settle.
+
+---
+### 3ak.20 — Identity is a member and its placement is not, which is I63 with a second subject
+
+**The question asked before the wiring**: the terminal draws categories in a left gutter sized to
+the longest label *in cells*, and the second arm has no metrics. So does `identity` cross the seam
+at all?
+
+**Measured, on a bar in both orientations at width 44:**
+
+| | gutter | the other axis |
+|---|---|---|
+| `orientation: "horizontal"` | `alpha` `beta` `gamma`, right-aligned, one per row | **no numeric axis** — each value is printed at its own bar's end |
+| `orientation: "vertical"` | `10` `5` `0`, the value ticks | `alpha beta gamma` under the bars |
+
+Three separable facts, and they do not have one answer:
+
+- **The strings cross.** Both arms name the same categories in the same order, and `Figure.identity`
+  already carries them. Nothing here is a placement.
+- **The side crosses**, because it is a function of `orientation`, which the figure carries. The
+  gutter holds the identity exactly when the values run along the other axis — which `valueOnX`
+  already computes for the marks, from the same member.
+- **The width does not cross.** `min(cells(widest label), width / 3)` is a cell measurement of a
+  string, and §3aj hazard 4 says a shared layout that calls `cells()` cannot serve the image path.
+  This arm sizes its gutter to **a tenth of the width and not to its content**, deliberately, for a
+  reason already written beside `SVG_DEFAULT_LAYOUT`: sizing to content is what drags metrics back
+  in, and it is affordable here because pixels overflow gracefully and cells do not.
+
+**So this is I63 arriving with a second subject.** *The shared layer states how much room a label has
+and never measures the label* was ruled for `Mark.text.room` — a treemap's tile name — and the
+identity gutter is the same shape one furniture along: the threshold is shared, the outcome is each
+arm's. **No new member.** The strings are `identity`, the side is `orientation`, and the width is
+each arm's own.
+
+**And this is not §3aj.6's answer, which is worth saying because the two look alike.** A tree's
+placement stays per-arm because a `Mark` — a position — would carry one arm's answer and the other
+would fail `U1b`. Here nothing is a position: the identity labels are furniture, drawn beside the
+figure rather than in it, so the arms can differ in gutter width while naming the same things in the
+same order. The disagreement matrix compares the **strings**, and that cell closes.
+
+**The one difference this leaves is legitimate and has no instance yet.** §2's closed list includes
+the font metrics, and *a third of the cells* against *a tenth of the pixels* is exactly that. `AD3`
+asserts no cell claims `legitimate`; this is not a cell, because no decision the matrix measures is
+the gutter's width. The day one is, that is the argument to make.
+
+### 3ak.21 — What a `GlyphRole` determines, measured — and the four things it does not
+
+**F289's claim, checked.** §3ak.3's rung table places *the glyph per `GlyphRole` per unicode rung* in
+"the terminal walker's `Record`". There is no terminal walker and there is no record: the type is read
+in one file, the one that declares it, and the terminal reaches its median, mean and outlier
+characters inside rasterisers that have never heard of it.
+
+**The artefact is a classification table**, because the interaction here is structural — two
+statements that both hold at rest, with no event between them — and the rung ladder already has its
+trace in §3ak.15. What follows is measured at four rungs against `forestRow`, `dumbbellRow`,
+`boxplotBand` and `boxplotColumn`.
+
+| role | terminal | conditioned on | SVG |
+|---|---|---|---|
+| `point` | `●` / `○` | **which of a pair** — a dumbbell's two ends | a circle, told apart by colour |
+| `median` | `├───┤` across the box, `┬ │ ┴` down it | **orientation** | a 2px bar across the slot |
+| `mean` | `◆`, and `◈` where it lands on the median | **coincidence** | a diamond, edged in the furniture tone |
+| `outlier` | `◌` | — | a smaller circle |
+| `cap` | `├`/`┤`, `╷`/`╵`, `╶─┬─╴` | **orientation and which end** | a 1px bar, half the slot |
+| `target` | `◆` | — | a diamond, sized by weight |
+| `absent` | **nothing** | — | nothing |
+
+**1 · A role does not determine a character.** Four of the seven are conditioned on something the role
+does not carry. So `Record<GlyphRole, string>` is not the type the rung table implied — it would force
+one character where the terminal draws two, and the terminal does not move inside a refactor.
+
+**2 · What *is* shared is the **shape**, and both arms have it and neither states it.** `median` and
+`cap` are drawn **across the slot** — `runRow(…)` in the terminal, `across(…)` here, whose own comment
+names *the two roles that are drawn across a slot rather than at a point*. The other five are marks at
+a point. **One partition written twice** is F289's complaint one level down, so it goes up:
+`GLYPH_SHAPE` is character-free, lives beside the type, and both arms read it.
+
+**3 · The ladder has two rungs, not five.** Measured over every slot this family reaches: `full` and
+`bmp` agree on all of them, and **`ascii` and `full/wide` agree on all of them**, because `glyphs()`
+returns the ASCII set for `unicode === "ascii" || ambiguousWidth === "wide"` — C02 I9's ruling. A record
+keyed by the matrix's five capability sets would carry three duplicate columns; one keyed by `unicode`
+alone would be **wrong at `full/wide`**. So the rung lives in the record, as its `caps` argument rather
+than as a column — which is the answer to *do the rungs live in the mapping*, and the answer is yes and
+the mapping is not the one the question assumed.
+
+**4 · `mean` and `target` are one character, so §3ak.13's sentence over-claims.** *What both agree about
+is which of the seven things this is* is false as written: the terminal draws `◆` for both. The collapse
+is **legitimate** and was never stated — measured over the catalogue, the two never share a figure,
+because `distributionFigure` returns from the forest branch before the boxplot branch can add a mean.
+The true claim is co-occurrence-scoped: **two roles that can appear in one figure are drawn differently
+by each arm.** That is falsifiable where seven-and-seven is not, and it is I68.
+
+**Where the record lives, and why not beside `Figure`.** I62 says a mark names a role and never a glyph,
+and this arm has no characters at all — a shared table of `┃` and `◌` would be one arm's alphabet in the
+layer above both. So the **shape** partition is shared and the **alphabet is the terminal's**: `roles.ts`
+holds a `Record<GlyphRole, …>` resolved against `caps`, and `walk` holds a `Record<GlyphRole, (…) => void>`
+of draw closures. **Exhaustive on both sides is what makes an eighth role a compile error twice** — this
+arm's `switch` ended in a `default:` and would have drawn one as a circle, silently.
+
+**And the record has to be *read*, which is the test the eight `block.axes` reads were held to.** Five
+of the seven roles take their character from it; the two spans keep their orientation tables and the
+record says they are spans. Anything more would be a second table nothing consults, which is the
+`GlyphChars` this replaces: eleven slots, **five of them dead, and the dead five were exactly the
+role-named ones** (F298).
+
+### 3ak.22 — `absent` was an accident on both sides, and no fixture constructs it
+
+§3ak.13's table says the terminal draws *a character for nothing was reported*. **It draws nothing**,
+and not by decision: `normalisedSummary` falls `centre` back to `median`, a row with neither has
+`at(undefined)` — `NaN` — and `row[NaN] = mark` sets a property on an array rather than a cell. The two
+arms agree, and one of them agrees by writing to `row.NaN`.
+
+**Measured over the catalogue: of 17 variants that emit a point mark at all, `absent` is emitted by
+none.** An invariant is vacuous until its subject exists, and this one had its subject only in prose —
+which is why four rungs of frame-reading never showed it and a hand-built summary showed it at once.
+
+`forestRow` reads the role's `none` and skips explicitly. **Zero frames move, because nothing in the
+corpus constructed the state** — and that is the finding rather than a caveat on it: the change is
+invisible to every gate this repo has, and the thing it removes is a defect that would have appeared
+the first time a caller passed a row with no estimate.
+
+### 3ak.24 — The degradation pass: width is a question about the alphabet too
+
+**F293's subject, measured rather than argued.** At `ambiguousWidth: "wide"` the catalogue emits
+**27 distinct characters that take two cells** — box drawing, the quadrant blocks, the half blocks —
+across **18 of 178 forms**, into grids that were built and measured in cells. `glyphs()` had already
+fallen the *frame* back to ASCII by then, so a `ridgeline` drew `+------+` around `╭────╮`.
+
+**One row, two alphabets was the visible half. The figure being cut was the larger one.** 174 rows
+carried the truncation marker at that rung — a `contour` reached column 34 of a 60-column terminal
+and showed three of its five rings; a `violin` lost a quarter of its width; a `radar` truncated
+mid-shape. F292 made the rows the width they were measured at, and this is what makes them the
+figure they were measured as.
+
+**The predicate existed and one caller had it.** `arrowsFor` asks `unicode === "ascii" ||
+ambiguousWidth === "wide"`, in the same layer, for the same reason. `glyphForMask` did not — and the
+reason it did not is worth naming: **its `caps` parameter was typed `Pick<TerminalCapabilities,
+"unicode">`**, so the field that decides was not in scope at the point of decision. Widening the type
+made the compiler enumerate the two callers that had narrowed it the same way, which is the trail the
+defect left.
+
+**The two questions, and why collapsing them is right *here* and wrong in general.**
+
+| | asks | answered by |
+|---|---|---|
+| repertoire | can this terminal draw the glyph at all | `unicode` |
+| width | does the glyph take one cell or two | `ambiguousWidth` |
+
+`glyphs()` collapses them because **its whole set is ambiguous** — box drawing, `▌`, `●`, the arrows
+— so both questions have the same answer for every member. `flatAlphabet` is that predicate named, and
+the rule for a caller is *is my vocabulary ambiguous*. **Braille is not**, so `ladderFor("height")`
+answers `wide` by moving to braille rather than to ASCII, and `curve.ts` keeps its dots at every rung.
+A blanket *fall back when wide* would take a curve's resolution away for a width problem it does not
+have.
+
+**The quadrant blocks take the substitution rung rather than a coarser one** (§3ak.18). U+2596–U+259F
+are ambiguous throughout and a shape has no coarser form that is still that shape, so `pie` and
+`radar` are *replaced* at `wide` exactly as they are at `ascii` — a share of a whole, a value per
+axis, drawn as a labelled table.
+
+**What moved, read and classified.** 46 baseline frames, **every one `-wide-`** and nothing at the
+other four rungs, which is the control the mechanism predicts. Rows carrying the truncation marker go
+**174 → 5**, and the five that remain are the ones the marker is for: `graph/crowded` and three
+`tree/overflow-*`, whose *content* overflows rather than whose glyphs do.
+
+**The rung ladder moved four cells and the net was two**, which is the argument for reading a record
+per edge rather than summing it. `graph` went **`same` → `glyph`**: the connectors were unicode at both
+ends of the `24bit → wide` edge, so the rung was doing nothing at all — the defect stated as a
+classification. `ridgeline` and `tree` went **`layout` → `glyph`**: their ink moved because the figure
+was being *truncated*, and now only the vocabulary changes. `pie` went **`glyph` → `layout`**, which is
+§3ak.18's substitution rung and one the classifier cannot separate from a moved coordinate.
+
+**A `same` cell on a capability edge is the one to distrust.** It reads as *this rung does not reach
+this form*, and it can mean *this form does not answer this rung* — which is the whole of F293 in one
+cell, sitting in a committed record through the pass that wrote the record.
+
+**And the rung has not collapsed onto `ascii`, which is the control that matters most.** Rendering
+every variant at width 60 under both sets and stripping colour: **154 of 178 still differ** (14 → 24
+identical, and the ten that joined are monochrome connector figures with no narrower alternative). The
+radar makes it concrete — `⣿` at `wide`, `#` at `ascii`: the substitution's *shape* is shared and the
+*fill* still answers to the repertoire.
+
+---
+
+### 3ak.25 — The other half of I54's width question: which rasteriser, on the form that reimplemented it
+
+§3ak.24 gave the **alphabet** its width arm. This is the **rasteriser** half, and it is the same rule
+arriving at the one form that did not go through the function holding it.
+
+**Measured first, because the claim is about what other forms already do.** Rendered at `24bit` and at
+`wide`, counting braille against box-drawing characters:
+
+| form | 24bit | wide |
+|---|---|---|
+| `density/default` | 189 box, 0 braille | **57 braille**, 0 box |
+| `line/legend-right` | 274 box, 0 braille | **147 braille**, 0 box |
+| `histogram/two-series` | 102 box, 0 braille | **147 braille** |
+| `ridgeline/default` | 353 box | 353 **ascii** — no braille arm exists |
+| `violin/default` | box outline | **ascii** `+--+` |
+
+`styleRasteriser` holds the rule and states it: *how wide is this glyph is what decides whether an
+unstyled curve prefers box drawing to braille.* The violin reimplemented the choice in its own
+`brailleArm` predicate and kept only the repertoire half, so it degraded further than its siblings —
+and a violin's shape is the whole of what it is.
+
+**The first attempt was too broad, and the frames said so before anything was committed.** Widening
+`brailleArm` itself moved **21** frames, and 11 of them were `violin/compact` and `violin/raindrop`,
+where it replaced a *filled* braille density ramp with an outline:
+
+```
+before   ⡀⣀⣀⣄⣤⣦⣶⣷⣿⣷⣶⣦⣤⣄⣀⣀⡀      a filled density, already narrow, already right
+after    ⢀⣀⣀⠤⠤⠤⠒⠒⠉⠉⠉⠒⠒⠤⠤⠤⣀⣀⡀     an outline — a different figure, for no reason
+```
+
+Those rungs reach braille through `ladderFor("density")` at every capability set, so there was nothing
+for a width arm to fix. **The discriminator is neither the form nor the capability: it is whether the
+alternative was box drawing**, and only the `violin` rung's outline is. Scoped to it, 21 → **10**.
+
+**What moved, read.** 10 frames, every one `-wide-`, all five unstyled violin fixtures at two widths.
+No compact rung, no raincloud, no styled variant — `plotStyle: "line"` still means line drawing at
+every rung, exactly as it does in `styleRasteriser`.
+
+**And the control moves the right way**: `wide` against `ascii` at width 60, colour stripped, goes
+**24 → 19 identical of 178**. The alphabet fix brought the two rungs closer where no narrower
+alternative existed; this one pushes them apart again where one does, which is what a ladder with two
+independent questions should look like (F302).
+
+---
+
+### 3ak.23 — The second terminal move: three of five call sites had the ruling
+
+**Extracting the alphabet is what made this findable, and that is the reusable half.** Every mean in
+the tree now comes off one record, so the five renderers that draw one beside a median are five
+expressions naming the same two members — and **three ask about coincidence while two do not**.
+Before the extraction the same duplication was there with nothing to compare against: `gl.diamondTee`
+in one function and `gl.diamond` in another are two glyph lookups, and it takes reading both to see
+that one asks a question the other does not.
+
+`boxOnSpine` already carried the whole reason: *skipping the diamond avoided hiding the median tee,
+which was right, and left a band with no mean mark beside two that had one — so **they coincide** read
+as **it is missing**. A cell holds one glyph, so the glyph names both.* `boxplotColumn` and
+`boxplotBand` had it. `violinColumn`'s inline spine and `boxOnSpineColumn` — the braille arm of the
+same form — did not.
+
+**One frame carries the whole argument**, which is why this is a frame-read and not a diff:
+
+```
+before                                  after
+│ │    ─    │    ╰─┼─╯    │   ◆   │ │   │ │    ─    │    ╰─┼─╯    │   ◆   │ │
+│ ╰╮   │   ╭╯      │      │   ┤   │ │   │ ╰╮   │   ╭╯      │      │   ┤   │ │
+│  ╰╮  ┤  ╭╯       │     ╭╯   │   ╰╮│   │  ╰╮  ◈  ╭╯       │     ╭╯   │   ╰╮│
+```
+
+`violin/vertical` draws three bands. `dose-b`'s mean sits away from its median and says so; `control`
+and `dose-a` said nothing, in the same figure, with no way to read *coincident* from *absent*.
+
+**What moved, read.** 30 baseline frames — `violin-vertical`, `violin-vertical-braille` and
+`violin-vertical-braille-filled` at five capability sets and two widths, and **nothing else**. No
+horizontal violin and no boxplot, which is the control the mechanism predicts: those arms already had
+the ruling.
+
+**Classified rather than eyeballed**: 60 lines changed, **no line gained or lost**, and every changed
+cell is one of two substitutions — `┤ → ◈` 36 times and `+ → X` 24 times, which is the same
+substitution in the two alphabets `glyphs()` has. **One cell per changed line, sixty for sixty.** A
+frame-read that reports *it looks right* is a frame-read that has not been done; a classified diff is
+what says the change is the mechanism and not a side effect of it.
+
+Four golden snapshots move with them, and **`-u` was not used**: each was verified to differ from its
+fresh render by exactly two cells of that same pair before being rewritten. A snapshot records, it
+does not check.
+
+The catalogue's terminal digest moves with it, `d06687b479814a56` → `40ec44bcc4d321ce`, the second
+terminal move of this campaign and the reason it is a commit of its own.
+
+**§3q records the same class on the same family**, and that is the finding rather than a coincidence:
+*a rule that has to be applied N times is applied N−1 times eventually, which is why it is here rather
+than only in the code that got it right.* The shared-axis fix was three instances; this is two. The
+arms are written as transposes of one another, so a fix goes into the one whose frame was being read
+and the transpose keeps the defect — and neither is wrong when read on its own (F301).
+
+---
+
+### 3ak.26 — The proportion family's walk: three compensations, and two of them are not what the plan named
+
+`CALCIUM_SVG_COMPLETION.md` states family 6's subject exactly — **three things the terminal arm
+compensates for that SVG simply does not have**: the cell's 2:1 aspect, the minimum-segment
+threshold, and the dot grid's resolution, each to be *stated as terminal-only rather than ported*.
+
+All three are structural — two rules that hold at rest with no event between them — so the artefact
+is a **classification table** and not a trace (§3ak.4). Measured over the catalogue's nine proportion
+variants at widths 40, 60 and 80, and over `SVG_DEFAULT_LAYOUT`, before anything was written.
+
+| # | the cell | the two rules that meet there | measured | ruling |
+|---|---|---|---|---|
+| 1 | a pie's disc · a radar's rings · a waffle's squares | *positions are normalised and uninverted* (I61) · *aspect compensation is a terminal fact and never crosses* (G2) | the plot area is **524.8 × 275.2 px**, and 396.8 × 275.2 with a right legend — a unit-square figure through `projected` is stretched **1.91×** and **1.44×** across | **the aspect that disappears is not the aspect that decides** — I69 |
+| 2 | a radar's ceiling | *a form whose readings are not on an axis has no value axis* (I60) · `HAS_VALUE_AXIS.radar === false` | `radarCeiling` is `niceAxis({0, top}, 6, {}).range.max`; every vertex is `v / ceiling` and the four rings at 0.2 · 0.4 · 0.6 · 0.8 **are** that scale drawn | the row is right about pie and waffle and **wrong about radar** — `true`, and the pin threaded |
+| 3 | the minimum-segment merge | *the merge is terminal-only* · *`identity` is the list the legend names* | **0 merges in 12 variant·width cells.** `many-segments`' smallest slice is 1% against a 0.82% threshold at height 10 | terminal-only — **and nothing in the corpus can say so** |
+| 4 | a pie's wedge | *a mark carries geometry and never a picture* (§3ak.5's residue ruling) · no mark kind holds an angle | `slicesOf` returns fractions and `fillWedge` spends them as two bounds; a closed `polyline` cannot be read back into them | **widening `Mark` is right here and wrong for the residue** — `arc` |
+| 5 | a pie's legend | *a legend slot names a role, never a glyph* (I62) · the terminal prints `swatch label 65%` | `LegendEntryOf` has four members and `LegendSlot` has four **different** ones; the percent is a formatted string derived from the data — `ValueAxis.labels`' own class | `LegendSlot.value` |
+| 6 | a radar's two name lists | *`identity` is the list the legend names* | the legend names **series** and the ring labels name **categories** | already decided — `categoricalDecisions` sets `identity: block.categories` while its legend names series, and the curve family's rows assert the two differ |
+| 7 | a waffle's square counts | *the square assignment is shared* · `Math.round(v · 100/Σ)` | one variant, `65/25/10`, sums to exactly 100 — so `scale === 1` and the rounding is the identity function | shared — **and nothing in the corpus can say so** either |
+
+**Rows 1 and 2 are the two that change the design.** Rows 3 and 7 change no code and are the reason
+the family's fixtures move. Row 6 was answered before it was asked, which is what a table is for.
+
+#### Finding 1 — a sentence true about the cell, attached to a decision about the box
+
+*The aspect compensation the terminal arm needs **disappears** because an SVG square is square* is
+**true**, and it is about `CELL_ASPECT`. A braille dot is square and a pixel is square, so
+`squareColumns` and `rx = 2·ry` are terminal facts and G2 holds unaltered.
+
+**What does not disappear is `radiusFor`'s `min`** — fitting an isotropic figure into an anisotropic
+box, which the terminal does in dots and the second arm would have to do in pixels. Two different
+quantities, and one was wearing the other's name.
+
+The measurement is what separates them. Every pie and every radar in the catalogue is
+**height-bound at every width**, so `radiusFor`'s `byWidth` arm is dead across the whole corpus — the
+`min` reads as though it were not deciding anything. In the second arm the box is 1.44× wider than
+tall, so a unit square through `projected` is an ellipse, and a waffle's hundred squares come out
+39.7 × 27.5 px. **This is MG24's class arriving in a plan rather than in a rule**: review checks
+whether a justification is true, and this one is.
+
+**So the ruling is a figure member and not an arm's repair.** A figure whose two normalised axes
+carry **one unit** says so, and each arm fits a centred square inside its own box rather than filling
+it — the terminal already, in dots; the second arm in `projected`, which stays the only place in that
+arm reading a figure's directions and now reads three things instead of two. That is I69.
+
+#### Finding 2 — a row with three subjects, and its reason fits two of them
+
+`HAS_VALUE_AXIS` enters the family on one line: *Proportion: an angle, a polygon's radius, a count of
+squares. The reading is a share of a whole, which is not a position on a scale.*
+
+An angle is a share of a whole. A count of squares is a share of a whole. **A polygon's radius is
+not.** `radarCeiling` nices `{min: 0, max: top}` to six ticks and every vertex is `v / ceiling`
+clamped to `[0, 1]`; the value rings at a fifth, two fifths, three fifths and four fifths of the
+radius are that scale, drawn. A radar's reading is a position on a scale by construction, and the
+record says it is not.
+
+**The record's own doc says which question it is answering** — *not whether the terminal draws a
+numeric gutter; that is a different question with a different answer* — and `radar: false` is right
+about the gutter and wrong about the question. F267 is the same defect on the row below, found the
+same way, and neither is carelessness: three forms were bundled and the shared reason is rarely any
+of theirs.
+
+**And the correction exposes a second thing.** `radarCeiling` passes `{}` where every other axis in
+this component passes the block, so a radar's `yMin`, `yMax` and `yFormat` are **read by nothing** —
+an author pinning a radar's ceiling is ignored in silence. `valueAxisOf({min: 0, max: top}, 6, block)`
+is `radarCeiling` with the pin threaded, and it closes both halves in one expression: the record says
+`true` because the figure now carries a `value`, and the `value` honours the pin because it is built
+by the same helper as everyone else's.
+
+#### Findings 3 and 7 — two rules the corpus has never been able to contradict
+
+The minimum-segment merge fired **zero times** in twelve cells. The waffle's rounding ran once, on
+values summing to exactly 100, where it is the identity function. Both rules are correct. **Neither
+has anything to be wrong about in this repository**, which is A03 §2's vacuity class arriving in a
+fixture rather than in a rule: deleting either one moves no frame, and *terminal-only* is a claim a
+green corpus is agreeing with by not asking.
+
+`test/support/README.md` already carries the remedy — *a fixture must be shown to respond to the
+thing under test before it is asserted against* — so the family's fixtures gain the two cases that
+make the claims falsifiable, and the measurements say exactly what those are: `many-segments` at any
+height of 8 or less merges its 1% slices, and any segment list not summing to a hundred leaves
+squares over or drops the last one.
+
+**Row 7's ruling was *shared*, and shared was not the question.** The fixtures were built and the frames read, and the shared function was wrong in both arms at once: `Math.round` per segment, filled greedily against `pos < 100`, gave `over-100`'s `50/50/1` fifty, fifty and **no square at all** for the 1% — `waffle-over-100-24bit-80w.txt` reads `█ Sliver 1%` in its legend beside a mosaic of two colours — and gave `under-100`'s `1/1/1` `33/33/33` with the hundredth square drawn as `surface.border`, a ground the legend does not name. No invariant governed the allocation; the only record of it was this table quoting the formula. **Ruled as I108**: the hundred squares are the largest-remainder allocation of the shares — floors first, the leftover squares one each to the largest remainders, the earlier segment winning a tie — so `50/50/1` is `50/49/1`, `1/1/1` is `34/33/33`, and a square is unowned only when the shares sum to zero. The tie-break is named because it is the one thing the arithmetic leaves open, and the all-zero case gets a fixture (`waffle/all-zero`) because the `scale = 0` arm was the one branch of the function no frame had ever reached. **Reading that fixture found a second thing**: both arms drew three swatches and three names with no reading at all beside a mosaic carrying none of them — `sharesOf` returns nothing for a zero total, so the slot never got a `value`. A zero segment among non-zero ones already reads `0%` with a swatch and no ink, so the all-zero waffle now reads the same. The pie draws `No data.` and refuses for the same list, which is a family disagreement about what a zero total is; it is recorded in the lane's findings and not ruled here.
+
+#### Finding 4 — where widening `Mark` is right, and it is the opposite of the residue
+
+§3ak's residue ruling refuses to widen `Mark` for `contour`, `quiver` and `horizon`, and the reason
+is precise: *what is missing is a derivation above cells* — those forms never separated their
+geometry from their rasterisation, so a new mark kind would be a hole punched for a picture.
+
+**A pie is the inverse of that case.** Its geometry above cells already exists and is already
+separate: `slicesOf` returns fractions of the whole, and `fillWedge` is what spends them on dots. The
+missing thing is not a derivation, it is a **member** — an angle, which no mark kind carries. So the
+same test that refuses three forms admits this one, and the test is *does the form already have a
+coordinate*, never *is the type short of a case*.
+
+`arc` is `{ from, to, radius, fill }` in **turns from twelve o'clock, clockwise** — the terminal's
+`START_ANGLE` and its direction, made explicit because a sign convention that lives in two files is
+a sign convention that ends up different in them. A pie's wedge is `from · to · 1 · filled`; a
+radar's circular ring is `0 · 1 · t · unfilled`. **The polygon ring stays a closed `polyline`**,
+because it is one — a mark kind that both is and is not a polygon is how two arms come to draw two
+figures.
+
+#### What the three findings add to the type
+
+`§3ak.2` sketched it and `§3ak.19` amended it; this is the third amendment, and every member is
+character-free, capability-free and read by both arms.
+
+```ts
+type Mark =
+  | …
+  //  turns from twelve o'clock, CLOCKWISE — the terminal's own START_ANGLE, said out loud
+  | { kind: "arc"; from: number; to: number; radius: number; fill: boolean };
+
+type LegendSlot = Readonly<{
+  role: LegendRole;
+  label: string;
+  ref: ColourRef;
+  seriesIndex?: number;
+  value?: string;        // the reading beside the name — `65%`. A STRING, like ValueAxis.labels
+}>;
+
+type Figure = Readonly<{
+  …
+  isotropic: boolean;    // one unit on both axes: each arm fits a centred SQUARE in its own box
+}>;
+```
+
+**`isotropic` is a boolean and not a ratio**, deliberately. A ratio would be a knob with one live
+value, and `arcDots`' own comment is the precedent: *a knob nothing turns is a knob the next reader
+has to check.* The day a form wants three-by-two, the member widens and every call site is a compile
+error — which is the outcome a premature `number` buys nothing towards.
+
+**`value` is optional and `radar` is why.** `segmentLegend` is called by all three forms and the
+radar passes `""` — it has a swatch and a series name and no reading to put beside them. An empty
+string and *no reading* are the same on the page and different in the record, and F280 is the
+standing instance of an absent case taking its meaning from the only case that had one.
+
+#### Finding 5 — a zero total is one thing, and `sharesOf` is where it is said
+
+**Measured.** An all-zero segment list drew a hundred unowned squares beside `None 0% · Nil 0% ·
+Zero 0%` as a waffle (I108) and *No data.* as a pie — a refusal in the SVG arm, because
+`sharesOf` returned `[]` and a figure with no marks is I64's refusal. One list, one function, two
+answers; the waffle had a mosaic to draw and the pie had no disc, so the first ruling covered the
+waffle alone.
+
+> **The ruling: a zero total is every segment at nought, never an empty list.** `sharesOf` returns
+> each segment with `fraction: 0`; the legend names every one at `0%` in both forms and both arms;
+> the waffle owns no square; the pie draws its rim — the radar's outer ring, an unfilled full turn
+> on the furniture layer — and no wedge. A refusal is for a figure that cannot be drawn (I79), and
+> a list with no segments at all is that; `hasDatum` asks it, and `sharesOf` never did.
+
+**What the arms had to be told.** The terminal's `mergeShares` would have folded every zero share
+into `other` and then dropped it for having no fraction — so a zero total passes through unmerged,
+and `pieRender` draws the rim as a layer with `segmentIndex: -1`, which the definition paints as
+`surface.border`. The ascii ladder lists each segment at `0%` with an empty bar, which is the
+alphabet doing the right thing unasked. `pie/all-zero` is the fixture, and it responds: before the
+ruling its frame read *No data.* and its SVG was `null`.
+
+### 3ak.27 — The derivation's other half: the ruling landed, the module landed, the wiring did not
+
+**§3ak.7 C1 ruled this and F314 found it still true**, which is the finding rather than the
+repetition. The ruling was *the derivation moves into the shared layer, and it is not a refusal*;
+`derive.ts` was created for it, `ecdfSeries` and `densitySeries` moved out of `scatter.ts` and
+`kde.ts`, and I65 was written. Measured at the commit the paired sheet was built from:
+
+| what the ruling asked for | at HEAD |
+|---|---|
+| the derivations are pure and live below both arms | **done** — `derive.ts`, no `cells()`, no capability, 148 lines |
+| the figure describes the block that is **drawn** | **done** — `curveFigure` is a function of whatever it is handed |
+| **a caller hands it the drawn block** | **never landed** — `derive.ts` is imported by `definition.ts` and `kde.ts`, and by nothing on the second arm's side |
+
+**The third row is the whole of the effect**, and the two above it are what made its absence
+invisible. A module in the right layer and a figure with the right shape are both true statements
+about the tree, and neither of them draws a cumulative fraction.
+
+#### The row that covers it supplies its own subject
+
+`FC5 (C12 I65)` is the row written for this ruling. Its comment says *a caller hands over the derived
+block and the figure is about that*, and its body builds one:
+
+```ts
+const drawn = { ...authored, series: authored.series.map((s) => ecdfSeries(s)), yMin: 0, yMax: 1 };
+expect(curveFigure(drawn).extent, "the cumulative fractions").toEqual({ min: 0, max: 1 });
+```
+
+**No caller does what that line does.** The row passes on the day nothing calls the mechanism,
+because it *is* the caller — the seam-level assertion holding while the wiring is absent, which is
+the class the campaign already records for a mechanism tested by calling it directly. A row of this
+shape is verified by mutating the **call site**, and there was no call site to mutate.
+
+#### `histogram` is a third instance, in a family whose walk did not index for it
+
+§3ak.7's artefact was the **curve** family's — nine cells over six forms. `histogram` is
+`SVG_FAMILY: "bar"`: `binValues` counts its samples into an `asBar` block inside the terminal's
+dispatch, exactly as `ecdf` and `density` do, and §3ak.12's bar-family walk has no C1-shaped row.
+So a walk indexed by rule interaction found the class and the *family* bounded it — which is worth
+saying because the remedy for that is not a better walk but running the found class across the other
+families, once, as a sweep.
+
+**The sweep, run before the rule was written.** Ten `{ ...block,` sites in the dispatch table.
+Three derive the series — `ecdf`, `density`, `histogram`. Four default `categories`. One is
+`boxplot`'s range from quartiles, and `quartileRange` already crosses. **No fourth block-level
+derivation exists**, so the list is closed at three rather than left open.
+
+> **I70 — a form whose figure is a derivation of its series computes that derivation above both
+> renderers, and each arm draws the derived block.**
+
+I65 says the derivation happens once, above both arms. **I70 is the half that makes it observable**:
+somebody has to apply it, at each arm's entry, before anything reads the block. The two are not the
+same claim, and holding only the first is precisely the state this section is about.
+
+#### F259's two kinds, because they read alike
+
+**A refusal is for a figure that cannot be drawn.** `ohlc` is a datum this path does not read; a
+non-default `origin` draws the same data upside down. In both, the arm has everything it needs to
+produce a picture and the picture would be *false* — the plausible wrong figure.
+
+**It is not for a figure whose data has not been computed yet.** A histogram of 240 unbinned samples
+is not a form the arm cannot draw; it is the arm drawing the wrong *quantity* because the quantity
+was computed one layer above it, in the other arm. The remedy is to move the derivation, and reaching
+for `null` here costs every form that shares the missing derivation rather than the one in hand.
+
+The two states are told apart by a single question: **is there a pure function of the block that
+produces the datum, and does it already exist?** Where it does, the refusal is unnecessary and
+recording it as owed would record a debt that does not exist.
+
+#### What this does *not* open, measured rather than assumed
+
+**`violin` and `ridgeline` are not opened by moving a call**, and the reason is one line of
+`violinColumn`:
+
+```ts
+for (let r = 0; r < n; r += 1) points.push(hi + pad - ((hi - lo + 2 * pad) * r) / Math.max(1, n - 1));
+```
+
+`n` is `rows`. **The estimate is evaluated at the renderer's row count**, so it is not a function of
+the block alone — where `ecdfSeries` is a function of `values.length`, `densitySeries` fixes its
+resolution at 100, and `binValues` takes a binning rule. Their derivation is a per-category set of
+outlines, which is a family emitter and a walk, not a wiring change.
+
+Family 8 carries the same distinction: `stackBands(series, columns, centred)` folds freely and
+**resamples across `columns`**, so the fold crosses and the resampling does not.
+
+**Stated because the opposite is the natural inference.** Five forms are refused for wanting a
+density and three are fixed by moving a call, and *therefore all five open* is one step that does not
+hold. Two of the five want a different piece of work, and the cheapest moment to know that is before
+the commit that was going to include them.
+
+### 3ak.28 — The record's two missing columns, and the member that cannot exist
+
+**F316 measured two decisions the arms make differently that no cell of the matrix asks about**: the
+matrix family's colour ramp, on every terminal frame and no SVG frame, and the `· N older not shown`
+notice, on four terminal frames and none. `DECISIONS` is
+`numericLabels · identityLabels · border · interiorRules · legend`, and neither is any of them —
+**a rule table is exhaustive over the rules you stated and blind to one you did not.**
+
+`heatmap.legend: "agree"` is what that blindness looks like from inside: both arms report `false`,
+the SVG because it draws no legend and the terminal because **its ramp is coloured spaces** and the
+reader takes stripped text. Two different facts, one cell, and the cell is right about neither.
+
+| column | the terminal | the second arm | disposition |
+|---|---|---|---|
+| `ramp` | a colour bar the ladder descends with the cells (I29) | **0 of 181 frames carry a gradient or `<defs>`** | **open** |
+| `notice` | `· N older not shown` below the seam | never, and never will | **legitimate** |
+
+#### The notice is legitimate, and `drops` is not a member a `Figure` can have
+
+The plan's §2 sketch declared `drops: Readonly<{ hidden: number; notice: string | null }>` and the
+shipped type does not carry it. **The omission is correct and the sketch was wrong**, which is the
+opposite of how it reads:
+
+```ts
+const dropped = Math.max(0, longest - layout.areaWidth);
+```
+
+`longest` is a sample count and `layout.areaWidth` is **cells**. §3aj hazard 3 is *anything measured
+in cells stays in cells*, and `G1`/`G1b` assert the shared layer's side of it by arity — `niceAxis`
+takes three arguments and none is a width, `seriesRange` three and none is a width. A member computed
+from `areaWidth` would put the rendering width inside the object both arms read, which is the one
+property that makes a figure a figure.
+
+**So the difference is a resolution difference and belongs in §2's closed list.** The terminal drops
+leading columns because a cell is a quantum and 100 readings do not fit in 62 of them; the second arm
+scales its 640 px across whatever it is given and has nothing to drop. Recorded as `legitimate`, the
+row asserts *they differ and always will* — and fails the day the SVG grows a drop rule of its own,
+which is the seam leaking the other way and worth a failure.
+
+**The ramp is not legitimate.** A colour bar is a legend entry with a continuous ref rather than a
+discrete one, the terminal's descends the same ladder as its cells, and nothing about an SVG prevents
+one. It is an open disagreement with the second arm owing the work.
+
+#### The ramp reader reads the frame with its colours in it
+
+`terminalDecisions` takes stripped lines, which is right for every column it had — a border, a rule
+and a label all survive stripping. **A ramp does not**: the heatmap's ramp is spaces carrying a
+background colour, so a stripped frame shows the figure as blank, and a reader on `.plain` reports
+`false` for a thing plainly on the page.
+
+This is the sixth instance of a reader calibrated to an encoding nobody wrote, and the fourth on the
+terminal's side. Both readers get a fabricated violation in both directions before either is trusted:
+a frame with a ramp that must read `true`, and one without that must read `false`.
+
+### 3ak.29 — The residue's walk: what crosses when a derivation's output is geometry
+
+Three forms have been refused for the length of the pass, and `SVG_FAMILY` carries each refusal's
+condition **as a symbol** rather than as a mood:
+
+> **`contourFigure`, returning normalised marks with no `areaWidth`, no `areaRows`, no `caps` and no
+> string in the signature.** The day it exists these are `"matrix"`.
+
+> **`horizonFigure`, taking a block and returning normalised marks with no `areaWidth`, no
+> `areaRows` and no `caps`.** The day it exists this is `"bar"`.
+
+That is the deferral discipline working exactly as written — a condition stated as a symbol is one
+the next reader can grep, and both of these are correct. **The prose around them is not**, in three
+separate ways, and no two were found by the same instrument.
+
+#### 8a · The artefact is a table, because the residue's rule interactions are structural
+
+A trace finds rules that meet because something happened in between; these three forms have no
+events. What they have is **a form, a layer set and a channel**, all three holding at rest — so the
+artefact is a classification table, indexed by the pairs where two rules could claim the same mark.
+
+| form · condition | rule A | rule B | the cell |
+|---|---|---|---|
+| `contour` · `["field","contour"]` | a field cell is a `rect` carrying a `value` (I63) | an iso-line is a `polyline` | both, the line over the cells — draw order is the layer order |
+| `contour` · `["contour"]` | `paintsField` is membership, never position (I51) | the levels come from the field's range | **the cells are not drawn and the range is still the field's** — `contourLevels` reads a range, not the marks |
+| `contour` · `levels: [25,50,75,500]` | a declared level wins over a derived one | a level outside the range crosses nothing | named in the legend, drawn nowhere — and the legend is text, so it crosses |
+| `quiver` · no scalar series | the field under a quiver is the vectors' magnitude (I50) | an arrow's colour **is** its magnitude (I50) | **the same datum twice**, so the second yields — the zero-contrast measurement, already in the tree |
+| `quiver` · `["field","contour","quiver"]` | the field is `series` | the arrow's colour is the magnitude | **both channels live, and this is the only variant of six where they do** |
+| `contour`/`quiver` · `fieldDim` · `glyphInk` | a glyph and its ground share a cell (I51) | a stroke sits over a fill | **no shared quantum, so neither remedy has a subject** — §3ak.26's class, a resolution limit on a form that has no resolution |
+| `horizon` · `height > 1` | the rows below the top of a band are full (I52) | the top row carries the remainder | one quantity, and rows are how a raster spends it |
+| `horizon` · below `CONTINUOUS_FLOOR` | depth rides colour where colour can carry it | the glyph carries depth where it cannot (§3z ruling 4 arm A) | a colour-depth fork, so it stays terminal |
+
+**Four of the eight rows are cells no row of the suite could have held**, because a refused form has
+nothing to disagree about. That is F321's measurement arriving as a method rather than as a repair:
+a `silent` cell records nothing, so a refusal is a place the arm **and** the instrument both go
+unchecked.
+
+#### The list I70 closed at three was closed by a file
+
+I70's evidence reads *closed at three by a sweep of the ten sites in the dispatch that reshape a
+block*. The sweep ran, and its ten sites are real. **Its corpus was `definition.ts`**, and the class
+is a *shape* — `Plot → Plot`, no width, no capability — which `heatmapFormRows` holds three more of,
+one file along:
+
+| site | what it derives | who reads it |
+|---|---|---|
+| `fieldAxes` | row labels and a three-point `xLabels` from the grid's own domain | the terminal |
+| `calendarRows` | `calendarGrid(unit, start, values)` — a date grid from one series | the terminal |
+| the quiver's field | `magnitudeSeries(vectors)`, where the caller named no scalar | the terminal |
+
+**Two of the three are the reason two `SVG_FAMILY` entries are `null`.** `calendar`'s is filed under
+*its own domain: a date grid* — and a date grid **is** the derivation; once it has run, a calendar is
+a matrix at a different column count, which is what `IS_MATRIX` already says. `quiver`'s field does
+not exist at all until the substitution runs, so the arm was refusing a form for want of data the
+block does not carry and a pure function thirty lines away does.
+
+So a sweep bounded by a file left the second arm refusing two forms for a transform that was already
+written, already pure, and in the file next to the one that had just moved. **F322**, and it is the
+same shape as the rule it falsifies: *index by what the thing is, not by where it lives.*
+
+#### An arrow's colour is its magnitude, and no mark that can be an arrow carries one
+
+`SVG_FAMILY`'s own entry rules the residue's marks:
+
+> an iso-line is a `polyline` and an arrow is a `polyline` plus a `closed` triangle, **so nothing in
+> `Mark` is missing.**
+
+True about **shapes**, and silent about **channels** — MG24's class again, a correct sentence
+attached to a decision it does not constrain. I50 says an arrow's colour *is* its magnitude.
+`Mark.rect` carries `value`; `polyline` does not, and `Drawn` carries `ref` and `seriesIndex`, both
+categorical slots. So the arrow that crosses is the right shape with its only data channel dropped,
+and the sentence reads as coverage because it answers the question it asked.
+
+**The remedy is the member, not a mark kind** — which is the test `Mark`'s own doc states: *does the
+form already have a coordinate*, never *is the type short of a case*. A quiver has one, the grid;
+`value` is the established way a reading crosses where the mark's appearance is the datum, and it
+reaches a second kind rather than creating one. **F323**.
+
+**Measured: the channel is live on one variant of six.** Five quiver variants carry no scalar series,
+so the field *is* the magnitude and the terminal deliberately leaves the arrow uncoloured. A reader
+over the corpus would have found agreement on five frames and disagreement on the one nobody drew —
+which is the probe-at-the-extremes rule arriving on a colour channel.
+
+#### What crosses is the geometry, and what stays is the raster
+
+This is the residue's difference from I70's three, and it matters because **the same gate does not
+prove the same thing.**
+
+`ecdfSeries`, `densitySeries` and `binValues` return **series**, so the terminal reads back exactly
+what the second arm reads, and 1810 frames did not move. A contour's derivation returns **geometry**:
+crossings interpolated between adjacent readings, which exist on the data's own grid and nowhere
+else. A glyph-per-cell rasteriser cannot draw them — it resamples the field onto the cells it has and
+marches again, and `glyphForMask` wants a mask per cell that no set of segments can supply.
+
+So the terminal keeps its resampling, and that is rasterisation rather than a second derivation:
+marching squares over the data's grid is what the reference implementation draws, and the terminal's
+finer grid is the same iso-line at the resolution a cell affords. The same split runs through the
+other two — `horizonGrid`'s `within` is the geometry and its `eighths` is the raster, one line apart
+in the same function; `quiverRows`' vector is the geometry and its glyph is the raster.
+
+**The consequence for the gate inverts, and it is worth saying out loud.** For I70's three an unmoved
+terminal baseline *was* the proof the extraction was faithful. Here the terminal never reads the
+shared geometry back, so an unmoved baseline proves only that nothing was disturbed. **The frame is
+the only instrument that can say the two arms draw the same figure** — the fourth time this pass that
+has been the answer, and the first time it is true by construction rather than by accident.
+
+#### What building it moved, and none of it was the geometry
+
+The two conditions were right and the geometry landed as written. **Four things around them did not.**
+
+**The family is `"field"` and the record predicted `"matrix"`.** That prediction is about
+resemblance, and the member decides **which emitter**: `matrixFigure` emits cells and nothing else,
+so a contour routed through it draws a heatmap with the lines missing and reports as supported — the
+plausible wrong figure a `null` arm refuses and a wrong family would not.
+
+**`HAS_VALUE_AXIS` was `true` for both, and the sentence that made it true is about the ordinate.**
+*A field is sampled over a domain, so its columns are positions and its rows are a scale* — true, and
+the record's own doc says it answers whether the **readings** sit on a value scale. Measured on the
+frame: a contour's readings are on the **ramp legend**, `1.5  99 · 20 40 60 80`, exactly where a
+heatmap's are, and its y gutter reads `0 1 2 3 4 5`, which `fieldAxes` writes into `identity`. So it
+is the matrix family's answer, reached by the matrix family's argument. **FV1 could not have caught
+it**: it skips every form marked `true`, which is the refusal-hides-the-instrument shape on a record
+cell rather than on a reader.
+
+**A matrix's row names were on the wrong axis, on ten frames that had been drawing all along**
+(F325). Two mechanisms each borrowed for a question it does not answer — `figure.orientation`, which
+a matrix sets to `ORIENTATION_UNUSED`, and `ROW_IS_AN_IDENTITY`, which answers *does each row get its
+own palette slot*. A matrix has the placeholder **and** no value axis, so the identity fell to the
+*else* and five row names were drawn evenly along a ninety-column figure. The missing condition is
+that **a family with no value axis has an identity that indexes rows**.
+
+**And the second arm's reader classified a label by `clip-path`** (F326) — *a clipped label names a
+thing; an unclipped one names a value*, a true observation about the tiles and nodes families
+promoted to the rule that classifies every label the arm draws. It held until a form's row captions
+were numbers. Removing it closed **27 cells and opened none**.
+
+**The residue's own cells, and both open ones have a named cause.** `ramp` is F316's column on a
+family that has always had a key; `numericLabels` is the terminal reader's stated limit — its x-row
+scan is gated on a bottom rule and a field draws none, so its numeric set is the gutter's six where
+the second arm's is the axis's three, and both arms draw both axes. Widening the boundary to *the
+last edge-bearing line* was measured and rejected: it moves cells in both directions across five
+other forms, which is a different reader rather than a repair.
+
+#### And the horizon, whose split is one line of one loop
+
+`horizonGrid` computed `within` — the fraction of a band — and then, on the next statement, spent it
+on `eighths`. **That statement is the line between the geometry and the raster**, and it is why this
+form had no coordinate to share rather than a hard one: nobody had drawn the line, so the whole loop
+read as rasterisation.
+
+```
+within      a fraction of a band, and of nothing else            the figure's
+eighths     how many of a cell's eight sub-rows that buys        the raster's
+```
+
+**The family it named was `"bar"` and it is its own**, on `contour`'s correction one form along. *A
+folded band is a `rect` with a `value`* is right about the mark and wrong about the emitter:
+`barFigure` reads `categoricalDecisions`, insets each rect into a categorical slot and anchors it on
+a niced value axis, and a horizon has none of the three.
+
+**The frame agrees to three figures.** The terminal's first column of `horizon/bands-3` draws one
+full row and four eighths of the next — 1.5 of 3, so `within` is 0.500 — and the second arm draws
+137.672 px of 275.2. And `signed` uses **six** fills where `bands-3` uses three, which is the mirror
+taking both halves of a diverging map (I52) shown rather than asserted.
+
+**One defect in the new arm, and a row found it rather than a frame.** `within` was unclamped, so a
+sample outside the caller's pin landed in the deepest band with `scaled − band > 1` — *how far into
+the band* exceeding the band, and a rect taller than its own plot area. The terminal never showed it
+because `horizonGrid` takes `min(h · 8, …)` a line later, which is the raster quietly repairing the
+geometry. `G6`'s clamp row is what asked.
+
+### 3ak.30 — Which ramp, which is a figure decision two sentences agreed was not
+
+**A correlation matrix is drawn coolwarm by the terminal and viridis by the second arm** (F324), and
+the terminal's own table says why that matters: *a correlation runs −1 → 0 → +1 and wants a diverging
+map, and reading it in a sequential one is the single most common chart defect there is.* The arm
+draws the defect the table exists to prevent, on the form it was written for.
+
+```
+correlation   terminal   #3b4cc0 #8db0fe #dddddd #f49a7b #b40426     diverging
+              SVG        #440154 #3b528b #21918d #5dc863 #fde725     sequential
+utilisation   terminal   inferno            SVG   viridis
+heatmap       both       viridis                                     agree
+```
+
+`DEFAULT_COLORMAP` is a `Record<PlotForm, ColormapName | null>` in `heatmap.ts` — a **terminal
+renderer** — and the second arm's whole ramp decision is `COLORMAPS[block.colormap ?? "viridis"]`.
+
+**This is F322's class arriving on something that is not a derivation.** A `Plot → Plot` transform
+and a lookup keyed by form are different shapes; what makes them one finding is that both are
+*decisions the figure needs, held by an arm*. So the sweep the class is owed is not over transforms
+either — it is over **anything a renderer decides that is a property of the figure**, and the test is
+whether the other arm would have to reach into this file to agree.
+
+#### The pair of sentences, because neither is wrong on its own
+
+| where | what it says | why it does not hold |
+|---|---|---|
+| `Mark.rect.value` | *each arm turns it into a colour at its own depth — `colormapFor` in the terminal, `continuousColour` in SVG, **one ramp either way*** | there is no one ramp: one side reads a per-form table and the other a literal |
+| the SVG walk's header | *the form is read twice below and both are **rasterisation**: which polyline joint a step takes, and **which ramp a matrix reads*** | the **depth** is rasterisation — `continuousColour(map, t, caps)`. *Which* map varies by **form**, and a form is not a resolution |
+
+Read the first and the ramp is shared, so the second's exception is a detail. Read the second and
+reading the form is licensed, so the first is aspirational rather than false. **Each sentence
+supplies the other's alibi**, and a reader checking statements one at a time agrees with both — which
+is A03 §2's argument arriving on a *pair* rather than on a rule.
+
+**And the second is MG24's class in its sharper form.** *Both are rasterisation* is a true-sounding
+classification attached to a decision it does not fit, and it does not merely fail to constrain that
+decision — it licenses exactly what it should have forbidden. The walk's own rule is *nothing here
+reads the form to decide what is drawn*, and the sentence excusing the exception is what broke it.
+
+#### The remedy is a member, and the member is a name
+
+`Figure.ramp` carries the colormap's **name**, unresolved — `LegendSlot.ref`'s pattern one member
+along, for the same reason: a resolved colour must not cross the seam (I62), and a name resolves at
+each arm's own depth. `RAMP_DEFAULT` moves to the shared layer beside `HAS_VALUE_AXIS`, which is
+already a `Record<PlotForm, …>` answering a figure question, and `colormapFor` reads it from there.
+
+**Two SVG frames move and no terminal frame does**, which is the direction that says the table was
+right and the guess was wrong.
+
+### 3ak.31 — `candlestick`: a refusal for a datum nobody read, and the two are not the same thing
+
+**F259's refusal is for a figure that cannot be drawn; this was a figure whose data had not been
+read**, and §3ak.29 already names the difference. The record says so precisely and reads as though it
+does not:
+
+> `ohlc` is the candles' own data and **nothing here reads it**. A `line` with
+> `plotStyle: "candlestick"` therefore took the curve arm, found `series: []` — which is legal
+> precisely because plain candles are the ordinary case (C04 I57) — and drew **a fully furnished
+> plot with an axis running 0 to 1** while the terminal drew three candles over 8 to 16.
+
+Every clause is true and the remedy in it is *read the datum*, not *refuse the block*. The refusal
+was the right thing to do on the day it was written, when reading it meant work nobody had done —
+and by the time it was checked, **the work was done and the refusal was not**:
+
+| what the marks needed | where it already was |
+|---|---|
+| a range over the bars | `positionalDecisions` → `seriesRange(block.series, block, candlesOf(block))`, since §3ak.7 C6 |
+| a legend that names them | `legendSlots` → `{ role: "rising", ref: "tone.ok" }` and `falling`, since the same commit |
+| a body and a wick | `Mark.rect` and `Mark.polyline`, since the type existed |
+
+**Two marks, and the body takes the bar's device.** A rect with no `depth`, no `value` and
+`layer: "series"` is inset by `SLOT_SHARE` at each arm's own resolution — `candleWidth`'s `per − 1`
+in cells, three fifths of a slot in pixels — which is `boxplotColumn`'s argument one form along: two
+rising candles that touch draw one six-cell body and not two three-cell ones. The wick is not inset,
+so it runs through the body's centre at any width, and a doji is a body of no height that each arm
+floors at its own smallest unit.
+
+**Read on the frame.** `line/candlestick` gives 32 wicks — 20 in `tone.ok` and 12 in `tone.error` —
+against a gutter of 95 … 125, which is the terminal's gutter; the legend's two swatches carry the
+same two refs as the candles they name. `candlestick-overlay` adds a **third** ink, the moving
+average in slot 0, drawn over them.
+
+**The two rows that asserted the refusal now assert what it protected**, which is the point of
+inverting rather than deleting: `G8a` measured *an axis running 0 to 1* and now measures that the
+axis covers the candles' 8 … 16; `G8b` measured *ticks 11 to 12 against data spanning 8 to 16* and
+now measures that the average and its candles share one range. **A deleted row takes its measurement
+with it**, and those two are the only record of what the wrong frame looked like.
+
+**And the declarations came back as dead the moment the arm drew.** `pair-catalogue`'s four `ohlc`
+rows were reported by name — which is what comparing a declaration list **by equality** buys, and
+what a subset check would have left sitting there (F310).
+
+### 3ak.32 — `calendar`: family 8's first form, and the derivation is the whole of it
+
+`SVG_FAMILY`'s reason was *its own domain: a date grid*, filed with `gantt`, `timeline` and `funnel`.
+**A date grid is not a domain this arm cannot reach; it is a `Plot → Plot` transform that lived in a
+terminal renderer** — `calendarRows`, moved by F322 — and once it has run the block is seven weekday
+rows of week columns with the dates in their labels. That is a matrix at a different column count,
+which `IS_MATRIX` has recorded all along.
+
+So the entry is `"matrix"` and the emitter is unchanged. **Six frames, and no new code**: the arm
+draws because the derivation crossed, which is F322's value landing two commits after its extraction.
+
+**Read on the frame.** `calendar/default` gives `Mon Tue Wed Thu Fri Sat Sun` down the gutter, one
+per band, which is the terminal's gutter exactly — and it is F325's placement fix that put them
+there rather than evenly along a fifty-four-column x axis.
+
+**Two open cells and one is F318's, on a third form.** `ramp` is F316's column. `notice` is
+*legitimate*: a calendar drops leading columns because a cell is a quantum and 365 days do not fit in
+62 of them, where this arm scales its 640 px across whatever it is given — and `identityLabels` 3/12
+is that same drop read through another column, because the terminal's notice names the dates it
+withheld.
+
+**And `PR1`'s floor came down with `G7`'s.** *The corpus has refusals to partition — `> 50`* was a
+number this pass has moved from 77 to 45 in eight commits, and a bound that has to be edited every
+time a form lands says nothing when it is. The floor is `> 0`, and the day it reaches zero the arm
+claims every frame and the row says so first (F310).
+
+### 3ak.33 — Family 8's aggregating three, and the fold needed no second implementation
+
+`SVG_FAMILY` filed `waterfall`, `streamgraph` and `stackedarea` together with one reason:
+
+> *Cumulative*: the coordinate is a running total, so **a sample's position is not a function of its
+> own value.**
+
+**True, and it is a statement about a sample where the test is about the block.** `drawnBlock`'s
+requirement — and I70's — is that the derivation be a function of *the block*, which a cumulative
+fold is by construction. The reason describes exactly the property that makes these three F314's
+subject, and files them as though it made them impossible.
+
+#### One function, two resolutions
+
+`stackBands(series, columns, centred)` takes a column count, and **passing the data's own length
+makes its resampler the identity** — so the fold crosses at native resolution with no second
+implementation, and the terminal keeps calling it with `areaWidth`. That is I71 arriving somewhere
+it costs nothing: the geometry and the raster are the same function at two arguments.
+
+**It also removes a hazard nothing was watching.** `stackBands` resamples *then* sums; a
+hand-written fold in the figure would sum *then* resample, and for series of unequal length those
+are different numbers. The two arms would have agreed on every fixture in the corpus, because every
+stacked fixture has series of one length.
+
+#### The axis is the fold's, and the pin still wins
+
+`seriesRange` over the inputs answers *how big is one band*; what a gutter must cover is *how big
+are they stacked*. So both emitters pin the block to their own fold's range before asking for
+decisions — `{ ...block, yMin: block.yMin ?? span.min, … }` — which keeps the caller's pin winning
+on the precedent every other family sets, and reuses the axis machinery rather than copying it.
+
+**`waterfall` zero-anchors and `stackedarea` does not**, because the first reaches
+`categoricalDecisions`: *a bar's length is its value, so signed data grows both ways from zero*
+(F272). Zero is where a running total starts, so the anchor is right here rather than tolerated —
+and `G6`'s arm asserts the two floors separately with that reason attached, which is the only thing
+that stops the difference reading as a defect later.
+
+#### `Mark.polyline` gains a `fill`, and it serves a second form already
+
+A stacked band is a **quantity** and the eye reads its thickness; an outline leaves the reader
+integrating two curves, which is `stack.ts`' own argument for filling in the terminal. `arc` and
+`rect` both carry an explicit `fill`, so this is the type's convention on a third kind rather than
+`closed` quietly meaning two things.
+
+**Measured while adding it: `line/confidence` draws one stroked path in this arm and a filled band
+in the terminal** — the same missing mechanism, on a variant of a form that has been claimed
+throughout. Recorded rather than fixed here, because a confidence band is the curve family's
+business and this section is family 8's.
+
+#### Read on the frame
+
+`waterfall/default`'s five bars land at `x = 89.6 w = 396.8`, `327.68 / 158.72`, `228.48 / 99.2`,
+`188.8 / 39.68`, `89.6 / 99.2` — full width, then a short bar at the right, then middle-right, then
+middle, then back to the left. That is the terminal's frame proportion for proportion, and it is the
+running baseline crossing rather than being recomputed.
+
+### 3ak.34 — Family 8's residue, and three value axes nobody had ever drawn
+
+Five forms are left — `gantt`, `funnel`, `slope`, `timeline`, `bullet` — and the step opens with a
+check rather than a build: was §3ak.33's ruling **applied**, or **re-derived**? The answer is the
+second, and it is worth more than the forms.
+
+#### The fold was copied, and the copy had to settle a disagreement the original has with itself
+
+`definition.ts`'s `waterfall` walks its series **twice** — once for the bounds, once for the bars —
+and the two walks do not agree. The bounds walk reads `s.values[i] ?? 0`, so a total with no reading
+resets the running sum to zero; the drawing walk guards the advance with `if (v !== null)`, so the
+same total holds it. `waterfallFigure` walks a third time and follows the bounds walk.
+
+**Measured**, on `values: [50, null, 30]` against `totals: [false, true, false]`:
+
+```
+terminal   row C is one cell at the right edge     bar 50 → 80, both ends clamped to an axis of 0 … 50
+figure     row C is a rect from 0 to 30            three fifths of the row, from the origin
+```
+
+That is not a rasterisation difference. And the terminal's own row is internally impossible — a bar
+whose far end is outside its own axis — which is only reachable because two walks inside one
+function disagree about what a null total does.
+
+**No fixture has a null, so every gate is green and stays green.** I71's stated blind spot arriving
+on a form that has already crossed: an unmoved baseline is evidence that nothing was disturbed and
+not evidence that the arms agree.
+
+**The remedy is `stackBands`' shape rather than `drawnBlock`'s.** This fold returns bars and a range,
+not a block, so it is not I70's subject — it goes beside the other cumulative fold in `stack.ts`,
+which both arms already import, and neither arm gains an edge. **The convention is the drawing
+walk's**: a null is *no reading*, and no reading cannot move a running total. One walk also makes the
+bounds agree with the bars by construction, which is the property the three walks could not have.
+
+#### Three value axes, and every one of them would have been drawn wrong
+
+`HAS_VALUE_AXIS` marked all five `true`. Every cell had been silent since the forms were refused, and
+asking what each figure's axis would be **against what its marks need** separates them three to two:
+
+| form | the axis the record would draw | what the marks are placed on |
+|---|---|---|
+| `gantt` | `0 … 5`, from `seriesRange` over the **durations** | `0 … 11`, the span from the earliest start to the latest end |
+| `funnel` | `0 … 1000` | a **width**, `v / max`, centred — neither end of a bar is its reading |
+| `bullet` | `0 … 100`, niced from the series' max of 72 | `0 … 100`, `0 … 60`, `0 … 40` — **one scale per row** |
+| `timeline` | `0 … 50` | `0 … 41`, the raw extent the terminal rasterises against |
+| `slope` | `10 … 40` | the same, over every value and not only the two drawn |
+
+**`gantt` is the ordinary repair**: the extent is derived from the wrong quantity, and the fix is
+`waterfallFigure`'s pin — the block carries the fold's own range before decisions are asked for.
+
+**`funnel` and `bullet` are the class**, and it is new. A `Figure` has **one** `value`, so a form
+whose marks need more than one range, or none, cannot have a true one — and marking it `true`
+produces exactly the confidently-wrong axis this record was created to stop. A funnel's readings are
+**shares**, which is the proportion family's reason one family along; a bullet's rows are three
+quantities in three units, and putting them on one axis is the thing a bullet chart exists not to do.
+
+**§3q does not reach `bullet`, and a reader applying it would break the form.** *A categorical
+distribution form scales every band to one axis* is scoped by purpose in its own words — *comparing
+the categories is the whole of what a violin, a raincloud or a ridgeline is for* — and comparing a
+revenue in pounds against a churn in percent is not what a bullet is for. The per-row scale is the
+design, not the defect.
+
+**The reason was already written down, in the renderer that draws it**: *the bands say what good is,
+so a reader needs no legend and no second glance at a dial.* A record cell said the opposite, in a
+different file, and nothing compared them — F327's shape at its third instance.
+
+#### `timeline` is the honest one, and its repair is F210's
+
+Its events **are** positions on a shared scale, so the record's `true` stands. What does not is the
+range: the terminal places against the raw `0 … 41` and the figure's axis nices to `0 … 50`, so marks
+and labels would come from two ranges again. Pinned, like the fold's, and then there is one.
+
+#### `slope`'s refusal reason is wrong, and its fixture cannot show it
+
+> *a slope's two positions are on **two axes***
+
+Measured, the terminal draws `curveRows` over a two-value series on **one** value axis with two x
+positions — the curve family exactly, which the 24-bit frame shows as three two-point curves between
+a `10 … 40` gutter and a `0.0 … 1.0` scale. The refusal reason describes a chart this component does
+not draw.
+
+**And the derivation is post-range, which is the one thing that keeps it out of `drawnBlock`.**
+`positionalForm` takes its decisions from the **authored** block and the rasteriser takes the
+endpoints, so the axis covers every value and the marks cover two. Deriving in `drawnBlock` would
+narrow the axis — a change to the terminal, in a case no fixture has.
+
+**Every `slope` series in the corpus has exactly two values**, so `ends` is the identity and the
+form's one distinguishing operation is invisible in every frame. A claimed form whose only fixture is
+degenerate is claimed on no evidence, which is `G7b`'s argument one level up — so a
+`slope/three-points` variant lands with the arm, and it is what separates `slope` from `line`.
+
+#### `gantt` and `funnel` drew, and reading the pair found what the arithmetic could not
+
+Both agree with the terminal proportion for proportion, checked on the numbers first: `gantt`'s four
+tasks land at `89.6 / 180.364`, `269.964 / 108.218`, `378.182 / 72.145`, `450.327 / 36.073` against a
+plot area of `89.6 … 486.4`, which is `0 … 5`, `5 … 8`, `8 … 10`, `10 … 11` of eleven; `funnel`'s four
+stages are centred at shares `1`, `0.4`, `0.2`, `0.08`, and the terminal's `pad` is `21`, `28` and
+`32` cells of seventy.
+
+**And the picture disagreed anyway.** The terminal draws each task in its own colour and this arm
+drew all four in one — which is F331, and the same frame shows `waterfall` doing it, a form that
+shipped in §3ak.33 with its frame read. **What was read then was the geometry, and the geometry was
+right.** `categoricalForm`'s `own = ROW_IS_AN_IDENTITY[block.form] ? i : 0` is the rule, `i` is the
+**row**, and for every form but the timeline a row is a category; every emitter passed the series
+index. Eight frames moved when `rowSlot` landed, and `histogram` and `autocorrelation` did not.
+
+**`gantt` joins `span` and `funnel` does not**, and the reason is I73's. A task and a running-total
+step are the same rect between two values, so they share an emitter and part only at the extent — a
+running total starts at zero and a project starts on its first day, which is `categoricalDecisions`'
+second form branch. A funnel's bar is `v / max` wide and **centred**, so its two ends are
+`(1 ∓ share) / 2` and neither is the reading: no shared axis can carry it, which is `value: null` and
+its own emitter.
+
+#### A reading with no ramp, which is the bullet's bands
+
+The terminal draws all of a bullet row — bands, measure and target — in **one** colour, measured off
+the frame as `rgb(230,159,0)` throughout, and varies only the glyph: `●` for the measure, `⠖` and `⠶`
+for the bands. So the band's ordinal is the datum and the ink is the raster.
+
+`Mark.rect.value` is that member already, and the walk drops it when `Figure.ramp` is `null` —
+correct for every mark that has one today, all of which are on a ramp, and silent for the first one
+that is not. **A reading with no ramp is density on the mark's own slot**, which is what the terminal
+does and what this arm can do with an opacity. Not a ramp entry for `bullet`: `FV1c` forbids a form
+from having both, with no exceptions, and it is right — a bullet's *readings* are on its rows'
+scales, and only its *furniture* is on a ladder.
+
+---
+### 3ak.35 — `slope`, `timeline`, `bullet`: three axes, and one of them was labelling a domain that is not drawn
+
+#### The fixture came first, and it is F331's lesson one commit old
+
+Every `slope` series in the corpus had exactly **two** values, so *take the first reading and the
+last* was the identity on every frame — a slope chart with two points **is** a line chart with two
+points. A frame read against that checks the thing that is already correct, which is what §3ak.33
+did to `waterfall`'s colours.
+
+`slope/six-readings` is three series of six quarterly readings, with `south` dipping to 9 and `east`
+peaking at 41 **between** the two columns that are drawn. Rendered against the arm as it stood:
+
+```
+50 ┤                                                                   │ █ north
+40 ┤                                                           ⣀⣀⣀⠤⠤⠤⠒⠒│ █ east
+   └─┬─────┬─────┬──────┬─────┬──────┬──────┬─────┬──────┬─────┬─────┬─┘
+    0.0   0.5   1.0    1.5   2.0    2.5    3.0   3.5    4.0   4.5   5.0
+```
+
+**The position axis reads `0.0 … 5.0` and the figure draws two points.** Five intervals of labelled
+domain, no readings in any of them, and three straight lines crossing the whole width — a reader
+takes the intermediate positions for data. The value axis is `0 … 50`, which covers the 9 and the 41
+that **nothing draws**.
+
+#### A derivation below a form's own decisions is I70's defect one arm smaller
+
+`positionalForm(block, …)` takes its decisions from the block it is handed and hands each series to
+the rasteriser, which is where `slope` takes its two ends. So the axis describes the **authored**
+block and the marks describe the **derived** one, inside a single renderer, and no second arm is
+needed to make the two disagree. That is I74.
+
+**So `drawnBlock` is the right home after all**, and the earlier ruling — *the derivation is
+post-range, which is the one thing that keeps it out of `drawnBlock`* — was reasoning from the
+current behaviour to the rule. It preserved a defect exactly. What made the difference is the
+fixture: with two-value series the two readings of *where does the derivation go* are
+indistinguishable, and the convenient input shape is the degenerate one.
+
+`slope/default` is byte-identical after the move, because there `ends` **is** the identity. Only the
+variant built to show the derivation moves, and it moves to `0.0 … 1.0` over `10 … 40`.
+
+#### And the pair found a gate keyed on the wrong record
+
+`slope/six-readings` agrees on every line — north 12 → 38, south 31 → 14, east 22 → 27, one value
+axis of `10 … 40`, the crossing where the ranking changes. What it does **not** agree on is the
+position axis: the terminal reads `0.0 … 1.0` and this arm reads `north south east`.
+
+The gate is `ROW_IS_AN_IDENTITY[block.form] || svgFamilyOf(block.form) === "field"`, and that record
+answers *does each row get its own palette slot*. **The comment beside it says so** — about the field
+family, because F325 added that exception and left the borrowing. It is `true` for the curve family,
+so the gate excluded nothing there, and every curve document has been captioning its series names
+along the position axis.
+
+**The sentence next to it is true and constrains nothing.** *A curve's identity is its series, which
+the terminal names in the legend and never in the gutter* — correct, and the fall-through draws them
+along **x**, which is neither the gutter nor the legend. MG24's class, in the comment that records
+having fixed this once already.
+
+**`HAS_POSITION_AXIS` is the record for this question**: an identity is captioned along an axis
+exactly where the identity **is** that axis. 51 frames move and every one is curve-family;
+`identityLabels` closes for `density`, `ecdf`, `scatter` and `step`, and `line` goes from **54/78 to
+13/78**. F333.
+
+#### `timeline` is F210's rule, and the pin is the whole of it
+
+Its events are positions on a shared scale, so the record's `true` stands and its rows are **series**
+rather than categories — I38's one exception, and `refFor` in the terminal already says so. What did
+not stand is the range: the terminal places against the raw `0 … 41` and `axisOver` nices to
+`0 … 50`, so marks and labels would come from two ranges. The block carries the fold's own range
+before decisions are asked for, exactly as the `span` family does.
+
+#### `bullet` has no value axis, and its bands are a reading with no ramp
+
+Three rows, three quartile summaries, three scales — `0 … 100`, `0 … 60`, `0 … 40` — so there is no
+one range and I73 answers `value: null`. **§3q does not reach it**: *comparing the categories is the
+whole of what a violin, a raincloud or a ridgeline is for*, and comparing a revenue in pounds against
+a churn in percent is what a bullet chart exists not to do.
+
+**Measured off the painted frame, the whole row is one colour.** `rgb(230,159,0)` for the bands, the
+measure and the target alike; only the glyph varies — `●` for the measure, `⠖` and `⠶` for the two
+bands the measure does not cover, `│` for the target. So the band's **ordinal** is the datum and how
+much ink it becomes is the raster, which is I71 on a channel rather than on a geometry.
+
+`Mark.rect.value` is that member and the walk drops it when `Figure.ramp` is `null` — correct for
+every mark that had one, all of which are on a ramp, and silent for the first that is not. **A
+reading with no ramp is density on the mark's own slot.** Not a `RAMP_DEFAULT` entry for `bullet`:
+`FV1c` forbids a form from having both and it is right, because a bullet's *readings* are on its
+rows' scales and only its *furniture* is on a ladder.
+
+---
+### 3ak.36 — The facets, which are whatever their children are
+
+`smallmultiples` and `pairplot` recurse into `plotToSvg`, so they draw exactly what their children
+draw — **and they inherit every refusal a child has.** A facet holding a `violin` holds a form this
+path computes no density for. The campaign's last structural question is what a composition does
+about that, and it is a decision rather than a consequence.
+
+#### The terminal has already answered, twice
+
+`smallMultiplesRows` renders each child through `formRows[f.form]` and falls back to `[]` — **a
+column of nothing rather than a composition of nothing**. That branch is dead in the terminal, since
+`FORM_ROWS` is total; the one beside it is live, and it states the principle:
+
+> *A facet with no row at this index contributes blanks rather than nothing: a short facet must not
+> pull the ones after it leftwards.*
+
+**A column belongs to a facet by position, not by content.** So: a refused child leaves its column
+empty and its siblings draw. Nothing is dropped — C12 I8 is about a facet that loses its place, and
+this one keeps its width and its offset — and nothing plausible-but-wrong is drawn, which is what
+F259 refuses. The parent refuses only when **no** child draws, and that is I64 rather than a new
+rule: a document with nothing on it is refused wherever it comes from.
+
+**`U11` constructs the state, because no fixture has it.** Both facet fixtures hold four drawable
+children, so the decision is invisible in every frame the corpus produces.
+
+#### `facetWidths` is called, not copied
+
+The terminal's divider distributes the remainder rather than dropping it — three columns of
+`floor(80 / 3)` leave two blank at the right edge — and the same arithmetic in pixels gives the same
+split, which is what makes the two compositions comparable at all. 640 over three is `214, 213, 213`,
+and `U11` asserts against the function rather than against `width / 3` for exactly that reason.
+
+#### Two things the recursion needed that a leaf does not
+
+**Each child's id is made unique.** A child's clip paths are keyed `i{id}-{n}` and `o{id}-{n}`, so
+two facets sharing an id would share a clip. The terminal has no such hazard: its facets compose
+*rows* and carry no identifiers at all.
+
+**The gutter is a share and the text in it is not** (I63). This arm sizes the gutter to a fraction of
+the width, deliberately, because it has no metrics — and a quarter-width column gets a quarter-width
+gutter while the labels stay 12px. Read on the frame: `100` came out as `.00`, clipped at the child's
+own left edge, in all four columns. The gutter that must hold text is **absolute**, so the share is
+scaled by `parentWidth / childWidth` to keep it the width it would have had.
+
+#### And the builder cannot construct them
+
+`b.plot`'s spec declares 48 of `Plot`'s 58 members, and `facets` is one of eight that are missing —
+with `offsets`, `totals`, `layout`, `binning`, `xScale` and `yScale`. So **six forms in the public
+union have no builder that can construct them**: `gantt`, `waterfall`, `smallmultiples`, `pairplot`,
+a grouped `bar`, and a `histogram` with a chosen strategy. It is a compile error rather than a silent
+drop, which is the good direction — and `FigureBuilder.setFacets` exists one file along, so one
+builder can and the other cannot. F335, and it is C24's rather than this component's.
+
+---
+### 3ak.37 — The colour key, and the three readers that saw a gradient's own coordinates
+
+F316's `ramp` column read *the terminal draws a key on every pair of eleven forms and this arm draws
+none on any* — **0 of 181** — and the reason was never a missing decision. `Figure.ramp` has named
+the map since I72 and `Figure.extent` the two readings it runs between; what was missing is
+furniture.
+
+#### Continuous where the reading is, discrete where the data is
+
+The terminal draws **eight** swatches for a matrix because it has eight cells. That is a resolution,
+so this arm's own resolution is a **gradient**. A horizon's key is **three swatches for three bands**
+— and that is not a resolution: `horizonBandT` quantises the reading, so a gradient there would claim
+a continuity the figure has not got. I71 on a key rather than on a geometry.
+
+**Bracketed by its bounds**, which is §3's own rule — *the swatch is a key to a scale the range
+names, and a key with no scale beside it is decoration* — and the terminal's shape.
+
+**Every `ramp` cell closes**, including `horizon`'s. Its `8/10` was the reader's floor:
+`terminalRamp` wants three adjacent swatches and `bands-2`'s key has two. This arm draws one swatch
+per band, so it is under the same floor for the form's own reason, and both arms read `false`
+together where they used to differ.
+
+#### One thing, one column
+
+Drawing the key opened `numericLabels` on six forms, because the key's own bounds are `<text>` and
+the SVG reader counted them — where the terminal's reader excludes them by construction, its seam
+being the bottom border. Measured on a heatmap: `[]` against `["0.19", "100"]`.
+
+`svgRampBounds` excludes them, on `svgLegendNames`' own device one shape along — adjacency in
+document order, a text, the bar, a text. **A key's bounds are measured in the `ramp` column**, and
+counting them twice is measuring one thing twice.
+
+#### `heatmap.legend` agrees, and it took measuring to know why
+
+The cell to distrust: the reader's own note says it reads `agree` because *the SVG has none and the
+terminal's ramp is coloured spaces and the reader took stripped text* — a cell agreeing for two
+different reasons, which is F297's shape. **Measured over the corpus: 74 frames draw a key and report
+`legend: false`, and zero carry a coloured-space swatch beside a name.** There is no legend the scan
+is missing. A key is bracketed by **readings**; a legend is a swatch and a **name**. Different marks,
+different questions, a column each. `AD11` asserts all four directions including the blind spot the
+corpus has no instance of.
+
+#### Three readers saw the gradient's own coordinates
+
+Each read an attribute of the `<defs>` as if it were a mark, and each is a different instrument:
+
+| reader | what it saw | why it is not that |
+|---|---|---|
+| `SS37` | `stop-color=` | `\b` matches at the `c`, because `-` is a non-word character; an SVG attribute is not an Ink prop |
+| `TC5` | `fill="url(#rheatmap)"` | a reference, not a colour — so it is **followed** to the stops rather than skipped |
+| `G6` | `x2="1"` | a gradient's `x1`/`x2` are object-bounding-box coordinates, not page positions |
+
+**Each fix is narrower than the obvious one.** `SS37` takes a lookbehind rather than a file
+exemption, because allowing `svg.ts` would blind the rule in the file most likely to grow a real
+`color=`. `TC5` follows the reference rather than dropping it, because a skipped attribute would let
+a whole ramp of foreign colours through unchecked. `G6` strips `<defs>` rather than filtering the
+value `1`, because a `1` that *is* a page position is what the row exists to catch.
+
+#### And `violin` and `ridgeline` keep their refusal, on a reason that moved
+
+The recorded reason — *their datum is `series` and this path computes no density* — is true and is
+**not the blocker**. A density can be computed above both arms; `densitySeries` already is, for the
+`density` form, at a resolution the shared layer chooses.
+
+**What blocks it is where the resolution comes from.** `violinRows`, the default orientation's arm,
+takes `areaWidth` and evaluates the estimate at **one point per cell** — `const w = Math.max(1,
+Math.floor(areaWidth))`, then a point per `i < w`. That width is the terminal's runtime columns,
+which C12 may not read outside `lifecycle.ts` and which this arm has no analogue for. A shared curve
+would be sampled somewhere else and resampling it to `w` is not the same numbers.
+
+**F314 found three derivations computed in a renderer that never reached the seam, and a KDE is that
+shape** — which is why this was checked rather than assumed. The difference is that those three are
+resolution-free: `ecdfSeries` is a function of `values.length`, `densitySeries` takes its 100 as an
+argument, `binValues` bins. This one is not. `G1c` states it as a signature, by arity, so the day
+`violinRows` stops taking a width the row fails and the refusal is re-read.
+
+**Re-read: the refusal is gone, and `G1c` had already said so.** `SVG_FAMILY` reads
+`violin: "density", ridgeline: "density"` and `densityFigure` computes the outline from
+`densitySeries` at its fixed resolution, above both arms — exactly the escape the paragraph above
+ruled out, and F383 took it. **The row was inverted with the fix rather than left standing**: it
+keeps the arity assertion as a *control*, because the terminal arm is still width-bound and a
+regression reaching for `areaWidth` in the shared layer must fail, and it adds the two claims that
+matter — the family is claimed, and the figure's path has the **same point count at two output
+widths**. A width-bound estimate gives more samples at the wider one; a fixed-resolution one gives
+the same curve drawn larger.
+
+**The paragraph above is the record of a pass, and it is left as written.** What it says was true
+when the pass ran, and the sentence *the day `violinRows` stops taking a width the row fails*
+describes an expiry the fix did not use: the curve stopped depending on the width without
+`violinRows` losing it. **An expiry watching the wrong symbol is not a stale guard where the row
+was re-read anyway** — and the first draft of this note called `G1c` stale on the strength of its
+doc comment, which is the claim-with-no-record class turned on a test (F403).
+
+**`plotFill` is the half that was genuinely outstanding.** I80's stated blind spot reads *it has
+nowhere to be read until `violin` draws*; the family drew and the second arm went on filling
+unconditionally, so a member read by one arm on a form both arms render — I75's collision, not a
+dependency. `densityFigure` now fills on `plotFill === "solid"`, which is the terminal's own test
+at all four of its sites and makes the arms agree on **every** value including absent: C04 I59
+refuses `solid` beside `plotStyle: "line"`, so a terminal violin's default is a stroked outline.
+`violin/braille` and `violin/braille-filled` differ in exactly this field and drew byte-identical
+documents here; they no longer do.
+
+---
+
+### 3ak.38 — A key that names its bounds and not its readings, and the invariant it was already under
+
+The paired sheet, resampled across all 182. The terminal's contour key reads `1.5  █████  99 · 20 40
+60 80` and this arm's reads `1.5 █████ 99`. **The levels are the readings the lines are**, and a
+contour key without them is a legend that does not say what its figure means.
+
+#### It is not an uncovered case — it is I49's second arm
+
+I49 has said *levels are named in the legend and never on the line* since §3y, and the sentence is
+about **a legend** rather than about a terminal. It reads as satisfied because the arm that has the
+feature satisfies it, and nothing asks the arm that does not. That is D13's class — a terminal
+feature the second arm was never given — arriving *under an invariant that already forbids it*, on a
+form that landed after D13 closed.
+
+**The derivation had crossed and the third caller was missing.** `contourLevels` is `figure.ts`'s and
+pure; it is what the terminal's key calls **and** what `contourFigure` marches for its crossings. So
+the levels the key names and the levels the lines are come from one function already — in one arm.
+This arm called it for the lines and not for the key: commitment 65 with furniture as the subject
+rather than a block.
+
+#### The `ramp` column is a presence question, and a key can be present and say less
+
+`ramp` is a boolean: *is a colour key drawn*. It closed on eleven forms in §3ak.37 and it is blind by
+construction to what the key says. **Both arms drew a key, both reported `true`, and one of them
+named six readings while the other named two.**
+
+So the instance closes with a column and not with a frame. **`keyReadings`** is the readings a key
+names, in reading order, on both arms: the terminal's are the numeric tokens of the row `terminalRamp`
+matched with the withheld clause cut out — that is `notice`'s subject, and counting it here would
+measure one thing twice — and this arm's are the numeric tokens of every text on the key's
+**baseline**.
+
+**Geometric, not adjacent**, which is F297's own ruling one reader along. `svgRampBounds` found the
+bounds by document order — a text, the bar, a text — so a third text after the second falls outside
+the match and anything drawn between them breaks it. The baseline is `y + height` of the bar the
+reader already locates, and **every text on it belongs to the key**.
+
+#### Where the levels go, and it is the terminal's shape for this arm's own reason
+
+There is no second row to put them on. `box.bottom` is `height · (1 − gutter)` = **288**, the
+abscissa's baseline is **300**, the key's is **316.8**, and the viewBox ends at **320** — 3.2 px. So
+the run trails the upper bound on the key's own baseline: what the terminal does because it has one
+row, and what this arm does because it has one row's worth of room. The arms agree about the shape
+and neither copied it.
+
+**A level outside the range is still named and has no place on the bar.** `contour/levels` declares
+`[25, 50, 75, 500]` over a field of `1.5 … 99`. The terminal names all four — dropping the fourth
+makes an empty area indistinguishable from a constant field — and this arm names all four for the
+same reason. Nothing is drawn at 500 in either.
+
+#### Three rulings the build made, each of which falsified something written above
+
+**The caption is one function, gated on the layer and on the list** (F340). The list crossed and the
+*string around it* did not, which is how one arm came to name its levels and the other not — so
+`levelCaption` is what both keys call. Two conditions live in it and both were wrong before:
+
+- **Empty.** A constant field has no interior ticks, so the terminal drew `50          50 ·` — a mark
+  announcing a list with nothing after it, on ten frames. Found by the second arm reproducing the
+  construction faithfully, which is the only way a defect in the first arm surfaces from this work.
+- **The gate is the *layer*.** Both arms asked `form === "contour"`, and `layersOf` is what decides
+  whether iso-lines are drawn: `quiver`'s `with-contour` variant marches the same `contourLevels` and
+  named none of them. A strict superset, so the widening reaches exactly the fixture that was wrong.
+  Dropping the gate altogether — the first attempt — gave **250** matrix frames levels for lines they
+  do not draw, and the terminal baseline named all 250 before anything was committed.
+
+**A key's floor and a ramp's floor are two questions** (F338). `ramp` asks *is a colour ramp drawn*,
+and three adjacent swatches is what reads as a progression rather than as two blocks — a two-band
+`horizon` key is **discrete**, and §3ak.37 records both arms answering `false` for that reason.
+Whether a text *belongs to the key* is the other question, and a two-swatch key is still a key. One
+implementation and one named parameter on each arm, with the floors matching across the seam:
+collapsing them into a single finder re-opened `horizon.numericLabels` at 2/10 with nothing wrong.
+
+**A count is not a reading, and the key row carries two of them.** `100 · 56 older not shown` is a
+bound and a column count; `0.0038 100 3 bands` is two bounds and a band count. Neither sits on the
+value scale, and the second arm says the band count in its own medium — one swatch per band. Cut by
+name rather than filtered, because a bare `56` has a reading's shape.
+
+#### The column found its own class again before the commit closed
+
+**`horizon`'s key was drawn by a formula the figure does not use** (F341). It ramped `i / (bands − 1)`
+across the bands; the figure draws `horizonBandT`, which is `0.5 + sign · depth / 2` on a diverging
+map because **the two halves are the two directions**. So the key advertised a cold end and a grey
+centre that appear nowhere in the figure, and only the deepest band agreed:
+
+| | key, before | figure and terminal key |
+|---|---|---|
+| band 0 | `#3b4cc0` | `#f7b89c` |
+| band 1 | `#dddddd` | `#e8755c` |
+| band 2 | `#b40426` | `#b40426` |
+
+**A signed horizon compounds it**: the figure has `2n` bands and the key drew `n`, and it named no
+fold — `-50 ▮▮▮ 50` where the terminal draws `-50 ▮▮▮ 0 ▮▮▮ 50`. The baseline is the one reading a
+horizon is *about*, which is `keyReadings`' subject exactly.
+
+**Two instruments, two halves, and neither reaches the other's.** The missing `0` came from
+`keyReadings` on the commit that added it. The colours came from **reading the diff of a regeneration
+made for a different reason** — no column of the record measures a swatch's fill, and none should,
+because a colour that matches is what `svg-baseline` is for.
+
+---
+
+### 3ak.39 — Two forms drawing one picture, and the instrument that counts them
+
+`bar/stacked` and `bar/normalised` differ in one block field and produce **the same bytes**:
+
+```
+test/golden/svg-baseline/bar-stacked.svg      ef00e027b0d2c0eb6e638834180670c9
+test/golden/svg-baseline/bar-normalised.svg   ef00e027b0d2c0eb6e638834180670c9
+```
+
+`layout: "overlap" | "grouped" | "stacked" | "normalised"` is read at `definition.ts:2265` and nowhere
+else in the renderer. The terminal draws three figures — bars side by side, bars cumulated, bars
+cumulated to a shared full width — and this arm draws grouped for all three. **A stacked bar is not a
+normalised bar**, and a reader given one for the other is misinformed rather than shown a different
+idiom.
+
+#### `layout` selects a figure, so it crosses as the marks and needs no member
+
+The seam's rule is *decisions cross, ink is each arm's*, and the question a new field asks is which of
+the two it is. `layout` changes **which marks exist** — four rects per category stacked end to end, or
+eight side by side — and it changes nothing about how a rect is inked. So it crosses as `Figure.marks`
+and `Figure` grows nothing. That is the cheapest possible answer and it is available only because the
+marks are in the figure's own normalised space; a member would have been needed had the arms been
+handed rectangles in cells and pixels.
+
+**And the fold is already across the seam.** `stackBands` was extracted for §3ak.33's cumulative three
+and takes a column count precisely so each arm can call it at its own resolution — pass the category
+count and its resampler is the identity, which is what `stackedFigure` does with the sample count.
+A stacked bar is a **fourth consumer**, not a fourth implementation, and the doc comment forty lines
+below `barFigure` says *one fold, three consumers* while sitting in the same file as the form that
+makes it four. **A count of consumers goes stale in the file that holds it.**
+
+**A category's total is the last band's upper bound**, so `normalised` needs no second walk either: it
+is the same bands divided by `bands[n − 1].upper[i]`, and its axis is the fraction `0 … 1`.
+
+#### The axis is the one thing that had to move as well as the marks
+
+I73's rule — *a form has a value axis only where one range carries every mark* — decides this, and the
+stacked figure's marks span the **totals**. Today the axis reads `0 10 20 30` from `seriesRange` over
+the individual values while `bar/stacked`'s tallest column is `25 + 12 = 37`, so a correctly stacked
+bar drawn against the current axis runs past the end of its own scale. `stackedFigure`'s precedent is
+followed exactly: `stackRange` pinned through `yMin`/`yMax` so an author's own bounds still win.
+
+**The terminal's fraction is unniced and stays that way.** `stackedBarRow` scales `w / totalMax` on the
+raw 37 where the figure takes the niced 40, which is the third range this family has carried since
+F272b and which `barFigure`'s own header already records: the horizontal arm's value scale is
+*invisible rather than absent*, because its gutter holds categories and there is no label for the
+fraction to disagree with. Landing the figure on the niced range is F210 applied; correcting the
+terminal is a separate change with its own moved frames.
+
+#### The instrument: a collision is a dropped field, and the corpus counts them (I75)
+
+**No column of the disagreement record can see this.** Both arms draw the same labels, the same legend,
+the same border, the same count of everything — they draw *the same document*, which is the strongest
+possible agreement and here means a field reached one of them. The record is indexed by decision and
+this is a decision that was never made twice.
+
+What sees it is byte-identity between two baselines whose blocks are not equal. Measured over all 182,
+with the catalogue's header line — which names the variant — stripped, because it makes every terminal
+frame distinct by construction and would have made the control vacuous:
+
+| | distinct documents | collisions |
+|---|---|---|
+| terminal, 24-bit | 175 of 182 | 7 |
+| this arm | 125 of 182 | 57 |
+
+The empty document accounts for 32 of the second arm's and 3 of the terminal's: a refused form and a
+form with no data both draw it, and both are correct. **Past it: 25 for this arm and 4 for the
+terminal** — and the terminal's 4 are all *also* the second arm's, which is the sweep's sharpest
+result. **A collision both arms have is a fixture defect; a collision one arm has is a seam defect.**
+Twenty-one belong to this arm alone.
+
+| field | variants | disposition |
+|---|---|---|
+| `layout` | `bar/stacked · bar/normalised` | **closed here** |
+| `yCallout` | `line/callout-{both,last,name}` | **crossed** — `calloutOf`, the strings cross and the rung does not (I81, §3ak.47); this row said *owed* after it was paid |
+| `plotCorners` | `line/corners-sharp` | **refused, with a measurement** — §3ak.46's *seventy-nine corners from three turns*: staircase steps, not turns, so a sharp corner has no subject here |
+| `matrixAnchor` | `calendar/day-stretch` | owed a ruling — **and not a refusal**, which F346 said it was |
+| `annotations.fill` | `line/confidence{,-unfilled}` | **closed** — I109. The collision was never the member's: the whole `confidence` kind was dropped by `annotationMarks`, so `fill` had nothing to be read against |
+| `plotStyle` | `contour/style-line`, `pie/solid` | owed a ruling |
+| `fieldDim`, `glyphInk` | `contour/*`, `quiver/*` | **ruled** — §3y's per-cell remedies, `floor` and `contrast`, inert below the floor (I51); this row cited §3ak.26, the proportion family's walk, which has no such remedy |
+| `height` | `tree/overflow-*`, `horizon/folded-1x3`, `pie/*` | **legitimate** — a row count, and F318's `notice` |
+| `width`, `align` | `line/size-{left,centre,right}` | **legitimate** — the block's place in the document, not the plot's figure |
+| `cursor` | `line/cursor-candles` | the candles' refusal, recorded |
+| `pointLabels` | `scatter/point-labels` | **terminal-only by ruling** (I55's blind spot, §3ag) — the strings and the flip are owed to the second arm as `pointLabelMarks`, unbuilt; the free-cell pass never crosses |
+
+**Its blind spot, stated because a corpus-shaped instrument has one.** A collision needs two variants
+differing in **one** field, so the sweep names a field only where the corpus happens to isolate it.
+`aspect`, `axisCross`, `plotBox`, `lower` and `upper` are each read by one arm and appear
+nowhere above — not because they cross, but because nothing in the corpus varies them alone. The sweep
+is a lower bound on the drop and an exact count of the pictures.
+
+#### Two fixtures whose names state a claim their block does not make
+
+The four collisions **both** arms have are all of one kind, and none of them is about a renderer:
+
+- **`line/legend-right` is byte-identical to `line/multi-series`** — the same three series, the same
+  height, and `legend` **undefined**. A variant named for a placement declares none.
+- **`heatmap/palette` sets `colormap: "viridis"`**, which is `rampOf`'s answer for `heatmap` already.
+  A variant named for a field pins it to the value it already had.
+- **`histogram/default` and `histogram/scott`** draw the same bins, so `binning` is exercised by a
+  fixture that cannot separate two strategies. I66's own blind spot, one field along: *a fixture that
+  cannot answer reads exactly like one that answered well.*
+- **`slope/default` and `slope/six-readings` are the one legitimate case**, and it is legitimate
+  *because* of I74: six readings whose first and last are the two of `slope/default` must draw the
+  same figure, so the identity is the proof the derivation crossed. Recorded so a later sweep does not
+  read it as the other three.
+
+**Three of four are fixtures asserting nothing, and all three were invisible to every gate.** A golden
+frame records what a fixture produced; it cannot ask whether the fixture varies what its name says.
+
+#### A negative reading in a stacked bar takes the whole block down
+
+Found by asking what the shared fold's rule is for a value the bar row has no rule for at all.
+`stackBands` clamps — `v === null || !Number.isFinite(v) ? 0 : Math.max(0, v)` — and `stackedBarRow`
+does `?? 0` and nothing else, so a negative fill reaches `String.prototype.repeat` with a negative
+count:
+
+```
+plot "p": form "bar", layout "stacked", series [[10, 20], [-4, 5]]
+  → ▲ plot failed to render: Invalid count value: -8
+```
+
+Both layouts, and the registry catches it into an ERROR block — so the reader is told the plot failed
+rather than shown a wrong picture, which is the good half. **The rule exists and the second
+implementation of the fold does not have it**, which is F329's class arriving as a crash rather than a
+disagreement. The clamp is extracted so there is one rule and not two, and the rounding stays each
+arm's.
+
+---
+
+### 3ak.40 — `axes: false` reaches one resolver of two, and I67 already said it gates three
+
+```ts
+export function positionAxisOf(block: Pick<Plot, "axes" | "form" | "xLabels">): boolean {
+  return block.xLabels !== undefined || (block.axes === true && HAS_POSITION_AXIS[block.form]);
+}
+export function valueLabelsOf(block: Pick<Plot, "yAxis">): "left" | "right" | "both" | null {
+  const y = block.yAxis ?? "left";
+  return y === false ? null : y;
+}
+```
+
+Forty lines apart in this file. **One reads `axes` and the other does not**, so `axes: false` silences
+the position axis, the frame and the gutter, and says nothing to the value labels: the figure reports
+`valueLabels: "left"` and this arm draws them. Measured — `line/minimal`, `scatter/minimal` and
+`step/minimal` each draw `["0", "5"]` down the left of a figure whose terminal frame has no furniture
+at all.
+
+#### It is I67 unimplemented, and the type had already ruled it
+
+I67 says *`axes` gates three things and each carries a per-form override*. Three are named — `gutter`,
+`positionAxis`, `valueLabels` — and the third resolver cannot see the field. And `yAxis`'s own doc in
+`types.ts` states the ruling from the other side: **`false` removes the labels and keeps the frame and
+the x axis, which is what `axes: false` cannot say on its own.** That sentence is true only if
+`axes: false` removes all three; it is the reason `yAxis: false` exists as a separate field, and it was
+written before either resolver was.
+
+**So no new invariant, and that is the finding's shape.** A rule naming three subjects is checked
+against whichever one the reader looks at first, and two of the three obey it. This is the citation
+class one level up: not a reference mistaken for a disposition, but a rule whose *subject is a set*
+being confirmed by a member.
+
+#### Why no reader could have found it, and why the terminal looks right
+
+`svg.ts` consumes `figure.valueLabels` exactly as written — the arm is not what is wrong. And a `Pick`
+is what a reviewer reads as *the inputs this decision depends on*, so a resolver that lists one field
+where the decision has two reads as deliberate rather than as an omission.
+
+**The terminal is right by a second mechanism, which is what hid it.** It draws value labels from
+`layout.labelColumn`, and `bandLayout` gets no gutter at all when `axes: false` — so the labels are
+suppressed downstream of the decision rather than by it. **A decision enforced twice in one arm and
+once in the shared layer is not enforced in the shared layer**, and the arm holding the redundancy is
+the one that looks correct. The repair is in the resolver, so no terminal frame moves and three of this
+arm's do.
+
+**An explicit `yAxis` does not override it.** `positionAxisOf`'s `xLabels !== undefined` escape looks
+like the precedent for one, and it is not: `xLabels` is *content* — three captions the author wrote —
+where `yAxis` is a *placement* for labels the figure derives. `axes` says whether there is any
+furniture, so `axes: false, yAxis: "right"` asks for a side of an axis that is not drawn, which is
+exactly why `xTitle` is refused under `axes: false` rather than honoured.
+
+#### Two rulings the build made
+
+**The class is `axes !== true`, and the default is where it is reachable** (F347). The finding named
+`axes: false` and the corpus has three of those; a block that says nothing gets the same answer from
+`frameOf`, `gutterOf` and `positionAxisOf`, and it is the commonest call there is. Measured on a bare
+`b.plot({ form: "line", series })`: the terminal draws three rows of curve with no furniture and this
+arm drew `0 2 4 6` down its left. Six frames move rather than three — the three `minimal` variants and
+three `sparkline`s — and `sparkline` closes to `agree`.
+
+**And the override is the matrix family, which `gutterOf` had keyed on one form of it** (F352). Written
+without an override at all, the rule took `utilisation/default`'s row labels off the terminal — the one
+frame of 182 that moved, and I67's named exception arriving as a failure. `gutterOf` was where to copy
+the override from, and reading the two side by side is what showed that its copy says
+`block.form === "heatmap"` where the other says `IS_MATRIX`. `heatmap/default` sets `axes: true`, so
+the clause written for it is the one case that never needed it, and the second arm was drawing a matrix
+with **no row labels** while the terminal drew four. **C04 found the same narrowness on the same form**
+and repaired it with `IS_MATRIX`; the copy one file along kept the form name, because neither reads as
+wrong from where the other sits.
+
+---
+
+### 3ak.41 — A clip contains and does not communicate, and the premise it was chosen under named its own trigger
+
+```
+terminal   boxplot/default    sepal_length ┤ …   petal_length ┤ …      all four, in full
+SVG        boxplot-default    text-anchor="end" x="83.6"  →  starts at x ≈ −2.8, clipped at 0
+                              petal_length renders as `betal_length`
+```
+
+**A cut head is a different word.** A tail cut reads as truncation and a head cut reads as a name,
+and nothing on the page says anything was removed — so the reader is not shown less, they are shown
+something else.
+
+#### The sentence that licensed it is true and is about a different question
+
+`SVG_FONT_SIZE`'s own doc: *it sizes nothing: the label places itself, so this is the glyph height and
+never an input to a layout (§3aj hazard 4).* Both halves hold. `text-anchor="end"` really does place a
+right-aligned label with no width, which is the whole of what hazard 4 asked for.
+
+**Placement and containment are two questions**, and the sentence answers the first while sitting
+above a decision about the second. That is F84's class — *a correct sentence justifying the wrong
+decision survives being read carefully* — and it is why review agreed: the justification is checked
+for truth, and this one is true.
+
+#### §3ak.20's premise, and it wrote down what would falsify it
+
+> This arm sizes its gutter to **a tenth of the width and not to its content**, deliberately … sizing
+> to content is what drags metrics back in, and **it is affordable here because pixels overflow
+> gracefully and cells do not**.
+>
+> The one difference this leaves is legitimate and has no instance yet … **The day one is, that is the
+> argument to make.**
+
+They do not overflow gracefully. The instance is `boxplot/default` and the argument is this section.
+
+**What that ruling forbids is untouched.** It forbids `min(cells(widest), width / 3)` in a *shared*
+layout, because `cells()` cannot serve the image path — hazard 4, and still true. `SVG_EM` is not
+shared, does not call `cells()`, and measures nothing in the terminal's units: it is the arm sizing
+its own furniture in its own units, which §3ak.20 says in as many words is each arm's business. **No
+new member and no shared metric** — the strings are `identity`, the side is `orientation`, and the
+width is still each arm's own.
+
+#### Grown, capped, and cut at the tail past the cap
+
+`bandLayout`'s shape in pixels — `min(widest · em, width / 3)` — with two decisions of its own:
+
+- **Grown and never shrunk.** The tenth stays the floor. It was chosen deliberately and the only
+  thing measured against it is the overflow; a rule that also narrowed would move every guttered
+  frame in the corpus on the strength of a case that was fine.
+- **The cut is at the tail and marked**, which is `truncate` in the other arm. It has **no instance
+  in the corpus** — the longest identity string is twelve characters and a third of 640 is 213 px —
+  and it is written because the defect is *an unmarked cut at the head*, which a forty-character
+  label reaches whatever the gutter is. Close the class, not the instance.
+
+**The clip stays**, as belt to the estimate's braces: the estimate decides where to cut, the
+rectangle guarantees nothing escapes the gutter if the estimate is wrong about a font.
+
+**And the value labels had no clip at all.** They are `end`-anchored on the left by the same code
+shape, so a long one ran off the viewBox — the same head-first loss with nothing catching it. One
+rule, both.
+
+#### A label taller than the box it names, which is the same rule across the text rather than along it
+
+`graph/crowded` is 14 ranks in `height: 7`. The terminal draws three and says `+11 more · service-14 ·
+service-01 · …`; this arm draws all fourteen at `275.2 / 14 = 9.83 px` a rank and writes every label at
+`SVG_FONT_SIZE = 12` — **every glyph taller than the box it names**, ascending into the rank above and
+descending into the one below, both of which it does not name.
+
+**It qualifies F318's `legitimate` row rather than overturning it.** *This arm scales its box across
+whatever it is given and has nothing to drop* is true; what it did instead, past a rank count, was draw
+something no reader can use. Scaling is what the medium affords, it drops nothing, and `notice` stays a
+legitimate difference rather than becoming a disagreement the record has to open.
+
+**No floor on the size.** A rank too short to read is too short at any size, and the clip already stops
+a label leaving its box — a floor would be a policy invented for a case nobody has measured, which is
+the other half of *close the class, not the instance*: the class is the overflow, and a legibility
+threshold is a different claim.
+
+**So the rule has two axes and one shape.** A label overflows **along** its text direction or
+**across** it: along, it is cut at the tail and marked; across, it is scaled to the box. Both are the
+arm containing what the shared layer declined to measure, which is I63's other half.
+
+---
+
+### 3ak.42 — `seriesIndex` is the colour slot, so it cannot also be the shape
+
+`dumbbell/default` is two series — `start` and `end` — over four categories.
+
+```
+terminal   4 inks, one per row: 230;159;0 · 86;180;233 · 60;191;154 · 240;228;66
+           shape: ● at the near end, ○ at the far one
+SVG        2 inks, one per series: #e69f00 ×4 · #56b4e9 ×4
+           shape: ● and ●; the connector #626262, the rule's grey
+```
+
+**The terminal spends colour on the row and shape on the end**, which is I29's *one datum, one
+channel*: the pair is the datum and the end is a shape. This arm spends colour on the end and grey on
+the row, so nothing says which row is which and the shape channel says nothing at all.
+
+#### The member says one thing and one arm read it as another
+
+`Drawn.seriesIndex` is documented as *the categorical slot, unresolved — `refOf`'s index, not a
+colour*. It is the **colour** channel. `roles.ts` refuses the far end a role of its own on the
+grounds that *the figure says `point` twice and distinguishes them by `seriesIndex`* — which spends
+that channel on the pair position and leaves the row with nothing.
+
+**The terminal never noticed, because it does not read the member here.** `categoricalForm`'s default
+`refFor` colours by row — `ROW_IS_AN_IDENTITY[dumbbell]` is `true` — and `dumbbellRow` takes its two
+shapes from `roles.pairedPoint`, which sits *beside* the record. So one arm has a private second
+channel and the other read the seam as written. **A member with two meanings is not a disagreement
+until an arm exists that has only the member.**
+
+#### The refusal counted roles rather than asking what the figure has to say
+
+> giving either a role of its own would make `GLYPH_SHAPE` describe eight things where the figure says
+> seven
+
+The figure says eight. A dumbbell's far end **is** drawn distinguishably from its near one, in both
+arms, today — which is I68's subject exactly: *a role is drawn distinguishably from every role it can
+share a figure with*. Counting the record's entries answers *how many roles are there*, and the
+question is *how many things does the figure distinguish*.
+
+**The other one beside the record stays, and the difference is the reusable part.** `meanOnMedian` is
+**one cell holding two marks** — a composition, not a shape — so it is an answer to *what happens when
+two roles land together* and not to *which role is this*. The far end is a role; the coincidence is
+not. The note refused both for one reason and only one of them earns it.
+
+#### What lands
+
+- `GlyphRole` gains **`paired`**, `GLYPH_SHAPE` calls it a `mark`, and `roleGlyphs` moves
+  `pairedPoint`'s `g.hollow` into `of.paired`. **No terminal frame moves**, which is what says this is
+  an extraction: the character is the same one.
+- `distributionFigure`'s dumbbell arm gives all three marks the **row**'s slot and the far end the
+  `paired` role.
+- **The connector had no slot at all**, which is why it fell to the rule's grey — measured, not
+  inferred, and it takes the row's with the ends.
+- This arm draws `paired` as a **hollow** circle: the same ink, stroked rather than filled, which is
+  the second arm's `g.hollow`.
+
+**And it is not `rowSlot`.** That helper's `per > 1 → seriesIndex` branch is right for `bar/grouped`,
+where each drawn row *is* one series' datum; a dumbbell's row consumes both, so the slot is the row
+index directly.
+
+
+
+### 3ak.43 — a reader's alphabet is the renderer's, and a control built by hand cannot check that
+
+`ArmDecisions.interiorRules` asks *how many rules does this figure draw inside its frame*. Measured
+over the corpus at 24-bit, both widths, 364 frames:
+
+```
+reader answers > 0        15 frames
+frame holds ┄ or ┊        16 frames
+both                       0
+```
+
+**The positives and the subject are disjoint sets.** Every frame the reader called a rule was a
+*figure* — a steep curve's `│`, a candle's body, a vertical boxplot's whiskers — and every real rule
+was missed. `line/frame-grid`, the corpus's own gridded variant, holds eight rows of `┄┊` and reported
+zero.
+
+#### The cause is a character class, and F334 is right about what it fixed
+
+`RULE_ONLY` is `[\s┌┐└┘├┤┬┴┼─│+|-]`, and this renderer draws an interior rule **dotted**: `┄` across
+at every value tick, `┊` down at every position tick. So a gridded row fails the predicate outright,
+and a plot row holding two borders plus one curve segment matches it with three glyphs and clears
+F334's `> 2`.
+
+F334's rule — *a blank row inside a frame is not a rule* — is correct and stays: `│` + spaces + `│` is
+two glyphs. **It could not have found this**, because the frames it was measured against had no third
+glyph, and the third glyph, when one arrived, belonged to the figure. Third instance of one class after
+F321's edge glyph and F334's blank row, and the first two were each closed on the instance.
+
+#### The control inherited the vocabulary the way SP1's inherited its misreading
+
+AD10 asserted `├────────────┤` counts 1 and `│    │    │ │` counts 1. Both are hand-built strings, both
+passed, and **the renderer draws neither**. A03 §2 records the same failure one artefact along — a
+fabricated fixture *written by the same person, in the same sitting, under the same misreading as the
+rule*. Here what it inherited is an alphabet.
+
+**So the positives are rendered rather than composed.** AD10 now takes a real `plotFrame: "grid"` block
+and asserts the reader sees rules, takes the same block without the grid and asserts it sees none, and
+takes `x-log`'s exponential series and asserts a curve's own vertical is not a rule. The negatives stay
+hand-built, because a blank row inside a frame is a shape the renderer will not produce on demand.
+
+#### What it moved, and why the total is the least interesting number
+
+Twenty-eight of 328 pairs changed disposition and the disagreement count went **16 → 16**. The two sets
+are disjoint: out go the curve glyphs, in come rules the terminal draws and this arm does not —
+`line/annotation-label`'s two, `axis-cross`'s nine, `cursor`'s crosshair, `forest`'s reference line,
+`autocorrelation`'s significance bands. Over the record: `boxplot`, `density` and `smallmultiples`
+closed, `autocorrelation` and `forest` opened, `line` went 8/78 to 12/78, and AD4's open count moved
+50 → 49.
+
+**A total that does not move is not evidence that nothing did**, which is the reusable half: comparing
+totals across an instrument change is the one comparison guaranteed to agree with itself.
+
+
+### 3ak.44 — the position axis crosses as a domain, because its budget is a width
+
+`Figure.positionAxis` is a boolean — *is the row drawn* — and it was the whole of what crossed. So the
+second arm's only abscissa was `block.xLabels`, three captions the caller supplied, and `xMin`, `xMax`,
+`xScale` and `xFormat` had **zero readers** in it. Six blocks differing only in those:
+
+```
+                 terminal                                    svg
+xScale unset     1  100  200  300 …  900 1000                1225 bytes
+xScale: "log"    1    5   10   20 …  500 1000                1225 bytes · IDENTICAL
+xFormat          1% 100% 200% 300% … 900%                    1225 bytes · IDENTICAL
+xMax: 500        1   50  100  150 …  450  500                1225 bytes · IDENTICAL
+```
+
+**Not drawn linearly — not drawn.** F355 said *logarithmically in the terminal and linearly here*, and
+the reason was wrong in the shape that keeps recurring: not wrong as stated, and concealing three more
+members than the one it named.
+
+#### A domain and not an axis, and the asymmetry with `value` is real
+
+`Figure.value` carries a niced `ValueAxis` because `axisOver` nices against `ticksFor(plotAreaRows(block))`
+— a count derived from `height`, which is a **block** field, so one call serves both arms. An abscissa's
+budget comes from the **width**, which no block carries and which §3aj hazard 3 keeps in cells.
+
+So what crosses is `{ range, scale, format }`, and each arm nices it with its own budget through
+`positionAxisAt(pos, maxTicks)` — **one derivation, the budget a parameter**, which is `valueAxisOf`'s
+own shape. The terminal passes `xTicksFor(areaWidth)` in cells; this arm passes a pixel span over its
+own pitch. A shared tick count would be a width crossing the seam.
+
+**`xTickRow` packs the axis and no longer derives it**, which is what makes byte-identity a property of
+the extraction: `axisFor`, `stepDecimals`, `formatValue` and `xPositionOf` moved out of it in one piece,
+and the terminal baseline compared 1840 frames with **0 moved**.
+
+#### Placed by `at`, so the position crosses rather than the scale being applied twice
+
+`PositionAxis.at` is `xPositionOf` applied above the seam. When this was written `normalisedOf` was not
+scale-aware, and an arm placing a log tick with it would have drawn the label at the linear position
+and the sample beneath it at the log one — the half of F189 the abscissa did *not* have. C04 I81 made
+the shared coordinate apply the scale, so `xPositionOf` is one call to it now; what `at` still settles
+is that both arms read one number.
+
+#### The grid's other half was never a decision
+
+`plotFrame: "grid"` crosses through `frameOf` and both arms draw it, and the pictures were not the same
+style: the terminal draws `┄` at every value tick **and `┊` at every position tick**, this arm drew five
+horizontal rules and no verticals. A comment in its own file said *both ways, and drawing one was half of
+what the style means*. The member was never missing — **the positions were**, so there was nothing to
+hang the other half on. It applies on the caption path too: `line/frame-grid` is three captions and a
+grid, and the terminal gives it three verticals.
+
+**A member can cross and still be drawn wrongly, because what it needs is a second member that did not**
+— and the member sweep is blind to that by construction, since it asks whether a member is read in both
+arms and `plotFrame` is.
+
+#### What moved
+
+55 documents gained an abscissa and **not one terminal frame moved**. `line/x-linear` and `line/x-log`
+leave the collision list, which is the fixture that was added to make the defect reportable doing exactly
+that, and AD14's `xScale` row inverts — it asserted *two blocks draw one document* and now asserts they
+do not.
+
+
+### 3ak.45 — an empty figure is drawn, and a refusal is for one that cannot be
+
+`plotToSvg` ended with `if (body.length === 0) return null`, so a `line` holding `series: [{ values: [] }]`
+and a `violin` — a form this arm does not draw at all — produced **byte-identical output**. Both land in
+the corpus's 33-strong refusal group, and a consumer cannot tell *no data yet* from *not supported*.
+
+The terminal draws neither of those things. It holds the block's declared height and centres
+`emptyMessage ?? "No data."` in the muted tone.
+
+#### The comment that line carries is right about the defect and wrong about the remedy
+
+It records what it was written for: *`series: []` reaches here with a range nobody declared … five
+gridlines labelled 0 to 1 over an empty box — a plot of a range the block never had*. That is correct
+and it is a **false axis**. Drawing nothing at all fixes it by removing the state as well, which is a
+different thing from fixing it.
+
+**F259's distinction taken one step further.** A refusal is for a figure that **cannot be drawn** — an
+`ohlc` this path does not read, an `origin` it would draw upside down. A figure with nothing in it *can*
+be drawn; having nothing in it is what there is to say. `emptyRows`' own comment names the consumer: a
+`--watch` on a run that has not reported an epoch yet.
+
+**So the empty figure draws its ground and its message and no axis.** The half the old comment earns is
+kept: there is no range, so there are no ticks, no gridlines and no frame to imply one.
+
+#### `emptyMessage` rides on it, and could not have crossed first
+
+The member has **no corpus instance at all** — one of the two F355 named that no frame-based instrument
+reaches — and while the whole state is a `null` there is nowhere for a reader to be. The fixture is a
+**pair**, `line/empty` against `line/empty-message`, differing in exactly that field, which is what I75
+needs before a collision can name a member.
+
+
+### 3ak.46 — a choice forced by cells has no counterpart where both answers fit
+
+F355 owed eleven members and paired two of them under one note — *every `plotFill` and `plotBox`
+variant is a `violin`, which this arm refuses*. True of the corpus, and it hid that the two are not
+alike.
+
+**`plotBox` is the `boxplot` form's.** `definition.ts` reads it at four sites, two inside `boxplot:` and
+two inside `violin:` where a violin whose rung has no density degrades to a box. A `boxplot` fixture was
+buildable all along; the corpus placement was an accident, not a dependency.
+
+```
+plotDetail: "compact"      solid   ├────────────┤███████████│████████████├───────────┤
+                           line    ├────────────┤━━━━━━━━━━━│━━━━━━━━━━━━├───────────┤
+default detail             identical
+```
+
+**Which is the whole of what it means.** At `compact` a box is **one row** and has no top or bottom
+edge, so its single row of cells is spent either on mass or on a stroke heavier than the whisker — I46,
+and the frames agree. At the default detail the box has edges and the member decides nothing.
+
+#### So it is `legitimate`, and the reason is in this arm's own output
+
+The IQR box here is `fill="#e69f00" fill-opacity="0.35" stroke="#e69f00" stroke-width="1.5"` — it
+carries **mass and stroke in the same rect**. The terminal chooses because one cell row can only be
+spent once; a pixel box has both, so there is nothing to choose, and the two documents being
+byte-identical is correct rather than a dropped field.
+
+**A second kind of `legitimate`, and worth naming apart from the first.** F355's four — `height`,
+`width`, `aspect`, `align` — are legitimate because each **is** a quantity in cells. This one is not a
+quantity at all: it is a **choice forced by** cells, and it disappears where the constraint does. The
+first kind is found by asking *what unit is this in*; the second only by asking *why does a choice exist
+here at all*.
+
+#### `plotFill` is a dependency, not a decision
+
+All four of its sites are inside the `violin:` entry, on the braille arm. It chooses whether a density
+outline is filled — and a pixel density curve can be filled or stroked too, so unlike `plotBox` it has a
+meaning here. It has nowhere to be read until `violin` draws.
+
+**Recorded as a stated dependency** — *this member cannot be measured until `violin` draws* — with the
+blocker named as a form rather than as an owed ruling. A member blocked on a form is not the same
+remainder as a member nobody has decided, and a list that mixes them reports the wrong amount of work.
+
+#### `plotCorners` is the same rule again, and the probe is the part worth keeping
+
+Rounded against sharp is `╭╮╰╯` against `┌┐└┘` — same widths, a glyph choice — and the discriminator
+took three measurements, the first two pointing the wrong way.
+
+```
+data turning points                        3
+
+corners @ width  40 / 60 / 80 / 120       37 · 37 · 37 · 38      ← reads as: tracks the data
+the second arm's curve                    <path>, fifty L segments   ← reads as: expressible, so owed
+
+corners @ height  4 / 8 / 16 / 24         15 · 37 · 61 · 79      ← the grid's rows, not the data
+```
+
+**Seventy-nine corners from three turns.** They are **staircase steps** — a sloped line quantised onto a
+character grid, stepping row to row — and `plotCorners` chooses how a step looks. The fifty joins in the
+second arm's path are a *different set*: they sit at the samples, three of which turn. Honouring the
+member there would round joins the terminal does not have.
+
+**The tree is the case with no ambiguity.** `╭──────────┴──┬────────╮` against `M352 47.2 L220.8 116` —
+an orthogonal connector against one straight segment. The terminal's edge turns because a cell grid
+cannot draw a diagonal; remove the grid and there is no corner.
+
+**And the reusable half is about the probe.** Both wrong readings came from varying the axis the
+artefact does not depend on. Width is the obvious parameter — a plot is wide — and the staircase is a
+function of **height**. *Measure the case that would falsify your own falsification* names the
+direction; this is one step earlier, where the parameter itself is wrong and the answer comes back
+stable, plausible, and about nothing.
+
+
+### 3ak.47 — the strings cross, the rung does not, and the anchor is each arm's own
+
+`yCallout` writes a name or a reading at the line's end, and the terminal has done it since §3ag:
+
+```
+last   ┣ 99.12        and the legend stays — "last" names a value, not an identity
+name   ┣ beta         and the legend is REMOVED
+both   ┣ beta 99.12
+```
+
+**This arm drew `alpha` and `beta` in a legend for all three, byte for byte** — the collision group I75
+already reported and nobody had read.
+
+#### The legend clause was in one resolver and not the crossed one
+
+`legendPlacement` has carried *a name at the line's end **is** the legend* since §3ag; `legendOf` never
+did. So the second arm drew a legend the terminal deliberately removes, and would have drawn it **beside**
+the callouts once they landed — the identity three times.
+
+**I48's sentence selects rather than excludes**, which is what lets one clause serve both arms: *a
+callout names a value where a legend names an identity*. The arms that write the identity answer the
+legend's question; `"last"` still does not, and keeps its legend.
+
+#### Three things in one function, and only one of them crosses
+
+`calloutTextFor` chose the text, applied a capability rung, and was called at a cell row.
+
+- **The strings** — `calloutOf` on the figure. A series with no finite value has no *value* and still has
+  a name, so `"name"` answers where `"last"` does not.
+- **The rung stays.** Below the colour floor the family stacks into labelled strips and a name at the
+  line's end is a third copy of one, so the terminal writes nothing for `"name"` and degrades `"both"` to
+  the value. Applied **over** the strings rather than folded into them.
+- **The anchor is each arm's own.** *The row that series' ink ends on* is `lastInkRow` in cells; here it
+  is the last point of the last polyline the series drew. **The same question in two units** — which is
+  what I78 said about the tick budget one member earlier, and the second time this pass has had to say
+  it.
+
+**1840 terminal frames, 0 moved**, which is what makes it an extraction rather than a second derivation.
+
+
+### 3ak.48 — the reader map counted names, and two of the eleven had crossed already
+
+Every ruling in this pass opened with the same measure: how many times does a member appear in
+`svg.ts`. Eleven came back `svg=0` and it was read as *the second arm does not read it*.
+
+**It counts which members the file names.** A member reaching the arm through a shared `Plot → Plot`
+transform is never written there — and `calendarUnit` and `startDate` are exactly that. `svg.ts` calls
+`drawnBlock`, `drawnBlock` routes `calendar` to `calendarRows`, and **F322 moved that transform out of a
+terminal renderer**. Rendered rather than grepped, one series and five blocks:
+
+```
+no unit             9 811 b
+calendarUnit: day  11 621 b
+week               10 933 b
+hour               14 939 b
+day, startDate +4  11 609 b
+```
+
+Five distinct documents. Both crossed a year ago and this pass counted them owed for six commits.
+
+**Run on the other two it holds**: `axisCross` at `unset`/`"zero"`/`"edge"` draws one document, `xTitle`
+at `unset`/`"seconds"`/`"minutes"` draws one. So the remainder was **two**.
+
+#### What the last two carry, and what stays behind
+
+- **`title`** — the words and not the row. The terminal spends a row on the caption and this arm spends
+  pixels below the position row; the string is what must not be decided twice.
+- **`cross`** — *whether*, and not where. `positionAxisAt`'s `zeroAt` answers the abscissa and
+  `normalisedOf(0)` the ordinate, each in its own units, and only a domain that **strictly** straddles
+  zero has a crossing at all (§3ad A4). Forwarding `axisCross` itself would make the second arm
+  re-derive *which of these values means cross*, which is the second copy this section exists to stop.
+
+#### The fixtures ran through the sweep before either member was touched
+
+Neither was isolated by the corpus: `line/x-title` sets `xLabels` beside the title, `line/axis-cross`
+sets `xMin`/`xMax` beside the crossing. So `line/x-captions` and `line/straddle-zero`, each **named for
+what its block sets** — F350's rule, which this pass has already been caught breaking once on
+`compact-box-solid` — and the sweep run first:
+
+```
+before   line/x-title == line/x-captions       one document
+         line/axis-cross == line/straddle-zero one document
+         terminal                              four distinct frames
+after    both pairs distinct
+```
+
+**The lesson is the instrument's.** A file-level count answers *is this name written here* and the
+question was *does this arm read it*, which only a rendered comparison answers. F355's member sweep has
+the same shape and the same blind spot — it reads the type against the files — and **a grep over names
+cannot see a value that arrives through a transform**, which is what this whole pass has been building.
+
+
+### 3ak.49 — the right margin is a fixed fraction and the callout is content, so the callout is drawn off the page
+
+§3ak.41 grew the **left** margin to fit its labels and left the right one at `width · pad` — 25.6 px on
+a 640 canvas — while §3ak.47 gave that side a string whose length is the *series' name and its reading*.
+The two commits are three sections apart and neither is wrong on its own.
+
+```
+line-callout-both     x=620.4  text-anchor="start"  "alpha 0.8774"   →  ends at 707, viewBox is 640
+line-both-axes-narrow x=620.4  text-anchor="start"  "eu-west-1-primary-p99-latency 0.8774"
+                                                                     →  ends at 881, 38% of the figure gone
+```
+
+**Read as a picture, `line-both-axes-narrow` says `eu`.** Two characters of thirty-six, and the fixture's
+own comment in `catalogue-forms.ts` is *the right column's width comes from a callout, which is the case a
+dashboard actually has* — written for the terminal's narrow rung, which sizes that column with
+`calloutWidth(block, ambiguous, stacked)` **before the layout exists** (I48). So the two arms answer *does
+the callout fit* differently and one of them does not ask.
+
+#### Measured first: seven frames, thirteen strings, and the corpus's worst is not the one that was reported
+
+Every `<text>` in all 244 committed frames, laid against its own `viewBox` at the advance measured below:
+
+| frame | string | past the edge |
+|---|---|---|
+| `line-both-axes-narrow` | `eu-west-1-primary-p99-latency 0.8774` | **240.5 px** |
+| `line-callout-both` | `alpha 0.8774` / `beta 99.12` | 67.1 / 52.7 |
+| `line-callout-single` | `0.8774` | 23.8 |
+| `line-callout-name` | `alpha` / `beta` | 16.5 / 9.3 |
+| `line-both-axes-narrow`, `line-callout-*`, `line-yaxis-right`, `line-yaxis-both` | `100` | 2.1 each |
+| `heatmap-both-axes-narrow` | `ap-south-1-primary-db` | 0.5 **inside a clip** |
+
+Two things the count changes. The **right-hand value label** overruns too — `100` at `box.right + 6` is
+three glyphs in a 25.6 px margin — so this is not a callout defect with a callout fix; the margin is
+short for everything drawn in it. And the last row is the one case that degrades gracefully, because
+§3ak.41 put a clip there: contained, cut, *and* the cut is at the head, which is why the clip alone was
+not the remedy then and is not the remedy now.
+
+#### The advance ratio is a guess about a font this arm cannot see, so it is measured and stated as a bound
+
+The proposal was `longest × SVG_FONT_SIZE × 0.6 + gap`, and `0.6` was already in the file as `SVG_EM`,
+documented as *this arm's own estimate*. It is **low for every monospace face measured**, which is the
+one direction that reproduces this defect:
+
+| face | advance ÷ em | how |
+|---|---|---|
+| Courier New, Andale Mono, Monaco | 0.6001 | `hmtx`/`head` over the shipped `.ttf` |
+| DejaVu Sans Mono, Menlo | 0.6021 | same, and confirmed by rendering — 72.2 px for 20 glyphs at size 120 |
+| **SF Mono** (`SFNSMono.ttf`) | **0.6182** | same |
+
+The arm emits `font-family="monospace"`, a **generic** family: the face is the renderer's choice and the
+metrics are unknowable at emit time. So the constant is not an estimate of one font, it is an **upper
+bound over the faces a renderer is likely to pick**, and it is used for exactly two things — reserving
+room, and deciding how many characters fit in room — both of which want the bound and not the mean.
+`SVG_EM` becomes **`SVG_EM_MAX = 0.65`**, 5% above the widest face measured.
+
+**What the bound costs, and what falsifies it.** Too generous is a visible margin and too small is this
+defect again, and the two are not the same size: on the corpus's widest reserved string the headroom is
+`12 × 12 × (0.65 − 0.6182) = 4.6 px` of blank — 0.7% of the width, invisible — against a cut word. The
+falsification is stated rather than assumed away: **a monospace face whose advance exceeds 0.65 clips
+again**, and no face measured is within 5% of it.
+
+#### The ruling
+
+- **The right margin is grown to fit, capped at a third, exactly as the left is** — `rightRoom` mirrors
+  `gutterRoom` and the cap is the same cap for the same reason.
+- **One room for both readers, and it is the maximum** — the callout and the right-hand value labels are
+  drawn in the same column, so two reserves would be two boxes. This is `definition.ts`'s own shape:
+  `right = sides.right ? max(wanted, calloutWidth(...)) : 0`, in pixels.
+- **Past the cap the string is cut with an ellipsis**, through `fitLabel`, so the 36-character callout is
+  contained *and* says it was cut. §3ak.41 wrote that half with no instance in the corpus; this is the
+  instance.
+- **The room is a function of the block, the figure and the layout, and never of the theme.** `area()` is
+  called from two places — the marks walk and the axis emitter — and if the two computed different rooms
+  the marks would be drawn against a different box than the furniture. That is the interaction the walk
+  found, not the overflow.
+- **The reserve is zero where nothing is drawn on the right**, so a frame with no callout and no
+  right-hand labels keeps `width · pad` and does not move. A margin rule that moved figures with nothing
+  to reserve for would be the wrong rule (F325's shape, one direction along).
+
+#### 3ak.49a · The walk — a table, because every one of these rules holds at rest
+
+Structural interactions (§3ak.4's second shape): no event mediates any of these, so a trace would index
+the wrong thing.
+
+| the cell | rule A | rule B | ruling |
+|---|---|---|---|
+| a callout **and** right-hand value labels | reserve the callout's length | reserve the labels' length | one column, `max` of the two — the terminal's own expression |
+| a callout longer than a third of the width | grown to fit | capped at `width / 3` | the cap wins and `fitLabel` marks the cut; `line-both-axes-narrow` is the first instance either arm has had |
+| `area()` in the marks walk **and** in the axis emitter | each computes its own room | the box must be one box | the room takes no theme, so both calls answer identically by construction — this is what a theme-conditional reserve would have broken silently |
+| `valueLabels: "both"` with `orientation: "horizontal"` | `"both"` means a right-hand column | the value axis runs along **x**, so the labels are under the box | `!valueOnX` gates the reserve, the same clause the drawing uses |
+| a right-hand **legend** and a callout | the legend takes a band off `box.right` | the callout starts at `box.right + gap` | the band already moved `box.right` inward, so the callout is reserved against the *narrowed* box and lands inside — `line-callout-multiseries` is the frame, and it uncovered a **second** defect below |
+| a callout whose text is `null` | the series has no finite reading | a name always exists | `calloutOf` already answers this: `"name"` gives a string, `"last"` gives `null`, and a `null` is skipped by both the reserve and the drawing |
+| `yCallout` on a form that draws no polyline | the block asks for a callout | nothing sets an `ends` entry, so nothing is drawn | reserved anyway, and deliberately: `calloutWidth` has the same property in the terminal, and the alternative reads `figure.marks`, which the marks walk's own `Omit<Figure, "marks">` call site cannot |
+
+#### 3ak.49b · Residue — two, and the first is only visible as a picture
+
+**The callout and the right-hand value label overprint.** `line-callout-multiseries` renders `99.12`
+and `100` at the same anchor: the top-right of that frame is `90012`, unreadable, and it is unreadable
+before this change and after it, because both texts move right together. The terminal has a rule for
+this and it is I48's contention ladder — *one series' last reading, and three that contend for rows* —
+which this arm does not implement at all. **No arithmetic assertion could see it**: both texts are
+inside the canvas, at the coordinates their own rules give them. **Closed by §3ak.50 and I114** (F710).
+
+**The left gutter reserves from `figure.value.labels` and the drawing writes `labels[i] ?? String(tick)`.**
+So an axis whose `labels` array is short reserves for nothing and draws a number. No instance in the
+corpus — every axis in it labels every tick — and it is the same class as the defect above, on the other
+side of the box. Recorded rather than fixed, because fixing it moves guttered frames on a case that is
+fine, which is the ruling §3ak.41 already made about narrowing (F713). **Ruled in §3ak.50c, and the
+ruling is that the premise is false**: `labels` cannot be short, so there is nothing to fix and what
+was missing is the watch.
+
+---
+
+## 3ak.50 — the callout displaces the label it lands on, and the row has to leave the walk to say so
+
+**I48 already ruled this and it is not this arm's to invent.** *It displaces the right gutter's
+content on its row and never the left's.* The question §3ak.49b left open is whether that sentence
+survives the change of units, and the answer is that **one half of it does and the other half's
+reason does not** — which is exactly the thing the disagreement matrix exists to record.
+
+### 3ak.50a · What carries, and what carries only its conclusion
+
+| I48's clause | its reason in cells | in pixels | ruling |
+|---|---|---|---|
+| the callout displaces the **right** gutter's content on its row | the reading is the number a live chart is read for, and two writers on one row is I24's four-gutter defect | the same, with *row* meaning *the band a 12 px glyph paints* | **carries whole.** The reason is about what a reader needs, not about cells |
+| and **never the left's** | *your data is here* reaches only the gutter it is written in | the callout is written at `end[0] + LABEL_GAP`, which is never left of the box | **carries, and is stronger here**: the left label is not merely spared, it is never contended for |
+| two on one row: the later wins, and a one-cell `+` says so | not `+N`, whose count needs the width being sized; not a second row, **which would change the count and break I1** | there is no row count and no `plotHeight`; the `viewBox` is fixed whatever is written in the margin | **the conclusion does not carry, because its reason is gone.** See §3ak.50d |
+
+**The unit of *row* is a bound and not a measurement**, on `SVG_EM_MAX`'s own argument one axis
+along. Two `<text>` baselines a full em apart cannot have overlapping ink, because a glyph's ink is
+inside its em box; anything closer may. So `|y₁ − y₂| < SVG_FONT_SIZE` is the collision test, and it
+errs by suppressing a tick that would have cleared by at most half a glyph — the safe direction,
+because a suppressed number is a number you can still read off the axis and a smeared one is
+`90012`. **The falsification is stateable**: a face whose ink escapes its em box, which is the same
+falsification `SVG_EM_MAX` already carries.
+
+### 3ak.50b · The row is ink, so it is carried and not shared
+
+**`rightRoom` is the wrong precedent and saying so is half the ruling.** The *width* of the right
+column is a pure function of the figure, which is why one function serves both readers and why it
+takes no theme (I113). The *row* is not: I48 requires it be read from ink, and in this arm the ink is
+the last point of the last non-annotation polyline a series drew, taken through `projected` — which
+exists only inside `walk`. A second pure function computing it from `figure.marks` would be a
+**second derivation of one quantity**, which is precisely the mechanism §3ak.49 records for
+`fitLabel`: the reserve and the fit disagreed at equality because the product was written twice.
+
+So the row **leaves the walk by being handed out**. `walk` already takes `out: string[]` as a
+mutable collector; it takes a second, and `marks` forwards it. What that costs, stated:
+
+- **Two functions gain a parameter** — `marks` and `walk` — and neither gains a return type.
+- **An ordering that was incidental becomes load-bearing.** `plotToSvg` has always called `marks`
+  before the axis emitter; now the emitter reads what the walk wrote, so moving either would empty
+  the collector and silently restore the overprint. `RC5` is the row that watches it.
+- **The collector holds only rows that were actually drawn.** It is filled at the `out.push` site,
+  past both `continue`s, so a `null` callout and a series with no `ends` entry contribute nothing —
+  the displacement follows the ink and not the reserve, and the two are *deliberately* allowed to
+  disagree (§3ak.49a's last row reserves for a callout no polyline draws).
+
+### 3ak.50c · The walk — a table, because the contenders all hold at rest
+
+Structural again, and for the same reason as §3ak.49a: nothing happens between a tick and a callout.
+
+| the cell | rule A | rule B | ruling |
+|---|---|---|---|
+| a callout's row overlaps a **right-hand** value label's | I47 labels every tick on the side asked for | I48 displaces the right gutter's content | **the callout wins and the label is not emitted.** Not moved: moving a tick's label off its tick is the lie I55 separates a tick from a label to forbid |
+| a callout's row overlaps a **left-hand** value label's | the same | I48's *never the left's* | **the left label stands**, at `yAxis: "both"` where one tick has a label on each side and only one of them is contended |
+| the callout was **cut** by the cap, so it is narrower | `fitLabel` cuts at the drawing site (§3ak.41) | displacement | **displacement is decided by the row alone.** A width test would be a tautology today — both texts are written at the same `x` by construction, since `end[0] ≤ box.right` — and a tautology that stops firing the day the callout's `x` moves |
+| a callout on a figure with **no** right-hand labels (`yAxis: "left"`, `null`) | there is a callout | there is nothing on the right | **nothing changes**, and the frame must not move. This is the half that would make it the wrong rule |
+| `valueLabels: "both"` on a **horizontal** figure | `"both"` names a right-hand column | the labels are written *under* the box | **no displacement.** Governed by `!valueOnX`, the same clause `rightRoom` reads |
+| a suppressed label's **gridline** | the tick keeps its rule | the label goes | **the rule is still drawn.** This is what the decision leaves behind, and it is not a cell either artefact shape indexes: the loop body draws a rule *and* a label, and suppressing one glyph more than intended changes the figure's geometry rather than its text |
+| a callout's row overlaps a **legend** entry's | the legend is furniture in the same right band | I48: *a callout does not replace the legend* | **the legend's placement, and it is given in §3ak.50f** (I115). Recorded here as *out of this ruling* and left, which is the state a conflict should not be left in — and the reading was wrong as well as unfinished: nothing has to give, because `area()` reserves two columns off one edge and every writer anchors to that edge. F726, now closed |
+| two **callouts** overlap each other | I48's later-wins ladder | I81's stated blind spot: this arm stacks text at the same `y` | **§3ak.50d.** Still open, now with a measurement |
+
+### 3ak.50d · Two callouts, and the third option cells did not have
+
+**Measured first: zero instances.** Across the 212 committed frames that draw anything, no two
+callout texts come within `SVG_FONT_SIZE` of each other; only 4 frames carry two at all, and the
+closest pair is **84.757 px** apart — `0.8774` against `31.68` on `line-callout-multiseries`, seven
+glyph heights. So I81's blind spot is still a blind spot and building a
+mechanism for it now would be an invariant vacuous until its subject exists.
+
+**And the mechanism it would build is the wrong one.** I48 chose *later wins plus a one-cell `+`*
+over two named alternatives, and it rejected both for reasons this arm does not have: `+N` needs the
+ink that needs the width that needs the column being sized, and a second row *changes the count and
+breaks I1*. Neither binds a fixed `viewBox`. **A choice between two bad options means a third is
+missing**, and here the third is the affordance the terminal lacks: **nudge the later callout by a
+glyph height**, which is a lie about a row in cells and merely a placement in pixels, where a label
+is *near* a coordinate rather than *at* one (I55). It is named rather than built, because it needs
+its own containment ruling against the canvas edge and there is nothing in the corpus to read it on.
+
+**What is owed, as a symbol so the deferral is checkable by grep**: `calloutNudge`.
+
+### 3ak.50e · F713 is not a defect, and the record is what was wrong
+
+§3ak.49b said the two sides of the box measure differently: `gutterRoom` reads
+`figure.value?.labels ?? []` and the emitter writes `axis.labels[i] ?? String(tick)`. **Going to
+find where that was written down turns up the opposite.** `ValueAxis.labels` is built in exactly one
+place — `valueAxisOf` in `figure.ts`, `{ ...axis, labels: tickLabels(axis, block.yFormat) }` — and
+`tickLabels` is `axis.ticks.map(...)`. It is **total over `ticks` by construction**, at all three
+call sites in the tree (`figure.ts`'s `axisOver` and its radar arm, `definition.ts`). No `ValueAxis`
+literal exists anywhere else.
+
+So `labels[i]` is never `undefined`, the `?? String(tick)` is a fallback for a case that cannot
+arise, and the two reserves are not merely equal on the corpus — **they are the same function**. The
+mirrored fix would have changed nothing, which is a fix indicting its diagnosis.
+
+**Wrong in both directions, which is the shape to watch for.** It was not a defect for the reason
+given, and the hazard it was pointing at is real and stated differently: the left reserve and the
+left drawing are two expressions of one width, and if they ever part the symptom is a **silently
+ellipsised gutter label** — `fitLabel(text, box.left - LABEL_GAP)` cuts rather than overflows, and a
+cut label reads as a shorter number. That is what nothing was watching. `RC6` watches it over the
+whole catalogue, and it is non-vacuous: it fires the moment `gutterRoom` under-measures by a
+character, from any cause including the one F713 named.
+
+### 3ak.50f · The right band has three writers and one anchor, and the column it reserves is drawn in by nobody
+
+**The frame said it and the arithmetic did not.** On `line-callout-multiseries` at 640 × 320,
+`box.right` is **459.2**; the right-hand value labels start at 465.2, the callout at 465.2, the
+legend's swatch at 471.2 and its text at 484.8. `rightRoom` is **52.8** and `LEGEND_SHARE · width`
+is **128**, so `area()` moves `box.right` in by **180.8 px** — and then all three writers anchor on
+`box.right`. Nothing at all is drawn between **587.2 and 640**: 52.8 px of canvas, 8.25% of the
+width, reserved for the column and left empty, while `99.12` (465.2 … 504.2) paints through
+`alpha` (484.8 … 523.8). **Read in colour, the swatch is inside the digits.**
+
+**So F726's framing is wrong, and being wrong is what makes it fixable.** It is not two rules that
+cannot both hold with nothing to decide which gives. The arithmetic reserves **two** columns off one
+edge and the drawing writes **one**; the callout is not standing where the legend is, it is standing
+where the *callout's own reserve is not*. There is nothing to give up and no invariant to weigh —
+which is why five months of the record could not find the give: it was looking for one.
+
+**And F726's fourth interaction does not exist.** It records the right-hand tick `100`
+(x 465.2 … 488.6, y 16.8) overlapping `alpha` — *the tick column and the legend collide on their
+own* — with the warning that a callout-only repair leaves a measured overprint standing. **`100` is
+not drawn on the right in either frame.** I114 suppresses it: the callout sits at y 19.215 and
+2.415 px is inside a glyph. Sweeping all **244** committed frames for any two texts within a glyph
+height sharing a horizontal band gives **126 pairs in 11 frames**, of which the right band's are
+**2 pairs in 2 frames**, both `99.12` over `alpha`. F726 says four in two.
+
+**Wrong in both directions, which is the shape to watch for** — and the second direction is the one
+worth keeping. The tick/legend collision is not instanced *for the reason given*, and it is latent
+for a reason nobody stated: **I114's suppression is what hides it.** A callout short enough not to
+contend for the top tick's row leaves that tick drawn, at 465.2, under a legend at 484.8. So the
+hazard is real, it is the same hazard, and it argues for **placing the legend** rather than for a
+second suppression — which is the opposite of what F726's warning asked for.
+
+**The classification table — structural, because the three writers all hold at rest.** Nothing
+happens between a legend and a tick; what makes the cells is which writers are present.
+
+| the cell | rule A | rule B | ruling |
+|---|---|---|---|
+| the column alone (labels, a callout, or both) | `rightRoom` sizes the reserve | `area()` grants it | **`box.right + LABEL_GAP` is inside the reserve.** Correct today and the frame must not move |
+| a right legend alone | `rightRoom` is 0 | the legend takes `LEGEND_SHARE` | **the whole band is the legend's**, `box.right + 12`. Correct today. **81 of the 83 frames with a right-placed legend are in this cell**, which is why the ruling below moves two frames and not eighty-three |
+| **a right legend and a column** | the column anchors on `box.right` | so does the legend, 6 px along | **the collision**, and the reserve is on the far side of the thing it collides with |
+| a right legend and a column, callout **cut** by the cap | `fitLabel` cuts against `layout.width` | the column ends at `box.right + rightRoom` | **the cut is against the wrong edge.** Moving the legend outward without this licenses a capped callout to write straight across the band it was moved out of |
+| the same, with **no** legend | the same cut | the same column | **the same number.** `box.right = width − rightRoom` whenever the cap binds, so the two expressions agree by construction and no frame without a right legend can move |
+| a **left** or **above/below** legend | `area()` costs the other side | the column is on the right | **nothing changes.** This is the half that would make it the wrong rule |
+
+**And the trace, because the callout's width is event-mediated.** `rightRoom` reads the callout's
+string, `area()` turns it into `box.right`, and the legend reads `box.right`: **the wider the
+callout, the further left the legend moves, which is deeper under the callout.** That is the
+mechanism F726 named and it is a trace's finding, not a table's. Under the ruling the legend's
+origin is `box.right + rightRoom + 12`, and `box.right + rightRoom` does not move with the string —
+so the coupling is not weakened, it is **removed**.
+
+**The ruling.** *The right margin is a band with three writers, ordered outward from the box, and
+each anchors on the previous one's outer edge rather than on the box's.* The value labels and the
+callout keep `box.right + LABEL_GAP`; the legend takes `box.right + rightRoom(figure, layout) + 12`;
+and both cuts take the column's outer edge in place of the page's. The order is *column then
+legend* because **a value label names a tick and has to stay beside the tick, and a legend names
+identities rather than coordinates** — the writer bound to a coordinate goes first, and the
+furniture takes the outside.
+
+**The candidate reading was tested and is not load-bearing, which is the honest result.** The
+reading offered was that I48's *a callout does not replace the legend* is about **content** while
+this collision is about **layout**, so a reserve keeping both legible is what I48 asks for rather
+than what it forbids. It survives — but the ruling **does not need it**, because the ruling
+displaces nothing: no glyph is dropped, no row is moved off its tick, both texts are drawn in full
+in disjoint columns. Under the *stricter* reading of I48 — that the callout must not take the
+legend's space — the ruling is licensed too, since it takes the callout **out** of the legend's
+space. A sentence that licenses a decision under both of its readings is not the sentence that
+decided it, and saying so is cheaper than discovering later that it was doing no work (MG24's class,
+one artefact along).
+
+**The operation was checked before the ruling was written down.** A ruling that moves the legend
+outward is a ruling that can push it off the page, and the check is whether the layer has a verb for
+that: **it has none — the legend's text is pushed with no `fitLabel` at either anchor.** So the
+ruling is only safe if it is measured, and it was: over the corpus's **171 right-placed legend
+entries in 83 frames**, the tightest is `waffle-over-100`'s `Half again 50%` with **18.80 px** of
+slack — 2.4 glyphs. **Nothing leaves the `viewBox`**, and the widest text in the whole corpus after
+the change ends at exactly **640.00** (`line-yaxis-both`'s `100`, a frame that does not move). The
+missing verb is recorded rather than built, under the name `legendFit`, because building it now
+would be a mechanism with no instance and the number that says so is 18.80.
+
+**What moves: 2 of 244**, measured by rendering the corpus in memory and comparing against the
+committed bytes — `line-callout-multiseries` and `line-callout-last`, exactly the two frames that
+carried the overprint. *Every SVG golden moves* was the fear at F706 and was 10 of 244 there; here
+it is two, and the reason is the cell above: `rightRoom` is 0 on 81 of the 83 frames that have a
+right-placed legend at all.
+
+---
+---
+---
+---
+---
+---
+---
+---
+## 3al. The camera — where it arrives from, what it may not touch, and the grid it projects into
+
+**`docs/notes/CALCIUM_3D_DESIGN.md` carries the design and this section carries the contract.**
+The rung was measured rather than assumed (F431) and the dither was refused rather than ported
+(F433); what follows is only the part this component is bound by.
+
+### It is context, and it is a record rather than a value
+
+**C12 owns no state** (I11), so the live camera cannot be here. The block declares where a view
+**starts** (C04 I75) and `RenderContext` carries where it **is**, exactly as focus and the scroll
+offset do.
+
+```ts
+cameras?: Readonly<Record<string, Camera>>;   // by block id, absent is the block's own
+```
+
+**A record and not a value, and the reason is a document rather than a plot.** Two 3D plots can
+sit in one document — a loss landscape beside its parameter sweep is the obvious pair — and a
+camera threaded down the tree as a scalar would give them one view, so orbiting either would
+turn both. That is `scrollOffsets`' own shape and its own reason: *a record the container looks
+itself up in rather than a value threaded down*.
+
+**The axis and its writer are C22's and they are one commitment** (C22 I71). Nothing here is
+observable until something in `src/` can move a camera, and a context field with no writer is
+`cursorPositions` — read in one place, written by nothing, correct and unobservable together
+(§3s). This component states what it draws; C22 states that somebody can change it.
+
+### Geometry is invariant under the camera, and `measure` cannot see it at all
+
+**`plotHeight` reads `form`, `height`, `axes`, `legend` and `xTitle`** (I1, `height.ts`'s
+`PlotGeometry`) and a camera is none of them, so **the same block is the same number of rows at
+every viewing angle**. That is not a courtesy: a plot whose height moved as it turned would move
+every block below it thirty times a second, which is the failure I1 exists for arriving through
+a new door.
+
+**And it is structural rather than asserted.** `measure` is `(block, width)`; the camera reaches
+only `render`, so deriving a height from it is unspellable in the same way `PlotGeometry` makes a
+height from the series unspellable. `tick`'s treatment exactly (I8) — appearance animates,
+geometry never does.
+
+**The width, too — and here the camera forces a ruling rather than inheriting one.** A cartesian
+form spends `AXIS_GUTTER` on a fixed left column of labels. **A 3D form has three axes, two of
+them not vertical, and every label moves as the camera turns** — so a gutter is the wrong shape
+for them and they are drawn *inside* the plot area, billboarded at their projected anchors. So a
+3D form's `HAS_Y_GUTTER` is `false` and it spends no `AXIS_GUTTER`, which is the same answer the
+matrix family gives for a different reason.
+
+### The sample grid — a rule, and every number in the note is a measurement of it
+
+```
+                 across            down          at 80×24      at 120×30
+every rung       cells × 2         cells × 8     160 × 192     240 × 240
+```
+
+**`160×192` is not a constant and must not be read as one.** It is the grid at the size the
+measurement ran in. The projection scales to the sample grid, the grid to the block, and the
+block to whatever region it is given — the chain every raster in this component already uses.
+
+**There is one grid and there used to be two** (F498). The rung chose between `width × 1` by
+`height × 2` and `width × 2` by `height × 4` until the silhouette alphabet took the half rung onto
+the dot grid; `sampleGrid` lost its rung parameter with that landing, and `AREA_ROWS` is the down
+factor because the block alphabet offers nine positions along an axis and a grid sampling four can
+only quantise to quarters.
+
+**The table above read `80 × 48` for nineteen weeks after that stopped being true** (F506), here
+and in `docs/notes/CALCIUM_3D_DESIGN.md` §11 and §12, where every performance budget is costed on
+it. **A derived figure outlives the distinction it was derived from**, which is F498's own ruling
+pointed at the documents rather than at the tier tables.
+
+**The depth buffer is `Float32Array(sampleWidth × sampleHeight)`, allocated per render.** I11
+forbids state that *survives* a render and permits a local, and this is why the distinction
+matters rather than being pedantry: a module-level buffer would be exactly the state I11
+forbids, and would also be the wrong size the first time a region changed. **120 KB at 80×24 and
+225 KB at 120×30** — measured 2026-09-03 — and the figure moves with the region rather than being
+a budget.
+
+### The shading model — one sample carrying both, and the disambiguation is an OPEN MEASUREMENT
+
+**The design note used to claim two independent channels and that claim is retracted** (F436).
+It is restated here as what it now is, because the retracted version's natural home is a spec
+section and a reader who does not find the correction here will find the claim there.
+
+```
+                       on the dot grid                       on this rung
+field (or height)  →   the palette      → COLOUR         →   the palette   ┐
+face normal · light →  intensity 0..1   → GLYPH DENSITY  →   intensity     ┘  ONE sample
+```
+
+**On the dot grid the two were genuinely independent, because a cell had two carriers**: a
+foreground colour and a glyph chosen from a density ramp. A half block has **one carrier per
+sample**, so the shading multiplies the colour and a dark sample is a low field value **or** a
+face turned away, with nothing in the picture to say which.
+
+**And the collision is worst on the map chosen to avoid collisions.** A perceptually uniform
+colormap makes lightness monotonic in the value — that is what viridis is *for* — so multiplying
+it by a Lambertian term puts the field and the slope on one perceptual axis by construction.
+
+**This is deliberately not an invariant, and the reason is the same one A03 §2 gives about
+vacuity.** Its subject does not exist: there is no surface renderer, no member carries a second
+reading, and an invariant here would hold trivially while reading as settled — which is exactly
+how the retracted claim survived a rewrite. So it is a **question owed at step 6**, with its
+candidate and its falsifier written down now:
+
+| | |
+|---|---|
+| the candidate | hue and chroma carry the field, lightness carries the shading |
+| how it is settled | a measurement against two references per form — a terminal implementation and matplotlib — looking at the images, not at an error metric |
+| what would falsify the candidate | a terminal's quantisation collapsing the chroma at 8-bit, where the 26-grey ramp has no chroma at all |
+| the outcome if it fails | **one reading, and the caller picks which** — no member is added, and `colourBy` already has the shape |
+
+**No axis is added to `Encoding` either way.** `ladderFor` is over `LadderAxis`, which is
+`Extract<Encoding, "height" | "density">` — **two** of `Encoding`'s four — and `Serves` is a
+`Record` over them, so widening it is a compile error at every existing ladder. The half-block
+rung is colour rather than a ladder step, so nothing here touches either.
+
+### A plot with a camera is focusable, and the implementation is what found it
+
+**C22 I71 says the field and a writer land together, and building it showed the writer could not
+be reached.** `orbitBlock` needs `focus.current.at === "liveBlock"` with a non-null element, and
+elements come from `BlockDefinition.elements` — which, measured at HEAD, **only `table`
+declares** (C26 §4a row 1 says so in as many words). So a plot could never be focused, the
+binding could never fire, and the store could never be written: **`cursorPositions` again in a
+different coat**, with every reference present and the seam broken.
+
+**So a `plot` declares one block-level element, when it has a camera or can take a cursor**
+(I85 — the second arm arrived with the crosshair's writer, C22 I76, and this paragraph said
+*exactly when it has a camera* for a release after the invariant stopped saying so).
+
+```
+no camera, not cursorable   →  no elements. The block is atomic, as it has always been
+a camera, or cursorable     →  one element, level "block", the whole plot
+```
+
+**Gated on what a reader can act on rather than on the form**: a plot with no view to turn and
+no sample to point at affords nothing, and `table` already declares elements only when it has
+rows. **The element spans the block and the plot area does not**, and that gap is the whole of
+the pointer's problem: a click carries a block column, the crosshair is an index into the data,
+and `sampleIndexAt` (§3s) is how one becomes the other — through the same layout the frame was
+drawn with, never a second copy of it.
+
+**And a focused plot draws its frame in `accent`** (C26 §7). The frame's cells — lid, side rules,
+bottom rule, corners — are reserved by the data whether or not focus is on the block, and the
+element exists only where the frame does (I85 gates on `plotFrame !== "none"`), so there is
+always something to carry it and the tone is the only thing that moves: no row, no cell, no
+gutter changes, and the y-labels keep `muted` — the enclosure lights up, not the scale. Measured
+at 80 columns: seven rows differ (the lid, five area rows, the bottom rule; the x-label row does
+not), 164 cells, every one a frame glyph — the blank between a label and its edge is
+kept out of the edge's span — and only in their SGR. At 1-bit the
+carrier is `accent`'s mono class — bold where the frame was dim — a weight rather than a colour
+(F34). `Layout.focused` is how the furniture learns it, set in `reserving` from `ctx.focus`, which
+is the one place a layout already meets the block.
+
+**A `plot3d` has no `Layout` and its frame is `scatter3.ts`'s, so it reads `ctx.focus` where its
+frame ink is chosen** (C26 §7, arc 6): a focus naming the block turns the box, the three axes and
+their ticks `accent` where they were `muted`; the tick labels keep `muted` as the y-labels above
+do, and an axis carrying its own tone keeps it — I98's per-axis ink is data and focus is not, so
+the axis tone wins the cell. Two inks rather than one flag, because `overlay` takes the label ink
+as an argument and the callback takes the line ink, and they were one variable only while both
+were `muted`. The focus the session writes is `{ blockId, rowId: blockId }` — the element's id is
+the block's (`elements()` above) — and that is the form this arm tests for. **And the frame cell
+carries the `Style`, not only its colour** (F803, closed 2026-09-05): `frameInkAt` holds `slot(...)`
+whole, so at 1-bit `muted` is dim and focus turns the frame bold — F34's rule reaching the 3-D frame
+as it already reached the 2-D one. The data raster keeps a `ColourValue` a sample and the labels keep
+the colour channel alone, both as before.
+
+**C26 §4a's table gains a row rather than being corrected in passing** — *the only kind
+declaring `elements`* was true when it was written and this is what stops it being true.
+
+### The degenerate cases, and the first one produces a plausible picture
+
+**A projection has five ways to be degenerate and four of them are loud.** The fifth draws
+something that looks right, which is why it is written first rather than last.
+
+| # | case | what is zero | what happens without a rule |
+|---|---|---|---|
+| 1 | **behind the eye** | nothing | **view `z < 0`, and the divide by it gives a valid-looking coordinate on the wrong side of the picture** |
+| 2 | a point at the eye | view `z` | a divide by zero — `±Infinity`, then `NaN` through the raster |
+| 3 | coplanar data, edge-on | one axis's extent | the normalisation divides by zero |
+| 4 | collinear data | two axes' extents | the same, twice |
+| 5 | coincident data | all three | the same, three times |
+
+**Row 1 is the classic bug and the reason for the order.** A point at `z = −4` divides to a
+finite `(x, y)` inside the frame, mirrored through the origin — so the figure has a plausible
+extra lobe rather than a missing one, and nothing about the output says *this sample is behind
+you*. It cannot be found by looking at a frame and it cannot be found by an assertion about
+bounds, because the coordinate **is** in bounds. **So the cull is on view `z` and it happens
+before the divide**, which is the only place the information still exists.
+
+**The rules, and each is a decision rather than a guard:**
+
+**A view `z` at or below the near plane is culled, and the near plane is a constant in view
+units.** `NEAR = 0.01`. The data is normalised into `[−1, 1]³` and the default camera sits at
+distance 10, so the near face of anything real is nine units away and this clips nothing —
+while bounding the divide, which is what the constant is for. **It applies to the orthographic
+arm too**: there is no divide there, but a sample behind the reader is behind the reader.
+
+**A camera whose `distance` is zero draws nothing, and that is the answer rather than a
+refusal.** The eye sits on the target, every sample is at or behind the near plane, and the
+picture is empty. Refusing at construction would make `distance` the one camera field with a
+validity rule, and an empty plot is what *standing inside the data* looks like.
+
+**The orthographic arm drops the divide and keeps the scale, and the same `distance` frames
+both.** Both arms fold one focal length — `f = 1 / tan(FOV / 2)` at `FOV = 42°` — and the
+perspective arm divides by the *sample's own* view depth. The orthographic arm divides by the
+**distance to the target** instead, which is the one number that makes the two agree **exactly**
+at the target plane: at `z = distance` the two expressions are the same expression, so the arms
+are a statement about what happens either side of the plane rather than two unrelated mappings.
+That equality is the property a row can assert, and it is stronger than any bound.
+
+**Dropping the scale as well as the divide leaves a projection with no framing control at all**,
+which is what the arm shipped as. Measured over the unit cube's eight corners at
+`azimuth: π/4, elevation: 0.3`, the screen extent was `−0.187 … 1.187` at distance 4, 6, 10 **and**
+20 — the same two numbers four times, 37% of the figure off the plot, and nothing a caller could
+set to recover it. The perspective arm fits from distance 6 upward and overflows at 4, which is
+the behaviour a reader expects from a camera: moving back frames more.
+
+**The premise came from a comment in a type and lived nowhere else.** C04 §3's `Camera` carried
+*`distance` is ignored by the second* in one line, with no invariant, no argument and no test — and
+I86 two paragraphs above contradicts it, because a `distance` of zero draws nothing on the
+orthographic arm too, and it does so *by moving the eye*. Measured, `distance` moves an
+orthographic sample's depth from `2.77` to `18.77` across those four cameras while its screen
+position does not move at all: the member reaches the eye, the cull and the depth order, and only
+the scale was missing. **The claim was true about the scale and false about the member**, and that
+gap is exactly the size of the defect (F503).
+
+**What does not move.** The near-plane cull is unchanged and still runs before the divide — there
+is no divide to protect here and there never was, and a sample behind the reader is behind the
+reader. **I91's edge-on degenerate survives by construction**: a line parallel to the view
+direction projects to zero extent under orthographic, and zero times a focal length over a
+distance is still zero, so `AX5` asserts the same exact zero it always did. What moves is every
+orthographic frame's size, which is the point.
+
+**A zero extent maps to the axis's centre.** Not to its minimum, and not to `NaN`: a degenerate
+axis has no spread, so every sample sits in the middle of it — which draws a plane edge-on as a
+**line** and a coincident set as a **point**, both of which are the truth. Dividing by the
+extent is what the rule replaces, and the three rows differ only in how many axes take it.
+
+**A plane viewed edge-on keeps its line and loses its labels** (§4's rule, arriving early), and
+it is a **different zero from row 3**: the data spreads on all three axes and the *projection*
+collapses to a line.
+
+**Not *a zero extent on one screen axis*, and this sentence took three attempts.** It first
+said exactly that; the second draft over-corrected to *both screen axes spread*; the third is
+measured over a family rather than over the case to hand. An edge-on plane contains the view
+direction, and its other in-plane direction sets the image's angle:
+
+```
+the plane's in-plane direction      collinear?   screen-x spread   screen-y spread
+right                                    yes           2.12e-1          1.11e-16
+0.866 right + 0.500 up                   yes           1.84e-1           1.86e-1
+0.707 right + 0.707 up                   yes           1.50e-1           2.63e-1
+up                                       yes          1.67e-16           3.72e-1
+```
+
+**Collinearity holds throughout and a zero screen extent does not.** It appears only where the
+line is parallel to a screen axis, which is two of five rows — so it is a special case of the
+image being a line, not the rule. Screen x and screen y are the frame's axes and the figure has
+its own. **The row asserts collinearity, which is frame-independent, and asserts that both
+screen extents are non-zero in the diagonal case** — because that is the half the first draft
+denied.
+
+### Two more rulings the camera forces
+
+**Orbit and the readout cursor are mutually exclusive.** A moving camera and a fixed sample index
+disagree about what the reader is pointing at, so orbit pauses while the cursor is active. It was
+recorded before either half existed and said so rather than sitting as a row that passes by having
+no subject; both halves exist now — the orbit since step 8 and the cursor's writer since C22 I76 —
+and the row is buildable (C22 §6i.4).
+
+**Nothing animates through `measure`.** A block cannot declare that it orbits (C04 I75), for
+`tick`'s reason: whether a picture moves is L4's, exactly as whether a spinner turns is.
+
+---
+
+## 3am. `plot3d` — two arms, and a tier that means a different thing in each
+
+**This is the form step 3 ships, and it is where 3D stops being speculative.** Everything before it
+is a camera nothing looks through and a projector nothing draws with; everything after it is
+improvement rather than proof.
+
+### Four arms — one pair the terminal picks, three the caller can name
+
+```
+halfBlockEligible(caps, false)     a colour raster: samples at width x 1 by height x 2 (I84),
+                                   halfBlockRows averaging the identity, and `HALF_BLOCK` with
+                                   two colours a cell. THE RUNG F431 MEASURED
+otherwise                          one marker glyph per cell, with a unicode rung and an ASCII
+                                   rung. The glyph carries the depth tier; colour carries what
+                                   the terminal has left
+```
+
+**That pair is `auto`, and it stays the terminal's.** Neither of the two is a taste:
+`halfBlockEligible` reads `unicode`, `ambiguousWidth` and `colourDepth`, and forcing the colour
+raster past it draws `▀` at double the column the projection put it in — the geometric corruption
+the switch exists to prevent. **So there is no `"half"` member**, and `auto` is the only route to
+that rung.
+
+**`STYLE_ARMS.plot3d` was `[]`, it is now three, and the retraction is measured rather than
+reconsidered.** The old ruling — *the choice belongs to the terminal and there is nothing left for
+the member to select* — is true of the pair above and answers a question no caller asks. The
+question a caller has is not *which of those two* but **what a line and a mark are made of**:
+
+```
+plotStyle: "braille"   points and lines into the 2x4 dot grid — width x 2 by height x 4 (I84).
+                       Floor: `unicode !== "ascii"`. `⣿` is width-stable at both width
+                       conventions, so `ambiguousWidth` does not bind — which is the reason
+                       `halfblock.ts` gives for why the braille arm has never met that problem
+plotStyle: "line"      box drawing at cell resolution, with real joins. No floor: `glyphForMask`
+                       degrades to `+ - |` rather than refusing
+plotStyle: "marker"    the marker table above the colour floor, and the shape is the caller's.
+                       No floor: the table has an ASCII rung
+```
+
+**The measurement is F431's own, asked at the primitive it was never asked at.** F431 chose this
+rung because a *surface* is 89–96% interior, so the dot grid stipples over a colour the cell was
+going to paint anyway. Ask the same question of an **outline** figure — how much of the rung's
+extra channel does it spend? — and the answer is symmetric:
+
+```
+                              half-block cells   carrying two distinct colours
+lines-series                              107          6     5.6%
+trajectory                                113         21    18.6%
+default (a cloud)                          96         19    19.8%
+wireframe                                 103         32    31.1%
+a shaded surface   (the control)          112         70    62.5%
+```
+
+**69–94% of an outline figure's cells carry one colour**, so the second channel — the whole of what
+this rung buys — is as unspent there as the dot grid's interior is on a surface. And what it costs
+is measurable: over the cube's twelve edges the worst deviation of a drawn sample from its own line
+is **0.5000 cells at the half rung against 0.2500 at braille**, mean per edge `0.3485` against
+`0.1965`. **The surface row is the control**, and it is what says the low numbers belong to the
+figures rather than to the instrument (F482).
+
+**So the braille arm is a trade and not an upgrade**, and naming it that way is what keeps it
+honest: twice the positional resolution in each axis, against the second colour a cell carries.
+
+**And the second half of that sentence used to read *and against a surface's shading*, which the
+walk corrected** (§6m.1, F485). A surface in the dot grid sets every interior dot, `foldBraille`
+answers `⣿` — a **full block** — and the cell takes its nearest sample's shaded colour. So it is
+neither a silhouette nor unshaded: it is shaded at **one colour per cell instead of two**, and the
+fraction that loses information is the 62.5% in the table above. The word was wrong in the
+direction that flatters the arm, and a wrong word implies a wrong repair — *shading gone* invites
+refusing the combination, where the picture is merely coarser in one axis.
+
+### The tier, and the two arms mean different things by it
+
+**Three tiers, bucketed on view `z`, exactly as the density ramp buckets on value.** A terminal
+cannot scale a mark smoothly and a reader cannot tell more than three sizes apart, so the ceiling
+is a decision rather than a limitation.
+
+```
+              colour raster                 glyph arm
+near          a 2x2 block of samples        the near row of the marker table
+mid           a 1x2 block                   the mid row
+far           one sample                    the far row
+```
+
+**One table cannot serve both, and that is the finding rather than a detail.** The design note's
+marker table is a table of *glyphs*, and on the colour raster there are no glyphs — every cell is
+`HALF_BLOCK` and the picture is entirely in the two colours. A tier there is a **sample count**.
+Reading the note's table onto both arms would put a `?` in a cell whose text is fixed.
+
+**The tier is the only depth channel the glyph arm has**, which is why it is not an ornament.
+Below the colour floor a ramp says nothing, and a near point is bigger — so a 3D scatter at one
+bit still reads as three-dimensional, and that is the honest degradation rather than a consolation.
+
+**A near point at the frame's edge clips per sample.** `writeDepth` refuses an out-of-bounds
+coordinate and returns `false`, so the in-bounds quarter of a 2x2 block draws and the rest does
+not. The alternative — dropping the point because its block does not fit — deletes data at the
+edge of every frame, which is the one place a reader is most likely to be looking.
+
+**The tier never sees a culled sample**, because the cull runs first (I86). That ordering is not a
+convenience: a tier bucketed on a view `z` at or behind the eye is bucketing a number the
+projection has already declared meaningless.
+
+### Colour, and the one rule that decides two things
+
+```
+colourBy: "depth"    the ramp over the view-z range        reads as recession    (the default)
+colourBy: "value"    the ramp over point.value             reads as a field
+colourBy: "series"   the categorical palette               reads as identity
+```
+
+**`colourBy` decides both what colour means and whether there is a legend, from one rule.** Under
+`"series"` the block's identities are its `points3` labels, `identityOf` answers them, and
+`legendPlacement`'s count is non-zero, so the key is drawn. Under `"depth"` and `"value"`
+`identityOf` answers nothing, the count is zero, and a categorical legend naming a channel the
+picture does not use never appears. **Two rules here would be a second place for them to
+disagree** — which is I81's mechanism, avoided rather than repaired.
+
+**`SHARES_CELLS` is `true`, and the legend is what makes that cell observable.** Two series'
+samples land in one cell and the depth buffer keeps the nearer, so the cell shows one series and
+nothing in the picture says which. Without the legend the record's entry would be a cell nobody
+could be wrong about, which is F330's class exactly.
+
+**The value ramp's zero-span rule is the field family's own** — mid-ramp at a zero span (C04 I74) —
+and is not re-derived here. The **position** extent's zero rule is I86's centre. They are different
+axes answering different questions, and the reason to say so is that both are called "a zero
+extent" and only one of them is about geometry.
+
+### The twenty-three answers, because each is a question
+
+Adding a member to `PlotForm` produces **23 compile errors in `src/`** across total
+`Record<PlotForm, ...>`s, and 5 more in `test/` and `tools/`. That is the mechanism working: each
+one is a question the form must answer. **None of them is answered from the neighbouring form** —
+`scatter` is `true` at seven cells where this is `false`, and copying it is how F330's five silent
+cells were written.
+
+| record | answer | why, and it is not `scatter`'s reason |
+|---|---|---|
+| `DECLARES_HEIGHT` | `true` | the sample grid is `height x 2`; a derived height would make the grid a function of the data |
+| `ORIENTABLE` | `false` | `orientation` is a two-valued version of what `camera.azimuth` answers continuously — not *unbuilt*, which is the other three reasons in that record |
+| `ORIGIN_DEFAULT` | `null` | the corner the data grows from **moves under an orbit**; a fixed answer would be true at one azimuth |
+| `HONOURS_AXIS_CROSS` | `false` | `overlaidRows` does not compose this area — the form rasterises its own |
+| `HAS_Y_GUTTER` | `false` | the ordinate is drawn in the scene and turns; a gutter is a fixed column |
+| `HAS_DETAIL_RUNGS` | `false` | no `RUNGS` entry, and T2.10 asserts the pair |
+| `HIERARCHY_ROLE` | `null` | draws a series, not a containment |
+| `HAS_X_TITLE` | `false` | there are **three** axes and `xTitle` names one; a caption row naming one of three is worse than none |
+| `HAS_CALLOUT` | `false` | a callout annotates the last reading at the right edge, and the rightmost sample here is a camera artefact |
+| `IS_MATRIX` | `false` | — |
+| `IS_FIELD_FORM` | `false` | — |
+| `STYLE_ARMS` | `["braille", "line", "marker"]` | `auto`'s pair is a capability; what a line is *made of* is a taste, and F431's measurement asked at the outline primitive is what says so (above). The entry was `[]` and the deferral it carried named its own condition |
+| `PLOT_FORM_MEMBERS` | `true` | mechanical |
+| `FORM_ROWS` | the renderer | — |
+| `HAS_VALUE_AXIS` | `false` | **a `Figure` holds one `value` and this form has three ranges** — F330's exact class, and `scatter`'s `true` is the wrong answer to copy |
+| `RAMP_DEFAULT` | `"viridis"` | depth reads as recession and a perceptual ramp is what says so; consumed through `rampOf`, so the entry is not decorative |
+| `MATRIX_LAYOUT` | `null` | not a matrix, which is a different answer from *a matrix with no preference* |
+| `AREA_ROWS` | `heightOrOne` | — |
+| `FURNITURE_ROWS` | `() => 0` | no frame, no rule, no x-labels; a horizontal legend is `legendRows`' and is accounted centrally |
+| `HAS_POSITION_AXIS` | `false` | the abscissa is a **projected** x, not a sample index |
+| `ROW_IS_AN_IDENTITY` | `true` | a `Point3Series` is a thing the caller named; whether colour *carries* that identity is `colourBy`'s decision, which is a different question |
+| `SHARES_CELLS` | `true` | the depth buffer keeps one of two, and the legend is what makes it readable |
+| `SVG_FAMILY` | `null` | a claimed form must put ink on the page (G7b), and no emitter here carries a projection |
+
+**The seam for the day the SVG arm crosses is ruled now rather than after it disagrees.** The
+projection happens **above** the seam: the figure would carry projected, normalised `point` marks
+and neither arm would compute a basis. That is §3ak's finding applied before the second arm exists,
+which is the whole of what 73 disagreeing cells cost the first time.
+
+---
+
+## 6e. The 3D scatter walk — a table, because the interactions are structural
+
+**The shape is a decision and this one is a table.** §3al's own walk was a trace: a camera changes
+because something happened. Nothing here is event-mediated — the arm, the tier, the ramp, the
+identity and the depth buffer all hold at rest, and two of them meet because of what the *block*
+says rather than because of what a reader did. A trace indexed by events cannot reach a cell where
+two records are simply both true, which is C19's `--flag=value` defect in a different component.
+
+Indexed by rule interaction. A row governed by one rule restates that rule and finds nothing.
+
+| # | the two rules | the input | ruling |
+|---|---|---|---|
+| 1 | the glyph arm x `colourBy: "depth"` | 4-bit terminal, default `colourBy` | the glyph arm has one foreground per cell and no ramp below the colour floor, so **depth reads through the tier alone**. The tier is load-bearing rather than decorative, which is I88's whole reason for existing |
+| 2 | the colour raster x the tier | 24-bit, a near point | a "size" on a raster with a fixed glyph is a **sample count**, not a glyph — 2x2, 1x2, 1x1. The note's marker table is the glyph arm's and does not port |
+| 3 | the colour raster x `colourBy: "series"` | two clouds, 24-bit | no conflict on the colour channel — series colour replaces the ramp. The conflict is with the tier: under `"series"` **depth is carried by tier alone even on the raster**, because the raster's one channel is spent |
+| 4 | `colourBy: "value"` x an absent `value` | one point of one series with none | the point has a position, so it would be drawn in some colour. **Refused at the gate** — dropping it is I8's class and a floor colour is indistinguishable from a floor reading (C04 I76) |
+| 5 | `colourBy: "depth"` x a zero z extent | a coplanar cloud | I86's centre rule gives every sample the axis's centre, so the ramp is evaluated at 0.5 and the picture is one flat colour. **That is true**: they are all at the same depth |
+| 6 | the depth buffer x `colourBy: "series"` | two series in one cell | the nearer wins the cell, colour and all. This is why `SHARES_CELLS` is `true` and why the legend is load-bearing rather than polite |
+| 7 | the cull x the depth buffer | every sample behind the eye | nothing is written; the block draws **blank**, not an error — I86's `distance: 0` ruling generalised |
+| 8 | `identityOf` x `colourBy` | `"depth"` with two labelled series | no identities, so no legend. **One rule for both effects**, because two would be a second place to disagree |
+| 9 | the glyph arm x `colourDepth: 1` | monochrome | no colour at all, and the tier is the entire picture. `colourBy` is accepted and decides nothing, which is the honest degradation rather than a refusal |
+| 10 | the tier x the cull | a sample exactly at the near plane | the cull runs first, so the tier never buckets a view `z` at or behind the eye and never divides by zero doing it |
+| 11 | the near tier x the frame edge | a near point at column 0 | `writeDepth` refuses out of bounds per sample, so the in-bounds quarter draws. Dropping the whole point deletes data at the edge of every frame |
+| 12 | the value ramp x a zero **value** span | every point carrying the same `value` | **the field family already answers this** — mid-ramp at a zero span (C04 I74) — and it is not I86's centre rule, which is about the *position* extent. Two things called a zero extent, one of them not about geometry |
+
+**What the table found that no list of inputs would have.** Rows 2 and 3 are the same discovery
+from two directions: the tier and the colour are **one budget of two channels**, and which reading
+each carries depends on the arm *and* on `colourBy` together. A suite indexed by inputs would test
+`colourBy` against every arm and agree with itself every time, because each rule is individually
+satisfied in every cell. Row 12 is the *who else already solved this* instrument: the answer was in
+the field family and re-deriving it here would have been a second zero-span rule to keep in step.
+
+**And the throw's residue, asked because a ruling chose to throw.** Row 4's refusal is at the gate,
+before construction, so it leaves nothing half-built — which is the answer, and it is only an
+answer because it was asked. The refusal that would have residue is one taken *inside* the render,
+and there is none: every degenerate case here draws something or draws nothing, and none of them
+throws.
+
+---
+
+## 3an. The 3D axes — three lines in a frame that turns, and the corner is a computation
+
+**This is more work than the renderer it decorates**, which the design note says and which the
+build confirmed: three projected lines whose labels stay legible as the camera orbits, in a
+coordinate system the reader is moving.
+
+### The corner is three sign tests, and the axes do not draw from the far one
+
+**Three sign tests, not three dot products.** The design note asks for dot products and in a
+**world-aligned** box `eye · x̂` *is* `eye.x` — saying so is the difference between a rule a reader
+can check and one they have to trust. Everything below is those three numbers.
+
+```
+signs        = (sign(eye.x), sign(eye.y), sign(eye.z))
+far corner   = (−sx, −sy, −sz)          the three back faces meet here
+axis corner  = ( sx,  sy, −sz)          near in x and y, far in z
+```
+
+**The design note's rule is wrong about which corner, and its reason is right** (F448). It says
+*compute which of the eight box corners is furthest from the camera and draw from there*, because
+*the axes never occlude the data*. Measured at the default camera, the far corner projects to
+screen **(0.500, 0.527)** — the exact centre of the figure. Axes anchored there run outward
+**across** the data, which is the opposite of the reason.
+
+**The silhouette is what the reason asks for.** The corner near in x and y and far in z projects
+to **(0.500, 0.888)**, the bottom vertex of the cube's outline, and the two bottom edges leaving
+it are the outline's lower left and lower right. That is where every 3D library a reader has seen
+puts x and y, and it is still three sign tests — the same three, combined differently.
+
+**So the box and the axes are two readings of one computation rather than one corner.** The F444
+point is kept and its statement corrected: there is one source of truth and two derived answers,
+not one answer with two consumers. **A rule and its reason can disagree, and the reason is the
+half worth keeping** — which is only findable by drawing the thing.
+
+**The z axis takes a side vertical edge**, not the anchor's own: the vertical at the bottom vertex
+points at the reader, so its ticks would run into the figure and its labels would sit on top of
+it. The two candidates are the outline's left and right verticals, and the left is taken — a
+**fixed** side rather than a nearest, so the axis does not swap sides mid-orbit over a difference
+of a fraction of a cell.
+
+**A zero component ties to the negative end.** At azimuth 0 the eye's `y` is exactly zero and
+there is no furthest corner on that axis. `Math.sign(0)` is `0`, which names no corner at all, so
+the tie is broken **deterministically toward the negative end** — because a camera crossing the
+plane would otherwise make the axes jump twice, once into the degenerate state and once out.
+
+### An edge-on axis keeps its line and loses its labels
+
+**The degenerate arrives as a feature.** F438's edge-on plane is the same geometry: when an axis
+projects to near-zero length its ticks collapse into one point and its labels stack on each other.
+**Hide the labels, keep the line** — the axis is still information about *orientation* when its
+scale is unreadable, and a reader turning the camera needs to see which axis is coming round.
+
+**And the degenerate is orthographic, which is not where it was expected** (F448). A line parallel
+to the view direction projects to an exact point only without a divide; **under perspective it
+keeps extent, because its near end is nearer and therefore larger.** Measured over the two
+projections, in cells at 80×16:
+
+```
+                                  x       y       z
+perspective   top-down          9.41    9.41    3.37
+perspective   level, azimuth 0  2.66   16.67    8.34
+orthographic  top-down         25.30   25.30    0.00
+orthographic  level, azimuth 0  0.00   32.00   16.00
+```
+
+So the rule **fires** at zero under orthographic and **degrades** under perspective, where a short
+axis hands off to the collision rule rather than to the edge-on one. Both are the same statement
+about legibility at two ends of a scale, and stating only the first would have left the perspective
+case reading as a defect.
+
+**And it needs no second rule for priority.** An axis with no visible extent has no labels to
+place, so it neither collides with another axis's labels nor competes for precedence: the collision
+rule is *drop the later, order by projected extent*, and a zero extent sorts last by construction.
+Writing a separate *edge-on axes do not compete* clause would be a second statement of one fact.
+
+### A segment with one endpoint behind the eye is clipped, not dropped
+
+**The step-2 cull is per sample and an axis is not a sample.** `project` returns `null` for a point
+behind the near plane and deliberately has no lateral clip — *a triangle is not one sample and needs
+a real lateral cull, which arrives with the surface* — and the **depth** direction has the same
+problem one step earlier. An axis running from the far corner toward the reader can have its near
+end behind the eye at a small `distance`.
+
+So a segment with one endpoint behind the near plane is **clipped** — at the parameter where view
+`z` crosses `NEAR`, and to the first depth the projector *accepts* rather than to the plane itself.
+`project` culls on `z <= NEAR` **inclusive**, so a clip landing exactly on it is refused by the
+function the clip exists to satisfy, and the first implementation dropped every segment it was
+written to save (F450).
+
+**And the reason first given for the rule was wrong** — *dropping it makes the axis vanish as the
+camera approaches*. Measured: the clipped remainder reaches the frame at **one** of six distances
+swept, because `basisOf` always targets the origin and the divide throws the near region outside
+`[0,1]²`. So a frame comparison agrees whether a segment is clipped, dropped, or clipped to a point
+that is then dropped — which is how the defect survived a row written to catch it. The rule stands
+on being the correct treatment of a straddling segment; the *symptom* it was justified by was
+measured against a clip that never ran.
+
+### The box is the data's extent; the ticks are nice values inside it
+
+**Turning the axes on does not move the data.** The alternative is what matplotlib does — extend
+the range to the nearest nice bounds, so the box corners are round numbers — and it means a reader
+toggling a reference frame watches the picture rescale under them. **`unitOf` normalises the data's
+own extent (I86) whether or not the axes draw**, and the ticks are `niceAxis`'s values *clamped
+inside* that box. A tick that would land outside is not drawn rather than the box being grown to
+meet it.
+
+### The labels are billboarded and cost no gutter
+
+**Always horizontal, never rotated, moving with their anchor and nothing else** — the ruling that
+makes the rest tractable, and the one the camera forced (I83): three axis labels move as the view
+turns, so a fixed column beside the plot could only ever name one of them. They are drawn **inside
+the plot area**, and a 3D form spends no `AXIS_GUTTER`.
+
+**Cell resolution, over a sub-cell raster.** A label is text and the raster arm's samples are half
+a cell tall, so a label overwrites whole **cells** — half a cell of label is not a thing. That is
+the one place in this component where the two resolutions meet, and the rule is that text wins the
+cell it occupies.
+
+**Depth-tested at the anchor and drawn over.** A string is not a sample: testing every cell would
+draw half a label, which is worse than none and reads as corruption rather than as occlusion. It
+is also what makes `axes3: "origin"` readable at all — those lines cross inside the figure by
+construction, so their labels sit where the data is.
+
+**A label reserves a blank on each side, and the frame is why** (F449). Overlap alone is not
+enough: `1` and `0.5` at adjacent columns claim disjoint cells, both draw, and the frame reads
+`10.5` — one number that is neither of them. **Two labels touching are unreadable without
+overlapping**, so the reservation is the label plus its gap, which is the spacing the y-gutter
+already has one dimension down.
+
+**An axis name sits at its midpoint**, pushed further out than its ticks. Past the positive end it
+collides: x and y both run *to* the anchor corner, so both names and a shared tick landed on one
+cell and the frame read `xy1`. The midpoint is the one point on an axis that no other axis shares.
+
+### The four members, and the one that is not here
+
+```ts
+axes3?: "corner" | "origin" | "centre" | false;   // where the three LINES are
+origin3?: "auto" | "min" | "centre" | { x, y, z }; // where coordinate zero SITS
+box3?: "none" | "back" | "full";                   // the wireframe reference frame
+axisStyle3?: { x?: AxisSpec3; y?: AxisSpec3; z?: AxisSpec3 };
+```
+
+**`axes3` and `origin3` are two decisions and conflating them is how a plot ends up unable to show
+a signed field.** Where the lines are drawn and where zero sits are independent; `origin3` is read
+by `axes3: "origin"` and by nothing else, so it is **refused** on the other three — F207's rule,
+and the same shape as `yCallout` needing `yAxis: "right"`.
+
+**`box3`, not the note's `box`.** `plotBox` already exists and means a boxplot's interquartile run,
+so a bare `box` would be two members one letter apart meaning unrelated things. The `3` suffix is
+this form's convention and it is what the other three carry.
+
+**`AxisSpec3` has no `scale`, and that is an omission with a reason rather than a deferral.** The
+note asks for per-axis `ScaleType` — log z with linear x and y — and it is right that one scale for
+three axes is the wrong shape. It is not here because **nothing would read it**: the log transform
+is threaded through `positionalForm`'s machinery and this form composes its own rows, so the member
+would be accepted and ignored, which is the state C04 §3 refuses. It arrives with the code that
+transforms an axis, not with the field that names one.
+
+---
+
+## 6f. The axis walk — a table, and the fifth row is the one that matters
+
+**A table again, and for §6e's reason**: nothing here is event-mediated. The corner changes with
+the camera, but it changes *because the camera is a value*, not because something happened — every
+rule below holds at rest.
+
+| # | the two rules | the input | ruling |
+|---|---|---|---|
+| 1 | far corner × back faces | any camera | **one computation, two readings.** Three signs, computed once; the back faces are the negative side on each and the axes anchor near in x and y — F444's point kept and its statement corrected by the frame (F448), because the two are different corners and not one shared answer |
+| 2 | far corner × a zero eye component | azimuth 0, so `eye.y` is exactly 0 | `Math.sign(0)` is `0` and names no corner. **Tie to the negative end**, deterministically, or a camera crossing the plane makes the axes jump twice |
+| 3 | edge-on × labels | elevation ±π/2, the z axis | keep the line, drop the labels — the axis is orientation even when its scale is unreadable. **And the degenerate is orthographic**: under perspective the same axis keeps 3.37 cells of extent, because the divide spreads a radial line (F448) |
+| 4 | edge-on × label priority | two axes edge-on at once | no second rule needed: a zero extent has no labels to place and sorts last, so *drop the later, order by extent* already covers it |
+| 5 | a segment × the near plane | a small `distance`, a corner behind the eye | **clip, and to the first depth the projector accepts** — `project` culls on `z <= NEAR` inclusive, so clipping *to* the plane drops every segment it saves (F450). The walk predicted the interaction and was wrong about the symptom: the remainder reaches the frame at one distance of six, so no ink comparison can see it |
+| 6 | an axis line × the depth buffer | a point in front of the axis | the line is depth-tested and loses that cell, which is what *never occlude the data* means read from the other side |
+| 7 | a label × the depth buffer | a label over the cloud | tested at the **anchor** and drawn **over**; per-cell testing draws half a label, which reads as corruption rather than as occlusion |
+| 8 | label × label | two labels claiming one cell | drop the later, ordered by projected extent — `niceAxis`'s own rule, reused rather than restated |
+| 9 | `axes3: false` × `box3: "back"` | both set | independent: the box draws with no axes, which is a legitimate render and not a state to refuse |
+| 10 | `origin3` × `axes3` | `origin3` with `"corner"` | `origin3` decides nothing there, so it is **refused** — a member accepted and ignored tells the caller nothing (F207) |
+| 11 | ticks × the data extent | a nice tick outside the range | the box is the data's extent and the tick is dropped; **turning the axes on never moves the data** |
+| 12 | `show: false` × the box | one axis hidden | the box is not an axis: hiding x's line and labels leaves the box's x edges, because they are the reference frame rather than the scale |
+| 13 | the raster × text | a label's cells | labels are **cell** resolution and the raster is sub-cell, so text wins the whole cell. The one place the two resolutions meet |
+| 14 | the glyph arm × labels | 4-bit, ascii | the same labels: the arm changes the marks and not the text, so nothing here is per-arm |
+
+**Row 5 is the one that would have shipped.** Every other cell is a decision between two reasonable
+answers; that one has a wrong answer that draws a legal frame. **Row 1 is F444 arriving as a
+prediction rather than as a finding**, which is the first time this discipline has been able to
+name the shape before building it — the entry exists because a rule with two derivations was
+measured one commit earlier.
+
+**And the throw's residue: there is none.** Every refusal here is at the gate, before construction,
+so nothing is half-built when one fires. Asked because a ruling that throws owes the question, and
+the answer is only an answer because it was asked.
+
+---
+
+## 3ao. The polyline — the primitive that was already built, and three claims that were not
+
+**`strokeSeg` already does what the design note schedules for this step.** It walks a projected
+segment on the dominant screen axis, interpolates `z`, and calls `writeDepth` per sample — which
+is §3b's *`write(x, y, z, …)` instead of an unconditional set, with `z` interpolated along the
+segment*, verbatim. It landed one step earlier as the means to draw the axis lines and the box.
+**So what this step owes is the carrier, not the primitive** (C04 I78), and the note's three
+supporting claims are each measurably wrong about the tree they name.
+
+**One — two line functions, and the note names one while describing the other.** *The existing
+function walks a path in the dot grid setting dots* is `drawLine`'s behaviour (`raster.ts`:
+Bresenham over a `Uint8Array` of dots). `strokePolyline` (`linedraw.ts`) walks a **cell mask**
+setting **edge bits** — `mask[y][x] |= bit`, four bits a cell, in cell coordinates, consumed by
+`glyphForMask`. Both are *the line function*, nothing in the prose forces a choice, and that is
+F58's conflation shape rather than a mistake.
+
+**Two — the substitution has nowhere to live.** There is no `set` to replace: a mask cell
+accumulates up to four bits from up to four segments and `glyphForMask` resolves it **after** all
+strokes, so a per-bit depth test has no carrier and a per-cell one answers a different question.
+Worse, the test is strictly-nearer, so at a shared vertex the second edge is refused **by
+construction** — which is exactly the cell where a join is needed. Box-drawing joins are therefore
+not inherited; they need a second depth rule (equal-or-nearer for the mask, strictly-nearer for
+the colour) on one buffer.
+
+**Three — the selector was not a member of this form, and that is a consequence rather than a
+reason.** *A wireframe with real box-drawing joins is what `plotStyle: "line"` gives you here*, and
+`STYLE_ARMS.plot3d` was `[]` — which is the deferral, not an argument for it. **Retracted**: the
+member exists (I87), and an entry citing its own emptiness is circular.
+
+**And the argument that the joins die with the rung is conditional, and the condition has failed.**
+It read: *on the dot grid, braille and box-drawing were two full-capability choices a caller picked
+between, so box-drawing was a genuinely different picture rather than a coarser copy; here the glyph
+arm is what a terminal gets when it cannot do colour.* **Every clause is true of the glyph arm** —
+which is `auto`'s floor — and false of an arm a caller names at 24-bit, which restores exactly the
+condition the paragraph says is gone. The sentence refuses the *route* and reads as refusing the
+*thing*. **A correct sentence justifying the wrong decision**, which is MG24's shape and is why it
+survived being read carefully (F483).
+
+**What survives is argument two, as the mechanism — and it names its own remedy, which is the half
+nobody acted on**: *a second depth rule, equal-or-nearer for the mask and strictly-nearer for the
+colour, on one buffer.* So `strokeSeg` reports the comparison's **outcome** rather than painting on
+a boolean; one stepping loop still serves all three of its callers, which is why it lives in
+`project3.ts` rather than in a renderer; and the mask takes an edge at a shared vertex where the
+colour does not. **Argument one stands as written** and is now load-bearing in the other direction:
+the note named `drawLine` while describing `strokePolyline`, and the arm built here is
+`strokePolyline`'s.
+
+**And on `auto`'s glyph arm a line is still one directional glyph a sample** — `│` or `─` by
+dominant screen direction, which is what the box and the axis lines have drawn since step 4 and what
+the frame reads legibly at `1bit`, `ascii` and `wide`. That arm does not change; `plotStyle: "line"`
+is a fourth thing beside it rather than a replacement for it.
+
+---
+
+## 6g. The polyline walk — a table, and the three rows are about the *other* carrier
+
+**A table again**: nothing here is event-mediated. And the finding is that the interesting rows
+are not about `lines3` at all — they are rules written against `points3` that a second carrier
+falsifies, which is why indexing by the member would have found none of them.
+
+| # | the two rules | the input | ruling |
+|---|---|---|---|
+| 1 | the extent is the data's (I92) × a line has its own points | `lines3` set, `points3` empty | **the extent is over both carriers.** Otherwise `extentOf([])` returns the unit cube, the polyline draws unnormalised, and the frame is on-screen, in-bounds and describing a different document — T6.77 |
+| 2 | the form is refused with no `points3` (C04 I76) × a wireframe has no cloud | `lines3` only | the gate reads **neither carrier**. A parametric curve and a wireframe are complete documents with no samples |
+| 3 | `colourBy: "value"` walks every point (C04 I76) × a line's points are `Point3` | a line missing a `value` | the walk covers both carriers, or the arm is enforced on half its input — T3.55 |
+| 4 | the series index reads `clouds[i]` × a line has a `tone` and a `label` | one cloud, one line | **one index space, clouds first.** Two spaces give them one palette slot and the legend no way to separate them |
+| 5 | the glyph arm packs `tier × clouds + series` (I88) × row 4 | a line on the glyph arm | a line **must not** reach `glyph[]`, or the `% clouds.length` decode breaks. It takes the literal-glyph channel, whose distinction from `glyph[]` is *chosen glyph* versus *index into the marker table* — and the frame/data difference is carried by `ink[]`, which both writers already set |
+| 6 | first drawn wins a tie (I84) × a trajectory's vertices are its own cloud's points | a path through the cloud that made it | **points draw before lines.** Equal depth at every vertex, so lines-first swallows every marker in the path |
+| 7 | colour is the depth ramp × a segment spans near to far | `colourBy: "depth"` | **per sample, not per segment.** `strokeSeg` has `z` at every step, and one colour for a segment crossing the figure contradicts the cue the whole form rests on. Under `"series"` it is one colour, because that channel is categorical |
+| 8 | `clipProject` clips to the near plane (I91) × a polyline is a chain | one **interior** vertex behind the eye | it clips **twice**, once per adjacent segment, and the two ends land at different points on the near plane — a gap, which is what a line passing behind the reader looks like. Not a defect |
+| 9 | `closed` connects last to first × a polyline of one or two points | `closed: true` | a closing segment at **three or more**. At two it retraces; at one it is zero-length — T3.56 |
+| 10 | a zero extent maps to the centre (I86) × a line along that axis | coplanar input | inherited unchanged: the axis collapses and the line is drawn in the plane, which is the truth |
+
+**Rows 1, 2 and 3 are the walk's whole yield, and all three are the same shape**: a rule correctly
+written for one carrier, unchanged, and wrong the moment there are two. **None of them is
+reachable by asking what `lines3` needs** — the member's own rules (rows 4–9) are all decisions
+between two defensible answers, and the three that have a *wrong* answer are about `points3`.
+That is the classification table finding a structural interaction where the obvious index —
+what does the new field do — finds nothing.
+
+**And the throw's residue: there is none.** Every refusal is at the gate, before construction.
+
+---
+
+## 6h. The surface walk — a table again, and the two zeros are the yield
+
+**A table and not a trace**, on the same reading as §6g: nothing here is event-mediated, and the
+draw-order rows are structural because the order is fixed rather than reached. The yield is rows
+1–5 and 8–9, and **six of the seven are about arithmetic two stages from where the design note put
+them** — a normal that is fine where a projection is degenerate, a clamp applied to the wrong
+quantity, and a measurement whose range nobody wrote down.
+
+| # | the two rules | the input | ruling |
+|---|---|---|---|
+| 1 | a normal describes the geometry **drawn** × `unitOf` maps a zero extent to the centre (I86) | a height field with `xRange: [c, c]` | **normals come from unit space**, and the normalisation is what makes the face degenerate: **8 of 8** zero normals from a mesh with good area in data space — *when the surface is also constant along the collapsed axis*, and **0 of 8** when it is not, since the cross product reduces to `(−Δz_x · Δy, 0, 0)`. The first wording was the unconditional version, which is F451's class in the row recording F456. Computed in data space instead, a surface 1000× wider than it is tall shades as though it were flat — which is not the surface on screen |
+| 2 | a face has a normal × an edge-on plane's faces have zero **projected** area | the plane `x = 0`, camera inside it | **two different zeros.** Measured: 3D area `0.125` per face, first normal `(0.25, 0, 0)` — the plane's own — and **0 of 32** degenerate; projected area exactly `0`, `1/area` = `−Infinity`, barycentric weights `NaN`. The design note scheduled *undefined normals and a divide by zero in the lighting* as the first test, and three of that row's four clauses are false (F456) |
+| 3 | `unit` returns a zero-length vector unchanged × *refuse the face rather than dividing by its length* | a genuinely degenerate face | **nothing divides by a normal's length**, three steps before this step was written. So the face is **not refused**: `dot(0, l)` is `0`, it shades at **ambient**, and I86 already draws a collapsed set rather than refusing one. The remedy the note names is for a divide the pipeline does not contain |
+| 4 | a triangle is filled from barycentric weights × row 2's zero | any triangle under **one sample** of projected area | **stroke the three edges instead of filling**, on one threshold. It covers the edge-on plane, the sub-sample triangle of a dense mesh and the exactly-degenerate face together; a test at exact zero leaves a discontinuity at 89.999° and a 69k-triangle mesh full of holes |
+| 5 | the normal is flipped toward the eye (two-sided) × the sign of a degenerate triangle's screen area | row 2's face | **the flip reads the normal's view `z`, never the screen winding.** `1/area` measured `−Infinity`, so a degenerate area is a **signed** zero and a winding test answers from a sign nobody set. Two-sided is what makes §7's *inconsistent winding* hazard a culling problem only |
+| 6 | `shading: "smooth"` averages adjacent faces × adjacent faces differ in **area** | a grid with unevenly spaced columns | **accumulate raw cross products and normalise once**, which is area-weighted by construction: a big face should move a shared vertex's normal more than a sliver. Measured against the unit average: **13.7°** apart on an even grid, **24.0°** at cubic spacing, **49.2°** at quintic. **The reason first given here was the degenerate face, and it is not one** — `unit` returns the zero vector unchanged, so a zero-area face contributes nothing under *either* scheme, and the two agree to 13.682° with and without a collapsed column. The mutation swapping them is what said so: it survived a sphere, whose faces are near-equal (F459) |
+| 7 | `"smooth"` interpolates a normal per sample × row 5's flip | a silhouette | **flip per sample and not per face.** Per face with smooth normals puts a seam down the silhouette; per sample it is continuous, because the flip happens exactly where `n · l` is zero |
+| 8 | the intensity is clamped to `[0, 1]` × the terms sum to **1.4** | a face at the specular's maximum | **the terms are rebalanced to `0.2 / 0.6 / 0.2`.** Measured: ambient and diffuse reach `0.9501` alone, the specular takes it to `1.3501`, and an intensity clamp leaves **0.0499 of 0.4000 — 12.5%**, three parts in 255 on viridis's mid entry. The clamp was deleting the term §3c calls the difference between a disc and a ball (F457) |
+| 9 | clamping the **component** instead × F455's endorsement of one channel | intensity past 1 on any map | **refused, and by F455's own mechanism.** A channel past 255 clips, a clipped channel rotates hue, and viridis's field ratio falls **3.91× → 0.01×**. F455 measured intensities **0.2–1.0** and neither F455 nor §3c records that — the range is the finding, because it is the number deciding whether the endorsement covers what ships (F457) |
+| 10 | the extent is over every carrier (§6g row 1) × a surface's relief is normalised against it | a flat-ish surface with a cloud far outside it | inherited, and it reads as a defect: the shading flattens because of a point somewhere else. The drawn geometry **is** the normalised one, so flat is the truth — and it is here because a reader will file it |
+| 11 | first drawn wins a tie (I84) × a height field's boundary **is** the extent's boundary | any full-extent surface | **surfaces draw after points and lines and before the frame.** Marks on a surface keep their cells; the frame loses its coincident edges to the surface, which is F452's ruling where the coincidence is structural rather than incidental |
+| 12 | the glyph arm packs `tier × clouds + series` (I88, §6g row 5) × a surface sample is neither | a surface below `halfBlockEligible` | the literal-glyph channel again, and it carries **more** than the frame's mark: `ladderFor("density")` indexed by the intensity. **The glyph arm has the two channels the half-block arm does not** — F436 retracted the two-channel claim because the rung changed, and on the arm that kept two carriers it holds |
+| 13 | `colourBy: "value"` refuses a point with no value (C04 I76) × a surface's field is a grid | `colourBy: "value"` with a surface | the completeness walk covers **three** carriers, and this is where the class closes rather than the instance: one carrier constant read by the gate and the walk, so a fifth carrier is one line |
+| 14 | a value is interpolated barycentrically across a face × row 4's stroke arm | a degenerate face under `colourBy: "value"` | **along the edge by `t`**, because the barycentric weights are exactly what row 4 refuses to compute |
+| 15 | a segment behind the eye is clipped rather than dropped (I91, F450) × a triangle has three vertices | one or two vertices behind the near plane | **clipped into one or two triangles**, with the field value and the smooth normal interpolated to the new vertices — step 5's `ta`/`tb` one dimension up. Dropping is F450 repeated on the carrier that covers the most area |
+
+**Rows 2, 3, 8 and 9 are the ones a reader could not have got to.** Each is a correct sentence
+attached to the wrong quantity: a normal that is defined where the projection is not, a divide that
+another file already refused, a clamp on the intensity rather than on the thing whose range was
+measured, and an endorsement whose interval neither document wrote down. **None of them is
+reachable by asking what a surface needs** — they are reachable only by asking which two rules
+claim one number.
+
+**And the throw's residue: there is none.** The arm refusals are at the gate; the renderer refuses
+nothing and draws a collapsed surface rather than dropping it.
+
+---
+
+## 6i. The wireframe and the cull — a table again, and two of the note's three rulings do not survive
+
+**A table and not a trace, and this time the choice was checked rather than inherited.** The
+step has one sequence-shaped question — two coincident surfaces, where the array order decides —
+and it reduces to I84's tie rule, which is already written. Everything else here holds at rest:
+which member enables what, which normal a test reads, which of a triangle's three edges is the
+caller's. Rows 6, 7, 10 and 15 are the yield, and **three of them are about a mechanism the
+design note specified that cannot be built.**
+
+| # | the two rules | the input | ruling |
+|---|---|---|---|
+| 1 | backface culling drops `dot(normal, view) < 0` × a perspective camera gives every face its own direction to the eye | a sphere at `distance: 1.5` | **the direction is per face** — `centroid − eye`, never a view-space constant. Measured over 2304 faces: they disagree on **7.29%** at distance 6 and **34.03%** at 1.5, and the constant answers *48.18% visible* at **every** distance because a view-space `z` test cannot read the eye's position. The note's form is the orthographic limit (F460) |
+| 2 | *removes ~half the faces of a sphere* × the visible fraction is `(1 − r/d)/2` | any distance | **58% at distance 6 and 83% at 1.5.** Half is what the cull approaches as `d → ∞`. By **face count** it is 44.5% rather than 41.7% at distance 6, because a UV sphere's polar faces are slivers — so the prose states the area figure and the row asserts the count, or the two disagree by three points and nobody knows which is wrong |
+| 3 | `closed` enables culling × the caller's winding decides which side is out | the obvious UV sphere | **`closed` licenses two powers and the second is the one a reader will miss**: the renderer orients the cull from the mesh's **own signed volume**, `Σ dot(a, cross(b, c)) / 6`. Rings by segments in grid order measures **−4.16** — wound inward — so trusting it culls the front and draws the back. Oriented, the natural and reversed spheres produce **byte-identical masks** — kept faces 576/576, sample mask 0 of 8960 apart (F461) |
+| 4 | two-sided shading flips the normal toward the eye (§6h row 5) × a wrongly-oriented cull draws the far hemisphere | row 3's sphere, unoriented | **the shading is what hides it.** The back lights correctly, so the frame is a plausible hollow shell rather than a bug and no assertion about a colour, an intensity or a silhouette can tell the two apart. §6h row 5 made winding irrelevant to *shading*; this is where that stops being a simplification |
+| 5 | the volume gives a sign × winding can be locally inconsistent | a sphere with some faces reversed | **not covered, and the sensitivity is inverted relative to the damage.** Half reversed by latitude measures `−1.2e-15`, by longitude `−1.3e-16`, alternating `−1.3e-16` — all refused by `|V| < ε`, which draws everything. **One face in eight** leaves a confident `−3.12` and gets 54.1% culled against 55.5%: about 32 faces wrong, in silence. The **badly** wound mesh is caught and the **mildly** wound one is not, and this row is the record of it rather than a defect to fix |
+| 6 | `closed` is the culling switch × a height field is open by construction | `closed: true` with `heights` | **refused at both gates**, because the renderer cannot detect it. *An open surface's signed volume is exactly 0* was measured on a flat quad; a 9×9 Gaussian measures **0.1742** and a 21×21 **0.1785**. **The zero belongs to `unitOf`** — it centres each axis on the extent, so every *planar* surface normalises onto a plane through the origin and cancels. Three of six fixtures returned zero for that reason and read as corroboration (F463) |
+| 7 | a wireframe edge is biased toward the camera by a small constant × the two rasterisers do not sample the same points | any surface with a grazing face | **there is no such constant.** `strokeSeg` floors and steps on the dominant axis; `fill` samples at `+0.5` centres — so an edge disagrees with its **own** face by a median `1.60e-2` and a max `4.31e-1`, against a sample row of `4.17e-2` on a figure spanning 2. Swept: 22.6% of edge samples draw at bias 0, 27.6% at `1e-3`, and the ceiling of 55.4% costs `3e-1` — 15% of the figure, which a far wireframe then punches through near geometry with (F462) |
+| 8 | the edge is a primitive × the edge is where a face's barycentric weight is small | the same | **the edge is the fill's own sample.** `w0` is twice the sub-triangle's area, so `w0 / \|ab\|` is the perpendicular distance in **samples** and a sample is on edge `ab` below `EDGE_HALF = 0.7` of one. No second rasteriser, no bias, no z-fight constructible, and hidden-line removal exact rather than approximate. The threshold is in screen samples, so it does not move with the mesh's density |
+| 9 | the wireframe follows the input's structure × a height field is triangulated before it is drawn | a 6×6 grid | **the diagonal is not an edge.** A 9×9 grid's triangulation has **208** undirected edges against the grid's **144** — 64 diagonals, one a cell, 44% more. Drawn at 78×44: every-triangle-edge gives 258 edge samples to 36 interior and no cell is legible; the grid's own lines give **168 to 126** and the cells read. A mesh has no structure but its triangles, so its mask is all true, and a dense mesh's wireframe is solid — which is honest rather than a defect |
+| 10 | the clip splits a face into two (§6h row 15) × the edge test reads the barycentric weights | a face straddling the near plane | **a cut edge is not an edge.** `clipNear` makes vertices the caller never supplied, so the mask has to be carried through the clip and the new edges masked off — otherwise a surface entering the camera grows a bright seam across it that is in no input. Nothing in either member's description reaches this; it is two correct rules meeting |
+| 11 | `wireframe: true` paints only edges × the depth buffer is shared with every carrier | a cloud behind a wireframe surface | **the interior writes depth and clears the ink.** A cage that does not write depth lets a point behind it draw through, which is wrong under any reading; one that writes without clearing keeps a nearer carrier's ink at a sample it has just lost — I90's rule about the frame's write, one carrier along. So a wireframe is a **solid whose interior is not painted**, and hidden-line rather than see-through: matplotlib's is see-through because it can be orbited, and a committed frame cannot |
+| 12 | culling is per face × `shading: "smooth"` interpolates vertex normals | a smooth closed mesh | **the cull reads the face normal**, which the smooth arm computes and then discards. A vertex normal is an average over adjacent faces and does not describe any face's orientation, so `Tri3` carries the face normal beside the shading normal rather than deriving one from the other |
+| 13 | the edge takes the surface's colour × the fill takes the same colour | `wireframe: "over"` anywhere | **the edge is its own face at half the intensity**, so it cannot collapse into it. Any absolute value lies inside the fill's own range — measured `0.1332 … 0.7871` over a Gaussian — so an edge pinned to a constant disappears wherever the face reaches it. Halving keeps the shading and the depth attenuation on the edge and separates everywhere, worst case `0.1332` against `0.0666`. On the glyph arm the same number moves the density ramp down, so one rule serves both arms |
+| 14 | the cull changes what is drawn × the extent and the depth span are the data's (I92, §6h row 10) | a culled sphere | **neither moves.** Culling is a drawing decision and the extent is the document's, so the span keeps the back of the sphere and the attenuation uses only the near half of its range. Consistent with points and lines, which key to the whole data for the same reason — and it is here because a reader will file it as a defect |
+| 15 | `closed` is refused on the height-field arm (row 6) × `wireframe` is not | `wireframe` with `heights` | **accepted, and the two members do not imply each other.** A wireframe is about the edges the input already has and a height field has the most structured ones; `closed` is about enclosing a volume and a grid encloses nothing. Refusing both on one arm because they arrived together is the bundled-row mistake with a member in place of a blocker |
+
+**Rows 6, 7, 10 and 15 are the ones a reader could not have got to.** Row 7 is the sharpest: the
+note's sentence is *specific*, *falsifiable* and *never measured against the thing it has to
+beat*, and it reads as a settled ruling because it names a mechanism and a discipline in the same
+breath. Row 6 inverts F463's premise; row 10 is two correct rules meeting at a vertex neither
+mentions; row 15 is one arm's refusal about to be copied onto a member that does not want it.
+
+**And the throw's residue: there is none.** The refusals are at the gate, and the renderer's only
+decision is to draw fewer faces.
+
+---
+
+## 6j. The geometry walk — a table, and every row is about the *fixture* rather than the renderer
+
+**The seventh walk, and the first whose subject is a suite.** Steps 2 to 7 each added a mechanism
+and walked it; step 9 adds no mechanism at all — seven shapes, the ones §7 of the design note
+names, and rows that say whether a whole figure is right. So the interactions are not between two
+renderer rules; they are between **a renderer rule and the shape chosen to exercise it**, which is
+the same structural kind and lands in the same artefact. A trace would find nothing: nothing here
+happens in sequence, and the one thing that does — orbiting a shape — is I84's tie rule and C22's
+cadence, both already written.
+
+**Six rows are the yield and none of them is a defect in `src/`.** Every one is a claim in the
+design note's §7 that the shape it names cannot support, which is what makes this the walk to run
+before the fixtures exist rather than after: a fixture written from the note's text passes,
+asserts the wrong quantity, and reads as coverage.
+
+| # | the two rules | the input | ruling |
+|---|---|---|---|
+| 1 | the plane's own normal survives `unitOf` (I94, F456) × the triangulation's diagonal is fixed | `x = 0`, `y = 0` and `z = 0` as meshes | **all three keep their own normal.** 72 faces each, **0** zero normals, first normals `(1,0,0)`, `(0,−1,0)`, `(0,0,1)`. F456 measured one plane; the other two are the row, because the quad's diagonal runs one way and a rule that held for `x` could have failed for `y` |
+| 2 | a zero-projected-area face is stroked rather than dropped (I94) × the three planes | each from a camera lying in it | **the kind agrees and the orientation does not.** All 72 faces project to zero area in every case; `x = 0` draws 8 cells in one column, `y = 0` 8 in one column, `z = 0` **16 in one row**. So the row asserts a line and its direction, and a suite asserting only *not blank* would pass on all three with the axes transposed |
+| 3 | the light is fixed in **view** space (C04 I79) × the corner camera every 3D fixture uses | a cube, `shading: "flat"`, colour held constant | **azimuth `π/4` is the symmetry plane and two of the three visible faces light identically** — 2 luminance clusters of 47 and 89 cells. At 0.5 and 1.2 it is **3**. The note's *six distinct intensities under one light* is unmeasurable at the camera the corpus reaches for, and it is a property of the camera rather than of the shading |
+| 4 | backface culling is a sign test on a dot product (I95) × a UV sphere's poles are degenerate | `sphere(24, 12)`, `closed: true` | **a zero normal cannot be culled** — it fails both signs — and **42 of 576** faces have one. All 42 survive, and **the frame is byte-identical with and without them**: the consequence is arithmetic, not visual. Recorded rather than repaired, because dropping them is a fourth branch in the hot loop for cells nobody can see |
+| 5 | row 4 × *exactly half the faces should survive* | the same sphere at four distances | **false at every one**: 21.88% at 1.5, 38.54% at 3, 45.49% at 6, **53.13%** at 100. Perspective shows *less* than half and the figure exceeding half at the orthographic limit is row 4's 42 faces — over the non-degenerate faces alone it is **49.4%**. A fraction-visible figure is a statement about the tessellation as much as about the cull |
+| 6 | the cull × a closed convex body's face count | a cube at three cameras | **2, 4 and 6 of 12** — face-on, edge-on, corner. One, two or three faces and never more, so *half* is the corner camera's coincidence and not a rule |
+| 7 | `unitOf` normalises each axis independently × *the tilted plane is the general case* | `z = 0.3x + 0.15y` at the reference camera | **the general case chosen carelessly is the degenerate one.** The heights span `[−0.9, 0.9]`, so `unitOf` steepens `z` by `1/0.9` and the plane comes to lie nearly along the view direction: **25 inked cells against the flat control's 59**. The slope has to be chosen against the camera, and the row says which |
+| 8 | shading multiplies the resolved colour (I94) × *the cleanest test of the colour/shading separation* | a Gaussian, `field` constant | **a constant field is not a constant frame** — 50 distinct colours from one field value, because shading varies the luminance of a held hue. The separation is *hue held, luminance varying*; a row asserting *one colour* asserts the separation is broken |
+| 9 | the quantisation ladder × *a band is the colour quantisation, and the row reads the `colourDepth` it ran at* | the saddle at all five capability sets | **84 → 13 → 1**: 24-bit 84 colours, 8-bit 13, `ascii` and `1bit` **1**. `ascii` and `1bit` are the same rung for colour and differ in glyph — 91 inked against 87 — so a row that names *the ASCII arm* when it means *no colour* is naming the wrong axis |
+| 10 | interior holes are cracks between triangles **or** they are the silhouette | four height fields at four grid resolutions | **geometry, and the control is what says so.** The flat plane and the Gaussian have **0** holes at 9, 17, 33 and 65; the egg-carton converges to **10** and the saddle to **2**. A crack scales with the triangle count and these do not, and without the two zero rows the same numbers read as a rasteriser defect |
+
+### 6j.1 · The rulings
+
+**R1 — the reference camera is off the symmetry plane, and the suite says why.** Rows 3 and 7 are
+one fact twice: `azimuth: π/4` is where the `x` and `y` axes exchange, so a view-space light gives
+two of three cube faces the same intensity, and a mesh and its own `x`/`y` transpose ink the *same
+number of cells* while drawing different frames. Every geometry row therefore takes an asymmetric
+azimuth, and any row that must use `π/4` compares the **frame** rather than a count.
+
+**R2 — a fraction-visible figure names its denominator.** Row 5's 53.13% is not a cull defect and
+is not half; it is 306 of 576 where 42 of the 576 cannot be culled at all. So the suite asserts the
+figure over the faces the cull can decide, and records the degenerate count beside it.
+
+**R3 — the degenerate faces stay.** Row 4's remedy would be a length test per face per frame, in
+the loop §11 already measures at 1.265 ms for 3,200 triangles, to remove cells that do not exist.
+The condition is written where the cull is, and the symbol to grep if a mesh ever arrives whose
+degeneracies *do* ink is `fn`.
+
+**R4 — a shape row asserts the whole figure and never a count alone.** Row 2's three planes agree
+on every scalar and differ in orientation; row 3's cube at `π/4` agrees on cluster count with a
+renderer that has lost a face. This is *a property only a set has* arriving inside one row, and the
+answer is the same: assert the arrangement, not the total.
+
+### 6j.2 · Residue
+
+**What this walk did not reach**: the real meshes. Rows 4, 5 and 10 are all about a tessellation's
+own defects — degenerate faces, a non-convex silhouette — and every one of them was **placed there
+deliberately by the fixture**. A scanned mesh has them in unknown places, which is step 10's whole
+argument and is not weakened by anything here.
+
+**And the throw's residue: there is none.** Nothing in the suite decides; the refusals it exercises
+are the gate's and are already covered by T3.57.
+
+---
+
+## 6k. The real-mesh walk — a table, and the meshes are right for none of the stated reasons
+
+**The eighth walk, and its subject is three files.** §6j's rows were between a renderer rule and a
+shape *chosen* to exercise it; these rows are between a renderer rule and a shape **nobody chose** —
+a 1975 tessellation, a 1994 laser scan and a Blender demo model. That is the whole argument for
+them, and it is why the interactions are still structural: a mesh has no history, only properties,
+and the question is which of them meet a rule that was written without them.
+
+**The design note's §7 gives three reasons and two are false of all three meshes.** Measured before
+a fixture existed, which is the point of running this first:
+
+```
+                 triangles   degenerate   inconsistent edges   boundary edges   non-manifold
+teapot               6,320            0                    0            1,036              0
+stanford-bunny      69,451            0                    0              223              0
+suzanne                968            0                    0               42              1
+```
+
+| # | the two rules | the input | ruling |
+|---|---|---|---|
+| 1 | OBJ carries no up-axis × `basisOf` builds its eye from `elevation` about **z** | all three files | **Y-up, so every one is drawn lying on its back — and the frame does not say so.** The teapot on its side inks 188 cells and reads as a plausible egg; upright, 192 and a lid knob. The statistic that separates them is **interior holes**, because a silhouette along an axis of near-symmetry has none: as-is 2 / 18 / 6, rotated 0 / 0 / 1. The rotation belongs in the loader, once, with those numbers (F476) |
+| 2 | *a teapot either looks like a teapot or it does not* × the figure is aspect-bound to the block's height (§3p) | the teapot at four heights | **the argument needs a size and the note gives none.** 60, 144, 336 and 726 inked cells at heights 12, 20, 32 and 48; a recognisable lid from about 24 rows. **Widening does nothing** — a 240-column frame draws the same 40-column teapot as a 120-column one. A transcript block is 12 to 20 rows, so *wrong is instantly visible* is true at a height no reader gives it |
+| 3 | `closed: true` licenses the cull (I95) × every real mesh here is **open** | 1,036 / 223 / 42 boundary edges | **the orientation holds across two orders of magnitude of openness** — `cullSign` reads +2.587, +2.031 and +1.966, confident and correct. What the cull changes on an open mesh is not its own correctness but which interior surfaces show through the openings: 2 cells on the teapot, 4 on Suzanne. This is the case `closed` was written for and had no fixture (F475) |
+| 4 | the cull drops back faces × the depth test would have rejected them anyway | the bunny | **32,974 of 69,451 dropped for a byte-identical frame**, and 222.3 ms against 229.9 without — **3.3%**. So on a closed body the cull's correctness is invisible and its throughput is negligible, and a row asserting *the cull works* against the bunny asserts nothing. The cull's fixture has to be an open mesh, which is row 3 |
+| 5 | §11's budget is stated **per triangle** × a real mesh's triangles are not uniform | the bunny against a 69,192-triangle grid | **1.56×** at the same count, the same frame and the same warmup — 222.3 ms against 142.7. The grid's triangles cover the frame once; the bunny packs about 30 into every sample of a 60 × 40 grid. **And the obvious replacement unit is wrong in the other direction**: counted, the bunny produces **0.159×** the grid's *surviving* samples — `drawTri`'s callback fires post-depth-test — so the budget tracks neither the triangle count nor the output, and the work is in the samples that lose (F478) |
+| 6 | I95's confident-sign case × *real meshes have faces wound both ways* | all three | **0 inconsistently wound edges in every one.** The note's most confident sentence — *every renderer hits this once and synthetic geometry never shows it* — is false of the corpus it was written to justify. The case must be constructed, and `WF3` constructs it |
+| 7 | flat against smooth in **one** mesh × Suzanne's sharp and smooth regions | Suzanne | **holds, and it is the only one of the note's four claims that does.** 69 distinct colours flat against 83 smooth over the same 122 inked cells |
+| 8 | an external check × this renderer's lighting model | the Cornell box | **refused with its mechanism.** The published renders are radiosity solutions and the scene exists to show colour bleeding; one light direction, no interreflection and terms summing to 1 (F457) cannot produce it, so every interesting difference would be a feature of the model rather than a defect (F477) |
+
+### 6k.1 · The rulings
+
+**R1 — the loader owns the orientation.** Applied once, in `test/support/obj.ts`, with the hole
+counts written beside it. Per fixture is worse than wrong: the next mesh added inherits the default
+and nothing says so.
+
+**R2 — a mesh fixture states the height it was read at.** Row 2 makes the size a parameter of the
+claim rather than a property of the mesh, and widening the frame is not a remedy.
+
+**R3 — a row about the cull uses an open mesh.** Row 4 is the reason: the bunny cannot witness the
+cull, in either direction.
+
+**R4 — a per-frame budget names its mesh or its sample count, never a triangle count alone.** Row 5
+is the fixture-regularity error of F474 and F475 arriving in the performance model, where it reads
+as a safety margin.
+
+**R5 — the fourth mesh is refused rather than deferred**, because *we could not find an OBJ* is a
+cost argument in fit-argument clothes and would be answered by the next URL.
+
+| 9 | *the visual check is unambiguous* × the picture **is** the colour on this rung | the teapot at 24-bit | **a stripped capture cannot judge it.** The half-block arm paints `▀` in every inked cell and puts both colours in the SGR, so a text frame carries one character class and the entire picture is in the escape codes. The readable statistic is the studio light's direction — the mean luminance up-and-right of the figure's centre against down-and-left — which is `plot-surface3d.test.ts`'s `litRatio` one carrier along |
+
+### 6k.1a · The catalogue takes none of them, and the coverage was checked rather than assumed
+
+**§7 already ruled it**: *a teapot in `docs/catalogue/` is fun and it is not what the catalogue is
+for — the catalogue shows what a form does for a reader, and a reader does not plot teapots.* What
+step 10 owed was to check that the 3D forms are covered without one, and they are: `plot3d` has
+**twelve** catalogue variants at five capability sets — default, both colour arms, orthographic,
+axes at the origin, the full box, a trajectory, a path with no cloud, the wireframe — and the
+surface carrier is covered by a synthetic sphere across `shading: "smooth"`, `shading: "flat"`, an
+explicit `light3` and the cull. So the meshes are fixtures and the record they get is **golden
+frames**, which move when the renderer moves and are read by nobody looking for a form.
+
+### 6k.2 · Residue
+
+**What this walk did not reach**: the raw scans. Every property the note reasoned from — random
+degeneracies, mixed winding — belongs to scanner output before cleaning, and nobody distributes
+that. The honest position is that this corpus has none of it and the synthetic fixtures are where
+those cases live: a UV sphere's 42 poles (F473) and `WF3`'s hand-reversed winding.
+
+**And the throw's residue: there is none.** The loader throws on a digest mismatch, before any
+mesh exists to leave half-built.
+
+---
+
+## 6l. The axis tone walk — a table, and the trap is which object the colour belongs to
+
+**The ninth walk and the arc's last.** One optional field on a type that already exists, which is
+the smallest subject any of these has had — and it still has four cells where two rules meet,
+because a colour on an axis touches the box, the labels, the depth test and the degradation ladder,
+and each of those already has a rule.
+
+| # | the two rules | the input | ruling |
+|---|---|---|---|
+| 1 | `box3` and `axes3` are independent members (I90, AX14) × a box edge runs **parallel to an axis** | `box3: "full"` with three tones set | **the box stays `tone.muted`.** Twelve edges in three colours is a tricolour cage, and the note's own worry — *three different tones by default would make the frame compete with the data* — lands hardest exactly there. The tone colours the **axis line, its ticks and its label**, which are the three things `axes3` draws and the box is not one of them |
+| 2 | a label is drawn over the cloud, whole (I92) × the label **names** the axis | a coloured axis with `ticks` on | **the label takes the axis's tone**, because it is the axis's name and a muted label beside a coloured line is two answers to *which axis is this*. `overlay` takes one ink for the whole label pass today, so this is the one place the field costs a signature rather than a lookup |
+| 3 | the frame draws **last** and `writeDepth` is strictly nearer (I90, F452) × a tone is only observable where the axis wins its cell | any camera where the cloud covers the axis | **a row asserting a tone has to place the axis in front.** The frame's cells are whatever the data did not take, so at the wrong camera a per-axis tone is correct and invisible, and the row passes for a renderer that ignores the field. A sparse cloud is what makes the assertion honest — **and the box is a second occluder the table missed**: it strokes before the axes and a tie goes to whoever drew first (F452), so `box3: "full"` takes the axis lines it coincides with, measured **9 accent cells down to 1**. So `AT1`'s box arm is a ceiling rather than an equality, and `box3` is a parameter of the row rather than a constant (F481) |
+| 4 | `slot()` resolves through the capability set × `Tone` is a compile-time union the gate does not check | `tone: "chartreuse"` from an adapter | **`slot` answers `{}`** — no colour, no throw — so an unknown tone draws an *uncoloured* mark. Measured across six carriers, **every one accepts it**, so this is a repo-wide convention rather than something the new field introduces, and validating one member of one union on one carrier would be the wrong repair (F479) |
+| 5 | the tone is a colour × the ASCII and 1-bit rungs have none | three tones at `1bit` | **the frame is identical with and without them**, which is the row that says the feature adds no reading on that rung and takes none away. The axes stay distinguishable by their labels, which is what carries the reading below the colour rungs already |
+
+### 6l.1 · The rulings
+
+**R1 — the default is `tone.muted` for all three and the reason is recorded.** §10 step 11 asks
+what needs deciding and this is it: three tones by default makes the frame compete with the data,
+so the field is opt-in and a caller who sets one axis gets one coloured axis.
+
+**R2 — the box is not an axis.** Row 1, and it follows from C04 I77's own separation rather than
+from taste.
+
+**R3 — a tone row places the axis in front of the data.** Row 3 is the trap and it is the same
+shape as the geometry suite's camera: a correct implementation and a wrong fixture agree.
+
+**R4 — the unknown tone stays unvalidated, and the limit is stated rather than half-closed.**
+Row 4, F479.
+
+### 6l.2 · Residue
+
+**What this walk did not reach**: `overlay`'s single ink. Row 2 makes the label's colour per axis,
+and `overlay(composed, labels, frameInk, width)` takes one. The labels already carry which axis
+they belong to, so the change is local — but it is the one place in the frame where a *pass* rather
+than a *sample* holds the colour, and that asymmetry is worth naming before somebody adds a second
+per-label property to it.
+
+**And the throw's residue: there is none.** Nothing here refuses anything; row 4's ruling is that
+the gate stays as it is.
+
+---
+
+## 3ap. `sankey` — bars for the nodes, ribbons for the flows, over `graph`'s layering
+
+§3d ruled it before there was a consumer: *passes 1–5 transfer as `graphLayers`, and nothing
+after them does*. The consumer arrived as C04 I92, and this section is the placement and the
+drawing the ruling said were missing. **Nothing in `graph.ts`'s six passes changed**; it gained
+one output, `origins`, which is topology rather than weight (§3ap.4 K1).
+
+### 3ap.1 — compared against two references, and what each settled
+
+**The pictures first, then the preference** — the memory rule, because a reference's default is
+its taste and not a measurement.
+
+| reference | what it draws | what it settled here |
+|---|---|---|
+| **d3-sankey** (the energy figure) and **plotly `go.Sankey`** | thin node rectangles stacked per layer with a pad; ribbons as two cubic Béziers, filled in a source-derived colour at about half opacity; labels beside the bar, to the right everywhere and to the **left** on the last layer | the whole shape — layers left to right, a bar's extent is its flow, a ribbon's width is its weight, links drawn before nodes, the last layer's label flipped so the figure does not trail off the right edge |
+| **`mermaid-ascii`'s `sankey`** (the only terminal implementation found) | **one line per flow**: `Source ████ ──> Target (100)`, the bar's *length* the value, `#` at ASCII, no layout at all | what to do with the value — **nothing**. The ribbon's width is the reading; a numeral beside every bar is the table that renderer draws *instead of* a figure, and this form has a layout to spend the cells on. And the ASCII pair: `#` for a bar, which both agree on |
+
+**The preference taken deliberately**: plotly's half-opacity ribbon is a *colour* effect, and
+this component has no second channel to spend on it (I6, I17). The terminal's equivalent is a
+**glyph** — the medium shade `▒` for a ribbon's interior against the solid `█` for a bar — which
+reads as the lighter colour at every depth from 24-bit down and is still two shapes at one bit.
+Both alternatives were rendered and read (§3ap.2).
+
+### 3ap.2 — the alphabet, and the frame that chose it (I111)
+
+Two candidates for a ribbon's interior, both drawn on the default fixture at 24-bit and read
+with the colour stripped:
+
+```
+A · solid + dim          B · shade                 the 1-bit question
+██b█████▄▄▄▄▄▄▄▄▄▄▄▄     █▒b▒▒▒▒▒▄▄▄▄▄▄▄▄▄▄▄▄      A: a bar and a ribbon are the same glyph,
+████████████████y██      █▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒y▒█         and `dim` is an attribute a dumb
+        ▀▀▀▀▀▀▀▀▀▀▀█             ▀▀▀▀▀▀▀▀▀▀▀█         terminal drops — the column of bars
+██a█████████████████     █▒a▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒█         disappears into the fill
+```
+
+**B is the ruling, and the argument is I17's rather than taste**: *the glyph is the channel at
+every depth*. A carries the bar/ribbon distinction in `dim`, which is an SGR attribute — gone at
+one bit and on any terminal that ignores attributes, where the whole figure becomes one block of
+`█` with letters in it. B carries it in the shape, so the frame at `MONO_UNICODE_CAPS` is the
+same frame as at 24-bit with the colours removed. That B also *looks* like the half-opacity
+ribbon the references draw is the medium shade being, literally, a 50% fill.
+
+The alphabet, one function (`sankeyAlphabet`), both arms in the same expression:
+
+| | narrow unicode | ASCII, or `ambiguousWidth: "wide"` |
+|---|---|---|
+| a bar, both halves | `█` | `#` |
+| a ribbon's interior | `▒` | `=` |
+| the upper half only | `▀` | `-` (bar: `#`) |
+| the lower half only | `▄` | `-` (bar: `#`) |
+| two owners in one cell | `▀`, the upper owner's slot as foreground and the **lower owner's as background** | `#` if either is a bar, else `=`, in the upper owner's slot |
+
+**`▀ ▄ █ ▒` are `East_Asian_Width=Ambiguous` every one**, so the wide arm takes the ASCII set —
+`barStyle`'s rule (C02 I9, A03 SS47) applied to the same family, and the reason there is one
+function rather than a glyph per site.
+
+**The two-owner cell is `image.ts`'s precedent and not a new licence.** C10 I21 admits a
+background only from a `surface` ref because its floors are measured for text *on* a surface; a
+half-block cell whose two halves are two flows has no text to be illegible, which is the one case
+I21 was widened for (`wash`, C12 I29). The slots are still named, not embedded — the area returns
+`categorical.cN` refs and `definition.ts` resolves them at the terminal's depth (I4).
+
+### 3ap.3 — the geometry, one function and two painters (I110)
+
+`sankeyLayout(g, { height, gap, min, quantum })` is pure — 0 `cells()`, 0 `caps` — and both
+arms call it: the terminal in **half-rows** with `quantum: true`, the SVG in **pixels** with
+`quantum: false`. Every bar, every slice and every ribbon end the two arms draw comes out of the
+same arithmetic on different units, which is I1's *measure the same* one level up and the
+opposite of `graph`'s arrangement, where the topology crosses and the placement does not
+(§3aj.6). It can cross here because nothing in it is a string: what does not cross is the
+horizontal axis and the labels, which are cells on one side and a font on the other (§3aj
+hazard 4).
+
+1. **The scale is one number.** For each layer, `(height − gap · (n − 1)) / Σflow`, where a
+   node's flow is the larger of its two sides and a dummy's is the weight it carries; the
+   **smallest** over the layers is the scale, so a unit of flow is the same height everywhere
+   and a ribbon leaves a bar at the width it arrives with.
+2. **A slice is `max(min, weight · scale)`** — rounded to a whole unit under `quantum`, never
+   below one. **A bar is the larger of its two sides**, summed over its rounded slices, so a bar
+   is exactly its slices with nothing between them on the side that sets it.
+3. **Stack from the top and centre, per layer**, then **relax**: four alternating sweeps pull
+   each bar toward the weighted mean of its neighbours' centres and `separate` restores the gap
+   **without reordering** — the ordering pass owns the order (§3ai.6) — shifting the whole stack
+   back inside `[0, height]` rather than clamping one bar.
+4. **Slices are ordered by the far end's centre**, on both sides, after the positions are final.
+5. **The vertical quantum is a half-row**, which is what `▀ ▄` buy: a flow that rounds below one
+   half-row still draws as one.
+
+The terminal arm (`sankeyArea`) puts the layers at `round(l · (width − 1) / (k − 1))` — first bar
+in column 0, last in the last column — and draws ribbons **column by column** between two bars
+along `t²(3 − 2t)`, the cubic's S sampled per cell; the SVG arm (`sankeyMarks`) draws the same
+S as two Béziers with their control points at the mid x, closed and filled at `fill-opacity
+0.5`. Ribbons first, bars over them (d3's order and the treemap's reason). A node's colour is
+its **declaration index** through `refOf` — plotly's per-node colour, and the reason the graph's
+per-layer `refOf(d)` is not reused.
+
+**The budget loop is the terminal's alone.** The row for the notice is spent before the drawing
+is chosen (§3ah.4); the gap is tried at one row, a half-row and none; when nothing fits the
+**least-flow** node is dropped — ties by declaration order reversed, so the order is total (I11)
+— and the layering re-run, because a dropped node takes its edges and their dummies with it
+(§3ai.4 G4). The SVG has no budget and drops nothing, which is `graph`'s split exactly.
+
+**Labels** sit one cell off the bar at the bar's centre row, to the right everywhere but the last
+layer. One that would run into the next bar, or into a label already written, is **dropped,
+never truncated** — §3n's oldest rule, arriving on a fourth form: the bar keeps its colour and its
+extent as a tile whose name did not fit keeps both, and nothing is said in the notice, because
+the notice is for data that is not drawn. Written **from the outside in**, so where two compete
+it is the inner one that goes — the sources and sinks are the reading a sankey exists for.
+
+### 3ap.4 — §8a, the classification table
+
+Structure at rest, so the table is primary. Every row is a cell two rules both claim; a row
+governed by one rule restates it and is not here.
+
+| | two rules | the cell | ruling |
+|---|---|---|---|
+| **K1** | deduplication (§3ai.4 G1) · a weight per edge | `a→b 2` and `b→a 3`: reversal makes them one edge | **the weights are summed.** A flow drawn once and counted once is data loss in the other direction; `graphLayers` gained `origins` — the declared edges each segment stands for — so `graph` reads nothing new and a sankey sums over it. The first origin is the edge that survived |
+| **K2** | slice stacking · crossing minimisation | the ribbons leaving one bar could cross each other at the bar | slices are ordered by the **far end's centre** on both sides, after placement, so a bar's fan leaves in the order it arrives. Stable on the segment index for equal centres (I11) |
+| **K3** | labels · width | three labels of 14, 12 and 16 cells in two gaps of 19 | the two outer ones fit exactly and the middle would run into the last, so **the middle is dropped** — written from the outside in, never truncated (§3n). Measured: `long-labels` names three at 80 columns and two at 40 |
+| **K4** | dummy nodes (§3ai.4 G5) · a ribbon through a layer | an edge spanning two layers has a waypoint in the middle one | the dummy is **ribbon, never bar**, in the declared source's slot, and it **counts in that layer's height and scale** — a ribbon passing through spends the layer's rows too. Measured on `cycle`: `a→c` through layer 1 at `[13, 16)`, the same slot on both of its sides |
+| **K5** | a bar's minimum · a small height | twelve sources in a four-row figure | a slice is never below one half-row; the gap falls one row → a half-row → none; then the **least-flow** node goes and the notice names it. Measured: `crowded` keeps eight of twelve at gap 0 and says `+4 more · src-01 · src-02 · src-03 · src-04` |
+| **K6** | total in ≠ total out | `hub` receives 2 and emits 5 | **the bar is the larger side** and the shorter side leaves bare bar below its last slice — what a sankey draws for a loss. Measured: `hub` is 16 half-rows; its one incoming ribbon covers `[1, 7)` and the ten below it are bar with nothing arriving |
+| **K7** | a reversed edge (§3ai.3) · a ribbon's colour | `c→a` is drawn as `a→c` | the ribbon is drawn **forward**, counted in `N reversed`, and keeps its **declared source's** colour — `c`'s, leaving `a`'s bar. The arithmetic does not say which colour; the walk did, and the colour is the one sign of the reversal beside the count |
+| **K8** | labels · two bars in one row | at gap 0 two one-half-row bars share a row, and both centre on it | one label per row centre; the second collides and is dropped (K3's rule, vertically). Measured on `crowded`: `src-05 · 07 · 09 · 11` named, their neighbours drawn and unnamed |
+| **K9** | two owners in one cell | a ribbon's lower edge over another's upper edge | `▀` in the upper owner's slot over the lower owner's as background (§3ap.2); at ASCII a bar wins the cell, else `=` |
+| **K10** | relaxation · the ordering pass | pulling a bar to its neighbours' mean could pass its sibling | `separate` restores the gap without reordering and shifts the **whole stack** back inside the height — a clamp on one bar is a relative move the shift cannot undo (§3ai.6's argument, vertically) |
+| **K11** | an isolated node · a bar whose extent is its flow | flow 0 | one minimum slice of bar and no ribbon. Drawn, because the node was declared (I79's shape) |
+| **K12** | the notice row · the budget | something dropped or reversed | the row is spent **before** the drawing is chosen — `graphArea`'s ruling and `treeArea`'s before it (§3ah.4) |
+| **K13** | one bit · bar against ribbon | no colour to separate them | the **glyph** does (§3ap.2, I17): `█` against `▒`, `▀`/`▄` for a half either way. The `dim` alternative was drawn and rejected on this row |
+| **K14** | `ambiguousWidth: "wide"` · the block family | every glyph doubles | the ASCII set, `barStyle`'s rule — one function, so the wide frame *is* the ASCII frame |
+| **K15** | a label is placed **outside** the bar (K3, the references' shape) · a ribbon begins **at** the bar's edge | the region a label is placed into is the region a ribbon is filled into | **the two are the same region, so placement cannot solve readability** — a node with an outgoing flow has ribbon immediately right of it, one in the last layer has ribbon immediately left of it, and there is no node in the corpus with neither. So the SVG label needs an ink and a ground of its own: **`tone.default` with a halo in the page's own ground** (I112, §3ap.7) — `surface.bgDeep` when this cell was written, `surface.bg` since C10 §4f moved the page, and the halo is the page showing through either way. The terminal arm answers the same cell by *substituting* — a label cell is `{ text: ch }` with no `ref` and no background, so the ribbon glyph is gone where the letter is |
+
+### 3ap.5 — §8a-bis, the placement trace
+
+The relaxation is event-mediated inside itself, which the table cannot reach.
+
+| | sequence | the interaction | ruling |
+|---|---|---|---|
+| **S1** | sweep down, then up | the second can undo the first | alternate, four sweeps, the last one's separation standing — `graph`'s count and argument |
+| **S2** | a layer's bars pulled, then separated | separation before every bar has moved reads a half-applied order | pull every bar in the layer, then `separate` once (§3ai.5 S2's shape) |
+| **S3** | the stack pushed past the bottom, then the top | fixing the bottom bar alone moves it against its siblings | the ceiling pass walks up the stack and the lift walks down it, so the stack moves as one |
+| **S4** | positions relaxed, then slices ordered | ordering slices **before** the sweeps orders them against centres that then move | slices are assigned last, on the final positions, or the fan at a bar is stacked against a picture nobody drew |
+
+### 3ap.6 — what the second painter measured
+
+The arm-disagreement table's row, measured over the six variants at both widths: `silent 0/12`,
+`identityLabels 5/12`, `notice 2/12`, every other column `agree`. Both open cells are the nodes
+family's own shape — the terminal drops labels and nodes against a budget the SVG does not have
+(F318), and the reader files a notice's names as identity — and `graph` carries the same two.
+
+### 3ap.7 — the node label's ink and its ground, measured (I112)
+
+**Read from a picture, not asserted.** All six `sankey-*.svg` baselines rendered to PNG at
+1280 px and looked at: the node labels are `tone.muted` painted straight onto the ribbon fill,
+and on the default fixture they are all but gone. **No variant is fine**, and §3ap.4 K15 says
+why — the label is already in the references' place, outside the bar, and outside the bar *is*
+the ribbon. Placement had nothing left to give.
+
+**The figure, before.** Every label's backdrop taken from the raster with the `<text>` elements
+stripped, sampled over the glyph box, worst pixel kept, and the C10 ratio computed against the
+label's own ink. **33 labels across the six variants:**
+
+| | worst | best | floor it is measured against |
+|---|---|---|---|
+| dark (`#626262` on the ribbons) | **1.02** (`src-04`) | 1.41 (`src-12`) | `muted`'s own 2.5 — and body text's 4.5 |
+| light (`#94959c` on the ribbons) | **1.02** (`src-05`) | 1.25 (`src-04`, `src-12`) | as above |
+
+Not one label on either variant clears even the recessive floor, and the median is 1.05.
+
+**The two references, and they do not answer the same way** (the §3ap.1 rule again — a
+reference's default is its taste, so read what it *does*):
+
+| reference | what it does about the label's ground | what it settles here |
+|---|---|---|
+| **d3-sankey**, the energy figure | **nothing.** Black ink on white paper, links at low opacity; the label reads because the paper is light and the fill is pale, not because anything was decided | that d3's answer **does not transfer**. Its placement was already taken (K3), and its readability came from its page. A near-black ground with the source's slot at `fill-opacity 0.5` has no pale region to put a label on |
+| **plotly `go.Sankey`** | `textfont: fontAttrs({ autoShadowDflt: true })` — the node label's font shadow defaults to `"auto"`, documented as *places minimal shadow **and applies contrast text font color*** | the ruling. Plotly cannot assume a light link either, so it does **both** halves: a minimal shadow behind the glyph and an ink chosen for contrast. Two of the three candidates, together, and shipped as a default rather than an option |
+
+**The ruling: `tone.default` with a halo in the page's own ground** — `surface.bgDeep` when this was ruled, `surface.bg` since C10 §4f, and the halo moves with the page by construction (C10 T2.28).
+
+- **The ink moves off `tone.muted`.** A node label *names the datum*; it is not axis furniture,
+  which is `LABEL`'s reason and does not reach here. `tone.muted`'s floor is 2.5 because it is
+  *deliberately recessive*, and a recessive slot cannot carry the only text that says which flow
+  is which.
+- **The halo is the SVG spelling of what the terminal already does.** A label cell in
+  `sankeyArea` is `{ text: ch }` — no `ref`, no `background` — so the ribbon glyph is *replaced*
+  and the letter sits on the page. An SVG cannot substitute a region, so it paints one:
+  `stroke="<the page's ground>" stroke-width="3" stroke-linejoin="round" paint-order="stroke"`, three
+  quarters of which is `SVG_FONT_SIZE / 4`. **Both arms now put the same thing behind the
+  glyph**, in the two media's own terms, which is the whole of §3ap.3's claim applied to ink.
+- **`sankeyLayout` does not move.** The ruling is the painter's; every number the shared
+  geometry returns is unchanged, and the terminal baselines are byte-identical.
+
+**The figure, after — and measured rather than argued from `paint-order`.** *By construction*
+would have been the wrong thing to write down, so the backdrop is taken **under the ink**: render
+the figure twice, once as it ships and once with the labels' `fill` set to `none`, and every
+pixel that changed is a pixel the ink painted; the backdrop at exactly those pixels is read off
+the second render. Worst pixel per figure, over 193 to 2 308 ink pixels each:
+
+| figure | before (dark, `#626262`) | after (dark, `#d4d4d4`) | after (light, `#383a42`) |
+|---|---|---|---|
+| `default` · `chain` · `loss` · `cycle` · `long-labels` | **1.04**, a ribbon | **11.74**, the page ground | **10.86**, the page ground |
+| `crowded` | **1.04**, a ribbon | **9.51** | **7.59** |
+
+The floor is 4.5 and the worst cell in the table is 7.59. **`crowded` is the one figure whose
+backdrop is not exactly the ground**, and the reason is worth keeping: its labels sit close
+enough that one halo meets the antialiased edge of the next, so the worst pixel is a blend. It
+is not a case the ruling has to answer — 9.51 and 7.59 are three times the floor either way —
+but it is the reason the row is a table and not a single number.
+
+**And the halo alone would not have been enough**, which is why the ink is half the ruling and
+not a preference beside it: `tone.muted` *on the halo* measures **2.85** on dark and **2.86** on
+light, against `muted`'s own 2.5 floor.
+
+**The note owed to C10 was paid the same day, and the answer was that the surface was wrong**
+(C10 §4f, I34). `surface.bgDeep` is excluded from `textSurfaces` on the stated grounds that it
+carries no text — *"if a surface ever paints text on it, that surface is wrong or the exclusion
+is"* — and this arm painted every one of its labels on it, so the exclusion's own conditional had
+fired. C10 measured all 27 slots against both grounds on all three themes: dark and high-contrast
+cleared, **light failed twelve times**, `muted` among them at **2.44** against its own 2.5 floor.
+The page is now `surface.bg`, which every theme load checks. **The figures above moved with it and
+the ruling did not**: the ink is still `tone.default` and the halo is still the page's ground.
+Dark loses 5.5% uniformly, light gains 17%, and no token and no floor moved.
+
+**And the *second* note owed to C10 is paid too, one axis over** (C10 §4g, I35, F652, F653). §4f
+moved the ground and left two lines owed about the **ink**: a callout at a line's end is
+`categorical.cN` on the page, and a treemap tile's label is the page's ground painted *over* a
+`categorical` fill — neither a pairing C10 §4 held, because `categorical` is a `decoration`
+palette and the family-wide check skips it. C10 has ruled: a decoration slot the framework paints
+as text is bound by a named pairing at the meaning floor, and `decorationTextPairs` is it.
+
+**The sweep that ruling ran is the part this component owes a reader**, because it found the class
+is **ten** sites and not two, and six of them are this file's: the SVG callout, the treemap and
+heatmap tile label, the graph node label, the outline label and a hierarchy label with no box; and
+in the terminal arm the callout column, a flame or icicle frame's name inside its own bar, a pie's
+legend rows and a run's label. **The two arms take the same slot for the same figure**, which is
+D11 holding rather than a coincidence — and it is why the ruling moved the check and not the
+sites. **F652 and F653 are one pairing**: `ratio` is symmetric, so a slot on the page and the
+page's ground on that slot are the same two colours, which is why C10 §4f.1's last two rows print
+the same three figures.
+
+**Nothing here moves.** The inks are F382's and F306's and both stand; what changes is that they
+are now measured on every theme load (C10 T2.29, T2.29a, T2.29c) and that every `<text>` fill this
+arm emits is asserted to be a slot some pairing names (C10 T2.29b) — the row that would have found
+the outline and graph-node labels, which neither finding named.
+
+**What was checked rather than assumed**: `paint-order` is not universally implemented, and a
+renderer that drops it paints the stroke *over* the fill — every label becomes a
+ground-coloured blob, and a byte-compare golden cannot see it. Rendered through the same
+librsvg the catalogue uses, against the two-element `fill="none"` stroke idiom as a control:
+identical. The fallback, if a consumer's renderer ever drops the attribute, is that idiom —
+the same text twice, stroke first — and it costs one extra element per label.
 
 ## 3q. One value axis across the bands, and the record it never had
 
@@ -4581,6 +9369,112 @@ than furniture beside it.
 
 ---
 
+## 3aq. A hidden series — not drawn, still named, and the axis does not move
+
+C04 I99 gives a series and an annotation a `hidden` member and rules it appearance; this section
+is what the renderer does with it, and with the reader's override that arrives beside it in
+`RenderContext.seriesVisibility` (C22 I78). Four decisions, each measured before it was made.
+
+**What a hidden series is: a layer that is not rasterised.** `overlaidRows` builds one `Layer`
+per series and merges them per cell (§3u); a hidden series contributes no layer, and *its index
+is kept* — `refOf(s, index)` is what colours the others, so filtering the list would recolour every
+series after the hidden one. The 1-bit stacked arm keeps the strip's band and its gutter label
+and rasterises nothing into it, because the band is geometry (I7) and the ink is not. The callout
+(I48), the readout (I37) and the point labels (I55) are ink about that series and go with it.
+`hidden` on an annotation removes its rows from the `context` layer and nothing else.
+
+**The legend keeps the entry, and the mark is `glyphs.hollow`.** Measured: a legend entry is
+`${mark} ${label}` where `mark` is `markOf(seriesIndex, caps)` — the series' own glyph, descending
+the capability ladder with the figure (§3g, I29). A hidden series keeps its label and its slot
+colour and takes `hollow` (`○`, `o` at ASCII) in the swatch — an outline for a curve with no ink.
+**A mark rather than a tone**, on I6's rule: colour is never the only channel, and at one bit
+the tone is gone while the swatch is exactly the column that survives. The design note drew the
+toggle as *a legend that clicks* (`CALCIUM_WIDGETS_DESIGN.md` §8 step 2); what landed first was the
+keyboard half C02 requires of every pointer affordance, and **the click landed 2026-09-05** (C16 §4a's
+legend row): `legendHitAt(block, width, ctx, col, row)` beside `sampleIndexAt` answers the series index
+under a block cell, and it is **the placement inverted by search through the forward map** (I117, F775's
+method) — `legendEntryAt` in `furniture.ts` walks the cells `legendColumn` and `legendRow` write, through
+the same `legendCell` and `legendRowLayout` those two now write from, so the swatch and the label hit, the
+leading blank, the two-cell separator and the `+n` tail do not, and a placement that moves moves the
+inverse with it. Only a `series` slot answers: a candle's or an annotation's entry is `null`, and so is
+every entry of a form where `HAS_HIDEABLE_SERIES` is false. The click is `seriesVisibility`'s third
+writer through the digit key's own lines, so the two cannot disagree about what a toggle is. **The entry must stay nameable or the toggle cannot be undone by eye** — a legend
+that dropped the row would leave the reader pressing digits at a list that no longer numbers the
+way the keys do.
+
+**The axis does not rescale, and that is a ruling rather than an omission.** Three reasons, in
+order of weight. *Comparability*: the reason a reader hides a series is to look at the others
+against the scale they shared with it, and a range recomputed without it moves every remaining
+curve on the toggle. *Geometry*: `layoutFor` sizes the gutter from the range, so a rescale can
+change the gutter width, move the plot area and the legend column, and change which x ticks fit —
+appearance that reads as a different plot. *Parity*: matplotlib's `Artist.set_visible(False)`
+does not `relim`, so a toggled legend there leaves the axes where they were unless the caller
+asks for an autoscale — stated from the library's documented behaviour rather than a measurement
+in this repository, because `docs/notes/CALCIUM_PLOT_PRIOR_ART.md` has no line on visibility
+(grepped `visible`, `hidden`, `set_visible` — 0 hits, 2026-09-05). So `seriesRange` is called
+over every series, and a hidden one still pins the extent.
+
+**Every series hidden is not *No data.*** `hasSamples` asks about the data and the data is
+there; the frame, gutter, axis and legend draw and the area is blank. *No data.* would take the
+legend with it, and the legend is the only thing on screen that says which digit brings a series
+back.
+
+### The digits — `keymap(block)` and the first `BlockKeymap` producer
+
+`plotDefinition.keymap(block)` declares `1` … `min(9, series.length)` → `toggleSeries1` …
+`toggleSeries9`, and L4 merges it through `Keymap.mergeBlock` when focus lands on the plot and
+withdraws it when focus leaves (C16 I27, C22 I78). **Measured against `defaultKeymap`**: no digit
+is bound at `global` or `liveBlock` (76 rows, none named `1`–`9`), so every digit lands at
+`liveBlock` and fires from the first `↓` — the reader steps into the plot and presses `2`, with
+no `⏎` (A01 D4). A one-series plot declares `1` alone, so `2` on it is *unbound* rather than a
+no-op — `/help` lists exactly the digits the plot has. **This is `mergeBlock`'s first production
+caller and `BlockKeymap`'s first producer**, which is what C26 T2.6a was written to detect; the
+digits collide with nothing, so `interaction` still carries no binding and C26 §8b.8's ruling
+stands on the placement fact rather than on the no-producer fact.
+
+**`keymap?` on `BlockDefinition`, beside `elements?`, with `elements?`'s own argument**: an absent
+member cannot be deleted by a later edit while a branch returning `[]` can, so a kind with no keys
+omits it. The declaration takes the block and nothing else — no width, no context — because a key
+table that varied with the frame would be one the reader could not learn.
+
+### The walk — both artefacts, because the member has structure and the store has events
+
+Classification, at rest (rules that both hold):
+
+| # | cell | rules meeting | ruling |
+|---|---|---|---|
+| A1 | block `hidden: true` × store `shown` | C04 I99 × C22 I78 | drawn; the override reads first |
+| A2 | every series hidden | I99 × I2 | frame, axis, legend; blank area (above) |
+| A3 | hidden × `yCallout: "last"` | I99 × I48 | no callout; the right column keeps its width |
+| A4 | hidden × a crosshair | I99 × I37 | the readout omits that series; the cursor still marks the column |
+| A5 | hidden × 1-bit stacked | I99 × §5 | band and label kept, no ink |
+| A6 | the plot's `1` × `defaultKeymap` | I27 × the measured table | no collision, `liveBlock`, fires without `⏎` |
+| A7 | a one-series plot × `2` | `keymap(block)` × I27 | unbound — nothing is declared for a series that does not exist |
+| A8 | a hidden annotation × its `label` | I99 × I52 | the legend row stays with `hollow`; the line is gone |
+
+Trace, event-mediated:
+
+| # | sequence | ruling |
+|---|---|---|
+| B1 | focus a two-series plot → `2` | series 2 not drawn, legend row 2 reads `○ val`, the frame's other ink is byte-identical |
+| B2 | B1 → `2` | back to the frame before B1, byte for byte |
+| B3 | B1 → `tab` away → `tab` back | still hidden — the override is per entry and block and focus is not in it |
+| B4 | B1 → the far side `replace`s the block with one series | the override for index 1 is **kept** and inert; the frame is the one-series frame. C23 I47's rule: a store corrected on every patch is one that accumulates, so it is ignored where read and never fixed up where written. If a second series returns, the override resumes — named as the residue this leaves |
+| B5 | B1 → `←` | the crosshair appears and the readout names series 1 alone |
+| B6 | B1 → `↑` out of the plot → `1` | nothing: the keymap was withdrawn with focus, and `1` at the prompt is a character |
+
+### Tests — the rows are declared in §9; this is what each asserts
+
+- T1.126 (I116): `keymap(block)` on a three-series plot declares `1`, `2`, `3` and nothing else; on a one-series plot `1` alone; on a twelve-series plot nine; on `series: []` nothing.
+- T1.127 (I116, C04 I99): a two-series line plot rendered with `hidden: true` on the second — the frame differs from the unhidden frame, the gutter labels are identical (the axis held), the legend's second row carries `hollow` and the label, and the callout for the second series is absent while the right column's width is unchanged.
+- T1.128 (I116): every series hidden draws the frame and the legend and no curve ink; the same block through the store override (`seriesVisibility`) rather than the member draws the same frame; a block with `hidden: true` and an override of `false` draws the unhidden frame.
+- T3.20 (I116): at `colourDepth: 1` a hidden series' strip keeps its band and label and draws no ink; a hidden annotation's line is gone and its legend row remains.
+- T1.129 (I117): the legend located in the painted frame first — a right legend at 60 columns, a left one, a `below` one — then `legendHitAt` at the swatch's column and at the label's last column answers the entry's index, at the leading blank, in the separator, on the `+n` tail, in the gutter and inside the area answers `null`; a `bar` with an explicit legend answers `null` at its own entries; a two-annotation line plot answers `null` on the annotation rows and the index on the series row.
+- T6.94 (I117): the column origin off by the swatch's width → T1.129's swatch arm fails; the row origin off by the lid → every vertical arm fails; the horizontal search reading `legendRow`'s output string rather than its layout → the `+n` arm fails. `tools/mutate/runs/c01-hover-legend.mjs`.
+- T6.93 (I116): removing the hidden filter from `overlaidRows` → T1.127 fails; removing the `hollow` arm from `legendEntries` → T1.127's legend row fails; removing the override read → T1.128's override row fails; removing `keymap` from `plotDefinition` → T1.126 fails. `tools/mutate/runs/c22-series-visibility.mjs`.
+
+---
+
 ## 3s. The cursor's column — what C12 owns of a crosshair, and what it does not
 
 A readout naming four values says *what this mark is*. It does not say **which** mark, and
@@ -4590,16 +9484,17 @@ reader knowing which column it describes.
 ### The seam, measured rather than assumed
 
 `cursorPositions` is declared on `RenderContext`, threaded through `render-lines.ts`, and read in
-**one** place: `positionalForm`, which selects `axedWithCursor`. **Nothing in `src/` or
-`examples/` writes it.** So this is a complete mechanism with nothing on the other side — the
-shape MG24 exists for, on a context field rather than an interface member, which is why no rule
-fired.
+**one** place: `positionalForm`, which selects `axedWithCursor`. **Written by `CursorPositions` in
+`shell/cursor-positions.ts` since C22 I76, from `←`/`→` at `liveBlock` (C16 I28); until then it
+was a complete mechanism with nothing on the other side — the shape MG24 exists for, on a context
+field rather than an interface member, which is why no rule fired.**
 
 **§10 lists *interactive plots — zoom, crosshair, hover* as Phase 2, and that row is about the
 writer.** Who moves a cursor is L4's question: a key press, a mouse column, a hover. What a
 cursor *draws* once something has set it is C12's, and C12 has answered it since `cursorReadout`
 shipped. Completing that answer is maintenance of a surface already here; it does not move the
-phase boundary, and §10's row is reworded to say which half it defers.
+phase boundary, and §10's row is reworded to say which half it defers. The key half of that writer
+has landed (C22 I76), the mouse column with C16 §4a and the hover with C01 I21; the row now defers zoom only.
 
 ### Two marks, because either alone fails in the case that motivates it
 
@@ -4650,6 +9545,47 @@ bars.length⌋` — but it is the *pitch and the left-alignment* that make one r
 
 Out of range — a cursor past the data — draws **neither** mark, which is the same statement the
 readout's four dashes make.
+
+### The pointer half — the second writer, and the mapping inverted rather than copied
+
+**A click or a drag over a cursorable plot sets the same store** (`CursorPositions.set`, C22 I76;
+C16 §4a's gesture table): the pointer is the second writer and there is no second store. What the
+pointer has that a key does not is a column, and the column is in the **block's** coordinates — the
+element `elements()` declares spans the whole block (I85) — while the crosshair indexes the
+**data**. Between the two sit the alignment pad (§3ab), a left legend's reserved column, the gutter
+and the area's own placement rule, and every one of them is already computed once for the frame.
+
+**So the inverse is a search through the forward map, not a second formula.** `sampleIndexAt(block,
+width, ctx, col)` lays the plot out exactly as `positionalForm` does — `positionalLayout` is one
+function both call — subtracts the pad, the legend column and `layout.gutter` to reach an area
+column, and answers the index whose `cursorColumn` is nearest to it, the lower index on a tie. A
+candlestick's bucketed placement and a left-facing axis are then right for free, because the
+function being inverted is the one that placed the mark; a second copy of the arithmetic would
+agree until either moved, and the table above is what a copy would have had to track.
+**Measured at 80 columns, five samples, a two-digit gutter**: the samples sit at block columns 4,
+23, 41, 60 and 78; a click at 41 answers 2 and the `▲` lands under the pointer; a click at 32 — nine cells from
+23 and nine from 41, a tie — answers 1 and the mark moves to 23, the lower index and the column
+the readout's value was drawn at. The mark follows the data and not the mouse.
+
+**Outside the area is nothing for the cursor**: a column in the gutter, under a legend, in the
+alignment pad or right of the frame answers `null` and the crosshair stays where it was — the
+click still focuses the plot (C16 §4a), because the element is the block. Inside the area every
+column answers, so a click past the last sample's column lands on the last sample: the clamp
+C22 I76 puts in the effect is here the nearest-sample rule, and nothing stores an index the
+readout cannot print.
+
+**A hover sets the same store and moves no focus** (C16 §4a's hover row, C01 I21; 2026-09-05). Under
+mode 1003 the pointer *resting* over the area arrives as a motion report with no button, and
+`sampleUnder` answers it exactly as it answers a click — the same `sampleIndexAt`, the same nearest-
+sample rule — with the one difference that nothing focuses: the readout follows the pointer while the
+highlight stays where the keys left it. Off by default because 1003 is a sequence per cell crossed;
+`TuiConfig.hover` turns it on, and with it off the bytes never arrive and every sentence here about a
+hover is about nothing. Leaving the area leaves the cursor at its last sample — outside is `null` and
+`null` is no effect — because a readout that cleared with the pointer would have no keyboard equal.
+
+**The pointer changes nothing about what is drawn.** I37's two marks, the readout row and
+`cursorColumn` are untouched; the writer differs and the frame does not — three writers now, one store.
+§10's row now defers zoom only.
 
 ---
 
@@ -5501,6 +10437,136 @@ orientation — and belongs in the classification table as its own rows.
 
 ---
 
+## 6m. The arms walk, part one — a table, because most of it holds at rest
+
+**Both artefacts, and taking one would have taken the trace.** A depth rule that changes what a tie
+means looks like a state machine and invites a sequence trace, which is §6n. But the arms are a
+**member**: which one is in force, what carrier the block holds and what the terminal can draw are
+all true before anything happens, and two of them meet because of what the *block* says. That is
+C19's lesson used rather than restated — a component with state and structure needs both, and
+taking the trace alone because the state machine is the obvious thing is how the structural half
+goes unexamined.
+
+Indexed by rule interaction. A row governed by one rule restates that rule and finds nothing.
+
+| # | the two rules | the input | ruling |
+|---|---|---|---|
+| 1 | `plotStyle: "braille"` is for outlines (I87) × a surface fills its interior (I94) | `"braille"` with `surfaces3` and no `wireframe` | **it fills, and the cost is not the one the ruling named** — see 6m.1. Every interior sample sets a dot, `foldBraille` answers `⣿`, and the cell takes its nearest sample's *shaded* colour. So the picture is a full-cell colour raster, not a silhouette and not a stipple: what it loses is the second colour, and **62.5% of a shaded surface's cells carry two distinct colours**, so that is the fraction that loses information. Refusing the combination would be worse — a legal document drawing nothing — and the caller who wants the arm's actual subject sets `wireframe` |
+| 2 | the frame writes a **literal glyph** per cell into `mark[]` (I90) × a braille cell is also a glyph | `"braille"` with `axes3: "corner"` | **the data wins the cell and the frame draws where the data did not** — and this row's first draft headlined it the other way round while citing the evidence against itself (F488). Both are one glyph a cell, so there is no compositing question; what decides is `glyphRows`' precedence, which the draft quoted correctly — *`glyph` before `mark`* — and then contradicted in its own first clause. Data before frame is also *the axes never occlude the data* read from the other side (I90), so nothing here is new: what the braille rung adds is that a **cell now holds eight samples and can carry both**, where every earlier arm had one sample a cell and no arbitration to make. The frame's samples are therefore withheld from the dot grid, or the axis would be drawn twice |
+| 3 | `plotStyle: "line"` × `plotFill: "solid"` is refused (C04 I59) | both set | **already a construction error, and inherited rather than restated.** C04 refuses `"solid"` with `"line"` on the ground that a box-drawing outline has no interior alphabet; that is true of this form for exactly the same reason. **The joint landing in the right place is the finding** — a rule written for the 2D curve family covers a 3D arm nobody had thought about, which is what says `plotStyle` is the right member rather than a new one |
+| 4 | `plotStyle: "marker"` × `colourBy: "depth"` (I89) × the tier is a depth channel (I88) | `"marker"`, default `colourBy` | **depth is encoded twice and that is correct.** `auto`'s raster already does it — block size *and* ramp — so this is not new, and the redundancy is what makes the figure survive the colour rungs: at `1bit` the ramp is gone and the tier is the whole reading (I88's own argument) |
+| 5 | `Point3Series.marker` names identity × `colourBy: "series"` names identity | `"marker"`, five clouds, `colourBy: "series"` | **two channels for one reading, and it is the arm's reason for existing.** Shape survives `colourDepth: 1` where colour does not, so a caller who sets both gets a figure that degrades to a readable one instead of to a monochrome smear |
+| 6 | `braille`'s floor is `unicode !== "ascii"` (I87) × `STYLE_ARMS` accepts the member at the gate | `"braille"` at `unicode: "ascii"` | **it degrades to `auto`, it does not refuse.** `plotStyle: "line"` already sets the precedent one family over — `lineDrawRows` falls to `+ - |` rather than refusing — and a construction error for a *terminal's* capability would make a document valid on one machine and invalid on another, which C04 cannot express and should not |
+| 7 | an unknown `marker` name × `Tone` is unvalidated anywhere (F479) | `marker: "hexagon"` from an adapter | **validated, and the difference from F479 is the ruling.** A tone resolves through `slot`, which answers `{}` — the mark draws, uncoloured. A marker name indexes a **table**, so an unknown one is `undefined` and the sample draws *nothing*: the same input that costs a tone its colour costs a marker its point. Absence indistinguishable from failure is C04's own class, so this one goes in `PLOT_STYLE_MEMBERS`' neighbour rather than inheriting F479's convention |
+| 8 | the marker table's far row × `marker` names a column | `marker: "square"`, points at every depth | **honoured at near and mid, a dot at far** — `· ∙ • ˙ ‧` is one glyph to a reader, so the shape channel is spent before the dispatch reaches it. A limit of the alphabet rather than of the lookup, which is why it is written with the table and not as a `// TODO` beside it (F484) |
+
+### 6m.1 · The ruling this table corrected, one commit after it landed
+
+**The arms' record says a surface at the braille rung is a *solid silhouette* with *the shading
+gone*. That is wrong in the direction that flatters the arm.**
+
+Walked by hand: every interior sample sets a dot, so `foldBraille` returns `⣿` — and `⣿` is a
+**full block**. The cell then takes its nearest drawn sample's colour, which is the shaded colour
+`shadeColour` computed. So the surface is not a silhouette and it is not unshaded; it is **shaded at
+one colour per cell instead of two**, which is a full-cell colour raster at the same horizontal
+resolution and half the vertical.
+
+**And the cost has a number already measured.** F482 counted, on a shaded surface, **70 of 112
+half-block cells carrying two distinct colours — 62.5%**. That is exactly the fraction that loses
+information when the second colour goes, and it is the figure the ruling should have carried
+instead of a word.
+
+**What neither the ruling nor this row had is the other side of the trade, and the built frame is
+where it came from.** A surface at the dot grid draws `⣿` in the interior — measured, 44 of 78
+inked cells full, and the eight dot positions set 59 to 61 times each, which is the evenness that
+says the fill is a fill — while its **silhouette** is drawn at twice the resolution in each axis:
+`⢠⣾⣷⡄` and `⠈⠙⠿` where the half-block arm has `▄▀▀▄`. So the arm costs a surface half its colour
+resolution and buys it a finer outline, which is the same trade the whole arm is, stated for the
+primitive it was thought not to serve.
+
+**The correction matters because the wrong word implies a wrong repair.** *Shading gone* invites a
+refusal — reject `"braille"` with `surfaces3`, or fall back — and both are wrong: the picture is
+legible, it is simply coarser in one axis, and the arm's actual subject is the wireframe the caller
+reaches for next. **A trade described in the wrong currency is still a trade**, and this is the
+walk doing the job the schedule gives it (F485).
+
+---
+
+## 6n. The arms walk, part two — a trace, because the mask's depth rule is event-mediated
+
+**§3am's remedy is a second depth rule and a second rule about ties is a rule about order.** Every
+row here is a sequence: something was written into the buffer, then something else asked.
+
+| # | the sequence | what the two rules say | ruling |
+|---|---|---|---|
+| 1 | edge A stroked, edge B stroked, sharing a vertex | the mask needs both bits at that cell × `writeDepth` is **strictly** nearer (F454) | **the shared vertex is the whole reason for the rule.** B arrives at exactly A's depth, `q < d.z[i]` is false, and B's bit is refused at precisely the cell where the join lives — so a wireframe of a cube draws twelve segments and no corners. Equal-or-nearer for the **mask**; strictly-nearer for the **colour** |
+| 2 | points drawn, then a trajectory through their own depths (F452, I93) | points draw first so first-drawn wins × the mask is now equal-or-nearer | **the marker keeps its colour and the line adds its bits.** The colour rule is unchanged, so F452's ruling stands exactly as written; what the line gains is a direction in a cell it could not previously touch. **This is the row that says the two rules must be separable per call** rather than one relaxed test — a single equal-or-nearer test would hand the cell's *colour* to the line and undo the ordering the trajectory case exists for |
+| 3 | a surface filled, then its own wireframe edge (I95) | the edge **is** the fill's own sample × the mask writes on equal | **nothing changes, and checking that is the point.** I95 removed the second rasteriser: the edge is identified inside the fill by `w0 / \|ab\|`, so there is no second write to be tested. The mask arm inherits that and does not reintroduce a bias — the z-fight F462 swept for cannot be constructed here for the same reason it could not be there |
+| 4 | data drawn, then the frame drawn **last** (F452, I90) | the frame loses coincident cells to the data × the mask writes on equal | **the frame contributes bits and never colour, and it is safe because a coincidence is a collinearity.** `unitOf` normalises the data's own extent, so a box edge coincident with data is the *same line*: both contribute the same bits and the glyph does not move. Where they genuinely cross at equal depth the cell resolves to `┼`, which is what a crossing is. **The row was written expecting to have to weaken the rule and did not** — the reason F452 could have been reversed here is that the frame draws last, and the reason it is not is that the mask is direction and the colour is identity |
+| 5 | a segment leaves the frame mid-stroke | `writeDepth` refuses out of bounds and returns `false` (I93) × the mask's `link` also bounds-checks | **two bounds checks, one convention, and they agree.** `strokePolyline`'s `inside` and `writeDepth`'s range test both drop the sample rather than the segment, so a line running off the frame clips per sample on every arm. Stated because the outcome would be identical if they disagreed on a boundary cell, and nothing would show it |
+| 6 | the near-plane clip splits a segment, then both halves stroke | the clip is carried through (I95) × the mask accumulates | **the introduced vertex is a shared vertex**, so row 1's rule is what stops the clip growing a visible joint. Without equal-or-nearer, a face entering the camera would draw a seam at a vertex the caller never supplied — which is I95's own sentence arriving in a second rasteriser |
+
+### 6n.1 · Residue
+
+**What the throw leaves behind: nothing new.** The only refusal these arms add is row 7 of §6m's
+table, an unknown `marker` name, and it fires at the gate before any buffer is allocated. The
+capability floor does not throw at all — it degrades — so there is no half-drawn frame to leave.
+
+**What neither artefact reaches**: whether the pictures are *good*. Both tables index rules against
+rules, and the question *does a braille wireframe read better than a half-block one* is answered by
+looking at a frame, in colour, which is scheduled rather than asserted.
+
+---
+
+## 6o. The geometry-cache walk — a table, because a cache's rules all hold at rest
+
+**A table and not a trace, and the choice is the first ruling.** `trianglesOf` is a pure function
+of `(surface, extent, series)`; a cache over it fails when two rules *both hold* — *this slot is
+valid* meeting *this input moved* — with no event in between. The one event it has is eviction, and
+§6o.1 says why that is a residue row rather than a trace.
+
+**The shape.** `RenderContext` gains an optional `scratch`, written by L4 and read here, on
+`cameras`' precedent one field along: view state the renderer reads and never keeps. **One slot per
+owner, and the key is a validity predicate rather than a map key** — `HeightCache`'s header is the
+argument and it transfers verbatim, because read as a composite key it describes a table with one
+slot per revision, which is the leak T3.18 catches. A `WeakMap` on the owner is what bounds it, so
+nothing subscribes and nothing evicts.
+
+Indexed by rule interaction. A row governed by one rule restates that rule and finds nothing.
+
+| # | the two rules | the input | ruling |
+|---|---|---|---|
+| 1 | identity keys the slot × **the extent is the *block's*** (C04 I78, I79) | one surface, a point cloud beside it gaining a point | **the extent is in the key, and leaving it out is the silent failure.** `trianglesOf` normalises through `unitOf(p, extent)` and the extent is taken over *every* carrier — clouds, paths and surfaces — so a cloud gaining a point moves every surface's triangles while the surface itself does not change. A key over the surface alone draws the figure at the wrong scale, **inside the box, with every arithmetic assertion passing**: §6g row 1's own defect arriving one layer up, and the only row here that could not be found by reading the signature |
+| 2 | identity keys the slot × **a live part is handed a new block every tick** (C23 I34) | `/live` on a mesh whose data does not move | **key on the carriers, never on the `Surface3`.** The refresh driver replaces the part's block per tick, so a surface built fresh around a cached mesh is a *new wrapper holding the same two arrays*. Keyed on the wrapper the cache misses every tick and buys nothing on the path that renders most often; keyed on `vertices` and `faces` it hits. **The demo is the measured instance** — `mesh(name)` is cached and the catalogue spreads its arrays into a fresh object each tick |
+| 3 | identity implies content × **a caller holds the array too** | the same mesh in two blocks | **sound, and measured in both directions rather than assumed.** `block()` deep-freezes and freezes the caller's array *in place* — same identity, now frozen, mutation throws — and `applyPatch` deep-freezes the patched document. So nothing the renderer can see is mutable and identity is a legitimate proxy for content. **Without that this design is a stale read waiting for its first mutating consumer**, which is why it is a measurement and not a sentence |
+| 4 | the geometry does not depend on width × **the line cache is keyed on width** (C22 I58) | one entry re-rendered after a resize | **hit, and it is the second thing the cache buys.** I58's slot is invalidated by a resize because a themed row is a different string at the same height; nothing `trianglesOf` reads is a width. Stated because the instinct is to hang the scratch off I58's slot, which would throw the triangles away for a reason that has nothing to do with them |
+| 5 | an orbit moves no block field (C22 I71) × **the line cache keys on `Cameras.key`** | `o` on a focused plot | **miss on the lines, hit on the geometry, and the disagreement is the point.** Both caches are right about different questions: the picture changed and the geometry did not. This is the row the whole entry exists for — F469 measured `trianglesOf` at over the 33 ms budget on its own *for a computation the camera does not move* |
+| 6 | two surfaces in one block × **`series` is an argument** | `surfaces3: [a, b]` | **`series` is in the key.** It is written into every `Tri3` and read by `colourOf`, so a slot shared between two surfaces colours the second as the first. One line — and it is a row because `series` is the argument a key written from the signature's first two parameters leaves out |
+| 7 | the scratch survives a render × **I11 forbids state that survives a render** | any second render | **the scratch is an *input* and I11 is about the renderer.** I11 permits a local and forbids a module-level buffer, and the distinction it draws is ownership: a caller-owned slot passed in is `RenderContext.cameras`' shape exactly. F469 named this remedy for this reason — *caller-owned scratch on `RenderContext`, which §11 already rules for the depth buffer* — and recorded it rather than taking it. **What it obliges is that a module-level `WeakMap` is still forbidden**, and it is the tempting version |
+| 8 | a slot is written after the build × **`trianglesOf` can throw** (F508) | a mesh past the spread ceiling | **nothing half-written, and the ordering is what makes it true of any future refusal.** Writing the slot before the build would leave an entry for a mesh that produced no triangles — unreachable through the getter and wrong the moment a smaller mesh reused the same arrays. F508's loop removes today's throw; the ordering survives it, which is the difference between a fix and a rule |
+| 9 | absent is a miss × **a field with no writer is unobservable** (C12 §3s) | the scratch left optional and never supplied | **the L4 writer lands with the field or neither does.** `cursorPositions` is the recorded instance one field along — read here, written by nothing in `src/`, correct and complete and unobservable at once. A `scratch` nobody constructs is a cache that is never wrong and never used, and both suites pass |
+
+### 6o.1 · Residue
+
+**The one event, and why it is not a trace.** Eviction is event-mediated — an entry goes and its
+geometry should go with it — and it needs no handler at all: the owner is the caller's own
+`faces` array, held in a `WeakMap`, so the slot dies when the document holding it does. **That is
+the reason to key on the array rather than on an entry id**, and it is worth stating because the
+alternative — a slot per entry, dropped on `rendered`'s subscription beside `Cameras` and
+`ScrollOffsets` — is the shape this tree already uses twice and would have been the obvious choice.
+Three subscriptions is three places for a future eviction path to reach two of.
+
+**What neither artefact reaches: whether the cache is worth it.** That is a measurement and it is
+F507's, not a rule — and F507 exists because the last set of figures for this component was taken
+against a sample grid that has since gone away.
+
+**What the table cannot see: a second consumer.** Every row above is about `trianglesOf`, which is
+the one expensive camera-independent computation *today*. `extentOf` over 35,947 vertices is 0.6 ms
+and not worth a slot; if a second one appears, the table is indexed by this function's inputs and
+would have to be re-run rather than extended.
+
+---
+
 ## 7. Invariants
 
 - **I1** — Measured height is a function of the block alone, never of the data.
@@ -5510,7 +10576,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I5** — Downsampling preserves per-column minima and maxima. *Composition (§3): a column also keeps its first and last sample, because preserving only the extremes leaves I14 nothing to join.*
 - **I6** — At `colourDepth: 1`, multi-series plots stack; series are never distinguished by colour alone.
 - **I7** — Stacked strips sum to exactly `height`; series labels occupy the y-label column and consume no plot rows.
-- **I8** — When series outnumber available rows, the plot renders the first series plus a legend and marks itself truncated. Series are never dropped silently.
+- **I8** — **A datum that cannot be given a row is named in the area, never dropped silently — and the subject is *rows*, not series.** When series outnumber the rows, the plot draws the first plus a `+N more` legend and marks itself truncated; a tree whose nodes do not fit spends a row on a `warn`-toned notice **before** choosing its layout (I57); and a **category** past the last row is named the same way. *Measured before the third arm existed: `categoricalForm` opened `const labels = cats.slice(0, areaRows)` while the series branch spent twenty lines on the notice with a comment saying a series dropped in silence is the failure it exists to avoid. Three of 45 row-bearing variants in the catalogue were short and all three were histograms — `freedman-diaconis` drawing 8 of 11 bins, **39 of 200 samples and the whole right tail**, as a clean unimodal distribution that had ended. The rule was written about the subject that had the defect, and a histogram's rows are bins a strategy chose rather than categories an author wrote, so the count is not a number anybody could check against the height* (F319).
 - **I9** — The ASCII fallback occupies an identical cell grid to the Unicode form.
 - **I10** — A plot never emits a character outside its measured region — `height` rows without axes, `height + 3` with (the frame's lid, the axis rule, the x-labels), by `width` cells. The matrix family keeps `height + 2`: it has no lid.
 - **I11** — C12 owns no state; every render is a pure function of block, width and context.
@@ -5549,7 +10615,7 @@ orientation — and belongs in the classification table as its own rows.
 - **I34** — **`plotDetail` is a ladder of four rungs, every rung adds information rather than resolution, and the budget below the lowest rung is refused rather than drawn.** 1 row / 1 column is the box; 2 rows / 3 columns is the raincloud — the half-violin over it, because **the mirror carries no information** and dropping it buys the summary row; **its density is sampled on the box's axis and not on the violin's**, which pads by a tenth at each end, or the cloud's mode sits a tenth of the width from the median below it with every count agreeing — and the tail is stopped by the cut that already stops the violin's outline rather than by a second mechanism. **Blank means outside the support and the ladder's first step means an estimate near zero** (I16), which is the one place those two can collide; **and the vertical figure narrows to three fifths of its slot at five columns or more, by the rule `boxplotColumn` already applies, and is capped at five cells on top of that** — drawn to the full slot a band's cloud ran into the next band's box and three distributions read as one field; drawn to three fifths of a wide one it was fourteen solid cells a row, because a run is the magnitude axis and lengthening it is the same move as adding steps to the ladder. Four cells of cloud resolve `2n + 1` = nine levels against the height ladder's eight, which is the derivation. Every count was right in both; 3 rows / 4 columns adds the raw samples as a jittered strip — **the only part of the figure that is the data**, and the part that carries the sub-cell win: two value positions per cell against the cloud's one horizontally, four down a cell vertically, with the remaining dot axis spent on jitter. ASCII draws a rug instead and that is I21 — there is no sub-cell position to spend, and folding through the ramp would draw a magnitude the data has not got; 5+ rows is the mirrored outline with the box overlaid. **The budgets are asymmetric because the cell's aspect shows through**, and a vertical violin in two columns is four dot-columns split between density and box. **The rung is chosen once for the chart, from its narrowest band** — a vertical arm distributes its remainder a cell at a time, so a ladder keyed on each band's own width drew three mirrored violins among fifteen rainclouds and a reader reads that as a property of three categories. The drawing still takes each band's own width. **Refuse below the floor and degrade above it** — the two have different subjects: the budget asks whether the form has room at all, and the mode asks which renderer fits the room there is. **Only the row floor is refused at construction** (C04 I56), because `validateBlock` sees a block and no width; the column floor is enforced by drawing the box rung, on I18's ladder. **And `plotDetail`'s three values are three behaviours**: `"compact"` is the form's floor, `"full"` is the highest rung the budget affords, and `"auto"` is the highest rung the budget affords *and the data supports* — a density rung draws five levels and a band with fewer than five finite samples cannot distinguish five. *They were two behaviours under three names until this was written: `"auto"` and `"full"` took the same branch, and every assertion about one was satisfied by the other.* **The jitter is a *hash* of the sample's identity and not merely a pure function** — no clock, no `Math.random`, no module counter, because I11 says every render is a pure function of block, width and context and a strip that moves between two renders of one block is a picture of the renderer; **and not `index % positions` either**, which satisfies I11 exactly and draws a sawtooth, so sorted data comes out in diagonal stripes that are a pattern in the renderer read as a pattern in the measurements. The band's index is an input so two bands of one distribution do not draw the same speckle. *The counter is invisible when the sample count is a multiple of the jitter's positions — the phase resets and both frames are byte-identical — so the fixture asserts its count is coprime to them.*
 - **I35** — **A categorical distribution form scales every band to one value axis, and the caller's pin is what that axis is.** Scaled to its own extent each band fills its own width, so a tight distribution and a wide one draw the same shape and the comparison the form exists to make is gone — with every count in the figure agreeing. *Three instances, because the fix is per call site: `ridgelineArea` had it and the two violin arms each computed their own bounds.* Where there is no pin the axis is the union, which `seriesRange` already computes — the same argument §6a A6 makes for a matrix, one form along. **And the cut is what keeps a shared axis readable**: a kernel estimate is defined everywhere, so across a shared axis it draws flat tails to the frame's edge unless it is stopped two bandwidths past the data (§3q).
 - **I36** — **`candlestick` is a curve style and not a form, its data is a typed field, and the readout is part of it.** Everything a line plot has is unchanged — axis, grid, annotations, legend, crosshair — and what differs is what one column draws, so it sits in `plotStyle` beside `braille` and `line` with `form` still `line` or `step`. **Bullish and bearish are two categories, so §3b binds**: hollow-versus-filled carries direction at **every** depth and colour reinforces it — because I25's sweep is indexed by `PlotForm` and a style is invisible to it, and because the frame-read this repository schedules strips colour. **There is no sub-cell win, and the section records that the mechanism was looked for** — a body floats between open and close so both ends fall inside a cell, Unicode's vertical eighths ladder upward only, and the one vocabulary that resolves both ends is the one that cannot draw a hollow body. Cell resolution, as every reference implementation draws it; what is exact here is the aggregation. **The width is a stated layout rule** — `clamp(⌊areaWidth ÷ n⌋ − 1, 1, 5)` with the gap taken before the body, the wick left of centre at an even width by `boxplotColumn`'s existing rounding — and **more bars than columns aggregate rather than sample**: open of the first, high of the maxima, low of the minima, close of the last, which is exact where every other downsampling in this component approximates. **The vocabulary is not swapped to braille** — a bar's length *is* its value so doubling the glyph doubles the datum, while a candle's glyph carries direction and its column carries the time — **and the wide arm is `glyphs()`' ASCII set, so the column count does not change.** Two swaps were both called *the wide arm*, and drawing the consequence from the wrong one would have set a layout floor of one cell that `wide` cannot reach. **The readout is load-bearing rather than a convenience**, because a doji and an overlay line both draw `─` in one cell and only the four values tell them apart (§3r, §6b B5).
-- **I37** — **The cursor's column is marked twice, and the mapping from index to column is the form's.** A readout names values and a reader cannot use them without knowing which mark they describe — which is what §6b B5's ruling about the doji rests on. **A dashed vertical behind the data** through the same path the gridlines take, so it never overwrites a sample; **and a mark on the bottom rule**, because the dashed line is invisible in exactly the case that motivates it, a dense column with ink in every row. *The index is into the data and not the area* — `cursorReadout` has always read `values[cursorIdx]` — so a candlestick inverts through its own pitch and its buckets. **Measured, and re-measured when §3r changed the layout**: the two mappings agree wherever a body is one cell and separate by the wick's offset inside its body where it is wider — `⌈(cw − 1) ÷ 2⌉` at the last bar, so four bars in forty-four columns put the last candle at column 41 and the curve's rule at 43. The earlier figure was 20 against 43, and it measured the left-anchored layout §3r struck; the invariant is unchanged and only its magnitude moved. **C12 owns what a cursor draws and not who moves one**: nothing in `src/` writes `cursorPositions`, and §10's Phase 2 row is about that writer (§3s).
+- **I37** — **The cursor's column is marked twice, and the mapping from index to column is the form's.** A readout names values and a reader cannot use them without knowing which mark they describe — which is what §6b B5's ruling about the doji rests on. **A dashed vertical behind the data** through the same path the gridlines take, so it never overwrites a sample; **and a mark on the bottom rule**, because the dashed line is invisible in exactly the case that motivates it, a dense column with ink in every row. *The index is into the data and not the area* — `cursorReadout` has always read `values[cursorIdx]` — so a candlestick inverts through its own pitch and its buckets. **Measured, and re-measured when §3r changed the layout**: the two mappings agree wherever a body is one cell and separate by the wick's offset inside its body where it is wider — `⌈(cw − 1) ÷ 2⌉` at the last bar, so four bars in forty-four columns put the last candle at column 41 and the curve's rule at 43. The earlier figure was 20 against 43, and it measured the left-anchored layout §3r struck; the invariant is unchanged and only its magnitude moved. **C12 owns what a cursor draws and not who moves one**: the writer is L4's (C22 I76), and §10's Phase 2 row is about the pointer half (§3s).
 - **I38** — **Colour indexes an identity, and a row that is a slice of a continuous axis has none.** A histogram's bins and a correlogram's lags are cut from an axis by the renderer, so eight bins are one distribution and drew eight colours; a band named `control` is a thing the caller chose and keeps its slot. `ROW_IS_AN_IDENTITY` is that partition, total over `PlotForm`. *The claim this replaced lived in a code comment and no file — true about the grouped bar it was written for, general by nothing — and **the first correction over-reached in the other direction**: eleven reference renderings draw one colour per series and that is the references' taste rather than the principle under it, so reading the measurement as the ruling took the colour off every named band too. A measurement settles what is true; it does not settle what to draw.* **The switch is span ownership and not `SHARES_CELLS`**, which is indexed by form and so answers for a plain bar and a stacked one at once: a builder returning owners has interior identities and each run takes its owner's slot; a builder returning a string has none, and the row's identity is in the gutter already. **A form whose rows are series says so** — the timeline is the single cell where the old default was accidentally right, three tracks in one colour is what the correction costs there, and every count in that frame would still be correct. Measured against eleven reference renderings: the cycle advances per series and only per series, and mapping the category axis to colour is `hue=x` — available, explicit, and redundant by construction (§3t).
 - **I39** — **A mirrored figure draws on an odd extent, and the spare cell precedes it.** A reflection needs a centre and an even extent has none: both violin arms split their slot symmetrically and then take the spine at `round((k−1) ÷ 2)`, which for an even `k` is the lower baseline rather than the axis of reflection — so the figure carried three rows of ink above its rule against two below, at 4, 6 and 8, in both arms. *Neither statement is wrong and the pair is, which is why the comment already standing over the first one — **a violin that is asymmetric by a row is a violin that is wrong, and it is invisible in anything but a mirror assertion** — was right about the class and did not reach the instance. No mirror assertion existed, and the golden corpus could not supply one: `ONE_PER_FORM`'s violin is four rows a band, which this ladder spends on the **raincloud**, so the top rung had no horizontal golden frame at all and the fix moved four vertical frames and none of the other 280.* **The spare cell goes first** because `bandedForm` places a band's name at `⌊rows ÷ 2⌋` and `columnLabels` places its tick at `x + ⌊w ÷ 2⌋` — padding before lands the spine on both at every even extent and padding after lands it one short of both, so two untouched placements agree. **The raincloud rungs are outside this**, being one-sided by construction, and an extent of two falls to the fill because two cells are two edges with no centre between them (§3i).
 - **I40** — **Where two layers ink one cell the merge is per dot, and the colour is the first layer's.** `mergedRow` resolved the whole cell to the first layer that inked it, and every figure that composites — a pie's wedges, a radar's polygons over its frame — is folded to braille *before* it arrives, so the second layer's dots were dropped. *A pie's disc is fully covered by construction and `pie-default-40` had seven cells flanked by a full cell on each side that were not themselves full; the radar had it twice, its polygons eating each other and its frame drawn only in the cells nothing else wanted — which reads as dashed strokes and is not, because `dashFor` is solid at any depth above one bit.* A braille cell is `U+2800 + bits`, so the union is `0x2800 | (bitsA | bitsB)`; where any candidate is **not** braille the first-wins rule stands, because a letter and a polygon cannot share a cell. **The colour remains one layer's and that is a limit of the span model, not an oversight** — two wedges meeting in a cell draw both sets of dots in the first wedge's colour, so what the union removes is the gap and not the boundary's exactness, and saying *the gaps are fixed* would imply a per-dot colour a `Span` cannot carry. **The priority order stays the ref's** rather than becoming the densest layer's, because that order is a ruling — labels over polygons over frame — and a dot count would overturn it wherever the frame was denser (§3u).
@@ -5567,11 +10633,72 @@ orientation — and belongs in the classification table as its own rows.
 - **I51** — **`layers` is a draw order the caller reads and a priority order the merge takes, reversed at one documented seam.** `layers` says what is drawn; `Layer.kind` (I44) says how two inked cells resolve, and both a contour and a quiver are `"curve"`. **`field`'s membership is load-bearing and its position is inert** — a background cannot occlude, so the two orderings render byte-identical. `fieldDim` and `glyphInk` are two fields because they answer two questions: `"floor"` dims per colormap by measurement rather than by a constant (viridis and coolwarm at 50%, inferno at 40%) and costs viridis 78% of its luminance spread; `"contrast"` picks black or white per cell and costs a quiver its magnitude channel. Below `colourDepth: 8` the field is a ramp **glyph** rather than a wash, so two glyph layers meet — and **the field yields where the layer over it is drawn in the ramp's own alphabet**, which a contour is at every capability and an arrow is at none. Ruling the other way settles the cell contention and leaves both layers in one vocabulary, which no assertion can see and the frame shows at once. `fieldDim` is inert below the floor regardless (§3y).
 - **I52** — **A horizon carries band depth in colour and within-band height in the vertical eighths, and it folds by mirroring.** The form had no section and no invariant: it was built from the survey's entry, which says *colour = which band*, and shipped carrying depth on the density **glyph** ramp with `DEFAULT_COLORMAP.horizon` set to `null` — so the compression its own header calls *paid for in a colour axis* was charged and never delivered, and depth was occupying the alphabet height needs. At `height: 1`, the canonical horizon, every inked column was therefore exactly one row. **The mirror is forced rather than chosen**: §3r measured that Unicode's eighths are a complete ladder upward and `▀`/`▔` are the whole of the downward repertoire, so an offset fold would resolve one direction to an eighth and the other to a half — precision at one end reading as precision at both. The sign rides a diverging map's two halves, so a **sequential** `colormap` is refused rather than drawing a trough as a peak, and `legend: false` is refused because the colour axis *is* the reading (I19's argument for a matrix's scale). **The baseline is 0 where the range spans it and `range.min` otherwise** — folding about the minimum unconditionally is why it only ever folded one way, and it is invisible on any fixture that never goes negative. **A finite reading always draws ink** (I16 one form along): a floor rendering blank gives blank two meanings in the form whose subject is *how deep*. *Below `CONTINUOUS_FLOOR` there is one channel for two data and the frame decides, not this invariant (§3z).*
 - **I53** — **A calendar's rows are the sub-unit, its columns the super-unit, and its cells are the one thing in the matrix family that have a duration.** `calendarUnit` picks the cell and the grid falls out: 24 rows for `hour`, 7 for `day`, 5 for `week`, 12 for `month`, one flat series in and `N` labelled rows out, substituted at `heatmapFormRows` where a `quiver`'s magnitude field already is so that the range, the gutter, the legend and the overflow row all see one series list. **Three units are `(offset + i) mod cycle` and `week` is a calendar**, because a month is not a whole number of weeks — so `week` is the only unit whose grid has interior holes, and they are periods that do not exist rather than readings that are missing. **The span needs no member**: `startDate` + unit + `values.length` fixes it, which is the reader `startDate` was published without. **The columns are `uniform`** — every cell the same width, the oldest dropped first, the remainder a fringe — because `stretch` differs by one cell and one cell at a pitch of one is a doubling, and a two-cell week beside a one-cell week reads as two weeks holding one value (§6b B15's rule on its third consumer). `uniform` is `left` with the cells widened to fill, identical wherever the pitch is one, and the fringe is removed with `width` rather than by stretching. **No height refusal** — `matrixRows` spends its last row on `+17 more · 07 · 08 · …`, which is commitment 46 speaking in the calendar's own labels, and at `height: 1` the frame is that notice and no cells. **No `Date`** (SS1), UTC only, days-from-civil by hand. **Three x captions, derived at the super-unit's granularity where the caller declared none, and read through `columnMap` so they name the columns that are shown rather than the columns that exist.** The walk ruled the other way and gave a reason — *placing one against a grid that need not reach the area's right edge needs an offset, and `xLabelRow` takes a width* — that is true of a right-anchored grid and false of the three arms whose grid starts at column 0. **A matrix's captions span its grid rather than its area** from here on, which was already wrong for `left` and was shipped; `window` keeps the area and §3ae.7 names why (§3ae.8).
-- **I54** — **An alphabet is chosen by capability and never by `plotStyle`, and at `unicode: "ascii"` every sub-cell repertoire has a stated substitute.** §3c's *`plotStyle` names what, never the alphabet* was the rule and four sites decided it from the style alone: `lineDrawRows` selected its glyph table with no capability in the signature, `styleRasteriser` branched on `ambiguousWidth` where the question is `unicode`, and the contour and violin arms read `plotStyle` while holding `ctx.capabilities`. **The substitutions are C02 §4's, not new ones** — box drawing becomes `+ - |` through the `ASCII` table `glyphForMask` has had all along, braille becomes the density ramp, and the legend separator becomes `-`. **A style is degraded and never refused**, on I18's precedent: a caller cannot avoid the terminal they are on. **`lineDrawRows` degrades in place rather than yielding to `curveRows`**, because the ramp is ASCII and loses the connectivity that is the whole content of `plotStyle: "line"`. Measured: 49 of 159 variants at `ascii · narrow` and 24 at `ascii · wide`, 32 files of the rendered corpus carrying braille in a frame labelled ascii, and `expectDocument(…).degradesToAscii()` — the assertion this framework publishes for a consumer's suite — failing on a `line` plot and on a `contour` (C12 §3af, F216, → C09 I22, C02 §4).
-- **I55** — **A label is placed once, marked where it displaces another, and never sized into the thing that sizes it.** Six kinds share one anchor vocabulary — a value and a series name at the series' own inked row, an annotation's in a legend row, a node's inside its own figure, a point's beside its sample, an axis title in a declared row — and a **tick is not one of them**, because a tick is *at* a coordinate and a label is *near* one, which is the whole difference between moving a tick (a lie) and moving a name (still the name). **A point label takes one of two positions and never slides**: right of its sample, else left of it, else dropped — a label slid inward from the right edge covers the sample it names, and an anchor hidden by its own label is worse than no label. **Placement is a single pass in series order onto free cells only**, so no label displaces one already placed and the output does not depend on which of two independent labels was considered first. **A displaced label is marked with a one-cell `+` at the survivor and is never a legend entry**, which is I48's clause inherited rather than re-derived: a vertical legend sizes itself to its longest entry, that width sets `areaWidth`, `areaWidth` sets where samples land, and what collides sets what would be counted — *`+N`'s count needs the ink that needs the width that needs the column being sized.* **The legend is sized from series, segments and annotations alone**, all knowable before a label is placed. **I8 does not reach a dropped label**: it governs a series given no row, and a tile whose name did not fit is still drawn and still carries its extent — so a treemap tile with no padding ring drops its name and says nothing, and §3n's first wording said *counted* by borrowing an invariant one case too far. **A label draws over the data and an annotation line draws behind it** (C04 I23), because a reference line is a claim the curve is compared against and a name is the curve's own. **At one bit the leader survives and the identity does not** — `─ │ ╰` degrade to `- | +` through `linedraw.ts`'s ASCII table, so the arm at risk is `unicode` and it is already built. **The remedy this clause first named cannot fire and is struck**: it said a label takes its series' `markOf` glyph as a prefix *on the same predicate the swatch uses*, which is `colourDepth >= 4` — and above that floor colour separates the categories, while below it `positionalForm` stops overlaying and **stacks into strips the gutter already names**. Every form that accepts a point label is in `POSITIONAL_STACKS`, so the two arms meet with nothing between them. **The identity is carried at one bit, by the strip's own gutter label**, which is a mechanism that already shipped — and the prefix was a member that would have done nothing at any capability (§3ag). *The cycle is broken by this invariant and not by a signature, which is weaker than `measure`'s purity and is recorded as weaker* (§3ag).
+- **I54** — **An alphabet is chosen by capability and never by `plotStyle`, and at `unicode: "ascii"` every sub-cell repertoire has a stated substitute.** §3c's *`plotStyle` names what, never the alphabet* was the rule and four sites decided it from the style alone: `lineDrawRows` selected its glyph table with no capability in the signature, `styleRasteriser` branched on `ambiguousWidth` where the question is `unicode`, and the contour and violin arms read `plotStyle` while holding `ctx.capabilities`. **The substitutions are C02 §4's, not new ones** — box drawing becomes `+ - |` through the `ASCII` table `glyphForMask` has had all along, braille becomes the density ramp, and the legend separator becomes `-`. **A style is degraded and never refused**, on I18's precedent: a caller cannot avoid the terminal they are on. **`lineDrawRows` degrades in place rather than yielding to `curveRows`**, because the ramp is ASCII and loses the connectivity that is the whole content of `plotStyle: "line"`. Measured: 49 of 159 variants at `ascii · narrow` and 24 at `ascii · wide`, 32 files of the rendered corpus carrying braille in a frame labelled ascii, and `expectDocument(…).degradesToAscii()` — the assertion this framework publishes for a consumer's suite — failing on a `line` plot and on a `contour` (C12 §3af, F216, → C09 I22, C02 §4). **And width bears on *both* decisions, which this rule assigned to one of them.** *How wide is this glyph* chose the **rasteriser** — an unstyled curve prefers braille at `wide` — and the **alphabet** question was left to `unicode` alone. An explicit `plotStyle: "line"` has no narrow line-drawing alternative, so at `wide` it drew two-cell box glyphs into a grid measured in cells: the row mixed alphabets with its own frame and the figure was truncated. So the alphabet falls back for **either** reason — `flatAlphabet(caps)`, which is `glyphs()`'s own predicate named — and the substitute is the one this rule already states. *Measured before the rule: 27 distinct two-cell characters across 18 of 178 catalogue forms at `wide`, and 174 rows carrying the truncation marker where the figure was cut* (F293, §3ak.24).
+- **I55** — **A label is placed once, marked where it displaces another, and never sized into the thing that sizes it.** Six kinds share one anchor vocabulary — a value and a series name at the series' own inked row, an annotation's in a legend row, a node's inside its own figure, a point's beside its sample, an axis title in a declared row — and a **tick is not one of them**, because a tick is *at* a coordinate and a label is *near* one, which is the whole difference between moving a tick (a lie) and moving a name (still the name). **A point label takes one of two positions and never slides**: right of its sample, else left of it, else dropped — a label slid inward from the right edge covers the sample it names, and an anchor hidden by its own label is worse than no label. **Placement is a single pass in series order onto free cells only**, so no label displaces one already placed and the output does not depend on which of two independent labels was considered first. **A displaced label is marked with a one-cell `+` at the survivor and is never a legend entry**, which is I48's clause inherited rather than re-derived: a vertical legend sizes itself to its longest entry, that width sets `areaWidth`, `areaWidth` sets where samples land, and what collides sets what would be counted — *`+N`'s count needs the ink that needs the width that needs the column being sized.* **The legend is sized from series, segments and annotations alone**, all knowable before a label is placed. **I8 does not reach a dropped label**: it governs a series given no row, and a tile whose name did not fit is still drawn and still carries its extent — so a treemap tile with no padding ring drops its name and says nothing, and §3n's first wording said *counted* by borrowing an invariant one case too far. **A label draws over the data and an annotation line draws behind it** (C04 I23), because a reference line is a claim the curve is compared against and a name is the curve's own. **At one bit the leader survives and the identity does not** — `─ │ ╰` degrade to `- | +` through `linedraw.ts`'s ASCII table, so the arm at risk is `unicode` and it is already built. **The remedy this clause first named cannot fire and is struck**: it said a label takes its series' `markOf` glyph as a prefix *on the same predicate the swatch uses*, which is `colourDepth >= 4` — and above that floor colour separates the categories, while below it `positionalForm` stops overlaying and **stacks into strips the gutter already names**. Every form that accepts a point label is in `POSITIONAL_STACKS`, so the two arms meet with nothing between them. **The identity is carried at one bit, by the strip's own gutter label**, which is a mechanism that already shipped — and the prefix was a member that would have done nothing at any capability (§3ag). *The cycle is broken by this invariant and not by a signature, which is weaker than `measure`'s purity and is recorded as weaker* (§3ag). **Stated blind spot — the second arm** (§3ag): the label strings and the two-position flip cross, because both are decided from the data; the free-cell pass does not, because the second arm has no cell to be free — a label there is text at a pixel and its footprint is a measurement §3aj hazard 4 forbids the figure — so `pointLabels` is **terminal-only by ruling** until that arm has a unit for a label, and the crossing half is owed under the name `pointLabelMarks`, chosen so the deferral is checkable by grep.
 - **I56** — **The abscissa is named in one declared row beneath its labels, and the forms that can carry one were measured rather than reasoned about.** `xTitle?: string`, drawn centred over the **plot area** — `layout.gutter` is the whole left offset, which is what `xLabelRowFor` one row above uses — truncated and never wrapped, because a second row would change a declared height (I1). **Below the labels and never above them**: the labels are the scale, and a name between a scale and the thing it measures separates the two. **The row is added by `titleRows` centrally**, on `legendRows`' recorded reason — every form that draws one pays it the same way, and thirty-six entries each adding the same term is thirty-six chances to forget one. **`HAS_X_TITLE` is total over `PlotForm` and every value in it was measured**: each form was rendered with a title and the frame searched for it, giving **26 true and 18 false** — and **16 of those 18 also broke `measure === rendered`**, because the row was declared and nothing composed it. So the record is not a taste, it is what keeps I1, and the **refusal is the mechanism**: a `true` in the wrong place is a block whose declaration and drawing disagree. *The matrix family is a named gap and not an omission* — a heatmap draws a column-label row a title could sit under, and wiring it is a change to that family's compositor. **`axes: false` is refused**, because a title for an axis that is not drawn names nothing and the alternative is a second placement rule for one member. **There is no `yTitle`**: rotated it is a column of single letters no terminal reader parses, horizontal above the gutter it is `xLabels`' shape and a second title member — and **a y-axis title is a heading, which C09 already has**, costing the same row and reusable by every kind. *The first draft offset the row by `labelColumn + AXIS_GUTTER` on top of the gutter and pushed it four cells right, off the area's centre and past its right edge into `clampSpans`' ellipsis; a row-width assertion cannot see that, because the row is exactly `width` either way* (§3ag).
 - **I57** — **A tree is one drawing in three layouts, chosen to fit and never as a rung.** `tree` is the fourth reading of `hierarchy` and the first whose subject is structure rather than magnitude: it takes `label` and `children`, and **`value` is ignored** — optional on the node for it (C04 I64), with the answer beside the ruling in the member's own doc, because *put it in the name* costs nothing and a bare refusal leaves *a field that does nothing* reading as one not yet implemented. **Top-down Reingold–Tilford, left-to-right, and `tree(1)`'s indented outline**, with natural sizes `2·depth + 1` × `W(root)`, `leaves` × `Σ_d max label + 2·depth`, and `nodes` × `max(4·depth + label)` — where **`W(node) = max(cells(label), Σ W(children) + gaps)`**, because a parent's own name can be wider than everything beneath it and then the parent sets the width: measured at 20 columns against a plan formula's 5, with the leaf positions, the depth and the node total agreeing either way. **They are not a ladder, and `HAS_DETAIL_RUNGS.tree` is `false`.** Measured over four trees, the top-down figure is the cheapest of the three in rows on a broad tree (3) and the dearest on a deep one (13) while its columns invert with it, so no ordering by budget exists — **not even one that depends only on the budget**, since which layout is cheapest depends on the tree; and all three draw the same names and the same edges, which is I34's own test for a rung failed three times in the same way. **The choice is `treeLayout` and `"auto"` is a fit**: the first of top-down, left-to-right, outline whose natural size fits both axes, else the one that keeps the most nodes at the budget. **What does not fit is a `warn`-toned row inside the area** (I8), and **the row is spent before the choice rather than after it**, so the notice cannot remove itself by making the drawing fit — §3ag.4's cycle in a second place, ruled the same way. **Truncation runs before placement**, or a surviving parent is centred over a span that includes the subtree that is gone, with every count agreeing; and an edge is derived from the kept set rather than from `children`, which is that defect one pass along and a separate ruling because the first fix does not make the second. A fan is three orthogonal moves through `strokePolyline` and `glyphForMask`, **a fan of one is `│` and never a zero-length bar**, the outline's indent is four cells because `├── ` and `|-- ` both are, and edges are `tone.muted` with no categorical palette — **so I25 has nothing to carry here**, the name being the identity at every depth and drawn at every capability. `hierarchy` absent is refused at both gates and drawn as `emptyRows` on the third path, where a fixture reaches the renderer without passing either (I2).
 - **I58** — **A graph is one drawing in one layout, and the layered pipeline is seven passes rather than the three it is usually named with.** Cycle removal, deduplication, longest-path layering, dummy nodes, ordering, x-coordinate assignment and painting — and *deduplication* is there because reversing `b→a` where `a→b` exists yields the same edge twice, drawn twice and counted twice, which was found by checking the instrument rather than by reading the recipe (F242, §3ai.1). **Two sweeps is a number chosen and best-kept is what makes it safe**: one sweep never hurts and cuts crossings four- to fivefold, two taken plainly is worse than one in a whole family — near-path *n* = 50, mean 36.5 to 38.1, worse in 17 trials of 40 — and keeping the ordering with the fewest crossings seen makes it monotone for one crossing count a sweep. Past two the gain is 3–6% where the first buys 80%, and at the sizes that fit a terminal it is already at the floor. **`force` is refused on the labels alone and the refusal has been moved once**: it rested on `strokePolyline` stepping orthogonally, which is a fact about the tool — `drawLine` strokes arbitrary angles at 2 × 4 — and what stands is 17.4% of label pairs overlapping at a third of the edges present, *n* = 20. **The same question asked of `layered` comes back clean structurally**: a layer's labels sit side by side with a gap, so an overlap is not expressible — zero in 360 graphs — and the failure mode is overflow, which I8's row answers. Its expiry is `shiftInward` and the label taxonomy, written as a symbol because a deferral names a condition and nothing watches it. **The figure does not claim direction**, because an arrowhead needs a glyph the set does not have and `▲`, `↑` and `↓` are ambiguous-width throughout; the layering carries it, and edges the cycle pass reversed are counted in the notice row rather than marked (§3ai.3). **The seventh pass was missing and the figure is what found it** (§3ai.6): every layer was centred on its own width, so a chain whose layers hold different numbers of nodes stepped sideways at each rung — 37, 35, 34 for one four-node chain — and the edges between them drew as staircases between nodes that belong in a column. Arithmetically self-consistent at every count, which is why nothing but reading it could have said so. The remedy is the phase Sugiyama names and the first build skipped: pull each node to the **median** of its neighbours, restore separation without reordering — the ordering pass owns that, and a placement that reordered would throw away the crossings it bought — alternate the sweep direction so neither end is privileged, and centre **once, on the whole figure** rather than per layer.
+- **I59** — **Every decision above the shared coordinate is made once, and both arms read the same one.** Which mark, which orientation, which tick, which label, which furniture, which colour slot and what is dropped are members of a `Figure`; a renderer that computes one of them is a renderer that can disagree. *Measured before the rule: 73 of 135 cells over the 27 forms the SVG arm claims disagreed, 59 of them everywhere — and three of the five decisions disagreed on every ticked form in the corpus.*
+- **I60** — **A form whose readings are not on an axis has no value axis, and the figure says so.** `value` is `null` for the matrix, tiles and nodes families, whose readings are colours, areas and structure. *This is not a tidiness rule: `matrix`, `tiles` and `nodes` each furnished an axis out of `seriesRange([]) ?? {0, 1}` in three separate commits, so a fourth renderer would have furnished a fourth. An absent axis is a decision with a reason, never an omission.*
+- **I61** — **Positions are normalised and uninverted, and the facing is carried rather than assumed.** One decision about which end is zero and which way each axis grows, applied twice. *`svgPoints` passed `invert: true` unconditionally, so all four `origin` values were byte-identical and a block asking for a top-left origin drew flipped in one arm and unflipped in the other.*
+- **I62** — **A mark names a role and a slot, never a glyph and never a colour.** `GlyphRole` is an exhaustive `Record`, so a rung with no entry is a compile error rather than a silently different character; `ref` stays unresolved so each arm calls `resolve()` at its own depth — one resolution rule, two depths.
+- **I63** — **The shared layer states how much room a label has and never measures the label.** `room` is a fraction of the figure; the terminal turns it into cells and truncates, the SVG turns it into a `clipPath`. *§3aj hazard 4 says a shared layout that calls `cells()` cannot serve the image path, so the two arms cannot agree about which labels fit — measured, a `treemap` names five tiles in one arm and eight in the other. The threshold is shared and the outcome is each arm's.*
+- **I64** — **`figureOf` is total, and a refusal is a figure with no marks.** No block throws, because a throw one level above the rasteriser abandons a half-built figure in the component whose claim is that both arms read the same one (I2, one level up). *How each arm refuses stays its own — `null` in SVG, empty rows in the terminal — because what must be identical is whether there was anything to draw.*
+- **I65** — **A form whose datum is derived derives it once, above both arms.** `ecdf` replaces its samples with a sorted cumulative fraction and `density` replaces five of them with a hundred kernel estimates; both answer *what is drawn* and never *how*, so a derivation one renderer can reach and the other cannot is a second figure rather than a second rasterisation. *Measured before the rule: for one block the terminal drew `[0.2 … 1.0]` over 0–1 and the SVG drew `5 1 4 2 3` over 1–5 — an ECDF that descends, and a density plot with no density in it. Both functions were pure, written and living in rasteriser modules, which is the one place the second arm could not reach them (F268).*
+- **I66** — **A claimed form's frame is a function of its data.** A form the renderer accepts draws something that changes when its readings change; ink on the page is `G7b`'s rung and this is the one above it. *Measured before the rule: `ecdf` draws one fixed staircase for every dataset of a given length — `ecdfSeries` reads its own `sort` only for `.length` — and the sweep that found it reports 16 unmoving frames of 178, of which **15 had no number to perturb** and were never asked (F269). A fixture that cannot answer reads exactly like one that answered well.*
+- **I67** — **A decision the block splits, the figure resolves — and a decision that needs a capability stays out.** `axes` and `plotFrame` are two fields because an **author** has two questions; after resolution there is one border, so `frame` carries it with `"none"` and the renderers stop asking. `gutter`, `positionAxis` and `valueLabels` are separate members and not one, because `axes` gates three things and each carries a per-form override — a heatmap guts its rows whatever `axes` says, since its row labels *are* its ordinate. *Measured before the rule: five of the six block fields governing furniture reached no member, so `frame: "box"` came back for `axes: false` and `legendSlots` returned the same list for `legend: false` as for `legend: "right"` — an arm consuming them would have drawn furniture the author refused* (F295). **And the boundary is `caps`**: `legendPlacement` auto-enables through a clause reading `caps.colourDepth`, so `Figure.legend` carries the author's request and each arm resolves it. A figure that could answer differently at two rungs is not a figure.
+- **I68** — **A role is drawn distinguishably from every role it can share a figure with, and each arm holds a record keyed exhaustively by the role.** Not *seven roles, seven shapes*: the terminal draws `◆` for `mean` and for `target`, which is legitimate because `distributionFigure` cannot emit them together — and unfalsifiable stated the other way, so the claim is scoped to co-occurrence. Exhaustiveness is the compile-time half; the co-occurrence claim is the behavioural one, and neither alone holds the arms together. *Measured before the rule: `GlyphRole` was read in one file, the one declaring it; the terminal's own `GlyphChars` carried eleven slots of which **five were dead** and the dead five were exactly the role-named ones — `median`, `outlier`, `whiskerH`, `boxLeft`, `boxRight`; and the SVG's `switch` ended in a `default:` that would have drawn an eighth role as a circle. The arms agreed because the roles were extracted from the terminal's composition, which is agreement by history* (F289, F298, F300).
+- **I69** — **A figure whose two normalised axes carry one unit says so, and each arm fits a centred square inside its own box rather than filling it.** `isotropic` is a figure member because it is a property of the *figure* — a disc, a ring and a mosaic of squares are round or square in any renderer — and it is not the cell aspect, which stays a terminal fact under G2 and never crosses. *Measured before the rule: every pie and every radar in the catalogue is height-bound at every width, so `radiusFor`'s `byWidth` arm is dead across the corpus and its `min` reads as though it decided nothing; the second arm's plot area is 1.44× wider than tall with a right legend, so a unit square through `projected` is an ellipse and a waffle's hundred squares are 39.7 × 27.5 px. The plan's sentence — the aspect compensation disappears because an SVG square is square — is true about `CELL_ASPECT` and attached to a decision about the box* (F303).
+- **I70** — **A form whose figure is a derivation of its series computes that derivation above both renderers, and each arm draws the derived block.** I65 puts the derivation below both arms; this is the half that makes it observable, because a pure function in the right layer draws nothing until somebody applies it at an arm's entry. *Measured before the rule: `derive.ts` had existed since §3ak.7 ruled on it, holding `ecdfSeries` and `densitySeries`, and was imported by the terminal's dispatch table and by `kde.ts` — **by nothing on the second arm's side**. The row written for I65 builds the derived block itself and asserts the figure against it, so it passed while no caller did that; and a third form, `histogram`, was never named at all, because the walk that found the class was one family's. Three forms, closed at three by a sweep of the ten sites in the dispatch that reshape a block — **and the sweep's corpus was a file**: `heatmapFormRows` holds three more of exactly that shape one file along, two of which are why two `SVG_FAMILY` entries are `null`* (F268, F314, F317, F322).
+- **I71** — **Where a derivation's output is geometry, the geometry crosses at the data's own resolution and each arm rasterises it at the resolution it has.** I70 says each arm draws the derived *block*, which is what a derivation returning series affords; a derivation returning a figure has no block to hand over. A contour's crossings are interpolations between adjacent readings, so they live on the data's grid — and a glyph-per-cell arm cannot draw them, because `glyphForMask` wants a mask per cell. The rule's observable form is a signature: `contourFigure` and `horizonFigure` take a block and return normalised marks with **no `areaWidth`, no `areaRows`, no `caps` and no string**, while `contourCellRows` and `horizonGrid` keep all four. *Stated blind spot: the terminal does not read the shared geometry back, so an unmoved terminal baseline is evidence that nothing was disturbed and **not** evidence that the arms agree — for I70's three the byte-identity was the proof, and here only the frame is* (F322, F323).
+- **I72** — **Which ramp a reading is on is a figure decision; resolving that ramp to a colour is the arm's.** A `Figure` carries the colormap's **name** and never a colour, which is I62 one member along: a name resolves at each arm's own depth — `continuousColour` descends a capability ladder in one and does not in the other — while *which* map varies by **form**, and a form is not a resolution. *Measured before the rule: `DEFAULT_COLORMAP` lived in a terminal renderer and the second arm's whole ramp decision was `COLORMAPS[block.colormap ?? "viridis"]`, so `correlation` drew sequential where the terminal draws diverging and `utilisation` drew viridis where it draws inferno — the defect the table's own comment calls the single most common chart defect there is, on the form the row was written for. Two sentences licensed it and each was the other's alibi: the seam member's doc said **one ramp either way** and the walk's header called **which ramp a matrix reads** rasterisation* (F324).
+- **I73** — **A form has a value axis only where one range carries every mark.** A `Figure` holds one `value`, so a form whose rows each carry their own scale has no value axis, and neither has one whose readings are shares rather than positions. I60 asks whether a form's readings sit on a value scale *at all*; this is the half that asks whether they sit on **one**, and the two look identical until a form is drawn. *Measured before the rule, over the five that had never been drawn: `gantt`'s axis would have read `0 … 5` over bars spanning `0 … 11`, because the extent came from the durations rather than the spans; `funnel`'s `0 … 1000` labels a **width**, so neither end of a bar is its reading; `bullet`'s `0 … 100` sits over three rows scaled `0 … 100`, `0 … 60` and `0 … 40`, which is the one thing a bullet chart exists not to do — and the reason was already written in the renderer that draws it, in a different file from the record that contradicted it* (F329, F330).
+- **I74** — **A form's furniture and its marks describe the same block.** I70 puts a derivation above both arms; this is the half that says *above the decisions too*, because a renderer that derives inside its rasteriser labels one block and draws another and needs no second arm to disagree with itself. *Measured before the rule: `positionalForm` takes its decisions from the block it is handed and `slope` takes its two ends in the callback, so `slope/six-readings` drew a position axis reading `0.0 … 5.0` over a figure with two points on it — five intervals of labelled domain with no readings in any of them — and a value axis of `0 … 50` covering a 9 and a 41 that nothing draws. **It took a fixture to see**: every `slope` series in the corpus had exactly two values, where the derivation is the identity and the two readings of the rule are indistinguishable* (F332).
+- **I75** — **Two blocks that draw different frames in one arm draw different documents in the other.** A block field the second arm does not read draws one picture for two figures, and that is the strongest agreement the disagreement record can report: same labels, same legend, same border, same count of everything. The observable form is a **collision** — byte-identical baselines whose blocks are not equal — and it is checked over the corpus with the catalogue's header line stripped, because the header names the variant and would make every terminal frame distinct by construction. *Measured before the rule, over 182 variants: the terminal draws 175 distinct frames and this arm draws 125. The empty document is 3 of the terminal's collisions and 32 of this arm's — a refused form and a form with no data both draw it, and both are correct. Past it, **4 and 25**, and the terminal's four are all also this arm's: a collision both arms have is a **fixture** defect, and three of those four are variants whose names state a claim their block does not make — `line/legend-right` sets no legend, `heatmap/palette` pins `colormap` to the heatmap's own default, `histogram/scott` bins identically to `sturges`. Twenty-one belong to this arm alone: `layout`, `yCallout`, `plotCorners`, `matrixAnchor`, `plotStyle` and a band's `fill`* (F342, F349, F350). **Stated blind spot**: a collision needs two variants differing in **one** field, so the sweep names a field only where the corpus isolates it — `aspect`, `axisCross`, `plotBox`, `lower` and `upper` are each read by one arm and appear nowhere in it. **`plotFill` was the sixth and has left** (F404): the corpus *did* isolate it — `violin/braille` and `violin/braille-filled` differ in exactly that field — and this arm filled unconditionally, so the pair collided and the note beside the group explained all four of its members as the terminal's cell-spending choices. Three of the four were. A lower bound on the drop, an exact count of the pictures. **Checked at AD13, and the figures above are a probe's.** The invariant's subject is the corpus and its only citation was `FB7`, a row about `layout` whose assertions are rect widths — so 76 of 76 C12 invariants cited by a test file was a convention held by hand, and a citation satisfies it whatever the row does. Computed: **126 documents and 24 shares past the largest group**, not 125 and 25, and nothing drifted — `layout` crossed, which split `bar/stacked` from `bar/normalised`, the first pair in the list above. **A figure quoted from a probe is a snapshot of a corpus the fix then changed**, and the probe was deleted before staging, so there was no route back to it. **The check reads neither the catalogue nor the committed baselines**: `baselineFrames()` and `svgFrames()` are `name → bytes` in memory with no header, so the stripping clause above describes a hazard of a corpus the sweep does not read. **And it asserts the groups rather than the counts** — a count moves when a field starts crossing and moves the same amount when a variant is deleted, where a group names which member is dropped (F349, F357).
+- **I76** — **A label the shared layer declines to measure is contained by the arm that draws it, and a cut is at the tail and marked.** I63 puts the *room* above both arms and the outcome in each; this is the half that says the outcome is a **decision** and not a clipping rectangle. **A clip contains and does not communicate** — an `end`-anchored text grows leftward, so the rectangle that stops it removes the label's **head**, and a head cut is a different word where a tail cut is truncation. The rule has two axes and one shape: a label overflowing **along** its text direction is cut at the tail and marked; one overflowing **across** it is scaled to its box. *Measured before the rule: `boxplot/default` draws `petal_length` as `betal_length` in the second arm, beside a terminal frame naming all four rows in full — the gutter is a **tenth of the width** where the terminal's is `min(widest, width / 3)`, and the value labels on the same side had no clip at all, so a long one left the viewBox entirely. And `graph/crowded` writes fourteen labels at `SVG_FONT_SIZE` into ranks `275.2 / 14 = 9.83 px` tall, every glyph ascending into the rank above and descending into the one below* (F343, F345). **The premise this replaces named its own trigger**: §3ak.20 chose a tenth *because pixels overflow gracefully and cells do not*, and recorded that the day an instance appeared was the day to make the argument. What it forbids is untouched — `cells()` in a shared layout is still hazard 4, and an em estimate inside one arm is not shared, measures nothing in the other arm's units, and adds no member.
+- **I77** — **An output reader takes its alphabet from the renderer, and a control composed by hand cannot check that it did.** A reader over rendered text is an instrument whose subject is a vocabulary, so its fabricated violation has to be *rendered*: a hand-built fixture is written in the same sitting and under the same reading of the alphabet as the rule, which is A03 §2's note about SP1 arriving on a character class. *Measured before the rule, over 364 frames: `interiorRules` answered `> 0` on 15 and the frame held a `┄` or `┊` on 16, and **not one frame was in both** — every positive a figure glyph, every real rule missed, and `line/frame-grid` reporting zero over eight rows of gridlines. Its control asserted `├────────────┤` and `│    │    │ │`, neither of which this renderer draws* (F358, C12 §3ak.43). **Stated blind spot**: it says nothing about a reader whose alphabet is right and whose *predicate* is wrong, which is what F334 fixed and what this inherited. **And the check is a disposition count, not a total** — correcting this moved 28 of 328 pairs and left the disagreement count at 16, so a rule phrased over the total would have passed unchanged.
+- **I78** — **The position axis crosses as a domain — `{ range, scale, format }` — and each arm nices it with its own tick budget through one shared function.** `positionAxis` answers *is the row drawn* and says nothing about what is in it, which is why `xMin`, `xMax`, `xScale` and `xFormat` had no reader in the second arm at all. **A domain and not an axis, and the asymmetry with `value` is the budget**: a value axis nices against `ticksFor(plotAreaRows(block))`, a count derived from `height` and therefore a block fact, where an abscissa's comes from the width and stays in cells (§3aj hazard 3). So `positionAxisAt(pos, maxTicks)` is the single derivation and the budget is a parameter — `valueAxisOf`'s shape. **Ticks are placed by `at`**, which is `xPositionOf` above the seam: `normalisedOf` is not scale-aware, and an arm using it would put a log label at the linear position with the sample beneath it at the log one. *Measured before the rule: six blocks differing only in the abscissa drew six terminal frames and one 1225-byte document, and `plotFrame: "grid"` — a member that **does** cross — drew five horizontal rules and no verticals under a comment in its own file saying both ways* (F356, C12 §3ak.44). **Stated blind spot**: it says nothing about which *values* the domain should hold, so a slope chart's two positions still nice to `0.0 … 1.0` in both arms — consistent, and a question the seam does not ask.
+- **I79** — **A figure with nothing in it is drawn; a refusal is for a figure that cannot be drawn.** The second arm returned `null` when a figure emitted no marks, so a block with no data and a form the arm does not support produced one document and a consumer could not tell *not yet* from *not supported*. **An empty figure draws its ground and its message and no axis** — there is no range, so ticks, gridlines and a frame would each imply one, which is the false-axis defect the `null` was protecting against and is kept. `emptyMessage` is the message, defaulted to `No data.` in both arms. *Measured before the rule: `line/empty` and `violin/default` were byte-identical, in the corpus's 33-strong refusal group, while the terminal held the declared height and centred `No data.` in the muted tone* (F259, F363, C12 §3ak.45). **Stated blind spot**: it says nothing about a figure whose marks are empty because the *data* is degenerate rather than absent — a series of all-`null` reaches the same branch, and the two are one state here.
+- **I80** — **A member that resolves a competition for one cell is legitimate where both answers fit at once.** `plotBox` chooses how a **one-row** box spends its single row — on mass, or on a stroke heavier than the whisker — because at `plotDetail: "compact"` the box has no top or bottom edge to carry the range (I46). At the default detail it decides nothing, and in the second arm it decides nothing either: the IQR box there is `fill-opacity="0.35"` **and** `stroke-width="1.5"` in one rect, so it carries both. *Measured before the rule: `boxplot/compact-box-solid` and `boxplot/compact-box-line` draw `███` against `━━━` in the terminal and byte-identical documents here* (F365, C12 §3ak.46). **A second kind of `legitimate`**: F355's four are legitimate because each **is** a quantity in cells; this is a **choice forced by** cells, found by asking why a choice exists rather than what unit it is in. **Stated blind spot**: it says nothing about a member that is blocked rather than legitimate — `plotFill` chooses fill against outline for a density, which a pixel curve can also do, and it has nowhere to be read until `violin` draws. That is a dependency, and a remainder that mixes the two reports the wrong amount of work.
+- **I81** — **What a callout says crosses; the rung that degrades it and the row it lands on do not.** `yCallout` writes a name or a reading at each series' end, and the second arm read none of it — it drew a legend instead, the *same* legend for all three callout variants. **And the legend clause was in one resolver and not the crossed one**: `legendPlacement` has carried *a name at the line's end **is** the legend* since §3ag and `legendOf` had not, so this arm drew a legend the terminal removes and would have drawn it beside the callouts — the identity three times. I48's sentence **selects** rather than excludes, which is what lets one clause serve both. **Three things were in one function and one of them crosses**: the strings (`calloutOf`), the capability rung (below the colour floor the family stacks into labelled strips, so a name there is a third copy — applied *over* the strings), and the anchor (`lastInkRow` in cells, the last point of the last polyline here — the same question in two units, as I78 said one member earlier). *Measured before the rule: `line/callout-last`, `callout-name` and `callout-both` drew one document; the terminal draws three, and moving the strings moved 0 of 1840 terminal frames* (F349, F368, C12 §3ak.47). **Stated blind spot**: it says nothing about *where* a callout may go when two series end on the same row — the terminal has a collision rule and this arm stacks text at the same y, which no corpus variant exercises.
+- **I82** — **A member crosses as what must not be decided twice, and each arm keeps the room and the arithmetic.** `xTitle` crosses as the *words* — the terminal spends a row on the caption and the second arm spends pixels — and `axisCross` as *whether the rules cross*, because `positionAxisAt`'s `zeroAt` and `normalisedOf(0)` are the same question in two units and only a domain **strictly** straddling zero has a crossing (§3ad A4). Forwarding `axisCross` itself would make the second arm re-derive which of its values means cross. *Measured before the rule: `line/x-title` and `line/x-captions` drew one document, and `axisCross` at `unset`, `"zero"` and `"edge"` drew one* (F369, F370, C12 §3ak.48). **Stated blind spot**: the reader map that found these counted **names in `svg.ts`**, not values reaching the arm — `calendarUnit` and `startDate` had crossed since F322 through `drawnBlock` and were counted owed for six commits, because a grep over names cannot see a value arriving through a transform.
+- **I83** — **The camera reaches the renderer through `RenderContext`, as a record by block id, and no geometry may read it.** C12 owns no state (I11), so the live camera is view state and the block declares only where a view starts (C04 I75). **A record rather than a value**, because a document can hold two 3D plots and a scalar threaded down the tree would give them one view — `scrollOffsets`' shape and `scrollOffsets`' reason. **Geometry is invariant under it and structurally so**: `plotHeight` reads `form`, `height`, `axes`, `legend` and `xTitle` (I1) and `measure` is `(block, width)`, so a height derived from a viewing angle is unspellable rather than merely forbidden — `tick`'s treatment (I8). **The width is ruled and not inherited**: a 3D form's three axis labels move as the camera turns, so they are billboarded inside the plot area rather than written in a fixed gutter, and the form spends no `AXIS_GUTTER`. Nothing here is observable until something can move a camera, which is why the axis and its writer are one commitment elsewhere (→ C22 I71).
+- **I84** — **The sample grid is derived from the block and the rung, and the depth buffer is allocated per render.** `width × 2` by `height × AREA_ROWS`, **one grid for every rung**; `160 × 192` is the grid at the size the measurement ran in and **not a constant**, so every absolute figure in `docs/notes/CALCIUM_3D_DESIGN.md` is a measurement at 80×24 rather than a threshold. **It was two grids chosen by rung** — `× 1` by `× 2` for half blocks, `× 2` by `× 4` for braille — until F498 merged them, and this sentence went on quoting `80 × 48` afterwards while the function returned eight times it (F506): the note's whole performance tier is costed on the smaller figure, and re-measuring it found the frame 3.5–4.6× the recorded budget with two grid-independent rows reproducing exactly, so the excess is the grid and not the host. The depth buffer is `Float32Array(sampleWidth × sampleHeight)` **allocated per render**: I11 forbids state that survives a render and permits a local, and the distinction is load-bearing rather than pedantic — a module-level buffer is exactly the forbidden state *and* is the wrong size the first time a region changes. **The shading model is one sample carrying both readings, and whether they can be separated is an open measurement rather than a rule** (§3al, F436): the two-channel claim was a property of the dot grid's two carriers, it is retracted, and it is deliberately not stated as an invariant because its subject does not exist yet. **The depth test compares in the buffer's own precision, and until it did the tie rule was false as implemented** (F454): a `double` stored into a `Float32Array` is rounded, so a second writer handing over the *identical* value passed `z < d.z[i]` whenever that rounding went up — about half of all ties, decided by the last bits of a number nothing reads, and invisible to any assertion comparing the two depths because as doubles they are equal. `Math.fround` on both sides is the whole fix. Every rule phrased over *equal depth* — the draw order, the frame going in last, a wireframe over its own surface — inherits that coin flip, and a `Float32Array` beside a `double` comparison is the ordinary way to write a depth buffer rather than a slip.
+- **I85** — **A `plot` declares one block-level element when it declares a camera or when it can take a cursor — a positional form with at least one sample and a frame to mark it on.** Elements are what a reader can act on, and a plot with neither affords nothing; one with a camera can be turned and one with samples on a positional form can be pointed at, and each needs focus to be able to land on it. **The second arm is `cursorable`**, exported for L4's writer (C22 I76) and read by `elements()`, so the block that gains a focus stop and the block whose cursor is stored are one predicate: the forms `positionalForm` serves — the only reader of `cursorPositions` — with samples, and `plotFrame` other than `"none"`, because the mark on the bottom rule is half of I37 and a frameless plot has no rule to mark. **The first ruling said *exactly when it declares a camera***, and it was true about what a reader could act on until the crosshair had a writer; Lane D's frame test reached a line plot through `camera: {}` because that was the only constructible route, which is the narrowness measured. **The implementation is what found this and the spec did not**: C22 I71 requires the field and a writer to land together, and the writer runs off `focus.current` — which can only reach a kind declaring `elements`, and until now that was `table` alone (C26 §4a row 1). A binding that no focus can reach is `cursorPositions` in a different coat. **Gated on the member and not on the form**, which is also what makes the change invisible to every shipped frame: no block in the tree declares a camera, so no document gains a focus stop (→ C26 I8, C22 I71). **The element's `copy` is the plot's series, tab-separated** (C26 I17, §5c — *source, never rendering*): a header of series labels — the label, or the legend's own default `series N` where a series has none — then one row per sample index carrying each series' value as the block holds it (`String(v)`), `""` where a series is shorter or holds a gap; no units, no colours, no axis furniture. Tab-separated because a table row's `copy` already is (`rowCopyText`), so a reader pasting either into a spreadsheet meets one convention. **Omitted where `series` is empty**: measured over `ONE_PER_FORM`, ten of forty-eight forms carry their data elsewhere (`points3`, `ohlc`, `hierarchy`, `nodes`, `vectors`), and only `plot3d` among them can declare an element — through a camera — and its three carriers have no one flat shape, so inventing one would be a second serialisation of a figure this component already draws. *Measured before the rule: `y` on a focused line plot did nothing and said nothing, because `copyElement` filters an undefined `copy` and returns early — the empty-block class containers closed, one kind along.* **Stated blind spot**: a matrix form reaches the element only through a camera and its `series` are rows, so its copy is the matrix transposed; no fixture declares one.
+- **I86** — **The frustum cull is on view `z` and happens before the divide; a zero extent maps to the centre.** Five degenerate cases, and **the first draws a plausible picture**: a sample behind the eye has a negative view `z`, the perspective divide sends it to a finite coordinate *inside* the frame mirrored through the origin, and nothing downstream can tell it from a real one — an assertion about bounds is satisfied by it, and so is a frame read. So the cull is on view `z` against a near plane of **0.01 view units** and it runs **before** the divide, which is the only point at which the information still exists; the orthographic arm takes the same cull, because a sample behind the reader is behind the reader whether or not there is a divide. **A `distance` of zero draws nothing** — the eye is on the target, everything is at or behind the near plane, and an empty picture is what standing inside the data looks like, which is why it is not a construction error. **A zero extent maps to the axis's centre** rather than to its minimum or to `NaN`: a degenerate axis has no spread, so a coplanar set draws as a line and a coincident set as a point, and the coplanar, collinear and coincident rows differ only in how many axes take the rule (§3al).
+- **I87** — **A 3D scatter has four arms: `auto`'s pair, which the terminal chooses, and three the caller names.** `auto` is the colour raster above `halfBlockEligible` — samples at `width × 1` by `height × 2` (I84), `HALF_BLOCK` carrying two colours a cell, the rung F431 measured — and one **marker glyph per cell** below it, with a unicode rung and an ASCII rung because every glyph in the table is `East_Asian_Width=Ambiguous` (→ A03 SS47, C02 I9). **There is no `"half"` member**: forcing the raster past that switch draws `▀` at double the column the projection put it in, so `auto` is the only route to that rung and the capability question stays the terminal's. **What `STYLE_ARMS` carries is the other question** — not *which of those two* but what a line and a mark are made of — and it was `[]` on a ruling that answered the first. It now holds `braille` (`width × 2` by `height × 4`, floor `unicode !== "ascii"`, because `⣿` is width-stable at both width conventions and `ambiguousWidth` therefore does not bind), `line` (box drawing at cell resolution, no floor, since `glyphForMask` degrades to `+ - |` rather than refusing) and `marker` (the table above the colour floor with the shape the caller's, no floor, since the table has an ASCII rung). **The retraction is F431's own measurement asked at the primitive it was never asked at**: a surface is 89–96% interior, and an outline figure spends the second colour on **5.6%–31.1%** of its half-block cells against a shaded surface's **62.5%** — so the channel this rung buys is as unspent on a line as the dot grid's interior is on a surface — while the resolution it costs is a worst deviation of **0.5000 cells against 0.2500**, mean per edge `0.3485` against `0.1965`, over the cube's twelve edges (F482). Declaring an arm the renderer does not have is still F207's class, which is why **each arm joins the list, with its own invariant and its own rows, on the commit that makes it draw** — the entry reads `["marker"]` today — the deferral this entry replaces named its condition and watched nothing, and three forward references here would be the same shape one document along (→ I84).
+- **I88** — **Depth buckets into three tiers, and a tier is a sample count on one arm and a glyph on the other.** Continuous scaling has no spelling in a character grid and a reader cannot separate more than three sizes, so the ceiling is a decision; the bucketing is on view `z`, exactly as the density ramp buckets on value. **One table cannot serve both arms**: on the colour raster every cell is `HALF_BLOCK` and the picture is entirely in the two colours, so a tier is how many samples the point paints — `2×2` near, `1×2` mid, `1×1` far — while on the glyph arm it is which row of the marker table the glyph comes from. **The tier is the only depth channel the glyph arm has**, and the only one either arm has once `colourBy` is `"series"`, which is why it is not an ornament: below the colour floor a near point is bigger and a 3D scatter at one bit still reads as three-dimensional. **A near point at the frame's edge clips per sample** — `writeDepth` refuses an out-of-bounds coordinate, so the in-bounds quarter draws where dropping the point would delete data at the edge of every frame. The tier never sees a culled sample, because the cull runs first and a view `z` at or behind the eye is a number the projection has already declared meaningless (→ I86, C04 I76).
+- **I89** — **`colourBy` decides what colour means and whether there is a legend, from one rule.** Under `"series"` the block's identities are its `points3` labels, `identityOf` answers them, and `legendPlacement`'s count is non-zero, so the key is drawn; under `"depth"` and `"value"` `identityOf` answers nothing and a categorical legend naming a channel the picture does not use never appears. **Two rules would be a second place for them to disagree**, which is I81's mechanism avoided rather than repaired. **`SHARES_CELLS` is `true` and the legend is what makes that cell observable**: two series' samples land in one cell, the depth buffer keeps the nearer, and nothing in the picture says which series won — without a legend the record's entry would be a cell nobody could be wrong about (→ FINDINGS F330). **The value ramp's zero-span rule is the field family's own** — mid-ramp at a zero span (→ C04 I74) — and is not re-derived here; I86's centre rule is about the **position** extent. Both are called a zero extent and only one is about geometry (§3am).
+- **I90** — **Three signs are computed once and read twice: the box's far corner, and the axes' corner, which is not the same one.** In a world-aligned box the three dot products the design note asks for are three **sign tests** — `eye · x̂` is `eye.x`. The three back faces meet at `(−sx, −sy, −sz)`; the axes anchor at `(sx, sy, −sz)`, **near in x and y and far in z**. **The note's rule names the far corner and its reason forbids it** (F449's sibling, F448): measured at the default camera the far corner projects to screen `(0.500, 0.527)` — the centre of the figure — so axes drawn from it run *across* the data, which is what *the axes never occlude the data* exists to prevent; the silhouette corner projects to `(0.500, 0.888)`, the bottom vertex of the outline. **A rule and its reason can disagree and the reason is the half worth keeping**, which only drawing the thing can show. The F444 point survives as *one source of truth, two derived answers* rather than *one answer, two consumers*. **The z axis takes a side vertical edge** and a fixed one, so it does not swap sides mid-orbit for a fraction of a cell. **A zero component ties to the negative end**, because `Math.sign(0)` names no corner and a camera crossing the plane would otherwise make the axes jump twice. The frame is **depth-tested against the data**, which is *never occlude* read from the other side — and it is drawn **last**, which is a rule about ties rather than a reading convenience (F452). It drew first under a comment saying *order does not decide occlusion here*; order decides exactly the coincident case, and coincidence is structural, because `unitOf` normalises the **data's own extent** so the extreme samples lie on the box by construction and a wireframe of a bounding volume coincides with it entirely. Drawn first, the frame took every one of those cells and painted the reader's geometry in `tone.muted`. Nothing else moves — a frame edge genuinely in front of a sample still wins, which is what `box3: "full"` means — but the frame's write must clear the tier code as well as setting the mark, because `glyphRows` reads `glyph` before `mark` (→ I84, I86, C04 I77).
+- **I91** — **An edge-on axis keeps its line and loses its labels, and a segment behind the eye is clipped rather than dropped.** When an axis projects to near-zero length its ticks collapse to a point and its labels stack, so the labels are hidden and the **line stays**: an axis is information about orientation when its scale is unreadable, and a reader turning the camera needs to see which axis is coming round. It needs no separate priority clause — a zero extent has no labels to place and sorts last under *drop the later, order by projected extent*, which is `niceAxis`'s rule reused. **The exact degenerate is orthographic and not perspective** (F448): a line parallel to the view direction projects to a point only without a divide, and under perspective it keeps extent because its near end is nearer and therefore larger — 3.37 cells against 0.00, measured at 80×16. So the rule fires at zero under one projection and hands off to the collision rule under the other, which is the same statement about legibility at two ends of a scale. **The near-plane case is clipped and not dropped**, and to the first depth the projector *accepts* rather than to the plane itself: `project` culls on `z <= NEAR` inclusive, so a clip landing on the plane is refused by the function it exists to satisfy and drops every segment it was written to save (F450). **The reason first given for the rule was wrong and the rule is right.** *The frame vanishes as the camera approaches* is not what happens: the clipped remainder reaches the screen at one of six distances swept, because `basisOf` targets the origin and the divide throws the near region outside `[0,1]²`. A frame comparison therefore agrees whether a segment is clipped, dropped, or clipped-then-dropped — which is how the defect survived the row written to catch it, and why `AX6` asserts the clipped endpoint's **depth** rather than the frame's ink (→ I86, §3an).
+- **I92** — **Labels are billboarded, cell-resolution and drawn over; the box is the data's extent and the ticks are nice values inside it.** Always horizontal, moving with their anchor and nothing else, **inside the plot area** — a 3D form spends no `AXIS_GUTTER` because three labels move as the view turns and a fixed column can only name one of them (I83). A label is **text over a sub-cell raster**, so it wins the whole cell: half a cell of label is not a thing, and this is the one place in this component where the two resolutions meet. **Depth-tested at the anchor and drawn over**, because per-cell testing draws half a string, which reads as corruption rather than as occlusion — and it is what makes `axes3: "origin"` readable, since those lines cross inside the figure by construction. **A label reserves a blank on each side** (F449): overlap alone let `1` and `0.5` claim disjoint adjacent cells and the frame read `10.5`, one number that is neither of them, so the reservation is the label plus its gap. **An axis name sits at its midpoint** rather than past its positive end, where x's and y's collided with each other and with a shared tick and the frame read `xy1`. **Turning the axes on does not move the data**: `unitOf` normalises the data's own extent whether or not they draw, and a `niceAxis` tick outside that box is dropped rather than the box being grown to meet it — the alternative rescales the picture under a reader who only asked for a reference frame (→ I83, I86, C04 I77).
+- **I93** — **A polyline is stroked per sample with its depth, its colour varies along it, and the points draw first.** The primitive is `strokeSeg`, which **already existed**: it landed with the axis lines and the box one step earlier, so the design note's *`write(x, y, z, …)` instead of an unconditional set* was built before the step that schedules it, for another reason. **Colour is per sample under `"depth"` and `"value"` and per segment under `"series"`** — the ramp arms have a reading at every step and a segment crossing the figure in one colour contradicts the depth cue the form rests on, where the categorical arm has one reading for the whole line. **Points are drawn before lines**, and it is a rule about ties rather than about layering: `writeDepth` is strictly nearer so first-drawn wins, and a trajectory's vertices sit at *exactly* its own cloud's depths, so lines-first swallows every marker in the path. **A sample is floored and not rounded, matching every other writer in the file** (F453): rounding puts sample `i` over `[i − 0.5, i + 0.5)` where the glyph arm's point and the raster arm's `round(fx − bw/2)` both put it over `[i, i + 1)`, so the two conventions disagree for half of all coordinates — a path drifts off its own markers, and the tie the draw order depends on cannot happen because the two writers are never naming the same cell. It is F445's bias one function along. **On the glyph arm a line writes a literal glyph and never a tier code** — `glyph[]` packs `tier × clouds + series` and a line is neither, and a line index reaching it breaks the `% clouds.length` decode; the channel it takes is the one the frame uses, whose real distinction is *chosen glyph* versus *index into the marker table*, with `ink[]` carrying the frame/data difference. **There are no box-drawing joins and the note's claim that they are inherited is false in three measurable ways**: it describes `drawLine`'s dot grid while naming `strokePolyline`'s cell mask; a mask cell accumulates four bits resolved after all strokes, so a strictly-nearer test refuses the second edge at exactly the shared vertex a join needs; and `plotStyle: "line"`, the selector it names, is not a member of this form (I87). **The argument for them dies with the rung** — braille and box drawing were two full-capability choices on the dot grid, and here the glyph arm is what a terminal gets when it cannot do colour (→ I84, I86, I88, I91, C04 I78).
+- **I94** — **A surface is normals in unit space, one light, and two zeros that want opposite remedies.** The normal is the cross product of the **normalised** tangents, because the geometry a normal describes is the one on screen: computed in data space, a surface a thousand times wider than it is tall shades flat while drawing as a mountain range. **`shading: "smooth"` accumulates raw cross products and normalises once**, which is area-weighted by construction — a big face moves a shared vertex's normal more than a sliver does, by **13.7°** on an even grid and **49.2°** at quintic column spacing. It is *not* about the degenerate face, which contributes nothing under either scheme because `unit` returns the zero vector unchanged (F459); `"flat"` uses the face normal, and the default is smooth because a sphere with face normals reads as a geodesic dome. **The normal is flipped toward the eye per sample**, on the view-space `z` and never on the screen winding — a degenerate triangle's screen area is a **signed zero** (`1/area` measures `−Infinity`), so a winding test answers from a sign nobody set, and a per-face flip with smooth normals seams the silhouette where a per-sample flip is continuous. **The two zeros are different zeros and the design note conflated them** (F456): an edge-on plane's faces keep their area (`0.125`), their normals (`(1, 0, 0)`, the plane's) and their lighting — **0 of 32** degenerate — while their *projected* area is exactly zero and the barycentric weights are `NaN`, so the divide-by-zero is the rasteriser's; and the face that genuinely has no normal comes from **`unitOf` collapsing an axis the surface is constant along** — measured at 8 of 8 there and **0 of 8** when the height varies along the collapsed axis, because the cross product reduces to `(−Δz_x · Δy, 0, 0)` — which is a legal document the gate must accept. Nothing divides by a normal's length anywhere, because `unit` returns a zero vector unchanged, so such a face shades at **ambient** rather than being refused. **A triangle under one sample of projected area is stroked rather than filled**, one threshold covering the edge-on plane, the dense mesh's sub-sample triangle and the degenerate face — a test at exact zero leaves a discontinuity at 89.999° and a 69k mesh full of holes — and its value interpolates along the edge, since the barycentric weights are what the arm exists to avoid. **A triangle straddling the near plane is clipped into one or two triangles**, not dropped: F450 on the carrier covering the most area. **The lighting terms sum to 1** — ambient `0.2`, diffuse `0.6`, specular `0.2`, times `(1 − 0.3 · depth)` — because at `0.2 / 0.8 / 0.4` the clamp was deleting **87.5% of the specular at its own maximum** (`1.3501` down to `1.0`, three parts in 255 on viridis), and clamping the colour component instead collapses the field ratio **3.91× → 0.01×** by clipping a channel, which is F455's gamut mechanism on the scheme F455 endorsed. **F455 measured intensities 0.2–1.0 and no document recorded the interval**, so the terms are rebalanced to make the shipped range the measured one (F457). Surfaces draw **after points and lines and before the frame**; on the glyph arm a sample takes the literal-glyph channel with `ladderFor("density")` indexed by intensity, which is the **two channels the half-block arm does not have** (→ I84, I86, I88, I90, I93, C04 I79).
+- **I95** — **The cull is oriented by the mesh, the wireframe is not a primitive, and both of the design note's mechanisms for them are unbuildable as written.** Backface culling reads the **per-face** direction to the eye, `dot(n, centroid − eye)`, because a view-space constant is the orthographic limit: measured on 2304 faces the two disagree on **7.29%** at distance 6 and **34.03%** at 1.5, and the constant answers *48.18% visible* at every distance while the truth `(1 − r/d)/2` falls from 41.67% to 16.67% (F460). *Removes ~half* is that same limit — the cull removes **58%–83%**, and by face count rather than area it is 44.5% at distance 6, because a UV sphere's polar faces are slivers. **`closed` licenses two powers and a reader will see one**: it enables the cull *and* licenses orienting it from the mesh's own signed volume, because the obvious UV sphere is wound **inward** at **−4.16** and trusting it culls the front — which two-sided shading (I94, §6h row 5) then lights correctly, so the picture is a plausible hollow shell rather than a bug (F461). Oriented, the natural and reversed spheres give **byte-identical masks** — the kept-face set 576 of 576 and the drawn sample mask 0 of 8960 apart. **The frame is not quite, and the residue is the rasteriser's rather than the orientation's** (F464): a sample lying exactly on a shared edge is claimed by whichever adjacent triangle rounds its weight non-negative, the two windings compute that weight from different operands, and adjacent faces differ in normal — so `shading: "flat"` is identical at 300 inked cells and `"smooth"` differs in **6 of 300**, worst intensity gap `6.5e-3` against `1.2e-15`. **Compared cell against cell and not by string position** — one differing cell early in a line shifts every SGR after it, and the same six-cell difference read as 71% that way. There is no fill rule here and adding one is not this step's; the claim to state is the mask. **What that does not cover is locally inconsistent winding, and the sensitivity is inverted relative to the damage**: half reversed cancels to `1e-15` and `|V| < ε` refuses to cull, while one face in eight leaves a confident `−3.12` and gets about 32 faces wrong in silence — recorded here because it is a property of the ruling. **`closed` is refused on the height-field arm** rather than guarded at runtime, since an open surface's signed volume is **not** zero — a 9×9 Gaussian measures `0.1742` — and the zero the premise rested on belongs to `unitOf` centring a planar patch on its own extent (F463, → C04 I80). **And the wireframe's z-fight has no bias that solves it**: `strokeSeg` floors while `fill` samples at `+0.5` centres, so an edge disagrees with its own face by up to `4.31e-1` against a sample row of `4.17e-2`, and a sweep draws 22.6% of edge samples at bias 0, 27.6% at `1e-3` and 55.4% — the ceiling — only at `3e-1`, which is 15% of the figure (F462). **The edge is the fill's own sample**: `w0` is twice the sub-triangle's area, so `w0 / |ab|` is the perpendicular distance in samples and a sample is on the edge below **0.7** of one — no second rasteriser, no bias, no z-fight constructible, and hidden-line removal exact. **The mask follows the input's structure** — a height field's grid lines and not its triangulation's diagonals, which are 64 extra edges on a 9×9 and turn 168 edge samples against 126 interior into 258 against 36 — and it is **carried through the near-plane clip**, or a face entering the camera grows a seam along vertices the caller never supplied. `wireframe: true` writes depth for the whole face and paints only the edges, clearing the ink elsewhere, so a cage still occludes what is behind it; the edge is its own face at **half** the intensity, which is the only rule that cannot collapse into a fill whose own range is `0.1332 … 0.7871` (→ I84, I90, I92, I94, C04 I80).
+- **I96** — **A figure measured over a shape is a statement about the camera and the tessellation as much as about the renderer, so the geometry suite fixes both and names them** (§6j). Two halves, and either alone leaves a row that passes for the wrong reason. **The reference camera is off `azimuth: π/4`**, because that is the plane in which the `x` and `y` axes exchange: a view-space light (C04 I79) gives two of a cube's three visible faces *identical* intensity there — 2 luminance clusters where 0.5 and 1.2 give 3 — and a mesh and its own `x`/`y` transpose ink the same number of cells while drawing different frames. So the note's *six distinct intensities under one light* is unmeasurable at the camera every existing 3D fixture reaches for, and a row that must use `π/4` compares the frame rather than a count. **And a fraction-visible figure names its denominator**, because `backfaceCulled` is a sign test on a dot product and a zero normal fails both signs: 42 of a `sphere(24, 12)`'s 576 faces are degenerate at the poles, none can be culled, and **the frame is byte-identical with and without them** — so the consequence is arithmetic and the cost of removing it is a length test per face per frame in the loop §11 measures at 1.265 ms. *Exactly half the faces survive* is false at every distance — 21.88%, 38.54%, 45.49%, **53.13%** — and the figure exceeding half at the orthographic limit **is** those 42; over the faces the cull can decide it is 49.4% (→ C04 I79, C04 I80, FINDINGS F473 · F474).
+- **I97** — **A real-mesh fixture states its orientation, the height it was read at, and which claim it can witness — because the properties it was chosen for are not the ones it has** (§6k). Measured over the teapot, the Stanford bunny and Suzanne: **0 degenerate faces and 0 inconsistently wound edges in all three**, so two of the design note's three reasons are false of its own corpus and I95's confident-sign case still has to be constructed. What every one of them *does* have is **openness** — 1,036, 223 and 42 boundary edges — which is the case `closed: true` was written for and had no fixture, and across which `cullSign` stays confident and correct at +2.587, +2.031 and +1.966. **Orientation is the loader's**, once, because OBJ carries no up-axis and `basisOf` builds its eye about `z`: all three files are Y-up, drawn on their backs they read as plausible solids, and the statistic that separates them is interior holes — 2 / 18 / 6 as-is against 0 / 0 / 1 rotated. **The height is part of the claim**, because the figure is aspect-bound (§3p) and widening does nothing: the teapot inks 60, 144, 336 and 726 cells at heights 12, 20, 32 and 48 and shows a lid from about 24 rows, where a transcript block is 12 to 20. **And a per-frame budget names its mesh**: the bunny is **1.56×** a 69,192-triangle grid at the same count and frame while producing **0.159×** its surviving samples, so the cost tracks neither the triangle count nor the output (→ C04 I80, FINDINGS F475 · F476 · F477 · F478).
+- **I98** — **`AxisSpec3.tone` colours an axis's line, its ticks and its label, defaults to `tone.muted`, and leaves the box alone** (§6l). The box is a separate member (C04 I77, I90) and its edges run parallel to axes, so colouring them by direction would make `box3: "full"` a twelve-edge tricolour cage — which is the outcome the note's own reason for the default warns against: three tones by default make the frame compete with the data, so the field is opt-in and one axis set is one axis coloured. **The label takes the line's tone**, because a label names its axis and a muted label beside a coloured line is two answers to one question. **A row asserting the tone has to put the axis in front of the data**: the frame draws last and `writeDepth` is strictly nearer (F452), so at the wrong camera a per-axis tone is correct and invisible and the row passes for a renderer that ignores the field. **And an unknown tone stays unrefused**, because no `Tone` is validated anywhere — `slot` answers `{}` and the mark draws uncoloured, measured on six carriers that all accept it, so checking one member of one union on one carrier would teach a rule that holds in one place (→ C04 I77, FINDINGS F479).
+- **I99** — **`plotStyle: "marker"` lifts the marker table above the colour floor and gives the shape to the caller, and its default is the series index because that is what already drew.** The table has always held five shapes × three depth tiers; the shape was indexed by the series' position and the whole table was unreachable above `halfBlockEligible`, so a caller on a 24-bit terminal got a 1–2 sample rectangle of colour with no shape at all. `Point3Series.marker` names a column and the tier still picks the row, so **size stays the depth cue and shape becomes identity** — which is the same separation `colourBy` already makes, one channel over. **The default is the series index and not a constant**, because a table of styles must contain the one that was already drawn: a caller who sets nothing gets the frame they had, and no existing golden moves. **And the shape channel is spent at the far tier**, which is stated rather than discovered: the far row is `· ∙ • ˙ ‧`, five glyphs a reader cannot tell apart at one cell, so `marker` is honoured at near and mid and is a dot at far — a limit of the alphabet rather than of the dispatch (→ I84, I87, I88, C04 I76, FINDINGS F484).
+- **I100** — **`plotStyle: "braille"` is a trade and not an upgrade, and the trade is twice the positional resolution against the second colour and against a surface's shading.** The grid is `sampleGrid(width, rows, "braille")` — `width × 2` by `height × 4`, the seam that has existed since step 2 with nothing calling it — one depth buffer at that grid, and `strokeSeg` unchanged. **A cell's colour is its nearest drawn sample's and never a mean**: the depth buffer is the authority on drawn-ness, as `halfRows` already reads it, and a mean of two clouds' colours is a third colour naming neither. **The marker tiers scale so apparent size is constant** — a braille sample is half a half-rung sample in each axis, so a tier's block doubles in both, and without it the near tier disappears at the rung that was supposed to draw it more finely. **A surface here is solid and still shaded**: every interior sample sets a dot so the cell is `⣿` — measured 44 of 78 inked cells full, the eight dot positions set 59 to 61 times each — and it takes its nearest drawn sample's shaded colour, which is **one colour a cell rather than two** (F485) against a **silhouette at twice the resolution in each axis**. Not the stipple F431 refused, because a solid fill is not a dither; and not the *unshaded* picture the arm's own first ruling described, which the walk corrected and the frame confirmed. The floor is `unicode !== "ascii"` alone, since `⣿` is width-stable at both width conventions (→ I84, I87, I93, I94, FINDINGS F482).
+- **I101** — **`plotStyle: "line"` is the box-drawing arm §3am refused, built on the remedy §3am named.** Of that refusal's four arguments, one stands, one is the mechanism, one was circular and one was conditional on a premise this arm removes: *the argument dies with the rung* is true of `auto`'s glyph arm, which is what a terminal gets when it cannot do colour, and false of an arm a caller names at 24-bit — a correct sentence justifying the wrong decision, MG24's shape (F483). **The mechanism is real and its remedy was written down**: a mask cell accumulates up to four edge bits resolved by `glyphForMask` after all strokes, and a strictly-nearer test refuses the second edge at exactly the shared vertex a join needs — so the depth rule is **equal-or-nearer for the mask and strictly-nearer for the colour, on one buffer**. `strokeSeg` therefore reports the comparison's outcome rather than painting on a boolean, and takes the tie rule as a **required** argument so each of its **five** callers states its own — the frame's box, its axis lines, its ticks and the surface's degenerate stroke all write a colour and keep the strict rule; only the polyline carrier relaxes it, and only on this arm. **And the consequence is measured rather than inherited from the refusal's wording**: §3am reads as a figure coming apart at every vertex, and on the cube's twelve edges the two rules give **36 corners and 8 tees against 29 and 5** — the mechanism is exact and what it is worth is about a tenth of the drawn glyphs (F491). Three constructed fixtures — an L, a closed triangle and a four-way star — are **identical** under both, which is why the row that asserts the rule asserts it at the function and a second row asserts the call site. **A diagonal step crosses a corner cell the walk does not visit**, and linking the two cells directly gives a staircase no vertical bits at all; the corner is claimed on the same equal-or-nearer test as any other sample, and where it is occluded the link falls back to one axis rather than inventing a cell in front of a surface that owns it. The alphabet is `glyphForMask`'s, so `plotCorners` applies and the ASCII and wide rungs are inherited rather than restated; a surface draws its edges and no fill, and `plotFill: "solid"` is already a construction error under this member (C04 I59), which is the joint landing in the right place (→ I84, I87, I90, I93, FINDINGS F483).
+- **I102** — **The reference frame is a structure of its own, not a share of the data's channels.** Its mask and its colour are a cell each, and `frameGlyph` resolves them — where before, one array carried both a surface's density glyph and the frame's stroke. **A channel with two owners wants two names**: the local reading that array was called `framed`, so pulling the frame out of it looked like pulling out everything it held, and `glyphRows`' argument was **replaced** rather than joined. A surface on the ASCII rung writes its glyph there, the compose stopped looking, and the figure came out **blank** rather than degraded (F500). The precedence the split has to preserve is the one it inherited and extends by a rung: **a marker, then the caller's own mask, then the data's density glyph, then the frame** — the axes never occlude the data (I90), and a caller's wireframe outranks the reference frame's stroke for the same reason (→ I90, I101, FINDINGS F500).
+- **I103** — **`kind` names which primitive owns a sample, and a point is not a silhouette.** `AREA` is a surface's fill, `OUTLINE` a stroke or a wireframe edge, `MARK` a point's own block; one buffer, one depth test, and the compose reads the owner rather than guessing from coverage. **The three were two until the silhouette alphabet existed**, because one rule served points and surfaces and nothing downstream could tell them apart — an invariant is vacuous until its subject exists, and the day the subject arrived the sharing became a defect with no assertion against it. A mark quantised to eighths does not merely shrink: its apparent size starts depending on where in the cell it falls, so the same point drifts between a half block and a two-eighth sliver as the camera turns, which is the wobble the tier table exists to prevent. So a mark keeps the half-block rule, and the colour lookup takes a **set** of kinds, because a point in front of a surface owns only the samples it won (F498) (→ I88, I95, I104, FINDINGS F498).
+- **I104** — **`auto` rasterises at the dot grid and composes at both, so one buffer serves the fill, the outline and the marks.** `HALF_BLOCK` is gone from the renderer and that is the finding rather than the tidy-up: `▀` is `QUADRANT[3]`, reached whenever a top-against-bottom split is the cell's answer, so the incumbent frame is a *member* of the new alphabet rather than an alternative to it. **The triangles `◢◣◤◥` were tried and are not here**, and the reason is kept because the next reader will have the idea: chosen per cell by a score, they serrate, because neighbouring cells disagree about the angle and a silhouette is read as a run (F494) — and a half-cell triangle's hypotenuse is one row per column where the edges that offend are three times shallower. A shared edge needs a tolerance **proportional to the triangle's own area**, since a sample exactly on it has a zero weight in both and floating point decides which; absolute epsilons are wrong at both ends of the size range a mesh spans, and the fault was invisible until the grid doubled (F493) (→ I88, I94, I103, FINDINGS F492, F493, F494).
+- **I105** — **A cell's silhouette is drawn area-preserving in the block ladder, and the ceiling is stated with it.** The area grid is `w·2 × rows·8` because the alphabet offers **nine** levels along an axis and a grid that samples four can only quantise to quarters; `round(total / 2)` is the mean height of the boundary across the cell, which makes the drawn area equal the covered area and a straight edge draw as a monotone ramp. **One family for the run, and that is the ruling**: a classifier taking eighths only where the two columns agreed drew *three* of them on a Gaussian and sent every other edge cell to a half-cell staircase, and two families alternating cell to cell read as noise even where each cell is individually the closer fit (F496). The one exception is a boundary that never crosses a side wall, decided by comparing the two spreads rather than by a threshold. **And the ceiling is named rather than tuned**: a block element splits a cell with one horizontal line, so a run moves the boundary once per cell and a shallow silhouette is a staircase whatever the level count — the box beside it is smooth because braille carries eight positions in a cell where a block carries one. Everything derived from the grid rather than declared, `CELL_ASPECT · sx / sy` included, because a constant correct for every configuration that exists is wrong the day there is another one (F495). A cell whose covered mass sits at the **top** is drawn as its complement with the two colours exchanged, and the exchange takes the plot's ground explicitly — left unset the terminal paints it in the default foreground, which streaked a Gaussian's base white (F501) (→ I94, I100, I104, FINDINGS F495, F496, F501).
+- **I106** — **The orthographic arm divides by the distance to the target where the perspective arm divides by the sample's depth, and the two agree exactly at the target plane.** One focal length serves both — `f = 1 / tan(FOV / 2)`, `FOV = 42°` — so the arms differ in *what* they divide by and in nothing else, and at `z = distance` the two expressions are identical rather than merely close. **The arm shipped with no scale at all**, which is not the orthographic convention but the absence of one: measured over the unit cube's eight corners at `azimuth: π/4, elevation: 0.3`, the screen extent was `−0.187 … 1.187` at distance 4, 6, 10 and 20 — four cameras, one answer, 37% of the figure off the plot and no member that could frame it, while the perspective arm fits from 6 upward. **The premise was a comment in a type declaration and nothing else** (F503): C04 §3 read *`distance` is ignored by the second*, with no invariant, no argument and no test, and I86 already contradicted it — a `distance` of zero draws nothing on this arm too, and it does so by moving the eye. `distance` moves an orthographic sample's **depth** from 2.77 to 18.77 over those same cameras while its screen position does not move, so the member always reached the eye, the cull and the depth order; only the scale was missing, and the sentence was true about the scale and false about the member. **The near-plane cull is untouched** and still runs before the divide, and **I91's exact zero survives structurally** — a line parallel to the view direction has zero extent, and zero over a distance is zero — so `AX5` asserts the same number it always did (→ I86, I91, C04 I75, FINDINGS F503).
+- **I107** — **The triangles a surface builds are a function of the surface, the block's extent and the series index, and none of the three is the camera — so they may be held in caller-owned scratch and are never held here.** `trianglesOf` normalises, triangulates, accumulates the vertex normals and folds the edge mask; an orbit repeats all of it identically, and at 69,451 faces that is **194 ms of a 319 ms frame**. The scratch arrives on `RenderContext` beside `cameras`, which makes it an **input** rather than state — I11 permits a local and forbids a module-level buffer, and the distinction it draws is ownership, so a module-level `WeakMap` is still refused and is the tempting version. **The key is the carriers and never the `Surface3`** (§6o row 2): C23 I34 hands a live part a *new* block every tick, so a surface built fresh around a cached mesh is a new wrapper holding the same two arrays, and keying the wrapper buys nothing on the path that renders most often. **Identity is a proxy for content because `block()` deep-freezes** — the caller's own array, in place, mutation throwing — and `applyPatch` does the same to a patched document; measured in both directions, because without it this is a stale read waiting for its first mutating consumer. **The extent is in the key and is the row nothing else would find** (§6o row 1): it is taken over every carrier, so a point cloud gaining a point moves a surface's triangles while the surface does not change, and the figure draws at the wrong scale inside the box with every arithmetic assertion passing. **One slot per owner, the key a validity predicate rather than a map key**, which is `HeightCache`'s argument verbatim; a `WeakMap` on the carrier bounds it, so nothing subscribes and nothing evicts (→ I11, I84, I94, C22 I58, FINDINGS F469, F507).
+- **I108** — **The hundred squares are a partition of the segments, and the legend never names a share the mosaic does not draw.** Every square is owned by exactly one segment, and a square is unowned only when the shares sum to zero — the all-zero waffle, which draws a hundred empty squares beside a legend reading `0%` for every segment — **and the pie draws the same list as a rim with no wedge beside the same legend**, because a zero total is ruled once, in `sharesOf`: every segment at nought, never an empty list, so a figure with nothing in it is drawn (I79) in both forms and both arms. The pie answered that list with *No data.* in one arm and a refusal in the other while the waffle beside it drew, and the split was recorded here before it was closed (§3ak.26 finding 5). The counts are the **largest-remainder** allocation of a hundred over the shares — each segment its floor, the squares left over going one each to the largest fractional parts, the earlier segment winning a tie — so they sum to a hundred whatever the shares sum to, and a segment with a non-zero share receives at least one square whenever that allocation gives it one, which is every share of one per cent or more and every smaller share whose remainder is among the largest. **The tie-break is stated because it is the one decision the arithmetic leaves open**: `1/1/1` is `34/33/33` and not `33/34/33`, and a rule that left it to iteration order would move frames the day the segments were sorted. **Measured before the rule** (F305): independent `Math.round` per segment, filled greedily against `pos < 100`, gave `50/50/1` fifty, fifty and **nothing** — the legend read `█ Sliver 1%` beside a mosaic holding no square of that colour, committed at `waffle-over-100-24bit-80w.txt` — and gave `1/1/1` `33/33/33` with a hundredth square drawn as `surface.border`, a ground the legend does not name. Both arms call `waffleGrid`, so the two drew the same wrong mosaic and the correction moves both together (→ I25, I69, §3ak.26 row 7, FINDINGS F305).
+- **I109** — **Every annotation kind crosses to the second arm as marks the type already had, and the legend names an annotation wherever the arm draws it.** `line` is one dashed full-width polyline; `band` is a shaded rect for the interior plus a dashed polyline per in-range edge; `confidence` is a shaded closed polyline where `fill` is on plus dashed upper and lower edges broken at every out-of-range sample; `whiskers` is one undashed two-point polyline per point, at its own `x` on the abscissa's domain, as `whiskersRows` places it. **The dash is the mark's** (`Mark.polyline.dashed`) and not the layer's, because a whisker on the annotation layer must not break into dots; **an interior has no stroke of its own**, so no outline runs along the ceiling for a sample above it — the clamped-threshold lie §3e forbids, arriving on a region; and **a claim is drawn behind the data in this arm as in the terminal**, a claim being an annotation-layer mark with no `seriesIndex` — the violin's IQR box carries one, sits on that layer for its width alone, and is the counted exemption. The terminal's rules cross with the kinds: an out-of-range edge is dropped, an interior clamps, a flat range admits every value. **Measured before the rule**: `annotationMarks` opened `if (a.kind !== "line") return []`, a `line` block with and without a `band` rendered byte-identical SVG, `line/confidence` and `line/confidence-unfilled` were one document, and the legend filtered `role !== "annotation"` under a comment saying the arm drew none. **A whisker's `x` is where it sits** (C04 I52): a value on the abscissa's domain, placed through the shared coordinate in both arms — it was read by neither and both agreed on an index spread nobody had ruled, and `whiskers-placed` is the fixture that shows it read (→ I23, I25, I55, C04 I52, §3e, FINDINGS F259).
+
+
+- **I110** — **A sankey is `graph`'s layering plus one placement that both arms draw from, and a node's extent is its flow.** `sankeyLayout` is pure — no `cells()`, no capabilities — and takes its height, gap and minimum as numbers, so the terminal calls it in half-rows with `quantum: true` and the SVG in pixels without; every bar, slice and ribbon end in either arm is that one function's answer (§3ap.3). **The scale is one number, the tightest layer's `(height − gaps) / Σflow`**, so a unit of flow is the same height in every layer and a ribbon leaves a bar at the width it arrives with; **a slice is never below one unit** and **a bar is the larger of its two sides**, the shorter leaving bare bar below its last slice — a loss, drawn (K6). **Slices are ordered by the far end's centre after placement** (K2, S4), and the relaxation separates without reordering (K10). **A deduplicated edge sums the weights it stands for** through `graphLayers`'s `origins` (K1); **a dummy is ribbon in its declared source's slot and counts in its layer's height** (K4); **a reversed edge is drawn forward, counted, and keeps its declared source's colour** (K7). **The terminal's budget loop is its own**: the notice row is spent first, the gap falls one row → a half-row → none, then the least-flow node goes and the notice names it (K5, K12); the SVG drops nothing (§3aj.6). **A label that does not fit is dropped and never truncated**, written from the outside in so the inner one goes first, and nothing is said of it in the notice (K3, K8, §3n). A node's colour is its declaration index through `refOf` (→ I1, I11, I58, C04 I92, §3d, §3ai.4 G1, G4, G5, §3n).
+- **I111** — **The bar and the ribbon are two glyphs at every depth, the ribbon's interior is the shade, and one function resolves the family for both width conventions.** `█` for a bar, `▒` for a ribbon's interior, `▀`/`▄` for a half either owns; `# = -` at ASCII, and the same three at `ambiguousWidth: "wide"` because every member of the block family is `East_Asian_Width=Ambiguous` — `barStyle`'s rule, in `sankeyAlphabet` (§3ap.2). **The shade rather than `dim` is I17's ruling and not taste**: an attribute is dropped at one bit and by any terminal that ignores SGR, and the frame it leaves is one block of `█` with letters in it; the shade is a shape, so the one-bit frame is the 24-bit frame with its colours removed — and it is, literally, the half-opacity fill the references draw. **Two owners in one cell put the lower one in the background**, `image.ts`'s half-block precedent and C10 I21's one widening (`wash`), never text on a tone; the slots cross as `categorical.cN` refs and are resolved in `definition.ts` at the terminal's depth. The SVG's ribbon is two cubic Béziers at `fill-opacity 0.5` in the declared source's slot (→ I4, I6, I17, C02 I9, C09 I22, C10 I21, C12 I29, A03 SS47).
+- **I112** — **A sankey's SVG node label is `tone.default` on a halo of the page's own ground, and the halo is the terminal's cell substitution written in the other medium.** (The halo was `surface.bgDeep` when this was ruled and is `surface.bg` since C10 §4f moved the page; §3ap.7's body recorded the move and this sentence did not, which is the compression class — the abstract keeping a claim the section it summarises had already corrected.) The label is already in the references' place — right of the bar, left of it on the last layer — and §3ap.4 K15 is the cell that place cannot answer: a ribbon begins at the bar's edge, so *outside the bar* and *on the ribbon* are one region, and no node in the corpus has bare ground beside it. Measured before the ruling, over 33 labels and both shipped variants: **1.02 at worst and 1.41 at best**, against `tone.muted`'s own recessive floor of 2.5 and body text's 4.5. The ink moves because a node label names the datum rather than the axis, and the halo goes behind it because the terminal's label cell is `{ text: ch }` with no `ref` and no background — the ribbon glyph is *replaced* there, and an SVG paints the region it cannot substitute (`stroke` in the page's ground at `SVG_FONT_SIZE / 4`, `paint-order="stroke"`). **After, measured under the ink rather than argued from `paint-order`** — the backdrop taken from a second render with the label's `fill` set to `none`, at exactly the pixels the ink changed: **12.43 on dark and 9.25 on light** for five of the six figures, and **9.51 / 7.59** on `crowded`, where one label's halo meets the next one's antialiased edge. Worst cell 7.59 against a floor of 4.5. **Both halves are load-bearing** — the halo alone leaves `muted` at 3.02 and 2.44, the light figure under its own floor. `sankeyLayout` does not move and the terminal frames are byte-identical: this is the second painter's ink, not the shared geometry's (→ I110, I111, C10 I32, §3ap.4 K15, §3ap.7).
+- **I113** — **The right margin is grown to fit what is drawn in it, and a glyph's advance is a bound rather than an estimate.** The callout (I48, I81) and the right-hand value labels (I47) share one column in the SVG arm, so `rightRoom` reserves the **maximum** of the two — `definition.ts`'s `right = sides.right ? max(wanted, calloutWidth(...)) : 0` in pixels — grown from `width · pad`, capped at `width / 3`, and **zero where neither is drawn**, so a figure with nothing to reserve for does not move. Past the cap the string is cut with an ellipsis by `fitLabel`, which is the half §3ak.41 wrote with no instance and `line-both-axes-narrow` supplies: 36 characters wanting 281 px in a 25.6 px margin, of which **two were on the page**. **Measured before the rule**: 13 strings in 7 of 244 committed frames past their own `viewBox`, the worst 240.5 px — 38% of the figure — and the right-hand `100` among them, which is why the reserve is not the callout's alone. **`SVG_EM_MAX = 0.65` is an upper bound over measured faces and not one font's metric**: `font-family="monospace"` is generic, so the face is the renderer's choice, and the advance measured over six of them runs 0.6001 (Courier New, Andale Mono, Monaco) to 0.6182 (SF Mono) — every one of them **above** the 0.6 the constant carried, in the one direction that clips. It is used for reserving and for fitting, both of which want the bound; the cost is 4.6 px of blank on the corpus's widest string and the falsification is stated — a face above 0.65 clips again. **The room takes no theme**, because `area()` is called from the marks walk and from the axis emitter and a room that differed between them would draw the data against a different box than the furniture, silently and with every arithmetic assertion passing (→ I47, I48, I81, §3ak.41, §3ak.49).
+- **I114** — **In the SVG arm too, a callout displaces the right-hand value label it lands on and never the left's — and the row it lands on is carried out of the walk rather than derived a second time.** I48's first two clauses carry across the change of units unchanged, because their reason is what a reader needs and not what a cell is; its third — *two on one row, the later wins and a one-cell `+`* — does **not**, because both alternatives it rejected were rejected for reasons a fixed `viewBox` does not have (`+N` needs the width being sized; a second row *changes the count and breaks I1*). **A row is `|y₁ − y₂| < SVG_FONT_SIZE`**, a bound rather than a measurement on `SVG_EM_MAX`'s own argument: a glyph's ink is inside its em box, so baselines a full em apart cannot overlap and anything closer may — erring by at most half a glyph, in the direction that suppresses a number a reader can still get off the axis rather than smearing two into `90012`. **The row is ink and therefore carried, not shared.** `rightRoom` is the precedent for the column's *width* and the wrong precedent for its *rows*: the width is a pure function of the figure and the row is the last point of the last non-annotation polyline taken through `projected`, which exists only inside `walk` — so `walk` fills a second mutable collector at the site where the text is pushed, past both `continue`s, and the axis emitter reads it. The cost is stated rather than hidden: two functions gain a parameter, and `plotToSvg`'s call order stops being incidental. **A second pure derivation was refused**, because that is exactly the mechanism §3ak.49 records for `fitLabel` — one product written twice, disagreeing at equality. **The gridline of a suppressed label is still drawn**, which is what the decision leaves behind and is a cell neither walk artefact indexes. **Measured before the rule**: 10 overprinting pairs in 6 of 212 drawn frames, every one of them a callout on a right-hand tick label, and every one of them inside its own `viewBox` — so `RM1` agreed with all ten. **Stated blind spots, two**: a callout against a *legend* row is real and not ruled here (4 pairs in 2 frames, F726), because I48's own *a callout does not replace the legend* makes that the legend's placement question; and two callouts against each other keeps I81's blind spot, with zero instances measured and the pixel-only third option named as `calloutNudge` (→ I47, I48, I55, I81, I113, §3ak.50).
+- **I115** — **The right margin is a band with three writers, ordered outward from the box, and each anchors on the previous one's outer edge rather than on the box's.** `area()` takes the value column's reserve **and** the legend's band off one edge, and every writer in the band was anchored to that edge — so the value labels and the callout were drawn on top of the legend while the reserve grown for them stood empty at the canvas: 180.8 px taken on `line-callout-multiseries`, 52.8 px of it unreachable, with `99.12` painted through `alpha`. **The order is the column and then the legend**, because a value label names a tick and has to stay beside it while a legend names identities rather than coordinates. So the labels and the callout keep `box.right + LABEL_GAP` and the legend's `originX` becomes `box.right + rightRoom(figure, layout) + 12` — which is `box.right + 12` unchanged wherever there is no column, and that is **81 of the 83 frames** in the corpus that carry a right-placed legend. **The cut moves with the anchor**: a right-hand label and a callout are `fitLabel`-cut to the column's outer edge and no longer to the page, which is *the same number* on every figure with no legend beyond the column (`box.right = width − rightRoom` whenever the cap binds) and is what stops a capped callout writing across the band the legend was just moved out of. **This is not I48's clause and does not need it**: the ruling displaces nothing, so it is licensed under both readings of *a callout does not replace the legend*, and a sentence that licenses a decision either way is not the sentence that decided it. **Measured before the rule**: 2 overprinting pairs in 2 of 244 frames — F726 recorded four in two, and the other two were a right-hand tick `100` **I114 does not draw**, 2.415 px from the callout that suppresses it. **Measured after it**: 2 frames move, nothing leaves the `viewBox`, and the widest text ends at 640.00 on a frame that does not move. **Stated blind spot**: the legend has **no `fitLabel` at either anchor**, so an entry wider than its band runs off the page — the tightest slack in the corpus is 18.80 px, and the missing verb is owed under the name `legendFit`. *The tick-against-legend half is not instanced and is not absent: I114's suppression is what hides it, so it returns the day a callout is short enough to leave the top tick drawn* (→ I47, I48, I113, I114, §3ak.50f).
+- **I116** — **A hidden series is a layer that is not rasterised, with its index kept, its legend entry kept under `glyphs.hollow`, its callout, readout and point labels withheld, and the axis unmoved — and the plot declares the digits that toggle it.** `overlaidRows` and the stacked arm skip the layer and keep the slot (`refOf(s, index)` colours the rest); the legend keeps the label and the slot colour and puts `hollow` in the swatch, a mark rather than a tone because colour is never the only channel (I6) and one bit is where the toggle must still read. `seriesRange` runs over every series so the remaining curves do not move on the toggle and the gutter does not resize. Every series hidden draws the frame, axis and legend with a blank area, never *No data.*. `RenderContext.seriesVisibility` is read before `Series.hidden` (C22 I78). `keymap(block)` declares `1` … `min(9, n)` → `toggleSeriesN`, merged at `liveBlock` because no digit is a built-in — measured — and withdrawn with focus (C16 I27, A01 D4); the SVG arm honours the member and cannot see the store (→ C04 I99, C22 I78, §3aq).
+- **I117** — **The legend's hit test is its placement inverted by search, never a second formula.** `legendEntryAt` lays the entries out with the functions that drew them — `legendCell` for a vertical legend's row, `legendRowLayout` for a horizontal one — and answers the series index whose cells contain the pointer: the swatch and the label, not the leading blank, the separator or the `+n` tail. Only a `series` slot answers, and only where `HAS_HIDEABLE_SERIES` holds. `legendHitAt` reaches the legend's origin through `positionalLayout`, `alignPad` and `frameOf` — the three the frame was composed with — so a left legend's column, a right one's, a lid and an alignment pad are right for free, as `sampleIndexAt`'s candles are (→ C16 §4a, C22 I78, §3aq).
 
 ## 8. Commitments
 
@@ -5582,7 +10709,7 @@ orientation — and belongs in the classification table as its own rows.
 5. Every degenerate series in §4 has a defined result and none throws (I2, I3, I4).
 6. Downsampling is by per-column min/max, so spikes survive (I5).
 7. At 1-bit, multi-series plots stack into strips summing exactly to `height`; labels live in the y-label column (I6, I7).
-8. Series that cannot be given a row are named in a legend, never dropped silently (I8).
+8. A series, a node or a category that cannot be given a row is named in the area, never dropped silently (I8, I57).
 9. The ASCII fallback keeps the cell grid identical and only loses subcell resolution (I9).
 10. C12 holds no state and registers through the public mechanism (I11, I12).
 11. Braille rasterisation and Bresenham are ported from the mockup's working implementation (→ A01 A.2).
@@ -5627,8 +10754,74 @@ orientation — and belongs in the classification table as its own rows.
 50. **The abscissa gets a name, in a row declared before the data and drawn only by the forms that were measured to draw it** — 26 of 44, with the other 18 refused because 16 of them would otherwise declare a row nothing composes; and there is no `yTitle`, because a y-axis title is a heading and C09 has one (I56, §3ag).
 51. **A tree is one drawing in three layouts, chosen to fit** — measured over four trees rather than ordered into a ladder, because the cheapest layout depends on the tree and not on the budget; the choice is a member, the overflow row is spent before the choice so it cannot remove itself, and truncation runs before placement so no parent is centred over a subtree that is gone (I57, §3ah).
 52. **A graph is one form with a layered layout, its pipeline is six passes, and its sweep count is a measured number rather than a recipe** (I58). `force` stays refused on the labels alone, with the label pass named as its expiry; the figure does not claim direction, and the reversed edges are counted rather than marked.
+53. **One figure and two renderers — every decision above the shared coordinate is made once** (I59, §3ak). The seam moves from *value → [0,1]* to *value → a drawing*, and what was three defects found by building is 73 disagreeing cells found by looking.
+54. **A form whose readings are not on an axis is given none, in the type rather than per renderer** (I60, §3ak). Three families furnished a false axis out of an empty range in three separate commits; `value: null` is what stops the fourth.
+55. **The inversion is decided once and applied twice, and the figure carries the facing** (I61, §3ak).
+56. **A mark carries a role and an unresolved slot, so neither arm holds a glyph or a colour** (I62, §3ak). The role table is exhaustive, so a missing rung fails to compile in both arms rather than drawing a different character in one.
+57. **The label allowance crosses the seam and the label does not** (I63, §3ak). §2 asked for the same labels dropped and hazard 4 forbids the measurement that would achieve it; the threshold is shared and the truncation is each arm's.
+58. **A figure is total and a refusal is an empty one** (I64, §3ak). F259's *refuse a false figure, record an incomplete one*, expressed as a type rather than as a clause in two renderers.
+59. **The datum a form draws is derived once, above both renderers** (I65, §3ak.7). A derivation inside one arm's dispatch table is a figure the other arm cannot reach: `ecdf` and `density` drew their raw samples in SVG while the terminal drew a cumulative fraction and a kernel estimate — D14's shape found a second time, by walking a family rather than a form.
+60. **A form that is drawn is drawn from its data, and a sweep says so rather than a reader** (I66, §3ak.8). `G7b` asks whether a claimed form puts ink on the page; `ecdf` passes it and draws the same picture for every dataset. The rung above is the one a golden frame, a disagreement matrix and a mutation on dead code all structurally cannot reach.
+61. **A derivation is applied at each arm's entry, and the record has a column for every decision the arms make differently** (I70, §3ak.27, §3ak.28). A pure function in the shared layer is not a seam until a caller uses it: `derive.ts` sat one import away from the second arm for the length of the pass while `histogram`, `density` and `ecdf` drew a different quantity in each. And what caught it was a frame rather than a cell — the matrix had no column for a colour ramp or a drop notice, and a rule table is exhaustive over the rules you stated.
+62. **The residue's three forms draw in both arms, and what crosses is their geometry rather than their raster** (I71, §3ak.29). `contour`, `quiver` and `horizon` were refused for the length of the pass with the condition written down as a symbol, and checking the symbols found the prose around them wrong three times: a derivation sweep bounded by a file rather than by a shape, a ruling about mark *kinds* standing in for one about *channels*, and a gate whose meaning inverts when the derivation's output stops being a block.
+64. **A refusal is re-read against the tree before it is carried, never after** (I71, §3ak.31). `ohlc` was refused because *nothing here reads it*, which was true when it was written and false by the time it was checked: the range had crossed, the legend slots had been earned, and the two marks the candles need had been in `Mark` all along. F259's subject is a figure that **cannot be drawn**, and a figure whose data has not been read is a missing derivation wearing a refusal's clothes.
+63. **The ramp a reading is on is named by the figure and resolved by each arm** (I72, §3ak.30). A per-form default table in a terminal renderer is a figure decision the other arm cannot reach, which is F322's class on a lookup rather than on a transform — and the two sentences that licensed it were each the other's alibi, so a reader checking statements one at a time agreed with both.
+65. **A derivation that crosses is *called* by both arms, and a second implementation of it is checked by nothing** (I70, I71, §3ak.34). §3ak.33 ruled one fold for the cumulative three and `waterfall` shipped a second copy, which had to settle a disagreement the first has with itself — its bounds walk and its drawing walk answer differently for a null total, and the copy followed the one that does not draw. The corpus that separates two implementations is by definition the corpus neither arm has, so the test is mechanical and not empirical: does the other arm **call** the function, or contain the walk?
+66. **A form has a value axis only where one range carries every mark** (I73, §3ak.34). A record answering *do the readings sit on a scale* is satisfied by a form whose every row sits on a **different** scale, and the cell reads as deliberate. All five of family 8's residue said `true`; three of them could not be drawn that way, and each had been silent for as long as the form was refused.
+67. **A fixture is built before the frame that reads it, where the form's own operation is what is being read** (I74, §3ak.35). `slope`'s corpus was three series of two values each, so *take the first and the last* was the identity everywhere and a frame read against it checked the thing that was already correct. The variant that separates the form from `line` found a position axis labelling five intervals nobody draws in — and it also settled where the derivation goes, which reasoning from the current behaviour had got backwards.
+68. **A reading crosses and the ink it becomes is the arm's, on a channel as much as on a geometry** (I71, I73, §3ak.35). A bullet's qualitative bands are one hue at four glyph densities in the terminal, measured off the painted frame; the ordinal is the datum, the quantisation is the grid's. `Mark.rect.value` already carried readings and the walk dropped them wherever the figure named no ramp, which was every mark that could ever have had one until this form.
+69. **A composition refuses only when nothing in it draws, and a refused child keeps its column** (I8, I64, §3ak.36). The facets recurse, so they inherit `violin` and `ridgeline`'s refusal — and the terminal had already decided what that means, twice: a child with no renderer contributes `[]`, and a facet short of a row contributes blanks *so that a short facet must not pull the ones after it leftwards*. A column belongs to a facet by position. Read out of the arm that had the case rather than chosen by the arm that has it now.
+70. **A key crosses as a name and a range, and each arm draws it at its own resolution** (I71, I72, §3ak.37). The `ramp` column measured *0 of 181* for the length of the pass and the decision had crossed the whole time; what was missing was furniture. Continuous where the reading is and **discrete where the data is** — a horizon's key is one swatch per band, because `horizonBandT` quantises and a gradient would claim a continuity the figure has not got.
+71. **A key is drawn by what the figure is drawn by, and names every reading the figure is keyed to** (I49, I72, §3ak.38). I49 has said *levels are named in the legend and never on the line* since §3y and it reads as satisfied, because the arm that has a legend satisfies it and nothing asks the arm that does not. `contourLevels` is the shared function the terminal's key calls and `contourFigure` marches, and the third caller was missing. **A boolean `ramp` column cannot see it**: both arms drew a key, both reported `true`, and one named six readings against the other's two. And the second half is the same rule about colour rather than text — a `horizon` key computed `i / (bands − 1)` where the figure computes `horizonBandT`, so it showed the cold half of a diverging map that the figure never enters (F340, F341).
+72. **A block field that selects between figures crosses as the marks, and a corpus that draws one document from two blocks is where a dropped field is visible** (I73, I75, §3ak.39). `layout` changes which marks exist and nothing about how one is inked, so it needs no `Figure` member and the fold it selects had crossed for §3ak.33's cumulative three — a stacked bar is `stackBands`' **fourth consumer**, and the comment forty lines below `barFigure` says *three* while sitting in the same file as the form that makes it four. **A count of consumers goes stale in the file that holds it.** The axis moves with the marks because a stacked figure spans the totals: `bar/stacked` tops out at 37 against an axis labelled to 30. And the rule the second implementation of the fold did not have is the one that crashes — `stackBands` clamps a negative to zero and `stackedBarRow` hands it to `repeat`, so `layout: "stacked"` with any negative reading renders an ERROR block (F342, F349, F350, F351).
+73. **A rule whose subject is a set is checked against the member the reader looks at first** (I67, §3ak.40). I67 says `axes` gates three things and names them — `gutter`, `positionAxis`, `valueLabels` — and the third resolver's `Pick` never listed the field, so `axes: false` drew value labels on three variants whose terminal frames have no furniture at all. `yAxis`'s own doc had ruled it from the other side before either resolver existed: *`false` removes the labels and keeps the frame and the x axis, which is what `axes: false` cannot say on its own*. **The terminal is right by a second mechanism** — its labels come from a gutter width that `axes: false` already zeroes — and a decision enforced twice in one arm and once in the shared layer is not enforced in the shared layer (F347).
+74. **A correct sentence can justify the wrong decision, and the question that reaches it is whether it constrains the decision it is attached to** (I76, §3ak.41). `SVG_FONT_SIZE`'s doc said *it sizes nothing: the label places itself* — true, about **placement**, and attached to a decision about **containment**. So the gutter stayed a tenth of the width, the clip that made overflow safe cut the label's head instead of its tail, and `petal_length` shipped as `betal_length` under a justification review checks for truth and finds. F84's class, and the second half is that **§3ak.20 had written down what would falsify it** — *the day one is, that is the argument to make* — so the premise was refutable, dated, and refuted by the first instance to arrive (F343, F345).
+75. **A seam member with two meanings is not a disagreement until an arm exists that has only the member** (I29, I62, I68, §3ak.42). `Drawn.seriesIndex` is documented as the colour slot and `roles.ts` uses it as the shape channel — *the figure says `point` twice and distinguishes them by `seriesIndex`* — which leaves a dumbbell's row with no colour to be named by. The terminal never noticed because it does not read the member for this form: it colours by row through `ROW_IS_AN_IDENTITY` and takes its two shapes from `pairedPoint` *beside* the record. **And the refusal that put it there counted roles rather than asking what the figure distinguishes** — *eight things where the figure says seven*, when the figure says eight and has said so in both arms all along. `meanOnMedian` stays beside the record on a reason the far end never had: it is one cell holding two marks, a composition rather than a shape (F344).
+76. **An invariant whose subject is a corpus is not checked by a row that cites it** (I75, §3ak.39). A03 pairs a commitment to an invariant and nothing pairs an invariant to a check, so *every C12 invariant is cited by some test file* — 76 of 76, measured — is a convention held by hand. I75 says the collision sweep *is checked over the corpus* and reports 175 frames, 125 documents, 4 and 25; its citation was `FB7`, whose subject is `layout` selecting a figure and whose assertions are rect widths and x offsets, and **nothing computed any of the five numbers**. This is the class already written down about findings — *the test is never does this mention it, it is would landing this close it* — arriving on invariants, where there is no gate to fool because the reading is done by a person. **The figures were a probe's and the probe was deleted before staging**, so the measurement was a count in prose with no route back, which is what a ruling looks like from outside (F349, F357).
+77. **A reader over rendered output owes a rendered control** (I77, §3ak.43). `interiorRules` and its subject were disjoint sets across 364 frames — 15 positives, all figure glyphs; 16 frames holding a real rule, all missed — because `RULE_ONLY` never had the dotted vocabulary this renderer draws in, and AD10 certified it with `├────────────┤` and `│    │    │ │`, which nothing draws. **F334's `> 2` is correct and could not have found it**: a blank row is two glyphs, and the third glyph, when one came, was the curve's. The correction moved 28 of 328 pairs, closed `boxplot`, `density` and `smallmultiples`, opened `autocorrelation` and `forest`, and left the disagreement total at 16 (F321, F334, F358).
+78. **A seam member that answers *whether* and not *what* leaves everything it gates on one side** (I67, I78, C12 §3ak.44). `Figure.positionAxis` is a boolean, so four block members — `xMin`, `xMax`, `xScale`, `xFormat` — had zero readers in the second arm and six blocks differing only in the abscissa drew one document. **The remedy is a domain rather than an axis, because the budget is a width**: `height` is a block field so `value` can carry niced ticks, and no block carries a width, so `positionAxisAt` takes the budget as a parameter and each arm brings its own. `xTickRow` packs what it used to derive, and 1840 terminal frames compared with 0 moved. **And a member that crosses can still be drawn wrongly for want of one that did not** — `plotFrame: "grid"` drew half a grid here until there were positions to hang the rest on (F356).
+79. **A remedy that removes a state is not a fix for a wrong value in it** (I79, C12 §3ak.45). The second arm's `return null` on an empty figure was written against a real defect — *five gridlines labelled 0 to 1 over an empty box, a plot of a range the block never had* — and it fixed the false axis by deleting the difference between *no data* and *not supported*, which F259 says are the two things a refusal must keep apart. `line/empty` and `violin/default` were byte-identical. **The half the comment earns is kept**: an empty figure draws no axis, because there is no range for one to be about. And `emptyMessage` could not have crossed first — a member with no corpus instance has nowhere to be read while the whole state is a `null` (F259, F355, F363).
+80. **A remainder that does not separate *undecided* from *blocked* reports the wrong amount of work** (I80, C12 §3ak.46). F355 owed eleven members and paired `plotFill` with `plotBox` under one note — *every variant is a `violin`, which this arm refuses*. `plotBox` is the **boxplot** form's, read at two sites inside `boxplot:`, so a fixture was buildable all along and the corpus placement was an accident; built, it is **legitimate**, because a one-row box spends its single row on mass or on a stroke and a pixel box carries both in one rect. `plotFill` is violin-only and *does* have a meaning here — a pixel density can be filled or stroked — so it is **blocked on a form**, which is a dependency and not a decision anybody owes (F355, F365).
+81. **A rule written into one resolver and not the crossed one draws the picture the other arm removes** (I48, I55, I81, C12 §3ak.47). `legendPlacement` has held *a name at the line's end **is** the legend* since §3ag; `legendOf` never did, so the second arm drew `alpha` and `beta` in a legend the terminal deliberately removes — identically for all three callout variants, which is what a member with no reader looks like from outside. **Only the strings cross**: the capability rung stays where the capability is, and the anchor is each arm's own, a cell row against a pixel y. 1840 terminal frames moved 0, which is what separates an extraction from a second derivation (F349, F368).
+106. **The orthographic arm has a scale, and it is the distance to the target** (I106). Both arms fold one focal length and differ only in the divisor — the sample's own depth, or the distance to the target — which makes them agree *exactly* at the target plane rather than approximately. The arm shipped dividing by nothing, so the unit cube measured `−0.187 … 1.187` at four distances and no member could frame it; the claim licensing that was a comment in C04's `Camera` type, unsourced and contradicted by I86 in this document (→ I86, C04 I75, FINDINGS F503).
+107. **A surface's triangles are camera-independent, and the renderer holds none of them** (I107). They are a function of the surface's carriers, the block's extent and the series index; the scratch that holds them is the caller's and arrives on `RenderContext`, so I11 is satisfied by ownership rather than by rebuilding. F469 measured the cost — over the whole 33 ms budget on its own for a computation the camera does not move — named this remedy and recorded it rather than taking it (§6o, FINDINGS F469, F507).
+108. **A waffle's hundred squares partition its segments, and each arm draws the same partition** (I108, §3ak.26). The allocation is largest-remainder with the tie to the earlier segment, computed once in `waffleGrid` and read by both arms, so a segment with a share has a square and the legend names nothing the mosaic lacks. Row 7 of the family's table was right that the assignment is shared and wrong that sharing was the whole question: the shared function dropped a segment, in both arms at once (FINDINGS F305).
+109. **The four annotation kinds are drawn by both arms, each as a mark the type already had** (I109, §3e). A reference line is a dashed polyline, a band a shaded rect and its in-range edges, a confidence region a shaded closed polyline and its edges broken where a sample leaves the scale, a whisker an undashed vertical per point — and the legend names them where they are drawn. The dash is carried on the mark and the shade has no stroke, because the first draft was read as a frame and both were wrong in it (FINDINGS F259).
+83. **The camera is context, by block id, and geometry cannot see it** (I83). A record rather than a value, because two 3D plots in one document must not turn together; invariant for `plotHeight` **structurally**, because `measure` is `(block, width)` and a camera is not in it; and a 3D form's labels are billboarded inside the area rather than written in a gutter, because three axes turn and a gutter is a fixed column. Observable only once something can move it, which is one commitment along (→ C22 I71, C04 I75).
+86. **The cull is before the divide, and a zero extent has a centre** (I86). The first of five degenerate cases is the one that draws a **plausible** picture — a sample behind the eye divides to a finite coordinate inside the frame, so bounds assertions and frame reads both pass — which is why the cull is on view `z` at a near plane of 0.01 and runs before the divide rather than after. The other four are loud and their rules are decisions: a `distance` of zero draws nothing, and a zero extent puts every sample at the axis's centre, so a plane edge-on is a line and a coincident set is a point (§3al).
+85. **A plot is focusable when it has a camera or can take a cursor** (I85). An element is a thing a reader can act on, and a plot with no view to turn and no sample to point at affords nothing — so the gate is the camera member or the `cursorable` predicate, and a positional plot with data gains the focus stop its crosshair keys need (C22 I76). **Found by building the writer**, not by the walk: `orbitBlock` reads `focus.current`, focus reaches only a kind declaring `elements`, and `table` was the only one (→ C26 I8, C22 I71). **Its element's `copy` is the series as tab-separated rows** — header of labels, one row per sample index — and omitted where `series` is empty (→ C26 I17).
+84. **The sample grid is derived and the depth buffer is per render** (I84). `width × 2` by `height × AREA_ROWS` at every rung — it was two grids chosen by rung until F498 merged them — and `160 × 192` is a measurement of that rule at 80×24 rather than a number to hardcode (F506). The buffer is local because I11 forbids a survivor — and because a module-level one is the wrong size the first time a region changes, which is the failure a purity argument alone would not have predicted. **The shading is one sample carrying both readings**, the two-channel claim is retracted (F436), and its replacement is an open measurement at step 6 rather than an invariant with no subject.
+82. **A reader map counts names and a rendered comparison counts readers** (I82, C12 §3ak.48). Eleven members came back `svg=0` and it was read as *the arm does not read it*; `calendarUnit` and `startDate` had crossed since F322 through `drawnBlock` → `calendarRows`, and five blocks differing only in them draw **five distinct documents**. F355's member sweep shares the blind spot, reading the type against the files. The genuinely owed two cross as **what must not be decided twice** — the caption's words, and *whether* the rules cross — with the room and the arithmetic staying in each arm, and their fixtures went through the collision sweep **before** either member was touched (F322, F369, F370).
+87. **The pair is a capability, the three are a taste, and the member answers the second question** (I87). `auto` is the terminal's — the colour raster above `halfBlockEligible`, the marker glyph below it — and there is no `"half"` member, because forcing the raster past that switch is a geometric corruption rather than a preference. `STYLE_ARMS` was `[]` on a ruling that answered *which of those two*, which is not the question a caller has; it now carries `braille`, `line` and `marker`, each with its capability floor stated. **The retraction is a measurement rather than a reconsideration**: an outline figure spends the half rung's second colour on 5.6%–31.1% of its cells against a shaded surface's 62.5%, which is F431's own question asked at the other primitive (§3am, FINDINGS F482).
+88. **The tier is the depth channel, and it means a different thing in each arm** (I88). Three buckets on view `z`, because a grid cannot scale smoothly and a reader cannot read four sizes. On the raster a tier is a **sample count** and on the glyph arm a **table row** — one table cannot serve both, which is what reading the design note's glyph table onto the raster would have done. It is the only depth channel the glyph arm has and the only one either arm has under `colourBy: "series"`, so a scatter at one bit still reads as three-dimensional; and a near point at the edge clips per sample rather than being dropped whole (→ I86, C04 I76).
+89. **One rule decides what colour means and whether there is a key** (I89). `identityOf` answers `points3` labels under `colourBy: "series"` and nothing otherwise, so the legend's presence and its contents fall out together and cannot disagree — I81's mechanism avoided rather than repaired. `SHARES_CELLS` is `true` because the depth buffer keeps one of two samples in a cell, and the legend is what makes that entry observable rather than a cell nobody can be wrong about. The value ramp's zero span is the field family's rule and not I86's centre, which is about the position extent (→ C04 I74, FINDINGS F330).
+90. **The corner is three sign tests, and the back faces are the same three** (I90). A world-aligned box turns the design note's three dot products into three signs, which is the difference between a rule a reader can check and one they have to trust; the far corner and the three back faces are one computation with two consumers, because two derivations of one fact are F444's shape and it was measured one commit earlier. A zero component ties to the negative end so a camera crossing the plane does not make the axes jump twice (→ C04 I77).
+91. **An edge-on axis keeps its line, and a segment behind the eye is clipped** (I91). The first is F438's degenerate arriving as a feature — orientation survives when scale does not — and it needs no priority clause, because a zero extent sorts last under the collision rule already there. The second is the one that would have shipped: dropping a segment whose near end is behind the eye makes the reference frame vanish as the camera approaches, and the frame is legal (→ I86).
+92. **The labels are billboarded, they win their cell, and the box does not move the data** (I92). Three labels turn with the view, so no gutter is spent and they are drawn inside the area; text is cell-resolution over a sub-cell raster and takes the whole cell; and the box is the data's own extent with nice ticks clamped inside it, so a reader switching a reference frame on does not watch the picture rescale (→ I83, I86, C04 I77).
+94. **The surface's two zeros want opposite remedies, and the clamp was on the wrong quantity** (I94). Normals come from the normalised geometry because that is what is drawn; the edge-on plane the design note scheduled as the first degenerate keeps its normals and its lighting, and the face that has none is made by the projector rather than supplied by the caller. The divide the note asks to avoid does not exist and the one that does is the rasteriser's, answered by stroking any triangle under a sample of projected area. And the lighting terms are rebalanced to sum to 1, because the clamp written to guard them was deleting seven eighths of the specular while the alternative destroyed the field the whole form is read by (→ C04 I79, FINDINGS F456 · F457).
+93. **The line primitive was already built, and what this step owes is the carrier** (I93). `strokeSeg` interpolates `z` and depth-tests per sample, and it landed with the axis lines — so the scheduled work was done one step early for another reason, and the three claims the note made in support of it are each wrong about the function they name, the structure they assume, or the member they select on. Colour varies along a segment on the ramp arms because the depth is available at every step; the points draw first because a trajectory's vertices tie with its own cloud; and the box-drawing joins are refused with their mechanism rather than deferred with a condition (→ C04 I78, C12 I88).
+95. **The cull is the mesh's own question and the wireframe is not a second primitive** (I95). `closed` enables backface culling and licenses orienting it from the signed volume, because the winding a caller writes by hand is as likely to be inward as outward and two-sided shading draws the wrong answer convincingly; it is refused on the height-field arm because an open surface cannot be detected, only declared. The wireframe's edge is a property of the fill's own sample rather than a stroke over it, which removes the bias the design note specified — a number measured, swept and found not to exist — and makes hidden-line removal exact instead of approximate. The mask follows the caller's structure and survives the near-plane clip, or the picture grows edges nobody supplied (→ C04 I80, FINDINGS F460 · F461 · F462 · F463).
+96. **The geometry suite's fixtures are chosen against the camera and the tessellation, and both are named** (I96). The reference camera is off `azimuth: π/4` because that is where the two horizontal axes exchange and a view-space light stops distinguishing two of a cube's three faces; a fraction-visible figure is taken over the faces the cull can decide, because a degenerate face fails both signs of the test and draws nothing. Six of the design note's §7 clauses do not survive being measured on the shape they name, and every one of them would have produced a fixture that passes while asserting the wrong quantity (→ C04 I79, C04 I80, FINDINGS F473 · F474).
+97. **The real meshes are kept and every reason given for them is corrected** (I97). Two of the design note's three — random degeneracies and mixed winding — are absent from all three meshes, and the property present in all three is the openness it never named; the orientation belongs to the loader because OBJ has no up-axis and a mesh on its back reads as a plausible solid; the height is part of any silhouette claim because the figure is aspect-bound; a budget names its mesh rather than a triangle count; and the Cornell box is refused with its mechanism rather than deferred (→ C04 I80, FINDINGS F475 · F476 · F477 · F478).
+98. **A colour per axis is a `tone` on `AxisSpec3`, not a fourth member on the plot** (I98). It colours the line, its ticks and its label; it defaults to `tone.muted` because three tones by default make the frame compete with the data; the box keeps its own colour because the box is its own member; and the row that asserts it places the axis in front of the cloud, because the frame draws last and an invisible tone passes for an ignored one (→ C04 I77, FINDINGS F479).
+99. **The marker table stops being indexed by the series' position and starts being indexed by a name** (I99). The five shapes and three tiers already existed and were unreachable above the colour floor; `plotStyle: "marker"` reaches them and `Point3Series.marker` names a column, so size carries depth and shape carries identity rather than one of them carrying both by accident. The default is the series index because a table of styles must contain the one that already drew, and the far tier's five glyphs are one glyph to a reader — so the shape channel is spent there, stated rather than found (§3am, FINDINGS F484).
+100. **The braille arm is offered as a trade and described as one** (I100). Twice the positional resolution in each axis, against the second colour a half-block cell carries and against a surface's shading; the grid is the `sampleGrid` seam cut at step 2 and never called; a cell's colour is its nearest drawn sample's because the depth buffer is what knows; the marker tiers double so apparent size survives the change of rung; and a surface draws as a solid silhouette, which is the arm rather than a fault in it (§3am, FINDINGS F482).
+101. **A refusal is re-argued at its own site, and only the conditional argument is retracted** (I101). §3am's box-drawing refusal had four arguments: the conflation of `drawLine` with `strokePolyline` stands and now points at the arm actually built; the mask's depth problem is real and its remedy — equal-or-nearer for the mask, strictly-nearer for the colour, on one buffer — was written in the refusal and never acted on; the selector's absence was the deferral rather than a reason for it; and *the argument dies with the rung* is true of the degraded arm and false of a named one, which is why it survived being read (§3am, FINDINGS F483).
+102. **The reference frame gets its own structure rather than a share of the data's** (I102). Mask and colour, a cell each, resolved by `frameGlyph` — and the precedence gains a rung so a surface's density glyph is data and outranks it. The rule the split exists to state: a channel with two owners wants two names, or the next person to divide it will divide it in favour of whichever one the identifier mentions (FINDINGS F500).
+103. **A point and a surface stop sharing a kind** (I103). `MARK` beside `AREA` and `OUTLINE`, because the silhouette alphabet is about regions and a mark is not one; a mark keeps the half-block rule and the colour lookup takes a set of kinds so a near point does not punch the fill out around itself (FINDINGS F498).
+104. **The half rung composes on the dot grid, and `▀` becomes a member of the alphabet rather than an alternative to it** (I104). The triangles are refused with their measurement kept, and a shared edge's tolerance is proportional to the triangle's area (§3an, FINDINGS F492, F493, F494).
+105. **A silhouette is quantised area-preserving in the nine block levels, with one family for the run and the ceiling stated** (I105). Nine levels put the boundary in the right place and cannot make it a line; that is arithmetic rather than tuning, and it is written down so the next reader does not spend four iterations on the quantisation (§3an, FINDINGS F495, F496, F501).
 
 ---
+
+110. **A sankey is a placement and a drawing over `graph`'s layering, and both arms draw from one geometry** (I110). `graphLayers` gained `origins` and nothing else; the scale is one number, a bar is the larger of its sides, a dummy is a ribbon, a reversed edge keeps its declared source's colour, and the budget loop — notice row first, gap ladder, least-flow drop — is the terminal's alone (§3ap.3, §3ap.4).
+112. **The SVG node label gets an ink and a ground of its own, because placement had already been spent** (I112). Six frames read as pictures and 33 labels measured at 1.02–1.41 against floors of 2.5 and 4.5; d3 does nothing about it and its readability does not transfer, plotly's default does both halves, and the terminal was already substituting the cell. `tone.default` on a halo of the page's own ground, 12.43 and 9.25 — and the note that opened, *this arm paints text on a surface C10 §4 excludes*, was paid by C10 §4f moving the page to `surface.bg` (§3ap.4 K15, §3ap.7).
+111. **The ribbon's interior is the shade, chosen on the one-bit frame rather than the 24-bit one** (I111). Both candidates were drawn; the one that carried bar-against-ribbon in an attribute lost it where attributes are dropped, and the one that carries it in the glyph is also the half-opacity fill the references draw (§3ap.2).
+113. **The SVG arm sizes its right margin the way the terminal sizes its right column, and its glyph advance is a bound** (I113). Both arms now answer *does the callout fit* before the layout exists; the margin serves the value labels drawn in it as well as the callout, past the cap the string is marked, and `SVG_EM_MAX` is the widest advance measured over six monospace faces rather than a guess at one (§3ak.49).
+114. **The right column's *width* was one question and its *rows* are another, and only the first could be answered by a shared pure function** (I114). The callout displaces the right-hand value label it overlaps and never the left's — I48's clause in this arm's units, with the third clause's conclusion refused because its reason was I1's row count and there is no row count here. What made it look unfixable is that the row is **ink**: `rightRoom` could be shared because a width is a function of the figure, and the row is the last point of a polyline inside the marks walk, so it is handed out through a collector rather than derived again. Ten overprints in six frames, all inside their own `viewBox`, so the geometric row that exists could not see one and `RC1` is the row that can (§3ak.50).
+116. **A hidden series keeps its slot, its name and its place in the range, and loses only its ink; the plot itself declares the digits that toggle it** (I116). The mark is a glyph and not a tone, the axis holds, an empty plot is a frame and a legend, and the keymap is the first `BlockKeymap` producer.
+117. **A legend that clicks finds its entry by searching the map that drew it** (I117). The swatch and the label hit, the blanks between do not, and the answer is a series index or nothing — never an annotation's, a candle's, or a form's whose series cannot be hidden.
+115. **A conflict with nothing to decide it usually has nothing to decide** (I115). F726 read the callout striking the legend as two invariants that cannot both hold, and the remedy it named — *the legend's placement* — was recorded and not given. The frame says otherwise: `area()` subtracts the column's reserve **and** the legend's band from one edge, and then the column, the callout and the legend all anchor on that edge, so 52.8 px of reserved canvas stands empty outside a legend the column is drawn on top of. Nothing has to give. Ordering the band outward from the box moves **2 of 244** frames, and F726's fourth interaction — a right-hand tick colliding with the legend on its own — **is not drawn at all**, because I114 suppresses that tick 2.415 px from the callout (§3ak.50f).
 
 ## 9. Tests
 
@@ -5647,6 +10840,93 @@ Six tiers. No state machine — C12 is pure over the block.
 - **HZ5** (I52, I16): a reading at the range minimum draws ink. **A fixture that can respond to it first**: `sin50` reaches its minimum at two adjacent columns in three shipped frames, which is where the two-cell break came from.
 - **HZ6** (I52, I19): `legend: false` on a horizon is refused at both gates, **with both controls** — a diverging map is accepted and a sequential one is accepted on unsigned data, because a refusal that fires on everything refuses nothing.
 - **HZ7** (I52, §3z H7): the legend row is declared, spent and drawn — `plotHeight` accounts for it, the rendered frame is that many rows, and the last of them is the scale. **The row the mutation pass asked for**: setting `FURNITURE_ROWS.horizon` to 0 leaves the grid untouched, so every geometry row passes while `composeRows` cuts the scale off the bottom. A test that calls the mechanism misses the wiring.
+- **PR1** (I86): **a sample behind the eye is culled, and the row is written first.** The control is the same point *in front*, which must project — and the assertion is that the behind case returns **nothing**, not that its coordinate is out of bounds. It is in bounds: at the default camera a point at `z = −4` divides into the frame, which is why *containment is not correctness* is the wrong instrument here.
+- **PR2** (I86): a sample **at** the eye is culled rather than dividing by zero, and no coordinate anywhere in the output is `NaN` or infinite. Its control is a sample one near-plane in front, which projects.
+- **PR3** (I86): a `distance` of zero projects **nothing at all** from a full point set, and the plot is empty rather than refused.
+- **PR4** (I86): coplanar data — a zero extent on one axis — maps every sample to that axis's **centre**, and the projected figure is a **line**. Asserted over the set rather than on one member.
+- **PR5** (I86): collinear data, zero on two axes, and coincident data, zero on three: a point, and no `NaN` in either. **Three rows rather than one parameterised row**, because the count of degenerate axes is what differs and a single row taking a parameter tests whichever value it is given last.
+- **PR6** (I86, §4): a **plane viewed edge-on** projects to a **line** while spreading on all three data axes — a different zero from PR4, and the one §4's *hide the labels, keep the line* rests on. **Collinearity rather than a zero screen extent**: the row's first draft asserted the latter and the implementation refuted it, because a tilted plane's image is a line at whatever angle the geometry gives and both screen axes still spread. Its control is the same plane from a camera *not* in it, which must not be collinear.
+- **PR7** (I84): the sample grid is `width × 2` by `height × AREA_ROWS` at **three widths and two heights**, plus the measurement's own 80×24 restated as `160 × 192`. **The control used to be that the two rungs disagree and there is only one rung** (F498, F506): the row's control is now the *absence* of a rung parameter, because a function still varying by rung would describe a distinction the renderer no longer has. The implementation was corrected with F498 and this entry was not, so it went on naming a control that cannot be constructed.
+- **PR8** (I84, I11): the depth buffer is **allocated per render**. Two calls return distinct buffers and a write to the first is not visible in the second — asserted on the *second*, because a module-level buffer is correct on the first by construction. **The row exists before the optimisation does**: a scratch buffer is what step 8's 30fps orbit invites, and SS24 cannot see one declared `const`.
+- **CAM1** (I83, I1): `plotHeight` and `measure` are **identical across every camera** — one block at eight `(azimuth, elevation, distance, projection)` values, asserted over the **set** and not against element zero. The degenerate values are in the set on purpose: elevation at exactly ±π/2, `distance: 0`, and both projections. A collapse-onto-zero mutation survives a row that checks the first member.
+- **CAM2** (I83): two 3D plots in one document, given different cameras, render **differently from each other** — and each renders identically to the same block alone at that camera. The row that fails on a scalar threaded down the tree, which no document holding one plot can see.
+- **CAM3** (I83, I8): the camera is unreachable from `measure` — **structural**, asserted on the signature and on `PlotGeometry`'s `Pick`, not on a rendered number. A row asserting *the height did not change* is satisfied by a renderer that reads the camera and happens to return the same value.
+- **CAM4** (I84): **PR7 under a second id, and the duplication is the finding** (F506). Same invariant, same claim, same control, two entries — and `CAM4` appears in no test file, while `PR7` does. **A row listed twice is covered once**, and the copy is where a correction stops: F498 updated the implementation and PR7's own comment, and both spec entries kept the two-rung grid because a reader fixing one has no reason to look for the other. Retained as a pointer rather than deleted, so a search for `CAM4` lands somewhere that says where the row went.
+- **CAM5** (I84, I11): the depth buffer does not survive a render — the **second** render of one block at a new camera equals a fresh render at that camera. Asserted on the second, because a module-level buffer is correct on the first by construction.
+- **SC1** (I87): the arm is the terminal's — one block rendered at four capability sets draws `HALF_BLOCK` at 24-bit and 8-bit and **never** at 4-bit or `unicode: "ascii"`, where it draws marker glyphs. **The control is that the two arms disagree in the frame**, which is what says the row read a capability rather than a constant.
+- **SC2** (I87, C04 I59): `plotStyle` is refused on this form over **every** member of the union rather than one — an empty `STYLE_ARMS` entry and a missing one produce different errors, and a row testing `"braille"` alone passes against a record that lists it. **The validator's gate and not the constructor's**: `block()` checks a block's *shape* and `STYLE_ARMS` is a rule over a total record that C04 I59 places in the validator, which is where every other form's arm check already is.
+- **SC2b** (C04 I76): the four **member** refusals at both gates — the validator and `b.plot` — each with its converse. The fifth rule is the validator's alone and is T3.53's, which is `vectors`' own split: a statement about members at both gates, a walk over the data at the gate that reports rather than throws.
+- **SC3** (I88): the three tiers are distinguishable in the frame at both arms — on the raster a near point inks **four** samples and a far point one, and on the glyph arm the near and far glyphs differ. Asserted over a cloud spanning the depth range, **not** against a hand-placed pair: a two-point fixture agrees with a renderer that buckets on the point's index.
+- **SC4** (I88): at `colourDepth: 1` a 3D scatter still reads as three-dimensional — the frame carries **all three** tier glyphs and no colour. The row that says the degradation is honest rather than a consolation; its control is the same block at 24-bit, whose glyphs are all one tier's because the raster arm drew it.
+- **SC5** (I88, I86): a near point at column 0 draws its **in-bounds** samples and the render does not throw. The control is the same point one tier further away, which fits whole — without it the row passes against a renderer that clips everything.
+- **SC6** (I89): `colourBy: "series"` draws a legend naming the `points3` labels; `"depth"` and `"value"` draw **none**, on the same block. Three renders, one fixture, and the row asserts the legend's *contents* rather than its presence — a legend drawn from `series` would be empty and present.
+- **SC7** (I89): two series' samples landing in one cell resolve to the **nearer** one's colour, asserted on the cell rather than on the picture. The row `SHARES_CELLS` exists for, and the reason the legend is load-bearing.
+- **SC8** (I89, C04 I74): every point carrying the same `value` under `colourBy: "value"` draws **mid-ramp**, which is the field family's rule and not I86's centre. Paired with the row that a zero *position* extent draws at the axis's centre, because the two are called the same thing and answer different questions.
+- **SC9** (I86, I88): every sample behind the eye draws a **blank block of the declared height**, not an empty document and not a refusal. `plotHeight` is asserted alongside the frame, because a form that returned no rows would pass a content assertion and break I24.
+- **SC10** (I84, I11): the frame at `colourBy: "depth"` is **identical** across two consecutive renders of one block, and differs from the render at a second camera. The row that a per-render depth buffer is actually per render — asserted on the second render, because a survivor is correct on the first by construction.
+- **SC11** (I87, I88): the **frame read in colour** — a PTY capture through `painter().styled()`, `ansiToSvg` and `sharp`, at 24-bit. A stripped capture cannot judge this arm at all: the glyph is `HALF_BLOCK` in every cell and the entire picture is the two colours, so a text assertion reports a correct render and a blank one identically.
+- **PR9** (I106, §3al): the two arms are **equal to within a float** at the target plane and diverge either side of it — one point at `z = distance` projects to the same screen coordinate under both, and a nearer and a farther point do not. Asserted as an equality rather than as a bound, because every wrong scale that happens to fit is inside a bound. The row also sweeps the unit cube's eight corners at four distances and asserts the orthographic extent **moves**, which is the half that was shipped broken: the survivor it kills is a projection ignoring `distance`, and that projection passed every containment assertion the suite had.
+- **PR10** (I107): the geometry scratch is **caller-owned, keyed on the carriers, and invalidated by the extent**. Four assertions and each is a row of §6o: two renders at two cameras produce **byte-identical lines** and build the triangles once; a *new* `Surface3` around the **same** `vertices` and `faces` still hits, which is the live path; a **cloud gaining a point** misses, because the extent moved and the surface did not; and a second surface in the same block gets its own slot rather than the first's colour. **The control is that the no-scratch arm renders identically** — a cache whose absence changes a frame is not a cache — and the row asserts the *build count* rather than elapsed time, because a timing assertion is what F507 is about.
+- **AX1** (I90): the far corner is the box vertex of **greatest view depth** at eight cameras, one per octant — measured, not restated — and the **axes' corner is a different vertex**, asserted as *near in x and y, far in z*. Paired with the row that says why: the far corner's projected screen position is within a cell of the figure's centre and the axis corner's is not, which is F448 as an assertion rather than as a comment.
+- **AX2** (I90): `box3: "back"` draws **nine** of the twelve box edges and the three it omits are the ones meeting the **near** corner — asserted as the omitted set, because a count of nine is satisfied by nine wrong edges. `"full"` draws twelve and `"none"` none.
+- **AX3** (I90): the back faces all contain the **far** corner, over eight cameras — the box's half of the shared computation, asserted structurally. And the axis corner shares exactly **one** coordinate with it, which is the sign the two readings agree on and the row that fails if either drifts to its own derivation.
+- **AX4** (I90): at azimuth 0, where `eye.y` is exactly zero, the corner is stable — the frame at `azimuth: −1e−9`, at `0` and at `+1e−9` names **two** distinct corners and not three, so the degenerate does not get one of its own.
+- **AX5** (I91, §4): an axis edge-on **keeps its line and drops its labels** — at `projection: "orthographic"` and `elevation: π/2` the z axis projects to **exactly zero** extent and the frame carries no z label, while the inked cells still exceed `axes3: false`. **Orthographic and not perspective, which is the row's whole content**: the same camera under perspective leaves the z axis 3.37 cells long, because the divide spreads a line along the view ray — so the perspective case is the control and it must still carry a z label.
+- **AX6** (I91, F450): a segment with one endpoint behind the near plane is **clipped rather than dropped**, asserted on the **mechanism** — the surviving pair's near endpoint sits *just inside* the near plane and not on it. **A frame comparison cannot see this and the first draft was one**: the clipped remainder reaches the screen at one of six distances swept, so ink is identical clipped or dropped at the other five. The row also records that at least one *is* visible, because zero is what a broken clip gives.
+- **AX5b** (I92, §4): every maximal run of label characters in a rendered row **is** one of the tick strings the axis produced. A length bound is not enough — `10.5` is four characters and so is `-0.5` — and only membership separates two labels touching from one label. **The mutation it was written for kills nothing today** and the run file records why with both figures.
+- **AX7** (I92, I1): `plotHeight` and `measure` are **identical** across all four `axes3` values and all three `box3` values, at three widths. The furniture is inside the area and costs no row and no gutter.
+- **AX8** (I92, F450): a label is drawn **over** the cloud rather than depth-tested per cell — every occurrence of its opening characters is the whole string, so no half of it ever appears. **The anchor test's own subject is recorded as absent rather than asserted**: it fires on no fixture measured, because the anchors are pushed outward toward the reader by construction, and a first draft that compared against an empty cloud was measuring `niceAxis` tick clamping instead.
+- **AX9** (I92): turning the axes on **does not move the data** — the inked cells of the cloud are identical at `axes3: false` and `axes3: "corner"`, compared over the cells the axes do not occupy. The row that fails if the box is niced rather than the data's own extent.
+- **AX10** (C04 I77): `origin3` is refused on every `axes3` but `"origin"`, at **both** gates, each with its converse; and `axes3: "origin"` with no `origin3` is accepted, because the member has a default.
+- **AX11** (I92): `axisStyle3.x.show: false` removes the x line and its labels and **leaves the box's x edges**, asserted as both halves — the box is the reference frame and the axis is the scale, and a row asserting only the removal passes against a renderer that removed the box too.
+- **AX12** (I92): the labels are the same strings on **both arms** — the raster at 24-bit and the marker glyphs at `ascii` carry identical text, because the arm changes the marks and not the words.
+- **SF1** (I94, F456): a plane `x = 0` from a camera **inside it** draws a **line of inked cells** and not an empty area — the row row 4 exists for. **Its control is the same plane from a camera not in it**, which must fill: an empty frame satisfies *no NaN reached the raster* exactly as a correct one does, and the first draft asserted only that.
+- **SF2** (I94, F456): a height field on a **collapsed axis it is constant along** renders, and every face's normal is the zero vector; the same heights over a real range keep theirs. **The row failed on its first run and that is what narrowed the rule** — a grid whose heights vary along the collapsed axis gives 0 of 8, so *a zero-width range is degenerate* was a claim measured on one grid and stated over all of them.
+- **SF3** (I94): `shading: "flat"` and `"smooth"` differ on a **sphere** — more distinct shades under smooth — and agree on a **single planar quad**, where the vertex normals average to the face normal. The second half is the control: a difference on every input says nothing about shading. **And a graded grid asserted against the rejected alternative**: the unit average is computed in the row and the shipped normals must be **more than 30° from it** at quintic column spacing, and **within 0.001°** on a planar quad, where the two schemes coincide. A sphere cannot see the weighting at all — its faces are near-equal — and comparing a graded grid's *shading* to an even grid's cannot either, because that differs under both schemes. Both of those survived the mutation before the row was pointed at the alternative (F459).
+- **SF3a** (I94, F456): under `"studio"` the frame is **1.47× brighter up-and-right of its own centre than down-and-left**, and **1.02×** with the normal left in world space. **The row the frame-found defect did not have**: a range of colours, a terminator and an ambient floor are all satisfied by a normal dotted with a light in the wrong frame, because the product of two unit vectors is in `[−1, 1]` whichever frames they are in. Its control is `light3: "headlight"`, whose whole defect is having no direction — ratio under 1.15.
+- **SF4** (I94, F457): the intensity at the specular's maximum is `0.9625` and **never exceeds 1** at any of 8192 swept normals, and the specular contributes **0.1971** of a possible 0.2 rather than 0.0499 of 0.4. **Asserted on the number and not on the appearance**, which is what §3c's own rule asks for — and the sweep is the half that matters, because the figure at the maximum says the term survives while only the sweep says the clamp cannot fire.
+- **SF5** (I94, C04 I79): `colourBy: "value"` reads the height field's `field` and **not its heights** — a surface whose field is the transpose of its heights draws a different frame from one whose field is its heights, at identical geometry.
+- **SF6** (I94, I90, C04 I79): a **surfaces-only** block scaled by five draws the identical frame — LN1's scale invariance one carrier along — and a full-extent surface takes the reference box's coincident cells, the count of `tone.muted` falling when it is added. **The first half needs the cloud gone**: with a cloud already spanning the cube the extent is unchanged by the surface, and the row passes against the defect it names.
+- **SF7** (I94, I88): below `halfBlockEligible` a surface draws **density glyphs** from `ladderFor("density")` and never a marker from the tier table, and the set of glyphs used is a subset of the ladder's. At `unicode: "ascii"` the ladder is `.:-=+*#@` and the row asserts against that alphabet rather than against a hard-coded string.
+- **SF8** (I94, I91): a surface with **one vertex behind the near plane** inks strictly more cells than the same surface with the straddling faces dropped, at a distance where both are non-empty. F450's row one carrier along, and it asserts the mechanism rather than the frame.
+- **SF9** (I94, F455, F480): the field's **hue ratio under shading, per colormap** — the drift as intensity sweeps against the step between adjacent field values. Above **3×** on viridis and plasma, below **0.1×** on magma, inferno and coolwarm, and zero chroma on `gray`. **Per map is the assertion**: a row asserting only viridis passes for a renderer that has lost the property everywhere else, and the split is what F455 found and what `shadeColour`'s ruling rests on. It closes F480 — the measurement ran, its result is written in five places, and until this row nothing checked it; a golden frame moves for any change to the colour path and cannot say which one.
+- **WF1** (I95, §6i rows 1–2): the cull's per-face test and the view-space constant **disagree on a measured fraction that grows as the camera closes** — under 10% at `distance: 6` and over 30% at 1.5 — and the constant returns the **same** visible count at all four distances while the per-face one does not. The second half is the row: a disagreement figure alone is satisfied by any two different tests, and what is wrong with the constant is that it cannot see the eye. The count culled at distance 6 is asserted against **44.5% by face**, with the note's 41.7% recorded as the area figure it is not.
+- **WF2** (I95, §6i rows 3–4): a UV sphere and the **same sphere with every face reversed** keep the **same faces** and ink the **same samples** under `closed: true`, and the frame is byte-identical under `shading: "flat"`. **The row asserts the mask and not the frame**, which is the distinction the invariant made and the first draft of this row lost (F464): under `"smooth"` two characters of 3449 differ, from the rasteriser's shared-edge tie rather than from the cull. Its control is a cull that trusts the winding, computed in the row — it disagrees with the shipped one on **92.7%** of faces — because **no assertion about colour, intensity or silhouette reaches this**: two-sided shading lights the far hemisphere correctly, and culling a convex closed mesh does not change the picture at all, which is the second half the row states as a bound: `closed` and no-`closed` differ in **6 cells of 306** at 140 × 30 and are **byte-identical** at catalogue widths in all four modes — solid, `wireframe: true`, `wireframe: "over"` and `shading: "flat"` — because the cull removes exactly the faces the depth buffer would have refused. **Backface culling on a closed surface is a cost decision and not a picture one**, which is why the member earns no catalogue variant and why nothing frame-shaped can reach this.
+- **WF3** (I95, §6i row 5): a sphere with **half its faces reversed** measures a volume under `1e-9` and is **not culled** — the drawn cell count equals the same mesh with `closed` unset. The guard's own case, and it is here because the mesh a caller is most likely to ship broken is the one it does *not* catch.
+- **WF4** (I95, C04 I80, §6i rows 6, 15): `closed` with `heights` is refused at both gates and `wireframe` with `heights` is **accepted** — the pair asserted together, or one arm's refusal gets copied onto a member that does not want it.
+- **WF5** (I95, §6i row 9): a height field under `wireframe: "over"` inks its **grid lines** — the edge samples are strictly fewer than the same surface masked with every triangle edge, and the interior sample count is strictly greater than zero, which the diagonals arm cannot manage at this size. The control is a **mesh**, where every triangle edge is the caller's structure and both masks agree.
+- **WF6** (I95, §6i row 11): a point cloud **behind** a `wireframe: true` surface does not draw, and the same cloud in front of it does. The row that fails if the interior stops writing depth — a see-through cage passes every assertion about the wireframe itself.
+- **WF7** (I95, §6i row 13): every edge sample is **dimmer than the fill sample adjacent to it**, over a Gaussian whose own fill intensity spans `0.1332 … 0.7871`. Its control is an edge pinned to a constant intensity, which collides with the fill somewhere in that range by construction — so the row asserts the **ratio** rather than a colour, and a constant edge colour is what it rejects.
+- **WF8** (I95, §6i row 10): a surface with a face **straddling the near plane** grows no edge along the cut — the edge samples on the clipped frame lie on the caller's own grid lines, asserted against the vertex positions rather than counted. **The row two correct rules leave uncovered**: `clipNear`'s vertices satisfy the barycentric edge test exactly as the caller's do.
+- **WF9** (I95, §6i row 12): `shading: "smooth"` with `closed: true` culls the **same** faces as `shading: "flat"` with `closed: true`. The cull reads the face normal under both, and a vertex normal substituted for it changes the set — which is invisible to any row asserting only that something was culled.
+- **GM1** (I96, I94, §6j row 1): the three coordinate planes as meshes each keep **their own normal** — `(1,0,0)`, `(0,−1,0)`, `(0,0,1)` — with **0** zero normals of 72 faces apiece. F456 measured `x = 0`; the row is the three together, because the quad's diagonal runs one way and a rule holding for `x` could fail for `y`.
+- **GM2** (I96, I94, §6j row 2): each plane from a camera lying in it draws a **line whose direction is asserted** — `x = 0` and `y = 0` one column of 8 cells, `z = 0` one row of 16 — with every face at zero projected area. The direction is the row: *not blank* passes on all three with the axes transposed.
+- **GM3** (I96, C04 I79, §6j rows 3 and 6): a flat-shaded cube with colour held constant gives **three** luminance clusters at an azimuth off the symmetry plane and **exactly two** at `π/4`, and its cull keeps **2, 4 and 6** of 12 faces face-on, edge-on and corner-on. Both halves, because the two-cluster reading is the light and the face counts are the cull, and a suite that saw only the first would report a shading defect.
+- **GM4** (I96, I95, §6j rows 4 and 5): `sphere(24, 12)` has **42** faces of 576 with a zero normal, **none** of them culled at any distance, and the frame with them is **byte-identical** to the frame without. The visible fraction is asserted over the faces the cull can decide — 49.4% at the orthographic limit against 53.13% over all of them — so the row records the denominator rather than the ratio.
+- **GM5** (I96, §6j row 7): the tilted plane `z = 0.3x + 0.15y` inks **25** cells at the reference camera against the flat plane's **59**, and the same plane from a second camera fills. The row exists to say the general case has to be chosen *against the camera*: `unitOf` steepens `z` by `1/0.9` and puts the surface nearly along the view direction, which is the degenerate case wearing the general one's name.
+- **GM6** (I96, I94, §6j row 8): a Gaussian with a **constant** `field` under `colourBy: "value"` draws **one hue at many luminances** — more than one distinct colour, and every one of them the same hue to within a bound. Asserted both ways, because *one colour* says the shading is gone and *many colours* says the field is being read.
+- **GM7** (I96, §6j row 9): the saddle at the five capability sets carries **84, 13, 88, 1, 1** distinct colours — 24-bit, 8-bit, wide, `ascii`, `1bit` — so the banding is the `colourDepth` and `ascii` and `1bit` are one rung for colour and two for glyph, 91 inked against 87.
+- **GM8** (I96, §6j row 10): interior holes over four grid resolutions — **0, 0, 0, 0** for the flat plane and the Gaussian, converging to **10** and **2** for the egg-carton and the saddle. The two zero rows are the control and are not optional: without them the same numbers read as cracks between triangles, and the count that would distinguish them is the one that does not scale with the triangle count.
+- **GM9** (I96, §6j row 1, C04 I79): the egg-carton `z = sin x · cos y` and the Gaussian are drawn and **compared to each other**, not to a threshold — the egg-carton's frame has more than one local maximum along a row and the Gaussian exactly one. The pair is the assertion, because a renderer drawing either as a mound satisfies every scalar both of them carry.
+- **RM1** (I97, §6k row 1): each vendored mesh loads to its **recorded digest** and is drawn upright. The orientation is asserted through the interior-hole count — 0, 0 and 1 rotated, against 2, 18 and 6 as-is — because inked cells cannot separate a solid from the same solid on its back, and that is the whole difficulty (F476).
+- **RM2** (I97, §6k row 2): the teapot at heights 12, 20, 32 and 48 inks a **monotonically growing** figure, and the same mesh at 120 and 240 columns inks the **same** number of cells. Both halves: the first says the silhouette needs rows and the second says widening is not a substitute, which is the half a reader would otherwise try.
+- **RM3** (I97, I95, §6k rows 3 and 6): the three meshes carry **0 degenerate faces and 0 inconsistently wound edges**, and 1,036, 223 and 42 **boundary edges**. Asserted together, because the row exists to say that the properties the meshes were chosen for are not the ones they have — and `cullSign` reads +2.587, +2.031 and +1.966 across all of it.
+- **RM4** (I97, I95, §6k row 4): `closed: true` on the **bunny** drops more than a third of its faces and leaves the frame **byte-identical**, while on the **teapot** and **Suzanne** it changes the frame. The pair is the assertion: a cull row driven by the bunny alone passes against a cull that does nothing.
+- **RM5** (I97, §6k row 7): Suzanne under `shading: "flat"` and `shading: "smooth"` inks the **same cells** and carries **different colours** — the note's one surviving claim, and asserted as *same geometry, different shading* rather than as a count, so a mutation that moves both arms cannot satisfy it.
+- **RM6** (I97, §6k row 5): the bunny and a synthetic grid of the **same triangle count** at the same frame, compared by the samples each one's triangles win — **under half**, measured at 0.159. Deterministic, because `drawTri`'s callback fires post-depth-test and a millisecond figure is a machine's; the 1.56× cost stays in F478 with its protocol. The two numbers together are the row: the cost is higher and the output is smaller, so the unit is neither.
+- **RM7** (I97, C04 I79, §6k row 9): the teapot's frame is read **in colour** — the mean luminance of the inked cells above and right of the figure's centre against those below and left. **The stripped frame is the control and it cannot see it**: the same picture with SGR removed has one character class and no ratio to compute, which is the whole of why a half-block render needs a colour capture. The ratio is asserted against the studio light's direction rather than against a constant, so a light pointing the other way fails and a brighter light does not.
+- **AT1** (I98, §6l rows 1 and 3): one axis given a tone draws **that axis** in it and leaves the other two and the box in `tone.muted`, at a camera and a `box3` where the axis wins its own cells. Both halves, because the frame draws last: a row that only asserts *a coloured cell exists* passes for a renderer colouring the whole frame, and one taken at the wrong camera passes for a renderer ignoring the field.
+- **AT2** (I98, §6l row 2): the axis's **label** carries the line's tone and a label on an untoned axis does not. The pair is the assertion — the label is drawn by a separate pass with its own ink, so it is the one part of the frame that could keep the old colour while the line changed.
+- **AT3** (I98, §6l row 5): three tones at `1bit` give a frame **identical** to no tones at all, and the same block at 24-bit does not. The row says the feature is a colour rung's and nothing below it, and its control is the 24-bit arm, without which it passes for a field nothing reads.
+- **AT4** (I98, C04 I77): `tone` is refused on `axisStyle3` **nowhere**, and that is asserted rather than assumed — an unknown tone validates `ok` and `slot` answers `{}`, on this carrier as on the six others measured (F479). The row exists so the limit is a decision in the corpus rather than a silence.
+- **AT5** (I98): the default is `tone.muted` — a plot with `axisStyle3` set and no `tone` draws the **same frame** as one with no `axisStyle3` at all. The row that fails if the field acquires a default of its own.
+- **LN1** (I93, C04 I78): the extent is over **both** carriers — a block with `lines3` only renders its polyline inside the box, asserted as *the inked cells lie within the frame the box draws*, and the same polyline with a cloud added at a wider extent **moves**. The second half is the row: an extent taken from `points3` alone still draws something in bounds, because `extentOf([])` is the unit cube.
+- **LN2** (I93): a segment spanning near to far under `colourBy: "depth"` carries **more than one** colour and its near end matches the near end of the ramp — compared against `continuousColour(map, 1)` rather than counted, because a count is satisfied by any two wrong colours. Under `colourBy: "series"` the same segment is **one** colour, and it is the cloud's second slot rather than its first.
+- **LN3** (I93): a polyline through a cloud's own points leaves **every** marker visible — the marker glyphs present at `1bit` with `lines3` set are the same set as without it. The row fails if lines draw first, and no bounds or ink-count assertion reaches it, because the line inks the cell either way.
+- **LN4** (I93): on the glyph arm a line cell carries `│` or `─` by dominant screen direction and **never** a marker glyph, and the markers on the same frame still decode to the right tier and series — the row that fails if a line index reaches `glyph[]`.
+- **LN5** (I93, I91): a polyline with an **interior** vertex behind the eye clips **twice** and the two ends land in **different places** — asserted on `clipProject`'s own parameters (`tb < 1` on the first segment, `ta > 0` on the second) and on the distance between the two projected ends. **The mechanism and not the frame**, for F450's reason: the gap is what a line passing behind the reader looks like, and a row asserting *something is drawn* passes against a renderer that drops both segments.
+- **SC12** (I87, C12 I2): the form renders through the registry at every width in the sweep and `measure` equals the row count, over both arms. The generic contract, named here because a form composing its own rows outside `axed` is the shape that has broken I24 twice.
+- **CAM6** (I83, §3al): orbit pauses while the readout cursor is active. **Owed at step 8 and not written now** — the orbit does not exist, so the row would pass by having no subject, which is the vacuity this suite has recorded three times.
 - **YA1** (I47): `yAxis: "both"` renders the same tick values on both sides, from **one** `yLabels` call — asserted as equality of the two label sets rather than as each being correct, which is the half a per-side assertion cannot see.
 - **YA2** (I47): `yAxis: "right"` draws no left label column and the plot area starts where the border does; the labels are the same strings `"left"` puts on the other side, at the same rows.
 - **YA2b** (I47): at `yAxis: "right"` the left border is `│` on every row and never `┤`, with the converse asserted on the same fixture with the axis left. **The row the mutation pass asked for**: YA2 compares the gutters' *contents*, which are empty on that side either way, so it passes against a border still drawing a stub that points out at a column zero cells wide.
@@ -5766,6 +11046,8 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T1.121** (I57): `TR8` — a single-node tree draws one name, no edge and no notice, **and the three layouts produce identical frames** — the row exists to keep a fixture honest, since a single node discriminates no layout at all.
 - **T1.122** (I57, C04 I64): `TR9` — `value` changes no frame — two trees differing only in it are byte-identical — **and `label: "gc (2.1s)"` does change it**, which asserts the workaround rather than describing it.
 - **T1.123** (I57): `TR10` — every node drawn is named once, no name twice, and every parent sits over the span of its own children — on an asymmetric tree where a midpoint and a first-child position differ, so the two placements are not satisfied by one assertion.
+- **T1.126–T1.128** (I116, C04 I99): §3aq's rows — the declaration, the hidden frame, and the empty-and-overridden frames. In `test/unit/plot-hidden.test.ts`.
+- **T1.129** (I117): `legendHitAt` against legends located in painted frames — right, left and `below` — at the swatch, the label, the blanks, the tail, the gutter and the area; a `bar`'s legend and an annotation's entry answer `null`. In `test/unit/plot-legend-hit.test.ts`.
 - **T1.125** (I57): `TR13` — the outline's *last child* glyph is read from the **real** sibling list: a node whose later siblings were truncated still draws `├──`, and the last one drawn keeps its `╰──` where the claim is true. **Found by reading the overflow frame** (§3ah.8a), and the row records the arm it could not have been found on — at `unicode: "ascii"` both forms substitute to `+`, so no frame there distinguishes them.
 - **T1.124** (I57): `TR11` — a wide codepoint in a label is measured with `cells()`, and the cell behind it is not written into (§3n, T1.104).
 - **T2.9** (I56): **`HAS_X_TITLE` is re-measured rather than trusted** — every `true` renders its title and keeps `measure === rendered`, every `false` is refused at the gate, and the count of drawing forms is asserted at 26 so the sweep cannot pass against an all-`false` record. This is the row that makes the record safe to edit.
@@ -5781,6 +11063,49 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T1.90** (I28): a compact box plot at three categories in twelve rows, and a three-row box in five — the set of rows carrying a box spine and the set carrying a category name are **the same set**. Equality rather than containment, because *every named row has a spine* passes on a frame with spines elsewhere too and *every spine is named* passes on one where a band lost its name. **The glyph took two goes and both misses were furniture**: the median is `│`, which is the plot's right border on every row, and the box's minimum cap is `┤`, which is the gutter's axis tick on every named row by construction. `├` is drawn by the spine and by nothing else in the frame. Not asserted at a row index, which an off-by-one in the offset satisfies when the index is written from the same expression.
 - **T1.88** (I34, I21): a vertical raincloud draws a leftward `extentRun` and a horizontal one a `ladderFor("height")` step — asserted by the glyph set each produces rather than by the call, so the row survives the call being moved. The five levels at two columns are `⠀⠀ · ⠀⢸ · ⠀⣿ · ⢸⣿ · ⣿⣿`.
 - **T1.71** (I34, I11): rendering the same block twice returns identical rows, and the jittered strip's offsets are a function of the sample's index alone.
+
+#### The arm unification rows (§3ak, I59–I66)
+
+**The emitters land one family at a time and their rows land with them** — `FC` curve, `FS` scatter, `FB` bar, `FM` matrix, `FD` distribution — because a family is the smallest unit in which the disagreement matrix's cells are jointly satisfiable (§3ak.7). Every one of those commits reports the same gate: **1780 baseline frames compared, 0 moved**, and the catalogue at `64b8845e6408c819`.
+
+- **FV1–FV3** (I60, §3ak): **`HAS_VALUE_AXIS`' true direction over the corpus** — a form marked `false` never draws a numeric gutter label, at both widths and every capability set, with the count of forms checked reported rather than assumed. **`FV1` failed on the commit that introduced it**, four offenders, against a record its own author had just written (F267). `FV2` refuses the converse — a form marked `true` need draw no numeric label, because whether the gutter holds values is orientation and rung — and `FV3` pins the strings the axis carries, so the arm that stopped computing them cannot start again.
+- **DS1–DS4** (I66, §3ak.8): **every catalogue fixture rendered twice, with its numbers moved by a position-varying factor** — a uniform scale leaves a normalised figure identical and a reversal leaves a histogram identical, and neither is a defect. `DS2` is the row that makes `DS1`'s number mean anything: the exempt set is the fixtures with **nothing to perturb**, compared by equality, and it is 15 of the 16 unmoving frames. `DS3` is the fabricated violation — a comparison that never reports equality reports every form as moving, on any corpus. `DS4` names `ecdf`'s mechanism, so a repair that moves the frame for the wrong reason still has to face it.
+- **FC1–FC9** (I59, I61, I64, I65, §3ak.7): **the curve family's emitter, and the terminal reading it back.** `FC1` is the seam's claim as an assertion — a mark's `y` and `rowOf`'s row are one coordinate with the facing applied once each side, which no frame shows because a frame wrong in both arms is a frame that agrees. `FC2` breaks a run where the samples stop being consecutive; `FC3` composes the legend once and projects the swatch twice, at two capability rungs; `FC4` refuses with an empty list rather than a throw, including the pinned-bounds case where an axis exists and nothing was measured; `FC5` asserts the figure describes the block that is **drawn**; `FC6` holds the decisions and the marks apart, so no caller can hold a figure with another family's marks on it; `FC7`–`FC9` came from the mutation pass — **the orientation, the mark's own slot and the scale each had a row named after them and no assertion in it**, and `FC9`'s subject is a unit block because no rendered fixture anywhere constructs a `yScale` (F270).
+- **FS1–FS3** (I59, I62, §3ak.7): **the scatter family, whose decisions are the curve's** — both reach `positionalForm`, so the extent, the nicing, the tick count and the facing are one computation and only the marks differ, which is what makes a *family* the unit rather than a form. `FS3` carries the size channel: a bubble's radius **is data** and crosses normalised against the size series' own maximum, where a scatter dot's radius is each renderer's and does not. **It also asserts F271** — the channel is a member of `series`, so the terminal draws it as a second bubble series and the figure says so; correcting that here would be a divergence no commit announced, and the row fails the day the channel stops being a series.
+- **FB1–FB5** (I59, I62, I64, §3ak.7): **the bar family, where `identity` stops meaning the series.** The member is *what the figure's slots are named* — a curve's are its series, a bar's its categories — so the legend and the identity are one list there and **two** here, and `FB1` asserts both answers side by side so the difference is on purpose. `FB2` holds the zero-anchored extent (`[10, 25, 15]` anchored at 10 draws nothing for its first category); `FB3` is D11, the orientation the two arms defaulted opposite ways; `FB4` puts the rects in the **figure's** space rather than the screen's, `x` along the identity axis whatever the orientation says — and **asserts F272**, that both terminal arms fill from the range floor so a signed bar chart draws no negative bars. `FB5` keeps the identity through a refusal.
+- **FM1–FM4** (I60, I61, I62, §3ak.7): **the matrix family, where `value` is `null` and `extent` is not** — the pair is the family's whole shape. Three renderers furnished an axis out of `seriesRange([]) ?? {0, 1}` over readings that are colours; there is no axis, and the *ramp* still has a domain, so `FM1` holds both halves. `FM2` carries the type's one extension: a matrix cell has no length and no position to spend on its value, so **the reading crosses on the mark** — `point.size`'s argument one mark along — and each arm turns it into a colour at its own depth. `FM3` pins the family's own facing default, reachable from two files before it was decided once. `FM4` takes the identity from the **gutter**, because an unlabelled row is `""` there and `row N` to the overflow notice twenty-five lines away, and `series N` to the positional families — three answers to *what is this row called*.
+- **FD1–FD5** (I59, I62, I64, §3ak.7): **the distribution family, and the reason `GlyphRole` exists.** A median is `┃` at full unicode, `|` in ASCII and a distinct mark below the colour floor; a mean is a different character; an outlier a third — and the SVG draws a line and two circles. What both arms agree about is **which of the seven things this is**, which is the whole content of the seam here. `FD2` holds `quartileRange`'s two arms: a boxplot's extent is the whiskers plus outliers, a forest plot's is the interval, because a confidence bound can reach past the observed range. `FD3` is `absent` — `normalisedSummary` falls `centre` back to the median, so the *summary* cannot say **nothing was reported** and the role is what does, which is how the SVG refuses where the terminal draws.
+- **FT1–FT3 · FN1–FN2** (I60, I61, §3ak.7, §3aj.6): **tiles and nodes, and the two families that end differently.** `FT1` is the distinction that makes `extent: null` a statement: a matrix has no axis and its **ramp** still has a domain; a tiles figure reads its numbers as **areas**, and an area is the reading itself — `hierarchy.ts` divides by the total while it walks. `FT3` records that the facing is **live** here where the matrix's is dead (F273), because these three forms declare `ORIGIN_DEFAULT: null`. **`FN1` asserts that there is no `nodesFigure`**: §3aj.6 ruled that a tree's placement is a function of its labels' widths in one arm and of slots in the other, so a `Mark` — which is a position — would carry one arm's answer and the other would fail `U1b` for a reason the type cannot express. `marks: []` is not the alternative, because I64 makes an empty list a **refusal**.
+
+- **AD1–AD5** (I59, §3ak): **the disagreement matrix, and it is walk artefact A** — every form, every variant, both widths, at 24-bit, with each cell's disposition stated as *the relation the row asserts*: `agree` fails if the arms drift apart, `n/m` fails if it closes silently **or becomes a different disagreement**, `legitimate` fails if they ever start agreeing. Shipped ahead of the type, because the list of disagreements is what the type is designed against. `AD5` corrupts one side and requires the comparison to see it, since a sweep certified only by its own record agrees with itself whatever it does.
+- **U1a** (I59, §3ak.16): **a decision mutated inside `figureOf` moves BOTH arms.** *The row U1 was written as — `the same block yields an identical Drawn[] for both arms` — is `f(x) === f(x)` the moment one emitter serves both, which is A03 §2's vacuity class arriving in the assertion the pass exists for.* One arm moving alone is the finding: the other still decides it itself. **Measured per member against a fixture that constructs its state, it holds for five of eight.** `identity`, `frame` and `legend` move the terminal and not the SVG, and they are exactly D10, D9 and D13 — the three terminal features the second arm has never been given. **MG24 is silent on all three**, because it counts a member consumed when its *name* is read anywhere in `src/`, and those three names are owned by half the tree (F286). *The negative direction is the sound one — an arm that did not move read neither the member nor the block field — so the `still` cells are this row's findings and the `moves` cells are `c12-arm-seam.mjs`'s subject (F287).*
+- **U1b** (I62, §3ak): **each arm's output is a faithful projection of the figure** — every `Drawn` appears as an element in the SVG and as a glyph at the mapped cell in the terminal. This is what catches *the shared layer says a diamond and the terminal draws a comma*.
+- **U2–U3** (I59, §3ak.17): **U1b's subject, crossed over every form and every variant** — 86 drawn documents, every mark accounted for by an element. *As written they inherited U1's subject and so inherited its vacuity: crossing `f(x) === f(x)` over the catalogue is one tautology 178 times.* `U3` keys the emitter off **`spec.form`** and not the catalogue bucket, because one variant's bucket lies — `line/whiskers` is a `scatter` — and an instrument keyed off the bucket compares a curve figure against a scatter document and reports a dropped mark that never existed (F290).
+- **U4** (I62, §3ak): identical across themes, because the refs are unresolved — a theme change moves nothing in the figure.
+- **RM1–RM5** (I113, §3ak.49): **the right margin, and the rows are split by which half of the rule they can see.** `RM1` is geometric over the emitted document and over the whole catalogue — every `<text>` inside its own `viewBox` at **0.6182**, the widest face measured, and not at the arm's own constant, because a row asserting at `SVG_EM_MAX` agrees with the code by construction. It is the row the byte-compare golden could not make: `line-callout-both` recorded `alpha 0.8774` 67 px off the page and agreed with itself for as long as it existed. `RM2` is the reserve — the maximum of the callout and the right-hand labels, and **zero where neither is drawn**, which is the half that would make this the wrong rule. `RM3` asserts that the marks walk and the axis emitter answer to one box, which is the interaction the walk found rather than the overflow. `RM4` is the cap and the marked cut. `RM5` is the boundary where the reserve and the fit meet — a string in a margin sized for exactly that string. **The hand pass is what indexed them**: removing the reserve does not fail `RM1`, because the fit still contains the string, and removing the fit does not fail `RM2` — a containment row cannot see a reserve going missing and a reserve row cannot see containment going missing.
+- **RC1–RC6** (I114, §3ak.50): **the callout's row, and the first of them is the row `RM1` could not be.** `RC1` is geometric over the whole catalogue and it is the one the corpus needed: no callout's painted band overlaps a right-hand value label's, where `RM1` asks only whether a string is on the page and agreed with all ten overprints for as long as they existed. **Containment is not correctness**, and this is the measured instance of that — every one of those ten strings was inside its `viewBox`. `RC2` is the left side, at `yAxis: "both"`, where one tick has a label on each side and I48 says only the right one may go: the row asserts the **left label survives on the contended tick specifically**, not merely that left labels exist, because a count agrees with a rule that drops the wrong one. `RC3` is the half that would make this the wrong rule, and **designing the mutations is what gave it its shape**: `RC1` is satisfied by deleting the whole right column, so a row asserting only *no overprint* accepts an over-eager rule that suppresses every label. `RC3` therefore asserts the **set** — the right column still reads every label the callout did not land on, by value *and* by row — and it asserts it at **two tick pitches**, because the first mutation run showed the sparse one cannot see a widened threshold: at `height: 8` the labels are 137.6 px apart and four times a glyph reaches nothing, at `height: 40` they are **15.29 px** apart and it reaches a neighbour. The second half of the row is the figure with no right-hand column at all, whose left gutter must be untouched by a callout arriving. `RC4` is the suppressed label's **gridline**, still drawn, which is what the ruling leaves behind. `RC5` is the wiring rather than the mechanism: it asserts the emitter reads what the walk wrote, by constructing a block whose callout lands on a tick and checking the *emitter's* output, so it fails if `marks` is ever called after the axis pass. `RC6` is F713's real hazard on the other side of the box — no left-hand value label in the catalogue is ellipsised, which fires the moment `gutterRoom` under-measures what the emitter draws, from any cause.
+- **RC7** (I115, §3ak.50f): **the right band's three writers hold disjoint columns, over the whole catalogue — and it asserts positions rather than containment.** Every one of the two overprinting pairs was inside its own `viewBox`, so a containment row agreed with both; `RC7` sweeps every frame for a legend entry sharing a horizontal band with a callout or a right-hand value label, using the emitter's own `rect`-then-`text` arithmetic to identify a legend entry rather than a coordinate. **The half that would make it the wrong rule is asserted too**: the legend of a figure with **no** right-hand column keeps `box.right + 12` exactly, so a rule that pushed every legend outward fails here and nowhere else — and that is 81 of the 83 frames, which is what makes the row cheap to satisfy wrongly. **The fixture property that makes it sensitive is the column's width**: `rightRoom` must be non-zero *and* the legend must be drawn, which is `yCallout: "last"` with `legend` on `line-callout-multiseries`, where the reserve is 52.8 px — a legend moved by anything less than a glyph would still overprint, and 52.8 is 6.8 glyphs.
+- **U5** (I59, §3ak.17): **the SVG arm cannot see a capability, asserted on the signature rather than on a frame.** *As written — `identical at every capability set` — the row had no parameter to vary and therefore nothing to be wrong about.* `plotToSvg` takes a block, a theme and a layout; `svg.ts` imports no `Caps`. The guard is structural and says so, so a green run is not read as a measurement.
+- **U6** (I59, §3ak.15, §3ak.17): **walk artefact B — the rung ladder as a trace, and the degradation audit this component has never had.** Its first half, *the terminal's figure is identical at every capability set*, is unfalsifiable for U5's reason and becomes the same structural guard: the emitters take `block` alone. **The content is the second half**, and it is a record — 46 forms against the four edges that isolate one capability each, classified on raw frames. *The `CAPS` array's neighbours are not those edges*: `ascii` is two capabilities from full, so a trace walking the array would attribute a colour change to the unicode rung. `U6c` is the control — `tree` draws no SGR at 24-bit, so its `same` cells are what make the other 45 evidence.
+- **T1–T5** (§3ak, §6b): the terminal arm is byte-identical throughout — `TB1`–`TB5` over 1780 baseline frames crossed on width as well as capability set, plus the glyph-per-role, 1-bit strip, truncation-ladder and `ambiguousWidth` rows named in the rung table.
+- **WA1** (I108, §3ak.26): `waffleGrid` is a largest-remainder partition — `50/50/1` owns `50/49/1` squares, `1/1/1` owns `34/33/33` with the tie going to the **first** segment, `65/25/10` is unchanged, and every case sums to a hundred with no `-1`. The all-zero list is the one exception, asserted as a hundred `-1`s.
+- **WA2** (I108): **the legend names no share the mosaic lacks** — over every catalogue waffle variant, each legend slot's segment owns at least one square in the shared grid, and the terminal frame and the SVG document both carry ink for it. The control is the pre-I108 allocation, reimplemented in the row, which fails it on `over-100`.
+- **WA3** (I108, C12 §3ak.26): the `waffle/all-zero` fixture **responds** — its frame differs from `default` in the mosaic region and its legend reads `0%` beside every name, and the shared grid it renders from is all `-1`. The `scale = 0` arm, reached for the first time.
+- **AC1** (I109, §3e): a `line` block with and without a `band` renders **different** SVG, asserted byte-for-byte because the two were identical for the whole of the pass; the same for `confidence` against none, `whiskers` against none, and `confidence` against `confidence-unfilled`. The control is the drop rule: a band wholly outside the range renders **identical** to none, so the comparison can be seen to produce equality.
+- **AC2** (I109): the marks each kind becomes — a `band` is one `stroke="none"` rect and two dashed edges, and an edge outside the range is not emitted while the rect still is; a `confidence` upper edge above the ceiling **breaks** its run rather than pinning to it, and the region carries no stroke; a whisker is one polyline with no dash; a `line` outside the range emits nothing where it used to emit a rule along the ceiling.
+- **AC3** (I109, §3e): the SVG legend of `line/annotation-label` names `budget` and `warm-up`; claims are emitted **before** the series they annotate; and the violin's IQR box — on the annotation layer for its width, carrying a `seriesIndex` — is opaque and emitted **after** its density, the counted exemption.
+
+- **SK1** (I110, §3ap.3): the default fixture's geometry, walked by hand and asserted as numbers — scale `14/11`, slices `6 · 1 · 4 · 3`, bars `a 7 · b 4 · c 3 · x 9 · y 5` half-rows, `a`'s two slices in far-end order — **and the fixture responds**: doubling one weight moves the frame.
+- **SK2** (I110 K6): `hub` receives 2 and emits 5 — its bar is 16 half-rows, its one incoming ribbon covers six of them, and the ten below are bar with no ribbon arriving. Read from the cells left of the bar, not from a count.
+- **SK3** (I110 K1, K7): `c→a` is drawn as `a→c` in **`c`'s** slot with `1 reversed` in the notice; and `a→b 2` beside `b→a 3` is one ribbon of weight 5 with the same notice.
+- **SK4** (I110 K4): an edge through a layer leaves ribbon cells in the middle column at the dummy's rows, in the source's slot, and no bar cell there.
+- **SK5** (I110 K3): `long-labels` names three at 80 columns and two at 40 — the middle one gone, the outer two intact, and no `…` anywhere in either frame.
+- **SK6** (I110 K5, I8): `crowded` keeps the eight largest sources at gap 0 and says `+4 more` with the four smallest by name, in a frame of exactly the declared height.
+- **SK7** (I111): the 24-bit frame's non-label glyphs are `█ ▒ ▀ ▄`, the ASCII frame's are `# = -`, the wide frame **is** the ASCII frame, the one-bit unicode frame keeps `█` and `▒` distinct, and a two-owner cell carries a background SGR at 24-bit.
+- **SK8** (I110, §3ap.3): the SVG draws one `<rect>` per declared node and one path per segment at `fill-opacity="0.5"`, the last layer's label `text-anchor="end"`, and the rect heights of `x` and `y` in the ratio `7 : 4` — continuous, because that arm has no quantum.
+- **SK11** (I112, §3ap.7): every `<text>` a sankey's SVG emits for a node carries the **`tone.default`** hex and a `stroke` in **the page's own ground** with `paint-order="stroke"` — asserted over all six variants and on **both** shipped theme variants, so the row is about the slots rather than about two hex literals. Paired with the ratio itself: `ratio(fill, stroke)` per label is at or above `DEFAULT_FLOOR`, which is the promise, and the two hex values are only how it is kept. The reversed notice is excluded by name — it is `tone.warn` on bare ground and is not a node label.
+- **SK9** (I110 K10, I11): two renders are byte-identical, and every layer's bars keep the ordering pass's order top to bottom after relaxation.
+- **SK10** (C04 I69, I92): the builder admits `graph` on `sankey` as the validator does. Runs the day `b.plot`'s guard is widened; until then it is a `todo` that names the file — a deferral whose condition is the code itself, so it cannot stay deferred once met.
 
 ### Tier 2 — contract / interface
 
@@ -5812,6 +11137,7 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T3.13**: a series of exactly `width × 2` points → one point per dot column, no downsampling, no interpolation.
 - **T3.17** (I24): on a terminal reporting `ambiguousWidth: "wide"`, a label carrying an ambiguous-width character leaves every row's border in the **same cell column**, across all four gutter paths — positional, categorical, banded, matrix. Asserted by *measuring the rows against each other* rather than by matching a border at a fixed offset, which would pass on a frame where every row is wrong by the same amount. The fixture is shown to respond first: `a→b` is 3 cells narrow and 4 wide, and a label with no ambiguous character passes against a renderer that ignores the capability entirely.
 - **T3.18** (I55): a label wider than the whole plot area is dropped at both candidate positions and marks nothing — there is no survivor to carry a `+`, and a rule that emitted one would be pointing at a label that does not exist.
+- **T3.20** (I116): the 1-bit strip and the hidden annotation — §3aq. In `test/unit/plot-hidden.test.ts`.
 - **T3.19** (I57, I2): `form: "tree"` with no `hierarchy` — refused at both gates, and the renderer called directly draws `emptyRows` at the declared height rather than throwing. The third path is the row, because a refusal at two gates reads as a guarantee at three.
 
 ### Tier 4 — integration
@@ -5892,6 +11218,10 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T6.17** (I24): the gutter measuring or padding against a default `ambiguousWidth` → T3.17 fails, and the axis bends by one cell on the labelled row only. **One row and not two**, because either half alone produces it: the budget and the drawing disagreeing is the failure, and which of them moved is the diff's job.
 - **T6.18** (I15, I22): `yLabels` calling `niceAxis` instead of `axisFor` → S9 fails, and a log plot is labelled linearly. Invisible from the block: `positionalForm` picks the right ticks and reads only `.range` off them, so the correct set is computed and discarded while the labels are derived a second time from the linear arm.
 - **T6.21** (I34, I11): replacing the jitter hash with a counter → T1.71 fails, and the same block renders differently on its second draw. **Nothing else sees it**: every width, row-count and glyph-set assertion passes against a moving strip, because each render is internally consistent and only the pair disagrees.
+- **T6.71** (I83, I1): letting `plotAreaRows` read the camera — a 3D form whose rows follow its elevation → **CAM1** fails at the degenerate angles and passes at the comfortable ones, which is why CAM1 asserts over the set rather than against a first element.
+- **T6.72** (I83): threading the camera as a scalar rather than a record → **CAM2** fails and CAM1 passes. Two 3D plots in one document turn together, which is correct-looking on every document holding one.
+- **T6.73** (I84): hardcoding the sample grid to 160×192 → **PR7** fails at every width but 80 and every height but 24. The row that would pass on the fixtures the measurement was taken with, which is why PR7 crosses three widths and two heights. **The constant written here was `80×48` and had been wrong since F498** — a revert row naming the grid it reverts *to* inherits the figure, so correcting the rule above without correcting this leaves the revert describing a hardcode nobody could write (F506).
+- **T6.74** (I84): hoisting the depth buffer to module level → **CAM5** fails. It is the optimisation the design already refuses and the one a profile invites; the row asserts the *second* render rather than the first, because a surviving buffer is right the first time by construction.
 - **T6.31** (I36): dispatching candlestick through `styleRasteriser` → CS1 fails, and the `Rasteriser` type describes a function that ignores the argument it is keyed on.
 - **T6.30** (I35): computing each band's bounds from its own samples → T1.98 fails, and three distributions of different spread draw one shape with every count agreeing.
 - **T6.29** (I34): choosing the rung from each band's own width rather than from the narrowest → T1.97 fails, and a chart whose band count does not divide its width draws two different figures with the boundary set by the remainder.
@@ -5907,13 +11237,31 @@ Six tiers. No state machine — C12 is pure over the block.
 
 ---
 
+- **T6.78** (I110, §3ap.4 K6): the bar taken from the in-side alone → **SK2 fails** — `hub` shrinks to its two units and the loss disappears, with every other assertion green.
+- **T6.79** (I110, K1): the weight read from the first origin only → **SK3's second half fails**: `a→b 2` and `b→a 3` draw a ribbon of 2, correct in every count but the one that carries the data.
+- **T6.80** (I110, K4): the dummy drawn as a bar → **SK4 fails** — a node the graph does not have, in the right colour at the right rows.
+- **T6.81** (I110, K3): the fit test removed so a label is written wherever its bar is → **SK5 fails**: `rate-limiter` runs under `upstream-service` at 40 columns. Labels written inner-first instead → **SK5 fails the other way**, keeping the middle name and losing the sink's.
+- **T6.87** (I112, §3ap.7): the label's ink put back to `LABEL` — the axis furniture's `tone.muted` — → **SK11 fails**, on the slot row and on the ratio row, the light variant at 2.44 and under `muted`'s own floor.
+- **T6.88** (I112, §3ap.7): the halo dropped, the ink left at `tone.default` → **SK11 fails** on the `stroke`/`paint-order` half. This is the mutation that says the halo is load-bearing rather than decorative: without it the backdrop is the ribbon again and the ratio row has nothing to resolve against.
+- **T6.89** (I112, §3ap.7): `paint-order="stroke"` dropped and the `stroke` kept → **SK11 fails on 12 rows and not on 24**, and the ratio row does not move. That asymmetry is the whole reason `paint-order` is a separate assertion: the stroke is then painted *over* the fill, every label becomes a ground-coloured blob, and a rule that reads the two hex attributes is satisfied by exactly the document that hides it. Measured — 24 rows for the ink, 24 for the halo, **12** for this.
+- **T6.82** (I110, K5): the sacrifice order reversed → **SK6 fails** — the largest sources go and the notice names `src-12`.
+- **T6.83** (I111, K13): the ribbon interior returned to `█` → **SK7 fails at one bit**, and the 24-bit frame still reads correctly in colour, which is why the row is asserted where it is. The two-owner background dropped → **SK7's SGR assertion fails**.
+- **T6.84** (I110, K7): the colour taken from the drawn source rather than the declared one → **SK3 fails**: the reversed ribbon arrives in `a`'s slot.
+- **T6.85** (I110, K12): the notice row spent after the drawing → **SK3 fails**: `composeRows` slices the figure to its height and the `1 reversed` row is the one that falls off.
+- **T6.86** (I110, K2): slices stacked in declaration order rather than by the far end's centre → **SK1 fails** on `a`'s slice order, with every bar height and every crossing count of the ordering pass unchanged. The control for the run is the gap ladder collapsed to none, which restacks every layer and moves SK1's walked positions and every sankey golden.
+- **T6.90** (I113, §3ak.49): six mutations in `c12-svg-right-margin.mjs`, run by hand and each producing the row it names — the shipped state restored, the fixed right margin **and** no cut at the drawing site (→ `RM1`, and `line-callout-both` reads `alp` again); the reserve alone removed (→ `RM2`, `RM3`, `RM4`, `RM5`, and **`RM1` survives**, which is the finding: the fit contains what the missing reserve overran); `SVG_EM_MAX` back to the 0.6 it replaced (→ **`RM1`**, and `G6c5` on the other side of the box, because 0.6 is below every one of the six faces measured); the exact-fit tolerance dropped (→ `RM5`, and `G11a`, which is how the defect was found — `100` rendered as `1…` in a margin sized for `100`); the marks walk given a different room than the axis emitter (→ `RM3`); and the cap removed (→ `RM4`). The control is the advance at 0.2.
+- **T6.91** (I114, §3ak.50): five mutations in `c12-svg-callout-row.mjs`, **run by hand and reported as measured rather than as predicted** — the displacement removed entirely (→ `RC1` `RC2` `RC3` `RC4` `RC5`, and **`RM1` survives**, which is the whole finding: an overprint is inside its own `viewBox`); the threshold widened from `SVG_FONT_SIZE` to four times it (→ **`RC3` alone** — over-suppression leaves no overprint for `RC1` to see, which is what a row asserting only *no collision* accepts); the test *inverted* so the **left** label is suppressed (→ `RC1` `RC2` `RC3` `RC4`); the suppression moved above the `gridded` branch (→ `RC2` `RC3` `RC4`, and **not `RC1`** — the figure loses a gridline and every collision assertion agrees); and the collector detached from the walk, which is the ordering mutation (→ `RC1` `RC2` `RC3` `RC4` `RC5`). **The control is `<` widened to `<=`**, which nothing sees because the corpus's closest contended pair is 2.415 px and its closest uncontested pair 15.29. **Two predictions were wrong and running it is what said so**: the inversion was expected to leave `RC1` standing and does not, and the four-times widening was expected to kill `RC3` at the sparse fixture and did not — at `height: 8` the right column's pitch is 137.6 px, so four times a glyph reaches nothing. `RC3` gained its dense fixture from that survival, which is the mutation pass indicting a fixture rather than a rule.
+- **T6.93** (I116, §3aq): four mutations — the layer filter, the `hollow` arm, the override read, the `keymap` member — each named with the row it kills, in `tools/mutate/runs/c22-series-visibility.mjs`.
+- **T6.94** (I117, §3aq): the legend's column origin off by the swatch's width → **T1.129**'s swatch arm and C16 T4.73 fail; the row origin ignoring the lid → T1.129's vertical arms fail. `tools/mutate/runs/c01-hover-legend.mjs`.
+- **T6.92** (I115, §3ak.50f): four mutations in `c12-svg-legend-column.mjs`, **run by hand twice and reported as measured** — the legend's anchor reverted to `box.right + 12`, the shipped defect (→ **`RC7` alone**, and **`RM1` and `RC1` both survive**, which is the finding restated: an overprint between two *different* writers is invisible to a row about one of them); the anchor pushed out unconditionally by `LEGEND_SHARE · width` (→ `RC7` on its no-column half, **and `RM1`**, because 81 uncontended legends move toward the edge and strings leave the page — four rows in all); the right label's cut returned to `layout.width` (→ `RC7`); and the callout's cut returned to `layout.width` at the walk's call site (→ `RC7`). **The last two survived the first pass**, because no frame in the catalogue has a right legend *and* a writer past the cap — the clause was not vacuous, the corpus was — and `RC7` gained two constructed fixtures from that survival: a 48-character `yCallout: "name"` at the default width, cut to 27 characters against 42, and a `0.000123` readout at `svgLayout(160, 200)`, cut to `0.000…` against standing whole. The second fixture is narrow because a **numeric** right-hand label cannot reach the cap at the default width: `formatReadout` writes ~18 characters at worst, 140 px against 213.3. **Two controls, one slot.** The harness's `control` is the mutation whose kill is not in doubt — the shipped defect — because its job is to prove the pass can see a kill; the *survivor* control widens the column's edge by `1e-9`, inside `fitLabel`'s own tolerance, and was run by hand (`+ 12` → `+ 13` on the legend's gap was rejected for it because `RC7` asserts positions and sees a pixel). The run's first version put the survivor in the harness's slot and the harness refused to report (`BlindHarnessError`) — the instrument catching its own misuse, which is what the control pair is for.
+
 ## 10. Out of scope
 
 | Not here | Where |
 |---|---|
 | Where the numbers come from | C07 adapters, the S-series |
 | Terminal image protocols for real charts | Phase 1B — C02 detects them, nothing uses them |
-| Interactive plots — **who moves** a cursor: zoom, hover, the key or mouse column that sets `cursorPositions` | Phase 2 · nothing in `src/` writes it (§3s) |
+| Interactive plots — zoom | Phase 2 · the key writer landed with C22 I76, the pointer's with C16 §4a, and the hover with C01 I21 — opt-in through `TuiConfig.hover`; the index is set by `←`/`→` on a focused plot, by a click or a drag over its area, and by the pointer resting over it (§3s). The legend clicks too (§3aq, I117) |
 | Axis tick density beyond max/mid/min | Phase 1B |
 | Tone → colour | C10 |
 | Column planning around a sparkline cell | C11 |

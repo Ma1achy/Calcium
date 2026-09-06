@@ -138,9 +138,18 @@ function parse(text) {
 
   // The evidence table: `| 17 | PART | … | … |`.
   const evidence = new Map();
+  /** number -> the status the evidence table gives it, for the agreement check. */
+  const tableStatus = new Map();
   for (const line of text.split("\n")) {
-    const m = /^\| (\d+) \| (BUILT|PART|RULED) \| (.*) \|$/.exec(line);
+    // **`OPEN` is in the alternation and was not, which is what hid entry 3.**
+    // The table writes `OPEN` for a row that has left nothing built (49 does),
+    // so excluding it made the table's *blank-column* rows invisible to the
+    // agreement check below — and a row saying `PART` above a column saying
+    // nothing is the same two-records-of-one-fact defect F667 named, arriving
+    // in the half the fix did not cover.
+    const m = /^\| (\d+) \| (BUILT|PART|RULED|OPEN) \| (.*) \|$/.exec(line);
     if (m === null) continue;
+    tableStatus.set(m[1], m[2]);
     // The residue is the last cell and is a description of what is *not* done, so
     // its identifiers name absent things. Only the evidence cell is resolved.
     const cells = m[3].split(" | ");
@@ -165,6 +174,7 @@ function parse(text) {
 
   return {
     all,
+    tableStatus,
     marked,
     described,
     evidence,
@@ -256,7 +266,7 @@ function resolve(cell) {
 // `--file` takes an absolute path from the fixture and a relative one from the
 // Makefile, so it is resolved rather than always joined.
 const text = readFileSync(isAbsolute(ROADMAP) ? ROADMAP : join(ROOT, ROADMAP), "utf8");
-const { all, marked, described, evidence, confirmedOpen, unchecked } = parse(text);
+const { all, marked, described, evidence, tableStatus, confirmedOpen, unchecked } = parse(text);
 
 const fail = [];
 
@@ -271,6 +281,43 @@ for (const [entry] of [...marked].sort((a, b) => Number(a[0]) - Number(b[0]))) {
   const problems = resolve(cell);
   if (problems.length === 0) resolved += 1;
   for (const p of problems) fail.push(`entry ${entry}: ${p}`);
+}
+
+// --- 1b. the two records of one entry's status agree -------------------------
+//
+// **Two records of the same fact, and nothing compared them** (F667). The Order
+// column and the evidence table each carry a status per entry; the parser has
+// built both maps since this tool existed and rule 1 reads the evidence row only
+// for its *citations*. Entry 11 shipped with `PART` in the column and `BUILT` in
+// the table, and this tool printed *every claim resolves* on that tree — the
+// resolver is exact about whether a claim points at something real and had no
+// opinion about whether the two claims are the same claim.
+//
+// Its blind spot, stated: an entry marked in neither place is rule 2's, and an
+// entry whose two records agree and are both *wrong* is nothing's — resolution
+// is what rule 1 checks and agreement is what this one checks; neither is truth.
+//
+// **It ran over the marked rows and the hole was the unmarked ones** (measured
+// 2026-09-04). A blank column *means* OPEN — the parser's own comment says so —
+// but the loop iterated `marked`, so an entry with `PART` in the evidence table
+// and nothing in the column was compared against nothing. Entry 3 was the live
+// instance: `| 3 | PART |` in the table, blank in the column, listed in the
+// confirmed-OPEN paragraph, and the paragraph's own prose saying *3 is PART in
+// the table above … rather than open*. Three records, all readable, and this
+// tool printed *every claim resolves*.
+//
+// So it iterates the **table** and reads a blank column as `OPEN`, which is the
+// direction that has a default: an entry with no table row is rule 1's.
+for (const [entry, said] of [...tableStatus].sort((a, b) => Number(a[0]) - Number(b[0]))) {
+  const row = evidence.get(entry);
+  if (row === undefined) continue; // rule 1 has already said so
+  const status = marked.get(entry) ?? "OPEN";
+  if (said !== status) {
+    fail.push(
+      `entry ${entry}: the Order column says ${status} and the evidence table says ${said}` +
+        " — two records of one fact, and a reader believes whichever they met first",
+    );
+  }
 }
 
 // --- 2. the partition, by equality ------------------------------------------
@@ -326,23 +373,22 @@ if (confirmedOpen !== null && unchecked !== null) {
 //
 // The equality arm is what stops an entry outliving its reason: an exemption whose
 // sentence has changed, or whose entry is no longer OPEN, is itself a failure.
-const OPEN_BUILT_WORDS = Object.freeze({
-  "3": {
-    phrase: "says who validates the design, not who has to exist first",
-    why:
-      "instrumental and now corrective. The old exemption quoted *built with prism-tui as the " +
-      "consumer* and reasoned that prism-tui does not exist in this tree — which was true and " +
-      "was the wrong reason, because it made the entry's gate the consumer's absence. The row " +
-      "now quotes that phrase to rule it is not a gate, and cites `b.plot`'s real caller as " +
-      "counter-evidence. Same shape as 24's `defaultTheme` and 28's `cursorCell`: a built-word " +
-      "naming something that exists in order to say the entry's own subject does not",
-  },
-  // 15's exemption was here and is gone: the entry is BUILT, so the phrase it
-  // covered — *build one scope alone and the model is built three times* — is
-  // no longer a claim about something absent. The arm removed it rather than
-  // anyone remembering, which is the second exemption this month disposed of by
-  // its subject being wired.
-});
+//
+// **The table is empty as of 2026-09-04, and that is a state with a cost worth
+// naming.** 15's exemption went when 15 was built; 3's went when 3 was marked
+// PART — its column had been blank while the evidence table said PART, and
+// fixing the record took the entry out of the arm's population by the arm's own
+// equality rule, which is the disposal working rather than an oversight.
+//
+// **An empty table makes both failure modes unreachable**, so the arm is
+// vacuous today in A03 §2's exact sense: it passes because it has no subject,
+// which reads identically to passing because it is satisfied. Nothing in the
+// fixture can construct one either — the exemptions are code and the fixture
+// only fabricates documents. RS8b therefore asserts the *emptiness* and fails
+// the day an entry is added, which is where the fabricated violation belongs:
+// with the hand that adds the exemption, not with the hand that finds the table
+// already bare.
+const OPEN_BUILT_WORDS = Object.freeze({});
 const BUILT_CLAIM = /\b(built|shipped|landed|already exists|is wired)\b/i;
 for (const entry of [...all].sort((a, b) => Number(a) - Number(b))) {
   const exempt = OPEN_BUILT_WORDS[entry];
@@ -494,6 +540,119 @@ const clauseOf = (entry) => {
 };
 const greppable = openEntries.filter((e) => /`[^`]+`/u.test(clauseOf(e)));
 
+// --- 6. a clause claiming a symbol is absent has to be right about it -------
+//
+// **Check 5's argument with the noun changed, and check 5 said so.** Its own
+// header records the limit: *a negative claim about a symbol is not covered —
+// entry 33's `no queue of any kind in src/shell/, the word does not appear` is
+// the uncovered instance in the list today, and it decays the same way.* It
+// then decayed, in the session that named it.
+//
+// **The class is measured rather than argued.** Entry 52's clause said
+// `camera`, `azimuth`, `elevation` and `halfBlockRows` occur zero times in
+// `src/presentation/plot/`; re-measured they occur 33, 7, 7 and 1. Entry 3's
+// said `tensor` and `heatmap` occur zero times in `src/`; `heatmap` is a built
+// form. Two clauses, six symbols, three false, and nothing re-read either —
+// which is the whole of the negative-claim shape: **the sentence is written
+// here and what falsifies it is written somewhere else.**
+//
+// **Why it is not simply *every backticked symbol in a confirmed-OPEN
+// clause***, which is what the grep-reach count above measures. Check 3's
+// header already names the population that forbids it: a confirmed-OPEN
+// sentence legitimately cites symbols that **do** exist, as counter-evidence —
+// 29's `chromeRows`, 24's `defaultTheme`, 28's `cursorCell`, each named
+// precisely because it reads as coverage and is not. A rule over every symbol
+// would fire on all of them, which is F94's shape: a violation describing the
+// document rather than a defect.
+//
+// So the claim is **declared**, in one form, and only the declared ones are
+// resolved:
+//
+//     **Gate**: `defaultRoute` occurs zero times in `src/` (2026-09-04)
+//
+// The marker is deliberate and cannot arise from prose, which matters here
+// more than usual: this document's convention is to **keep** an expired
+// sentence and mark what falsified it, so the paragraph still contains
+// *"this said `camera` … occur zero times"* as history. A pattern matching the
+// idiom alone would fire on the record of the correction. Retiring a gate is
+// therefore deleting four characters, and the sentence stays.
+//
+// **Its blind spots, stated because an unrecorded limit reads as strength.**
+// (a) It resolves presence, not meaning — `defaultRoute` appearing anywhere in
+// `src/` fires, including in a comment about not having one, which is why
+// comments are stripped first; a string literal is not. (b) It cannot say the
+// entry is *closed*, only that its stated evidence is gone. (c) An entry whose
+// subject is a relationship between two call sites rather than a name — 26's
+// *append on push, patch on pop* — can carry no gate at all, and inventing a
+// name for it is F161 exactly: a count, a finding number and a shipped instance
+// are what a ruling looks like from outside, and all three can be present with
+// nothing behind them. Such an entry is marked `**Unverifiable by a symbol**`
+// with its reason, and counted rather than excluded.
+const GATE = /\*\*Gate\*\*: ((?:`[\w$]+`(?:,| and)? ?)+)occurs? zero times in `(src[\w./-]*)`/gu;
+
+/** Every `.ts` under a scope. The scope is a directory, written with its slash. */
+function sourcesUnder(scope) {
+  const out = [];
+  const walk = (dir, rel) => {
+    if (!existsSync(dir)) return;
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (SKIP.has(e.name)) continue;
+      const here = rel === "" ? e.name : `${rel}/${e.name}`;
+      if (e.isDirectory()) walk(join(dir, e.name), here);
+      else if (e.name.endsWith(".ts")) out.push({ path: here, body: readFileSync(join(dir, e.name), "utf8") });
+    }
+  };
+  walk(join(ROOT, scope), scope.replace(/\/$/u, ""));
+  return out;
+}
+
+/**
+ * **Prose inflates a textual signal, and this file is the worst case for it.**
+ * `src/shell/document-view.ts` names `transcript` exactly once and the once is
+ * a comment; `cursorPositions` is discussed in prose it is not written by. A
+ * gate that counted those would report a symbol present because somebody
+ * explained why it is absent.
+ *
+ * Line comments are matched only where `//` does not follow a colon, so a URL
+ * in a comment does not eat the rest of the line — the known limit, and it is
+ * bounded: a false *positive* is impossible here, only a false negative on a
+ * symbol written after a URL on one line.
+ */
+const stripComments = (s) =>
+  s.replace(/\/\*[\s\S]*?\*\//gu, "").replace(/(^|[^:])\/\/.*$/gmu, "$1");
+
+let gates = 0;
+for (const m of text.matchAll(GATE)) {
+  const scope = m[2] ?? "src/";
+  const files = sourcesUnder(scope);
+  if (files.length === 0) {
+    fail.push(`a gate names the scope \`${scope}\`, which holds no \`.ts\` file — an empty scan is not a clean one`);
+    continue;
+  }
+  for (const [, ident] of (m[1] ?? "").matchAll(/`([\w$]+)`/gu)) {
+    gates += 1;
+    const needle = new RegExp(`\\b${ident}\\b`, "u");
+    // **The set, not the first hit.** Which file a walk reaches first is an
+    // ordering `readdirSync` gives and the rule does not promise, and a fixture
+    // that pinned it went red on the order rather than on the claim. Naming
+    // every writer also answers the reader's next question — *is it one stray
+    // reference or the whole feature* — which the first alone cannot.
+    const hits = files.filter((f) => needle.test(stripComments(f.body))).map((f) => f.path).sort();
+    if (hits.length > 0) {
+      const shown = hits.length > 6 ? `${hits.slice(0, 6).join(", ")} and ${String(hits.length - 6)} more` : hits.join(", ");
+      fail.push(
+        `a gate says \`${ident}\` occurs zero times in \`${scope}\` and ${String(hits.length)} ` +
+          `file${hits.length === 1 ? "" : "s"} write${hits.length === 1 ? "s" : ""} it (${shown}) — ` +
+          `a negative claim is falsified by something being created elsewhere, and this is the ` +
+          `symbol half check 5 named as its own blind spot`,
+      );
+    }
+  }
+}
+
+/** Confirmed-OPEN entries whose clause rules that no symbol can carry them. */
+const unverifiable = openEntries.filter((e) => /\*\*Unverifiable by a symbol\*\*/u.test(clauseOf(e)));
+
 // --- report -----------------------------------------------------------------
 // **The counter, not the status.** Scanning zero rows is very fast and exits 0,
 // and `45 of 45 resolve` over an empty set reads as a pass — the trap
@@ -511,10 +670,22 @@ console.log(
 );
 console.log(
   `  grep reach · ${String(greppable.length)}/${String(openEntries.length)} confirmed-OPEN ` +
-    `entries carry their own symbol; the rest rest on a blanket claim` +
+    `entries carry their own symbol` +
     (greppable.length === openEntries.length
-      ? ""
-      : ` — ${openEntries.filter((e) => !greppable.includes(e)).sort((x, y) => Number(x) - Number(y)).join(", ")}`),
+      ? "; none rests on a blanket claim"
+      : `; the rest rest on a blanket claim — ${openEntries.filter((e) => !greppable.includes(e)).sort((x, y) => Number(x) - Number(y)).join(", ")}`),
+);
+// **Two counters and not one, because they answer different questions.** The
+// line above asks how much of a clean sweep was a measurement; this one asks
+// how much of it is still being measured. A clause can carry a symbol and
+// carry it as counter-evidence (29's `chromeRows`), so *carries a symbol* is
+// not *is gated* — and an entry ruled uncarryable is counted here rather than
+// dropped, since an exemption excluded from its own total is how a population
+// stops being read.
+console.log(
+  `  negative-symbol gates · ${String(gates)} symbols declared absent and resolved against the tree · ` +
+    `${String(unverifiable.length)} confirmed-OPEN entries ruled unverifiable by a symbol` +
+    (unverifiable.length === 0 ? "" : ` — ${unverifiable.sort((x, y) => Number(x) - Number(y)).join(", ")}`),
 );
 for (const f of fail) console.error(`  ${f}`);
 if (fail.length > 0) {

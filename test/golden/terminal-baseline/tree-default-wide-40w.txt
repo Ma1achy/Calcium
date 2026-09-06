@@ -1,0 +1,8 @@
+── tree · default · wide · 40w
+                   root
+         +----------+--+--------+
+       render        layout   parse
+      +--+---+      +--+--+
+    curve  paint measure wrap
+      |
+    raster

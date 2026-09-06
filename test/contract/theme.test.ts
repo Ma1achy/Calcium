@@ -6,6 +6,7 @@ import { SCAN_BUDGET_MS } from "../support/budget.js";
 
 import {
   defaultTheme,
+  decorationTextPairs,
   diffPairs,
   errorTagPairs,
   validateTokens,
@@ -18,6 +19,8 @@ import {
   textSurfaces,
   type ColourRef,
 } from "../../src/presentation/theme/index.js";
+import { plotToSvg } from "../../src/presentation/plot/svg.js";
+import { CATALOGUE_FORMS } from "../../tools/catalogue-forms.js";
 import { checkSourceScans, SCANS } from "../../tools/enforce/source-scans.mjs";
 import { caps, DEPTHS, store, SURFACES, SYNTAX_SLOTS, TONES } from "../support/theme.js";
 
@@ -40,6 +43,58 @@ const VARIANTS = Object.keys(defaultTheme);
 /** The tokens beside the name, so no row indexes a record and finds `undefined`. */
 const SHIPPED = Object.entries(defaultTheme);
 
+/**
+ * Every hex a theme's palettes carry, with **every** slot that carries it — so
+ * a colour scraped out of a document can be named and given its floor.
+ *
+ * **Built from the tokens rather than from a list**, for T2.23's reason: a list
+ * here covers what the test already knew about.
+ *
+ * **`string[]` and not `string`, and the map was the second kind** (F654, found
+ * by T2.29b on its first run). I17 forbids two slots of *one* palette sharing a
+ * value and says nothing across palettes, and the shipped set is full of them:
+ * eight on light, ten on high-contrast — `tone.default` is `syntax.punctuation`
+ * and `spectrum.outline`, `tone.muted` is `syntax.comment`. A one-slot map keeps
+ * whichever came last in `Object.entries`, so T2.27 has been resolving axis
+ * furniture to `syntax.comment` and taking **that** slot's floor. Nothing fails
+ * today because both floors clear on the shipped values; the row was measuring a
+ * slot it had not chosen, and a theme where the two hexes diverged would be
+ * checked at the wrong number. A collision is a dropped input, and no assertion
+ * about the ratio can see it.
+ */
+function slotsByHex(tokens: (typeof SHIPPED)[number][1]): Map<string, readonly string[]> {
+  const out = new Map<string, string[]>();
+  for (const [family, palette] of Object.entries(tokens.palettes)) {
+    for (const [slot, hex] of Object.entries(palette.slots)) {
+      if (typeof hex !== "string") continue;
+      const key = hex.toLowerCase();
+      const names = out.get(key);
+      if (names === undefined) out.set(key, [`${family}.${slot}`]);
+      else names.push(`${family}.${slot}`);
+    }
+  }
+  return out;
+}
+
+/** The one `<rect>` that covers the page, and the hex it is filled with. */
+function pageFill(svg: string): string | undefined {
+  return /<rect width="100%" height="100%" fill="(#[0-9a-f]{6})"\/>/u.exec(svg)?.[1];
+}
+
+/** Every `fill` an SVG `<text>` element carries, in document order. */
+function textFills(svg: string): readonly string[] {
+  return [...svg.matchAll(/<text[^>]*\sfill="(#[0-9a-f]{6})"/gu)].map((m) => m[1] ?? "");
+}
+
+/** One catalogue spec as a plot block. */
+function plotOf(form: string, variant: string): Parameters<typeof plotToSvg>[0] | undefined {
+  const spec = (CATALOGUE_FORMS as Record<string, Record<string, Record<string, unknown>>>)[form]?.[variant];
+  if (spec === undefined) return undefined;
+  const { cursor, ...rest } = spec;
+  void cursor;
+  return { kind: "plot", id: "t225", ...rest } as Parameters<typeof plotToSvg>[0];
+}
+
 function sourceFiles(dir = "src"): string[] {
   const out: string[] = [];
   for (const name of readdirSync(dir)) {
@@ -51,6 +106,242 @@ function sourceFiles(dir = "src"): string[] {
 }
 
 describe("C10 contract", () => {
+  /**
+   * **T2.27 (C10 I34, §4f.3) — the page a renderer paints is a surface
+   * `textSurfaces` holds.**
+   *
+   * §4's exclusion of `bgDeep` names a trigger — *if a surface ever paints text
+   * on it* — and named no watcher, so the SVG plot arm painted every label on
+   * the one surface no floor is measured against, for as long as it has
+   * existed. This is the watcher, for the one ground that has one.
+   *
+   * **Asserted against `textSurfaces(tokens)` and never against a hex**, so what
+   * fails is *this ground is not a text surface* whatever the theme makes it —
+   * the class rather than the instance. Reverting the page to `surface.bgDeep`
+   * fails this row on every shipped theme (T6.86).
+   */
+  it("T2.27 (I34, §4f): the SVG arm's page is a text surface, and every label on it clears its floor", () => {
+    let checked = 0; // cells-ok — a frame count
+    for (const [variant, tokens] of SHIPPED) {
+      const theme = store(variant).current;
+      const grounds = new Set(textSurfaces(tokens).map(([, hex]) => hex.toLowerCase()));
+      const named = slotsByHex(tokens);
+      for (const [form, variants] of Object.entries(CATALOGUE_FORMS)) {
+        for (const name of Object.keys(variants)) {
+          const block = plotOf(form, name);
+          if (block === undefined) continue;
+          const svg = plotToSvg(block, theme);
+          if (svg === null) continue; // a refusal has no page
+          const page = pageFill(svg);
+          expect(page, `${variant} ${form}/${name} paints a page`).toBeDefined();
+          expect(grounds, `${variant} ${form}/${name}: the page is a surface text lands on`)
+            .toContain((page ?? "").toLowerCase());
+          checked += 1; // cells-ok — a frame count
+          // **The page-coloured fill is delegated now, not exempted** (§4g.3).
+          // A tile or node label inked in the page's ground over a series fill
+          // measures 1 against the page by construction, so this row cannot
+          // check it — but `decorationTextPairs` can, and the difference
+          // between an exemption and a delegation is that the second names the
+          // check which does hold the case. `ratio` is symmetric, so the pair
+          // is the same one the callout makes in the other order.
+          const covered = new Set(
+            decorationTextPairs(tokens).map(([, , , hex]) => hex.toLowerCase()),
+          );
+          for (const fill of textFills(svg)) {
+            if (fill.toLowerCase() === (page ?? "").toLowerCase()) {
+              expect(covered, `${variant} ${form}/${name}: the page is a ground the §4g pairing covers`)
+                .toContain((page ?? "").toLowerCase());
+              continue;
+            }
+            const slots = named.get(fill.toLowerCase()) ?? [];
+            expect(slots.length, `${variant} ${form}/${name}: ${fill} is a palette slot and not a literal`)
+              .toBeGreaterThan(0);
+            // **The strictest of the slots this hex could be** (F654). One hex
+            // is several slots across palettes on two of the three shipped
+            // themes, and picking one of them picks its floor — so the floor is
+            // the highest any candidate demands rather than whichever the map
+            // happened to keep.
+            const floor = Math.max(...slots.map((s) => floorFor(s.split(".")[1] ?? "")));
+            expect(ratio(fill, page ?? "#000000"), `${variant} ${form}/${name}: ${slots.join(" / ")} on the page`)
+              .toBeGreaterThanOrEqual(floor);
+          }
+        }
+      }
+    }
+    // Derived, so a form or variant leaving the catalogue moves it (F256).
+    const forms = Object.values(CATALOGUE_FORMS).reduce((n, v) => n + Object.keys(v).length, 0);
+    expect(checked, "every drawn frame on every shipped theme").toBeGreaterThan(forms * SHIPPED.length * 0.5);
+  });
+
+  /**
+   * **T2.29 (C10 I35, §4g.3) — the pairing, by equality and not by result.**
+   *
+   * T2.14b's form and for its reason: every alternative arm *passes* on the
+   * shipped tokens, so what separates them is which pairs are named. `spectrum`
+   * is asserted absent because it is the wide arm's whole cost — 7 of the light
+   * theme's 9 stops sit under 4.5 — and a palette measured out of a pairing and
+   * quietly kept in it is the drift T2.14c exists to stop.
+   */
+  it("T2.29 (I35, §4g): the decoration pairing is the eight categorical slots on the two text surfaces", () => {
+    for (const [variant, tokens] of SHIPPED) {
+      const pairs = decorationTextPairs(tokens);
+      const grounds = textSurfaces(tokens).map(([name]) => name);
+      expect([...new Set(pairs.map(([, , surface]) => surface))], variant).toEqual(grounds);
+      for (const ground of grounds) {
+        expect(
+          pairs.filter(([, , surface]) => surface === ground).map(([palette, slot]) => `${palette}.${slot}`),
+          `${variant} on ${ground}`,
+        ).toEqual(["c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8"].map((c) => `categorical.${c}`));
+      }
+      // The wide arm, asserted absent. `spectrum` is declared art (I16, SS21)
+      // and binding it here rejects the light theme outright.
+      expect(pairs.map(([palette]) => palette), variant).not.toContain("spectrum");
+    }
+  });
+
+  /**
+   * **T2.29a (C10 I35, §4g.1) — the figures, recomputed.**
+   *
+   * T2.4's shape: the ratios come from the shipped tokens rather than from
+   * A01 A.1, so the catalogue is an assertion rather than a record. The
+   * tightest pair is named on its own, because a passing sweep does not say
+   * which slot was in question — and this one has 5% of headroom, which is the
+   * answer to *would anything notice if it stopped clearing*.
+   */
+  it("T2.29a (I35, §4g): every decoration text pair clears the meaning floor, tightest named", () => {
+    let tightest = { pair: "", measured: Number.POSITIVE_INFINITY };
+    let checked = 0; // cells-ok — a pair count
+    for (const [variant, tokens] of SHIPPED) {
+      for (const [palette, slot, surface, hex] of decorationTextPairs(tokens)) {
+        const value = tokens.palettes[palette]?.slots[slot] ?? "";
+        const measured = ratio(value, hex);
+        expect(measured, `${variant} ${palette}.${slot} on ${surface}`).toBeGreaterThanOrEqual(4.5);
+        if (measured < tightest.measured) tightest = { pair: `${variant} ${palette}.${slot} on ${surface}`, measured };
+        checked += 1; // cells-ok — a pair count
+      }
+    }
+    expect(checked, "eight slots on two surfaces on every shipped theme").toBe(8 * 2 * SHIPPED.length);
+    expect(tightest.pair).toBe("light categorical.c4 on bgElev");
+    expect(tightest.measured).toBeCloseTo(4.74, 2);
+  });
+
+  /**
+   * **T2.29b (C10 I35, §4g.2) — the generalising cell of the classification
+   * table, mechanised.**
+   *
+   * §4g's walk asked *is there any other text in either arm whose ink and
+   * ground are not a validated pair*, and the sweep that answered it was done
+   * by hand. This is the part of it a suite can hold: every `<text>` fill the
+   * arm emits is a slot one of the two pairings names. It fails on a text site
+   * inked from a palette neither reaches — which is what the outline label, the
+   * graph node label and the unboxed hierarchy label each were, and none of
+   * them appears in either finding.
+   */
+  it("T2.29b (I35, §4g): every text fill in the SVG arm is a slot some pairing names", () => {
+    let checked = 0; // cells-ok — a fill count
+    for (const [variant, tokens] of SHIPPED) {
+      const theme = store(variant).current;
+      const named = slotsByHex(tokens);
+      // **Paired *hexes*, not paired slot names** (F654). A fill is a colour and
+      // the pairing is a colour's; asking whether a name is paired asks a
+      // question the document cannot answer, because `tone.default` and
+      // `spectrum.outline` are one hex on two of the three shipped themes and
+      // only one of them is paired.
+      const pairedHex = new Set([
+        ...decorationTextPairs(tokens).map(([palette, slot]) =>
+          (tokens.palettes[palette]?.slots[slot] ?? "").toLowerCase()),
+        ...Object.entries(tokens.palettes)
+          .filter(([, palette]) => palette.carries === "meaning")
+          .flatMap(([, palette]) => Object.values(palette.slots).map((hex) => String(hex).toLowerCase())),
+      ]);
+      const grounds = new Set(textSurfaces(tokens).map(([, hex]) => hex.toLowerCase()));
+      for (const [form, variants] of Object.entries(CATALOGUE_FORMS)) {
+        for (const name of Object.keys(variants)) {
+          const block = plotOf(form, name);
+          if (block === undefined) continue;
+          const svg = plotToSvg(block, theme);
+          if (svg === null) continue;
+          for (const fill of textFills(svg)) {
+            checked += 1; // cells-ok — a fill count
+            // A ground used as ink: the pair is the ground's own, backwards.
+            if (grounds.has(fill.toLowerCase())) continue;
+            const slots = named.get(fill.toLowerCase()) ?? [fill];
+            expect(pairedHex, `${variant} ${form}/${name}: ${slots.join(" / ")} is a slot some pairing names`)
+              .toContain(fill.toLowerCase());
+          }
+        }
+      }
+    }
+    expect(checked, "the arm draws text at all").toBeGreaterThan(100);
+  });
+
+  /**
+   * **T2.29c (C10 I35, §4g.3) — the check fires, by fabricated violation.**
+   *
+   * T2.14f's row and its argument: T2.29 asserts the pairing's *shape* and
+   * T2.29a its *results*, and both survive the check never being called — a
+   * mechanism tested by calling it says nothing about the wiring. So this one
+   * goes through `validateTokens`, which is what a theme actually meets, with a
+   * control on the unmodified tokens so an empty corpus cannot pass for a clean
+   * one.
+   */
+  it("T2.29c (I35, §4g): a categorical slot under the floor is refused by name", () => {
+    for (const [variant, tokens] of SHIPPED) {
+      expect(validateTokens(tokens).map((e) => e.path), `${variant}: the control is clean`)
+        .not.toContain("palettes.categorical.c4");
+      // A mid grey: distinct from every other slot (I17) and far from the
+      // background on no theme in particular — it measures under 4.5 against
+      // every shipped `bg`, which is the property this row needs.
+      const broken = {
+        ...tokens,
+        palettes: {
+          ...tokens.palettes,
+          categorical: {
+            ...tokens.palettes["categorical"]!,
+            slots: { ...tokens.palettes["categorical"]!.slots, c4: "#767676" },
+          },
+        },
+      };
+      const errors = validateTokens(broken);
+      const named = errors.filter((e) => e.path === "palettes.categorical.c4");
+      expect(named.length, `${variant}: the slot is named`).toBeGreaterThan(0);
+      expect(named[0]?.message, `${variant}: and the ratio is in the message`).toMatch(/: 1 against bg/u);
+    }
+  });
+
+  /**
+   * **T2.28 (C10 I34, §4f.2) — four sites, one constant.**
+   *
+   * The page, a sankey label's halo, a tile label's ink and the stroke parting
+   * two adjacent tiles are all *the page showing through*, and a second constant
+   * for any of them is a rim rather than a hole — a difference a byte-compare
+   * golden records faithfully and cannot object to. Asserted as an equality
+   * across the four rather than four comparisons against a literal.
+   */
+  it("T2.28 (I34, §4f): the page, the halo, the tile ink and the separator are one colour", () => {
+    for (const [variant] of SHIPPED) {
+      const theme = store(variant).current;
+      const sankey = plotToSvg(plotOf("sankey", "crowded") ?? plotOf("sankey", "default")!, theme);
+      const treemap = plotToSvg(plotOf("treemap", "default")!, theme);
+      expect(sankey, `${variant}: the sankey draws`).not.toBeNull();
+      expect(treemap, `${variant}: the treemap draws`).not.toBeNull();
+      const page = pageFill(sankey ?? "");
+      expect(pageFill(treemap ?? ""), `${variant}: both figures paint the same page`).toBe(page);
+
+      const halos = [...(sankey ?? "").matchAll(/<text[^>]*\sstroke="(#[0-9a-f]{6})"/gu)].map((m) => m[1]);
+      expect(halos.length, `${variant}: the sankey haloes its node labels`).toBeGreaterThan(0);
+      for (const h of halos) expect(h, `${variant}: a halo is the page`).toBe(page);
+
+      const inks = [...(treemap ?? "").matchAll(/<text[^>]*\sfill="(#[0-9a-f]{6})"/gu)].map((m) => m[1]);
+      expect(inks.length, `${variant}: the treemap names its tiles`).toBeGreaterThan(0);
+      for (const i of inks) expect(i, `${variant}: a tile label is inked in the page`).toBe(page);
+
+      const edges = [...(treemap ?? "").matchAll(/<rect[^>]*\sstroke="(#[0-9a-f]{6})"/gu)].map((m) => m[1]);
+      expect(edges.length, `${variant}: adjacent tiles are parted`).toBeGreaterThan(0);
+      for (const e of edges) expect(e, `${variant}: a separator is the page`).toBe(page);
+    }
+  });
+
   it("T2.1 (I1): a thousand calls return identical styles and touch nothing", () => {
     const current = store().current;
     const first = resolveTone("ok", current, caps(8));
@@ -140,9 +431,18 @@ describe("C10 contract", () => {
   it("T2.5 (I13): no ANSI index outside the curated map, and SS19 fires", () => {
     const rule = SCANS.find((s) => s.id === "SS19");
     expect(rule, "SS19 is gone from the scan table").toBeDefined();
-    expect(rule?.allow).toEqual(["src/presentation/theme/four-bit.ts"]);
+    // **No exception.** `four-bit.ts` was allowed by name and never matched —
+    // its indices are bare numbers, a form the pattern cannot see — so SS53
+    // removed the entry; a file that spells an SGR in `theme/` fires whoever it is.
+    expect(rule?.allow).toEqual([]);
 
     expect(checkSourceScans(sourceFiles()).filter((v) => v.rule === "SS19")).toEqual([]);
+    // And SS19 fires: a raw SGR in the one file that used to be exempt.
+    const fabricated = checkSourceScans(
+      ["src/presentation/theme/four-bit.ts"],
+      () => 'const red = "\u001b[31m";\n',
+    ).filter((v) => v.rule === "SS19");
+    expect(fabricated.map((v) => v.file)).toEqual(["src/presentation/theme/four-bit.ts:1"]);
   });
 
   it("T2.6 (I12): theme/ reads no environment", () => {

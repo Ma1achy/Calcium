@@ -69,7 +69,13 @@ export type FrameSchedulerOptions = Readonly<{
 const WINDOWS: Readonly<Record<CommitReason, number>> = Object.freeze({
   input: 0,
   completion: 0,
-  resize: 0,
+  // **16 ms, and not zero** (I15). A drag is dozens of `SIGWINCH`es and the cost
+  // of a resize is not the frame: width invalidates every cached height (C14 I8),
+  // so thirty events were thirty re-measures of the whole transcript — 544 ms at
+  // a thousand entries, of which the index rebuild everyone named was 0.07%
+  // (F423). One frame instead of thirty, and the final size is the only one
+  // anyone sees.
+  resize: 16,
   stream: 33,
   spinner: 100,
 });
@@ -79,11 +85,26 @@ const WINDOWS: Readonly<Record<CommitReason, number>> = Object.freeze({
  * resolved windows rather than restating the order in a second table — two
  * tables is how the two come to disagree (§3, I10).
  */
-const IMMEDIATE: ReadonlySet<CommitReason> = new Set<CommitReason>([
-  "input",
-  "completion",
-  "resize",
-]);
+const IMMEDIATE: ReadonlySet<CommitReason> = new Set<CommitReason>(["input", "completion"]);
+
+/**
+ * Coalesced, but with a window a config may not touch (I15).
+ *
+ * **Two rejections with two reasons, so two sets.** I2 refuses a window on
+ * `input` and `completion` because a config file must not introduce *lag the
+ * user causes*. This refuses one on `resize` because a longer window shows a
+ * frame that is **wrong** rather than one that is **stale** — `stream` and
+ * `spinner` may be tuned precisely because their staleness is bounded content,
+ * not bad geometry.
+ *
+ * **The distinction is not pedantry: it is the defect.** `resize` was in
+ * `IMMEDIATE`, and three places in C03's spec plus this file's own error message
+ * cited I2 for it — an invariant whose text names two reasons. A citation that
+ * resolves against an invariant not covering the case reads as backed, and
+ * `make enforce` cannot see it: it checks that a citation names an invariant
+ * which exists, never that the invariant says the cited thing (F423).
+ */
+const FIXED_WINDOW: ReadonlySet<CommitReason> = new Set<CommitReason>(["resize"]);
 
 const defaultSchedule = (fn: () => void, ms: number): Disposable => {
   const handle = setTimeout(fn, ms);
@@ -318,7 +339,13 @@ function resolveWindows(
     if (ms === undefined) continue;
     if (IMMEDIATE.has(key)) {
       throw new RangeError(
-        `cannot give ${key} a window: input, completion and resize are never delayed (C03 I2)`,
+        `cannot give ${key} a window: input and completion are never delayed (C03 I2)`,
+      );
+    }
+    if (FIXED_WINDOW.has(key)) {
+      throw new RangeError(
+        `cannot give ${key} a window: its ${String(WINDOWS[key])} ms window is fixed, because a ` +
+          `longer one shows a frame that is wrong rather than stale (C03 I15)`,
       );
     }
     if (!Number.isFinite(ms) || ms < 0) {

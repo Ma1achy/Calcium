@@ -76,8 +76,10 @@ const results = runPass({
     {
       name: "runApp appends a fresh pending entry over the queued one",
       file: FILE,
-      from: "    const pendingId = settle.into ?? deps.transcript.append(",
-      to: "    const pendingId = deps.transcript.append(",
+      // Re-anchored 2026-09-05 (Lane P, C23 I54): step 3 became an `if` over `settle.into`
+      // when the pending entry became the card; the mutation is the same one.
+      from: "    if (settle.into === null) {\n      pendingId = deps.transcript.append(",
+      to: "    if (true) {\n      pendingId = deps.transcript.append(",
       expect: "T3.17",
     },
     {

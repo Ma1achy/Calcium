@@ -4,7 +4,7 @@
  * Gaussian kernel density estimation, then three folds over the curve.
  */
 import { normalisedSummary } from "../../data/viewmodel/distribution.js";
-import type { QuartileSummary, Series } from "../../data/viewmodel/index.js";
+import type { Plot, QuartileSummary, Series } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { curveRows } from "./curve.js";
 import { extentFor, extentRun, ladderFor, pairFor } from "./ramp.js";
@@ -13,108 +13,12 @@ import { stripColumn, stripRow } from "./strip.js";
 import { cells } from "../text.js";
 import { glyphForMask, LINE_DOWN, LINE_LEFT, LINE_RIGHT, LINE_UP, strokePolyline } from "./linedraw.js";
 import { glyphs } from "../blocks/glyphs.js";
+import { roleGlyphs } from "./roles.js";
 import { BRAILLE_DOTS, createGrid, drawLine, foldBraille, setDot } from "./raster.js";
 import type { Facing, Range } from "./scale.js";
+import { kde, scaledBandwidth, silvermanBandwidth, supportedRange } from "./derive.js";
 
 type Caps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">;
-
-function gaussianKernel(x: number): number {
-  return Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI);
-}
-
-function silvermanBandwidth(values: readonly number[]): number {
-  const n = values.length; // cells-ok — a sample count
-  if (n <= 1) return 1;
-  const mean = values.reduce((a, b) => a + b, 0) / n;
-  const variance = values.reduce((a, b) => a + (b - mean) ** 2, 0) / n;
-  const sd = Math.sqrt(variance);
-  const iqr = (() => {
-    const sorted = [...values].sort((a, b) => a - b);
-    const q1 = sorted[Math.floor(n * 0.25)] ?? 0;
-    const q3 = sorted[Math.floor(n * 0.75)] ?? 0;
-    return q3 - q1;
-  })();
-  // **0.9, not 1.06 — the constant belongs to the estimator below it.**
-  // Silverman gives `1.06 · σ̂ · n^(-1/5)` for the *standard-deviation* form and
-  // `0.9 · min(σ̂, IQR/1.34) · n^(-1/5)` for the robust one. This used 1.06 with
-  // the robust estimator, which is neither rule and oversmooths by 18%.
-  //
-  // Measured on `[1,1,1,1,2,3,5,5,5,5]` — the bimodal case a violin exists to
-  // show — the old constant put the normalised density's floor at **0.72**, so
-  // every column saturated and the traced outline came out a rectangle. The
-  // corrected constant is a real fix and not a sufficient one: a ten-point
-  // sample genuinely does not support strong bimodality at any rule-of-thumb
-  // bandwidth, which is why `bandwidth` is a parameter rather than only a rule.
-  const spread = Math.min(sd, iqr / 1.34);
-  return spread > 0 ? 0.9 * spread * Math.pow(n, -0.2) : 1;
-}
-
-/**
- * The rule of thumb, scaled by the caller's `bandwidth` (C12 §3m).
- *
- * **A multiplier, which is seaborn's `bw_adjust` and for its reason**: a
- * bandwidth in the data's own units means nothing until you know the data, so an
- * absolute field would have every caller computing Silverman themselves in order
- * to scale it.
- *
- * `undefined` and `1` are the same answer, and both leave `kde` to its own
- * default — so the adjust costs nothing where nobody asks for it.
- */
-export function scaledBandwidth(data: readonly number[], adjust?: number): number | undefined {
-  if (adjust === undefined || !Number.isFinite(adjust) || adjust <= 0 || adjust === 1) return undefined;
-  return silvermanBandwidth(data) * adjust;
-}
-
-/**
- * Estimate the density at `points` given `data` values and a bandwidth.
- */
-export function kde(
-  data: readonly number[],
-  points: readonly number[],
-  bandwidth?: number,
-): number[] {
-  const h = bandwidth ?? silvermanBandwidth(data);
-  const n = data.length; // cells-ok — a sample count
-  if (n === 0) return points.map(() => 0);
-
-  return points.map((x) => {
-    let sum = 0;
-    for (const xi of data) sum += gaussianKernel((x - xi) / h);
-    return sum / (n * h);
-  });
-}
-
-/**
- * Build a density series from raw data: estimate the density and return a
- * Series whose values are the density estimates, suitable for rendering as a
- * line/curve.
- */
-export function densitySeries(
-  series: Series,
-  resolution = 100,
-  adjust?: number,
-): { series: Series; range: Range } {
-  const finite = series.values.filter((v): v is number => v !== null && Number.isFinite(v));
-  if (finite.length === 0) return { series: { ...series, values: [] }, range: { min: 0, max: 1 } }; // cells-ok — a sample count
-
-  const sorted = [...finite].sort((a, b) => a - b);
-  const lo = sorted[0]!;
-  const hi = sorted[sorted.length - 1]!; // cells-ok — a sample count
-  const pad = (hi - lo) * 0.1 || 1;
-
-  const points: number[] = [];
-  for (let i = 0; i < resolution; i++) {
-    points.push(lo - pad + ((hi - lo + 2 * pad) * i) / (resolution - 1));
-  }
-
-  const densities = kde(finite, points, scaledBandwidth(finite, adjust));
-  const maxD = Math.max(...densities);
-
-  return {
-    series: { ...series, values: densities },
-    range: { min: 0, max: maxD > 0 ? maxD : 1 },
-  };
-}
 
 /**
  * Render density as a curve using curveRows.
@@ -173,24 +77,13 @@ export function densityRows(
  * spine still runs the full width — it is the axis, and the marks sit on it —
  * but the outline stops where the data stops having anything to say.
  */
-const CUT = 2;
-
-function supported(
-  points: readonly number[],
-  sorted: readonly number[],
-  bandwidth: number,
-): { first: number; last: number } {
-  const lo = sorted[0]! - CUT * bandwidth;
-  const hi = sorted[sorted.length - 1]! + CUT * bandwidth; // cells-ok — a sample count
-  let first = -1; // cells-ok — a sentinel index
-  let last = -1; // cells-ok — a sentinel index
-  for (let i = 0; i < points.length; i += 1) { // cells-ok — a sample count
-    if (points[i]! < lo || points[i]! > hi) continue;
-    if (first < 0) first = i;
-    last = i;
-  }
-  return first < 0 ? { first: 0, last: points.length - 1 } : { first, last }; // cells-ok — a sample count
-}
+/**
+ * **`derive.ts`'s, since F388**, and the constant went with it. It was private
+ * here, and the figure the second arm reads had no way to reach it — so a violin
+ * crossed the seam with its zero-density tails still on it and drew them as
+ * lines the width of the frame, which is the picture this comment describes.
+ */
+const supported = supportedRange;
 
 /**
  * The raincloud — a one-sided cloud over the compact box (C12 §3i, I34).
@@ -470,7 +363,7 @@ export function violinColumn(
     }
 
     const folded = foldBraille(dots).map((r) => r.padEnd(w).slice(0, w));
-    return boxOnSpineColumn(folded, spineCol, n, glyphs(caps), quartiles, lo, hi, pad)
+    return boxOnSpineColumn(folded, spineCol, n, caps, quartiles, lo, hi, pad)
       .map((r) => gap + r);
   }
 
@@ -516,8 +409,14 @@ export function violinColumn(
     put(at(ns.q3), gl.horizontal);
     put(at(ns.median), gl.teeRight);
     if (ns.mean !== undefined) {
+      const roles = roleGlyphs(caps);
       const rm = at(ns.mean);
-      if (rm !== at(ns.median)) put(rm, gl.diamond);
+      // **Mean on median gets its own glyph rather than no glyph** — the third
+      // of five call sites to be given the ruling `boxOnSpine` states (C04 I53,
+      // C12 I33, F301). Skipping avoided hiding the median tee, which was right,
+      // and left a band with no mean mark beside two that had one, so *they
+      // coincide* read as *it is missing*.
+      put(rm, rm === at(ns.median) ? roles.meanOnMedian : roles.of.mean);
     }
   }
 
@@ -732,6 +631,34 @@ export function rainColumns(
  * drift about where a median is.
  */
 /**
+ * Whether a violin's outline is drawn in braille rather than box drawing
+ * (C12 I54, §3ak.25).
+ *
+ * **The rule lives in `styleRasteriser` and this form reimplemented it** (F302),
+ * keeping the repertoire clause and not the width one — so an unstyled violin
+ * fell to `+--+` at `wide` where `density`, `line` and `histogram` all crossed to
+ * braille and kept their shape. Exported rather than inline because a predicate
+ * with two copies is what the finding is about: the second copy has the clauses
+ * that existed the day it was written, and both read as correct.
+ *
+ * **Only the outline rung asks this.** `rain` and `raindrop` draw a filled
+ * density through `ladderFor("density")`, braille at every capability set, so
+ * they are already narrow and a width arm has nothing to fix there — widening
+ * the shared predicate replaced a correct filled figure with an outline in 11
+ * frames. The discriminator is *whether the alternative was box drawing*.
+ *
+ * `plotStyle: "line"` still means line drawing at every rung, exactly as it does
+ * in `styleRasteriser`.
+ */
+export function brailleOutline(
+  plotStyle: Plot["plotStyle"],
+  caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+): boolean {
+  if (caps.unicode === "ascii") return false;
+  return plotStyle === "braille" || ((plotStyle ?? "auto") === "auto" && caps.ambiguousWidth === "wide");
+}
+
+/**
  * The summary marks on a vertical violin's spine — `boxOnSpine` stood up.
  *
  * Separate rather than parameterised on an axis: the two write different
@@ -742,7 +669,7 @@ function boxOnSpineColumn(
   rows: readonly string[],
   spineCol: number,
   n: number,
-  gl: ReturnType<typeof glyphs>,
+  caps: Caps,
   quartiles: QuartileSummary | undefined,
   lo: number,
   hi: number,
@@ -752,6 +679,8 @@ function boxOnSpineColumn(
   const ns = normalisedSummary(quartiles, { min: lo - pad, max: hi + pad });
   const at = (t: number): number =>
     Math.max(0, Math.min(n - 1, n - 1 - Math.round(t * (n - 1)))); // cells-ok — a row index
+  const gl = glyphs(caps);
+  const roles = roleGlyphs(caps);
   const out = rows.map((r) => [...r]);
   const put = (r: number, ch: string): void => {
     const row = out[r];
@@ -762,7 +691,9 @@ function boxOnSpineColumn(
   put(at(ns.median), gl.teeRight);
   if (ns.mean !== undefined) {
     const rm = at(ns.mean);
-    if (rm !== at(ns.median)) put(rm, gl.diamond);
+    // **The same ruling as its transpose, which had it and this did not**
+    // (F301). A cell holds one glyph, so the glyph names both.
+    put(rm, rm === at(ns.median) ? roles.meanOnMedian : roles.of.mean);
   }
   return out.map((r) => r.join(""));
 }
@@ -771,13 +702,15 @@ function boxOnSpine(
   rows: readonly string[],
   spineRow: number,
   w: number,
-  gl: ReturnType<typeof glyphs>,
+  caps: Caps,
   quartiles: QuartileSummary | undefined,
   lo: number,
   hi: number,
   pad: number,
 ): readonly string[] {
   if (quartiles === undefined) return rows;
+  const gl = glyphs(caps);
+  const roles = roleGlyphs(caps);
   const line = [...(rows[spineRow] ?? " ".repeat(w))];
   // Not inverted: a column index grows the way a value does.
   const ns = normalisedSummary(quartiles, { min: lo - pad, max: hi + pad });
@@ -795,7 +728,7 @@ function boxOnSpine(
   // holds one glyph, so the glyph names both.
   if (ns.mean !== undefined) {
     const xm = at(ns.mean);
-    put(xm, xm === at(ns.median) ? gl.diamondTee : gl.diamond);
+    put(xm, xm === at(ns.median) ? roles.meanOnMedian : roles.of.mean);
   }
   return rows.map((r, i) => (i === spineRow ? line.join("") : r));
 }
@@ -906,7 +839,6 @@ export function violinRows(
   // the figure was a capped blob rather than a shape that tapers into the axis.
   // A violin's tails go to nothing and meet the centre line; they are not
   // stopped by a bar.
-  const gl = glyphs(caps);
   const spineRow = spine;
 
   // **The braille arm resamples, and that is where the smoothness is** (C12
@@ -969,7 +901,7 @@ export function violinRows(
     }
 
     const rows = foldBraille(dots).map((r) => r.padEnd(w).slice(0, w));
-    return [...gap, ...boxOnSpine(rows, spineRow, w, gl, quartiles, lo, hi, pad)];
+    return [...gap, ...boxOnSpine(rows, spineRow, w, caps, quartiles, lo, hi, pad)];
   }
 
   strokePolyline(mask, upper, false);
@@ -999,7 +931,7 @@ export function violinRows(
     r.map((m) => glyphForMask(y === spineRow ? m | spineBits : m, corners, caps)),
   );
 
-  return [...gap, ...boxOnSpine(grid.map((r) => r.join("")), spineRow, w, gl, quartiles, lo, hi, pad)];
+  return [...gap, ...boxOnSpine(grid.map((r) => r.join("")), spineRow, w, caps, quartiles, lo, hi, pad)];
 }
 
 /**

@@ -235,6 +235,7 @@ The layer rule (A02 §1) made executable. One test walks the compiled graph and 
 | MG25 | An exported **function or class** under `src/` is named somewhere else under `src/`, comments excluded. MG24's blind spot: a producer expressed as free functions rather than as an interface | A02 Seam 4, C23 §3b, C24 I16 |
 | MG27 | A field a **block type** carries that no builder sets. The reasons live in `BUILDER_OMISSIONS`, keyed `Kind.field`, with the bidirectional arm `UNCONSUMED_MEMBERS` has: an entry the builder now sets is itself a violation | C24 I18, C24 commitment 16, FINDINGS F41 · F114 |
 | MG28 | A **closed string union** on a block field whose builders write only bare literals, reaching some of its arms. Top-level fields only; a builder threading a parameter opens them all | C24 I18, FINDINGS F180 |
+| MG29 | An **exported function whose parameter type is not published**, so the function resolves and the argument cannot be supplied. Named types only; a type reachable through a published member counts | C24 I29, FINDINGS F376 |
 | MG26 | No module under `src/` outside `testing/` and `fixtures/` value-imports either of them | C24 I8, T2.3 |
 
 **MG10 is the sharpest instance of MG6's third kind, because both its edges go *downward*.** C13 is L2, `terminal/` is L0 and `presentation/` is L1, so MG1 reports an import of either as legal and MG2 sees no cycle. Every rule in this document passes an edge C13 I18 forbids outright — which is why it is a row here and not a consequence of the layer walk. What it guards is knowledge rather than layering: a store that can measure a document will eventually evict by height, and "evict the tallest" reads as more correct than "evict the oldest" while making the transcript depend on a width it has no honest way to obtain. The cap is on blocks (C13 I17) precisely so this component never renders to do its job.
@@ -276,6 +277,8 @@ So the arm is on, and the one edge that survives it is named rather than tolerat
 
 **What the arm sees, measured, and it is not one thing.** Twenty-two type-only edges reach `terminal/` from above L0 — eleven from `presentation/`, nine from `shell/`, one each from `src/index.ts` and `src/testing/` — and thirteen files above L0 name both halves. **The arm forbids none of them**, because none is MG3's subject: L1 and L4 importing L0 is *downward*, and `presentation/` could not render C04's blocks onto a terminal without seeing both at once.
 
+**MG29 found three instances and not the one that produced it, which is the honest report.** It exists because `plotToSvg` shipped as *the second renderer* with `ResolvedTheme` and `loadTheme` both interior — published, resolving, uncallable — and **the rule clears that case**, because `RenderContext.theme` is a published route to the type. The route ends inside a synchronous `render`, which is the one place an SVG cannot be rasterised, and reachability cannot ask where a route arrives. What it did find on its first run: `registerGrammar` taking an unexported `LanguageFn`, and `cells`/`truncate` taking an unexported `AmbiguousWidth` — the pair C24 commitment 12 publishes *because a custom block kind cannot be written without them*, callable in one parameter and not the other. **Its first draft also reported `SVG_DEFAULT_LAYOUT`**, a default value read as a type; caught by reading what it named rather than counting how many it found.
+
 **MG28 is MG27's subject read properly, and F84's shape one rule along.** MG27 asks whether a builder's constructed literal *mentions* each field. `form: "line"` mentions `form` — so a closed union with one hardcoded arm satisfies a check about **names** while its other arms are buildable by nothing public. `PlotForm` has three members and the heatmap shipped with a walk, an invariant, a validator arm, a renderer, three golden frames and a mutation pass, constructible only by reaching past `b` into `block()`. MG27 was right about what it checked; what it read as covering was wider.
 
 **Its population is six and that is deliberate.** Six top-level block fields are closed string unions — `Notice.tone`, `Plot.form`, `Plot.yFormat`, `Plot.colormap`, `Patch.layout`, `Group.direction` — and five thread a parameter and were already correct. A rule that examined two and found nothing is indistinguishable from one that examined twenty, so the figure is asserted in `enforce-rules.test.ts` rather than implied by a green run. **Widening it until the output looks larger is the tuning A03 §2 warns about**: the subject is a vocabulary a consumer picks from, and six of them are.
@@ -303,7 +306,7 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 | SS7 | — folded into SS1 | — | C17 T2.3 |
 | SS8 | — folded into SS1 | — | C19 T2.3 |
 | SS9 | `fs`, any dot-directory path literal (`.x`, `~/.x`) — the clock clause dropped, being SS1's | `history/` | C20 T2.4 |
-| SS10 | `process.env` reads of the seven terminal variables | outside C02 | C02 T2.5 |
+| SS10 | `process.env`, in any form | anywhere in `src/`, no exceptions — C02 takes the injected record, and the allowance it held for C02's capabilities module was never exercised (SS53) | C02 T2.5 |
 | SS11 | `process.env` | `src/presentation/` | C09 T2.7 |
 | SS12 | `process.env` | `theme/` | C10 T2.6 |
 | SS13 | `fs`, clipboard shell-out | `viewport/` | C14 T2.4 |
@@ -329,14 +332,14 @@ What SS42 buys is that a **second** live reader cannot appear quietly beside the
 | # | Forbidden | Where | Declared |
 |---|---|---|---|
 | SS14 | `\x1b`, `\u001b` | outside `terminal/escapes.ts`, allowing `interaction/router/decode.ts` | C01 I1, T2.5 |
-| SS15 | Mode numbers `1049 25 2004 1002 1006 2026` | outside `terminal/escapes.ts` | C01 I1, T2.8 |
+| SS15 | Mode numbers `1049 25 2004 1002 1003 1006 2026` | outside `terminal/escapes.ts` | C01 I1, T2.8 |
 | SS16 | Hex, ANSI code, colour name | `viewmodel/` | C04 T2.7 |
 | SS17 | Hex, ANSI, named colour | `blocks/` | C09 T2.8 |
-| SS18 | Hex literal | any block-producing module | C10 T2.9 |
-| SS19 | ANSI index or terminal-specific value | `presentation/theme/`, allowing `four-bit.ts` | C10 I13, T2.5 |
+| SS18 | Hex literal | the modules that construct blocks — `src/data/adapters/`, `src/data/fixtures/`, `src/shell/` — the third population beside SS16's types and SS17's renderers. Pending on "the block-producing module list" for the whole life of C10 | C10 I14, T2.9 |
+| SS19 | ANSI index or terminal-specific value | `presentation/theme/`, no exceptions — the four-bit map holds its indices as bare numbers the pattern cannot see, so its allowance was never load-bearing (SS53) | C10 I13, T2.5 |
 | SS20 | `syntax` palette reference | outside `presentation/theme/`, `blocks/kinds/code.ts` and `presentation/patch/` | C10 T2.8 |
-| SS21 | `spectrum` palette reference | outside `presentation/theme/`, where the art is declared | C10 T2.8 |
-| SS22 | Literal verb, flag or enum list | `src/interaction/completion/`, allowing `completion/types.ts` | C19 I4, T2.6, T4.1 |
+| SS21 | `spectrum` palette reference | anywhere in `src/`, no exceptions — the art is declared through the palette record, not by name, and the theme directory's allowance matched nothing in ten files (SS53) | C10 T2.8 |
+| SS22 | Literal verb, flag or enum list | `src/interaction/completion/`, no exceptions — `SLOT_KINDS` is quoted one per line and the list arm never matched it (SS53) | C19 I4, T2.6, T4.1 |
 
 **SS22 is the anti-drift check**, and it became real on the day `completion/` did. A hardcoded enum in completion is how the manifest stops being the source of truth, and it looks harmless in review — the list is *correct* on the day it is written, which is why nothing else in the suite would notice it. C19 T4.1 keeps passing against a literal list, because the fixture manifest still holds the same values.
 
@@ -371,10 +374,15 @@ Two shapes, because there are two ways to write one: a `"--flagname"` literal is
 | SS47 | A non-ASCII mark in a `src/` string literal that is not prose punctuation. The reasons live in `MARK_EXEMPTIONS`, keyed by file, with MG27's bidirectional arm: an entry whose file no longer carries a mark is itself a violation | `src/`, ten sites excused with reasons | C09 I22, C22 I52, FINDINGS F55 · F122 |
 | SS52 | A literal **NUL** anywhere the repository's own tools read — `src/`, `test/`, `tools/`. **Not SS43 widened**, and the difference is the subject: SS43 is about a character a *reader* cannot see, and NUL is about a file `grep` skips **in silence**, so a search for its contents returns nothing and nothing reads exactly like no coverage. Its own pass, because `SCANS` only ever receives `walk("src")` — widening SS43's scope string would have read as tightened and changed nothing. Narrowed to NUL by measurement: the whole C0 class reported **90** hits, every one a literal ESC in a test about escape sequences, and those files grep perfectly well | `src/`, `test/`, `tools/`, no exceptions | C16 T2.10, FINDINGS F236 |
 | SS48 | A second frame composition — a `paint(` call under `src/shell/` outside the unit that owns it. `composeFrame` in `render-frame.ts` is the one, and `session.ts` calls it | `src/shell/`, `render-frame.ts` and `paint.ts` excused | C22 I54, C24 I25, FINDINGS F126 |
-| SS46 | `origin: "refresh"` outside the four sites that mean it | `src/` outside `viewport/transcript/cap.ts`, `shell/construct.ts`, `shell/execution.ts` and `shell/types.ts` | C23 §3a, I22 |
+| SS46 | `origin: "refresh"` outside the three sites that mean it | `src/` outside `viewport/transcript/cap.ts`, `shell/construct.ts` and `shell/execution.ts` — the shell's types module named the value in a doc comment only and its allowance was never exercised (SS53) | C23 §3a, I22 |
 | SS49 | `origin: "defect"` outside the one site that means it | `src/` outside `shell/execution.ts` | C23 §5a, I48 · C04 I13 |
 | SS50 | a `cells()` call naming neither the ambiguous-width convention nor `// narrow-ok` | `src/` outside `src/interaction/completion/menu.ts`, `src/interaction/history/layers.ts` and `src/shell/fallback.ts` | C02 I9 · C02 §3 |
+| SS53 | An `allow` entry in `SCANS` that **no file under it exercises** — zero files in scope under the allowed path match the rule's pattern outside a comment, measured with the scan's own `lineFires`. An exemption nothing exercises cannot be told from one that has expired; the allow-lists were the last exemption lists in `tools/enforce/` with no equality arm. **Five dead on the first run** — SS10's `capabilities.ts` (a comment-only `process.env`), SS19's `four-bit.ts`, SS21's `theme/`, SS22's `types.ts`, SS46's `shell/types.ts` — each with a `why` that read as current. *Stated blind spot*: a directory allow is one entry and one live file carries it; `allowListCoverage` reports the per-file count and does not gate on it | every `allow` entry of every `SCANS` row | A03 §2, §9a · CLAUDE.md § compare exemption lists by equality |
+| SS54 | **The refusal register** (`tools/enforce/refusals.mjs`). A refusal whose premise is a negative-existence claim — *X does not exist*, *nothing sets X*, *no consumer* — names X as `{ absent }` and the rule asserts X is still absent from `src/` (comments stripped) or `package.json`; a refusal resting on an internal mechanism names it as `{ present }`; a refusal resting on taste — *a novelty*, *low value* — is `{ unverifiable }`, **counted on the summary line and never gated**. Seeded with `DEPENDENCIES.md`'s eleven "Not installed" rows, C12's symbol-named refusals (`shiftInward`, `decodeJpeg(`, `horizonFigure`, `SVG_FAMILY.plot3d`) and two taste rows. *Stated blind spot*: it checks the symbol, not the reason — a refusal can be true and its reason irrelevant (MG24's scope, F84) — and the finding sections that carry a refusal have no verdict field and are outside it by construction | the register against `src/` and `package.json` | A03 §9a · CLAUDE.md § A refusal accumulates reasons · DEPENDENCIES.md · C12 I58, I71, I87 |
+| SS55 | A binding filtering on the kitty keyboard protocol's `event` type — `event: "press"`, `"repeat"` or `"release"` — with no `// none-fallback: <action>` on the same line naming what fires under `keyboardProtocol: "none"`. **Vacuous on landing and says so**: `Binding.key` has no `event` member and no row names one, so the rule has nothing to be wrong about until the first release binding arrives; its fabricated violation is a binding on `event: "release"` alone. *Stated blind spots*: the fallback is named, not resolved; a filter spelled otherwise passes; one file | `src/interaction/router/keymap.ts` | C02 I12 · C16 §2 |
 | SS51 | One of the four encoding vocabularies named by `RAMP_VOCABULARIES` — `RAMP_UNICODE`, `RAMP_ASCII`, `RAMP_BRAILLE`, `RAMP_DENSITY` | `src/` outside `src/presentation/plot/ramp.ts` | C12 §3c · C12 I21 |
+| SS57 | **A glyph with an emoji presentation form** — a non-ASCII code point inside a string literal that is a base of an emoji variation sequence, against `text.ts`'s `EMOJI_VARIATION_BASES` (derived from `emoji-variation-sequences.txt` 17.0.0), comments blanked. Found eleven on its first run — `⏺` U+23FA, `ℹ` U+2139, the `arrow` spinner's four diagonals, `▪ ▫ ◼ ◻` in two bar styles, a `⚠` in the fixtures report (F823, F832, F833); no allow-list | `src/` | C09 I45, T2.112 |
+| SS56 | **A hand-composed notice** — `kind: "notice"` as an object-literal value — anywhere the L4 family (`documents.ts`'s `noticeDoc`, `builders/`' `b.notice`) is meant to be called instead. Sixteen files carried the literal at landing and every one was allowed **by name with its reason in the rule's comment**: two are the family, two are the kind's declaration and definition (`viewmodel/types.ts`, `blocks/kinds/simple.ts`), eight are below L4 where the family is unreachable (A02 — four adapters, markdown, the cap marker, the history layer, `art.ts`), and **four were L4 surfaces that owed a migration** — fourteen sites, allowed so that SS53 would retire each entry when its last literal went. **It did** (2026-09-05, F777): every site calls `b.notice`, SS53 failed four times with the entries still present, the entries left, and `test/contract/notice-family.test.ts` holds the frames the literals drew and asserts the family draws the same bytes. Twelve entries remain. *Stated blind spots*: a notice built through a helper the rule does not know, the kind held in a constant, or a spread from elsewhere all pass; it is per line and cannot tell a composition from an object-literal type guard; it does not say which member of the family a site should call | `src/`, allowing by name — the family `src/shell/documents.ts` and `src/shell/builders/`; the kind `src/data/viewmodel/types.ts` and `src/presentation/blocks/kinds/simple.ts`; below L4 `src/data/adapters/fallback.ts`, `src/data/adapters/mapping.ts`, `src/data/adapters/overflow.ts`, `src/data/adapters/registry.ts`, `src/data/viewmodel/markdown.ts`, `src/viewport/transcript/cap.ts`, `src/interaction/history/layers.ts`, `src/presentation/art.ts` | C22 T2.40 · C24 I5 · FINDINGS F739 |
 | SS36 | A string literal assigned to a `colour` field | `src/` | C10 I24, T2.19 |
 | SS37 | An Ink `color=` or `backgroundColor=` prop | `src/presentation/` | C09 I15, T2.17 |
 | SS39 | A character literal in a `glyph` position | `src/` outside C09's glyph table | C04 I6, C09 §4 |
@@ -571,8 +579,24 @@ The suite governs the source. **SP1 governs the documents the source is written 
 | SP6 | Every finding is keyed in `TRIAGE.md`, and its declared total is compared by equality | FINDINGS F142 · F87 | A03 §7a |
 | SP7 | A test row's number is unique within its spec; `Tn.x` placeholders exempt | `docs/components/` | A03 §2 · A03 §7a |
 | SP8 | Every `§` reference resolves against the document that owns it — **reported, not gated** | `src/`, `test/`, `tools/`, `docs/` outside `notes/` | A02 §1 · A03 §7a |
+| SP9 | Every invariant is named by at least one test row; the uncited are an exemption list compared **by equality** | `docs/components/` against `test/**/*.ts` | A03 §7a · FINDINGS |
+| SP10 | A mnemonic test-row label — `SK10`, `HZ4` — is unique **within one document**; reuse across specs is legitimate and not gated | `docs/components/` | A03 §2 · A03 §7a |
 
 They run in `make enforce` and their fire-tests are `test/unit/enforce-commitments.test.ts`.
+
+**SP9 meets the spec-first rule at every new invariant, and the two rulings commits before the
+rule was written down resolved the meeting by landing red.** A spec commit lands alone, before
+code (CLAUDE.md §The spec is the contract); SP9 wants each invariant named by a test row on the
+day it exists. The commits `f818fbaf` and `35589052` both added invariants with no row and both
+pass `make enforce` only at the tree the *following* code commit produced — re-running
+`checkInvariantCoverage` against their own trees reports six and four uncited (F814). CI never saw
+either, because a push carries both commits. **The ruling**: a spec-first commit carries each new
+invariant's test row as an `it.todo` titled with the row and the marker *not deferred on a
+component*, and the code commit of the same round replaces the todo with the test. The citation
+exists on the day the invariant does; the body is owed to a named commit rather than to a
+condition; and the todo-expiry guard already reads the marker. Adding the invariants to
+`UNCITED_INVARIANTS` is not the route — that list may only shrink, and a debt list that grows for
+convenience stops being a debt list.
 
 **SP7 is SP2's argument applied to the numbers tests actually cite, and it was missing for the
 whole build.** SP2 makes invariant ids unique because *"C13 I17 is the cap"* locates something
@@ -600,6 +624,38 @@ strength.** A spec under construction writes `T3.x` for a row whose number is no
 C26 §8b carries seven — and a placeholder is not a claim about a row, so `x` rows are excluded
 before the comparison. The cost is real: two rows that both stay `T3.x` are two this rule will
 never separate, and only their landing numbers close that.
+
+**SP10 is SP7 for the rows a spec names by mnemonic, and it is the definition side of a rule
+that was already exact in the other direction** (F635). A tier does not have to number its rows:
+C12 §9 names them `SK` for sankey, `HZ` for horizon, `PR` for projection, and **183 rows across
+three specs are declared that way** — none of which SP7 can see, because `T\d+\.` is the whole of
+what it matches.
+
+The measured instance is C12's. Two rows both called `SK10` sat in §9 and `make enforce` reported
+*338 files · 26 specs · 15 728 invariant references resolved · no violations* with both in the
+file; it was caught by reading a grep. A fail-on-revert row saying *`T6.87` → `SK10` fails* then
+resolves against whichever row a reader meets first and **neither reading is wrong** — §2's failure
+arriving at the citation rather than at the rule, which is SP7's own argument. SP3 catches a bare
+`I112` in a run file and SP5 catches an `Fnn` that resolves to nothing: both prove a *citation* has
+a target, and nothing proved the target was one target.
+
+**Its blind spot is the scope, and the scope is a ruling rather than a limitation.** `IF8` is
+declared in C09 §9 and again in C22 §9, about two different things, and both are correct: a
+mnemonic is a two- or three-letter mark that means something inside the component that draws it, so
+`SK` in C12 and `SK` in another spec are different subjects. A corpus-wide comparison would gate
+legitimate reuse and be switched off, which is §2's lesson about every rule in this list. The cost
+is named: a citation writing `SK10` with no spec in front of it is ambiguous *across* documents and
+this rule cannot say so — the qualified-reference habit SP3 enforces is what closes that, and only
+for invariants.
+
+**A second blind spot: it matches a shape, not a section.** Any bolded, dashed list item whose
+label is two-or-more capitals followed by digits is read as a declaration wherever it sits.
+Measured 2026-09-04, all 183 matches in `docs/components/` are test rows and all 183 sit inside a
+Tests section, so the shape is exact today and stops being so the day a spec writes a glossary in
+that form. **And there is no placeholder arm**: SP7 exempts `Tn.x` because a spec under
+construction writes one, the mnemonic families have no such convention, and the corpus carries zero
+such rows — an exemption here would be a clause with nothing to be wrong about, which is §2's
+vacuity class installed inside the rule against it.
 
 **SP2 is a check that existed as a habit rather than a mechanism**, which is the same class as SS3 (§2) approached from the other side: not a rule written down and never built, but a rule performed reliably and never written down. Ordering was verified by ad-hoc script while the specs were written and caught every time. When the habit stopped, the drift resumed — twenty of twenty-five specs, C04 declaring `…17, 22, 23, 24, 25, 26, 27, 28, 19, 29, 18, 20, 20a, 33, 32, 31, 30, 21` — and nothing went red, because nothing was missing and no citation dangled. The list had simply stopped locating anything.
 
@@ -676,11 +732,13 @@ SP4 carries the same risk in its own shape — **a heading that stopped matching
 | When | Which | Budget |
 |---|---|---|
 | Compile | EX, TL | 0 — the type-checker already runs |
-| Pre-commit | MG, SS | < 3 s total |
+| Pre-commit | MG, SS, SP, **TD** | < 3 s total |
 | CI, every MR | MG, SS, EX, TL, CP | CP dominates; target < 60 s |
 | CI, nightly | CP plus golden frames at four widths × two themes × two unicode modes | minutes |
 
 **MG and SS run pre-commit because they are the ones whose violations become load-bearing.** A layer violation merged on Monday has three components depending on it by Friday.
+
+**And TD, since the foundation pass** — for the whole life of the family its only runner was `test/unit/todo-expiry.test.ts`, which the pre-commit path never executes, so a deferral whose blocker had landed was caught by whoever next ran the unit tier and by nothing on the way to a commit. The defect a stale deferral hides is depended upon while the row says *waits on*, which is this paragraph's argument exactly. `index.mjs` reproduces TD0's equality against `ACKNOWLEDGED_BACKLOG` in both directions and splices TD1–TD6 into the gated list; the unit file asserts the call sites rather than calling the functions, because calling them is what could not see the gap (§9a).
 
 Each check names, on failure: the rule, the file, the line, and the spec that declared it. A scan that says only "forbidden pattern found" wastes the time it was meant to save.
 
@@ -700,14 +758,14 @@ Each check names, on failure: the rule, the file, the line, and the spec that de
 10. `TL5` makes the argv/shell boundary a type error to blur.
 11. `CP6` and `CP8` are the two corpus properties that have already found or would find defects reading does not.
 12. Every failure names the rule, the file, the line and the declaring spec.
-13. MG and SS run pre-commit, because their violations become depended-upon within days.
+13. MG, SS and TD run pre-commit, because their violations become depended-upon within days. TD joined in the foundation pass; until then the deferral rules had a test and no gate (§8).
 14. **Every rule ships with a test that fabricates a violation and asserts it fires, naming the rule.** A rule with no such test is assumed vacuous until it has one. Every scan's scope is separately asserted to match at least one file in the tree; and where a rule enumerates named entities — mode owners, export names, file paths — those names are separately asserted to exist. A scope or a name that matches nothing is listed as pending, with its blocking component, and the pending entry fails once it becomes real.
 14a. **Where a rule targets a code idiom, its fabricated violation is copied from a real call site rather than written fresh.** A fabrication written by the author of the rule, in the same sitting, reproduces the author's assumption about how the code is written — which is how SS20 came to be correct about a syntax its only consumer does not use (§2). Where no real call site exists yet, the rule is pending until one does.
 14b. **The inventory in this document equals what is implemented plus what is explicitly pending**, asserted as set equality over the rule ids. A rule listed here and never built is invisible to every other check — there is no code for a fabricated violation to fire against — so it fails at the point of being written down instead.
 15. **The deferral rule reports mislabelled blockers, not only expired ones.** That is its second value, and it is the one nobody designs for. For surface deferrals it is a check rather than a consequence: TD4 asserts the named blocker's kind appears in that surface's own composition, which is the one form of "wrong blocker" that is derivable from two things a surface spec already states (§9a).
 15a. **A surface deferral's blocker is the right component** (TD4, §9a), checked from two things a surface spec already states: which section holds its illustration, and what the surface composes to. Half of it has no live subject once C25 lands, and the suite asserts that rather than leaving it to be assumed.
 15b. **No rule id appears twice in this document.** Every other check here compares sets, so a duplicated id is one member and the second rule is invisible to all of them (§2).
-15b. **A deferral names a component id or says it names none** (TD6, §9a). A blocker phrased as a fact about the tree names nothing to watch, so nothing can expire it — the third hole, after a wrong blocker and a missing path, and the only one whose failure mode is a deferral that reads correctly.
+15c. **A deferral names a component id or says it names none** (TD6, §9a). A blocker phrased as a fact about the tree names nothing to watch, so nothing can expire it — the third hole, after a wrong blocker and a missing path, and the only one whose failure mode is a deferral that reads correctly.
 16. **Every path the deferral map names exists** (TD3, §9a). A mapped file that is not there reports compliance because it cannot find what it was asked about, which is commitment 14's vacuity class inside the deferral machinery itself.
 17. **A spec's invariants are numbered 1..n, in order** (SP2, §7a). The numbers are what a citation resolves against, so a list that has stopped ascending has stopped locating anything — and this one drifted for twenty specs because it was a habit rather than a mechanism (§2). A lettered variant sits beside its base, because adjacency is the whole of what the letter says.
 18. **Every invariant reference resolves, everywhere, not only in the specs** (SP3, §7a). SP1 stops at `docs/components/`; the eleven hundred bare references in `src/`, `test/` and the other documents were resolved by nothing. **The rule states where it stops**: it proves a reference resolves against its owner, not that the owner is the intended one, and a qualified reference is preferred wherever a file's owner is not obvious from its path.
@@ -786,6 +844,50 @@ It reads as a deferral with a reason and it is one nothing can expire. L4 draws 
 
 Seven deferrals in the tree took the marker when the rule landed, and two of the seven were restatements it forced: one naming a component that is built with unbuilt work inside it, one naming a harness gap that no component owns.
 
+### SS53 — an allow-list entry nothing exercises
+
+**The allow-lists were the last exemption lists here with no equality arm.** `UNCONSUMED_MEMBERS`, `MARK_EXEMPTIONS`, `BUILDER_OMISSIONS` and `ACKNOWLEDGED_BACKLOG` each fail when an entry stops excusing anything; a `SCANS` row's `allow` did not, so an entry whose file never matched the pattern sat beside a `why` that read as current for as long as nobody re-read it. Five did, across four rules, and one — SS10's `capabilities.ts` — was dead for the whole life of the rule: the file names `process.env` in a comment saying it does *not* read it.
+
+**The measurement is the scan's own.** A file exercises its allowance iff `checkSourceScans` would have reported it without the entry, so SS53 shares `lineFires` rather than re-deciding what a match is — and that is why a comment-only occurrence counts as dead: the scan skips comment forms too. Blanking comments first, as SS47's `codeOnly` does, was measured and rejected: SS23 and SS50 read their `// cells-ok` and `// narrow-ok` markers through a negative lookahead, so the blanked form reported three `theme/` files matching SS23 where the scan reports two.
+
+**Stated blind spot: a directory allow is one entry, and one live file carries it.** SS20 allows `theme/` and one of ten files matches; SS23 allows it and two do. Nine files in each hold a permission they do not use, and SS53 passes both because the entry is the directory. `allowListCoverage` returns the per-file count so the residue is visible; gating on it would demand a file-level allow-list for every directory, trading one unread list for ten.
+
+**And one entry the pass expected to be dead was live.** SS50's three allowed files were said to contain `ambiguous` zero times — which is the condition under which the allowance *is* exercised, since the pattern fires on a `cells(` call that does not name it. The claim conflated "the file does not spell the word" with "the exemption is unused"; they are opposites for a negative-lookahead rule. Whether SS50's *reason* — "until those signatures move (roadmap 51)" — has expired is a question about the reason and not the symbol, and SS54's blind spot names why no rule here answers it.
+
+### SS54 — the refusal register
+
+**A refusal in a table cell is read by nobody after the day it is written.** Four expired unnoticed in one campaign — italic's *no consumer*, thirty-five chart types' *no consumer*, `force`'s *until `shiftInward`*, `axesAt3` — and each was a negative-existence claim a grep could have checked. The 127 code-list refusals in `tools/enforce/` never expire unnoticed because each has an equality arm; the ~194 prose ones had nothing.
+
+**The ruling divides refusals by what their premise is about.** *X does not exist* is a claim about the tree and resolves against it: the register row names X as `absent` and SS54 fails the day X appears. A refusal resting on an internal mechanism standing in for a package names it as `present`. *A novelty* and *low value* are judgements, and no grep settles a judgement: the row is `unverifiable` with its reason, counted on the summary line and never gated, because a register that is mostly judgements is a list of opinions wearing a rule's name.
+
+**Seeding found two things the register was not looking for.** `DEPENDENCIES.md` says the NDJSON alternative is `node:readline` and C06 splits on `indexOf("\n")` — the refusal holds and its stated alternative is not the one in use. C12 I71 names `contourFigure` and `horizonFigure` as the signature I71 is observable through, and the tree has `contourSegments` and `horizonFigure` — half the sentence names a function that exists only in comments. Neither is a violation SS54 can report; both are what writing a premise down as a symbol forces a person to check.
+
+**Stated blind spot, and it is the register's whole shape**: it checks the symbol, not the reason. `shiftInward` staying absent says `force`'s expiry has not arrived; it says nothing about whether the refusal should survive when it does — MG24's scope was justified by a true sentence about the wrong thing (F84), and a register row can be too. The 176 sections of `examples/docker/FINDINGS.md` that carry a refusal have no verdict field and are outside this by construction: the register holds what someone moved into it, and nothing sweeps prose for refusals it has not been told about.
+
+### SS57 — a glyph with an emoji presentation form
+
+**A width measured with `cells()` cannot see this class, and the one place a mark was measured before its row was written is where the class got in** (F823). `⏺` U+23FA is `East_Asian_Width=Neutral` and a base in `emoji-variation-sequences.txt`; a font that prefers the emoji form draws it two cells wide in a slot every table in `text.ts` calls one. T2.71 asked the question of spinner frames against a seventeen-character list from memory that opened with `·` — an Ambiguous character with no emoji form — so the instrument conflated the two classes it was written to separate and never looked at the glyph tables at all.
+
+**The rule reads the Unicode data, not a recollection of it.** `text.ts` carries the variation-sequence bases derived from the 17.0.0 file with the version named, as the Ambiguous and Wide tables are (C09 §5), and SS57 scans every string literal under `src/`, comments blanked, for a non-ASCII member of that set — non-ASCII because the file also lists the keycap bases `#`, `*` and `0`–`9`, which no terminal draws as emoji bare and which are the alphabet the tables degrade to (F832). On its first run over the tree the table found `info`'s `ℹ` U+2139 beside `⏺`. Its fabricated violation is the shipped character: `step: ["⏺", "*"]` restored fails the rule on the line, and an empty derived table fails the rule's own control. **Test-time only, never a runtime branch** — terminals disagree about presentation, and `cells()` counting it would be a guess in a measurement's clothes (C09 I45).
+
+**Its first run found eleven, not the two the walk named** (F833): the `arrow` spinner's diagonals `↖ ↗ ↘ ↙`, the `beads` and `squares` bar styles' `▪ ▫ ◼ ◻`, and a `⚠` in the fixtures provenance report — three families, in a spinner table T2.71 had scanned with a list from memory, a bar table whose docstring measured width and not presentation, and a module two layers below the glyph vocabulary. A scope of *the tables in `glyphs.ts`*, which this section first proposed, would have found seven of the eleven.
+
+**Stated blind spot**: the scan reads literals in the source, so a mark that reaches a frame as *text at runtime* — a far side's string, a fixture's payload, a producer's label — is outside it, as it is outside every glyph rule; C09 §4's *anything outside the vocabulary is text* is the line and SS47 is the rule on the other side of it.
+
+### SS56, widened — the builder call is the composition
+
+**The rule existed and the nine sites it was written for passed it** (F827). SS56 forbade a hand-composed `kind: "notice"` literal outside `documents.ts` and `builders/`; the shell's failure, truncation, refusal and usage notices are `b.notice.warn(…)` and `b.notice.error(…)` — builder calls, which the pattern does not see. The rule's premise was *call the family instead of composing the object*. The call grammar's is one step stricter — *compose the notice in one file*, so that two calls never read as two products — and a builder call outside that file is exactly the composition the rule exists to catch, in a form it could not.
+
+**Widened rather than doubled.** A second rule on the same subject keeps both sets of birthday clauses and neither reader checks the other; SS56's pattern gains `\bb\.notice\.` scoped to `src/shell/`, the allow-list stays `documents.ts` and `builders/`, and every entry is exercised (SS53). The nine sites migrate to composer functions — `callStatus`, `queuedNotice`, `stallNotice`, `approvalPrompt` — as the code lands (C23 I61); the widened row lands with it, per §7a's rule that a rule table follows its code. Fabricated violation: `b.notice.error("stream failed")` restored in `execution.ts`.
+
+### MG2 — inventoried at the start, implemented at the end
+
+**The second half of A02 §1's sentence had a row and no rule for the whole life of the suite.** *Never upward, never cyclically within a layer*: MG1 was the first half from the first day, and the second was carried by three named pairs — MG13, MG18, MG22 — each written on the day someone noticed one edge that would close a cycle. The pending entry said *nothing — implementable today*, which is a blocker nothing can expire; CLAUDE.md's *acyclicity is MG1 + MG22* described the tree honestly and the rule not at all.
+
+**Module granularity, value imports only, Tarjan over the edges MG1 already walks.** One real cycle on the first run, in L4: `shell/paint.ts` imports `composite` and `shell/composite.ts` imports `FrameError` and `exact` back. It works because ESM hoists, which is the shape the sentence forbids because it works until an initialiser is read before it runs. Acknowledged in `ACKNOWLEDGED_CYCLES` by equality rather than folded into the rule: breaking it fails until the entry is removed, and a second cycle fails on the commit that closes it.
+
+**The pending list's string arm was the same hole one file over.** `PENDING_RULES` skipped every string entry, and `SS18: "C10 — needs the block-producing module list"` was a blocker with a component id in it, written as prose, walked past while C10 was built and twenty more components landed. A string that begins with a component id is now read as a `waitsOn` in the wrong shape; SS18 is implemented over the three directories that construct blocks, and SS12's fold is rewritten to start with the word.
+
 ### MG24 — a published interface member with no consumer
 
 **The interior half of a rule this project already has.** CLAUDE.md carries *add no export nothing consumes* — the rule for the public API's edge, which stops the façade growing surface nobody asked for. This is the same rule one layer in, and either alone reads as arbitrary. It catches the opposite shape, which is not an excess but a **gap**: a component complete on its own side of a seam, with nothing on the other.
@@ -822,9 +924,16 @@ filed by a consumer who wanted it), `patch.actions` and `table.sort` (found by
 this rule and by nothing else).
 
 **The model it enforces was already in the tree, twice.** `b.plot` exposes
-`yMin`/`yMax` and leaves `yFormat`, `xLabels` and `emptyMessage` out with the
-reason recorded for each. That is the shape: an omission with a reason is a
-decision, and an omission without one is a gap the next consumer rediscovers.
+`yMin`/`yMax` and, when this was written, left `yFormat`, `xLabels` and
+`emptyMessage` out with the reason recorded for each. **Every one of the three
+has since been admitted by a consumer wanting it** — `yFormat` (C04 I41, F31),
+`xLabels` (F180), `emptyMessage` (declared and forwarded by `b.plot` since
+6c61593d, 2026-08-30) — and the one field `b.plot` withholds today is
+`graphLayout`, with its reason in `BUILDER_OMISSIONS`. That is the shape: an
+omission with a reason is a decision, an omission without one is a gap the next
+consumer rediscovers, and a decision is revisited by the consumer who wants the
+field rather than by the list growing quietly. (Corrected 2026-09-03 on Lane A's
+request; the sentence had named three omissions two years after the first left.)
 
 **Its blind spots, because an unrecorded limit reads as strength.**
 

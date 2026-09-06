@@ -105,6 +105,153 @@ export function continuousColour(
  */
 export const CUBE_LEVELS = [0, 95, 135, 175, 215, 255] as const;
 
+/**
+ * A colour with every channel remapped, **in whatever encoding it arrived in**.
+ *
+ * The traversal `dimColour` had and `shadeColour` would otherwise have copied:
+ * parse the hex, map the three channels, and put an `ansi256` back through the
+ * cube it came from. Two copies of it are two places for the 8-bit arm to stop
+ * agreeing, which is the defect `dimColour`'s own comment records.
+ *
+ * **0–15 are returned unchanged**, because those are the terminal's own palette
+ * and have no value we can read — there is nothing to scale.
+ */
+export function overChannels(colour: ColourValue, f: (c: number) => number): ColourValue {
+  const map = (hex: string): string => {
+    const n = (i: number): number => {
+      const v = f(parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16) / 255);
+      return Math.max(0, Math.min(255, Math.round(v * 255)));
+    };
+    return `#${[0, 1, 2].map((i) => hex2(n(i))).join("")}`;
+  };
+  if (colour.kind === "rgb") return { kind: "rgb", hex: map(colour.hex) };
+  if (colour.kind === "ansi256") {
+    const hex = ansi256Hex(colour.index);
+    return hex === null ? colour : { kind: "ansi256", index: nearestAnsi256(map(hex)) };
+  }
+  return colour;
+}
+
+/** The sRGB transfer function, both directions. */
+const toLinear = (c: number): number =>
+  c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+const toSrgb = (c: number): number =>
+  c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+
+/**
+ * A colour under an illumination of `intensity`, **scaled in linear light**
+ * (C12 I94, FINDINGS F455).
+ *
+ * **Linear and not encoded, for two independent reasons.** Light is linear, so
+ * a face at 20% illumination should carry 20% of the luminance — scaling the
+ * *encoded* value by 0.2 gives about 2.9% of it, which turns the ambient floor
+ * back into the hole it exists to prevent. And scaling in linear light is
+ * exactly *hold chromaticity, change luminance*, which is what makes the field
+ * recoverable from hue under the shading: 0.0330 rad of drift on viridis
+ * against a 0.1292 rad step between adjacent field values, 3.9× (F455).
+ *
+ * **That ratio holds over `[0, 1]` and nowhere else**, which is why the
+ * intensity is clamped before it arrives here rather than after: past 1 a
+ * channel clips, a clipped channel rotates hue, and viridis's ratio falls to
+ * 0.01× (F457). The clamp in `overChannels` is the last guard and not the rule.
+ *
+ * **Per map rather than per rung.** The field survives the shading exactly when
+ * the map travels in hue, and three of the six shipped maps do not — magma,
+ * inferno and coolwarm invert the ratio, and `gray` has no chroma to carry
+ * anything. That is a consequence of the caller's `colormap` and not a branch
+ * here (F455).
+ */
+export function shadeColour(colour: ColourValue, intensity: number): ColourValue {
+  const k = intensity < 0 ? 0 : intensity > 1 ? 1 : intensity;
+  if (k === 1) return colour;
+  return overChannels(colour, (c) => toSrgb(toLinear(c) * k));
+}
+
+/**
+ * The sixteen ANSI colours, as the xterm defaults (C10 §4i, I38).
+ *
+ * **A table rather than a computation**, because there is nothing to compute: a
+ * terminal's low sixteen are whatever the user's palette says, and these are the
+ * reference values the mapping measures distance against. A child asking for
+ * *the terminal's red* keeps its index and never reaches this table (I38); it is
+ * consulted only when an `rgb` or an `ansi256` has to come down to four bits.
+ */
+const ANSI16_HEX: readonly string[] = Object.freeze([
+  "#000000", "#800000", "#008000", "#808000", "#000080", "#800080", "#008080", "#c0c0c0",
+  "#808080", "#ff0000", "#00ff00", "#ffff00", "#0000ff", "#ff00ff", "#00ffff", "#ffffff",
+]);
+
+/** The 256-colour cube and greys as hexes, for the `ansi256` → 4-bit step. */
+function hexOfAnsi256(index: number): string {
+  if (index < 16) return ANSI16_HEX[index] ?? "#000000";
+  if (index >= 232) {
+    const level = 8 + (index - 232) * 10; // cells-ok — a grey ramp step
+    const part = level.toString(16).padStart(2, "0");
+    return `#${part}${part}${part}`;
+  }
+  const n = index - 16;
+  const parts = [Math.floor(n / 36) % 6, Math.floor(n / 6) % 6, n % 6].map((step) => {
+    const level = step === 0 ? 0 : 55 + step * 40; // cells-ok — the cube's levels
+    return level.toString(16).padStart(2, "0");
+  });
+  return `#${parts.join("")}`;
+}
+
+/**
+ * The nearest of the sixteen, by squared distance in sRGB (C10 I38).
+ *
+ * `nearestAnsi256`'s sibling one table smaller, and deliberately the same
+ * arithmetic: two quantisers disagreeing about which red is nearest would put a
+ * child's colour in one place at 8-bit and another at 4-bit for no reason a
+ * reader could name.
+ */
+export function nearestAnsi16(hex: string): number {
+  const channel = (h: string, i: number): number => parseInt(h.slice(1 + i * 2, 3 + i * 2), 16);
+  let best = 0;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < ANSI16_HEX.length; i += 1) { // cells-ok — a palette index
+    const candidate = ANSI16_HEX[i] ?? "#000000";
+    let distance = 0;
+    for (let c = 0; c < 3; c += 1) { // cells-ok — a colour channel
+      const d = channel(hex, c) - channel(candidate, c);
+      distance += d * d;
+    }
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = i;
+    }
+  }
+  return best; // cells-ok — a palette index
+}
+
+/**
+ * A literal colour, down C10's ladder (§4i, I38).
+ *
+ * **The theme is not a parameter and cannot become one.** A child's colour is
+ * not a slot, has no dark and light form, and nothing about the application's
+ * taste applies to it — so this takes capabilities alone, which is what makes it
+ * safe to call beside a measurer and impossible to make theme-dependent by
+ * accident.
+ *
+ * `ansi16` passes through above 1-bit: the child asked for *the terminal's red*,
+ * and the user's palette is the right answer to that question. Resolving it to a
+ * hex and back would substitute our red for theirs.
+ */
+export function degradeColour(
+  value: ColourValue,
+  caps: Readonly<Pick<TerminalCapabilities, "colourDepth">>,
+): ColourValue | undefined {
+  const depth = caps.colourDepth;
+  if (depth === 1) return undefined;
+  if (value.kind === "ansi16") return value;
+  if (value.kind === "ansi256") {
+    return depth === 4 ? { kind: "ansi16", index: nearestAnsi16(hexOfAnsi256(value.index)) } : value;
+  }
+  if (depth === 24) return value;
+  if (depth === 4) return { kind: "ansi16", index: nearestAnsi16(value.hex) };
+  return { kind: "ansi256", index: nearestAnsi256(value.hex) };
+}
+
 /** The nearest cube index to a hex colour — the greyscale ramp is not searched. */
 export function nearestAnsi256(hex: string): number {
   const at = (i: number): number => {

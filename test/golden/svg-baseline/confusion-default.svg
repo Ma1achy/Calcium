@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
+<rect width="100%" height="100%" fill="#1a1a1a"/>
+<text x="149.6" y="316.8" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">5</text>
+<defs><linearGradient id="rsvgb" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#440154"/><stop offset="0.125" stop-color="#472d7b"/><stop offset="0.25" stop-color="#3b528b"/><stop offset="0.375" stop-color="#2c728e"/><stop offset="0.5" stop-color="#21918d"/><stop offset="0.625" stop-color="#27ad81"/><stop offset="0.75" stop-color="#5dc863"/><stop offset="0.875" stop-color="#aadc32"/><stop offset="1" stop-color="#fde725"/></linearGradient></defs>
+<rect x="153.6" y="307.2" width="268.8" height="9.6" fill="url(#rsvgb)"/>
+<text x="426.4" y="316.8" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">90</text>
+<clipPath id="isvgb-0"><rect x="0" y="46.667" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="62.667" text-anchor="end" clip-path="url(#isvgb-0)" font-size="12" font-family="monospace" fill="#626262">cat</text>
+<clipPath id="isvgb-1"><rect x="0" y="138.4" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="154.4" text-anchor="end" clip-path="url(#isvgb-1)" font-size="12" font-family="monospace" fill="#626262">dog</text>
+<clipPath id="isvgb-2"><rect x="0" y="230.133" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="246.133" text-anchor="end" clip-path="url(#isvgb-2)" font-size="12" font-family="monospace" fill="#626262">bird</text>
+<rect x="89.6" y="12.8" width="132.267" height="91.733" fill="#fde725"/>
+<rect x="221.867" y="12.8" width="132.267" height="91.733" fill="#440154"/>
+<rect x="354.133" y="12.8" width="132.267" height="91.733" fill="#440154"/>
+<rect x="89.6" y="104.533" width="132.267" height="91.733" fill="#481769"/>
+<rect x="221.867" y="104.533" width="132.267" height="91.733" fill="#b0dd2f"/>
+<rect x="354.133" y="104.533" width="132.267" height="91.733" fill="#481769"/>
+<rect x="89.6" y="196.267" width="132.267" height="91.733" fill="#440154"/>
+<rect x="221.867" y="196.267" width="132.267" height="91.733" fill="#472a7a"/>
+<rect x="354.133" y="196.267" width="132.267" height="91.733" fill="#b0dd2f"/>
+</svg>

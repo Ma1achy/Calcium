@@ -15,12 +15,138 @@ import { createElement, type ReactElement } from "react";
 import { SGR_RESET, sgr } from "../../terminal/escapes.js";
 import { resolve, resolveBackground, resolveTone, type Style } from "../theme/index.js";
 import type { ColourRef, ColourValue, ResolvedTheme } from "../theme/index.js";
-import type { Tone } from "../../data/viewmodel/index.js";
+import { COLORMAPS, continuousColour } from "../theme/colormap.js";
+import type { ColormapName, Tone } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { cells, truncate } from "../text.js";
+import type { Run, SpanAttrs } from "../runs.js";
+import { graphemes } from "../text.js";
+import { rampStyle } from "../theme/ramp.js";
+import { animateT, effectiveTick, extentT } from "./ramp.js";
 
 /** A run of text and the style it carries. Width is the text's, never the run's. */
 export type Span = Readonly<{ text: string; style?: Style }>;
+
+/**
+ * A run's attributes onto the style its block resolved (C10 I33, C04 I85).
+ *
+ * **A spread, and it touches neither colour channel.** The span contributes at
+ * most `bold`, `italic` and `underline`; `colour` and `background` are the
+ * tone's and `withBackground`'s, so a span never enters `MONO`, the ladder or a
+ * floor — there is no colour for a floor to be about. Returning `style` itself
+ * when there is nothing to add is what lets `paintRuns` coalesce unstyled
+ * pieces by reference and keep a plain row's bytes exactly what they were.
+ */
+export function withSpan(style: Style, attrs: SpanAttrs | undefined): Style {
+  return attrs === undefined ? style : { ...style, ...attrs };
+}
+
+/**
+ * What a run needs beyond the block's style to be painted: the theme and
+ * capabilities every renderer already holds, and the block's `colormap` by
+ * name where the block has one (C04 I90). Structural, so a `RenderContext`
+ * satisfies the first two by itself.
+ */
+export type RunContext = Readonly<{
+  theme: ResolvedTheme;
+  capabilities: TerminalCapabilities;
+  colormap?: ColormapName;
+  /** C03's spinner counter, for a ramp that moves (C09 I53); absent is the static frame. */
+  tick?: number;
+}>;
+
+/**
+ * A run's style: the block's, or its span's tone in place of it; the span's
+ * attributes spread on top; and its value as a background (C10 I33, C04 I89,
+ * C04 I90).
+ *
+ * **Each colour comes from the resolver its owner already has.** A `tone` goes
+ * through `resolveTone` — the same call, the same memo, so two runs of one tone
+ * are one reference and coalesce below — and *replaces* `style`, because a run
+ * cannot be two tones. A `value` goes through `continuousColour` on the block's
+ * map, so the ladder is the colormap's: `undefined` below 8-bit, and the run
+ * then paints as its neighbours do and coalesces with them by reference — a
+ * 4-bit frame is byte-identical with and without the value (C10 I31). The gate
+ * refused a `value` on a block with no map, so the `colormap === undefined`
+ * arm is a total function's and not a branch anything reaches.
+ */
+export function runStyle(run: Run, style: Style, ctx: RunContext): Style {
+  const base = run.tone === undefined ? style : resolveTone(run.tone, ctx.theme, ctx.capabilities);
+  const merged = withSpan(base, run.attrs);
+  if (run.value === undefined || ctx.colormap === undefined) return merged;
+  const map = COLORMAPS[ctx.colormap];
+  const background = map === undefined ? undefined : continuousColour(map, run.value, ctx.capabilities);
+  return background === undefined ? merged : { ...merged, background };
+}
+
+/**
+ * Runs to spans, adjacent runs of one style merged.
+ *
+ * The merge is by reference — `runStyle` returns `style` unchanged for a run
+ * with nothing to say — so a row with no spans paints as the single span it
+ * always was, and a styled run breaks the row into exactly the pieces its
+ * members require. A `paint` that closed and reopened the same style between
+ * two plain pieces would change every golden frame while drawing the same thing.
+ */
+export function paintRuns(runs: readonly Run[], style: Style, ctx: RunContext): readonly Span[] {
+  const out: { text: string; style: Style }[] = [];
+  const push = (text: string, merged: Style): void => {
+    const last = out[out.length - 1]; // cells-ok — an array index
+    if (last !== undefined && (last.style === merged || sameColour(last.style, merged))) last.text += text;
+    else out.push({ text, style: merged });
+  };
+  for (const run of runs) {
+    const merged = runStyle(run, style, ctx);
+    if (run.ramp === undefined) {
+      push(run.text, merged);
+      continue;
+    }
+    // **A ramped run is one span per cluster, split here and nowhere earlier**
+    // (C09 I51): `measure` saw the run whole, the wrap saw it whole, and the
+    // position comes from the span through `at`/`of` rather than from this
+    // run's own index — so a span wrapped across two rows continues rather
+    // than restarting. No SGR lands inside a cluster because the split is by
+    // grapheme. Where C10 says nothing (`undefined`) the cluster keeps `merged`
+    // and coalesces with its neighbours by reference, which is how a 1-bit
+    // colormap bar is byte-identical with and without its ramp (C10 I31).
+    const { ramp, at, of, ordinal } = run.ramp;
+    const clusters = graphemes(run.text);
+    const tick = effectiveTick(ctx.tick, ctx.capabilities);
+    clusters.forEach((cluster, i) => {
+      const index = at + i;
+      const t = animateT(ramp.animate, extentT(index, of), tick, of, index);
+      // A palette cycles identities, and on text the identity is the span
+      // (C04 §3am.2): the ordinal, not the cluster — per cluster is confetti.
+      const sampled = rampStyle(ramp, t, ramp.fill === "palette" ? ordinal : index, ctx.theme, ctx.capabilities);
+      push(cluster, sampled === undefined ? merged : { ...merged, ...sampled });
+    });
+  }
+  return out;
+}
+
+/**
+ * Two ramp samples that resolved to the same colour and carry the same
+ * attributes — so a 4-bit step of two paints two spans and not one per cluster.
+ * Reference equality is what the plain path relies on and stays first; this is
+ * the by-value arm the split needs, and it compares every member `Style` has.
+ */
+function sameColour(a: Style, b: Style): boolean {
+  return (
+    sameValue(a.colour, b.colour) &&
+    sameValue(a.background, b.background) &&
+    a.bold === b.bold &&
+    a.dim === b.dim &&
+    a.italic === b.italic &&
+    a.inverse === b.inverse &&
+    a.underline === b.underline
+  );
+}
+
+function sameValue(a: ColourValue | undefined, b: ColourValue | undefined): boolean {
+  if (a === undefined || b === undefined) return a === b;
+  if (a.kind !== b.kind) return false;
+  return a.kind === "rgb" ? a.hex === (b as { hex: string }).hex : a.index === (b as { index: number }).index;
+}
 
 /** A tone, resolved. The only way a renderer obtains a style (I4). */
 export function tone(
@@ -71,6 +197,27 @@ export function background(
  */
 export function withBackground(style: Style | undefined, surface: Style): Style {
   return surface.background === undefined ? (style ?? {}) : { ...style, background: surface.background };
+}
+
+/**
+ * The selection wash for a transcript element, or reverse video where there is
+ * no colour to wash with (C11 I14, C10 §4b).
+ *
+ * `surface.selection` is the editor's own slot, shared rather than copied: a
+ * selected row and a selected span mean the same thing — what `y` will copy —
+ * and one slot carries one meaning. **The 1-bit rung is `inverse`, not a
+ * mark**: `resolveBackground` answers `NO_STYLE` without colour, and a wash
+ * alone would fall straight from a background to nothing; an attribute
+ * survives the depth where a colour does not, and a gutter mark would cost a
+ * cell C11 I14 forbids. `shell/paint.ts`'s `selectionStyle` is this same
+ * ladder for the prompt, written first; it should import this one.
+ *
+ * Painted **over `tone.default`** and nothing else — the one ink C10 §4b has
+ * measured against this ground (`SELECTION_SLOTS`).
+ */
+export function selectionStyle(theme: ResolvedTheme, caps: TerminalCapabilities): Style {
+  const bg = background("surface.selection", theme, caps);
+  return bg.background === undefined ? { inverse: true } : bg;
 }
 
 /**

@@ -1,0 +1,17 @@
+── radar · triangle-circle · ascii · 40w
+      alpha            beta
+Speed ##########    80 ######        50
+Power #######       60 ###########   85
+Range ###########   90 #####         45
+
+
+
+
+
+
+
+
+
+
+
+

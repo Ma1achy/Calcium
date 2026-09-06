@@ -1,9 +1,13 @@
 // C10 tier 1 — unit. The ladder at each depth, the 1-bit collapse, and the
 // rejection paths that keep a broken theme off the screen.
+import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { fires, sourceOf } from "../support/source.js";
 import {
+  assertPictureGlyph,
   clearResolutionCache,
   defaultTheme,
+  isPictureGlyph,
   loadTheme,
   ratio,
   resolve,
@@ -14,9 +18,61 @@ import {
   validatePaintedFloors,
 } from "../../src/presentation/theme/index.js";
 import { floorFor } from "../../src/presentation/theme/index.js";
+import { REQUIRED_SLOTS } from "../../src/presentation/theme/contrast.js";
 import { caps, DEPTHS, store, SURFACES, TONES, withTone } from "../support/theme.js";
 
+/**
+ * **T1.34's fixture: §4f.1's table, recomputed.** The twelve light slots that
+ * fail against `bgDeep` — the whole reason the page moved rather than the check.
+ * Held as a set with its figures so the row asserts *which* twelve, not *some*:
+ * element zero is the degenerate one, and an arm collapsing onto it survives a
+ * `.some()`.
+ */
+const LIGHT_FAILS_ON_BGDEEP: readonly (readonly [string, string, number])[] = [
+  ["tone", "muted", 2.44], ["tone", "ok", 4.29], ["tone", "warn", 4.30],
+  ["tone", "info", 4.29], ["tone", "accent", 4.30], ["tone", "identifier", 4.31],
+  ["categorical", "c4", 4.41], ["syntax", "string", 4.29], ["syntax", "comment", 2.89],
+  ["syntax", "number", 4.30], ["syntax", "function", 4.30], ["syntax", "operator", 4.29],
+];
+
 describe("C10 resolution", () => {
+  it("T1.34 (I34, §4f.1): every slot clears its floor on `bg`, and light fails twelve times on `bgDeep`", () => {
+    // **Both halves, because either alone reads as the other's evidence.** The
+    // first is why the page can be `bg`; the second is why widening the check to
+    // `bgDeep` was the arm not taken, and it is a property of the *theme's*
+    // polarity — dark's `bgDeep` recesses away from its tones and light's
+    // recesses toward them, so a surface outside the check is a surface whose
+    // polarity nobody constrained.
+    for (const [name, tokens] of Object.entries(defaultTheme)) {
+      const failed: string[] = [];
+      // **`REQUIRED_SLOTS`' families and not every palette** — `spectrum` is
+      // declared art, `carries: "decoration"`, and lands on no page. Derived
+      // rather than listed, so a fourth family the framework resolves against
+      // enters this row on the day it is added (I30).
+      for (const family of Object.keys(REQUIRED_SLOTS)) {
+        const palette = tokens.palettes[family];
+        if (palette === undefined) continue;
+        for (const [slot, hex] of Object.entries(palette.slots)) {
+          if (typeof hex !== "string") continue;
+          const floor = floorFor(slot);
+          expect(ratio(hex, tokens.surfaces.bg), `${name} ${family}.${slot} on bg`).toBeGreaterThanOrEqual(floor);
+          if (ratio(hex, tokens.surfaces.bgDeep) < floor) failed.push(`${family}.${slot}`);
+        }
+      }
+      // **The set, not its first member.** `dark` and `high-contrast` clear
+      // `bgDeep` too, which is exactly what makes the exclusion look harmless.
+      if (name === "light") {
+        expect(failed.sort()).toEqual(LIGHT_FAILS_ON_BGDEEP.map(([f, s]) => `${f}.${s}`).sort());
+        for (const [family, slot, figure] of LIGHT_FAILS_ON_BGDEEP) {
+          const hex = tokens.palettes[family]?.slots[slot] ?? "";
+          expect(ratio(hex, tokens.surfaces.bgDeep), `light ${family}.${slot} on bgDeep`).toBeCloseTo(figure, 1);
+        }
+      } else {
+        expect(failed, `${name} clears bgDeep too, which is why one theme in three hid this`).toEqual([]);
+      }
+    }
+  });
+
   it("T1.1 (I1): every tone at every depth yields a Style and never throws", () => {
     // Forty cases. Totality is the invariant a renderer depends on without ever
     // stating it: a missing slot mid-frame must not be what takes a session down.
@@ -441,5 +497,112 @@ describe("C10 resolution", () => {
     clearResolutionCache();
     expect(loadTheme(defaultTheme, "dark").ok).toBe(true);
     expect(loadTheme(defaultTheme, "light").ok).toBe(true);
+  });
+});
+
+/**
+ * I21's fourth admitted case — the picture cell (C10 §4c.1).
+ *
+ * The admission used to read *the cell carries no text*, and the golden read
+ * below is what falsified it: both shipped picture-cell constructors always
+ * draw a glyph. The condition that is true is that the glyph is a **fill**, and
+ * these rows are what makes the alphabet evidence rather than a stipulation.
+ */
+describe("C10 §4c.1 — the picture cell's alphabet", () => {
+  it("T1.35 (C10 I21, §4c.1): the alphabet admits the fills and refuses everything a reader reads", () => {
+    // Admitted, by range and not by a list the rows could agree with.
+    expect(isPictureGlyph(" "), "the blank — `wash`'s own case through this door").toBe(true);
+    for (let cp = 0x2580; cp <= 0x259f; cp += 1) {
+      expect(isPictureGlyph(String.fromCodePoint(cp)), `U+${cp.toString(16)} block element`).toBe(true);
+    }
+    for (let cp = 0x2800; cp <= 0x28ff; cp += 1) {
+      expect(isPictureGlyph(String.fromCodePoint(cp)), `U+${cp.toString(16)} braille`).toBe(true);
+    }
+
+    // Refused — and the refusal list is where the ruling shows. `#`, `=` and
+    // `-` are `sankeyAlphabet`'s ASCII arm: the set a brand put on the
+    // *alphabet* would have had to admit, and which a brand on the background
+    // *channel* never has to, because `cellOf` passes no lower owner there.
+    for (const ch of ["a", "Z", "0", "#", "=", "-", "_", "→", "─", "│", "╭", "↗"]) {
+      expect(isPictureGlyph(ch), `${JSON.stringify(ch)} is not a fill`).toBe(false);
+    }
+
+    // Not one glyph is not one cell — a cluster and the empty string both out.
+    expect(isPictureGlyph(""), "the empty string").toBe(false);
+    expect(isPictureGlyph("▀▀"), "two fills are not one cell").toBe(false);
+  });
+
+  it("T1.36 (C10 I21, §4c.1, C12): every glyph the shipped frames paint a background under is admitted", () => {
+    // **Read off the goldens, not off the constructors.** An admission list
+    // derived from the table the constructors read agrees with itself and
+    // passes on any addition — T2.20's reason, one artefact along. These bytes
+    // are the frames the two sites actually produce on every shipped depth.
+    const dir = new URL("../golden/terminal-baseline/", import.meta.url);
+    const names = readdirSync(dir).filter(
+      (n) => /^(sankey|plot3d)-/u.test(n) && /-(24bit|8bit)-/u.test(n) && n.endsWith(".txt"),
+    );
+    expect(names.length, "the corpus is not empty — an empty scan is a green scan").toBeGreaterThan(20);
+
+    const sankeyGlyphs = new Set<string>();
+    const plot3dGlyphs = new Set<string>();
+    for (const name of names) {
+      const text = readFileSync(new URL(name, dir), "utf8");
+      const into = name.startsWith("sankey") ? sankeyGlyphs : plot3dGlyphs;
+      // Walk the SGR state and collect the glyph of every cell with a
+      // background set. `48;` opens one, `49` closes it, `0`/`` resets both.
+      let painted = false;
+      for (const m of text.matchAll(/\u001b\[([0-9;]*)m|([^])/gu)) {
+        const sgrParams = m[1];
+        if (sgrParams !== undefined) {
+          if (sgrParams.startsWith("48;")) painted = true;
+          else if (sgrParams === "49" || sgrParams === "0" || sgrParams === "") painted = false;
+          continue;
+        }
+        const ch = m[2];
+        if (painted && ch !== undefined && ch !== "\n") into.add(ch);
+      }
+    }
+
+    // The control the scan owes: a reader that saw no backgrounds would report
+    // a clean corpus, which is what a broken walk looks like.
+    expect(sankeyGlyphs.size, "sankey paints backgrounds at all").toBeGreaterThan(0);
+    expect(plot3dGlyphs.size, "plot3d paints backgrounds at all").toBeGreaterThan(0);
+
+    // Asserted as a set. Sankey's is exactly one glyph — `▀`, the half that
+    // carries bar against ribbon at 1-bit, which is why a blank `Span` could
+    // never have served this site.
+    expect([...sankeyGlyphs].sort()).toEqual(["▀"]);
+    for (const ch of [...sankeyGlyphs, ...plot3dGlyphs]) {
+      expect(isPictureGlyph(ch), `${JSON.stringify(ch)} U+${ch.codePointAt(0)!.toString(16)} is painted over`).toBe(true);
+    }
+    // And plot3d's set is wider than one range, so the row is not satisfied by
+    // the block elements alone.
+    expect([...plot3dGlyphs].some((c) => c.codePointAt(0)! >= 0x2800), "braille is in it").toBe(true);
+    expect([...plot3dGlyphs].some((c) => c.codePointAt(0)! < 0x2600), "block elements are in it").toBe(true);
+  });
+
+  it("T1.37 (C10 I21, §4c.1): the refusal fires, and both constructors are on it", () => {
+    // The function, with its control beside it — a throw asserted without one
+    // is satisfied by a function that always throws.
+    expect(() => { assertPictureGlyph("a", "site"); }).toThrow(/C10 I21/u);
+    expect(() => { assertPictureGlyph("-", "site"); }).toThrow(/not one/u);
+    expect(() => { assertPictureGlyph("▀", "site"); }, "the control").not.toThrow();
+    expect(() => { assertPictureGlyph("⠉", "site"); }, "the control").not.toThrow();
+
+    // **And the sites, asserted on stripped source — with the limit stated.**
+    // Neither guard is reachable from a public surface: `sankeyArea` takes its
+    // glyph from `sankeyAlphabet(caps)` and `mixedRows` is not exported, which
+    // is the same measurement that says no input the tree produces trips them.
+    // So the honest row is that the call is *there*, on the background arm, and
+    // T6.92 is what says removing it is invisible in every other result.
+    const sankeySrc = sourceOf("src/presentation/plot/sankey.ts");
+    const scatterSrc = sourceOf("src/presentation/plot/scatter3.ts");
+    expect(fires(sankeySrc, /assertPictureGlyph\(text, "sankeyArea"\)/u), "sankey's cell").toBe(true);
+    expect(fires(scatterSrc, /assertPictureGlyph\(glyph, "plot3d mixedRows"\)/u), "plot3d's span").toBe(true);
+    // The control for the stripper: both files still hold the construction the
+    // guard sits in front of, so a stripper that ate the code would fail here
+    // rather than pass over an empty string.
+    expect(fires(sankeySrc, /background: refOf\(below\)/u), "stripper control").toBe(true);
+    expect(fires(scatterSrc, /colour, background: bg/u), "stripper control").toBe(true);
   });
 });

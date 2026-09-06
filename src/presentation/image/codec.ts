@@ -15,8 +15,14 @@
  * decoder, not a function. The expiry is a symbol rather than a sentence —
  * `decodeJpeg` below — so the deferral can be grepped. PNG is what matplotlib
  * writes, which is the reference this phase serves.
+ *
+ * **GIF is the second format, and it is `gif.ts`'s** (C04 I93). This file keeps
+ * the PNG walk and gains the front door: `decodeImage` reads the signature and
+ * dispatches, so the two decoders share a result type and nothing above them
+ * asks which format it holds.
  */
 import { inflateSync } from "node:zlib";
+import { decodeGif, isGifSignature } from "./gif.js";
 
 /** Straight RGBA, four bytes per pixel, alpha composited by the caller. */
 export type Pixels = Readonly<{
@@ -25,9 +31,56 @@ export type Pixels = Readonly<{
   data: Uint8Array;
 }>;
 
-export type Decoded = Readonly<{ ok: true; pixels: Pixels }> | Readonly<{ ok: false; fault: string }>;
+/**
+ * **A refusal carries the extent when it has one** (C09 I38, §8b G7, F413).
+ *
+ * The IHDR is filled in the chunk walk and every refusal below it happens with
+ * `w` and `h` already in hand — so *this cannot be rasterised* and *how big is
+ * it* are separable, and the protocol arm needs only the second. `size` is
+ * absent exactly when the failure is a failure to find a picture at all: no
+ * signature, no IHDR, a zero dimension.
+ */
+export type Refused = Readonly<{ ok: false; fault: string; size?: Readonly<{ width: number; height: number }> }>;
+
+/**
+ * A GIF's frames, every one a full logical screen, and the delay each shows for
+ * in milliseconds (C04 I93, C09 I39). Present on a decode **only when there is
+ * more than one frame**, so a still — PNG or one-frame GIF — is `pixels` alone
+ * and every consumer that never asked about animation reads it unchanged.
+ */
+export type Animation = Readonly<{ frames: readonly Pixels[]; delays: readonly number[] }>;
+
+/**
+ * `pixels` is what a still consumer draws — for a GIF it is frame 0, so the
+ * geometry, the identity and the kitty arm's plain transmission all see one
+ * picture and only the arms that animate look past it.
+ */
+export type Decoded = Readonly<{ ok: true; pixels: Pixels; animation?: Animation }> | Refused;
 
 const SIGNATURE = Object.freeze([137, 80, 78, 71, 13, 10, 26, 10]);
+
+/**
+ * The codec's front door: **the signature chooses the decoder** (C04 I93).
+ *
+ * Six bytes for a GIF and eight for a PNG, and nothing else is read before the
+ * choice — a signature check is what separates *this is not an image we read*
+ * from *this image is broken*, and the second is each decoder's to phrase.
+ */
+export function decodeImage(bytes: Uint8Array): Decoded {
+  if (isGifSignature(bytes)) {
+    const gif = decodeGif(bytes);
+    if (!gif.ok) return gif;
+    const first = gif.frames[0];
+    if (first === undefined) return { ok: false, fault: "a GIF with no frames" };
+    return gif.frames.length > 1 // cells-ok — a frame count
+      ? { ok: true, pixels: first, animation: { frames: gif.frames, delays: gif.delays } }
+      : { ok: true, pixels: first };
+  }
+  if (bytes.length < 8 || SIGNATURE.some((b, i) => bytes[i] !== b)) { // cells-ok — a byte count
+    return { ok: false, fault: "not a PNG or a GIF — neither the eight-byte signature nor the six-byte one matches" };
+  }
+  return decodePng(bytes);
+}
 
 /** Bytes per pixel by colour type, at bit depth 8. */
 const CHANNELS: Readonly<Record<number, number>> = Object.freeze({ 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 });
@@ -76,24 +129,30 @@ export function decodePng(bytes: Uint8Array): Decoded {
   // real PNG this cannot read, and a decoder that guessed would produce a wrong
   // picture rather than an error — the failure mode this phase is most careful
   // about (C09 I36).
-  if (interlace !== 0) return { ok: false, fault: "interlaced PNG (Adam7) — phase 1 reads progressive only" };
-  if (depth !== 8) return { ok: false, fault: `bit depth ${String(depth)} — phase 1 reads 8-bit only` };
+  // **From here the extent is known and travels with the refusal** (F413).
+  const size = { width: w, height: h };
+  if (interlace !== 0) {
+    return { ok: false, fault: "interlaced PNG (Adam7) — phase 1 reads progressive only", size };
+  }
+  if (depth !== 8) return { ok: false, fault: `bit depth ${String(depth)} — phase 1 reads 8-bit only`, size };
   const channels = CHANNELS[colour];
-  if (channels === undefined) return { ok: false, fault: `colour type ${String(colour)} is not a PNG colour type` };
-  if (idat.length === 0) return { ok: false, fault: "no IDAT chunk — nothing to decode" }; // cells-ok — a chunk count
+  if (channels === undefined) {
+    return { ok: false, fault: `colour type ${String(colour)} is not a PNG colour type`, size };
+  }
+  if (idat.length === 0) return { ok: false, fault: "no IDAT chunk — nothing to decode", size }; // cells-ok — a chunk count
 
   let raw: Uint8Array;
   try {
     raw = new Uint8Array(inflateSync(Buffer.concat(idat.map((c) => Buffer.from(c)))));
   } catch {
-    return { ok: false, fault: "IDAT does not inflate — the image data is corrupt" };
+    return { ok: false, fault: "IDAT does not inflate — the image data is corrupt", size };
   }
 
   const stride = w * channels; // cells-ok — a byte count
   const got = raw.length; // cells-ok — a byte count
   const need = (stride + 1) * h; // cells-ok — a byte count
   if (got < need) {
-    return { ok: false, fault: `inflated to ${String(got)} bytes where ${String(need)} were needed` };
+    return { ok: false, fault: `inflated to ${String(got)} bytes where ${String(need)} were needed`, size };
   }
 
   // **Unfiltered in place, row by row**, because every filter but `None` reads

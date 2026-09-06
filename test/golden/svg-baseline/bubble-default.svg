@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
+<rect width="100%" height="100%" fill="#1a1a1a"/>
+<line x1="89.6" y1="12.8" x2="89.6" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="89.6" y1="288" x2="486.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="486.4" y1="12.8" x2="486.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="89.6" y1="12.8" x2="486.4" y2="12.8" stroke="#2c2c2c" stroke-width="1"/>
+<text x="83.6" y="292" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">0</text>
+<text x="83.6" y="200.267" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">20</text>
+<text x="83.6" y="108.533" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">40</text>
+<text x="83.6" y="16.8" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">60</text>
+<text x="89.6" y="300" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">0</text>
+<text x="155.733" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">1</text>
+<text x="221.867" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">2</text>
+<text x="288" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">3</text>
+<text x="354.133" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">4</text>
+<text x="420.267" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">5</text>
+<text x="486.4" y="300" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">6</text>
+<rect x="498.4" y="15.2" width="9.6" height="9.6" fill="#e69f00"/>
+<text x="512" y="24.8" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">value</text>
+<rect x="498.4" y="34.4" width="9.6" height="9.6" fill="#56b4e9"/>
+<text x="512" y="44" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">size</text>
+<circle cx="89.6" cy="196.267" r="2.714" fill="#e69f00"/>
+<circle cx="155.733" cy="81.6" r="5.214" fill="#e69f00"/>
+<circle cx="221.867" cy="150.4" r="3.429" fill="#e69f00"/>
+<circle cx="288" cy="12.8" r="7" fill="#e69f00"/>
+<circle cx="354.133" cy="113.707" r="4.143" fill="#e69f00"/>
+<circle cx="420.267" cy="49.493" r="5.929" fill="#e69f00"/>
+<circle cx="486.4" cy="173.333" r="3.071" fill="#e69f00"/>
+<circle cx="89.6" cy="278.827" r="2.714" fill="#56b4e9"/>
+<circle cx="155.733" cy="246.72" r="5.214" fill="#56b4e9"/>
+<circle cx="221.867" cy="269.653" r="3.429" fill="#56b4e9"/>
+<circle cx="288" cy="223.787" r="7" fill="#56b4e9"/>
+<circle cx="354.133" cy="260.48" r="4.143" fill="#56b4e9"/>
+<circle cx="420.267" cy="237.547" r="5.929" fill="#56b4e9"/>
+<circle cx="486.4" cy="274.24" r="3.071" fill="#56b4e9"/>
+</svg>

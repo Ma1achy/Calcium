@@ -17,7 +17,28 @@ const ALL_REASONS = ["input", "completion", "resize", "stream", "spinner"] as co
 const _exhaustive: readonly CommitReason[] & { length: 5 } = ALL_REASONS;
 void _exhaustive;
 
-const IMMEDIATE_REASONS = ["input", "completion", "resize"] as const;
+/**
+ * **Three categories, not two, and the third appeared inside the second.**
+ *
+ * `resize` used to sit in `IMMEDIATE_REASONS`, so *not configurable* and *no
+ * window* were one predicate and the rows below could test either and mean both.
+ * I15 splits them: `resize` is coalesced **and** not configurable, for a reason
+ * that is not I2's — an input window introduces lag the user causes, a resize
+ * window shows a frame that is **wrong** rather than stale.
+ *
+ * A binary classification here would have put `resize` on whichever side made
+ * the tests pass and lost the distinction that the whole ruling turns on.
+ */
+const IMMEDIATE_REASONS = ["input", "completion"] as const;
+const FIXED_WINDOW_REASONS = ["resize"] as const;
+const TUNABLE_REASONS = ["stream", "spinner"] as const;
+
+const _partition: readonly CommitReason[] & { length: 5 } = [
+  ...IMMEDIATE_REASONS,
+  ...FIXED_WINDOW_REASONS,
+  ...TUNABLE_REASONS,
+];
+void _partition;
 
 describe("C03 contract", () => {
   it("T2.1: every member of FrameScheduler is present; the flags are getters", () => {
@@ -116,6 +137,18 @@ describe("C03 contract", () => {
       // caught at compile time by `WINDOWS` being a total Record).
       if ((IMMEDIATE_REASONS as readonly string[]).includes(reason)) {
         expect(configure, `${reason} must not be configurable`).toThrow(RangeError);
+        // I2's reason, and it must name only the reasons I2 covers. The message
+        // read "input, completion and resize are never delayed (C03 I2)" — the
+        // fourth site of a miscitation whose other three were in the spec, and
+        // the only one a reader meets at runtime (F423).
+        expect(configure, `${reason} is refused by I2`).toThrow(/never delayed \(C03 I2\)/u);
+      } else if ((FIXED_WINDOW_REASONS as readonly string[]).includes(reason)) {
+        expect(configure, `${reason} must not be configurable`).toThrow(RangeError);
+        // **A different message, because it is a different ruling** (I15). A
+        // shared one would restate the conflation this replaces — and a reader
+        // told "never delayed" about a reason that *is* delayed, by 16 ms, has
+        // been given a sentence that cannot be checked against the behaviour.
+        expect(configure, `${reason} is refused by I15`).toThrow(/wrong rather than stale \(C03 I15\)/u);
       } else {
         expect(configure, `${reason} must be configurable`).not.toThrow();
       }

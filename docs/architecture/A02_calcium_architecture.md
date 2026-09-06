@@ -20,7 +20,7 @@ L4  shell          composition root · session · execution pipeline
 L3  interaction    input router · editor · parser · completion · history
 L2  viewport       transcript store · viewport · overlay manager
 L1  presentation   block library · theme · table engine · plot renderer
-L0  foundation     terminal (C01 C02 C03)   ·   data (C04 C05 C06 C07 C21)
+L0  foundation     terminal (C01 C02 C03)   ·   data (C04 C05 C06 C07 C21 C27)
 ```
 
 **L0 has two halves that do not know about each other.** Terminal knows nothing of view models; data knows nothing of terminals. That independence is not incidental — it is what allows C04–C07 to be built in parallel with C01–C03, and it is the first thing a lint rule should protect.
@@ -79,7 +79,7 @@ L0T and L0D have no edge between them. That absence is the point.
 | Layer | Components |
 |---|---|
 | L0 terminal | C01 lifecycle · C02 capabilities · C03 frame scheduler |
-| L0 data | C04 view model · C05 manifest · C06 transport · C07 adapters · C21 process runner |
+| L0 data | C04 view model · C05 manifest · C06 transport · C07 adapters · C21 process runner · C27 terminal emulator |
 | L1 | C09 blocks · C10 theme · C11 table · C12 plot |
 | L2 | C13 transcript · C14 viewport · C15 overlays |
 | L3 | C16 input router · C17 editor · C18 parser · C19 completion · C20 history |
@@ -123,6 +123,7 @@ The markers are what make the check exact. A word-overlap heuristic cannot do th
 | Transcript, viewport, overlays | C13, C14, C15 |
 | Input, editor, parser, completion, history | C16, C17, C18, C19, C20 |
 | Process runner | C21 |
+| Terminal emulator | C27 |
 
 ### Seam 1 — measurement injection
 

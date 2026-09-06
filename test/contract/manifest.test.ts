@@ -462,7 +462,8 @@ describe("C05 contract", () => {
 
 describe("C05 as C19 will read it", () => {
   it("flags, enum values and sub-verbs are all reachable from the manifest alone", () => {
-    // Not C19's tests — C19 does not exist. This asserts the *data* is present
+    // Not C19's tests — those are test/contract/completion*.test.ts (C19 is built; this said
+    // *C19 does not exist* until 2026-09-03). This asserts the *data* is present
     // to satisfy them, so that when it lands, nothing here has to change.
     const m: Manifest = fixture();
     const ps = m.tools.find((t) => t.name === "ps");

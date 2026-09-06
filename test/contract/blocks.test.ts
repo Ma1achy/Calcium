@@ -14,8 +14,14 @@ import { SCAN_BUDGET_MS } from "../support/budget.js";
 import { checkAsciiParity, checkMeasurement, formatReport, uncoveredKinds } from "../../src/testing/measurement-conformance.js";
 import { ADVERSARIAL, CORPUS, ONE_PER_KIND } from "../support/blocks.js";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LIGHT_THEME, measurable, visible } from "../support/render.js";
-import { cells } from "../../src/presentation/text.js";
-import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
+import { cells, hasEmojiForm, TEXT_PRESENTATION } from "../../src/presentation/text.js";
+import { SPINNER_SETS } from "../../src/presentation/blocks/glyphs.js";
+import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
+import { renderToLines } from "../../src/presentation/render-lines.js";
+import { Text } from "ink";
+import { createElement } from "react";
+import type { Block } from "../../src/data/viewmodel/index.js";
+import type { BlockDefinition, RenderContext } from "../../src/presentation/blocks/index.js";
 import { patchDefinition } from "../../src/presentation/patch/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
@@ -24,6 +30,7 @@ import {
   GLYPH_TOKENS,
   glyphCells,
   glyphFor,
+  glyphs,
   SUBSTITUTIONS,
 } from "../../src/presentation/blocks/index.js";
 import { checkModuleGraph } from "../../tools/enforce/module-graph.mjs";
@@ -177,7 +184,7 @@ describe("C09 contract — measurement", () => {
     }
   });
 
-  it("T2.6 (I13): the eighteen ship here; the other three are registered elsewhere", () => {
+  it("T2.6 (I13): the nineteen ship here; the other three are registered elsewhere", () => {
     // The composition-level half of I13 belongs with C11, C12 and C25. What is
     // assertable here is the split itself — and that the three absentees still
     // render, through `raw`, rather than throwing (I10).
@@ -202,6 +209,7 @@ describe("C09 contract — measurement", () => {
         "scroll",
         "status",
         "steps",
+        "terminal",
         "tip",
       ],
     );
@@ -221,7 +229,7 @@ describe("C09 contract — measurement", () => {
     expect(uncoveredKinds(measurable(), CORPUS)).toEqual([]);
   });
 
-  it("T2.6c (I13): all twenty-one kinds, and the three arrive through `register`", () => {
+  it("T2.6c (I13): all twenty-two kinds, and the three arrive through `register`", () => {
     // **The composition-level half, assertable for the first time.** It waited on
     // C25 because "every block kind" cannot be honest while one is unregistered,
     // and a test that named the fourteen would have read as covering the union.
@@ -259,6 +267,7 @@ describe("C09 contract — measurement", () => {
       "status",
       "steps",
       "table",
+      "terminal",
       "tip",
     ]);
 
@@ -272,6 +281,46 @@ describe("C09 contract — measurement", () => {
     for (const kind of REGISTERED_ELSEWHERE) {
       expect(defaults.has(kind), `${kind} must not be a default`).toBe(false);
     }
+  });
+
+  it("T2.126 (I59, §6b): the kinds a bounded container cannot slice, compared by equality", () => {
+    // **An exemption list held by equality, not by membership** — a kind that
+    // gains a `window` has to move this list, and a new kind that cannot be
+    // bounded has to fail here rather than join a subset quietly. The overrun
+    // those kinds keep inside a `scroll` is recorded by I59 rather than asserted
+    // correct: `plot` is atomic permanently (I27, C12 I1) and the rest simply
+    // have no window yet.
+    const kit = measurable({
+      definitions: [
+        tableDefinition as unknown as BlockDefinition<never>,
+        plotDefinition as unknown as BlockDefinition<never>,
+        patchDefinition as unknown as BlockDefinition<never>,
+      ],
+    });
+    const atomic = [...kit.kinds]
+      .filter((kind) => kit.registry.get(kind)?.window === undefined)
+      .sort();
+
+    expect(atomic).toEqual([
+      "comparison",
+      "events",
+      "group",
+      "image",
+      "mosaic",
+      "notice",
+      "panel",
+      "pills",
+      "plot",
+      "progress",
+      "rule",
+      "scroll",
+      "status",
+      "steps",
+      "tip",
+    ]);
+
+    const plot = { kind: "plot", id: "p", form: "curve", series: [], height: 30 } as unknown as Block;
+    expect(kit.registry.windowChild(plot, 40, 0, 6), "and an atomic child gets no slice").toBeNull();
   });
 });
 
@@ -345,3 +394,207 @@ function srcFiles(dir: string, out: string[] = []): string[] {
   }
   return out;
 }
+
+describe("C09 §4 — the call grammar's glyph rows", () => {
+  const WIDE_CAPS = { ...FULL_CAPS, ambiguousWidth: "wide" as const };
+
+  it("T2.112 (C09 I45): every emoji base drawn by a glyph table or a spinner set carries the text selector", () => {
+    // **The check C09 §4 could not run when `step` was chosen** (F823): `cells()`
+    // measured `⏺︎` at one cell under both conventions and it is a base of an
+    // emoji variation sequence all the same.
+    //
+    // **The rule inverted under F854**: refusing the base cost eleven marks, and
+    // U+FE0E says *draw the preceding character as text* — counted zero by
+    // `cells()`, so the qualified mark is still one cell. A base is admitted
+    // when it carries the selector and is a violation when it is bare.
+    const offenders: string[] = [];
+    const seen = (label: string, text: string): void => {
+      const chars = [...text];
+      for (const [i, c] of chars.entries()) {
+        const cp = c.codePointAt(0) ?? 0;
+        if (cp < 0x80 || !hasEmojiForm(cp)) continue;
+        if (chars[i + 1] === TEXT_PRESENTATION) continue;
+        offenders.push(`${label}: ${c} U+${cp.toString(16)} written bare`);
+      }
+    };
+    for (const token of GLYPH_TOKENS) seen(`Glyph ${token}`, glyphFor(token, FULL_CAPS));
+    for (const [slot, ch] of Object.entries(glyphs(FULL_CAPS))) seen(`GlyphSet ${slot}`, ch);
+    for (const [name, set] of Object.entries(SPINNER_SETS)) for (const f of set.frames) seen(`spinner ${name}`, f);
+    expect(offenders).toEqual([]);
+    // **The controls, so an empty table cannot pass the row**: the two marks
+    // the table found on its first run are in it, and the keycap base `*` —
+    // `step`'s and `running`'s ASCII rung — is excluded by the row's own guard.
+    expect(hasEmojiForm(0x23fa), "⏺︎ U+23FA, the mark F823 is about").toBe(true);
+    expect(hasEmojiForm(0x2139), "ℹ U+2139, the mark F832 found").toBe(true);
+    expect(hasEmojiForm(0x2b24), "⬤ U+2B24, which held the slot between F823 and F854").toBe(false);
+    // **The arm that says the row can still fail**: the head mark without its
+    // selector is what the rule refuses, and it is the shipped character.
+    const bare: string[] = [];
+    for (const c of ["\u23fa"]) {
+      const cp = c.codePointAt(0) ?? 0;
+      if (hasEmojiForm(cp)) bare.push(c);
+    }
+    expect(bare, "a bare base is still a violation — the remedy is the selector, not the exemption").toEqual(["\u23fa"]);
+    expect(hasEmojiForm(0x2a), "* is a keycap base in the Unicode file and excluded by construction (F832)").toBe(false);
+    expect(glyphFor("step", ASCII_CAPS), "so the ASCII rung is still *").toBe("*");
+  });
+
+  it("T2.115 (C09 I48): every `Glyph` is 1:1 by cell count at BOTH conventions, through `glyphFor`", () => {
+    // T2.5b asserted the rule at `narrow` alone, and ten of seventeen members
+    // broke it at `wide` while it was green (F825). The two named sets are
+    // compared by equality so a member moving between them fails the row.
+    const AMBIGUOUS = new Set(["warn", "info", "pending", "working", "running", "queued", "cancelled", "expand", "collapse", "live", "bullet"]);
+    const NEUTRAL = new Set(["ok", "error", "quote", "nested", "continuation", "step"]);
+    expect(new Set([...AMBIGUOUS, ...NEUTRAL])).toEqual(new Set(GLYPH_TOKENS));
+    const tiered: string[] = [];
+    const steady: string[] = [];
+    for (const token of GLYPH_TOKENS) {
+      const narrow = glyphFor(token, FULL_CAPS);
+      const wide = glyphFor(token, WIDE_CAPS);
+      const ascii = glyphFor(token, ASCII_CAPS);
+      expect(cells(narrow, "narrow"), `${token} narrow`).toBe(1);
+      expect(cells(wide, "wide"), `${token} at wide, through glyphFor`).toBe(1);
+      expect(cells(ascii, "wide"), `${token} ascii`).toBe(1);
+      if (wide === ascii && narrow !== ascii) {
+        tiered.push(token);
+      } else {
+        steady.push(token);
+        expect(cells(narrow, "wide"), `${token} is Neutral`).toBe(1);
+      }
+    }
+    expect(new Set(tiered)).toEqual(AMBIGUOUS);
+    expect(new Set(steady)).toEqual(NEUTRAL);
+  });
+
+  it("T2.116 (C09 I49): the separator slot is one cell at both arms and both alphabets", () => {
+    // The head joined its fields with a literal `·` — non-ASCII at the ASCII arm
+    // and two cells at wide — and the contract row asserted it under ASCII
+    // (F828). A slot, so the composer resolves it where the capability is.
+    expect(glyphs(FULL_CAPS).separator).toBe("·");
+    expect(glyphs(ASCII_CAPS).separator).toBe(":");
+    expect(glyphs(WIDE_CAPS).separator, "the internal set collapses at wide (C02 I9)").toBe(":");
+    for (const caps of [FULL_CAPS, WIDE_CAPS, ASCII_CAPS]) {
+      const sep = glyphs(caps).separator;
+      expect(cells(sep, caps.ambiguousWidth), `separator at ${caps.unicode}/${caps.ambiguousWidth}`).toBe(1);
+      // **Beside the spinner, not alone** (F834): the rung was `-`, which is the
+      // turn set's first frame, and a dispatched head read `verb - -`. Against
+      // every set, so a new pair carrying the separator fails here before it lands.
+      for (const [name, set] of Object.entries(SPINNER_SETS)) {
+        expect(set.ascii, `set ${name}'s ASCII frames must not carry the separator ${sep}`).not.toContain(sep);
+        if (caps.unicode !== "ascii") expect(set.frames, `set ${name}'s frames`).not.toContain(sep);
+      }
+    }
+    // **And no composer joins with the literal**: the slot exists so that
+    // `src/shell/` never writes ` · ` into a head again. Comments stripped
+    // first — the prose about the separator is exactly where the bytes appear.
+    const offenders: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir)) {
+        const file = `${dir}/${entry}`;
+        if (statSync(file).isDirectory()) walk(file);
+        else if (file.endsWith(".ts") && !file.endsWith(".d.ts")) {
+          const code = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//gu, "").replace(/\/\/.*$/gmu, "");
+          if (/["'`][^"'`\n]*\s\u00b7\s[^"'`\n]*["'`]/u.test(code)) offenders.push(file);
+        }
+      }
+    };
+    walk("src/shell");
+    expect(offenders, "a head joined with a literal `·` (F828)").toEqual([]);
+  });
+});
+
+describe("C09 contract — the slice seam", () => {
+  it("T2.123 (I58): windowChild reaches every definition, and it is the registry's own", () => {
+    // **The same assertion `measureChild` and `renderChild` carry** (§2): the
+    // registry overwrites all three unconditionally, so a caller cannot hand a
+    // kind a windowing function of its own — which is why `RenderContextInput`
+    // omits the three rather than making them optional (F85).
+    const seen: RenderContext[] = [];
+    const probe: BlockDefinition = {
+      kind: "probe-ctx",
+      measure: () => 1,
+      render: (_block: Block, ctx: RenderContext) => {
+        seen.push(ctx);
+        return createElement(Text, null, "x");
+      },
+    } as unknown as BlockDefinition;
+    const r = createBlockRegistry({ defaults: true });
+    r.register(probe);
+
+    renderToLines(r, { kind: "probe-ctx", id: "q" } as unknown as Block, 40, {
+      theme: DARK_THEME,
+      capabilities: FULL_CAPS,
+    });
+
+    expect(seen.length, "the probe drew").toBe(1); // cells-ok
+    expect(seen[0]?.windowChild, "and it is the registry's own function").toBe(r.windowChild);
+  });
+
+  it("T2.124 (I58): over every corpus block, windowChild is null exactly where the slice would cost the caller", () => {
+    // **A sweep, because a single offset cannot see the residual** (B1's
+    // argument): a row asserting one window against a constant passes against a
+    // residual that is simply wrong. The predicate is the whole of I58 —
+    // atomic kind, or non-zero `skipRows`/`dropRows` — and it is computed from
+    // the definition rather than restated, so the two sides cannot drift.
+    const kit = measurable({
+      definitions: [
+        tableDefinition as unknown as BlockDefinition<never>,
+        plotDefinition as unknown as BlockDefinition<never>,
+        patchDefinition as unknown as BlockDefinition<never>,
+      ],
+    });
+    // **Two fixtures the corpus does not hold, and the mutation pass is what
+    // said so.** Removing the floor guard and removing the cap guard both
+    // survived: no corpus block carries `minHeight` or `capped`, so the sweep
+    // could not see either. A corpus chosen for a property may not have it —
+    // third instance in this change, after T3.75's and the atomic one.
+    //
+    // Both extra rows are *sliceable kinds*, so the only thing stopping the
+    // slice is the guard: a `logs` whose window is always exact, floored in one
+    // and capped in the other.
+    const lines = (id: string, n: number): Block =>
+      ({
+        kind: "logs",
+        id,
+        lines: Array.from({ length: n }, (_u, i) => ({ ts: "00:00:00", level: "info" as const, message: `l${String(i)}` })),
+      }) as unknown as Block;
+    const floored = { ...(lines("floored", 6) as object), minHeight: 12 } as unknown as Block;
+    const capped = { ...(lines("capped", 6) as object), capped: { shown: 6, total: 900 } } as unknown as Block;
+
+    const disagreed: string[] = [];
+    let refused = 0;
+    let sliced = 0;
+    for (const blk of [...CORPUS, floored, capped]) {
+      for (const width of [20, 40, 80]) {
+        const total = kit.measure(blk, width);
+        if (total < 2) continue;
+        const from = Math.floor(total / 3);
+        const to = Math.max(from + 1, total - 1);
+        const direct = kit.window(blk, width, from, to);
+        // **The predicate is the whole of I58**, computed rather than restated:
+        // atomic kind, a residual the container cannot pay, a floor whose
+        // padding is drawn outside the definition, or a cap whose marker is.
+        const exact =
+          direct !== undefined &&
+          direct.skipRows === 0 &&
+          direct.dropRows === 0 &&
+          ((blk as { minHeight?: number }).minHeight ?? 0) === 0 &&
+          (blk as { capped?: unknown }).capped === undefined;
+        const got = kit.registry.windowChild(blk, width, from, to);
+        if (exact) sliced += 1;
+        else refused += 1;
+        if (exact !== (got !== null)) disagreed.push(`${blk.kind} ${blk.id} @${String(width)}`);
+      }
+    }
+
+    expect(disagreed, "the seam and the definition agree on every block").toEqual([]);
+    expect(sliced, "and the corpus exercises both answers — some slices are taken").toBeGreaterThan(10); // cells-ok
+    expect(refused, "and some are refused").toBeGreaterThan(10); // cells-ok
+    // The two added blocks are refused for their own reason and not because
+    // their kind cannot window: `logs` slices exactly at every offset.
+    expect(kit.registry.windowChild(floored, 40, 2, 5), "a floored block is kept whole").toBeNull();
+    expect(kit.registry.windowChild(capped, 40, 2, 5), "and so is a capped one").toBeNull();
+    expect(kit.window(lines("plain", 6), 40, 2, 5)?.skipRows, "while the same kind, unfloored, slices").toBe(0);
+    expect(kit.registry.windowChild(lines("plain", 6), 40, 2, 5), "and the seam takes it").not.toBeNull();
+  });
+});

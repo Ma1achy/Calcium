@@ -356,7 +356,7 @@ describe("TR12 (C04 I65): the member's gates, and the values agree with the code
 
   it("`treeLayout` is refused on every other form, at both gates", () => {
     const others = ALL_FORMS.filter((f) => f !== "tree");
-    expect(others).toHaveLength(45); // cells-ok — a form count
+    expect(others).toHaveLength(47); // cells-ok — a form count; 46 before `sankey`
     for (const form of others) {
       const extra = HIERARCHY_ROLE[form] === null ? { treeLayout: "outline" } : { treeLayout: "outline", ...tree };
       expect(errs(form, extra).some((m) => /treeLayout/u.test(m)), form).toBe(true);

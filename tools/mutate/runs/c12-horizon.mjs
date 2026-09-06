@@ -18,6 +18,9 @@ import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
 const HORIZON = "src/presentation/plot/horizon.ts";
+// The fold — baseline, band and `within` — moved above both rasterisers with
+// C12 I71; what is left in `horizon.ts` is the resampling and the eighths.
+const FIGURE = "src/presentation/plot/figure.ts";
 const HEIGHT = "src/presentation/plot/height.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
@@ -72,7 +75,7 @@ const results = runPass({
       // that never crosses zero, which is every horizon fixture the catalogue
       // had until `signed` was added.
       name: "the baseline is always the range's minimum",
-      file: HORIZON,
+      file: FIGURE,
       from: "  return range.min <= 0 && range.max >= 0 ? 0 : range.min;",
       to: "  return range.min;",
       expect: "HZ3",
@@ -83,8 +86,8 @@ const results = runPass({
       // finding is what forbids the glyph half of this; nothing but a test
       // forbids the colour half.
       name: "the sign stops choosing a half of the map",
-      file: HORIZON,
-      from: "  return 0.5 + (cell.sign * depth) / 2;",
+      file: FIGURE,
+      from: "  return diverging ? 0.5 + (cell.sign * depth) / 2 : depth;",
       to: "  return 0.5 + depth / 2;",
       expect: "HZ3",
     },

@@ -90,8 +90,10 @@ const results = runPass({
       // Re-anchored when the point-label layers landed ahead of the curves
       // (C12 I55 §3ag A11). The mutation is unchanged: the annotations go to
       // the front of the list, which is what "layered in front" means.
-      from: "  const layers: readonly Layer[] = [\n    ...block.series.flatMap((s, index) =>",
-      to: "  const layers: readonly Layer[] = [\n    ...(block.annotations ?? []).map((a) => ({\n      glyphRows: annotationRows(a, range, layout.areaWidth, layout.areaRows, ctx.capabilities),\n      ref: `tone.${a.tone ?? \"muted\"}`,\n      kind: \"context\" as const,\n    })),\n    ...block.series.flatMap((s, index) =>",
+      // Re-anchored 2026-09-05: the series list is `drawn` — the hidden filter's
+      // output with indices kept (C12 I116) — and the annotations sit after it.
+      from: "  const layers: readonly Layer[] = [\n    ...drawn.flatMap(({ s, index }) =>",
+      to: "  const layers: readonly Layer[] = [\n    ...(block.annotations ?? []).map((a) => ({\n      glyphRows: annotationRows(a, range, layout.areaWidth, layout.areaRows, ctx.capabilities),\n      ref: `tone.${a.tone ?? \"muted\"}`,\n      kind: \"context\" as const,\n    })),\n    ...drawn.flatMap(({ s, index }) =>",
       expect: "T1.30",
     },
     {

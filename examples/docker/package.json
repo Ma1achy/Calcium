@@ -13,7 +13,7 @@
   "scripts": {
     "check": "tsc --noEmit",
     "test": "vitest run --dir test",
-    "start": "node --experimental-strip-types src/main.ts",
+    "start": "NODE_ENV=production node --experimental-strip-types src/main.ts",
     "test:package": "vitest run --dir test --exclude \"**/repo/**\""
   },
   "dependencies": {

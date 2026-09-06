@@ -97,9 +97,9 @@ exports[`C09 I34 — the contained failure, in a frame > dark-ascii wrapping at 
 frame 2 — asked 6
 +--------------------------------------+
 | [38;2;198;40;40m--------------[38;2;255;255;255m[48;2;198;40;40m ERROR [49m[38;2;198;40;40m---------------[39m |
-| [38;2;198;40;40m! plot failed to render: Cannot     [39m |
-| [38;2;198;40;40mread properties of undefined        [39m |
-| [38;2;198;40;40m(reading 'series')                  [39m |
+| [38;2;198;40;40m! plot failed to render: Cannot read[39m |
+| [38;2;198;40;40mproperties of undefined (reading    [39m |
+| [38;2;198;40;40m'series')                           [39m |
 +--------------------------------------+"
 `;
 
@@ -212,9 +212,9 @@ exports[`C09 I34 — the contained failure, in a frame > dark-unicode wrapping a
 frame 2 — asked 6
 ┌──────────────────────────────────────┐
 │ [38;2;198;40;40m──────────────[38;2;255;255;255m[48;2;198;40;40m ERROR [49m[38;2;198;40;40m───────────────[39m │
-│ [38;2;198;40;40m▲ plot failed to render: Cannot     [39m │
-│ [38;2;198;40;40mread properties of undefined        [39m │
-│ [38;2;198;40;40m(reading 'series')                  [39m │
+│ [38;2;198;40;40m▲ plot failed to render: Cannot read[39m │
+│ [38;2;198;40;40mproperties of undefined (reading    [39m │
+│ [38;2;198;40;40m'series')                           [39m │
 └──────────────────────────────────────┘"
 `;
 
@@ -327,9 +327,9 @@ exports[`C09 I34 — the contained failure, in a frame > light-unicode wrapping 
 frame 2 — asked 6
 ┌──────────────────────────────────────┐
 │ [38;2;168;31;18m──────────────[38;2;255;255;255m[48;2;168;31;18m ERROR [49m[38;2;168;31;18m───────────────[39m │
-│ [38;2;168;31;18m▲ plot failed to render: Cannot     [39m │
-│ [38;2;168;31;18mread properties of undefined        [39m │
-│ [38;2;168;31;18m(reading 'series')                  [39m │
+│ [38;2;168;31;18m▲ plot failed to render: Cannot read[39m │
+│ [38;2;168;31;18mproperties of undefined (reading    [39m │
+│ [38;2;168;31;18m'series')                           [39m │
 └──────────────────────────────────────┘"
 `;
 

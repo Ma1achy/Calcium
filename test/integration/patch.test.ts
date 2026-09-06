@@ -6,7 +6,9 @@ import { patchDefinition } from "../../src/presentation/patch/index.js";
 import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
 import { defaultTheme, diffPairs, floorFor, ratio } from "../../src/presentation/theme/index.js";
 import { hunkOf, patchOf, THE_ILLUSTRATION } from "../support/blocks.js";
-import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LIGHT_THEME, measurable, visible } from "../support/render.js";
+import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LIGHT_THEME, MONO_CAPS, measurable, visible } from "../support/render.js";
+import { underlinedRuns } from "../support/underline.js";
+import { b } from "../../src/index.js";
 import { cells } from "../../src/presentation/text.js";
 import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
@@ -165,5 +167,47 @@ describe("C25 integration", () => {
 
     expect(dark.join("\n")).not.toBe(light.join("\n"));
     expect(light.map(visible), "colour never changes geometry").toEqual(dark.map(visible));
+  });
+
+  it("T4.12 (C25 I10, with C04, C10): the frame — SGR 4 on the changed word alone, unified at 60 and split at 120, and still there at 1-bit", () => {
+    // **The frame this row was read against**, before it was asserted: three lines,
+    // one changed digit. `b.patch` is the writer, so the fixture goes through it
+    // rather than through `patchOf`, which builds a block and writes nothing.
+    const patch = b.patch({
+      id: "frame",
+      path: "deploy.yaml",
+      language: "yaml",
+      hunks: [
+        {
+          header: "@@ -1,3 +1,3 @@",
+          lines: [
+            { kind: "context", text: "spec:", oldNo: 1, newNo: 1 },
+            { kind: "remove", text: "  replicas: 2", oldNo: 2 },
+            { kind: "add", text: "  replicas: 3", newNo: 2 },
+            { kind: "context", text: "  image: app", oldNo: 3, newNo: 3 },
+          ],
+        },
+      ],
+    });
+
+    for (const caps of [FULL_CAPS, MONO_CAPS, ASCII_CAPS]) {
+      const unified = kit({ capabilities: caps }).renderToLines(patch, 60);
+      // path, header, spec:, -replicas, +replicas, image
+      expect(unified.map(underlinedRuns), `unified at 60, depth ${String(caps.colourDepth)}`).toEqual([[], [], [], ["2"], ["3"], []]);
+      // The gutter is never underlined: the underlined cell is *after* the marker.
+      const remove = visible(unified[3] ?? "");
+      expect(remove.indexOf("2"), "the first `2` is the line number, in the gutter").toBeLessThan(remove.indexOf("replicas"));
+      expect(remove.lastIndexOf("2")).toBeGreaterThan(remove.indexOf("replicas"));
+
+      const split = kit({ capabilities: caps }).renderToLines(patch, 120);
+      // path, header, spec: │ spec:, -replicas │ +replicas, image │ image
+      expect(split.map(underlinedRuns), `split at 120, depth ${String(caps.colourDepth)}`).toEqual([[], [], [], ["2", "3"], []]);
+    }
+  });
+
+  it("T4.12 (C25 I10, with C09): a patch built without the builder carries no spans and paints no underline — the renderer never diffs", () => {
+    // `patchOf` constructs the block directly. Same lines, same pair, no writer.
+    const rows = kit().renderToLines(patchOf({ hunks: [hunkOf([" spec:", "-  replicas: 2", "+  replicas: 3"])] }), 60);
+    expect(rows.map(underlinedRuns)).toEqual(rows.map(() => []));
   });
 });

@@ -12,7 +12,15 @@ import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
 const FIELD = "src/presentation/plot/field.ts";
+// **`dimColour`'s traversal moved to `colormap.ts`** when `shadeColour` needed
+// the same one (C12 I94). The mutation below is re-anchored rather than
+// dropped: it is now a wider cut — both callers lose their 8-bit arm — and
+// LY8b still names the one this run is about.
+const CMAP = "src/presentation/theme/colormap.ts";
 const HEAT = "src/presentation/plot/heatmap.ts";
+// The marching-squares core, the levels and the layer membership moved above
+// both rasterisers with C12 I71 — the derivation is what both arms share.
+const FIGURE = "src/presentation/plot/figure.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -41,8 +49,8 @@ const results = runPass({
       // *disagree*; reading the corner bit itself is the plausible wrong answer
       // and it is right in four of the sixteen cases by coincidence.
       name: "the mask reads the corner bit rather than the disagreement",
-      file: FIELD,
-      from: "    (a !== b ? LINE_UP : 0) |",
+      file: FIGURE,
+      from: "    (a !== b ? LINE_UP : 0) | (b !== c ? LINE_RIGHT : 0) |",
       to: "    (a ? LINE_UP : 0) |",
       expect: "CN1",
     },
@@ -50,7 +58,7 @@ const results = runPass({
       // The saddle by a constant. **Fails CN2 and not CN2b**, which is the pair:
       // on the `line` arm both resolutions are `┼` and this mutation is invisible.
       name: "the saddle resolves by a constant rather than the centre value",
-      file: FIELD,
+      file: FIGURE,
       from: "  const centre = (tl + tr + br + bl) / 4;\n  return (centre >= level) === (tl >= level);",
       to: "  return true;",
       expect: "CN2",
@@ -72,7 +80,7 @@ const results = runPass({
       // there. CN9 was written because of it: a hole in a uniformly-high region
       // is the only shape that separates the two readings.
       name: "an absent corner counts as below the level",
-      file: FIELD,
+      file: FIGURE,
       from: "  if (tl === null || tr === null || br === null || bl === null) return 0;",
       to: "  tl ??= 0; tr ??= 0; br ??= 0; bl ??= 0;",
       expect: "CN9",
@@ -141,7 +149,7 @@ const results = runPass({
     {
       // `field`'s membership is load-bearing; dropping the check paints it always.
       name: "the field paints whether or not `layers` names it",
-      file: FIELD,
+      file: FIGURE,
       from: '  return layersOf(block).includes("field");',
       to: "  return true;",
       expect: "LY2",
@@ -170,9 +178,9 @@ const results = runPass({
       // argument — applied, ignored, silent, on every terminal between the
       // colour floor and true colour (C12 §3y).
       name: "the dim is applied only to an rgb colour, so 8-bit gets none",
-      file: FIELD,
-      from: '  if (colour.kind === "ansi256") {',
-      to: "  if (false) {",
+      file: CMAP,
+      from: '  if (colour.kind === "ansi256") {\n    const hex = ansi256Hex(colour.index);',
+      to: "  if (false) {\n    const hex = ansi256Hex(colour.index);",
       expect: "LY8b",
     },
     {
@@ -189,8 +197,8 @@ const results = runPass({
       // Levels derived from the ends inward, so a level sits at the minimum and
       // crosses nothing — *no contour* where the caller asked for one.
       name: "the derived levels include the range's ends",
-      file: FIELD,
-      from: "  return axis.ticks.filter((v) => v > range.min && v < range.max);",
+      file: FIGURE,
+      from: "  return niceAxis(range, 6, block).ticks.filter((v) => v > range.min && v < range.max);",
       to: "  return axis.ticks;",
       expect: "CN5",
     },

@@ -9,6 +9,19 @@ export declare function checkModuleGraph(
 
 export declare const MODULE_GRAPH_RULES: readonly string[];
 
+/** MG2 — cycles known and not yet broken, `a <-> b` keys with a reason each; compared by equality. */
+export declare const ACKNOWLEDGED_CYCLES: Readonly<Record<string, string>>;
+/** MG2 — every intra-layer value-import cycle in `files`, as sorted ` <-> `-joined member lists. */
+export declare function layerCycles(
+  files: readonly string[],
+  readFile?: (file: string) => string,
+): string[];
+export declare function checkLayerCycles(
+  files: readonly string[],
+  readFile?: (file: string) => string,
+  acknowledged?: Readonly<Record<string, string>>,
+): Violation[];
+
 /**
  * Which `MODE_OWNERS` rows name an export `escapes.ts` actually has. A row for
  * an absent name cannot fire — the third way a rule comes to have nothing to be
@@ -69,6 +82,18 @@ export declare const UNCONSUMED_FUNCTIONS: Readonly<Record<string, string>>;
  * than as an interface. The allow-list is compared by equality, so an entry that
  * no longer excuses anything is itself a violation.
  */
+/**
+ * MG29 — an exported function whose parameter type is not published (C24 I29).
+ *
+ * `readFile` is a parameter so the fabricated violation can un-publish a type
+ * without touching the tree, which is the only way to drive a rule whose subject
+ * is the entry point's own export list.
+ */
+export declare function checkExportedArguments(
+  files: readonly string[],
+  readFile?: (f: string) => string,
+): Violation[];
+
 export declare function checkFunctionConsumers(
   files: readonly string[],
   readFile?: (f: string) => string,

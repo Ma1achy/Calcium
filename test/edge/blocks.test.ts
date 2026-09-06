@@ -7,7 +7,9 @@ import type { BlockFault, BlockRegistry } from "../../src/presentation/blocks/in
 import { cells } from "../../src/presentation/text.js";
 import { scrollDefinition } from "../../src/presentation/blocks/kinds/containers.js";
 import { renderSequenceToLines, renderToLines } from "../../src/presentation/render-lines.js";
-import { ONE_PER_KIND } from "../support/blocks.js";
+import { CORPUS, ONE_PER_KIND } from "../support/blocks.js";
+import { tableDefinition } from "../../src/presentation/table/index.js";
+import { planColumns } from "../../src/presentation/table/plan.js";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LOUD, measurable, visible } from "../support/render.js";
 
 describe("C09 §6 — the transition table's remaining cells", () => {
@@ -355,7 +357,7 @@ describe("C09 tier 3 — containment", () => {
         render: (): never => ONE_PER_KIND.rule as never,
         elements: (): unknown => {
           if (kind === "bad") throw new TypeError("elements exploded");
-          return [{ id: `${kind}-e0`, rows: { from: 0, to: 1 }, kind: "row" }];
+          return [{ id: `${kind}-e0`, rows: { from: 0, to: 1 }, cols: { from: 0, to: 1 }, level: "row" }];
         },
       } as never);
     }
@@ -384,8 +386,8 @@ describe("C09 tier 3 — containment", () => {
         measure: (): number => 2,
         render: (): never => ONE_PER_KIND.rule as never,
         elements: (): unknown => [
-          { id: "e0", rows: { from: 0, to: 1 }, kind: "row" },
-          { id: "e1", rows: { from: 1, to: 2 }, kind: "row" },
+          { id: "e0", rows: { from: 0, to: 1 }, cols: { from: 0, to: 1 }, level: "row" },
+          { id: "e1", rows: { from: 1, to: 2 }, cols: { from: 0, to: 1 }, level: "row" },
         ],
       } as never);
       registry.register({
@@ -511,5 +513,85 @@ describe("C09 §3, I33 — C04's floor, applied by the registry", () => {
     const kept = kit.registry.windowSequence([tall], 40, 5, 10);
     expect(kept.blocks[0], "the floored block is the block").toBe(tall);
     expect(kept.skipRows, "and its rows are paid out of slack").toBe(5);
+  });
+});
+
+describe("C09 §2c width — the answers (I42–I44)", () => {
+  const kit = measurable({ definitions: [tableDefinition as never] });
+  const w = (b: Block, at: number): number => kit.registry.width(b, at);
+
+  it("T3.67 (C09 I43): a block is the same height at its content width, over the corpus and widths 7…80", () => {
+    const corpus = CORPUS.filter((b) => !["plot", "patch"].includes(b.kind));
+    const failures: string[] = [];
+    for (const b of corpus) {
+      for (let at = 7; at <= 80; at += 1) {
+        const cw = w(b, at);
+        if (cw < 1 || cw > at) failures.push(`${b.kind} ${b.id}: width ${String(cw)} at ${String(at)} is outside [1, ${String(at)}]`);
+        if (kit.measure(b, cw) !== kit.measure(b, at)) {
+          failures.push(`${b.kind} ${b.id}: ${String(kit.measure(b, cw))} rows at ${String(cw)}, ${String(kit.measure(b, at))} at ${String(at)}`);
+        }
+      }
+    }
+    expect(failures).toEqual([]);
+  });
+
+  it("T3.68 (C09 I42, C09 I44): the text kinds answer their edge and the residual-absorbing forms fill", () => {
+    const notice = block({ kind: "notice", id: "n", tone: "info", text: "abcdefghi" });
+    expect(w(notice, 40)).toBe(9);
+    expect(w(notice, 7), "clamped to the cell when it wraps").toBe(7);
+    expect(w(block({ kind: "raw", id: "r", text: "abc\nabcdefghijkl\nabcde" }), 40)).toBe(12);
+    const pills = block({ kind: "pills", id: "p", chips: [{ id: "a", label: "one" }, { id: "b", label: "two" }] });
+    expect(w(pills, 40), "two chips and the gap").toBe(3 + 2 + 3);
+    const bar = block({
+      kind: "keyValue", id: "kv",
+      rows: [{ label: "cpu", value: "50%", bar: { value: 50, max: 100 }, barWidth: 10 }],
+    });
+    expect(w(bar, 40), "a bar absorbs the residual").toBe(40);
+    const plain = block({ kind: "keyValue", id: "kv2", rows: [{ label: "cpu", value: "50%" }, { label: "memory", value: "1.2 GiB" }] });
+    expect(w(plain, 40), "key column, gap, longest value").toBe(6 + 2 + 7);
+
+    const column = { key: "name", label: "Name", align: "left", priority: 10, minWidth: 8, sortable: false } as const;
+    const rows = [{ id: "r1", cells: { name: { text: "row 1" } } }];
+    expect(w(block({ kind: "table", id: "tf", columns: [{ ...column, flex: true }], rows }), 40), "an uncapped flex column takes the residual").toBe(40);
+    const capped = block({ kind: "table", id: "tc", columns: [{ ...column, flex: true, maxWidth: 12 }], rows });
+    expect(w(capped, 40), "a capped flex column stops short, and the plan says where").toBe(12);
+    expect(w(block({ kind: "table", id: "ta", columns: [column], rows, actionBar: true }), 40), "an action bar").toBe(40);
+    expect(w(block({ kind: "table", id: "te", columns: [column], rows: [] }), 40), "no rows").toBe(40);
+    const fixed = block({ kind: "table", id: "tn", columns: [column, { ...column, key: "size", label: "Size" }], rows: [
+      { id: "r1", cells: { name: { text: "row 1" }, size: { text: "12" } } },
+    ] });
+    const plan = planColumns(fixed.columns, 40);
+    const planned = plan.visible.reduce((t, c) => t + c.width, 0) + plan.gap * (plan.visible.length - 1);
+    expect(w(fixed, 40), "the planned columns and gaps").toBe(planned);
+    expect(planned).toBeLessThan(40);
+  });
+
+  it("T3.69 (C09 I44): containers answer only when their layout does not depend on the width", () => {
+    const notice = block({ kind: "notice", id: "n", tone: "info", text: "abcdefghi" });
+    const raw = block({ kind: "raw", id: "r", text: "abcdefghijkl" });
+    const fixed = block({ kind: "group", id: "gf", direction: "row", children: [notice, raw], flex: [{ cells: 9 }, { cells: 12 }] });
+    expect(w(fixed, 40), "fixed shares sum with the gutter").toBe(9 + 1 + 12);
+    const weighted = block({ kind: "group", id: "gw", direction: "row", children: [notice, raw], flex: [1, 1] });
+    expect(w(weighted, 40), "a weighted row fills").toBe(40);
+    const column = block({ kind: "group", id: "gc", direction: "column", children: [notice, raw] });
+    expect(w(column, 40), "the widest child").toBe(12);
+    const aligned = block({ kind: "group", id: "ga", direction: "column", children: [notice, raw], align: ["left", "right"] });
+    expect(w(aligned, 40), "a column with an aligned child fills").toBe(40);
+    const panel = block({ kind: "panel", id: "p", title: "", children: [column] });
+    expect(w(panel, 40), "the widest child plus the border").toBe(14);
+    const titled = block({ kind: "panel", id: "pt", title: "abcdefghijklmnopqrst", children: [column] });
+    const cw = w(titled, 40);
+    // **The furniture is measured rather than counted**: the top border at the
+    // answered width carries the whole title, and one cell narrower it does not.
+    const border = (at: number): string => visible(kit.renderToLines(titled, at)[0] ?? "");
+    expect(border(cw)).toContain("abcdefghijklmnopqrst");
+    expect(border(cw - 1)).not.toContain("abcdefghijklmnopqrst");
+    expect(cw).toBe(25);
+  });
+
+  it("T3.70 (C09 I42): a row at a width that drops its second child answers the first child's width alone", () => {
+    const a = block({ kind: "raw", id: "a", text: "x" });
+    const dropped = block({ kind: "group", id: "gd", direction: "row", children: [a, a], flex: [{ cells: 30 }, { cells: 30 }] });
+    expect(w(dropped, 40)).toBe(30);
   });
 });

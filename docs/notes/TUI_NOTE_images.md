@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Working note. Nothing committed. Phase 1B at the earliest |
+| **Status** | Working note, and **the feature is built** — measured 2026-09-03: `src/presentation/image/` (codec, dither, halfblock, kitty, overlay, index), `src/presentation/blocks/kinds/image.ts`, `src/shell/transmit-image.ts`, eight `test/unit/image-*.test.ts`. This line said *Nothing committed. Phase 1B at the earliest*. **The tree followed `CALCIUM_IMAGES_NOTE.md`'s order, not this note's**: dither is the first arm rather than the last (`src/presentation/image/dither.ts:1-8`), `alt` is required as this note asked, and the Bayer matrix is 8×8 rather than the 2×4 cited below. Audit: `CALCIUM_NOTE_AUDIT.md` §7 |
 | **Prompted by** | [`ink-picture`](https://github.com/endernoke/ink-picture) — good reference, unusable as a dependency |
 | **Already there** | C02 detects `imageProtocol` (`iterm2` \| `kitty` \| `sixel` \| `none`); C09 §4 has its degradation row |
 

@@ -9,8 +9,11 @@
  * let the glyph carry the meaning.
  */
 
-export { DEFAULT_FLOOR, diffPairs, errorTagPairs, floorFor, isHex, luminance, ratio, selectionPairs, textSurfaces, validateTokens } from "./contrast.js";
+export { CATEGORY_REFS, refOf } from "./categorical.js";
+export { mixHex, rampStyle, stepOf } from "./ramp.js";
+export { DEFAULT_FLOOR, decorationTextPairs, diffPairs, errorTagPairs, floorFor, isHex, luminance, ratio, selectionPairs, textSurfaces, validateTokens } from "./contrast.js";
 export { DARK_FOUR_BIT, HIGH_CONTRAST_FOUR_BIT, LIGHT_FOUR_BIT, MUST_STAY_DISTINCT } from "./four-bit.js";
+export { assertPictureGlyph, isPictureGlyph } from "./picture.js";
 export {
   cacheSize,
   clearResolutionCache,

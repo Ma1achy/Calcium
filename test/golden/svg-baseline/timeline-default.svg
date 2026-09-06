@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
+<rect width="100%" height="100%" fill="#1a1a1a"/>
+<line x1="89.6" y1="12.8" x2="89.6" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="89.6" y1="288" x2="486.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="486.4" y1="12.8" x2="486.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="89.6" y1="12.8" x2="486.4" y2="12.8" stroke="#2c2c2c" stroke-width="1"/>
+<text x="89.6" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">2</text>
+<text x="486.4" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">41</text>
+<clipPath id="isvgb-0"><rect x="0" y="46.667" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="62.667" text-anchor="end" clip-path="url(#isvgb-0)" font-size="12" font-family="monospace" fill="#626262">deploy</text>
+<clipPath id="isvgb-1"><rect x="0" y="138.4" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="154.4" text-anchor="end" clip-path="url(#isvgb-1)" font-size="12" font-family="monospace" fill="#626262">incident</text>
+<clipPath id="isvgb-2"><rect x="0" y="230.133" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="246.133" text-anchor="end" clip-path="url(#isvgb-2)" font-size="12" font-family="monospace" fill="#626262">rollback</text>
+<path d="M89.6 58.667 L486.4 58.667" fill="none" stroke="#e69f00" stroke-width="2"/>
+<circle cx="89.6" cy="58.667" r="3" fill="#e69f00"/>
+<circle cx="160.821" cy="58.667" r="3" fill="#e69f00"/>
+<circle cx="242.215" cy="58.667" r="3" fill="#e69f00"/>
+<circle cx="354.133" cy="58.667" r="3" fill="#e69f00"/>
+<circle cx="486.4" cy="58.667" r="3" fill="#e69f00"/>
+<path d="M89.6 150.4 L486.4 150.4" fill="none" stroke="#56b4e9" stroke-width="2"/>
+<circle cx="191.344" cy="150.4" r="3" fill="#56b4e9"/>
+<circle cx="303.262" cy="150.4" r="3" fill="#56b4e9"/>
+<circle cx="435.528" cy="150.4" r="3" fill="#56b4e9"/>
+<path d="M89.6 242.133 L486.4 242.133" fill="none" stroke="#3cbf9a" stroke-width="2"/>
+<circle cx="201.518" cy="242.133" r="3" fill="#3cbf9a"/>
+<circle cx="445.703" cy="242.133" r="3" fill="#3cbf9a"/>
+</svg>

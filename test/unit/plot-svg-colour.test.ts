@@ -36,14 +36,29 @@ const hexOf = (ref: string, theme: ResolvedTheme): string => {
 };
 
 /** Every `fill=` and `stroke=` value in an SVG, lowercased, `none` dropped. */
-const paints = (svg: string): readonly string[] =>
-  [...svg.matchAll(/(?:fill|stroke)="([^"]*)"/gu)]
+// **A `url(#…)` is a reference and not a colour, so it is followed rather than
+// skipped** (§3ak.37). The colour key fills its bar from a `<linearGradient>`,
+// and the paint that reaches the page is the gradient's **stops** — so dropping
+// the reference and taking the stops keeps this row's claim true and makes it
+// stronger: it now checks the colours actually painted rather than the name of
+// the thing painting them. Skipping the reference and stopping there would have
+// let a whole ramp of foreign colours through under one unchecked attribute.
+const paints = (svg: string): readonly string[] => [
+  ...[...svg.matchAll(/(?:fill|stroke)="([^"]*)"/gu)]
     .map((m) => (m[1] ?? "").toLowerCase())
-    .filter((v) => v !== "none");
+    .filter((v) => v !== "none" && !v.startsWith("url(")),
+  ...[...svg.matchAll(/stop-color="([^"]*)"/gu)].map((m) => (m[1] ?? "").toLowerCase()),
+];
 
+// **`axes: true`, and it is load-bearing rather than tidy** (C12 I67). This arm
+// used to draw a gridline per tick whatever the block said, so a fixture with no
+// furniture still produced one and `TC1` could assert its colour. The furniture
+// is the figure's now — `frameOf` answers `"none"` when `axes` is unset, which is
+// what the terminal does — so a block that asks for no furniture has none to
+// paint, and a colour row needs a block that has some.
 const series = (n: number, values: readonly number[]): Plot =>
   b.plot({
-    id: "tc", form: "line", height: 8,
+    id: "tc", form: "line", height: 8, axes: true,
     series: Array.from({ length: n }, (_, i) => ({ label: `s${i}`, values: [...values] })),
   });
 
@@ -88,8 +103,11 @@ describe("TC — the SVG arm takes its colour from the theme", () => {
     // *furniture is not a series*, so it is muted, and the rule and the ground
     // are surfaces because they are drawn on the page rather than said about
     // the data.
-    expect(svg, "the ground is a surface").toContain(`fill="${hexOf("surface.bgDeep", DARK_THEME)}"`);
-    expect(svg, "the gridline is the border surface").toContain(`stroke="${hexOf("surface.border", DARK_THEME)}"`);
+    // **`surface.bg` and not `surface.bgDeep`** (C10 I34, §4f): the page carries
+    // every label this arm writes, and `bgDeep` is the one surface C10 §4
+    // excludes from every floor. The ref is asserted, not the hex.
+    expect(svg, "the ground is a surface").toContain(`fill="${hexOf("surface.bg", DARK_THEME)}"`);
+    expect(svg, "the frame is the border surface").toContain(`stroke="${hexOf("surface.border", DARK_THEME)}"`);
     expect(svg, "the tick labels are muted, not toned").toContain(`fill="${hexOf("tone.muted", DARK_THEME)}"`);
     expect(svg.includes(hexOf("tone.error", DARK_THEME)), "nothing here carries meaning").toBe(false);
   });

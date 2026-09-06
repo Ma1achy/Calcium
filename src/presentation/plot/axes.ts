@@ -428,8 +428,7 @@ export function yLabels(
   // from the *span* before, which is the same number divided by the tick count —
   // right when there were three labels and wrong the moment there are five, and
   // wrong in the direction that drops a digit two adjacent ticks differ by.
-  const places = axis.step > 0 ? stepDecimals(axis.step) : undefined;
-  const at = (v: number): string => formatValue(v, format, places);
+  const at = (v: number): string => formatValue(v, scaleFormat(format, axis.range.scale), placesFor(axis));
 
   if (h === 1) return [{ row: 0, text: at(axis.range.max) }];
 
@@ -490,6 +489,56 @@ function stepDecimals(step: number): number {
     if (Number(step.toFixed(d)) === step) return d;
   }
   return MAX_DECIMALS;
+}
+
+/**
+ * Every tick's label, at the axis's own precision — **the strings, beside the
+ * numbers that produced them** (C12 I59, §3ak).
+ *
+ * `yLabels` answers *which rows carry a label*, which is a question about cells
+ * and belongs to the terminal. This answers *what a tick says*, which is a
+ * question about the axis and belongs to both arms — and the two were computed
+ * in different places from different inputs, so the SVG printed `String(tick)`
+ * and got `1` where the terminal's uniform precision gives `1.0`, and
+ * `0.6000000000000001` where it gives `0.6`.
+ *
+ * **The precision is `stepDecimals` and not `decimalsFor`**, which is `yLabels`'
+ * own ruling and the reason this function is here rather than in the figure: a
+ * step is exact by construction, so the question has an exact answer, and asking
+ * a magnitude formatter instead put a decimal on every label of an integer axis.
+ * One derivation, read by both.
+ */
+export function tickLabels(axis: Axis, format: Plot["yFormat"]): readonly string[] {
+  return axis.ticks.map((v) => formatValue(v, scaleFormat(format, axis.range.scale), placesFor(axis)));
+}
+
+/**
+ * The format an axis's labels take — **the block's, or a duration where a
+ * `time` scale has none** (C04 I81).
+ *
+ * A `time` axis is seconds on a linear scale, and `niceTimeAxis` chooses its
+ * ticks at round intervals — minutes, hours, days. A label reading `172800`
+ * beside a tick chosen *because* it is two days is the scale doing half its job;
+ * the ladder A01 A.3's messages use (`2m 10s`, `48h`) is the other half. A
+ * declared `yFormat`/`xFormat` still wins, so a caller who wants raw seconds
+ * says `"number"` rather than losing the option.
+ */
+function scaleFormat(format: Plot["yFormat"], scale: ScaleType | undefined): Plot["yFormat"] {
+  return format ?? (scale === "time" ? "duration" : undefined);
+}
+
+/**
+ * An axis's precision — **one derivation, and it was two for a commit.**
+ *
+ * `tickLabels` landed with its own copy of `yLabels`' line, under a comment
+ * saying *one derivation, read by both*. Two identical lines is not only the
+ * duplication the comment denied: the mutation harness replaces by string, so
+ * an anchor on that line matched **twice**, and `anchors.mjs` did not report it
+ * because the sweep checks whether an anchor **exists** and not whether it is
+ * **unique** (F219).
+ */
+function placesFor(axis: Axis): number | undefined {
+  return axis.step > 0 ? stepDecimals(axis.step) : undefined;
 }
 
 /** Rows between two labels. One blank line, or the pair reads as one label. */
@@ -654,34 +703,78 @@ const X_LABEL_PITCH = 8;
 /**
  * Where a value sits along the x domain, as a fraction (C12 I41, §3d.1).
  *
- * **The x axis transforms where the y axis cannot, and the asymmetry is real
- * rather than an inconsistency.** A y value *is* the datum, so placing it under
- * a log scale needs the rasteriser to plot `log(v)` — which this component does
- * not do, and `yScale: "log"` therefore picks log ticks and draws them at linear
- * rows (F189). An x sample is placed by its **index**, evenly, and the domain is
- * what declares which value that index carries: under `xMin: 1, xMax: 1000,
- * xScale: "log"`, sample *i* of *n* holds `1000 ^ (i / (n − 1))` and already
- * sits at `i / (n − 1)` of the width. Placing a tick at `log(v) / log(max/min)`
- * is what makes the label agree with the sample beneath it.
- *
- * **`symlog` falls back to linear, and that is stated rather than silent.** Its
- * transform is piecewise — linear inside a threshold and logarithmic outside —
- * and the threshold is not on the scale value, so there is nothing here to read
- * it from. `niceSymlogAxis` still chooses the tick *values*; only their spacing
- * is linear, which is wrong near the origin and is the one arm of this function
- * that does not agree with its samples.
+ * **The shared coordinate, through the domain's scale** (C04 I81, §3ak). An x
+ * sample is placed by its **index**, evenly, and the domain declares which value
+ * that index carries: under `xMin: 1, xMax: 1000, xScale: "log"`, sample *i* of
+ * *n* holds `1000 ^ (i / (n − 1))` and already sits at `i / (n − 1)` of the
+ * width, so a tick placed at `log(v) / log(max / min)` is the one that agrees
+ * with the sample beneath it. That arithmetic used to live here, for the log
+ * family alone, with `symlog` falling back to linear spacing under a comment
+ * saying so; it is `scaled` in L0 now, which is the same function the y axis
+ * places its samples and ticks through — so this is one call and the abscissa
+ * has no arm that disagrees with its samples.
  */
 function xPositionOf(value: number, range: Range, scale?: ScaleType): number {
-  // **The shared coordinate** (C04 §3ak). This read `span <= 0 ? 0`, which puts
-  // every tick of a constant range at the axis's left edge; mid-ramp is the
-  // family's answer and the one C04's table gives.
-  const linear = normalisedOf(value, { min: range.min, max: range.max }, false);
-  const isLog = scale === "log" || scale === "log2" || scale === "ln"
-    || (typeof scale === "object" && "log" in scale);
-  if (!isLog || range.min <= 0 || range.max <= 0) return linear;
-  const lo = Math.log(range.min);
-  const hi = Math.log(range.max);
-  return hi === lo ? 0 : (Math.log(Math.max(value, Number.MIN_VALUE)) - lo) / (hi - lo);
+  const applied = scale ?? range.scale;
+  const through: Range = applied === undefined ? range : { min: range.min, max: range.max, scale: applied };
+  return normalisedOf(value, through, false);
+}
+
+/**
+ * **The abscissa's domain, its scale and its formatter — the three block fields
+ * the position axis is made of** (C12 I78, §3ak.44, F356).
+ *
+ * `Figure.positionAxis` is a boolean — *is the row drawn* — and it was the whole
+ * of what crossed, so `xMin`, `xMax`, `xScale` and `xFormat` had **zero readers**
+ * in the second arm. Six blocks differing only in these drew six terminal frames
+ * and one document.
+ *
+ * **The ticks are not here and that is the asymmetry with `value`.** A value
+ * axis nices against `ticksFor(plotAreaRows(block))` — a count derived from
+ * `height`, which is a *block* field, so both arms get the same ticks from one
+ * call. An abscissa's budget comes from the **width**, which no block carries
+ * and which §3aj hazard 3 keeps in cells. So what crosses is the domain and each
+ * arm nices it with its own budget, through `positionAxisAt` — one derivation,
+ * the budget a parameter, which is `valueAxisOf`'s own shape.
+ */
+export type PositionDomain = Readonly<{
+  range: Range;
+  scale: ScaleType | undefined;
+  format: Plot["xFormat"];
+}>;
+
+/** The abscissa niced to a budget: its ticks, their labels, and where each sits (I78). */
+export type PositionAxis = Axis & Readonly<{
+  labels: readonly string[];
+  /**
+   * Where each tick sits, normalised and **unflipped** — `xPositionOf`, above
+   * the seam so the position crosses rather than the scale being applied twice.
+   * `normalisedOf` has been scale-aware since C04 I81; what this member still
+   * settles is that both arms read one number rather than each computing it.
+   */
+  at: readonly number[];
+  /** Where 0 sits, or `null` unless the domain *strictly* straddles it (§3ad A4). */
+  zeroAt: number | null;
+}>;
+
+/**
+ * The abscissa at a given tick budget — **one derivation, called by both arms**
+ * (I78, §3ak.44).
+ *
+ * **`stepDecimals` and not `placesFor`**, which is `xTickRow`'s own rule moved
+ * rather than re-chosen: one precision per axis, from the step. `tickLabels`
+ * answers the ordinate's question and would give an index axis `0.0 5.0 10.0`.
+ */
+export function positionAxisAt(pos: PositionDomain, maxTicks: number): PositionAxis {
+  const axis = axisFor(pos.range, maxTicks, { yMin: pos.range.min, yMax: pos.range.max }, pos.scale);
+  const decimals = axis.step > 0 ? stepDecimals(axis.step) : undefined;
+  const straddles = axis.range.min < 0 && axis.range.max > 0;
+  return {
+    ...axis,
+    labels: axis.ticks.map((v) => formatValue(v, scaleFormat(pos.format, pos.scale), decimals)),
+    at: axis.ticks.map((v) => xPositionOf(v, axis.range, pos.scale)),
+    zeroAt: straddles ? xPositionOf(0, axis.range, pos.scale) : null,
+  };
 }
 
 export function xTicksFor(width: number): number {
@@ -733,23 +826,29 @@ export function xTickRow(
   if (w === 0 || !Number.isFinite(range.min) || !Number.isFinite(range.max)) {
     return { text: "", tickColumns: [], zeroColumn: null };
   }
-  const axis = axisFor(range, xTicksFor(w), { yMin: range.min, yMax: range.max }, scale);
-  // **`stepDecimals` and not `decimalsFor`**, which is §3d's own rule — *one
-  // precision per axis, from the step, and it is the step's own decimals*.
-  // `decimalsFor` answers a different question (how many digits does a value at
-  // this magnitude want) and gives a step of 5 one decimal, so an index axis
-  // came out `0.0 5.0 10.0` where the reference draws `0 5 10`. The rule was
-  // already written and `yLabels` already followed it.
-  const decimals = axis.step > 0 ? stepDecimals(axis.step) : undefined;
+  // **The axis is `positionAxisAt`'s and this function packs it** (I78,
+  // §3ak.44). What was here — `axisFor`, `stepDecimals`, `formatValue`,
+  // `xPositionOf` — is the abscissa, and the second arm had no way to reach any
+  // of it, so `xScale` and `xFormat` drew nothing there (F356). Everything below
+  // is cells: which column a label starts in, what it may not overlap, where the
+  // row runs out.
+  //
+  // **`stepDecimals` and not `decimalsFor`** moved with it, which is §3d's own
+  // rule — *one precision per axis, from the step, and it is the step's own
+  // decimals*. `decimalsFor` answers a different question and gives a step of 5
+  // one decimal, so an index axis came out `0.0 5.0 10.0` where the reference
+  // draws `0 5 10`.
+  const axis = positionAxisAt({ range, scale, format }, xTicksFor(w));
 
   const row: string[] = Array.from({ length: w }, () => " ");
   const tickColumns: number[] = [];
   let free = 0; // the first cell no label has claimed
 
-  for (const value of axis.ticks) {
-    const text = formatValue(value, format, decimals);
+  for (const [i, value] of axis.ticks.entries()) {
+    void value;
+    const text = axis.labels[i] ?? "";
     const wide = cells(text, caps.ambiguousWidth); // cells-ok — a label width
-    const t = xPositionOf(value, axis.range, scale);
+    const t = axis.at[i] ?? 0;
     // **`columnAt` gets the unflipped position and flips inside** (§3ac B3).
     // It maps a position to a *bar*, and `candleColumn` already faces its own
     // placement — handing it `1 − t` as well would flip the axis twice and draw
@@ -776,11 +875,11 @@ export function xTickRow(
   // sample 0, and a degenerate one — and the column must be strictly inside the
   // area, because at the edge `"zero"` and `"edge"` name the same place and a
   // rule at column 0 abuts the gutter's border (§3ad A4, A10, A15).
-  const straddles = axis.range.min < 0 && axis.range.max > 0;
-  const zero = straddles
-    ? columnAt?.(xPositionOf(0, axis.range, scale))
-      ?? Math.round((facing.x === "left" ? 1 - xPositionOf(0, axis.range, scale) : xPositionOf(0, axis.range, scale)) * (w - 1)) // cells-ok — a column index
-    : null;
+  const zeroAt = axis.zeroAt;
+  const zero = zeroAt === null
+    ? null
+    : columnAt?.(zeroAt)
+      ?? Math.round((facing.x === "left" ? 1 - zeroAt : zeroAt) * (w - 1)); // cells-ok — a column index
   const zeroColumn = zero !== null && zero !== undefined && zero > 0 && zero < w - 1 ? zero : null; // cells-ok — a column index
 
   return { text: row.join("").replace(/\s+$/u, ""), tickColumns, zeroColumn };
@@ -840,7 +939,9 @@ export function niceLogAxis(
 /**
  * Symlog axis: linear near zero, logarithmic outside.
  *
- * The linear threshold defaults to 1.
+ * The linear threshold is 1 — the same unit `scaled` in L0 places samples and
+ * ticks against (`sign(v) · log10(1 + |v|)`), so a tick chosen here lands where
+ * the transform puts the value it names.
  */
 export function niceSymlogAxis(
   range: Range,
@@ -919,9 +1020,28 @@ export function niceTimeAxis(
 }
 
 /**
- * Dispatch to the appropriate axis algorithm for a scale type.
+ * Dispatch to the appropriate axis algorithm for a scale type — **and hand the
+ * scale to the range the axis is placed against** (C04 I81).
+ *
+ * Every consumer of the shared coordinate holds `axis.range` and nothing else
+ * about the scale: the terminal's `rowOf`, the SVG's tick placement, the
+ * annotations, the candles, the bands. Attaching the scale here is what makes a
+ * `log` or `symlog` axis move its samples and its ticks together in both arms,
+ * with no consumer changed — F189's defect was a scale that chose ticks and
+ * reached no coordinate.
  */
 export function axisFor(
+  range: Range,
+  maxTicks: number,
+  pin: Pick<Plot, "yMin" | "yMax">,
+  scale?: ScaleType,
+): Axis {
+  const axis = pickAxis(range, maxTicks, pin, scale);
+  if (scale === undefined || scale === "linear") return axis;
+  return { ...axis, range: { ...axis.range, scale } };
+}
+
+function pickAxis(
   range: Range,
   maxTicks: number,
   pin: Pick<Plot, "yMin" | "yMax">,

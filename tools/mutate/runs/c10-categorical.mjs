@@ -11,7 +11,8 @@ import { report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const CMD = "npx vitest run test/contract/categorical.test.ts";
 const PLOT = "src/presentation/plot/definition.ts";
-const MARKS = "src/presentation/plot/marks.ts";
+// `refOf` moved down to C10 with the ink ramps (C10 I37); the control follows the door.
+const CATEGORICAL = "src/presentation/theme/categorical.ts";
 const VALID = "src/data/viewmodel/validate.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
@@ -72,7 +73,7 @@ const results = await runPass({
     // because every other consumer went on distinguishing colours and the frame
     // still had eight of them. The harness reported itself blind, which is what
     // that check is for.
-    file: MARKS,
+    file: CATEGORICAL,
     from: '  return CATEGORY_REFS[index % CATEGORY_REFS.length] ?? "categorical.c1"; // cells-ok — a palette size',
     to: '  return "categorical.c1";',
     why:

@@ -23,11 +23,11 @@ import {
   ROW_GUTTER,
   sequenceHeight,
 } from "../../../data/viewmodel/index.js";
-import type { Block, Group, MeasureFn, Mosaic, Panel, Scroll } from "../../../data/viewmodel/index.js";
-import { mosaicRects, parseAreas } from "../../../data/viewmodel/index.js";
+import type { Block, Group, MeasureFn, Mosaic, Panel, Scroll, WidthFn } from "../../../data/viewmodel/index.js";
+import { BORDER_INSET, axesOf, groupPlacements, groupRows, mosaicRects, parseAreas } from "../../../data/viewmodel/index.js";
 import type { NavElement } from "../types.js";
 import { cells, stripControl, truncate } from "../../text.js";
-import { glyphFor, glyphs } from "../glyphs.js";
+import { glyphCells, glyphFor, glyphs } from "../glyphs.js";
 import { clampSpans, paint, tone } from "../paint.js";
 import type { BlockDefinition, RenderContext } from "../types.js";
 
@@ -52,6 +52,30 @@ export const panelDefinition: BlockDefinition<Panel> = {
     // The border, one row each side. An empty panel is still two rows: the
     // border is content, unlike an empty group (C04 I17).
     return atLeastOne(total) + 2;
+  },
+
+  /**
+   * C09 §2c — the widest child plus the border, or the title or footer plus
+   * their furniture, whichever is wider. The furniture is five: `railPart`
+   * truncates to `inner − 3` and wraps the text in a space each side, so a
+   * title of `n` cells needs `n + 5` columns to draw untruncated with one
+   * horizontal glyph beside it; a live title carries its glyph and a space.
+   * Children are asked at the inset width they are rendered at.
+   */
+  width(block: Panel, width: number, widthChild: WidthFn): number {
+    const w = normaliseWidth(width);
+    const inner = insetWidth(w);
+    let widest = 1;
+    for (const child of block.children) widest = Math.max(widest, widthChild(child, inner));
+    const rail = (text: string | undefined, live: boolean): number => {
+      const shown = stripControl(text ?? "");
+      if (shown === "") return 0;
+      return cells(shown) + (live ? glyphCells("live") + 1 : 0) + 5; // narrow-ok — `width` is pure in (block, width) as `measure` is (C09 I42), and narrow is the measurer's convention
+    };
+    return Math.max(
+      1,
+      Math.min(w, Math.max(widest + BORDER_INSET, rail(block.title, block.live === true), rail(block.footer, false))),
+    );
   },
 
   render(block: Panel, ctx: RenderContext): ReactElement {
@@ -174,19 +198,13 @@ export const panelDefinition: BlockDefinition<Panel> = {
 
 // --- group -----------------------------------------------------------------
 
-/**
- * C04's vocabulary to Ink's, **down the row's height only** (C04 I45).
- *
- * There is no horizontal table because there is no horizontal axis: every
- * renderer fits its output to the width it is handed, so a child fills its
- * allocation and has nothing to be placed within. Heights are measurable and
- * widths are not.
- */
-const DOWN = {
-  top: "flex-start",
-  middle: "center",
-  bottom: "flex-end",
-} as const;
+// The vertical axis used to be a table from `Valign` to Yoga's `justifyContent`,
+// with a comment saying there was no horizontal table because there was no
+// horizontal axis: every renderer fits its output to the width it is handed.
+// That was true of the seam that existed — `measure(block, width) → height` —
+// and C09 §2c's `width` is the seam it lacked (F817). Both axes are now
+// `groupPlacements` in `measure.ts`, read here as margins and by the registry's
+// element walk as offsets (C04 I103), because the two used to disagree (F816).
 
 // --- scroll -----------------------------------------------------------------
 
@@ -213,6 +231,16 @@ function childRanges(
   return out;
 }
 
+/**
+ * The rows the box gives its content: `height`, or **zero when collapsed**
+ * (C04 I98). The residue row is chrome on top of this in both cases, which is
+ * what makes a collapsed box *the residue row and nothing else* without a second
+ * rule about what it draws.
+ */
+function interiorOf(block: Scroll): number {
+  return block.collapsed === true ? 0 : block.height; // cells-ok — a row count
+}
+
 /** The content's total height, which decides the residue row (C04 I49). */
 function contentHeight(block: Scroll, width: number, measureChild: MeasureFn): number {
   const ranges = childRanges(block, width, measureChild);
@@ -228,8 +256,17 @@ function contentHeight(block: Scroll, width: number, measureChild: MeasureFn): n
  * number this function bounds and nothing else ever sees.
  */
 function offsetOf(block: Scroll, ctx: RenderContext, content: number): number {
-  const held = ctx.scrollOffsets?.[block.id] ?? 0;
-  const most = Math.max(0, content - block.height);
+  const interior = interiorOf(block);
+  // **Collapsed, the offset is forced to zero** (C04 §3c S2): the residue row
+  // then reads *+N more*, which is the fold's whole statement (C04 I104). A
+  // collapsed follow box has nothing to follow.
+  if (interior === 0) return 0;
+  const most = Math.max(0, content - interior);
+  const held = ctx.scrollOffsets?.[block.id];
+  // **A follow box nobody has touched opens at its tail** (C04 I97). The field
+  // is the initial preference; a held value — including the store's `∞`, which
+  // the clamp below resolves — is the reader's, and wins.
+  if (held === undefined) return block.follow === true ? most : 0;
   return Math.min(Math.max(0, Math.trunc(held)), most);
 }
 
@@ -275,12 +312,30 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
    */
   measure(block: Scroll, width: number, measureChild: MeasureFn): number {
     const w = normaliseWidth(width);
-    return block.height + (contentHeight(block, w, measureChild) > block.height ? 1 : 0);
+    const interior = interiorOf(block);
+    // Collapsed: `0 + 1`, because C04 I47 refuses an empty scroll so the content
+    // is always taller than a zero interior. The residue row is unconditional
+    // there *because* the interior is zero, not because C04 I49's condition changed.
+    return interior + (contentHeight(block, w, measureChild) > interior ? 1 : 0);
   },
 
   /** One per child, at block level — which is what makes C04 I47's refusal expressible. */
   elements(block: Scroll, width: number, measureChild: MeasureFn): readonly NavElement[] {
     const w = normaliseWidth(width);
+    // **A block declaring a collapsed form carries the toggle on every element**
+    // (C04 I98). Declared by presence: a scroll without the field has no fold
+    // and no affordance. The target is the block, because `expand`'s dispatcher
+    // searches rows first and blocks second (C04 §3c S5).
+    const activate =
+      block.collapsed === undefined
+        ? {}
+        : {
+            activate: Object.freeze({
+              kind: "expand" as const,
+              label: block.collapsed ? "expand" : "collapse",
+              target: block.id,
+            }),
+          };
     return Object.freeze(
       childRanges(block, w, measureChild).map((r) =>
         Object.freeze({
@@ -288,6 +343,7 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
           level: "block" as const,
           rows: Object.freeze({ from: r.from, to: r.to }),
           cols: Object.freeze({ from: 0, to: w }),
+          ...activate,
           // **A child with no `copy` makes `y` a silent no-op** (C26 I17).
           // `copyElement` filters undefined and empty out and returns early on
           // an empty result, so a container whose elements carried none was a
@@ -316,6 +372,16 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
    * `windowSequence` keeps a kind declaring none whole and pays for it out of
    * `skipRows`, which is exactly right for a block that is already small.
    *
+   * **The last sentence was true of the box and false of what it painted, for
+   * as long as no child was taller than the box** (F855). `height + 1` is the
+   * measure, and `render` drew every overlapping child whole — so a six-row box
+   * over a thirty-line screen measured 7 and painted 32, and the residue row
+   * went on counting against a window nobody had applied. The ruling above is
+   * unchanged: this kind still declares no `window`, because a bounded region's
+   * height is declared. What was missing is the window in the other direction —
+   * a scroll is not sliced, and it must slice — and that is C09 I58's
+   * `windowChild`, taken in `render` below.
+   *
    * **The correction this forces is in the classification, not here.** C26 §4a's
    * 2 × 2 sorted kinds by whether they declare `BlockDefinition.window` and read
    * that as *the container has a viewport*. Those are two senses of one word: a
@@ -325,35 +391,65 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
 
   render(block: Scroll, ctx: RenderContext): ReactElement {
     const width = normaliseWidth(ctx.width);
+    const interior = interiorOf(block);
     const content = contentHeight(block, width, ctx.measureChild);
     const offset = offsetOf(block, ctx, content);
     const g = glyphs(ctx.capabilities);
 
     const ranges = childRanges(block, width, ctx.measureChild);
-    const shown = ranges.filter((r) => r.to > offset && r.from < offset + block.height);
+    const shown = ranges.filter((r) => r.to > offset && r.from < offset + interior);
 
-    const children: ReactElement[] = shown.map((r) =>
-      createElement(
+    // **Each survivor is sliced to the part of it the window holds** (C09 I58,
+    // I59). Filtering by overlap and then drawing each child whole is right for
+    // several short children and bounds nothing when one child is taller than
+    // the interior: the route's own terminal measured 7 rows and painted 32,
+    // with `follow` inert and the residue counting against a window that was
+    // never applied (F855). `windowChild` returns `null` where the slice would
+    // cost the container something — an atomic kind, a floor, a cap, a residual
+    // — and the child is then kept whole, which is what every child got before.
+    const children: ReactElement[] = shown.map((r) => {
+      const height = r.to - r.from;
+      const from = Math.max(0, offset - r.from); // cells-ok — a row index
+      const to = Math.min(height, offset + interior - r.from); // cells-ok — a row index
+      const piece =
+        from === 0 && to === height ? r.child : (ctx.windowChild(r.child, width, from, to)?.block ?? r.child);
+      return createElement(
         Box,
         { key: r.child.id, width, flexDirection: "column" },
-        ctx.renderChild(r.child, width),
-      ),
-    );
+        ctx.renderChild(piece, width),
+      );
+    });
 
     const residue: ReactElement[] = [];
     // **The residue, both directions** (C04 I49). A settled container keeps the
     // offset it had, so content is hidden above as well as below — and a
     // bounded region that says neither is the empty-block class (F123).
-    if (content > block.height) {
+    if (content > interior) {
       const above = offset;
-      const below = Math.max(0, content - block.height - offset);
-      const dim = tone("dim", ctx.theme, ctx.capabilities);
+      const below = Math.max(0, content - interior - offset);
+      // **`accent` while focus is inside the box, `dim` otherwise** (C26 §7).
+      // The residue row is the box's only chrome and the one set of cells the
+      // data reserves whether or not a reader is in it, so it is what carries
+      // a focus that would otherwise paint nothing (F769). A scroll's elements
+      // are its children, so the head's `blockId` is this box and `rowId` is a
+      // child — the test is on the block alone. A box whose content fits has no
+      // residue row, and under focus draws as it did; §7 says so.
+      const held = ctx.focus !== null && ctx.focus.blockId === block.id;
+      const dim = tone(held ? "accent" : "dim", ctx.theme, ctx.capabilities);
       // **The separator is a comma and not a middle dot.** The first version
       // used one and C09 T4.4 caught it under unicode:"ascii" -- a literal
       // non-ASCII character in the very row written to keep the *mark* out of
       // the source. F6's class, one token to the right of where it was watched
       // for, and a comma needs no slot because it is the same everywhere.
-      const text = `${g.residue} ${String(above)} above, ${String(below)} below`;
+      // **Two texts, one mechanism** (C04 I104). An open box says which way the
+      // hidden rows lie, because the direction was measured to matter (§3c T6);
+      // a collapsed box shows nothing, so *0 above* names a distinction that
+      // does not exist (F826) and the fold reads *+N more*. Neither names a key:
+      // the affordance is `activate`, and the footer shows its label (C16 I19).
+      const text =
+        interior === 0
+          ? `${g.residue} +${String(content)} more`
+          : `${g.residue} ${String(above)} above, ${String(below)} below`;
       residue.push(
         createElement(
           Text,
@@ -399,7 +495,7 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
     // class, and the remedy is a seam rather than a clip.
     const drawn = shown.reduce((n, r) => n + ctx.measureChild(r.child, width), 0);
     const pads = Array.from(
-      { length: Math.max(0, block.height - drawn) }, // cells-ok — a row count, not a width
+      { length: Math.max(0, interior - drawn) }, // cells-ok — a row count, not a width
       (_unused, i) => createElement(Text, { key: `pad-${String(i)}` }, " "),
     );
 
@@ -541,47 +637,84 @@ export const groupDefinition: BlockDefinition<Group> = {
       // side by side have no "before" to put a gap in, so the field is ignored
       // there rather than being an error — which is why the two branches do not
       // share this line.
-      return atLeastOne(sequenceHeight(block.children, widths[0] ?? width, measureChild));
+      return atLeastOne(groupRows(block, sequenceHeight(block.children, widths[0] ?? width, measureChild)));
     }
 
     let tallest = 0;
     for (const height of heights) tallest = Math.max(tallest, height);
-    return atLeastOne(tallest);
+    // The author's floor (C04 I102): the row is its tallest child, or `minRows`
+    // if that is taller — and the cells are that tall, which is what lets a
+    // single child sit in a corner.
+    return atLeastOne(groupRows(block, tallest));
+  },
+
+  /**
+   * C09 §2c — a container answers only when its layout does not depend on the
+   * width it is given. A `row` whose shares are all `{cells}` sums them and the
+   * gutters; a `column` whose children are all `left` takes the widest. Every
+   * other group fills: a weighted row rendered at its own sum would re-divide
+   * that sum and land its children elsewhere, and a column holding a `right`
+   * child would move it when the column's cell shrank (C04 §3 table row 11a).
+   */
+  width(block: Group, width: number, widthChild: WidthFn): number {
+    const w = normaliseWidth(width);
+    if (block.direction === "column") {
+      if (block.children.some((_child, i) => axesOf(block.align?.[i]).h !== "left")) return w;
+      let widest = 1;
+      for (const child of block.children) widest = Math.max(widest, widthChild(child, w));
+      return Math.min(w, widest);
+    }
+    const shares = block.flex;
+    if (shares === undefined || shares.some((share) => typeof share !== "object")) return w;
+    const widths = childWidths(block, w);
+    const placed = placeable(block, w);
+    let total = 0;
+    for (let i = 0; i < placed; i += 1) total += (widths[i] ?? 1) + (i > 0 ? ROW_GUTTER : 0);
+    return Math.max(1, Math.min(w, total));
   },
 
   render(block: Group, ctx: RenderContext): ReactElement {
     const width = normaliseWidth(ctx.width);
     const widths = childWidths(block, width);
+    // **One placement, read here as margins** (C04 I103). `left` renders at the
+    // cell and moves nothing, so an unaligned row is byte for byte what it was;
+    // `centre` and `right` render the child at its content width and offset it
+    // (C04 I101). The vertical offset is against the row's height — the tallest
+    // child or `minRows` — and zero in a column, where the cell is the child's own
+    // height and there is nothing to move inside.
+    const placements = groupPlacements(block, width, ctx.measureChild, ctx.widthChild);
 
     const children = block.children
       .slice(0, placeable(block, width))
       .flatMap((child, index) => {
-        // **One axis, and it is not a measurement** (C04 I45). The child's Box
-        // is already the width the container computed and already stretches to
-        // the row's height, so `justifyContent` places its lines down inside a
-        // box that was sized before it was read. Absent is `top`, which is what
-        // a row did before this existed.
-        const align = block.align?.[index];
+        const at = placements[index] ?? { left: 0, top: 0, width: widths[index] ?? 1 };
+        // The cell — the allocation wide, stretched to the row's height by the
+        // row's default `alignItems` — and inside it the child at its placement.
+        // **No height is stated on the cell, and a dead guard is why that is
+        // written down.** A first version passed the row's height here; the row
+        // leaves `alignItems` at stretch, so every cell is already the row's
+        // height and the arithmetic changed nothing. It was added while
+        // diagnosing a consumer's failing frame that turned out to be a stale
+        // `dist/`, which is how a guard comes to be justified by a sentence that
+        // is true and not about the decision it is attached to.
         const drawn = createElement(
           Box,
           {
             key: child.id === "" ? String(index) : child.id,
             width: widths[index] ?? 1,
             flexDirection: "column",
-            // **No height is stated, and a dead guard is why that is written
-            // down.** A first version passed the row's height here, reasoning
-            // that `justifyContent` places content along a box's main axis and
-            // a box with no height is as tall as its content. The reasoning is
-            // sound and the premise is false: the row leaves `alignItems` at
-            // its default stretch — for the reason given below — so every child
-            // is already the row's height and the arithmetic changed nothing.
-            // **It was added while diagnosing a consumer's failing frame that
-            // turned out to be a stale `dist/`**, which is how a guard comes to
-            // be justified by a sentence that is true and not about the
-            // decision it is attached to.
-            ...(align === undefined ? {} : { justifyContent: DOWN[align] }),
           },
-          ctx.renderChild(child, widths[index] ?? 1),
+          createElement(
+            Box,
+            {
+              width: at.width,
+              flexDirection: "column",
+              flexShrink: 0,
+              ...(at.left === 0 ? {} : { marginLeft: at.left }),
+              ...(at.top === 0 ? {} : { marginTop: at.top }),
+            },
+            ctx.renderChild(child, at.width),
+          ),
         );
         return block.direction === "column" && child.gapBefore === true
           ? [createElement(Text, { key: `gap-${index}` }, " "), drawn]
@@ -609,6 +742,9 @@ export const groupDefinition: BlockDefinition<Group> = {
         // row, present at every width and invisible until something counts.
         columnGap: block.direction === "row" ? ROW_GUTTER : 0,
         overflowX: "hidden",
+        // The author's floor (C04 I102) — `minHeight`, never `height`, on §3d's
+        // measured argument: an over-full fixed box drops its first row.
+        ...(block.minRows === undefined ? {} : { minHeight: block.minRows }),
       },
       children,
     );

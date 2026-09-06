@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
+<rect width="100%" height="100%" fill="#1a1a1a"/>
+<line x1="89.6" y1="70.4" x2="89.6" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="89.6" y1="288" x2="614.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="614.4" y1="70.4" x2="614.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="89.6" y1="70.4" x2="614.4" y2="70.4" stroke="#2c2c2c" stroke-width="1"/>
+<text x="83.6" y="292" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">0</text>
+<text x="83.6" y="183.2" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">50</text>
+<text x="83.6" y="74.4" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">100</text>
+<text x="89.6" y="300" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">0</text>
+<text x="143.151" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">5</text>
+<text x="196.702" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">10</text>
+<text x="250.253" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">15</text>
+<text x="303.804" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">20</text>
+<text x="357.355" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">25</text>
+<text x="410.906" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">30</text>
+<text x="464.457" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">35</text>
+<text x="518.008" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">40</text>
+<text x="571.559" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">45</text>
+<text x="614.4" y="300" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">49</text>
+<rect x="89.6" y="3.2" width="9.6" height="9.6" fill="#e69f00"/>
+<text x="103.2" y="12.8" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">alpha</text>
+<rect x="185.6" y="3.2" width="9.6" height="9.6" fill="#56b4e9"/>
+<text x="199.2" y="12.8" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">beta</text>
+<rect x="281.6" y="3.2" width="9.6" height="9.6" fill="#3cbf9a"/>
+<text x="295.2" y="12.8" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">gamma</text>
+<path d="M89.6 179.2 L100.31 168.338 L111.02 157.585 L121.731 147.047 L132.441 136.831 L143.151 127.039 L153.861 117.767 L164.571 109.109 L175.282 101.152 L185.992 93.974 L196.702 87.648 L207.412 82.237 L218.122 77.794 L228.833 74.365 L239.543 71.983 L250.253 70.673 L260.963 70.446 L271.673 71.307 L282.384 73.245 L293.094 76.243 L303.804 80.268 L314.514 85.283 L325.224 91.236 L335.935 98.067 L346.645 105.71 L357.355 114.086 L368.065 123.113 L378.776 132.701 L389.486 142.753 L400.196 153.17 L410.906 163.846 L421.616 174.676 L432.327 185.551 L443.037 196.363 L453.747 207.003 L464.457 217.365 L475.167 227.346 L485.878 236.846 L496.588 245.77 L507.298 254.029 L518.008 261.54 L528.718 268.229 L539.429 274.027 L550.139 278.879 L560.849 282.734 L571.559 285.555 L582.269 287.314 L592.98 287.992 L603.69 287.583 L614.4 286.091" fill="none" stroke="#e69f00" stroke-width="2"/>
+<path d="M89.6 179.2 L100.31 190.062 L111.02 200.815 L121.731 211.353 L132.441 221.569 L143.151 231.361 L153.861 240.633 L164.571 249.291 L175.282 257.248 L185.992 264.426 L196.702 270.752 L207.412 276.163 L218.122 280.606 L228.833 284.035 L239.543 286.417 L250.253 287.727 L260.963 287.954 L271.673 287.093 L282.384 285.155 L293.094 282.157 L303.804 278.132 L314.514 273.117 L325.224 267.164 L335.935 260.333 L346.645 252.69 L357.355 244.314 L368.065 235.287 L378.776 225.699 L389.486 215.647 L400.196 205.23 L410.906 194.554 L421.616 183.724 L432.327 172.849 L443.037 162.037 L453.747 151.397 L464.457 141.035 L475.167 131.054 L485.878 121.554 L496.588 112.63 L507.298 104.371 L518.008 96.86 L528.718 90.171 L539.429 84.373 L550.139 79.521 L560.849 75.666 L571.559 72.845 L582.269 71.086 L592.98 70.408 L603.69 70.817 L614.4 72.309" fill="none" stroke="#56b4e9" stroke-width="2"/>
+<path d="M89.6 179.2 L100.31 157.585 L111.02 136.831 L121.731 117.767 L132.441 101.152 L143.151 87.648 L153.861 77.794 L164.571 71.983 L175.282 70.446 L185.992 73.245 L196.702 80.268 L207.412 91.236 L218.122 105.71 L228.833 123.113 L239.543 142.753 L250.253 163.846 L260.963 185.551 L271.673 207.003 L282.384 227.346 L293.094 245.77 L303.804 261.54 L314.514 274.027 L325.224 282.734 L335.935 287.314 L346.645 287.583 L357.355 283.531 L368.065 275.32 L378.776 263.277 L389.486 247.882 L400.196 229.749 L410.906 209.6 L421.616 188.24 L432.327 166.519 L443.037 145.304 L453.747 125.44 L464.457 107.72 L475.167 92.849 L485.878 81.421 L496.588 73.89 L507.298 70.558 L518.008 71.558 L528.718 76.849 L539.429 86.22 L550.139 99.298 L560.849 115.561 L571.559 134.362 L582.269 154.95 L592.98 176.504 L603.69 198.167 L614.4 219.073" fill="none" stroke="#3cbf9a" stroke-width="2"/>
+</svg>

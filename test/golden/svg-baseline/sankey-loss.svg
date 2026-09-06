@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
+<rect width="100%" height="100%" fill="#1a1a1a"/>
+<path d="M100.096 96.225 C223.424 96.225 223.424 16.065 346.752 16.065 L346.752 122.945 C223.424 122.945 223.424 203.105 100.096 203.105 Z" fill="#e69f00" fill-opacity="0.5"/>
+<path d="M357.248 16.065 C480.576 16.065 480.576 12.8 603.904 12.8 L603.904 173.12 C480.576 173.12 480.576 176.385 357.248 176.385 Z" fill="#56b4e9" fill-opacity="0.5"/>
+<path d="M357.248 176.385 C480.576 176.385 480.576 181.12 603.904 181.12 L603.904 288 C480.576 288 480.576 283.265 357.248 283.265 Z" fill="#56b4e9" fill-opacity="0.5"/>
+<rect x="89.6" y="96.225" width="10.496" height="106.88" fill="#e69f00" stroke="#1a1a1a" stroke-width="1"/>
+<text x="106.096" y="153.665" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round" paint-order="stroke">src</text>
+<rect x="346.752" y="16.065" width="10.496" height="267.2" fill="#56b4e9" stroke="#1a1a1a" stroke-width="1"/>
+<text x="363.248" y="153.665" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round" paint-order="stroke">hub</text>
+<rect x="603.904" y="12.8" width="10.496" height="160.32" fill="#3cbf9a" stroke="#1a1a1a" stroke-width="1"/>
+<text x="597.904" y="96.96" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="end">p</text>
+<rect x="603.904" y="181.12" width="10.496" height="106.88" fill="#f0e442" stroke="#1a1a1a" stroke-width="1"/>
+<text x="597.904" y="238.56" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="end">q</text>
+</svg>

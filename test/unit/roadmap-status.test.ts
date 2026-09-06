@@ -58,9 +58,15 @@ function run(text?: string): { ok: boolean; out: string } {
  * which one the report named.
  */
 function openRow(text: string): Readonly<{ at: number; end: number; line: string }> {
-  const m = /grep reach · \d+\/\d+[^\n]*?claim(?: — ([\d, ]+))?/u.exec(run().out);
-  const id = (m?.[1] ?? "").split(",")[0]?.trim();
-  expect(id, "the report names a confirmed-OPEN entry").toBeTruthy();
+  // **Fifth expiry, and the previous fix carried the very hostage it named.**
+  // It derived the id from the report's *blanket-claim* suffix — the subset of
+  // confirmed-OPEN entries whose clause names no symbol — and this session
+  // emptied that subset by giving 26, 32 and 37 clauses of their own. A
+  // derivation from a list that is allowed to be empty is a literal by another
+  // name. So the id comes from the population itself: the first entry the
+  // confirmed-OPEN paragraph discusses. That set is non-empty by RS4's rule.
+  const id = confirmedOpen(text)[0];
+  expect(id, "the confirmed-OPEN paragraph discusses at least one entry").toBeTruthy();
 
   const from = text.indexOf("## Order\n\n```\n") + "## Order\n\n```\n".length;
   const block = text.slice(from, text.indexOf("\n```\n", from));
@@ -70,6 +76,19 @@ function openRow(text: string): Readonly<{ at: number; end: number; line: string
 
   const at = from + (hit?.index ?? 0);
   return { at, end: at + (hit?.[0].length ?? 0), line: hit?.[0] ?? "" };
+}
+
+const OPEN_HEADING = "**Checked and confirmed OPEN**";
+
+/** The paragraph the sweep writes its evidence in, and the entries it discusses. */
+function openParagraph(text: string): Readonly<{ at: number; body: string }> {
+  const at = text.indexOf(OPEN_HEADING);
+  expect(at, "the confirmed-OPEN paragraph").toBeGreaterThan(-1);
+  return { at, body: text.slice(at, text.indexOf("\n\n", at)) };
+}
+
+function confirmedOpen(text: string): readonly string[] {
+  return [...openParagraph(text).body.matchAll(/\*\*(\d+)\*\*/gu)].map((m) => m[1] ?? "");
 }
 
 /** A fabrication, asserted to have changed something. */
@@ -101,27 +120,30 @@ describe("roadmap-status — the Order column's verifier", () => {
   });
 
   it("RS2: a claim naming the wrong file fails, and names the identifier", () => {
-    // The measured case, replayed as it actually stood: one cited file, and the
-    // wrong one. `logs` occurs 0 times in `simple.ts` and 8 in `structured.ts`.
-    // A file-exists check passes here — both files are real — so this is the row
-    // that distinguishes the two checks.
+    // The measured case's shape, on the row that still has it: one cited file,
+    // and the wrong one. It was row 17's `logs`, until that row grew to four
+    // implementers citing three files — every one of which holds `logs` or is
+    // cited beside one that does, so RS2c's limit masks any single repointing.
+    // Row 18 cites `refresh.ts` alone for `Source` and `folds`; `folds` occurs
+    // 0 times in `render-cache.ts`. A file-exists check passes here — both files
+    // are real — so this is the row that distinguishes the two checks.
     const r = run(
       mutate(
-        "`logs` — `src/presentation/blocks/kinds/structured.ts:123` — **and** `patch` — " +
-          "`src/presentation/patch/definition.ts:211` — declare",
-        "`logs` — `src/presentation/blocks/kinds/simple.ts:1` — declares",
+        "| 18 | BUILT | `src/shell/refresh.ts` — `Source`, the `folds` memo",
+        "| 18 | BUILT | `src/shell/render-cache.ts` — `Source`, the `folds` memo",
       ),
     );
     expect(r.ok, "a wrong-file citation must fail").toBe(false);
-    expect(r.out).toContain("entry 17");
-    expect(r.out).toMatch(/`logs` appears in none of/u);
+    expect(r.out).toContain("entry 18");
+    expect(r.out).toMatch(/`folds` appears in none of/u);
   });
 
   it("RS2c: a sibling citation masks a wrong one — the limit, asserted", () => {
     // **The fixture found this rather than the tool's comment predicting it.**
     // An identifier resolves against any file its cell cites, so repointing row
-    // 17's `logs` at `simple.ts` while the `patch` citation stands beside it
-    // PASSES: `logs` occurs once in the patch definition.
+    // 17's `logs` at `simple.ts` while its siblings stand beside it PASSES:
+    // `keyValue`'s citation is the same `structured.ts`, and `logs` occurs once
+    // in the patch definition besides.
     //
     // Asserted rather than described, because an unrecorded limit reads as
     // strength — and because the day the shape is tightened, this row is what
@@ -130,8 +152,8 @@ describe("roadmap-status — the Order column's verifier", () => {
     // fails every correct multi-file row.
     const masked = run(
       mutate(
-        "`src/presentation/blocks/kinds/structured.ts:123`",
-        "`src/presentation/blocks/kinds/simple.ts:1`",
+        "`logs` (`src/presentation/blocks/kinds/structured.ts:217`)",
+        "`logs` (`src/presentation/blocks/kinds/simple.ts:1`)",
       ),
     );
     expect(masked.ok, "the known limit: a two-file row hides a wrong citation").toBe(true);
@@ -213,28 +235,28 @@ describe("roadmap-status — the Order column's verifier", () => {
     expect(r.out).toMatch(/entry \d+ is OPEN and its own description says/u);
   });
 
-  it("RS8b: a built-word exemption that no longer matches its row fails", () => {
-    // **The equality arm, which is what keeps the exemption honest.** The pattern
-    // fired on four rows and two were real; 3 and 15 use a built-word without
-    // asserting the entry's own subject exists. Narrowing the regex to exclude them
-    // would also stop it seeing the next phrasing, so they are named exemptions
-    // quoting the sentence. An exemption checked by membership alone is one that
-    // outlives its reason, which is the failure every over-permissive list in this
-    // repo has had.
+  it("RS8b: the built-word exemption table is empty, and an empty arm is stated", () => {
+    // **The arm is vacuous today and this row is what says so.** Its two failure
+    // modes — an exemption on a row that is no longer OPEN, and one quoting a
+    // sentence the row no longer says — both need an entry in
+    // `OPEN_BUILT_WORDS`, and the table is now empty: 15's went when 15 was
+    // built, 3's went 2026-09-04 when 3 was marked PART. That is the equality
+    // rule disposing of its own population twice, which is the arm working.
     //
-    // **And the arm has now caught an exemption whose reason was wrong rather than
-    // stale, which is the case membership could never reach.** 3's old exemption
-    // quoted *built with prism-tui as the consumer* and reasoned that prism-tui does
-    // not exist in this tree — true, and it made the entry's gate the consumer's
-    // absence. The row now quotes the phrase in order to rule that it is not a gate,
-    // so the exemption had to be re-earned on the sentence that replaced it.
-    const reworded = mutate(
-      "says who validates the design, not who has to",
-      "settles who validates the design, not who has to",
-    );
-    const r = run(reworded);
-    expect(r.ok, "the quoted sentence is gone").toBe(false);
-    expect(r.out).toContain("re-earn the exemption or drop it");
+    // **The fixture cannot fabricate a violation for it**, and that is a fact
+    // about where the subject lives rather than a gap to be papered over: the
+    // exemptions are code and this file only fabricates documents. A row that
+    // pretended otherwise would be asserting a proxy. So it asserts the state,
+    // and the day someone adds an exemption this goes red — which puts the
+    // fabricated violation with the hand that adds it, where it can be written
+    // against a real sentence.
+    const tool = readFileSync("tools/roadmap-status.mjs", "utf8");
+    const m = /const OPEN_BUILT_WORDS = Object\.freeze\((\{[\s\S]*?\})\);/u.exec(tool);
+    expect(m, "the exemption table is declared where it always was").not.toBeNull();
+    expect(
+      (m?.[1] ?? "").replace(/\s+/gu, ""),
+      "an exemption was added — write its fabricated violation here, quoting the row's own sentence",
+    ).toBe("{}");
   });
 
   it("RS9: the grep-reach signal counts the sweep's own evidence, not the Order row", () => {
@@ -263,10 +285,18 @@ describe("roadmap-status — the Order column's verifier", () => {
     // ratio stops meaning anything rather than where the number happens to be.
     expect(total, "the confirmed-OPEN population is worth taking a ratio of").toBeGreaterThan(4);
     expect(carried, "some entries do carry their own symbol").toBeGreaterThan(0);
-    expect(carried, "and most rest on a blanket claim — that is the finding").toBeLessThan(total);
+    // **The ratio inverted 2026-09-04 and the assertion had to invert with it.**
+    // It read `carried < total` — *most rest on a blanket claim, that is the
+    // finding* — which was true at 5/8 and is a pin on a defect, so it went red
+    // on the session that fixed the defect. A bound that fails on success is the
+    // one direction a roadmap assertion must not fail in (RS9's own note, two
+    // lines up, about the floor). The relation asserted now is the one that
+    // stays true in both regimes: the count is a subset of the population.
+    expect(carried, "an entry cannot carry a symbol without being in the population")
+      .toBeLessThanOrEqual(total);
   });
 
-  it("RS9b: an entry given its own symbol moves the signal", () => {
+  it("RS9b: the reach count moves with the text — an entry losing its symbol", () => {
     // **The mutation, because a count that cannot move is not a measurement.** A
     // signal asserted only against itself passes whatever it reports, which is the
     // shape RS1 already had to be rewritten for.
@@ -279,11 +309,22 @@ describe("roadmap-status — the Order column's verifier", () => {
     // rests on a blanket claim, give that one a symbol, assert the count rises.
     // The circularity is only in *which* entry is picked; the assertion — the
     // count moves by exactly one — is independent of what the tool said.
+    // **Fifth anchor, and the direction is reversed because the population it
+    // read is now empty.** It took the first entry the signal called a blanket
+    // claim and gave it a symbol; this session gave all three of them clauses,
+    // so there is no blanket entry left to promote and the row would have failed
+    // on `id` being undefined. Adding one back would be fabricating the defect
+    // the session removed.
+    //
+    // So the mutation runs the other way: take an entry that **does** carry a
+    // symbol, strip the backticks out of its clause, and assert the count falls
+    // by exactly one. It measures the same thing — that the number moves with
+    // the text rather than being reported from nowhere — and its population is
+    // the one RS9 has already asserted is non-empty.
     const first = run().out;
     const before = Number(/grep reach · (\d+)\//u.exec(first)?.[1]);
-    const blanket = /blanket claim — ([\d, ]+)/u.exec(first)?.[1]?.split(",") ?? [];
-    const id = blanket[0]?.trim();
-    expect(id, "the signal names at least one blanket entry").toBeDefined();
+    const id = confirmedOpen(ROADMAP)[0];
+    expect(id, "the paragraph discusses at least one entry").toBeTruthy();
 
     // **Fourth anchor, and this time nothing textual is left in it.** The third
     // derived the *entry* from the report and then hardcoded the separator after
@@ -296,19 +337,123 @@ describe("roadmap-status — the Order column's verifier", () => {
     // it, splice there. `**9**` occurring earlier in the document — the hazard
     // the separator was carrying — cannot arise, because the offset is taken
     // from the paragraph rather than from the file.
-    const heading = "**Checked and confirmed OPEN**";
-    const from = ROADMAP.indexOf(heading);
-    const para = ROADMAP.slice(from, ROADMAP.indexOf("\n\n", from));
+    const { at: from, body: para } = openParagraph(ROADMAP);
     const at = para.indexOf(`**${String(id)}**`);
-    expect(at, `${String(id)} is discussed in the paragraph the signal reads`).toBeGreaterThan(-1);
+    const next = para.slice(at + 1).search(/\*\*\d+\*\*/u);
+    const end = next === -1 ? para.length : at + 1 + next;
+    const clause = para.slice(at, end);
+    expect(clause, "the clause names a symbol to take away").toMatch(/`[^`]+`/u);
 
-    const mark = `**${String(id)}**`;
-    const given =
-      ROADMAP.slice(0, from + at) +
-      `${mark} (no \`b.art\` in \`src/\`)` +
-      ROADMAP.slice(from + at + mark.length);
-    const after = /grep reach · (\d+)\//u.exec(run(given).out)?.[1];
-    expect(Number(after), `${String(id)} now carries its own symbol`).toBe(before + 1);
+    const stripped =
+      ROADMAP.slice(0, from + at) + clause.replaceAll("`", "") + ROADMAP.slice(from + end);
+    const after = /grep reach · (\d+)\//u.exec(run(stripped).out)?.[1];
+    expect(Number(after), `${String(id)} no longer carries its own symbol`).toBe(before - 1);
+  });
+
+  it("RS12: a declared gate whose symbol is present fails — the fabricated violation", () => {
+    // **Check 5 named this as its own blind spot and then became its instance.**
+    // Its header records: *a negative claim about a symbol is not covered —
+    // entry 33's `no queue of any kind in src/shell/` is the uncovered instance
+    // in the list today* — and 33's sentence went false in the same session.
+    // Two more went false unread: 52's clause said `camera`, `azimuth`,
+    // `elevation` and `halfBlockRows` occur zero times in
+    // `src/presentation/plot/` and they occur 33, 7, 7 and 1; 3's said `tensor`
+    // and `heatmap` occur zero times in `src/` and `heatmap` is a built form.
+    //
+    // The violation is fabricated rather than anchored on either, for RS8/RS10's
+    // reason: this session is rewriting both sentences. It is spliced onto the
+    // end of the confirmed-OPEN paragraph, and the symbol is one that certainly
+    // exists in the scope the gate names — `documentView` has an implementation
+    // file of its own under `src/shell/`.
+    const { at, body } = openParagraph(ROADMAP);
+    const gate = " **Gate**: `documentView` occurs zero times in `src/`.";
+    const r = run(ROADMAP.slice(0, at + body.length) + gate + ROADMAP.slice(at + body.length));
+    expect(r.ok, "a symbol declared absent and present in the tree").toBe(false);
+    expect(r.out).toMatch(/a gate says `documentView` occurs zero times/u);
+    // **The set is asserted, not the first file.** The first draft pinned
+    // `document-view.ts` and went red because the arm named `construct.ts` —
+    // which is where the walk happened to arrive first, an ordering the rule
+    // never promised. The arm now reports every writer, sorted, so the row
+    // asserts a member of the set (`execution.ts` calls `documentView.open`)
+    // and survives any reorder of the tree.
+    expect(r.out).toMatch(/\d+ files write it \(/u);
+    expect(r.out).toContain("src/shell/execution.ts");
+  });
+
+  it("RS12b: the roadmap's own gates resolve, and a true one passes — the control", () => {
+    // **Without this the arm is indistinguishable from one that fires on the
+    // marker.** A rule failing every `**Gate**` would pass RS12 exactly as well,
+    // and the document's live gates are the population it would break. They are
+    // asserted through the report's own counter rather than by name, because a
+    // gate is allowed to be retired and a literal here would be a hostage.
+    const r = run();
+    expect(r.ok, "the corpus as it stands").toBe(true);
+    const m = /negative-symbol gates · (\d+) symbols declared absent/u.exec(r.out);
+    expect(m, "the gate counter").not.toBeNull();
+    expect(Number(m?.[1]), "at least one entry states its absence as a gate").toBeGreaterThan(0);
+
+    const { at, body } = openParagraph(ROADMAP);
+    const gate = " **Gate**: `queueEngineOfNoFile` occurs zero times in `src/`.";
+    const ok = run(ROADMAP.slice(0, at + body.length) + gate + ROADMAP.slice(at + body.length));
+    expect(ok.ok, "a symbol that genuinely is not there").toBe(true);
+    expect(ok.out).not.toContain("queueEngineOfNoFile");
+  });
+
+  it("RS12c: a gate over an empty scope fails rather than reporting a clean resolve", () => {
+    // **The control that has to fail when the corpus is stubbed**, without which
+    // RS12b is vacuous: a resolver handed no files agrees with every negative
+    // claim ever written, very quickly, and exits 0. It is group 9's ruling for
+    // the third time in this file — RS6 for the entry list, RS7 for the
+    // accounting paragraph, this for the scope a gate names.
+    const { at, body } = openParagraph(ROADMAP);
+    const gate = " **Gate**: `whatever` occurs zero times in `src/no-such-dir/`.";
+    const r = run(ROADMAP.slice(0, at + body.length) + gate + ROADMAP.slice(at + body.length));
+    expect(r.ok, "an empty scan is not a clean one").toBe(false);
+    expect(r.out).toMatch(/holds no `\.ts` file/u);
+  });
+
+  it("RS12d: a symbol that occurs only in prose does not falsify its own gate", () => {
+    // **Prose inflates a textual signal, and the worst case is a comment saying
+    // why a thing is absent.** `src/shell/document-view.ts` names `transcript`
+    // exactly once and the once is a comment explaining that the view does not
+    // have one — so a gate counting raw matches would report the symbol present
+    // on the strength of the sentence stating its absence.
+    //
+    // Asserted on `Konsole`, which `src/terminal/` discusses and never writes.
+    // **The row asserts the premise too**: if the comment went, this would pass
+    // for the wrong reason and certify nothing.
+    const raw = readFileSync("src/terminal/capabilities.ts", "utf8");
+    expect(raw, "the premise: the word is in the file at all").toContain("Konsole");
+    expect(raw.replace(/\/\*[\s\S]*?\*\//gu, "").replace(/(^|[^:])\/\/.*$/gmu, "$1"))
+      .not.toContain("Konsole");
+
+    const { at, body } = openParagraph(ROADMAP);
+    const gate = " **Gate**: `Konsole` occurs zero times in `src/terminal/`.";
+    const r = run(ROADMAP.slice(0, at + body.length) + gate + ROADMAP.slice(at + body.length));
+    expect(r.ok, "comments are stripped before the symbol is resolved").toBe(true);
+  });
+
+  it("RS13 (F667, the other half): a blank column against a table status fails", () => {
+    // **The agreement check ran over the marked rows and the hole was the
+    // unmarked ones.** A blank column *means* OPEN — the parser says so in its
+    // own comment — but the loop iterated `marked`, so an entry with a status in
+    // the evidence table and nothing in the column was compared against nothing.
+    // Entry 3 was the live instance on 2026-09-04: `| 3 | PART |` in the table,
+    // blank in the column, listed as confirmed-OPEN, and the paragraph's own
+    // prose saying *3 is PART in the table above … rather than open*. Three
+    // records, all readable, and the tool printed *every claim resolves*.
+    //
+    // Constructed rather than anchored on 3, because 3 is what this session
+    // repaired. The subject is any confirmed-OPEN entry given a table row: it is
+    // OPEN by the column and PART by the table, and nothing else moves.
+    const id = confirmedOpen(ROADMAP)[0];
+    const anchorRow = "| 3 | PART |";
+    expect(ROADMAP, "the evidence table is where it was").toContain(anchorRow);
+    const row = `| ${String(id)} | PART | \`src/index.ts\` | — |\n`;
+    const r = run(ROADMAP.replace(anchorRow, row + anchorRow));
+    expect(r.ok, "two records of one status, one of them blank").toBe(false);
+    expect(r.out).toContain(`entry ${String(id)}`);
+    expect(r.out).toContain("the Order column says OPEN and the evidence table says PART");
   });
 
   it("RS5: an entry in two of the three sets fails", () => {
@@ -356,6 +501,30 @@ describe("roadmap-status — the Order column's verifier", () => {
     );
     expect(r.ok, "the file genuinely is not there").toBe(true);
     expect(r.out).not.toContain("queue-engine.ts");
+  });
+
+  it("RS11 (F667): the two records of one entry's status must agree", () => {
+    // **The rule that found two instances on its first run, one of them a day old.**
+    // The Order column and the evidence table each carry a status per entry and the
+    // parser has built both maps since this tool existed — nothing compared them,
+    // so entry 11 shipped `PART` in the column against `BUILT` in the table and
+    // this tool printed *every claim resolves* on that tree. Entry 7 had been
+    // disagreeing (`RULED` against `PART`) for longer.
+    const r = run(mutate("BUILT 11 markdown", "PART  11 markdown"));
+    expect(r.ok, "a disagreement is a failure").toBe(false);
+    expect(r.out).toContain("entry 11");
+    expect(r.out).toContain("the Order column says PART and the evidence table says BUILT");
+  });
+
+  it("RS11b: agreement is not resolution — the control", () => {
+    // **Without this row the check is indistinguishable from one that fires on any
+    // edit to the column.** The real roadmap's 42 marked entries all agree, and the
+    // rule must be silent on every one of them; what it does *not* check is whether
+    // the pair is right, which is rule 1's job for the citations and nobody's for
+    // the status itself.
+    const r = run(ROADMAP);
+    expect(r.ok, "the corpus as it stands").toBe(true);
+    expect(r.out).not.toContain("two records of one fact");
   });
 
   it("RS6: an Order block with no entries fails rather than reporting a clean scan", () => {

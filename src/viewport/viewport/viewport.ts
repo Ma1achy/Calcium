@@ -16,6 +16,7 @@
 
 import { HeightCache } from "./cache.js";
 import { HeightIndex } from "./index-tree.js";
+import { atTail } from "./tail.js";
 import type {
   Anchor,
   ScrollState,
@@ -123,8 +124,26 @@ class ViewportImpl implements Viewport {
       entries: Object.freeze(out),
       topRow: top,
       atTop: top === 0,
-      atBottom: top >= this.#maxTop(),
+      atBottom: atTail(top, this.#maxTop()),
     });
+  }
+
+  entryAtRow(row: number): Anchor | null {
+    // A region row, bounded by the viewport it is a row of. `>= height` rather
+    // than `> totalRows` alone, because a transcript taller than the viewport
+    // has rows below the region that no pointer can be on.
+    if (!Number.isInteger(row) || row < 0 || row >= Math.max(0, this.#height)) return null;
+    const absolute = this.#topRow + row;
+    // No `totalRows` guard: `locate` past the end yields `index === entries.length`,
+    // and the `undefined` check below already answers `null`. A guard here was
+    // measured dead — removing it failed nothing (F754's mutation M7).
+    // `locate` walks past zero-height entries, so `offset` is inside an entry
+    // that has rows — the same descent `visible()` starts from (T3.1c: an entry
+    // that begins above the top edge answers with the rows already scrolled).
+    const { index, offset } = this.#index.locate(absolute);
+    const entry = this.#view.entries[index];
+    if (entry === undefined) return null;
+    return Object.freeze({ id: entry.id, rowOffset: offset });
   }
 
   scrollBy(rows: number): void {
@@ -135,8 +154,9 @@ class ViewportImpl implements Viewport {
     // I5 — `followTail` is on iff the viewport is at the bottom. Derived from
     // where the viewport ended up, never from which way the user scrolled: a
     // scroll up that clamps at the bottom because the transcript is shorter than
-    // the screen has not detached anything.
-    this.#followTail = this.#topRow >= this.#maxTop();
+    // the screen has not detached anything. `atTail` is the one comparison the
+    // shell's tail helpers read too (C04 I97), so `>=` cannot drift in one copy.
+    this.#followTail = atTail(this.#topRow, this.#maxTop());
     if (!this.#followTail) this.#captureAnchor();
     else this.#anchor = null;
 
@@ -145,7 +165,9 @@ class ViewportImpl implements Viewport {
 
   scrollToTop(): void {
     this.#setTop(0);
-    this.#followTail = this.#maxTop() === 0;
+    // The same derivation as `scrollBy`: at the top, following iff the whole
+    // transcript fits — `maxTop() === 0`, spelled as the comparison it is.
+    this.#followTail = atTail(this.#topRow, this.#maxTop());
     this.#captureAnchor();
     this.#emit({ kind: "scroll" });
   }

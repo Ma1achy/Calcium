@@ -11,6 +11,23 @@
  * `muted` was the case in point: 2.52 on `bg`, 2.31 on `bgElev`. `bgDeep` is
  * excluded because it carries no text; if a surface ever paints text on it, that
  * surface is wrong or the exclusion is.
+ *
+ * **That conditional has fired once and the answer was *the surface*** (C10 I34,
+ * §4f, F632). The SVG plot arm painted its page in `bgDeep` and wrote every
+ * label on it; measured across the three shipped themes, light failed twelve
+ * slots there — `tone.muted` at 2.44 under its own 2.5 — while every one of them
+ * clears against `bg`. The page is `surface.bg` now. **The exclusion is not the
+ * watcher**, and nothing here can be: C10 T2.27 asserts the arm's page is a hex
+ * some member of `textSurfaces` holds, which closes that ground rather than the
+ * class of grounds.
+ *
+ * **And the same conditional on the other axis, also fired** (C10 I35, §4g,
+ * F652, F653). A floor is an ink paired with a ground, and the table above is
+ * written over the `meaning` palettes because those were the inks it knew about.
+ * `categorical` is `decoration` and the framework paints it as text at ten sites
+ * in both plot arms — so it was exempt from a check over every surface, and read
+ * as exempt from every floor. `decorationTextPairs` is the fourth named pairing;
+ * the two wider arms are refused by measurement below.
  */
 
 import type { PaletteSpec, ThemeError, ThemeTokens } from "./types.js";
@@ -91,7 +108,15 @@ export function floorFor(slot: string): number {
   return FLOORS[slot] ?? DEFAULT_FLOOR;
 }
 
-/** The two surfaces text lands on. `bgDeep` is not one of them, by decision. */
+/**
+ * The two surfaces text lands on. `bgDeep` is not one of them, by decision.
+ *
+ * **Exported for a second reason since C10 I34**: a renderer that paints its own
+ * page must paint it in a surface this function holds, and C10 T2.27 asserts
+ * that against the returned pairs rather than against a hex literal. So the
+ * failure it catches is *this ground is not a text surface*, whatever the theme
+ * happens to make that ground — the class, not the instance.
+ */
 export function textSurfaces(tokens: ThemeTokens): readonly (readonly [string, string])[] {
   return [
     ["bg", tokens.surfaces.bg],
@@ -245,6 +270,88 @@ export function selectionPairs(
   return Object.freeze(out);
 }
 
+/**
+ * §4g — a `decoration` palette painted as **text**, and it is the fourth named
+ * pairing rather than an entry in any of the first three (I35).
+ *
+ * **`validatePalette` skips a decoration palette entirely**, which was an
+ * exemption from the check over *every* surface and was read as an exemption
+ * from every floor. `categorical` is a decoration palette and the framework
+ * paints it as text: a callout at a line's end takes its series' colour (F382),
+ * a treemap tile's label is the page's ground **over** a categorical fill, and
+ * the outline, graph-node, flame-frame, pie-legend and terminal callout sites do
+ * the same — **ten sites in four figure families and both arms**, none of them
+ * art and none of them measured.
+ *
+ * **F652 and F653 are one pairing because `ratio` is symmetric.** A slot on the
+ * page and the page's ground on that slot are the same two colours; C10 §4f.1
+ * printed the same three figures twice and they were read as two findings.
+ *
+ * **Not vacuous, and the figures say so**: light `c4` is 4.74 against `bgElev`,
+ * 5% over its floor and the tightest margin the framework ships — and the
+ * palette has no luminance discipline of its own, the worst pair *within*
+ * `categorical` measuring **1.00** on all three themes because it is authored
+ * for hue. **The wide arm is refused by measurement, not by taste**: deleting
+ * the `decoration` skip binds `spectrum` too and rejects the light theme on 7 of
+ * its 9 stops, worst 2.36 — which is I31's own measurement from the colormap's
+ * side, that a floor deletes the low end a ramp exists to have.
+ *
+ * **Derived from the slots the framework can resolve** (`REQUIRED_SLOTS`, I30),
+ * so it grows with `refOf` and not with a theme's ambition — and it inherits
+ * I30's limit: a ninth slot a theme declares is painted by nothing and checked
+ * by nothing.
+ */
+export function decorationTextPairs(
+  tokens: ThemeTokens,
+): readonly (readonly [string, string, string, string])[] {
+  const out: (readonly [string, string, string, string])[] = [];
+  for (const [surfaceName, hex] of textSurfaces(tokens)) {
+    if (!isHex(hex)) continue;
+    for (const slot of REQUIRED_SLOTS["categorical"] ?? []) {
+      const value = tokens.palettes["categorical"]?.slots[slot];
+      if (value === undefined || !isHex(value)) continue;
+      out.push(["categorical", slot, surfaceName, hex]);
+    }
+  }
+  return Object.freeze(out);
+}
+
+/**
+ * §4g's check, and it is **not** folded into `validateDiffSurfaces` for the
+ * reason `validateErrorTag` is not: that function's message says *the background
+ * moves rather than the slot*, which is true of a diff row and false here. The
+ * ground is `bg`, every other floor is already measured against it, and the half
+ * that can move is the slot. A shared message would give the wrong advice at
+ * exactly the moment someone is reaching for the quick fix (SS23's argument, one
+ * layer down).
+ */
+function validateDecorationText(tokens: ThemeTokens): readonly ThemeError[] {
+  const errors: ThemeError[] = [];
+  for (const [palette, slot, surfaceName, hex] of decorationTextPairs(tokens)) {
+    const value = tokens.palettes[palette]?.slots[slot];
+    if (value === undefined) continue;
+    const measured = ratio(value, hex);
+    // **Written as the positive form rather than as `>= DEFAULT_FLOOR` and
+    // `continue`**, which is how `validateErrorTag` two functions up says the
+    // same thing — and a second copy of that line makes *its* mutation anchor
+    // ambiguous (F219; MA4 caught it on the first full run). An anchor is a
+    // claim about uniqueness in the tree, so a function added elsewhere can
+    // falsify one without touching the run file that holds it.
+    if (measured < DEFAULT_FLOOR) {
+      errors.push({
+        path: `palettes.${palette}.${slot}`,
+        message:
+          `"${slot}" is ${measured.toFixed(2)} : 1 against ${surfaceName} (${hex}), ` +
+          `below the ${DEFAULT_FLOOR} : 1 meaning floor — a decoration palette is ` +
+          `exempt from the check over every surface and not from a floor, and this ` +
+          `slot is the only thing naming its series where the framework paints it ` +
+          `as text (C10 I35, §4g), so the slot moves rather than the surface`,
+      });
+    }
+  }
+  return errors;
+}
+
 function validateDiffSurfaces(tokens: ThemeTokens): readonly ThemeError[] {
   const errors: ThemeError[] = [];
 
@@ -365,6 +472,7 @@ export function validateTokens(tokens: ThemeTokens): readonly ThemeError[] {
   errors.push(...validateRequiredSlots(tokens));
   errors.push(...validateDiffSurfaces(tokens));
   errors.push(...validateErrorTag(tokens));
+  errors.push(...validateDecorationText(tokens));
   errors.push(...validateVariant(tokens));
 
   return Object.freeze(errors);

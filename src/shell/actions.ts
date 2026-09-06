@@ -17,11 +17,19 @@
  *
  * **An action from a frozen entry is refused** (C23 I18, A01 D5, C13 §2). Frozen
  * entries hold stale data, and firing `↑ promote` from one is the footgun that
- * rule exists to prevent. Frozen-but-streaming is refused for the same reason:
- * it is not focusable, so an action on it can only have arrived by mistake.
+ * rule exists to prevent. Frozen-but-streaming is refused for the same reason.
+ *
+ * **Reachable from a keyboard since C26 §4g**, which is when the ruling was
+ * first pressed: a settled row can be focused and `⏎` arrives here with the
+ * settled entry as its origin. All five kinds stay refused — the two consumers
+ * that wanted something from a settled entry (a notebook's *re-run this cell*,
+ * an agent harness's *retry that tool call*) wanted its **recorded command**,
+ * which is not one of the five and is not stale; `rerunEntry` in `keys.ts` is
+ * that route, and the notice below names the command so the reader has it.
  */
 
-import type { Action } from "../data/viewmodel/index.js";
+import { descendants } from "../data/viewmodel/index.js";
+import type { Action, Block, Scroll } from "../data/viewmodel/index.js";
 import type { EntryId, TranscriptStore } from "../viewport/transcript/index.js";
 
 /** The schemes an `open` action may use. Nothing else reaches the OS handler. */
@@ -73,8 +81,25 @@ export function createActionDispatcher(deps: ActionDeps) {
   return (action: Action, from: EntryId | null = null): void => {
     // C23 I18 — before the switch, because every kind is refused and putting the
     // check inside each arm is three places to forget it.
-    if (isFrozen(deps.transcript, from)) {
-      deps.refuse(from, `\`${action.label}\` is from a frozen entry — its data is stale`);
+    //
+    // **`expand` is the exception, and the design walk is what found it** (C04
+    // §3c S4). It reveals data the entry already holds, fills nothing and runs
+    // nothing, so D8's staleness argument has no purchase — and the surfaces it
+    // exists for (a folded reasoning panel, a tool call's folded body) are
+    // settled entries by the time anyone reads them. Refused, §9b's *expanded
+    // with the expand action, which exists* was true of the live entry only.
+    if (action.kind !== "expand" && isFrozen(deps.transcript, from)) {
+      // **Every kind, including the one that only fills the prompt** (C23 I18).
+      // `fill`'s command was composed against rows that may no longer exist,
+      // and reading a stale identifier before running it is not the protection
+      // A01 D8 meant. What a settled entry holds that is *not* stale is its
+      // recorded command, so the notice names it: a reader can type it, and
+      // `⇧⏎`/`⌥⏎` on the entry does the same through C23 §2 (`rerunEntry`).
+      // Named by command rather than by key, because a key named in a notice
+      // is a second keymap that drifts under rebinding (C16 I19's argument).
+      const command = deps.transcript.entries.find((e) => e.id === from)?.doc.command ?? "";
+      const hint = command === "" ? "" : ` Re-run \`${command}\` for a live copy.`;
+      deps.refuse(from, `\`${action.label}\` is from a frozen entry — its data is stale.${hint}`);
       return;
     }
 
@@ -164,9 +189,29 @@ export function createActionDispatcher(deps: ActionDeps) {
           return;
         }
 
-        // A target no row carries. Said rather than swallowed: an action that
-        // does nothing is indistinguishable from one that worked.
-        deps.notify(`nothing to expand — no row \`${action.target}\``);
+        // **A block declaring a collapsed form, at any depth** (C04 I98). Rows
+        // first — the shipped path above — then blocks, so a row id equalling a
+        // block id has a known answer (C04 §3c S5). The toggle is a shell-origin
+        // `replace` with the flag inverted: `op: "expand"` names a row and
+        // `patch.ts` refuses a scroll (*is a scroll, which has no rows*), which
+        // was measured before this arm was written rather than assumed.
+        const folded = [...entry.doc.blocks, ...entry.doc.blocks.flatMap((b) => [...descendants(b)])].find(
+          (b: Block): b is Scroll =>
+            b.kind === "scroll" && b.id === action.target && b.collapsed !== undefined,
+        );
+        if (folded !== undefined) {
+          const outcome = deps.transcript.patch(
+            from,
+            { op: "replace", blockId: folded.id, block: { ...folded, collapsed: folded.collapsed !== true } },
+            "shell",
+          );
+          if (outcome.ok) deps.scheduler.commit("input");
+          return;
+        }
+
+        // A target no row or block carries. Said rather than swallowed: an
+        // action that does nothing is indistinguishable from one that worked.
+        deps.notify(`nothing to expand — no row or folded block \`${action.target}\``);
         return;
       }
     }

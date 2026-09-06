@@ -86,7 +86,7 @@ const results = runPass({
     {
       name: "the box is drawn in the braille arm's own alphabet",
       file: KDE,
-      from: "    return [...gap, ...boxOnSpine(rows, spineRow, w, gl, quartiles, lo, hi, pad)];",
+      from: "    return [...gap, ...boxOnSpine(rows, spineRow, w, caps, quartiles, lo, hi, pad)];",
       to: "    return [...gap, ...rows];",
       expect: "SA3",
     },
@@ -109,15 +109,18 @@ const results = runPass({
     {
       name: "the legend keeps its braille swatch beside a block-glyph disc",
       file: CIRC,
-      from: "      swatch: solid ? pairFor(caps).filled : patternSwatch(patternFor(s.originalIndex, caps)),",
-      to: "      swatch: patternSwatch(patternFor(s.originalIndex, caps)),",
+      // Re-anchored: `Slice.originalIndex` became `Share.index` when the shares
+      // moved to the figure (§3ak.26). Same line, same mutation.
+      from: "      swatch: solid ? pairFor(caps).filled : patternSwatch(patternFor(s.index, caps)),",
+      to: "      swatch: patternSwatch(patternFor(s.index, caps)),",
       expect: "SA7",
     },
     {
       name: "the radar's line arm is not wired",
       file: DEFN,
-      from: '      block.plotStyle === "line", block.plotGrid ?? "polygon",',
-      to: '      false, block.plotGrid ?? "polygon",',
+      // Re-anchored: `ceiling` is now a parameter, read off the figure (F304).
+      from: '      block.series, cats, width, areaRows, ctx.capabilities, ceiling,\n      block.plotStyle === "line", block.plotGrid ?? "polygon",',
+      to: '      block.series, cats, width, areaRows, ctx.capabilities, ceiling,\n      false, block.plotGrid ?? "polygon",',
       expect: "SA6",
     },
     {
@@ -149,9 +152,15 @@ const results = runPass({
       // `brailleArm` predicate — `plotStyle` names the figure and the capability
       // names the alphabet, so the expression moved one scope up. Same mutation,
       // same subject; the pass was re-run rather than only re-anchored.
+      //
+      // **Re-anchored again, and the name moved because the predicate split**
+      // (F302): the outline rung asks *how wide is this glyph* and the
+      // filled-density rungs do not, so `brailleArm` stayed the author's request
+      // and `brailleOutline` took the width clause. The mutation is the same —
+      // this arm stops answering to either.
       name: "the vertical violin ignores plotStyle again",
       file: DEFN,
-      from: '          brailleArm, block.plotFill === "solid",\n        );',
+      from: '          outlineInBraille, block.plotFill === "solid",\n        );',
       to: "          false, false,\n        );",
       expect: "SA10",
     },

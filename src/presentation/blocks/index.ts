@@ -12,19 +12,21 @@
 export { DEFAULT_DEFINITIONS } from "./defaults.js";
 export { ANIMATES, animationIntervalOf, tickIntervalOf } from "./animation.js";
 // The floor the shell reserves for a contained failure (C22 I69, C04 I67).
-export { elapsed, statusRowsFor } from "./kinds/status.js";
+export { countdown, elapsed, statusRowsFor } from "./kinds/status.js";
 export {
   glyphs,
   glyphFor,
   glyphCells,
   spinnerFrames,
   spinnerIntervalMs,
+  spinnerSetNames,
+  barStyleNames,
   GLYPH_SUBSTITUTIONS,
   GLYPH_TOKENS,
   SUBSTITUTIONS,
   type GlyphSet,
 } from "./glyphs.js";
-export { createBlockRegistry } from "./registry.js";
+export { DEFAULT_MAX_BLOCK_ROWS, createBlockRegistry } from "./registry.js";
 // C25 renders code inside a diff line and does not tokenise (C25 §4). The
 // tokeniser and its memo stay C09's; what crosses the seam is the token stream.
 export {

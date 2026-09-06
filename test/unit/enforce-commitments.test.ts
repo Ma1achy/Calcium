@@ -11,7 +11,8 @@
 // with nothing to be wrong about passes exactly like a rule that is satisfied,
 // and this one is especially exposed to that, because a document with no
 // Commitments section produces no findings and looks compliant.
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { checkFindings, checkTriageInventory } from "../../tools/enforce/findings.mjs";
 import {
@@ -33,8 +34,12 @@ import {
   SEAM_OWNERS,
   seamRows,
   specFiles,
+  checkInvariantCoverage,
   tableColumn,
   testRowsOf,
+  mnemonicRowsOf,
+  checkMnemonicRowIds,
+  SPEC_RULES,
 } from "../../tools/enforce/commitments.mjs";
 
 /**
@@ -81,15 +86,21 @@ const at =
 describe("A03 SP1 — commitment/invariant pairing", () => {
   it("SP1: the real corpus is clean, and it is a corpus", () => {
     // Both halves. The first is the rule; the second is what stops it passing
-    // because it looked at nothing — twenty-six specs, several hundred
+    // because it looked at nothing — twenty-seven specs, several hundred
     // commitments, and a count that fails if the glob ever stops matching.
     //
     // **It fired on C26 and that is the guard working**, not a maintenance cost:
     // the count went 25 → 26 the moment a spec landed, in CI, on a change whose
     // author had run `enforce` and `check` and not `test`. A derived count would
     // have said nothing, which is the state this number exists to prevent.
+    //
+    // **Second instance, 26 → 27 on C27** (the terminal emulator, 2026-09-06),
+    // and it fired the same way: a spec-alone commit, `enforce` green, six rows
+    // red. Two instances is the minimum for noticing a rule rather than evidence
+    // for one — what both share is that the landing change touched no code the
+    // count is about, so nothing else in the suite had a reason to move.
     const files = specFiles();
-    expect(files.length).toBe(26);
+    expect(files.length).toBe(27);
 
     const total = files.reduce((n, f) => n + commitmentsOf(f).length, 0);
     expect(total).toBeGreaterThan(300);
@@ -216,8 +227,113 @@ describe("A03 SP1 — commitment/invariant pairing", () => {
     // Found by running the rule, not by reading it. `(→ C04 I28)` matched the
     // local-citation pattern first and reported a dangling reference in the one
     // spec that had got the cross-reference right.
+    //
+    // **This row is true and it tests one of the two ways to write one** (F437).
+    // The arrow can fall in the middle of a group and eight commitments put it
+    // there; those went to the local arm for four years of this rule's life. The
+    // four rows below are the other way, and the second of them is the direction
+    // this row's shape cannot reach.
     const source = spec([["I1", "one."]], ["Elsewhere's (→ C04 I28)."]);
     expect(checkCommitments(["docs/components/C99_x.md"], at(source))).toEqual([]);
+  });
+
+  it("SP1: an arrow in the MIDDLE of a group still names another spec (F437)", () => {
+    // `GROUP` was `/\((?!→)([^()]*)\)/g` — every group that did not *open* with
+    // an arrow, with every `I\d+` inside read as local. `(I1, → C09 I9999)` is
+    // such a group, so this reported `cites I9999` against C99.
+    const source = spec([["I1", "one."]], ["Both (I1, → C09 I9999)."]);
+    const violations = checkCommitments(["docs/components/C99_x.md"], at(source));
+
+    expect(violations).toHaveLength(1);
+    // The message is the assertion, not the count: reported *as a
+    // cross-reference*. `cites I9999` would be the old arm firing for the old
+    // reason, and a bare `toHaveLength(1)` cannot tell those apart.
+    expect(violations[0]?.message).toContain("cross-references C09 I9999");
+    expect(violations[0]?.message).not.toContain("cites I9999");
+  });
+
+  it("SP1: the FALSE PASS — a foreign id colliding with a real local one (F437)", () => {
+    // **The direction the row above cannot reach, and the one that actually
+    // happened: 8 of 8.** Every mixed group in the corpus named a foreign
+    // invariant whose number the citing spec also declared, so the local arm
+    // found it and said nothing — a verdict decided by a coincidence of
+    // numbering rather than by resolution.
+    //
+    // C99 declares I28. C09 does **not** declare I28 (it stops at I38 but has no
+    // I28 gap — asserted below rather than assumed, because a fixture that
+    // agreed with the rule by accident is what this whole finding is about).
+    const source = spec([["I28", "a local one with the same number."]], ["Collides (I1x, → C09 I9999)."]);
+    const collide = spec([["I9999", "the local homonym."]], ["Collides (→ C09 I9999)."]);
+
+    // Control first: the fabrication's own I9999 exists, so a rule reading the
+    // token as local finds it and reports nothing. That is the pre-fix verdict.
+    expect(invariantsOf("docs/components/C99_x.md", at(collide)).has("I9999")).toBe(true);
+
+    // And the rule reports it anyway, because it resolves against C09.
+    const violations = checkCommitments(["docs/components/C99_x.md"], at(collide));
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.message).toContain("cross-references C09 I9999");
+
+    // The mixed form of the same collision, which is where the eight live.
+    const mixed = spec([["I1", "one."], ["I9999", "the local homonym."]], ["Collides (I1, → C09 I9999)."]);
+    const mv = checkCommitments(["docs/components/C99_x.md"], at(mixed));
+    expect(mv).toHaveLength(1);
+    expect(mv[0]?.message).toContain("cross-references C09 I9999");
+
+    void source;
+  });
+
+  it("SP1: every token after the arrow is resolved, not just the first (F437)", () => {
+    // The cross arm read `/^(I\d+[a-z]?)/` off the START of a target that was
+    // *everything after the spec id*, so `(→ C04 I67, I68)` checked I67 and
+    // dropped I68. Ten groups in the corpus, twenty tokens, ten unchecked.
+    const source = spec([["I1", "one."]], ["Two of C09's (→ C09 I5, I9999)."]);
+    const violations = checkCommitments(["docs/components/C99_x.md"], at(source));
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.message).toContain("cross-references C09 I9999");
+  });
+
+  it("SP1: a second spec inside one group re-targets what follows it (F437)", () => {
+    // `(→ C04 I73, C10 I31)` means C10's I31 and not C04's. Asserted on **which
+    // spec the message names**, because reporting the right token against the
+    // wrong document is the defect rather than a cosmetic difference.
+    const source = spec([["I1", "one."]], ["Two specs (→ C09 I5, C10 I9999)."]);
+    const violations = checkCommitments(["docs/components/C99_x.md"], at(source));
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.message).toContain("cross-references C10 I9999");
+    expect(violations[0]?.message).not.toContain("C09 I9999");
+  });
+
+  it("SP1: an arrow naming a section and no invariant is still a citation (F437)", () => {
+    // **The repair's own regression, caught by running it.** The walk that
+    // replaced the two-pass parser emitted a cross-reference only when an
+    // invariant token attached, and `(→ A02 §1)` has none — so eight correctly
+    // written commitments across C01, C05 and others became *cites nothing*.
+    // Trading one silent defect for eight loud ones is still a defect.
+    const source = spec([["I1", "one."]], ["Whose rule it is (→ A02 §1)."]);
+    expect(checkCommitments(["docs/components/C99_x.md"], at(source))).toEqual([]);
+
+    // And its control: a bare group with neither an invariant nor an arrow must
+    // still fail, or the row above passes by making the rule permissive.
+    const bare = spec([["I1", "one."]], ["Nothing at all (§4)."]);
+    expect(checkCommitments(["docs/components/C99_x.md"], at(bare))).toHaveLength(1);
+  });
+
+  it("SP1: a cross-reference written without the arrow stays local — the stated blind spot (F437)", () => {
+    // **Recorded rather than fixed.** `(C11 I17, I9)` is genuinely ambiguous:
+    // the second token is either C11's or the citing spec's, and a rule that
+    // guessed would resolve a citation against the wrong document in the other
+    // direction. The arrow is the mark that says *elsewhere*; this rule follows
+    // the mark and nothing else.
+    const source = spec([["I1", "one."]], ["No arrow (C09 I1)."]);
+    expect(checkCommitments(["docs/components/C99_x.md"], at(source))).toEqual([]);
+
+    // The blind spot made visible: C09's I9999 does not exist and this passes,
+    // because with no arrow the token is read as C99's — which it has.
+    const blind = spec([["I9999", "the local one."]], ["No arrow (C09 I9999)."]);
+    expect(checkCommitments(["docs/components/C99_x.md"], at(blind))).toEqual([]);
   });
 });
 
@@ -252,7 +368,7 @@ describe("A03 SP2 — invariants are numbered 1..n, in order", () => {
     // The vacuity half. `checkOrdering` skips a spec declaring nothing, so a
     // parser that stopped matching would report twenty-six clean documents.
     const files = specFiles();
-    expect(files.length).toBe(26);
+    expect(files.length).toBe(27);
 
     const total = files.reduce((n, f) => n + invariantOrderOf(f).length, 0);
     expect(total, "355 invariants at the last audit; the parser must still see them").toBeGreaterThan(
@@ -326,6 +442,73 @@ describe("A03 SP2 — invariants are numbered 1..n, in order", () => {
   });
 });
 
+/** Every `.ts` test file — the corpus `enforce` walks, so the row runs on it. */
+function walkTests(dir = "test", out: string[] = []): string[] {
+  for (const e of readdirSync(dir)) {
+    const p2 = `${dir}/${e}`;
+    if (statSync(p2).isDirectory()) walkTests(p2, out);
+    else if (/\.tsx?$/u.test(e) && !/\.d\.ts$/u.test(e)) out.push(p2);
+  }
+  return out;
+}
+
+describe("A03 SP9 — every invariant is named by at least one test row", () => {
+  const SPEC = "docs/components/C99_x.md";
+  const TEST = "test/unit/plot.test.ts"; // `TOPICS.plot` attributes bare ids here
+
+  /** A spec and a test corpus, in the real form, parsed before it is judged. */
+  function run(invariants: readonly string[], testSource: string, exempt: readonly string[]) {
+    const spec = ["# C99 — fabricated", "", "## Invariants", "",
+      ...invariants.map((n) => `- **${n}** — text.`), ""].join("\n");
+    const read = (f: string): string => (f === SPEC ? spec : testSource);
+    return checkInvariantCoverage([SPEC], [TEST], read, exempt);
+  }
+
+  it("SP9: the real corpus, and it is a corpus", () => {
+    // **The vacuity half, and this rule needs it most** (F361, C12 §3ak.44's
+    // neighbourhood). The whole finding is that an unsound matcher reported
+    // full coverage — so a parser that stopped seeing invariants, or a walk
+    // that stopped seeing tests, reports every spec clean in the same green
+    // line the correct answer prints.
+    const files = specFiles();
+    expect(files.length).toBe(27);
+    const r = checkInvariantCoverage(files, walkTests());
+    expect(r.declared, "768 invariants at the last count; the parser must still see them")
+      .toBeGreaterThan(700); // cells-ok — an invariant count
+    expect(r.violations, "run `make enforce` for the detail").toEqual([]);
+  });
+
+  it("SP9: an invariant nobody names fails, and the message says which", () => {
+    const { violations } = run(["I1", "I2"], 'it("T1.1 (C99 I1): text", () => {});', []);
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.rule).toBe("SP9");
+    expect(violations[0]?.message).toContain("C99 I2");
+  });
+
+  it("SP9: a run-on citation counts, because that is how the corpus cites", () => {
+    // `C04 I10, I11, I25` — one spec id governing what follows, which is SP3's
+    // own reading. A resolver without it would call two of those three unowned
+    // and this rule would demand rows that already exist.
+    const { violations } = run(["I1", "I2"], 'it("T1.1 (C99 I1, I2): text", () => {});', []);
+    expect(violations).toEqual([]);
+  });
+
+  it("SP9: the exemption list is compared by equality, both ways", () => {
+    // **A subset check lets a cleared entry outlive its reason unread**, which
+    // is `anchors.mjs`' rule and this repository's own finding. So a listed
+    // invariant that has since been cited is a failure too — the list may only
+    // shrink, and shrinking it is a deliberate edit.
+    const cited = 'it("T1.1 (C99 I1, I2): text", () => {});';
+    const stale = run(["I1", "I2"], cited, ["C99 I2"]);
+    expect(stale.violations).toHaveLength(1);
+    expect(stale.violations[0]?.message).toContain("now cited");
+
+    const uncited = 'it("T1.1 (C99 I1): text", () => {});';
+    expect(run(["I1", "I2"], uncited, ["C99 I2"]).violations, "and a listed one that is still uncited passes")
+      .toEqual([]);
+  });
+});
+
 describe("A03 SP7 — a test row's number is unique within its spec", () => {
   const FILE = "docs/components/C99_x.md";
 
@@ -344,7 +527,7 @@ describe("A03 SP7 — a test row's number is unique within its spec", () => {
     // no test rows is skipped, so a parser that stopped matching would report
     // twenty-six clean documents in the same green line.
     const files = specFiles();
-    expect(files.length).toBe(26);
+    expect(files.length).toBe(27);
 
     const total = files.reduce((n, f) => n + testRowsOf(f).length, 0);
     expect(total, "1,100 test rows at the last count; the parser must still see them").toBeGreaterThan(
@@ -442,6 +625,184 @@ describe("A03 SP7 — a test row's number is unique within its spec", () => {
   });
 });
 
+describe("A03 SP10 — a mnemonic test-row label is unique within its spec", () => {
+  const FILE = "docs/components/C99_x.md";
+
+  /** A tier list in the corpus's exact form. Parses first, then judges. */
+  function rows(ids: readonly string[]): readonly [string[], ReturnType<typeof checkMnemonicRowIds>] {
+    const source = ["# C99 — fabricated", "", "### Tier 1", "", ...ids.map((id) => `- **${id}**: text.`), ""].join(
+      "\n",
+    );
+    const read = at(source, FILE);
+    return [mnemonicRowsOf(FILE, read), checkMnemonicRowIds([FILE], read)];
+  }
+
+  it("SP10: the real corpus, and it is a corpus", () => {
+    // The vacuity half, and this rule needs it more sharply than SP7 does:
+    // twenty-three of twenty-six specs declare **no** mnemonic rows at all, so
+    // a parser that stopped matching would skip every file and report the same
+    // green line. The count is what a reader watches, not the verdict.
+    const files = specFiles();
+    expect(files.length).toBe(27);
+
+    const declaring = files.filter((f) => mnemonicRowsOf(f).length > 0);
+    expect(declaring.map((f) => (f.split("/").pop() ?? "").slice(0, 3)), "C09, C12 and C22 name rows by mnemonic").toEqual([
+      "C09",
+      "C12",
+      "C22",
+    ]);
+
+    const total = files.reduce((n, f) => n + mnemonicRowsOf(f).length, 0);
+    expect(total, "183 mnemonic rows at the last count; the parser must still see them").toBeGreaterThan(150);
+
+    // The control for the fabrication below: the tree as it stands is clean.
+    expect(checkMnemonicRowIds(files), "run `make enforce` for the detail").toEqual([]);
+  });
+
+  it("SP10: fires on F635's own shape, in the file it happened in", () => {
+    // **The fabricated violation over the real corpus rather than a fixture.**
+    // C12 §9 held two rows both called `SK10`; the second was renamed to `SK11`
+    // by hand and `make enforce` was green either way. This puts it back — in a
+    // scratch copy read through the injected reader, never on disk — and the
+    // rule must find it in the document it actually happened in.
+    const target = "docs/components/C12_plot_renderer.md";
+    const original = readFileSync(target, "utf8");
+    expect(original, "the anchor the replacement below depends on").toContain("- **SK11** ");
+    const mutated = original.replace("- **SK11** ", "- **SK10** ");
+    expect(mutated, "a fabrication that changed nothing is not a fabrication").not.toBe(original);
+
+    const violations = checkMnemonicRowIds(specFiles(), (f) => (f === target ? mutated : readFileSync(f, "utf8")));
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.rule).toBe("SP10");
+    expect(violations[0]?.file).toBe(target);
+    expect(violations[0]?.message).toContain("C12 declares SK10 twice");
+  });
+
+  it("SP10: distinct labels pass, families and letter variants included", () => {
+    // A letter suffix says *variant of the row above* — SP2's ruling, which SP7
+    // inherited — so `SC2b` beside `SC2` is two rows and not a collision.
+    const [parsed, clean] = rows(["SK1", "SC2", "SC2b", "HZ10", "CAM3"]);
+    expect(parsed, "the fabrication does not parse to what it looks like").toEqual([
+      "SK1",
+      "SC2",
+      "SC2b",
+      "HZ10",
+      "CAM3",
+    ]);
+    expect(clean).toEqual([]);
+  });
+
+  it("SP10: every duplicate is named, not only the first", () => {
+    // SP7's row, and it is here because the guard it tests is now **shared**:
+    // `duplicatesIn` is one implementation for both rules, so dropping the
+    // `already listed` clause has to fail on this side too. Three occurrences
+    // and not two — with pairs alone the two readings agree.
+    const [, violations] = rows(["SK1", "SK1", "HZ2", "HZ2", "SK1"]);
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.message).toContain("SK1, HZ2");
+    expect(violations[0]?.message, "named once, however many times it recurs").not.toContain("SK1, HZ2, SK1");
+  });
+
+  it("SP10: one label in two specs is legitimate, and that is the stated scope", () => {
+    // **The blind spot, asserted rather than described, against the corpus's
+    // own instance.** `IF8` is declared in C09 §9 and again in C22 §9, about two
+    // different things: a mnemonic means something inside the component that
+    // draws it, so `IF` in one spec and `IF` in another are different subjects.
+    // A corpus-wide comparison would gate this and be switched off.
+    const declared = specFiles().filter((f) => mnemonicRowsOf(f).includes("IF8"));
+    expect(declared.map((f) => (f.split("/").pop() ?? "").slice(0, 3)), "the reuse is real today").toEqual([
+      "C09",
+      "C22",
+    ]);
+    expect(checkMnemonicRowIds(declared), "and it is not a violation").toEqual([]);
+  });
+
+  it("SP10: an invariant declaration is not a row, and SP2 keeps it", () => {
+    // `[A-Z]{2,}` and not `[A-Z]+`. A single leading capital is what an
+    // invariant looks like, and matching those would put every invariant list
+    // under this rule — reporting a duplicate SP2 already owns, in a family it
+    // does not belong to, twice for one defect.
+    const source = ["# C99 — fabricated", "", "- **I39** — an invariant.", "- **I39** — and again.", ""].join("\n");
+    const read = at(source, FILE);
+    expect(mnemonicRowsOf(FILE, read)).toEqual([]);
+    expect(checkMnemonicRowIds([FILE], read)).toEqual([]);
+  });
+
+  it("SP10: the two families partition the corpus, so no row is counted twice", () => {
+    // The structural interaction between SP7 and SP10: one anchor, two callers.
+    // A label claimed by both would be one defect reported twice, and one
+    // claimed by neither is the gap the pair exists to close.
+    for (const file of specFiles()) {
+      const numbered = new Set(testRowsOf(file));
+      const mnemonic = mnemonicRowsOf(file);
+      expect(mnemonic.filter((id) => numbered.has(id)), `${file} has a row in both families`).toEqual([]);
+    }
+  });
+
+  it("SP10: the gate calls it, and so does every other SP rule", () => {
+    // **The mutation pass asked for this row and nothing in the suite answered.**
+    // Deleting `...checkMnemonicRowIds(specs)` from `tools/enforce/index.mjs`
+    // failed **nothing**: every fire-test above calls the checker directly, so a
+    // rule that is implemented, inventoried, fabricated against and never
+    // invoked by `make enforce` passes the whole family. Measured on SP7 as
+    // well — unwiring it fails nothing either — so this closes the class rather
+    // than the instance it was found on.
+    //
+    // **Stated limit**: it proves the gate *calls* the checker, not that it
+    // gates on the result. SP8 deliberately reports without gating, so demanding
+    // the spread into `violations` would be wrong for one of the ten.
+    const carriers: Record<string, string> = {
+      SP1: "checkCommitments",
+      SP2: "checkOrdering",
+      SP3: "checkReferences",
+      SP4: "checkSeamFour",
+      SP5: "checkFindings",
+      SP6: "checkTriageInventory",
+      SP7: "checkTestRowIds",
+      SP8: "checkSectionReferences",
+      SP9: "checkInvariantCoverage",
+      SP10: "checkMnemonicRowIds",
+    };
+
+    // Equality, so a rule added to `SPEC_RULES` without a carrier fails here
+    // rather than being invisible to the loop below.
+    expect([...SPEC_RULES].sort()).toEqual(Object.keys(carriers).sort());
+
+    const runner = readFileSync("tools/enforce/index.mjs", "utf8");
+    for (const [rule, fn] of Object.entries(carriers)) {
+      expect(runner, `${rule}: the gate never calls ${fn}`).toMatch(new RegExp(`\\b${fn}\\(`));
+    }
+  });
+
+  it("SP10: a label named mid-sentence is a citation, not a declaration", () => {
+    // The anchor, in the shape the corpus actually writes: a fail-on-revert row
+    // naming the row it breaks. Shared with SP7 rather than reimplemented, so
+    // this is the same clause tested from the second side.
+    const source = [
+      "# C99 — fabricated",
+      "",
+      "- **SK10**: text.",
+      "- **SK11**: reverting the guard - **SK10** fails, and nothing else does.",
+      "",
+    ].join("\n");
+    const read = at(source, FILE);
+    expect(mnemonicRowsOf(FILE, read), "the mid-line id is a reference").toEqual(["SK10", "SK11"]);
+    expect(checkMnemonicRowIds([FILE], read)).toEqual([]);
+  });
+
+  it("SP10: an indented label is still a row", () => {
+    // The under-matching direction, which is the one that goes quiet: a tier
+    // written as a nested list would be skipped entirely and the rule would
+    // report compliance exactly like a satisfied one.
+    const source = ["# C99 — fabricated", "", "  - **SK10**: text.", "  - **SK10**: text again.", ""].join("\n");
+    const read = at(source, FILE);
+    expect(mnemonicRowsOf(FILE, read)).toEqual(["SK10", "SK10"]);
+    expect(checkMnemonicRowIds([FILE], read)[0]?.message).toContain("declares SK10 twice");
+  });
+});
+
 // --- SP3 — every reference resolves ---------------------------------------
 
 describe("A03 SP3 — invariant references resolve outside the specs too", () => {
@@ -479,7 +840,7 @@ describe("A03 SP3 — invariant references resolve outside the specs too", () =>
     // other twenty-five stayed invisible.
     const files = referenceFiles();
     const components = files.filter((f) => f.startsWith("docs/components/"));
-    expect(components.length, "all 26 component specs").toBe(26);
+    expect(components.length, "all 27 component specs").toBe(27);
 
     const { resolved } = checkReferences(components);
     expect(resolved, "the densest citation corpus in the project").toBeGreaterThan(1500);
@@ -658,14 +1019,46 @@ describe("A03 SP3 — invariant references resolve outside the specs too", () =>
     expect(violations[0]?.message).toContain("has outlived its reason");
   });
 
-  it("SP3: the exception list is two entries, and both are fabrication sites", () => {
-    // Written out rather than counted, because the interesting fact is *which*:
-    // the only files excused are the two that fabricate specs for these very
-    // tests. Every other id in the tree resolves.
-    expect(Object.keys(REFERENCE_EXCEPTIONS).sort()).toEqual([
+  it("SP3: the exception list is four entries in two kinds, and the kinds are named", () => {
+    // Written out rather than counted, because the interesting fact is *which*.
+    // **And partitioned, because the second kind arrived inside the first.** The
+    // row read *two entries, and both are fabrication sites* — true when written,
+    // and a third category appeared the day three dated design notes were
+    // unpacked into `docs/notes/`. Widening a count would have absorbed it: the
+    // list would still have been "the exceptions" and nobody would have seen
+    // that "every file excused fabricates a spec" had stopped being true.
+    const FABRICATION = [
       "test/unit/enforce-commitments.test.ts",
       "tools/enforce/commitments.mjs",
-    ]);
+    ];
+    // Dated working documents citing a bare invariant whose owner is plain in
+    // the paragraph. Excused on the same argument `docs/archive/` is: rewriting
+    // one to cite ids the tool's way falsifies the record it exists to be. Named
+    // one by one so the rest of `docs/notes/` stays checked.
+    //
+    // **`CALCIUM_3D_DESIGN.md` was here and is gone**, and the bidirectional arm
+    // is what removed it rather than anyone remembering. Its reason named a
+    // condition — *the design's premise is open pending a measurement* — the
+    // measurement was taken and the note rewritten against it, so every
+    // reference in it resolves and the excuse became a violation of its own
+    // rule. **A reason that names a condition is one a gate can retire**, which
+    // is what the deferral problem usually cannot manage: there the condition is
+    // prose and nothing watches it, and here it was *the file being wrong*,
+    // which the rule already checks every run (F431).
+    const DATED_NOTES = [
+      "docs/notes/CALCIUM_BLOCK_STATES.md",
+      "docs/notes/CALCIUM_ML_BLOCKS.md",
+    ];
+
+    expect(Object.keys(REFERENCE_EXCEPTIONS).sort()).toEqual(
+      [...FABRICATION, ...DATED_NOTES].sort(),
+    );
+    // **Every excused file exists**, or an exception outlives its subject — the
+    // shape the row above this one tests for a stale reason, one field over.
+    for (const f of Object.keys(REFERENCE_EXCEPTIONS)) {
+      const at = join(import.meta.dirname, "..", "..", f);
+      expect(existsSync(at), `${f} is excused and must exist`).toBe(true);
+    }
   });
 });
 
@@ -806,6 +1199,23 @@ describe("A03 SP4 — Seam 4 and its owners agree, both directions", () => {
     expect(unkeyed.length, "a removed key fails completeness and the sum").toBe(2);
   });
 
+  /**
+   * A reader that fakes **only the citing file** (F281).
+   *
+   * **The rows below handed their stub to the whole rule**, so `sectionsOf` read
+   * it too and every spec's index came back empty — and a rule that finds no
+   * sections reports every citation as dangling. Measured: `C12 §3a`, which
+   * exists and is cited across the corpus, produced a violation under that
+   * setup. So the two fabricated violations fired for any input at all and could
+   * not tell a missing section from a present one, which is A03 §2's vacuity
+   * class arriving in the instrument a rule owes.
+   *
+   * **That is why the one-letter pattern survived**: the probes agreed with the
+   * rule instead of testing it.
+   */
+  const citing = (path: string, text: string) => (f: string): string =>
+    f === path ? text : readFileSync(f, "utf8");
+
   it("SP8: the real tree is read, and its residue is a worklist rather than a gate", () => {
     // **SP8 is reported and not gated, and this row is what makes that expire.**
     // SP3 shipped with its two findings already fixed; this one arrived with 120
@@ -833,21 +1243,65 @@ describe("A03 SP4 — Seam 4 and its owners agree, both directions", () => {
     // The defect the rule exists for, and the one it found on its first run:
     // `C12 §3q` was pointed at by three source comments and had never been
     // written. A citation reads as a source.
-    const v = checkSectionReferences(
-      ["docs/architecture/A01_fabricated.md"],
-      () => "The rule is stated in C12 §9z, which does not exist.",
-    );
+    const at = "docs/architecture/A01_fabricated.md";
+    const v = checkSectionReferences([at], citing(at, "The rule is stated in C12 §9z, which does not exist."));
     expect(v.violations.map((x) => x.message).join(" ")).toContain("no such section");
+    // **The control, and it is what the row was missing.** A citation that
+    // resolves must produce nothing — otherwise the assertion above is satisfied
+    // by a rule that cannot read any document at all.
+    const ok = checkSectionReferences([at], citing(at, "The rule is stated in C12 §3a."));
+    expect(ok.violations, "a citation that resolves produces nothing").toEqual([]);
+  });
+
+  it("SP8 fires (F281): a two-letter section id, which the rule read as a one-letter one", () => {
+    // **The fabricated violation above used `§9z`, and that is why the blind
+    // spot survived**: one letter is the shape the pattern already handled, so
+    // the probe agreed with the rule instead of testing it. `\d+[a-z]?` reads
+    // `3ag` as **`3a`** — which C12 declares — so the citation resolved against
+    // a section saying something else, and `### 3ak.12` matched no heading at
+    // all. **612 citations in the corpus use two or more letters.**
+    //
+    // The pair below is what discriminates: under the old pattern **both** read
+    // as `3a` and both resolved.
+    const at = "docs/architecture/A01_fabricated.md";
+    // **`§3aq` was the fabricated id until 2026-09-05, when C12 wrote a §3aq**
+    // (the hidden series, I116) and the probe stopped being fabricated — the
+    // row failed, which is the probe doing its job. `§3zq` is a two-letter id
+    // no document is likely to reach; if it ever does, move again.
+    const bad = checkSectionReferences([at], citing(at, "As C12 §3zq settles it."));
+    expect(bad.violations.map((x) => x.message).join(" "), "C12 has no §3zq").toContain("§3zq");
+    const ok = checkSectionReferences([at], citing(at, "As C12 §3ag settles it."));
+    expect(ok.violations, "and C12 does have §3ag").toEqual([]);
+  });
+
+  it("SP8 fires (F281): a sub-section of a parent that numbers its own headings", () => {
+    // **The dotted fallback is right about `§8b.7` and it hid a whole class.**
+    // That id names the seventh *item inside* C26 §8b — a numbered line, not a
+    // heading — so an index of headings cannot see it and reporting it would be
+    // over-reporting. `§3ak.12` has the same shape and means a heading.
+    //
+    // What tells them apart is the parent: C12 §3ak declares `3ak.1` … `3ak.12`
+    // as headings, and a document numbering its sub-sections that way is not
+    // also using inline numbering for the same ids.
+    const at = "docs/architecture/A01_fabricated.md";
+    const v = checkSectionReferences([at], citing(at, "As C12 §3ak.99 has it."));
+    expect(v.violations.map((x) => x.message).join(" ")).toContain("§3ak.99");
+    const ok = checkSectionReferences([at], citing(at, "As C12 §3ak.11 has it."));
+    expect(ok.violations, "and a sub-section that was written resolves").toEqual([]);
+
+    // **The limit, stated, because an unrecorded one reads as strength.** A
+    // *first* sub-section under a parent with no numbered children still falls
+    // back — the two meanings are genuinely indistinguishable there.
+    const item = checkSectionReferences([at], citing(at, "As C26 §8b.7 has it."));
+    expect(item.violations, "an item inside a section is not a missing heading").toEqual([]);
   });
 
   it("SP8 fires: a bare § in a file no document owns", () => {
     // The other half — a pointer with nothing before it saying which document
     // owns it. Unresolvable rather than wrong, and it reads the same to a
     // reader either way.
-    const v = checkSectionReferences(
-      ["examples/docker/NOTES.md"],
-      () => "See §4b for the ordering.",
-    );
+    const at = "examples/docker/NOTES.md";
+    const v = checkSectionReferences([at], citing(at, "See §4b for the ordering."));
     expect(v.violations.map((x) => x.message).join(" ")).toContain("bare §4b");
   });
 
@@ -872,6 +1326,35 @@ describe("A03 SP4 — Seam 4 and its owners agree, both directions", () => {
     expect(v).toHaveLength(1);
     expect(v[0]?.rule).toBe("SP5");
     expect(v[0]?.message).toContain("F99");
+  });
+
+  it("SP5: `U+F900` is a code point and not a citation of F900", () => {
+    // **The one hex form the word rule did not reach.** `0xF900` and `\uF900`
+    // were excluded from the start because `x` and `u` are word characters;
+    // `+` is not, so the Unicode form read as a citation and the rule invented
+    // one — the loud failure rather than the quiet one. It fired on a docstring
+    // naming a block of the East Asian Width property.
+    const known = new Set(["F1", "F2", "F3"]);
+    const v = checkFindings({
+      known,
+      files: ["fake.ts"],
+      read: () => "the CJK compatibility ideographs at U+F900..U+FAFF are Wide",
+    });
+    expect(v, "a code point cites nothing").toHaveLength(0);
+  });
+
+  it("SP5: and a real citation beside one still resolves — the control", () => {
+    // **Without this the narrowing is indistinguishable from one that stopped
+    // reading the line.** The same line carries a code point and a citation.
+    const known = new Set(["F1", "F2", "F3"]);
+    const v = checkFindings({
+      known,
+      files: ["fake.ts"],
+      read: () => "U+F900 is Wide, which is F99's subject",
+    });
+    expect(v, "the citation past the end still fires").toHaveLength(1);
+    expect(v[0]?.message).toContain("F99");
+    expect(v[0]?.message, "and the code point is not named").not.toContain("F900");
   });
 
   it("SP5 fires: a gap in the middle, which is the other way to be wrong", () => {

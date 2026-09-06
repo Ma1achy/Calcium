@@ -10,13 +10,12 @@
  * error* — an assertion about pixels would be discovering it exactly that way.
  */
 import { describe, expect, it } from "vitest";
-import { sourceOf } from "../support/source.js";
+import { fires, sourceOf } from "../support/source.js";
 import sharp from "sharp";
 import {
   plotToSvg,
   svgFamilyOf,
   svgLayout,
-  svgPoints,
   SVG_DEFAULT_LAYOUT,
   SVG_FAMILY,
   SVG_FONT_SIZE,
@@ -27,12 +26,23 @@ import { decodePng } from "../../src/presentation/image/index.js";
 import { COLORMAPS, sample as sampleMap } from "../../src/presentation/theme/colormap.js";
 import { rgbOf } from "../support/theme.js";
 import { tiles } from "../../src/presentation/plot/hierarchy.js";
+import { flatten } from "../../src/presentation/plot/tree.js";
 import { refOf } from "../../src/presentation/plot/marks.js";
+import {
+  barFigure, curveFigure, distributionFigure, funnelFigure, HAS_VALUE_AXIS, horizonFigure, proportionFigure,
+  stackedFigure, spanFigure, trackFigure, bulletFigure,
+} from "../../src/presentation/plot/figure.js";
+import { drawnBlock } from "../../src/presentation/plot/derive.js";
 import { resolve } from "../../src/presentation/theme/index.js";
-import { DARK_THEME as THEME } from "../support/render.js";
+import { DARK_THEME as THEME, DARK_THEME, LIGHT_THEME } from "../support/render.js";
+import { CATALOGUE_FORMS } from "../../tools/catalogue-forms.js";
+import { DEFAULT_FLOOR, ratio, type ColourRef, type ResolvedTheme } from "../../src/presentation/theme/index.js";
 import { b } from "../../src/shell/builders/index.js";
 import { ONE_PER_FORM } from "../support/plot-forms.js";
-import type { PlotForm } from "../../src/data/viewmodel/index.js";
+import type { Plot, PlotForm } from "../../src/data/viewmodel/index.js";
+import { block as vmBlock } from "../../src/data/viewmodel/index.js";
+// @ts-expect-error — the catalogue tool is JS; `plot-arm-disagreement` casts it the same way.
+import { frameFor as catFrameRaw, stripSgr as stripSgrRaw } from "../../tools/plot-catalogue.mjs";
 
 /** A slot's hex at this arm's one depth — the same call the renderer makes. */
 const hexOf = (ref: string): string => {
@@ -41,9 +51,59 @@ const hexOf = (ref: string): string => {
   return colour.hex;
 };
 
+/**
+ * **The page coordinates the arm actually emitted, read off its own path.**
+ *
+ * `svgPoints` used to be the subject of the two rows below, and it was deleted
+ * when the marks walk took its last caller (§3ak.12): the arm no longer turns
+ * values into pixels: it projects a figure's normalised marks. So the rows read
+ * the seam on one side — `curveFigure(...).marks` — and the **drawn document**
+ * on the other, rather than a helper that sat between them and now sits beside
+ * them. That is the house rule applied to a row that had drifted off it: assert
+ * the artefact, not a proxy.
+ */
+const pathPoints = (svg: string): readonly (readonly [number, number])[] =>
+  [...(/<path d="([^"]+)"/u.exec(svg)?.[1] ?? "").matchAll(/[ML]([-\d.]+) ([-\d.]+)/gu)]
+    .map((m) => [Number(m[1]), Number(m[2])] as const);
+
+/**
+ * One y per sample, **whichever of the three ways the arm drew them**.
+ *
+ * **The first version read `M`/`L` alone and it was wrong for two families at
+ * once** — a `step` and an `ecdf` draw `H`/`V` corners, and a `scatter` draws no
+ * path at all. Twenty-one rows failed and every failure was the reader, not the
+ * renderer: *a matcher that sees one encoding reports absence when the value
+ * changes form*. It replaced `svgPoints`, which was form-independent because it
+ * never looked at the output, so the widening is the cost of asserting the
+ * artefact instead of a proxy — and worth paying, since the proxy is what had
+ * stopped being what ships.
+ *
+ * A staircase's samples are its `M` and each `V`: the `H` moves along the
+ * previous value and the `V` is where the new one lands.
+ */
+const sampleYs = (svg: string): readonly number[] => {
+  const path = /<path d="([^"]+)"/u.exec(svg)?.[1];
+  if (path !== undefined) {
+    const ys: number[] = [];
+    for (const m of path.matchAll(/([MLV])([-\d.]+)(?: ([-\d.]+))?/gu)) {
+      const y = m[1] === "V" ? m[2] : m[3];
+      if (y !== undefined) ys.push(Number(y));
+    }
+    return ys;
+  }
+  return [...svg.matchAll(/<circle [^>]*cy="([-\d.]+)"/gu)].map((m) => Number(m[1]));
+};
+
+/** A curve's y values in the figure's space — one run, uninverted, 0 at the floor. */
+const figureYs = (blk: Parameters<typeof plotToSvg>[0]): readonly number[] => {
+  const run = curveFigure(blk).marks.find((d) => d.mark.kind === "polyline");
+  if (run === undefined || run.mark.kind !== "polyline") throw new Error("no polyline");
+  return run.mark.points.map((pt) => pt[1]);
+};
+
 const VALUES = [1, 4, 2, 8, 5, 9, 3, 7];
 const RANGE = { min: 1, max: 9 };
-const block = b.plot({ id: "p", form: "line", height: 8, series: [{ label: "s", values: VALUES }] });
+const block = b.plot({ id: "p", form: "line", height: 8, axes: true, series: [{ label: "s", values: VALUES }] });
 
 /**
  * A source file with its comments removed.
@@ -116,10 +176,16 @@ describe("G3–G5 — the second renderer", () => {
     const layout = SVG_DEFAULT_LAYOUT;
     const top = layout.height * layout.pad;
     const bottom = layout.height * (1 - layout.gutter);
-    const points = svgPoints(VALUES, RANGE, layout);
+    // **The range is the figure's**, because both arms take it from there now —
+    // asserting against a hand-written `RANGE` would be asserting against the
+    // range this row happens to know rather than the one drawn (D1).
+    const range = curveFigure(block).value?.range ?? RANGE;
+    const ys = figureYs(block);
+    const points = pathPoints(plotToSvg(block, THEME, layout) ?? "");
     for (const [i, v] of VALUES.entries()) {
-      const t = normalisedOf(v, RANGE, true);
-      expect(rowOf(v, RANGE, rows, FACING_DEFAULT), `cells, sample ${String(i)}`).toBe(
+      const t = normalisedOf(v, range, true);
+      expect(1 - (ys[i] ?? 0), `the figure's coordinate, sample ${String(i)}`).toBeCloseTo(t, 6);
+      expect(rowOf(v, range, rows, FACING_DEFAULT), `cells, sample ${String(i)}`).toBe(
         Math.round(t * (rows - 1)),
       );
       expect(points[i]?.[1], `pixels, sample ${String(i)}`).toBeCloseTo(top + (bottom - top) * t, 6);
@@ -130,17 +196,23 @@ describe("G3–G5 — the second renderer", () => {
     // mutation replacing `normalisedOf` with open-coded arithmetic survived the
     // rows above. The clamp is C04 I29 — an out-of-range sample presses against
     // the bound it exceeded — and it is the only thing here a copy gets wrong.
-    const pinned = { min: 2, max: 6 };
-    const outside = [-40, 2, 4, 6, 40];
-    const clamped = svgPoints(outside, pinned, layout);
+    const pinnedBlock = b.plot({
+      id: "pin", form: "line", height: 8, yMin: 2, yMax: 6,
+      series: [{ label: "s", values: [-40, 2, 4, 6, 40] }],
+    });
+    const clamped = pathPoints(plotToSvg(pinnedBlock, THEME, layout) ?? "");
     expect(clamped[0]?.[1], "far below pins to the floor's pixel").toBeCloseTo(bottom, 6);
     expect(clamped[4]?.[1], "far above pins to the ceiling's").toBeCloseTo(top, 6);
     expect(clamped[0]?.[1], "and never escapes the plot area").toBe(clamped[1]?.[1]);
     expect(clamped[4]?.[1]).toBe(clamped[3]?.[1]);
     // A span under 1, where open-coded arithmetic reaches for a guard the
     // shared layer does not need.
-    const narrow = { min: 0, max: 0.5 };
-    expect(svgPoints([0, 0.25, 0.5], narrow, layout)[2]?.[1], "a small span is not a special case").toBeCloseTo(top, 6);
+    const narrowBlock = b.plot({
+      id: "nar", form: "line", height: 8, yMin: 0, yMax: 0.5,
+      series: [{ label: "s", values: [0, 0.25, 0.5] }],
+    });
+    expect(pathPoints(plotToSvg(narrowBlock, THEME, layout) ?? "")[2]?.[1],
+      "a small span is not a special case").toBeCloseTo(top, 6);
 
     // Ordering agrees between the two, which is the reader-visible consequence:
     // the highest sample is the topmost row and the topmost pixel.
@@ -191,10 +263,22 @@ describe("G3–G5 — the second renderer", () => {
     const layout = SVG_DEFAULT_LAYOUT;
     const top = layout.height * layout.pad;
     const bottom = layout.height * (1 - layout.gutter);
-    // The maximum sample is at t=0 and the minimum at t=1, so the ink spans the
-    // whole plot area — within a stroke's half-width.
-    expect(inkTop, "the peak sits where normalisedOf(9) puts it").toBeCloseTo(top, -1);
-    expect(inkBottom, "and the trough where it puts 1").toBeCloseTo(bottom, -1);
+    // **The range is the figure's now, and this row re-derived it** (C12 §3ak.10).
+    //
+    // It read *the maximum sample is at t=0 and the minimum at t=1, so the ink
+    // spans the whole plot area*, which was true while this arm rasterised
+    // against the data's own extent. The shared axis is **niced** — it reaches
+    // past the data to a round number, which is what puts the same curve on the
+    // same scale in both arms (D1) — so the peak is no longer at the ceiling and
+    // the row's premise was false the moment the seam moved.
+    //
+    // Read rather than recomputed: a test that derives the coordinate itself is
+    // a third place for the two arms to disagree, which is the thing this whole
+    // pass removes. `toBeCloseTo(…, -1)` keeps the stroke's half-width tolerance.
+    const range = curveFigure(block).value!.range;
+    const at = (v: number): number => top + (bottom - top) * normalisedOf(v, range, true);
+    expect(inkTop, "the peak sits where the shared axis puts 9").toBeCloseTo(at(Math.max(...VALUES)), -1);
+    expect(inkBottom, "and the trough where it puts the minimum").toBeCloseTo(at(Math.min(...VALUES)), -1);
   });
 
   it("G5c: a label places itself, which is the whole of what SVG buys", () => {
@@ -275,6 +359,92 @@ const datumFor = (form: PlotForm): Record<string, unknown> => {
       },
     };
   }
+  // **The same shape with a weight on every edge** (C04 I92) — `graph`'s datum
+  // is refused on `sankey` and a sankey's on `graph`, so the two cannot share
+  // an entry however alike they look. Unequal weights, because equal ones are
+  // the degenerate input on which a ribbon drawn at the wrong width still
+  // agrees with every other.
+  if (form === "sankey") {
+    return {
+      series: [],
+      graph: {
+        nodes: [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "d" }],
+        edges: [
+          { from: "a", to: "b", weight: 3 }, { from: "a", to: "c", weight: 1 },
+          { from: "b", to: "d", weight: 3 }, { from: "c", to: "d", weight: 1 },
+        ],
+      },
+    };
+  }
+  // **A fourth datum shape, and the family holds two of them** (§3ak.26). A
+  // pie and a waffle read `segments`; a radar reads `categories` + `series`, and
+  // it is the only member of its family that has a pin to sit outside of.
+  //
+  // **What plays the clamp's part for a share is the total**, since there is no
+  // range to pin: an open-coded copy divides by 100, or forgets that a negative
+  // value contributes nothing. Neither is visible on segments summing to a
+  // hundred, which is the corpus's only waffle (F305).
+  if (form === "pie" || form === "waffle") {
+    return {
+      series: [],
+      segments: [
+        { label: "one", value: 30 }, { label: "two", value: 12 },
+        { label: "three", value: 7 }, { label: "four", value: -5 },
+      ],
+    };
+  }
+  if (form === "radar") {
+    return {
+      series: [{ label: "s", values: SAMPLES }],
+      categories: ["one", "two", "three", "four", "five"],
+      ...PIN,
+    };
+  }
+  // **The field family wants a grid, and one row is the degenerate shape.**
+  // `contourSegments` needs two rows and two columns before a cell exists at
+  // all, so the one-series datum every other positional form takes would draw
+  // the painted field and no lines — a frame that passes *a claimed form draws
+  // something* while the layer this row is about is missing.
+  if (svgFamilyOf(form) === "field") {
+    const grid = Array.from({ length: 4 }, (_v, r) => ({
+      label: `r${String(r)}`,
+      values: Array.from({ length: 6 }, (_w, c) => Math.sin(r * 0.6) * Math.sin(c * 0.6) * 50 + 50),
+    }));
+    if (form !== "quiver") return { series: grid, ...PIN };
+    // A rotation, so the arrows are not all parallel and the barbs of one do
+    // not sit exactly where its neighbour's shaft is.
+    return {
+      series: [],
+      vectors: Array.from({ length: 4 }, (_v, r) => ({
+        values: Array.from({ length: 6 }, (_w, c) => [-(r - 1.5), c - 2.5] as const),
+      })),
+      ...PIN,
+    };
+  }
+  // **A bullet reads `quartiles` and draws nothing without them** — the
+  // distribution family's datum on a form outside that family, and each row
+  // scaled to **its own** summary rather than to one shared range (C12 I73).
+  // Two measures in two units is the shape the form exists for, so the
+  // representative carries two.
+  // **A composition's datum is its children, and `b.plot` cannot carry them**
+  // (F335). `facets` is one of eight `Plot` members the public builder's spec
+  // does not declare — with `offsets`, `totals`, `layout`, `binning`, `xScale`
+  // and `yScale` — so `b.plot({ facets })` is a compile error rather than a drop,
+  // and six forms in the public union have no builder that can construct them.
+  // The branch below builds its own block through `block()`, which is what the
+  // catalogue does and why nothing had noticed.
+  if (svgFamilyOf(form) === "facets") return { series: [] };
+  // (see `blockFor` below for how a composition is built)
+  if (form === "bullet") {
+    return {
+      series: [{ label: "measure", values: [72, 38] }],
+      categories: ["revenue", "churn"],
+      quartiles: [
+        { min: 0, q1: 40, median: 65, q3: 85, max: 100, centre: 80 },
+        { min: 0, q1: 10, median: 20, q3: 30, max: 40, centre: 15 },
+      ],
+    };
+  }
   if (svgFamilyOf(form) !== "distribution") return { series: [{ label: "s", values: SAMPLES }], ...PIN };
   if (form === "dumbbell") {
     return { series: [{ label: "a", values: [2, 5, 8] }, { label: "b", values: [8, 3, 4] }], ...PIN };
@@ -304,25 +474,89 @@ const datumFor = (form: PlotForm): Record<string, unknown> => {
   };
 };
 
+/**
+ * A representative block for a form — **through `b.plot`, except where it cannot
+ * go** (F335).
+ *
+ * `facets` is one of eight `Plot` members the public builder's spec does not
+ * declare, with `offsets`, `totals`, `layout`, `binning`, `xScale` and `yScale`,
+ * so `b.plot({ facets })` is a compile error and six forms in the public union
+ * have no builder that can construct them. The catalogue builds through
+ * `block()`, which is transparent to any field — which is why nothing had
+ * noticed, and why this branch is here rather than a `datumFor` entry.
+ */
+function blockFor(form: PlotForm, id: string, height: number): Plot {
+  if (svgFamilyOf(form) !== "facets") {
+    const spec = { id, form, height, axes: true, ...datumFor(form) } as Parameters<typeof b.plot>[0];
+    // **`sankey` goes through the builder the day the builder admits it.**
+    // `b.plot`'s C04 I69 guard reads `drawn !== "graph"` and refuses a sankey's
+    // `graph`, while the validator admits it (C04 I92, T2.38) — the two gates
+    // disagree, which is the state GG1 exists to catch one form over. The
+    // builder is not this lane's file; the fix is written to its owner
+    // (`src/shell/builders/index.ts`, the `graph` arm) and this branch expires
+    // on its own: once `b.plot` accepts the block, the try succeeds and the
+    // fallback is dead code that `SK10` reports.
+    if (form === "sankey") {
+      try {
+        return b.plot(spec);
+      } catch {
+        return vmBlock({ kind: "plot", ...spec } as Plot);
+      }
+    }
+    return b.plot(spec);
+  }
+  return vmBlock({
+    kind: "plot", id, form, height, axes: true, series: [],
+    facets: [
+      vmBlock({ kind: "plot", id: `${id}-a`, form: "line", height: 6, axes: true, series: [{ label: "a", values: SAMPLES }] } as Plot),
+      vmBlock({ kind: "plot", id: `${id}-b`, form: "scatter", height: 6, axes: true, series: [{ label: "b", values: [...SAMPLES].reverse() }] } as Plot),
+    ],
+  } as Plot);
+}
+
 describe.each(supported)("G6 — %s", (form) => {
-  const made = b.plot({
-    id: `f-${form}`,
-    form,
-    height: 8,
-    ...datumFor(form),
-  } as Parameters<typeof b.plot>[0]);
+  // **`axes: true`, and it is the row's premise rather than decoration.** The
+  // furniture is the figure's now, so a block that does not ask for any has no
+  // border — and the box these rows measure against is read out of that border.
+  // Left unset, `edges` came back empty and every coordinate filtered away.
+  const made = blockFor(form, `f-${form}`, 8);
 
   it("renders, and its ink stays inside the fractional plot area", () => {
     const layout = svgLayout(600, 300);
     const svg = plotToSvg(made, THEME, layout);
     expect(svg, "a claimed form draws something").not.toBeNull();
     if (svg === null) return;
+    // **A composition has no plot area of its own** (§3ak.36). Its children each
+    // hold one, at their own gutters and inside their own columns, so *left of
+    // the parent's gutter* is where a second facet's gutter is meant to be. What
+    // containment means here is that every child sits inside the parent's
+    // viewBox, which is asserted below rather than skipped — containment is not
+    // correctness, and a row that returns early asserts nothing at all.
+    if (svgFamilyOf(form) === "facets") {
+      const kids = [...svg.matchAll(/<svg x="([-\d.]+)"[^>]*width="([-\d.]+)"/gu)]
+        .map((m2) => ({ x: Number(m2[1]), w: Number(m2[2]) }));
+      expect(kids.length, `${form}: a nested document per child`).toBe(2); // cells-ok — a facet count
+      for (const k of kids) {
+        expect(k.x, `${form}: a child left of the parent`).toBeGreaterThanOrEqual(0);
+        expect(k.x + k.w, `${form}: a child past the parent's right edge`).toBeLessThanOrEqual(layout.width);
+      }
+      // **And they tile it**, which is `facetWidths` distributing the remainder
+      // rather than dropping it: two columns of 300 and not two of 299.
+      expect(kids.reduce((t, k) => t + k.w, 0), `${form}: the columns fill the width`).toBe(layout.width);
+      return;
+    }
     const left = layout.width * (layout.gutter + layout.pad);
     const right = layout.width * (1 - layout.pad);
     // **Every x in the document, checked against the fractional bounds.** A
     // gutter pinned to a label's width moves `left` and this fails — which is
     // the point of running it per form rather than once.
-    const xs = [...svg.matchAll(/(?:\bx|cx|x1|x2)="([-\d.]+)"/gu)]
+    // **A gradient's `x1`/`x2` are its own object-bounding-box coordinates and
+    // not page positions** (§3ak.37). `<linearGradient x1="0" … x2="1">` put a
+    // `1` into a scan of page x, and every ramp-bearing form read as painting a
+    // pixel from the left edge. Stripped rather than filtered by value, because
+    // a `1` that *is* a page position is exactly what this row exists to catch.
+    const svgNoDefs = svg.replace(/<defs>[\s\S]*?<\/defs>/gu, "");
+    const xs = [...svgNoDefs.matchAll(/(?:\bx|cx|x1|x2)="([-\d.]+)"/gu)]
       .map((m) => Number(m[1]))
       .filter((v) => Number.isFinite(v) && v !== 0);
     expect(xs.length, "the form drew marks with coordinates").toBeGreaterThan(0);
@@ -349,11 +583,20 @@ describe.each(supported)("G6 — %s", (form) => {
     // killer here.
     if (svgFamilyOf(form) === "distribution") {
       const layout = SVG_DEFAULT_LAYOUT;
-      const top = layout.height * layout.pad;
-      const bottom = layout.height * (1 - layout.gutter);
-      const left = layout.width * (layout.gutter + layout.pad);
-      const right = layout.width * (1 - layout.pad);
       const svg = plotToSvg(made, THEME, layout) ?? "";
+      // **The box is read out of the drawing, not recomputed from the layout.**
+      // These four lines were a copy of `area()`'s arithmetic, and the copy went
+      // stale the day a legend started costing width: the row failed asserting a
+      // right edge at 612.4 against a plot area ending at 486.4, with nothing
+      // wrong in the renderer. A test that rolls its own reader carries the
+      // premise with it — so the frame's own border lines name the box.
+      const edges = [...svg.matchAll(/<line x1="([-\d.]+)" y1="([-\d.]+)" x2="([-\d.]+)" y2="([-\d.]+)"/gu)]
+        .map((m) => [Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4])] as const);
+      const left = Math.min(...edges.map((e) => Math.min(e[0], e[2])));
+      const right = Math.max(...edges.map((e) => Math.max(e[0], e[2])));
+      const top = Math.min(...edges.map((e) => Math.min(e[1], e[3])));
+      const bottom = Math.max(...edges.map((e) => Math.max(e[1], e[3])));
+      void top; void bottom;
       // **Horizontal is the family's default**, matching the terminal, so the
       // value axis is x and the two outliers define its ends.
       const xs = [...svg.matchAll(/(?:\bcx|\bx)="([-\d.]+)"/gu)]
@@ -368,15 +611,268 @@ describe.each(supported)("G6 — %s", (form) => {
       void top; void bottom;
       return;
     }
+    // **The density family derives its coordinates, so there is no sample to
+    // clamp — and this is an exemption with a claim in it**, on the two
+    // precedents above (F384, F387, F388). A violin's marks are a kernel
+    // estimate: `-40` and `40` are *inputs to a derivation*, not readings placed
+    // on the axis this row measures, exactly as `ecdf`'s and `histogram`'s are.
+    //
+    // **It cannot take the `derived` arm below**, which is the reason this is
+    // written out rather than folded in: that arm asks `drawnBlock` whether the
+    // readings moved, and `drawnBlock` does not transform `violin` or
+    // `ridgeline` — `densityFigure` does, at figure time. The premise is the
+    // same and the witness is a different function, so a row keyed on
+    // `drawnBlock` would have fallen through to the general arm and asserted the
+    // page ordinate of a curve that has none. It did, which is how this row
+    // failed: `237.017` against a floor of `288`.
+    //
+    // The equivalent assertion is that the derivation **is** applied — three
+    // ways, so no one of them can pass by coincidence.
+    if (svgFamilyOf(form) === "density") {
+      const svg = plotToSvg(made, THEME, SVG_DEFAULT_LAYOUT) ?? "";
+      expect(svg.length, `${form}: the arm draws`).toBeGreaterThan(0);
+      // A hundred-point estimate, not five samples joined up. Counted off the
+      // longest path, which is the outline.
+      const longest = [...svg.matchAll(/<path d="([^"]+)"/gu)]
+        .map((m) => (m[1] ?? "").split(/[ML]/u).length) // cells-ok — a point count
+        .reduce((a, x) => Math.max(a, x), 0);
+      expect(longest, `${form}: the marks are an estimate, not the samples`)
+        .toBeGreaterThan(SAMPLES.length * 2);
+      // **And the estimate reads the data.** Without this the row above passes
+      // for any fixed-resolution shape, including a constant one — which is what
+      // a resolution-free curve looks like when the samples stop reaching it.
+      const moved = plotToSvg(
+        { ...made, series: made.series.map((sr) => ({ ...sr, values: sr.values.map((v) => (v === null ? v : v * 3 + 11)) })) },
+        THEME, SVG_DEFAULT_LAYOUT,
+      ) ?? "";
+      expect(moved, `${form}: and it moves when the samples do`).not.toBe(svg);
+      return;
+    }
     const layout = SVG_DEFAULT_LAYOUT;
-    const range = { min: PIN.yMin, max: PIN.yMax };
-    const points = svgPoints(SAMPLES, range, layout);
     const top = layout.height * layout.pad;
     const bottom = layout.height * (1 - layout.gutter);
-    expect(points[0]?.[1], `${form}: far below pins to the floor`).toBeCloseTo(bottom, 6);
-    expect(points[4]?.[1], `${form}: far above pins to the ceiling`).toBeCloseTo(top, 6);
-    expect(points[0]?.[1]).toBe(points[1]?.[1]);
-    expect(points[4]?.[1]).toBe(points[3]?.[1]);
+    // **A bar encodes by length and a curve by position, so *where did the
+    // sample land* is a different measurement for each** — and this row asked
+    // the position of both until D11 turned the bar family on its side, at which
+    // point it was reading the page's ordinate for a figure whose values run
+    // along the abscissa. It agreed for as long as every form was vertical,
+    // which is how one measurement came to stand for two.
+    //
+    // The clamp itself is `normalisedOf`'s and lives in the figure, so the bar
+    // family is asked there: a sample below the floor is a bar of no length and
+    // one above the ceiling is a bar of the whole span.
+    const family = svgFamilyOf(form);
+    // **A derived form has no sample outside the pin, because it has no
+    // samples** (C12 I70, §3ak.27). `histogram` replaces `SAMPLES` with counted
+    // bins, `ecdf` with cumulative fractions and `density` with kernel
+    // estimates, so `-40` and `40` are inputs to a derivation rather than
+    // readings on the axis this row measures. The premise is gone, and without
+    // this arm the row asserted a coincidence: `ecdf`'s fractions all sit below
+    // a pinned floor of 2, so every one of them clamped and *far above pins to
+    // the ceiling* came back with the floor.
+    //
+    // **An exemption with a claim in it**, on the distribution family's
+    // precedent above: the equivalent assertion is that the derivation *is*
+    // applied — the whole of what F317 found missing — so this fails the day
+    // `drawnBlock` stops being called.
+    const derived = drawnBlock(made);
+    // **The discriminator is the *readings*, not the object.** `drawnBlock`
+    // returns a new block for the field forms too, and what it derives there is
+    // captions: a contour's rows and columns caption a domain the renderer knows
+    // (F322). Its samples are still the caller's, so the premise below — *there
+    // is no sample outside the pin, because there are no samples* — is exactly
+    // false for it. A `quiver` does move its readings, and takes this arm.
+    const readings = (bl: typeof made): string => JSON.stringify(bl.series.map((sr) => sr.values));
+    if (readings(derived) !== readings(made)) {
+      expect(derived.series.map((sr) => sr.values), `${form}: the samples are not the datum`)
+        .not.toEqual(made.series.map((sr) => sr.values));
+      expect((plotToSvg(made, THEME, layout) ?? "").length, `${form}: and the arm still draws`)
+        .toBeGreaterThan(0);
+      return;
+    }
+    // **Three families have no value axis, so there is no bound to clamp
+    // against — and the old row appeared to cover them.** It called `svgPoints`
+    // with the samples directly, which answers for any list of numbers whether
+    // or not the arm ever asks it that question; for a matrix, a treemap and a
+    // tree it never does. Measuring a helper instead of the output is how a row
+    // reports coverage it does not have (§3ak.12).
+    if (family === "matrix" || family === "tiles" || family === "nodes" || family === "field") {
+      expect(HAS_VALUE_AXIS[form], `${form}: no value axis, so no bound to clamp against`).toBe(false);
+      return;
+    }
+    // **The proportion family splits inside itself, and the record is what
+    // splits it** (F304, §3ak.26). A pie's angle and a waffle's count of squares
+    // are shares of a whole with no bound to clamp against; **a radar's radius
+    // is `v / ceiling` and has one.** Keying this on the family would have given
+    // all three the same answer, which is exactly the mistake the record's own
+    // row made.
+    if (family === "proportion") {
+      if (!HAS_VALUE_AXIS[form]) {
+        expect(form === "pie" || form === "waffle", `${form}: a share of a whole`).toBe(true);
+        return;
+      }
+      // The pin **is** the ceiling here, so far below is the centre and far
+      // above is the outer ring — asked of the figure, because a polygon's
+      // vertices are what carry the clamp and the path string is this arm's
+      // rendering of them.
+      const poly = proportionFigure(made).marks
+        .filter((d) => d.layer === "series" && d.mark.kind === "polyline");
+      expect(poly.length, "the radar drew a series polygon").toBe(1); // cells-ok — a series count
+      const pts = poly[0]!.mark.kind === "polyline" ? poly[0]!.mark.points : [];
+      const radii = pts.map((pt) => Math.hypot(pt[0] - 0.5, pt[1] - 0.5) * 2);
+      expect(Math.min(...radii), "far below pins to the centre").toBeCloseTo(0, 6);
+      expect(Math.max(...radii), "far above pins to the outer ring").toBeCloseTo(1, 6);
+      return;
+    }
+    if (family === "bar") {
+      const marks = barFigure(made).marks;
+      const stems = marks.flatMap((d) => (d.mark.kind === "rect" ? [d.mark.h] : []));
+      const heads = marks.flatMap((d) => (d.mark.kind === "point" ? [d.mark.y] : []));
+      const ts = stems.length > 0 ? stems : heads;
+      // **A lag bar's length is its distance from ZERO, so the extremes are its
+      // longest bars and not its shortest** (§3ak.14). `lagRow` ranges over
+      // `±max(1, |v|)` and grows either way from a centre column, so *far below*
+      // is a full half-span to the left where every other form in this family
+      // reads it as no length at all. The claim below held while the family
+      // behaved one way, which is the third time in this pass.
+      //
+      // The pin is ignored too, and faithfully: the terminal's `mag` is taken
+      // over the raw values, so `yMin`/`yMax` do not reach it.
+      if (form === "autocorrelation") {
+        expect(ts[0], `${form}: the floor is a full half-span from zero`).toBeCloseTo(0.5, 6);
+        expect(ts[4], `${form}: and so is the ceiling`).toBeCloseTo(0.5, 6);
+        expect(ts[1] ?? 1, `${form}: an interior sample is shorter than either`).toBeLessThan(0.5);
+        return;
+      }
+      expect(ts[0], `${form}: far below clamps to no length`).toBeCloseTo(0, 6);
+      expect(ts[4], `${form}: far above clamps to the full span`).toBeCloseTo(1, 6);
+      // **A pinned floor is not a bar's floor** (F272), which this row is the
+      // first to say out loud. `categoricalDecisions` zero-anchors the extent,
+      // so `yMin: 2` leaves the bars starting at 0 and the sample *at* the pin
+      // is not on the floor — where for a curve the two coincide, which is why
+      // one assertion stood for both families until the bar family crossed.
+      expect(ts[1], `${form}: the pinned floor is not the bar's baseline`).toBeGreaterThan(0);
+      return;
+    }
+    // **A funnel has no bound because its reading is a share** (I73, F330). The
+    // proportion branch above makes the same argument for `pie` and `waffle`;
+    // this is the third form of that shape and the first drawn as a rectangle,
+    // which is why keying it on the family would have missed it.
+    // **A timeline's events are positions on one shared axis**, so the clamp is
+    // the ordinary one — and it is asked of the *points*, because the rule
+    // across each track spans the axis by construction and would answer for
+    // every input.
+    // **A composition has no clamp of its own, because it has no scale of its
+    // own** (§3ak.36). Each child is a whole block through the whole pipeline, so
+    // the pin the row hands down is the *children's* to honour and this asserts
+    // the property that replaces it: every child that can draw is on the page,
+    // at the offset its position gives it.
+    if (family === "facets") {
+      const doc = plotToSvg(made, THEME, layout) ?? "";
+      const kids = [...doc.matchAll(/<svg x="([-\d.]+)"/gu)].map((m2) => Number(m2[1]));
+      expect(kids.length, `${form}: one nested document per child`).toBe(2); // cells-ok — a facet count
+      expect(kids[0], `${form}: the first child at the left edge`).toBeCloseTo(0, 6);
+      expect(kids[1], `${form}: the second at its own column`).toBeGreaterThan(0);
+      expect(kids[1], `${form}: and inside the parent`).toBeLessThan(layout.width);
+      return;
+    }
+    if (family === "track") {
+      const pts = trackFigure(made).marks.flatMap((d) => (d.mark.kind === "point" ? [d.mark.y] : []));
+      expect(pts.length, `${form}: the events put something on the page`).toBeGreaterThan(0); // cells-ok — a mark count
+      expect(Math.min(...pts), `${form}: far below clamps to the axis floor`).toBeCloseTo(0, 6);
+      expect(Math.max(...pts), `${form}: far above clamps to the ceiling`).toBeCloseTo(1, 6);
+      return;
+    }
+    // **A bullet has no bound to clamp against, and it is I73's first case**
+    // (F330): each row is scaled to its **own** `q.min … q.max`, so a `Figure`'s
+    // one `value` cannot describe it and the pin has nothing to act on. What is
+    // asserted instead is the property that replaces the clamp — every row fills
+    // its own span exactly, whatever units it is in.
+    if (family === "bullet") {
+      expect(HAS_VALUE_AXIS[form], `${form}: three rows, three scales, so no one axis`).toBe(false);
+      const fig = bulletFigure(made);
+      expect(fig.value, `${form}: and no axis to draw it on`).toBeNull();
+      const bands = fig.marks.filter((d) => d.mark.kind === "rect" && d.mark.value !== undefined);
+      expect(bands.length, `${form}: four bands per measure`).toBe(8); // cells-ok — a band count
+      for (const d of fig.marks) {
+        if (d.mark.kind !== "rect") continue;
+        expect(d.mark.y, `${form}: inside its own row's span`).toBeGreaterThanOrEqual(0);
+        expect(d.mark.y + d.mark.h, `${form}: and no further`).toBeLessThanOrEqual(1 + 1e-9);
+      }
+      // The last band reaches the top of its own scale in **both** rows, which
+      // is what per-row scaling means and what one shared axis would break.
+      const tops = bands.filter((d) => d.mark.kind === "rect" && d.mark.value === 1)
+        .map((d) => (d.mark.kind === "rect" ? d.mark.y + d.mark.h : 0));
+      expect(tops.length, `${form}: one full band per measure`).toBe(2); // cells-ok — a measure count
+      for (const t of tops) expect(t, `${form}: each row fills its own span`).toBeCloseTo(1, 6);
+      return;
+    }
+    if (family === "funnel") {
+      expect(HAS_VALUE_AXIS[form], `${form}: a share of a whole, so no bound`).toBe(false);
+      const fig = funnelFigure(made);
+      expect(fig.value, `${form}: and no axis to draw it on`).toBeNull();
+      const hs = fig.marks.flatMap((d) => (d.mark.kind === "rect" ? [d.mark.h] : []));
+      expect(hs.length, `${form}: the shares put something on the page`).toBeGreaterThan(0); // cells-ok — a mark count
+      // Centred: the bar's two ends are `(1 ∓ share) / 2`, so a rect's midpoint
+      // is the axis's midpoint whatever its width, and the widest is the max.
+      for (const d of fig.marks) {
+        if (d.mark.kind !== "rect") continue;
+        expect(d.mark.y + d.mark.h / 2, `${form}: centred, whatever the share`).toBeCloseTo(0.5, 6);
+      }
+      expect(Math.max(...hs), `${form}: the largest stage is the whole span`).toBeCloseTo(1, 6);
+      return;
+    }
+    if (family === "stacked" || family === "span") {
+      // **A cumulative coordinate is not a sample's own position**, so *far below
+      // pins to the floor* has no subject here: the fold decides where a sample
+      // lands and the pin decides the axis it lands on. What the pin must still
+      // do is **win over the fold's own range** — that is the property the two
+      // emitters share and the one a copy of `seriesRange` would have lost, and
+      // `normalisedOf` is what clamps whatever falls outside it.
+      const fig = family === "stacked"
+        ? stackedFigure(made, form === "streamgraph")
+        : spanFigure(made);
+      expect(fig.value, `${form}: the fold has an axis`).not.toBeNull();
+      // **The ceiling is the pin's on both; the floor differs and the record
+      // says why.** A waterfall reaches `categoricalDecisions`, which
+      // zero-anchors — *a bar's length is its value, so signed data grows both
+      // ways from zero* (F272) — and zero is where a running total starts, so
+      // the anchor is right rather than tolerated. A stacked band is positional
+      // and keeps the pin as given.
+      expect(fig.value?.range.max, `${form}: the pin's ceiling wins over the fold`).toBe(PIN.yMax);
+      // **The floor is keyed on the FORM and the family has two answers**
+      // (§3ak.34). `waterfall` reaches `categoricalDecisions`, which zero-anchors
+      // — *a bar's length is its value, so signed data grows both ways from
+      // zero* (F272), and zero is where a running total starts. **A gantt does
+      // not**: a task is an interval, so a project beginning on day three begins
+      // on day three, and `categoricalDecisions` carries a form branch for it.
+      // A stacked band is positional and keeps the pin as given.
+      expect(fig.value?.range.min, `${form}: and its floor, zero-anchored where the form is`)
+        .toBe(form === "waterfall" ? Math.min(0, PIN.yMin) : PIN.yMin);
+      const ts = fig.marks.flatMap((d) => (d.mark.kind === "rect"
+        ? [d.mark.y, d.mark.y + d.mark.h]
+        : d.mark.kind === "polyline" ? d.mark.points.map((pt) => pt[1]) : []));
+      expect(ts.length, `${form}: the fold put something on the page`).toBeGreaterThan(0); // cells-ok — a mark count
+      expect(ts.every((t) => t >= 0 && t <= 1), `${form}: and every one is on the axis`).toBe(true);
+      return;
+    }
+    if (family === "horizon") {
+      // **A horizon folds rather than positions, so the clamp is on depth.** A
+      // sample outside the pin lands in the deepest band, and `within` — *how
+      // far into the band* — is what must not exceed it. Unclamped it drew a
+      // rect taller than the plot area, which the terminal never showed because
+      // `horizonGrid` takes `min(h · 8, …)` one line after computing it.
+      const hs = horizonFigure(made).marks.flatMap((d) => (d.mark.kind === "rect" ? [d.mark.h] : []));
+      expect(hs.length, "a rect per sample").toBeGreaterThan(0); // cells-ok — a sample count
+      expect(Math.max(...hs), "the deepest band is full and no fuller").toBeCloseTo(1, 6);
+      expect(hs.every((h) => h >= 0 && h <= 1), "and every fold is inside its own band").toBe(true);
+      return;
+    }
+    const drawn = sampleYs(plotToSvg(made, THEME, layout) ?? "");
+    expect(drawn[0], `${form}: far below pins to the floor`).toBeCloseTo(bottom, 6);
+    expect(drawn[4], `${form}: far above pins to the ceiling`).toBeCloseTo(top, 6);
+    expect(drawn[0]).toBe(drawn[1]);
+    expect(drawn[4]).toBe(drawn[3]);
     // And the drawn document never puts ink outside the area either.
     const svg = plotToSvg(made, THEME, layout) ?? "";
     const ys = [...svg.matchAll(/(?:\by|cy|y1|y2)="([-\d.]+)"/gu)].map((m) => Number(m[1]));
@@ -418,10 +914,18 @@ describe("G6b — the two assertions containment could not make", () => {
     expect(fills[2], "the ceiling is the map's ceiling").toBe(sampleHex(map, 1));
   });
 
-  it("a bar's baseline is zero where the range holds it, not the area's floor", () => {
-    // The first draft computed `normalisedOf(range.min, …)`, which is `1` by
-    // construction — `box.bottom` the long way round. Signed data is what tells
-    // the difference: a bar of `-3` grows *down* from zero.
+  it("F272: every bar fills from the RANGE FLOOR — the defect both arms now share", () => {
+    // **This row asserted the opposite until the arms were unified, and it was
+    // right.** `plotToSvg` computed its own zero baseline, so a bar of `-3`
+    // grew *down* from zero; the terminal does not, in either orientation —
+    // `barRow` and `barColumn` both compute `(value - min) / span`, so signed
+    // data draws no negative bars at all.
+    //
+    // **The tie-break resolves it the wrong way on purpose** (F272, §3ak.9).
+    // Correcting the terminal inside a refactor moves no frame, splits the arms
+    // at step 4, and is announced by nothing; unified, the two draw one wrong
+    // figure and one repair fixes both. So this row now asserts the defect, and
+    // **it fails the day a bar hangs below zero** — which is the repair landing.
     const signed = b.plot({
       id: "bz",
       form: "bar",
@@ -430,14 +934,21 @@ describe("G6b — the two assertions containment could not make", () => {
     });
     const layout = SVG_DEFAULT_LAYOUT;
     const svg = plotToSvg(signed, THEME, layout) ?? "";
-    const rects = [...svg.matchAll(/<rect x="([-\d.]+)" y="([-\d.]+)" width="([-\d.]+)" height="([-\d.]+)"/gu)];
+    const rects = [...svg.matchAll(/<rect x="([-\d.]+)" y="([-\d.]+)" width="([-\d.]+)" height="([-\d.]+)"/gu)]
+      .map((m) => ({ x: Number(m[1]), w: Number(m[3]) }));
     expect(rects, "three bars").toHaveLength(3);
-    const bottom = layout.height * (1 - layout.gutter);
-    const [neg, , pos] = rects.map((m) => ({ y: Number(m[2]), h: Number(m[4]) }));
-    // The negative bar's *top* is the baseline; the positive bar's *bottom* is.
-    expect(neg?.y, "the negative bar hangs from the baseline").toBeGreaterThan(layout.height * layout.pad);
-    expect((pos?.y ?? 0) + (pos?.h ?? 0), "and the positive one stands on it").toBeCloseTo(neg?.y ?? -1, 3);
-    expect(neg?.y, "which is not the area's floor").toBeLessThan(bottom - 1);
+    const left = layout.width * (layout.gutter + layout.pad);
+    // **Every bar starts at the same place and that place is the floor**, which
+    // is the whole of the defect in one assertion: nothing marks where zero is,
+    // so `-3` and `5` are told apart by length alone and the sign is gone.
+    for (const [i, r] of rects.entries()) {
+      expect(r.x, `bar ${String(i)} starts at the range floor`).toBeCloseTo(left, 3);
+    }
+    // **The set, not its first member.** Lengths ordered by value is what says
+    // the bars are still a reading of the data rather than three copies.
+    const ws = rects.map((r) => r.w);
+    expect(ws[0], "the most negative gets no length at all").toBeLessThan(ws[1] ?? 0);
+    expect(ws[1], "and zero gets less than the positive").toBeLessThan(ws[2] ?? 0);
   });
 });
 
@@ -450,6 +961,729 @@ describe("G6b — the two assertions containment could not make", () => {
  * never crosses. A `line` is claimed; a `line` **carrying candles** is a
  * different block that the same claim covers.
  */
+const catFrame = catFrameRaw as (s: unknown, c: unknown, w: number, id?: string) => readonly string[];
+const stripSgr = stripSgrRaw as (s: string) => string;
+
+/** The terminal arm at 24-bit, for the one row that reads a grid rather than a document. */
+const TERM_CAPS = {
+  colourDepth: 24, unicode: "full", ambiguousWidth: "narrow", synchronisedUpdate: true,
+  bracketedPaste: true, mouse: true, imageProtocol: "none", keyboardProtocol: "none", altScreen: true,
+} as const;
+
+describe("G12 — the last two of the eleven", () => {
+  const straddle = (extra: Record<string, unknown>): Plot => vmBlock({
+    kind: "plot", id: "x", form: "line", height: 10, axes: true, xMin: -6, xMax: 6,
+    series: [{ label: "obs", values: [-4, -1, 2, 6, 3, -2, -5, 1, 5, 2, -3, -1, 4] }],
+    ...extra,
+  } as unknown as Plot);
+
+  it("G12a (C12 I82, §3ak.48, F370): the caption's words cross and the room does not", () => {
+    const bare = plotToSvg(straddle({ xLabels: ["a", "b", "c"] }), THEME) ?? "";
+    const titled = plotToSvg(straddle({ xLabels: ["a", "b", "c"], xTitle: "seconds" }), THEME) ?? "";
+    expect(bare === titled, "`line/x-title` and `line/x-captions` drew one document").toBe(false);
+    expect(titled, "the caption is drawn").toContain(">seconds<");
+    expect(curveFigure(straddle({ xTitle: "seconds" })).title, "the words are the figure's").toBe("seconds");
+    expect(curveFigure(straddle({})).title, "and `null` where there is none").toBeNull();
+  });
+
+  it("G12b (C12 I82, §3ad, F370): `cross` says whether, and a domain that does not straddle has none", () => {
+    // **The member says *whether*** — `zeroAt` and `normalisedOf(0)` are each
+    // arm's own arithmetic — and only a domain that **strictly** straddles zero
+    // has a crossing to draw (§3ad A4).
+    const edge = plotToSvg(straddle({}), THEME) ?? "";
+    const zero = plotToSvg(straddle({ axisCross: "zero" }), THEME) ?? "";
+    expect(edge === zero, "all three `axisCross` values drew one document").toBe(false);
+    expect((zero.match(/<line /gu) ?? []).length - (edge.match(/<line /gu) ?? []).length,
+      "two rules arrive: one down the abscissa's zero and one across the ordinate's")
+      .toBe(2); // cells-ok — an element count
+
+    // **An index domain has no crossing**, which is the clause `zeroAt` carries:
+    // sample 0 is its own left edge, and a rule there abuts the gutter.
+    const indexed = vmBlock({
+      kind: "plot", id: "i", form: "line", height: 8, axes: true, axisCross: "zero",
+      series: [{ values: [1, 2, 3, 4] }],
+    } as unknown as Plot);
+    expect(curveFigure(indexed).cross, "the member is still set").toBe(true);
+    expect((plotToSvg(indexed, THEME) ?? "").match(/<line /gu)?.length ?? 0,
+      "and no crossing rule is drawn, because 0 … 3 does not straddle zero")
+      .toBe(4); // cells-ok — the box's four edges
+  });
+});
+
+describe("G11 — a callout is a name at the line's end", () => {
+  it("G11a (C12 I81, I48, §3ak.47, F368): the three callout modes draw three documents, and two remove the legend", () => {
+    // **The collision F349 reported and nobody read.** `line/callout-last`,
+    // `callout-name` and `callout-both` drew **one** document here while the
+    // terminal drew three — the member had no reader, which is the shape every
+    // one of F355's remaining eleven has.
+    const line = (mode: string): Plot => vmBlock({
+      kind: "plot", id: "c", form: "line", height: 8, axes: true, yAxis: "both",
+      yCallout: mode,
+      series: [{ label: "alpha", values: [10, 40, 90] }, { label: "beta", values: [90, 40, 10] }],
+    } as unknown as Plot);
+    const draw = (mode: string): string => plotToSvg(line(mode), THEME) ?? "";
+    const texts = (svg: string): readonly string[] =>
+      [...svg.matchAll(/<text[^>]*>([^<]*)<\/text>/gu)].map((m) => m[1] ?? "");
+
+    expect(new Set([draw("last"), draw("name"), draw("both")]).size,
+      "three modes, three documents").toBe(3); // cells-ok — a document count
+
+    // **`"last"` keeps its legend and the other two remove it** (C12 I48's
+    // sentence selects rather than excludes). `legendPlacement` has carried this
+    // since §3ag and `legendOf` had not, so this arm drew the legend the
+    // terminal removes — and would have drawn it beside the callouts.
+    expect(texts(draw("last")).filter((t) => t === "alpha").length,
+      "`last` names a value, so the legend still names the identity").toBe(1); // cells-ok — a label count
+    expect(texts(draw("name")).filter((t) => t === "alpha").length,
+      "and `name` writes the identity once, at the line's end").toBe(1); // cells-ok — a label count
+    expect(texts(draw("both")).some((t) => t === "alpha 90"),
+      "`both` is the name and the reading, in that order").toBe(true);
+
+    // **The strings are the figure's** — the same list the terminal writes, so
+    // there is one place left to get the text wrong.
+    expect(curveFigure(line("both")).callout, "one entry per series, in order")
+      .toEqual(["alpha 90", "beta 10"]);
+    expect(curveFigure(line("none")).callout, "and `null` where the field is off").toBeNull();
+  });
+});
+
+describe("RM — the right margin is grown to fit what is drawn in it (C12 I113, §3ak.49)", () => {
+  /**
+   * **The widest advance measured, not the bound the arm reserves at.**
+   * `SVG_EM_MAX` is 0.65 and the containment rows assert against 0.6182 — SF
+   * Mono, the widest of six faces measured from `hmtx ÷ head.unitsPerEm`. A row
+   * asserting at the arm's own constant would agree with it by construction and
+   * find nothing; this one asks whether a real renderer's glyphs fit.
+   */
+  const WIDEST_FACE = 0.6182;
+  const layout = SVG_DEFAULT_LAYOUT;
+
+  /** Every `<text>` the document places, in page coordinates. */
+  const placed = (svg: string): Array<{ text: string; left: number; right: number; clipped: boolean }> =>
+    [...svg.matchAll(/<text ([^>]*)>([^<]*)<\/text>/gu)].map((m) => {
+      const attrs = m[1] ?? "";
+      const text = m[2] ?? "";
+      const x = Number(/(?:^| )x="([-\d.]+)"/u.exec(attrs)?.[1] ?? "NaN");
+      const size = Number(/font-size="([\d.]+)"/u.exec(attrs)?.[1] ?? String(SVG_FONT_SIZE));
+      const anchor = /text-anchor="(\w+)"/u.exec(attrs)?.[1] ?? "start";
+      const w = [...text].length * size * WIDEST_FACE; // cells-ok — a character count
+      const left = anchor === "start" ? x : anchor === "end" ? x - w : x - w / 2;
+      return { text, left, right: left + w, clipped: /clip-path=/u.test(attrs) };
+    });
+
+  /** The frame's right edge — the vertical rule furthest right. */
+  const rightEdge = (svg: string): number => {
+    let at = 0;
+    for (const m of svg.matchAll(/<line x1="([-\d.]+)" y1="[-\d.]+" x2="([-\d.]+)"/gu)) {
+      if (m[1] === m[2]) at = Math.max(at, Number(m[1]));
+    }
+    return at;
+  };
+
+  const line = (extra: Record<string, unknown>): Plot => vmBlock({
+    kind: "plot", id: "rr", form: "line", height: 8, axes: true, legend: false,
+    series: [{ label: "alpha", values: [50, 90, 10] }, { label: "beta", values: [10, 40, 99] }],
+    ...extra,
+  } as unknown as Plot);
+
+  it("RM1 (C12 I113): every string in the catalogue is on the page, which the byte-compare golden could not ask", () => {
+    // **The golden certified this defect for as long as it existed.** A frame
+    // compared byte for byte agrees with whatever it recorded, and
+    // `line-callout-both` recorded `alpha 0.8774` at x=620.4 in a 640-wide
+    // viewBox — 67 px off the page, read as `alp`. So the assertion is
+    // geometric and over the emitted document: nothing is placed where it
+    // cannot be read.
+    //
+    // A clipped text is contained by construction and cut by design (§3ak.41),
+    // so it is excluded rather than exempted — the clip is what bounds it.
+    const outside: string[] = [];
+    for (const [form, variants] of Object.entries(CATALOGUE_FORMS)) {
+      for (const [variant, spec] of Object.entries(variants)) {
+        const { cursor, ...rest } = spec as Record<string, unknown>;
+        void cursor;
+        const svg = plotToSvg(vmBlock({ kind: "plot", id: "cat", ...rest } as unknown as Plot), THEME, layout);
+        if (svg === null) continue;
+        for (const t of placed(svg)) {
+          if (t.clipped) continue;
+          if (t.left < -0.5 || t.right > layout.width + 0.5) {
+            outside.push(`${form}/${variant}: "${t.text}" spans ${t.left.toFixed(1)}…${t.right.toFixed(1)} of ${String(layout.width)}`);
+          }
+        }
+      }
+    }
+    expect(outside, "every callout, label and title inside its own viewBox").toEqual([]);
+  });
+
+  it("RM2 (C12 I113): the margin is the maximum of the two things drawn in it, and zero where neither is", () => {
+    // **`definition.ts`'s own expression in pixels** —
+    // `right = sides.right ? max(wanted, calloutWidth(...)) : 0`. The three
+    // frames differ only in what is written on the right.
+    const bare = plotToSvg(line({ yAxis: "left" }), THEME, layout) ?? "";
+    const labelled = plotToSvg(line({ yAxis: "both" }), THEME, layout) ?? "";
+    const called = plotToSvg(line({ yAxis: "both", yCallout: "both" }), THEME, layout) ?? "";
+
+    // **A figure with nothing to reserve for does not move**, which is the half
+    // of this rule that would make it the wrong rule (F325's shape).
+    expect(rightEdge(bare), "the fixed margin stays where nothing is drawn in it")
+      .toBeCloseTo(layout.width * (1 - layout.pad), 6);
+    // `100` is three glyphs and a gap, which is wider than `width · pad` on the
+    // default layout — the 2 px overrun six committed frames carried.
+    expect(rightEdge(labelled), "a right-hand value label takes the room its glyphs need")
+      .toBeCloseTo(layout.width - (3 * SVG_FONT_SIZE * 0.65 + 6), 6);
+    // `alpha 99` and `beta 99` — eight glyphs, so the callout wins the maximum.
+    expect(rightEdge(called), "and the callout wins where it is the wider of the two")
+      .toBeCloseTo(layout.width - (8 * SVG_FONT_SIZE * 0.65 + 6), 6);
+    expect(rightEdge(called), "which is strictly more room than the labels alone asked for")
+      .toBeLessThan(rightEdge(labelled));
+  });
+
+  it("RM3 (C12 I113, I48): the marks walk and the axis emitter answer to one box", () => {
+    // **The interaction the walk found, and it is not the overflow.** `area()`
+    // is called from two places; a room that read the theme — or that either
+    // caller computed differently — would draw the data against a different box
+    // than the furniture, with every arithmetic assertion still passing. The
+    // callout is written by the marks walk at the series' last point and the
+    // frame is drawn by the emitter, so the two agreeing is the assertion.
+    const svg = plotToSvg(line({ yAxis: "both", yCallout: "both" }), THEME, layout) ?? "";
+    const callouts = [...svg.matchAll(/<text x="([-\d.]+)"[^>]*text-anchor="start"[^>]*>(alpha[^<]*)<\/text>/gu)];
+    expect(callouts.length, "one callout for the named series").toBe(1); // cells-ok — a callout count
+    expect(Number(callouts[0]?.[1]), "written a gap past the frame the other call drew")
+      .toBeCloseTo(rightEdge(svg) + 6, 6);
+  });
+
+  it("RM4 (C12 I113, §3ak.41): past the cap the callout is cut at the tail and marked", () => {
+    // **The half §3ak.41 wrote with no instance in the corpus.** There is one
+    // now and it is committed: `line-both-axes-narrow`'s callout is 36
+    // characters wanting 281 px of a 640-wide page, of which two were drawn.
+    const long = plotToSvg(line({
+      yAxis: "both", yCallout: "both",
+      series: [{ label: "eu-west-1-primary-p99-latency", values: [50, 90, 10] }],
+    }), THEME, layout) ?? "";
+    const cut = placed(long).find((t) => t.text.startsWith("eu-west"));
+    expect(cut?.text.endsWith("…"), "cut at the tail and marked").toBe(true);
+    expect(cut?.text.startsWith("eu-west-1"), "the head — the part that names it — survives").toBe(true);
+    expect(cut?.right ?? 0, "and what is left is on the page").toBeLessThanOrEqual(layout.width + 0.5);
+    expect(rightEdge(long), "the margin is capped at a third whatever the string wants")
+      .toBeCloseTo(layout.width - (layout.width / 3 + 6), 2);
+  });
+
+  it("RM5 (C12 I113): a string in a margin sized for exactly that string is not cut", () => {
+    // **The reserve and the fit are two derivations of one product.** At
+    // exactly the granted room `23.400000000000006 / 7.8` is `2.9999…`, so
+    // `100` shipped as `1…` in a margin sized for `100` — a defect the frame
+    // showed and no count would have. The row is the boundary itself.
+    const svg = plotToSvg(line({ yAxis: "right" }), THEME, layout) ?? "";
+    const right = placed(svg).filter((t) => !t.clipped && t.left > rightEdge(svg));
+    expect(right.length, "the right-hand column has labels in it").toBeGreaterThan(0); // cells-ok — a label count
+    expect(right.map((t) => t.text).filter((t) => t.includes("…")),
+      "and none of them is cut, because the room was sized for them").toEqual([]);
+  });
+});
+
+describe("RC — the callout displaces the label it lands on (C12 I114, §3ak.50)", () => {
+  const layout = SVG_DEFAULT_LAYOUT;
+  /**
+   * **The widest face measured, as `RM` uses it** — a box drawn at the arm's
+   * own `SVG_EM_MAX` would agree with the code by construction.
+   */
+  const WIDEST_FACE = 0.6182;
+
+  /** Every `<text>`, with the band its ink paints. */
+  const texts = (svg: string): Array<{
+    text: string; x: number; y: number; left: number; right: number; anchor: string; fill: string; clipped: boolean;
+  }> =>
+    [...svg.matchAll(/<text ([^>]*)>([^<]*)<\/text>/gu)].map((m) => {
+      const attrs = m[1] ?? "";
+      const text = m[2] ?? "";
+      const x = Number(/(?:^| )x="([-\d.]+)"/u.exec(attrs)?.[1] ?? "NaN");
+      const size = Number(/font-size="([\d.]+)"/u.exec(attrs)?.[1] ?? String(SVG_FONT_SIZE));
+      const anchor = /text-anchor="(\w+)"/u.exec(attrs)?.[1] ?? "start";
+      const w = [...text].length * size * WIDEST_FACE; // cells-ok — a character count
+      const left = anchor === "start" ? x : anchor === "end" ? x - w : x - w / 2;
+      return {
+        text, x, y: Number(/(?:^| )y="([-\d.]+)"/u.exec(attrs)?.[1] ?? "NaN"),
+        left, right: left + w, anchor,
+        fill: /fill="([^"]+)"/u.exec(attrs)?.[1] ?? "",
+        clipped: /clip-path=/u.test(attrs),
+      };
+    });
+
+  /**
+   * A callout is a **start**-anchored text in a series' own colour; a value
+   * label is drawn in the theme's `label` slot. Read off the document rather
+   * than off the block, because what is on the page is the subject.
+   */
+  const LABEL_INK = "#626262";
+  const callouts = (svg: string): ReturnType<typeof texts> =>
+    texts(svg).filter((t) => t.anchor === "start" && t.fill !== LABEL_INK && !t.clipped && t.text !== "");
+
+  /**
+   * **A legend entry is excluded by the emitter's own pair, not by a
+   * coordinate.** It is pushed as `<rect>` then `<text>` with
+   * `x = swatch.x + swatch.width + 4`, so the arithmetic identifies it exactly
+   * — and a value label can never satisfy it. Written this way because the
+   * legend shares the right band with the value labels and the callout, which
+   * is the lane's legend finding and is *not* what `RC1` is about.
+   */
+  const legendTexts = (svg: string): ReadonlySet<string> => {
+    const out = new Set<string>();
+    for (const m of svg.matchAll(
+      /<rect x="([-\d.]+)" y="[-\d.]+" width="([\d.]+)" height="[\d.]+" fill="[^"]+"\/>\n<text x="([-\d.]+)"[^>]*>([^<]*)<\/text>/gu,
+    )) {
+      if (Math.abs(Number(m[3]) - (Number(m[1]) + Number(m[2]) + 4)) < 1e-6) out.add(`${String(Number(m[3]))}|${m[4] ?? ""}`);
+    }
+    return out;
+  };
+
+  /**
+   * The right-hand value labels: the axis emitter writes them at
+   * `box.right + LABEL_GAP`, which is past the half-width on every layout the
+   * cap allows (`box.left ≤ width / 3 + 6`), and the legend is the only other
+   * label-ink text in that half.
+   */
+  const rightLabels = (svg: string): ReturnType<typeof texts> => {
+    const legend = legendTexts(svg);
+    return texts(svg).filter((t) =>
+      t.fill === LABEL_INK && t.anchor === "start" && !t.clipped
+      && t.x > layout.width / 2 && !legend.has(`${String(t.x)}|${t.text}`));
+  };
+
+  /**
+   * The left gutter's labels: `end`-anchored at `box.left - LABEL_GAP`, which
+   * is the **smallest** such x in the document — the abscissa's last caption is
+   * `end`-anchored too, at `box.right`.
+   */
+  const leftLabels = (svg: string): ReturnType<typeof texts> => {
+    const ends = texts(svg).filter((t) => t.fill === LABEL_INK && t.anchor === "end" && !t.clipped);
+    const at = Math.min(...ends.map((t) => t.x));
+    return ends.filter((t) => t.x === at);
+  };
+
+  const line = (extra: Record<string, unknown>): Plot => vmBlock({
+    kind: "plot", id: "rc", form: "line", height: 8, axes: true, legend: false,
+    yCallout: "last",
+    series: [{ label: "alpha", values: [50, 90, 0.8774] }],
+    ...extra,
+  } as unknown as Plot);
+
+  it("RC1 (C12 I114): no callout overprints a right-hand value label, over the whole catalogue", () => {
+    // **The row `RM1` could not be, and the measured proof of it.** Ten pairs
+    // in six of 212 drawn frames overprinted — `99.12` written over `100` as
+    // `90012`, `e` over `0` — and every one of the ten was **inside its own
+    // `viewBox`**, so `RM1` agreed with all of them for as long as they
+    // existed. Containment is not correctness.
+    const bad: string[] = [];
+    for (const [form, variants] of Object.entries(CATALOGUE_FORMS)) {
+      for (const [variant, spec] of Object.entries(variants)) {
+        const { cursor, ...rest } = spec as Record<string, unknown>;
+        void cursor;
+        const svg = plotToSvg(vmBlock({ kind: "plot", id: "cat", ...rest } as unknown as Plot), THEME, layout);
+        if (svg === null) continue;
+        for (const c of callouts(svg)) {
+          for (const l of rightLabels(svg)) {
+            if (Math.abs(c.y - l.y) >= SVG_FONT_SIZE) continue;
+            if (c.right <= l.left + 1e-3 || l.right <= c.left + 1e-3) continue;
+            bad.push(`${form}/${variant}: "${c.text}" over "${l.text}" at y ${c.y.toFixed(2)}/${l.y.toFixed(2)}`);
+          }
+        }
+      }
+    }
+    expect(bad, "a callout and a right-hand value label never paint the same band").toEqual([]);
+  });
+
+  it("RC2 (C12 I114, I48): the left label on the contested tick stands, which is the clause the right one loses by", () => {
+    // **`never the left's`, asserted on the tick that has two chances.** At
+    // `yAxis: "both"` one tick carries a label on each side and only the right
+    // is contended, so a rule that displaced by row rather than by side would
+    // lose the reading here and nowhere else. Asserted on **that tick**, not on
+    // a count: a count agrees with a rule that drops the wrong one.
+    const svg = plotToSvg(line({ yAxis: "both" }), THEME, layout) ?? "";
+    const c = callouts(svg)[0];
+    expect(c?.text, "the callout is drawn").toBe("0.8774");
+    const contestedLeft = leftLabels(svg).filter((l) => Math.abs(l.y - (c?.y ?? NaN)) < SVG_FONT_SIZE);
+    expect(contestedLeft.map((l) => l.text), "the left label on the callout's own row survives").toEqual(["0"]);
+    const contestedRight = rightLabels(svg).filter((l) => Math.abs(l.y - (c?.y ?? NaN)) < SVG_FONT_SIZE);
+    expect(contestedRight.map((l) => l.text), "and the right one on that same row is gone").toEqual([]);
+  });
+
+  it("RC3 (C12 I114): exactly the contested labels go, and a figure with nothing contested does not move", () => {
+    // **Designing the mutations gave this row its shape.** `RC1` is satisfied
+    // by deleting the whole right column — a rule that suppresses every label
+    // has no overprint in it — so the assertion is the **set** that survives
+    // and not the absence of a collision.
+    //
+    // **And the fixture's tick pitch is the row's sensitivity, measured.** At
+    // `height: 8` the right column's labels are 137.6 px apart, so a threshold
+    // widened by *four times* suppresses nothing extra and this row survives
+    // it — found by running that mutation and watching it kill nothing, which
+    // is the mutation pass indicting the fixture rather than the rule. At
+    // `height: 40` the pitch is **15.29 px**, a quarter of a glyph's height
+    // above the threshold itself, so the same widening is visible. Both are
+    // asserted, because the sparse case is the one the corpus has.
+    for (const extra of [{}, { height: 40 }]) {
+      const without = plotToSvg(line({ yAxis: "right", yCallout: "none", ...extra }), THEME, layout) ?? "";
+      const withOne = plotToSvg(line({ yAxis: "right", ...extra }), THEME, layout) ?? "";
+      const c = callouts(withOne)[0];
+      expect(c, "the callout is drawn").toBeDefined();
+      const expected = rightLabels(without)
+        .filter((l) => Math.abs(l.y - (c?.y ?? NaN)) >= SVG_FONT_SIZE)
+        .map((l) => `${l.text}@${l.y.toFixed(3)}`);
+      expect(expected.length, "and some labels are uncontested, or this row asserts nothing") // cells-ok — a label count
+        .toBeGreaterThan(0);
+      expect(rightLabels(withOne).map((l) => `${l.text}@${l.y.toFixed(3)}`),
+        "the right column keeps every label the callout did not land on, by value and by row").toEqual(expected);
+    }
+
+    // **The half that would make this the wrong rule** (F325's shape). With no
+    // right-hand column there is nothing to displace, so the gutter the figure
+    // *does* draw is untouched by the callout arriving.
+    const leftOnly = plotToSvg(line({ yAxis: "left" }), THEME, layout) ?? "";
+    const leftBare = plotToSvg(line({ yAxis: "left", yCallout: "none" }), THEME, layout) ?? "";
+    expect(leftLabels(leftOnly).map((l) => `${l.text}@${l.y.toFixed(3)}`),
+      "a callout on a figure with no right-hand labels displaces nothing")
+      .toEqual(leftLabels(leftBare).map((l) => `${l.text}@${l.y.toFixed(3)}`));
+  });
+
+  it("RC4 (C12 I114): a displaced label keeps its gridline, which is what the ruling leaves behind", () => {
+    // **The rejection path.** The loop body draws a rule *and* a label; a
+    // suppression written one line up takes both, and the figure loses a
+    // gridline while every text assertion still agrees. Neither walk artefact
+    // indexes this — it is what the decision leaves behind rather than a cell
+    // two rules claim.
+    const horizontals = (svg: string): number => // cells-ok — a gridline count
+      [...svg.matchAll(/<line x1="([-\d.]+)" y1="([-\d.]+)" x2="([-\d.]+)" y2="([-\d.]+)"/gu)]
+        .filter((m) => m[2] === m[4] && m[1] !== m[3]).length; // cells-ok — a gridline count
+    const withOne = plotToSvg(line({ yAxis: "right", plotFrame: "grid" }), THEME, layout) ?? "";
+    const without = plotToSvg(line({ yAxis: "right", plotFrame: "grid", yCallout: "none" }), THEME, layout) ?? "";
+    expect(rightLabels(withOne).length, "a label was displaced, or this row asserts nothing") // cells-ok — a label count
+      .toBeLessThan(rightLabels(without).length); // cells-ok — a label count
+    expect(horizontals(withOne), "and the grid is the grid the figure had").toBe(horizontals(without));
+  });
+
+  it("RC5 (C12 I114, §3ak.50b): the emitter reads what the walk wrote, so the order is the mechanism", () => {
+    // **The wiring rather than the rule.** The row is ink, so it leaves the
+    // walk through a collector rather than through a second pure function; the
+    // consequence is that `plotToSvg`'s call order stops being incidental.
+    // Reversing it empties the collector and silently restores every overprint,
+    // with `RC1`'s catalogue sweep the only thing that would notice.
+    const src = sourceOf("src/presentation/plot/svg.ts");
+    const walkAt = src.indexOf("const body = marks(block, figure, layout, theme, calloutRows);");
+    const readAt = src.indexOf("calloutRows.some(");
+    expect(walkAt, "the walk is called with the collector").toBeGreaterThan(-1);
+    expect(readAt, "and the axis emitter reads it").toBeGreaterThan(-1);
+    expect(walkAt, "the walk fills the collector before the emitter reads it").toBeLessThan(readAt);
+    // **The control**: the matcher can see the thing it asserts about, after
+    // the stripper has run (`test/support/source.ts`'s own rule).
+    expect(fires(src, /calloutRows\.some\(/u), "the matcher fires on the stripped source").toBe(true);
+  });
+
+  it("RC6 (C12 I114, §3ak.50e): a left gutter label is cut only where the gutter is at its cap", () => {
+    // **F713's real hazard, and F713 itself is not a defect.** `ValueAxis` is
+    // built in one place — `valueAxisOf`, `{ ...axis, labels: tickLabels(...) }`
+    // — and `tickLabels` is `axis.ticks.map(...)`, so `labels` is total over
+    // `ticks` by construction and `gutterRoom` and the emitter are the same
+    // function rather than two that happen to agree on this corpus. The
+    // mirrored fix would have changed nothing.
+    //
+    // What nothing watched is the symptom if they ever part: `fitLabel` cuts
+    // rather than overflows, so an under-measured reserve reads as a **shorter
+    // number** with nothing on the page to say so. A cut is legitimate only at
+    // the cap, which is `width / 3` (§3ak.41 — `heatmap/captions-left` is the
+    // instance).
+    const bad: string[] = [];
+    for (const [form, variants] of Object.entries(CATALOGUE_FORMS)) {
+      for (const [variant, spec] of Object.entries(variants)) {
+        const { cursor, ...rest } = spec as Record<string, unknown>;
+        void cursor;
+        const svg = plotToSvg(vmBlock({ kind: "plot", id: "cat", ...rest } as unknown as Plot), THEME, layout);
+        if (svg === null) continue;
+        for (const l of leftLabels(svg)) {
+          if (!l.text.includes("…")) continue;
+          if (l.x >= layout.width / 3) continue;
+          bad.push(`${form}/${variant}: "${l.text}" cut at x ${l.x.toFixed(1)}, below the cap ${(layout.width / 3).toFixed(1)}`);
+        }
+      }
+    }
+    expect(bad, "no left gutter label is cut inside a gutter that was not capped").toEqual([]);
+  });
+
+  /**
+   * A legend entry, with its geometry — the emitter's own `rect`-then-`text`
+   * pair, the same arithmetic `legendTexts` identifies one by, kept as
+   * positions because `RC7` asserts where the entry is and not merely that it
+   * is somewhere.
+   */
+  const legendEntries = (svg: string): readonly { x: number; y: number; text: string; left: number; right: number }[] => {
+    const out: { x: number; y: number; text: string; left: number; right: number }[] = [];
+    for (const m of svg.matchAll(
+      /<rect x="([-\d.]+)" y="([-\d.]+)" width="([\d.]+)" height="[\d.]+" fill="[^"]+"\/>\n<text x="([-\d.]+)" y="([-\d.]+)"[^>]*>([^<]*)<\/text>/gu,
+    )) {
+      const x = Number(m[4]);
+      if (Math.abs(x - (Number(m[1]) + Number(m[3]) + 4)) > 1e-6) continue;
+      const text = m[6] ?? "";
+      out.push({ x, y: Number(m[5]), text, left: x, right: x + [...text].length * SVG_FONT_SIZE * WIDEST_FACE }); // cells-ok — a character count
+    }
+    return out;
+  };
+
+  it("RC7 (C12 I115, §3ak.50f): the right band's writers hold disjoint columns, and a figure with no column does not move", () => {
+    // **Three writers, one anchor, and 52.8 px of reserved canvas nobody drew
+    // in.** `area()` subtracts the column's reserve *and* the legend's band
+    // from `box.right` and then the value labels (`box.right + 6`), the
+    // callout (`end[0] + 6`) and the legend (`box.right + 12`) all anchor on
+    // it — so the column is painted over the legend while its own reserve
+    // stands empty at the canvas edge. Both overprinting pairs were **inside
+    // their own `viewBox`**, so containment saw neither: this asserts columns.
+    const bad: string[] = [];
+    for (const [form, variants] of Object.entries(CATALOGUE_FORMS)) {
+      for (const [variant, spec] of Object.entries(variants)) {
+        const { cursor, ...rest } = spec as Record<string, unknown>;
+        void cursor;
+        const svg = plotToSvg(vmBlock({ kind: "plot", id: "cat", ...rest } as unknown as Plot), THEME, layout);
+        if (svg === null) continue;
+        const entries = legendEntries(svg);
+        for (const w of [...callouts(svg), ...rightLabels(svg)]) {
+          for (const e of entries) {
+            if (Math.abs(w.y - e.y) >= SVG_FONT_SIZE) continue;
+            if (w.right <= e.left + 1e-3 || e.right <= w.left + 1e-3) continue;
+            bad.push(`${form}/${variant}: "${w.text}" over legend "${e.text}" at y ${w.y.toFixed(2)}/${e.y.toFixed(2)}`);
+          }
+        }
+      }
+    }
+    expect(bad, "no legend entry shares a band with a callout or a right-hand value label").toEqual([]);
+
+    // **F726's fourth interaction, which the corpus does not have and which is
+    // real** — the tick column against the legend, with *no callout in the
+    // figure at all*. F726 records it as measured on `line-callout-*`; it is
+    // not there, because C12 I114 suppresses that tick 2.415 px from the callout.
+    // Constructed here instead. **The fixture property that makes it sensitive
+    // is the width of the widest right-hand tick label**: `100` is three
+    // characters, so `rightRoom` is 29.4 px and the old anchor put `alpha`'s
+    // first glyph at 508.2, **2.655 px inside** the ink of `100`, which ends at
+    // 510.855. One character and the defect vanishes — which is why the number
+    // is written down rather than the shape.
+    const legendRight = (extra: Record<string, unknown>): Plot => vmBlock({
+      kind: "plot", id: "rc7", form: "line", height: 8, axes: true, legend: "right",
+      series: [{ label: "alpha", values: [50, 90, 0.8774] }, { label: "beta", values: [10, 20, 30] }],
+      ...extra,
+    } as unknown as Plot);
+
+    const ticksOnly = plotToSvg(legendRight({ yAxis: "right" }), THEME, layout) ?? "";
+    const tick100 = texts(ticksOnly).find((t) => t.text === "100" && t.anchor === "start");
+    expect(tick100?.left).toBeCloseTo(488.6, 6);
+    // 488.6 + 3 · 12 · 0.6182. The **reserve** granted it 23.4 px on
+    // `SVG_EM_MAX`'s 0.65 bound and the ink takes 22.255 of it, which is the
+    // bound erring in the safe direction and is why the two numbers differ.
+    expect(tick100?.right).toBeCloseTo(510.8552, 4);
+    // `box.right` is 482.6 and `rightRoom` is 29.4, so `originX` is
+    // 482.6 + 29.4 + 12 = 524 and the entry's **text** is a swatch and a gap
+    // further on, at 537.6 — **26.7 px clear of the tick's ink**, where the old
+    // `originX` of 494.6 put that text at 508.2, inside 488.6 … 510.855.
+    expect(legendEntries(ticksOnly).map((e) => e.x)).toEqual([537.6, 537.6]);
+
+    // **The half that would make it the wrong rule.** No right-hand column, so
+    // `rightRoom` is 0 and the legend keeps `box.right + 12` **exactly** —
+    // 486.4 + 12 = 498.4, its text at 512. That is 81 of the 83 frames in the
+    // catalogue that carry a right-placed legend, so a rule that pushed every
+    // legend outward passes the sweep above and fails here.
+    const noColumn = plotToSvg(legendRight({ yAxis: "left" }), THEME, layout) ?? "";
+    expect(legendEntries(noColumn).map((e) => e.x)).toEqual([512, 512]);
+
+    // **And the callout's own column, asserted as a position.** `box.right` is
+    // 459.2, the callout and the mirrored labels are written at 465.2, and the
+    // reserve is 52.8 px — 6.8 glyphs — so `originX` is 524 and the text 537.6.
+    const withCallout = plotToSvg(legendRight({ yAxis: "both", yCallout: "last" }), THEME, layout) ?? "";
+    expect(legendEntries(withCallout).map((e) => e.x)).toEqual([537.6, 537.6]);
+    expect(callouts(withCallout).map((c) => c.x)).toEqual([465.2, 465.2]);
+
+    // **The cut moves with the anchor, and both cuts are asserted on the string
+    // rather than on a collision** — because the first mutation pass left both
+    // standing: no frame in the catalogue has a right legend *and* a writer past
+    // the cap, so reverting either cut to `layout.width` failed nothing. The
+    // clause is not vacuous; the corpus was. Two constructed instances:
+    //
+    // The callout's, at the default width. `yCallout: "name"` on a 48-character
+    // series label wants 374 px against a 213.3 px cap, so the column is capped
+    // and the callout is cut to **27 characters** ending at 498.97 — inside the
+    // column, whose legend sits at 524. Cut to the page instead it takes 42 and
+    // runs to 610, through the legend's text at 537.6.
+    const longName = "a-very-long-series-name-that-cannot-possibly-fit";
+    const capped = plotToSvg(vmBlock({
+      kind: "plot", id: "rc7c", form: "line", height: 8, axes: true, legend: "right",
+      yAxis: "right", yCallout: "name", series: [{ label: longName, values: [0.8774, 50, 99] }],
+    } as unknown as Plot), THEME, layout) ?? "";
+    expect(callouts(capped).map((c) => `${c.text}@${String(c.x)}`)).toEqual([`${longName.slice(0, 26)}…@298.667`]);
+    expect(legendEntries(capped).map((e) => e.x)).toEqual([537.6]);
+
+    // The right-hand value label's, which **cannot be reached at the default
+    // width**: `formatReadout` writes a number, ~18 characters at worst, 140 px
+    // against a 213.3 px cap. At `svgLayout(160, 200)` the cap is 53.3 px — 6.8
+    // glyphs on the bound — and a readout of `0.000123` wants 8, so the label
+    // is cut to `0.000…` inside the column. Cut to the page it would take 10
+    // and stand uncut.
+    const narrow = plotToSvg(vmBlock({
+      kind: "plot", id: "rc7n", form: "line", height: 8, axes: true, legend: "right",
+      yAxis: "right", series: [{ label: "a", values: [0.000123, 0.000456, 0.000789] }],
+    } as unknown as Plot), THEME, svgLayout(160, 200)) ?? "";
+    const narrowLegend = new Set(legendEntries(narrow).map((e) => e.x));
+    const narrowLabels = texts(narrow).filter((t) =>
+      t.fill === LABEL_INK && t.anchor === "start" && t.x > 60 && t.y < 190 && !narrowLegend.has(t.x));
+    expect(narrowLabels.length).toBeGreaterThan(0);
+    expect(narrowLabels.map((t) => t.text)).toEqual(narrowLabels.map(() => expect.stringMatching(/^0\.00[01]…$/u)));
+  });
+});
+
+describe("G10 — a choice forced by cells", () => {
+  it("G10b (C12 I80, §3ak.46, F366): `plotCorners` counts the grid's steps, and this arm has no grid", () => {
+    // **I80's second instance, and the probe is the finding.** Corner cells
+    // against *width* are stable — 37 at 40, 60 and 80 — which reads as *tracks
+    // the data*. Against **height** they are 15, 37, 61 and 79, for a curve with
+    // **three** turning points: they are staircase steps, where a sloped line
+    // quantised onto a character grid steps from one row to the next.
+    const sin50 = Array.from({ length: 50 }, (_v, i) => 50 + 45 * Math.sin(i / 6));
+    const turns = sin50.slice(1)
+      .map((v, i) => Math.sign(v - (sin50[i] ?? 0)))
+      .filter((sg, i, a2) => i > 0 && sg !== a2[i - 1]).length;
+    expect(turns, "the data turns three times").toBe(3); // cells-ok — a sample count
+
+    const corners = (h: number, w: number): number =>
+      [...(catFrame({ form: "line", height: h, axes: true, legend: false, series: [{ values: sin50 }] }, TERM_CAPS, w) as readonly string[])
+        .map((l) => stripSgr(l)).join("")].filter((c) => "\u256d\u256e\u256f\u2570".includes(c)).length;
+    expect([corners(4, 60), corners(8, 60), corners(16, 60), corners(24, 60)],
+      "the count is the grid's row count, not the data's turns").toEqual([15, 37, 61, 79]);
+    expect(corners(8, 120) - corners(8, 60), "and width barely moves it").toBe(1); // cells-ok — a glyph count
+
+    // **The tree is the case with no ambiguity.** The terminal draws an
+    // orthogonal connector because a cell grid cannot draw a diagonal; this arm
+    // draws one straight segment, so there is no corner to round.
+    const tree = b.plot({
+      id: "t", form: "tree", height: 6, axes: true, series: [],
+      hierarchy: { label: "r", value: 3, children: [{ label: "a", value: 1 }, { label: "b", value: 2 }] },
+    } as unknown as Parameters<typeof b.plot>[0]);
+    const drawn = plotToSvg(tree, THEME) ?? "";
+    expect(drawn, "the arm draws a tree").not.toBe("");
+    expect(/<path[^>]*d="M[\d.]+ [\d.]+ L[\d.]+ [\d.]+"/u.test(drawn),
+      "and its edge is one straight segment, with no corner in it").toBe(true);
+  });
+
+  it("G10a (C12 I80, I46, §3ak.46, F365): `plotBox` decides a compact row and nothing here", () => {
+    // **The pair F355 could not build.** Both `plotFill` and `plotBox` were owed
+    // under one note — *every variant is a `violin`, which this arm refuses* —
+    // and `plotBox` is the **boxplot** form's: `definition.ts` reads it inside
+    // `boxplot:`, so a fixture was buildable all along and the corpus placement
+    // was an accident.
+    const box = (extra: Record<string, unknown>): Plot => vmBlock({
+      kind: "plot", id: "b", form: "boxplot", height: 4, axes: true,
+      categories: ["A", "B"], series: [],
+      quartiles: [
+        { min: 1, q1: 3, median: 5, q3: 7, max: 9 },
+        { min: 2, q1: 4, median: 6, q3: 8, max: 10 },
+      ],
+      ...extra,
+    } as unknown as Plot);
+
+    // **Byte-identical, and that is correct** (C12 I80). The terminal chooses
+    // because a one-row box has no top or bottom edge and its single row is
+    // spent on mass or on a stroke; the box here carries both — `fill-opacity`
+    // and `stroke-width` on one rect — so there is nothing to choose.
+    const solid = plotToSvg(box({ plotDetail: "compact", plotBox: "solid" }), THEME) ?? "";
+    const line = plotToSvg(box({ plotDetail: "compact", plotBox: "line" }), THEME) ?? "";
+    expect(solid, "the arm draws a compact boxplot").not.toBe("");
+    expect(solid === line, "and `plotBox` decides nothing here, which is legitimate").toBe(true);
+
+    // **The reason, asserted rather than stated**: one rect with mass *and*
+    // stroke. The day that stops being true the ruling is owed again.
+    expect(solid, "the IQR box carries a fill").toContain("fill-opacity=");
+    expect(solid, "and a stroke, in the same rect").toMatch(/fill-opacity="[^"]*" stroke="[^"]*" stroke-width=/u);
+  });
+});
+
+describe("G9 — an empty figure is a state, not a refusal", () => {
+  it("G9a (C12 I79, §3ak.45, F363): no data and no support draw the same document, and must not", () => {
+    // **The fixture before the fix** (F350's rule, and `x-linear`/`x-log`'s
+    // shape). `plotToSvg` ends `if (body.length === 0) return null`, so a block
+    // with nothing in it is indistinguishable from a form this arm does not
+    // draw at all — both are the corpus's refusal sentinel, in one 33-strong
+    // collision group.
+    //
+    // **The terminal draws neither**: it holds the declared height and centres
+    // `emptyMessage ?? "No data."` in the muted tone. F259 says a refusal is for
+    // a figure that *cannot* be drawn, and one with nothing in it can.
+    //
+    // **This row asserts the measured state and inverts when the fix lands.**
+    // Asserting the rule today would be red; asserting the defect without
+    // naming why would outlive it.
+    const empty = b.plot({ id: "e", form: "line", height: 5, axes: true, series: [{ values: [] }] });
+    const unsupported = b.plot({
+      id: "u", form: "violin", height: 8, axes: true,
+      series: [{ values: [1, 2, 3, 4, 5, 6, 7, 8] }],
+    } as unknown as Parameters<typeof b.plot>[0]);
+
+    // **The refusal half of this row is gone, and its absence is the assertion**
+    // (F383, F384). The pair was *a block with nothing in it* against *a form
+    // this arm does not draw*, both collapsing to `null` — one 33-strong
+    // collision group. `violin` was the second half's example and it draws now.
+    //
+    // **Measured rather than assumed: nothing refuses.** Over all 46 forms
+    // through `ONE_PER_FORM`, and over five degenerate blocks — no series, an
+    // empty series, a `flame` with categories and no hierarchy, a `tree` with no
+    // hierarchy — `plotToSvg` returns `null` **zero** times. So the collision
+    // cannot recur while that holds, and what this row now guards is the half
+    // that still has two states: a block with no data draws its message.
+    //
+    // That `plotToSvg` still declares `string | null` with no reachable `null`
+    // is **F390**, recorded and not fixed here: narrowing a published return is
+    // a C24 change and wants its own ruling, on F335's precedent.
+    expect(plotToSvg(unsupported, THEME), "a violin draws now — F383").not.toBeNull();
+    // **Inverted when the fix landed** (C12 I79). It asserted `toBeNull()` — the
+    // measured defect — and the two states are apart now: a refusal is still a
+    // refusal and an empty block draws its message.
+    expect(plotToSvg(empty, THEME), "a block with no data draws, and says so").not.toBeNull();
+    expect(plotToSvg(empty, THEME) ?? "", "the default message").toContain("No data.");
+
+    // **The boundary is the block and not the figure** (F363's near-miss).
+    // Keyed on `marks.length === 0` alone, `flame/default` — six categories with
+    // values, whose tiles this arm cannot build from that shape — said `No
+    // data.` over data, which is the old defect one state along. And a category
+    // *name* is not a reading: `bar/empty` is one category and an empty value
+    // list, and the terminal draws `No data.` for it.
+    const shaped = b.plot({
+      id: "f", form: "flame", height: 6, axes: true,
+      categories: ["main", "parse"], series: [{ values: [100, 60] }],
+    } as unknown as Parameters<typeof b.plot>[0]);
+    // **And this one too**: `flame` with categories and no hierarchy is the
+    // shape F383 re-routed to `barFigure`, because the terminal draws it as
+    // plain horizontal bars. It was the *near-miss* example — keyed on
+    // `marks.length === 0` alone it said `No data.` over data — and the boundary
+    // it was guarding still matters, so the assertion inverts rather than going:
+    // the datum is drawable and is drawn, and `No data.` is what must not appear.
+    const shapedSvg = plotToSvg(shaped, THEME) ?? "";
+    expect(shapedSvg, "a datum this arm can now draw is drawn").not.toBe("");
+    expect(shapedSvg, "and is not reported as empty").not.toContain("No data.");
+
+    // **`emptyMessage` needs a reader, and this row is where it gets one**, which is
+    // why the corpus gained `line/empty-message` beside `line/empty`: a pair
+    // differing in one field is what a collision needs to name a member (C12 I75).
+    // **C12 I79's message, through `vmBlock`.** This comment used to say `b.plot`
+    // does not declare `emptyMessage` — *one of the eight it does not* — and that
+    // has been false since 6c61593d (2026-08-30; re-read 2026-09-03): `b.plot` declares and
+    // forwards it (`src/shell/builders/index.ts`). The row keeps `vmBlock` because it
+    // is testing the SVG arm's reader, not the builder; the builder-side row —
+    // `b.plot({ emptyMessage })` reaching the block — is
+    // `test/contract/builders.test.ts` T4.2a.
+    const messaged = vmBlock({
+      kind: "plot", id: "m", form: "line", height: 5, axes: true, series: [{ values: [] }],
+      emptyMessage: "Waiting for the first epoch",
+    } as unknown as Plot);
+    expect(plotToSvg(messaged, THEME) === plotToSvg(empty, THEME),
+      "and the two draw different documents, so the member has a reader")
+      .toBe(false);
+    expect(plotToSvg(messaged, THEME) ?? "", "the caller's message, not the default")
+      .toContain("Waiting for the first epoch");
+  });
+});
+
 describe("G8 — a claimed form whose datum this path cannot read", () => {
   const OHLC = [
     { open: 10, high: 14, low: 8, close: 12 },
@@ -457,73 +1691,147 @@ describe("G8 — a claimed form whose datum this path cannot read", () => {
     { open: 11, high: 13, low: 9, close: 13 },
   ] as const;
 
-  it("G8a: candles are refused rather than drawn as an empty axis", () => {
-    // **Measured before it was fixed**: this returned a full frame with five
-    // gridlines labelled 0, 0.25, 0.5, 0.75, 1 — `seriesRange([])` is `null`
-    // and the fallback furnished an axis out of nothing — while the terminal
-    // drew three candles spanning 8 to 16.
+  /**
+   * **These two rows asserted the refusal and now assert what it protected**
+   * (§3ak.31). The refusal was right and narrow — *`ohlc` is the candles' own
+   * data and nothing here reads it* — and the remedy is to read it, so the
+   * measurement each row was written around is the thing to keep: the axis, not
+   * the `null`.
+   *
+   * Inverting rather than deleting is deliberate. A deleted row takes its
+   * measurement with it, and this one is the only record of what the wrong
+   * frame looked like.
+   */
+  it("G8a (§3ak.31): candles draw, on the candles' own range and not a furnished one", () => {
+    // **Measured before the refusal existed**: this returned a full frame with
+    // five gridlines labelled 0, 0.25, 0.5, 0.75, 1 — `seriesRange([])` is
+    // `null` and the fallback furnished an axis out of nothing — while the
+    // terminal drew three candles spanning 8 to 16.
     const candles = b.plot({
-      id: "c", form: "line", height: 6, plotStyle: "candlestick", series: [], ohlc: [...OHLC],
+      id: "c", form: "line", height: 6, axes: true, plotStyle: "candlestick", series: [], ohlc: [...OHLC],
     });
-    expect(plotToSvg(candles, THEME), "the datum is ohlc and nothing here reads it").toBeNull();
+    const svg = plotToSvg(candles, THEME);
+    expect(svg, "the datum is read now, so there is a picture").not.toBeNull();
+    // **The gutter's labels and not every `<text>` in the document** (F190,
+    // C12 §3ak.44). This read all of them, which was true *about* the claim
+    // while the rest of the frame stayed quiet — and the frame gained a row:
+    // three candles are an index domain of 0 … 2, which nices to `0.00 0.25
+    // 0.50 …`, so the abscissa put a literal `0.25` in the document and the
+    // proxy fired on the axis it is not about. The value labels are the ones
+    // anchored at their right edge against the left of the box.
+    const labels = [...(svg ?? "").matchAll(/<text[^>]*text-anchor="end"[^>]*>([^<]*)<\/text>/gu)]
+      .map((m) => m[1]);
+    expect(labels, "the axis is the candles', not `seriesRange([])`'s fallback")
+      .not.toEqual(expect.arrayContaining(["0.25"]));
+    // **Coverage rather than the exact ticks**, because the nicing rule is
+    // `niceAxis`'s business and this row is about *whose* range it niced: 8 to
+    // 16 nices to 5, 10, 15, 20, and asserting that list would fail the day the
+    // step changed while saying nothing more than these two bounds do.
+    const ticks = labels.filter((l) => l !== undefined && /^\d+$/u.test(l)).map(Number);
+    expect(ticks.length, "the gutter is labelled").toBeGreaterThan(1); // cells-ok — a tick count
+    expect(Math.min(...ticks), "the floor is at or below the candles' low").toBeLessThanOrEqual(8);
+    expect(Math.max(...ticks), "the ceiling at or above their high").toBeGreaterThanOrEqual(16);
+    // **One body per candle, counted on the figure** — the document's rects
+    // include the legend's two swatches, and a filter on the *document* would be
+    // this row guessing which rect is which. The figure is where *one body per
+    // candle* is a fact; the document is where the two inks are.
+    const bodies = curveFigure(candles).marks.filter((d) => d.mark.kind === "rect");
+    expect(bodies, "one body per candle").toHaveLength(3); // cells-ok — a candle count
+    expect(new Set(bodies.map((d) => d.ref)).size, "and both directions are drawn").toBe(2);
+    expect(new Set([...(svg ?? "").matchAll(/fill="(#[0-9a-f]{6})"/gu)].map((m) => m[1])).size,
+      "which reach the page as two inks and a ground").toBeGreaterThanOrEqual(3);
   });
 
-  it("G8b: a moving average over candles is refused too — the worse of the two", () => {
-    // **The range came from the average alone.** Ticks 11 to 12 against data
-    // spanning 8 to 16, with a line drawn confidently across them: not a blank
-    // a reader questions but a chart of the wrong thing. The empty-marks clause
-    // cannot reach this one, because the average draws a mark.
+  it("G8b (§3ak.31): a moving average over candles is on the candles' range, not its own", () => {
+    // **The range came from the average alone** before §3ak.7 C6 put the bars
+    // into `seriesRange`: ticks 11 to 12 against data spanning 8 to 16, with a
+    // line drawn confidently across them — not a blank a reader questions but a
+    // chart of the wrong thing, and the empty-marks clause cannot reach it
+    // because the average draws a mark. **This is the row that says the range is
+    // the union**, which is what makes drawing the two together honest.
     const withMa = b.plot({
-      id: "m", form: "line", height: 6, plotStyle: "candlestick",
+      id: "m", form: "line", height: 6, axes: true, plotStyle: "candlestick",
       series: [{ label: "ma", values: [11, 12, 12] }], ohlc: [...OHLC],
     });
-    expect(plotToSvg(withMa, THEME), "an average is not a picture of the candles").toBeNull();
+    const svg = plotToSvg(withMa, THEME);
+    expect(svg, "an average and its candles are one picture").not.toBeNull();
+    const labels = [...(svg ?? "").matchAll(/<text[^>]*>([^<]*)<\/text>/gu)]
+      .map((m) => m[1]).filter((l) => l !== undefined && /^\d+$/u.test(l)).map(Number);
+    expect(Math.min(...labels), "the floor is the candles' low, not the average's").toBeLessThanOrEqual(8);
+    expect(Math.max(...labels), "and the ceiling is their high").toBeGreaterThanOrEqual(16);
+    // The average is a polyline in a series slot; the candles are in tone slots.
+    const strokes = new Set([...(svg ?? "").matchAll(/stroke="(#[0-9a-f]{6})"/gu)].map((m) => m[1]));
+    expect(strokes.size, "three inks: rising, falling, and the overlay").toBeGreaterThanOrEqual(3);
   });
 
-  it("G8c: furniture with no ink is a refusal, and that is a second clause", () => {
-    // `series: []` on a plain form and an all-`null` series both reach the
-    // renderer with a range nobody declared. Two clauses because two failures:
-    // this one is caught by counting marks and G8b is not.
+  it("G8c (C12 I79, §3ak.45): furniture with no ink draws no axis — and is a state, not a refusal", () => {
+    // **Half of this row was overturned and half was not** (F363). `series: []`
+    // on a plain form and an all-`null` series both reach the renderer with a
+    // range nobody declared, and the defect it was written against — *five
+    // gridlines labelled 0 to 1 over an empty box* — is real. **Refusing was the
+    // wrong remedy**: it made a block with no data byte-identical to a form this
+    // arm does not draw at all, and a consumer could not tell *not yet* from
+    // *not supported*.
+    //
+    // So what it asserts now is the half that stands: **no axis**. No ticks, no
+    // gridlines, no frame — each would imply a range the block never had.
     const bare = b.plot({ id: "d", form: "line", height: 6, series: [] });
-    expect(plotToSvg(bare, THEME), "no series is no picture").toBeNull();
+    const drawn = plotToSvg(bare, THEME) ?? "";
+    expect(drawn, "no series is a state, and the state is drawn").not.toBe("");
+    expect(drawn, "and it says so").toContain("No data.");
+    expect(drawn.includes("<line"), "no rule, because there is no range for one to be about").toBe(false);
+    expect(drawn.includes("<path"), "and no figure").toBe(false);
 
     const nulls = b.plot({ id: "f", form: "line", height: 6, series: [{ label: "n", values: [null, null, null] }] });
-    expect(plotToSvg(nulls, THEME), "a series that draws nothing is no picture").toBeNull();
+    // **A series of all-`null` is C12 I79's stated blind spot** — the data is
+    // degenerate rather than absent, and `hasDatum` counts the values, so this
+    // stays a refusal where `series: []` does not. Asserted so the day the two
+    // are separated is a day this row moves.
+    expect(plotToSvg(nulls, THEME), "a series that draws nothing is still no picture").toBeNull();
   });
 
-  it("G8e: a flipped ordinate is refused, and all four origins were identical", () => {
-    // **Measured**: `svgPoints` passes `invert: true` unconditionally, so
-    // `top-left`, `bottom-left`, `top-right` and `bottom-right` produced
-    // byte-identical output — the first sample's y was 288 in every one. The
-    // terminal honours `origin`; this arm did not, so the same block drew the
-    // right way up in one and upside down in the other.
-    const flipped = b.plot({
-      id: "o", form: "line", height: 6, origin: "top-left",
-      series: [{ label: "s", values: [1, 9] }],
-    });
-    expect(plotToSvg(flipped, THEME), "an ordinate this path cannot flip").toBeNull();
-
-    // And the default is not refused, which is what makes the clause a clause
-    // rather than a ban on the field.
-    const upright = b.plot({
-      id: "u", form: "line", height: 6, origin: "bottom-left",
-      series: [{ label: "s", values: [1, 9] }],
-    });
-    expect(plotToSvg(upright, THEME), "the default origin still renders").not.toBeNull();
-  });
-
-  it("G8f: an annotation is DROPPED, and that is recorded rather than refused", () => {
-    // **The third axis, and the line falls differently here.** A reference line
-    // at 5 labelled `target` reaches the renderer and nothing draws it — the
-    // six `<line>` elements in the output are gridlines. Measured, like the
-    // other two.
+  it("G8e (F383): all four origins draw, and the four documents differ", () => {
+    // **This row asserted a refusal and the refusal has expired.** `svgPoints`
+    // passed `invert: true` unconditionally, so `top-left`, `bottom-left`,
+    // `top-right` and `bottom-right` produced byte-identical output — the first
+    // sample's y was 288 in every one — and `plotToSvg` refused the three
+    // non-default values rather than draw the wrong way up.
     //
-    // **It is not refused, because the picture it leaves is true.** A dropped
-    // `ohlc` leaves a chart of the wrong thing and a flipped ordinate leaves one
-    // upside down; a missing annotation leaves a correct curve with a claim
-    // absent from beside it. **Refuse a false figure, record an incomplete
-    // one** — and this row is the record, so the day annotations land it fails
-    // and says what changed.
+    // `projected` reads `figure.facing` now, both `up` and `mirrored`, so the
+    // guard was refusing something the arm could do. **Four distinct documents**
+    // is the assertion the old one becomes: a partition by equality, so a
+    // regression that re-collapses them fails here rather than in a frame.
+    const at = (origin: "top-left" | "bottom-left" | "top-right" | "bottom-right"): string => {
+      const svg = plotToSvg(b.plot({
+        id: "o", form: "line", height: 6, origin,
+        series: [{ label: "s", values: [1, 9] }],
+      }), THEME);
+      expect(svg, `${origin}: draws`).not.toBeNull();
+      return svg ?? "";
+    };
+    const drawn = ["top-left", "bottom-left", "top-right", "bottom-right"].map((o) =>
+      at(o as "top-left"));
+    expect(new Set(drawn).size, "four origins, four documents — not one repeated").toBe(4);
+
+    // **And they differ the right way**, which four-distinct alone does not say:
+    // flipping the ordinate must move the *sample*, so the first point's `y`
+    // under `top-*` is the mirror of its `y` under `bottom-*`. Measured against
+    // the plot box the frame itself declares, not against recomputed layout
+    // arithmetic — a test that rolls its own reader carries the premise with it.
+    const firstY = (svg: string): number =>
+      Number(/<path d="M ?([-\d.]+)[, ]+([-\d.]+)/u.exec(svg)?.[2] ?? NaN);
+    expect(firstY(drawn[1] ?? ""), "bottom-left puts the low sample low").toBeGreaterThan(firstY(drawn[0] ?? ""));
+  });
+
+  it("G8f: an annotation is DRAWN and named — F259's residue, closed (C12 I109)", () => {
+    // **This row was written to fail the day annotations landed, and it did.**
+    // It read *a reference line at 5 labelled `target` reaches the renderer and
+    // nothing draws it*, and asserted the label's absence as F259's record —
+    // *refuse a false figure, record an incomplete one*. The line crossed
+    // first, and the legend row naming it stayed filtered out under a comment
+    // that said this arm drew no annotations; I109 crosses the other three
+    // kinds and removes the filter, so the record becomes the drawing: a dashed
+    // rule at 5, and `target` beside its swatch.
     const annotated = b.plot({
       id: "a", form: "line", height: 6,
       series: [{ label: "s", values: [1, 9] }],
@@ -531,7 +1839,8 @@ describe("G8 — a claimed form whose datum this path cannot read", () => {
     });
     const svg = plotToSvg(annotated, THEME);
     expect(svg, "the curve still renders").not.toBeNull();
-    expect((svg ?? "").includes("target"), "and the annotation is not in it — F259's residue").toBe(false);
+    expect((svg ?? "").includes("target"), "and the annotation is named in the legend").toBe(true);
+    expect((svg ?? "").includes('stroke-dasharray="4 3"'), "and drawn, dashed, as a claim about the ordinate").toBe(true);
   });
 
   it("G8d: and a form that does draw is untouched by any clause", () => {
@@ -631,6 +1940,94 @@ describe("G6c — the distribution family, where containment says nothing", () =
     expect([...both.matchAll(/<polygon /gu)].length, "two means").toBe(2);
   });
 
+  it("G6c5 (C12 I76, §3ak.41): the gutter grows to its labels, and what still does not fit is cut at the tail", () => {
+    // **A cut head is a different word** (F343). `petal_length` came out as
+    // `betal_length`: an `end`-anchored text grows leftward, so the clip that
+    // stops it without font metrics removes its **head**, and nothing on the
+    // page said anything was removed. The terminal names all four rows in full.
+    const gutterOf = (svg: string): number =>
+      Number(/<line x1="([\d.]+)" y1="[\d.]+" x2="\1"/u.exec(svg)?.[1] ?? "0");
+    const guttered = (svg: string): readonly string[] =>
+      [...svg.matchAll(/text-anchor="end" clip-path[^>]*>([^<]*)<\/text>/gu)].map((m) => m[1] ?? "");
+
+    // **`axes: true` on every block here, and it is the fifth fixture in this
+    // arc that did not construct the state it claims** (C12 §3ak.40, F347).
+    // The describe's own `boxplot()` sets no `axes`, so after the resolver was
+    // repaired it draws no frame, no gutter and no labels at all — and a row
+    // asserting a gutter width against it would have been measuring zero.
+    const short = plotToSvg(boxplot({ axes: true }), THEME, layout) ?? "";
+    const long = plotToSvg(
+      boxplot({ axes: true, categories: ["petal_length", "sepal_width"] }), THEME, layout,
+    ) ?? "";
+
+    // **Grown and never shrunk.** The tenth stays the floor: a one-character
+    // label does not pull the plot area leftwards, because the only thing
+    // measured against §3ak.20's premise is the overflow.
+    expect(gutterOf(short), "a short label leaves the default alone")
+      .toBeCloseTo(layout.width * (layout.gutter + layout.pad), 6);
+    expect(gutterOf(long), "and a long one takes what it needs").toBeGreaterThan(gutterOf(short));
+    expect(guttered(long), "drawn whole, which is what the terminal draws")
+      .toEqual(["petal_length", "sepal_width"]);
+    // The room is the label's, so the anchor sits exactly at its width.
+    expect(gutterOf(long)).toBeCloseTo(12 * SVG_FONT_SIZE * 0.65 + 6, 6);
+
+    // **Past the cap the arm still has to cut, and it cuts the tail.** No corpus
+    // instance — the longest identity string is twelve characters and a third of
+    // 600 is 200 px — so the row constructs one, because the defect is *an
+    // unmarked cut at the head* and a long enough label reaches it whatever the
+    // gutter is.
+    const huge = "a".repeat(60);
+    const cut = plotToSvg(boxplot({ axes: true, categories: [huge, "b"] }), THEME, layout) ?? "";
+    expect(gutterOf(cut), "capped at a third of the width")
+      .toBeCloseTo(layout.width / 3 + 6, 6);
+    const [first] = guttered(cut);
+    expect(first?.length, "so it is shorter than what was asked for").toBeLessThan(huge.length);
+    expect(first?.endsWith("\u2026"), "cut at the tail and marked").toBe(true);
+    expect(first?.startsWith("a"), "and the head — the part that names it — survives").toBe(true);
+
+    // **The value labels are `end`-anchored on the left by the same code shape
+    // and had no clip at all**, so a long one left the viewBox entirely. One
+    // rule, both.
+    const wide = plotToSvg(
+      boxplot({ axes: true, orientation: "vertical", yFormat: "bytes" }), THEME, layout,
+    ) ?? "";
+    for (const m of wide.matchAll(/<text x="([-\d.]+)"[^>]*text-anchor="end"[^>]*>([^<]*)<\/text>/gu)) {
+      const right = Number(m[1]);
+      expect(right - (m[2]?.length ?? 0) * SVG_FONT_SIZE * 0.65,
+        `\`${m[2] ?? ""}\` starts inside the viewBox`).toBeGreaterThanOrEqual(-0.001);
+    }
+  });
+
+  it("G6c6 (C12 I29, I68, §3ak.42): a dumbbell's row takes the colour and its ends take the shape", () => {
+    // **One datum, one channel** (F344). The terminal spends colour on the row —
+    // four inks for four rows — and shape on the end: `●` near, `○` far. This arm
+    // spent colour on the *end* and grey on the row, so nothing said which row
+    // was which and the shape channel said nothing at all. Read off the paired
+    // sheet; no column of the disagreement record measures a fill.
+    const dumb = b.plot({
+      id: "db", form: "dumbbell", height: 8, axes: true,
+      categories: ["w", "x", "y", "z"],
+      series: [{ values: [1, 3, 5, 4], label: "start" }, { values: [6, 4, 9, 7], label: "end" }],
+    } as Parameters<typeof b.plot>[0]);
+    const svg = plotToSvg(dumb, THEME, layout) ?? "";
+
+    const filled = [...svg.matchAll(/<circle [^>]*fill="(#[0-9a-f]{6})"[^>]*\/>/gu)].map((m) => m[1]);
+    const hollow = [...svg.matchAll(/<circle [^>]*fill="none" stroke="(#[0-9a-f]{6})"[^>]*\/>/gu)].map((m) => m[1]);
+    const rules = [...svg.matchAll(/<path [^>]*stroke="(#[0-9a-f]{6})"[^>]*\/>/gu)].map((m) => m[1]);
+
+    // **Four rows, four inks** — one per row, which is what the terminal draws.
+    expect(new Set(filled).size, "one ink per row and not one per series").toBe(4); // cells-ok — a row count
+    expect(filled, "and the far end is the same ink as the near one").toEqual(hollow);
+    expect(rules, "the connector too, which had no slot at all and fell to the rule's grey")
+      .toEqual(filled);
+
+    // **The ends are told apart by shape**, which is what survives the colour
+    // floor — the argument `candleHollow` makes one form along, and the reason
+    // `paired` is a role rather than a second tone.
+    expect(hollow.length, "a hollow end per pair").toBe(4); // cells-ok — a pair count
+    expect(filled.length, "and a filled one").toBe(4); // cells-ok — a pair count
+  });
+
   it("G6c4: a forest plot ranges over its interval, not its whiskers", () => {
     // The clip happens with `quartileRange` behaving correctly — the caller
     // chooses the arm, which is where a per-family renderer diverges.
@@ -641,25 +2038,48 @@ describe("G6c — the distribution family, where containment says nothing", () =
     const svg = plotToSvg(wide, THEME, layout) ?? "";
     const xs = rects(svg).flatMap((r) => [r["x"] ?? 0, (r["x"] ?? 0) + (r["width"] ?? 0)])
       .filter((x) => x >= box.left - 1 && x <= box.right + 1);
-    // The interval is the extent, so it spans the area edge to edge. Ranged
-    // over the whiskers instead, 4..8 would sit in the middle third.
-    // Half a pixel short at each end, because a tee is one pixel wide centred
-    // on its value. Ranged over the whiskers instead, 4..8 would sit inside the
-    // middle third of an area the interval spans end to end.
-    expect(Math.min(...xs), "the interval's left end is the area's left").toBeLessThanOrEqual(box.left + 1);
-    expect(Math.min(...xs), "and not inside it").toBeGreaterThanOrEqual(box.left - 1);
-    expect(Math.max(...xs), "and its right end the area's right").toBeGreaterThanOrEqual(box.right - 1);
+    // **What this row is for is unchanged and its premise moved** (C12 §3ak.10).
+    // It asserted the interval spans the area *edge to edge*, which held while
+    // the arm rasterised against `quartileRange`'s own output. The shared axis is
+    // niced past it, so the interval now spans its share of a wider range — and
+    // the question the row exists to ask is still answerable: **does this plot
+    // range over its interval or over its whiskers?**
+    //
+    // Ranged over the whiskers, 4..8 of a 1..11 interval would sit inside the
+    // middle third. Ranged over the interval, the ends sit where the shared axis
+    // puts 1 and 11 — read from the figure rather than derived a second time.
+    const fRange = distributionFigure(wide).value!.range;
+    const atX = (v: number): number => box.left + (box.right - box.left) * normalisedOf(v, fRange, false);
+    expect(Math.min(...xs), "the interval's left end is where the axis puts 1")
+      .toBeCloseTo(atX(1), -1);
+    expect(Math.max(...xs), "and its right end where the axis puts 11").toBeCloseTo(atX(11), -1);
+    expect(atX(8) - atX(4), "the whiskers alone would be a third of that span")
+      .toBeLessThan((Math.max(...xs) - Math.min(...xs)) * 0.6);
 
     // **The ends clamp under either arm, so they cannot tell them apart.** An
     // interval of 1..11 ranged over the whiskers 4..8 still reaches both edges,
     // because `normalisedOf` clamps — the survivor that said so. The
     // **estimate** is where the two disagree: `centre: 5` is 0.4 of 1..11 and
     // 0.25 of 4..8.
-    const estimate = rects(svg).filter((r) => (r["width"] ?? 0) > 2 && (r["height"] ?? 0) > 2);
+    // **A circle, where this looked for a square** — the estimate is a `point`
+    // mark now and the walk draws the role rather than the family's own shape
+    // (§3ak.13). The reader is what changed and not the claim: a matcher that
+    // sees one encoding reports absence when the value changes form, which is
+    // the third time in this pass and the second in this file.
+    const estimate = [...svg.matchAll(/<circle cx="([-\d.]+)"/gu)].map((m) => Number(m[1]));
     expect(estimate.length, "the estimate is drawn").toBeGreaterThan(0);
-    const cx = (estimate[0]?.["x"] ?? 0) + (estimate[0]?.["width"] ?? 0) / 2;
+    const cx = estimate[0] ?? 0;
     const t = (cx - box.left) / (box.right - box.left);
-    expect(t, "0.4 of the interval, not 0.25 of the whiskers").toBeCloseTo(0.4, 2);
+    // **The discriminator survives the seam moving; only its arithmetic reads
+    // from somewhere else.** Under the raw interval 1..11 the estimate sat at
+    // 0.4 and under the whiskers 4..8 at 0.25, which is what separates the two
+    // arms of `quartileRange`. The shared axis is niced past the interval, so
+    // both numbers change and **the gap between them does not** — the row asks
+    // the same question with the figure's range instead of a literal.
+    expect(t, "where the shared axis puts the estimate").toBeCloseTo(normalisedOf(5, fRange, false), 2);
+    const whiskers = normalisedOf(5, { min: 4, max: 8 }, false);
+    expect(Math.abs(t - whiskers), "and not where the whiskers would put it")
+      .toBeGreaterThan(0.05);
   });
 });
 
@@ -697,14 +2117,32 @@ describe("G6d — the tiles family, and every default checked against the termin
     // shared function's coordinates are the ones drawn.
     // Sorted by depth, because the renderer paints parents before children —
     // that ordering *is* how nesting reads without a border per node.
-    const expected = [...tiles(HIER, 1 / Math.max(area.right - area.left, area.bottom - area.top))]
-      .sort((p, q) => p.depth - q.depth);
+    //
+    // **The pad is gone from this call and the row is stronger for it** (F278).
+    // It used to read `tiles(HIER, 1 / max(w, h))` — the layout-time pad — which
+    // is one unit of *this* output and therefore cannot be in a figure both arms
+    // read. The partition is now the true one and the inset is `depth + 1` px,
+    // applied here, so the expression below is the ruling rather than a
+    // restatement of the renderer.
+    const expected = [...tiles(HIER, 0)].sort((p, q) => p.depth - q.depth);
     const drawn = boxes(plotToSvg(tileBlock("treemap"), THEME, tl) ?? "");
     expect(drawn.length, "one rect per node").toBe(expected.length);
     for (const [i, t] of expected.entries()) {
-      expect(drawn[i]?.["x"], `tile ${i} x`).toBeCloseTo(area.left + t.x0 * (area.right - area.left), 3);
-      expect(drawn[i]?.["y"], `tile ${i} y`).toBeCloseTo(area.top + t.y0 * (area.bottom - area.top), 3);
+      const inset = t.depth + 1;
+      expect(drawn[i]?.["x"], `tile ${i} x`).toBeCloseTo(area.left + t.x0 * (area.right - area.left) + inset, 3);
+      expect(drawn[i]?.["y"], `tile ${i} y`).toBeCloseTo(area.top + t.y0 * (area.bottom - area.top) + inset, 3);
     }
+    // **And the ring is what the inset is for, so it is asserted rather than
+    // implied.** A uniform inset separates siblings and puts a child's shared
+    // edge exactly on its parent's — the frame that found F278 — so a row that
+    // only checked *the tiles are inside the area* would have agreed with it.
+    const depths = expected.map((t) => t.depth);
+    const deeper = depths.findIndex((d) => d > (depths[0] ?? 0));
+    expect(deeper, "the fixture has a child to nest").toBeGreaterThan(0);
+    expect(
+      (drawn[deeper]?.["x"] ?? 0) - (drawn[0]?.["x"] ?? 0),
+      "a child starting on its parent's own left edge is inset one further, so the parent shows",
+    ).toBeCloseTo(1, 3);
   });
 
   it("G6d2: a tile's fill is the slot its index names — a separate claim", () => {
@@ -734,17 +2172,35 @@ describe("G6d — the tiles family, and every default checked against the termin
     expect(rootY("icicle"), "an icicle's root is at the head").toBeLessThan(mid);
   });
 
-  it("G6d4: the treemap's inset is a proportion, which is the terminal's rule", () => {
-    // The terminal passes `1 / max(width, areaRows)` — a cell's worth on the
-    // unit square, resolution-independent. This passes a pixel's worth by the
-    // same expression, so the two arms inset by the same fraction and differ
-    // only in what a unit is.
-    const share = (px: number): number => {
+  it("G6d4 (F278): the PARTITION is a proportion and the inset is not", () => {
+    // **The row used to claim the inset was the proportion, and it was true of a
+    // pad that could not cross the seam.** `tiles(root, 1 / max(w, h))` insets at
+    // layout time by one unit of *this* output — one pixel — where the terminal
+    // insets by one cell, and neither number is a figure's to hold. So the
+    // partition crosses and the inset does not (F278), which splits the old
+    // claim in two and this row asserts both halves.
+    const measured = (px: number): Readonly<{ share: number; inset: number }> => {
       const l = svgLayout(px, px / 2);
-      const w = l.width * (1 - l.pad) - l.width * (l.gutter + l.pad);
-      return Math.max(...boxes(plotToSvg(tileBlock("treemap"), THEME, l) ?? "").map((r) => r["width"] ?? 0)) / w;
+      const left = l.width * (l.gutter + l.pad);
+      const w = l.width * (1 - l.pad) - left;
+      const drawn = boxes(plotToSvg(tileBlock("treemap"), THEME, l) ?? "");
+      const widest = Math.max(...drawn.map((r) => r["width"] ?? 0));
+      // A depth-0 tile starts at the area's own left edge, so whatever it is
+      // offset by is the inset.
+      const first = drawn.find((r) => Math.abs((r["width"] ?? 0) - widest) < 0.01);
+      // Added back, because the tile drawn is the partition minus the inset.
+      return { share: (widest + 2) / w, inset: (first?.["x"] ?? 0) - left };
     };
-    expect(share(300), "the same share of the area at either size").toBeCloseTo(share(1200), 1);
+    const small = measured(300);
+    const large = measured(1200);
+    expect(small.share, "the partition is the same share of the area at either size")
+      .toBeCloseTo(large.share, 3);
+    // **One unit, not one share** — which is the half that used to be missing,
+    // and it is the half a resolution sweep is blind to when the tolerance is
+    // wide enough to cover a pixel at both sizes.
+    expect(small.inset, "a depth-0 tile is inset one unit at 300px").toBeCloseTo(1, 3);
+    expect(large.inset, "and one unit at 1200px — the same pixel, not the same fraction")
+      .toBeCloseTo(1, 3);
   });
 
   it("G6d5: a label clips itself and nothing measures it", () => {
@@ -776,7 +2232,13 @@ describe("G6d — the tiles family, and every default checked against the termin
     }
     // The control: a form that does have one still draws it, so a zero above is
     // a decision rather than a renderer that stopped ticking.
-    const curve = b.plot({ id: "cv", form: "line", height: 6, series: [{ label: "s", values: [1, 4, 2] }] });
+    // **`axes: true`, and the control is why it is written here rather than
+    // assumed** (C12 §3ak.40, F347). This block had no `axes` at all and drew
+    // ticks anyway, because `valueLabelsOf` could not see the field — so the
+    // control passed *on the defect it was controlling for*, and asserting
+    // `> 0` against a renderer that had stopped ticking would have been the
+    // only thing it could still catch.
+    const curve = b.plot({ id: "cv", form: "line", height: 6, axes: true, series: [{ label: "s", values: [1, 4, 2] }] });
     expect([...(plotToSvg(curve, THEME, tl) ?? "").matchAll(/text-anchor="end"/gu)].length)
       .toBeGreaterThan(0);
   });
@@ -862,10 +2324,78 @@ describe("G6e — the nodes family, where the placement is per-arm", () => {
     expect(new Set(right.map((r) => r["x"])).size, "leftRight puts each depth on its own x").toBe(3);
   });
 
-  it("G6e4: `outline` is refused, because it is a listing and not a placement", () => {
-    // An indented text listing drawn as boxes would be a different figure from
-    // the terminal's — the plausible wrong figure the `null` arm refuses.
-    expect(plotToSvg(treeAt({ treeLayout: "outline" }), THEME, nl), "outline has no node placement").toBeNull();
+  it("G6e4: `outline` is drawn, and it names every node the terminal does", () => {
+    // **This row asserted a refusal and the refusal was backwards** (F310). Its
+    // reason — *a listing and not a placement* — is true about the drawing and
+    // is not a reason to withhold it: a listing **is** a placement, whose
+    // across-axis is `depth` and whose along-axis is the walk order, and
+    // `flatten` returns both. It was the layout with the **least** geometry
+    // above cells and the only one refused, and it was in no refusal record.
+    const svg = plotToSvg(treeAt({ treeLayout: "outline" }), THEME, nl);
+    expect(svg, "the cheapest of the three layouts draws").not.toBeNull();
+    const labels = [...(svg ?? "").matchAll(/<text\b[^>]*>([^<]*)<\/text>/gu)].map((m) => m[1]);
+    const flat = flatten(HIER);
+    expect(labels, "every node, in walk order").toEqual(flat.map((f) => f.label));
+    // **One row per node, indented by depth** — the two properties that make it
+    // the same figure as the terminal's, asserted rather than eyeballed.
+    const rows = [...(svg ?? "").matchAll(/<text\b[^>]*\by="([-\d.]+)"/gu)].map((m) => Number(m[1]));
+    expect(new Set(rows).size, "a row each, none shared").toBe(flat.length); // cells-ok — a node count
+    expect([...rows].sort((a, c) => a - c), "in the walk's order down the page").toEqual(rows);
+    const xs = [...(svg ?? "").matchAll(/<text\b[^>]*\bx="([-\d.]+)"/gu)].map((m) => Number(m[1]));
+    const byDepth = new Map<number, Set<number>>();
+    for (const [i, f] of flat.entries()) (byDepth.get(f.depth) ?? byDepth.set(f.depth, new Set()).get(f.depth)!).add(xs[i]!); // cells-ok — a node index
+    for (const [d, set] of byDepth) expect(set.size, `depth ${String(d)} shares one indent`).toBe(1); // cells-ok — a depth index
+    expect(byDepth.size, "and the depths are distinct indents")
+      .toBe(new Set([...byDepth.values()].map((v) => [...v][0])).size); // cells-ok — a depth index
+    // The elbows: one per node that has a parent.
+    expect([...(svg ?? "").matchAll(/<path\b/gu)].length, "an elbow per edge")
+      .toBe(flat.filter((f) => f.parent >= 0).length); // cells-ok — a node count
+  });
+
+  it("G6e9 (C12 I76, §3ak.41): a node's label is the box's size where the box is smaller than the type", () => {
+    // **Every glyph taller than the box it names** (F345). `graph/crowded` is 14
+    // ranks in `height: 7`: the terminal draws three and says `+11 more`, and
+    // this arm drew all fourteen at `275.2 / 14 = 9.83 px` a rank with the label
+    // at 12 — ascending into the rank above and descending into the one below,
+    // both of which it does not name. The same rule as the gutter's, across the
+    // text rather than along it.
+    const chain = (n: number): Record<string, unknown> => ({
+      nodes: Array.from({ length: n }, (_v, i) => ({ id: `s${String(i)}`, label: `service-${String(i)}` })),
+      edges: Array.from({ length: n - 1 }, (_v, i) => ({ from: `s${String(i)}`, to: `s${String(i + 1)}` })),
+    });
+    const sized = (n: number): readonly Readonly<{ h: number; size: number }>[] => {
+      const svg = plotToSvg(
+        b.plot({ id: "gn", form: "graph", height: 7, series: [], graph: chain(n) } as unknown as Parameters<typeof b.plot>[0]),
+        THEME, nl,
+      ) ?? "";
+      const heights = [...svg.matchAll(/<rect [^>]*height="([\d.]+)" rx="2"/gu)].map((m) => Number(m[1]));
+      const sizes = [...svg.matchAll(/<text [^>]*font-size="([\d.]+)"[^>]*>service-/gu)].map((m) => Number(m[1]));
+      return sizes.map((size, i) => ({ h: heights[i] ?? 0, size }));
+    };
+
+    const crowded = sized(14);
+    expect(crowded.length, "every node is still drawn — nothing is dropped").toBe(14); // cells-ok — a node count
+    for (const { h, size } of crowded) {
+      // Three decimals, because `n()` rounds the attribute and the assertion
+      // must not be tighter than the document it reads.
+      expect(size, "the type is four fifths of the rank").toBeCloseTo(h * 0.8, 3);
+      expect(size, "so it fits inside the box it names").toBeLessThan(h);
+    }
+
+    // **The control, and it is the half that says this is a shrink and not a
+    // scale.** A rank taller than the type does not get bigger text: the size is
+    // a property of the document and only the shrinking is the box's.
+    const roomy = sized(3);
+    expect(roomy.length).toBe(3); // cells-ok — a node count
+    for (const { h, size } of roomy) {
+      expect(h, "the fixture has to have room, or the control checks nothing")
+        .toBeGreaterThan(SVG_FONT_SIZE / 0.8);
+      expect(size, "and the type stays the figure's own").toBe(SVG_FONT_SIZE);
+    }
+
+    // **F318's `notice` row is untouched**: nothing was dropped, so the arms
+    // still differ on the notice and that difference is still legitimate.
+    expect(crowded.length, "fourteen boxes, no `+N more`").toBeGreaterThan(roomy.length);
   });
 
   it("G6e5: a graph's edges are diagonals, which the terminal cannot draw", () => {
@@ -934,9 +2464,35 @@ describe("G7 — the partition itself", () => {
     // refused form refuses rather than drawing a plausible wrong figure.
     const all = Object.keys(SVG_FAMILY) as PlotForm[];
     expect(all.length, "every form in the union is keyed").toBeGreaterThan(40);
-    expect(supported.length, "and the claimed set is not empty").toBeGreaterThan(15);
     const refused = all.filter((f) => SVG_FAMILY[f] === null);
-    expect(refused.length, "nor is the refused set").toBeGreaterThan(15);
+    // **The two sides are compared by equality against the union, not by a
+    // bound** (F310). `> 15` on each side was a number that had to be edited
+    // every time a form landed and said nothing when it was: a refusal can
+    // appear or vanish and a range still holds, which is exactly the shape SB4
+    // was repaired for. What the row can assert without a literal is that the
+    // partition covers the union with no overlap and neither side is empty.
+    expect([...supported, ...refused].sort(), "the two sides partition the union")
+      .toEqual([...all].sort());
+    expect(supported.length, "and the claimed set is not empty").toBeGreaterThan(0);
+    // **The refused set is empty, and that is asserted by equality** (F383).
+    // It was `> 0` — a bound, which is what F310 repaired elsewhere in this very
+    // row — and a bound cannot say *this side is now empty*. `toEqual([])` is
+    // the same statement a returning refusal fails, and it names which form
+    // came back rather than reporting a count.
+    //
+    // **The loop below is now over the empty set**, which is A03 §2's vacuity
+    // class arriving here by success rather than by mistake: it asserts nothing
+    // and passes. It is kept because it is the thing that will run the day a
+    // refusal returns, and the equality above is what stops that day being
+    // silent. G7b carries the positive half — a claimed form puts ink on the
+    // page — over all 46.
+    // **And a refusal came back.** `plot3d` is `null` because no emitter here
+    // carries a projection: routed through `scatter` it would draw the x and y
+    // of a 3D cloud as a flat one and report as supported, which is the
+    // plausible wrong figure F259 refuses (C12 §3am). **The loop below is no
+    // longer over the empty set**, which is what this equality was written to
+    // make happen rather than to prevent.
+    expect(refused, "exactly one form is refused, and it says why in SVG_FAMILY").toEqual(["plot3d"]);
     // **Every one, not the first six.** A sample is the same blind spot one
     // level down from the one G8 is about: it tests the rule against the forms
     // you already had in mind.
@@ -977,11 +2533,103 @@ describe("G7 — the partition itself", () => {
     // guard that a claimed form puts ink on the page has to hand it the form's
     // own data, or it measures the corpus rather than the renderer.
     for (const form of supported) {
-      const made = b.plot({ id: `c-${form}`, form, height: 6, ...datumFor(form) } as Parameters<typeof b.plot>[0]);
+      const made = blockFor(form, `c-${form}`, 6);
       const svg = plotToSvg(made, THEME);
       expect(svg, `${form} is claimed, so it renders`).not.toBeNull();
       const ink = (svg ?? "").split("\n").filter((l) => /^<(path|rect x|circle)/u.test(l));
       expect(ink.length, `${form} puts ink on the page rather than furniture alone`).toBeGreaterThan(0);
     }
+  });
+});
+
+/**
+ * **SK11 (C12 I112, §3ap.7)** — the sankey node label's ink and its ground.
+ *
+ * **The row is about the two slots and about the ratio, and it needs both.**
+ * Asserting the hex alone is a test of two literals: it would go green on a
+ * theme whose `tone.default` had drifted onto the ribbons. Asserting the ratio
+ * alone is a test that passes on `tone.dim` with no halo on the light variant
+ * by a whisker, which is not the ruling. So the slots say *what was decided*
+ * and the ratio says *what was promised*, and a mutation that keeps one loses
+ * the other.
+ *
+ * **Both shipped variants**, because the defect that produced this section was
+ * measured on both and the light one is the tighter of the two — `tone.muted`
+ * on the page's own ground measures 2.44 there, under its own floor.
+ *
+ * The reversed notice is excluded by name: it is `tone.warn` on bare ground
+ * below the box and is not a node label (§3ap.7).
+ */
+describe("SK11 — the sankey node label reads against what it is drawn on (C12 I112)", () => {
+  const VARIANTS = Object.keys(CATALOGUE_FORMS.sankey);
+
+  const sankeySvg = (variant: string, theme: ResolvedTheme): string => {
+    const spec = CATALOGUE_FORMS.sankey[variant as keyof typeof CATALOGUE_FORMS.sankey] as Record<string, unknown>;
+    const { cursor, ...rest } = spec;
+    void cursor;
+    const svg = plotToSvg({ kind: "plot", id: "sk11", ...rest } as unknown as Plot, theme);
+    expect(svg, `${variant} draws`).not.toBeNull();
+    return svg ?? "";
+  };
+
+  /** Every node label, as `{ fill, stroke, paintOrder }`. The notice is not one. */
+  const labelsOf = (svg: string): { fill: string; stroke: string | null; paintOrder: string | null; text: string }[] =>
+    [...svg.matchAll(/<text\b([^>]*)>([^<]*)<\/text>/gu)]
+      .filter((m) => !/\breversed$/u.test(m[2] ?? ""))
+      .map((m) => ({
+        fill: /fill="(#[0-9a-f]{6})"/u.exec(m[1] ?? "")?.[1] ?? "",
+        stroke: /stroke="(#[0-9a-f]{6})"/u.exec(m[1] ?? "")?.[1] ?? null,
+        paintOrder: /paint-order="([a-z ]+)"/u.exec(m[1] ?? "")?.[1] ?? null,
+        text: m[2] ?? "",
+      }));
+
+  describe.each([["dark", DARK_THEME], ["light", LIGHT_THEME]] as const)("%s", (name, theme) => {
+    // **The slots, resolved — never a hex literal in a test.** `rgbOf` is the
+    // helper that exists because a test naming a colour is a third source of
+    // truth; this is the same rule one conversion further, because the arm
+    // writes hex into the document.
+    const hexOf = (ref: ColourRef): string =>
+      `#${rgbOf(ref, theme).map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+    const ink = hexOf("tone.default");
+    // **The page's ground, which is `surface.bg`** (C10 I34, §4f). The halo is
+    // the page showing through the glyph, so it is the page's slot and never
+    // one of its own — a second constant would be a rim, not a hole.
+    const ground = hexOf("surface.bg");
+
+    it.each(VARIANTS)("%s — every node label is tone.default over a page-ground halo", (variant) => {
+      const labels = labelsOf(sankeySvg(variant, theme));
+      expect(labels.length, `${name}/${variant} names at least one node`).toBeGreaterThan(0);
+      for (const l of labels) {
+        expect(l.fill, `${name}/${variant} · ${l.text} is tone.default, not the furniture's tone.muted`).toBe(ink);
+        expect(l.stroke, `${name}/${variant} · ${l.text} carries a halo`).toBe(ground);
+        // **`paint-order` and not merely a stroke.** Without it the stroke is
+        // painted *over* the fill and the label is a ground-coloured blob — a
+        // defect a byte-compare golden cannot see, which is why it is a
+        // separate assertion rather than part of the one above.
+        expect(l.paintOrder, `${name}/${variant} · ${l.text}'s halo is under the fill`).toBe("stroke");
+      }
+    });
+
+    it.each(VARIANTS)("%s — and the ratio the halo buys clears C10's floor", (variant) => {
+      for (const l of labelsOf(sankeySvg(variant, theme))) {
+        // The promise, not the pair of literals that keeps it: whatever the
+        // ink and the halo are, the reader gets body text's floor. Measured on
+        // the raster at 12.43 (dark) and 9.25 (light), worst pixel 7.59 on
+        // `crowded` where two halos meet (§3ap.7).
+        expect(
+          ratio(l.fill, l.stroke ?? l.fill),
+          `${name}/${variant} · ${l.text} at ${ratio(l.fill, l.stroke ?? l.fill).toFixed(2)}`,
+        ).toBeGreaterThanOrEqual(DEFAULT_FLOOR);
+      }
+    });
+  });
+
+  it("the placement is unchanged, so this is the painter's ruling and not the geometry's", () => {
+    // **§3ap.4 K15's other half.** The ink moved because placement could not
+    // move: `sankeyLayout` is shared with the terminal, and the last layer's
+    // label still anchors at its end. A ruling that had quietly shifted a
+    // label would show up here rather than in a golden nobody re-reads.
+    const svg = sankeySvg("default", DARK_THEME);
+    expect(svg.match(/text-anchor="end"/gu)?.length, "the last layer's labels still flip").toBe(2);
   });
 });

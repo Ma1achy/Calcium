@@ -14,6 +14,7 @@ import {
   stripControl,
   truncate,
   wrapCells,
+  wrapCellsParts,
 } from "../../src/presentation/text.js";
 import { SGR_RESET } from "../../src/terminal/escapes.js";
 
@@ -137,6 +138,62 @@ describe("wrapCells (§3)", () => {
         expect(cells(line), `"${line}" at width ${width}`).toBeLessThanOrEqual(width);
       }
     }
+  });
+
+  it("T3.10b2 (C04 I86, §5): no row could have taken the first word of the next row", () => {
+    // The general property F591 is one instance of, swept rather than pinned:
+    // a row breaking one word early is invisible to a per-row width assertion,
+    // because a short row fits. Measured before the arm: 161 violating joins
+    // over 102 of these 560 (string, width) pairs — the wrapper broke early at
+    // every width where a row filled exactly and a space followed. After: 0.
+    const corpus = [
+      "aa bb cc dd",
+      "abcdef gh",
+      "abc   def",
+      "ab  cd",
+      "the quick brown fox jumps over the lazy dog",
+      "a bb ccc dddd eeeee ffffff",
+      "one two three four five six seven eight nine ten",
+      "Calcium is a framework for building terminal user interfaces over JSON emitting CLIs",
+      "x y z aa bbb cccc ddddd",
+      "日本 語です テスト します",
+      "an unbrokenwordthatisverylong indeed here",
+      "i i i i i i i i i i i i i i i i i i i i",
+      "tip: run make enforce before opening an MR, it is five seconds",
+      "no such container: calcium-dev-probe-0001 (try docker ps -a)",
+    ];
+
+    const early: string[] = [];
+    for (const text of corpus) {
+      const ascii = !/[^ -~]/u.test(text);
+      for (let width = 1; width <= 40; width += 1) {
+        const rows = wrapCellsParts(text, width);
+        // The two guards the arm must not move, over the same 560 pairs: no
+        // row overflows, and every row is an exact slice from its `start`
+        // (C04 I86) — asserted on the ASCII members, since a cluster too wide
+        // for the row is substituted and a substituted row is not a slice.
+        for (const row of rows) {
+          expect(cells(row.text), `"${row.text}" at ${width}`).toBeLessThanOrEqual(width);
+          if (ascii) expect(text.slice(row.start, row.start + row.text.length)).toBe(row.text); // cells-ok — a code-unit slice
+        }
+        for (let i = 0; i + 1 < rows.length; i += 1) {
+          const row = rows[i]!;
+          const next = rows[i + 1]!;
+          // Only where the join is legitimate: the two rows are separated by
+          // exactly one source space, the next row does not open with content
+          // whitespace, and its first word is whole rather than the head of a
+          // token the wrapper had to cut mid-cluster.
+          if (text.slice(row.start + row.text.length, next.start) !== " ") continue; // cells-ok — a code-unit slice
+          const word = next.text.split(" ")[0]!;
+          if (word === "" || next.text.startsWith(" ")) continue;
+          const after = next.start + word.length; // cells-ok — a code-unit cursor
+          if (after < text.length && text[after] !== " ") continue; // cells-ok — a code-unit index
+          if (cells(`${row.text} ${word}`) <= width) early.push(`w=${width} "${row.text}" + "${word}" of "${text}"`);
+        }
+      }
+    }
+
+    expect(early).toEqual([]);
   });
 
   it("T3.10c: an unbroken token breaks mid-word rather than overflowing", () => {
@@ -313,5 +370,246 @@ describe("C09 §5 — the printable-ASCII path", () => {
     // the guard is what keeps it so.
     expect(cells("\t"), "one cell, by clusterCells").toBe(1);
     expect(cells("\n"), "and so is a newline").toBe(1);
+  });
+});
+
+/**
+ * C09 T1.27 — the Ambiguous set is `East_Asian_Width=Ambiguous`, not a memory
+ * of it (C09 §5, C09 I6, C02 I9).
+ *
+ * The table this pins replaced one that began at U+2010 and called the omission
+ * deliberate: *the rest of the property is letters no terminal draws wide.* That
+ * is a claim about fonts and the capability is a claim about a **convention**,
+ * so 138,132 code points measured one cell where the property says two — and a
+ * row measured at n cells that draws n+1 wraps, which scrolls the alternate
+ * screen (F665).
+ *
+ * **The sets below are the property's, transcribed from
+ * `EastAsianWidth-17.0.0.txt` (2025-07-24) and not chosen.** Latin-1 because it
+ * is where the gap started and because `§` `·` `×` live there; both halves,
+ * because a row asserting only the Ambiguous half passes just as well on a
+ * table that says *everything* is Ambiguous.
+ */
+describe("cells — the Ambiguous set against its source (C09 §5)", () => {
+  /** U+00A0..U+00FF with `; A` in the property — 44 of the 96. */
+  const LATIN1_AMBIGUOUS = "¡¤§¨ª\u00ad®°±²³´¶·¸¹º¼½¾¿ÆÐ×ØÞßàáæèéêìíðòó÷øùúüþ";
+  /** The other 52, every one Neutral. `µ` and `«` `»` are here, not above. */
+  const LATIN1_NEUTRAL = "\u00a0¢£¥¦©«¬¯µ»ÀÁÂÃÄÅÇÈÉÊËÌÍÎÏÑÒÓÔÕÖÙÚÛÜÝâãäåçëîïñôõöûýÿ";
+
+  it("T1.27 (I6, C02 I9): every Latin-1 Ambiguous character is two cells at wide and one at narrow", () => {
+    // **The fabricated violation.** Restoring the old table — any table whose
+    // lowest range starts at U+2010 — makes every row here report 1 at wide.
+    expect([...LATIN1_AMBIGUOUS].length, "the property's Latin-1 Ambiguous count").toBe(44);
+    for (const c of LATIN1_AMBIGUOUS) {
+      const cp = `U+${(c.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, "0")}`;
+      expect(cells(c, "wide"), `${cp} at ambiguousWidth "wide"`).toBe(2);
+      expect(cells(c, "narrow"), `${cp} at ambiguousWidth "narrow"`).toBe(1);
+    }
+  });
+
+  it("T1.27b (I6): the control — every Latin-1 Neutral character is one cell under both conventions", () => {
+    // **The control the row above owes.** It passed before the fix and passes
+    // after, so it is not evidence for the change; what it refuses is the
+    // repair that over-shoots — a table that answers *Ambiguous* for the block
+    // rather than for the property satisfies T1.27 exactly and fails here.
+    expect([...LATIN1_NEUTRAL].length, "the property's Latin-1 Neutral count").toBe(52);
+    for (const c of LATIN1_NEUTRAL) {
+      const cp = `U+${(c.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, "0")}`;
+      expect(cells(c, "wide"), `${cp} at ambiguousWidth "wide"`).toBe(1);
+      expect(cells(c, "narrow"), `${cp} at ambiguousWidth "narrow"`).toBe(1);
+    }
+  });
+
+  it("T1.27c (I6): SS47's PROSE_MARKS, accounted one mark at a time", () => {
+    // **The count is asserted because the count was wrong.** The finding said
+    // four of eight, the ledger correction said five of ten, and the property
+    // says **seven of ten are Ambiguous and three of those were in the gap**.
+    // A row per mark rather than a total, because a total is satisfied by the
+    // wrong three.
+    const marks = [..."—§·×≤≥→«»⚠"];
+    expect(marks.length, "SS47's PROSE_MARKS").toBe(10);
+    const wide = Object.fromEntries(marks.map((m) => [m, cells(m, "wide")]));
+    expect(wide, "seven Ambiguous at 2, «» Neutral at 1, ⚠ Neutral but inside the geometry deviation").toEqual({
+      "—": 2, "§": 2, "·": 2, "×": 2, "≤": 2, "≥": 2, "→": 2, "«": 1, "»": 1, "⚠": 2,
+    });
+  });
+
+  it("T1.27d (I6): the geometry deviation is deliberate, and it is asserted where it is claimed", () => {
+    // C09 §5 keeps nine blocks Ambiguous whole even where the property says
+    // Neutral, because §4c's gates read this answer. 625 code points depend on
+    // that list; these are four of them, and the day a generated table is
+    // dropped in without the deviation this fails here rather than in fifteen
+    // golden frames.
+    for (const c of "▐░▖▚") expect(cells(c, "wide"), `${c} — Neutral in the property, drawn as geometry here`).toBe(2);
+    for (const c of "▐░▖▚") expect(cells(c, "narrow"), `${c} at narrow`).toBe(1);
+  });
+
+  it("T1.27e (I6): a supplementary variation selector is zero cells, not two", () => {
+    // The property calls U+E0100..U+E01EF Ambiguous, so deriving the table from
+    // it started measuring a combining mark at two cells under the wide
+    // convention until `isZeroWidth` grew the range. A repair that introduces
+    // an over-count one table over is what a generated table makes possible and
+    // a hand-written one hid.
+    expect(cells("\u{E0100}", "wide"), "VARIATION SELECTOR-17 at wide").toBe(0);
+    expect(cells("\u{E01EF}", "narrow"), "VARIATION SELECTOR-256 at narrow").toBe(0);
+    expect(cells("\u{DFFFF}", "wide"), "and the code point below the range is untouched").toBe(1);
+  });
+});
+
+/**
+ * C09 T1.28 — the Wide set is `East_Asian_Width` in {`W`, `F`}, and its errors
+ * were in the mode everything is rendered in (C09 §5, C09 I6, C02 I9).
+ *
+ * The sibling of T1.27 and the more dangerous half. `isAmbiguous`'s gap only
+ * showed at `ambiguousWidth: "wide"`; `isWide`'s showed at **narrow**, which is
+ * the default and the convention every golden frame in the tree is rendered in.
+ * Measured against `EastAsianWidth-17.0.0.txt` before the change: **8,619 code
+ * points are `W` or `F` and measured one cell**, in 65 runs, every one an
+ * under-count — and a row measured at n cells that draws n+1 wraps, which
+ * scrolls the alternate screen (F692).
+ *
+ * **The sets below are the property's, transcribed and not chosen**: one
+ * representative per large run, and every emoji singleton the finding named. Both
+ * directions are asserted, because a row saying *these are two cells* passes just
+ * as well on a table that says everything is wide.
+ */
+describe("cells — the Wide set against its source (C09 §5)", () => {
+  /**
+   * The runs of the 8,619, as `[lo, hi]` bounds — **not one representative
+   * each**, which is what this list was first written as and what the mutation
+   * pass refused. Collapsing `0x17000, 0x18cd5` to `0x17000, 0x17000` — 7,382
+   * code points out of the table — left every row green, because every
+   * representative was its run's *first* member and element zero is the one a
+   * collapse keeps. Both bounds and the midpoint are asserted below, so a
+   * collapse onto either end and an off-by-one at either bound all fail.
+   */
+  const WIDE_RUNS: readonly (readonly [number, number, string])[] = [
+    [0x231a, 0x231b, "WATCH, HOURGLASS"],
+    [0x23e9, 0x23ec, "black right-pointing double triangles"],
+    [0x23f0, 0x23f0, "ALARM CLOCK"],
+    [0x23f3, 0x23f3, "HOURGLASS WITH FLOWING SAND"],
+    [0x25fd, 0x25fe, "white and black medium small squares"],
+    [0x2614, 0x2615, "UMBRELLA WITH RAIN DROPS, HOT BEVERAGE"],
+    [0x2630, 0x2637, "the eight trigrams"],
+    [0x2648, 0x2653, "the zodiac"],
+    [0x268a, 0x268f, "monogram and digram symbols"],
+    [0x26aa, 0x26ab, "medium white and black circles"],
+    [0x26c4, 0x26c5, "SNOWMAN WITHOUT SNOW, SUN BEHIND CLOUD"],
+    [0x26f2, 0x26f3, "FOUNTAIN, FLAG IN HOLE"],
+    [0x2753, 0x2755, "question and exclamation ornaments"],
+    [0x2795, 0x2797, "heavy plus, minus, division"],
+    [0x2b1b, 0x2b1c, "black and white large squares"],
+    [0x4dc0, 0x4dff, "the Yijing hexagrams — 64"],
+    [0xa960, 0xa97c, "Hangul Jamo Extended-A — 29"],
+    [0x16fe0, 0x16fe4, "Tangut and Nushu iteration marks"],
+    [0x16ff0, 0x16ff6, "Vietnamese alternate reading marks"],
+    [0x17000, 0x18cd5, "Tangut ideographs — 7,382"],
+    [0x18cff, 0x18d1e, "Khitan small script"],
+    [0x18d80, 0x18df2, "Tangut components supplement"],
+    [0x1b000, 0x1b122, "Kana Supplement and Extended-A"],
+    [0x1b170, 0x1b2fb, "Nushu"],
+    [0x1d300, 0x1d356, "Tai Xuan Jing symbols"],
+    [0x1d360, 0x1d376, "counting rod numerals"],
+    [0x1f210, 0x1f23b, "squared CJK ideographs"],
+    [0x1f7e0, 0x1f7eb, "large coloured circles and squares"],
+  ];
+
+  /** The singletons the finding named, one code point each. */
+  const WIDE_SINGLETONS = "\u{26A1}\u{26D4}\u{2705}\u{2728}\u{274C}\u{2757}\u{2B50}\u{2B55}\u{1F004}\u{1F200}";
+
+  it("T1.28 (I6, C02 I9): every Wide code point is two cells under both conventions", () => {
+    // **The fabricated violation.** Restoring the hand-written table — the
+    // seventeen coarse blocks that stood here — makes every row report 1 in both
+    // modes. All of these lie outside those blocks; that is what put them in the
+    // 8,619.
+    expect(WIDE_RUNS.length, "runs of the 8,619 named here").toBe(28);
+    for (const [lo, hi, name] of WIDE_RUNS) {
+      for (const cp of [lo, (lo + hi) >> 1, hi]) {
+        const c = String.fromCodePoint(cp);
+        const label = `U+${cp.toString(16).toUpperCase()} (${name})`;
+        expect(cells(c, "narrow"), `${label} at ambiguousWidth "narrow" — the default`).toBe(2);
+        expect(cells(c, "wide"), `${label} at ambiguousWidth "wide"`).toBe(2);
+      }
+    }
+    for (const c of WIDE_SINGLETONS) {
+      const label = `U+${(c.codePointAt(0) ?? 0).toString(16).toUpperCase()}`;
+      expect(cells(c, "narrow"), `${label} at narrow`).toBe(2);
+      expect(cells(c, "wide"), `${label} at wide`).toBe(2);
+    }
+  });
+
+  it("T1.28b (I6): the control — what left the table is Neutral, and no glyph a terminal draws wide lost a cell", () => {
+    // **The control T1.28 owes, and it is the row that refuses the over-shooting
+    // repair.** *Wide is missing entries, so union the property onto the blocks
+    // that were there* satisfies T1.28 exactly and fails here: 369 code points
+    // measured two and are not `W` or `F`.
+    //
+    // Two shapes, because they are wrong for different reasons. The first four
+    // are unassigned gaps the coarse blocks swallowed. The last is the one that
+    // had to be checked rather than argued: a **text-presentation** emoji, which
+    // the property calls Neutral because a terminal draws it one cell until a
+    // variation selector asks for the emoji form. Of the 369, none has
+    // `Emoji_Presentation=Yes` (`emoji-data.txt` 17.0.0), so nothing a terminal
+    // draws double-width narrowed here.
+    const NOW_NARROW = [
+      ["\u{2E9A}", "unassigned, CJK radicals supplement"],
+      ["\u{3097}", "unassigned, Hiragana"],
+      ["\u{A48D}", "unassigned, Yi radicals"],
+      ["\u{FF00}", "unassigned, halfwidth and fullwidth forms"],
+      ["\u{1F321}", "THERMOMETER — text presentation"],
+    ] as const;
+    for (const [c, name] of NOW_NARROW) {
+      const cp = `U+${(c.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, "0")} ${name}`;
+      expect(cells(c, "narrow"), `${cp} at narrow`).toBe(1);
+      expect(cells(c, "wide"), `${cp} at wide`).toBe(1);
+    }
+    // And the half that says the narrowing is the property's rule rather than a
+    // loss: the same code point asking for the emoji form is still two.
+    expect(cells("\u{1F321}\u{FE0F}", "narrow"), "THERMOMETER with U+FE0F").toBe(2);
+  });
+
+  it("T1.28c (I6, C02 I9): the two tables overlap, and the property settles it — U+3248..U+324F is Ambiguous, not Wide", () => {
+    // The hand-written `0x3041..0x33ff` claimed these eight, which the property
+    // calls Ambiguous: they measured **two at narrow**, an over-count inside an
+    // under-counting table, and the direction that no union repair fixes.
+    // Deriving both tables from one file makes it impossible rather than fixed —
+    // the property's classes are disjoint, so the two ranges cannot intersect.
+    // A repair that adds `WIDE_RANGES` and leaves the old blocks in place keeps
+    // all eight and fails here.
+    for (let cp = 0x3248; cp <= 0x324f; cp += 1) {
+      const c = String.fromCodePoint(cp);
+      const label = `U+${cp.toString(16).toUpperCase()} CIRCLED NUMBER TEN ON BLACK SQUARE and up`;
+      expect(cells(c, "narrow"), `${label} at narrow — Ambiguous, so one`).toBe(1);
+      expect(cells(c, "wide"), `${label} at wide`).toBe(2);
+    }
+  });
+
+  it("T1.28d (I6): where the property and the geometry deviation meet, the property wins in both modes", () => {
+    // 49 code points of `DRAWN_AS_GEOMETRY` are `W` in the property.
+    // `clusterCells` asks `isWide` first, so they are two cells under **both**
+    // conventions — which is the ruling and not an ordering accident: the
+    // deviation exists to make a geometry glyph measure two at wide, and a glyph
+    // the property already calls Wide measures two at every convention. What the
+    // list still governs is the 576 Neutral members, and T1.27d asserts those.
+    for (const c of "\u{26C4}\u{25FD}\u{2B1B}\u{2614}") {
+      expect(cells(c, "narrow"), `${c} — Wide in the property, inside a geometry block, at narrow`).toBe(2);
+      expect(cells(c, "wide"), `${c} at wide`).toBe(2);
+    }
+    // The control: a Neutral member of the same blocks keeps the deviation's
+    // answer, so this row is about the intersection and not about the blocks.
+    expect(cells("\u{2591}", "narrow"), "LIGHT SHADE — Neutral, the deviation's own").toBe(1);
+    expect(cells("\u{2591}", "wide"), "LIGHT SHADE at wide").toBe(2);
+  });
+
+  it("T1.28e (I6): the deliberate deviations survived the generated table", () => {
+    // Swept against the property after the change, the disagreements are
+    // **exactly** the three recorded deviations and nothing else: 0 under-counts
+    // in either mode, 26 regional indicators, 576 geometry code points at wide,
+    // and 722 zero-width. A lone regional indicator is the one asserted here
+    // because it is the only non-zero-width disagreement left at narrow, and a
+    // generated table dropped in over it would have made it one cell.
+    expect(cells("\u{1F1E6}", "narrow"), "REGIONAL INDICATOR A alone — Neutral in the property").toBe(2);
+    expect(cells("\u{1F1E6}\u{1F1E9}", "narrow"), "and a pair is one flag of two cells, not four").toBe(2);
+    expect(cells("\u{0301}", "narrow"), "COMBINING ACUTE ACCENT — Ambiguous in the property, zero here").toBe(0);
   });
 });

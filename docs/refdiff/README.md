@@ -23,12 +23,16 @@ change is the signal.
 what both halves independently took before F183 and is why a *style* was
 uncomparable: a candlestick is `form: "line"`. The extras are `EXTRA_VARIANTS`
 in `export-fixtures.ts`. So this table ranks
-**47 of 178 catalogue variants**, and the rest are unread rather than passing —
+**48 of 193 catalogue variants**, and the rest are unread rather than passing —
 adding one means adding a reference renderer beside it.
+
+**The matplotlib frames are committed under `reference/`** — the record the
+gate compares against, refreshed by `make refdiff`. Only the side-by-side
+text beside this file is generated and ignored.
 
 | form | grid | ink | extent |
 |---|---|---|---|
-| histogram | 64x16 | 69.3% | — *5 bands vs 6* |
+| histogram | 64x16 | 68.2% | 44.7% |
 | waffle | 64x10 | 55.9% | — *fewer than two bands — ours 1, theirs 0* |
 | bar | 64x16 | 50.4% | — *3 bands vs 7* |
 | ridgeline | 64x16 | 41.0% | — *fewer than two bands — ours 4, theirs 1* |
@@ -55,6 +59,7 @@ adding one means adding a reference renderer beside it.
 | dumbbell | 64x16 | 9.7% | — *fewer than two bands — ours 1, theirs 1* |
 | ecdf | 64x16 | 9.4% | — *fewer than two bands — ours 1, theirs 2* |
 | bubble | 64x16 | 9.0% | — *fewer than two bands — ours 1, theirs 1* |
+| plot3d | 64x16 | 7.8% | — *fewer than two bands — ours 0, theirs 0* |
 | scatter | 64x16 | 4.5% | — *fewer than two bands — ours 1, theirs 2* |
 | step | 64x16 | 4.0% | — *fewer than two bands — ours 1, theirs 1* |
 | dotplot | 64x16 | 1.9% | — *fewer than two bands — ours 1, theirs 1* |
@@ -67,6 +72,7 @@ adding one means adding a reference renderer beside it.
 | graph | — | — | *no reference renderer — see reference.py SKIPPED* |
 | tree | — | — | *no reference renderer — see reference.py SKIPPED* |
 | treemap | — | — | *no reference renderer — see reference.py SKIPPED* |
+| sankey | — | — | *no reference renderer — see reference.py SKIPPED* |
 | calendar | — | — | *C04 I50b — as heatmap* |
 | correlation | — | — | *C04 I50b — as heatmap* |
 | confusion | — | — | *C04 I50b — as heatmap* |

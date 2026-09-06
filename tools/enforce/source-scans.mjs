@@ -31,10 +31,16 @@ export const SCANS = [
   // `process.env[k]`. No file in src/ has business reading the environment —
   // C22 reads config through an injected filesystem — so the broad rule has no
   // false positives and, unlike the narrow one, no false negatives.
+  //
+  // **No exception, and there was one for the whole life of the rule.**
+  // `capabilities.ts` was allowed by name, and the file names `process.env`
+  // only in a comment saying it does *not* read it — C02 takes the injected
+  // record. SS53 found the entry had never been exercised, and its own `why`
+  // already said so.
   { id: "SS10", spec: "C02 T2.5 · C02 T6.2",
     pattern: /process\.env/,
-    scope: "src/", allow: ["src/terminal/capabilities.ts"],
-    why: "only C02 reads the environment, and it reads the injected record" },
+    scope: "src/", allow: [],
+    why: "no file under src/ reads the environment — C02 takes the injected record and C22 supplies it" },
 
   { id: "SS11", spec: "C09 T2.7 · C10 T2.6",
     pattern: /process\.env/,
@@ -162,7 +168,7 @@ export const SCANS = [
   // meaning, and a mode number that is not in it does nothing on its own: it
   // still needs an escape prefix, which SS14 catches.
   { id: "SS15", spec: "C01 I1 · C01 T2.8",
-    pattern: /\?(?:1049|25|2004|1002|1006|2026)[hl]/,
+    pattern: /\?(?:1049|25|2004|1002|1003|1006|2026)[hl]/,
     scope: "src/", allow: ["src/terminal/escapes.ts"],
     why: "mode literals live in one module; C01 owns what they mean" },
 
@@ -180,6 +186,22 @@ export const SCANS = [
     pattern: /#[0-9a-fA-F]{3,8}\b/,
     scope: "src/presentation/blocks/", allow: [],
     why: "renderers resolve tones; they do not carry colours" },
+
+  // **SS18, pending on C10 for the whole life of C10.** Its entry said *needs
+  // the block-producing module list*, and the list is the directories that
+  // construct `Block` values for a transcript: the adapters, the fixtures that
+  // stand in for them, and everything under `src/shell/` — builders, local
+  // handlers, the refresh driver, the startup notices. SS16 covers the view
+  // model's own types and SS17 the renderers; this is the third population,
+  // the one that *writes* blocks, and it had no scan. Measured clean on landing.
+  //
+  // Stated blind spot: a hex colour built by string concatenation or reached
+  // through a variable passes, as SS17's does. The shape someone actually
+  // writes is the literal.
+  { id: "SS18", spec: "C10 I14 · C10 T2.9",
+    pattern: /#[0-9a-fA-F]{3,8}\b/,
+    scope: ["src/data/adapters/", "src/data/fixtures/", "src/shell/"], allow: [],
+    why: "a block names a palette slot and never embeds a colour value (C10 I14) — the modules that construct blocks carry no hex literal" },
 
   // C10 I13. The rule scopes to the *directory* with one named exception, not
   // to `tokens-*.ts`: a narrowed scope reads as tighter and is looser, because
@@ -221,10 +243,16 @@ export const SCANS = [
     scope: "src/", allow: ["src/terminal/lifecycle.ts"],
     why: "the terminal's dimensions are read in lifecycle.ts and handed down; width is the axis that wraps" },
 
+  // `four-bit.ts` was allowed by name as "the one file that holds indices", and
+  // it does hold them — as bare numbers (`"tone.default": 15`), a form this
+  // pattern cannot see: it wants an `ansi:` key, a `38;5;` sequence or an SGR
+  // string. So the allowance was never load-bearing (SS53) and it is gone; the
+  // day the pattern learns the bare form is the day the exemption is argued
+  // for, with the reason beside it.
   { id: "SS19", spec: "C10 I13 · C10 T2.5",
     pattern: /\b(?:38|48);5;\d|\bansi(?:16|256)?\s*[:=]\s*\d|\[\d{1,2}m/,
-    scope: "src/presentation/theme/", allow: ["src/presentation/theme/four-bit.ts"],
-    why: "tokens are 24-bit hex; the curated 4-bit map is the one file that holds indices" },
+    scope: "src/presentation/theme/", allow: [],
+    why: "tokens are 24-bit hex; no theme file spells an ANSI index or a raw SGR" },
 
   // **The pattern was correct about a syntax nobody writes**, and that is its own
   // vacuity class (A03 §2). It required a word character after `syntax.`, and
@@ -248,9 +276,14 @@ export const SCANS = [
     allow: ["src/presentation/theme/", "src/presentation/blocks/kinds/code.ts", "src/presentation/patch/"],
     why: "`syntax` is consumed by code and patch rendering only; the list is closed at two" },
 
+  // `theme/` was allowed as "where the art is declared", and none of its ten
+  // files spells a `spectrum` reference in either form this matches — the art
+  // is declared through the palette record, not by name. Never exercised
+  // (SS53), so the rule has no exceptions and a future `spectrum.` in the theme
+  // directory is a decision rather than a default.
   { id: "SS21", spec: "C10 I16 · C10 T2.8",
     pattern: /["'`]spectrum\.\w|palettes\s*\.\s*spectrum/,
-    scope: "src/", allow: ["src/presentation/theme/"],
+    scope: "src/", allow: [],
     why: "`spectrum` is decorative and restricted to declared art" },
 
   // --- structural ----------------------------------------------------------
@@ -460,6 +493,30 @@ export const SCANS = [
     ], allow: [],
     why: "C11, C12 and C25 own no state: a module-level binding is a cache two blocks share and only one of them invalidates" },
 
+  // **Stated blind spot: the `why` says *binding* and the pattern says
+  // `let|var`.** A `const` bound to a mutable is a module-level binding by any
+  // reading of that sentence and this rule cannot see one — F84's class, a
+  // correct justification attached to a narrower mechanism, in the rule rather
+  // than in a spec.
+  //
+  // **Measured rather than assumed**: one instance in the whole scope,
+  // `plot/field.ts`'s `const DIM_FACTORS = new Map()`. It is a memo over frozen
+  // framework data keyed by a colormap's name, so no render can observe it — a
+  // pure function's cache, which is what C10 I11 already permits one component
+  // over.
+  //
+  // **And that is why the pattern is not widened.** Catching the scratch buffer
+  // would mean catching `DIM_FACTORS`, and no regex distinguishes *a cache of a
+  // pure function of frozen data* from *a cache of anything else*. The rule
+  // would fire on the legitimate case, get an exemption, and the exemption would
+  // be the next reader's evidence that module-level mutables are fine.
+  //
+  // **What covers the hazard is a row rather than a rule** — `PR8` allocates two
+  // depth buffers and requires the first to survive the second, which is the
+  // property a shared array cannot have. It caught a scratch buffer handed out
+  // as `SCRATCH.subarray(0, n)`, which passes an identity check and a cleared-to-
+  // Infinity check both.
+
   // C18 I11 and C05 I18, as one rule.
   //
   // **Its subject was always "a shared text primitive with one implementation";
@@ -572,12 +629,16 @@ export const SCANS = [
   // array literal is a verb or enum list. `"--"` alone is not matched — the
   // prefix test in `context.ts` is a question about syntax, not a flag name.
   //
-  // `types.ts` is allowed by name: `SLOT_KINDS` is C19's own closed union,
-  // enumerated so T2.7 can be exhaustive over it, and it is not manifest data.
-  // The alternative is a rule that cannot see a list added to any other file.
+  // `types.ts` was allowed by name for `SLOT_KINDS`, C19's own closed union —
+  // and the union is spelled in camelCase (`flagValue`), which the list arm's
+  // `[a-z][\w -]*` does match, so the allowance looked necessary and was not:
+  // the arm wants three consecutive quoted lower-case words and the list is
+  // longer, quoted per line. Never exercised (SS53). If `SLOT_KINDS` is ever
+  // reformatted onto one line this fires, and that is the moment to decide
+  // rather than a permission granted in advance.
   { id: "SS22", spec: "C19 I4 · C19 T2.6 · C19 T4.1",
     pattern: /"--[a-z][\w-]*"|\[\s*"[a-z][\w -]*"\s*,\s*"[a-z][\w -]*"\s*,\s*"[a-z][\w -]*"/,
-    scope: "src/interaction/completion/", allow: ["src/interaction/completion/types.ts"],
+    scope: "src/interaction/completion/", allow: [],
     why: "every candidate is a projection of the manifest (I4): a literal verb, flag or enum list here is how completion drifts from the far side, and it is correct on the day it is written" },
 
   // **C20 owns a `flush` that has nothing to do with a frame**, and the
@@ -639,8 +700,17 @@ export const SCANS = [
   //
   // The `=` is what makes this a prop rather than prose: `color={style}` and
   // `color="red"` both match, a comment about colour does not.
+  // **A hyphen before it is an SVG attribute and not a prop** (§3ak.37). `\b`
+  // matches at the `c` of `stop-color=`, because `-` is a non-word character —
+  // so the second arm's colour key, which writes `<stop stop-color="#440154"/>`,
+  // read as an Ink prop discarding a depth tag. There is no other spelling: a
+  // gradient stop's colour attribute is `stop-color` and nothing else.
+  //
+  // **The lookbehind is narrower than a file exemption and that is the point.**
+  // Allowing `svg.ts` would blind the rule to a real `color=` in the file most
+  // likely to grow one.
   { id: "SS37", spec: "C09 I4 · C09 T2.17",
-    pattern: /\b(?:color|backgroundColor)\s*=/,
+    pattern: /(?<![\w-])(?:color|backgroundColor)\s*=/,
     scope: "src/presentation/", allow: [],
     why: "renderers emit SGR from terminal/escapes.ts; an Ink colour prop discards the depth tag" },
 
@@ -665,13 +735,23 @@ export const SCANS = [
   // the rule silently, which is the failure this scan exists to prevent, arriving
   // through the scan itself. So: literal, and the cost is one word per token.
   //
+  // **The token list is restated here and that is a known cost** (F661):
+  // `Glyph` gained `quote` and `nested` and this rule reported both as defects,
+  // because the alternation is a second copy of the union with no mechanism
+  // holding the two together. It is the reimplemented-rule shape — both copies
+  // read as correct, and the one that goes stale is the one nothing asserts
+  // against. The scans are a flat table of regexes with no import of `src/`, so
+  // deriving the list from `GLYPH_TOKENS` is a change to the table's shape
+  // rather than to this row; recorded so the next token's author knows to come
+  // here rather than diagnosing a false violation.
+  //
   // The pattern matches a glyph position whose literal is *not* a token, so
   // `glyph: "error"` passes and `glyph: "✗"` does not. Scoped to `src/`: the
   // one file that holds the characters writes them as table rows rather than in
   // a glyph position, so it needs no exemption — and an exemption nobody needs
   // is a door left open.
   { id: "SS39", spec: "C04 I6 · C09 §4",
-    pattern: /\bglyph\s*:\s*["'`](?!(?:ok|warn|error|info|pending|working|running|queued|cancelled|expand|collapse|live|bullet|continuation)["'`])/,
+    pattern: /\bglyph\s*:\s*["'`](?!(?:ok|warn|error|info|pending|working|running|queued|cancelled|expand|collapse|live|bullet|quote|nested|continuation|step)["'`])/,
     scope: "src/", allow: [],
     why: "a block names a glyph slot; C09 §4 owns both renderings and the 1:1 width rule" },
 
@@ -759,11 +839,13 @@ export const SCANS = [
   { id: "SS46", spec: "C23 §3a · C23 I22",
     pattern: /origin:\s*"refresh"/,
     scope: "src/",
+    // `src/shell/types.ts` was here and is gone: it names `origin: "refresh"`
+    // in a doc comment only, which the scan skips, so the entry was never
+    // exercised (SS53).
     allow: [
       "src/viewport/transcript/cap.ts",
       "src/shell/construct.ts",
       "src/shell/execution.ts",
-      "src/shell/types.ts",
     ],
     why: "`origin: \"refresh\"` is provenance — a system notice with no user behind it (C23 §3a). A fifth site is either a new one of those or the word drifting" },
 
@@ -876,6 +958,126 @@ export const SCANS = [
     scope: "src/", allow: ["src/presentation/plot/ramp.ts"],
     why: "a renderer names the axis it draws and never a vocabulary (C12 I21) — `ladderFor` is the door, and reading a ramp constant is the move that produced the heatmap's density-for-height defect" },
 
+  // --- SS55 — the keyboard protocol's ladder: no binding reachable only with it ---
+  //
+  // C02 I12: `keyboardProtocol` makes interaction better and never possible. The
+  // one place that could break it is a binding in `keymap.ts` filtering on the
+  // `event` field the kitty arm sets — `event: "release"` — since under `"none"`
+  // no event ever carries the field and the binding is dead on every terminal
+  // but four. So a binding line that names an event filter must, on the same
+  // line, name the fallback that fires without one: `// none-fallback: <action>`.
+  //
+  // **Vacuous on the day it lands, and this comment is where that is said.**
+  // `Binding.key` has no `event` member today and no row in `defaultKeymap` names
+  // one, so the pattern matches nothing in the tree. That is A03 §2's class —
+  // a rule with nothing to be wrong about passes exactly like a satisfied one —
+  // and the fabricated violation in `enforce-rules.test.ts` is what shows the
+  // rule *can* fire; the scope-reach test shows the file exists. The rule is
+  // landed ahead of its subject deliberately: the day someone adds the member
+  // and the first release binding, the check is already in the default path
+  // rather than owed (CLAUDE.md § a gate that exists and is not run).
+  //
+  // **Stated blind spots.** Textual: the annotation names a fallback and the
+  // rule does not resolve it — a `none-fallback:` naming an action nothing
+  // implements passes. A filter spelled another way (`when:`, `on:`) passes. A
+  // binding split across lines with `event:` on its own line still fires — the
+  // pattern is per line and the annotation must be on that line — which errs
+  // towards reporting. And it watches one file: a `BlockKeymap` an adapter
+  // attaches (C26) is outside it, on the argument SS40 makes for allow-lists
+  // over scopes — a second file wants its own row, not a wider glob.
+  { id: "SS55", spec: "C02 I12 · C16 §2",
+    pattern: /\bevent:\s*"(?:press|repeat|release)"(?!.*\/\/ *none-fallback:)/,
+    scope: "src/interaction/router/keymap.ts",
+    allow: [],
+    why: "a binding that filters on the kitty keyboard protocol's event type names, on the same line, the fallback that fires under `keyboardProtocol: \"none\"` (C02 I12) — nothing is reachable only with the protocol" },
+
+  // --- SS56 — one grammar for a notice: nothing under L4 hand-composes one ---
+  //
+  // C22 T2.40. `documents.ts` (`noticeDoc`, the document) and `builders/`
+  // (`b.notice`, the block) are the family every shell surface is meant to
+  // reach for, and the arc's rule is that no surface rolls its own — a notice
+  // written by hand chooses its own glyph, and the four sites that forgot one
+  // threw inside `appendAndCommit` and produced no entry at all (documents.ts's
+  // header records it). The rule is the literal `kind: "notice"` as an
+  // object-literal value, anywhere in `src/`.
+  //
+  // **Allow-list rather than a narrower scope**, and every entry has a reason
+  // here because the row shape holds one `why`. Sixteen files carried the
+  // literal on the day the rule landed (34 lines; 28 outside the family and the
+  // type); twelve do now. SS53 retires any entry the moment its file stops
+  // matching, which is what made the *owed* group below a deferral that expired
+  // by itself.
+  //
+  //   the family — the two places a notice is meant to be composed:
+  //     src/shell/documents.ts             `noticeDoc`, `errorDoc`'s remediation
+  //     src/shell/builders/                `b.notice` and its four tones (C24 I5)
+  //   the kind itself — a declaration and a definition, not compositions:
+  //     src/data/viewmodel/types.ts        the `Notice` type's discriminant
+  //     src/presentation/blocks/kinds/simple.ts   `noticeDefinition.kind`
+  //   below L4 — the family is unreachable by A02 (imports go down only), so a
+  //   notice built here is the layer's own output and there is nothing to call:
+  //     src/data/adapters/fallback.ts      the fallback adapter's document
+  //     src/data/adapters/mapping.ts       an adapter's error notice
+  //     src/data/adapters/overflow.ts      the overflow notice (C07 §4)
+  //     src/data/adapters/registry.ts      an unmapped verb's notice
+  //     src/data/viewmodel/markdown.ts     a blockquote parses to a notice
+  //     src/viewport/transcript/cap.ts     the cap marker (C13 §5)
+  //     src/interaction/history/layers.ts  the reverse-search layer's status
+  //     src/presentation/art.ts            a figure's text fallback
+  //   **the owed group is gone** (F777, 2026-09-05). Four L4 files carried
+  //   fourteen sites — `confirm.ts` (1), `execution.ts` (5), `refresh.ts` (2),
+  //   `local/handlers.ts` (6) — and every one now calls `b.notice`. SS53 did
+  //   what it was kept for: with the literals gone and the entries still here it
+  //   failed four times, which is the proof the entries were load-bearing.
+  //   `test/contract/notice-family.test.ts` holds the frames the literals drew
+  //   and asserts the family draws the same bytes; the one site where the
+  //   helper's default and the literal disagreed (`ok` takes no default glyph,
+  //   the view route's `finish` always drew one) passes its glyph explicitly.
+  //
+  // **Stated blind spots.** A notice built through a helper this rule does not
+  // know — a local `noticeOf` in a new file — passes, as does `kind: NOTICE`
+  // with the literal held in a constant, or a spread from an object declared
+  // elsewhere. The pattern is per line and matches the discriminant only, so it
+  // cannot tell a composition from a type guard written as an object literal
+  // (`{ kind: "notice" } satisfies Pick<…>`), which errs towards reporting. And
+  // it says nothing about *which* member of the family a site should call.
+  //
+  // **Widened to the builder call, 2026-09-06** (F827, C23 I61, A03 §SS56).
+  // The nine sites the rule was written for passed it: `b.notice.warn(…)` and
+  // `b.notice.error(…)` in `confirm.ts`, `document-view.ts`, `execution.ts` ×4
+  // and `local/handlers.ts` ×3 are builder calls, which the discriminant does
+  // not see. The premise was *call the family instead of composing the object*,
+  // and the widened premise is *the composition lives in `documents.ts`*: a
+  // failure, a refusal, a usage line each have one composer function there.
+  // Widened rather than doubled — a second rule on one subject keeps two sets
+  // of birthday clauses. `src/testing/expect-document.ts` was going to join the
+  // allow-list for a `b.notice.ok` it names — SS53 said the name is in a comment
+  // and the exemption would have been dead on arrival.
+  //
+  // **Stated blind spot, the widened arm's**: the bare form `b.notice(tone, …)`
+  // passes — it is the family's general call and every remaining site is a
+  // muted status line or the view route's `finish`. A `b.notice.warn` held in
+  // a variable, or the member read by bracket, passes as the literal in a
+  // constant does.
+  { id: "SS56", spec: "C22 T2.40 · C24 I5 · C23 I61",
+    pattern: /\bkind:\s*"notice"|\bb\.notice\./,
+    scope: "src/",
+    allow: [
+      "src/shell/documents.ts",
+      "src/shell/builders/",
+      "src/data/viewmodel/types.ts",
+      "src/presentation/blocks/kinds/simple.ts",
+      "src/data/adapters/fallback.ts",
+      "src/data/adapters/mapping.ts",
+      "src/data/adapters/overflow.ts",
+      "src/data/adapters/registry.ts",
+      "src/data/viewmodel/markdown.ts",
+      "src/viewport/transcript/cap.ts",
+      "src/interaction/history/layers.ts",
+      "src/presentation/art.ts",
+    ],
+    why: "one grammar for a notice — composed in `documents.ts`, never a hand-composed `kind: \"notice\"` or a `b.notice.warn`/`.error` call outside it (C23 I61, F827); a site that rolls its own chooses its own glyph and the ones that forgot produced no entry at all" },
+
   { id: "SS35", spec: "C04 §4 · C05 §2",
     pattern: /^\s*(?:export\s+)?type Result\s*[<=]/m,
     scope: "src/", allow: ["src/data/viewmodel/types.ts"],
@@ -914,6 +1116,21 @@ export const SCANS = [
  * A second limit: this reads literals lexically, so a mark built by
  * `String.fromCodePoint` or held in a variable passes. Every current site is a
  * literal, and a computed one would be a change worth noticing on its own.
+ *
+ * **A third, and it is about the exemption rather than the scan** (F665).
+ * `PROSE_MARKS` is let through *because it is prose*, so it is the one class of
+ * mark that reaches a frame unconverted — and this rule says nothing about
+ * whether those marks are **measured** correctly. Seven of the ten are
+ * `East_Asian_Width=Ambiguous` and three of the seven — `§` `·` `×` — measured
+ * one cell at `ambiguousWidth: "wide"` and drew two, which is the wrap this
+ * exemption's own subjects are most likely to cause. Two of the ten (`«` `»`)
+ * are Neutral and were right; one (`⚠`) is Neutral and is over-counted by
+ * C09's recorded geometry deviation. **Measured against the property, not
+ * recalled**: `EastAsianWidth-17.0.0.txt`, 2025-07-24.
+ *
+ * The width half is C09 §5's and is fixed there. It is recorded here because
+ * the two rules meet on one set and neither one's tests could see the other's
+ * failure: a scan about substitution is green whatever the marks measure.
  */
 const PROSE_MARKS = new Set("—§·×≤≥→«»⚠");
 
@@ -940,6 +1157,10 @@ export const MARK_EXEMPTIONS = Object.freeze({
     "the braille blank, folded per mode by `definition.ts`; braille is chosen only where the capability allows it",
   "src/presentation/plot/linedraw.ts":
     "the box-drawing glyph tables — the vocabulary for line-style curves, gated by ambiguousWidth in `definition.ts`",
+  "src/presentation/plot/sankey.ts":
+    "`sankeyAlphabet` is the pair resolved where the capability is in hand — `▀ ▄ █ ▒` at narrow unicode and `# - =` at ASCII or wide, one function, both arms in the same expression (C12 I111). The premise to re-check: every mark in the file is read from that table, so a glyph written beside it rather than into it is what this reason does not cover",
+  "src/presentation/image/halfblock.ts":
+    "`HALF_BLOCK` is `linedraw.ts`'s premise one module over — a rendering primitive rather than framework text, and gated by ambiguousWidth in `halfBlockEligible` in the same file rather than one away. The premise to re-check: it is the *only* mark here, so a second one is a second decision and this reason would not cover it",
   "src/shell/config.ts":
     "`PROMPT_SUBSTITUTION` is the pair, and `frame.ts` asserts both forms are `PROMPT_GUTTER.first` cells (C22 I52)",
   "src/shell/paint.ts":
@@ -1038,6 +1259,128 @@ export function checkMarks(files, readFile = (f) => readFileSync(f, "utf8"), exe
 }
 
 /**
+ * SS57 — a glyph with an emoji presentation form (C09 I45, F823, F832, F854).
+ *
+ * **The class `cells()` cannot see.** A code point can be `East_Asian_Width=
+ * Neutral` — one cell by every table — and still be a base of an emoji
+ * variation sequence, so a font that prefers the emoji form draws it two cells
+ * wide. `⏺` U+23FA shipped as the head mark that way, measured before its row
+ * was written; the measurement answered the wrong question.
+ *
+ * **The rule refused the characters, and refusing them was the wrong remedy**
+ * (F854). Unicode has an answer to *this glyph, in text style*: U+FE0E, the
+ * text presentation selector. `cells()` already counts it zero — measured, not
+ * assumed — so `⏺\ufe0e` is one cell by every table and one cell on a terminal
+ * that honours the selector. Refusing the base instead cost the vocabulary its
+ * best marks: eleven characters moved under F832 and F833, including the head
+ * mark, whose replacement `⬤` U+2B24 is a circle of the right size and nothing
+ * else. U+23FA sits in Miscellaneous Technical beside ⏵ PLAY and ⏸ PAUSE, and a
+ * call in progress is a recording.
+ *
+ * So the rule inverts: **a base must carry the selector**, and a bare one is the
+ * violation. The hazard it named is unchanged and the remedy is now the one that
+ * keeps the character. **The residual risk, stated**: a terminal that ignores
+ * U+FE0E draws the emoji form anyway and the head is one cell wide of C09 I5.
+ * Nothing on this side can measure that, which is why the ASCII rung exists.
+ *
+ * **One source of truth, read lexically.** The set lives in `text.ts` as
+ * `EMOJI_VARIATION_BASES`, derived from the Unicode file with its version named;
+ * this tool cannot import TypeScript, so it parses that array's hex literals out
+ * of the source it is handed. Two copies of the ranges would be the birthday-
+ * clause problem; a parse of the one copy is not, and the meta-test asserts the
+ * parsed set agrees with the module's `hasEmojiForm` on the characters the rule
+ * exists for.
+ *
+ * **Scope is `src/` string literals, comments blanked, non-ASCII only.** The
+ * file also lists `#`, `*` and the digits as keycap bases, and those are the
+ * alphabet the tables degrade to (F832). Its first run found `⏺`, `info`'s `ℹ`
+ * U+2139, and nine more the walk had not named — `↖ ↗ ↘ ↙` in the `arrow`
+ * spinner, `▪ ▫ ◼ ◻` in two bar styles, `⚠` in the fixtures report (F833). All
+ * eleven moved, and under the inverted rule each is spelled with `\ufe0e`
+ * instead. The scope has no allow-list and needs none: the remedy is available
+ * to every character the rule names.
+ *
+ * **Escapes are decoded before the literal is read.** `field.ts` spells the
+ * quiver's ring as `"\u2192\u2197…"` because SS47 forbids a bare mark in a
+ * `src/` literal, and a scan that read the source bytes saw eight ASCII escape
+ * sequences and no arrows — four of which are emoji bases. A matcher that sees
+ * one encoding reports absence when the value changes form (F833).
+ *
+ * **Stated blind spot**: a mark that reaches a frame as text — a far side's
+ * string, a producer's label — is outside every glyph rule, this one included;
+ * and a mark built by `String.fromCodePoint` or held in a variable passes, as
+ * it does SS47.
+ */
+export function parseEmojiBases(textSource) {
+  const start = textSource.indexOf("const EMOJI_VARIATION_BASES: readonly number[] = [");
+  if (start < 0) return [];
+  const end = textSource.indexOf("\n];", start);
+  const body = textSource.slice(start, end);
+  return [...body.matchAll(/0x([0-9a-f]+)/gu)].map((m) => Number.parseInt(m[1], 16));
+}
+
+/** U+FE0E — *draw the preceding character as text, not as an emoji*. */
+const TEXT_PRESENTATION = "\ufe0e";
+
+/** `\uXXXX` and `\u{X…}` in a literal's body, as the characters they spell. */
+function decodeEscapes(body) {
+  return body.replaceAll(/\\u\{([0-9a-fA-F]+)\}|\\u([0-9a-fA-F]{4})/gu, (_, braced, plain) =>
+    String.fromCodePoint(Number.parseInt(braced ?? plain, 16)),
+  );
+}
+
+function inEmojiRanges(cp, ranges) {
+  for (let i = 0; i + 1 < ranges.length; i += 2) {
+    if (cp >= ranges[i] && cp <= ranges[i + 1]) return true;
+  }
+  return false;
+}
+
+export function checkEmojiBases(
+  files,
+  readFile = (f) => readFileSync(f, "utf8"),
+  ranges = parseEmojiBases(readFileSync("src/presentation/text.ts", "utf8")),
+) {
+  const violations = [];
+  if (ranges.length === 0) {
+    violations.push({
+      rule: "SS57", file: "src/presentation/text.ts", line: 1,
+      message: "`EMOJI_VARIATION_BASES` parsed to nothing — an empty table passes every glyph, which is the vacuity the rule exists to refuse (C09 I45)",
+      spec: "C09 I45",
+    });
+    return violations;
+  }
+  for (const file of files) {
+    const f = file.replaceAll("\\", "/");
+    if (!f.startsWith("src/")) continue;
+    const code = codeOnly(readFile(file));
+    for (const m of code.matchAll(LITERALS)) {
+      const body = decodeEscapes(m[0].slice(1, -1));
+      for (const c of body) {
+        const cp = c.codePointAt(0) ?? 0;
+        if (cp < 0x80 || !inEmojiRanges(cp, ranges)) continue;
+        // **The character after it, in code points, not units.** A base spelled
+        // as a surrogate pair is two units and one character, and an index into
+        // units would read half of it.
+        const at = [...body].indexOf(c);
+        if ([...body][at + 1] === TEXT_PRESENTATION) continue;
+        violations.push({
+          rule: "SS57",
+          file: f,
+          line: code.slice(0, m.index).split("\n").length,
+          message:
+            `\`${c}\` U+${cp.toString(16).toUpperCase().padStart(4, "0")} has an emoji presentation form and is written bare: ` +
+            `a font that prefers that form draws two cells where every width table says one. Follow it with ` +
+            `\\ufe0e, the text presentation selector, which \`cells()\` counts as zero (C09 I45)`,
+          spec: "C09 I45 · A03 SS57",
+        });
+      }
+    }
+  }
+  return violations;
+}
+
+/**
  * `readFile` is injected for the same reason the module graph injects it: a rule
  * is only known to work when it has been shown to fire, and showing that means
  * a fabricated violation at a path that does not exist on disk. A03 commitment
@@ -1046,6 +1389,115 @@ export function checkMarks(files, readFile = (f) => readFileSync(f, "utf8"), exe
 /** A rule's scopes, as a list. A bare string is the one-scope case. */
 function scopesOf(scan) {
   return Array.isArray(scan.scope) ? scan.scope : [scan.scope];
+}
+
+/**
+ * Whether one source line is a violation of one scan — **the** definition, used
+ * by `checkSourceScans` and by SS53 alike so the two cannot disagree about what
+ * a match is.
+ *
+ * Comments are prose about the rule, not violations of it. A line comment was
+ * already skipped; a block comment's continuation was not, so documenting
+ * `frames[tick % frames.length]` in a doc comment fired SS23 — the rule
+ * reporting a sentence that explains it.
+ *
+ * Only the comment *forms* are skipped, never a line with code on it:
+ * `const w = s.length; // why` still fires, which is the case that matters.
+ * **And the trailing comment is kept on the line deliberately**: SS23 and SS50
+ * read their `// cells-ok` and `// narrow-ok` markers through a negative
+ * lookahead, so blanking comments first (as `codeOnly` does for SS47) would
+ * turn every marked line into a violation. Measured while SS53 was built: the
+ * blanked form reported three `theme/` files matching SS23 where this reports
+ * two, and the third was a marked line.
+ */
+function lineFires(scan, line) {
+  const start = line.trimStart();
+  if (start.startsWith("//") || start.startsWith("*") || start.startsWith("/*")) return false;
+  return scan.pattern.test(line);
+}
+
+/**
+ * SS53 — every allow-list entry is exercised by the file it names.
+ *
+ * An `allow` entry says *this file may match the pattern*. A file that never
+ * matches has never exercised the permission, so the exemption cannot be told
+ * from a dead one — and it outlives its reason unread, which is the failure
+ * every equality-compared list in this directory exists to prevent
+ * (`UNCONSUMED_MEMBERS`, `MARK_EXEMPTIONS`, `ACKNOWLEDGED_BACKLOG`). The allow
+ * lists were the last exemption lists with no such arm.
+ *
+ * **Five dead entries on the first run, across four rules.** SS10 allowed
+ * `capabilities.ts` for `process.env`, which the file names only in a comment
+ * explaining that it does *not* read it — a match in prose is exactly what
+ * `checkSourceScans` skips, so the permission had never been used. SS19's
+ * `four-bit.ts`, SS21's `theme/` (ten files) and SS22's `types.ts` matched
+ * nothing at all, in code or prose; SS46's `shell/types.ts` matched in a
+ * comment. Each `why` still read as current.
+ *
+ * **The measurement is the scan's own**: a file exercises its allowance iff
+ * `checkSourceScans` would have reported it without the entry, so this shares
+ * `lineFires` rather than re-deciding what a match is. That is why the
+ * comment-only cases count as dead here — the scan would not have fired on
+ * them either.
+ *
+ * **Stated blind spot: a directory allow is one entry, and one live file
+ * carries it.** SS20 allows `theme/` and one of its ten files matches; SS23
+ * allows the same directory and two do. Nine files in each hold a permission
+ * they do not use, and this passes both, because the entry is the directory
+ * and the directory is exercised. `allowListCoverage` returns the per-file
+ * count so the residue is visible; gating on it would demand a file-level
+ * allow-list for every directory, which trades one unread list for ten.
+ */
+export function allowListCoverage(
+  files,
+  readFile = (f) => readFileSync(f, "utf8"),
+  scans = SCANS,
+) {
+  const rows = [];
+  const cache = new Map();
+  const read = (f) => {
+    const hit = cache.get(f);
+    if (hit !== undefined) return hit;
+    const src = readFile(f);
+    cache.set(f, src);
+    return src;
+  };
+  for (const scan of scans) {
+    const scopes = scopesOf(scan);
+    for (const allow of scan.allow) {
+      const under = files
+        .map((f) => f.replaceAll("\\", "/"))
+        .filter((f) => scopes.some((s) => f.startsWith(s)) && (f === allow || f.startsWith(allow)));
+      const matching = under.filter((f) => read(f).split("\n").some((line) => lineFires(scan, line)));
+      rows.push({ rule: scan.id, allow, spec: scan.spec, files: under.length, matching: matching.length });
+    }
+  }
+  return rows;
+}
+
+export function checkAllowLists(
+  files,
+  readFile = (f) => readFileSync(f, "utf8"),
+  scans = SCANS,
+) {
+  const violations = [];
+  for (const row of allowListCoverage(files, readFile, scans)) {
+    if (row.matching > 0) continue;
+    violations.push({
+      rule: "SS53",
+      file: "tools/enforce/source-scans.mjs",
+      message:
+        row.files === 0
+          ? `${row.rule} allows \`${row.allow}\`, and no file in its scope is under that path — ` +
+            `the entry names nothing the scan walks. Remove it, or fix the path`
+          : `${row.rule} allows \`${row.allow}\`, and ${String(row.matching)} of ${String(row.files)} ` +
+            `file(s) under it match the rule's pattern outside a comment — the exemption has never ` +
+            `been exercised and cannot be told from a dead one. Remove the entry, or the reason ` +
+            `stops being one anybody checks`,
+      spec: `A03 §4 SS53 · ${row.spec}`,
+    });
+  }
+  return violations;
 }
 
 export function checkSourceScans(files, readFile = (f) => readFileSync(f, "utf8")) {
@@ -1082,17 +1534,7 @@ export function checkSourceScans(files, readFile = (f) => readFileSync(f, "utf8"
       if (scan.allow.some((a) => f === a || f.startsWith(a))) continue;
       const src = read(file);
       src.split("\n").forEach((line, i) => {
-        // Comments are prose about the rule, not violations of it. A line
-        // comment was already skipped; a block comment's continuation was not,
-        // so documenting `frames[tick % frames.length]` in a doc comment fired
-        // SS23 — the rule reporting a sentence that explains it.
-        //
-        // Only the comment *forms* are skipped, never a line with code on it:
-        // `const w = s.length; // why` still fires, which is the case that
-        // matters.
-        const start = line.trimStart();
-        if (start.startsWith("//") || start.startsWith("*") || start.startsWith("/*")) return;
-        if (scan.pattern.test(line)) {
+        if (lineFires(scan, line)) {
           violations.push({
             rule: scan.id, file: `${file}:${i + 1}`,
             message: `${scan.why} — found: ${line.trim().slice(0, 70)}`,

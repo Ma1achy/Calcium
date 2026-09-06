@@ -11,28 +11,46 @@ import { ASCII_CAPS, FULL_CAPS, MONO_CAPS, MONO_UNICODE_CAPS, measurable } from 
 import { HIERARCHY_ROLE, block, type Plot, type QuartileSummary } from "../../src/data/viewmodel/index.js";
 import { bubbleRows, scatterRows, stepRows } from "../../src/presentation/plot/scatter.js";
 import { boxplotBand, boxplotColumn, bulletRow, forestRow, lagRow, timelineRow } from "../../src/presentation/plot/glyph-row.js";
+import { brailleOutline, violinColumn, violinRows } from "../../src/presentation/plot/kde.js";
 import { glyphs } from "../../src/presentation/blocks/glyphs.js";
-import { barRow, binValues } from "../../src/presentation/plot/categorical.js";
+import { barRow } from "../../src/presentation/plot/categorical.js";
+import { binValues } from "../../src/presentation/plot/derive.js";
 import { extentFor, extentRun, ladderFor, pairFor } from "../../src/presentation/plot/ramp.js";
 import { legendPlacement } from "../../src/presentation/plot/furniture.js";
 import { plotHeight } from "../../src/presentation/plot/height.js";
 import { drawnWidth } from "../../src/presentation/plot/definition.js";
 import { cells } from "../../src/presentation/text.js";
-import { kde, rainColumns, rainRows, ridgelineArea, scaledBandwidth } from "../../src/presentation/plot/kde.js";
+import { rainColumns, rainRows, ridgelineArea } from "../../src/presentation/plot/kde.js";
+import { kde, scaledBandwidth } from "../../src/presentation/plot/derive.js";
 import { jitterOf, stripColumn, stripRow } from "../../src/presentation/plot/strip.js";
 import { aggregate, candleColumn, candleLeft, candleRows, candleWidth } from "../../src/presentation/plot/candles.js";
 import { seriesRange, FACING_DEFAULT } from "../../src/presentation/plot/scale.js";
+import { proportionDecisions, sharesOf } from "../../src/presentation/plot/figure.js";
+/**
+ * The two figure members `circle.ts` used to compute for itself (§3ak.26).
+ *
+ * A test passing its own ceiling or its own shares would be the
+ * reimplemented-rule class one layer up — so both come off the same emitter
+ * `definition.ts` reads.
+ */
+const ceilingOf = (series: readonly { values: readonly (number | null)[] }[], categories: readonly string[]): number =>
+  proportionDecisions(block({
+    kind: "plot", id: "ceil", form: "radar", height: 10,
+    categories: [...categories], series: series.map((s) => ({ values: [...s.values] })),
+  })).value?.range.max ?? 1;
+
 import { formatReadout, readoutSet, xTickRow } from "../../src/presentation/plot/axes.js";
 import { waffleCells } from "../../src/presentation/plot/waffle.js";
 import { squareColumns } from "../../src/presentation/plot/aspect.js";
 import { fillHeight } from "../../src/presentation/plot/height.js";
-import { horizonBandT, horizonGlyph, horizonGrid, horizonSpans } from "../../src/presentation/plot/horizon.js";
+import { horizonGlyph, horizonGrid, horizonSpans } from "../../src/presentation/plot/horizon.js";
+import { horizonBandT } from "../../src/presentation/plot/figure.js";
 import { COLORMAPS } from "../../src/presentation/theme/colormap.js";
 import { validateBlock, HONOURS_AXIS_CROSS, ORIGIN_DEFAULT, type PlotForm } from "../../src/data/viewmodel/index.js";
 import { b } from "../../src/shell/builders/index.js";
 import { pieRender, radarRender } from "../../src/presentation/plot/circle.js";
 import { facetWidths, smallMultiplesRows } from "../../src/presentation/plot/facet.js";
-import { bandRows, stackBands } from "../../src/presentation/plot/stack.js";
+import { bandRows, stackBands, waterfallBars } from "../../src/presentation/plot/stack.js";
 import { strips, tiles } from "../../src/presentation/plot/hierarchy.js";
 import { categoryMarks, refOf as paletteRef } from "../../src/presentation/plot/marks.js";
 import { slot } from "../../src/presentation/blocks/paint.js";
@@ -981,6 +999,39 @@ describe("GROUP 6d: one fold, two origins", () => {
       .not.toBe(kitFull.renderToLines(mk("streamgraph"), 40).join("\n"));
   });
 
+  it("T1.102 (C12 I73): a null total holds the running sum, and one walk is what makes the bounds agree", () => {
+    // **The row F329 did not have** (§3ak.34). `waterfall`'s fold existed three
+    // times — two walks in `definition.ts` and a copy in `waterfallFigure` — and
+    // the bounds walk read `values[i] ?? 0`, which lets a total with no reading
+    // reset the running sum to zero, while the drawing walk guarded the advance
+    // and let it hold. The copy followed the walk that does not draw.
+    //
+    // **No fixture has a null**, so the terminal baseline, the SVG baseline, the
+    // pair sheet and the matrix are all green either way. The state has to be
+    // constructed, which is the whole of why this row exists.
+    const { bars, min, max } = waterfallBars([50, null, 30], [false, true, false]);
+    expect(bars[1]!.drawn, "a null is no reading, so nothing is drawn").toBe(false);
+    // The third bar starts where the first ended: the null total moved nothing.
+    expect(bars[2], "the running total carried past the null").toEqual({ from: 50, to: 80, drawn: true });
+    // **And the bounds cover the bars, which three walks could not promise.**
+    // Under the bounds walk's convention this was `0 … 50` with a bar ending at
+    // 80 — an end outside its own axis, drawn as one clamped cell at the row's
+    // right edge.
+    expect({ min, max }, "the axis covers every bar").toEqual({ min: 0, max: 80 });
+    for (const bar of bars.filter((b) => b.drawn)) {
+      expect(Math.min(bar.from, bar.to), bar.from + " is inside the axis").toBeGreaterThanOrEqual(min);
+      expect(Math.max(bar.from, bar.to), bar.to + " is inside the axis").toBeLessThanOrEqual(max);
+    }
+  });
+
+  it("T1.103: a total restarts from zero rather than adding, so the sum is not drawn twice", () => {
+    const { bars, max } = waterfallBars([100, -40, -25, -10, 25], [false, false, false, false, true]);
+    expect(bars.map((b) => [b.from, b.to]), "four steps and a total").toEqual([
+      [0, 100], [100, 60], [60, 35], [35, 25], [0, 25],
+    ]);
+    expect(max, "the range is the running total's, not the steps'").toBe(100);
+  });
+
   it("T1.48 (C12 I25): at one bit the bands differ by mark", () => {
     const b = block({ kind: "plot", id: "sa", form: "stackedarea", height: 7, axes: true, series: S } as Plot);
     const rows = kit(MONO_UNICODE_CAPS).renderToLines(b, 40)
@@ -1813,7 +1864,7 @@ describe("GROUP 7: pie merges sub-threshold slices", () => {
       { label: "Tiny2", value: 0.3 },
       { label: "Tiny3", value: 0.2 },
     ];
-    const { layers } = pieRender(segs, 10, 5, FULL_CAPS);
+    const { layers } = pieRender(sharesOf(segs), segs.length, 10, 5, FULL_CAPS);
     // Four segments in, two layers out — and the survivor of the merge carries
     // `segments.length` as its index, which is what makes it "other" rather than
     // the last tiny slice wearing the others' colour.
@@ -1857,7 +1908,7 @@ describe("GROUP 7a: the circle forms are readable without colour (C12 I25)", () 
       return [...tally].sort((a, b) => b[1] - a[1])[0]?.[0] ?? " ";
     };
     const fillsAt = (caps: typeof MONO_UNICODE_CAPS): string[] =>
-      pieRender(segments, 80, 10, caps).layers.map((l) => fillOf(l.glyphRows));
+      pieRender(sharesOf(segments), segments.length, 80, 10, caps).layers.map((l) => fillOf(l.glyphRows));
 
     const mono = fillsAt(MONO_UNICODE_CAPS);
     expect(mono.length).toBe(4); // cells-ok — a layer count
@@ -1873,10 +1924,11 @@ describe("GROUP 7a: the circle forms are readable without colour (C12 I25)", () 
   it("a 1-bit radar strokes each series differently, and a coloured one does not", () => {
     const twins = [{ values: [80, 60, 90, 40, 70] }, { values: [80, 60, 90, 40, 70] }];
     const cats = ["Speed", "Power", "Range", "Defence", "HP"];
-    const mono = radarRender(twins, cats, 80, 10, MONO_UNICODE_CAPS).polygons;
+    const ceiling = ceilingOf(twins, cats);
+    const mono = radarRender(twins, cats, 80, 10, MONO_UNICODE_CAPS, ceiling).polygons;
     expect(mono.length).toBe(2); // cells-ok — a series count
     expect(mono[0]!.join("\n")).not.toBe(mono[1]!.join("\n"));
-    const full = radarRender(twins, cats, 80, 10, FULL_CAPS).polygons;
+    const full = radarRender(twins, cats, 80, 10, FULL_CAPS, ceiling).polygons;
     expect(full[0]!.join("\n")).toBe(full[1]!.join("\n"));
   });
 
@@ -2086,6 +2138,87 @@ describe("C12 I33 — no whisker, no stub", () => {
     const none = { min: 3, q1: 3, median: 5, q3: 7, max: 7 };
     expect(spine(none)).not.toContain(g.diamond);
     expect(spine(none)).not.toContain(g.diamondTee);
+  });
+
+  it("T1.101 (C12 I54, §3ak.25): an unstyled violin prefers braille at `wide`, and only the outline rung", () => {
+    // **Fail-on-revert.** Dropping `brailleOutline`'s width clause — leaving the
+    // repertoire half `brailleArm` already had — fails this row and moves 10
+    // baseline frames (F302). Giving the clause to `brailleArm` instead, so the
+    // filled-density rungs take it too, moves 11 more and replaces a correct
+    // filled figure with an outline.
+    //
+    // **The predicate is imported and not restated.** The first draft of this row
+    // wrote the three lines out again, which is the finding it is about: a rule
+    // with two copies, the second holding the clauses that existed the day it was
+    // written. A test that keeps its own copy cannot fail when the real one moves.
+    const at = (unicode: string, ambiguousWidth: string, plotStyle?: string): boolean =>
+      brailleOutline(plotStyle as never, { unicode, ambiguousWidth } as never);
+
+    expect(at("full", "narrow"), "unstyled, narrow: box drawing").toBe(false);
+    expect(at("full", "wide"), "unstyled, wide: braille — the clause that was missing").toBe(true);
+    expect(at("full", "wide", "line"), "an explicit line style is still a line, at every rung").toBe(false);
+    expect(at("ascii", "wide"), "no repertoire, no braille — degraded, never refused").toBe(false);
+    expect(at("full", "narrow", "braille"), "the author's request stands where it always did").toBe(true);
+
+    // **And the figure, so the row is not only about a boolean.** `styleRasteriser`
+    // states the rule this restores; `density`, `line` and `histogram` already
+    // obeyed it and this form kept half.
+    const values = Array.from({ length: 30 }, (_, i) => 20 + Math.sin(i * 0.6) * 7);
+    const drawn = (braille: boolean, caps: typeof FULL_CAPS): string =>
+      violinRows(
+        { values } as never, 40, 9, caps, undefined, "rounded", undefined, undefined, braille, false,
+      ).join("");
+    const brailleCells = (t: string): number =>
+      [...t].filter((c) => c >= "\u2800" && c <= "\u28ff").length; // cells-ok — a glyph count
+    const boxCells = (t: string): number =>
+      [...t].filter((c) => c >= "\u2500" && c <= "\u257f").length; // cells-ok — a glyph count
+
+    const wide = { ...FULL_CAPS, ambiguousWidth: "wide" as const };
+    expect(brailleCells(drawn(true, wide)) > 0, "the wide arm draws braille").toBe(true); // cells-ok — a glyph count
+    expect(boxCells(drawn(true, wide)), "and no box drawing, which is the whole point").toBe(0); // cells-ok — a glyph count
+    expect(boxCells(drawn(false, FULL_CAPS)) > 0, "the narrow arm keeps box drawing").toBe(true); // cells-ok — a glyph count
+  });
+
+  it("T1.100d (C12 I33, C04 I53): the violin's column arms say it too — three of five had the ruling", () => {
+    // **Fail-on-revert.** Restoring either column arm's `if (rm !== at(median))`
+    // — which skipped the write rather than combining the two marks — fails this
+    // row, and moves 30 baseline frames (F301).
+    //
+    // T1.100c is this row's sibling and it found the same defect in the boxplot
+    // pair. **The ruling landed in one of the five places that needed it**: the
+    // two boxplot renderers and `boxOnSpine` combined the marks, and the two
+    // *column* arms skipped — so a violin whose mean is its median rendered
+    // identically to one carrying no mean, in the vertical arm only. A rule that
+    // has to be applied N times is applied N−1 times eventually, which §3q
+    // already records for a different fix on this same family.
+    //
+    // **The frame is where it reads worst**: `violin/vertical` draws three bands
+    // and `dose-b`'s mean sits away from its median, so one band showed `◆` and
+    // the other two showed a plain median tee — *they coincide* and *there is no
+    // mean* wearing one glyph, beside a band that says otherwise.
+    const on = { min: 3, q1: 3, median: 5, q3: 7, max: 7, mean: 5 };
+    const apart = { min: 3, q1: 3, median: 5, q3: 7, max: 7, mean: 6 };
+    const none = { min: 3, q1: 3, median: 5, q3: 7, max: 7 };
+    // **Two arms, and the second is reached only through braille.** The plain
+    // path writes its spine inline; the braille path folds its dots and hands
+    // them to `boxOnSpineColumn`, which had the same skip. Covering one and
+    // letting the baseline gate cover the other would leave the reason recorded
+    // in bytes: a moved frame says *something changed*, never *and here is why*.
+    const vc = (q: Record<string, number>, braille = false): string =>
+      violinColumn(
+        { values: [3, 4, 5, 6, 7] } as never, 9, 11, FULL_CAPS, q as never,
+        "rounded", undefined, undefined, braille,
+      ).join("");
+
+    for (const braille of [false, true]) {
+      const arm = braille ? "the braille arm" : "the line arm";
+      expect(vc(on, braille), `${arm}: mean on median`).toContain(g.diamondTee);
+      expect(vc(apart, braille), `${arm}: mean apart`).toContain(g.diamond);
+      expect(vc(apart, braille), `${arm}: and not the combined mark`).not.toContain(g.diamondTee);
+      // Or the rows above pass against an arm that marks the median twice.
+      expect(vc(none, braille), `${arm}: no mean at all`).not.toContain(g.diamond);
+      expect(vc(none, braille), `${arm}: and no combined mark either`).not.toContain(g.diamondTee);
+    }
   });
 
   it("T1.100b (C12 I33): the vertical arm's lid, and the alphabet that can say it after all", () => {
@@ -3058,7 +3191,7 @@ it("OR11 (§3ac B1, B2): the crosshair's column follows the facing, curve and ca
     const refused = (Object.keys(ORIGIN_DEFAULT) as PlotForm[]).filter(
       (f) => ORIGIN_DEFAULT[f] === null,
     );
-    expect(refused.length).toBe(31); // cells-ok — a form count
+    expect(refused.length).toBe(33); // cells-ok — a form count; 31 before `plot3d`, 32 before `sankey`
     // **A form with a required member needs it here, or this row asserts about
     // a different refusal.** `tree` is the first: without a `hierarchy` the
     // constructor complains about that instead, and the row would pass on a
@@ -3307,7 +3440,7 @@ describe("C12 §3ad — axisCross, and the two conditions that are not one condi
   it("AC11 (§3ad A14): every form outside the seven refuses at both gates", () => {
     const forms = Object.keys(HONOURS_AXIS_CROSS) as PlotForm[];
     const refused = forms.filter((f) => !HONOURS_AXIS_CROSS[f]);
-    expect(refused.length, "39 of 46").toBe(39); // cells-ok — a form count
+    expect(refused.length, "41 of 48").toBe(41); // cells-ok — a form count; 40 of 47 before `sankey`
     // **A form with a required member needs it here, or this row asserts about
     // a different refusal.** `tree` is the first: without a `hierarchy` the
     // constructor complains about that instead, and the row would pass on a

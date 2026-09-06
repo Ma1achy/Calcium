@@ -35,15 +35,23 @@
  * header enumerating a subset of what its own function does is the cheapest
  * possible instance. **Read the abstract against its own section.**
  *
- * **`7m` (inverse) has no arm and no producer.** `Style.inverse` is written
- * nowhere in `src/`, so an arm here would be a mechanism with nothing to
- * exercise it — this session's most-found class, in the instrument. The
- * condition is watched rather than deferred: `assertNoUnparsedSgr` below fails
- * the build if any catalogue frame ever emits one.
+ * **`7m` (inverse) gained its arm the day a catalogue frame emitted it.** The
+ * header here used to say *no arm and no producer — `Style.inverse` is written
+ * nowhere in `src/`*, and PC11 watched the catalogue for the day that changed.
+ * Two things were wrong with the sentence by then: `shell/paint.ts`'s
+ * `selectionStyle` had been writing `inverse` for the prompt's 1-bit selection
+ * all along (a producer PC11 could not see, because the prompt is in no
+ * catalogue frame), and arc3's interaction catalogue put the transcript's
+ * selection — reverse video at 1-bit, C11 I14 — into a frame PC11 sweeps. The
+ * 1-bit PNG then showed no selection while the bytes carried one, which is the
+ * instrument dropping a code it does not handle: F227's class, on the arm F227
+ * chose not to build. `7` swaps the channels and `27` restores them; the
+ * default ink and ground are the theme's, so a swapped cell at 1-bit is the
+ * theme's foreground as a fill with the ground as ink — what a terminal does.
  *
  *     node tools/catalogue-png.mjs
  */
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import sharp from "sharp";
 import { defaultTheme, loadTheme } from "../src/presentation/theme/index.js";
@@ -109,17 +117,31 @@ export function parseLine(raw) {
   let colour = FG;
   let background = null;
   let bold = false;
+  // Reverse video (`7`/`27`): the channels swap, and the swap is undone by
+  // swapping back rather than by resetting — a `39` inside an inverse run must
+  // still land on the right channel. Held as a flag and applied at emit time.
+  let inverse = false;
   let pos = 0;
-  for (const m of raw.matchAll(ESC)) {
-    if (m.index > pos) {
-      spans.push({ text: raw.slice(pos, m.index), colour, background, bold });
+  const emit = (text) => {
+    if (inverse) {
+      spans.push({ text, colour: background ?? sheetBgHex(), background: colour, bold });
+    } else {
+      spans.push({ text, colour, background, bold });
     }
+  };
+  for (const m of raw.matchAll(ESC)) {
+    if (m.index > pos) emit(raw.slice(pos, m.index));
     pos = m.index + m[0].length;
     const params = m[1].split(";").map(Number);
     if (params[0] === 0) {
       colour = FG;
       background = null;
       bold = false;
+      inverse = false;
+    } else if (params[0] === 7) {
+      inverse = true;
+    } else if (params[0] === 27) {
+      inverse = false;
     } else if (params[0] === 39) {
       colour = FG;
     } else if (params[0] === 49) {
@@ -156,10 +178,14 @@ export function parseLine(raw) {
       bold = false;
     }
   }
-  if (pos < raw.length) {
-    spans.push({ text: raw.slice(pos), colour, background, bold });
-  }
+  if (pos < raw.length) emit(raw.slice(pos));
   return spans;
+}
+
+/** The sheet's ground as `rgb(...)`, for an inverse run over no background. */
+function sheetBgHex() {
+  const { r, g, b } = sheetBg();
+  return `rgb(${r},${g},${b})`;
 }
 
 /**
@@ -172,7 +198,7 @@ export function parseLine(raw) {
  * arm gets built then, against something that exercises it.
  */
 const KNOWN_SGR = new Set([
-  0, 1, 2, 22, 38, 39, 48, 49,
+  0, 1, 2, 7, 22, 27, 38, 39, 48, 49,
   30, 31, 32, 33, 34, 35, 36, 37, 90, 91, 92, 93, 94, 95, 96, 97,
   40, 41, 42, 43, 44, 45, 46, 47, 100, 101, 102, 103, 104, 105, 106, 107,
 ]);
@@ -330,6 +356,47 @@ export function ansiToSvg(ansi) {
         if (!textRun) return;
         [...textRun].forEach((ch, i) => {
           const x = PAD + (textStart + i) * CELL_W;
+          // **Braille is drawn as geometry and everything else as text, and
+          // that split is a measurement rather than a preference.**
+          //
+          // `fc-list ":charset=2800"` in this container returns DejaVu Sans,
+          // DejaVu Serif and their condensed faces — and **not DejaVu Sans
+          // Mono**, the family this stylesheet asks for. Box drawing, the block
+          // elements, the quadrants and the marker glyphs all resolve in the
+          // mono face; braille alone falls through to a **proportional** font,
+          // whose dots are small and widely spaced. Every braille frame this
+          // instrument has ever produced showed that fallback's design, and a
+          // reader — including the one writing this — read it as the renderer
+          // drawing a dotted line.
+          //
+          // A braille cell **is** a 2×4 coverage mask, so drawing it as eight
+          // rects is not a guess about a font: it is the character's own
+          // definition, and it is what a terminal with real braille coverage
+          // shows. The rest stays text, because a shape is the font's business
+          // and this container has a face for all of it.
+          const cp = ch.codePointAt(0) ?? 0;
+          if (cp >= 0x2800 && cp <= 0x28ff) {
+            const mask = cp - 0x2800;
+            const dw = CELL_W / 2;
+            const dh = CELL_H / 4;
+            // Dot 1,2,3 down the left column, 4,5,6 down the right, 7 and 8 the
+            // fourth row — the historic six-dot cell extended downward, which is
+            // why the low bits are not the top row.
+            const BITS = [[0x01, 0x08], [0x02, 0x10], [0x04, 0x20], [0x40, 0x80]];
+            for (let dy = 0; dy < 4; dy += 1) {
+              for (let dx = 0; dx < 2; dx += 1) {
+                if ((mask & BITS[dy][dx]) === 0) continue;
+                const rx = x + dx * dw + dw * 0.12;
+                const ry = PAD + row * CELL_H + dy * dh + dh * 0.12;
+                parts.push(
+                  `<rect x="${rx.toFixed(2)}" y="${ry.toFixed(2)}" ` +
+                  `width="${(dw * 0.76).toFixed(2)}" height="${(dh * 0.76).toFixed(2)}" ` +
+                  `fill="${span.colour}"/>`,
+                );
+              }
+            }
+            return;
+          }
           const weight = span.bold === true ? ' font-weight="bold"' : "";
           parts.push(`<text x="${x.toFixed(1)}" y="${y}" fill="${span.colour}"${weight}>${escapeXml(ch)}</text>`);
         });
@@ -350,6 +417,184 @@ export function ansiToSvg(ansi) {
 
   parts.push("</svg>");
   return parts.join("\n");
+}
+
+/**
+ * An SVG string to PNG bytes, at the catalogue's density.
+ *
+ * **One rasteriser for both arms.** The terminal arm reaches it through
+ * `ansiToSvg` and the SVG arm hands it `plotToSvg`'s output directly — two
+ * pipelines, one `sharp` call, so a background changing here cannot move one
+ * arm's images and not the other's.
+ *
+ * **The density is a parameter and the still catalogue's 144 is the default.**
+ * One frame's cost is a still's whole cost; an animation multiplies it by the
+ * frame count, and a GIF is a palletised format whose size scales with pixels
+ * rather than with content. The two callers want different answers to one
+ * question, which is what a parameter is for.
+ */
+export async function pngFromSvg(svg, density = 144) {
+  return await sharp(Buffer.from(svg), { density }).png().toBuffer();
+}
+
+/**
+ * PNG pages to an animated GIF, at a delay per frame.
+ *
+ * **Here rather than in the generator that first needed it**, and the reason is
+ * that there were about to be two. `status-proof.mjs` owned this and
+ * `animation-proof.mjs` wanted the same seven lines — including the two
+ * comments below, each naming a defect that has already shipped once. A second
+ * copy inherits the comments without the bug and then drifts, which is the
+ * shape `screenRows` carries three times and names as such.
+ *
+ * **A raw buffer carries no page metadata**, so the strip is joined and the page
+ * height declared here rather than inferred — `n-pages` is a libvips field only
+ * a decoded animated image has, and asking a raw one for it is the error this
+ * first produced.
+ *
+ * **`pageHeight` belongs to the raw *input* options, not to `.gif()`.** Given to
+ * the encoder it is accepted and ignored, and the file writes as a single tall
+ * frame — a GIF that looks like a GIF and does not move. `metadata()` is what
+ * said so, and only when read with `{ animated: true }`: a plain read reports
+ * `pages 1` for an animated file too, so the first check agreed with the defect
+ * either way.
+ *
+ * **The pages are padded to a common box rather than assumed equal.** A frame
+ * whose widest row is one cell shorter than its neighbour's rasterises one cell
+ * narrower, and a strip of unequal pages is a GIF sheared diagonally — which is
+ * the failure that looks like a rendering defect in the frames themselves.
+ *
+ * **The channel count is measured, and declaring it is what broke every GIF this
+ * repository ever produced** (F419). This read `channels: 3` against a raster
+ * that has four: `pngFromSvg` renders an SVG, SVG rendering carries alpha, and
+ * `.raw()` hands back RGBA. Reading a 4-byte pixel stream as 3-byte pixels makes
+ * every row four thirds as long as declared, so each row wraps into the next and
+ * the shear accumulates down the page — the frames came out **green, tripled
+ * horizontally and illegible**, with the colour channels rotated as a side
+ * effect.
+ *
+ * Nothing caught it. `metadata()` reported the right page count and the right
+ * delays; the fixture asserted the *frames* were distinct, which is true of
+ * corrupt frames; the still catalogue was never affected, because a PNG is
+ * written by `sharp` from the same raster without a raw round trip. **It was
+ * found by looking at a picture** — an `inferno` heatmap that came out green —
+ * and no assertion in the tree could have said so.
+ *
+ * So the alpha is composited onto the page background and then removed, and the
+ * count comes back **from the buffer** through `resolveWithObject` rather than
+ * from this file's belief about it. `flatten` is the right operation rather than
+ * `removeAlpha`: dropping the channel would leave every antialiased edge
+ * blended against nothing.
+ */
+export async function gifFrom(pages, delays, file, comment) {
+  const metas = await Promise.all(pages.map((buf) => sharp(buf).metadata()));
+  const w = Math.max(...metas.map((m) => m.width ?? 0));
+  const h = Math.max(...metas.map((m) => m.height ?? 0));
+  const raws = await Promise.all(
+    pages.map((buf) =>
+      sharp(buf)
+        .resize({ width: w, height: h, fit: "contain", position: "left top", background: BG })
+        .flatten({ background: BG })
+        .raw()
+        .toBuffer({ resolveWithObject: true }),
+    ),
+  );
+  const channels = raws[0].info.channels;
+  // **Asserted rather than trusted, because the failure is silent and pretty.**
+  // A wrong count does not throw — it produces a plausible-looking animation of
+  // the wrong picture, which is the one outcome no reader questions.
+  for (const { data, info } of raws) {
+    if (info.channels !== channels || data.length !== w * h * channels) {
+      throw new Error(
+        `page raster is ${String(data.length)} B at ${String(info.channels)} channels, ` +
+          `expected ${String(w * h * channels)} B at ${String(channels)}`,
+      );
+    }
+  }
+  await sharp(Buffer.concat(raws.map((r) => r.data)), {
+    raw: { width: w, height: h * pages.length, channels, pageHeight: h },
+  })
+    .gif({ delay: [...delays], loop: 0 })
+    .toFile(file);
+  if (comment !== undefined) writeFileSync(file, withGifComment(readFileSync(file), comment));
+  return { width: w, height: h, pages: pages.length, channels };
+}
+
+/** The end of a run of data sub-blocks starting at `i`: past the zero terminator. */
+function pastSubBlocks(bytes, i) {
+  while (i < bytes.length && bytes[i] !== 0x00) i += 1 + bytes[i];
+  return i + 1;
+}
+
+/**
+ * Every top-level block of a GIF after its header, logical screen descriptor
+ * and global colour table: `{ at, kind, end }`, with `kind` the introducer
+ * (`0x21` extension, `0x2c` image, `0x3b` trailer) and `label` for extensions.
+ */
+function* gifBlocks(bytes) {
+  if (bytes.subarray(0, 3).toString("latin1") !== "GIF") throw new Error("not a GIF");
+  const packed = bytes[10];
+  let at = 13 + ((packed & 0x80) === 0 ? 0 : 3 * (1 << ((packed & 0x07) + 1)));
+  while (at < bytes.length) {
+    const kind = bytes[at];
+    if (kind === 0x3b) {
+      yield { at, kind, end: at + 1 };
+      return;
+    }
+    if (kind === 0x21) {
+      const end = pastSubBlocks(bytes, at + 2);
+      yield { at, kind, label: bytes[at + 1], end };
+      at = end;
+    } else if (kind === 0x2c) {
+      const local = bytes[at + 9];
+      const table = (local & 0x80) === 0 ? 0 : 3 * (1 << ((local & 0x07) + 1));
+      const end = pastSubBlocks(bytes, at + 10 + table + 1);
+      yield { at, kind, end };
+      at = end;
+    } else {
+      throw new Error(`unknown GIF block 0x${kind.toString(16)} at ${String(at)}`);
+    }
+  }
+}
+
+/**
+ * The same GIF with a Comment Extension (`21 FE`, sub-blocks of at most 255
+ * bytes, a zero terminator) inserted ahead of the trailer.
+ *
+ * **What it is for: a fact about the frames, carried by the file that shows
+ * them** (F820). The pixels are the rasteriser's — fonts, hinting, the platform's
+ * antialiasing — and differ by host while the frames they draw do not. A reader
+ * who wants to know whether a committed GIF is current asks the comment, not
+ * the bytes. Every decoder skips a comment, so the picture is unchanged. It goes
+ * ahead of the trailer rather than ahead of the first image so that the bytes
+ * the encoder wrote are a prefix of the file — a reader comparing headers sees
+ * the same header.
+ */
+export function withGifComment(bytes, text) {
+  const body = Buffer.from(text, "utf8");
+  const blocks = [];
+  for (let i = 0; i < body.length; i += 255) {
+    const chunk = body.subarray(i, i + 255);
+    blocks.push(Buffer.from([chunk.length]), chunk);
+  }
+  let at = bytes.length;
+  for (const b of gifBlocks(bytes)) if (b.kind === 0x3b) at = b.at;
+  return Buffer.concat([bytes.subarray(0, at), Buffer.from([0x21, 0xfe]), ...blocks, Buffer.from([0x00]), bytes.subarray(at)]);
+}
+
+/** The first Comment Extension's text, or `null` when the file carries none. */
+export function gifComment(bytes) {
+  for (const b of gifBlocks(bytes)) {
+    if (b.kind !== 0x21 || b.label !== 0xfe) continue;
+    const parts = [];
+    let i = b.at + 2;
+    while (bytes[i] !== 0x00) {
+      parts.push(bytes.subarray(i + 1, i + 1 + bytes[i]));
+      i += 1 + bytes[i];
+    }
+    return Buffer.concat(parts).toString("utf8");
+  }
+  return null;
 }
 
 // --- main ---

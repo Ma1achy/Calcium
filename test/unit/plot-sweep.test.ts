@@ -37,13 +37,15 @@ describe("P3: height is declared", () => {
   // C12 already does.
   const FIXED_HEIGHT: Record<PlotForm, boolean> = {
     sparkline: true, waffle: true,
+    // The sample grid is `height x 2`, so the height is the caller's (C12 I84).
+    plot3d: false,
     line: false, scatter: false, step: false, ecdf: false, density: false,
     bar: false, histogram: false, lollipop: false, dotplot: false,
     funnel: false, gantt: false, waterfall: false, flame: false, icicle: false,
     boxplot: false, violin: false, ridgeline: false, forest: false, dumbbell: false,
     heatmap: false, contour: false, quiver: false, calendar: false, correlation: false, confusion: false,
     spectrogram: false, latency: false, density2d: false,
-    streamgraph: false, stackedarea: false, treemap: false, tree: false, graph: false, smallmultiples: false, pairplot: false,
+    streamgraph: false, stackedarea: false, treemap: false, tree: false, graph: false, sankey: false, smallmultiples: false, pairplot: false,
     slope: false, bubble: false, autocorrelation: false, timeline: false, bullet: false, utilisation: false,
     pie: false, radar: false, horizon: false,
   };

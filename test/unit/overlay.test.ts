@@ -6,7 +6,8 @@ import { describe, expect, it } from "vitest";
 
 import { createOverlayManager } from "../../src/viewport/overlay/index.js";
 import type { OverlayChange } from "../../src/viewport/overlay/index.js";
-import { REGION, anchored, centred, placeIn, registry, rows, view } from "../support/overlay.js";
+import { REGION, anchored, centred, peek, placeIn, registry, rows, view } from "../support/overlay.js";
+import { OverlayError } from "../../src/viewport/overlay/index.js";
 
 const manager = () => createOverlayManager({ registry });
 
@@ -17,6 +18,75 @@ describe("C15 unit — the stack", () => {
     expect(m.stack.map((l) => l.id)).toEqual(["a"]);
     expect(m.top?.id).toBe("a");
     expect(m.hasView).toBe(false);
+  });
+
+  it("T1.23 (I21): a peek on empty → one layer and top is null; two peeks, still null", () => {
+    const m = manager();
+    m.push(peek("p1", 2, { row: 5, prefer: "below" }));
+    expect(m.stack.map((l) => l.id)).toEqual(["p1"]);
+    expect(m.top, "a peek is never top").toBeNull();
+    m.push(peek("p2", 2, { row: 8, prefer: "below" }));
+    expect(m.stack.map((l) => l.id)).toEqual(["p1", "p2"]);
+    expect(m.top).toBeNull();
+    expect(m.hasView).toBe(false);
+  });
+
+  it("T1.24 (I21, I23): a peek pushed after an overlay sits beneath it; after a view, above it; between the two, between them", () => {
+    // Through `push`, in the order a real session produces: the confirm is up,
+    // then focus moves and the peek opens. I2's sort was unreachable through
+    // `push` (T2.8's reason); I23's is not, and that is why this row exists.
+    const m = manager();
+    m.push(anchored("confirm", 2, { row: 10, prefer: "above" }));
+    m.push(peek("p", 2, { row: 5, prefer: "below" }));
+    expect(m.top?.id, "the overlay keeps the keys").toBe("confirm");
+    expect(m.stack.map((l) => l.id), "and the stack is sorted on the way in").toEqual(["p", "confirm"]);
+    expect(m.layout(REGION).map((p) => p.layer.id), "placed bottom-first, peek beneath").toEqual(["p", "confirm"]);
+
+    const v = manager();
+    v.push(view("dash"));
+    v.push(peek("p", 2, { row: 5, prefer: "below" }));
+    expect(v.top?.id, "the view is still top").toBe("dash");
+    expect(v.layout(REGION).map((p) => p.layer.id)).toEqual(["dash", "p"]);
+
+    v.push(anchored("menu", 2, { row: 10, prefer: "above" }));
+    expect(v.layout(REGION).map((p) => p.layer.id), "view, peek, overlay").toEqual(["dash", "p", "menu"]);
+    expect(v.top?.id).toBe("menu");
+  });
+
+  it("T1.25 (I21, I3): pop never removes a peek; dismiss does, and emits dismiss rather than pop", () => {
+    const m = manager();
+    const changes: OverlayChange[] = [];
+    m.subscribe((c) => changes.push(c));
+    m.push(peek("p", 2, { row: 5, prefer: "below" }));
+    m.push(centred("menu", 2, { width: 20 }));
+    expect(m.pop()?.id, "the overlay goes").toBe("menu");
+    expect(m.stack.map((l) => l.id), "the peek stays").toEqual(["p"]);
+    expect(m.pop(), "nothing keyed to pop").toBeNull();
+    expect(m.stack.map((l) => l.id), "and the peek still stays").toEqual(["p"]);
+    m.dismiss("p");
+    expect(m.stack).toEqual([]);
+    expect(changes.filter((c) => c.kind === "pop").map((c) => c.id), "pop named the overlay only").toEqual(["menu"]);
+    expect(changes.at(-1)).toEqual({ kind: "dismiss", id: "p", reason: "explicit" });
+  });
+
+  it("T1.26 (I22): a centred or fill peek is refused at push, and at update the layer is left as it was", () => {
+    const m = manager();
+    expect(() =>
+      m.push({ id: "c", kind: "peek", placement: { kind: "centred" }, content: rows(1, "c"), dismissable: true, width: 20 }),
+    ).toThrow(OverlayError);
+    expect(() =>
+      m.push({ id: "f", kind: "peek", placement: { kind: "fill" }, content: rows(1, "f"), dismissable: true }),
+    ).toThrow(OverlayError);
+    expect(m.stack, "neither landed").toEqual([]);
+
+    const ok = peek("p", 1, { row: 5, prefer: "below" });
+    m.push(ok);
+    expect(() => m.update("p", { placement: { kind: "fill" } })).toThrow(OverlayError);
+    expect(m.stack[0], "the survivor is exactly the pushed layer").toEqual(ok);
+    // The control: the same update on an overlay is legal, so the refusal is the peek's.
+    const o = manager();
+    o.push(anchored("a", 1, { row: 5, prefer: "below" }));
+    expect(o.update("a", { placement: { kind: "fill" } })).toBe(true);
   });
 
   it("T1.2: push(view) on empty → hasView", () => {
@@ -219,4 +289,10 @@ describe("C15 unit — one layer's geometry", () => {
     expect(m.update("a", { placement: { kind: "centred" }, width: 30 })).toBe(true);
     expect(m.top?.placement).toEqual({ kind: "centred" });
   });
+});
+
+describe("C15 §2b — approval is a layer, owed at the spec commit", () => {
+  it.todo(
+    "T1.27 (C15 I24, §2b): approvalPrompt's options through the confirm host produce an overlay whose blocks are the invocation notice, the warn consequence when supplied and none when not, and the host's 3-column choice table with always allow as an ordinary row; activeTarget answers overlay; deny pops it and the entry reads denied — not deferred on a component: approvalPrompt lands with C4 of the call grammar",
+  );
 });

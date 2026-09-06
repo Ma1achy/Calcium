@@ -1,0 +1,13 @@
+── treemap · default · ascii · 40w
+# curve ///////// paint xxxxxx# parse %%
+#/ raster \\\\\\/xxxxxxxxxxxxx#%%%%%%%%%
+#/\\\\\\\\\\\\\\/xxxxxxxxxxxxx#%%%%%%%%%
+#/\\\\\\\\\\\\\\/xxxxxxxxxxxxx#%%%%%%%%%
+#/\\\\\\\\\\\\\\/xxxxxxxxxxxxx#%%%%%%%%%
+#/\\\\\\\\\\\\\\/xxxxxxxxxxxxx#%%%%%%%%%
+#/\\\\\\\\\\\\\\/xxxxxxxxxxxxx#%%%%%%%%%
+o measure vvvvvvvvvv wrap ~~~~o%%%%%%%%%
+ovvvvvvvvvvvvvvvvvvv~~~~~~~~~~o%%%%%%%%%
+ovvvvvvvvvvvvvvvvvvv~~~~~~~~~~o%%%%%%%%%
+ovvvvvvvvvvvvvvvvvvv~~~~~~~~~~o%%%%%%%%%
+ovvvvvvvvvvvvvvvvvvv~~~~~~~~~~o%%%%%%%%%

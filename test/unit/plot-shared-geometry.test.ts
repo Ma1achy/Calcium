@@ -17,7 +17,11 @@ import { rowOf, seriesRange, FACING_DEFAULT } from "../../src/presentation/plot/
 import { niceAxis } from "../../src/presentation/plot/axes.js";
 import { normalisedOf, pinnedRange } from "../../src/data/viewmodel/range.js";
 import type { Facing } from "../../src/presentation/plot/scale.js";
-import { plotToSvg, SVG_DEFAULT_LAYOUT } from "../../src/presentation/plot/svg.js";
+import { plotToSvg, svgFamilyOf, SVG_DEFAULT_LAYOUT } from "../../src/presentation/plot/svg.js";
+import { violinColumn, violinRows } from "../../src/presentation/plot/kde.js";
+import { gutterOf, levelCaption, positionAxisOf, valueLabelsOf } from "../../src/presentation/plot/figure.js";
+import { partSeparator } from "../../src/presentation/plot/marks.js";
+import { FULL_CAPS } from "../support/render.js";
 import { b } from "../../src/shell/builders/index.js";
 import { DARK_THEME } from "../support/render.js";
 
@@ -91,6 +95,173 @@ describe("G — the shared layer, and the rounding that stays behind", () => {
     // *units*; a guess about a neighbouring behaviour dressed as a corollary is
     // how a row comes to fail for a reason it was not written about.
     expect(niceAxis(range, 5, { yMin: 0, yMax: 100 })).toEqual(niceAxis(range, 5, { yMin: 0, yMax: 100 }));
+  });
+
+  it("G1c (§3ak.37): the violin's estimate is sampled at the terminal's width, and that is the refusal", () => {
+    // **The refusal `violin` and `ridgeline` keep, stated as a symbol so it can
+    // expire.** `SVG_FAMILY` records *their datum is `series` — samples for a
+    // kernel estimate — and this path computes no density*, which is true and is
+    // not the blocker: a density **could** be computed above both arms, exactly
+    // as `densitySeries` already is for the `density` form, at a resolution the
+    // shared layer chooses.
+    //
+    // **What blocks it is where the resolution comes from.** `violinRows` — the
+    // default orientation's arm — takes `areaWidth` and evaluates the estimate at
+    // one point per **cell**: `const w = Math.max(1, Math.floor(areaWidth))`, then
+    // a point per `i < w`. That width is the terminal's runtime columns, which
+    // C12 may not read outside `lifecycle.ts` and which the second arm has no
+    // analogue for. So a shared curve would be sampled somewhere else, and
+    // resampling it to `w` is not the same numbers — the terminal's frames move,
+    // and this pass freezes them.
+    //
+    // **F314 found three derivations computed in a renderer that never reached
+    // the seam, and the KDE is that shape**, which is why the check is written
+    // down rather than assumed. The difference is that those three were
+    // resolution-free — `ecdfSeries` is a function of `values.length`,
+    // `densitySeries` takes its 100 as an argument, `binValues` bins — and this
+    // one is not.
+    //
+    // **Asserted by arity, like `G1`**: the day `violinRows` stops taking a
+    // width, this row fails and the refusal is re-read against the tree rather
+    // than carried (commitment 64).
+    // `Function.length` counts parameters before the first default, so this is
+    // `series, areaWidth, rowsPerCategory, caps, quartiles?` — five, and the
+    // width is the second of them.
+    expect(violinRows.length, "series, areaWidth, rowsPerCategory, caps, quartiles — a width among them").toBe(5);
+    expect(violinColumn.length, "and its transpose takes a column width too").toBe(5);
+
+    // **And the estimate really does move with the width**, which is the claim
+    // the arity stands for: same data, two widths, different curves — where a
+    // shared geometry would give one curve rasterised twice.
+    const sr = { label: "s", values: [1, 1, 2, 3, 5, 5, 5, 8, 13] };
+    const at = (w: number): string => violinRows(sr, w, 5, FULL_CAPS).join("|");
+    expect(at(40), "a wider area is not the narrow one padded").not.toBe(at(20));
+
+    // **Everything above is still true and the conclusion has inverted** (F383).
+    // The row asserted `svgFamilyOf("violin") === null` on the reasoning that a
+    // width-bound estimator cannot cross — and the premise held while the
+    // inference did not. **The seam never had to reuse `violinRows`.**
+    // `densitySeries` is the other kind of derivation the paragraph above
+    // already names: fixed at 100 points, a function of the block alone, and
+    // crossing for `density` since F314. The figure carries the outline and each
+    // arm rasterises it, so the terminal keeps its width-bound estimator and its
+    // frames do not move.
+    //
+    // **This is the deferral class**: the condition was written where the
+    // refusal was, and the thing that satisfied it was written somewhere else —
+    // in the same file, in the sentence listing the resolution-free three.
+    expect(svgFamilyOf("violin"), "claimed, on a resolution-free estimate").not.toBeNull();
+    expect(svgFamilyOf("ridgeline"), "and so is the form built on the same one").not.toBeNull();
+
+    // **The figure's curve is resolution-free, which is the property the
+    // refusal was about** — asserted directly, because it is now something this
+    // arm does rather than something it declines.
+    //
+    // **The point count, not the bytes.** Same block at two output sizes: a
+    // width-bound estimate gives *more samples* at the wider one — that is what
+    // `violinRows` does five lines up and what the refusal was written about —
+    // while a fixed-resolution one gives the same curve drawn larger. So the
+    // path's point count is invariant and the pixels are not, and a regression
+    // that reaches for `areaWidth` fails here rather than in a frame.
+    const block = b.plot({ id: "v", form: "violin", height: 8, axes: true, series: [sr] });
+    const points = (width: number): number => {
+      const svg = plotToSvg(block, DARK_THEME, { ...SVG_DEFAULT_LAYOUT, width }) ?? "";
+      expect(svg.length, `violin draws at ${String(width)}px`).toBeGreaterThan(0);
+      return [...svg.matchAll(/<path d="([^"]+)"/gu)]
+        .map((m) => (m[1] ?? "").split(/[ML]/u).length)
+        .reduce((a, x) => Math.max(a, x), 0);
+    };
+    expect(points(1200), "one estimate, whatever size it is drawn at").toBe(points(400));
+    expect(plotToSvg(block, DARK_THEME, { ...SVG_DEFAULT_LAYOUT, width: 1200 }),
+      "the raster differs because the page does, not because the estimate did")
+      .not.toBe(plotToSvg(block, DARK_THEME, { ...SVG_DEFAULT_LAYOUT, width: 400 }));
+  });
+
+  it("G1d (C12 I49, §3ak.38): the key's levels are one function's, gated on the layer and on the list", () => {
+    // **The caption both keys call** (F338). It was built twice — once in the
+    // terminal's legend and once nowhere, which is how one arm named its levels
+    // and the other named its bounds. Asserted as behaviour rather than by
+    // arity, because the defects it carries are two conditions and not a width.
+    const field = [
+      { label: "r0", values: [0, 25, 50] },
+      { label: "r1", values: [50, 75, 100] },
+    ];
+    const full = { min: 0, max: 100 };
+
+    // **Gated on the layer, not on the form.** Both arms asked `form ===
+    // "contour"`, so a quiver *drawing iso-lines* named none of them.
+    expect(levelCaption({ form: "contour", series: field } as never, full, partSeparator(FULL_CAPS)),
+      "a contour names its levels").toBe(" \u00b7 20 40 60 80");
+    expect(levelCaption({ form: "quiver", series: field, layers: ["field", "contour", "quiver"] } as never,
+      full, partSeparator(FULL_CAPS)), "and so does anything that draws them").toBe(" \u00b7 20 40 60 80");
+    expect(levelCaption({ form: "quiver", series: field, layers: ["field", "quiver"] } as never, full, partSeparator(FULL_CAPS)),
+      "a form with no contour layer names nothing").toBe("");
+    // A matrix asks `niceAxis` for the same ticks and draws no line at all, so
+    // the gate is what keeps 250 terminal frames from growing levels they have
+    // no lines for — which is exactly what happened when it was dropped.
+    expect(levelCaption({ form: "heatmap", series: field } as never, full, partSeparator(FULL_CAPS)),
+      "and a matrix has the ticks without the lines").toBe("");
+
+    // **The separator is a promise about what follows.** A constant field has no
+    // interior ticks, and this drew `50          50 \u00b7` on every rung.
+    expect(levelCaption({ form: "contour", series: field } as never, { min: 50, max: 50 }, partSeparator(FULL_CAPS)),
+      "an empty list draws no mark announcing it").toBe("");
+
+    // The mark is the arm's, and it descends (C12 I72). **The caption now takes
+    // the separator rather than the capability** — `·` is Ambiguous, so the mark
+    // depends on `ambiguousWidth` as well as on `unicode` (F665), and the image
+    // arm has neither (G4). So the resolution happens at the two call sites and
+    // this row asserts both answers of the function that makes it.
+    expect(levelCaption({ form: "contour", series: field } as never, full, partSeparator({ unicode: "ascii", ambiguousWidth: "narrow" })),
+      "the ascii arm's mark").toBe(" - 20 40 60 80");
+    expect(levelCaption({ form: "contour", series: field } as never, full, partSeparator({ unicode: "full", ambiguousWidth: "wide" })),
+      "and the wide arm takes it too, because `\u00b7` is two cells there").toBe(" - 20 40 60 80");
+    expect(levelCaption({ form: "contour", series: field } as never, full, partSeparator({ unicode: "full", ambiguousWidth: "narrow" })),
+      "only the narrow unicode arm keeps the dot").toBe(" \u00b7 20 40 60 80");
+  });
+
+  it("G1e (C12 I67, §3ak.40): `axes` reaches all three resolvers it gates, and the matrix is the override", () => {
+    // **I67 names three and one could not see the field** (F347). A rule whose
+    // subject is a set is checked against the member the reader looks at first,
+    // and two of the three obeyed it — so the row asks all three together, in
+    // one expression, rather than asserting the repaired one on its own.
+    const three = (block: Parameters<typeof valueLabelsOf>[0] & Parameters<typeof positionAxisOf>[0]) =>
+      [gutterOf(block), positionAxisOf(block), valueLabelsOf(block)];
+
+    expect(three({ form: "line", axes: true }), "with axes, all three answer").toEqual([true, true, "left"]);
+    expect(three({ form: "line", axes: false }), "`axes: false` silences all three").toEqual([false, false, null]);
+    // **The default is the one the finding did not name and the corpus reaches.**
+    // `bar/stacked` and every `axes: true` variant hid it; a bare `b.plot({form:
+    // "line", series})` — the commonest call there is — drew `0 2 4 6` in the
+    // SVG against a terminal frame with no furniture at all.
+    expect(three({ form: "line" }), "and so does saying nothing").toEqual([false, false, null]);
+
+    // **An explicit `yAxis` does not override it**, because `axes` says whether
+    // there is any furniture: a side of an axis that is not drawn.
+    expect(valueLabelsOf({ form: "line", axes: false, yAxis: "right" }),
+      "a placement for labels the figure does not derive").toBeNull();
+    expect(valueLabelsOf({ form: "line", axes: true, yAxis: "right" }), "and it is honoured when there is one")
+      .toBe("right");
+    expect(valueLabelsOf({ form: "line", axes: true, yAxis: false }), "`yAxis: false` still says its own thing")
+      .toBeNull();
+
+    // **The override is the matrix family and it is C12 I67's own** — *a heatmap
+    // guts its rows whatever `axes` says*. Written for the family rather than
+    // for `heatmap` alone: `utilisation/default` is the one frame of 182 that
+    // moved when the rule was first written with no override, and it is the same
+    // form that found C04's `checkHeatmap` reaching one form of eight.
+    for (const form of ["heatmap", "utilisation", "correlation", "calendar", "spectrogram"] as const) {
+      expect(valueLabelsOf({ form }), `${form}'s row labels are its ordinate`).toBe("left");
+    }
+    // **And `gutterOf` held the same override keyed on `heatmap` alone** (F352),
+    // so `utilisation/default` — the only matrix in the corpus that does not set
+    // `axes` — drew a matrix with no row labels in the second arm. Both are
+    // asserted here because a family override written twice is one rule, and the
+    // narrow copy is invisible from the wide one.
+    for (const form of ["heatmap", "utilisation", "correlation", "calendar", "spectrogram"] as const) {
+      expect(gutterOf({ form }), `${form} is guttered whatever \`axes\` says`).toBe(true);
+    }
+    expect(gutterOf({ form: "line" }), "and a form outside the family is not").toBe(false);
   });
 
   it("G1b (§3aj hazard 3): the layout ladder is cell-bound, and that is the ruling", () => {

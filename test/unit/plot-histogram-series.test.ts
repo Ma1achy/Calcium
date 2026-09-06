@@ -1,12 +1,13 @@
 /**
- * HS1–HS7: more than one histogram on one plot (C12 I42, §3v).
+ * HS1–HS9: more than one histogram on one plot (C12 I42, §3v), and the rows
+ * a form cannot draw (C12 I8).
  *
  * **The edges are the whole of it.** Every row here is about something two
  * series share or something the second one is owed; a row about one series
  * restates the histogram that already worked.
  */
 import { describe, expect, it } from "vitest";
-import { binValues } from "../../src/presentation/plot/categorical.js";
+import { binValues } from "../../src/presentation/plot/derive.js";
 import { block } from "../../src/data/viewmodel/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { FULL_CAPS, measurable } from "../support/render.js";
@@ -152,5 +153,80 @@ describe("HS7 (C12 I42): a plain bar no longer drops its second series", () => {
     // Six rows of data, not three: every (category, series) pair has one.
     expect(rows.filter((r) => r.includes("┤")).length).toBe(6); // cells-ok — a row count
     expect(rows.join("\n")).toContain("second");
+  });
+});
+
+describe("HS8 (C12 I8): a category past the last row is named, never dropped", () => {
+  // **A bell rather than a uniform, because the strategy is what makes the bins**
+  // and Freedman–Diaconis scales its width by the IQR. A uniform 200 samples
+  // gives **six** bins — fewer than the eight rows below — so the first draft of
+  // this row asserted a state it had not constructed. Summed uniforms give 13.
+  const data = Array.from({ length: 200 }, (_v, i) => { // cells-ok — a sample count
+    let acc = 0;
+    for (let k = 1; k <= 4; k += 1) acc += ((i * (7 * k + 3)) % 29) / 29;
+    return 10 + acc * 20;
+  });
+
+  it("a histogram whose bins outnumber its rows says how many it withheld", () => {
+    // **The measured case, and it is the corpus'** (F319). Two hundred samples
+    // under Freedman–Diaconis give eleven bins; the block declares eight rows.
+    // The old arm drew the first eight and stopped, so the frame read as a
+    // clean unimodal distribution that had ended — with **39 of 200 samples**,
+    // the whole right tail, absent and unmentioned.
+    const rows = kit().renderToLines(block({
+      kind: "plot", id: "hs8", form: "histogram", height: 8, axes: true,
+      binning: "freedman-diaconis", series: [{ values: data, label: "s" }],
+    }), 80).map(plain);
+    const bins = binValues([data], "freedman-diaconis").counts[0]!.length; // cells-ok — a bin count
+    expect(bins, "the strategy chose more bins than there are rows").toBeGreaterThan(8); // cells-ok — a row count
+    const notice = rows.find((r) => r.includes("more"));
+    expect(notice, "the withheld bins are named").toBeDefined();
+    // **The count is what the reader needs and the names are the courtesy**, so
+    // the assertion is on the number rather than on the list — which truncates
+    // at narrow widths and would make this row about the ellipsis.
+    expect(notice).toContain(`+${String(bins - 7)} more`); // cells-ok — a bin count
+  });
+
+  it("the notice costs a row rather than the declared height", () => {
+    // **C12 I1 is the other half.** A notice that grew the plot would trade one
+    // silent failure for another: `measure` is what a caller reserved space by,
+    // and a form taller than its declaration scrolls whatever is beneath it.
+    const spec = {
+      kind: "plot", id: "hs8b", form: "histogram", height: 8, axes: true,
+      binning: "freedman-diaconis", series: [{ values: data, label: "s" }],
+    } as const;
+    const short = kit().renderToLines(block(spec), 80).map(plain);
+    const roomy = kit().renderToLines(block({ ...spec, id: "hs8c", height: 14 }), 80).map(plain);
+    // **Counted against the declaration rather than against a total**, because
+    // a total folds the furniture in and would pass for a frame that grew by a
+    // row and lost one somewhere else. `area` is every row inside the border.
+    const area = (rows: readonly string[]): number => rows.filter((r) => /┤|│/u.test(r)).length; // cells-ok — a row count
+    expect(area(short), "eight declared, eight drawn — the notice is one of them").toBe(8); // cells-ok — a row count
+    expect(short.some((r) => r.includes("more")), "and it is there").toBe(true);
+    expect(area(roomy), "fourteen declared, fourteen drawn").toBe(14); // cells-ok — a row count
+    expect(roomy.some((r) => r.includes("more")), "a frame with room says nothing").toBe(false);
+    // The furniture is the same either way, so the two totals differ by exactly
+    // the declared heights.
+    expect(roomy.length - short.length).toBe(6); // cells-ok — a row count
+  });
+});
+
+describe("HS9 (C12 I8): the rule is about rows, not about histograms", () => {
+  it("a plain bar with more categories than rows names the rest too", () => {
+    // **The subject is `categoricalForm`**, so a row keyed to the histogram
+    // would be the rule tested against the one form that had the defect —
+    // which is how I8 came to have two subjects honoured and a third written
+    // the way it forbids.
+    const cats = ["a", "b", "c", "d", "e", "f", "g", "h"];
+    const rows = kit().renderToLines(block({
+      kind: "plot", id: "hs9", form: "bar", height: 5, axes: true, categories: cats,
+      series: [{ values: [1, 2, 3, 4, 5, 6, 7, 8], label: "s" }],
+    }), 60).map(plain);
+    const notice = rows.find((r) => r.includes("more"));
+    expect(notice, "a bar is short in exactly the same way").toBeDefined();
+    expect(notice).toContain("+4 more");
+    expect(notice).toContain("e");
+    // Four categories drawn, one row spent on the notice, five declared.
+    expect(rows.filter((r) => r.includes("┤")).length).toBe(4); // cells-ok — a row count
   });
 });

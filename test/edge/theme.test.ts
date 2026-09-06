@@ -1,10 +1,23 @@
 // C10 tier 3 — edge cases. The overrides an app can legitimately write that have
 // no sensible reading, and the moments a switch could be observed half-done.
 import { describe, expect, it } from "vitest";
-import { defaultTheme, loadTheme, resolve, resolveTone } from "../../src/presentation/theme/index.js";
+import { defaultTheme, loadTheme, ratio, resolve, resolveTone } from "../../src/presentation/theme/index.js";
 import { caps, store, withTone } from "../support/theme.js";
 
 describe("C10 edges", () => {
+  it("T3.34 (I34, §4f.1): a theme whose `bgDeep` leans toward its tones still loads", () => {
+    // The shipped light theme *is* this case — `tone.muted` measures 2.44 there
+    // against its own 2.5 floor — and it must load, because `bgDeep` carries no
+    // text and is not checked. The row exists so a later widening of
+    // `textSurfaces` fails **here**, where the reason is written down, rather
+    // than in the token files where it would read as a bad colour.
+    const light = defaultTheme["light"];
+    expect(light, "the shipped set has a light theme").toBeDefined();
+    expect(ratio(light!.palettes["tone"]!.slots["muted"]!, light!.surfaces.bgDeep))
+      .toBeLessThan(2.5);
+    expect(loadTheme(defaultTheme, "light").ok, "and it loads regardless").toBe(true);
+  });
+
   it("T3.1: an override naming an unknown tone is ignored, not a throw", () => {
     // The same leniency C05 applies to unknown manifest fields: a theme written
     // for a newer palette should not stop a session opening.

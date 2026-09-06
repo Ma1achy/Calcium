@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
+<rect width="100%" height="100%" fill="#1a1a1a"/>
+<rect x="498.4" y="15.2" width="9.6" height="9.6" fill="#e69f00"/>
+<text x="512" y="24.8" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">alpha</text>
+<rect x="498.4" y="34.4" width="9.6" height="9.6" fill="#56b4e9"/>
+<text x="512" y="44" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">beta</text>
+<circle cx="288" cy="150.4" r="137.6" fill="none" stroke="#626262" stroke-width="1.5"/>
+<circle cx="288" cy="150.4" r="27.52" fill="none" stroke="#626262" stroke-width="1.5"/>
+<circle cx="288" cy="150.4" r="55.04" fill="none" stroke="#626262" stroke-width="1.5"/>
+<circle cx="288" cy="150.4" r="82.56" fill="none" stroke="#626262" stroke-width="1.5"/>
+<circle cx="288" cy="150.4" r="110.08" fill="none" stroke="#626262" stroke-width="1.5"/>
+<path d="M288 150.4 L288 12.8" fill="none" stroke="#626262" stroke-width="2"/>
+<path d="M288 150.4 L418.865 107.879" fill="none" stroke="#626262" stroke-width="2"/>
+<path d="M288 150.4 L368.879 261.721" fill="none" stroke="#626262" stroke-width="2"/>
+<path d="M288 150.4 L207.121 261.721" fill="none" stroke="#626262" stroke-width="2"/>
+<path d="M288 150.4 L157.135 107.879" fill="none" stroke="#626262" stroke-width="2"/>
+<path d="M288 40.32 L366.519 124.888 L360.791 250.589 L255.648 194.928 L196.394 120.635 Z" fill="none" stroke="#e69f00" stroke-width="2"/>
+<path d="M288 81.6 L399.236 114.257 L324.396 200.494 L227.341 233.891 L216.024 127.014 Z" fill="none" stroke="#56b4e9" stroke-width="2"/>
+<text x="288" y="9.2" font-size="12" font-family="monospace" fill="#626262" text-anchor="middle">Speed</text>
+<text x="418.865" y="109.669" font-size="12" font-family="monospace" fill="#626262">Power</text>
+<text x="368.879" y="272.231" font-size="12" font-family="monospace" fill="#626262">Range</text>
+<text x="207.121" y="272.231" font-size="12" font-family="monospace" fill="#626262" text-anchor="end">Defence</text>
+<text x="157.135" y="109.669" font-size="12" font-family="monospace" fill="#626262" text-anchor="end">HP</text>
+</svg>

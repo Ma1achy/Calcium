@@ -40,7 +40,7 @@
 import { HAS_CALLOUT, HAS_DETAIL_RUNGS, HAS_Y_GUTTER, HIERARCHY_ROLE, HONOURS_AXIS_CROSS, IS_FIELD_FORM, IS_MATRIX, ORIGIN_DEFAULT, STYLE_ARMS, block, cell, hierarchyFault, markdownBlocks, rebuild } from "../../data/viewmodel/index.js";
 import { samplesChildren, samplesLayout, type Sample, type SamplesOptions, samplesScale } from "./samples.js";
 import { readFileSync } from "node:fs";
-import { digestOf, overlayFault, parseAreas } from "../../data/viewmodel/index.js";
+import { digestOf, intralineLines, overlayFault, parseAreas } from "../../data/viewmodel/index.js";
 import { COLORMAPS } from "../../data/colormaps/index.js";
 import { parseStartDate } from "../../data/dates.js";
 import type {
@@ -51,26 +51,31 @@ import type {
   Code,
   ColumnDef,
   Comparison,
+  ErrorLike,
   Events,
   Glyph,
   Group,
   Share,
-  Valign,
+  Align,
   Hunk,
   KeyValue,
   Logs,
   Notice,
   Panel,
   Image,
+  Terminal as TerminalBlock,
+  TerminalLine,
   Mosaic,
   Scroll,
   Patch,
   Pills,
   Plot,
   Progress,
+  Ramp,
   Raw,
   Rule,
   Series,
+  Status,
   Steps,
   Table,
   TableRow,
@@ -81,6 +86,9 @@ import { blockId } from "../documents.js";
 import { defaulted, seq } from "./seq.js";
 import type {
   BlockOpts,
+  RuleOpts,
+  ValuedTextOpts,
+  NoticeOpts,
   CellInput,
   ChipInput,
   ComparisonRow,
@@ -163,15 +171,22 @@ function toCells(input: Record<string, CellInput>): Record<string, Cell> {
 
 // --- the nineteen ---------------------------------------------------------
 
-function rule(label: string, meta?: string, opts?: BlockOpts): Rule {
+function rule(label: string, meta?: string, opts?: RuleOpts): Rule {
   return finish<Rule>(
-    { kind: "rule", id: idOf(opts, "rule"), label, ...(meta === undefined ? {} : { meta }) } as Rule,
+    {
+      kind: "rule",
+      id: idOf(opts, "rule"),
+      label,
+      ...(opts?.level === undefined ? {} : { level: opts.level }),
+      ...(opts?.spans === undefined ? {} : { spans: opts.spans }),
+      ...(meta === undefined ? {} : { meta }),
+    } as Rule,
     opts,
     true,
   );
 }
 
-function noticeOf(tone: Tone, text: string, glyph?: Glyph, opts?: BlockOpts): Notice {
+function noticeOf(tone: Tone, text: string, glyph?: Glyph, opts?: NoticeOpts): Notice {
   const g = glyphFor(tone, glyph);
   return finish<Notice>(
     {
@@ -180,6 +195,11 @@ function noticeOf(tone: Tone, text: string, glyph?: Glyph, opts?: BlockOpts): No
       tone,
       text,
       ...(g === undefined ? {} : { glyph: g }),
+      ...(opts?.spans === undefined ? {} : { spans: opts.spans }),
+      ...(opts?.colormap === undefined ? {} : { colormap: opts.colormap }),
+      // The one button (C04 §3, arc 6 §5) — written only when supplied, so a
+      // notice without one is byte-identical to what this built before.
+      ...(opts?.action === undefined ? {} : { action: opts.action }),
     } as Notice,
     opts,
     false,
@@ -187,10 +207,10 @@ function noticeOf(tone: Tone, text: string, glyph?: Glyph, opts?: BlockOpts): No
 }
 
 const notice = Object.assign(noticeOf, {
-  ok: (text: string, opts?: BlockOpts): Notice => noticeOf("ok", text, undefined, opts),
-  warn: (text: string, opts?: BlockOpts): Notice => noticeOf("warn", text, undefined, opts),
-  error: (text: string, opts?: BlockOpts): Notice => noticeOf("error", text, undefined, opts),
-  info: (text: string, opts?: BlockOpts): Notice => noticeOf("info", text, undefined, opts),
+  ok: (text: string, opts?: NoticeOpts): Notice => noticeOf("ok", text, undefined, opts),
+  warn: (text: string, opts?: NoticeOpts): Notice => noticeOf("warn", text, undefined, opts),
+  error: (text: string, opts?: NoticeOpts): Notice => noticeOf("error", text, undefined, opts),
+  info: (text: string, opts?: NoticeOpts): Notice => noticeOf("info", text, undefined, opts),
 });
 
 /**
@@ -414,6 +434,26 @@ function plot(
     yAxis?: Plot["yAxis"];
     yCallout?: Plot["yCallout"];
     vectors?: Plot["vectors"];
+    /** A 3D scatter's cloud, and the channel colour spends (C04 I76, C12 I87). */
+    points3?: Plot["points3"];
+    lines3?: Plot["lines3"];
+    surfaces3?: Plot["surfaces3"];
+    light3?: Plot["light3"];
+    colourBy?: Plot["colourBy"];
+    /** The 3D reference frame — four members and two decisions (C04 I77). */
+    axes3?: Plot["axes3"];
+    origin3?: Plot["origin3"];
+    box3?: Plot["box3"];
+    axisStyle3?: Plot["axisStyle3"];
+    /**
+     * Where the view starts (C04 I75).
+     *
+     * **Held back until a form could use it**, and the reason was sharper than
+     * *not yet built*: a plot declaring a camera becomes focusable (C12 I85), so
+     * exposing it earlier handed callers a way to add a focus stop to a 2D plot
+     * and no way to draw anything. `plot3d` is what released it.
+     */
+    camera?: Plot["camera"];
     levels?: Plot["levels"];
     layers?: Plot["layers"];
     fieldDim?: Plot["fieldDim"];
@@ -472,14 +512,55 @@ function plot(
     axisCross?: Plot["axisCross"];
     calendarUnit?: Plot["calendarUnit"];
     startDate?: Plot["startDate"];
+    /**
+     * **The eight F335 measured, and the argument is per member** (C24 I30, §4b).
+     *
+     * Four are a form's **only** datum, so four forms could not be built at all
+     * and three were reduced to one variant: `offsets` is a start per row and
+     * without it a `gantt` is a bar chart; `totals` says which bars are totals
+     * and a `waterfall`'s running balance is not otherwise drawable; `facets`
+     * is what `pairplot` and `smallmultiples` delegate to, and a delegating
+     * form with no children has nothing to delegate; `layout` is `bar`'s and
+     * `histogram`'s only multi-series reading, so both built `overlap` and
+     * nothing else.
+     *
+     * Two are defaulted **choices** a consumer must still be able to make —
+     * `binning`, which the corpus distinguishes `scott` from `sturges` on, and
+     * `emptyMessage`, whose absence means every app hand-composes an empty
+     * state, which is §8d's defect one kind along.
+     *
+     * And two became readable in **both** arms this arc, so omitting them now
+     * would be omitting something that works: `xScale` and `yScale`.
+     */
+    layout?: Plot["layout"];
+    binning?: Plot["binning"];
+    offsets?: Plot["offsets"];
+    totals?: Plot["totals"];
+    facets?: Plot["facets"];
+    emptyMessage?: Plot["emptyMessage"];
+    xScale?: Plot["xScale"];
+    yScale?: Plot["yScale"];
   },
 ): Plot {
-  const { quartiles, categories, segments, bands, graph, graphLayout, series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, vectors, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, xTitle, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, treeLayout, matrixAnchor, legend, plotFrame, width, aspect, align, origin, axisCross, calendarUnit, startDate } =
+  const { quartiles, categories, segments, bands, graph, graphLayout, series, height, axes, yMin, yMax, yFormat, yAxis, yCallout, vectors, points3, lines3, surfaces3, light3, colourBy, camera, axes3, origin3, box3, axisStyle3, levels, layers, fieldDim, glyphInk, xMin, xMax, xFormat, annotations, colormap, form, xLabels, xTitle, plotStyle, plotFill, plotGrid, plotBox, ohlc, plotDetail, plotCorners, orientation, bandwidth, hierarchy, treeLayout, matrixAnchor, legend, plotFrame, width, aspect, align, origin, axisCross, calendarUnit, startDate, layout, binning, offsets, totals, facets, emptyMessage, xScale, yScale } =
     spec;
   // **The same refusal the validator makes** (C04 I50a). Two expressions of one
   // rule, which is this file's shape throughout: the constructor is where an
   // author finds out and the validator is where an untrusted document does.
-  if (series.length > 8) {
+  //
+  // **And for a long time they were not the same rule** (F398). The validator
+  // carries an exemption this copy never got — *C04 I50a is a rule about colour, so
+  // it binds where colour is drawn; a heatmap carries magnitude in the ramp and
+  // never reads the categorical palette* — so an eleven-row heatmap validated
+  // and rendered correctly while `b.plot` refused to construct it. Two copies of
+  // one rule under a comment asserting they are one.
+  //
+  // **`IS_MATRIX`, not `form !== "heatmap"`**, which is the exemption's own
+  // rationale applied where it reaches: `correlation`, `confusion`,
+  // `spectrogram`, `latency`, `density2d`, `calendar`, `utilisation`, `contour`
+  // and `quiver` all spend their rows on a ramp too, and the validator was
+  // refusing every one of them past eight for a palette they never read.
+  if (!IS_MATRIX[form ?? "line"] && series.length > 8) {
     throw new TypeError(
       `b.plot: ${String(series.length)} series and the categorical palette distinguishes 8 ` +
         `(C04 I50a) — a ninth would repeat a colour, which reads as two series being one`,
@@ -569,9 +650,11 @@ function plot(
     // the one that matters: a node set accepted on a `line` is data the
     // renderer never opens, and accepted-and-ignored is the worst of three
     // answers (F207).
-    if (graph !== undefined && drawn !== "graph") {
+    // **`sankey` takes `graph` on `graph`'s own rule** (C04 I92, C12 §3ap): required
+    // there, refused everywhere else, and `graphLayout` stays `graph`'s alone.
+    if (graph !== undefined && drawn !== "graph" && drawn !== "sankey") {
       throw new Error(
-        `b.plot: "graph" is set on form "${drawn}" (C04 I69) — only a graph reads it`,
+        `b.plot: "graph" is set on form "${drawn}" (C04 I69) — only a graph or a sankey reads it`,
       );
     }
     if (graphLayout !== undefined && drawn !== "graph") {
@@ -738,6 +821,85 @@ function plot(
           `draws, and "series" carries one number per cell`,
       );
     }
+    // **`vectors`' four refusals, one dimension along** (C04 I76). The
+    // *member* rules are here and in the validator; the walk over every point
+    // for a finite `value` is the validator's alone, exactly as `vectors`'
+    // rectangularity is — a statement about members belongs at both gates and a
+    // walk over the data belongs at the one that reports rather than throws.
+    if (points3 !== undefined && drawn !== "plot3d") {
+      throw new TypeError(
+        `b.plot: "points3" on form "${drawn}" (C04 I76) — only a plot3d draws a point ` +
+          `cloud, and three coordinates per sample mean nothing to any other form`,
+      );
+    }
+    if (lines3 !== undefined && drawn !== "plot3d") {
+      throw new Error(
+        `b.plot: "lines3" on form "${drawn}" (C04 I78) — only a plot3d draws a path ` +
+          `through three-dimensional space, and there is no projection to draw it with`,
+      );
+    }
+    if (surfaces3 !== undefined && drawn !== "plot3d") {
+      throw new Error(
+        `b.plot: "surfaces3" on form "${drawn}" (C04 I79) — only a plot3d shades a ` +
+          `surface, and there is no projection, no depth buffer and no light to shade it with`,
+      );
+    }
+    if (light3 !== undefined && drawn !== "plot3d") {
+      throw new Error(
+        `b.plot: "light3" on form "${drawn}" (C04 I79) — it says where the light is, and ` +
+          `only a shaded surface reads one`,
+      );
+    }
+    // **`closed` is the mesh arm's** (C04 I80). The same refusal `validate`
+    // makes, at the other gate: it enables backface culling, culling needs an
+    // inside, and a grid has none — and the renderer cannot stand in for the
+    // check, because an open surface's signed volume is not zero (F463).
+    // `wireframe` is deliberately not beside it; it is about the edges the
+    // input already has and a grid has the most structured ones.
+    for (const [i, sf] of (surfaces3 ?? []).entries()) { // cells-ok — a surface index
+      if (sf.heights !== undefined && sf.closed !== undefined) {
+        throw new TypeError(
+          `b.plot: surfaces3[${String(i)}] has "closed" on a height field (C04 I80) — it ` +
+            `enables backface culling, which needs a surface with an inside; a grid has none`,
+        );
+      }
+    }
+    // **No carrier at all, and the set is what it reads** (C04 I79). A wireframe
+    // is edges with no cloud, a parametric curve is a path with no samples, and a
+    // loss landscape has neither — so any one alone is a complete document. The
+    // validator reads `CARRIERS_3D`; this gate is the same rule at the other
+    // side, and the two messages name the same list.
+    if (
+      drawn === "plot3d" && points3 === undefined && lines3 === undefined
+      && surfaces3 === undefined
+    ) {
+      throw new TypeError(
+        `b.plot: form "plot3d" has none of "points3", "lines3", "surfaces3" (C04 I79) — ` +
+          `a cloud, a path or a surface is what it draws, and "series" carries one reading ` +
+          `per position`,
+      );
+    }
+    if (colourBy !== undefined && drawn !== "plot3d") {
+      throw new TypeError(
+        `b.plot: "colourBy" on form "${drawn}" (C04 I76) — it names which of three readings ` +
+          `colour carries, and no other form has three competing for it`,
+      );
+    }
+    if (drawn === "plot3d" && axes === true) {
+      throw new TypeError(
+        `b.plot: "axes" on form "plot3d" (C04 I76) — three axes turn with the camera and ` +
+          `are drawn inside the area, so there is no gutter and no bottom rule to switch on`,
+      );
+    }
+    // **`origin3` is read by `axes3: "origin"` and by nothing else** (C04 I77),
+    // so it is refused where it decides nothing — `yCallout` needing
+    // `yAxis: "right"` is the same shape one dimension down.
+    if (origin3 !== undefined && (axes3 ?? "corner") !== "origin") {
+      throw new TypeError(
+        `b.plot: "origin3" with "axes3" of "${String(axes3 ?? "corner")}" (C04 I77) — it says ` +
+          `where the axis lines cross, and only "origin" draws a crossing`,
+      );
+    }
     if (levels !== undefined && drawn !== "contour") {
       throw new TypeError(
         `b.plot: "levels" on form "${drawn}" (C04 I61) — only a contour draws iso-lines, ` +
@@ -772,6 +934,16 @@ function plot(
       ...(yAxis === undefined ? {} : { yAxis }),
       ...(yCallout === undefined ? {} : { yCallout }),
       ...(vectors === undefined ? {} : { vectors }),
+      ...(points3 === undefined ? {} : { points3 }),
+      ...(lines3 === undefined ? {} : { lines3 }),
+      ...(surfaces3 === undefined ? {} : { surfaces3 }),
+      ...(light3 === undefined ? {} : { light3 }),
+      ...(colourBy === undefined ? {} : { colourBy }),
+      ...(axes3 === undefined ? {} : { axes3 }),
+      ...(origin3 === undefined ? {} : { origin3 }),
+      ...(box3 === undefined ? {} : { box3 }),
+      ...(axisStyle3 === undefined ? {} : { axisStyle3 }),
+      ...(camera === undefined ? {} : { camera }),
       ...(levels === undefined ? {} : { levels }),
       ...(layers === undefined ? {} : { layers }),
       ...(fieldDim === undefined ? {} : { fieldDim }),
@@ -810,6 +982,14 @@ function plot(
       ...(axisCross === undefined ? {} : { axisCross }),
       ...(calendarUnit === undefined ? {} : { calendarUnit }),
       ...(startDate === undefined ? {} : { startDate }),
+      ...(layout === undefined ? {} : { layout }),
+      ...(binning === undefined ? {} : { binning }),
+      ...(offsets === undefined ? {} : { offsets }),
+      ...(totals === undefined ? {} : { totals }),
+      ...(facets === undefined ? {} : { facets }),
+      ...(emptyMessage === undefined ? {} : { emptyMessage }),
+      ...(xScale === undefined ? {} : { xScale }),
+      ...(yScale === undefined ? {} : { yScale }),
     } as Plot,
     spec,
     true,
@@ -838,9 +1018,9 @@ function spark(values: readonly number[], opts?: BlockOpts): Plot {
  * decoration over a number that is already correct.
  */
 function progress(
-  spec: BlockOpts & { label: string; current: number; total: number; style?: string },
+  spec: BlockOpts & { label: string; current: number; total: number; style?: string; ramp?: Ramp },
 ): Progress {
-  const { label, current, total, style } = spec;
+  const { label, current, total, style, ramp } = spec;
   return finish<Progress>(
     {
       kind: "progress",
@@ -849,6 +1029,8 @@ function progress(
       current,
       total,
       ...(style === undefined ? {} : { style }),
+      // An ink over the bar's `on` cells, along the axis (C04 I108).
+      ...(ramp === undefined ? {} : { ramp }),
     } as Progress,
     spec,
     false,
@@ -917,7 +1099,11 @@ function patch(
       id: idOf(spec, "patch"),
       path,
       language,
-      hunks,
+      // **The intra-line diff runs here, once** (C25 I10, C04 I91). The builder
+      // is the writer of `Hunk.lines[].spans`; the renderer paints what the line
+      // carries and never diffs (C25 I7). A hunk whose lines already carry spans
+      // keeps them, which is what makes this idempotent over its own output.
+      hunks: hunks.map((hunk) => ({ ...hunk, lines: intralineLines(hunk.lines) })),
       ...(layout === undefined ? {} : { layout }),
       ...(collapsedAfter === undefined ? {} : { collapsedAfter }),
       ...(actions === undefined ? {} : { actions }),
@@ -1014,10 +1200,12 @@ function image(
     );
   }
   const bytes = data ?? readFileSync(path ?? "").toString("base64");
-  if (!bytes.startsWith("iVBORw0KGgo")) {
+  // PNG's eight-byte signature, or GIF's `GIF87a` / `GIF89a` (C04 I93) — as
+  // base64 prefixes, since that is the form the block carries.
+  if (!bytes.startsWith("iVBORw0KGgo") && !bytes.startsWith("R0lGODdh") && !bytes.startsWith("R0lGODlh")) {
     throw new TypeError(
-      "b.image: the bytes are not a PNG (C04 I73) — phase 1 reads PNG only, and a signature that " +
-        "does not match is a format this cannot draw rather than an image that is broken",
+      "b.image: the bytes are not a PNG or a GIF (C04 I73, C04 I93) — a signature that matches " +
+        "neither is a format this cannot draw rather than an image that is broken",
     );
   }
   // **One refusal, thrown here and pushed by the validator** (C04 I74).
@@ -1173,7 +1361,7 @@ function mosaic(
 function scroll(
   height: number,
   children: readonly Block[],
-  opts?: BlockOpts,
+  opts?: BlockOpts & { follow?: boolean; collapsed?: boolean },
 ): Scroll {
   if (!Number.isInteger(height) || height < 1) {
     throw new TypeError(
@@ -1186,8 +1374,18 @@ function scroll(
         "so an empty one is a container nobody can aim (C04 I47)",
     );
   }
+  // **`follow` opens the box at its tail and `collapsed` declares a fold by its
+  // presence** (C04 I97, C04 I98). Spread only when given: `collapsed: undefined`
+  // would still be a key, and *declared by presence* is what the renderer reads.
   return finish<Scroll>(
-    { kind: "scroll", id: idOf(opts, "scroll"), height, children } as Scroll,
+    {
+      kind: "scroll",
+      id: idOf(opts, "scroll"),
+      height,
+      children,
+      ...(opts?.follow === undefined ? {} : { follow: opts.follow }),
+      ...(opts?.collapsed === undefined ? {} : { collapsed: opts.collapsed }),
+    } as Scroll,
     opts,
     false,
   );
@@ -1196,7 +1394,7 @@ function scroll(
 function group(
   direction: "row" | "column",
   children: readonly Block[],
-  opts?: BlockOpts & { flex?: readonly Share[]; align?: readonly Valign[] },
+  opts?: BlockOpts & { flex?: readonly Share[]; align?: readonly Align[]; minRows?: number },
 ): Group {
   const flex = opts?.flex;
   if (flex !== undefined) {
@@ -1225,6 +1423,10 @@ function group(
       `b.group: ${String(align.length)} alignments for ${String(children.length)} children`,
     );
   }
+  const minRows = opts?.minRows;
+  if (minRows !== undefined && (!Number.isInteger(minRows) || minRows < 1)) {
+    throw new TypeError(`b.group: minRows is a whole number of rows above zero — got ${JSON.stringify(minRows)}`);
+  }
 
   return finish<Group>(
     {
@@ -1234,14 +1436,68 @@ function group(
       children,
       ...(flex === undefined ? {} : { flex: [...flex] }),
       ...(align === undefined ? {} : { align: [...align] }),
+      ...(minRows === undefined ? {} : { minRows }),
     } as Group,
     opts,
     false,
   );
 }
 
-function raw(text: string, opts?: BlockOpts): Raw {
-  return finish<Raw>({ kind: "raw", id: idOf(opts, "raw"), text } as Raw, opts, false);
+/**
+ * A child's screen (C04 §3i).
+ *
+ * **The one builder whose content is somebody else's** — an app composing this
+ * by hand is unusual, and the usual producer is C27's `snapshot`. It exists
+ * because a field a consumer cannot reach is a surface the spec describes and
+ * the API does not (MG27), and because a test or a fixture wants a screen
+ * without an emulator.
+ */
+function terminal(
+  cols: number,
+  lines: readonly TerminalLine[],
+  opts?: BlockOpts & {
+    screen?: "lines" | "grid";
+    cursor?: Readonly<{ line: number; col: number }>;
+    dropped?: number;
+  },
+): TerminalBlock {
+  if (!Number.isInteger(cols) || cols < 1) {
+    throw new TypeError(`b.terminal: cols is a positive integer — got ${JSON.stringify(cols)}`);
+  }
+  const dropped = opts?.dropped;
+  if (dropped !== undefined && (!Number.isInteger(dropped) || dropped < 1)) {
+    throw new TypeError(
+      `b.terminal: dropped is a positive integer when present (C04 I113) — declared by presence, ` +
+        `so a zero would draw "0 lines dropped at the cap"; got ${JSON.stringify(dropped)}`,
+    );
+  }
+  return finish<TerminalBlock>(
+    {
+      kind: "terminal",
+      id: idOf(opts, "terminal"),
+      cols,
+      screen: opts?.screen ?? "lines",
+      lines,
+      ...(opts?.cursor === undefined ? {} : { cursor: opts.cursor }),
+      ...(dropped === undefined ? {} : { dropped }),
+    } as TerminalBlock,
+    opts,
+    false,
+  );
+}
+
+function raw(text: string, opts?: ValuedTextOpts): Raw {
+  return finish<Raw>(
+    {
+      kind: "raw",
+      id: idOf(opts, "raw"),
+      text,
+      ...(opts?.spans === undefined ? {} : { spans: opts.spans }),
+      ...(opts?.colormap === undefined ? {} : { colormap: opts.colormap }),
+    } as Raw,
+    opts,
+    false,
+  );
 }
 
 /**
@@ -1262,6 +1518,122 @@ function spinner(label: string, opts?: BlockOpts): Steps {
     false,
   );
 }
+
+/**
+ * `status` — the kind both framework defaults return, and the one no builder made
+ * (C24 I30, §4b, §8d).
+ *
+ * **The parameters are `renderError`'s own, in its own order**, so the null
+ * override is `renderError: b.status` and the useful one wraps it:
+ * `b.group("column", [history, b.status(err, retryInMs, attempt)])`, which keeps
+ * the data the default replaces outright.
+ *
+ * **What is relayed and what is derived, which is the whole of the ruling.** A
+ * consumer is *handed* the error, the countdown and the attempt by the driver, so
+ * passing them back is relaying rather than claiming — the thing MG27 refuses is a
+ * `state` asserted against a fetch that never failed, and `state` is derived here
+ * from whether a countdown is present. `height` is derived too, and it is the one
+ * the scoping does not reach: 1 and 2 are C23's frame read about sitting inside
+ * `b.live`'s panel (F234, F235), so a consumer choosing 3 puts a second border
+ * inside the first and a consumer choosing 2 draws `loading` over `⠋ loading`.
+ * `elapsedMs` and `spinner` are never parameters at all.
+ *
+ * **One implementation, and that is the other half.** This kind was constructed in
+ * three places — here, `execution.ts`'s default `renderError`, and the registry's
+ * containment boundary — and the two that are a *declaration's* default now call
+ * this. Three copies of a shape drift, and the one that drifts is the one with
+ * fewer tests.
+ */
+function statusBlock(
+  err: ErrorLike,
+  retryInMs: number | null,
+  attempt: number,
+  opts?: BlockOpts,
+): Status {
+  return framedStatus(err, retryInMs, attempt, false, opts);
+}
+
+/**
+ * The same box, told whether something already frames it (C09 §3a, F406).
+ *
+ * **Not a parameter on `b.status`**, and MG27 holds the reason: whoever puts the
+ * box inside a bordered container knows, and a consumer holding one does not — a
+ * `renderError` override composing its own `group` is *not* a container that
+ * draws a border, so a consumer answering this would be guessing about furniture
+ * it cannot see. The one caller that knows is `b.live`'s own defaults, which put
+ * the box inside the part's panel.
+ */
+export function framedStatus(
+  err: ErrorLike,
+  retryInMs: number | null,
+  attempt: number,
+  framed: boolean,
+  opts?: BlockOpts,
+): Status {
+  // **The decision is named before the block, and SS45 is the reason it reads
+  // better as well as passing.** Written inline, `state: "error",` is a tone
+  // literal *as an object-literal value* — which is SS45's subject exactly, and
+  // the scan is right to look at it: `"error"` is a `Tone` as well as a
+  // `Status.state`, and the two vocabularies overlap. What makes this not
+  // inference is where the value comes from: **an argument the driver supplied**,
+  // not a field name, which is the distinction C24 I5 draws. Hoisting it says so
+  // structurally rather than in a comment, and the literal stops being an
+  // object-literal value because it is not one.
+  //
+  // It also tells MG28 the truth. A bare literal per arm would have that rule
+  // count which arms a builder writes; a derived value makes the field
+  // **parameterised**, which is what it is — all three states are reachable from
+  // the published surface, two through here and `loading` through the door below.
+  const state = retryInMs === null ? "error" : "retrying";
+  // **Framed heights are one row taller, and the row buys the tag** (F406, C09
+  // I31). Free-standing the numbers are 1 and 2 — the rungs below the ladder's
+  // first border — and inside `b.live`'s panel they read as a red line of text,
+  // which is what a reader with two screenshots reported. Framed, two rows are
+  // *tag and message* and three buy `retrying` its activity line.
+  const height = framed ? (retryInMs === null ? 2 : 3) : retryInMs === null ? 1 : 2;
+  return finish<Status>(
+    block({
+      kind: "status",
+      id: idOf(opts, "status"),
+      message: err.message,
+      state,
+      height,
+      ...(framed ? { framed } : {}),
+      ...(retryInMs === null ? {} : { retryInMs, attempt }),
+    }) as Status,
+    opts,
+    false,
+  );
+}
+
+/**
+ * The third state, which has no error to be handed and so no arity to share.
+ *
+ * `message` is what a taller box would say — the registry can size this one from
+ * a committed measure, and a consumer can read it — while at one row C09 I31
+ * gives `loading` the line that *moves* rather than the label the panel above
+ * already carries.
+ */
+function statusLoading(opts?: BlockOpts, framed = false): Status {
+  return finish<Status>(
+    block({
+      kind: "status",
+      id: idOf(opts, "status"),
+      state: "loading",
+      message: "loading",
+      height: 1,
+      // **`loading` is unchanged under either ladder** and carries the flag
+      // anyway: it has no tag to gain, and a box that says it is framed while
+      // its neighbours in the same panel do not would be two answers to one
+      // question about one container.
+      ...(framed ? { framed } : {}),
+    }) as Status,
+    opts,
+    false,
+  );
+}
+
+const status = Object.assign(statusBlock, { loading: statusLoading });
 
 // --- cells and actions ----------------------------------------------------
 
@@ -1338,6 +1710,11 @@ function live(spec: LiveSpec): Panel {
     // constructed before the driver has run — and it is one of the three states
     // a consumer cannot observe, which is the whole argument for the kind.
     //
+    // **Through `b.status.loading` now** (C24 I30). The literal that stood here
+    // was one of three constructions of this kind, and the argument against three
+    // is the argument against two: the builder and the default cannot drift if
+    // they are the same code.
+    //
     // **This was a `notice` and drew no spinner.** The `pending` glyph was the
     // right answer while the box was static: a builder runs above the renderer,
     // so a character written here cannot be substituted, and `◌` is one C09
@@ -1354,13 +1731,7 @@ function live(spec: LiveSpec): Panel {
     //
     // `message` is still what a taller one would say — the registry can size
     // this box from a committed measure, and a consumer can read it.
-    block({
-      kind: "status",
-      id: `${spec.id}-loading`,
-      state: "loading",
-      message: "loading",
-      height: 1,
-    });
+    statusLoading({ id: `${spec.id}-loading` }, true);
   const panel = finish<Panel>(
     { kind: "panel", id: spec.id, title: spec.title, children: [loading] } as Panel,
     spec,
@@ -1414,7 +1785,9 @@ export const b = {
   image,
   samples,
   raw,
+  terminal,
   spinner,
+  status,
 
   // cell shorthands
   id: toned("identifier"),

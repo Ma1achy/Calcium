@@ -24,9 +24,10 @@
  * Property 3 is why the arm survives either answer. The first real-terminal test
  * is where it is checked, beside the plane-16 width guarantee.
  */
-import { imageId, imageKey, payload, transmit, transmitRgba } from "../presentation/image/kitty.js";
+import { imageId, imageKey, payload, transmit, transmitAnimation, transmitRgba } from "../presentation/image/kitty.js";
 import { compositeOverlay } from "../presentation/image/overlay.js";
-import { decodePng } from "../presentation/image/index.js";
+import { decodeImage } from "../presentation/image/index.js";
+import { imageCells } from "../presentation/blocks/kinds/image.js";
 import type { Block, Image } from "../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
 
@@ -66,6 +67,17 @@ export function transmitImage(
   blocks: readonly Block[],
   capabilities: TerminalCapabilities,
   sent: SentImages,
+  /**
+   * The frame's width, because the declared cell box is a **render-time** fact
+   * (F380).
+   *
+   * The three call sites below passed a literal `1` for the columns, under a
+   * comment saying *the renderer derives the same numbers from the same block*.
+   * It does not: the renderer derives them from the block **and the width**, via
+   * `imageCells`, and there is no second computation to disagree with — there
+   * was one computation and one constant.
+   */
+  width: number,
 ): string {
   if (capabilities.imageProtocol !== "kitty") return "";
   const found: Image[] = [];
@@ -80,26 +92,57 @@ export function transmitImage(
     if (sent.has(key)) continue;
     sent.add(key);
     const bytes = Uint8Array.from(Buffer.from(image.data, "base64"));
-    // The declared cell box is the placement's, and the renderer derives the
-    // same numbers from the same block — so a mismatch here would be two
-    // computations of one figure. `c` and `r` are advisory to kitty; the
-    // placeholders are what address the cells.
-    if (image.overlay === undefined) {
-      out += transmit(imageId(key), payload(bytes), 1, image.height);
+    // **The declared cell box is the placement's, and now it is computed the
+    // same way** (F380). `imageCells` is the renderer's own function, called
+    // with the frame's width, so the transmission and the placement cannot
+    // disagree about the box.
+    //
+    // **The comment here used to say `c` and `r` are advisory to kitty; the
+    // placeholders are what address the cells.** That is a claim with no
+    // record, and it is false: `c` sizes the virtual placement, so a placeholder
+    // addressing column 40 of an image declared one column wide falls outside
+    // it. Measured in a real kitty — one APC emitted with `c=1,r=14`, 784
+    // placeholders spanning 56 columns, and **nothing drawn**, which is the
+    // failure this file's own header warns about arriving through the box
+    // rather than through a missing transmission.
+    const box = imageCells(image, width);
+    // **A PNG with no overlay is the bytes unchanged**, which needs no decoder
+    // at all — the terminal's reads formats ours refuses (C09 §8b G7).
+    const isPng = image.data.startsWith("iVBORw0KGgo");
+    if (image.overlay === undefined && isPng) {
+      out += transmit(imageId(key), payload(bytes), box.cols, box.rows);
       continue;
     }
-    // **The composited arm** (C04 §3h.2). The decode is here rather than in the
-    // renderer because this is the only place the overlaid pixels exist: the
-    // renderer draws placeholders at `kitty` and never looks at a pixel.
+    // **Every other case needs pixels, and this is the only place they exist
+    // for the protocol arm** (C04 §3h.2, C09 I39): the renderer draws
+    // placeholders at `kitty` and never looks at one. A GIF is decoded here
+    // because kitty reads no GIF — `f=100` is PNG — so its frames go as raw
+    // RGBA, all of them once, and the terminal runs the animation
+    // (`transmitAnimation`). An overlay is composited into every frame.
     //
-    // **A picture that does not decode falls through to the plain bytes.** The
-    // renderer's `alt` fallback is what the reader gets, and refusing here would
-    // leave a placement with no transmission — nothing drawn, blamed on the
-    // image. The overlay is lost and the picture is not.
-    const decoded = decodePng(bytes);
-    out += decoded.ok
-      ? transmitRgba(imageId(key), compositeOverlay(decoded.pixels, image.overlay), 1, image.height)
-      : transmit(imageId(key), payload(bytes), 1, image.height);
+    // **A picture that does not decode falls through to the plain bytes.** For
+    // a PNG that is the terminal's own decoder getting a chance ours did not
+    // take; for a GIF it is nothing drawn, which is §4c's loud failure and the
+    // same one a corrupt PNG already has. The renderer's fault box is what the
+    // reader gets on every rasterising arm either way.
+    const decoded = decodeImage(bytes);
+    if (!decoded.ok) {
+      out += transmit(imageId(key), payload(bytes), box.cols, box.rows);
+      continue;
+    }
+    const overlay = image.overlay;
+    const composite = (px: Parameters<typeof compositeOverlay>[0]): typeof px =>
+      overlay === undefined ? px : compositeOverlay(px, overlay);
+    out +=
+      decoded.animation === undefined
+        ? transmitRgba(imageId(key), composite(decoded.pixels), box.cols, box.rows)
+        : transmitAnimation(
+            imageId(key),
+            decoded.animation.frames.map(composite),
+            decoded.animation.delays,
+            box.cols,
+            box.rows,
+          );
   }
   return out;
 }

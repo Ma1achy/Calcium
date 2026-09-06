@@ -22,9 +22,10 @@
 import { Box, Text } from "ink";
 import { createElement, type ReactElement } from "react";
 import { atLeastOne, insetWidth, normaliseWidth, sequenceHeight } from "../../data/viewmodel/index.js";
-import type { MeasureFn, Table, TableRow } from "../../data/viewmodel/index.js";
-import { clampSpans, paint, tone } from "../blocks/paint.js";
-import type { BlockDefinition, NavElement, RenderContext } from "../blocks/types.js";
+import type { Block, MeasureFn, Table, TableRow } from "../../data/viewmodel/index.js";
+import { cells } from "../text.js";
+import { clampSpans, paint, selectionStyle, tone, type Span } from "../blocks/paint.js";
+import type { BlockDefinition, NavElement, RenderContext, Windowed } from "../blocks/types.js";
 import { emptySpans, headerSpans, rowSpans } from "./cells.js";
 import { detailBlocks, isExpandable } from "./detail.js";
 import { planColumns } from "./plan.js";
@@ -40,7 +41,12 @@ import { sortedRows } from "./sort.js";
  * measurement cannot catch, because each half is right on its own.
  */
 function hasActionBar(block: Table): boolean {
-  return block.rows.some((r) => (r.actions ?? []).length > 0); // cells-ok
+  // **The pin first, because a window's slice is not the document** (I18). A
+  // presence derived from `rows` moves in both directions under a slice: one
+  // that drops the only row declaring `actions` loses two rows the parent
+  // counted, and one that keeps a row mid-table draws a bar where the parent
+  // has data. `window` is the only writer (MG27).
+  return block.actionBar ?? block.rows.some((r) => (r.actions ?? []).length > 0); // cells-ok
 }
 
 /** Whether the header row is drawn. `showHeader` defaults to true (C04 §3). */
@@ -74,10 +80,58 @@ function detailHeight(
   return sequenceHeight(detailBlocks(block, row, plan), insetWidth(width), measureChild);
 }
 
+/**
+ * A table's divisible units, in **display** order (C11 §5a).
+ *
+ * **The units are not rows**, which is the whole of why a window here is more
+ * than a slice: the header is one unit, a row *with its detail* is one, and the
+ * gap-plus-bar is one. A range that ends inside an expanded row gets the whole
+ * row and the surplus hangs past `to`, which is what `Windowed.dropRows` is for
+ * (C09 I26, F428).
+ *
+ * **Display order, because the range is in display space.** `measure` walks
+ * `block.rows` and `render` walks `sortedRows`, and the counts agree — so a
+ * slice taken in declaration order passes C09 I26 exactly while showing different
+ * rows than the reader asked for (C09 §6b, F426's shape one kind over).
+ */
+type Unit = Readonly<{ rows: number; row: TableRow | null; bar: boolean }>;
+
+function unitsOf(block: Table, width: number, measureChild: MeasureFn): readonly Unit[] {
+  const out: Unit[] = [];
+  if (hasHeader(block)) out.push({ rows: 1, row: null, bar: false });
+  for (const row of sortedRows(block)) {
+    out.push({ rows: 1 + detailHeight(block, row, width, measureChild), row, bar: false });
+  }
+  if (hasActionBar(block)) out.push({ rows: 2, row: null, bar: true });
+  return out;
+}
+
 export const tableDefinition: BlockDefinition<Table> = {
   kind: "table",
 
   elements: tableElements,
+
+  /**
+   * C09 §2c — the planned columns and their gaps, when that is what every row
+   * is. The action bar, the empty message and an expanded row's detail are
+   * clamped to the width rather than to the columns — so a table with any of
+   * those fills, and only a table that is columns all the way down answers
+   * narrower. An overflowed plan (the last kept column truncated) is the width
+   * by construction. **A flex column is the plan's business, not a guard
+   * here**: the plan hands it the residual, so an uncapped flex column sums to
+   * the width on its own, and a `maxWidth`-capped one sums to less — which is
+   * the truth, and a guard returning the width for it would have lied. The
+   * mutation pass found the guard redundant on its first run (F818).
+   */
+  width(block: Table, width: number): number {
+    const w = normaliseWidth(width);
+    if (!hasBody(block) || hasActionBar(block) || block.rows.some((row) => row.expanded === true)) return w;
+    const plan = planColumns(block.columns, w);
+    if (plan.overflowed) return w;
+    let total = 0;
+    plan.visible.forEach((column, i) => { total += column.width + (i > 0 ? plan.gap : 0); });
+    return Math.max(1, Math.min(w, total));
+  },
 
   measure(block: Table, width: number, measureChild: MeasureFn): number {
     const w = normaliseWidth(width);
@@ -99,10 +153,117 @@ export const tableDefinition: BlockDefinition<Table> = {
     return atLeastOne(total);
   },
 
+  /**
+   * Rows `[from, to)` as a smaller table (C09 I25, C09 I26; C11 §5a).
+   *
+   * **Four things a window could change, and only two of them want a field.**
+   * The question is not *does a window change this* but *does a window change
+   * what this is derived from*:
+   *
+   * - **The column plan does not move.** `planColumns(cols, width)` takes no
+   *   rows — C11 §3 plans from declarations, never from cell content — which is
+   *   the structural reason `table` needs no width pin where `keyValue` did.
+   * - **The header is a declared flag** and was expressible all along.
+   * - **The action bar is a presence derived from the rows**, so it is pinned:
+   *   a slice moves it in both directions (I18).
+   * - **The display order is derived from the rows too**, through `kindOf`, and
+   *   re-deriving it can reverse the slice — so the rows are handed over already
+   *   ordered and `presorted` stops the second sort (I19, F429).
+   *
+   * **A window never holds zero rows** (I20). Both ends of a table can be asked
+   * for alone: `[0, 1)` is the header, and a bodyless table measures
+   * `header + 1` with the surplus *after* the header; `[n−2, n)` is the gap and
+   * the bar, and a bar whose existence derives from the rows cannot be drawn
+   * beside none. So the nearest row unit is kept and charged to whichever
+   * residual it falls outside.
+   */
+  window(
+    block: Table,
+    width: number,
+    from: number,
+    to: number,
+    measureChild: MeasureFn,
+  ): Windowed {
+    const w = normaliseWidth(width);
+    // **`tableDefinition.measure` by name, never `this.measure`.** A definition's
+    // members are extracted and called free — `navigation-conformance.ts` reads
+    // `registry.get(kind)?.window` and invokes it — and `this` is then
+    // undefined. The measurement suite calls it as `definition.window?.(…)`,
+    // which binds, so the first form passed every window in that file and threw
+    // on the first call from the second consumer. The other kinds are arrow
+    // properties and have no `this` to lose.
+    const total = tableDefinition.measure(block, w, measureChild);
+    const lo = Math.max(0, Math.min(Math.trunc(from), total - 1)); // cells-ok
+    const hi = Math.max(lo + 1, Math.min(Math.trunc(to), total)); // cells-ok
+
+    // A bodyless table is one message row under a header: there is nothing to
+    // divide, so it is kept whole and both ends are slack. The same answer
+    // `windowSequence` gives a kind that declares no window at all.
+    if (!hasBody(block)) {
+      return Object.freeze({ block, skipRows: lo, dropRows: total - hi }); // cells-ok
+    }
+
+    const units = unitsOf(block, w, measureChild);
+    const tops: number[] = [];
+    let cursor = 0; // cells-ok — a row cursor, not a width
+    for (const unit of units) {
+      tops.push(cursor);
+      cursor += unit.rows;
+    }
+    const bottomOf = (i: number): number => (tops[i] ?? 0) + (units[i]?.rows ?? 0);
+
+    let first = units.length - 1; // cells-ok — a unit index, not a width
+    let last = 0;
+    for (let i = 0; i < units.length; i += 1) { // cells-ok — a unit index, not a width
+      if (bottomOf(i) > lo && (tops[i] ?? 0) < hi) {
+        first = Math.min(first, i);
+        last = Math.max(last, i);
+      }
+    }
+
+    // **I20 — extend to the nearest row rather than return a bodyless block.**
+    // Widening only ever moves `first` down or `last` up, so both residuals stay
+    // non-negative by construction.
+    if (!units.slice(first, last + 1).some((u) => u.row !== null)) {
+      const rowIndices = units.map((u, i) => (u.row === null ? -1 : i)).filter((i) => i >= 0);
+      const firstRow = rowIndices[0] ?? 0;
+      const lastRow = rowIndices[rowIndices.length - 1] ?? 0; // cells-ok — an index, not a width
+      if (last < firstRow) last = firstRow;
+      else first = lastRow;
+    }
+
+    const kept = units.slice(first, last + 1);
+    return Object.freeze({
+      block: {
+        ...block,
+        rows: kept.map((u) => u.row).filter((r): r is TableRow => r !== null),
+        showHeader: first === 0 && hasHeader(block),
+        actionBar: kept.some((u) => u.bar),
+        presorted: true,
+      },
+      skipRows: lo - (tops[first] ?? 0), // cells-ok
+      dropRows: bottomOf(last) - hi, // cells-ok
+    });
+  },
+
   render(block: Table, ctx: RenderContext): ReactElement {
     const width = normaliseWidth(ctx.width);
     const plan = planColumns(block.columns, width);
     const focused = ctx.focus !== null && ctx.focus.blockId === block.id ? ctx.focus.rowId : null;
+    // **The extent is the entry's, kept to this block** (I14). The pairs are
+    // filtered by *their* block id and not gated on `ctx.focus.blockId`, because
+    // a selection whose head sits in a sibling block still names rows here —
+    // gating on the head would paint nothing in every block but one (T6.17).
+    const selected = new Set(
+      (ctx.focus?.selected ?? []).filter((s) => s.blockId === block.id).map((s) => s.rowId),
+    );
+    // The wash is applied to the whole row — gaps, marker and data runs alike —
+    // so a selected row reads as one thing, *selected* rather than *highlighted*
+    // (C22 §6e's own distinction for the prompt). The ink under it is `default`,
+    // decided in `rowSpans`; this adds the ground.
+    const wash = selectionStyle(ctx.theme, ctx.capabilities);
+    const washed = (spans: readonly Span[]): readonly Span[] =>
+      spans.map((s) => ({ ...s, style: { ...(s.style ?? {}), ...wash } }));
 
     const lines: ReactElement[] = [];
 
@@ -132,24 +293,19 @@ export const tableDefinition: BlockDefinition<Table> = {
     // not sort at all (I8, T1.13).
     for (const row of sortedRows(block)) {
       const expandable = isExpandable(row, plan);
+      const isHead = focused !== null && focused === row.id;
+      // **The head is never washed** — it keeps `accent`, which is what makes it
+      // distinguishable inside its own extent, and what makes a one-element
+      // extent draw exactly as no selection with no branch on the count (I14).
+      const isSelected = !isHead && selected.has(row.id);
+      const spans = clampSpans(
+        rowSpans(block, row, plan, ctx, { expandable, focused: isHead, selected: isSelected }),
+        width,
+        ctx.capabilities,
+      );
 
       lines.push(
-        createElement(
-          Text,
-          { key: `row-${row.id}` },
-          textOf(
-            paint(
-              clampSpans(
-                rowSpans(block, row, plan, ctx, {
-                  expandable,
-                  focused: focused !== null && focused === row.id,
-                }),
-                width,
-                ctx.capabilities,
-              ),
-            ),
-          ),
-        ),
+        createElement(Text, { key: `row-${row.id}` }, textOf(paint(isSelected ? washed(spans) : spans))),
       );
 
       if (row.expanded !== true) continue;
@@ -266,6 +422,44 @@ function rowCopyText(block: Table, r: TableRow): string {
   return block.columns.map((c) => r.cells[c.key]?.text ?? "").join("\t");
 }
 
+/**
+ * What this width could not show of a row, or `null` when it showed everything
+ * (C26 §5 `detail`, C15 §2a).
+ *
+ * **Two ways a rendering loses a cell, and both come from the plan** (C11 §3):
+ * a column the plan dropped, and a cell wider than the column it was planned
+ * into. Both are decided by `planColumns(columns, width)` — declarations and a
+ * width, never focus — so this is as pure as `elements` itself and answers the
+ * same for the frame and for the peek. A dropped column with an empty cell is
+ * nothing lost; a renderer-supplied column (`role: "expand"`) is nothing the
+ * data owns.
+ *
+ * **Known limit, stated rather than absorbed**: the cut test is `cells(text)` at
+ * the default ambiguous width against the planned width, and reads `text`
+ * alone. A cell whose glyph costs the column its last cell, or whose text is
+ * wide under the terminal's ambiguous-width setting, may be cut by the painter
+ * without declaring a detail here.
+ */
+function rowDetail(block: Table, r: TableRow, width: number): Block | null {
+  const plan = planColumns(block.columns, width);
+  const planned = new Map(plan.visible.map((v) => [v.key, v.width]));
+  const dropped = new Set(plan.dropped);
+  const rows: { label: string; value: string }[] = [];
+  for (const column of block.columns) {
+    if (column.role === "expand") continue;
+    const text = r.cells[column.key]?.text ?? "";
+    if (text === "") continue;
+    const w = planned.get(column.key);
+    // The plan's widths are declared in cells under the default convention and
+    // this compares against them; the painter's own cut is at the terminal's
+    // convention, which is the limit stated above.
+    const lost = dropped.has(column.key) || (w !== undefined && cells(text, "narrow") > w); // narrow-ok — the plan's own convention
+    if (lost) rows.push({ label: column.label === "" ? column.key : column.label, value: text });
+  }
+  if (rows.length === 0) return null; // cells-ok — a row count, not a width
+  return Object.freeze({ kind: "keyValue" as const, id: `${block.id}-${r.id}-detail`, rows: Object.freeze(rows) });
+}
+
 export function tableElements(
   block: Table,
   width: number,
@@ -280,6 +474,7 @@ export function tableElements(
   for (const r of sortedRows(block)) {
     const height = 1 + detailHeight(block, r, w, measureChild);
     const action = r.actions?.[0];
+    const detail = rowDetail(block, r, w);
     out.push(
       Object.freeze({
         id: r.id,
@@ -288,6 +483,7 @@ export function tableElements(
         cols: Object.freeze({ from: 0, to: w }),
         ...(action === undefined ? {} : { activate: action }),
         copy: rowCopyText(block, r),
+        ...(detail === null ? {} : { detail }),
       }),
     );
     row += height;

@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 // A03 — the enforcement suite. `make enforce`.
 // Every failure names: the rule, the file, what it prevents, and the spec.
-import { readdirSync, statSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { checkFindings, checkTriageInventory } from "./findings.mjs";
 import {
+  checkExportedArguments,
   checkFunctionConsumers,
+  checkLayerCycles,
   checkModuleGraph,
   checkOneStorePerComponent,
   checkSeamConsumers,
@@ -12,15 +14,26 @@ import {
   nameExactnessSignal,
   publicSurfaceUseSignal,
 } from "./module-graph.mjs";
-import { checkSourceScans, checkMarks, checkControlBytes } from "./source-scans.mjs";
+import { checkSourceScans, checkMarks, checkControlBytes, checkAllowLists, checkEmojiBases } from "./source-scans.mjs";
 import { checkDependencies, checkPhantomImports } from "./dependencies.mjs";
+import { checkRefusals, REFUSALS, unverifiableRefusals } from "./refusals.mjs";
+import {
+  ACKNOWLEDGED_BACKLOG,
+  backlogKey,
+  checkSourceMap,
+  checkSurfaceDeferrals,
+  checkTodoExpiry,
+  collectTodos,
+} from "./todo-expiry.mjs";
 import {
   checkCommitments,
   checkOrdering,
   checkTestRowIds,
+  checkMnemonicRowIds,
   checkReferences,
   checkSectionReferences,
   checkSeamFour,
+  checkInvariantCoverage,
   referenceFiles,
   specFiles,
 } from "./commitments.mjs";
@@ -38,11 +51,25 @@ function walk(dir, out = []) {
 }
 
 const files = walk("src");
-// The two consumers written from the public surface, for the by-use signal
-// alone — nothing here gates on them, and `enforce` still governs `src/`.
-// Skipped by the walk above and not by a separate one, because a second walk is
-// where the two would drift.
-const examples = [...walk("examples/minimal"), ...walk("examples/docker")];
+// The consumers written from the public surface, for the by-use signal alone —
+// nothing here gates on them, and `enforce` still governs `src/`. Skipped by the
+// walk above and not by a separate one, because a second walk is where they
+// would drift.
+//
+// **This sentence said *the two* and the change below made it three.** Caught by
+// reading the diff rather than by any assertion: a mechanical rewrite's tests
+// verify the transformation, never whether the prose above it is still true.
+// **Discovered, not listed** — and this is the third site that named the two by
+// hand. `Makefile`'s `check` and `test` were the other two, and both carry
+// comments recording that they exist *because an example's declared script was
+// invoked by nothing* (F150). A third example arriving and being invisible here
+// is the same defect one turn later, so the population is the directory and the
+// exception is named: anything under `examples/` with a `package.json` is a
+// consumer, and a directory without one is not yet a package.
+const examples = readdirSync("examples", { withFileTypes: true })
+  .filter((e) => e.isDirectory() && existsSync(`examples/${e.name}/package.json`))
+  .flatMap((e) => walk(`examples/${e.name}`))
+  .sort();
 const specs = specFiles();
 const references = referenceFiles();
 const { violations: refViolations, resolved } = checkReferences(references);
@@ -64,14 +91,63 @@ const sectionsUnowned = sectionRefs.violations.length - sectionsDangling.length;
 const sectionTargets = new Set(
   sectionsDangling.map((v) => /cites ([A-Z]\d\d §[\w.]+)/u.exec(v.message)?.[1] ?? v.file),
 ).size;
+// SP9's own numbers, computed once and reported beside the gate — the list is
+// the evidence and the count is what a reader watches move.
+const coverage = checkInvariantCoverage(specs, walk("test"));
+
+// TD1–TD6 — the deferral rules, **in the gate for the first time.** For their
+// whole life the only runner was `test/unit/todo-expiry.test.ts`, which the
+// pre-commit path never executes, so a deferral whose blocker had landed was
+// caught by whoever next ran the unit tier and by nothing on the way to a
+// commit. A03 §8 says MG and SS run pre-commit *because their violations become
+// load-bearing*; a deferral that has outlived its blocker is exactly that — the
+// defect it hides is depended upon while the row says *waits on*.
+//
+// **TD0's equality, reproduced rather than imported**: the acknowledged backlog
+// is compared by equality in both directions, so a new expiry fails because it
+// is not in the list and a resolved one fails because it still is. The test's
+// own fixtures are excluded for the test's stated reason — they are `it.todo`
+// calls in source text, indistinguishable to `collectTodos` from real ones.
+const todos = collectTodos("test").filter((e) => !e.file.endsWith("todo-expiry.test.ts"));
+const expiry = checkTodoExpiry(todos);
+const expiryKeys = new Set(expiry.map(backlogKey));
+const acknowledged = new Set(ACKNOWLEDGED_BACKLOG);
+const deferralViolations = [
+  ...expiry.filter((v) => !acknowledged.has(backlogKey(v))),
+  ...[...acknowledged].filter((k) => !expiryKeys.has(k)).map((k) => ({
+    rule: "TD0",
+    file: "tools/enforce/todo-expiry.mjs",
+    message:
+      `ACKNOWLEDGED_BACKLOG names \`${k}\`, which no longer expires — the deferral was written ` +
+      `or restated. Remove the entry; the list is compared by equality on purpose`,
+    spec: "A03 §9a · A03 commitment 16",
+  })),
+  ...checkSourceMap(),
+  ...checkSurfaceDeferrals(todos),
+];
+
 const violations = [
   ...checkModuleGraph(files),
+  // MG2 — no cycle within a layer, the second half of A02 §1's sentence; its own
+  // call for the equality arm's sake (see `checkModuleGraph`).
+  ...checkLayerCycles(files),
   // MG23 — one store per component above L0. SS29 folded here: as a source
   // scan its only in-scope file would have been its own exception.
   ...checkOneStorePerComponent(files),
   ...checkSeamConsumers(files),
   ...checkFunctionConsumers(files),
+  // MG29 — a published function whose parameter type is interior (C24 I29, §8c).
+  ...checkExportedArguments(files),
   ...checkSourceScans(files),
+  // SS53 — every allow-list entry above is exercised by the file it names. Five
+  // entries across four rules were dead on the first run, each with a `why`
+  // that still read as current; an exemption nothing exercises cannot be told
+  // from one that has expired.
+  ...checkAllowLists(files),
+  // SS54 — the refusal register. A refusal whose premise is *X does not exist*
+  // names X, and this asserts it still does not; judgements are counted below.
+  ...checkRefusals(),
+  ...deferralViolations,
   // SS52 — the control-character class over the tree the *tools* read, which is
   // wider than the one `SCANS` walks. `files` is `walk("src")`, so widening
   // SS43's scope string alone would have changed nothing; and putting `test/`
@@ -83,6 +159,10 @@ const violations = [
   // literal's contents, its exemptions carry reasons, and it has the
   // bidirectional arm a path allow-list cannot express.
   ...checkMarks(files),
+  // SS57 — a glyph with an emoji presentation form. Its own function for the
+  // reason SS47 is: the subject is a literal's contents against a table parsed
+  // out of `text.ts`, not a line against a regex.
+  ...checkEmojiBases(files),
   ...checkDependencies(),
   ...checkPhantomImports(files),
   // The specs are enforced too. A03 governs the source; SP1 governs the
@@ -93,6 +173,12 @@ const violations = [
   // one of them resolves, which for eleven hundred references nothing did.
   ...checkOrdering(specs),
   ...checkTestRowIds(specs),
+  // SP10 — the same question for the rows a spec names by mnemonic rather than
+  // by number, which SP7's `T\d+\.` cannot see. C12 §9 held two rows both
+  // called `SK10` and `make enforce` was green with both in the file: the
+  // citation side of this was already exact and the definition side had no rule
+  // at all (F635).
+  ...checkMnemonicRowIds(specs),
   // SP4 — Seam 4 and its owners agree, both directions. The only artefact
   // several components write to and none owns, wrong at every one that touched
   // it, because every row exists twice and nothing compared the copies.
@@ -102,10 +188,16 @@ const violations = [
   // against a real, unrelated finding with enforce green.
   ...checkFindings(),
   ...checkTriageInventory(),
+  // SP9 — an invariant nothing names is a claim no row was written against, and
+  // it reads exactly like one that is satisfied. SP1 paired a commitment to an
+  // invariant and nothing paired an invariant to a check, so *every invariant is
+  // cited* was a convention held by hand — 86 of 768 were not (F357, F361).
+  ...coverage.violations,
   ...refViolations,
 ];
 
 const RED = "\x1b[31m", DIM = "\x1b[2m", GREEN = "\x1b[32m", RESET = "\x1b[0m";
+const REFUSAL_COUNT = REFUSALS.length;
 
 // Computed only for the summary line — it gates nothing, and computing it beside
 // the violations would invite someone to push it into the list. F94.
@@ -129,6 +221,9 @@ if (violations.length === 0) {
       // A02 Seam 4 describes a component one; this is the difference, printed so
       // the number is visible rather than buried in F94. It is a count and not a
       // verdict — most of it is legitimate — so what it is good for is movement.
+      `  ${DIM}invariant coverage · ${String(coverage.uncited)} of ` +
+      `${String(coverage.declared)} invariants named by no test row, all listed ` +
+      `(SP9, gated by equality)${RESET}\n` +
       `  ${DIM}section citations · ${String(sectionsDangling.length)} of ` +
       `${String(sectionRefs.resolved + sectionsDangling.length)} resolve to no section, across ` +
       `${String(sectionTargets)} targets; ${String(sectionsUnowned)} more name no document ` +
@@ -141,7 +236,13 @@ if (violations.length === 0) {
       `  ${DIM}public surface by use · ${surface.candidates.length}/${surface.members} ` +
       `published members named by neither example — ${surface.concentrated.join(", ")}; ` +
       `${surface.ambiguous} of ${surface.cleared} clearings are ambiguous and none can list, ` +
-      `${surface.testOnly} named only in an example's tests (roadmap 48, reported not gated)${RESET}` +
+      `${surface.testOnly} named only in an example's tests (roadmap 48, reported not gated)${RESET}\n` +
+      // SS54's judgements. A register that holds only gated rows is one nobody
+      // put a taste refusal into; one that holds mostly judgements is a list of
+      // opinions with a rule's name. The number is what a reader watches.
+      `  ${DIM}refusal register · ${String(unverifiableRefusals().length)} of ` +
+      `${String(REFUSAL_COUNT)} refusals rest on a judgement and are not gated; ` +
+      `the rest resolve against the tree (SS54, reported not gated)${RESET}` +
       // The residue itself, behind a flag. A summary line is what a gate can
       // afford and a read needs the names — and printing them unasked would put
       // ninety lines of *not a violation* above every clean run, which is how a

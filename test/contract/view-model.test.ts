@@ -36,6 +36,8 @@ import {
   formatReport,
 } from "../../src/testing/measurement-conformance.js";
 import { ASCII_CAPS, measurable } from "../support/render.js";
+import { ALIGN_ENTRIES, block as blockOf } from "../../src/data/viewmodel/index.js";
+import type { Block as AnyBlock } from "../../src/data/viewmodel/index.js";
 
 /**
  * Every member of the union, listed. The annotation is the assertion: adding a
@@ -64,8 +66,9 @@ const EXPECTED_KINDS = [
   "image",
   "scroll",
   "status",
+  "terminal",
 ] as const;
-const _exhaustive: readonly BlockKind[] & { length: 21 } = EXPECTED_KINDS;
+const _exhaustive: readonly BlockKind[] & { length: 22 } = EXPECTED_KINDS;
 void _exhaustive;
 
 /**
@@ -129,9 +132,10 @@ describe("C04 contract", () => {
     expect(validateBlock({ kind: "patch", id: "p2", path: "a", language: "", hunks: [] }).ok).toBe(true);
   });
 
-  it("T2.10: every member of the Block union is validated, and the corpus covers all 21", () => {
-    // Nineteen kinds ship (commitment 2). The corpus is what T2.1 will run
-    // over once C09 exists, so a kind missing from it is a kind the headline
+  it("T2.10: every member of the Block union is validated, and the corpus covers all 22", () => {
+    // The kinds ship (commitment 2; the union is 21 at HEAD, nineteen when this
+    // was written). The corpus is what C09's T2.1 runs over (C09 is built; this
+    // said *once C09 exists* until 2026-09-03), so a kind missing from it is a kind the headline
     // test would silently never see.
     expect([...ALL_KINDS].sort()).toEqual([...EXPECTED_KINDS].sort());
 
@@ -315,6 +319,30 @@ describe("C04 contract", () => {
       /from\s+["'][^"']*presentation/,
     );
     expect(source).not.toMatch(/from\s+["'][^"']*terminal/);
+  });
+
+  it("T2.11b (C04 §3, arc 6 §5): a notice's one `action` is checked by the rule a tip's are — kind, label, and the kind's field", () => {
+    const notice = (action?: unknown): unknown => ({
+      kind: "notice",
+      id: "n1",
+      tone: "error",
+      glyph: "error",
+      text: "pull failed",
+      ...(action === undefined ? {} : { action }),
+    });
+    expect(validateBlock(notice()).ok, "absent is the notice it always was").toBe(true);
+    expect(validateBlock(notice({ kind: "fill", label: "retry", command: "pull" })).ok).toBe(true);
+    expect(validateBlock(notice({ kind: "open", label: "log", url: "file:///var/log/x" })).ok).toBe(true);
+
+    const unknownKind = validateBlock(notice({ kind: "retry", label: "retry", command: "pull" }));
+    expect(unknownKind.ok).toBe(false);
+    expect(unknownKind.ok ? "" : unknownKind.error.join(" ")).toMatch(/\.action: "kind" must be one of/);
+    const noField = validateBlock(notice({ kind: "fill", label: "retry" }));
+    expect(noField.ok).toBe(false);
+    expect(noField.ok ? "" : noField.error.join(" ")).toMatch(/\.action: "command" must be a string/);
+    const notObject = validateBlock(notice("retry"));
+    expect(notObject.ok).toBe(false);
+    expect(notObject.ok ? "" : notObject.error.join(" ")).toMatch(/\.action: must be an object/);
   });
 
   it("T2.11 (I4): validateDocument and validateBlock are total over hostile input", () => {
@@ -505,3 +533,45 @@ function readIfPresent(path: string): string {
     return "";
   }
 }
+
+describe("C04 §3 both axes — construction (I100, I102)", () => {
+  const raws = (n: number): AnyBlock[] =>
+    Array.from({ length: n }, (_, i) => ({ kind: "raw", id: `c${String(i)}`, text: "x\ny" }) as AnyBlock);
+  const errors = (over: Record<string, unknown>): string => {
+    const outcome = validateBlock({ kind: "group", id: "g", direction: "row", children: raws(3), ...over });
+    return outcome.ok ? "" : outcome.error.join(" ");
+  };
+
+  it("T2.110 (C04 I100): both axes construct, vertical first, one entry per child", () => {
+    expect(errors({ align: ["bottom-right", "centre", "top"] })).toBe("");
+    // **Vertical first, as the type reads** (table row 14): a typo that parsed
+    // either way round would be a layout nobody asked for.
+    const swapped = errors({ align: ["right-bottom", "top", "top"] });
+    expect(swapped).toContain("align[0]");
+    expect(swapped).toContain("bottom-right");
+    const short = errors({ align: ["left", "top"] });
+    expect(short).toContain("2 entries for 3 children");
+  });
+
+  it("T2.111 (C04 I102): minRows is a positive whole number, and the group measures it", () => {
+    expect(errors({ minRows: 6 })).toBe("");
+    const kit = measurable();
+    const floored = blockOf({ kind: "group", id: "g", direction: "row", children: raws(2), minRows: 6 });
+    expect(kit.measure(floored, 40), "two-row children under a floor of six").toBe(6);
+    for (const bad of [0, -1, 2.5, "6"]) {
+      expect(errors({ minRows: bad }), JSON.stringify(bad)).toContain("minRows");
+    }
+  });
+
+  it("T2.112 (C04 I100, C04 I45): every one of the fifteen entries constructs and none moves a height", () => {
+    expect(ALIGN_ENTRIES, "the vocabulary").toHaveLength(15);
+    const kit = measurable();
+    const plain = blockOf({ kind: "group", id: "g", direction: "row", children: raws(1) });
+    for (const entry of ALIGN_ENTRIES) {
+      const aligned = blockOf({ kind: "group", id: "g", direction: "row", children: raws(1), align: [entry] });
+      for (const width of [7, 40, 120]) {
+        expect(kit.measure(aligned, width), `${entry} at ${String(width)}`).toBe(kit.measure(plain, width));
+      }
+    }
+  });
+});

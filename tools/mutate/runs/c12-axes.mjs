@@ -96,8 +96,11 @@ const results = runPass({
       // two adjacent ticks differ by.
       name: "the precision comes from the span, not from the step",
       file: AXES,
-      from: "  const places = axis.step > 0 ? stepDecimals(axis.step) : undefined;",
-      to: "  const places = axis.step > 0 ? decimalsFor(axis.range.max - axis.range.min) : undefined;",
+      // Re-anchored when the derivation was extracted to `placesFor` — it had
+      // been copied into `tickLabels`, so this anchor matched twice and the
+      // sweep did not say so (F268).
+      from: "  return axis.step > 0 ? stepDecimals(axis.step) : undefined;",
+      to: "  return axis.step > 0 ? decimalsFor(axis.range.max - axis.range.min) : undefined;",
       expect: "T1.12",
     },
     {

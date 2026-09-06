@@ -2,7 +2,7 @@
 //
 // C01 and C02 exist, so the three seams C03 shares with them are driven by real
 // objects: a real capability record, a real lifecycle, and C01's own `writer`
-// as the injected `write`. The rest name their blocker in a greppable form.
+// as the injected `write`. The rest name their blocker in a greppable form; every named blocker is built at 2026-09-03.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildSession } from "../support/session.js";
 import { pipelineHarness, settled } from "../support/execution.js";
@@ -162,8 +162,8 @@ describe("C03 integration", () => {
     expect(with_.split(MODES.syncOn)).toHaveLength(with_.split(MODES.syncOff).length);
   });
 
-  it("T4.7 (with C01): a SIGWINCH snapshot produces a repaint, not a diff", () => {
-    const { scheduler, lifecycle, render, repaint } = wire();
+  it("T4.7 (with C01, C03 I15): a SIGWINCH run produces one repaint per window, not a diff", () => {
+    const { scheduler, lifecycle, render, repaint, clock } = wire();
     lifecycle.acquire();
 
     // L4's wiring: C01 reports the snapshot, the shell classifies the commit.
@@ -172,14 +172,24 @@ describe("C03 integration", () => {
 
     process.emit("SIGWINCH");
 
+    expect(repaint, "coalesced, so not yet").not.toHaveBeenCalled();
+    clock.advance(16);
     expect(repaint).toHaveBeenCalledTimes(1);
     expect(render).not.toHaveBeenCalled();
 
-    // D31 — resize is not debounced, by C01 or by C03. Three snapshots are
-    // three repaints, and dragging an edge stays continuously correct.
+    // **D31, amended.** It read *resize is not debounced* and three snapshots
+    // were three repaints. A debounce and a fixed window are not the same thing:
+    // a debounce waits for the events to stop, so a long drag draws nothing for
+    // its duration, and that is what D31 protects against. A 16 ms deadline
+    // draws throughout, at most one window behind — so *dragging an edge stays
+    // continuously correct* survives, and three snapshots inside one window are
+    // **one** repaint rather than three (C03 I15, F425).
     process.emit("SIGWINCH");
     process.emit("SIGWINCH");
-    expect(repaint).toHaveBeenCalledTimes(3);
+    process.emit("SIGWINCH");
+    expect(repaint, "still one — the deadline does not slide").toHaveBeenCalledTimes(1);
+    clock.advance(16);
+    expect(repaint, "and the run resolves to a single further frame").toHaveBeenCalledTimes(2);
   });
 
   // C13 and C14 both landed, and neither is what this was waiting for: L1, L2
@@ -197,7 +207,7 @@ describe("C03 integration", () => {
     const h = pipelineHarness();
 
     h.pipeline.submit("/ps");
-    await settled();
+    await settled(h.pipeline);
     expect(
       h.commits.filter((c: string) => c === "input"),
       "one submission, one input commit — not one per block",
@@ -213,7 +223,7 @@ describe("C03 integration", () => {
         })(),
     });
     streamed.pipeline.submit("/tail");
-    await settled();
+    await settled(streamed.pipeline);
 
     expect(
       streamed.commits.filter((c: string) => c === "input"),
@@ -246,6 +256,20 @@ describe("C03 integration", () => {
 
     const before = stdout.chunks.length;
     resize({ columns: 80, rows: 30 });
+    // **The window, and the guard below is what asked for this line** (C03 I15).
+    // With `resize` coalesced, nothing is written synchronously — so the frames
+    // examined below were an empty set and every assertion about them passed
+    // vacuously. They did not, because this row carries a guard that the set is
+    // non-empty, and that guard is the only reason the change surfaced here as a
+    // failure rather than as silent coverage loss.
+    //
+    // **A real wait, and `clock.advance` would not do.** This harness's clock is
+    // fake for `now()` and its `schedule` is a real `setTimeout`
+    // (`test/support/session.ts`) — C16's windows read the clock, C03's arm a
+    // timer, and they are different mechanisms. Advancing the reading fires
+    // nothing, which is a way for a test to wait for something that has already
+    // been made not to happen.
+    await new Promise((done) => setTimeout(done, 40));
 
     // Every frame written since, examined on its own.
     // **A frame is no longer `HOME` and rows.** It is hide, `HOME`, the rows,

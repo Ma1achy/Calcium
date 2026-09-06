@@ -53,7 +53,9 @@ const results = runPass({
       // state the tree was actually in.
       name: "THE DEFECT: the validator's vocabulary is a Set literal again, and the token is missing from it",
       file: VALIDATE,
-      from: "  continuation: true,\n} satisfies Record<Glyph, true>;",
+      // Re-anchored 2026-09-05: `step` joined the row (C09 §4), applied by hand
+      // and T3.18 died.
+      from: "  continuation: true, step: true,\n} satisfies Record<Glyph, true>;",
       to: "} as Record<string, true>;",
       expect: "T3.18",
     },
@@ -120,11 +122,14 @@ const results = runPass({
     },
     {
       // The stall notice's slot, which no `documents.ts` row can reach: it is
-      // the one consumer built by hand rather than through `noticeDoc`.
+      // the one consumer that is a block inside a streaming entry rather than a
+      // `noticeDoc`. Re-anchored 2026-09-05 when the site moved from a hand
+      // literal to `b.notice` (SS56, F777): the mark is now the third argument,
+      // and `muted` obliges no glyph, so dropping it is still a valid block.
       name: "the stall notice loses the mark — the consumer no other row covers",
       file: REFRESH,
-      from: '        glyph: "continuation",\n',
-      to: "",
+      from: 'b.notice("muted", `no output for ${String(quiet)}m`, "continuation", { id: STALL_BLOCK })',
+      to: 'b.notice("muted", `no output for ${String(quiet)}m`, undefined, { id: STALL_BLOCK })',
       expect: "T3.22",
     },
   ],

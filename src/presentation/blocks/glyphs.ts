@@ -14,7 +14,7 @@
  * `ascii` is for terminals that cannot draw beyond it at all — a terminal that
  * has box drawing and no astral planes still gets `┌` and `✓`.
  */
-import type { Glyph } from "../../data/viewmodel/types.js";
+import type { Glyph, Marker3 } from "../../data/viewmodel/types.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { cells } from "../text.js";
 
@@ -183,10 +183,24 @@ export type GlyphSet = Readonly<{
    * second time by a rule rather than by an author.
    */
   residue: string;
+  /**
+   * The separator between a call head's fields — `verb · args · duration ·
+   * outcome` (C09 I49, `AGENT_TUI_DESIGN.md` §9e).
+   *
+   * **A slot because it was a literal, and the literal was wrong at two arms
+   * of four** (F828). `·` U+00B7 is non-ASCII and `East_Asian_Width=Ambiguous`:
+   * the composer joined with it holding no capabilities, and the contract row
+   * asserted it under `unicode: "ascii"`. The residue row chose a comma and the
+   * status box parentheses for the same reason, each with its reason beside it;
+   * this is the third answer to the same question, and it is a slot because the
+   * head is the one place a reader sees the character twice on every line.
+   */
+  separator: string;
 }>;
 
 const UNICODE: GlyphSet = Object.freeze({
   residue: "\u22ef",
+  separator: "\u00b7",
   horizontal: "─",
   vertical: "│",
   dashedVertical: "┊",
@@ -230,6 +244,9 @@ const UNICODE: GlyphSet = Object.freeze({
 
 const ASCII: GlyphSet = Object.freeze({
   residue: "~",
+  // `:` and not `-` (F834): `-` is `TURN_ASCII`'s first frame, and a dispatched
+  // head read `verb - -`. The rung is a character no set's ASCII frames use.
+  separator: ":",
   horizontal: "-",
   vertical: "|",
   dashedVertical: ":",
@@ -504,6 +521,71 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
     ascii: PULSE_ASCII,
     narrowOnly: true,
   }),
+  /**
+   * **The other seven of the catalogue's refused eight** (`CALCIUM_SPINNERS.md`,
+   * *Refused, with the reason*), re-measured 2026-09-03: every frame is one
+   * cell under the narrow convention and two under wide, none has an emoji
+   * form, so each is the tier and not a refusal — the same ruling that moved
+   * `growVertical`. Two carry an interval the catalogue did not: `triangle` and
+   * `circleHalves` are 50 ms in `cli-spinners`, which is below the per-frame
+   * floor a four-frame set has (T2.72), so they take 120.
+   */
+  growHorizontal: Object.freeze({
+    frames: Object.freeze(["▏", "▎", "▍", "▌", "▋", "▊", "▉", "▊", "▋", "▌", "▍", "▎"]),
+    intervalMs: 120,
+    ascii: PULSE_ASCII,
+    narrowOnly: true,
+  }),
+  noise: Object.freeze({
+    frames: Object.freeze(["▓", "▒", "░"]),
+    intervalMs: 100,
+    ascii: PULSE_ASCII,
+    narrowOnly: true,
+  }),
+  boxBounce2: Object.freeze({
+    frames: Object.freeze(["▌", "▀", "▐", "▄"]),
+    intervalMs: 120,
+    ascii: TURN_ASCII,
+    narrowOnly: true,
+  }),
+  triangle: Object.freeze({
+    frames: Object.freeze(["◢", "◣", "◤", "◥"]),
+    intervalMs: 120,
+    ascii: TURN_ASCII,
+    narrowOnly: true,
+  }),
+  circleHalves: Object.freeze({
+    frames: Object.freeze(["◐", "◓", "◑", "◒"]),
+    intervalMs: 120,
+    ascii: TURN_ASCII,
+    narrowOnly: true,
+  }),
+  pipe: Object.freeze({
+    frames: Object.freeze(["┤", "┘", "┴", "└", "├", "┌", "┬", "┐"]),
+    intervalMs: 100,
+    ascii: TURN_ASCII,
+    narrowOnly: true,
+  }),
+  // **The cardinal four, since F833.** The set shipped as eight, and the four
+  // diagonals `↖ ↗ ↘ ↙` U+2196–2199 are bases of emoji variation sequences
+  // where `← ↑ → ↓` are not — SS57's first run over the tree found them, and
+  // T2.71's hand list never had them. Four frames at 200 ms is the eight's rate
+  // of turn; a mixed-weight ring (`⇖` beside `↑`) reads as two spinners.
+  arrow: Object.freeze({
+    frames: Object.freeze(["←", "↑", "→", "↓"]),
+    intervalMs: 200,
+    ascii: TURN_ASCII,
+    narrowOnly: true,
+  }),
+
+  // pulse — the agent-tui playground's set (`tools/spinner.js`), which shipped
+  // there and not here; measured 2026-09-03 as one cell on both conventions, so
+  // it needs no tier. 720 ms a cycle at the playground's own 120 ms.
+  pulse: Object.freeze({
+    frames: Object.freeze(["✢", "✲", "✱", "✻", "✱", "✲"]),
+    intervalMs: 120,
+    ascii: PULSE_ASCII,
+  }),
 });
 
 /** The default, and the set this returned before it took a name. */
@@ -536,6 +618,144 @@ export function spinnerFrames(
 }
 
 /**
+ * A 3D scatter's marks, three tiers deep (C12 I88, §3am).
+ *
+ * **Three rows, because depth buckets into three tiers** — a terminal cannot
+ * scale a mark smoothly and a reader cannot separate more than three sizes, so
+ * the ceiling is a decision rather than a limitation. **Several shapes per row,
+ * because the shape within a tier is the series**: the tier is the depth and the
+ * column is the identity, which is the only way one glyph carries both.
+ *
+ * **Filled, hollow, dot — weight rather than size.** A character grid has one
+ * cell whatever the tier, so *bigger* has to be spelled as *heavier*: a solid
+ * mark reads as nearer than an outline of the same shape, and an outline as
+ * nearer than a point. It survives the colour floor, which is the whole reason
+ * the tier exists on the glyph arm (C12 I88).
+ *
+ * **`narrowOnly` and the wide arm is required rather than optional** (A03 SS47,
+ * C02 I9). Every glyph in the unicode rows is `East_Asian_Width=Ambiguous` —
+ * `● ○ ◆ ◇ ▲ △ ■ □ ★ ☆ · ∙ •` all answer 1 under `narrow` and 2 under `wide` —
+ * so a terminal declaring `wide` draws every mark at twice the column the
+ * projection put it in, which is a picture with the wrong geometry rather than
+ * an ugly one.
+ */
+export type Marker3Set = Readonly<{
+  near: readonly string[];
+  mid: readonly string[];
+  far: readonly string[];
+}>;
+
+/**
+ * A shape name to its **column** in the table (C12 I99).
+ *
+ * **Here rather than in `types.ts`, and the split is the layer rule.** The
+ * union is schema — a document says `"square"` and C04 checks it — and *which
+ * character that is* is rendering data, which is this file's whole subject. So
+ * L0 owns the vocabulary and L1 owns the lookup, exactly as a colormap's name
+ * and its table are split.
+ *
+ * **Total over `Marker3` by `satisfies`**, so a sixth name cannot be added
+ * without deciding its column — the same forcing every table here relies on.
+ * The order is the order the rows are written in below, which is what makes the
+ * default — a series' own index — the shape that already drew.
+ */
+export const MARKER3_COLUMN = Object.freeze({
+  circle: 0, diamond: 1, triangle: 2, square: 3, star: 4,
+}) satisfies Record<Marker3, number>;
+
+/**
+ * How wide the marker table is — **derived from the map rather than written**
+ * (C12 I99).
+ *
+ * The renderer packs a tier and a column into one number and decodes it a
+ * layer later, so both halves need this figure. A literal `5` in two files is
+ * two places for it to drift the day a sixth shape is added; `MARKER3_COLUMN`
+ * is total over `Marker3` by `satisfies`, so its size is the answer and cannot
+ * disagree with the rows below.
+ */
+export const MARKER3_COLUMNS = Object.keys(MARKER3_COLUMN).length; // cells-ok — a table width
+
+/**
+ * Which column a cloud draws in — **its own name, or its index** (C12 I99).
+ *
+ * **The fallback is the index and not a constant**, which is the whole of why
+ * no committed frame moves: the shape within a tier has always been the series'
+ * position, so a caller who names nothing gets exactly what they had. The
+ * modulo is what a sixth cloud takes, unchanged from `glyphRows`' own decode.
+ */
+export function markerColumn(marker: Marker3 | undefined, series: number): number {
+  return marker === undefined
+    ? series % MARKER3_COLUMNS // cells-ok — a table width
+    : MARKER3_COLUMN[marker];
+}
+
+const MARKER3_UNICODE: Marker3Set = Object.freeze({
+  near: Object.freeze(["\u25CF", "\u25C6", "\u25B2", "\u25A0", "\u2605"]),
+  mid: Object.freeze(["\u25CB", "\u25C7", "\u25B3", "\u25A1", "\u2606"]),
+  far: Object.freeze(["\u00B7", "\u2219", "\u2022", "\u02D9", "\u2027"]),
+});
+
+const MARKER3_ASCII: Marker3Set = Object.freeze({
+  near: Object.freeze(["@", "#", "$", "&", "%"]),
+  mid: Object.freeze(["o", "x", "+", "=", "*"]),
+  far: Object.freeze([".", ",", ":", ";", "\u0027"]),
+});
+
+/**
+ * An axis's arrowhead, by the direction it points on **screen** (C12 I92).
+ *
+ * **Four cardinals rather than eight**, because a projected axis's direction is
+ * continuous and a reader cannot tell `↗` from `→` at one cell — the same
+ * argument the depth tier makes about size, one channel over.
+ *
+ * `narrowOnly` and the ASCII rung are required rather than optional: `→ ← ↑ ↓`
+ * are all `East_Asian_Width=Ambiguous`, so a terminal declaring `wide` would
+ * draw the head at twice the column the projection put it in (A03 SS47).
+ */
+export type ArrowSet = Readonly<{ right: string; left: string; up: string; down: string }>;
+
+const ARROW_ASCII: ArrowSet = Object.freeze({ right: ">", left: "<", up: "^", down: "v" });
+
+/**
+ * The arrowheads, **one set at every rung** (C12 I92).
+ *
+ * **Two arms became one, and removing an arm is the point.** `→ ← ↑ ↓` are
+ * `East_Asian_Width=Ambiguous`, so a terminal declaring `wide` already drew
+ * `> < ^ v` — the split existed to avoid a head at twice the column the
+ * projection put it in. Keeping the chevrons everywhere costs one alphabet at
+ * `narrow` and buys a mark that cannot move the picture on any terminal.
+ *
+ * **And it is the reason the solid triangles are refused.** `▲ ▼ ◀ ▶` read as
+ * arrowheads and are Ambiguous too, so they would need the arm back — and `▲`
+ * is already the marker table's third column, so an axis head and a data point
+ * would be the same glyph in one figure. A chevron is nothing else's mark.
+ *
+ * The set this chose against was `U+2192 U+2190 U+2191 U+2193`, and it is named
+ * by code point here rather than kept as a dead constant — an export nothing
+ * consumes is the thing this repository refuses, and a comment that names the
+ * rejected alternative carries the same information without one.
+ */
+export function arrows3(
+  _caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+): ArrowSet {
+  return ARROW_ASCII;
+}
+
+/**
+ * The marker table for this terminal (C12 I88).
+ *
+ * Two arms rather than a refusal, which is `spinnerFrames`' rule above and for
+ * its reason: a mark that changes width between terminals moves the picture,
+ * and a scatter with no marks is not a scatter.
+ */
+export function markers3(
+  caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+): Marker3Set {
+  if (caps.unicode === "ascii") return MARKER3_ASCII;
+  return caps.ambiguousWidth === "wide" ? MARKER3_ASCII : MARKER3_UNICODE;
+}
+
+/**
  * A determinate bar's on/off pair (roadmap 51's bar half, roadmap 22's sibling).
  *
  * **The same shape as `SpinnerSet` and for the same reason.** A style is a pair
@@ -544,7 +764,7 @@ export function spinnerFrames(
  * `off` — the drift the spinner table's pairing exists to prevent.
  *
  * **`narrowOnly` on six of the seven unicode styles, measured rather than
- * inferred.** `▐ ░ ▬ ▪ ▫ ▮ ▯ ▰ ▱ ◼ ◻` are `East_Asian_Width=Ambiguous` every
+ * inferred.** `▐ ░ ▬ • ◦ ▮ ▯ ▰ ▱ ■ □` are `East_Asian_Width=Ambiguous` every
  * one, so a terminal declaring `wide` draws them at double and a bar whose
  * glyphs double is not a bar. **`braille` is the only width-stable unicode
  * style**, which `CALCIUM_BARS.md` did not say and its determinate table read
@@ -590,10 +810,14 @@ const BAR_STYLES: Readonly<Record<string, BarStyle>> = Object.freeze({
   block: Object.freeze({ on: "█", off: "░", narrowOnly: true }),
   halfblock: Object.freeze({ on: "▐", off: "░", narrowOnly: true }),
   rectangle: Object.freeze({ on: "▬", off: "░", narrowOnly: true }),
-  beads: Object.freeze({ on: "▪", off: "▫", narrowOnly: true }),
+  // **`• ◦` and `■ □` since F833**: `▪ ▫ ◼ ◻` U+25AA/25AB/25FC/25FB are emoji
+  // variation bases — the small and medium squares have emoji forms where the
+  // plain squares U+25A0/25A1 and the bullets U+2022/25E6 do not. Both pairs
+  // stay Ambiguous, so `narrowOnly` stands.
+  beads: Object.freeze({ on: "•", off: "◦", narrowOnly: true }),
   posts: Object.freeze({ on: "▮", off: "▯", narrowOnly: true }),
   slant: Object.freeze({ on: "▰", off: "▱", narrowOnly: true }),
-  squares: Object.freeze({ on: "◼", off: "◻", narrowOnly: true }),
+  squares: Object.freeze({ on: "■", off: "□", narrowOnly: true }),
   // **No `narrowOnly`, and it is the only one.** Braille is `Neutral`, so it is
   // one cell under both conventions — which is what makes it the style a wide
   // terminal keeps rather than the one it loses.
@@ -620,8 +844,11 @@ export function barStyle(
   return style.narrowOnly === true && caps.ambiguousWidth === "wide" ? BAR_ASCII : style;
 }
 
-/** The style names, for the catalogue's own row and for a consumer listing them. */
+/** The style names, for the catalogue's own row and for a consumer listing them (C24 §6). */
 export const barStyleNames = (): readonly string[] => Object.freeze(Object.keys(BAR_STYLES));
+
+/** The set names, in catalogue order — what `Status.spinner` may name (C24 §6). */
+export const spinnerSetNames = (): readonly string[] => Object.freeze(Object.keys(SPINNER_SETS));
 
 /**
  * The set's own tick, in milliseconds (roadmap 51).
@@ -654,7 +881,14 @@ const GLYPH_TABLE: Readonly<Record<Glyph, readonly [unicode: string, ascii: stri
     ok: ["✓", "+"],
     warn: ["▲", "!"],
     error: ["✗", "x"],
-    info: ["ℹ", "i"],
+    // **`ⓘ` U+24D8, since F832.** `ℹ` U+2139 is a base of an emoji variation
+    // sequence — the same class as the head mark F823 was written about — and
+    // the derived table found it on its first run over the tree. U+24D8 has no
+    // emoji form; it is Ambiguous, so `glyphFor` resolves it to `i` at
+    // `ambiguousWidth: "wide"` (I48). Nineteen Neutral candidates were measured
+    // and none reads as *information*; a mark a reader has to learn is a worse
+    // trade than one the tier already covers.
+    info: ["\u24d8", "i"],
     pending: ["◌", "."],
     working: ["◐", "%"],
     running: ["●", "*"],
@@ -664,6 +898,22 @@ const GLYPH_TABLE: Readonly<Record<Glyph, readonly [unicode: string, ascii: stri
     collapse: ["▾", "v"],
     live: ["▌", "|"],
     bullet: ["•", "-"],
+    // **`⎸` U+23B8 is `East_Asian_Width=Neutral` — one cell under both
+    // conventions** — where `▌`, `│`, `┃`, `▎`, `▏`, `┆`, `┊` and `╎` are all
+    // Ambiguous and draw two on a terminal that says wide (measured with
+    // `cells()`). `continuation`'s note below says a third set of narrow
+    // survivors is the better answer the day someone measures one; this is the
+    // first slot picked *because* of that measurement. Not `live`'s `▌` for
+    // F161's reason as well: a shared mark acquires a consumer that cannot take
+    // it, and a live gutter and a quotation are two rôles in one position.
+    // The ASCII half is plain text's own quotation mark.
+    quote: ["⎸", ">"],
+    // **`⁃` U+2043 is Neutral too**, where the bullets a reader reaches for —
+    // `◦`, `‣`, `▪` — are Ambiguous. The ASCII half is `~`, the mark C04 §5
+    // already gives a bounded region, and deliberately not `-`: that is
+    // `bullet`'s, and reusing it would spend the whole distinction at exactly
+    // the rung that needs it.
+    nested: ["⁃", "~"],
     // **U+23BF is `East_Asian_Width=Neutral` — one cell under both
     // conventions**, where `└` and `╰` are Ambiguous and draw two, as do `▲`
     // and `⋯` above. That buys nothing today, because `glyphs()` discards the
@@ -672,6 +922,17 @@ const GLYPH_TABLE: Readonly<Record<Glyph, readonly [unicode: string, ascii: stri
     // survivors is the better answer the day someone measures one, and this is
     // one. The ASCII half is `tree(1)`'s rendering of the same hook.
     continuation: ["⎿", "`"],
+    // **`⏺` U+23FA BLACK CIRCLE FOR RECORD, followed by U+FE0E** (C09 I45,
+    // F854). The base has an emoji presentation form, which is why it left this
+    // slot under F823 — and refusing the character was the wrong remedy. The
+    // selector says *draw the preceding character as text*, `cells()` counts it
+    // zero (measured, not assumed), and the mark is one cell by every table.
+    //
+    // It is the character the slot means: Miscellaneous Technical, beside ⏵
+    // PLAY and ⏸ PAUSE, and a call in progress is a recording. `⬤` U+2B24, which
+    // held the slot between F823 and this, is a circle of the right size and
+    // nothing else.
+    step: ["\u23fa\ufe0e", "*"],
   });
 
 /** The pairs, for the test that asserts each is 1:1 by cell count (I5). */
@@ -684,12 +945,35 @@ export const GLYPH_TOKENS: readonly Glyph[] = Object.freeze(
 );
 
 /**
+ * The tokens whose Unicode half is `East_Asian_Width=Ambiguous` — two cells on a
+ * terminal that says wide, against a one-cell ASCII half (C09 I48, F825).
+ *
+ * **Derived from the table by measurement, not listed**, so a row added or
+ * changed is classified by `cells()` rather than by whoever wrote it. Eleven of
+ * seventeen on the day the tier landed: the ten F825 counted and `info`'s `ⓘ`
+ * (F832). The internal `GlyphSet` collapses to ASCII wholesale at `wide` (C02
+ * I9) and the spinner sets carry `narrowOnly`; this table had neither, and
+ * T2.5b asserted the 1:1 rule at one arm while more than half its members broke
+ * it at the other.
+ */
+const AMBIGUOUS_TOKENS: ReadonlySet<Glyph> = new Set(
+  (Object.keys(GLYPH_TABLE) as Glyph[]).filter(
+    (token) => cells(GLYPH_TABLE[token][0], "wide") !== cells(GLYPH_TABLE[token][1], "wide"), // ambiguousWidth "wide" for both halves: the one arm where they can differ
+  ),
+);
+
+/**
  * A block's glyph slot, resolved against capabilities. The single place either
  * character enters a frame.
+ *
+ * **Reads both fields** (C09 I48). An Ambiguous member resolves to its ASCII
+ * half at `ambiguousWidth: "wide"`, so the two renderings of every slot are one
+ * cell at either arm and `glyphCells` still needs no capability.
  */
-export function glyphFor(token: Glyph, caps: Pick<TerminalCapabilities, "unicode">): string {
+export function glyphFor(token: Glyph, caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">): string {
   const pair = GLYPH_TABLE[token];
-  return caps.unicode === "ascii" ? pair[1] : pair[0];
+  if (caps.unicode === "ascii") return pair[1];
+  return caps.ambiguousWidth === "wide" && AMBIGUOUS_TOKENS.has(token) ? pair[1] : pair[0];
 }
 
 /**
@@ -701,9 +985,37 @@ export function glyphFor(token: Glyph, caps: Pick<TerminalCapabilities, "unicode
  * trusting the two columns above to stay in step.
  */
 export function glyphCells(token: Glyph): number {
-  // narrow-ok — the two renderings of one slot are compared against each
-  // other, and the comparison holds under either convention: an ambiguous
-  // pair is 1:1 at narrow and 2:2 at wide. Passing a capability here would
-  // make a property of the table depend on the terminal reading it.
+  // narrow-ok — the two renderings of one slot are one cell at either arm:
+  // an Ambiguous member resolves to its ASCII half at wide (I48), so the
+  // narrow measurement of the Unicode half is the width at both. The comment
+  // this replaces said *2:2 at wide*, which assumed both halves Ambiguous;
+  // none of the ASCII halves is (F825). Passing a capability here would make a
+  // property of the table depend on the terminal reading it.
   return cells(GLYPH_TABLE[token][0]); // narrow-ok
+}
+
+/**
+ * **Whether the terminal needs the flat alphabet** — the predicate `glyphs()`
+ * applies, named so a rasteriser can apply the same one (F293).
+ *
+ * Two questions wear one answer here and the distinction is the point:
+ * `unicode: "ascii"` is about **repertoire** — can this terminal draw the glyph
+ * at all — and `ambiguousWidth: "wide"` is about **width**, since box drawing,
+ * quadrant blocks, `▌`, `●` and the arrows are East-Asian Ambiguous throughout.
+ * `glyphs()` collapses them because *its whole set* is ambiguous, and that is
+ * the condition under which collapsing is right.
+ *
+ * **A vocabulary with a narrow non-ASCII alternative must not use this.**
+ * Braille is not ambiguous, so `ladderFor("height")` answers `wide` by moving to
+ * braille rather than to ASCII, and `curve.ts` keeps its dots at every rung. A
+ * blanket *fall back when wide* would take a curve's resolution away for a
+ * width problem it does not have.
+ *
+ * So the question a caller asks is **is my vocabulary ambiguous**, and this is
+ * the answer for the ones that are.
+ */
+export function flatAlphabet(
+  caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+): boolean {
+  return caps.unicode === "ascii" || caps.ambiguousWidth === "wide";
 }

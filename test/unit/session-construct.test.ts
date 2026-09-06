@@ -59,7 +59,6 @@ const FRAME: FrameQueries = {
   copyMode: () => false,
   enterCopyMode: () => undefined,
   exitCopyMode: () => undefined,
-  entryAtRow: () => null,
   region: () => ({ top: 1, height: 20 }),
   overlayRegion: () => ({ width: 80, height: 24 }),
   promptAnchor: () => ({ row: 21, rows: 1 }),
@@ -327,6 +326,7 @@ describe("C22 §3 — construction order", () => {
         identityNotice: () => undefined,
       releaseView: () => undefined,
       visibilityChanged: () => undefined,
+      resized: () => undefined,
     producerContext: () => producerContext(),
     greeting: () => undefined,
       dispose: () => undefined,
@@ -489,6 +489,7 @@ describe("C22 §3 — construction order", () => {
             identityNotice: () => undefined,
       releaseView: () => undefined,
       visibilityChanged: () => undefined,
+      resized: () => undefined,
     producerContext: () => producerContext(),
     greeting: () => undefined,
       dispose: () => undefined,
@@ -506,7 +507,7 @@ describe("C22 §3 — construction order", () => {
     // **The correction, asserted.** It was `session: SessionSnapshot`, evaluated
     // once here, against a store that freezes a *fresh* object per write — so
     // the value could never change and C23 I12's `stopping` was false forever.
-    // T3.15 lands with C23; this is the half that can be checked without it.
+    // T3.15 is C23's (built; this said *lands with C23* until 2026-09-03); this is the half that can be checked without it.
     return captureDeps().then((deps) => {
       expect(deps.session().cwd).toBe("/work");
       deps.writes.setCwd("/moved");
@@ -722,6 +723,7 @@ describe("C22 §3 — construction order", () => {
         identityNotice: () => undefined,
       releaseView: () => undefined,
       visibilityChanged: () => undefined,
+      resized: () => undefined,
     producerContext: () => producerContext(),
     greeting: () => undefined,
       dispose: () => undefined,

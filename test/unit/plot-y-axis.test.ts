@@ -12,6 +12,7 @@ import { validateDocument } from "../../src/data/viewmodel/validate.js";
 import { b } from "../../src/shell/builders/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { FULL_CAPS, measurable } from "../support/render.js";
+import { cells } from "../../src/presentation/text.js";
 import { legendPlacement } from "../../src/presentation/plot/furniture.js";
 
 const kit = (caps = FULL_CAPS) => measurable({ definitions: [plotDefinition], capabilities: caps });
@@ -93,6 +94,13 @@ describe("YA4 (C12 I47, §3f): both columns are straight at `wide`", () => {
     // cells and a default measurement at four — the exact drift §3f names, now
     // reachable on two gutters instead of one.
     //
+    // **The other two labels are short on purpose.** They were `beta` and `gamma`
+    // and the row could not fail: `gamma` is five code units, so a width measured
+    // in code units returned the same 5 as one measured in cells and the frame
+    // did not move. Two cells each, so `café` is strictly the widest in cells (5)
+    // and strictly not in code units (4) — the only shape in which the two
+    // measurements disagree about the answer rather than about one label.
+    //
     // **The edges are `+` here and not `│`**, which is CS8's finding read from
     // the other side: box-drawing is Ambiguous too, so `glyphs()` hands a `wide`
     // terminal its ASCII set. A row matcher written for the unicode alphabet
@@ -101,13 +109,39 @@ describe("YA4 (C12 I47, §3f): both columns are straight at `wide`", () => {
     const anyEdge = /[│┤├┣|+]/u;
     const frame = kit(wide).renderToLines(block({
       kind: "plot", id: "ya", form: "bar", height: 3, axes: true, yAxis: "both",
-      categories: ["café", "beta", "gamma"], series: [{ values: [30, 70, 45] }],
+      categories: ["café", "ab", "cd"], series: [{ values: [30, 70, 45] }],
     }), 48).map(plain).filter((l) => /^\s*\S+\s[|+]/u.test(l));
     expect(frame.length).toBe(3);
-    const firsts = new Set(frame.map((r) => r.search(anyEdge)));
-    const lasts = new Set(frame.map((r) => r.split("").reduce((m, c, i) => (anyEdge.test(c) ? i : m), -1)));
-    expect(firsts.size).toBe(1);
-    expect(lasts.size).toBe(1);
+    // **Cell columns, not string indices** (F665's second half). This row measured
+    // `search()` and `reduce()` over code units, and a label whose drift it exists
+    // to catch is exactly a label whose cell count and character count differ:
+    // `café` is five cells in four characters at `wide`, so the correctly aligned
+    // frame reports edges at string 5 and string 6 and the row fails while every
+    // edge sits at cell 6. It passed before only because `é` measured 1, which is
+    // the same reason the row could not see the drift it names — vacuous in one
+    // direction and wrong in the other, from one missing width.
+    const columnsOf = (row: string, pick: (hits: number[]) => number): number => {
+      const hits: number[] = [];
+      let column = 0;
+      for (const ch of row) {
+        if (anyEdge.test(ch)) hits.push(column);
+        column += cells(ch, wide.ambiguousWidth); // cells-ok — a cell column, which is the subject
+      }
+      return hits.length === 0 ? -1 : pick(hits);
+    };
+    const firsts = new Set(frame.map((r) => columnsOf(r, (h) => h[0] ?? -1)));
+    const lasts = new Set(frame.map((r) => columnsOf(r, (h) => h[h.length - 1] ?? -1)));
+    expect(firsts.size, "one left edge column").toBe(1);
+    expect(lasts.size, "one right edge column").toBe(1);
+
+    // **And *which* column, from a literal** — because one column is satisfied by
+    // every uniformly wrong width. Measured with `labelColumnWidth` mutated to
+    // count code units: the edges stayed in one column and moved together, so
+    // both assertions above passed with the defect in. `café` is the widest label
+    // at five cells — c·a·f are one each and `é` is two under `wide` — and the
+    // gutter is one, so the left edge is at cell 6. The number is written out
+    // rather than computed from `cells()`, which is the function under suspicion.
+    expect([...firsts][0], "café is 5 cells at wide, plus one gutter").toBe(6);
   });
 });
 

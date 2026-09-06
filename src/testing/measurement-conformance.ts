@@ -69,7 +69,7 @@ export interface MeasurableRegistry {
     width: number,
     from: number,
     to: number,
-  ): Readonly<{ block: Block; skipRows: number }> | undefined;
+  ): Readonly<{ block: Block; skipRows: number; dropRows: number }> | undefined;
 }
 
 export type Failure = Readonly<{
@@ -86,7 +86,43 @@ export type ConformanceReport = Readonly<{
   failures: readonly Failure[];
   checked: number;
   kindsCovered: readonly string[];
+  /**
+   * The window rows compared, and the ones the bound left out (C09 §2a).
+   *
+   * **Reported because a bound nobody can see reads as coverage.** A corpus of
+   * tall blocks would have every window's arithmetic checked and none of its
+   * rows, and `✓ N measurements` says the same thing either way.
+   *
+   * **`bounded` rather than `skipped`, and the gate is what said so.** MG24 keys
+   * an exemption by `TypeName.member`, and `boundary-conformance.ts` publishes a
+   * second type also called `ConformanceReport` — with a `skipped` of its own,
+   * carrying an exemption. A nested field of the same name made that entry read
+   * as stale from a file it has nothing to do with. **`navigation-conformance.ts`
+   * hit the same thing and its `kinds` carries the note**: that one was renamed
+   * from `kindsCovered` because MG24 matched a *read* of one type against the
+   * other's member. This is the third instance and the other direction — a new
+   * member invalidating an old exemption by name alone (F105/F160).
+   */
+  exactness: Readonly<{ read: number; bounded: number }>;
 }>;
+
+/**
+ * The tallest block whose windows are compared **row for row** (C09 §2a).
+ *
+ * A window sweep is O(h²) and each comparison renders; the cells that matter — a
+ * boundary inside an indivisible unit, a slice that drops the value a derivation
+ * reads — are all reachable in a short block, and a fortieth row of `logs` is a
+ * repetition rather than a case. The arithmetic identity (I26) has no bound and
+ * runs over everything.
+ *
+ * **And at the first width only**, which is the second half of the bound and the
+ * one that was measured rather than chosen: at seven widths the table corpus ran
+ * past a 15 s timeout. Rendering is the cost, the question is *which rows a
+ * window selects*, and seven widths ask it seven times. `exactness.read` and
+ * `.bounded` say how much was left out, because a bound nobody can see reads as
+ * coverage.
+ */
+const EXACT_ROWS = 12;
 
 type Options = Readonly<{
   widths?: readonly number[];
@@ -100,6 +136,19 @@ type Options = Readonly<{
  * Returns a report. It never throws, and it never asserts: a caller that wants
  * an assertion writes one over `report.failures`.
  */
+/** Rendered lines, or null when the renderer throws — the throw is already reported. */
+function safeRender(
+  registry: MeasurableRegistry,
+  block: Block,
+  width: number,
+): readonly string[] | null {
+  try {
+    return registry.renderToLines(block, width);
+  } catch {
+    return null;
+  }
+}
+
 export function checkMeasurement(
   registry: MeasurableRegistry,
   corpus: readonly Block[],
@@ -109,6 +158,8 @@ export function checkMeasurement(
   const failures: Failure[] = [];
   const kinds = new Set<string>();
   let checked = 0;
+  let exactChecked = 0;
+  let exactSkipped = 0;
 
   for (const block of corpus) {
     kinds.add(block.kind);
@@ -149,13 +200,18 @@ export function checkMeasurement(
         failures.push({ ...at, check: "pure", expected: measured, actual: again ?? "threw" });
       }
 
-      // **C09 I26 — the window's height property, and it carries `skipRows`.**
+      // **C09 I26 — the window's height property, and it carries both
+      // residuals.**
       //
-      //     measure(w.block, width) − w.skipRows === to − from
+      //     measure(w.block, width) − w.skipRows − w.dropRows === to − from
       //
       // Not `measure(...) === to − from`, which is the form the seam invites and
       // which is false for every window that costs slack — an indivisible run
-      // (C25 I19) or a sticky header (C25 I18). Checked here rather than per
+      // (C25 I19) or a sticky header (C25 I18). **Both terms, because slack
+      // falls at both ends**: `skipRows` leads, and `table` is the first kind
+      // whose last unit can hang past `to` (F428). Still an equality — `≥` was
+      // the other repair, and containment is satisfied by every wrong answer
+      // inside the bounds. Checked here rather than per
       // kind so an **application's** arm is held to it: without this a
       // consumer's window can be silently short, and the frame then describes a
       // document nobody holds.
@@ -163,11 +219,20 @@ export function checkMeasurement(
       // Every start and length inside the block, because the interesting cells
       // are the ones where a window boundary lands inside something indivisible,
       // and those are not at the ends.
+      // The block's own rows, for the exactness check below — rendered once per
+      // (block, width) rather than once per window, and not at all when the
+      // caller has no renderer.
+      let whole: readonly string[] | null = null;
+      const wholeRows = (): readonly string[] | null => {
+        if (whole === null && options.measureOnly !== true) whole = safeRender(registry, block, width);
+        return whole;
+      };
+
       const windowOf = registry.window;
       if (windowOf !== undefined && measured !== null && measured > 1) {
         for (let from = 0; from < measured; from += 1) {
           for (let to = from + 1; to <= measured; to += 1) {
-            let out: Readonly<{ block: Block; skipRows: number }> | undefined;
+            let out: Readonly<{ block: Block; skipRows: number; dropRows: number }> | undefined;
             try {
               out = windowOf(block, width, from, to);
             } catch (err) {
@@ -186,15 +251,53 @@ export function checkMeasurement(
               failures.push({ ...at, check: "window-measures", expected: "a height", actual: "threw" });
               continue;
             }
-            if (inner - out.skipRows !== to - from) {
+            // **The rows, and not only how many** (C09 §2a). The identity above
+            // is the arithmetic shadow of the claim the seam actually makes —
+            // *the rows the caller keeps are the rows the full rendering would
+            // have produced* — and every failure this campaign found at this
+            // seam was invisible to the count: a `code` window is a different
+            // parse (F426), a `table` window taken in declaration order shows
+            // different rows than the range addressed, and a slice that
+            // re-derives its comparator can come back reversed (F429). Each of
+            // those balances perfectly. Containment is not correctness.
+            //
+            // **Bounded at `EXACT_ROWS` and counted, never silently.** A window
+            // sweep is O(h²) and this renders each one; the cells that matter —
+            // a boundary inside an indivisible unit, a slice that drops the
+            // value a derivation reads — are all reachable in a short block, and
+            // a fortieth row of `logs` adds a repetition rather than a case.
+            // `report.exactness` says how many were read and how many were
+            // skipped, so a corpus of tall blocks cannot report this as covered.
+            if (measured <= EXACT_ROWS && width === widths[0] && options.measureOnly !== true) {
+              exactChecked += 1;
+              const kept = safeRender(registry, out.block, width);
+              const full = wholeRows();
+              if (kept !== null && full !== null) {
+                const want = full.slice(from, to);
+                const got = kept.slice(out.skipRows, kept.length - out.dropRows);
+                if (got.length !== want.length || got.some((row, i) => row !== want[i])) {
+                  failures.push({
+                    ...at,
+                    check: "window-rows",
+                    expected: JSON.stringify(want),
+                    actual: JSON.stringify(got),
+                    detail: `window [${String(from)}, ${String(to)}) renders different rows than the block does at those offsets`,
+                  });
+                }
+              }
+            } else {
+              exactSkipped += 1;
+            }
+
+            if (inner - out.skipRows - out.dropRows !== to - from) {
               failures.push({
                 ...at,
                 check: "window-height",
                 expected: to - from,
-                actual: inner - out.skipRows,
+                actual: inner - out.skipRows - out.dropRows,
                 detail:
                   `window [${String(from)}, ${String(to)}) measured ${String(inner)} ` +
-                  `with skipRows ${String(out.skipRows)}`,
+                  `with skipRows ${String(out.skipRows)} and dropRows ${String(out.dropRows)}`,
               });
             }
           }
@@ -269,6 +372,7 @@ export function checkMeasurement(
     failures: Object.freeze(failures),
     checked,
     kindsCovered: Object.freeze([...kinds]),
+    exactness: Object.freeze({ read: exactChecked, bounded: exactSkipped }),
   });
 }
 
@@ -311,6 +415,8 @@ export function checkAsciiParity(
     failures: Object.freeze(failures),
     checked,
     kindsCovered: Object.freeze([...new Set(corpus.map((b) => b.kind))]),
+    // The ascii-parity pass measures and never windows, so it reads no rows.
+    exactness: Object.freeze({ read: 0, bounded: 0 }),
   });
 }
 

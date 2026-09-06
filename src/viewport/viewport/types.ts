@@ -85,6 +85,24 @@ export interface Viewport {
   readonly anchor: Anchor | null;
 
   visible(): VisibleRange;
+  /**
+   * The entry at a viewport row, and the row within it — in the entry's height
+   * as the index holds it, chrome rows included (I19, I20).
+   *
+   * **Pure and total**: reads the index and the current scroll, stores nothing,
+   * and answers `null` for any row the transcript does not occupy — a negative
+   * row, one past the viewport's height, or one below the last entry of a short
+   * transcript. A click on blank space beneath the transcript is not a click on
+   * the thing above it (T3.1b).
+   *
+   * **The only place a region row becomes an entry.** C16 routes the mouse by
+   * position and takes this as an injected dep rather than recomputing it — two
+   * components computing where a row is agree until one learns about a height
+   * change and the other does not. Declared by the spec from the start and, for
+   * the whole time the mouse could be decoded, supplied to C16 as `() => null`
+   * by the production frame: the router's viewport rung had never once fired.
+   */
+  entryAtRow(row: number): Anchor | null;
 
   scrollBy(rows: number): void;
   scrollToTop(): void;

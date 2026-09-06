@@ -23,7 +23,12 @@ import {
   type DocumentStatus,
   type Glyph,
   COLORMAP_NAMES,
+  RAMP_ANIMATIONS,
+  RAMP_FILLS,
+  RAMP_KEYS,
+  TONES,
   HAS_CALLOUT,
+  HAS_HIDEABLE_SERIES,
   HAS_DETAIL_RUNGS,
   HIERARCHY_MAX_DEPTH,
   HIERARCHY_ROLE,
@@ -33,7 +38,11 @@ import {
   ORIGIN_DEFAULT,
   IS_FIELD_FORM,
   IS_MATRIX,
+  MARKER3_MEMBERS,
   STYLE_ARMS,
+  TEXT_SPAN_KEYS,
+  TERMINAL_KEYS,
+  TERMINAL_RUN_KEYS,
   type OHLC,
   type Plot,
   type PlotForm,
@@ -41,6 +50,7 @@ import {
   type ViewDocument,
 } from "./types.js";
 import { parseAreas } from "./mosaic.js";
+import { ALIGN_ENTRIES } from "./measure.js";
 import { overlayFault } from "./overlay.js";
 import { parseStartDate } from "../dates.js";
 import { isContainerKind } from "./tree.js";
@@ -81,7 +91,8 @@ const GLYPH_MEMBERS = {
   ok: true, warn: true, error: true, info: true, pending: true,
   working: true, running: true, queued: true, cancelled: true,
   expand: true, collapse: true, live: true, bullet: true,
-  continuation: true,
+  quote: true, nested: true,
+  continuation: true, step: true,
 } satisfies Record<Glyph, true>;
 
 const GLYPHS: ReadonlySet<Glyph> = new Set(Object.keys(GLYPH_MEMBERS) as Glyph[]);
@@ -104,6 +115,14 @@ const ACTION_FIELD: Readonly<Record<Action["kind"], string>> = Object.freeze({
 });
 
 const COLORMAP_SET: ReadonlySet<string> = new Set<string>(COLORMAP_NAMES);
+
+/** A text block's `colormap` — the map its valued spans read through (C04 I90). */
+function checkColormapName(b: Record<string, unknown>, e: string[], at: string): void {
+  const name = b["colormap"];
+  if (name !== undefined && (typeof name !== "string" || !COLORMAP_SET.has(name))) {
+    e.push(`${at}: "colormap" must be one of ${COLORMAP_NAMES.join(", ")} (C10 I31, C04 I90)`);
+  }
+}
 const TRANSPORTS: ReadonlySet<string> = new Set(["emulated", "fixture", "subprocess", "local"]);
 const ORIGINS: ReadonlySet<string> = new Set(["user", "action", "agent", "refresh", "defect"]);
 /** C04 I41 — the arms, named for the unit that arrives, not the unit rendered. */
@@ -376,7 +395,7 @@ function plotGraphErrors(
       e.push(`${at}: "graphLayout" must be "layered" (C04 I70)`);
       return;
     }
-    if (form !== "graph") {
+    if (form !== "graph" && form !== "sankey") {
       e.push(
         `${at}: "graphLayout" on form ${JSON.stringify(form)} (C04 I70) — only a graph takes ` +
           `a graph layout, and an ignored member reads as one not yet implemented`,
@@ -389,15 +408,15 @@ function plotGraphErrors(
   if (g === undefined) {
     // **A form whose whole subject is the shape has nothing to fall back to**,
     // which is I65's ruling for `tree` one form along.
-    if (form === "graph") {
+    if (form === "graph" || form === "sankey") {
       e.push(
-        `${at}: form "graph" with no "graph" (C04 I69) — that form draws a node set and ` +
+        `${at}: form ${JSON.stringify(form)} with no "graph" (C04 I69) — that form draws a node set and ` +
           `nothing else, so there is no figure to fall back to`,
       );
     }
     return;
   }
-  if (form !== "graph") {
+  if (form !== "graph" && form !== "sankey") {
     e.push(
       `${at}: "graph" on form ${JSON.stringify(form)} (C04 I69) — it is that form's data ` +
         `rather than a modifier, and accepted-and-ignored is worse than refused`,
@@ -406,7 +425,7 @@ function plotGraphErrors(
   }
   // **A form has one data shape**, so two is a document that means two things.
   if (b["hierarchy"] !== undefined) {
-    e.push(`${at}: both "graph" and "hierarchy" on form "graph" (C04 I69) — a form has one data shape`);
+    e.push(`${at}: both "graph" and "hierarchy" on form ${JSON.stringify(form)} (C04 I69) — a form has one data shape`);
     return;
   }
   if (typeof g !== "object" || g === null || Array.isArray(g)) {
@@ -446,9 +465,20 @@ function plotGraphErrors(
     return;
   }
   for (const [i, x] of edges.entries()) { // cells-ok — an edge index
-    const edge = x as { from?: unknown; to?: unknown } | null;
+    const edge = x as { from?: unknown; to?: unknown; weight?: unknown } | null;
     if (typeof edge !== "object" || edge === null) {
       e.push(`${at}.graph.edges[${String(i)}]: must be an object with "from" and "to" (C04 I69)`);
+      return;
+    }
+    // C04 I92 — a flow is required where there is a ribbon and refused where there is not.
+    const w = edge.weight;
+    if (form === "sankey") {
+      if (typeof w !== "number" || !Number.isFinite(w) || w <= 0) {
+        e.push(`${at}.graph.edges[${String(i)}]: "weight" must be a positive finite number on form "sankey" (C04 I92)`);
+        return;
+      }
+    } else if (w !== undefined) {
+      e.push(`${at}.graph.edges[${String(i)}]: "weight" on form "graph" (C04 I92) — no ribbon to widen, and accepted-and-ignored is refused`);
       return;
     }
     for (const end of ["from", "to"] as const) {
@@ -509,6 +539,39 @@ function plotHierarchyErrors(
   if (fault !== null) e.push(`${fault} (C04 I64)`);
 }
 
+/**
+ * A series' `hidden` (C04 I99): a boolean, and only where a series is a layer.
+ *
+ * **The form gate is `HAS_HIDEABLE_SERIES` and not `HAS_CALLOUT`**, though the
+ * two name the same seven forms today — the record answers *does removing a
+ * series move the rest*, which is the question this member turns on (C04 §3
+ * *hidden*). **Both values are refused off those forms**, because the member is
+ * the claim and not its value: `hidden: false` on a `bar` is a document saying
+ * something about a channel the form does not have.
+ */
+function checkSeriesHidden(
+  s: Record<string, unknown>,
+  e: string[],
+  at: string,
+  index: number,
+  form: unknown,
+): void {
+  const hidden = s["hidden"];
+  if (hidden === undefined) return;
+  const where = `${at}: series[${String(index)}].hidden`;
+  if (typeof hidden !== "boolean") {
+    e.push(`${where} must be a boolean (C04 I99) — a series is drawn or it is not`);
+    return;
+  }
+  if (typeof form === "string" && HAS_HIDEABLE_SERIES[form as PlotForm] === false) {
+    e.push(
+      `${where} is set on form "${form}" (C04 I99) — a series is a layer only where removing ` +
+        `one moves nothing else, and on this form it is a row, a slice, a band or a matrix row; ` +
+        `hiding it would mean recomputing the figure, which is a different member`,
+    );
+  }
+}
+
 function checkAnnotations(
   annotations: unknown,
   e: string[],
@@ -525,6 +588,11 @@ function checkAnnotations(
     const label = a["label"];
     if (label !== undefined && !isString(label)) {
       e.push(`${at}: annotation "label" must be a string (C04 I52)`);
+    }
+    // C04 I99 — accepted on every arm, because an annotation is already a layer
+    // behind the data; only the type is checked.
+    if (a["hidden"] !== undefined && typeof a["hidden"] !== "boolean") {
+      e.push(`${at}: annotation "hidden" must be a boolean (C04 I99) — a reference is drawn or it is not`);
     }
     // **`confidence` and `whiskers` carry no label**, because both are drawn
     // across the whole abscissa: one string would name the band as a whole on
@@ -628,12 +696,12 @@ function requireFiniteNumbers(
  * the field its kind needs are two different messages rather than one silence.
  *
  * **Known limit, stated rather than left to be discovered**: this reaches the
- * `actions` array on `patch` and `tip`, and not `TableRow.actions` or a `pills`
- * chip's `action`. Those are nested inside collections this validator walks for
- * other reasons, and widening it there is a separate change with its own row.
- * What the table guarantees is that the *union* cannot gain a sixth member
- * unnoticed; what it does not guarantee is that every site carrying an action is
- * checked.
+ * `actions` array on `patch` and `tip`, and `Notice.action` through `checkAction`
+ * (arc 6 §5), and not `TableRow.actions` or a `pills` chip's `action`. Those are
+ * nested inside collections this validator walks for other reasons, and widening
+ * it there is a separate change with its own row. What the table guarantees is
+ * that the *union* cannot gain a sixth member unnoticed; what it does not
+ * guarantee is that every site carrying an action is checked.
  */
 function checkActions(b: Record<string, unknown>, e: string[], at: string): void {
   const actions = b["actions"];
@@ -642,21 +710,326 @@ function checkActions(b: Record<string, unknown>, e: string[], at: string): void
     e.push(`${at}: "actions" must be an array`);
     return;
   }
-  actions.forEach((raw, i) => {
-    const where = `${at}.actions[${String(i)}]`;
-    if (!isRecord(raw)) {
-      e.push(`${where}: must be an object`);
+  actions.forEach((raw, i) => checkAction(raw, `${at}.actions[${String(i)}]`, e));
+}
+
+/**
+ * One action, wherever it sits — an element of `actions` or a notice's single
+ * `action`. The two sites share the body so that a notice's button cannot be
+ * refused by a different rule from a tip's (C04 §3, T2.11).
+ */
+function checkAction(raw: unknown, where: string, e: string[]): void {
+  if (!isRecord(raw)) {
+    e.push(`${where}: must be an object`);
+    return;
+  }
+  const kind = raw["kind"];
+  if (!isString(kind) || !ACTION_KINDS.has(kind as Action["kind"])) {
+    e.push(`${where}: "kind" must be one of ${[...ACTION_KINDS].join(", ")}`);
+    return;
+  }
+  if (!isString(raw["label"])) e.push(`${where}: "label" must be a string`);
+  const field = ACTION_FIELD[kind as Action["kind"]];
+  if (!isString(raw[field])) e.push(`${where}: "${field}" must be a string`);
+}
+
+/**
+ * A member's spans (C04 I84, I85, §3am).
+ *
+ * **What the gate refuses is what a code-unit walk can decide.** `graphemes()` is
+ * L1's and this file is L0's, so a boundary inside a grapheme cluster is not
+ * visible here — except the one kind that is: a cut between the two halves of a
+ * surrogate pair. Everything else inside a cluster is snapped outward by the
+ * renderer, which preserves the width (C09).
+ *
+ * One error per fault, naming the span's index, and the walk stops at the first
+ * fault on a span — so a document with nine faulty spans reports nine lines and
+ * a reader can find each one.
+ */
+/**
+ * `attributesOnly` is the hunk-line arm (C04 I91): bold/italic/underline and
+ * neither `tone` nor `value`, because the line's gutter and syntax palettes are
+ * already the two a row may carry (C25 §3).
+ */
+/**
+ * C04 I110, I111 — a screen line's text and its runs.
+ *
+ * **Two gates for one property.** C27 replaces controls at the cell walk and
+ * this refuses them again, because a `terminal` can arrive from a far-side
+ * envelope or a persisted row without passing through C27 — and the renderer
+ * does not strip, which is what lets the block carry colour at all.
+ */
+function checkTerminalLine(line: Record<string, unknown>, e: string[], at: string): void {
+  const text = line["text"];
+  if (typeof text !== "string") {
+    e.push(`${at}: "text" must be a string (C04 I110)`);
+    return;
+  }
+  for (let i = 0; i < text.length; i += 1) {
+    const unit = text.charCodeAt(i);
+    if (unit < 0x20 || (unit >= 0x7f && unit <= 0x9f)) {
+      e.push(
+        `${at}: "text" carries a control character at ${String(i)} (C04 I110) — a terminal line is emitted without stripping, so an escape here would reach the outer terminal`,
+      );
       return;
     }
-    const kind = raw["kind"];
-    if (!isString(kind) || !ACTION_KINDS.has(kind as Action["kind"])) {
-      e.push(`${where}: "kind" must be one of ${[...ACTION_KINDS].join(", ")}`);
+    if (unit >= 0xd800 && unit <= 0xdbff) {
+      const next = text.charCodeAt(i + 1);
+      if (Number.isNaN(next) || next < 0xdc00 || next > 0xdfff) {
+        e.push(`${at}: "text" carries an unpaired surrogate at ${String(i)} (C04 I110)`);
+        return;
+      }
+      i += 1;
+      continue;
+    }
+    if (unit >= 0xdc00 && unit <= 0xdfff) {
+      e.push(`${at}: "text" carries an unpaired surrogate at ${String(i)} (C04 I110)`);
       return;
     }
-    if (!isString(raw["label"])) e.push(`${where}: "label" must be a string`);
-    const field = ACTION_FIELD[kind as Action["kind"]];
-    if (!isString(raw[field])) e.push(`${where}: "${field}" must be a string`);
+  }
+  const runs = line["runs"];
+  if (runs === undefined) return;
+  if (!isArray(runs)) {
+    e.push(`${at}: "runs" must be an array (C04 I111)`);
+    return;
+  }
+  let previousEnd = 0;
+  let previous: Record<string, unknown> | null = null;
+  runs.forEach((run, ri) => {
+    const where = `${at}.runs[${String(ri)}]`;
+    if (!isRecord(run)) {
+      e.push(`${where}: must be an object (C04 I111)`);
+      return;
+    }
+    for (const key of Object.keys(run)) {
+      if (!TERMINAL_RUN_KEYS.has(key)) e.push(`${where}: unknown key "${key}" on a run (C04 I111)`);
+    }
+    const from = run["from"];
+    const to = run["to"];
+    if (typeof from !== "number" || typeof to !== "number" || !Number.isInteger(from) || !Number.isInteger(to)) {
+      e.push(`${where}: "from" and "to" must be integers (C04 I111)`);
+      return;
+    }
+    if (from < 0 || to > text.length || to <= from) {
+      e.push(`${where}: [${String(from)}, ${String(to)}) is outside the text (C04 I111)`);
+      return;
+    }
+    if (from < previousEnd) {
+      e.push(`${where}: runs overlap or are out of order (C04 I111)`);
+      return;
+    }
+    if (previous !== null && from === previousEnd && sameRunStyle(previous, run)) {
+      e.push(
+        `${where}: adjacent runs share a style (C04 I111) — merging is the producer's job, and an unmerged pair measures the same and diffs differently on every frame`,
+      );
+      return;
+    }
+    previousEnd = to;
+    previous = run;
   });
+}
+
+/** Style equality for I111's adjacency check — every member but the offsets. */
+function sameRunStyle(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
+  for (const key of TERMINAL_RUN_KEYS) {
+    if (key === "from" || key === "to") continue;
+    const left = a[key];
+    const right = b[key];
+    if (isRecord(left) && isRecord(right)) {
+      if (left["kind"] !== right["kind"]) return false;
+      if (left["hex"] !== right["hex"] || left["index"] !== right["index"]) return false;
+      continue;
+    }
+    if (left !== right) return false;
+  }
+  return true;
+}
+
+function checkSpans(b: Record<string, unknown>, member: string, e: string[], at: string, attributesOnly = false): void {
+  const spans = b["spans"];
+  if (spans === undefined) return;
+  if (!isArray(spans)) {
+    e.push(`${at}: "spans" must be an array (C04 I84)`);
+    return;
+  }
+  const text = b[member];
+  const length = isString(text) ? text.length : 0; // cells-ok — a code-unit bound, not a width
+  let previousTo = 0;
+  spans.forEach((span, i) => {
+    const where = `${at}: spans[${String(i)}]`;
+    if (!isRecord(span)) {
+      e.push(`${where} must be a record (C04 I84)`);
+      return;
+    }
+    const from = span["from"];
+    const to = span["to"];
+    if (typeof from !== "number" || !Number.isInteger(from) || from < 0) {
+      e.push(`${where}: "from" must be a non-negative integer (C04 I84)`);
+      return;
+    }
+    if (typeof to !== "number" || !Number.isInteger(to) || to <= from) {
+      e.push(`${where}: "to" must be an integer greater than "from" — a span is [from, to) and never empty (C04 I84)`);
+      return;
+    }
+    if (to > length) {
+      e.push(`${where}: "to" (${String(to)}) is past the end of "${member}" (${String(length)} code units) (C04 I84)`);
+      return;
+    }
+    if (from < previousTo) {
+      e.push(`${where}: overlaps or precedes the span before it — spans are sorted by "from" and disjoint (C04 I84)`);
+      return;
+    }
+    previousTo = to;
+    if (isString(text) && (splitsSurrogate(text, from) || splitsSurrogate(text, to))) {
+      e.push(`${where}: a boundary falls between the two halves of a surrogate pair (C04 I84)`);
+      return;
+    }
+    // C04 I107 — two colour channels from two owners on one cell, neither floored.
+    if (span["value"] !== undefined && span["ramp"] !== undefined) {
+      e.push(`${where}: "value" and "ramp" on one span — a background from the map and a foreground from the ramp is two unmeasured colours on one cell (C04 I107)`);
+      return;
+    }
+    for (const key of Object.keys(span)) {
+      if (!TEXT_SPAN_KEYS.has(key)) {
+        e.push(`${where}: unknown member "${key}" — a span carries from, to, bold, italic, underline, tone, value, elide, ramp and nothing else (C04 I85)`);
+        return;
+      }
+      if (key === "ramp") {
+        if (attributesOnly) {
+          e.push(`${where}: "ramp" is refused on this member — its palettes are spoken for (C04 I107, I91)`);
+          return;
+        }
+        const before = e.length; // cells-ok — an error count
+        checkRamp(span[key], e, `${where}.ramp`, true);
+        if (e.length !== before) return; // cells-ok — an error count
+        continue;
+      }
+      if (key === "tone") {
+        if (!attributesOnly && typeof span[key] === "string" && TONE_SET.has(span[key])) continue;
+        e.push(
+          attributesOnly
+            ? `${where}: "tone" is refused on this member — its palettes are spoken for (C04 I89, I91)`
+            : `${where}: "tone" must be one of ${TONES.join(", ")} (C04 I89)`,
+        );
+        return;
+      }
+      if (key === "value") {
+        const v = span[key];
+        if (attributesOnly) {
+          e.push(`${where}: "value" is refused on this member (C04 I90, I91)`);
+          return;
+        }
+        if (typeof v !== "number" || !Number.isFinite(v) || v < 0 || v > 1) {
+          e.push(`${where}: "value" must be a finite number in [0, 1] (C04 I90)`);
+          return;
+        }
+        if (b["colormap"] === undefined) {
+          e.push(`${where}: "value" with no "colormap" on the block — a reading with no map paints nothing (C04 I90)`);
+          return;
+        }
+        continue;
+      }
+      if (key !== "from" && key !== "to" && typeof span[key] !== "boolean") {
+        e.push(`${where}: "${key}" must be a boolean (C04 I85)`);
+        return;
+      }
+    }
+  });
+}
+
+const TONE_SET: ReadonlySet<string> = new Set<string>(TONES);
+const RAMP_FILL_SET: ReadonlySet<string> = new Set<string>(RAMP_FILLS);
+const RAMP_ANIMATION_SET: ReadonlySet<string> = new Set<string>(RAMP_ANIMATIONS);
+
+/**
+ * A `Ramp` at the gate (C04 §3am.2, I106–I109). One error per fault, the first
+ * fault only, each naming the rule it broke.
+ *
+ * `onSpan` is the text arm: a colormap backing is refused there because the
+ * contrast floor is proven per slot and a sampled colour passes through no floor
+ * (I107); the bar's ink fills its cell and reads by area, so the same backing is
+ * admitted on `progress` (I108).
+ */
+function checkRamp(value: unknown, e: string[], where: string, onSpan: boolean): void {
+  if (!isRecord(value)) {
+    e.push(`${where} must be a record with a "fill" (C04 I106)`);
+    return;
+  }
+  for (const key of Object.keys(value)) {
+    if (!RAMP_KEYS.has(key)) {
+      e.push(`${where}: unknown member "${key}" — a ramp carries fill, from, to, colormap, bands, animate and nothing else (C04 I106)`);
+      return;
+    }
+  }
+  const fill = value["fill"];
+  if (typeof fill !== "string" || !RAMP_FILL_SET.has(fill)) {
+    e.push(`${where}: "fill" must be one of ${RAMP_FILLS.join(", ")} (C04 I106)`);
+    return;
+  }
+  const from = value["from"];
+  const to = value["to"];
+  const colormap = value["colormap"];
+  const bands = value["bands"];
+  const animate = value["animate"];
+  if ((from === undefined) !== (to === undefined)) {
+    e.push(`${where}: "from" and "to" are a pair — one without the other is half a backing (C04 I106)`);
+    return;
+  }
+  if (from !== undefined && (typeof from !== "string" || !TONE_SET.has(from) || typeof to !== "string" || !TONE_SET.has(to))) {
+    e.push(`${where}: "from" and "to" must each be one of ${TONES.join(", ")} (C04 I106)`);
+    return;
+  }
+  if (colormap !== undefined && (typeof colormap !== "string" || !COLORMAP_SET.has(colormap))) {
+    e.push(`${where}: "colormap" must be one of ${COLORMAP_NAMES.join(", ")} (C04 I106, C10 I31)`);
+    return;
+  }
+  const hasPair = from !== undefined;
+  const hasMap = colormap !== undefined;
+  if (fill === "palette") {
+    if (hasPair || hasMap) {
+      e.push(`${where}: a "palette" fill takes no backing — it cycles the theme's categorical slots and names nothing (C04 I106, C10 I16)`);
+      return;
+    }
+    if (bands !== undefined) {
+      e.push(`${where}: "bands" rides on "step" alone (C04 I106)`);
+      return;
+    }
+  } else {
+    if (hasPair === hasMap) {
+      e.push(
+        hasPair
+          ? `${where}: a "${fill}" takes one backing — a from/to pair or a colormap, not both (C04 I106)`
+          : `${where}: a "${fill}" takes one backing — a from/to pair or a colormap (C04 I106)`,
+      );
+      return;
+    }
+    if (hasMap && onSpan) {
+      e.push(`${where}: a colormap backing is refused on a span — the contrast floor is proven per slot and a sample passes through none; a slot pair is bounded by two proven colours (C04 I107, C10 I26)`);
+      return;
+    }
+    if (bands !== undefined) {
+      if (fill !== "step") {
+        e.push(`${where}: "bands" rides on "step" alone (C04 I106)`);
+        return;
+      }
+      if (typeof bands !== "number" || !Number.isInteger(bands) || bands < 2 || bands > 8) {
+        e.push(`${where}: "bands" must be an integer in 2..8 — one band is a gradient wearing a different name (C04 I106)`);
+        return;
+      }
+    }
+  }
+  if (animate !== undefined && (typeof animate !== "string" || !RAMP_ANIMATION_SET.has(animate))) {
+    e.push(`${where}: "animate" must be one of ${RAMP_ANIMATIONS.join(", ")} — a one-shot is an event the render cannot time (C04 I109)`);
+    return;
+  }
+}
+
+/** `i` lies strictly between a high and a low surrogate — the one cluster interior L0 can see. */
+function splitsSurrogate(text: string, i: number): boolean {
+  if (i <= 0 || i >= text.length) return false; // cells-ok — a code-unit index
+  const before = text.charCodeAt(i - 1);
+  const here = text.charCodeAt(i);
+  return before >= 0xd800 && before <= 0xdbff && here >= 0xdc00 && here <= 0xdfff;
 }
 
 /**
@@ -664,11 +1037,86 @@ function checkActions(b: Record<string, unknown>, e: string[], at: string): void
  * a new kind without a row here is a type error, not a silent pass (T2.10).
  */
 const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
-  rule: (b, e, at) => requireString(b, "label", e, at),
+  rule: (b, e, at) => {
+    requireString(b, "label", e, at);
+    // C04 I94 — three drawn forms, so three values. A fourth would be accepted
+    // and drawn as a third, which is the member-accepted-and-ignored shape one
+    // layer up from where F207 usually finds it; the type refuses it for a
+    // caller who compiles and this refuses it for a far side that does not.
+    const level = b["level"];
+    if (level !== undefined && level !== 1 && level !== 2 && level !== 3) {
+      e.push(`${at}: "level" must be 1, 2 or 3 (C04 I94) — a rule draws three forms, and a fourth would be drawn as one of them`);
+    }
+    // C04 I90 — a rule has no valued span to read a map through; the builder
+    // half is `ValuedTextOpts`, and this is the gate half (F589).
+    if (b["colormap"] !== undefined) {
+      e.push(`${at}: "colormap" is refused on rule — a rule has no valued span to read it (C04 I90)`);
+    }
+    checkSpans(b, "label", e, at);
+  },
+  terminal: (b, e, at) => {
+    const cols = b["cols"];
+    if (typeof cols !== "number" || !Number.isInteger(cols) || cols < 1) {
+      e.push(`${at}: "cols" must be a positive integer (C04 §3i) — the width the emulator painted to`);
+    }
+    const screen = b["screen"];
+    if (screen !== "lines" && screen !== "grid") {
+      e.push(`${at}: "screen" must be "lines" or "grid" (C04 I113) — the alternate screen has no scrollback, and the flag is what says which artefact a settled block keeps`);
+    }
+    requireArray(b, "lines", e, at);
+    const lines = b["lines"];
+    if (isArray(lines)) {
+      lines.forEach((line, li) => {
+        const where = `${at}.lines[${String(li)}]`;
+        if (!isRecord(line)) {
+          e.push(`${where}: must be an object with "text" (C04 I110)`);
+          return;
+        }
+        checkTerminalLine(line, e, where);
+      });
+    }
+    // C04 I113 — the two fields are exclusive by meaning, not by convention: a
+    // grid has nothing above it to lose.
+    const dropped = b["dropped"];
+    if (dropped !== undefined) {
+      if (typeof dropped !== "number" || !Number.isInteger(dropped) || dropped < 1) {
+        e.push(`${at}: "dropped" must be a positive integer when present (C04 I113) — declared by presence, so a zero would draw "0 lines dropped at the cap"`);
+      } else if (screen === "grid") {
+        e.push(`${at}: "dropped" is refused on a grid screen (C04 I113) — the alternate screen has no scrollback to lose lines from`);
+      }
+    }
+    // C04 I112 — appearance, and it still has to point at something that exists.
+    const cursor = b["cursor"];
+    if (cursor !== undefined) {
+      if (!isRecord(cursor)) {
+        e.push(`${at}: "cursor" must be an object with "line" and "col" (C04 I112)`);
+      } else {
+        const line = cursor["line"];
+        const col = cursor["col"];
+        const height = isArray(lines) ? lines.length : 0;
+        if (typeof line !== "number" || !Number.isInteger(line) || line < 0 || line >= height) {
+          e.push(`${at}.cursor: "line" must index a line that exists (C04 I112) — ${String(height)} line(s)`);
+        }
+        if (typeof col !== "number" || !Number.isInteger(col) || col < 0 || (typeof cols === "number" && col >= cols)) {
+          e.push(`${at}.cursor: "col" must be within "cols" (C04 I112)`);
+        }
+      }
+    }
+    for (const key of Object.keys(b)) {
+      if (!TERMINAL_KEYS.has(key)) {
+        e.push(`${at}: unknown key "${key}" on terminal (C04 I110)`);
+      }
+    }
+  },
   notice: (b, e, at) => {
     requireString(b, "text", e, at);
     requireString(b, "tone", e, at);
     requireGlyph(b["glyph"], e, at);
+    checkColormapName(b, e, at);
+    checkSpans(b, "text", e, at);
+    // The one button a notice may carry (C04 §3, arc 6 §5) — a chip's `Action`,
+    // refused by the same rule as a tip's.
+    if (b["action"] !== undefined) checkAction(b["action"], `${at}.action`, e);
   },
   keyValue: (b, e, at) => {
     requireArray(b, "rows", e, at);
@@ -724,6 +1172,7 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
         for (const [key, cell] of Object.entries(row["cells"])) {
           if (!isRecord(cell)) continue;
           requireGlyph(cell["glyph"], e, `${at} cell "${key}"`);
+          checkSpans(cell, "text", e, `${at} cell "${key}"`);
           // I46 — the second numeric array, and the one no round trip would
           // have surfaced: a sparkline drawn from a cell's own numbers.
           requireFiniteNumbers(cell["spark"], e, `${at} cell "${key}"`, "spark");
@@ -798,6 +1247,7 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
       for (const [i, s] of b["series"].entries()) {
         if (isRecord(s)) requireFiniteNumbers(s["values"], e, at, `series[${String(i)}].values`);
         if (isRecord(s)) checkPointLabels(s, e, at, i, b["form"]);
+        if (isRecord(s)) checkSeriesHidden(s, e, at, i, b["form"]);
       }
       // **I50a — refused, not cycled** (roadmap 51). The categorical palette
       // distinguishes eight, and a ninth series used to reuse the first's
@@ -810,7 +1260,15 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
       // never reads the categorical palette, so a cap at the palette's size
       // would refuse a document about something else — and eight rows is not a
       // matrix.
-      if (b["form"] !== "heatmap" && b["series"].length > CATEGORY_LIMIT) {
+      // **`IS_MATRIX`, not `heatmap` alone** (F398). C04 I50a's exemption above is
+      // stated as *a rule about colour binds where colour is drawn*, and that
+      // reaches every form whose rows are a ramp — `correlation`, `confusion`,
+      // `spectrogram`, `latency`, `density2d`, `calendar`, `utilisation`,
+      // `contour`, `quiver`. Named one form, it refused the other nine for a
+      // palette none of them reads. The record that answers *is this a matrix*
+      // already existed.
+      const matrix = typeof b["form"] === "string" && IS_MATRIX[b["form"] as PlotForm] === true;
+      if (!matrix && b["series"].length > CATEGORY_LIMIT) {
         e.push(
           `${at}: "series" has ${String(b["series"].length)} entries and the categorical ` +
             `palette distinguishes ${String(CATEGORY_LIMIT)} (C04 I50a) — a ninth series ` +
@@ -994,10 +1452,19 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     requireString(b, "label", e, at);
     if (!isFiniteNumber(b["current"])) e.push(`${at}: "current" must be a finite number`);
     if (!isFiniteNumber(b["total"])) e.push(`${at}: "total" must be a finite number`);
+    // C04 I108 — the one block-level carrier, and the one place a colormap
+    // backing is admitted: the bar's ink fills its cell and reads by area.
+    if (b["ramp"] !== undefined) checkRamp(b["ramp"], e, `${at}.ramp`, false);
   },
   code: (b, e, at) => {
     requireString(b, "language", e, at);
     requireString(b, "text", e, at);
+    // C04 I88 — `code` already carries a run stream over its text: the syntax
+    // tokens. A second stream over the same string is the collision spans exist
+    // to prevent, so the member is refused rather than merged.
+    if (b["spans"] !== undefined) {
+      e.push(`${at}: "spans" is refused on code — its syntax tokens are already a run stream over the text (C04 I88)`);
+    }
   },
   comparison: (b, e, at) => requireArray(b, "rows", e, at),
   patch: (b, e, at) => {
@@ -1005,6 +1472,17 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     requireString(b, "language", e, at);
     requireArray(b, "hunks", e, at);
     checkActions(b, e, at);
+    // C04 I91 — a hunk line's spans are attributes only, checked per line.
+    const hunks = b["hunks"];
+    if (isArray(hunks)) {
+      hunks.forEach((h, hi) => {
+        const lines = isRecord(h) ? h["lines"] : undefined;
+        if (!isArray(lines)) return;
+        lines.forEach((line, li) => {
+          if (isRecord(line)) checkSpans(line, "text", e, `${at} hunks[${String(hi)}].lines[${String(li)}]`, true);
+        });
+      });
+    }
     // A negative elision is not an elision, and it would render a marker claiming
     // there is content to reveal above what the block actually holds.
     const after = b["collapsedAfter"];
@@ -1039,8 +1517,13 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     }
     checkFlex(b, e, at);
     checkAlign(b, e, at);
+    checkMinRows(b, e, at);
   },
-  raw: (b, e, at) => requireString(b, "text", e, at),
+  raw: (b, e, at) => {
+    requireString(b, "text", e, at);
+    checkColormapName(b, e, at);
+    checkSpans(b, "text", e, at);
+  },
   /**
    * C04 I47, §3c cell 5 — **refused at parse, not corrected at render.**
    *
@@ -1057,7 +1540,7 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
   /**
    * C04 I73, §3g.1 — refused at both gates, each naming its own part.
    *
-   * **The PNG check is a signature check and not a decode.** `data/` may not
+   * **The PNG-or-GIF check is a signature check and not a decode.** `data/` may not
    * import the codec — that is L1's — and a gate that decoded would do the
    * expensive half of the work twice. The eight signature bytes are what
    * separates *this is not a PNG* from *this PNG is broken*, and the second is
@@ -1081,10 +1564,12 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     if (typeof data === "string") {
       // The base64 of the eight-byte PNG signature. Checked as a prefix so a
       // truncated or mislabelled file is refused here rather than drawn.
-      if (!data.startsWith("iVBORw0KGgo")) {
+      // PNG, GIF87a or GIF89a by base64 signature (C04 I73, I93) — the same three
+      // prefixes `b.image` checks, so the two gates are one rule.
+      if (!data.startsWith("iVBORw0KGgo") && !data.startsWith("R0lGODdh") && !data.startsWith("R0lGODlh")) {
         e.push(
-          `${at}: "data" is not a PNG (C04 I73) — phase 1 reads PNG only, and a signature that ` +
-            `does not match is a format this cannot draw rather than an image that is broken`,
+          `${at}: "data" is not a PNG or a GIF (C04 I73, C04 I93) — a signature that matches neither ` +
+            `is a format this cannot draw rather than an image that is broken`,
         );
       }
     }
@@ -1177,6 +1662,19 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
           `a box of zero rows shows nothing and has no reading to fall back on`,
       );
     }
+    // **Present-or-boolean, for both** (C04 I97, I98). `collapsed` is declared by
+    // presence, so a non-boolean value would declare a collapsed form and then
+    // fail to say which state it is in.
+    if (b["follow"] !== undefined && typeof b["follow"] !== "boolean") {
+      e.push(
+        `${at}: "follow" must be a boolean when present (C04 I97) — got ${JSON.stringify(b["follow"])}`,
+      );
+    }
+    if (b["collapsed"] !== undefined && typeof b["collapsed"] !== "boolean") {
+      e.push(
+        `${at}: "collapsed" must be a boolean when present (C04 I98) — got ${JSON.stringify(b["collapsed"])}`,
+      );
+    }
   },
 });
 
@@ -1236,7 +1734,7 @@ function checkFlex(b: Record<string, unknown>, e: string[], at: string): void {
 }
 
 /**
- * A `row` group's per-child vertical alignment (C04 I45).
+ * A group's per-child alignment, both axes (C04 I100; I45 for the vertical half).
  *
  * Refused on the same terms as `flex`: a length that does not match the children
  * has no reading, and a value outside the vocabulary would be silently ignored
@@ -1260,9 +1758,26 @@ function checkAlign(b: Record<string, unknown>, e: string[], at: string): void {
   }
 
   for (const [i, entry] of align.entries()) {
-    if (entry !== "top" && entry !== "middle" && entry !== "bottom") {
-      e.push(`${at}.align[${String(i)}]: one of top, middle, bottom`);
+    if (typeof entry !== "string" || !(ALIGN_ENTRIES as readonly string[]).includes(entry)) {
+      // Vertical first in the paired form — `bottom-right`, never `right-bottom`
+      // (I100 table row 14): the order is the type's, and an entry that parsed
+      // either way round would be a typo that became a layout.
+      e.push(
+        `${at}.align[${String(i)}]: one of top, middle, bottom, left, centre, right, or vertical-horizontal such as bottom-right`,
+      );
     }
+  }
+}
+
+/**
+ * The author's floor on a group (C04 I102), on I44's argument for `cells`: a
+ * floor of zero or a fraction of a row names something the grid cannot draw.
+ */
+function checkMinRows(b: Record<string, unknown>, e: string[], at: string): void {
+  const minRows = b["minRows"];
+  if (minRows === undefined) return;
+  if (typeof minRows !== "number" || !Number.isInteger(minRows) || minRows < 1) {
+    e.push(`${at}: "minRows" is a whole number of rows above zero`);
   }
 }
 
@@ -1430,6 +1945,7 @@ function plotFieldErrors(
       }
     }
   }
+  checkPoints3(b, form, at, e);
   // **A layer with no data is refused at the gate**, because the alternative is
   // an empty plot area that reads as a field with nothing in it.
   if (Array.isArray(layers) && layers.includes("quiver") && vectors === undefined) {
@@ -1437,6 +1953,389 @@ function plotFieldErrors(
       `${at}: "layers" names "quiver" and there are no "vectors" (C04 I61) — a layer ` +
         `with no data draws an empty area that reads as a field with nothing in it`,
     );
+  }
+}
+
+/**
+ * A 3D scatter's geometry and its colour channel (C04 I76, C12 I87).
+ *
+ * **`vectors`' shape one dimension along**, and the four refusals are the four
+ * §3am names: the carrier off the form, the form with no carrier, the channel
+ * off the form, and `axes` on it.
+ *
+ * **`axes` is F207's rule rather than a deferral.** Three axes turn with the
+ * camera and are drawn inside the area, so there is no gutter and no bottom
+ * rule for `axes: true` to switch on — and a member accepted and ignored tells
+ * the caller nothing. The blocker is the in-scene axis renderer rather than a
+ * step number, so a grep for `axesAt3` is what expires this clause.
+ */
+/**
+ * The carriers a `plot3d` draws, as **one list two rules read** (C04 I79).
+ *
+ * **The class rather than the instance.** The gate's *neither carrier* refusal
+ * and `colourBy: "value"`'s completeness walk are both over this set, and each
+ * was written against one carrier and widened by hand when the second arrived
+ * (C12 §6g rows 2 and 3). At the third that stops being a pair of edits: a
+ * fifth carrier is one entry here, and two places that must agree become one
+ * place that cannot disagree.
+ */
+const CARRIERS_3D = Object.freeze(["points3", "lines3", "surfaces3"] as const);
+
+function checkPoints3(
+  b: Record<string, unknown>,
+  form: unknown,
+  at: string,
+  e: string[],
+): void {
+  const pts = b["points3"];
+  const lns = b["lines3"];
+  const sfs = b["surfaces3"];
+  const by = b["colourBy"];
+  if (pts !== undefined && form !== "plot3d") {
+    e.push(
+      `${at}: "points3" on form "${String(form)}" (C04 I76) — only a plot3d draws a ` +
+        `point cloud, and three coordinates per sample mean nothing to any other form`,
+    );
+  }
+  if (lns !== undefined && form !== "plot3d") {
+    e.push(
+      `${at}: "lines3" on form "${String(form)}" (C04 I78) — only a plot3d draws a path ` +
+        `through three-dimensional space, and there is no projection to draw it with`,
+    );
+  }
+  // **Neither carrier, not *no `points3`*** (C04 I78). A wireframe is edges with
+  // no cloud and a parametric curve is a path with no samples, so either member
+  // alone is a complete document. The refusal as first written read the cloud
+  // only, and nothing about the member would have shown it — it is the carrier
+  // rule meeting the *other* carrier, which is C12 §6g row 2.
+  if (sfs !== undefined && form !== "plot3d") {
+    e.push(
+      `${at}: "surfaces3" on form "${String(form)}" (C04 I79) — only a plot3d shades a ` +
+        `surface, and there is no projection, no depth buffer and no light to shade it with`,
+    );
+  }
+  if (b["light3"] !== undefined && form !== "plot3d") {
+    e.push(
+      `${at}: "light3" on form "${String(form)}" (C04 I79) — it says where the light is, and ` +
+        `only a shaded surface reads one`,
+    );
+  }
+  // **The carrier set, not a widened pair of names** (C04 I79, C12 §6g row 2).
+  // A wireframe has no cloud, a parametric curve has no samples, and a loss
+  // landscape has neither — so the refusal is *no carrier at all*, and the list
+  // it reads is the one the completeness walk below reads.
+  if (form === "plot3d" && CARRIERS_3D.every((k) => b[k] === undefined)) {
+    e.push(
+      `${at}: form "plot3d" has none of ${CARRIERS_3D.map((k) => `"${k}"`).join(", ")} ` +
+        `(C04 I79) — a cloud, a path or a surface is what it draws, and "series" carries one ` +
+        `reading per position`,
+    );
+  }
+  if (by !== undefined && form !== "plot3d") {
+    e.push(
+      `${at}: "colourBy" on form "${String(form)}" (C04 I76) — it names which of three ` +
+        `readings colour carries, and no other form has three competing for it`,
+    );
+  }
+  if (form === "plot3d" && b["axes"] === true) {
+    e.push(
+      `${at}: "axes" on form "plot3d" (C04 I76) — three axes turn with the camera and ` +
+        `are drawn inside the area, so there is no gutter and no bottom rule to switch on`,
+    );
+  }
+  // **`origin3` is read by `axes3: "origin"` and by nothing else** (C04 I77).
+  const o3 = b["origin3"];
+  const a3 = b["axes3"] ?? "corner";
+  if (o3 !== undefined && a3 !== "origin") {
+    e.push(
+      `${at}: "origin3" with "axes3" of "${String(a3)}" (C04 I77) — it says where the axis ` +
+        `lines cross, and only "origin" draws a crossing`,
+    );
+  }
+  // **The walk covers both carriers, or the arm is enforced on half its input**
+  // (C04 I78, C12 §6g row 3). A `Line3`'s points are `Point3`s and
+  // `colourBy: "value"` reads them the same way, so a version that walked
+  // `points3` only would pass T3.53 and every row derived from it.
+  walkPoints3(pts, "points3", by, at, e);
+  walkPoints3(lns, "lines3", by, at, e);
+  walkSurfaces3(sfs, by, at, e);
+}
+
+/**
+ * A surface's arms and its field (C04 I79).
+ *
+ * **Exactly one arm per surface**, and the refusals are `origin3`'s rule: a
+ * member deciding nothing on the arm it was given tells the caller nothing. The
+ * `field` check is the height-field arm's alone, because a mesh's field is the
+ * `value` already on each vertex — one member cannot mean both, and a grid
+ * indexed by a vertex number is not a thing.
+ */
+function walkSurfaces3(
+  carrier: unknown,
+  by: unknown,
+  at: string,
+  e: string[],
+): void {
+  if (carrier === undefined) return;
+  if (!Array.isArray(carrier)) {
+    e.push(`${at}: "surfaces3" must be an array`);
+    return;
+  }
+  let si = 0;
+  for (const raw of carrier as readonly Record<string, unknown>[]) {
+    const sf = raw ?? {};
+    const where = `${at}: surfaces3[${String(si)}]`;
+    si += 1; // cells-ok — a surface index
+    const heights = sf["heights"];
+    const verts = sf["vertices"];
+    const grid = Array.isArray(heights);
+    const mesh = Array.isArray(verts);
+    if (grid && mesh) {
+      e.push(
+        `${where} has both "heights" and "vertices" (C04 I79) — a surface is a height field ` +
+          `or a mesh, and a renderer given both would silently pick one`,
+      );
+      continue;
+    }
+    if (!grid && !mesh) {
+      e.push(
+        `${where} has neither "heights" nor "vertices" (C04 I79) — those are the two ways to ` +
+          `say what the surface is, and a surface with no geometry draws nothing`,
+      );
+      continue;
+    }
+    if (!grid && sf["faces"] === undefined) {
+      e.push(
+        `${where} has "vertices" and no "faces" (C04 I79) — positions alone are a point cloud, ` +
+          `and "points3" is the carrier that draws one`,
+      );
+      continue;
+    }
+    // **`closed` is the mesh arm's, and the refusal is here because the
+    // renderer cannot take it** (C04 I80, F463). An open surface's signed
+    // volume is not zero — a 9×9 Gaussian measures `0.1742` — so `|V| < ε`
+    // cannot stand in for *is this closed*, and the zero the opposite premise
+    // rested on belongs to `unitOf`: it centres each axis on the extent, so
+    // every **planar** surface normalises onto a plane through the origin and
+    // cancels. Three fixtures returned zero for that reason and read as
+    // corroboration.
+    //
+    // **`wireframe` is not refused here and the pair is deliberate** (§6i row
+    // 15). It is about the edges the input already has and a grid has the most
+    // structured ones; copying one member's refusal onto the other because they
+    // arrived together is the bundled-row mistake with a member in place of a
+    // blocker.
+    if (grid && sf["closed"] !== undefined) {
+      e.push(
+        `${where} has "closed" on a height field (C04 I80) — it enables backface culling, ` +
+          `which needs a surface with an inside; a grid has none, and the renderer cannot ` +
+          `tell an open surface from a closed one because an open one's signed volume is ` +
+          `not zero`,
+      );
+      continue;
+    }
+    if (grid) walkHeights3(heights as readonly unknown[], sf, by, where, e);
+    else walkMesh3(verts as readonly unknown[], sf, by, where, e);
+  }
+}
+
+/** The height-field arm: a rectangular grid, a matching field, and two ranges. */
+function walkHeights3(
+  heights: readonly unknown[],
+  sf: Record<string, unknown>,
+  by: unknown,
+  where: string,
+  e: string[],
+): void {
+  const finite = (v: unknown): boolean => typeof v === "number" && Number.isFinite(v);
+  const width = Array.isArray(heights[0]) ? (heights[0] as readonly unknown[]).length : 0; // cells-ok — a grid width
+  if (heights.length < 2 || width < 2) { // cells-ok — a grid extent
+    e.push(
+      `${where} has a ${String(heights.length)}x${String(width)} "heights" grid (C04 I79) — a ` +
+        `cell needs two rows and two columns, so nothing below that has a face to shade`,
+    );
+    return;
+  }
+  for (const row of heights) {
+    if (!Array.isArray(row) || row.length !== width) { // cells-ok — a grid width
+      e.push(`${where} has a ragged "heights" grid (C04 I79) — a height field is over a regular grid`);
+      return;
+    }
+    for (const v of row as readonly unknown[]) {
+      if (!finite(v)) {
+        e.push(
+          `${where} has a non-finite "heights" entry (C04 I79) — a gap is a position that ` +
+            `produced no reading, and a grid has a reading everywhere by construction`,
+        );
+        return;
+      }
+    }
+  }
+  for (const k of ["xRange", "yRange"] as const) {
+    const r = sf[k];
+    if (!Array.isArray(r) || r.length !== 2 || !finite(r[0]) || !finite(r[1])) { // cells-ok — a pair
+      e.push(`${where} has no finite "${k}" pair (C04 I79) — the grid has no span without it`);
+      return;
+    }
+  }
+  const field = sf["field"];
+  if (field !== undefined) {
+    if (
+      !Array.isArray(field) ||
+      field.length !== heights.length || // cells-ok — a grid height
+      !field.every((row) => Array.isArray(row) && row.length === width) // cells-ok — a grid width
+    ) {
+      e.push(
+        `${where} has a "field" whose shape is not "heights"' (C04 I79) — the field is parallel ` +
+          `to the grid, which is what makes colour independent of height`,
+      );
+      return;
+    }
+  }
+  // **The completeness walk's third carrier** (C04 I79, C12 §6h row 13). Under
+  // `"value"` the surface's colour is the field, so a cell without one would be
+  // shaded in a colour nothing chose — `walkPoints3`'s rule over a grid.
+  if (by !== "value") return;
+  const src = field ?? heights;
+  for (let j = 0; j < src.length; j += 1) { // cells-ok — a row index
+    const row = src[j] as readonly unknown[];
+    for (let i = 0; i < row.length; i += 1) { // cells-ok — a column index
+      if (!finite(row[i])) {
+        e.push(
+          `${where}.${field === undefined ? "heights" : "field"}[${String(j)}][${String(i)}] ` +
+            `is not finite and "colourBy" is "value" (C04 I79) — the cell still has a position, ` +
+            `so it would be shaded in a colour nothing chose`,
+        );
+        return;
+      }
+    }
+  }
+}
+
+/** The mesh arm: finite positions, in-range face indices, and the value walk. */
+function walkMesh3(
+  verts: readonly unknown[],
+  sf: Record<string, unknown>,
+  by: unknown,
+  where: string,
+  e: string[],
+): void {
+  const finite = (v: unknown): boolean => typeof v === "number" && Number.isFinite(v);
+  const faces = sf["faces"];
+  if (!Array.isArray(faces)) {
+    e.push(`${where} has a non-array "faces" (C04 I79)`);
+    return;
+  }
+  let vi = 0;
+  for (const p of verts as readonly Record<string, unknown>[]) {
+    if (!finite(p?.["x"]) || !finite(p?.["y"]) || !finite(p?.["z"])) {
+      e.push(
+        `${where}.vertices[${String(vi)}] is not a finite (x, y, z) (C04 I79) — a gap is a ` +
+          `position that produced no reading, and a mesh lists only the positions it has`,
+      );
+      return;
+    }
+    if (by === "value" && !finite(p["value"])) {
+      e.push(
+        `${where}.vertices[${String(vi)}] has no finite "value" and "colourBy" is "value" ` +
+          `(C04 I79) — the vertex still has a position, so it would be shaded in a colour ` +
+          `nothing chose`,
+      );
+      return;
+    }
+    vi += 1; // cells-ok — a vertex index
+  }
+  let fi = 0;
+  for (const f of faces as readonly unknown[]) {
+    if (!Array.isArray(f) || f.length !== 3) { // cells-ok — a triangle
+      e.push(`${where}.faces[${String(fi)}] is not a triple (C04 I79) — a face is a triangle`);
+      return;
+    }
+    for (const ix of f as readonly unknown[]) {
+      if (typeof ix !== "number" || !Number.isInteger(ix) || ix < 0 || ix >= verts.length) { // cells-ok — a vertex count
+        e.push(
+          `${where}.faces[${String(fi)}] names vertex ${String(ix)} of ` +
+            `${String(verts.length)} (C04 I79) — an index outside the array is a face the ` + // cells-ok — a vertex count
+            `renderer would read as a hole`,
+        );
+        return;
+      }
+    }
+    fi += 1; // cells-ok — a face index
+  }
+}
+
+/**
+ * Every point of one carrier — **and only the value arm reads the value**
+ * (C04 I76, C04 I78).
+ *
+ * A point missing a `value` still has a position, so under `colourBy: "value"`
+ * it would be drawn in *some* colour — dropping it silently is C12 I8's class
+ * and the ramp's floor is indistinguishable from a floor reading. Under the
+ * other two arms the field is not read and its absence is not a fault.
+ *
+ * **One function over two carriers** rather than the loop written twice, which
+ * is the shape a second carrier is supposed to force: two copies of a
+ * completeness rule are two places for it to stop agreeing.
+ */
+function walkPoints3(
+  carrier: unknown,
+  name: "points3" | "lines3",
+  by: unknown,
+  at: string,
+  e: string[],
+): void {
+  if (carrier === undefined) return;
+  if (!Array.isArray(carrier)) {
+    e.push(`${at}: "${name}" must be an array`);
+    return;
+  }
+  let si = 0;
+  for (const group of carrier as readonly Record<string, unknown>[]) {
+    const points = group?.["points"];
+    if (!Array.isArray(points)) {
+      e.push(`${at}: a "${name}" entry has no "points" array`);
+      si += 1; // cells-ok — a group index
+      continue;
+    }
+    // **Checked here and not through `Tone`'s convention** (C04 I76, C12 I99,
+    // §6m row 7). An unknown tone resolves to no colour and the mark still
+    // draws; an unknown marker indexes past the table and the **sample
+    // disappears**, which is absence indistinguishable from failure. So this
+    // one is a document error rather than a silent nothing — and it is asked
+    // only of `points3`, because `Line3` has no shape to name.
+    const marker = group?.["marker"];
+    if (name === "points3" && marker !== undefined) {
+      if (typeof marker !== "string" || !(marker in MARKER3_MEMBERS)) {
+        e.push(
+          `${at}: ${name}[${String(si)}].marker is not a marker name (C04 I76) — ` +
+            `one of ${Object.keys(MARKER3_MEMBERS).join(", ")}, and an unknown one ` +
+            `would draw no mark at all rather than a default one`,
+        );
+      }
+    }
+    let pi = 0;
+    for (const p of points as readonly Record<string, unknown>[]) {
+      const finite = (v: unknown): boolean => typeof v === "number" && Number.isFinite(v);
+      if (!finite(p?.["x"]) || !finite(p?.["y"]) || !finite(p?.["z"])) {
+        e.push(
+          `${at}: ${name}[${String(si)}].points[${String(pi)}] is not a finite (x, y, z) ` +
+            `(C04 I76) — a gap is a position that produced no reading, and a cloud lists ` +
+            `only the positions it has`,
+        );
+        break;
+      }
+      if (by === "value" && !finite(p["value"])) {
+        e.push(
+          `${at}: ${name}[${String(si)}].points[${String(pi)}] has no finite "value" and ` +
+            `"colourBy" is "value" (C04 I76) — the point still has a position, so it would ` +
+            `be drawn in a colour nothing chose`,
+        );
+        break;
+      }
+      pi += 1; // cells-ok — a point index
+    }
+    si += 1; // cells-ok — a group index
   }
 }
 
@@ -1768,7 +2667,7 @@ const PLOT_FORM_MEMBERS = {
   scatter: true, step: true, ecdf: true,
   bar: true, histogram: true, boxplot: true, forest: true, dumbbell: true,
   lollipop: true, dotplot: true, waffle: true,
-  flame: true, icicle: true, funnel: true, gantt: true, waterfall: true, streamgraph: true, stackedarea: true, treemap: true, tree: true, graph: true,
+  flame: true, icicle: true, funnel: true, gantt: true, waterfall: true, streamgraph: true, stackedarea: true, treemap: true, tree: true, graph: true, sankey: true,
   slope: true, bubble: true, autocorrelation: true, timeline: true, bullet: true, utilisation: true,
   calendar: true, correlation: true, confusion: true, spectrogram: true, latency: true, density2d: true,
   density: true, violin: true, ridgeline: true,
@@ -1776,12 +2675,13 @@ const PLOT_FORM_MEMBERS = {
   pie: true, radar: true,
   horizon: true,
   contour: true, quiver: true,
+  plot3d: true,
 } satisfies Record<PlotForm, true>;
 const PLOT_FORMS: ReadonlySet<string> = new Set(Object.keys(PLOT_FORM_MEMBERS));
 
 const PLOT_STYLE_MEMBERS = {
   auto: true, braille: true, line: true, candlestick: true,
-  solid: true,
+  solid: true, marker: true,
 } satisfies Record<NonNullable<Plot["plotStyle"]>, true>;
 const PLOT_STYLES: ReadonlySet<string> = new Set(Object.keys(PLOT_STYLE_MEMBERS));
 
@@ -1827,7 +2727,11 @@ function childBlocksOf(b: Record<string, unknown>): readonly unknown[] {
  * below carries the same check — one set, asked in two places, because the two
  * places are where the two fields live.
  */
-const FAR_SIDE_REFUSES_ON_BLOCK: readonly string[] = Object.freeze(["minHeight"]);
+// `lineRange` is the third member and the first whose writer is a definition's
+// `window` rather than an op (C04 I82, §3d): the argument is the same — a far
+// side naming which of its own lines a reader is looking at is declaring view
+// state it has no standing to declare.
+const FAR_SIDE_REFUSES_ON_BLOCK: readonly string[] = Object.freeze(["minHeight", "lineRange", "capped"]);
 const FAR_SIDE_REFUSES_ON_ROW: readonly string[] = Object.freeze(["expanded"]);
 
 function walkBlock(

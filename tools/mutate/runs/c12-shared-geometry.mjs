@@ -27,6 +27,11 @@ const SCALE = "src/presentation/plot/scale.ts";
 // is §3aj hazard 4's seam, structural rather than asserted.
 const SHARED = "src/data/viewmodel/range.ts";
 const SVG = "src/presentation/plot/svg.ts";
+// **Where two of these defects now live.** Step 4 moved the marks across the
+// seam, so a mutation aimed at *how a family computes its own coordinate* has to
+// follow — the coordinate is the shared layer's and only the rasterisation is
+// still this arm's (C12 §3ak.10).
+const FIGURE = "src/presentation/plot/figure.ts";
 
 // **The goldens are in the file list on purpose.** They cannot catch the flat
 // line — that is the finding — and their presence is what makes each row's
@@ -83,8 +88,10 @@ const results = runPass({
       // rather than the picture.
       name: "the shared coordinate divides by a zero span again",
       file: SHARED,
-      from: "  const t = span === 0 ? 0.5 : (v - range.min) / span;",
-      to: "  const t = (v - range.min) / span;",
+      // Re-anchored 2026-09-03: the coordinate maps through the range's scale
+      // (C04 I81), so `v - range.min` became `scaled(v, range) - lo`.
+      from: "  const t = span === 0 ? 0.5 : (scaled(v, range) - lo) / span;",
+      to: "  const t = (scaled(v, range) - lo) / span;",
       expect: "G9",
     },
     {
@@ -95,8 +102,9 @@ const results = runPass({
       // rather than a bug.
       name: "a constant field is drawn at the floor rather than mid-ramp",
       file: SHARED,
-      from: "  const t = span === 0 ? 0.5 : (v - range.min) / span;",
-      to: "  const t = span === 0 ? 0 : (v - range.min) / span;",
+      // Re-anchored 2026-09-03, as above.
+      from: "  const t = span === 0 ? 0.5 : (scaled(v, range) - lo) / span;",
+      to: "  const t = span === 0 ? 0 : (scaled(v, range) - lo) / span;",
       expect: "G9",
     },
     {
@@ -126,9 +134,14 @@ const results = runPass({
       // the two paths now disagree about where a sample sits, which is the
       // divergence §3aj exists to prevent.
       name: "the image path normalises for itself instead of the shared layer",
-      file: SVG,
-      from: "    const y = top + (bottom - top) * normalisedOf(v, range, true);",
-      to: "    const y = top + (bottom - top) * (1 - (v - range.min) / Math.max(1, range.max - range.min));",
+      // **Re-anchored to the emitter** (§3ak.12). `svgPoints` turned values into
+      // pixels and the marks walk took its last caller, so this arm no longer
+      // normalises anything: it projects marks the shared layer already
+      // normalised. The open-coding this restores is one file down, and the
+      // clamp is still the only thing a copy gets wrong.
+      file: FIGURE,
+      from: "    const pt: Pt = [i / span, normalisedOf(v, range, false)];",
+      to: "    const pt: Pt = [i / span, (v - range.min) / Math.max(1, range.max - range.min)];",
       expect: "G5",
     },
     {
@@ -137,8 +150,12 @@ const results = runPass({
       // discovered as a wrong-looking image, caught here at the seam.
       name: "a label is anchored at its start and needs its width to sit right",
       file: SVG,
-      from: "        `<text x=\"${n(box.left - 6)}\" y=\"${n(y + SVG_FONT_SIZE / 3)}\" text-anchor=\"end\" ` +",
-      to: "        `<text x=\"${n(box.left - 6)}\" y=\"${n(y + SVG_FONT_SIZE / 3)}\" ` +",
+      // **Re-anchored** when the value labels learned `yAxis: "left" |
+      // "right" | "both"` (C12 I67): the anchor is chosen per side now, so
+      // the mutation drops the choice rather than one literal. Same defect,
+      // and it reaches both sides where it used to reach one.
+      from: "          `text-anchor=\"${side === \"left\" ? \"end\" : \"start\"}\" ` +",
+      to: "          `` +",
       expect: "G5c",
     },
     {
@@ -148,10 +165,18 @@ const results = runPass({
       // the difference is the **span**: `Math.max(1, span)` squashes a density
       // field over `0..0.3` into the bottom third of the map. The first fixture
       // had a span of 6 and could not see it.
+      //
+      // **Re-anchored when the marks crossed the seam** (§3ak.10). The open-coded
+      // span was `marks()`' own loop; the cell's reading is now a member of the
+      // mark — `value`, normalised, spent on a ramp at each arm's own depth — so
+      // the defect is one file down and identical in shape. Both arms would take
+      // it now, which is the point of moving it.
       name: "the matrix family normalises its colour for itself",
-      file: SVG,
-      from: "        const t = normalisedOf(v, range, false);",
-      to: "        const t = (v - range.min) / Math.max(1, range.max - range.min);",
+      file: FIGURE,
+      // Widened: `fieldFigure` emits the matrix's cell shape verbatim, so this
+      // line alone matches two emitters (C12 §3ak.29).
+      from: "            // place the facing does not reach.\n            value: normalisedOf(v, extent, false),",
+      to: "            value: (v - extent.min) / Math.max(1, extent.max - extent.min),",
       expect: "G6",
     },
     {
@@ -164,10 +189,20 @@ const results = runPass({
       // source.** `normalisedOf(range.min, …)` is `1` by construction, so the
       // expression it mutated was `box.bottom` written the long way round —
       // dead arithmetic wearing the shared layer's clothes.
-      name: "a bar's baseline is the area's floor rather than zero",
-      file: SVG,
-      from: "      const base = box.top + (box.bottom - box.top) * normalisedOf(zero, range, true);",
-      to: "      const base = box.bottom;",
+      // **Turned round, because the arms unified the other way** (F272,
+      // §3ak.9). This arm computed its own zero baseline and the terminal does
+      // not — `barRow` and `barColumn` both fill from `(value - min) / span` —
+      // so the figure reproduces the terminal's answer deliberately and `G6b`
+      // asserts the defect. The mutation is therefore the **repair**, applied
+      // where the repair would go, and the row fails if it ever lands without
+      // `G6b` being rewritten with it.
+      name: "a bar is drawn from zero, and G6b is not rewritten to match",
+      file: FIGURE,
+      // Re-anchored again when the lag arm landed: the floor-filled rect is now
+      // the second half of a conditional, and the zero-based one beside it is
+      // what an autocorrelation already draws (§3ak.14).
+      from: "              : { kind: \"rect\", x, y: 0, w, h: top, fill: true },",
+      to: "              : { kind: \"rect\", x, y: Math.min(zero, top), w, h: Math.abs(top - zero), fill: true },",
       expect: "G6",
     },
     {
@@ -175,20 +210,39 @@ const results = runPass({
       // with: five literals where C10 has eight slots. The picture still reads
       // as a chart and every curve is still a curve — the difference is that
       // the legend and the figure name different colours for series six.
+      // Re-anchored to the walk's resolver, which is where every colour in this
+      // arm is now chosen — the per-series loop it used to sit in went with the
+      // bar family (§3ak.12).
       name: "a series takes a colour this file chose",
       file: SVG,
-      from: "    const ink = inkOf(refOf(si), theme);",
-      to: '    const ink = "#6ea8fe";',
+      from: "      ? inkOf(d.ref, theme)",
+      to: '      ? "#6ea8fe"',
       expect: "TC4",
     },
     {
       // **The wrap point, and it is the whole of F-this-commit.** `% 5` is
       // indistinguishable from `% 8` on every fixture with five series or
       // fewer, which is every fixture the per-form corpus has.
+      //
+      // **Re-anchored, and the survivor is what asked for it** (§3ak.10). TC2's
+      // fixture is eight *curve* series, and the curve family left this loop for
+      // the marks walk — so the mutation stayed in real, reachable code and
+      // stopped being on the path the test exercises.
+      //
+      // **The anchor sweep cannot see that.** `anchors.mjs` asks whether the text
+      // still matches, and it does: the bar family still runs this loop. Only
+      // running the pass says the row went quiet, and the reading it routes to is
+      // *write a test* when the answer is *the subject moved* — F219's
+      // misrouting arriving from the opposite direction, from an anchor that is
+      // unique and present rather than duplicated.
+      // **Re-anchored when the resolver became the series'** (F382). This read
+      // `refOf(d.seriesIndex)` — the slot — and a series' `tone` reached the
+      // line here and the swatch nowhere. The mutation's subject is unchanged:
+      // the index still decides the slot when no tone is declared.
       name: "the slot index wraps at five rather than at the palette's size",
       file: SVG,
-      from: "    const ink = inkOf(refOf(si), theme);",
-      to: "    const ink = inkOf(refOf(si % 5), theme);",
+      from: "        ? inkOf(seriesRefOf(block.series[d.seriesIndex], d.seriesIndex), theme)",
+      to: "        ? inkOf(seriesRefOf(block.series[d.seriesIndex], d.seriesIndex % 5), theme)",
       expect: "TC2",
     },
     {
@@ -210,8 +264,8 @@ const results = runPass({
       // it says anything, and only a row that counts elements can.
       name: "the SVG arm degrades like the terminal instead of pinning truecolour",
       file: SVG,
-      from: "const SVG_CAPS = Object.freeze({ colourDepth: 24 as const });",
-      to: "const SVG_CAPS = Object.freeze({ colourDepth: 4 as const });",
+      from: 'const SVG_CAPS = Object.freeze({ colourDepth: 24 as const, unicode: "full" as const });',
+      to: 'const SVG_CAPS = Object.freeze({ colourDepth: 4 as const, unicode: "full" as const });',
       expect: "TC5b",
     },
     {
@@ -220,10 +274,15 @@ const results = runPass({
       // furnished plot with an axis running 0 to 1 while the terminal draws
       // three candles over 8 to 16. **G7's partition cannot see this** — the
       // form *is* claimed — and neither can a corpus with one variant per form.
+      //
+      // **Re-anchored when the refusal became a drawing** (§3ak.31). It used to
+      // sever `if (given.ohlc !== undefined) return null;`; the emitter is what
+      // reads the datum now, so this severs that instead and the row it expects
+      // is the same one, still measuring the same axis.
       name: "a block whose datum is ohlc is drawn by the curve family",
-      file: SVG,
-      from: "  if (block.ohlc !== undefined) return null;",
-      to: "  if (false) return null;",
+      file: FIGURE,
+      from: "    if (bars !== undefined) marks.push(...candleMarks(bars, value.range));",
+      to: "    if (false) marks.push(...candleMarks(bars ?? [], value.range));",
       expect: "G8a",
     },
     {
@@ -242,10 +301,21 @@ const results = runPass({
       // arms disagree about which way up the data goes — and every assertion
       // about *where the ink is* still passes, because the ink is somewhere
       // legal.
-      name: "a non-default origin is drawn with the default facing",
+      //
+      // **Re-anchored: the clause it mutated was a refusal, and F383 deleted
+      // it.** `plotToSvg` used to return `null` for a non-default origin, on a
+      // comment that `svgPoints` inverts unconditionally — true when written and
+      // no longer, since `projected` reads `figure.facing`. So the subject moved
+      // from *the guard that refuses* to *the read that makes the guard
+      // unnecessary*, which is the same defect one step earlier: pin `up` and
+      // all four origins draw identically again, upright, with every mark inside
+      // the frame. **The mutation is strictly stronger than the one it
+      // replaces** — it restores the original defect rather than the guard
+      // against it.
+      name: "the ordinate's facing is ignored, so all four origins draw alike",
       file: SVG,
-      from: "  if (block.origin !== undefined && block.origin !== ORIGIN_DEFAULT[block.form]) return null;",
-      to: "  if (block.origin === undefined) return null;",
+      from: "  const up = figure.facing.y === \"up\";",
+      to: "  const up = true;",
       expect: "G8e",
     },
     {
@@ -281,6 +351,35 @@ const results = runPass({
       expect: "G6e3",
     },
     {
+      // **The refusal, restored** (C12 §3ak, F310). `outline` was the layout
+      // with the least geometry above cells and the only one of three refused,
+      // for a reason true about the drawing and not about whether to draw it.
+      name: "the outline is refused again, for being a listing",
+      file: SVG,
+      from: '      if (wanted === "outline") return outlineMarks(flat, box, ink0, theme, block.id, out);',
+      to: '      if (wanted === "outline") return out;',
+      expect: "G6e4",
+    },
+    {
+      // **Every node at the root's indent**, which draws the right labels in the
+      // right order and says nothing about the tree — the shape a listing exists
+      // to carry.
+      name: "the outline flattens its depths onto one indent",
+      file: SVG,
+      from: "  const x = (f: FlatNode): number => box.left + f.depth * indent;",
+      to: "  const x = (_f: FlatNode): number => box.left;",
+      expect: "G6e4",
+    },
+    {
+      // **One row per node is the other half.** Sharing a row draws the same
+      // labels in the same order on top of each other.
+      name: "the outline's rows collapse onto one another",
+      file: SVG,
+      from: "  const y = (i: number): number => box.top + rowH * (i + 0.5); // cells-ok — a node index",
+      to: "  const y = (_i: number): number => box.top + rowH * 0.5; // cells-ok — a node index",
+      expect: "G6e4",
+    },
+    {
       // **A dummy node given a box.** The pipeline inserts them to carry an
       // edge across a layer, so a box there is a node the graph does not have —
       // and it draws in the right place with the right colour.
@@ -296,10 +395,16 @@ const results = runPass({
       // flag and the terminal passes `false` for a flame and `true` for an
       // icicle. Both figures still draw, inside the area, with every band the
       // right width — the only difference is which end the root is at.
+      //
+      // **Re-anchored, and the mutation is now F276 verbatim** (§3ak.12). This
+      // arm's `inverted` flag is gone: the growth direction is the figure's
+      // facing, which is what C12 I61 said it was while two renderers each kept a
+      // copy. Restoring the constant restores the defect exactly — the member
+      // says `up` for an icicle and nothing downstream can tell.
       name: "a flame and an icicle grow the same way",
-      file: SVG,
-      from: '    const inverted = block.form === "icicle";',
-      to: '    const inverted = block.form !== "icicle";',
+      file: FIGURE,
+      from: '    facing: facingOf(block, block.form === "flame" ? FACING_DEFAULT : FACING_MATRIX),',
+      to: "    facing: facingOf(block, FACING_DEFAULT),",
       expect: "G6d3",
     },
     {
@@ -307,21 +412,44 @@ const results = runPass({
       // painted, then its children over it — so an unsorted walk puts a parent
       // over its own children and the figure loses its structure while every
       // rectangle stays in the right place.
+      //
+      // **Re-anchored to the emitter, where the paint order now is** (§3ak.12).
+      // Both arms sorted separately before; a figure's mark list *is* its paint
+      // order, so the sort is one line and the renderers have none.
       name: "a treemap paints its nodes in walk order rather than by depth",
-      file: SVG,
-      from: "      const placed = [...tiles(root, 1 / Math.max(w, h))].sort((a, b) => a.depth - b.depth);",
-      to: "      const placed = tiles(root, 1 / Math.max(w, h));",
+      file: FIGURE,
+      from: "      for (const t of [...tiles(root)].sort((a, b) => a.depth - b.depth)) { // cells-ok — a depth",
+      to: "      for (const t of tiles(root)) { // cells-ok — a depth",
       expect: "G6d1",
     },
     {
-      // **The inset as a constant.** One pixel at every output size rather
-      // than one pixel's *worth* of the unit square: correct at the size it was
-      // tuned for and a different figure at every other, which is exactly what
-      // `svgLayout`'s fractions exist to prevent (§3aj hazard 3).
-      name: "the treemap's inset stops being a proportion",
+      // **Rewritten rather than re-anchored, because the subject changed** — the
+      // old row asserted the inset was a *proportion*, which was true of a
+      // layout-time pad that cannot cross the seam (F278). It is now two claims
+      // and this pass carries one row for each.
+      //
+      // **The first is the defect that shipped for the length of a frame read.**
+      // A **uniform** inset separates siblings and puts a child's shared edge
+      // exactly on its parent's, so the nesting ring vanishes at every depth and
+      // the figure reads as a flat mosaic of outlined boxes — every rectangle in
+      // the right place, and nothing saying which ones belong together.
+      name: "the treemap's inset stops compounding, so nesting stops showing",
       file: SVG,
-      from: "      const placed = [...tiles(root, 1 / Math.max(w, h))].sort((a, b) => a.depth - b.depth);",
-      to: "      const placed = [...tiles(root, 0.004)].sort((a, b) => a.depth - b.depth);",
+      from: "      const inset = nested ? (m.depth ?? 0) + 1 : 0;",
+      to: "      const inset = nested ? 1 : 0;",
+      expect: "G6d1",
+    },
+    {
+      // **And the second is the claim the old row was making, kept.** One unit
+      // of the output at every size, rather than a share of it: a share is what
+      // `svgLayout`'s fractions are for and it is the wrong answer *here*,
+      // because the ring's job is to be visible and a visible line is a fixed
+      // number of pixels. Tuned to 300px and drawn at 1200 it is four pixels of
+      // ring, which is a border.
+      name: "the ring becomes a share of the output rather than a unit of it",
+      file: SVG,
+      from: "      const inset = nested ? (m.depth ?? 0) + 1 : 0;",
+      to: "      const inset = nested ? ((m.depth ?? 0) + 1) * (box.right - box.left) / 300 : 0;",
       expect: "G6d4",
     },
     {
@@ -330,8 +458,14 @@ const results = runPass({
       // beside tiles — which is what the frame caught and no row did.
       name: "the tiles family gets a value axis",
       file: SVG,
-      from: '  const noValueAxis = family === "matrix" || family === "tiles" || family === "nodes";',
-      to: '  const noValueAxis = family === "matrix";',
+      // Re-anchored twice, and the second time is the seam arriving. First when
+      // the decision moved into `HAS_VALUE_AXIS` (C12 I60), because three
+      // renderers had reached the same wrong answer separately. Now the record
+      // is applied by the *emitter* — `figure.value` is already `null` for the
+      // three families — so this arm has no lookup left to get wrong and the
+      // mutation is against the read instead (§3ak.10).
+      from: "  if (axis !== null && rule !== undefined && label !== undefined) {",
+      to: "  if (rule !== undefined && label !== undefined) {",
       expect: "G6d6",
     },
     {
@@ -351,10 +485,19 @@ const results = runPass({
       // `SVG_FAMILY` before its branch exists in `marks()` refuses *as though
       // the form were unclaimed*, and every family in the completion plan does
       // exactly that on its first commit.
+      //
+      // **Re-anchored to the routing, which is what the row was always about**
+      // (§3ak.10). It used to blank the curve family's path because that was the
+      // only way to say *this family has no branch*; the walk makes the sentence
+      // literal — a family absent from the disjunction falls through to a loop
+      // that does not claim it and emits nothing. The mutation is now the exact
+      // shape the row predicted every family's first commit would have.
       name: "a claimed family draws no marks, and the refusal reads as unclaimed",
       file: SVG,
-      from: '      const d = curvePath(points, block.form === "step" || block.form === "ecdf");',
-      to: "      const d = \"\";",
+      // Re-anchored twice: the proportion family joined the disjunction
+      // (§3ak.26), then the density family (F383).
+      from: '  if ((family === "curve" || family === "scatter" || family === "matrix" || family === "tiles"\n    || family === "bar" || family === "distribution" || family === "proportion"\n    || family === "field" || family === "horizon" || family === "stacked"\n    || family === "span" || family === "funnel" || family === "track"\n    || family === "bullet" || family === "density") && "marks" in figure) {',
+      to: '  if ((family === "scatter" || family === "matrix" || family === "tiles"\n    || family === "bar" || family === "distribution" || family === "proportion"\n    || family === "field" || family === "horizon" || family === "stacked"\n    || family === "span" || family === "funnel" || family === "track"\n    || family === "bullet" || family === "density") && "marks" in figure) {',
       expect: "G7b",
     },
   ],

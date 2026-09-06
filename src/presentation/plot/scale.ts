@@ -10,7 +10,7 @@
  * content of its values.
  */
 import { ORIGIN_DEFAULT, type OHLC, type Origin, type Plot, type Series } from "../../data/viewmodel/index.js";
-import { normalisedOf, pinnedRange } from "../../data/viewmodel/range.js";
+import { normalisedOf, pinnedRange, type PinnedRange } from "../../data/viewmodel/range.js";
 
 /**
  * Which way each axis runs, derived from `origin` (C12 §3ac).
@@ -67,8 +67,11 @@ export function facingOf(block: Pick<Plot, "form" | "origin">, whenRefused: Faci
  */
 export type Sample = Readonly<{ i: number; v: number }>;
 
-/** The vertical range a plot is drawn against. */
-export type Range = Readonly<{ min: number; max: number }>;
+/**
+ * The vertical range a plot is drawn against — L0's `PinnedRange`, so a range
+ * that carries its scale (C04 I81) is the same type here as where it is placed.
+ */
+export type Range = PinnedRange;
 
 /**
  * One dot column's worth of samples, reduced to **four** values.

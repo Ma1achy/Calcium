@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
+<rect width="100%" height="100%" fill="#1a1a1a"/>
+<line x1="89.6" y1="12.8" x2="89.6" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="89.6" y1="288" x2="486.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="486.4" y1="12.8" x2="486.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="89.6" y1="12.8" x2="486.4" y2="12.8" stroke="#2c2c2c" stroke-width="1"/>
+<text x="83.6" y="292" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">0.0</text>
+<text x="83.6" y="154.4" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">0.5</text>
+<text x="83.6" y="16.8" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">1.0</text>
+<text x="89.6" y="300" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">0</text>
+<text x="168.96" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">2</text>
+<text x="248.32" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">4</text>
+<text x="327.68" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">6</text>
+<text x="407.04" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">8</text>
+<text x="486.4" y="300" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">10</text>
+<path d="M89.6 262.982 H129.28 V237.964 H168.96 V212.945 H208.64 V187.927 H248.32 V162.909 H288 V137.891 H327.68 V112.873 H367.36 V87.855 H407.04 V62.836 H446.72 V37.818 H486.4 V12.8" fill="none" stroke="#e69f00" stroke-width="2"/>
+</svg>

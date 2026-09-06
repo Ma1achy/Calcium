@@ -34,6 +34,7 @@ type TerminalCapabilities = Readonly<{
   bracketedPaste:     boolean;
   mouse:              boolean;
   imageProtocol:      "none" | "iterm2" | "kitty" | "sixel";
+  keyboardProtocol:   "none" | "kitty";
   altScreen:          boolean;
 }>;
 
@@ -60,14 +61,145 @@ Environment-based. **C02 never queries the terminal and never awaits a reply.** 
 
 | Capability | Rule |
 |---|---|
-| `colourDepth` | Checked in order. `TERM` = `dumb` or absent → 1 — a dumb terminal renders no colour whatever `COLORTERM` claims; `COLORTERM` ∈ {`truecolor`, `24bit`} → 24; `TERM` contains `256color` → 8; otherwise → 4 |
+| `colourDepth` | Checked in order. `TERM` = `dumb` or absent → 1 — a dumb terminal renders no colour whatever `COLORTERM` claims; `COLORTERM` ∈ {`truecolor`, `24bit`} → 24; **the terminal is identified (below) and `TMUX` is unset → 24**; `TERM` contains `256color` → 8; otherwise → 4 |
 | `unicode` | POSIX precedence: take the **first** of `LC_ALL`, `LC_CTYPE`, `LANG` that is set and read only that one — a set `LC_ALL` suppresses the others even when they name a UTF-8 locale. It contains `UTF-8` (case-insensitive, hyphen optional) → `full`; otherwise, and when none is set → `ascii`. `bmp` is reserved and never produced in v1 |
-| `synchronisedUpdate` | `TERM_PROGRAM` ∈ {iTerm.app, WezTerm, ghostty, WindowsTerminal} ∥ `TERM` = `xterm-kitty` → true |
+| `synchronisedUpdate` | The terminal is identified (below) → true. Every emulator this file can name implements it |
 | `bracketedPaste` | `TERM` present and ≠ `dumb` |
 | `mouse` | `TERM` present and ≠ `dumb`, **and** `TMUX` unset. Disabled inside tmux by default — sequence passthrough is unreliable and keyboard parity means nothing is lost (D34) |
-| `imageProtocol` | `TERM_PROGRAM` = iTerm.app → `iterm2`; `TERM` = `xterm-kitty` → `kitty`; otherwise `none`. Detected in v1, unused until Phase 1B |
+| `synchronisedUpdate` | The terminal is identified **and** `TMUX` is unset. Measured: tmux consumes `ESC [ ? 2026 h` and it never reaches the emulator, so the claim was false inside a multiplexer and the frame was written unwrapped regardless (F432) |
+| `imageProtocol` | From the identification, and `none` when `TMUX` is set. Measured: tmux consumes an unwrapped APC transmission. The DCS-wrapped form does reach the emulator at tmux's default, which is the fix — in `escapes.ts`, not here (F432) |
+| `imageProtocol` | The identification's own column (below): iTerm2 → `iterm2`; kitty and Ghostty → `kitty`; WezTerm, foot and Windows Terminal → `none`, **unmeasured rather than absent**; unidentified → `none` |
+| `keyboardProtocol` | The identification's second column (below): kitty, Ghostty, WezTerm and foot → `kitty`; iTerm2 and Windows Terminal → `none`, **unmeasured rather than absent**; unidentified → `none`; and `none` when `TMUX` is set, through the same gate every reader of the identification goes through (I11) — tmux 3.3's `extended-keys` can pass the sequences and is off by default, and nothing here has measured it |
+
+**Hover — DECSET 1003 — has no row here, and the absence is a ruling rather than a gap** (C01 I21,
+2026-09-05). A row in this table is a *rule*: an environment fact that predicts what the terminal can
+do. Nothing in the environment predicts 1003 separately from 1002 — every xterm-family emulator that
+honours button-event tracking honours any-event tracking, so the rule would read `hover: mouse`, a
+constant restated under a second name. What differs is not what the terminal *can* do but what the
+application *wants*: 1003 reports a sequence for every cell the pointer crosses, and only an
+application with a live readout under the pointer has a use for that stream. So the switch is
+`TuiConfig.hover` (C22) reaching C01 as an option, and `mouse` stays the one mouse fact this record
+holds — `mouse: false` still takes neither mode (C01 I10). The rule above the table is unchanged by it:
+everything the hover sets, `←`/`→` on a focused plot set too (C16 §4a).
 | `backgroundPolarity` | `COLORFGBG`'s **last** `;`-separated field: 0–6 or 8 → `dark`; 7 or 9–15 → `light`; absent, non-numeric or outside 0–15 → `unknown`. Not gated by `dumb` — the rule is derived from `COLORFGBG` and not from `TERM` |
 | `altScreen` | `TERM` present and ≠ `dumb` |
+
+### One identification, consulted by every capability
+
+**Three capabilities in this file identified the same terminal three different ways.**
+`synchronisedUpdate` knew Ghostty by `TERM_PROGRAM`, `imageProtocol` by `TERM` *or* `TERM_PROGRAM`,
+and `colourDepth` by neither — and the section below diagnosed exactly that class while fixing one
+member of it, which is *a citation reading as coverage*. The remedy is not a third list kept up to
+date with the other two. It is that **the question is asked once**:
+
+| terminal | identified by | `imageProtocol` | `keyboardProtocol` |
+|---|---|---|---|
+| kitty | `TERM` = `xterm-kitty` | `kitty` | `kitty` |
+| Ghostty | `TERM` = `xterm-ghostty` ∥ `TERM_PROGRAM` = ghostty | `kitty` | `kitty` |
+| iTerm2 | `TERM_PROGRAM` = iTerm.app | `iterm2` | `none` — unmeasured |
+| WezTerm | `TERM_PROGRAM` = WezTerm | `none` — unmeasured, see below | `kitty` |
+| foot | `TERM` = `foot` ∥ `foot-extra` | `none` — unmeasured; it speaks sixel and Calcium encodes none | `kitty` |
+| Windows Terminal | `TERM_PROGRAM` = WindowsTerminal | `none` | `none` |
+
+**`synchronisedUpdate` is true for every row**, and there is no column for it because the table's
+membership criterion *is* being an emulator modern enough to name. **`colourDepth` has no column for
+the same reason**: every terminal here is 24-bit. A terminal added for which either is false needs
+the column before it needs the row, and that is the expiry on both sentences — a column whose value
+never varies carries no information and is the first thing to distrust.
+
+**It was not a tidiness problem, and here is the frame it cost.** With `TERM=xterm-ghostty` alone —
+which is exactly what `docker exec -e TERM` forwards, and what `ssh` forwards — the three answers
+were:
+
+```
+                                             imageProtocol   synchronisedUpdate   colourDepth
+TERM=xterm-ghostty                           kitty           false                4
+TERM=xterm-ghostty  COLORTERM=truecolor      kitty           false                24
+TERM=screen-256color  TERM_PROGRAM=ghostty   kitty           true                 8
+TERM=xterm-kitty                             kitty           true                 4
+```
+
+**One terminal, two detectors, opposite answers**, in the environment this project runs its own demo
+in. The image arm worked and the frame tore, every frame, because the two lists were consulted for
+one question and only one of them had heard of `xterm-ghostty`.
+
+**Why `colourDepth` consults the identification, which is the row that looks least necessary.** A
+real Ghostty sets `COLORTERM=truecolor`, so the third column looks like an artefact of our own
+harness stripping it — and it is not. **`ssh` allocates a pty and forwards `TERM`; it does not
+forward `COLORTERM`.** A kitty or Ghostty user connecting to a machine that runs a Calcium app gets
+24-bit images and 4-bit colour, from one terminal, on the strength of which variable happened to
+survive. That is the case that earns the row.
+
+**And identity is gated by `TMUX` where it outranks a direct statement.** `COLORTERM` is the
+terminal speaking for itself; a name is us inferring. Inside a multiplexer we are not talking to the
+emulator we identified, so the identification does not raise the depth there and the answer stays
+what it is today. This is `mouse`'s rule (D34) reaching a second capability, and it is deliberately
+**conservative**: outside tmux it fixes the measured defect, and inside it changes nothing.
+
+### The axis none of the three stated, which was the fourth instance — measured and ruled
+
+**Identification is not capability.** *Which emulator is this* and *does a sequence reach it* are
+different questions, and for a long time only `mouse` asked the second. `imageProtocol` and
+`synchronisedUpdate` were claimed from a name inside `tmux` exactly as outside it, and **nothing in
+`src/` wraps an escape in tmux's passthrough form** — greppable, and the reason this was a real
+question rather than a stylistic one.
+
+**This section used to say the ruling needed a measurement this repository could not take**, and
+that was wrong in an instructive way: it named the unknown as *what unwrapped APC does inside a
+given tmux*, and the instrument as one `probe.py` run inside tmux on the same Ghostty. **The
+unknown is tmux's, not the emulator's.** tmux's own output is what reaches the emulator, so if the
+bytes never leave tmux there is nothing for an emulator to do — and that is measurable with a pty
+and no emulator at all (F432).
+
+Measured, tmux 3.5a, `-f /dev/null`, the sequence searched for in tmux's own output:
+
+| | reaches the emulator |
+|---|---|
+| bare pty · unwrapped APC | **present** — the control, and a probe whose reader cannot see the thing reports every absence as a finding |
+| tmux · unwrapped APC | **absent** |
+| tmux · DCS-wrapped APC, tmux's default config | **present** |
+| tmux · `ESC [ ? 2026 h` | **absent** |
+| bare pty · `ESC [ ? 2026 h` | **present** — the second control |
+
+**So both capabilities claimed from the identification are false inside tmux**, and neither is a
+near miss: the bytes are consumed. An APC transmission is swallowed and C09 §4c's failure is a
+placement addressing an image that never arrived, which draws *nothing*; a `BSU` is swallowed and
+the frame is written unwrapped, which the degradation table already accepts.
+
+**Ruled: the identification is gated by `TMUX` once, and every capability derived from it reads the
+gated value.** `colourDepth` and `mouse` already asked the second question; `synchronisedUpdate` and
+`imageProtocol` now read a `terminal` that is `null` inside a multiplexer, so there is one gate
+rather than four sites remembering to apply it.
+
+**And the remedy is a feature with a demonstrated mechanism rather than a hope.** The DCS-wrapped
+form reaches the emulator at tmux's default — `allow-passthrough` is `on` in 3.5a, so wrapping
+alone is sufficient there and no user setting is required. It belongs to whoever writes the escapes
+(`terminal/escapes.ts`), not to detection, and it is what would let `imageProtocol` survive a
+multiplexer instead of being switched off in one.
+
+### Ghostty, and how the second list came to be kept up
+
+**`synchronisedUpdate` has named ghostty since v1 and `imageProtocol` never did.** They are
+two lists over one subject — *which emulator is this* — and only one was kept up. The
+consequence is not a missing nicety: `TERM=xterm-ghostty` fell through to `none`, so **the whole
+protocol arm was unreachable on Ghostty** — `transmitImage`, `placementRows`, the placeholder
+encoding, every ruling in C09 §4c — and the first terminal it was ever run against drew the
+dither instead. That is *a reimplemented rule keeping its birthday clauses*, in a table where
+both copies are four lines apart.
+
+**Added on a measurement rather than on a claim.** `tools/terminal-probe/probe.py` sends the
+shipped encoder's own transmission to the terminal and reads the reply: Ghostty 1.3.1 answers
+`OK` for four PNGs and `EINVAL: invalid data` for a corrupted control, so the protocol is present
+and the failure path is distinguishable from the success path. Both `TERM` and `TERM_PROGRAM`
+are matched because a `ghostty` inside `tmux` reports `TERM=screen-256color` while
+`TERM_PROGRAM` survives.
+
+**WezTerm and Konsole are owed and deliberately not claimed.** Both are widely said to implement
+the protocol and **neither has been measured here**, and a false positive is worse than a false
+negative: placeholders addressing an image the terminal never received draw *nothing*, which is
+C09 §4c's loud failure arriving through a detection table. The expiry is cheap and named — run
+`tools/terminal-probe/probe.py` in the terminal and read the verdict — so this is a deferral with
+an instrument rather than a deferral with a hope.
 
 **Which rules the `dumb` gate applies to.** `TERM = dumb` gates every rule derived from `TERM` — `colourDepth`, `bracketedPaste`, `mouse`, `altScreen`. It does **not** gate rules derived from `TERM_PROGRAM` — `synchronisedUpdate` and `imageProtocol` — or from `COLORFGBG` — `backgroundPolarity` — because those describe the emulator, and `TERM=dumb` is a statement about terminfo. The case that makes this matter is an override of `altScreen: true` under `TERM=dumb` (T1.9): the user has said detection is wrong about their terminal, and iTerm2 supports synchronised update whatever `TERM` claims. Gating it would give them an alt screen that tears.
 
@@ -85,6 +217,64 @@ synchronised_update = false
 
 ---
 
+### The keyboard protocol is the identification's second column, and nothing is reachable only with it
+
+**What it is.** The kitty keyboard protocol is a progressive enhancement a terminal opts into: the
+application pushes a flag set with `CSI > flags u` and pops it with `CSI < u`, and the terminal keeps a
+stack of pushed sets — one per screen buffer — so the pop **restores whatever the terminal held before**
+rather than resetting it. That is why C01 takes the pop form and never `CSI = 0 u`: a terminal the user
+configured, or a parent program that pushed its own flags, is handed back its own state (→ C01 §5,
+`KITTY_KEYBOARD`). *Progressive enhancement* is the spec's own phrase and the reason this is a
+capability rather than a mode: a terminal that does not know the sequence ignores it, and a terminal that
+does behaves differently from that byte onward.
+
+**Detected the way `imageProtocol` is — identity, then a table.** kitty, Ghostty, WezTerm and foot
+implement it and answer `"kitty"`; iTerm2 and Windows Terminal answer `"none"`, **unmeasured rather than
+absent** (iTerm2 3.5 documents support and no build here has been run against it). Nothing unidentified
+gets it, and the `TMUX` gate is the identification's own (I11): a multiplexer sits between us and the
+emulator, tmux 3.3's `extended-keys` option can forward these sequences and is off by default, and the
+conservative answer inside one is `none`. foot joins the identification for this column — `TERM=foot`
+and `foot-extra` — and takes the columns that already exist: truecolour and synchronised update it
+implements, and `imageProtocol: "none"` **unmeasured**, since it speaks sixel and Calcium encodes none.
+
+**Which flags, and which not.** The spec defines five bits; C01 pushes **`0b11` = 3** — *disambiguate
+escape codes* (1) and *report event types* (2) — written as `CSI > 3 u`.
+
+| bit | name | pushed | why |
+|---|---|---|---|
+| 1 | disambiguate escape codes | **yes** | a lone `Esc` arrives as `CSI 27 u` and is a whole sequence rather than a prefix, so C16's 50 ms window never runs; modified Enter, Tab and Backspace arrive as `CSI 13;2 u` and its kin — the two forms the `defaultKeymap`'s Shift-Enter row already decodes. **Unmodified Enter, Tab and Backspace stay legacy bytes** under this flag; the spec keeps them so a shell still works, and the decoder's single-byte path is unchanged |
+| 2 | report event types | **yes** | `CSI 13;2:3 u` — the `:3` is a release, `:2` a repeat, `:1` or absent a press. Carried on the event as an **optional** field, so every consumer that ignores it is unchanged |
+| 4 | report alternate keys | no | a second key code per event — the shifted and base-layout forms. C16 I17 names a key one way, and a decoder handed two names has to choose; the code point alone is the name every binding already uses |
+| 8 | report all keys as escape codes | no | **this is the bit that reports a lone modifier press**, and it is not pushed: with it, every text key — `a` — arrives as `CSI 97 u`, so the decoder's text path is bypassed for the whole session and the paste heuristic loses the signal it reads. A lone `⇧` has no consumer today; the cost is every keystroke |
+| 16 | report associated text | no | the text a key would have produced, alongside its code — redundant with the code point for every key the keymap names |
+
+**So `⇧` alone stays invisible under the protocol as pushed**, and that is a decision rather than a gap:
+the decoder still names the modifier key codes (`57441`–`57452` → `shift`, `ctrl`, `alt`, `super`) so a
+terminal configured to send them anyway produces a named key rather than a private-use glyph inserted
+into the prompt, and the day a binding wants one the change is a flag and not a decoder.
+
+**Two encoders share the final byte, and one bit means two things.** `CSI key ; mods u` is also xterm's
+`formatOtherKeys=1`, and the two modifier encodings agree on bits 1, 2 and 4 — shift, alt, ctrl — and
+disagree on 8: xterm's *Meta*, kitty's *Super*, which is `⌘` on a Mac. The decoder's `u` arm reads bit 8
+as **neither**: folding it into `meta` would make every `⌘`-shortcut a terminal passes through fire an
+`Alt` binding, and `Key` carries no `super` flag to put it in. kitty's own meta is bit 32 and is folded
+into `meta` beside alt (bit 2), which is the same pair the `CSI 1;m X` arm already folds (C16 §2). **Stated
+blind spot**: an xterm at `formatOtherKeys=1` sending a Meta-modified key loses the modifier through this
+arm; xterm's default is format 0 (`CSI 27;m;k ~`), which keeps it.
+
+**Degradation — every affordance still works.** Without the protocol the OS owns auto-repeat, `Esc` is a
+prefix resolved by C16's 50 ms window, `⇧` alone is invisible, Shift-Enter arrives as `\r` and the
+`defaultKeymap`'s two terminal-independent newline bindings carry the affordance (C17 I12). Nothing in the
+keymap may name an `event` filter without a fallback that fires under `"none"`, and A03 SS55 is that rule
+— **vacuous on the day it lands**, because no binding names one, and it says so.
+
+**What has been measured, and what has not.** The container has no kitty, Ghostty, WezTerm or foot. What
+tier 5 measures is the bytes: a PTY spawn with the capability forced on captures `ESC [ > 3 u` at
+acquisition and `ESC [ < u` at release, in the positions C01 §5 gives them (T5.6). What no test here
+measures is an emulator's *response* — that `Esc` really does arrive as `CSI 27 u`, that a release really
+carries `:3` — and that row is written as a **named `it.todo`** naming `KITTY_KEYBOARD` rather than a pass
+(T5.7). `imageProtocol` shipped once and had never run against a terminal; this column says so up front.
+
 ### Ambiguous width is detected from the locale and declared over the top
 
 **`East_Asian_Width=Ambiguous` means the terminal decides** — one cell in a Western locale, two
@@ -100,6 +290,10 @@ leaves a CJK user with today's broken measurement until they find the setting, b
 default would be narrow — so the field would ship and change nothing for the people it is for.
 Imperfect detection with a declared override is the shape `TERM_PROGRAM` already has, and I4
 means the override wins unconditionally.
+
+**Which characters are in the set is the property's answer and not this repository's.** *Ambiguous* is a Unicode property with a file behind it, and the width table C09 resolves it through names its authority and its version — `EastAsianWidth-17.0.0.txt`, 2025-07-24 — rather than recalling the ranges a renderer is thought to reach. The table this replaced began at U+2010 on the argument that the rest of the property is *letters no terminal draws wide*, which is a statement about fonts and not about the convention this field records: an emulator that applies the wide convention applies it to the property, Latin-1 and Greek and Cyrillic included. 138,132 code points measured one cell where the property says two, `§` `·` `×` among them (F665, C09 §5).
+
+**The Wide half is the same rule and its errors were in the other mode — the one that is always on.** `ambiguousWidth` selects between two conventions, but `East_Asian_Width=Wide` and `=Fullwidth` are two cells under **both** of them, so a gap in that table is an under-count no capability setting can escape. Derived from the same authority and revision, C09's Wide table is now every `; W` and `; F` row — 123 ranges over 182,876 code points — where the hand-written blocks it replaced under-counted **8,619** and over-counted 369. Swept against the property afterwards, **neither mode has a single under-count left**; every remaining disagreement is one of the three deviations C09 §5 records. The relevance to this component is that a reader of this field can now assume it selects a convention rather than repairing a table: at `"narrow"` the width is the property's for everything the property calls Wide, and the field changes only what the Ambiguous class answers (C09 §5).
 
 **Session-constant, and that is what keeps it out of every cache.** The record is built once at
 construction and nothing reassigns it (I1); C22's T4.18d already asserts reference identity
@@ -161,6 +355,7 @@ fine; what cannot happen is a field with no row, or a row for no field.
 | Bracketed paste | `bracketedPaste` | Multi-line paste detected heuristically by inter-keystroke timing; a notice is committed on first use | C17 |
 | Mouse | `mouse` | Every mouse affordance has a keyboard equivalent, so nothing is lost — only convenience | C11 C15 |
 | Image protocol | `imageProtocol` | Nothing renders an image in v1, so its absence costs nothing; blocks that would carry one render their text form. Detected now so Phase 1B does not need a second detection pass | C09 |
+| Keyboard protocol | `keyboardProtocol` | The OS owns auto-repeat, `Esc` is a prefix resolved by C16's 50 ms window, `⇧` alone is invisible, Shift-Enter arrives as `\r`; every affordance still works, because nothing may be bound to an event the protocol alone can produce (I12, A03 SS55) | C01 C16 |
 | Ambiguous width | `ambiguousWidth` | Every `East_Asian_Width=Ambiguous` glyph is measured and drawn as **narrow**, which is the Western convention and today's behaviour; where a locale says otherwise the wide arm is used and the ramps and fills that would double in width are replaced by narrow ones | C09 C12 |
 | Background polarity | `backgroundPolarity` | `unknown` keeps the app's own opening theme — the set's first key, or whatever the reader persisted. Nothing is painted differently and no notice is drawn: a terminal that does not say is a terminal the framework does not guess about | C22 |
 | Alternate screen | `altScreen` | **The shell refuses to open**, prints help, exits 0 | L4 |
@@ -181,9 +376,13 @@ Alternate screen is the sole hard requirement (D28). A fullscreen application on
 - **I6** — Every capability has a fallback owned by a named component (§4). A capability with no fallback cannot be added.
 - **I7** — `isUsable` depends on `altScreen` alone. No other capability can prevent the shell opening. **The predicate had no caller and the rule had two expressions** — C01 asks `!capabilities.altScreen` inline, which is the refusal that reaches the user, so A03 §9's MG25 allow-listed `isUsable` as *a rule expressed twice, the second unreachable*. C22's gate 3b is now that caller (→ C22 I61), which disposes of the duplicate by consuming it rather than by exempting it: C01's inline test stays, because C01 is a component with its own consumers and must refuse whoever hands it an unusable record.
 - **I8** — Warnings are returned, never emitted. C02 decides what is wrong, never when the user is told.
-- **I9** — **`ambiguousWidth` is detected from the locale, overridable, and constant for the session.** `ja`, `zh` or `ko` as the language subtag of the first *set* variable of `LC_ALL` · `LC_CTYPE` · `LANG` gives `wide`; everything else, including an unset environment, gives `narrow`. **A declared-only field would ship without fixing anything** for the users it exists for, which is why detection is part of the invariant rather than a convenience. **Nothing may change it after construction** — every measured height, every rendered block and C14's index are computed against it, so a mid-session change is a frame that disagrees with the store it was built from (→ C22 I63, T4.18d's argument).
+- **I9** — **`ambiguousWidth` is detected from the locale, overridable, and constant for the session.** `ja`, `zh` or `ko` as the language subtag of the first *set* variable of `LC_ALL` · `LC_CTYPE` · `LANG` gives `wide`; everything else, including an unset environment, gives `narrow`. **A declared-only field would ship without fixing anything** for the users it exists for, which is why detection is part of the invariant rather than a convenience. The *set* it applies to is `East_Asian_Width=Ambiguous` as published, read from a named file at a named version, with any deviation listed where C09 resolves it. **Nothing may change it after construction** — every measured height, every rendered block and C14's index are computed against it, so a mid-session change is a frame that disagrees with the store it was built from (→ C22 I63, T4.18d's argument).
 
 - **I10** — **`backgroundPolarity` is read from `COLORFGBG` alone, answers `unknown` wherever it is not certain, and chooses nothing.** The background is the field after the **last** `;`, which is right for `fg;bg` and for rxvt's `fg;default;bg` alike; 0–6 and 8 are `dark`, 7 and 9–15 are `light`, and everything else — absent, empty, non-numeric, or an index above 15 — is `unknown`. **The third value is the invariant's load-bearing half**: *nothing stated* and *stated light* are different facts, and a two-valued field makes them one, which is exactly the distinction its only consumer branches on. **C02 does not choose a theme**, on commitment 9's shape — a depth is reported and never interpreted, and a polarity is the same kind of fact: what it *means* for which theme opens is C22's, decided against a set C02 cannot see (→ C22 I68).
+
+- **I11** — **The emulator is identified once, no capability matches an emulator name itself, and the identification is gated where the sequence does not reach it.** *Which emulator is this* and *does a sequence reach it* are two questions, and the second is asked **once**, on the identification, rather than by each capability that consults it — `TMUX` set means the value every reader sees is `null`, because inside a multiplexer we are not talking to the emulator we identified. Measured rather than assumed: tmux consumes an unwrapped APC transmission *and* `ESC [ ? 2026 h`, so both capabilities that read a name were false there (F432). One function takes `TERM` and `TERM_PROGRAM` and answers with a terminal or nothing; every rule that depends on *which emulator this is* reads that answer and never re-derives it. **Three rules derived it separately and two of them disagreed** — `TERM=xterm-ghostty` alone gave `imageProtocol: kitty` with `synchronisedUpdate: false`, one terminal answering opposite ways in the environment this project demos in. The invariant is not that the lists agree; it is that **there is one list**, because agreement between three copies is a property nothing checks and single-sourcing is a property a scan can (→ T1.12, T6.11).
+
+- **I12** — **Nothing is reachable only with the keyboard protocol.** `keyboardProtocol` makes interaction better and never possible: every key, binding and affordance available under `"kitty"` is available under `"none"`, by a route the keymap carries. Concretely — a `Key` event's `event` field is optional and absent under `"none"`, so a consumer that ignores it is unchanged; C01 pushes the flags only when the record says so (C01 I10) and pops rather than resets, so the terminal's prior state survives; and no binding in `keymap.ts` may name an `event` filter without a fallback that fires without one (A03 SS55). The protocol is detected from the identification and gated by `TMUX` with every other reader of it (I11), and it is declarable over the top like every field (I4), so a terminal the table does not know can be told to use it — and the table's errors run in the safe direction, because `none` on a terminal that would have answered is the behaviour every terminal already has.
 
 ---
 
@@ -202,6 +401,8 @@ Alternate screen is the sole hard requirement (D28). A fullscreen application on
 11. Warnings about rejected overrides are returned to the caller, never printed (I8).
 12. **`ambiguousWidth` is detected from the locale, overridden by declaration, and constant for the session** — and `cells()` takes it as a parameter rather than reading it, because only L1 measures and L0's data half must not learn about terminals (I9). `cells()` is C09's and takes it as an argument.
 13. **`backgroundPolarity` is detected from `COLORFGBG`, is three-valued, and is never acted on here** — the certain range is 0–15 because the range beyond it is C10's table and C10 is a layer up, and *not stated* keeps its own value because the consumer branches on it (I10). What a polarity *means* for which theme opens is decided against a set C02 cannot see (→ C22 I68).
+15. **`keyboardProtocol` is the identification's second column, pushed by C01 as `CSI > 3 u` and popped as `CSI < u`, and nothing is reachable only with it** — a lone `Esc` and a modified Enter arrive whole, a repeat or release is an optional field on the event, and every affordance the protocol improves has a route that works at `"none"` (I12). The bits *not* pushed are stated with their reasons in §3, and the one that would report a lone modifier is among them.
+14. **The emulator is identified once, every capability consults that identification, and the identification is gated by `TMUX` before any of them see it** — `synchronisedUpdate` and `imageProtocol` read it, and `colourDepth` reads it too but is outranked by `COLORTERM`, because that variable is the terminal speaking for itself where a name is us inferring (I11). **Identification is not capability**, and the second question — *does a sequence reach it* — is asked in one place rather than by each reader: measured, tmux consumes both an unwrapped APC and `ESC [ ? 2026 h`, and the wrapped form is what survives (§3, FINDINGS F432).
 
 ---
 
@@ -213,13 +414,17 @@ Six tiers. No state machine, so no transition table (A02 §7).
 
 A table of `env` fixtures. No mocks, no terminal.
 
-- **T1.1**: colour depth — `COLORTERM=truecolor` → 24; `TERM=xterm-256color` → 8; `TERM=xterm` → 4; `TERM=dumb` → 1; empty env → 1.
+- **T1.1**: colour depth — `COLORTERM=truecolor` → 24; `TERM=xterm-256color` → 8; `TERM=xterm` → 4; `TERM=dumb` → 1; empty env → 1; **`TERM=xterm-kitty` with no `COLORTERM` → 24**, which is the `ssh` case — a pty is allocated and `TERM` is forwarded where `COLORTERM` is not; **and `TERM=xterm-kitty` with `TMUX=/tmp/x` → 4**, because inside a multiplexer a name is not the terminal speaking for itself.
 - **T1.2**: `COLORTERM=24bit` → 24 (the less common spelling).
 - **T1.3**: unicode — `LANG=en_GB.UTF-8` → `full`; `LANG=C` → `ascii`; `LC_ALL` overrides `LANG`; `LC_CTYPE` overrides `LANG` but not `LC_ALL`.
 - **T1.4**: unicode detection is case-insensitive — `utf-8`, `UTF8`, `UTF-8` all → `full`.
-- **T1.5**: synchronised update — each of the four `TERM_PROGRAM` values → true; `TERM=xterm-kitty` → true; `TERM_PROGRAM=Apple_Terminal` → false.
+- **T1.5**: synchronised update — each of the four `TERM_PROGRAM` values → true; `TERM=xterm-kitty` → true; **`TERM=xterm-ghostty` alone → true**, which was `false` before the identification was single-sourced and is the row the defect lived in; `TERM_PROGRAM=Apple_Terminal` → false.
 - **T1.6**: mouse — `TERM=xterm` → true; `TERM=dumb` → false; `TERM=xterm` with `TMUX=/tmp/x` → false.
-- **T1.7**: image protocol — `TERM_PROGRAM=iTerm.app` → `iterm2`; `TERM=xterm-kitty` → `kitty`; plain xterm → `none`.
+- **T1.7**: image protocol — `TERM_PROGRAM=iTerm.app` → `iterm2`; `TERM=xterm-kitty` → `kitty`; `TERM=xterm-ghostty` → `kitty`; `TERM_PROGRAM=ghostty` with a `tmux` `TERM` → `kitty`; plain xterm → `none`; and `TERM_PROGRAM=WezTerm` → `none`, which is the **unmeasured** arm asserted as it stands rather than as it is assumed (FINDINGS F415).
+- **T1.12b** (I11): **inside tmux every reader answers as if there were no identification** — `imageProtocol` `none`, `synchronisedUpdate` `false`, `colourDepth` 4 — and the same environment without `TMUX` gives `kitty`, `true`, 24. **All three in one row**, because the gate is a single expression and a row naming one capability passes against a gate applied to that one alone. That is the state this file was in: thirty-four capability tests passed unchanged on the day the gate landed (F432).
+- **T1.12c** (I11): the gate is measured behaviour rather than caution, and `TERM_PROGRAM` is the route that reaches it — `TERM=screen-256color` with `TERM_PROGRAM=ghostty` identifies, and the same with `TMUX` set does not.
+- **T1.12** (I11): **the identification is one function and the capabilities are its readers.** A source scan over `terminal/capabilities.ts` finds every emulator name — `xterm-kitty`, `xterm-ghostty`, `iterm.app`, `ghostty`, `wezterm`, `windowsterminal` — inside the identifying function alone, and none in any `detect*` that answers a capability. **Asserted structurally rather than by comparing the three answers**, because three lists that happen to agree pass an agreement test and still are three lists (F84's shape: the property worth holding is the one a scan can see).
+- **T1.13** (I11, I12): keyboard protocol — `TERM=xterm-kitty`, `TERM=xterm-ghostty`, `TERM_PROGRAM=WezTerm` and `TERM=foot` → `kitty`; `TERM_PROGRAM=iTerm.app`, `TERM_PROGRAM=WindowsTerminal` and plain `xterm` → `none`; **and `TERM=xterm-kitty` with `TMUX=/tmp/x` → `none`**, through the identification's gate rather than a gate of its own — asserted beside `imageProtocol` in the same row, because a gate applied to one column and not the other is the state T1.12b was written against. `keyboardProtocol: "kitty"` declared over `TERM=xterm` wins (I4), and `"sixel"` declared for it is rejected with a warning (T3.5's shape).
 - **T1.8**: alt screen — `TERM=xterm` → true; `TERM=dumb` → false; `TERM` unset → false.
 - **T1.9** (I4): every field can be overridden, including `altScreen: true` on `TERM=dumb`.
 - **T1.10** (I7): `isUsable` is true iff `altScreen`, regardless of every other field being at its worst value.
@@ -227,7 +432,7 @@ A table of `env` fixtures. No mocks, no terminal.
 
 ### Tier 2 — contract / interface
 
-- **T2.1** (I1): the record has exactly the nine documented keys, all present, for every fixture in T1.
+- **T2.1** (I1): the record has exactly the ten documented keys, all present, for every fixture in T1.
 - **T2.2** (I1): the record is frozen — mutation attempts do not change it.
 - **T2.3** (I3): called twice with the same input, results are deeply equal and not the same reference (no shared mutable state).
 - **T2.4** (I2): no async boundary — the function's return value is not a promise, and a fake timer advanced zero ticks still yields a complete record.
@@ -261,6 +466,7 @@ A table of `env` fixtures. No mocks, no terminal.
 - **T4.5** (with C12): `unicode: "ascii"` → the braille plot degrades to a block plot rather than emitting braille codepoints.
 - **T4.6** (with C03): `synchronisedUpdate: false` → frames carry no `2026` wrapper.
 - **T4.7** (with L4): `altScreen: false` → the shell prints help and exits 0 without acquiring anything.
+- **T4.8** (with C01, I12): `keyboardProtocol: "kitty"` → `CSI > 3 u` is emitted after the mouse pair at acquisition and `CSI < u` **first** at release; `"none"` → neither byte in either direction. C01 T1.1, T1.2 and T1.28 carry it.
 
 ### Tier 5 — e2e
 
@@ -271,6 +477,8 @@ PTY harness with a controlled environment.
 - **T5.3**: launched under `LANG=C` → the frame contains only ASCII; no mojibake, no replacement characters.
 - **T5.4**: launched inside tmux → no mouse sequences emitted; keyboard navigation of a table still works end to end.
 - **T5.5**: a config override forcing `colour_depth = 24` under `TERM=xterm` → truecolour sequences appear, proving the override reaches the renderer and not just the record.
+- **T5.6** (I12, C01 I6): the capability forced on under `TERM=xterm-256color` → the PTY captures `ESC [ > 3 u` before the frame and `ESC [ < u` after it, with the pop **before** `1006l` — bytes read from the PTY, not reconstructed from the record; and the same run unforced captures neither. Both arms, because the forced arm alone passes a lifecycle that pushes unconditionally.
+- **T5.7** (I12; C16 I30): a real emulator — **kitty 0.41, under Xvfb, driven by XTEST** — receives `KITTY_KEYBOARD.enter` and answers `CSI 27 u` for a lone `Esc`, `CSI 27;1:3 u` for its release, `CSI 13;2 u` for Shift-Enter and `CSI 13;2:3 u` released; the real decoder reads the capture back as those six events. **Was a named `it.todo` for want of an emulator** (F810): the devcontainer and the `full` CI job install `xvfb xdotool kitty xterm`, and where one is absent the row skips *by name*, the reason in its title — never a silent pass. Every capture carries a typed control byte, because a capture with no reader is the same zero as a quiet terminal (F808).
 
 ### Tier 6 — fail-on-revert
 
@@ -283,7 +491,11 @@ PTY harness with a controlled environment.
 - **T6.7** (I3): caching detection in module scope so a second call returns a shared reference → T2.3 fails.
 - **T6.8** (I10): taking `COLORFGBG`'s **second** field rather than its last → T1.11 fails on the rxvt row alone. Every other row in the suite has two fields, where the two rules agree — so this is the row that exists to disagree with them.
 - **T6.9** (I10): collapsing `unknown` into `dark` → T1.11 fails on the absent row, and **C22's T1.20c passes unchanged**. That asymmetry is the row's whole content: the two-valued field is wrong only where nothing is stated, and it is the reader's behaviour there that the third value exists to protect.
+- **T6.11b** (I11): applying the `TMUX` gate **per reader** instead of to the identification — `colourDepth` keeps its own check and the other two lose theirs, which is correct for one capability and wrong for two → **T1.12b fails**. The mutation run also covers the gate dropped and the gate inverted, and its first control could not be caught at all: an unused entry added to `BY_TERM`, which nothing enumerates. The harness refused the run rather than reporting four kills.
+- **T6.11** (I11): re-deriving a capability from its own emulator list — `synchronisedUpdate: term === "xterm-kitty" || term === "xterm-ghostty" || […].includes(termProgram)` inline in `detect`, which answers **identically on every fixture in this file** — → **T1.12 fails alone; T1.1, T1.5 and T1.7 all pass.** Measured, and the first mutation written for this row did not have that property: hard-coding `xterm-kitty` into `detectColourDepth` also broke T1.1's tmux row, so it was a *disagreeing* second list and proved nothing about the invariant. **A second list that agrees is invisible to every assertion about answers**, which is the state this file shipped in for the life of the project and the whole content of the row.
 - **T6.10** (I1): adding a field to the record without declaring it in §2 → **T2.8 fails and T2.6 does not**, which is the state `ambiguousWidth` shipped in.
+- **T6.12** (I11, I12): gating `keyboardProtocol` on the ungated identification — `identified` rather than `terminal` — → T1.13's tmux arm fails while every other capability's tmux row passes, which is the per-reader gate T6.11b describes arriving in a new column.
+- **T6.13** (I12, C01 I6): making C01 reset the protocol with `CSI = 0 u` instead of popping → C01 T1.2 fails on the exact leave byte; making C01 push it unconditionally → C01 T1.28 and T5.6's unforced arm fail.
 
 ---
 
@@ -296,4 +508,5 @@ PTY harness with a controlled environment.
 | Tone → colour resolution | C10 |
 | The ASCII glyph substitutions themselves | C09, C12 |
 | Interactive capability probes | Phase 1B — an opportunistic 50 ms `XTVERSION` that upgrades the record if it answers and is ignored if it does not |
+| Querying the keyboard protocol | Phase 1B — `CSI ? u`, to which a supporting terminal answers `CSI ? flags u` and any other says nothing. It would replace `keyboardProtocol`'s table with a measurement and would have to share `XTVERSION`'s window and its I2 exemption; until then the table is the answer and its errors run in the safe direction (§3) |
 | Using the image protocol | Phase 1B |

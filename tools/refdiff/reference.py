@@ -56,12 +56,21 @@ if os.path.isdir(OUT):
 os.makedirs(OUT, exist_ok=True)
 
 
-def figure(rows):
+# Forms whose axes are not 2-D. One entry, and the map exists rather than a
+# conditional because a second 3-D form is step 5's and step 6's.
+PROJECTION = {"scatter3d": "3d"}
+
+
+def figure(rows, projection=None):
     """A figure that is nothing but its data area, sized to the braille grid."""
     fig = plt.figure(figsize=(COLS * 2 / DPI, rows * 4 / DPI), dpi=DPI)
-    ax = fig.add_axes((0, 0, 1, 1))
+    kw = {} if projection is None else {"projection": projection}
+    ax = fig.add_axes((0, 0, 1, 1), **kw)
     ax.axis("off")
-    ax.margins(0)
+    # `margins(0)` is a 2-D call; a 3-D axes sets its own box aspect and the
+    # equivalent would be a second knob with a different meaning.
+    if projection is None:
+        ax.margins(0)
     return fig, ax
 
 
@@ -282,6 +291,29 @@ def r_candlestick(a, s):
 def r_matrix(a, s): a.imshow(grid(s), aspect="auto", interpolation="nearest")
 
 
+def r_scatter3d(a, s):
+    """
+    The one external check a 3-D scatter gets.
+
+    **The camera is matched rather than defaulted.** `CAMERA_DEFAULT` is
+    azimuth pi/4 and elevation pi/6, and `view_init` takes degrees with the same
+    sense about the same up-axis — so 45/30 is the same view rather than a
+    similar one. Leaving matplotlib's default (elev 30, azim -60) would compare
+    two correct pictures of different things, which is the kind of number that
+    makes a reader tune the form.
+
+    **Its `s=2` matches `r_scatter`'s `ms=2`**, so the mark's size is the same
+    decision at both call sites and a difference in the diff is a difference in
+    geometry.
+    """
+    clouds = s.get("points3", [])
+    xs = [p["x"] for c in clouds for p in c["points"]]
+    ys = [p["y"] for c in clouds for p in c["points"]]
+    zs = [p["z"] for c in clouds for p in c["points"]]
+    a.scatter(xs, ys, zs, s=2)
+    a.view_init(elev=30, azim=45)
+
+
 def r_pie(a, s):
     seg = s.get("segments")
     v = [x["value"] for x in seg] if seg else vals(s)
@@ -398,6 +430,7 @@ RENDERERS = {
     # Keyed by `form.variant` where a *style* is the subject: a candlestick is
     # `form: "line"`, so it can only ever be a variant (F183).
     "line.candlestick": r_candlestick,
+    "scatter3d": r_scatter3d,
 }
 
 # Stated, not silently dropped. A form absent from a comparison reads as one
@@ -416,6 +449,12 @@ SKIPPED = {
     "graph": "no matplotlib primitive; the reference is the Sugiyama pipeline "
              "and F242 measures it directly — crossings, fit and collisions "
              "over 360 graphs",
+    # A sankey is the same pipeline plus a placement. matplotlib's `Sankey` is
+    # a single-node flow diagram with arrows and no layering, so it is not the
+    # figure C12 §3ap draws; the references compared by eye were d3-sankey and
+    # plotly's `go.Sankey`, and neither is a pip line this image should carry.
+    "sankey": "no matplotlib primitive of this shape; the layered references "
+              "are d3/plotly, and SK1-SK6 assert the geometry directly",
     "smallmultiples": "a composition of other forms; matplotlib's subplot grid "
                       "shares no geometry with ours to diff",
     "pairplot": "same — seaborn's PairGrid is furniture-dominated at this size",
@@ -449,8 +488,8 @@ SKIPPED = {
 }
 
 
-def capture(fn, spec, rows):
-    fig, ax = figure(rows)
+def capture(fn, spec, rows, projection=None):
+    fig, ax = figure(rows, projection)
     try:
         fn(ax, spec)
     except Exception as e:  # a fixture the reference cannot express
@@ -496,7 +535,7 @@ def main():
             print(f"  MISS {key}: no reference renderer")
             fail += 1
             continue
-        text, err = capture(fn, spec, rows)
+        text, err = capture(fn, spec, rows, PROJECTION.get(form))
         if text is None:
             print(f"  FAIL {key}: {err}")
             fail += 1

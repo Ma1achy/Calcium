@@ -43,10 +43,12 @@
  * indivisible units, and each further reducer is that work again. They wait for
  * a consumer, like everything else here.
  */
+import { hiddenRowsNotice } from "./documents.js";
 import { applyPatch } from "../data/viewmodel/index.js";
 import type { Block, ErrorLike, ViewDocument, ViewPatch } from "../data/viewmodel/index.js";
 import type { Layer, OverlayManager } from "../viewport/overlay/index.js";
 import { b } from "./builders/index.js";
+import { followTail } from "./tail.js";
 
 /** The layer id. One view at a time — C15 I1 forbids nesting. */
 export const DOCUMENT_VIEW_ID = "document-view";
@@ -243,12 +245,7 @@ export function createDocumentView(deps: DocumentViewDeps): DocumentView {
    * overstate what the reader can see by exactly the rows the wrap cost.
    */
   const notice = (rows: number, height: number, width: number): Block => {
-    const build = (hidden: number): Block =>
-      b.notice.warn(
-        `${String(hidden)} more rows — this block is taller than the screen, and `
-          + `n/p move by block so they cannot reach them`,
-        { id: TRUNCATED_ID },
-      );
+    const build = (hidden: number): Block => hiddenRowsNotice(hidden, TRUNCATED_ID);
     let self = 1;
     for (let pass = 0; pass < 2; pass += 1) {
       const candidate = build(rows - Math.max(0, height - self));
@@ -357,10 +354,16 @@ export function createDocumentView(deps: DocumentViewDeps): DocumentView {
        * *were we at the end before this arrived* — which is the question tail
        * semantics turn on. A reader who has scrolled up is reading, and moving
        * the window under them is the same failure as never moving it.
+       *
+       * **Through `followTail`, which `ScrollOffsets` shares** (C04 I97). The
+       * comparison used to be written here and was about to be written a second
+       * time in rows; two copies of `>=` are two places for one to become `>`.
        */
-      const wasAtBottom = at.offset >= lastOffset(at);
       const grown: State = { ...at, blocks: result.doc.blocks };
-      const candidate: State = wasAtBottom ? { ...grown, offset: lastOffset(grown) } : grown;
+      const candidate: State = {
+        ...grown,
+        offset: followTail(at.offset, lastOffset(at), lastOffset(grown)),
+      };
       // Both assigned together or neither, for `putBlock`'s reason: a throw
       // between the document and the projection leaves the owner holding a
       // document no frame ever displayed.

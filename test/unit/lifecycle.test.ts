@@ -178,9 +178,19 @@ describe("C01 acquisition and release", () => {
     lifecycle.acquire();
 
     const out = stdout.output;
-    for (const m of [MODES.altScreenOn, MODES.cursorHide, MODES.pasteOn, MODES.mouseOn, MODES.mouseSgrOn]) {
+    for (const m of [
+      MODES.altScreenOn,
+      MODES.cursorHide,
+      MODES.pasteOn,
+      MODES.mouseOn,
+      MODES.mouseSgrOn,
+      MODES.keyboardOn,
+    ]) {
       expect(out.split(m).length - 1, m).toBe(1); // exactly once
     }
+    // Step 7 is last: the protocol is pushed after the mouse pair, so it is the
+    // first thing popped at release (C01 §5).
+    expect(out.indexOf(MODES.keyboardOn)).toBeGreaterThan(out.indexOf(MODES.mouseSgrOn));
 
     // 1049h is first — asserted on the first chunk rather than on byte 0, since
     // MODES carries the mode without its ESC prefix on purpose.
@@ -207,6 +217,7 @@ describe("C01 acquisition and release", () => {
 
     const released = stdout.chunks.slice(acquired).join("");
     const order = [
+      MODES.keyboardOff,
       MODES.mouseOff,
       MODES.mouseSgrOff,
       MODES.pasteOff,
@@ -215,8 +226,9 @@ describe("C01 acquisition and release", () => {
     ];
     // Mouse leaves as 1006l then 1002l inside one key; the key itself is last
     // in, first out. Assert positions rather than a joined string so the
-    // within-key order is checked too.
+    // within-key order is checked too. The keyboard pop is first of all.
     const positions = [
+      released.indexOf(MODES.keyboardOff),
       released.indexOf(MODES.mouseSgrOff),
       released.indexOf(MODES.mouseOff),
       released.indexOf(MODES.pasteOff),
@@ -228,6 +240,30 @@ describe("C01 acquisition and release", () => {
 
     expect(stdin.rawModeCalls).toEqual([true, false]);
     expect(lifecycle.acquired).toBe(false);
+  });
+
+  it("T1.28 (I10, C02 I12): the keyboard protocol is pushed only when the record says so, and popped rather than reset", () => {
+    // The off arm: not a byte of it in either direction. `>` and `<` finals with
+    // `u` are the whole family, so the assertion is on the family rather than on
+    // the two members C01 writes — a reset written as `CSI = 0 u` would pass a
+    // check for the two known strings.
+    const off = harness({ keyboardProtocol: "none" });
+    off.lifecycle.acquire();
+    off.lifecycle.release();
+    expect(off.stdout.output).not.toMatch(/\x1b\[[<>=][0-9;]*u/);
+
+    // The on arm, on the exact bytes: `ESC [ > 3 u` and `ESC [ < u`. The pop
+    // form is asserted by equality because a reset — `ESC [ = 0 u` — passes
+    // every position and count assertion T1.2 makes and is the wrong claim
+    // about the terminal's prior state (C02 §3).
+    const on = harness({ keyboardProtocol: "kitty" });
+    on.lifecycle.acquire();
+    const pushed = on.stdout.output.match(/\x1b\[[<>=][0-9;]*u/g);
+    expect(pushed).toEqual(["\x1b[>3u"]);
+    const before = on.stdout.output.length;
+    on.lifecycle.release();
+    const popped = on.stdout.output.slice(before).match(/\x1b\[[<>=][0-9;]*u/g);
+    expect(popped).toEqual(["\x1b[<u"]);
   });
 
   it("T1.3 (I10, C8): absent capabilities emit nothing, in either direction", () => {
@@ -494,5 +530,77 @@ describe("C01 mouse tracking, toggled (copy mode)", () => {
     lifecycle.setMouseTracking(true);
 
     expect(stdout.output, "nothing is written into a child's terminal").toBe(before);
+  });
+});
+
+describe("C01 hover — 1003 in 1002's slot, never both (I21)", () => {
+  /** `harness()` with the one option it does not take. */
+  function hovering(caps: Partial<TerminalCapabilities> = {}, hover = true) {
+    const stdout = fakeStdout();
+    const lifecycle = createTerminalLifecycle({
+      stdout,
+      stdin: fakeStdin(),
+      capabilities: capabilities(caps),
+      onFatal: ((err: unknown) => {
+        throw err;
+      }) as (err: unknown) => never,
+      debug: fakeDebug(),
+      hover,
+    });
+    live.push(lifecycle);
+    return { lifecycle, stdout };
+  }
+
+  it("T1.29 (I21, I6): hover takes 1003h and 1006h and no 1002h; release is 1006l then 1003l and no 1002l", () => {
+    const { lifecycle, stdout } = hovering();
+    lifecycle.acquire();
+    const on = stdout.output;
+    expect(on, "1003 in the slot").toContain(MODES.hoverOn);
+    expect(on, "1006 beside it").toContain(MODES.mouseSgrOn);
+    expect(on, "and never 1002 — one tracking mode, not two").not.toContain(MODES.mouseOn);
+    // Same slot: after raw mode's neighbours and before the keyboard push (T1.1's order).
+    expect(on.indexOf(MODES.keyboardOn)).toBeGreaterThan(on.indexOf(MODES.hoverOn));
+
+    lifecycle.release();
+    const off = stdout.output.slice(on.length);
+    expect(off).toContain(MODES.hoverOff);
+    expect(off).not.toContain(MODES.mouseOff);
+    expect(off.indexOf(MODES.mouseSgrOff), "1006l first, then 1003l — I6 inside the key").toBeLessThan(off.indexOf(MODES.hoverOff));
+  });
+
+  it("T1.29 (cont., I6): the copy-mode toggle leaves and re-takes the pair that was chosen", () => {
+    const { lifecycle, stdout } = hovering();
+    lifecycle.acquire();
+    const before = stdout.output;
+    lifecycle.setMouseTracking(false);
+    const off = stdout.output.slice(before.length);
+    expect(off).toContain(MODES.hoverOff);
+    expect(off, "a toggle reading MOUSE while acquisition took MOUSE_ANY would write this").not.toContain(MODES.mouseOff);
+    const mid = stdout.output;
+    lifecycle.setMouseTracking(true);
+    const on = stdout.output.slice(mid.length);
+    expect(on).toContain(MODES.hoverOn);
+    expect(on).not.toContain(MODES.mouseOn);
+  });
+
+  it("T1.29 (cont., I10): hover with `mouse: false` takes neither mode — the record wins", () => {
+    const { lifecycle, stdout } = hovering({ mouse: false });
+    lifecycle.acquire();
+    lifecycle.setMouseTracking(true);
+    lifecycle.release();
+    const all = stdout.output;
+    expect(all).not.toContain("1003");
+    expect(all).not.toContain("1002");
+    expect(all).not.toContain("1006");
+  });
+
+  it("T1.29 (control): without hover the pair is 1002 + 1006 and no 1003 byte is written", () => {
+    // A lifecycle that took 1003 unconditionally passes every arm above this one.
+    const { lifecycle, stdout } = hovering({}, false);
+    lifecycle.acquire();
+    lifecycle.release();
+    expect(stdout.output).toContain(MODES.mouseOn);
+    expect(stdout.output).toContain(MODES.mouseOff);
+    expect(stdout.output).not.toContain("1003");
   });
 });

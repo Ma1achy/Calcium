@@ -14,6 +14,12 @@
  * stream graph whose bands cross is not a stream graph with a rendering defect;
  * it is a line chart.
  *
+ * **And two spans that are not a stack** (§3ak.34). `waterfallBars` and
+ * `ganttBars` live here because this is where a fold both arms need already
+ * lived, and because F329 is the argument: a derivation with two
+ * implementations is checked by nothing, since the corpus that separates them is
+ * the corpus neither arm has.
+ *
  * **Bands never cross, and that is the property to hold onto.** Each band's
  * lower bound is the previous band's upper bound, so the ordering is structural
  * rather than something the data can violate. A renderer that computed each
@@ -38,6 +44,25 @@ export type Band = Readonly<{ lower: readonly number[]; upper: readonly number[]
  * above it down by that column and put a notch in a shape that has none. The
  * value is unknown; the band's thickness there is not.
  */
+/**
+ * A reading's contribution to a stack — **a null is zero-width and so is a
+ * negative** (I70, §3ak.39).
+ *
+ * Extracted because it was the fold's rule in one of the fold's two
+ * implementations (F351). `stackedBarRow` read `values[i] ?? 0` and nothing
+ * else, so a negative reached `String.prototype.repeat` with a negative count
+ * and `layout: "stacked"` rendered an ERROR block for any block containing one.
+ * No corpus variant has a negative stacked reading, so the path had never run.
+ *
+ * **The rule is shared and the rounding is not.** This arm rounds each series'
+ * own fill and the figure rounds cumulative bounds; unifying those would move
+ * frames for no finding, and it is the *rule* that a second implementation was
+ * missing.
+ */
+export function stackedValue(v: number | null | undefined): number {
+  return v === null || v === undefined || !Number.isFinite(v) ? 0 : Math.max(0, v);
+}
+
 export function stackBands(
   series: readonly Series[],
   columns: number,
@@ -50,8 +75,7 @@ export function stackBands(
     const len = s.values.length; // cells-ok — a sample count
     if (len === 0 || n === 0) return 0; // cells-ok — a sample count
     const j = n === 1 ? 0 : Math.round((i / (n - 1)) * (len - 1)); // cells-ok — a sample index
-    const v = s.values[Math.max(0, Math.min(len - 1, j))]; // cells-ok — a sample index
-    return v === null || v === undefined || !Number.isFinite(v) ? 0 : Math.max(0, v);
+    return stackedValue(s.values[Math.max(0, Math.min(len - 1, j))]); // cells-ok — a sample index
   };
 
   const totals = Array.from({ length: n }, (_, i) => series.reduce((sum, s) => sum + at(s, i), 0));
@@ -62,6 +86,102 @@ export function stackBands(
     for (let i = 0; i < n; i += 1) cursor[i] = cursor[i]! + at(s, i);
     return { lower, upper: [...cursor] };
   });
+}
+
+/**
+ * **A bar drawn between two values on a shared axis** — the `span` family's
+ * datum (§3ak.34).
+ *
+ * Named for the shape rather than for the first form that needed it. A
+ * waterfall's step and a gantt's task are the same mark from two different
+ * arithmetics, and the emitter that draws them does not care which.
+ */
+export type Span = Readonly<{ from: number; to: number; drawn: boolean }>;
+
+/**
+ * A waterfall's running baseline — **the family's other cumulative fold** (I70,
+ * §3ak.34, F329).
+ *
+ * Here rather than in `derive.ts` because it returns bars and a range rather
+ * than a block, so I70's *each arm draws the derived block* has nothing to hand
+ * over. It is `stackBands`' shape, and this is `stackBands`' file.
+ *
+ * **It existed three times and two of the three disagreed.** `definition.ts`
+ * walked the series twice — once for the bounds and once for the bars — and the
+ * bounds walk read `values[i] ?? 0`, which lets a total with no reading reset the
+ * running sum to zero, while the drawing walk guarded the advance and let the
+ * same total hold it. `waterfallFigure` was a third walk following the first. On
+ * `[50, null, 30]` against `[false, true, false]` the terminal drew one cell at
+ * the right edge — a bar from 50 to 80 with both ends clamped to an axis of
+ * `0 … 50`, which is a bar outside its own axis — and the second arm drew three
+ * fifths of the row from the origin. **No fixture has a null**, so nothing could
+ * see it.
+ *
+ * **A null is no reading, and no reading moves no total** — which is the drawing
+ * walk's convention and `stackBands`' own, one fold along: *a null is a
+ * zero-width contribution, not a gap*. One walk also makes the bounds agree with
+ * the bars by construction, which is the property three walks could not have.
+ *
+ * **`totals` restarts rather than adds**: a total bar is drawn from zero to the
+ * running sum, and treating it as another step would draw the sum twice.
+ *
+ * The range is the **cumulative** one, anchored at zero — not `seriesRange` over
+ * the steps, which answers *how big is one change* where a gutter must cover
+ * *where the running total went*.
+ */
+/**
+ * A gantt's tasks — **a start and a duration, which is a span already**
+ * (§3ak.34, F329).
+ *
+ * Two lines, and here rather than in a renderer for exactly the reason the fold
+ * beside it is: two copies of two lines is how three copies of a fold began. The
+ * mechanical test F329 leaves behind is *does the other arm call the function*,
+ * and a derivation small enough to inline is the one most likely to be inlined
+ * twice.
+ *
+ * **The range has no floor**, which is the one thing that separates it from a
+ * waterfall's. A bar's length is its value, so it grows from zero; a task is an
+ * **interval**, and a project starting on day three starts on day three.
+ *
+ * **A task with no duration still has a start**, so it bounds the axis while
+ * drawing nothing — the terminal's own arithmetic, where `dur` falls back to
+ * zero for the bounds and the row comes out blank.
+ */
+export function ganttBars(
+  values: readonly (number | null)[],
+  offsets: readonly number[],
+): Readonly<{ bars: readonly Span[]; min: number; max: number }> {
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+  const bars = values.map((v, i) => {
+    const from = offsets[i] ?? 0;
+    const drawn = v !== null && Number.isFinite(v);
+    const to = from + (drawn ? v : 0);
+    min = Math.min(min, from);
+    max = Math.max(max, to);
+    return { from, to, drawn };
+  });
+  return { bars, min, max };
+}
+
+export function waterfallBars(
+  values: readonly (number | null)[],
+  totals: readonly boolean[],
+): Readonly<{ bars: readonly Span[]; min: number; max: number }> {
+  let running = 0;
+  let min = 0;
+  let max = 0;
+  const bars = values.map((v, i) => {
+    const isTotal = totals[i] === true;
+    const from = running;
+    if (v !== null && Number.isFinite(v)) {
+      running = isTotal ? v : running + v;
+      min = Math.min(min, running);
+      max = Math.max(max, running);
+    }
+    return { from: isTotal ? 0 : from, to: running, drawn: v !== null && Number.isFinite(v) };
+  });
+  return { bars, min, max };
 }
 
 /** The bounds every band spans together — what the axis must cover. */

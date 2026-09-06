@@ -11,6 +11,7 @@ import type { TuiConfig } from "../../src/shell/types.js";
 import { createExecutionPipeline } from "../../src/shell/execution.js";
 import { fakeStdin } from "../support/fake-terminal.js";
 import { displayCells } from "../../src/presentation/text.js";
+import { MOUSE } from "../../src/terminal/escapes.js";
 
 /** Two macrotask turns, so an ambient `setTimeout(0)` has run. */
 /**
@@ -54,8 +55,8 @@ describe("C22 §6b — the write is a difference", () => {
     expect(settled[0]?.trim(), "the header is on the screen").not.toBe("");
     expect(
       settled.findIndex((r) => r.trimStart().startsWith("❯")),
-      "the prompt sits on the row above the footer",
-    ).toBe(22);
+      "the prompt sits between the two rules, above the footer (C22 I81)",
+    ).toBe(21);
     const whole = settled.join("\r\n").length;
 
     const before = stdout.chunks.length;
@@ -98,6 +99,10 @@ describe("C22 §6b — the write is a difference", () => {
     // thing that can produce a write at all, which is the point of the row.
     resize({ columns: 100, rows: 24 });
     await settle();
+    // **The window** (C03 I15). `settle()` is a `setImmediate` flush, so it
+    // returns before a 16 ms timer fires — a resize is coalesced now and the
+    // write this row is about happens on the timer, not on the signal.
+    await new Promise((done) => setTimeout(done, 40));
 
     const written = stdout.chunks.slice(before).join("");
     expect(written, "the resize produced a write").not.toBe("");
@@ -147,6 +152,11 @@ describe("C22 §6b — the write is a difference", () => {
     // draws in the middle of the transcript with a gap beneath it.
     resize({ columns: 100, rows: 40 });
     await settle();
+    // **The window** (C03 I15). `settle()` is a `setImmediate` flush and the
+    // resize's frame is now written on a 16 ms timer, so the screen read below
+    // would be the frame from *before* the resize — which is a stale anchor
+    // read as a fresh one, exactly the confusion this row exists to catch.
+    await new Promise((done) => setTimeout(done, 40));
 
     const after = screen().rows;
     const promptAfter = rowOf("❯", after);
@@ -171,7 +181,9 @@ describe("C22 §6b — the write is a difference", () => {
 
     const rows = screen().rows;
     const prompt = rows.findIndex((r) => r.includes("❯"));
-    const menu = rows.slice(0, prompt);
+    // The row directly above the prompt is the frame's own rule (C22 I81); the
+    // menu's rows end above it.
+    const menu = rows.slice(0, prompt - 1);
     expect(menu.some((r) => /\+ \d+ more/u.test(r)), "the indicator is drawn").toBe(true);
     // **And the box closes**, which is the half a row about the indicator alone
     // does not cover: the bottom edge sits between the menu and the prompt, and
@@ -195,8 +207,8 @@ describe("C22 §6b — the write is a difference", () => {
     expect(screen().drawn, "a frame is on the screen").toBe(true);
     expect(
       screen().rows.findIndex((r) => r.trimStart().startsWith("❯")),
-      "the frame reaches the foot of the terminal",
-    ).toBe(22);
+      "the frame reaches the foot of the terminal — rule, prompt, rule, footer",
+    ).toBe(21);
 
     // The next write throws part-way — the screen keeps a prefix of a frame no
     // record describes. `throwOn` is what makes this constructible at all.
@@ -410,7 +422,22 @@ describe("C22 integration — the frame's viewport", () => {
 
     // The control: help arrived at all. Without it every assertion below is
     // about an empty screen and the row passes when nothing rendered.
-    expect(text, "the keymap document is on the frame").toContain("c+r");
+    //
+    // **It used to be `toContain("c+r")` and that was positional.** The keys
+    // document is longer than a 40-row frame and the frame shows its **tail**,
+    // so the control was really asserting *`c+r` is within the last 38
+    // bindings* — which two new `liveBlock` rows falsified by pushing it above
+    // the fold (C22 I71's camera binding). Nothing about help had broken.
+    //
+    // **A control that moves when an unrelated binding is added is measuring
+    // the ordering, not the arrival.** This counts rendered binding rows
+    // instead: it fails on an empty screen, which is its job, and it does not
+    // fail on the next binding anybody adds — which the old form would have,
+    // for whoever added it rather than for whoever wrote this.
+    // The keymap is a card's body since C22 I88, so each row arrives under the
+    // hook or the bar; the gutter is stripped before the binding shape is read.
+    const bindingRows = frame.filter((r) => /^\S+\s+\w+: \w+/u.test(r.replace(/^\s*[⎿│]\s/u, "").trim())).length;
+    expect(bindingRows, "the keymap document is on the frame").toBeGreaterThan(10);
 
     for (const shown of ["pageup", "pagedown", "c+home", "c+end"]) {
       expect(text, `/help shows ${shown}`).toContain(shown);
@@ -671,8 +698,10 @@ describe("C22 §4 step 7 — the greeting (I44)", () => {
     expect(screen().rows.join("\n"), "the row is on screen").toContain("alpha");
     expect(promptOf(), "and the prompt is empty before the action").not.toContain("/inspect");
 
-    // `↓` from the bottom of history enters the live block (C16 I22), then
-    // `enter` activates — the binding that did not exist.
+    // `↓` from the bottom of history enters the live block (C16 I22) on the
+    // card's head (C09 I47), `↓` again reaches the row, then `enter` activates
+    // — the binding that did not exist.
+    await type("\u001b[B");
     await type("\u001b[B");
     await type("\r");
 
@@ -796,6 +825,94 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
     ).toBeGreaterThan(after.indexOf(LEAVE_ALT));
   });
 
+  it("T4.63 (C22 I84, I85; C23 I57; §6l.6 rows 16–19): frame read — two settled cards: both hooks at column 2, the first hook row carries the table's header over its default gap, one blank row between the entries and one above the upper rule", async () => {
+    const manifest: NonNullable<TuiConfig["manifest"]> = {
+      schema: "tui.manifest/1",
+      binary: "prism",
+      version: "1.0.0",
+      tools: [
+        { name: "ps", local: true, summary: "a table with a leading gap", args: [], flags: [] },
+        { name: "note", local: true, summary: "one notice", args: [], flags: [] },
+      ],
+    };
+    const localHandlers: NonNullable<TuiConfig["localHandlers"]> = {
+      ps: () => ({
+        schema: "tui.view/1",
+        command: "ps",
+        status: "ok",
+        // A leading `gapBefore`, as C24 §4 gives a `table` by default — the card
+        // clears it so the hook marks content, not a blank (C23 I57). The kind
+        // does not matter to the clearing; the default's own mechanism is C23 T1.50.
+        blocks: [{ kind: "notice", id: "row", tone: "muted", text: "web running", gapBefore: true }],
+      }),
+      note: () => ({
+        schema: "tui.view/1",
+        command: "note",
+        status: "ok",
+        blocks: [{ kind: "notice", id: "n", tone: "muted", text: "done" }],
+      }),
+    };
+    const stdin = fakeStdin();
+    const { screen } = await buildSession({ manifest, localHandlers, stdin: stdin as never });
+    await settle();
+    stdin.emit("/ps\r");
+    await settle();
+    stdin.emit("/note\r");
+    await settle();
+
+    const rows = screen().rows.map((r) => r.trimEnd());
+    // No `ok` beside a dropped count (C23 I59): the settled head is the verb, and its tone.
+    const ps = rows.findIndex((r) => r.includes("⏺︎ ps"));
+    const note = rows.findIndex((r) => r.includes("⏺︎ note"));
+    expect(ps, "the first card").toBeGreaterThan(0);
+    expect(note, "the second card").toBeGreaterThan(ps);
+    // Row 17: the hook marks content, not the leading gap the block carried.
+    expect(rows[ps + 1]?.indexOf("⎿"), "the first hook at column 2").toBe(2);
+    expect(rows[ps + 1], "and it carries the body's content").toContain("web running");
+    expect(rows[note + 1]?.indexOf("⎿"), "the second hook at column 2").toBe(2);
+    // Rows 18–19: one blank closes entry 1 (before entry 2's `❯ /note` echo),
+    // one closes entry 2 above the upper rule.
+    expect(rows[note - 1]?.startsWith("❯ /note"), "entry 2's command echo").toBe(true);
+    expect(rows[note - 2], "one blank row closing entry 1").toBe("");
+    expect(rows[note + 2], "the blank closing entry 2").toBe("");
+    expect(/^[─-]{20,}/u.test(rows[note + 3] ?? ""), "then the upper rule").toBe(true);
+  });
+
+  it("T4.62 (C22 I83, §6l.2 row 12; C23 I55): a body one cell short of the width wraps once more under the indent, and the frame holds every row of it", async () => {
+    // **The wiring row.** T1.41 and T1.42 call `entryLayout` directly and would
+    // both pass with a `visibleRows` that never did, or a measurer wrapper that
+    // measured flush — the second is the one that drops a row: C14 believes the
+    // entry is two rows, the frame draws three, and the last cell is on no row.
+    const manifest: NonNullable<TuiConfig["manifest"]> = {
+      schema: "tui.manifest/1",
+      binary: "prism",
+      version: "1.0.0",
+      tools: [{ name: "wide", local: true, summary: "one notice, 99 cells", args: [], flags: [] }],
+    };
+    const localHandlers: NonNullable<TuiConfig["localHandlers"]> = {
+      wide: () => ({
+        schema: "tui.view/1",
+        command: "wide",
+        status: "ok",
+        blocks: [{ kind: "notice", id: "n", tone: "muted", text: "a".repeat(99) }],
+      }),
+    };
+    const stdin = fakeStdin();
+    const { screen } = await buildSession({ manifest, localHandlers, stdin: stdin as never });
+    await settle();
+    stdin.emit("/wide\r");
+    await settle();
+
+    const rows = screen().rows;
+    const at = rows.findIndex((r) => r.includes("⏺︎ wide"));
+    expect(at, "the card's header is on the screen").toBeGreaterThan(0);
+    expect(rows[at + 1]?.startsWith(`  ⎿ ${"a".repeat(96)}`), "the body's first row: the hook at 2 and 96 cells").toBe(true);
+    expect(rows[at + 2]?.trimEnd(), "the wrapped cells, under the bar (C22 I88)").toBe("  │ aaa");
+    expect(rows[at + 3]?.trim(), "the entry's blank row (I85)").toBe("");
+    expect(/^[─-]{20,}/u.test(rows[at + 4] ?? ""), "then the upper rule — nothing dropped between").toBe(true);
+    expect(rows[at + 5]?.trimStart().startsWith("❯"), "and the prompt").toBe(true);
+  });
+
   it("T4.28 (I6a, C09 I29): a swallowed render reaches the same drain", async () => {
     // **The fourth source, and its absence was structural rather than an
     // omission** (F223). L1 cannot reach this list, so C09's containments had
@@ -855,13 +972,20 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
     // border is the evidence the height was honoured. The definition measures 3,
     // so the box is border · message · border and the rows below sit where the
     // measurement put them.
-    expect(rows[at - 1]?.trimStart().startsWith("┌"), "the box opens above it").toBe(true);
-    expect(rows[at + 1]?.trimStart().startsWith("└"), "and closes below it").toBe(true);
+    // The box is a card's body (C23 I55), so its first row carries the hook (C22
+    // I83) — required, not optional: a `visibleRows` that skipped the layout
+    // survived this row while the hook was `(⎿ )?`.
+    expect(/^\s*⎿ ┌/u.test(rows[at - 1] ?? ""), "the box opens above it, under the hook").toBe(true);
+    expect(/^\s*│ └/u.test(rows[at + 1] ?? ""), "and closes below it, under the bar (C22 I88)").toBe(true);
     // **The prompt directly below the closing border is the height assertion.**
     // Three rows measured, three drawn, and nothing between the box and what
     // follows it — a stronger claim than a blank row, which a box one row short
     // would also satisfy.
-    expect(rows[at + 2]?.trimStart().startsWith("❯"), "the prompt follows the box").toBe(true);
+    // The entry closes with its blank row (C22 I85), then the rule bounding the
+    // prompt (C22 I81), then the prompt.
+    expect(rows[at + 2]?.trim(), "the entry's blank row").toBe("");
+    expect(/^[─-]{20,}/u.test(rows[at + 3] ?? ""), "the upper rule follows the box").toBe(true);
+    expect(rows[at + 4]?.trimStart().startsWith("❯"), "the prompt follows the rule").toBe(true);
 
     const before = stdout.chunks.length;
     await tui.stop("exit");
@@ -957,5 +1081,137 @@ describe("C22 — copy mode, entered and left (C16 §5b, C03 §4a)", () => {
     expect(stdout.output.length, "and resume writes the catching-up frame").toBeGreaterThan(
       held.length,
     );
+    // **The length is a proxy and the tracking pair satisfies it.** Measured
+    // 2026-09-05 with `resume()` deleted from the exit: `1002h 1006h` still
+    // arrives, the length grows, and the assertion above passed while the
+    // screen stayed frozen with `COPY` in the header. The frame is the subject,
+    // so the frame is what is read.
+    expect(screen().rows[0], "the catching-up frame took the indicator down").not.toContain("COPY");
+  });
+});
+
+describe("C22 — copy mode: the order inside the exit, and the far side under the hold (C16 §5b, §5c)", () => {
+  // Four microtasks rather than two: a settle runs through C23's continuation
+  // before the store moves, and a row reading `stdout` one tick early would
+  // report "nothing written" for a frame that had not been composed yet.
+  const typer =
+    (stdin: ReturnType<typeof fakeStdin>) =>
+    async (bytes: string): Promise<void> => {
+      stdin.emit(bytes);
+      for (let i = 0; i < 4; i += 1) await Promise.resolve();
+    };
+
+  const count = (haystack: string, needle: string): number => haystack.split(needle).length - 1;
+
+  it("T4.31b (C16 §5b B1, C01 I10): after ⌃c the tracking pair is the first thing written, before any byte of the frame", async () => {
+    const stdin = fakeStdin();
+    const { stdout, screen } = await buildSession({ stdin: stdin as never });
+    const type = typer(stdin);
+
+    await type("\u001bv");
+    expect(screen().rows[0], "in copy mode").toContain("COPY");
+
+    const before = stdout.output.length;
+    await type("\u0003");
+    const after = stdout.output.slice(before);
+
+    // **The control comes first**: a frame did follow the pair. Without it,
+    // "starts with the pair" is satisfied by a session that wrote the pair and
+    // then nothing — which is exactly what dropping `resume()` produces.
+    expect(after.length, "a catching-up frame followed").toBeGreaterThan(MOUSE.enter.length);
+    expect(screen().rows[0], "and it removed the indicator").not.toContain("COPY");
+
+    // The reader has finished selecting; the app takes the mouse back before it
+    // takes the screen. T4.31 asserts both bytes arrived and cannot see which
+    // came first — the swap passes it.
+    expect(
+      after.startsWith(MOUSE.enter),
+      `the first bytes after ⌃c are 1002h 1006h, got ${JSON.stringify(after.slice(0, 48))}`,
+    ).toBe(true);
+  });
+
+  it("T4.32b (C03 I13, C16 §5b B4): a verb settling during copy mode writes nothing; the exit's one frame carries it", async () => {
+    const stdin = fakeStdin();
+    let settle: ((doc: unknown) => void) | null = null;
+    const { stdout, screen } = await buildSession({
+      stdin: stdin as never,
+      manifest: {
+        schema: "tui.manifest/1",
+        binary: "prism",
+        version: "1.0.0",
+        tools: [{ name: "slow", local: true, summary: "settles when told", args: [], flags: [] }],
+      },
+      localHandlers: {
+        slow: () =>
+          new Promise((resolve) => {
+            settle = resolve;
+          }),
+      },
+    } as never);
+    const type = typer(stdin);
+    const TEXT = "SETTLED-UNDER-THE-HOLD";
+
+    await type("/slow\r");
+    expect(settle, "the verb is in flight").not.toBeNull();
+    expect(screen().text.join("\n"), "and has not settled").not.toContain(TEXT);
+
+    await type("\u001bv");
+    expect(screen().rows[0]).toContain("COPY");
+    const held = stdout.output;
+
+    // **The far side is not frozen.** The store moves; the screen does not.
+    settle!({ schema: "tui.view/1", status: "ok", blocks: [{ kind: "raw", id: "r1", text: TEXT }] });
+    for (let i = 0; i < 12; i += 1) await Promise.resolve();
+    expect(stdout.output, "the store moved and nothing reached the terminal").toBe(held);
+    expect(
+      screen().text.join("\n"),
+      "the screen still holds the frame the reader is selecting from",
+    ).not.toContain(TEXT);
+
+    await type("\u0003");
+    expect(stdout.output.length, "one catching-up frame").toBeGreaterThan(held.length);
+    expect(screen().text.join("\n"), "and it carries what settled under the hold").toContain(TEXT);
+  });
+
+  it("T4.32c (C16 §5c C5): ⌥v a second time in copy mode writes nothing — one 1002l, not two", async () => {
+    const stdin = fakeStdin();
+    const { stdout, screen } = await buildSession({ stdin: stdin as never });
+    const type = typer(stdin);
+
+    await type("\u001bv");
+    expect(screen().rows[0]).toContain("COPY");
+    const once = stdout.output;
+    expect(count(once, MOUSE.leave), "the leave pair, once").toBe(1);
+
+    await type("\u001bv");
+    expect(stdout.output, "the second press writes nothing at all").toBe(once);
+  });
+
+  // **RED UNTIL LANE S LANDS THE ROW — and `it.fails` is how it says so.** The
+  // ruling is C16 §5c: `Esc` leaves copy mode. It needs a `copyMode`/`escape`
+  // row in `keymap.ts`, `"exitCopyMode"` in `KeyAction`, and one effect line in
+  // `keys.ts`, none of which this lane owns. The body asserts the *ruling*; the
+  // wrapper asserts that the tree does not yet satisfy it. The day the three
+  // lines land this row goes red, which is the signal to flip it to `it` — a
+  // deferral that expires on the change it waits for, where an `it.todo` would
+  // not (`todo-expiry` is indexed by component, and every component here exists).
+  it("T4.68 (C16 §5c C1): Esc leaves copy mode — the tracking pair is the first bytes written, then the frame", async () => {
+    const stdin = fakeStdin();
+    const { stdout, screen, clock } = await buildSession({ stdin: stdin as never });
+    const type = typer(stdin);
+
+    await type("\u001bv");
+    expect(screen().rows[0]).toContain("COPY");
+    const before = stdout.output.length;
+
+    // A lone `Esc` waits C16 §2's 50 ms to be told apart from a sequence
+    // prefix; the wake is a real timer against the injected clock.
+    stdin.emit("\u001b");
+    clock.advance(80);
+    await new Promise((r) => setTimeout(r, 80));
+    for (let i = 0; i < 4; i += 1) await Promise.resolve();
+
+    expect(stdout.output.slice(before), "tracking back on Esc").toContain(MOUSE.enter);
+    expect(screen().rows[0], "the indicator goes with the mode").not.toContain("COPY");
   });
 });

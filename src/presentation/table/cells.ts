@@ -10,9 +10,10 @@
  * in one place so they cannot disagree.
  */
 import { glyphFor, glyphs } from "../blocks/glyphs.js";
-import { fit, pad, padStart, tone, type Span } from "../blocks/paint.js";
+import { fit, padStart, paintRuns, tone, type Span } from "../blocks/paint.js";
+import { runsOf, runsText, sliceRuns } from "../runs.js";
 import { sparkline, valueBar } from "../plot/index.js";
-import { stripControl, truncate } from "../text.js";
+import { cells, stripControl, truncate, truncateParts } from "../text.js";
 import type { Cell, ColumnDef, Table, TableRow } from "../../data/viewmodel/index.js";
 import type { RenderContext } from "../blocks/types.js";
 import type { PlannedColumns } from "./plan.js";
@@ -72,7 +73,7 @@ export function rowSpans(
   row: TableRow,
   plan: PlannedColumns,
   ctx: RenderContext,
-  options: Readonly<{ expandable: boolean; focused: boolean }>,
+  options: Readonly<{ expandable: boolean; focused: boolean; selected?: boolean }>,
 ): readonly Span[] {
   const byKey = new Map<string, ColumnDef>(block.columns.map((c) => [c.key, c]));
   const spans: Span[] = [];
@@ -132,7 +133,23 @@ export function rowSpans(
       return;
     }
 
-    const text = stripControl(cell === undefined ? "" : cell.text);
+    const spanned = cell === undefined ? [] : runsOf(cell.text, cell.spans);
+    // **A focused row drops a span's tone as it drops the cell's** (I14, C09
+    // §5): focus replaces `cell.tone` with `accent` below, and a span's `tone`
+    // is the same claim at a finer grain — a row that kept it would read as two
+    // things on the one occasion it must read as one. Attributes and a value
+    // are not claims about the foreground and survive.
+    // A selected row drops them the same way (I14): its ink is `default`, the
+    // one slot C10 §4b measured over the wash, and a span's own tone would be
+    // a second claim on the one occasion the row must read as one thing.
+    const textRuns = options.focused || options.selected === true
+      ? spanned.map((run) => {
+          if (run.tone === undefined) return run;
+          const { tone: _focusTakesIt, ...rest } = run;
+          return rest;
+        })
+      : spanned;
+    const text = runsText(textRuns);
     const glyph = cell?.glyph === undefined ? "" : glyphFor(cell.glyph, ctx.capabilities);
 
     // The glyph is part of the cell's width, not an addition to it: a status
@@ -145,25 +162,47 @@ export function rowSpans(
     // unconditionally made it two cells in a one-cell column — so it truncated,
     // and the frame showed `…` where every status glyph should have been. A
     // detail visible only in a golden, which is what D39 is for.
-    const body = glyph === "" || text === "" ? glyph + text : `${glyph} ${text}`;
+    // **The glyph is its own run, so a span's offsets stay offsets into `text`**
+    // (C04 §3am cell 7): a lead of `glyph + " "` is prepended as a piece, never
+    // spliced into the string the offsets address.
+    const lead = glyph !== "" && text !== "" ? `${glyph} ` : glyph;
+    const body = lead + text;
+    const bodyRuns = lead === "" ? textRuns : [{ text: lead }, ...textRuns];
 
     // **Focus is rendered, never owned** (I14). It changes the tone and nothing
     // else — no marker, no extra row, no width. `measure` receives no focus at
     // all (C04 §5), so a focused row that occupied a different number of cells
     // or rows would be I9 broken by whichever row the user happened to be on.
+    //
+    // **Selected is the same rule, one more state** (I14): `default` ink, and
+    // the caller lays the wash over the whole row. `focused` wins where both
+    // hold — the head is painted as the head.
     const style = options.focused
       ? tone("accent", ctx.theme, ctx.capabilities)
-      : tone(cell?.tone ?? "default", ctx.theme, ctx.capabilities);
+      : options.selected === true
+        ? tone("default", ctx.theme, ctx.capabilities)
+        : tone(cell?.tone ?? "default", ctx.theme, ctx.capabilities);
 
     // The end a cell truncates from is the surface's (C04 I30) — a path keeps its
     // filename, a config key its leaf, an image its tag. C11 reads the field and
     // never infers it: a column of paths and a column of prose are
     // indistinguishable from their contents.
     const from = column?.truncateFrom ?? "end";
-    const cut = truncate(body, planned.width, ctx.capabilities, from);
-    const fitted = column?.align === "right" ? padStart(cut, planned.width) : pad(cut, planned.width);
+    // `truncateParts` with the surface's end: `kept` is an exact slice of the
+    // body from `start`, so the runs are cut against it and the marker — at
+    // either end — is painted outside every span (C04 I86).
+    const parts = truncateParts(body, planned.width, ctx.capabilities, from);
+    const cut = parts.prefix + parts.kept + parts.suffix;
+    const short = Math.max(0, planned.width - cells(cut, ctx.capabilities.ambiguousWidth));
+    const pieces = [
+      { text: column?.align === "right" ? " ".repeat(short) : "" },
+      { text: parts.prefix },
+      ...sliceRuns(bodyRuns, parts.start, parts.kept.length), // cells-ok — a code-unit length
+      { text: parts.suffix },
+      { text: column?.align === "right" ? "" : " ".repeat(short) },
+    ];
 
-    spans.push({ text: fitted, style });
+    spans.push(...paintRuns(pieces, style, ctx));
   });
 
   return spans;

@@ -14,6 +14,9 @@
 import { describe, expect, it } from "vitest";
 import { interactivePty, runInPty, type PtyRun } from "../support/pty.js";
 import { displayCells } from "../../src/presentation/text.js";
+import { KITTY_KEYBOARD } from "../../src/terminal/escapes.js";
+import { createDecoder } from "../../src/interaction/router/decode.js";
+import { captureFromEmulator, emulatorMissing, sleep } from "../support/x-emulator.js";
 
 const FIXTURE = "node test/support/fixture.mjs caps";
 
@@ -150,6 +153,77 @@ describe("C02 e2e — the environment decides, and the terminal shows it", () =>
   );
 
   it(
+    "T5.6 (C02 I12, C01 I6): the keyboard protocol forced on puts `ESC [ > 3 u` and `ESC [ < u` on the wire, in C01's positions",
+    async () => {
+      // **Bytes read from the PTY, not reconstructed from the record.** Every
+      // tier-1 row asserts what C01 handed a fake stream; this asserts what a
+      // kernel device received, which is the claim a user's terminal depends on.
+      const forced = await runInPty(FIXTURE, { env: { TERM: "xterm-256color", FORCE_KEYBOARD: "kitty" } });
+      const push = forced.bytes.indexOf("\x1b[>3u");
+      const pop = forced.bytes.indexOf("\x1b[<u");
+      const frame = forced.bytes.indexOf("FRAME-START");
+      const mouseOff = forced.bytes.indexOf("\x1b[?1006l");
+      expect(push, `push present in ${JSON.stringify(forced.bytes.slice(0, 80))}`).toBeGreaterThanOrEqual(0);
+      expect(pop, "pop present").toBeGreaterThanOrEqual(0);
+      // Pushed after the mouse pair and before the frame; popped first, before
+      // the mouse leaves (C01 §5 step 7).
+      expect(push).toBeGreaterThan(forced.bytes.indexOf("\x1b[?1006h"));
+      expect(push).toBeLessThan(frame);
+      expect(pop).toBeGreaterThan(frame);
+      expect(pop).toBeLessThan(mouseOff);
+      // The pop form and never a reset: no `CSI = … u` anywhere in the run.
+      expect(forced.bytes).not.toMatch(/\x1b\[=[0-9;]*u/);
+      // Exactly one of each — a re-push on some path would show here.
+      expect(forced.bytes.match(/\x1b\[[<>][0-9;]*u/g)).toEqual(["\x1b[>3u", "\x1b[<u"]);
+
+      // **The unforced arm**, so the bytes are attributable to the capability and
+      // not to a lifecycle that pushes regardless: `xterm-256color` is unidentified
+      // and the record says `none`.
+      const detected = await runInPty(FIXTURE, { env: { TERM: "xterm-256color" } });
+      expect(detected.bytes).not.toMatch(/\x1b\[[<>=][0-9;]*u/);
+      expect(detected.bytes).toContain('"keyboardProtocol":"none"');
+    },
+    45_000,
+  );
+
+  // **Was an `it.todo` for want of an emulator; the container has kitty now** (C02
+  // T5.7, F810). The row above proves the bytes leave the process; this one
+  // proves a terminal *answers* them, in its own encoding, and that the decoder
+  // reads that encoding — the wiring a graph-level row cannot see (F799). Skips
+  // by name where kitty, Xvfb or xdotool is absent, never silently: the reason
+  // is in the title. The `full` CI job and the devcontainer install all three.
+  const kittyMissing = emulatorMissing("kitty");
+  it.skipIf(kittyMissing !== null)(
+    `T5.7 (C02 I12; C16 I30): kitty receives KITTY_KEYBOARD.enter and answers \`CSI 27 u\` for a lone Esc, \`CSI 13;2:3 u\` for Shift-Enter released — and the real decoder reads both${kittyMissing === null ? "" : ` — skipped: ${kittyMissing}`}`,
+    async () => {
+      const { a } = await captureFromEmulator({
+        program: "kitty",
+        enter: KITTY_KEYBOARD.enter,
+        leave: KITTY_KEYBOARD.leave,
+        drive: async (xdo, _window, phase) => {
+          if (phase !== 1) return;
+          xdo("keydown", "Escape"); await sleep(150); xdo("keyup", "Escape"); await sleep(300);
+          xdo("keydown", "shift"); await sleep(100); xdo("keydown", "Return"); await sleep(150);
+          xdo("keyup", "Return"); await sleep(100); xdo("keyup", "shift"); await sleep(300);
+          xdo("type", "k"); // the control: a capture without it is a broken reader, not a quiet terminal
+        },
+      });
+      expect(a, "the control byte arrived, so the capture read").toContain("k");
+      expect(a, "a lone Esc is `CSI 27 u` — not a prefix").toContain("\x1b[27u");
+      expect(a, "its release carries `:3`").toContain("\x1b[27;1:3u");
+      expect(a, "Shift-Enter is `CSI 13;2 u`").toContain("\x1b[13;2u");
+      expect(a, "released, `CSI 13;2:3 u`").toContain("\x1b[13;2:3u");
+
+      // **The decoder, on the emulator's bytes** — the pair T4.72 could not see (F799).
+      const d = createDecoder({ capabilities: { bracketedPaste: true, mouse: true }, now: () => 0 });
+      const events = d.push(new TextEncoder().encode(a)).filter((e) => e.kind === "key");
+      const keys = events.map((e) => (e.kind === "key" ? `${e.key.name}${e.key.shift ? "+shift" : ""}${e.event === "release" ? "/release" : ""}` : ""));
+      expect(keys).toEqual(["escape", "escape/release", "enter+shift", "enter+shift/release", "k", "k/release"]);
+    },
+    60_000,
+  );
+
+  it(
     "T5.4b: inside tmux, keyboard navigation of a table works end to end",
     async () => {
       // **Three gaps deep, and each was invisible until the one in front of it
@@ -199,7 +273,10 @@ describe("C02 e2e — the environment decides, and the terminal shows it", () =>
         expect(before.length, "both rows are on the screen").toBe(2);
 
         // `↓` at the prompt: history has nothing further to offer, so this is
-        // the keystroke's second effect (C16 I22).
+        // the keystroke's second effect (C16 I22). It lands on the card's head
+        // (C09 I47), which is not one of the two rows, so a second `↓` is what
+        // reaches the table.
+        pty.type("\u001b[B");
         pty.type("\u001b[B");
         await pty.waitForFrame(() => rawRows().join("\n") !== before.join("\n"), 15_000);
 

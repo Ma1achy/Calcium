@@ -193,5 +193,24 @@ finally:
     os.remove("/tmp/_capture_locale_row")
 
 
+# ── F811: a persisted `/theme` statement outlives the shot that made it ──────
+#
+# `theme-light` types `/theme light`, the shell writes `.calcium/theme`, and the
+# next start honours it — so the screencast and every media shot recorded after
+# that day opened light. The clearing is per shot and before, never after: the
+# order-dependent version is the same defect one crash away.
+_saved_theme = capture.STATE_THEME
+try:
+    capture.STATE_THEME = "/tmp/_capture_theme_row"
+    with open(capture.STATE_THEME, "w", encoding="utf8") as fh:
+        fh.write("light\n")
+    capture.forget_theme()
+    case("a stated theme is forgotten before a shot", os.path.exists(capture.STATE_THEME), False)
+    capture.forget_theme()
+    case("and forgetting nothing is not an error", os.path.exists(capture.STATE_THEME), False)
+finally:
+    capture.STATE_THEME = _saved_theme
+
+
 if __name__ == "__main__":
     sys.exit(main("capture.py"))

@@ -27,12 +27,16 @@ import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import type { Span } from "../blocks/paint.js";
 import type { ColourRef, ColourValue, Style } from "../theme/types.js";
 import type { Colormap } from "../theme/colormap.js";
-import { ansi256Hex, nearestAnsi256 } from "../theme/colormap.js";
+import { ansi256Hex, nearestAnsi256, overChannels } from "../theme/colormap.js";
 import { DEFAULT_FLOOR, luminance, ratio } from "../theme/contrast.js";
 import { glyphForMask, LINE_DOWN, LINE_LEFT, LINE_RIGHT, LINE_UP } from "./linedraw.js";
+// **The marching-squares core, the levels and the layer membership are
+// `figure.ts`'s now** (C12 I71, §3ak.29). The derivation is what both arms
+// share and this file is one arm's raster: `contourCellRows` resamples the
+// field onto the cells it is about to draw and marches there, because
+// `glyphForMask` wants a mask per cell that no set of segments can supply.
+import { crossing, layersOf, marchingMask, paintsField, saddleJoinsTopLeft } from "./figure.js";
 import { BRAILLE_DOTS, createGrid, drawLine, foldBraille } from "./raster.js";
-import type { Range } from "./scale.js";
-import { niceAxis } from "./axes.js";
 
 /**
  * The field, resampled onto the cells actually drawn.
@@ -88,84 +92,6 @@ export function fieldSampler(series: readonly Series[]): FieldSample {
 }
 
 /**
- * The four corners of one cell, above or below the level, as an **edge** mask.
- *
- * An edge is crossed exactly when its two corners disagree, which is the whole
- * derivation. `glyphForMask` takes it from here.
- *
- * A corner that is `null` — a gap — makes the cell uncrossable rather than
- * counting as below: a field with a hole in it has no contour across the hole,
- * and treating absence as *below the level* draws one along the hole's rim.
- */
-export function marchingMask(
-  tl: number | null,
-  tr: number | null,
-  br: number | null,
-  bl: number | null,
-  level: number,
-): number {
-  if (tl === null || tr === null || br === null || bl === null) return 0;
-  const a = tl >= level;
-  const b = tr >= level;
-  const c = br >= level;
-  const d = bl >= level;
-  return (
-    (a !== b ? LINE_UP : 0) |
-    (b !== c ? LINE_RIGHT : 0) |
-    (c !== d ? LINE_DOWN : 0) |
-    (d !== a ? LINE_LEFT : 0)
-  );
-}
-
-/** The mask a saddle produces — all four edges. Both resolutions give it. */
-const SADDLE = LINE_UP | LINE_RIGHT | LINE_DOWN | LINE_LEFT;
-
-/**
- * Which way a saddle connects, by the cell's centre value — matplotlib's rule.
- *
- * `true` joins **top→left and bottom→right**; `false` joins top→right and
- * bottom→left. The centre is the bilinear average of the four corners, so the
- * pairing follows the surface rather than a convention.
- *
- * **This has no observable consequence on the `"line"` arm** — both pairings are
- * mask 15 and render `┼` — which is why `"auto"` picks braille (§3y). Stated
- * here as well as in the spec, because a reader meeting this function on the
- * cell path will otherwise take the ruling to be doing something.
- */
-export function saddleJoinsTopLeft(
-  tl: number,
-  tr: number,
-  br: number,
-  bl: number,
-  level: number,
-): boolean {
-  const centre = (tl + tr + br + bl) / 4;
-  return (centre >= level) === (tl >= level);
-}
-
-/** Where along an edge the level falls, as a fraction from the first corner. */
-function crossing(a: number, b: number, level: number): number {
-  const d = b - a;
-  if (d === 0) return 0.5;
-  const t = (level - a) / d;
-  return t < 0 ? 0 : t > 1 ? 1 : t;
-}
-
-/** The levels a contour draws, declared or derived. */
-export function contourLevels(block: Plot, range: Range): readonly number[] {
-  if (block.levels !== undefined) {
-    return block.levels.filter((v) => Number.isFinite(v));
-  }
-  // **The gutter's own function**, so a contour's levels and the y ticks are the
-  // same numbers rather than two nice-number runs that agree at most widths.
-  // The interior ticks only: a level at the field's minimum crosses nothing and
-  // a level at its maximum crosses nothing, so drawing them says *no contour*
-  // where the caller asked for one.
-  const axis = niceAxis(range, 6, block);
-  return axis.ticks.filter((v) => v > range.min && v < range.max);
-}
-
-/**
  * The cell arm — one glyph per cell, from `glyphForMask` (I49).
  *
  * Levels **union their masks** in a cell, which is the only way `┤ ├ ┴ ┬` can be
@@ -173,6 +99,8 @@ export function contourLevels(block: Plot, range: Range): readonly number[] {
  * *saddle* within one level and as *two levels crossing* across levels, and both
  * are true readings of the same mark.
  */
+const SADDLE_MASK = LINE_UP | LINE_RIGHT | LINE_DOWN | LINE_LEFT;
+
 export function contourCellRows(
   sample: FieldSample,
   span: Readonly<{ from: number; to: number; rows: number }>,
@@ -180,7 +108,7 @@ export function contourCellRows(
   areaRows: number,
   levels: readonly number[],
   corners: "rounded" | "sharp",
-  caps: Pick<TerminalCapabilities, "unicode">,
+  caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
 ): readonly string[] {
   const w = Math.max(0, Math.floor(areaWidth));
   const h = Math.max(0, Math.floor(areaRows));
@@ -250,7 +178,7 @@ export function contourDotRows(
         const bottom: [number, number] = [ox + crossing(bl, br, level) * (dx - 1), oy + dy - 1];
         const left: [number, number] = [ox, oy + crossing(tl, bl, level) * (dy - 1)];
 
-        if (mask === SADDLE) {
+        if (mask === SADDLE_MASK) {
           // **The one place the centre value is read**, and the one arm where
           // the reading is visible.
           if (saddleJoinsTopLeft(tl, tr, br, bl, level)) {
@@ -435,26 +363,25 @@ export function dimFactorFor(map: Colormap, indexed = false): number {
   return factor;
 }
 
-/** A colour dimmed by a factor, in whatever encoding it arrived in. */
+/**
+ * A colour dimmed by a factor, in whatever encoding it arrived in.
+ *
+ * **Scaled in the encoding and not in linear light**, which is the difference
+ * between this and `shadeColour` one layer over. `fieldDim: "floor"` is about a
+ * **contrast ratio against white**, and `dimFactorFor` searches for its factor
+ * in encoded space against that ratio — so the two functions answer different
+ * questions and share only the traversal.
+ *
+ * **The 8-bit arm returned its argument once** (C12 §3y). `continuousColour`
+ * gives `ansi256` below 24-bit, so `fieldDim: "floor"` was applied, ignored and
+ * silent on every terminal between the colour floor and true colour, while the
+ * member's own doc said it was inert only *below* the floor. `overChannels`
+ * carries that arm now, and 0–15 come back unchanged because those are the
+ * terminal's own palette and have no value we can read.
+ */
 export function dimColour(colour: ColourValue, factor: number): ColourValue {
   if (factor >= 1) return colour;
-  const scale = (hex: string): string => {
-    const n = (i: number): number => Math.round(parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16) * factor);
-    return `#${[0, 1, 2].map((i) => n(i).toString(16).padStart(2, "0")).join("")}`;
-  };
-  if (colour.kind === "rgb") return { kind: "rgb", hex: scale(colour.hex) };
-  // **The 8-bit arm, which returned its argument** (C12 §3y). `continuousColour`
-  // gives `ansi256` below 24-bit, so `fieldDim: "floor"` was applied, ignored
-  // and silent on every terminal between the colour floor and true colour —
-  // while the member's own doc said it was inert only *below* the floor.
-  if (colour.kind === "ansi256") {
-    const hex = ansi256Hex(colour.index);
-    // 0\u201315 are the terminal's own palette and have no value we can read, so
-    // there is nothing to scale: returning the argument is the honest answer
-    // here and was the wrong one above.
-    return hex === null ? colour : { kind: "ansi256", index: nearestAnsi256(scale(hex)) };
-  }
-  return colour;
+  return overChannels(colour, (c) => c * factor);
 }
 
 /** Black or white, whichever clears the floor against this background (I51). */
@@ -519,24 +446,6 @@ export function overlayGlyphs(
   return out;
 }
 
-/**
- * What a field form draws, in draw order (I51).
- *
- * The default is the form's own — a contour over a painted field, which is the
- * classic presentation and the one the request asked for. `["contour"]` asks for
- * lines on an unpainted area, and that is what membership is for.
- */
-export function layersOf(block: Pick<Plot, "form" | "layers">): readonly ("field" | "contour" | "quiver")[] {
-  if (block.layers !== undefined) return block.layers;
-  if (block.form === "contour") return ["field", "contour"];
-  return block.form === "quiver" ? ["field", "quiver"] : ["field"];
-}
-
-/** Whether the field itself is painted — membership, never position. */
-export function paintsField(block: Pick<Plot, "form" | "layers">): boolean {
-  return layersOf(block).includes("field");
-}
-
 /** The depth at or above which the field is a background rather than a ramp. */
 const FIELD_COLOUR_FLOOR = 8;
 
@@ -582,8 +491,16 @@ export function glyphLayerOrder(block: Pick<Plot, "form" | "layers">): readonly 
  * `ramp.ts` spells its ladders the same way. **The comment said this before the
  * code did**, which is the class the scan exists to catch: a literal that reads
  * as compliant because the sentence beside it is.
+ *
+ * **The double-arrow ring U+21D0–21D9, since F833.** The single arrows' four
+ * diagonals `↖ ↗ ↘ ↙` are bases of emoji variation sequences — a font that
+ * prefers the emoji form draws them two cells wide in a one-cell field — and
+ * the cardinals are not, so a ring of singles cannot be made safe. The doubles
+ * are the one complete eight-direction ring in one weight with no emoji form:
+ * the black arrows U+2B05–2B07 are emoji, and the white ones U+2B00–2B03 have
+ * no cardinals. SS57 found the escapes once it decoded them.
  */
-const ARROWS_UNICODE = "\u2192\u2197\u2191\u2196\u2190\u2199\u2193\u2198";
+const ARROWS_UNICODE = "\u21d2\u21d7\u21d1\u21d6\u21d0\u21d9\u21d3\u21d8";
 
 /**
  * The ASCII arm — `> / ^ \ < / v \`, **and the diagonals reuse**.
@@ -633,13 +550,10 @@ export function arrowFor(
   return arrows[((eighth % 8) + 8) % 8] ?? null; // cells-ok — a direction count
 }
 
-/** The magnitude of each vector, as a `Series` per row. */
-export function magnitudeSeries(vectors: readonly VectorSeries[]): readonly Series[] {
-  return vectors.map((row) => ({
-    values: row.values.map((p) => (p === null ? null : Math.hypot(p[0], p[1]))),
-    ...(row.label === undefined ? {} : { label: row.label }),
-  }));
-}
+// `magnitudeSeries` used to sit here and is now in `derive.ts` (F322): it is a
+// derivation of the block's data, and importing it from here would have put
+// braille, the dot grid and the glyph ladder on the second arm's graph to reach
+// `Math.hypot`.
 
 /**
  * The arrows, one glyph per cell, resampled onto the area (I50).

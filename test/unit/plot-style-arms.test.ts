@@ -10,6 +10,20 @@ import { block, validateBlock, STYLE_ARMS } from "../../src/data/viewmodel/index
 import type { PlotForm } from "../../src/data/viewmodel/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { radarRender } from "../../src/presentation/plot/circle.js";
+import { proportionDecisions } from "../../src/presentation/plot/figure.js";
+/**
+ * The two figure members `circle.ts` used to compute for itself (§3ak.26).
+ *
+ * A test passing its own ceiling or its own shares would be the
+ * reimplemented-rule class one layer up — so both come off the same emitter
+ * `definition.ts` reads.
+ */
+const ceilingOf = (series: readonly { values: readonly (number | null)[] }[], categories: readonly string[]): number =>
+  proportionDecisions(block({
+    kind: "plot", id: "ceil", form: "radar", height: 10,
+    categories: [...categories], series: series.map((s) => ({ values: [...s.values] })),
+  })).value?.range.max ?? 1;
+
 import { rainColumns } from "../../src/presentation/plot/kde.js";
 import { quadrantGlyph } from "../../src/presentation/plot/linedraw.js";
 import { FULL_CAPS, MONO_UNICODE_CAPS, measurable } from "../support/render.js";
@@ -380,7 +394,7 @@ describe("SA9 (C12 I45): the radar's grid is a polygon or a circle, and it is de
   const CATS3 = ["Speed", "Power", "Range"];
   const S3 = [{ values: [80, 60, 90], label: "alpha" }, { values: [50, 85, 45], label: "beta" }];
   const frameOf = (grid?: "polygon" | "circle") =>
-    radarRender(S3, CATS3, 80, 16, FULL_CAPS, false, grid ?? "polygon").frame;
+    radarRender(S3, CATS3, 80, 16, FULL_CAPS, ceilingOf(S3, CATS3), false, grid ?? "polygon").frame;
 
   /** Columns the frame inks on a row — a triangle's widest row is its base. */
   const inked = (row: string): number[] =>
@@ -450,15 +464,15 @@ describe("SA9 (C12 I45): the radar's grid is a polygon or a circle, and it is de
     // asserts is a branch that can be deleted with the suite still green.
     for (const cats of [["Speed"], ["Speed", "Power"]]) {
       const s = cats.map(() => ({ values: cats.map(() => 5) }));
-      const poly = radarRender(s, cats, 80, 16, FULL_CAPS, false, "polygon").frame;
-      const circ = radarRender(s, cats, 80, 16, FULL_CAPS, false, "circle").frame;
+      const poly = radarRender(s, cats, 80, 16, FULL_CAPS, ceilingOf(s, cats), false, "polygon").frame;
+      const circ = radarRender(s, cats, 80, 16, FULL_CAPS, ceilingOf(s, cats), false, "circle").frame;
       expect(poly.join("\n")).toBe(circ.join("\n"));
     }
   });
 
   it("the quadrant arm honours it too, which is where the two disagreed", () => {
     const fig = (grid: "polygon" | "circle") =>
-      JSON.stringify(radarRender(S3, CATS3, 80, 16, FULL_CAPS, true, grid).figure);
+      JSON.stringify(radarRender(S3, CATS3, 80, 16, FULL_CAPS, ceilingOf(S3, CATS3), true, grid).figure);
     expect(fig("polygon")).not.toBe(fig("circle"));
   });
 });

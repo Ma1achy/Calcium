@@ -25,13 +25,15 @@
  */
 
 import { createAdapterRegistry } from "../data/adapters/index.js";
-import { commandRows } from "./paint.js";
+import { blankRowsAbove, commandRows } from "./paint.js";
 import { noticeDoc } from "./documents.js";
 import type { NavElement } from "../presentation/blocks/index.js";
 import { initialRegionHeight } from "./frame.js";
+import { elementsOfEntry, measureEntry } from "./entry-layout.js";
 import { createManifestStore, parseManifest, withThemeNames } from "../data/manifest/index.js";
 import type { ManifestError } from "../data/manifest/index.js";
-import type { Result } from "../data/viewmodel/index.js";
+import { block as makeBlock, descendants } from "../data/viewmodel/index.js";
+import type { Block, Plot, Result } from "../data/viewmodel/index.js";
 import { createProcessRunner } from "../data/process/runner.js";
 import {
   createTransport,
@@ -42,17 +44,28 @@ import type { ProcessRunner } from "../data/process/types.js";
 import { createBlockRegistry, type BlockDefinition } from "../presentation/blocks/index.js";
 import { BlockFaultLog } from "./block-faults.js";
 import { tableDefinition } from "../presentation/table/index.js";
-import { plotDefinition } from "../presentation/plot/index.js";
+import { cursorable, legendHitAt, plotDefinition, sampleIndexAt } from "../presentation/plot/index.js";
 import { patchDefinition } from "../presentation/patch/index.js";
 import { loadTheme, type ThemeStore } from "../presentation/theme/index.js";
 import { createTranscriptStore } from "../viewport/transcript/index.js";
+import type { EntryId } from "../viewport/transcript/index.js";
 import { createViewport } from "../viewport/viewport/index.js";
 import { RenderCache } from "./render-cache.js";
+import { Cameras } from "./cameras.js";
+import { Frames } from "./frames.js";
+import { CursorPositions } from "./cursor-positions.js";
+import { SeriesVisibility } from "./series-visibility.js";
+import { RenderScratchStore } from "./render-scratch.js";
 import { ScrollOffsets } from "./scroll-offsets.js";
-import { createOverlayManager } from "../viewport/overlay/index.js";
+import { createOverlayManager, takesInput } from "../viewport/overlay/index.js";
 import { createEditor } from "../interaction/editor/index.js";
-import { createEngine, frameworkSources, MENU_ID } from "../interaction/completion/index.js";
-import { createFocusStore } from "../interaction/router/focus.js";
+import {
+  createEngine,
+  createSourceErrorSink,
+  frameworkSources,
+  MENU_ID,
+} from "../interaction/completion/index.js";
+import { createFocusStore, resolveFocus } from "../interaction/router/focus.js";
 import { createKeymap, defaultKeymap, keyText } from "../interaction/router/keymap.js";
 import { createRouter, type RouterDeps } from "../interaction/router/router.js";
 import { createConfirmHost, type ConfirmHost } from "./confirm.js";
@@ -63,6 +76,7 @@ import { createPatchView } from "./patch-view.js";
 import type { FocusTarget, InputEvent, Key, KeyAction } from "../interaction/router/types.js";
 import { openHistory, SEARCH_ID } from "../interaction/history/index.js";
 import { detectCapabilities, type TerminalCapabilities } from "../terminal/capabilities.js";
+import { glyphs } from "../presentation/blocks/index.js";
 import { createFrameScheduler } from "../terminal/frame-scheduler.js";
 import {
   createTerminalLifecycle,
@@ -146,6 +160,16 @@ async function readDocument(
  */
 const CHIP_LINES = 5;
 
+/**
+ * What one press of the dolly scales the eye distance by (C22 I75).
+ *
+ * **Multiplicative, so it cannot reach `distance: 0`** — the only value that
+ * draws nothing, measured. Twelve presses from `CAMERA_DEFAULT`'s 6 take the eye
+ * to 0.41 or to 87, and the reader is never on a blank frame with a control that
+ * still works.
+ */
+const DOLLY = 1.25;
+
 export const STEPS = Object.freeze([
   "capabilities",
   "registries",
@@ -190,7 +214,6 @@ export type FrameQueries = Readonly<{
   exitCopyMode: () => void;
   /** Enter it. The other half of B1's pair (C16 §5b). */
   enterCopyMode: () => void;
-  entryAtRow: (row: number) => Readonly<{ id: string; rowOffset: number }> | null;
   /**
    * Where the transcript sits, for mouse routing (C16 `RouterDeps.region`).
    *
@@ -236,8 +259,34 @@ export type Graph = Readonly<{
    * comment warning about the second could not see it.
    */
   liveElements: () => readonly Readonly<{ blockId: string; element: NavElement }>[];
+  /**
+   * The entry focus is in, or `null` at the prompt (C26 I22, §4g).
+   *
+   * **The one pull the render side and the key side share.** `focusFor` in
+   * `session.ts` and every effect in `keys.ts` ask this rather than `liveId`,
+   * which is what lifted the ceiling: three readers each read `liveId` and
+   * agreed on the same constant, so no element outside the live entry could be
+   * focused at all. Answers the stored entry while it exists and the live one
+   * when it does not — an evicted entry's highlight and its next arrow land in
+   * the same place because both came through here.
+   */
+  focusedEntryId: () => EntryId | null;
+  /** The focused entry's elements, from the same walk as `liveElements` (C26 I21). */
+  focusedElements: () => readonly Readonly<{ blockId: string; element: NavElement }>[];
   /** C04 I48 — page the focused container, in rows, focus unmoved (C26 I18). */
   pageBlock: (direction: 1 | -1) => void;
+  /** C22 I71 — turn the focused plot camera. A no-op where there is none. */
+  orbitBlock: (direction: 1 | -1) => void;
+  /** C22 I75 — tilt it. Unclamped, because the pole is unreachable (F467). */
+  tiltBlock: (direction: 1 | -1) => void;
+  /** C22 I75 — dolly it, multiplicatively, so `distance: 0` is unreachable. */
+  dollyBlock: (direction: 1 | -1) => void;
+  /** C22 I75 — restore the declared view, leaving the orbit alone. */
+  resetCamera: () => void;
+  /** C22 I72 — start or stop it turning. Off is the default and nothing declares it. */
+  toggleOrbit: () => void;
+  /** C22 I78 — hide or show series `n` of the focused plot. A no-op elsewhere. */
+  toggleSeries: (n: number) => void;
   /** Is the prompt answering keys under the top layer (I51, C19 I20)? */
   promptUnderMenu: () => boolean;
   /** Past the blink threshold since the last key (C22 I64). */
@@ -288,6 +337,18 @@ export type Graph = Readonly<{
    */
   rendered: RenderCache;
   scrollOffsets: ScrollOffsets;
+  cameras: Cameras;
+  /** C22 I77 — the frame each animated image is on, keyed like the two above and dropped with them. */
+  frames: Frames;
+  /** C22 I76 — the crosshair of each plot, keyed like the two above and dropped with them. */
+  cursorPositions: CursorPositions;
+  /** C22 I78 — the reader's series overrides per plot, keyed like the three above and dropped with them. */
+  seriesVisibility: SeriesVisibility;
+  /**
+   * Caller-owned render scratch (C12 I107). One per session, keyed on the
+   * caller's own arrays, so nothing evicts it and nothing subscribes.
+   */
+  scratch: RenderScratchStore;
   overlays: ReturnType<typeof createOverlayManager>;
   history: Awaited<ReturnType<typeof openHistory>>;
   editor: ReturnType<typeof createEditor>;
@@ -453,7 +514,12 @@ export async function constructGraph(
     // the only thing that knows which block gave way, and the shell has to
     // address one to reserve rows for it.
     const blockFaults = new BlockFaultLog();
-    const blocks = createBlockRegistry({ defaults: true, onError: blockFaults.report });
+    const blocks = createBlockRegistry({
+      defaults: true,
+      onError: blockFaults.report,
+      // C14 I24 — the app's cap on one block's rows, resolved in `config.ts`.
+      maxBlockRows: config.maxBlockRows,
+    });
     // **The three the framework itself produces** (C09 §1, I13). `defaults`
     // ships C09's fourteen; `table`, `plot` and `patch` register through the
     // public mechanism, and until this line nobody called it — so a stock
@@ -501,7 +567,17 @@ export async function constructGraph(
     // text all name the set the session actually holds.
     manifest.load(withThemeNames(parsed.value, Object.keys(config.theme)));
 
-    const completion = createEngine({ now: config.clock, recency: recencyOf });
+    // **The product's source-error sink** (C19 T3.6, C22 §8 step 3). Every
+    // test supplied `onSourceError` and nothing in `src/` did, so a failing
+    // completion source was dropped in silence for the life of the engine —
+    // I6 held and *logged once* had nowhere to log. One deduplicated line per
+    // failing source, drained with the other diagnostics below.
+    const completionFaults = createSourceErrorSink();
+    const completion = createEngine({
+      now: config.clock,
+      recency: recencyOf,
+      onSourceError: completionFaults.onSourceError,
+    });
     // **The framework's six first, then the app's** (I3b). §2 called
     // manifest-derived completion a working default and nothing built it, so
     // `Tab` produced no candidates in any real session while every C19 tier
@@ -515,7 +591,7 @@ export async function constructGraph(
     }
     for (const source of config.completionSources) completion.register(source);
 
-    return { blocks, adapters, manifest, completion, blockFaults };
+    return { blocks, adapters, manifest, completion, blockFaults, completionFaults };
   })().catch((cause: unknown) => {
     throw cause instanceof ConstructionError ? cause : new ConstructionError("registries", cause);
   });
@@ -554,6 +630,18 @@ export async function constructGraph(
   /** Roadmap 30 — the chip's display number, per session. */
   let chipCount = 0;
 
+  /**
+   * The rows the composer draws above an entry's blocks (C14 I20, C22 I33).
+   *
+   * **One function, three readers.** C14 measures `chrome ++ blocks` with it, the
+   * frame draws the same rows, and the pointer subtracts them before the element
+   * list's rows mean anything (C16 §4a row b). A second arithmetic in any of the
+   * three is a viewport describing a document the frame is not showing — or a
+   * click landing one command line below where it was made.
+   */
+  const chromeRowsOf = (entry: Readonly<{ doc: Readonly<{ command: string }> }>, width: number): number =>
+    commandRows(entry.doc.command, width, detection.capabilities).length;
+
   const stores = await (async () => {
     const transcript = createTranscriptStore(
       config.retainPayloads > 0 ? { retainPayloads: config.retainPayloads } : {},
@@ -568,13 +656,18 @@ export async function constructGraph(
       // that frame exists, and an initial value in the wrong axis is the same
       // defect with a shorter life. One row of prompt is the floor, which is
       // what a session opens with.
+      // The footer is guessed at one row (C22 §6l.2 row 8); the first frame
+      // corrects the region by `f − 1` — T1.37 measures the gap.
       height: initialRegionHeight(size),
-      measureSequence: (blocks, width) => built.blocks.measureSequence(blocks, width),
+      // **Through the entry's layout** (C22 I83, §6l.4 D): a card's body is
+      // measured at `width − 2`, by the same function `visibleRows` renders it
+      // through, so the rows C14 counts are the rows the frame draws.
+      measureSequence: (blocks, width) => measureEntry(built.blocks.measureSequence, blocks, width),
       // C14 I20 / C22 I33 — the command line is chrome the composer draws, so
       // it is part of the height the index virtualises against. **The same
       // function that draws it**, or the two arithmetics part company and the
       // viewport describes a document it is not showing.
-      chromeRows: (entry, width) => commandRows(entry.doc.command, width, detection.capabilities).length,
+      chromeRows: chromeRowsOf,
     });
 
     // **The render cache's two C13 arms, beside C14's** (I58, §6c trace rows 8
@@ -589,15 +682,48 @@ export async function constructGraph(
     // would be two places for a future eviction path to reach one and miss the
     // other.
     const scrollOffsets = new ScrollOffsets();
+    // **The camera joins the same subscription**, for the reason the comment
+    // above gives about the offsets: a third callback would be a third place for
+    // an eviction path to reach two and miss one (C22 I71).
+    const cameras = new Cameras();
+    // **The crosshair joins it too, and it is the writer C12 §3s waited for**
+    // (C22 I76). `RenderContext.cursorPositions` was read in one place and
+    // written by nothing in `src/` — the counter-example I71 cited when the
+    // camera landed. Same key shape, same subscription, same reason.
+    const cursorPositions = new CursorPositions();
+    // **And the animated images' frame positions** (C22 I77, C04 I93). Same key
+    // shape, same subscription, same reason — and the fourth store to join it,
+    // which is the count the argument was written to survive.
+    const frames = new Frames();
+    // **And the series overrides — the fifth** (C22 I78). Same key shape, same
+    // subscription, same reason; the first store whose writer is a keymap the
+    // block declares rather than a row of the default table.
+    const seriesVisibility = new SeriesVisibility();
+    // **This one does not join the subscription, and the difference is the
+    // point** (C12 I107, §6o.1). The two stores above are keyed by entry id and
+    // must be told when an entry goes; this is keyed on the caller's own
+    // `faces` or `heights` array in a `WeakMap`, so the slot dies with the
+    // document that held the mesh. Adding it to the callback would be a third
+    // place for a future eviction path to reach two of — which is exactly the
+    // argument the comment above makes, applied by *not* doing it.
+    const scratch = new RenderScratchStore();
     transcript.subscribe((change) => {
       if (change.kind === "evict") {
         for (const id of change.ids) {
           rendered.delete(id);
           scrollOffsets.delete(id);
+          cameras.delete(id);
+          cursorPositions.delete(id);
+          frames.delete(id);
+          seriesVisibility.delete(id);
         }
       } else if (change.kind === "clear") {
         rendered.clear();
         scrollOffsets.clear();
+        cameras.clear();
+        cursorPositions.clear();
+        frames.clear();
+        seriesVisibility.clear();
       }
     });
 
@@ -834,6 +960,11 @@ export async function constructGraph(
       viewport,
       rendered,
       scrollOffsets,
+      cameras,
+      cursorPositions,
+      seriesVisibility,
+      frames,
+      scratch,
       overlays,
       history,
       editor,
@@ -850,6 +981,8 @@ export async function constructGraph(
     createProcessRunner({
       env: config.env,
       stdin: config.stdin,
+      // C22 I91 — the one site that reads it, and it hands the same object on.
+      ...(config.pty === undefined ? {} : { pty: config.pty }),
       ...(deps.debug === undefined ? {} : { debug: deps.debug }),
     }),
   );
@@ -870,6 +1003,9 @@ export async function constructGraph(
       stdout: config.stdout,
       stdin: config.stdin,
       capabilities: detection.capabilities,
+      // C01 I21 — 1003 in 1002's place when the app asked; resolved to a boolean
+      // by `resolveConfig`, so C01 never sees an absent field.
+      hover: config.hover,
       onFatal: deps.onFatal,
       beforeRelease: makeBeforeRelease(runner, stores.history, [stores.transcriptWriter]),
       ...(deps.debug === undefined ? {} : { debug: deps.debug }),
@@ -912,15 +1048,29 @@ export async function constructGraph(
   let refreshAnchors: () => void = () => undefined;
 
   at("resize", () => {
-    lifecycle.onResize((size) => {
-      // **The width, and not the height** (C22 I34). Width is what invalidates
-      // every cached height (C14 I8) and is knowable here; the height is the
-      // *region's*, which only the composed frame knows, so `#render` sets it.
-      // Setting both here is what made the viewport three rows too tall — two
-      // writers with different ideas of one quantity, and the wrong one ran
-      // first. The height passed through is the one C14 already holds, so this
-      // call carries no opinion about it.
-      stores.viewport.resize({ width: size.columns, height: stores.viewport.scroll.viewportHeight });
+    lifecycle.onResize(() => {
+      // **The viewport is not resized here, and that is where the 544 ms was**
+      // (C03 I15, F423). The comment this replaces said *the width, and not the
+      // height* — two writers with different ideas of one quantity, which is
+      // C22 I34's own sentence about the height. It was true one field over:
+      // `render-frame.ts` already resizes the viewport from the composed frame,
+      // **width and height together**, before any row is read, and C14 I21 makes
+      // the second call a no-op. So this line's only effect was to do the
+      // re-measure per `SIGWINCH` instead of per frame — thirty full re-measures
+      // of the transcript for a drag, 544 ms at a thousand entries.
+      //
+      // **Nothing here needs to know the new width**, and a frame composed for
+      // any other reason cannot be stale: `compose` reads `lifecycle.size()`
+      // fresh, and the only reader of viewport rows is `paintDeps`, whose two
+      // call sites are both after the resize (C03 §8a, the classification
+      // table's third row). The size argument is therefore unread, which is why
+      // it is not taken.
+      //
+      // **`refreshAnchors` stays per signal rather than per frame**, and it is
+      // cheap: `promptAnchor` composes for `region.height` and `promptRows`
+      // only — layout, no paint — and reads `lifecycle.size()` fresh, so it
+      // never depended on the viewport having been resized first.
+
       // **The anchors, before the frame is asked for** (C15 I14, C19 I23). An
       // anchored layer stores the row it was placed against, and every writer
       // of that row was a keystroke path — so a resize left an open menu
@@ -928,6 +1078,10 @@ export async function constructGraph(
       // clamps, so nothing faults and no number disagrees; the menu is simply
       // in the wrong place, which is a frame's finding and not an assertion's.
       refreshAnchors();
+      // **A live child is told, before the frame** (C23 I65). The route resizes
+      // its child and then its emulator; composing first would draw one frame
+      // from a grid that is about to be reflowed.
+      pipeline.resized();
       scheduler.commit("resize");
     });
     // `SIGCONT` re-acquires and says so through `onResume`; C01 sets no
@@ -973,7 +1127,9 @@ export async function constructGraph(
       // the nullable form answers quietly, and a quiet `null` here is Ctrl-C
       // taking a lower rung over a running verb — C23 §8a A1 restored by its
       // own fix.
-      deps: routerDeps(stores, runner, scheduler, deps.frame, () => pipeline, confirm),
+      // A thunk: `entryAtRegionRow` is declared below, with the other pointer
+      // helpers, and the router is built here. Called at dispatch, never now.
+      deps: routerDeps(stores, runner, scheduler, deps.frame, () => pipeline, confirm, (row) => entryAtRegionRow(row)),
     }),
   );
 
@@ -1145,12 +1301,181 @@ export async function constructGraph(
    * measured and drawn at. A second width here would put the elements somewhere
    * the frame is not.
    */
-  const liveElements = (): readonly Readonly<{ blockId: string; element: NavElement }>[] => {
-    const id = stores.transcript.liveId;
+  const elementsOf = (
+    id: EntryId | null,
+  ): readonly Readonly<{ blockId: string; element: NavElement }>[] => {
     if (id === null) return [];
     const entry = stores.transcript.entries.find((e) => e.id === id);
     if (entry === undefined) return [];
-    return built.blocks.elementsIn(entry.doc.blocks, deps.frame.overlayRegion().width);
+    // Through the entry's layout (C22 I83): a card's body elements sit a gutter
+    // in, and their rows follow the header measured at the full width. The
+    // entry's recorded command rides along so a head's `copy` is the invocation
+    // (C22 I90).
+    return elementsOfEntry(built.blocks, entry.doc.blocks, deps.frame.overlayRegion().width, entry.doc.command);
+  };
+  /** The live entry's — what `↓` from the prompt enters (C16 I22). */
+  const liveElements = (): readonly Readonly<{ blockId: string; element: NavElement }>[] =>
+    elementsOf(stores.transcript.liveId);
+
+  /**
+   * The entry focus is in (C26 I22, §4g).
+   *
+   * **This pull is the whole of the widening.** `liveElements`, `focusedBlock`
+   * and `session.ts`'s `focusFor` each read `stores.transcript.liveId`, so no
+   * element outside the live entry could be focused and every reader agreed —
+   * three copies of one constant, which is the shape §8b.4 found for the element
+   * walk one release earlier. Now the stored location names the entry and this
+   * is the one place that resolves it.
+   *
+   * **The stored entry while it exists, the live one when it does not** (C26
+   * I22). An evicted entry's position does not survive it — its neighbours
+   * cannot be named without it — so the fall is to the live entry's first
+   * element, which is I10's block-went clause one scope up. A pull rather than
+   * an arm in the eviction callback below, because focus is C16's state and C16
+   * I11 keeps it a pull; the callback drops render state and nothing else.
+   */
+  const focusedEntryId = (): EntryId | null => {
+    const at = focus.current;
+    if (at.at !== "liveBlock") return null;
+    if (stores.transcript.entries.some((e) => e.id === at.entryId)) return at.entryId;
+    return stores.transcript.liveId;
+  };
+  const focusedElements = (): readonly Readonly<{ blockId: string; element: NavElement }>[] =>
+    elementsOf(focusedEntryId());
+
+  /**
+   * The focused element's detail, shown as C15's peek (C15 §2a, C26 §5).
+   *
+   * **A projection of focus, reconciled rather than driven.** Focus is a pull
+   * (C16 I11) and has no change stream to subscribe to, so this is called after
+   * every delivered input and on every viewport change, and each call
+   * re-derives the whole answer from three facts: the active target is
+   * `liveBlock` or `interaction`, the resolved element declares `detail`, and
+   * the element's first row is on screen. All three and one peek is on the
+   * stack, anchored at that row with that detail; any fewer and there is none.
+   * The peek therefore has no key of its own — `Esc` at `liveBlock` is
+   * `focusPrompt` exactly as before and the peek closes because focus left.
+   *
+   * **Never `top`** (C15 I21): it is `kind: "peek"`, so `↓`, `⏎` and `Esc`
+   * reach the element it describes. Measured with a plain overlay in its place,
+   * all three were taken by the layer.
+   *
+   * **The anchor is the frame's row, computed the way `entryAtRegionRow`
+   * computes its inverse**: `blankRowsAbove` for the bottom-aligned short
+   * transcript, C14's `visible()` for the entries on screen and how much of
+   * each, and the entry's chrome rows before its blocks (C14 I20). An element
+   * whose row is scrolled off has no anchor and no peek.
+   *
+   * **No element inside a `scroll` box can want a peek, and this used to carry
+   * a guard for the case** (`SCROLL_PEEK`, closed in arc 6). A scroll owns its
+   * elements — one per child, block-level (C26 §4b cell 3, C09 I30) — and none
+   * of them carries a `detail`, because only a table *row* declares one. So the
+   * `detail === undefined` test above already answers `null` for every element a
+   * box declares, and the content-row → region-row translation `elementAt` does
+   * for the pointer has nothing to translate here. Measured: `elementsIn` over a
+   * scroll holding a cut table answers two elements with no detail, against the
+   * table alone answering row `a` with one. `peek.test.ts` T4.13 pins the
+   * premise; the day a scroll's element gains a `detail` it goes red, and the
+   * translation — through `elementAt`'s arithmetic, one copy — is owed then.
+   *
+   * `update`, never pop-and-push, when the content or the row changes (C15
+   * I14, T4.12) — compared structurally, because `elementsIn` is recomputed
+   * per call and hands back fresh objects for an unchanged element.
+   */
+  const PEEK_ID = "peek";
+  const peekWanted = (): Readonly<{ key: string; row: number; detail: Block }> | null => {
+    const target = router.target;
+    if (target !== "liveBlock" && target !== "interaction") return null;
+    const at = focus.current;
+    if (at.at !== "liveBlock") return null;
+    const entryId = focusedEntryId();
+    if (entryId === null) return null;
+    const entry = stores.transcript.entries.find((e) => e.id === entryId);
+    if (entry === undefined) return null;
+    const elements = focusedElements();
+    const index = resolveFocus(at.element, elements);
+    if (index === null) return null;
+    const found = elements[index];
+    if (found === undefined || found.element.detail === undefined) return null;
+
+    const width = deps.frame.overlayRegion().width;
+    const { viewportHeight, totalRows } = stores.viewport.scroll;
+    let top = blankRowsAbove(viewportHeight, totalRows);
+    for (const ve of stores.viewport.visible().entries) {
+      if (ve.id !== entryId) {
+        top += ve.takeRows;
+        continue;
+      }
+      const within = chromeRowsOf(entry, width) + found.element.rows.from - ve.skipRows;
+      if (within < 0 || within >= ve.takeRows) return null;
+      return {
+        key: `${entryId}/${found.blockId}/${found.element.id}/${JSON.stringify(found.element.detail)}`,
+        row: top + within,
+        detail: found.element.detail,
+      };
+    }
+    return null;
+  };
+  let peekKey: string | null = null;
+  let peekRow: number | null = null;
+  const syncPeek = (): void => {
+    const want = peekWanted();
+    const have = stores.overlays.stack.some((l) => l.id === PEEK_ID);
+    if (want === null) {
+      peekKey = null;
+      peekRow = null;
+      if (have) stores.overlays.dismiss(PEEK_ID);
+      return;
+    }
+    if (have && want.key === peekKey && want.row === peekRow) return;
+    // A panel, so the peek is delimited by its rails rather than by a dim the
+    // terminal cannot draw (C15 I11). Anchored below and flipped by C15 when
+    // there is no room (I17); the width is the region's on the confirm's
+    // argument, and the height the default half of the region.
+    const content = [
+      makeBlock({ kind: "panel", id: "peek-panel", title: "Detail", children: [want.detail] }),
+    ];
+    const placement = { kind: "anchored" as const, row: want.row, prefer: "below" as const };
+    if (have) {
+      stores.overlays.update(PEEK_ID, { content, placement });
+    } else {
+      stores.overlays.push({ id: PEEK_ID, kind: "peek", placement, content, dismissable: true });
+    }
+    peekKey = want.key;
+    peekRow = want.row;
+  };
+  // Scroll, content and resize all move the element's row or the element
+  // itself (C14 emits on all three); a confirm answered from the far side does
+  // not, and the peek beneath it needs nothing.
+  stores.viewport.subscribe(() => syncPeek());
+
+  /**
+   * The nearest entry in `direction` that declares an element, and its first
+   * one (C26 I21, §4g row c and trace 5).
+   *
+   * `-1` is older — up the screen, `⇧tab` — and `1` is newer. An entry with
+   * nothing focusable is stepped over rather than entered, which is C16 I22's
+   * third clause applied to the outer scope: entering a notice would leave
+   * every arrow a no-op there. `null` at either end, and the effect stops.
+   *
+   * Counted from the live entry when the stored one is gone, so `tab` after an
+   * eviction walks from where resolution says focus is (C26 I22).
+   */
+  const neighbourOf = (
+    direction: 1 | -1,
+  ): Readonly<{ entryId: EntryId; first: Readonly<{ blockId: string; element: NavElement }> }> | null => {
+    const from = focusedEntryId();
+    if (from === null) return null;
+    const entries = stores.transcript.entries;
+    let i = entries.findIndex((e) => e.id === from);
+    if (i === -1) return null;
+    for (i += direction; i >= 0 && i < entries.length; i += direction) {
+      const candidate = entries[i];
+      if (candidate === undefined) continue;
+      const first = elementsOf(candidate.id)[0];
+      if (first !== undefined) return { entryId: candidate.id, first };
+    }
+    return null;
   };
 
   /**
@@ -1165,21 +1490,378 @@ export async function constructGraph(
    * store is nudged and nothing touches `focus`. A focused element outside the
    * box is the legal state C26 I18 names, and the next `↓` steps from it.
    */
-  const pageBlock = (direction: 1 | -1): void => {
-    const entryId = stores.transcript.liveId;
-    if (entryId === null) return;
+  /**
+   * The block focus is inside, **resolved through the tree** (F470).
+   *
+   * `elementsIn` walks into `panel` and `group` — a container declaring no
+   * elements of its own yields its children's — so focus can land on a block a
+   * top-level `find` cannot reach. Every effect here used that `find`, so a
+   * `scroll` inside a `panel` could be focused and not paged, and a 3D plot
+   * inside one could be focused and not turned. **`b.live` builds a panel**,
+   * which is how a defect this shape stays invisible: the arrangement the
+   * framework itself produces is the one that fails.
+   *
+   * **A `scroll` and not a table, which is what F470's own symptom said and it
+   * cannot witness anything** (F472). `ctx.scrollOffsets` has one reader in
+   * `src/` — `containers.ts` — so paging a non-container writes an offset
+   * nothing reads, at any depth: *focused and not paged* is as true of a flat
+   * table as of a nested one. The witness is a container inside a container
+   * (T4.59), and T4.60 holds the table case as a control.
+   *
+   * C04's `descendants` rather than a fourth walk, for `animationIntervalOf`'s
+   * reason — two copies of a traversal are two places to add a container kind.
+   */
+  const focusedBlock = (): Readonly<{ entryId: EntryId; block: Block }> | null => {
+    // **The focused entry, not the live one** (C26 I22). Reading `liveId` here
+    // was the third of the three readers §4g names, and with it a `scroll` in a
+    // settled entry could be focused and would page the live entry's block of
+    // the same id — or nothing.
+    const entryId = focusedEntryId();
+    if (entryId === null) return null;
     const at = focus.current;
-    if (at.at !== "liveBlock" || at.element === null) return;
-
+    if (at.at !== "liveBlock" || at.element === null) return null;
+    const wanted = at.element.blockId;
     const entry = stores.transcript.entries.find((e) => e.id === entryId);
-    const block = entry?.doc.blocks.find((b) => b.id === at.element?.blockId);
-    if (block === undefined) return;
+    if (entry === undefined) return null;
+    for (const top of entry.doc.blocks) {
+      if (top.id === wanted) return { entryId, block: top };
+      for (const child of descendants(top)) if (child.id === wanted) return { entryId, block: child };
+    }
+    return null;
+  };
+
+  const pageBlock = (direction: 1 | -1): void => {
+    const found = focusedBlock();
+    if (found === null) return;
+    const { entryId, block } = found;
 
     // One row of overlap, which is what lets a reader join two screens — and
     // a floor of one, so a box of a single row still moves.
     const height = built.blocks.measure(block, deps.frame.overlayRegion().width);
-    stores.scrollOffsets.nudge(entryId, block.id, direction * Math.max(1, height - 1));
+    stores.scrollOffsets.nudge(entryId, block.id, direction * Math.max(1, height - 1), scrollBox(block));
     scheduler.commit("input");
+  };
+
+  /**
+   * The box a scroll's offset is clamped against (C04 I97, §3c T2/T3/T7).
+   *
+   * The store spells *following* as `TAIL` and cannot resolve it — it does not
+   * know the width — so the caller who measured the content hands over the
+   * ceiling, and whether the block asked to follow. Without it `⇞` on a followed
+   * box is `∞ + δ`, a no-op (Lane B's T7). The sum is `childRanges`'s: every child
+   * of a scroll gets the full width, and `gapBefore` is not counted.
+   */
+  const scrollBox = (block: Block): { ceiling: number; follow?: boolean } | undefined => {
+    if (block.kind !== "scroll") return undefined;
+    const width = deps.frame.overlayRegion().width;
+    const content = block.children.reduce((n, c) => n + built.blocks.measure(c, width), 0);
+    return { ceiling: Math.max(0, content - block.height), follow: block.follow === true };
+  };
+
+  /**
+   * A block of `entry` by id, at any depth — `focusedBlock`'s walk, for the
+   * pointer (C16 §4a).
+   *
+   * **The same loop as `focusedBlock`'s rather than a shared one, on purpose**:
+   * `c22-camera.mjs` and `c22-nested-block.mjs` anchor mutations on that
+   * function's lines, and a mutation run is re-anchored only under a run of the
+   * pass (`tools/mutate`), which Lane W could not run. The duplication is
+   * recorded here so the next pass can fold the two together.
+   */
+  const blockIn = (entry: Readonly<{ doc: Readonly<{ blocks: readonly Block[] }> }>, id: string): Block | null => {
+    for (const top of entry.doc.blocks) {
+      if (top.id === id) return top;
+      for (const child of descendants(top)) if (child.id === id) return child;
+    }
+    return null;
+  };
+
+  /**
+   * Move the box under the pointer (C04 I48, C16 §4a). The store clamps at read.
+   *
+   * **Takes the entry and the block rather than reading focus**: `pageBlock`
+   * pages the focused box and the wheel pages the one under the pointer, which
+   * is why `blockPageUp/Down` could not be the wheel's effect — the walk said so
+   * before this function existed. `pageBlock` keeps its own two lines for the
+   * anchoring reason `blockIn` gives.
+   */
+  const nudgeScroll = (entryId: EntryId, blockId: string, rows: number): void => {
+    const entry = stores.transcript.entries.find((e) => e.id === entryId);
+    const block = entry === undefined ? null : blockIn(entry, blockId);
+    stores.scrollOffsets.nudge(entryId, blockId, rows, block === null ? undefined : scrollBox(block));
+    scheduler.commit("input");
+  };
+
+  /**
+   * The entry at a **region** row (C14 I19), through the frame's alignment.
+   *
+   * **The frame bottom-aligns a short transcript** — `paint.ts` pushes
+   * `region.height − rows` blank rows above the content so it grows towards the
+   * prompt — and C14 addresses its rows from the top. The two agree exactly when
+   * the transcript fills the region, which is every long session and no short
+   * one: a click on the second visible row of a two-entry session asked C14 for
+   * a row past `totalRows` and got `null`, while every store-level row passed.
+   * **Found by reading the painted frame and by nothing else** (C16 §4a row l).
+   *
+   * **The same function `paint.ts` aligns with**, over the same two numbers —
+   * `blankRowsAbove`, exported for this one reader — and it is the frame's
+   * translation rather than C14's: the viewport does not know how it is drawn,
+   * and making it know would put a composition rule in L2. It was the same
+   * expression written twice, which agrees until one copy changes (F755).
+   */
+  const entryAtRegionRow = (regionRow: number): Readonly<{ id: EntryId; rowOffset: number }> | null => {
+    const { viewportHeight, totalRows } = stores.viewport.scroll;
+    return stores.viewport.entryAtRow(regionRow - blankRowsAbove(viewportHeight, totalRows));
+  };
+
+  /**
+   * The element under a pointer, and the block that declared it (C16 §4a, I31).
+   *
+   * **One `find` over the list the keyboard walks** — `elementsOf`, at the same
+   * width — so the two cannot disagree about what is there (C26 §5). What the
+   * pointer needs and the keyboard never did is geometry, and there are two
+   * translations, both measured before this was written:
+   *
+   * - `rowOffset` is in `chrome ++ blocks` (C14 I20), so the chrome comes off
+   *   first; a pointer on the command line has a negative row and hits nothing.
+   * - a `scroll`'s elements are in **content** rows (C26 I3 — never the
+   *   offset), so inside the box the pointer is at `boxRow + offset`, and the
+   *   residue row and the rows past a short content hit nothing of the box's.
+   *   A hit by `rows` alone lands on the child *above* the one under the pointer
+   *   by exactly the offset — inside the bounds and wrong.
+   *
+   * Deepest level wins (C26 §6): a cell over a row over a block.
+   */
+  const elementAt = (
+    hit: Readonly<{ id: EntryId; rowOffset: number }>,
+    col: number,
+  ): Readonly<{ blockId: string; element: NavElement; block: Block; row: number }> | null => {
+    const entry = stores.transcript.entries.find((e) => e.id === hit.id);
+    if (entry === undefined) return null;
+    const width = deps.frame.overlayRegion().width;
+    const blockRow = hit.rowOffset - chromeRowsOf(entry, width);
+    if (blockRow < 0) return null;
+
+    const placed = elementsOf(hit.id);
+    let best: Readonly<{ blockId: string; element: NavElement; block: Block; row: number }> | null = null;
+    for (const p of placed) {
+      const block = blockIn(entry, p.blockId);
+      if (block === null) continue;
+      let row = blockRow;
+      if (block.kind === "scroll") {
+        // The box's top is its first child's content row 0, lifted; its content
+        // is the last child's end. Both read off the list rather than measured
+        // again, and the offset is clamped exactly as the renderer clamps it.
+        const own = placed.filter((q) => q.blockId === block.id);
+        const top = Math.min(...own.map((q) => q.element.rows.from));
+        const content = Math.max(...own.map((q) => q.element.rows.to)) - top;
+        if (blockRow < top || blockRow >= top + block.height) continue;
+        const held = stores.scrollOffsets.get(hit.id, block.id);
+        row = blockRow + Math.min(Math.max(0, Math.trunc(held)), Math.max(0, content - block.height));
+      }
+      if (row < p.element.rows.from || row >= p.element.rows.to) continue;
+      if (col < p.element.cols.from || col >= p.element.cols.to) continue;
+      if (best === null || LEVEL_DEPTH[p.element.level] > LEVEL_DEPTH[best.element.level]) {
+        // `row` is the pointer's row inside the element — the legend's inverse
+        // needs it (C12 I117) as the crosshair's needs the column.
+        best = { blockId: p.blockId, element: p.element, block, row: row - p.element.rows.from };
+      }
+    }
+    return best;
+  };
+
+  /**
+   * The focused plot, or `null` (C22 I71, I75, C12 I83).
+   *
+   * **`pageBlock`'s shape and one difference**: the camera effects read the
+   * block's own declared `camera`, because the baseline a key is normalised
+   * against is the view the block would be drawn from with no entry at all —
+   * and only the block knows that (`cameras.ts`'s header).
+   *
+   * **A block that is not a plot, or a plot declaring no camera, is a no-op.**
+   * The bindings are static and cannot see a block, so the gate is here — and a
+   * plot with no `camera` declares no element either (C12 I85), so focus cannot
+   * reach one and the second half of the gate is belt over braces.
+   */
+  const focusedPlot = (): Readonly<{ entryId: EntryId; plot: Plot }> | null => {
+    const found = focusedBlock();
+    if (found === null) return null;
+    const { entryId, block } = found;
+    if (block.kind !== "plot") return null;
+    const plot = block as Plot;
+    return plot.camera === undefined ? null : { entryId, plot };
+  };
+
+  /**
+   * Turn the focused plot's camera one step (C22 I71, I75).
+   *
+   * One sixteenth of a turn, which reads as a rotation rather than a jump at the
+   * sample counts this rung has. **Focus does not move**, exactly as paging does
+   * not (C26 I18).
+   */
+  const orbitBlock = (direction: 1 | -1): void => {
+    const at = focusedPlot();
+    if (at === null) return;
+    stores.cameras.nudge(at.entryId, at.plot.id, at.plot.camera, {
+      azimuth: (direction * Math.PI) / 8,
+    });
+    scheduler.commit("input");
+  };
+
+  /**
+   * Tilt the focused plot's camera (C22 I75).
+   *
+   * **Finer than the turn and deliberately unclamped.** The useful elevation
+   * range is `π` where the azimuth's is `2π`, so a sixteenth of a half-turn is
+   * the same visual step; and the pole is unreachable, because `cos(π/2)` is
+   * `6.123e-17` and `basisOf`'s degenerate `right` vector cannot be produced —
+   * measured, elevation exactly `π/2` draws a plan view (F467). A camera past
+   * the pole is a view rather than a corruption, which is `cameras.ts`'s own
+   * ruling and the reason nothing here normalises.
+   */
+  const tiltBlock = (direction: 1 | -1): void => {
+    const at = focusedPlot();
+    if (at === null) return;
+    stores.cameras.nudge(at.entryId, at.plot.id, at.plot.camera, {
+      elevation: (direction * Math.PI) / 16,
+    });
+    scheduler.commit("input");
+  };
+
+  /**
+   * Dolly the focused plot's camera, **multiplicatively** (C22 I75).
+   *
+   * **A scaling control cannot reach the one degenerate value.** `distance: 0`
+   * draws nothing and is the answer rather than a refusal (C12 §3al); measured,
+   * it is the *only* such value — `0.01` inks 1776 cells and `−6` inks the same
+   * 297 as `+6`, because a negative distance is the antipodal view. So the
+   * hazard is passing **through** a blank frame with a working control, and
+   * `× 1.25` never reaches zero from anywhere but zero.
+   *
+   * The store takes a delta and clamps nothing, so the step is computed here
+   * from the live value — `pageBlock`'s seam, where the effect knows the
+   * arithmetic and the store records what it is told.
+   */
+  const dollyBlock = (direction: 1 | -1): void => {
+    const at = focusedPlot();
+    if (at === null) return;
+    const now = stores.cameras.cameraFor(at.entryId, at.plot.id, at.plot.camera).distance;
+    const next = direction === 1 ? now / DOLLY : now * DOLLY;
+    stores.cameras.nudge(at.entryId, at.plot.id, at.plot.camera, { distance: next - now });
+    scheduler.commit("input");
+  };
+
+  /** Restore the focused plot's declared view, leaving the orbit alone (C22 I75). */
+  const resetCamera = (): void => {
+    const at = focusedPlot();
+    if (at === null) return;
+    stores.cameras.reset(at.entryId, at.plot.id, at.plot.camera);
+    scheduler.commit("input");
+  };
+
+  /**
+   * Start or stop the focused plot turning (C22 I72).
+   *
+   * **Off is the default and nothing declares otherwise**: a block cannot say
+   * that it orbits (C04 I75), and an orbiting 3D plot is a full-frame redraw for
+   * as long as it is on screen where a static one is a single cached render. So
+   * the reader turns it on, and this is the only thing that can.
+   */
+  const toggleOrbit = (): void => {
+    const at = focusedPlot();
+    if (at === null) return;
+    const on = !stores.cameras.orbiting(at.entryId, at.plot.id);
+    stores.cameras.setOrbit(at.entryId, at.plot.id, at.plot.camera, on);
+    // `input`, because a key caused it and the flag itself draws nothing — the
+    // frame it asks for is the one that arms the ticker (C22 I60a).
+    scheduler.commit("input");
+  };
+
+  /**
+   * Move the focused plot's crosshair one sample (C22 I76, C12 §3s, I37).
+   *
+   * **The index is into the data**, so the ceiling is the longest series and
+   * this is where it is known — the store records what it is told and clamps
+   * nothing, which is `dollyBlock`'s seam. A first `→` lands on the first
+   * sample and a first `←` on the last, so the cursor appears at the edge the
+   * reader is moving away from rather than in the middle of nowhere.
+   *
+   * **A no-op on anything but a plot with samples**, resolved here for the
+   * camera family's reason: the binding is static and cannot see a block. What
+   * this does not gate on is the plot's *form* — whether the form draws a
+   * crosshair is C12's knowledge (`positionalForm` is the one reader) and a
+   * second list of forms here would be the two-copies hazard. A cursor set on a
+   * form that ignores it is stored and unread, and that residue is named in
+   * C22 §6c rather than absorbed.
+   */
+  const moveCursor = (direction: 1 | -1): void => {
+    const found = focusedBlock();
+    if (found === null || found.block.kind !== "plot") return;
+    const plot = found.block as Plot;
+    // **The renderer's predicate, not a second list** (C12 I85, I76). `kind ===
+    // "plot" && n > 0` stored a cursor on forms that draw none; `cursorable` is
+    // what `elements()` gates the focus stop on, so the block that can be
+    // focused and the block that accepts a cursor are one predicate.
+    if (!cursorable(plot)) return;
+    const n = plot.series.reduce((most, sr) => Math.max(most, sr.values.length), 0); // cells-ok — a sample count
+    const was = stores.cursorPositions.get(found.entryId, plot.id);
+    const from = was ?? (direction === 1 ? -1 : n);
+    const next = Math.min(n - 1, Math.max(0, from + direction));
+    stores.cursorPositions.set(found.entryId, plot.id, next);
+    scheduler.commit("input");
+  };
+
+  /**
+   * Hide or show series `n` (1-based) of the focused plot (C22 I78, C12 I116).
+   *
+   * **The effective state is read here and its negation recorded**, which is
+   * `dollyBlock`'s seam: the store clamps nothing and knows no block, and only
+   * this side holds the block whose `hidden` is the default under the override.
+   * The one bound is *the series exists*; the keymap the plot declares already
+   * binds no digit past its series count, so the guard is for a `replace` that
+   * shortened the list between the merge and the key (C12 §3aq B4).
+   *
+   * **Not gated on `cursorable`**: a plot with a camera is focusable and can have
+   * series, and hiding one of those is as legal as hiding a curve's.
+   */
+  const toggleSeriesBlock = (n: number): void => {
+    const found = focusedBlock();
+    if (found === null || found.block.kind !== "plot") return;
+    toggleSeriesIn(found.entryId, found.block as Plot, n - 1);
+  };
+  /**
+   * The toggle itself, shared by the digit key and the legend click (C16 §4a's
+   * legend row, C12 I117) — **one definition of what a toggle is**, so the two
+   * writers cannot disagree about the effective state they invert.
+   */
+  const toggleSeriesIn = (entryId: EntryId, plot: Plot, index: number): void => {
+    if (index < 0 || index >= plot.series.length) return; // cells-ok — a series count
+    const held = stores.seriesVisibility.get(entryId, plot.id, index);
+    const hiddenNow = held ?? plot.series[index]?.hidden === true;
+    stores.seriesVisibility.set(entryId, plot.id, index, !hiddenNow);
+    scheduler.commit("input");
+  };
+
+  /**
+   * Re-run the focused entry's **recorded command** (C23 I18, C16 §6).
+   *
+   * **Not an action, and the distinction is the ruling.** The five `Action`
+   * kinds fire against a document's data and are refused from a frozen entry
+   * because that data is stale (A01 D5); `doc.command` is the one thing a
+   * settled entry holds that is not — it is what was typed, and typing it again
+   * is what a reader does by hand today. So this goes through C23 §2's submit,
+   * indistinguishable from the prompt: the guard applies, history records it,
+   * and the new entry is live where the old one stays as it was.
+   *
+   * A command of `""` — a notice, the eviction marker — has nothing to run and
+   * is a silent no-op; neither declares an element, so neither can be focused.
+   */
+  const rerunFocused = (): void => {
+    const id = focusedEntryId();
+    if (id === null) return;
+    const entry = stores.transcript.entries.find((e) => e.id === id);
+    if (entry === undefined || entry.doc.command === "") return;
+    pipeline?.submit(entry.doc.command);
   };
 
   const keys = createKeyEffects({
@@ -1198,6 +1880,7 @@ export async function constructGraph(
     focus,
     // The entry half of B1's pair; the exit is already on the `⌃c` rung below.
     enterCopyMode: deps.frame.enterCopyMode,
+    exitCopyMode: deps.frame.exitCopyMode,
     // **One walk, and it is the registry's** (C26 §5, §8b.4). This asked C11
     // directly and tested `block.kind === "table"`, which was one of *three*
     // such walks — the two below and `focusFor` in `session.ts`. Each was a
@@ -1213,7 +1896,21 @@ export async function constructGraph(
     // second's stated reason (cheap on arrows, expensive on `enter`) was
     // falsified by this very walk: both call `liveElements()`.
     liveElements,
+    // **The focused entry's, which is no longer always the live one** (C26
+    // I21, §4g). `liveElements` stays for the one key that enters from the
+    // prompt; everything that moves, activates or copies asks these two.
+    focusedElements,
+    focusedEntryId,
+    neighbourEntry: neighbourOf,
+    cursorBlock: moveCursor,
+    toggleSeries: toggleSeriesBlock,
+    rerunEntry: rerunFocused,
     pageBlock,
+    orbitBlock,
+    tiltBlock,
+    dollyBlock,
+    resetCamera,
+    toggleOrbit,
     liveEntryId: () => stores.transcript.liveId,
     // C23 I16 — the dispatcher is C23's and is supplied, never built here.
     onAction: (action, from) => {
@@ -1249,16 +1946,213 @@ export async function constructGraph(
   const promptUnderMenu = (): boolean =>
     stores.overlays.top?.id === MENU_ID && keys.selected === null;
 
+  /**
+   * Merge the focused block's own keymap, and withdraw the last one (A01 D4,
+   * C16 I27, C22 I78).
+   *
+   * **A pull before every resolution rather than a subscription**, because
+   * `FocusStore` has none and C26 §5 rules that resolution is a pull. The cost
+   * is one identity comparison per dispatched key; the state is the block
+   * whose keymap is merged, and a `replace` that rebuilds the block is a new
+   * identity and a fresh merge. **`mergeBlock`'s first production caller**, and
+   * the one C26 T2.6a was written to detect.
+   */
+  let mergedFor: Block | null = null;
+  let withdrawBlockKeymap: (() => void) | null = null;
+  const syncBlockKeymap = (): void => {
+    const blk = focusedBlock()?.block ?? null;
+    if (blk === mergedFor) return;
+    withdrawBlockKeymap?.();
+    withdrawBlockKeymap = null;
+    mergedFor = blk;
+    if (blk === null) return;
+    const declared = built.blocks.get(blk.kind)?.keymap?.(blk);
+    if (declared === undefined || declared.length === 0) return; // cells-ok — a binding count
+    withdrawBlockKeymap = keymap.mergeBlock(declared);
+  };
+
   /** A bound action, or `null` when the key is not bound at this target. */
   const bound = (target: FocusTarget, e: InputEvent): (() => void) | null => {
     if (e.kind !== "key") return null;
+    syncBlockKeymap();
     const binding = keymap.resolve(target, e.key);
     if (binding === null) return null;
-    // A block keymap's action is a surface's string and dispatches through
-    // C23 §3a; the built-in table is total over C16's union and has no entry
-    // for one (C16 I19).
+    // **Unreachable for a merged block keymap since C16 I19's ruling** (F779):
+    // `mergeBlock` refuses any action outside the union at merge time, so every
+    // binding that reaches here names a built-in and the table is total over
+    // those. The `?? null` stays as the type's honesty about `Binding.action:
+    // string` — and it is the arm that used to drop a surface's action with
+    // nobody seeing the refusal. No C23 §3a route exists; `blockActionRoute` is owed.
     return keys.table[binding.action as KeyAction] ?? null;
   };
+
+  /**
+   * The pointer's gesture table, onto the key effects (C16 §4a, I31).
+   *
+   * **Not a second focus mechanism.** Every arm below lands in a state a key
+   * reaches, through the same `focus` calls and the same `keys.table` effects:
+   * a click is `↓`/`tab`'s state, click-again is `⏎`, a drag is `⇧↓`, and the
+   * wheel inside a box is `PgDn` on it. Nothing here can store a location the
+   * keyboard could not, which is the constitution's *every mouse affordance has
+   * a keyboard equivalent* made structural rather than remembered.
+   *
+   * Reached from the `liveBlock` handler for an event C16 routed **by position**
+   * to the entry under the pointer (C16 I3) — so `focus.current` may be at the
+   * prompt, in another entry, or in `interact` mode, and each arm says what it
+   * does with that. `null` is *no effect and unconsumed*, so the router drops
+   * the event rather than passing it lower (C16 I5).
+   */
+  const pointerEffect = (e: InputEvent): (() => void) | null => {
+    if (e.kind !== "mouse" || !e.press) return null;
+    // **A hover aims and does nothing else** (§4a's hover row; C01 I21). Mode
+    // 1003's motion with no button held: the crosshair follows the pointer and
+    // focus stays where the keys left it — the readout half of `←`/`→` without
+    // the focus half. An unchanged index is a no-op, which is what makes a
+    // sequence per cell affordable; outside the area is `null` and the cursor
+    // stays, because a readout that vanished with the pointer has no key equal.
+    if (e.button === "none") {
+      if (!e.motion) return null;
+      const over = entryAtRegionRow(e.row - deps.frame.region().top);
+      if (over === null) return null;
+      const under = elementAt(over, e.col);
+      if (under === null) return null;
+      const sample = sampleUnder(under, e.col);
+      if (sample === null || stores.cursorPositions.get(over.id, under.block.id) === sample) return null;
+      return () => {
+        stores.cursorPositions.set(over.id, under.block.id, sample);
+        scheduler.commit("input");
+      };
+    }
+    // **One translation, and the same pull the router used.** The router
+    // translated the row for its rungs (C16 I20); a handler is handed the
+    // event alone, so L4 translates once more from the same `region()`.
+    const hit = entryAtRegionRow(e.row - deps.frame.region().top);
+    if (hit === null) return null;
+
+    if (e.button.startsWith("wheel")) {
+      // A horizontal wheel is a wheel and does nothing (§4a row j); a vertical
+      // one over a box pages **that** box, and elsewhere is declined so the
+      // transcript takes it (row i).
+      if (e.button !== "wheelUp" && e.button !== "wheelDown") return null;
+      const under = elementAt(hit, e.col);
+      if (under === null || under.block.kind !== "scroll") return null;
+      const rows = e.button === "wheelUp" ? -WHEEL_ROWS : WHEEL_ROWS;
+      return () => nudgeScroll(hit.id, under.block.id, rows);
+    }
+
+    // Recorded rather than absorbed: a second button has no key equal yet, and
+    // a `meta`- or `ctrl`-modified click has no `⇧↓`-shaped state to reach.
+    if (e.button !== "button0" || e.meta || e.ctrl) return null;
+    const under = elementAt(hit, e.col);
+    if (under === null) return null;
+    const address = Object.freeze({ blockId: under.blockId, elementId: under.element.id });
+    const at = focus.current;
+    const inHitEntry = at.at === "liveBlock" && focusedEntryId() === hit.id;
+    const onFocused =
+      inHitEntry &&
+      at.at === "liveBlock" &&
+      at.element !== null &&
+      at.element.blockId === address.blockId &&
+      at.element.elementId === address.elementId;
+    // **The crosshair, where the pointer is over a cursorable plot's area**
+    // (C16 §4a, C12 §3s, C22 I76). Resolved once for every arm below, because
+    // three of them want it: a click focuses the plot *and* aims, a click on
+    // the focused plot aims where a row would activate (row m), and a drag on
+    // the focused plot aims where a row would extend (row o).
+    const sample = sampleUnder(under, e.col);
+    // **The legend, where the pointer is over an entry of it** (§4a's legend row,
+    // C12 I117): `seriesVisibility`'s third writer, the digit key's own lines.
+    // Disjoint from the area by construction — the column and the area are
+    // complementary cells of one layout — so at most one of `sample` and
+    // `series` answers, and the focus call below is shared by both.
+    const series = sample === null ? legendUnder(hit.id, under, e.col) : null;
+    const aim = sample !== null
+      ? (): void => {
+          stores.cursorPositions.set(hit.id, under.block.id, sample);
+          scheduler.commit("input");
+        }
+      : series !== null
+        ? (): void => toggleSeriesIn(hit.id, under.block as Plot, series)
+        : null;
+
+    if (e.motion || e.shift) {
+      // **Over the focused plot, motion is the crosshair's** (§4a row o): the
+      // anchor and the head would be one block-level element, which is no
+      // selection in any case, so nothing is lost by not calling `extendRow`.
+      if (onFocused && aim !== null) return aim;
+      // A drag and a shift-click are both `⇧↓` (C16 §4a): the head lands on the
+      // element under the pointer and the anchor is placed on the first
+      // extension, so click `a` then shift-click `c` selects `a..c`. Within the
+      // focused entry and nowhere else — the anchor shares the entry by
+      // construction (C26 §4g), and **this guard is the whole of what enforces
+      // it**: `extendRow` trusts its callers with the entry (F764).
+      return inHitEntry ? () => focus.extendRow(hit.id, address) : null;
+    }
+    if (onFocused) {
+      // **A plot's second click moves the crosshair** (§4a row m): its element
+      // carries no `activate`, so there is no `⏎` for the click to be.
+      if (aim !== null) return aim;
+      // Click again is `⏎` — a state test, not a timer (C16 I9). In `interact`
+      // the block owns its keys (C26 I14) and the framework fires nothing.
+      return at.mode === "interact" ? null : keys.table.rowActivate;
+    }
+    // A click is a way in exactly as `↓` is, so from the prompt it takes the
+    // same call; from a row it is a move, and `focusRow` collapses a selection
+    // and drops the mode as every unshifted motion does (C26 I16).
+    const land = at.at === "prompt" ? () => focus.enterLiveBlock(hit.id, address) : () => focus.focusRow(hit.id, address);
+    // **Focus first, then the crosshair, in one effect** — so the readout row
+    // and the highlight arrive in the same frame (§4a's plot row). The store is
+    // per entry and a settled entry's view state is the reader's (row p).
+    return aim === null ? land : () => { land(); aim(); };
+  };
+
+  /**
+   * The sample under the pointer on a cursorable plot, or `null` (C16 §4a,
+   * C12 §3s) — the crosshair's second writer, sharing `moveCursor`'s store.
+   *
+   * **The renderer inverts its own placement.** The element spans the block and
+   * the plot area does not (gutter, legend, alignment pad), so the column is
+   * handed to C12 relative to the element's origin and at the element's width,
+   * and `sampleIndexAt` answers through the layout the frame was drawn with —
+   * never a second copy of it here (§4a row n). `null` is *outside the area*:
+   * the click is then the click row's alone and the crosshair stays.
+   *
+   * No clamp here, on purpose: every index the inverse returns is one the
+   * readout can print (nearest sample inside the area), so a clamp would be a
+   * second statement of a bound the renderer already holds.
+   */
+  const sampleUnder = (under: Readonly<{ element: NavElement; block: Block }>, col: number): number | null => {
+    if (under.block.kind !== "plot") return null;
+    const plot = under.block as Plot;
+    if (!cursorable(plot)) return null;
+    const { from, to } = under.element.cols;
+    return sampleIndexAt(plot, to - from, { capabilities: detection.capabilities }, col - from);
+  };
+
+  /**
+   * The series whose legend entry is under the pointer, or `null` (C16 §4a's
+   * legend row, C12 I117) — `sampleUnder`'s twin for the legend, and the same
+   * translation: the column relative to the element's origin, at the element's
+   * width, and the row `elementAt` handed back. C12 inverts its own placement;
+   * nothing here knows where a legend is drawn.
+   */
+  const legendUnder = (entryId: EntryId, under: Readonly<{ element: NavElement; block: Block; row: number }>, col: number): number | null => {
+    if (under.block.kind !== "plot") return null;
+    const { from, to } = under.element.cols;
+    return legendHitAt(
+      under.block as Plot,
+      to - from,
+      { capabilities: detection.capabilities, seriesVisibility: stores.seriesVisibility.forEntry(entryId) },
+      col - from,
+      under.row,
+    );
+  };
+
+  /** A click on chrome — header, footer, the prompt row — is the reader stepping out (C16 §4a trace 8). */
+  const chromeClick = (e: InputEvent): (() => void) | null =>
+    e.kind === "mouse" && e.press && !e.motion && e.button === "button0" && !e.shift && !e.meta && !e.ctrl
+      ? keys.table.focusPrompt
+      : null;
 
   at("register", () => {
     /**
@@ -1328,7 +2222,7 @@ export async function constructGraph(
         if (lines >= CHIP_LINES) {
           chipCount += 1;
           stores.editor.insertChip({
-            label: `[#${String(chipCount)} pasted · ${String(lines)} lines]`,
+            label: `[#${String(chipCount)} pasted ${glyphs(detection.capabilities).separator} ${String(lines)} lines]`,
             content: e.text,
           });
         } else {
@@ -1399,7 +2293,10 @@ export async function constructGraph(
     // nothing, and this target had neither bindings nor a handler while §3 said
     // focus goes here.
     router.register("liveBlock", (e) => {
-      const effect = bound("liveBlock", e);
+      // Keys through the table; the pointer through its gesture table (C16
+      // §4a). `bound` answers `null` for a mouse event, so the two arms cannot
+      // both claim one.
+      const effect = bound("liveBlock", e) ?? pointerEffect(e);
       if (effect === null) return false;
       effect();
       return true;
@@ -1412,6 +2309,18 @@ export async function constructGraph(
     // transcript underneath it. Vacuous only while nothing pushed a view.
     router.register("pushedView", (e) => {
       const effect = bound("pushedView", e);
+      if (effect === null) return false;
+      effect();
+      return true;
+    });
+    // **Copy mode's keys resolve through the keymap too** (C16 §5c, I24). The
+    // router registers its own `copyMode` rung for `⌃c`; this handler is the
+    // target's table row — today exactly one, `Esc → exitCopyMode` — and without
+    // it the row is bound and never consulted: `run("copyMode")` walked the
+    // rung alone, declined, and a lone `Esc` was dropped on a frozen screen
+    // (F765). `pushedView` above has had the same pair all along.
+    router.register("copyMode", (e) => {
+      const effect = bound("copyMode", e);
       if (effect === null) return false;
       effect();
       return true;
@@ -1433,7 +2342,7 @@ export async function constructGraph(
     // `(target, key)` to resolve on. That is the boundary rather than an
     // exception to it.
     router.register("global", (e) => {
-      const effect = bound("global", e);
+      const effect = bound("global", e) ?? chromeClick(e);
       if (effect !== null) {
         effect();
         return true;
@@ -1475,6 +2384,9 @@ export async function constructGraph(
     const deliver = (events: readonly InputEvent[]): void => {
       if (events.length > 0) {
         for (const e of events) router.dispatch(e);
+        // After the keys and before the frame: the peek follows the focus the
+        // keys just moved (C15 §2a).
+        syncPeek();
         stampInput();
         scheduler.commit("input");
       }
@@ -1554,7 +2466,15 @@ export async function constructGraph(
      */
     cursorIdle: () => config.clock() - lastInputAt >= CURSOR_BLINK_MS,
     liveElements,
+    focusedEntryId,
+    focusedElements,
     pageBlock,
+    orbitBlock,
+    tiltBlock,
+    dollyBlock,
+    resetCamera,
+    toggleOrbit,
+    toggleSeries: toggleSeriesBlock,
     capabilities: detection.capabilities,
     /**
      * C22 I6a — construction, then the session, then what the session contained.
@@ -1571,7 +2491,11 @@ export async function constructGraph(
      * renderer had nowhere to report and reported nowhere — for the life of the
      * registry, and with T3.14's own row saying `logged` the whole time.
      *
-     * The four are kept contiguous deliberately. `c23-faults` mutates this list
+     * **A fifth, C19's**: the completion source-error sink (T3.6). It was
+     * supplied by every test and by nothing in the product, so a failing source
+     * was dropped silently until `construct` passed the sink.
+     *
+     * The five are kept contiguous deliberately. `c23-faults` mutates this list
      * by removing members, and a comment between two of them makes an anchor
      * that spans the list unmatchable — which is how a mutation quietly becomes
      * a different mutation (F219).
@@ -1582,6 +2506,7 @@ export async function constructGraph(
         ...stores.history.warnings,
         ...built.blockFaults.messages,
         ...pipeline.faults,
+        ...built.completionFaults.messages,
       ]),
     blocks: built.blocks,
     blockFaults: built.blockFaults,
@@ -1620,6 +2545,9 @@ type Scroller = ReturnType<typeof createViewport>;
 
 const WHEEL_ROWS = 3;
 
+/** C26 §6 — deepest level wins when a pointer lands in nested elements. */
+const LEVEL_DEPTH: Readonly<Record<NavElement["level"], number>> = Object.freeze({ block: 0, row: 1, cell: 2 });
+
 function wheelAmount(e: InputEvent): ((v: Scroller) => void) | null {
   if (e.kind === "mouse" && e.press) {
     if (e.button === "wheelUp") return (v) => void v.scrollBy(-WHEEL_ROWS);
@@ -1648,6 +2576,7 @@ function routerDeps(
   frame: FrameQueries,
   pipeline: () => Pipeline | null,
   confirm: ConfirmHost,
+  entryAtRegionRow: RouterDeps["entryAtRow"],
 ): RouterDeps {
   const top = (): Readonly<{ kind: "overlay" | "view"; id: string; dismissable: boolean }> | null => {
     const layer = stores.overlays.top;
@@ -1660,7 +2589,8 @@ function routerDeps(
     overlayTop: top,
     overlayAnswerCallback: confirm.answerHandler,
     overlayRegion: frame.overlayRegion,
-    placed: () => stores.overlays.layout(frame.overlayRegion()),
+    // A peek is not hit-tested (C15 I21): a click on it reaches the row beneath.
+    placed: () => stores.overlays.layout(frame.overlayRegion()).filter(takesInput),
     popLayer: () => void stores.overlays.pop(),
     copyMode: frame.copyMode,
     exitCopyMode: frame.exitCopyMode,
@@ -1669,7 +2599,13 @@ function routerDeps(
       const id = stores.transcript.liveId;
       return id === null ? null : { id };
     },
-    entryAtRow: frame.entryAtRow,
+    // **C14's, and only C14's** (C14 I19), through the frame's alignment. This
+    // arrived through `FrameQueries` for as long as the viewport had no such
+    // method, and the production frame answered `() => null` — so the rung
+    // below it had never fired. The seam went with the stub: a second answer to
+    // *which entry is at this row* is the two-computations defect the invariant
+    // names.
+    entryAtRow: entryAtRegionRow,
     // **Rungs 1 and 2, from C23 rather than from the runner** (C16 §5, C23 §8a
     // A1). `runner.live` is empty through the window C23 I3 opens on purpose —
     // the pending entry is appended before the transport is invoked — so a

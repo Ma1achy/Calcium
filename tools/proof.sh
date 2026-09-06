@@ -101,7 +101,15 @@ install_example() {
   ' "$app/package.json" "$TARBALL"
 
   cd "$app"
-  npm install --ignore-scripts --no-audit --no-fund >/dev/null
+  # **`--legacy-peer-deps`, measured 2026-09-05 (F807).** A fresh `npm install`
+  # of `vitest@4.1.10` alone — no Calcium, no other dependency — crashes npm
+  # 10.9.8's arborist in `#loadPeerSet` with *Cannot read properties of null
+  # (reading 'edgesOut')*, in the container and on the runner alike; the
+  # example's other two devDependencies install clean without it. The crash is
+  # npm resolving vitest's *optional* peer set, and this package declares no
+  # peers, so the flag changes nothing this gate proves about the tarball: the
+  # install is still real, still from the packed file, still into a clean tree.
+  npm install --ignore-scripts --no-audit --no-fund --legacy-peer-deps >/dev/null
 
   # The install is only meaningful if it landed a real directory rather than a
   # link back into the repository. A symlink here would make every assertion

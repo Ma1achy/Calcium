@@ -40,6 +40,27 @@ const feed = (d: Decoder, s: string): readonly InputEvent[] => d.push(enc.encode
 const names = (events: readonly InputEvent[]): string[] =>
   events.map((e) => (e.kind === "key" ? e.key.name : e.kind));
 
+type Mouse = Extract<InputEvent, { kind: "mouse" }>;
+
+/**
+ * A whole mouse record with every flag false and the pointer at the origin, so
+ * each row spells out only what the sequence under test sets — and `toEqual`
+ * still checks the rest is *unset*. A helper that defaulted a flag to `true`
+ * would pass a decoder that set every bit.
+ */
+const mouse = (over: Partial<Mouse> & Pick<Mouse, "button"> | Partial<Mouse>): Mouse => ({
+  kind: "mouse",
+  row: 0,
+  col: 0,
+  button: "button0",
+  press: true,
+  shift: false,
+  meta: false,
+  ctrl: false,
+  motion: false,
+  ...over,
+});
+
 describe("C16 §2 — key decoding", () => {
   it("T1.3h (I17): `\\r` is enter and `\\n` is Ctrl-J — asserted as a pair", () => {
     // They were the same event, and only `\r` was ever asserted. A binding on
@@ -83,6 +104,73 @@ describe("C16 §2 — key decoding", () => {
     expect(feed(d, "[97;5u")).toEqual([
       { kind: "key", key: { name: "a", ctrl: true, meta: false, shift: false, sequence: "[97;5u" } },
     ]);
+  });
+
+  it("T1.3p (C16 §2, C02 I12): the kitty `CSI u` arm — whole records, event type optional", () => {
+    // **Every row asserts the whole record with `toStrictEqual`**, because the
+    // field under test is optional: `toEqual` treats `event: undefined` and no
+    // `event` as the same record, and the claim here is that legacy sequences
+    // carry *no* field, not an undefined one.
+    const { d } = decoder();
+    const k = (name: string, sequence: string, over: Partial<{ ctrl: boolean; meta: boolean; shift: boolean }> = {}) =>
+      ({ name, ctrl: false, meta: false, shift: false, sequence, ...over });
+
+    // Shift-Enter pressed — the row T1.3j already has, unchanged in shape.
+    expect(feed(d, "\x1b[13;2u")).toStrictEqual([{ kind: "key", key: k("enter", "\x1b[13;2u", { shift: true }) }]);
+    // Esc under the protocol: a complete sequence, so no window and no prefix.
+    expect(feed(d, "\x1b[27u")).toStrictEqual([{ kind: "key", key: k("escape", "\x1b[27u") }]);
+    // A repeat and a release, with the modifier intact on both. **This is the
+    // line that was wrong**: `Number("2:3")` is NaN, so `13;2:3` used to arrive
+    // as a bare `enter` with every modifier gone — the live-binding class.
+    expect(feed(d, "\x1b[13;2:2u")).toStrictEqual([
+      { kind: "key", key: k("enter", "\x1b[13;2:2u", { shift: true }), event: "repeat" },
+    ]);
+    expect(feed(d, "\x1b[13;2:3u")).toStrictEqual([
+      { kind: "key", key: k("enter", "\x1b[13;2:3u", { shift: true }), event: "release" },
+    ]);
+    // An explicit press carries the field; an absent sub-parameter does not.
+    expect(feed(d, "\x1b[97;1:1u")).toStrictEqual([{ kind: "key", key: k("a", "\x1b[97;1:1u"), event: "press" }]);
+    // ctrl+shift+a: 1 + (1 | 4) = 6.
+    expect(feed(d, "\x1b[97;6u")).toStrictEqual([
+      { kind: "key", key: k("a", "\x1b[97;6u", { ctrl: true, shift: true }) },
+    ]);
+    // An alternate key code (`97:65`, flag 4) is ignored in favour of the base.
+    expect(feed(d, "\x1b[97:65;2u")).toStrictEqual([{ kind: "key", key: k("a", "\x1b[97:65;2u", { shift: true }) }]);
+  });
+
+  it("T1.3q (C16 §2): the `u` arm's modifier bits are kitty's — bit 8 folds into nothing, bit 32 into meta", () => {
+    const { d } = decoder();
+    const only = (s: string) => {
+      const [e] = feed(d, s);
+      return e?.kind === "key" ? { ctrl: e.key.ctrl, meta: e.key.meta, shift: e.key.shift } : e;
+    };
+    // alt: 1 + 2 = 3 → meta. kitty meta: 1 + 32 = 33 → meta. Both, 35 → meta.
+    expect(only("\x1b[97;3u")).toEqual({ ctrl: false, meta: true, shift: false });
+    expect(only("\x1b[97;33u")).toEqual({ ctrl: false, meta: true, shift: false });
+    // super: 1 + 8 = 9 → **no modifier**. `⌘a` is not `Alt-a`.
+    expect(only("\x1b[97;9u")).toEqual({ ctrl: false, meta: false, shift: false });
+    // And the control the row needs: the same bit *is* meta through the xterm
+    // arm, so a decoder that shared one function between the two would fail one
+    // of the two rows rather than passing both.
+    expect(only("\x1b[1;9D")).toEqual({ ctrl: false, meta: true, shift: false });
+  });
+
+  it("T1.3r (C16 §2, C02 §3): a lone modifier key arrives named, never as a private-use glyph", () => {
+    // The flags C01 pushes do not ask for these (bit 8 is not pushed); a terminal
+    // configured to send them anyway must not insert U+E061 into the prompt.
+    const { d } = decoder();
+    expect(names(feed(d, "\x1b[57441u"))).toEqual(["shift"]);
+    expect(names(feed(d, "\x1b[57442;5u"))).toEqual(["ctrl"]);
+    expect(names(feed(d, "\x1b[57447;2:3u"))).toEqual(["shift"]);
+    expect(feed(d, "\x1b[57447;2:3u")[0]).toMatchObject({ event: "release" });
+  });
+
+  it("T1.3s (C16 §2): a `CSI u` sequence is decoded whatever the record says — the decoder takes no keyboard capability", () => {
+    // xterm's `formatOtherKeys=1` sends the same bytes with no protocol pushed,
+    // and the decoder has no way to know which encoder sent them. So the arm is
+    // not gated, and a terminal that sends `CSI u` unasked still produces the key.
+    const { d } = decoder({ bracketedPaste: false, mouse: false });
+    expect(names(feed(d, "\x1b[13;2u"))).toEqual(["enter"]);
   });
 
   it("T1.3e (C16 §2, I17): xterm's Meta bit is read, so 1;10D and 1;16D are different keys", () => {
@@ -383,14 +471,98 @@ describe("C16 §4 — mouse", () => {
 
     const on = decoder({ mouse: true });
     const events = feed(on.d, "[<0;10;5M");
-    expect(events).toEqual([{ kind: "mouse", row: 4, col: 9, button: "button0", press: true }]);
+    expect(events).toEqual([mouse({ row: 4, col: 9, button: "button0" })]);
   });
 
   it("a wheel event decodes as its own button, and release as press: false", () => {
     const { d } = decoder();
-    expect(feed(d, "[<64;1;1M")[0]).toMatchObject({ button: "wheelUp" });
-    expect(feed(d, "[<65;1;1M")[0]).toMatchObject({ button: "wheelDown" });
-    expect(feed(d, "[<0;1;1m")[0]).toMatchObject({ press: false });
+    expect(feed(d, "[<64;1;1M")).toEqual([mouse({ button: "wheelUp" })]);
+    expect(feed(d, "[<65;1;1M")).toEqual([mouse({ button: "wheelDown" })]);
+    expect(feed(d, "[<0;1;1m")).toEqual([mouse({ press: false })]);
+  });
+});
+
+/**
+ * C16 §2's SGR table (I30). Every row below asserts the **whole** record with
+ * `toEqual`, because a row on `button` alone is satisfied by the decoder this
+ * replaces — it produced a well-formed `button0` for a shift-click and a
+ * well-formed `wheelDown` for ctrl-wheel-up, and nothing above it could tell.
+ */
+describe("C16 §2 — the SGR mouse arm carries every bit (I30)", () => {
+  it("T1.3k (I30): ctrl-wheel-up is wheelUp with ctrl, not wheelDown", () => {
+    const { d } = decoder();
+    // 80 = 64 (wheel) + 16 (ctrl) + 0 (up). The shipped arm had `code === 64`
+    // as the only wheel-up, so this scrolled the wrong way.
+    expect(feed(d, "[<80;10;5M")).toEqual([
+      mouse({ row: 4, col: 9, button: "wheelUp", ctrl: true }),
+    ]);
+    // The unmodified pair beside it is the control: a fix that reads bit 0 of
+    // the wheel range must still tell these two apart.
+    expect(feed(d, "[<64;10;5M")).toEqual([mouse({ row: 4, col: 9, button: "wheelUp" })]);
+    expect(feed(d, "[<65;10;5M")).toEqual([mouse({ row: 4, col: 9, button: "wheelDown" })]);
+    // Shift-wheel-down: 64 + 4 + 1.
+    expect(feed(d, "[<69;1;1M")).toEqual([mouse({ button: "wheelDown", shift: true })]);
+  });
+
+  it("T1.3l (I30): a modified click carries shift, meta and ctrl", () => {
+    const { d } = decoder();
+    expect(feed(d, "[<4;10;5M")).toEqual([mouse({ row: 4, col: 9, button: "button0", shift: true })]);
+    expect(feed(d, "[<8;10;5M")).toEqual([mouse({ row: 4, col: 9, button: "button0", meta: true })]);
+    // 16, not 20: 20 is 16 + 4, ctrl *and* shift — the first draft of this row
+    // said 20 and the whole-record assertion refused it.
+    expect(feed(d, "[<16;10;5M")).toEqual([mouse({ row: 4, col: 9, button: "button0", ctrl: true })]);
+    // All three on the middle button: 1 + 4 + 8 + 16.
+    expect(feed(d, "[<29;10;5M")).toEqual([
+      mouse({ row: 4, col: 9, button: "button1", shift: true, meta: true, ctrl: true }),
+    ]);
+    // The bare click beside them, so a decoder setting every flag true fails too.
+    expect(feed(d, "[<2;10;5M")).toEqual([mouse({ row: 4, col: 9, button: "button2" })]);
+  });
+
+  it("T1.3m (I30): a drag is press, motion, release — and the motion report is not a second click", () => {
+    const { d } = decoder();
+    const events = feed(d, "[<0;1;1M[<32;2;1M[<0;3;1m");
+    expect(events).toEqual([
+      mouse({ row: 0, col: 0, button: "button0" }),
+      mouse({ row: 0, col: 1, button: "button0", motion: true }),
+      mouse({ row: 0, col: 2, button: "button0", press: false }),
+    ]);
+    // Motion with a modifier: 32 + 16 + 2 — a ctrl-drag on the right button.
+    expect(feed(d, "[<50;5;5M")).toEqual([
+      mouse({ row: 4, col: 4, button: "button2", ctrl: true, motion: true }),
+    ]);
+  });
+
+  it("T1.3r (I30, C01 I21): bits 0–1 reading 3 outside the wheel and 128 ranges is `none` — a 1003 hover", () => {
+    const { d } = decoder();
+    // 35 = 32 (motion) + 3 (no button): what mode 1003 sends for a pointer moving with nothing held.
+    expect(feed(d, "\x1b[<35;42;4M")).toEqual([mouse({ row: 3, col: 41, button: "none", motion: true })]);
+    // With shift: 32 + 4 + 3.
+    expect(feed(d, "\x1b[<39;42;4M")).toEqual([mouse({ row: 3, col: 41, button: "none", motion: true, shift: true })]);
+    // `3` alone, no motion bit — the bits are named, not interpreted.
+    expect(feed(d, "\x1b[<3;1;1M")).toEqual([mouse({ button: "none" })]);
+    // The controls: a held button's motion keeps its name, and `3` inside the
+    // wheel and 128 ranges is still the fourth of each — `none` is not a mask.
+    expect(feed(d, "\x1b[<34;1;1M")).toEqual([mouse({ button: "button2", motion: true })]);
+    expect(feed(d, "\x1b[<67;1;1M")).toEqual([mouse({ button: "wheelRight" })]);
+    expect(feed(d, "\x1b[<131;1;1M")).toEqual([mouse({ button: "button11" })]);
+  });
+
+  it("T1.3n (I30): horizontal wheel and buttons 8–11 have their own names", () => {
+    const { d } = decoder();
+    expect(feed(d, "[<66;1;1M")).toEqual([mouse({ button: "wheelLeft" })]);
+    expect(feed(d, "[<67;1;1M")).toEqual([mouse({ button: "wheelRight" })]);
+    const high = [128, 129, 130, 131].map((c) => feed(d, `[<${c};1;1M`)[0]);
+    expect(high).toEqual([
+      mouse({ button: "button8" }),
+      mouse({ button: "button9" }),
+      mouse({ button: "button10" }),
+      mouse({ button: "button11" }),
+    ]);
+    // The 128 bit is read, not folded: 130 and 2 are different buttons.
+    const low = feed(d, "[<2;1;1M")[0];
+    expect(low).toEqual(mouse({ button: "button2" }));
+    expect(high[2]).not.toEqual(low);
   });
 });
 

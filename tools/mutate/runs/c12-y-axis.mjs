@@ -61,8 +61,12 @@ const results = runPass({
       // frame rows rather than the label rows.
       name: "the curve is rasterised against a range the gutter does not describe",
       file: DEF,
-      from: "      : axisFor(data, ticksFor(plotAreaRows(block)), block, block.yScale);",
-      to: "      : axisFor(axisFor(data, ticksFor(plotAreaRows(block)), block, block.yScale).range, ticksFor(plotAreaRows(block)), block, block.yScale);",
+      // Re-anchored when the decisions moved into `positionalDecisions`
+      // (C12 §3ak.7). The second nicing is now expressed where the terminal
+      // reads the shared axis back, which is the only place left that could
+      // introduce one.
+      from: "      : figure.value;",
+      to: "      : valueAxisOf(figure.value.range, ticksFor(plotAreaRows(block)), block, block.yScale);",
       expect: "YA1",
     },
     {
@@ -97,8 +101,8 @@ const results = runPass({
       // nicing's coarser step it wrote `13` on the row holding `12.5`.
       name: "the labels take the magnitude's decimals rather than the step's",
       file: AXES,
-      from: "  const places = axis.step > 0 ? stepDecimals(axis.step) : undefined;",
-      to: "  const places = undefined;",
+      from: "  return axis.step > 0 ? stepDecimals(axis.step) : undefined;",
+      to: "  return undefined;",
       expect: "YA1",
     },
   ],

@@ -49,6 +49,7 @@ function createTerminalLifecycle(opts: {
   onFatal: (err: unknown) => never;      // required — see I14
   beforeRelease?: () => void;            // synchronous; runs before every release
   debug?: (line: string) => void;        // the debug sink (D32); defaults to a no-op
+  hover?: boolean;                       // step 6 takes 1003 in place of 1002 — I21; default false
 }): TerminalLifecycle;
 ```
 
@@ -105,10 +106,10 @@ shell:  lifecycle.suspend() → runner.handoff(argv) → lifecycle.resume()
 **The keys are named, not counted.**
 
 ```
-held ⊆ { stdout, altScreen, cursor, rawMode, bracketedPaste, mouse, scrollRegion }
+held ⊆ { stdout, altScreen, cursor, rawMode, bracketedPaste, mouse, keyboardProtocol, scrollRegion }
 ```
 
-Seven possible; six ever taken at startup, because `scrollRegion` is transactional and C03's (§5). Two of them are not escape sequences at all — `stdout` is the redirection and `rawMode` is a termios call — which is exactly why I8 can release the first while emitting nothing. And `mouse` is one key that emits two sequences, released as two in reverse.
+Eight possible; seven ever taken at startup, because `scrollRegion` is transactional and C03's (§5). Two of them are not escape sequences at all — `stdout` is the redirection and `rawMode` is a termios call — which is exactly why I8 can release the first while emitting nothing. And `mouse` is one key that emits two sequences, released as two in reverse.
 
 An earlier draft counted six in three places and meant a different six each time: §5's six acquisition steps, T2.8's six mode sequences, and this row. I6 cannot be implemented against three sets, so the set is now written out.
 
@@ -143,6 +144,7 @@ Nothing else in the process may write `acquired`. C01 has no `contaminated` — 
 - **I18a** — `attachInput()` resumes the stream as well as adding the listener, because `detachInput()` paused it. The pair is not symmetric on its own: `pause()` sets Node's `flowing` to `false`, and adding a `data` listener resumes a stream only when `flowing !== false` — so a re-attached listener sits on a stream nothing feeds, and every keystroke after the first handoff is lost with the session still drawing frames. Stated as its own invariant rather than folded into I18 because I18's subject is *who is attached when*, which is satisfiable in full while the terminal takes no input at all (§5).
 - **I19** — The cursor's visibility is C01's mode and its position is the frame's, so C01 returns the sequence and the frame writes it. `cursorSequence(at)` yields a move plus a show, or a hide when `at` is null; the drawer embeds it in the same `write` as the rows. Two reasons it is a string rather than a call, and the second is the one that decides it: the mode is C01's to hold and restore at release (I1), and the bytes must land inside the frame's single write — a separate call cannot be kept inside C03's synchronised-update window, and outside it the hide arrives after the rows on a terminal that honours the move immediately. **The order within the string is hide, move, show**, and the sync window does not make it moot: `synchronisedUpdate` is a capability, so the unwrapped path is real and on it a visible cursor is dragged across the frame by every row written.
 - **I20** — **The cursor's *shape* is a `setting`: a third category beside a mode and an SGR sequence, emitted only when it changes and restored at `release()` on a path of its own.** `escapes.ts` has exactly two categories and `DECSCUSR` is neither. A **mode** is an enter/leave pair, and I6 makes release a lookup of the inverse of `held`; an **SGR** sequence holds nothing, has no inverse and never enters `held`. A setting has **persistent state** like the first and **no inverse** like the second — its undo is a third value, `CSI 0 SP q`, which is the terminal's *configured* default rather than the negation of anything. Writing it as a `mode()` would make `held` and I6 false about the same bytes: release would emit a *leave* that is really *set to default*, and those are different claims. So it is restored beside `held` rather than inside it, which is also outside I8's reasoning — I8 permits releasing a key while emitting nothing, and that is an argument about keys. **Emitted only on change, which is why C01 holds the last value**: the cursor sequence goes out with every frame (I19), and a shape re-asserted at frame cadence is wasted bytes at best and a cursor that never blinks at worst. **`resume()` clears the record rather than re-emitting**, because a suspended terminal belonged to a child and `vim` leaves a bar behind — the record would otherwise say *already emitted* about a value the child overwrote, which is C22 I56's *drop the record before the bytes go out* arriving one component down (C22 I63, C22 §6f).
+- **I21** — **Hover is the application's to ask for, not the terminal's to declare, and it changes which mode step 6 takes rather than adding one.** `createTerminalLifecycle({ hover: true })` acquires DECSET 1003 in 1002's slot, 1006 beside it, released in the same order; absent or false is 1002 exactly as before, and `capabilities.mouse` false takes neither whatever `hover` says (I10). **Not a capability, and C02 §3 says so where the row would have gone**: nothing detects it — every xterm-family terminal that answers 1002 answers 1003, so a C02 rule for it would be a constant — and C02's record says what the terminal *can* do where this says what the application *wants*. The cost is volume, a sequence per cell the pointer crosses, which is the application's to pay and off by default (C22 `TuiConfig.hover`); what it buys is a readout that follows the pointer (C16 §4a, C12 §3s), which the keys also reach — C02's rule that the mouse is a faster way to a state and never the only one. `held` keeps its one `mouse` key and `setMouseTracking` toggles whichever pair was chosen.
 
 ---
 
@@ -171,12 +173,44 @@ precisely because it looks simpler at the call site.
 3  hide cursor             CSI ? 25 l
 4  raw mode                setRawMode(true)
 5  bracketed paste         CSI ? 2004 h     if capability
-6  mouse tracking          CSI ? 1002 h, CSI ? 1006 h    if capability
+6  mouse tracking          CSI ? 1002 h, CSI ? 1006 h    if capability — CSI ? 1003 h in 1002's place when `hover` is on (I21)
+7  keyboard protocol       CSI > 3 u        if capability — C02 `keyboardProtocol: "kitty"`
 ```
+
+**Step 7 is a push and its release is a pop, `CSI < u`, never `CSI = 0 u`.** The kitty keyboard
+protocol keeps a stack of flag sets per screen, so the pop returns the terminal to whatever it held
+before we arrived — a user's own configuration, or a parent program's push — where a reset would
+overwrite it (C02 §3, `KITTY_KEYBOARD`). Taken last so it is released **first**: the terminal is back
+to legacy key reporting before the mouse and paste modes leave, and a byte the user types into the
+gap between our release and the shell's next read arrives in the encoding the shell expects. The
+flags are `0b11` — disambiguate and event types — and C02 §3 says which bits are not pushed and why.
+
+**Step 6 takes one button mode and never both** (I21). `hover: true` selects DECSET 1003 — any-event
+tracking, every pointer move reported — in the slot 1002 occupies, with 1006 beside it as before and
+released in the same order (`1006l` then `1003l`). xterm's *ctlseqs* lists 9, 1000, 1002 and 1003 as
+values that each *select* the terminal's one mouse-tracking mode, so a terminal holding 1003 has nothing
+1002 could add, and a release emitting `1002l` after `1003l` would be leaving a mode never entered —
+`held` says `mouse` either way and I6's lookup emits the pair that was taken. **Measured on xterm 398
+under Xvfb, 2026-09-05 (F808)** — the reference implementation of the document the paragraph above
+cites, driven by XTEST with a typed key in every capture as the control:
+
+| taken | a rest (motion, no button) | a drag | after the release |
+|---|---|---|---|
+| `1003h` alone | `<35;C;RM` per cell | `<32;C;RM` per cell, `<0…M`/`<0…m` around it | — |
+| `1002h` alone | nothing | as above | — |
+| `1002h` then `1003h`, then `1003l` | 1003's | 1003's | **nothing** — 1002 is not left behind |
+| `1003h` then `1002h`, then `1002l` | 1002's | 1002's | **nothing** — 1003 is not restored |
+
+One tracking mode, the later select wins, and either release clears it, so `1003l` alone is the
+whole release and a `1002l` after it would address a mode the terminal is not in. That answers
+`HOVER_MODE_PAIR` for xterm — and C16 T5.9 runs the same capture as a gate wherever xterm, Xvfb and
+xdotool are installed, which the devcontainer and the `full` CI job now do; Ghostty, kitty, WezTerm and iTerm2 are unmeasured and the claim for
+them rests on their documented adherence to the same document. The default is 1002, byte for byte
+what shipped, and `capabilities.mouse` false takes neither (I10).
 
 The scroll region is not acquired at startup. It is taken and released transactionally by C03 only if scroll-region acceleration is ever built (M-T6), and `held` tracks it the same way.
 
-Release is steps 6 → 1, emitting only what `held` contains.
+Release is steps 7 → 1, emitting only what `held` contains.
 
 **A failure at step 2 unwinds before `onFatal`.** Step 1 is already held by then, and `onFatal` returns `never`, so nothing runs after it. Releasing first is not a courtesy: otherwise the only fatal case in the system is the one case that leaves state behind. The general rule is T3.7's — partial acquisition never leaves partial state — and the fatal path is not an exception to it.
 
@@ -307,6 +341,7 @@ Nested suspend is refused — `suspend()` while already suspended throws. There 
 21. The cursor's visibility is C01's mode and its position the frame's; `cursorSequence` hands over the bytes so they land inside the frame's one write, hide before move before show (I19, C15 I19).
 22. The cursor's **shape** is a `setting` — a third category beside a mode and an SGR sequence, with a declared reset rather than an inverse — emitted only when it changes, restored at `release()` beside `held` rather than inside it, and its record cleared by `resume()` because the child owned the terminal (I20, and C22 §6f for where the style is resolved).
 20. Raw stdin bytes are delivered through `onInput` while acquired and not otherwise: `acquire()` attaches, `suspend()` drops, `resume()` re-attaches, `release()` drops. C01 delivers and never interprets, and the bytes typed at a suspended terminal belong to the child rather than to a queue (I18).
+23. `hover` selects 1003 in 1002's slot and never both; it is an option on this component and a field on `TuiConfig`, not a capability, and the record's `mouse: false` still takes neither (I21, I10).
 20a. Re-attaching resumes: the attach is the inverse of the detach in both of its effects, not only in the listener. A shell that has suspended once otherwise draws frames forever and takes no input (I18a).
 
 ---
@@ -319,8 +354,9 @@ Six tiers. Behaviour is not a seventh — it cross-cuts scope and is carried by 
 
 Fabricated `TerminalCapabilities`, a fake `WriteStream` capturing bytes. No real terminal.
 
-- **T1.1** (I6, C5): full acquisition emits the six sequences in documented order.
-  *Given* a record with every capability true. *When* `acquire()`. *Then* all six acquisitions occur exactly once; `1049h` is **first**; `setRawMode(true)` precedes any mouse or paste sequence. Relative order of `2004h`, `1002h` and `1006h` is unasserted — it is arbitrary, and pinning it would break on a harmless refactor.
+- **T1.1** (I6, C5): full acquisition emits the seven sequences in documented order.
+  *Given* a record with every capability true. *When* `acquire()`. *Then* all seven acquisitions occur exactly once; `1049h` is **first**; `setRawMode(true)` precedes any mouse or paste sequence; `CSI > 3 u` is **last**, after the mouse pair. Relative order of `2004h`, `1002h` and `1006h` is unasserted — it is arbitrary, and pinning it would break on a harmless refactor.
+- **T1.28** (I10, C02 I12): with `keyboardProtocol: "none"` no `CSI > … u` or `CSI < u` byte appears in either direction; with `"kitty"` the push is `ESC [ > 3 u` exactly and the pop is `ESC [ < u` exactly — **the pop form, not `CSI = 0 u`**, asserted on the byte because the two are indistinguishable from every other assertion in this file.
 
 - **T1.2** (I6): release emits the exact inverse in reverse order.
 
@@ -332,10 +368,11 @@ Fabricated `TerminalCapabilities`, a fake `WriteStream` capturing bytes. No real
 - **T1.26** (I20): `release()` after a shape was set → `CSI 0 SP q` is emitted, and after a session that set none → **nothing**. Both arms, because a reset written unconditionally is the version that overwrites a terminal Calcium never touched — and `held` cannot carry this, so I6's lookup does not cover it.
 - **T1.27** (I20, C22 I63): `resume()` clears the record, so the next frame re-emits an unchanged shape. **The state emit-on-change created**: the record says *already emitted* about a value the child overwrote.
 - **T1.24**: a no-op while suspended, asserted on `setMouseTracking(**true**)`. **The `false` arm proves nothing here and the mutation pass is what found that**: `suspend()` has already unwound every held mode, so the idempotence check returns first and the row passed with the state guard removed. The `true` arm is the one the guard is load-bearing for — without it, `1002h` goes into a terminal a child owns.
+- **T1.29** (I21, I6, I10): `hover: true` → acquisition carries `1003h` and `1006h` and **no `1002h`**; release emits `1006l` then `1003l`, in that order, and no `1002l`; `setMouseTracking(false)` then `(true)` leave and re-take the **same** pair. `hover: true` with `mouse: false` → no `1003` byte in either direction — I10 wins. **And the control**: the same harness without `hover` carries `1002h` and no `1003` byte, because a lifecycle that took 1003 unconditionally passes every arm above it.
 - **T1.17** (I19): `cursorSequence({row, col})` is a hide, then a move to that cell, then a show, **in that order within the one string**; `cursorSequence(null)` is a hide and no move. The order is the assertion, not the members: all three present in any order passes a set comparison and still drags a visible cursor across the frame on a terminal without synchronised update, which is a capability rather than a guarantee.
 - **T1.16** (I18, C20): bytes reach an `onInput` subscriber only while acquired. Written across the whole transition rather than as four cases, because the subject is the transition: before `acquire()` nothing arrives; after it, a chunk does; after `suspend()` the same chunk does not; after `resume()` it does again; after `release()` it does not. The chunk written during suspension is asserted **absent from the subscriber and not buffered**, which is the half a per-state test would pass while queueing.
 - **T1.16b** (I18a): the fake stdin models Node's `flowing`, so the resumption after `suspend()` is a claim about a stream that can be stopped. `pause()` sets it false, `resume()` true, adding a `data` listener resumes only when it is not already false, and `emit` delivers to nobody while paused. Written as a property of the double rather than as a fifth case of T1.16, because the defect it exposes is one T1.16 already claimed to cover and could not: the double had no state the source could get wrong (§5).
-  *Given* an acquired instance. *When* `release()`. *Then* captured bytes are `1006l · 1002l · 2004l · 25h · 1049l` and `setRawMode(false)` was called once.
+  *Given* an acquired instance. *When* `release()`. *Then* captured bytes are `CSI < u · 1006l · 1002l · 2004l · 25h · 1049l` and `setRawMode(false)` was called once.
 
 - **T1.3** (I10, C8): absent capabilities emit nothing.
   *Given* a record with `mouse: false, bracketedPaste: false`. *When* `acquire()` then `release()`. *Then* no `2004`, `1002` or `1006` byte appears in either direction.
@@ -367,7 +404,7 @@ Proves the interface A02 §2 promises, so C03 and the shell can be written again
 - **T2.6** (C13): omitting `onFatal` is a compile error, and the fatal path invokes it rather than throwing.
 - **T2.7** (C14): `onResize` returns a disposable; disposing stops delivery. Likewise `onResume`.
 - **T2.8** (I1): two assertions, because neither holds on its own.
-  1. The bare mode numbers `1049 25 2004 1002 1006 2026` appear in `src/` only in `terminal/escapes.ts` — A03 SS15. I1 requires the literals to live there, so a rule saying they appear "only in C01" would fail on the one file that must contain them.
+  1. The bare mode numbers `1049 25 2004 1002 1003 1006 2026` appear in `src/` only in `terminal/escapes.ts` — A03 SS15. I1 requires the literals to live there, so a rule saying they appear "only in C01" would fail on the one file that must contain them.
   2. `escapes.ts`'s named export for each of those modes is imported only by `terminal/lifecycle.ts`, and `2026`'s only by `terminal/frame-scheduler.ts`. Asserted per sequence, so the transactional exception cannot widen silently.
 - **T2.9** (I1): `render()` is never called with `alternateScreen` — a source scan over `src/` (A03 SS34). Two owners of one piece of terminal state is the failure this component exists to prevent, and Ink's own option is the tempting shortcut.
 - **T2.10** (I13): `columns` and `rows` are read from a stream in `src/` only in `terminal/lifecycle.ts` — A03 SS42, imported from the enforcement tool rather than restated. Shown to fire against a fabricated violation **copied from `lifecycle.ts` itself**, `stdout.columns` through a held handle, rather than a form invented for the test (A03 commitment 14a).
@@ -399,7 +436,7 @@ Where the real defects live.
 - **T3.18c** (I12b): `SIGWINCH` arrives while **constructed** → every subscriber *is* notified, with the new size. The pair with T3.18 and not a row on its own: one state that drops and one that delivers, because a guard covering both passes any row that only checks the dropping half — which is how `state !== "acquired"` survived, and it made C22 I8 undeliverable.
 - **T3.18b** (I12a): `size()` reads `columns` and `rows` exactly once per call and returns them frozen together — asserted with T3.17's stream, whose `columns` getter mutates `rows`, so a second read inside one call produces a pair that cannot have coexisted. A stable fake would pass whether the accessor read once or twice, which is the setup where both readings agree.
 - **T3.18d** (I12a): `size()` answers while `constructed`, before any acquire, because C22 takes the viewport's dimensions at construction step 5. It is the one dimension route that is not gated on state.
-- **T3.19**: `SIGWINCH` fires three times in one tick → three notifications, not one. C01 does not coalesce, and neither does C03: `resize` is immediate there and cannot be given a window (C03 §3, C03 I2). Nothing in the system debounces it (D31).
+- **T3.19**: `SIGWINCH` fires three times in one tick → three notifications, not one. **C01 does not coalesce, and that half is the row's subject**; the other half was wrong twice. `resize` is *not* immediate in C03 — it is coalesced on a fixed 16 ms deadline (C03 I15) — and the citation for its window being unconfigurable was **C03 I2, which names `input` and `completion` and not `resize`**. That miscitation stood in three places in C03, in this row, and in `frame-scheduler.ts`'s own error message (F423). Nothing debounces it, which is a different claim and still true (D31, amended).
 - **T3.20**: `acquire()` while suspended → throws a named error. `resume()` is the intended call and the ambiguity is not tolerated.
 - **T3.21**: `acquire()` after `release()` → throws. `released` is terminal; the handlers are gone and a revived instance would hold state nothing releases.
 - **T3.22**: `suspend()` or `resume()` after `release()` → throws.
@@ -469,6 +506,7 @@ Tests whose only job is to fail loudly if a specific invariant is quietly undone
 - **T6.21** (I20): emitting the shape on every frame rather than on change → T1.25 fails. Every individual frame is correct, which is why the row counts rather than compares.
 - **T6.19** (I18a): dropping the `resume()` from `attachInput()` → T1.16 fails at its fourth case, and C22's tier-5 handoff row fails on the keystroke after the child exits. It failed neither for a whole stretch, because the fake's `pause` was a no-op — so the pair that matters is the source and the double, and reverting either alone must be red.
 - **T6.17** (I18, C20): moving the attach out of `acquire()` and into the constructor → T1.16's first case fails. Bytes would then reach a shell whose terminal is not acquired, which is the window I3 closes for handlers, arriving through the one subscription that was not one of them.
+- **T6.22** (I21): `hover` accepted and 1002 still taken → T1.29's first arm fails; 1003 taken with `hover` off → T1.1 and T1.29's control fail, and the `TRACKING_ON` pair `test/e2e/mouse.test.ts` checks at startup is no longer what a session writes; both pairs taken → T1.29's *no `1002h`* arm fails. `tools/mutate/runs/c01-hover-legend.mjs`.
 - **T6.14** (I13): reading `stdout.columns` in a second module — the plausible version being a renderer that wants the width without being handed it → T2.10 fails, naming the file. The regression is not that the read is wrong on its own; it is that two readers at two moments in one frame is how a frame comes to be composed against two widths.
 
 ---

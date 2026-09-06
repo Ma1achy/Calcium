@@ -35,9 +35,10 @@ import xml from "highlight.js/lib/languages/xml";
 import yaml from "highlight.js/lib/languages/yaml";
 import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
 import type { Code } from "../../../data/viewmodel/index.js";
-import { expandTabs, hardWrapCells, stripControl, truncateParts } from "../../text.js";
+import { cells, expandTabs, hardWrapCells, stripControl, truncateParts } from "../../text.js";
+import { sliceRuns } from "../../runs.js";
 import { paint, rows, slot, tone, type Span } from "../paint.js";
-import type { BlockDefinition, RenderContext } from "../types.js";
+import type { BlockDefinition, RenderContext, Windowed } from "../types.js";
 
 /**
  * The default set (§4a, I23), and the **rule** rather than a list, so the next
@@ -248,11 +249,29 @@ function flatten(node: HastNode, inherited: string | null): readonly Token[] {
 type Row = Readonly<{ line: number; start: number; text: string }>;
 
 /**
+ * The source lines `[from, to)` a block draws — every line unless a window
+ * pinned a range (C04 I82). Clamped rather than refused: the one writer is
+ * `window` below, and the field never arrives from outside the framework.
+ */
+function lineRangeOf(block: Code, lineCount: number): readonly [number, number] {
+  const held = block.lineRange;
+  if (held === undefined) return [0, lineCount];
+  const lo = Math.max(0, Math.min(Math.trunc(held[0]), lineCount)); // cells-ok
+  const hi = Math.max(lo, Math.min(Math.trunc(held[1]), lineCount)); // cells-ok
+  return [lo, hi];
+}
+
+/**
  * The rows a code block occupies, laid out identically by both halves.
  *
  * Tabs are expanded first (T3.16): a terminal advances to the next multiple of
  * eight, so a tab measured as one cell and drawn as eight diverges by seven per
  * tab, per line.
+ *
+ * **`line` is the absolute source line**, whether or not a `lineRange` narrowed
+ * the rows: the renderer indexes its per-line tokens by it, and the tokens are
+ * the whole text's (I25a). A window of a window narrows the range rather than
+ * re-basing it, for the same reason.
  */
 function codeRows(block: Code, width: number): readonly Row[] {
   const source = expandTabs(stripControl(block.text));
@@ -262,19 +281,20 @@ function codeRows(block: Code, width: number): readonly Row[] {
   // a tidy trailing newline a row too tall.
   const body = source.endsWith("\n") ? source.slice(0, -1) : source;
   const lines = body.split("\n");
+  const [lo, hi] = lineRangeOf(block, lines.length); // cells-ok — a line count, not a width
 
   if (block.wrap !== true) {
-    return lines.map((text, line) => ({ line, start: 0, text }));
+    return lines.slice(lo, hi).map((text, i) => ({ line: lo + i, start: 0, text }));
   }
 
   const out: Row[] = [];
-  lines.forEach((text, line) => {
+  for (let line = lo; line < hi; line += 1) { // cells-ok — a line index, not a width
     let start = 0;
-    for (const segment of hardWrapCells(text, normaliseWidth(width))) {
+    for (const segment of hardWrapCells(lines[line] ?? "", normaliseWidth(width))) {
       out.push({ line, start, text: segment });
       start += segment.length; // cells-ok
     }
-  });
+  }
   return out;
 }
 
@@ -286,6 +306,69 @@ export const codeDefinition: BlockDefinition<Code> = {
   // what lets a language ship tomorrow without reflowing yesterday's transcript.
   measure: (block: Code, width: number): number =>
     atLeastOne(codeRows(block, width).length), // cells-ok
+
+  // C09 §2c — the longest row the block draws at this width. Wrapped rows are
+  // already cut to the width, and a truncated row is exactly the width, so the
+  // answer is the width whenever anything did not fit.
+  width: (block: Code, width: number): number => {
+    const w = normaliseWidth(width);
+    let longest = 0;
+    for (const row of codeRows(block, w)) longest = Math.max(longest, cells(row.text)); // narrow-ok — `width` is pure in (block, width) as `measure` is (C09 I42), and narrow is the measurer's convention
+    return Math.max(1, Math.min(w, longest));
+  },
+
+  /**
+   * C09 I25 — rows `[from, to)`, as a smaller `code` (C14 §4a, C04 I82).
+   *
+   * **The text is not sliced, and that is the whole of the pin.** `tokenise`
+   * reads every character before a line, so a slice carrying only its own text
+   * is a different parse — a comment's tail comes back as live code, with every
+   * count correct (F426). The window hands back the *same* `text` and sets
+   * `lineRange`; `codeRows` above narrows the rows and `render` below
+   * tokenises the whole text, so the parse is the block's by construction and
+   * the memo hits on the same key every frame.
+   *
+   * **Units are source lines, not rows.** A wrapped line is one unit, so a
+   * window that opens or closes inside one keeps the whole line and charges the
+   * surplus to `skipRows`/`dropRows` (I26) — the shape `table` has for an
+   * expanded row, one kind over. `codeRows` already groups rows by `line`, so
+   * the unit boundaries are read off the row list rather than computed twice.
+   *
+   * `codeDefinition.measure` by name, never `this` — the members are extracted
+   * and called free (`table`'s window carries the measured case).
+   */
+  window: (block: Code, width: number, from: number, to: number): Windowed => {
+    const all = codeRows(block, width);
+    const total = atLeastOne(all.length); // cells-ok
+    const lo = Math.max(0, Math.min(Math.trunc(from), total - 1)); // cells-ok
+    const hi = Math.max(lo + 1, Math.min(Math.trunc(to), total)); // cells-ok
+
+    // An empty block is one row of nothing and has no lines to narrow to.
+    if (all.length === 0) return Object.freeze({ block, skipRows: 0, dropRows: 0 }); // cells-ok
+
+    const firstLine = all[lo]?.line ?? 0;
+    const lastLine = all[hi - 1]?.line ?? firstLine;
+    let first = lo;
+    while (first > 0 && all[first - 1]?.line === firstLine) first -= 1;
+    let last = hi;
+    while (last < all.length && all[last]?.line === lastLine) last += 1; // cells-ok — a row count
+
+    // **A window opening at line 0 slices rather than pins** (C09 I25a, F603):
+    // nothing precedes the slice, so the parse of `lines[0, lastLine]` is the
+    // whole block's over those lines by construction, and the tokeniser runs over
+    // `to` lines rather than all of them. Measured before this arm: 1 696 ms first
+    // paint of a 500-row window of a 50 000-line block, 196 ms steady — and a
+    // capped `code` block (C14 §4b) pays the first figure once per entry.
+    const windowed: Code =
+      firstLine === 0
+        ? { ...block, text: block.text.split("\n").slice(0, lastLine + 1).join("\n") }
+        : { ...block, lineRange: [firstLine, lastLine + 1] as const };
+    return Object.freeze({
+      block: windowed,
+      skipRows: lo - first, // cells-ok
+      dropRows: last - hi, // cells-ok
+    });
+  },
 
   render(block: Code, ctx: RenderContext): ReactElement {
     const width = normaliseWidth(ctx.width);
@@ -322,6 +405,9 @@ export const codeDefinition: BlockDefinition<Code> = {
  * so the split happens here rather than being assumed away.
  */
 function tokenLines(tokens: readonly Token[]): readonly (readonly Token[])[] {
+  const held = linesMemo.get(tokens);
+  if (held !== undefined) return held;
+
   const out: Token[][] = [[]];
   for (const token of tokens) {
     const pieces = token.text.split("\n");
@@ -330,8 +416,20 @@ function tokenLines(tokens: readonly Token[]): readonly (readonly Token[])[] {
       if (piece !== "") out[out.length - 1]?.push({ text: piece, slot: token.slot }); // cells-ok
     });
   }
+  linesMemo.set(tokens, out);
   return out;
 }
+
+/**
+ * The per-line cut, keyed on the token array `tokenise` memoises (C14 I23).
+ *
+ * A window keeps `text` whole, so every frame of a scrolled code block hands the
+ * same tokens back and the cut is the one thing still linear in the *document*:
+ * measured at 20 000 lines, the steady-state paint of a 40-row window was 64 ms
+ * with the cut re-run per frame and the block's own rows cost 17. Weak, so an
+ * evicted token array takes its lines with it.
+ */
+const linesMemo = new WeakMap<readonly Token[], readonly (readonly Token[])[]>();
 
 /**
  * The tokens covering `[start, start + length)` of one source line, in order.
@@ -345,17 +443,8 @@ export function sliceTokens(
   start: number,
   length: number,
 ): readonly Token[] {
-  const out: Token[] = [];
-  let at = 0;
-
-  for (const token of tokens) {
-    const size = token.text.length; // cells-ok
-    const from = Math.max(start, at);
-    const to = Math.min(start + length, at + size);
-    if (to > from) out.push({ text: token.text.slice(from - at, to - at), slot: token.slot });
-    at += size;
-    if (at >= start + length) break;
-  }
-
-  return out;
+  // One arithmetic for a token and a span (C04 I84): `sliceRuns` is this
+  // function generalised, and a second copy here is how the two would come to
+  // disagree about where a piece ends.
+  return sliceRuns(tokens, start, length);
 }

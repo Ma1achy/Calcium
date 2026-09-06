@@ -116,7 +116,10 @@ describe("C22 I69 — the next frame honours the floor", () => {
     ).toBe(2);
     // **One row, because that is what a `rule` measured** — the frame that
     // discovered the throw could not have drawn more without cutting the notice.
-    expect(first.some((r) => r.includes("─") || r.includes("│")), "no border yet").toBe(false);
+    // The corners, not `─` or `│`: the frame's two rules are `─` at every size
+    // (C22 I81), and the card's gutter draws `│` down every body after the
+    // first row (C22 I88) — so a bar is not a border, and a corner is.
+    expect(first.some((r) => r.includes("┌") || r.includes("└")), "no border yet").toBe(false);
 
     // One more frame. Nothing else changed.
     stdin.emit("x");

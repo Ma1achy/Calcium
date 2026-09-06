@@ -22,6 +22,7 @@ describe("C02 edge cases", () => {
       bracketedPaste: false,
       mouse: false,
       imageProtocol: "none",
+      keyboardProtocol: "none",
       altScreen: false,
     });
     expect(isUsable(capabilities)).toBe(false);
@@ -47,7 +48,7 @@ describe("C02 edge cases", () => {
     } as unknown as Partial<TerminalCapabilities>);
 
     expect(capabilities.colourDepth).toBe(24);
-    expect(Object.keys(capabilities)).toHaveLength(9);
+    expect(Object.keys(capabilities)).toHaveLength(10);
     expect(warnings).toEqual([]);
   });
 

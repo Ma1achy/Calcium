@@ -54,6 +54,109 @@ const OWN = argDir === -1;
  * anchoring a mutation without running it produces a row that applies and
  * asserts nothing, which is worse than one that says it could not apply.
  */
+/**
+ * Expectations that name a gate **outside their own run**, deliberately, with
+ * the run they belong to and the tier that answers instead.
+ *
+ * **A row's `expect` is a claim about which instrument caught it** — the same
+ * sentence `testPathsOf` above is written from, one step further along. That
+ * check asks whether a named test **file** exists; this one asks whether the
+ * named **row** is inside a file the run actually invokes, which is the question
+ * the sentence was about. Measured when it was built: **927 expectations across
+ * 99 runs, three of which named a row their run could not reach** — one in a
+ * file the command does not list, one that had lost the space and the brackets
+ * from a row named `F3 (b):`, and the entry below.
+ *
+ * **A debt list and not an exemption**, on `KNOWN_STALE`'s terms: an entry that
+ * starts resolving is a failure too, because a list nobody prunes outlives its
+ * reason unread.
+ */
+const CROSS_TIER = {
+  // The run mutates `fits = 0;` out of the keys module and says so: *the line
+  // tier 5 restored. Kept as a listed survivor with its reason.* Its integration
+  // corpus cannot see it; `test/e2e/completion.test.ts` can, and this run does
+  // not execute tier 5.
+  "c19-menu-window.mjs": ["C19 T5.1"],
+};
+
+/**
+ * Anchors that resolve to **more than one site** today, with the run they
+ * belong to — a debt list, on `KNOWN_STALE`'s terms and for its reasons (F219).
+ *
+ * These are not broken runs: the harness replaces the **first** match, and for
+ * every one of them the first match may well be the site the run names. What
+ * they are is *unchecked* — nothing said which site was mutated, so the run's
+ * name and the run's subject were never compared.
+ *
+ * **Eleven on the sweep's first run, across five components, one of them 5×.**
+ * They pre-date the check by a long way, which is the argument for recording
+ * them by count rather than fixing them inside the commit that found them: a
+ * repair here is a repair to a mutation nobody is running today, and repairing
+ * an anchor without running its pass produces a mutation that applies and
+ * asserts nothing — `KNOWN_STALE`'s own note, one property along.
+ *
+ * Compared by **equality**, both directions: an entry that becomes unique is a
+ * failure too, because a list nobody prunes outlives its reason unread.
+ */
+const KNOWN_AMBIGUOUS = {
+  "c04-kv-bar.mjs": 1,
+  "c04-ohlc.mjs": 1,
+  "c04-round-trip.mjs": 1,
+  "c10-categorical.mjs": 1,
+  "c10-colormap.mjs": 1,
+  "c10-named-set.mjs": 1,
+  "c12-annotate.mjs": 1,
+  "c12-calendar.mjs": 1,
+  "c12-origin.mjs": 1,
+  "c12-value-bar.mjs": 1,
+};
+
+/**
+ * Run files whose tail **runs and says nothing** (F768), by the shape of the
+ * silence — a debt list on `KNOWN_STALE`'s terms, compared by equality both
+ * ways, so a repaired tail still on the list is a failure.
+ *
+ * `report(results)` returns a string; a tail that does not `console.log` it
+ * prints nothing, and one that does not `process.exit` on a survivor exits 0
+ * whatever it found. Either way the pass ran — mutations applied, tree restored
+ * — and the exit status is the same bit as a clean pass. `c26-select-all.mjs`
+ * did this for five mutations before anyone opened the log.
+ *
+ * **Four of 146 on the sweep's first run** (2026-09-05): two of F768's exact
+ * shape (`report(results);` alone) and two that print and do not exit. Listed
+ * rather than repaired here, for the reason at the head of `KNOWN_STALE`: the
+ * repair is one line and belongs to whoever runs the pass, because a tail
+ * fixed without a run is a claim about what the run reports made by someone
+ * who has not read it.
+ */
+// **Empty since 2026-09-05**, when the four it listed were repaired in one pass —
+// two printed nothing (`report(results);` alone, F768's line) and two printed
+// and never exited. Compared by equality both ways, so a new silent tail fails
+// here and a repaired one must leave.
+const KNOWN_SILENT = {};
+
+/**
+ * How a run's tail ends — `null` when it prints its report **and** exits on a
+ * survivor, else the shape of the silence.
+ *
+ * Read from the last `runPass(` to the end of the file, because that is where
+ * the results exist to be dropped. **The blind spots, stated**: a tail printing
+ * the report of the *wrong* variable — `console.log(report(other))` — passes,
+ * and so does an unconditional `process.exit(0)`; both are the citation-
+ * resolves-against-the-wrong-thing class this tool declines to build for. And
+ * a file with no `runPass(` at all is not a run and is not checked, which is
+ * what lets a mutations-only fixture through MA1.
+ */
+function silenceOf(src) {
+  const at = src.lastIndexOf("runPass(");
+  if (at === -1) return null;
+  const tail = src.slice(at);
+  const printed = tail.includes("console.log(report(");
+  const exits = tail.includes("process.exit(");
+  if (printed && exits) return null;
+  return printed ? "no exit" : exits ? "unprinted" : "unprinted, no exit";
+}
+
 const KNOWN_STALE = {
   // **Re-anchoring is not always the fix, and this one shows both halves.**
   // `summaryLine(live)` gained a `unicode` argument, so the statement is still
@@ -83,7 +186,39 @@ const KNOWN_STALE = {
   // coverage from the summary line.
   "c10-categorical.mjs": 1,
   "c26-elements.mjs": 1,
-  "c26-focus-target.mjs": 1,
+
+  // **Five runs moved under C26 §4g and C22 I76 on 2026-09-03, none of them
+  // run that day.** `c04-scroll` and `c22-camera` anchor on the render slot,
+  // which gained a seventh axis (`cursorKey`); `c26-address` on `keys.ts`'s
+  // `↑`/`↓` rows, which now consult the focused entry; `c26-focus-target` and
+  // `c26-semantic-copy` on `focus.ts`'s stored shape, which gained `entryId`.
+  // Each is a one-token repair, and listed rather than repaired for the reason
+  // at the head of this list: the repair belongs to whoever runs the pass.
+  "c04-scroll.mjs": 1,
+  // **`c22-camera` went from one to three and `c22-cursor` joined, under C22 I77
+  // on 2026-09-04, neither run that day** (lane V). The render slot gained an
+  // eighth axis (`framesKey`), the commit reason became `orbits.length > 0 ||
+  // frames.length > 0`, and the cap's ternary moved onto one line (`const floor
+  // = … ? ORBIT_MS : ORBIT_MS_TORN`); `c22-cursor`'s slot fragment moved with the
+  // first. One-token repairs each, listed rather than repaired for the reason at
+  // the head of this list — the lane could not run the pass.
+  "c22-camera.mjs": 3,
+  "c22-cursor.mjs": 1,
+  "c26-address.mjs": 3,
+  "c26-focus-target.mjs": 2,
+  "c26-semantic-copy.mjs": 2,
+
+  // **The statement is gone, not moved** (C04 I81, 2026-09-03). "a log domain
+  // is spaced linearly" mutated `xPositionOf`'s own log arm — `if (!isLog || …)
+  // return linear;` — and that arm no longer exists: the function is one call
+  // to `normalisedOf` through a range that carries its scale. The equivalent
+  // mutation is dropping `scale` from that range, which is a different line
+  // with a different shape, so it is listed rather than guessed at; the repair
+  // belongs to whoever runs the pass. Four sibling drifts from the same session
+  // (`c12-layer-merge`, `c12-plot3d`, `c12-shared-geometry` ×2, `c22-camera`'s
+  // `elements` guard) were re-anchored instead, each onto the same statement
+  // one token wider.
+  "c12-x-axis.mjs": 1,
 };
 
 /**
@@ -172,6 +307,16 @@ function testPathsOf(src) {
   const flat = src.replace(/"\s*\+\s*\n?\s*"/g, "");
   const consts = {};
   for (const m of flat.matchAll(/^const ([A-Z_][A-Z_0-9]*) =\s*\n?\s*"([^"]*)";/gm)) consts[m[1]] = m[2];
+  // **And an array const, which the single-string form does not reach** (F336).
+  // `c22-construct.mjs` names its files as `const SUITE = [ … ]` and
+  // interpolates the array, so this function found **no paths at all** for it —
+  // and a run with no paths passes the existence check above by having nothing
+  // to check. That is A03 §2's vacuity class inside the gate written against it:
+  // the blind spot was found by building the sibling check on top, which read
+  // every one of that run's expectations as unreachable.
+  for (const m of flat.matchAll(/^const ([A-Z_][A-Z_0-9]*) =\s*\[([\s\S]*?)\]/gm)) {
+    consts[m[1]] = [...m[2].matchAll(/"([^"]+)"/gu)].map((q) => q[1]).join(" ");
+  }
   const out = new Set();
   for (const m of flat.matchAll(/vitest run ([^"`]+)/g)) {
     const expanded = m[1].replace(/\$\{([A-Z_][A-Z_0-9]*)\}/g, (whole, name) => consts[name] ?? whole);
@@ -180,6 +325,44 @@ function testPathsOf(src) {
     }
   }
   return [...out];
+}
+
+/**
+ * A gate name that is not a test row — the whole suite, or a make target.
+ */
+const RESERVED_EXPECTS = new Set([
+  "baseline", "golden", "enforce", "check", "e2e", "instruments",
+  "(none — expected to survive)",
+]);
+
+/** Every `expect:` string a run declares. */
+function expectationsOf(src) {
+  return [...src.matchAll(/expect:\s*"([^"]+)"/g)].map((m) => m[1]);
+}
+
+/**
+ * The text of every test file a run invokes — named files and `--dir` alike.
+ *
+ * **Two roots, and the run's own `ROOT` says which.** The docker runs cwd to
+ * `examples/docker`, so `--dir test` means that package's `test/` and not the
+ * repo's; resolving against the repo root alone walks the wrong tree and reports
+ * every one of their rows unreachable. That is `rootsFor`'s hazard on a
+ * directory rather than on a file, and it fired while this was being written.
+ */
+function testCorpusOf(src, _run) {
+  const pkg = /const ROOT = .*examples\/docker/u.test(src) ? "examples/docker/" : "";
+  const read = (p) => (existsSync(p) ? readFileSync(p, "utf8") : "");
+  const walk = (d) => {
+    if (!existsSync(d)) return [];
+    return readdirSync(d, { withFileTypes: true }).flatMap((e) =>
+      (e.isDirectory() ? walk(`${d}/${e.name}`) : /\.test\.[cm]?tsx?$/u.test(e.name) ? [`${d}/${e.name}`] : []));
+  };
+  const parts = testPathsOf(src).map((p) => rootsFor(p).map(read).join(""));
+  for (const m of src.matchAll(/vitest run --dir (\S+)/gu)) {
+    const dir = [`${ROOT}/${pkg}${m[1]}`, `${ROOT}/${m[1]}`].find((d) => existsSync(d));
+    if (dir !== undefined) parts.push(...walk(dir).map(read));
+  }
+  return parts.join("\n");
 }
 
 // An absolute `--dir` is used as given; the default is repo-relative.
@@ -191,8 +374,18 @@ const runs = readdirSync(RUNS_AT)
 
 let checked = 0;
 let suites = 0;
+let expectations = 0;
+/** Expectations naming a row no test path of their own run contains. */
+const unreachable = [];
 const missing = {};
+/** Anchors matching more than once — see the note in the loop below (F219). */
+const ambiguous = [];
+const ambiguousBy = {};
 const unresolvable = [];
+/** Runs whose tail runs and says nothing (F768), by run — see `silenceOf`. */
+const silent = {};
+/** Runs whose tail was read at all — the counter, so a reader matching nothing shows. */
+let tails = 0;
 
 // **Two roots, because a run cwds to the package it mutates.** The docker runs
 // address `src/ps.ts` and mean `examples/docker/src/ps.ts`; resolving against
@@ -202,10 +395,35 @@ const rootsFor = (file) => [`${ROOT}/${file}`, `${ROOT}/examples/docker/${file}`
 
 for (const run of runs) {
   const src = readFileSync(`${RUNS_AT}/${run}`, "utf8");
+  // **Does the run say what it found?** (F768). Checked before the anchors,
+  // because a run that cannot report is a run whose anchors do not matter.
+  if (src.includes("runPass(")) {
+    tails += 1;
+    const how = silenceOf(src);
+    if (how !== null) silent[run] = how;
+  }
   for (const path of testPathsOf(src)) {
     suites += 1;
     if (rootsFor(path).some((p) => existsSync(p))) continue;
     unresolvable.push(`${run}: names ${path}, which does not exist — vitest drops it silently`);
+  }
+  // **An expectation names a row, and a row lives in a file the run must run**
+  // (F336). `testPathsOf`'s own note says why: *every row's `expect` becomes a
+  // claim about which instrument caught it, made against an instrument set that
+  // is short.* A file that is absent is caught above; a file that is present and
+  // **unnamed** is caught here, and it reads identically from the report.
+  //
+  // **The corpus is what the run invokes**, so `--dir` is walked rather than
+  // skipped — resolving it against the repo root alone reports every docker row
+  // unreachable, which is this check's own two-roots hazard and it fired while
+  // the check was being written.
+  const corpus = testCorpusOf(src, run);
+  for (const e of expectationsOf(src)) {
+    expectations += 1;
+    if (RESERVED_EXPECTS.has(e) || corpus.includes(e)) continue;
+    const known = (OWN ? CROSS_TIER[run] : undefined) ?? [];
+    if (known.includes(e)) continue;
+    unreachable.push(`${run}: expects "${e}", which no test path it runs contains`);
   }
   for (const { file, from } of anchorsOf(src)) {
     const path = rootsFor(file).find((p) => existsSync(p));
@@ -214,8 +432,27 @@ for (const run of runs) {
       continue;
     }
     checked += 1;
-    if (readFileSync(path, "utf8").includes(from)) continue;
-    missing[run] = (missing[run] ?? 0) + 1;
+    const body = readFileSync(path, "utf8");
+    // **Existence is one property and uniqueness is another** (F219).
+    //
+    // The harness mutates by `String.replace`, which takes the **first** match.
+    // So an anchor matching twice is not a missing anchor — it is a run that
+    // still passes while testing a site nobody chose, and this sweep called it
+    // `ok` because it asked `includes`. Measured on the commit that extracted
+    // `tickLabels`: the precision line was copied rather than shared, two runs
+    // anchored on it, and both reported clean.
+    //
+    // **A duplicated anchor is reported as its own kind rather than folded into
+    // `missing`**, because the remedy is different — a missing anchor is
+    // re-pointed and an ambiguous one means the source has two copies of
+    // something that should have one.
+    const hits = body.split(from).length - 1;
+    if (hits === 1) continue;
+    if (hits === 0) missing[run] = (missing[run] ?? 0) + 1;
+    else {
+      ambiguousBy[run] = (ambiguousBy[run] ?? 0) + 1;
+      ambiguous.push(`${run}: an anchor matches ${String(hits)}x in ${file} — replace() takes the first`);
+    }
   }
 }
 
@@ -223,11 +460,57 @@ const runsWith = Object.keys(missing).length;
 const total = Object.values(missing).reduce((a, n) => a + n, 0);
 console.log(
   `mutation anchors — ${String(runs.length)} runs · ${String(checked)} anchors · ` +
-    `${String(suites)} test paths · ` +
-    `${String(total)} missing across ${String(runsWith)} run(s)`,
+    `${String(suites)} test paths · ${String(expectations)} expectations · ` +
+    `${String(tails)} tails · ` +
+    `${String(total)} missing across ${String(runsWith)} run(s)` +
+    `${ambiguous.length > 0 ? ` · ${String(ambiguous.length)} ambiguous` : ""}` +
+    `${Object.keys(silent).length > 0 ? ` · ${String(Object.keys(silent).length)} silent` : ""}`,
 );
 
-const problems = [...unresolvable];
+const problems = [...unresolvable, ...unreachable];
+
+// **The silence arm** (F768), on the same equality terms as the others: a tail
+// that says nothing and is not on the list fails; one on the list for a
+// different silence fails; one on the list that now speaks fails.
+const SILENT = OWN ? KNOWN_SILENT : {};
+for (const [run, how] of Object.entries(silent)) {
+  const known = SILENT[run];
+  if (known === undefined) {
+    problems.push(`${run}: runs and says nothing — its tail is ${how}: ` +
+      "print `console.log(report(results))` and `process.exit` on a survivor (F768)");
+  } else if (known !== how) {
+    problems.push(`${run}: its tail is ${how}, the list says ${known}`);
+  }
+}
+for (const [run, how] of Object.entries(SILENT)) {
+  if (silent[run] === undefined) {
+    problems.push(`${run}: the list says its tail is ${how} and it now prints and exits — remove it`);
+  }
+}
+
+// The ambiguity arm, on the same equality terms as the stale one below.
+const AMBIG = OWN ? KNOWN_AMBIGUOUS : {};
+for (const [run, n] of Object.entries(ambiguousBy)) {
+  const known = AMBIG[run];
+  if (known === undefined) problems.push(`${run}: ${String(n)} ambiguous anchor(s) and it is not on the list`);
+  else if (known !== n) problems.push(`${run}: ${String(n)} ambiguous anchor(s), the list says ${String(known)}`);
+}
+for (const [run, n] of Object.entries(AMBIG)) {
+  if (ambiguousBy[run] === undefined) {
+    problems.push(`${run}: the list says ${String(n)} ambiguous and every anchor is unique — remove it`);
+  }
+}
+
+// **The cross-tier list, pruned by equality like the others.** An entry whose
+// row has come into the run's corpus is a failure: a list nobody prunes outlives
+// its reason unread.
+for (const [run, names] of Object.entries(OWN ? CROSS_TIER : {})) {
+  const src = readFileSync(`${RUNS_AT}/${run}`, "utf8");
+  const corpus = testCorpusOf(src, run);
+  for (const e of names) {
+    if (corpus.includes(e)) problems.push(`${run}: the list says "${e}" is cross-tier and its run now reaches it — remove it`);
+  }
+}
 
 // The equality arm, both directions.
 const LIST = OWN ? KNOWN_STALE : {};

@@ -40,6 +40,10 @@ import type { Colormap } from "../theme/colormap.js";
 import type { ColourValue, Style } from "../theme/types.js";
 import { formatValue } from "./axes.js";
 import { ladderFor } from "./ramp.js";
+// **The fold is `figure.ts`'s now** (C12 I71, §3ak.29). `within` is a fraction
+// of a band and `eighths` is how many of a cell's eight sub-rows that buys —
+// the geometry and the raster, one line apart in the loop below.
+import { horizonBands, horizonBaseline, horizonBandT } from "./figure.js";
 import type { Range } from "./scale.js";
 
 type Caps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">;
@@ -64,19 +68,6 @@ export type HorizonCell = Readonly<{
   /** Ink in this cell, 1–8. A cell with none is `null` rather than 0. */
   eighths: number;
 }>;
-
-/**
- * What the fold is measured from (§3z, I52).
- *
- * **Zero where the range spans it, the minimum otherwise.** Folding about the
- * data's minimum unconditionally is what shipped, and it is why the form only
- * ever folded one way — a series that never crosses zero renders identically
- * under both rules, so the defect is invisible on exactly the fixtures a
- * catalogue carries.
- */
-export function horizonBaseline(range: Range): number {
-  return range.min <= 0 && range.max >= 0 ? 0 : range.min;
-}
 
 /**
  * Whether any reading falls on the far side of the baseline (§3z H3).
@@ -107,17 +98,11 @@ export function horizonGrid(
 ): readonly (readonly (HorizonCell | null)[])[] {
   const w = Math.max(1, Math.floor(areaWidth)); // cells-ok — a cell width
   const h = Math.max(1, Math.floor(areaRows)); // cells-ok — a row count
-  const n = Math.max(1, Math.floor(bands)); // cells-ok — a band count
-  const baseline = horizonBaseline(range);
-
-  // The deepest deviation either side, so the bands are the same size above and
-  // below — a mirror whose two halves had different scales would say a shallow
-  // trough is as deep as a tall peak.
-  const reach = Math.max(Math.abs(range.max - baseline), Math.abs(range.min - baseline));
-  const bandSize = reach > 0 ? reach / n : 0;
-
-  const values = series.values;
-  const count = values.length; // cells-ok — a sample count
+  // **The fold, taken rather than recomputed.** Baseline, band and `within` are
+  // the figure's; what is left here is the resampling onto columns and the spend
+  // on eighths, both of which need a grid.
+  const folded = horizonBands(series, range, bands);
+  const count = folded.length; // cells-ok — a sample count
   const grid: (HorizonCell | null)[][] = Array.from({ length: h }, () =>
     new Array<HorizonCell | null>(w).fill(null));
 
@@ -127,14 +112,9 @@ export function horizonGrid(
     // heatmap's right-anchoring defect in a second form, and one expression
     // covers both directions so it cannot disagree with itself.
     const idx = count <= 1 || w <= 1 ? 0 : Math.round((col / (w - 1)) * (count - 1)); // cells-ok — a sample index
-    const v = values[idx];
-    if (v === null || v === undefined || !Number.isFinite(v)) continue;
-
-    const deviation = Math.abs(v - baseline);
-    const sign: 1 | -1 = v < baseline ? -1 : 1;
-    const scaled = bandSize > 0 ? deviation / bandSize : 0;
-    const band = Math.min(n - 1, Math.floor(scaled)); // cells-ok — a band index
-    const within = bandSize > 0 ? scaled - band : 0;
+    const cell = folded[idx];
+    if (cell === null || cell === undefined) continue;
+    const { band, sign, within } = cell;
 
     // **A finite reading always draws ink** (I52, I16 one form along). A floor
     // that renders blank gives blank two meanings — absence and the minimum —
@@ -165,21 +145,6 @@ export function horizonGlyph(cell: HorizonCell | null, caps: Caps): string {
   const steps = [...ladderFor("height", caps).steps];
   const top = steps.length - 1; // cells-ok — a ramp index
   return steps[Math.max(0, Math.min(top, cell.eighths - 1))] ?? steps[top] ?? " "; // cells-ok — a ramp index
-}
-
-/**
- * Where a cell's band sits on the colormap, in `0…1` (I52, §3z).
- *
- * **A diverging map's two halves are the two directions**, deeper reading
- * further from the centre. On a sequential map — which the gates only allow
- * where nothing crosses the baseline — the whole ramp is one direction, so a
- * band indexes it directly and no half is wasted on a sign that cannot occur.
- */
-export function horizonBandT(cell: HorizonCell, bands: number, diverging: boolean): number {
-  const n = Math.max(1, Math.floor(bands)); // cells-ok — a band count
-  const depth = (cell.band + 1) / n;
-  if (!diverging) return depth;
-  return 0.5 + (cell.sign * depth) / 2;
 }
 
 /**
@@ -295,7 +260,7 @@ export function horizonLegendSpans(
       const g = steps[Math.max(0, Math.min(top, Math.round(((band + 1) / n) * top)))] ?? " "; // cells-ok — a ramp index
       return { text: g, style: muted };
     }
-    const t = horizonBandT({ band, sign, eighths: EIGHTHS_PER_ROW }, n, diverging);
+    const t = horizonBandT({ band, sign }, n, diverging);
     const colour = map === undefined ? undefined : continuousColour(map, t, caps);
     return colour === undefined ? { text: " ", style: muted } : wash(1, colour);
   };

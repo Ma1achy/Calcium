@@ -190,6 +190,20 @@ describe("C03 re-entrancy", () => {
     h.scheduler.commit("input");
 
     expect(h.render).toHaveBeenCalledTimes(1);
+    // **A deferred resize now takes a fresh window from the end of the write**,
+    // and the walk said this row was unchanged. It is not: `runWrite` gives a
+    // deferred *coalesced* reason a fresh window (T3.15), and `resize` is one
+    // now, so it inherits stream's path rather than being written inline.
+    //
+    // **The implementation is the first thing that can disprove a walk**, and
+    // this is the row it disproved. Safe, because the flag is already set — so
+    // whenever the write lands it is a repaint, at whatever width the terminal
+    // then has. C03 §8a A8 carries the correction.
+    expect(h.repaint, "not inline — it is coalesced now").not.toHaveBeenCalled();
+    expect(h.scheduler.contaminated, "and the flag survives the wait").toBe(true);
+
+    h.clock.advance(16);
+
     expect(h.repaint).toHaveBeenCalledTimes(1);
     expect(h.scheduler.contaminated).toBe(false);
   });
@@ -336,9 +350,18 @@ describe("C03 acquisition moving underneath a timer", () => {
     expect(() => h.scheduler.commit("input")).not.toThrow();
     expect(() => h.scheduler.commit("resize")).not.toThrow();
 
-    // No throw, no output, no timer — which is why §2 describes this as a hung
-    // UI with no error anywhere. It is L4's mistake to make; C03 cannot prevent
-    // it structurally, so it is demonstrated instead.
+    // No throw and no output — which is why §2 describes this as a hung UI with
+    // no error anywhere. It is L4's mistake to make; C03 cannot prevent it
+    // structurally, so it is demonstrated instead.
+    //
+    // **A timer now stands, because `resize` is coalesced** (I15), and letting
+    // it fire makes the row stronger rather than weaker: the write is attempted
+    // and still drops. The old `outstanding === 0` was true only because the
+    // resize wrote synchronously, so it was asserting the classification and
+    // reading as though it asserted the silence.
+    expect(h.clock.outstanding, "the resize's window is standing").toBe(1);
+    h.clock.advance(16);
+
     expect(h.render).not.toHaveBeenCalled();
     expect(h.repaint).not.toHaveBeenCalled();
     expect(h.written).toEqual([]);
@@ -378,14 +401,25 @@ describe("C03 coalescing under load", () => {
     expect(second.render).toHaveBeenCalledTimes(1);
   });
 
-  it("T3.16: a resize while pending cancels the timer and repaints now", () => {
+  it("T3.16 (I15): a resize while a stream is pending shortens the window rather than cancelling it", () => {
+    // **The row's subject survives the change and its mechanism does not.** It
+    // asserted that a resize pre-empts a pending stream, which it still does —
+    // but by being *strictly shorter* (16 ms against 33) rather than by being
+    // immediate. §3's strictly-shorter rule was already what ordered coalesced
+    // reasons; `resize` simply joined them, and this row is where that shows.
     const h = build();
 
     h.scheduler.commit("stream");
     h.scheduler.commit("resize");
 
-    expect(h.repaint).toHaveBeenCalledTimes(1);
-    expect(h.render).not.toHaveBeenCalled();
+    expect(h.scheduler.pending, "still pending, on the shorter window").toBe(true);
+    expect(h.clock.outstanding).toBe(1);
+    expect(h.repaint, "nothing written yet").not.toHaveBeenCalled();
+
+    h.clock.advance(16);
+
+    expect(h.repaint, "and it repaints, because the resize contaminated").toHaveBeenCalledTimes(1);
+    expect(h.render, "the stream's own frame never happens separately").not.toHaveBeenCalled();
     expect(h.clock.outstanding).toBe(0);
     expect(h.scheduler.pending).toBe(false);
   });

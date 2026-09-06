@@ -1,4 +1,6 @@
 // C02 tier 1 — unit. A table of env fixtures. No mocks, no terminal.
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   detectCapabilities,
@@ -19,6 +21,64 @@ describe("C02 detection", () => {
     expect(caps({ TERM: "xterm" }).colourDepth).toBe(4);
     expect(caps({ TERM: "dumb" }).colourDepth).toBe(1);
     expect(caps({}).colourDepth).toBe(1);
+
+    // **The identification's row, and the case that earns it** (C02 I11, F418).
+    // A real Ghostty or kitty sets `COLORTERM`, so this looks like an artefact of
+    // our own harness stripping it — and it is not. `ssh` allocates a pty and
+    // forwards `TERM`; it does not forward `COLORTERM`. The user got 24-bit
+    // images and 4-bit colour from one terminal, decided by which variable
+    // survived the hop.
+    expect(caps({ TERM: "xterm-kitty" }).colourDepth).toBe(24);
+    expect(caps({ TERM: "xterm-ghostty" }).colourDepth).toBe(24);
+    // **And gated by `TMUX`**, because inside a multiplexer we are not talking to
+    // the emulator we identified — `mouse`'s rule (D34) reaching a second
+    // capability. Conservative by construction: this is what the rule answered
+    // before the identification existed, so inside tmux nothing moved.
+    expect(caps({ TERM: "xterm-kitty", TMUX: "/tmp/x" }).colourDepth).toBe(4);
+    // `COLORTERM` still outranks the name — the terminal speaking for itself
+    // beats us inferring, which is why the identification sits below it.
+    expect(caps({ TERM: "xterm-kitty", TMUX: "/tmp/x", COLORTERM: "truecolor" }).colourDepth).toBe(24);
+  });
+
+  it("T1.12b (I11): the identification is gated once, and every reader sees the gate", () => {
+    // **All three readers in one row, and that is the assertion.** The gate is a
+    // single expression in `detect`; a row naming one capability passes just as
+    // well against a gate applied to that one alone, which is the state this file
+    // was in — 34 capability tests passed unchanged when the gate landed, because
+    // nothing had ever asserted the three together inside tmux.
+    const inside = caps({ TERM: "xterm-ghostty", TMUX: "/tmp/x" });
+    expect(
+      [inside.imageProtocol, inside.synchronisedUpdate, inside.colourDepth],
+      "inside a multiplexer every reader answers as if there were no identification",
+    ).toEqual(["none", false, 4]);
+
+    // And the same environment without `TMUX`, so the row cannot pass by the
+    // identification having stopped working (F432).
+    const outside = caps({ TERM: "xterm-ghostty" });
+    expect(
+      [outside.imageProtocol, outside.synchronisedUpdate, outside.colourDepth],
+      "outside it, all three follow the name",
+    ).toEqual(["kitty", true, 24]);
+  });
+
+  it("T1.12c (I11): the gate is measured behaviour, not caution", () => {
+    // **What tmux does with the bytes, which is why the gate is right** (F432).
+    // Measured on tmux 3.5a in its own output: an unwrapped APC transmission is
+    // absent and `ESC [ ? 2026 h` is absent, against a bare pty where both are
+    // present. So `imageProtocol` addressed an image that never arrived and
+    // `synchronisedUpdate` promised a wrapper nothing received — the record was
+    // false rather than merely optimistic.
+    //
+    // The DCS-wrapped form *does* reach the emulator at tmux's default, so this
+    // is a gate awaiting a wrapper in `escapes.ts` rather than a permanent no.
+    expect(caps({ TERM: "xterm-kitty", TMUX: "/tmp/x" }).imageProtocol).toBe("none");
+    expect(caps({ TERM: "xterm-kitty", TMUX: "/tmp/x" }).synchronisedUpdate).toBe(false);
+    // `TERM_PROGRAM` survives the hop where `TERM` does not, which is the route
+    // that made this reachable at all.
+    expect(caps({ TERM: "screen-256color", TERM_PROGRAM: "ghostty" }).imageProtocol).toBe("kitty");
+    expect(
+      caps({ TERM: "screen-256color", TERM_PROGRAM: "ghostty", TMUX: "/tmp/x" }).imageProtocol,
+    ).toBe("none");
   });
 
   it("T1.2: COLORTERM=24bit, the less common spelling, is also 24", () => {
@@ -53,6 +113,12 @@ describe("C02 detection", () => {
     }
     expect(caps({ TERM: "xterm-kitty" }).synchronisedUpdate).toBe(true);
     expect(caps({ TERM: "xterm", TERM_PROGRAM: "Apple_Terminal" }).synchronisedUpdate).toBe(false);
+    // **`false` here until the identification was single-sourced** (F418). This
+    // is what `docker exec -e TERM` forwards and what `ssh` forwards, so it is
+    // the common case rather than a corner: the images arrived and the frame
+    // tore, every frame, because two lists answered one question and only one had
+    // heard of `xterm-ghostty`.
+    expect(caps({ TERM: "xterm-ghostty" }).synchronisedUpdate).toBe(true);
   });
 
   it("T1.6: mouse needs a real terminal and no tmux (D34)", () => {
@@ -61,10 +127,119 @@ describe("C02 detection", () => {
     expect(caps({ TERM: "xterm", TMUX: "/tmp/x" }).mouse).toBe(false);
   });
 
-  it("T1.7: image protocol", () => {
+  it("T1.7 (C02 I9, F415): image protocol, and the terminals it does not claim", () => {
     expect(caps({ TERM: "xterm", TERM_PROGRAM: "iTerm.app" }).imageProtocol).toBe("iterm2");
     expect(caps({ TERM: "xterm-kitty" }).imageProtocol).toBe("kitty");
     expect(caps({ TERM: "xterm" }).imageProtocol).toBe("none");
+
+    // **Ghostty, on a measurement** — `tools/terminal-probe` sent the shipped
+    // encoder's own transmission to Ghostty 1.3.1 and read `OK`, against
+    // `EINVAL: invalid data` for a corrupted control. Before this the whole
+    // protocol arm was unreachable there, and the demo said so on screen.
+    expect(caps({ TERM: "xterm-ghostty" }).imageProtocol).toBe("kitty");
+    // The tmux case: `TERM` is rewritten and `TERM_PROGRAM` survives.
+    expect(caps({ TERM: "screen-256color", TERM_PROGRAM: "ghostty" }).imageProtocol).toBe("kitty");
+    expect(caps({ TERM: "xterm", TERM_PROGRAM: "Ghostty" }).imageProtocol).toBe("kitty");
+
+    // **The unmeasured arms, asserted as they stand rather than as assumed.**
+    // Both are widely said to implement the protocol and neither has been
+    // measured here, and the asymmetry decides it: a wrong `kitty` draws
+    // *nothing*, a wrong `none` draws a dither. This row is what fails on the day
+    // someone runs the probe in one of them and widens the rule — which is the
+    // expiry being a test rather than a hope.
+    expect(caps({ TERM: "xterm-256color", TERM_PROGRAM: "WezTerm" }).imageProtocol).toBe("none");
+    expect(caps({ TERM: "xterm-256color", KONSOLE_VERSION: "220400" }).imageProtocol).toBe("none");
+
+    // **This row asserted the defect as correct, and its comment is why that is
+    // hard to catch** (F418). It read: *asserted rather than narrated, because
+    // the first version of this row claimed `TERM=xterm-ghostty` implied a
+    // synchronised update and it does not.* Every word true — a reader hunting
+    // their own assumptions went to the code, found `false`, and wrote it down.
+    //
+    // **True about the code and false about Ghostty**, which implements
+    // synchronised update and is in the program list for exactly that reason. The
+    // row recorded which variable happened to be consulted, and a row that does
+    // that reads exactly like a row that records a decision. It then held the
+    // disagreement in place for the life of the project.
+    expect(caps({ TERM_PROGRAM: "ghostty" }).synchronisedUpdate).toBe(true);
+    expect(caps({ TERM: "xterm-ghostty" }).synchronisedUpdate).toBe(true);
+  });
+
+  it("T1.12 (C02 I11): the identification is one function and the capabilities read it", () => {
+    // **Structural rather than by comparing answers** (F84's shape). Three lists
+    // that happen to agree pass every agreement test and are still three lists —
+    // and this file shipped for the life of the project with two that did not.
+    // The property worth holding is the one a scan can see.
+    //
+    // **Comments stripped first**: the doc comments here name every emulator
+    // repeatedly, and a source assertion that counts prose measures the prose
+    // rather than the code.
+    const src = readFileSync(join(import.meta.dirname, "../../src/terminal/capabilities.ts"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//gu, "")
+      .replace(/\/\/[^\n]*/gu, "");
+    const NAMES = ["xterm-kitty", "xterm-ghostty", "iterm.app", "ghostty", "wezterm", "windowsterminal"];
+
+    // Brace-matched bodies, so a name in a later function is not attributed to an
+    // earlier one — the failure that makes a source scan agree with itself.
+    const bodies = new Map<string, string>();
+    for (const m of src.matchAll(/function\s+([A-Za-z0-9_]+)\s*\(/gu)) {
+      let i = src.indexOf("{", m.index + m[0].length);
+      if (i === -1) continue;
+      let depth = 0;
+      const from = i;
+      for (; i < src.length; i += 1) {
+        if (src[i] === "{") depth += 1;
+        else if (src[i] === "}") { depth -= 1; if (depth === 0) break; }
+      }
+      bodies.set(m[1] ?? "", src.slice(from, i + 1));
+    }
+
+    expect(bodies.has("identifyTerminal"), "the identification exists as one function").toBe(true);
+    for (const [name, body] of bodies) {
+      if (!name.startsWith("detect")) continue;
+      for (const emulator of NAMES) {
+        expect(body.includes(emulator), `${name} names ${emulator} itself`).toBe(false);
+      }
+    }
+    // And the control: the scan can see a name where one legitimately is, so a
+    // green run above is not the corpus being empty (a fabricated violation can
+    // be vacuous).
+    expect(NAMES.some((n) => src.includes(n)), "the names are in the file at all").toBe(true);
+  });
+
+  it("T1.13 (I11, I12): the keyboard protocol is the identification's second column, gated with it", () => {
+    for (const env of [
+      { TERM: "xterm-kitty" },
+      { TERM: "xterm-ghostty" },
+      { TERM: "xterm-256color", TERM_PROGRAM: "WezTerm" },
+      { TERM: "foot" },
+      { TERM: "foot-extra" },
+    ]) {
+      expect(caps(env).keyboardProtocol, JSON.stringify(env)).toBe("kitty");
+    }
+    // `none` where the table says so — iTerm2 unmeasured, Windows Terminal
+    // absent — and where nothing is identified at all.
+    expect(caps({ TERM: "xterm", TERM_PROGRAM: "iTerm.app" }).keyboardProtocol).toBe("none");
+    expect(caps({ TERM: "xterm", TERM_PROGRAM: "WindowsTerminal" }).keyboardProtocol).toBe("none");
+    expect(caps({ TERM: "xterm-256color" }).keyboardProtocol).toBe("none");
+
+    // **The tmux arm, beside `imageProtocol` in one assertion.** A gate applied
+    // to one column and not the other is the state T1.12b was written against;
+    // a row naming this column alone passes against a copy of the gate.
+    const inside = caps({ TERM: "xterm-kitty", TMUX: "/tmp/x" });
+    expect([inside.keyboardProtocol, inside.imageProtocol]).toEqual(["none", "none"]);
+    const outside = caps({ TERM: "xterm-kitty" });
+    expect([outside.keyboardProtocol, outside.imageProtocol]).toEqual(["kitty", "kitty"]);
+
+    // Declarable over the top (I4), and the domain is closed (T3.5's shape).
+    expect(caps({ TERM: "xterm" }, { keyboardProtocol: "kitty" }).keyboardProtocol).toBe("kitty");
+    const rejected = detectCapabilities(
+      { TERM: "xterm-kitty" },
+      { keyboardProtocol: "sixel" as unknown as "none" },
+    );
+    expect(rejected.capabilities.keyboardProtocol).toBe("kitty");
+    expect(rejected.warnings).toHaveLength(1);
+    expect(rejected.warnings[0]).toContain("keyboardProtocol");
   });
 
   it("T1.8: alt screen needs TERM present and not dumb", () => {
@@ -108,6 +283,7 @@ describe("C02 detection", () => {
       bracketedPaste: true,
       mouse: true,
       imageProtocol: "kitty",
+      keyboardProtocol: "kitty",
       altScreen: true,
     };
     // TERM=dumb detects every field at its floor; the overrides must win anyway.
@@ -124,6 +300,7 @@ describe("C02 detection", () => {
       bracketedPaste: false,
       mouse: false,
       imageProtocol: "none",
+      keyboardProtocol: "none",
     } as const;
 
     expect(isUsable({ ...worst, altScreen: true })).toBe(true);
@@ -140,6 +317,7 @@ describe("C02 detection", () => {
         bracketedPaste: true,
         mouse: true,
         imageProtocol: "kitty",
+        keyboardProtocol: "kitty",
         altScreen: false,
       }),
     ).toBe(false);

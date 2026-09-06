@@ -109,6 +109,23 @@ export type StoredFocus =
    */
   | Readonly<{
       at: "liveBlock";
+      /**
+       * The entry focus is in (C26 I21, §4g).
+       *
+       * **On the location and not on the address**, because the entry is the
+       * outer scope the element sits in (C26 §3, `entry → block → row → cell`)
+       * rather than a third half of the element's name — and `element: null`,
+       * *in the block on no element yet*, needs an entry to be in, which an
+       * address cannot carry. The `anchor` shares this entry by construction:
+       * a selection is extended within one entry's list and cannot straddle two.
+       *
+       * Until this member existed every reader of focus read `liveId` instead,
+       * and the three places that would have had to agree about *which entry*
+       * all agreed on the same constant — which is why the address never
+       * carried one. The target keeps its name: `liveBlock` is now *a transcript
+       * block*, and the word is historical.
+       */
+      entryId: string;
       /** `null` — in the block, on no element yet. */
       element: ElementAddress | null;
       /**
@@ -127,9 +144,45 @@ export type StoredFocus =
     }>;
 
 export type InputEvent =
-  | Readonly<{ kind: "key"; key: Key }>
+  | Readonly<{
+      kind: "key";
+      key: Key;
+      /**
+       * The kitty keyboard protocol's event type, when the sequence carried
+       * one (C16 §2, C02 I12). **Optional and absent under legacy reporting**,
+       * so every consumer that ignores it is unchanged and every `toEqual`
+       * record written before it exists unchanged. Nothing may be reachable
+       * only through it — A03 SS55 is the rule and it is vacuous today.
+       */
+      event?: "press" | "repeat" | "release";
+    }>
   | Readonly<{ kind: "paste"; text: string }>
-  | Readonly<{ kind: "mouse"; row: number; col: number; button: string; press: boolean }>;
+  | Readonly<{
+      kind: "mouse";
+      /** 0-based terminal row and column. */
+      row: number;
+      col: number;
+      /**
+       * SGR 1006's `Cb` bits 0–1, 6 and 7 (C16 §2's table, I30). `button0`–`2`
+       * are the three buttons, `button8`–`11` the 128-range, and the wheel's
+       * four directions are named because bits 0–1 select them.
+       */
+      button: `button${number}` | "wheelUp" | "wheelDown" | "wheelLeft" | "wheelRight" | "none";
+      /** The final byte: `M` is a press or a motion report, `m` the release. */
+      press: boolean;
+      /** Bits 4, 8 and 16 — carried, never interpreted here (I30). */
+      shift: boolean;
+      meta: boolean;
+      ctrl: boolean;
+      /**
+       * Bit 32 — a motion report; `press: true, motion: true` is not a second
+       * click. With a button held it is a 1002 drag; with `button: "none"` it
+       * is a 1003 hover — bits 0–1 read `3`, which is *no button*, and a string
+       * rather than `null` so `startsWith("wheel")` and `!== "button0"` stay
+       * true of it without a consumer changing (I30, C01 I21).
+       */
+      motion: boolean;
+    }>;
 
 /**
  * A binding, declaratively (C16 §6).
@@ -221,6 +274,12 @@ export type KeyAction =
   | "extendRowUp"
   | "extendRowDown"
   | "copyElement"
+  // **Every element the focused entry declares** (C26 §5c, I16) — anchor on
+  // the first, head on the last, and never across an entry: the list is the
+  // focused entry's, so the copy cannot depend on what lies between two.
+  // `⌃a` at `liveBlock`; the prompt's `⌃a` is `home` and the editor's
+  // select-all is `⌥a` (`selectAll` above), which is why this is a second name.
+  | "selectAllElements"
   // --- focus (I22) ---------------------------------------------------------
   //
   // `↓` enters through `historyNext`'s second clause rather than an action of
@@ -229,6 +288,60 @@ export type KeyAction =
   | "focusPrompt"
   | "rowUp"
   | "rowDown"
+  // --- between entries (C26 I21, §4g) ----------------------------------------
+  //
+  // **The only two keys that change which entry focus is in.** `↑`/`↓` step
+  // within the focused entry and its edge stops them (C26 I19); these step the
+  // outer scope, landing on the target entry's first element. `tab` was free at
+  // `liveBlock` and `⇧tab`'s wire form `CSI Z` was not decoded until this row
+  // needed it — added rather than assumed, because T2.13 walks every row here
+  // through the real decoder (I17).
+  | "entryPrev"
+  | "entryNext"
+  // --- the horizontal pair (C12 §3s, C22 I76) --------------------------------
+  //
+  // `←`/`→` at `liveBlock`. The vertical pair steps elements and the horizontal
+  // one had no subject: both fell through to nothing, because `liveBlock`'s
+  // handler resolves the table and step 3 binds no arrow. A focused plot moves
+  // its crosshair; a kind with no horizontal interior is a no-op, which is the
+  // camera family's precedent (C22 I75) and the cost of binding before every
+  // consumer exists. A table's column cursor is the second consumer (C26 §11).
+  | "cursorLeft"
+  | "cursorRight"
+  // --- re-run the focused entry (C23 I18) ------------------------------------
+  //
+  // **Not an action kind.** The five `Action` kinds fire against a document's
+  // data and are refused from a frozen entry (A01 D5); this fires the entry's
+  // **recorded command** through C23 §2's submit, which is the one thing a
+  // settled entry holds that is not stale. Both consumers C23 I18 names — a
+  // notebook's *re-run this cell* and an agent harness's *retry that tool call*
+  // — are this key on a settled entry.
+  | "rerunEntry"
+  | "orbitLeft"
+  | "orbitRight"
+  | "tiltDown"
+  | "tiltUp"
+  | "dollyIn"
+  | "dollyOut"
+  | "cameraReset"
+  | "orbitToggle"
+  // --- the series toggle (C22 I78, C12 I116) ----------------------------------
+  //
+  // **Nine names, because an effect takes no key.** `KeyEffect` is `() => void`
+  // and a block keymap's action must reach `keys.table` by name (`construct.ts`'s
+  // `bound`), so the digit is in the action. Bound by no row of `defaultKeymap`:
+  // the plot declares them itself (`plotDefinition.keymap`) and L4 merges them
+  // while the plot holds focus — the first `BlockKeymap` producer, and the reason
+  // I19's "an action nobody binds" clause is read over the merged table too.
+  | "toggleSeries1"
+  | "toggleSeries2"
+  | "toggleSeries3"
+  | "toggleSeries4"
+  | "toggleSeries5"
+  | "toggleSeries6"
+  | "toggleSeries7"
+  | "toggleSeries8"
+  | "toggleSeries9"
   | "blockPageDown"
   | "blockPageUp"
   // `enter` on a focused row, and the union's gap was the whole of F21: a row
@@ -274,15 +387,19 @@ export type KeyAction =
   | "viewPop"
   // --- copy mode (C16 §5b) -------------------------------------------------
   //
-  // **Entry only. The exit is §5's rung and not an action**, because leaving is
-  // `⌃c` and `⌃c` resolves on the ladder rather than in this table — the same
-  // split every other target has. An `exitCopyMode` row here would be a second
-  // way out with an order of its own, which is what makes copy mode a target
-  // rather than a mode in the first place.
+  // **Entry and exit, and the exit is the target's own dismissal** (C16 §5c,
+  // 2026-09-05). This read *the exit is §5's rung and not an action* for as long
+  // as `⌃c` was the only way out — and measured, `Esc` in copy mode was dropped
+  // silently on a frozen screen. A `copyMode`-target row has no order of its own:
+  // it resolves at the moment `activeTarget` answers `copyMode`, exactly as the
+  // rung does, so I24's objection to a *second mechanism* was true of a `global`
+  // row and not of this one. `⌃c` stays the ladder's; `pushedView` has the same
+  // pair (`viewPop` and the rung).
   //
   // A mode with entry and no exit is B1; a mode with an exit and no entry is
   // the same defect inverted, and just as testable.
-  | "enterCopyMode";
+  | "enterCopyMode"
+  | "exitCopyMode";
 
 export type Binding = Readonly<{
   target: FocusTarget;

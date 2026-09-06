@@ -13,7 +13,7 @@
 import type { ConfirmHost } from "./confirm.js";
 import type { Adapter, AdapterRegistry, ProducerContext } from "../data/adapters/index.js";
 import type { ManifestDocument, ManifestStore } from "../data/manifest/index.js";
-import type { ProcessRunner } from "../data/process/types.js";
+import type { ProcessRunner, PtyFactory } from "../data/process/types.js";
 import type { TransportRouter } from "../data/transport/index.js";
 import type { Action, Block, ViewDocument } from "../data/viewmodel/index.js";
 import type { EntryId } from "../viewport/transcript/index.js";
@@ -100,6 +100,14 @@ export type ChromeContext = Readonly<{
 export type ChromeFn = (ctx: ChromeContext) => readonly Block[];
 
 /**
+ * §6l — the chrome as the frame reads it: two functions of the frame. The
+ * header is one row; the footer is as tall as the blocks it returns, `[]` being
+ * no footer at all (I82). Nothing here is a height — the one thing an app
+ * decides is what its footer returns (§6l.4 F).
+ */
+export type Chrome = Readonly<{ header: ChromeFn; footer: ChromeFn }>;
+
+/**
  * Superset of C20's `HistoryFs` (C22 §2), so the injected value passes straight
  * down with no adapter.
  *
@@ -178,11 +186,14 @@ export interface Pipeline {
    */
   register(verb: string, handler: LocalHandler): void;
   /**
-   * C09's `RenderContext.onAction` (C23 §3a, I16).
+   * The action dispatcher (C23 §3a, I16) — what `⏎` on a focused element and a
+   * pointer hit reach through `shell/keys.ts`.
    *
    * **Nothing else may supply it.** An action is a submission by another route,
    * and routing submissions is what C23 does — a block library dispatching its
-   * own would be L1 causing effects in L2 and L4 at once.
+   * own would be L1 causing effects in L2 and L4 at once. It used to be named
+   * here as *C09's `RenderContext.onAction`*, a context field no renderer ever
+   * called; the field is gone and the route was always this one.
    */
   onAction(action: Action, from?: EntryId | null): void;
   /**
@@ -206,6 +217,17 @@ export interface Pipeline {
    * resume at all.
    */
   visibilityChanged(): void;
+  /**
+   * The region changed size (C23 I65).
+   *
+   * **Heard rather than polled, for the same reason `visibilityChanged` is.** A
+   * live child holds a grid whose width came from the body, and a child that has
+   * gone quiet has nothing left to notice the change on — polling on the next
+   * chunk resizes only the children that were about to redraw anyway. The order
+   * inside is the invariant: the child first, so its SIGWINCH names a size the
+   * emulator has already taken by the time the repaint arrives.
+   */
+  resized(): void;
   /**
    * The producer context, for C22's greeting (C22 I53, C23 I40).
    *
@@ -329,6 +351,15 @@ export type PipelineDeps = Readonly<{
    * rendering.
    */
   confirm: ConfirmHost;
+  /**
+   * Whether a call needs a decision before it runs, and what the layer says
+   * (C23 I60). `null` runs the call; a record puts the card in `waiting`, asks
+   * through `confirm`, and a denial settles it with code 126. **Optional and
+   * unset by the composition root**: no far side asks today, and the emitter
+   * lands with its test consumer rather than a producer nothing calls.
+   */
+  approval?: (call: Readonly<{ name: string; args: string }>) =>
+    Readonly<{ consequence?: string; choices?: readonly Readonly<{ key: string; label: string; default?: true }>[] }> | null;
   theme: ThemeStore;
   /** Persist the chosen variant (C22 I40). Absent in harnesses with no state directory. */
   persistTheme?: (name: string) => void;
@@ -426,8 +457,24 @@ export type TuiConfig = Readonly<{
    */
   commandPolicy?: CommandPolicy;
   completionSources?: readonly CompletionSource[];
-  chrome?: Readonly<{ header: ChromeFn; footer: ChromeFn }>;
+  /**
+   * §6 — header and footer as functions of the frame. The header is one row;
+   * the footer is as tall as its blocks, up to `MAX_FOOTER_ROWS`, and `[]` is
+   * none (I82, §6l). The two rules bounding the prompt are not configurable.
+   */
+  chrome?: Chrome;
   blocks?: readonly BlockDefinition[];
+  /**
+   * The most rows one block may occupy (C14 §4b, I24; C09 §2b). Default 2 000.
+   *
+   * A block over it draws its first rows and one marker row — `… 2,000 of
+   * 50,000 rows` — and the cap is the registry's, generic over
+   * `BlockDefinition`: it reaches an app's own kind the day that kind declares
+   * `window` and never a kind that does not. **Per session and never per
+   * block**, because a cap an adapter can lift per block is a cap on nothing.
+   * A positive integer; anything else is a `ConfigError` at `createTui`.
+   */
+  maxBlockRows?: number;
   transport?: TransportRouter;
 
   /** Off by default; 50 when enabled without a count (C13 §5a). */
@@ -482,6 +529,20 @@ export type TuiConfig = Readonly<{
    * (FINDINGS F53). Fixed here because this is the field with a consumer.
    */
   capabilities?: Partial<TerminalCapabilities> | undefined;
+  /**
+   * Hover — mouse mode 1003 in 1002's place, so the pointer *resting* over a
+   * cursorable plot moves its readout without a click and without moving
+   * focus (C01 I21, C16 §4a, C12 §3s).
+   *
+   * **Config and not a capability**, and the reason is written where the
+   * capability row would have gone (C02 §3): nothing in the environment
+   * predicts 1003 apart from 1002, so a detection rule would be a constant;
+   * what differs is what the application *wants*, and 1003 is a sequence per
+   * cell the pointer crosses. Default **off** for that cost. `capabilities.mouse`
+   * false still takes neither mode. Everything a hover sets, `←`/`→` on the
+   * focused plot set too — C02's rule that the mouse is never the only way.
+   */
+  hover?: boolean;
   /** The session's starting directory. Defaults to the process's. */
   cwd?: string;
   clock?: () => number;
@@ -506,6 +567,22 @@ export type TuiConfig = Readonly<{
   openUrl?: (url: URL) => Promise<void>;
   stdout?: NodeJS.WriteStream;
   stdin?: NodeJS.ReadStream;
+
+  /**
+   * A pseudo-terminal factory, for children that need a terminal (C22 I91,
+   * C21 §2a).
+   *
+   * **Passed through to C21 unchanged and read nowhere else.** Calcium depends
+   * on no PTY package — `node-pty` ships prebuilds for two platforms and this
+   * tree installs with `--ignore-scripts` (F840) — so the only way a child gets
+   * a terminal is a consumer handing one in. `node-pty` satisfies the shape
+   * without adaptation.
+   *
+   * Unset, the shell route runs commands on pipes and interprets their output
+   * with the same emulator: the child sees no tty and behaves as it does under
+   * `| cat`, which is what it did before this field existed.
+   */
+  pty?: PtyFactory;
 
   cluster?: string;
   version?: string;
@@ -667,8 +744,8 @@ export class UnusableTerminalError extends Error {
 
 /** Thrown by `createTui` for a missing required field (T2.7, I7a). */
 export class ConfigError extends Error {
-  constructor(readonly field: string) {
-    super(`createTui: \`${field}\` is required`);
+  constructor(readonly field: string, reason = "is required") {
+    super(`createTui: \`${field}\` ${reason}`);
     this.name = "ConfigError";
   }
 }

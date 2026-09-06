@@ -144,19 +144,85 @@ describe("IK — the kitty arm, as properties", () => {
     expect(kitty, "and it is the committed height").toHaveLength(rows);
   });
 
+  it("IK9 (F379): the table is kitty's, and the arm reaches a real terminal's width", () => {
+    // **The bound was 40 and every image a consumer places is wider**, so the
+    // arm fell back to the dither on everything and had never drawn a pixel.
+    // The sentence that justified it — *forty entries cover forty rows and forty
+    // columns, which is past any height a transcript block declares* — is true
+    // about height and silent about width, and a block's width is the
+    // terminal's. Found in a real kitty; no assertion here could have said it,
+    // because a refusal that falls back is well-formed.
+    expect(MAX_PLACEHOLDER_SPAN).toBe(297);
+
+    // The widths a terminal actually has, against the one that must still
+    // refuse — a wrapped diacritic addresses the wrong part of the image.
+    for (const cols of [56, 80, 130, 297]) {
+      expect(placementRows(1, cols, 14), `${String(cols)} columns must place`).toHaveProperty("rows");
+    }
+    expect(placementRows(1, 298, 14), "past the encoding, still refused").toHaveProperty("fault");
+  });
+
+  it("IK10 (F380): the transmission declares the box the placement uses", () => {
+    // **`c=1` was hardcoded at three call sites**, under a comment saying the
+    // field is advisory. It is not: `c` sizes the virtual placement, so 784
+    // placeholders spanning 56 columns addressed an image declared one column
+    // wide, and nothing drew. Revert the width to a literal and this fails.
+    const wide = { ...block, height: 14 } as Image;
+    const out = transmitImage([wide], KITTY_CAPS, new Set<string>(), 120);
+    const box = imageCells(wide, 120);
+    expect(box.cols, "the fixture must be wider than one cell").toBeGreaterThan(1);
+    expect(out, "the escape declares the placement's columns").toContain(`,c=${String(box.cols)},`);
+    expect(out).toContain(`,r=${String(box.rows)},`);
+
+    // **And it moves with the width**, which is what makes it a computation
+    // rather than a second constant.
+    // A width narrow enough that the clamp bites, so the two boxes differ.
+    const narrow = transmitImage([wide], KITTY_CAPS, new Set<string>(), 8);
+    const small = imageCells(wide, 8);
+    expect(small.cols, "the narrow width must clamp").toBeLessThan(box.cols);
+    expect(narrow).toContain(`,c=${String(small.cols)},`);
+  });
+
+  it("IK11 (F381): every chunk's payload is a multiple of four base64 bytes", () => {
+    // **kitty decodes base64 per chunk rather than concatenating first**, so a
+    // chunk whose length is not a multiple of 4 corrupts everything after it.
+    // The reserve was `CHUNK - opts.length - 9` = 4042, and the failure was
+    // total and silent: one chunk drew, two drew nothing, and the escape was
+    // well-formed under every reading available here.
+    //
+    // Only a real terminal could find it. This row is what keeps it fixed.
+    const big = "A".repeat(20_000);
+    const out = transmit(7, big, 40, 10);
+    const parts = out.split(`${ESC}_G`).slice(1);
+    expect(parts.length, "the fixture must need several escapes").toBeGreaterThan(4);
+
+    for (const [i, part] of parts.entries()) {
+      const body = part.slice(part.indexOf(";") + 1, part.lastIndexOf(`${ESC}\\`));
+      const last = i === parts.length - 1;
+      if (!last) {
+        expect(body.length % 4, `chunk ${String(i)} is not 4-aligned`).toBe(0);
+      }
+      // And the whole escape still fits the cap it is chunked for.
+      expect(`${ESC}_G${part}`.length).toBeLessThanOrEqual(4096);
+    }
+
+    // The payload survives reassembly — the property the alignment protects.
+    expect(parts.map((p) => p.slice(p.indexOf(";") + 1, p.lastIndexOf(`${ESC}\\`))).join("")).toBe(big);
+  });
+
   it("IK7 (C09 §4c): the seam transmits once per digest, and only at kitty", () => {
     const sent = new Set<string>();
     const twice = [block, { ...block, id: "other" } as Image];
-    const first = transmitImage(twice, KITTY_CAPS, sent);
+    const first = transmitImage(twice, KITTY_CAPS, sent, 80);
     const count = [...first.matchAll(new RegExp(`${ESC}_G`, "gu"))].length;
     expect(count, "two blocks of one image transmit once").toBe(1);
     expect(first).toContain(`i=${String(imageId(block.digest))}`);
 
     // **The set is session-scoped**, so a redraw sends nothing.
-    expect(transmitImage(twice, KITTY_CAPS, sent), "a second frame owes nothing").toBe("");
+    expect(transmitImage(twice, KITTY_CAPS, sent, 80), "a second frame owes nothing").toBe("");
 
     // And at every other protocol there is nothing to send.
-    expect(transmitImage(twice, FULL_CAPS, new Set<string>()), "no protocol, no payload").toBe("");
+    expect(transmitImage(twice, FULL_CAPS, new Set<string>(), 80), "no protocol, no payload").toBe("");
   });
 
   it("IK8 (C09 §4c): the seam reaches an image nested inside a container", () => {
@@ -164,7 +230,7 @@ describe("IK — the kitty arm, as properties", () => {
     // and the animation walk read, which is the third mechanism that turns on
     // that name (C04 I73).
     const wrapped = b.mosaic({ height: 4, areas: "AB", children: [block, b.raw("x")] });
-    const out = transmitImage([wrapped], KITTY_CAPS, new Set<string>());
+    const out = transmitImage([wrapped], KITTY_CAPS, new Set<string>(), 80);
     expect(out, "an image inside a mosaic still transmits").toContain(`${ESC}_G`);
     expect(out).toContain(`i=${String(imageId(block.digest))}`);
   });

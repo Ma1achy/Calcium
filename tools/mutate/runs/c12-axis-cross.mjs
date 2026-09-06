@@ -80,8 +80,8 @@ const results = runPass({
       // not the curve's rule. Two correct mappings from one position.
       name: "the zero column takes the curve's rule for a candlestick too",
       file: AXES,
-      from: "    ? columnAt?.(xPositionOf(0, axis.range, scale))",
-      to: "    ? undefined",
+      from: "    : columnAt?.(zeroAt)",
+      to: "    : undefined",
       expect: "AC9",
     },
     {

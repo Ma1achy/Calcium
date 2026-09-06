@@ -12,6 +12,7 @@ import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
 const DEF = "src/presentation/plot/definition.ts";
+const FIG = "src/presentation/plot/figure.ts";
 const FURN = "src/presentation/plot/furniture.ts";
 const VAL = "src/data/viewmodel/validate.ts";
 
@@ -34,9 +35,9 @@ const results = runPass({
   write,
   run,
   control: {
-    file: DEF,
-    from: "  return block.yCallout === \"both\" && !stacked ? `${name} ${value}` : value;",
-    to: "  return value;",
+    file: FIG,
+    from: "    return mode === \"both\" ? `${name} ${value}` : value;",
+    to: "    return value;",
     why:
       "every new arm collapsed onto the old one: a run that cannot see `both` stop writing a " +
       "name can see none of the rows below it",
@@ -47,17 +48,21 @@ const results = runPass({
       // sentence read as excluding rather than selecting: a callout naming a
       // *value* does not answer the legend's question and never did.
       name: "`last` suppresses the legend too",
-      file: FURN,
-      from: '  if (block.yCallout === "name" || block.yCallout === "both") return null;',
-      to: '  if (block.yCallout !== undefined && block.yCallout !== "none") return null;',
+      file: FIG,
+      from: '  if (block.legend === undefined && (block.yCallout === "name" || block.yCallout === "both")) return null;',
+      to: '  if (block.legend === undefined && block.yCallout !== undefined && block.yCallout !== "none") return null;',
       expect: "TL3",
     },
     {
       // The suppression removed entirely — the arm reverts to C12 I48's
       // unqualified reading and the identity is drawn twice.
+      // **Re-pointed to `legendOf`** (C12 §3ak.47). The clause lived in
+      // `legendPlacement`, which already reads `legendOf` first — so once the
+      // crossed resolver carried it the copy here was dead, and removing it
+      // caught nothing. A survivor that is a duplication rather than a gap.
       name: "a name at the line's end does not suppress the legend",
-      file: FURN,
-      from: '  if (block.yCallout === "name" || block.yCallout === "both") return null;',
+      file: FIG,
+      from: '  if (block.legend === undefined && (block.yCallout === "name" || block.yCallout === "both")) return null;',
       to: "",
       expect: "TL3",
     },
@@ -86,9 +91,11 @@ const results = runPass({
       // legend's own wording, so two unlabelled series are told apart by colour
       // alone — C12 I25, in the gutter instead of in the swatch.
       name: "an unlabelled series gets an empty name",
-      file: DEF,
-      from: "  const name = s.label ?? `series ${String(index + 1)}`;",
-      to: '  const name = s.label ?? "";',
+      // **Moved to `calloutOf` with the strings** (C12 §3ak.47): what a
+      // callout says is the figure's, and only the rung stayed behind.
+      file: FIG,
+      from: "    const name = s.label ?? `series ${String(i + 1)}`;",
+      to: '    const name = s.label ?? "";',
       expect: "TL5",
     },
     {
@@ -98,8 +105,8 @@ const results = runPass({
       // width assertion sees it.
       name: "a name is written even where the strips are labelled",
       file: DEF,
-      from: '  if (block.yCallout === "name") return stacked ? null : name;',
-      to: '  if (block.yCallout === "name") return name;',
+      from: '  if (block.yCallout === "name") return null;',
+      to: '  if (block.yCallout === "name") return text;',
       expect: "TL6",
     },
     {
@@ -107,8 +114,8 @@ const results = runPass({
       // to the value the strips do not carry.
       name: "`both` keeps its name below the colour floor",
       file: DEF,
-      from: '  return block.yCallout === "both" && !stacked ? `${name} ${value}` : value;',
-      to: '  return block.yCallout === "both" ? `${name} ${value}` : value;',
+      from: "  if (!stacked) return text;",
+      to: "  return text;",
       expect: "TL6",
     },
   ],

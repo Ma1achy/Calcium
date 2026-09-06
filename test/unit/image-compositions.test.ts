@@ -19,7 +19,7 @@ import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { renderToLines } from "../../src/presentation/render-lines.js";
 import { validateBlock } from "../../src/data/viewmodel/index.js";
-import { DARK_THEME, FULL_CAPS } from "../support/render.js";
+import { DARK_THEME, FULL_CAPS, drawsPicture } from "../support/render.js";
 import { rgbPng64 } from "../support/png.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
@@ -92,11 +92,11 @@ describe("phase 2 · the three compositions, against §3h's claim", () => {
     // **Read the frame, not only the numbers**: both halves must be present on
     // the same rows, which is the whole of what "a row group" claims.
     expect(measureBlock(composed, 60)).toBe(lines.length);
-    expect(lines.some((l) => /[⠀-⣿]/u.test(l)), "the picture is drawn").toBe(true);
+    expect(lines.some((l) => drawsPicture(l)), "the picture is drawn").toBe(true);
     // **Both halves on the same rows**, which is the whole of what "a row
     // group" claims and the only thing a frame read can confirm.
     expect(
-      lines.filter((l) => /[⠀-⣿]/u.test(l) && /[▏▎▍▌▋▊▉█]/u.test(l)).length,
+      lines.filter((l) => drawsPicture(l) && /[▏▎▍▌▋▊▉█]/u.test(l)).length,
       "picture and histogram share their rows",
     ).toBeGreaterThanOrEqual(7);
   });
@@ -251,6 +251,6 @@ describe("phase 2 · the three compositions, against §3h's claim", () => {
     // The headers are on the first row and the class labels down the first column.
     expect(lines[0]).toContain("cat");
     expect(lines.slice(1).some((l) => l.startsWith("cat"))).toBe(true);
-    expect(lines.filter((l) => /[⠀-⣿]/u.test(l).valueOf()).length).toBeGreaterThan(0);
+    expect(lines.filter((l) => drawsPicture(l)).length).toBeGreaterThan(0);
   });
 });

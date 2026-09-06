@@ -1,0 +1,8 @@
+── tree · default · 8bit · 80w
+                                       root
+                             ╭──────────┴──┬────────╮
+                           render        layout   parse
+                          ╭──┴───╮      ╭──┴──╮
+                        curve  paint measure wrap
+                          │
+                        raster

@@ -13,6 +13,7 @@ import { report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const AXES = "src/presentation/plot/axes.ts";
 const FURN = "src/presentation/plot/furniture.ts";
+const FIG = "src/presentation/plot/figure.ts";
 const MARKS = "src/presentation/plot/marks.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
@@ -40,23 +41,27 @@ const results = runPass({
     {
       // The state before this landed: the row reserved and left blank.
       name: "the index domain is not a fallback",
-      file: FURN,
-      from: "  const max = block.xMax ?? n - 1; // cells-ok — a sample count",
-      to: "  const max = block.xMax ?? 0; // cells-ok — a sample count",
+      // **Moved to `figure.ts` with the domain** (C12 §3ak.44): `xDomain` is
+      // `positionDomainOf` now, above the seam, because the second arm needs
+      // it and `furniture.ts` is the terminal's.
+      file: FIG,
+      from: "  const max = block.xMax ?? n - 1;",
+      to: "  const max = 0;",
       expect: "XA1",
     },
     {
       // **A clause that was wrong when written.** §3d's rule is one precision
       // from the step, and it is the step's own decimals.
       name: "the labels take two significant figures rather than the step's decimals",
+      // Moved into `positionAxisAt` with the rest of the derivation.
       file: AXES,
       from: "  const decimals = axis.step > 0 ? stepDecimals(axis.step) : undefined;",
-      to: "  const decimals = decimalsFor(axis.step);",
+      to: "  const decimals = 2;",
       expect: "XA1",
     },
     {
       name: "a declared domain does not replace the index",
-      file: FURN,
+      file: FIG,
       from: "  const min = block.xMin ?? 0;",
       to: "  const min = 0;",
       expect: "XA2",

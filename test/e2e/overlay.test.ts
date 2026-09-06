@@ -1,16 +1,18 @@
-// C15 tier 5 — e2e. Entirely deferred, and that is the honest state.
+// C15 tier 5 — e2e. Five rows, all live; this header said *entirely deferred*
+// until 2026-09-03, two of them on a premise that had been false for some time.
 //
 // Every one of C15's tier-5 claims is about a layer *and its input*: a menu that
 // flips and shows every candidate, a search that stacks over it and hands focus
-// back, a confirm that ignores `esc` and answers to `n`. C15 supplies geometry
-// and a stack; none of those sentences can be written without the router that
-// routes to it and the engine that fills it.
+// back, a view that takes the keys and gives them back on `esc`. C15 supplies
+// geometry and a stack; none of those sentences can be written without the
+// router that routes to it and the shell that pushes it — so every row here
+// drives `node test/support/fixture.mjs session` through a real PTY.
 //
 // A tier-5 file asserting something C15 can do alone would look like coverage
 // and be tier 1 in a different directory.
 import { describe, expect, it } from "vitest";
 
-import { createOverlayManager } from "../../src/viewport/overlay/index.js";
+import { createOverlayManager, takesInput } from "../../src/viewport/overlay/index.js";
 import type { OverlayManager } from "../../src/viewport/overlay/index.js";
 import { MENU_ID, menuLayer } from "../../src/interaction/completion/index.js";
 import { SEARCH_ID } from "../../src/interaction/history/index.js";
@@ -20,7 +22,7 @@ import { createRouter, type RouterDeps } from "../../src/interaction/router/rout
 import type { InputEvent } from "../../src/interaction/router/types.js";
 import { registry } from "../support/overlay.js";
 import { openWith } from "../support/history.js";
-import { interactivePty } from "../support/pty.js";
+import { interactivePty, PROMPT, promptRow } from "../support/pty.js";
 
 const escape = (): InputEvent => ({
   kind: "key",
@@ -37,7 +39,7 @@ function routerDeps(overlays: OverlayManager): RouterDeps {
       return top === null ? null : { kind: top.kind, id: top.id, dismissable: top.dismissable };
     },
     placed: () =>
-      overlays.layout({ width: 80, height: 24 }).map((p) => ({
+      overlays.layout({ width: 80, height: 24 }).filter(takesInput).map((p) => ({
         layer: { id: p.layer.id, kind: p.layer.kind, dismissable: p.layer.dismissable },
         top: p.top,
         left: p.left,
@@ -150,12 +152,51 @@ describe("C15 e2e — layers under real input", () => {
     expect(router.target, "the menu is still there, and still has the keys").toBe("overlay");
     expect(store.searchState).toBeNull();
   });
-  // T4.5b asserts the ladder's shape against C15 alone. This is the same claim
-  // through a real keystroke, and the rung that must not fire is the one that
-  // pops the dashboard out from under the confirm.
-  it.todo(
-    "T5.3: a confirm inside the dashboard — drawn over it, esc does nothing, n resolves it and returns. The routing half is asserted in test/integration/router.test.ts T4.2; composing the session is what remains — **not deferred on a component**, and the label is the correction: it named C23, which is built, and what is missing is not code in C23 but a *ruling*. Nothing in the tree pushes a `kind: \"view\"` layer. C15 supports them and `focus.ts` routes to `pushedView`; the shell pushes overlays only — the completion menu and reverse search. What is absent is the decision that makes a verb\'s result a pushed view rather than a transcript entry, which is a design question with no owner. Recorded in C22 §13",
-  );
+  // **T5.3 and T5.5 were deferred on a premise that was false when it was
+  // written down.** Both said *nothing in the tree pushes a `kind: "view"`
+  // layer* and cited C22 §13 as an open ruling. C22 §13a took the ruling,
+  // `document-view.ts` pushes exactly that layer, `construct.ts` registers the
+  // `pushedView` handler, and the fixture manifest declares `ps --watch` and
+  // `tail --screen` as view flags — all before this row was re-read. The todo
+  // survived because nothing re-reads a deferral that is not failing.
+  //
+  // The confirm half of the original title — *a confirm inside the dashboard,
+  // esc does nothing, n resolves it* — is not constructible from this fixture:
+  // the only confirm the shell raises is the exit confirm, and C16 §5's ladder
+  // puts *a pushed view → pop it* above *prompt empty → arm the exit confirm*,
+  // so Ctrl-C over a view pops the view and never reaches the confirm. The
+  // routing half of that claim is T4.2 in test/integration/router.test.ts; what
+  // this row asserts is the half that needed a session.
+  it("T5.3 (C22 §13a, C15 I1, A01 D4): a view verb pushes a `kind: \"view\"` layer over the transcript, and the layer owns the keys", async () => {
+    const pty = interactivePty("node test/support/fixture.mjs session", { cols: 80, rows: 20 });
+    try {
+      await pty.waitFor(PROMPT, 15_000);
+      // Something in the transcript first, so "drawn over it" has a referent.
+      pty.type("/ps --mine\r");
+      await pty.waitFor(/a3f9b21/, 15_000);
+      expect(pty.frame.join("\n")).toContain("/ps --mine");
+
+      pty.type("/ps --watch\r");
+      await pty.waitForFrame((f) => f.join("\n").includes("watching"), 15_000);
+      // **The view covers the region** (`placement: fill`): the entry that was
+      // on screen is not, and no pending entry was appended for the view verb —
+      // C22 §13a's *there is no source entry*.
+      const over = pty.frame.join("\n");
+      expect(over, "the transcript is underneath the view").not.toContain("/ps --mine");
+      expect(over, "no entry was appended for the view verb").not.toContain("❯ /ps --watch");
+
+      // **Input ownership is what makes it a view rather than an overlay**
+      // (A01 D4, C22 §13a): a printable does not reach the prompt while the
+      // view is up. The prompt row is read after a frame the keystroke could
+      // have changed has had time to arrive; T5.5 is the positive control that
+      // the same keystroke reaches the prompt once the view has popped.
+      pty.type("x");
+      await new Promise((r) => setTimeout(r, 400));
+      expect(promptRow(pty.frame).trim(), "the view took the key").toBe("❯");
+    } finally {
+      pty.kill();
+    }
+  }, 40_000);
   // C01 already delivers the SIGWINCH snapshot this needs; what is missing is
   // the thing that composes a frame from it, so the blocker is L4 alone. Naming
   // C01 alongside it made this expire the moment the rule ran, which is TD2
@@ -202,26 +243,38 @@ describe("C15 e2e — layers under real input", () => {
       pty.kill();
     }
   }, 40_000);
-  it.todo(
-    // **The trace was ruled out, not deferred.** S12 §3 records it: an earlier
-    // draft had C23 write `logs a3f9b21 — 1,284 lines … (esc 14:24:08)` and it
-    // could not be built — the trace is an entry, an entry freezes its
-    // predecessor, and the frozen block is the one A01 D7 returns focus to.
-    // C23 §4's pop row is the ruling, so the row asserts what remains true.
-    // **The reason was wrong, and TD2 is what said so.** It read "waits on C24 —
-    // a PTY needs a binary to drive", and C24 landing expired it. Checking what
-    // it was actually waiting for found the binary had been there all along:
-    // two tests in this file drive `node test/support/fixture.mjs session`
-    // through `interactivePty`, and have since before C24 existed. The clause
-    // named the wrong blocker and would have gone on reading as a good reason
-    // indefinitely, because nothing re-reads a deferral that is not failing.
-    //
-    // What it waits on is the gap T5.3 above already records, and the two are
-    // one finding: **nothing in the tree pushes a `kind: "view"` layer.** C15
-    // supports them and `focus.ts` routes to `pushedView`; the shell pushes
-    // overlays only. There is no logs view to press `esc` in, and there will
-    // not be until the decision that makes a verb's result a pushed view rather
-    // than a transcript entry is taken — recorded in C22 §13.
-    "T5.5: esc from the logs view — the view pops, nothing is appended, and focus returns to the live block — **not deferred on a component**, and the correction is the same one T5.3 carries: it named C24, which is built, and a PTY binary was never the blocker — two tests in this file drive `node test/support/fixture.mjs session` and have since before C24 existed. What is missing is the ruling in C22 §13 that makes a verb\'s result a pushed view; nothing pushes a `kind: \"view\"` layer, so the view this row pops out of cannot be opened",
-  );
+  // **The trace was ruled out, not deferred.** S12 §3 records it: an earlier
+  // draft had C23 write `logs a3f9b21 — 1,284 lines … (esc 14:24:08)` and it
+  // could not be built — the trace is an entry, an entry freezes its
+  // predecessor, and the frozen block is the one A01 D7 returns focus to.
+  // C23 §4's pop row is the ruling, so the row asserts what remains true.
+  //
+  // The deferral above it read "waits on C24 — a PTY needs a binary to drive",
+  // then "nothing pushes a `kind: \"view\"` layer"; the first was expired by
+  // TD2 and the second was false when written — see T5.3.
+  it("T5.5 (C23 §4, C22 §13a, B03 §2): esc from a pushed view — the view pops, nothing is appended, and the prompt has the keys again", async () => {
+    const pty = interactivePty("node test/support/fixture.mjs session", { cols: 80, rows: 20 });
+    try {
+      await pty.waitFor(PROMPT, 15_000);
+      pty.type("/ps --mine\r");
+      await pty.waitFor(/a3f9b21/, 15_000);
+      pty.type("/ps --watch\r");
+      await pty.waitForFrame((f) => f.join("\n").includes("watching"), 15_000);
+
+      pty.type("\u001b");
+      // The transcript is back, exactly as it was: the entry underneath, and no
+      // trace of the view verb — not an entry, not a notice.
+      await pty.waitForFrame((f) => f.join("\n").includes("/ps --mine"), 15_000);
+      const after = pty.frame.join("\n");
+      expect(after, "the view is gone").not.toContain("watching");
+      expect(after, "nothing was appended on the way out").not.toContain("--watch");
+
+      // **And the keys are the prompt's again** — the control for T5.3's
+      // "the view took the key": the same printable, now on the prompt row.
+      pty.type("still-here");
+      await pty.waitForFrame((f) => promptRow(f).includes("still-here"), 15_000);
+    } finally {
+      pty.kill();
+    }
+  }, 40_000);
 });

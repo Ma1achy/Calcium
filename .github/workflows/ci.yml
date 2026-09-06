@@ -14,8 +14,27 @@ jobs:
   fast:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      # **v5 for both, and the reason is the runtime rather than the features.**
+      # v4 targets Node 20, which the runner now force-migrates to Node 24 and
+      # annotates on every job — six orange warnings on a green run, which is
+      # how a real deprecation gets read as noise. v5 is the major that moved to
+      # node24 (minimum runner v2.327.1; the hosted runners are long past it).
+      #
+      # **Not the latest major, deliberately.** checkout is at v7 and setup-node
+      # at v7 today. Everything between v5 and v7 is a change this workflow does
+      # not use — checkout v6 persists credentials to a separate file and v7
+      # blocks fork-PR checkout for `pull_request_target` and `workflow_run`,
+      # neither of which appears in `on:`; setup-node v6 narrows automatic
+      # caching to npm and v7 drops the dummy `NODE_AUTH_TOKEN` export. Moving
+      # one major for one stated reason is a change that can be checked; moving
+      # three bundles four unexamined ones into a CI repair.
+      #
+      # **The one behaviour change v5 does carry was checked**: setup-node v5
+      # caches automatically when `package.json` declares `packageManager`. This
+      # repository declares none, and every step below sets `cache: npm`
+      # explicitly, so the arm cannot fire here either way.
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -29,6 +48,11 @@ jobs:
       # *in here rather than run by hand* — which was true of the local gate and
       # not of the enforced one. Same shape as F60 one job down: a gate that is
       # not wired is not a gate. 16 instruments, 113 rows, about ten seconds.
+      #
+      # **And two of those fixtures read `docs/catalogue/`, which is gitignored.**
+      # This job failed on it from 2026-08-23 until the target below existed —
+      # green locally on a directory a clean clone never has. The Makefile row
+      # carries the account; `catalogue` is a prerequisite of `instruments` and `test`.
       - run: make instruments
 
       - run: make audit
@@ -59,12 +83,16 @@ jobs:
     needs: fast
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
       - run: make install
+      # **Two tier-5 rows drive a real emulator under Xvfb** (C02 T5.7 on kitty,
+      # C16 T5.9 on xterm; F808, F810). Without these they skip by name — the
+      # reason in the row's title — which is not a pass, and not the gate either.
+      - run: sudo apt-get update -q && sudo apt-get install -y -q xvfb xdotool xterm kitty
       - run: make golden
       - run: make e2e
         env:
@@ -90,8 +118,8 @@ jobs:
     needs: fast
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with: { node-version: 22, cache: npm }
       - run: make install
       # Packs the real tarball, installs it into a tree that has never seen this
@@ -130,8 +158,8 @@ jobs:
           - { term: xterm,          lang: C }
           - { term: xterm-256color, lang: en_GB.UTF-8 }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with: { node-version: 22, cache: npm }
       - run: make install
       - run: make test
@@ -153,14 +181,22 @@ jobs:
       packages: write
       id-token: write        # attestation
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           registry-url: https://npm.pkg.github.com/
       - run: make install
       - run: npm run build
-      - uses: actions/attest-build-provenance@v1
+      # v1 → v3 for the runtime, as above. **v2 changed what this produces**: a
+      # `subject-path` matching several files now yields one attestation
+      # referencing each subject rather than one per artefact, which is the
+      # behaviour the current documentation describes and the better of the two
+      # for `dist/**`. Recorded because this job has never run — it is gated on
+      # a version tag, so nothing here is exercised by CI, and the bump is
+      # unverified in exactly the way the comment above already says publishing
+      # is.
+      - uses: actions/attest-build-provenance@v3
         with:
           subject-path: dist/**
       - run: npm publish

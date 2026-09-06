@@ -52,11 +52,38 @@ const COMMITMENT = /^(\d+)\.\s+(.*)$/;
  * exists to prevent, reappearing inside the rule itself, and the third pass over
  * the citation graph is what found it.
  */
-const GROUP = /\((?!→)([^()]*)\)/g;
-const INV_TOKEN = /\b(I\d+[a-z]?)\b/g;
+/**
+ * One paren group, and **every** group — including one opening with `→` (F437).
+ *
+ * This was `/\((?!→)([^()]*)\)/g`, which took every group that did not *open*
+ * with an arrow and then read every `I\d+` inside it as **local**. A group can
+ * hold the arrow in the middle — `(I66, §6g, → C10 I25)` — and eight commitments
+ * do, so eight cross-references were resolved against the citing spec rather than
+ * the cited one. **Wrong in both directions**: silent where the local spec
+ * happened to declare the same number, which was 8 of 8, and a false failure the
+ * first time one did not.
+ */
+const GROUP = /\(([^()]*)\)/g;
 
-/** `(→ C09 I5)`, `(→ A01 A.1)`, `(→ C06 I3)`. */
-const CROSS = /\(→\s*([AC]\d{2})\s+([^)]+)\)/g;
+/**
+ * The tokens inside a group, in order, with what re-targets them.
+ *
+ * `→ Cnn` sets the spec; a **bare** `Cnn` re-targets only once a spec is already
+ * set, which is what makes `(→ C04 I73, C10 I31)` attach `I31` to C10 rather
+ * than to C04. Before any arrow a bare `Cnn` is left alone.
+ *
+ * **Stated blind spot**: a commitment writing a cross-reference with no arrow at
+ * all — `(C11 I17, I9)` — still reads as local, and deliberately. The intent of
+ * the second token there is genuinely ambiguous between C11's and the citing
+ * spec's, and a rule that guessed would be resolving a citation against the wrong
+ * document in the other direction. The arrow is the mark that says *elsewhere*,
+ * and this rule only follows the mark.
+ */
+const TOKEN = /→\s*([AC]\d{2})|\b([AC]\d{2})\b|\b(I\d+[a-z]?)\b/g;
+
+// `CROSS` is gone: it required a group to **open** with the arrow, which is the
+// half of F437 that made a mixed group invisible to the cross arm. Its job is
+// done by `TOKEN`'s first alternative, which finds the arrow wherever it falls.
 
 function specPath(id) {
   const files = readdirSync(COMPONENTS);
@@ -177,12 +204,34 @@ function citations(text) {
   GROUP.lastIndex = 0;
   let m;
   while ((m = GROUP.exec(text))) {
-    INV_TOKEN.lastIndex = 0;
+    // **One walk per group rather than two passes over the text** (F437). The
+    // old shape harvested locals with one regex and cross-references with a
+    // second, so a token's *owner* was decided by which pattern reached it
+    // first — and neither pattern could see where the arrow fell.
+    let spec = null;
+    /** Specs an arrow named in this group, and whether an invariant attached. */
+    const arrows = new Map();
+    TOKEN.lastIndex = 0;
     let t;
-    while ((t = INV_TOKEN.exec(m[1]))) local.push(t[1]);
+    while ((t = TOKEN.exec(m[1]))) {
+      if (t[1] !== undefined) { spec = t[1]; if (!arrows.has(spec)) arrows.set(spec, false); continue; }
+      if (t[2] !== undefined) { if (spec !== null) { spec = t[2]; if (!arrows.has(spec)) arrows.set(spec, false); } continue; }
+      if (spec === null) { local.push(t[3]); continue; }
+      arrows.set(spec, true);
+      cross.push({ spec, target: t[3] });
+    }
+    // **An arrow naming a section rather than an invariant is still a citation**
+    // — `(→ A02 §1)` is how eight commitments name whose rule they are, and the
+    // old two-pass parser counted them because `CROSS` captured everything after
+    // the spec id without asking what it was. The walk has to say so explicitly,
+    // and this is the line that says it: a spec with no invariant attached
+    // contributes a reference with nothing to resolve. Dropping it turned eight
+    // correctly-written commitments into *cites nothing*, which is the shape of
+    // repair that trades one silent defect for eight loud ones.
+    for (const [named, attached] of arrows) {
+      if (!attached) cross.push({ spec: named, target: null });
+    }
   }
-  CROSS.lastIndex = 0;
-  while ((m = CROSS.exec(text))) cross.push({ spec: m[1], target: m[2].trim() });
   return { local, cross };
 }
 
@@ -246,14 +295,19 @@ export function checkCommitments(files, readFile = (f) => readFileSync(f, "utf8"
           continue;
         }
 
-        const wanted = /^(I\d+[a-z]?)/.exec(ref.target);
-        if (wanted !== null && !invariants(target).has(wanted[1])) {
+        // **One token, because `citations` now attaches each one to its own
+        // spec** (F437). This read `/^(I\d+[a-z]?)/` off the start of a target
+        // that was *everything after the spec id*, so `(→ C04 I67, I68)`
+        // resolved I67 and dropped I68 — ten groups, twenty tokens, half of them
+        // never checked. Both halves of that are the same defect: a parser that
+        // decides an owner by position rather than by the mark.
+        if (ref.target !== null && !invariants(target).has(ref.target)) {
           violations.push({
             rule: "SP1",
             file: `${file}:${String(c.line)}`,
             spec: "A02 §1 · A03 §5",
             message:
-              `commitment ${String(c.n)} cross-references ${ref.spec} ${wanted[1]}, ` +
+              `commitment ${String(c.n)} cross-references ${ref.spec} ${ref.target}, ` +
               `which ${ref.spec} does not declare. A cross-reference that does not ` +
               `resolve is the overclaim it was meant to replace, one indirection on.`,
           });
@@ -442,19 +496,68 @@ export function checkOrdering(files, readFile = (f) => readFileSync(f, "utf8")) 
  * measured 2026-08-13. So this keeps its shape on asymmetry rather than on odds
  * — a rule that stops seeing a section costs a silent gap, and the check costs
  * a character class.
+ *
+ * **The second alternative is SP10's, and it shares the anchor deliberately.** A
+ * mnemonic row — `- **SK10**`, `- **HZ4**` — is declared in exactly the form a
+ * numbered one is, so a second pattern would be a second copy of every clause
+ * above: the leading-whitespace ruling, the mid-line ruling, and the `- ` that
+ * separates a declaration from a citation. A reimplemented rule keeps its
+ * birthday clauses, and this is the birthday. The two families are split by
+ * `rowIdsOf`'s callers, not by two readers of one corpus.
+ *
+ * `[A-Z]{2,}` and not `[A-Z]+`: a single leading capital is what an invariant
+ * declaration looks like (`- **I39**`), and matching those would put every
+ * invariant list under a rule SP2 already owns, in a family it does not belong
+ * to.
  */
-const TEST_ROW = /^[ \t]*- \*\*(T\d+\.(?:\d+[a-z]?|x))\*\*/gm;
+const TEST_ROW = /^[ \t]*- \*\*(T\d+\.(?:\d+[a-z]?|x)|[A-Z]{2,}\d+[a-z]?)\*\*/gm;
 
-/** Every test row id a spec declares, in document order, `x` rows excluded. */
-export function testRowsOf(file, readFile = (f) => readFileSync(f, "utf8")) {
+/** Every row id of either family a spec declares, in document order. */
+function rowIdsOf(file, readFile) {
   const ids = [];
   const src = readFile(file);
   TEST_ROW.lastIndex = 0;
   let m;
-  while ((m = TEST_ROW.exec(src))) {
-    if (!m[1].endsWith(".x")) ids.push(m[1]);
-  }
+  while ((m = TEST_ROW.exec(src))) ids.push(m[1]);
   return ids;
+}
+
+/** A numbered row: the tier-and-number family SP7 governs. */
+const NUMBERED = /^T\d+\./;
+
+/** Every test row id a spec declares, in document order, `x` rows excluded. */
+export function testRowsOf(file, readFile = (f) => readFileSync(f, "utf8")) {
+  return rowIdsOf(file, readFile).filter((id) => NUMBERED.test(id) && !id.endsWith(".x"));
+}
+
+/**
+ * SP10 — every mnemonic row label a spec declares, in document order.
+ *
+ * The complement of `testRowsOf` over one read, so the two families partition
+ * the rows rather than overlapping: a label reported by both rules would be one
+ * defect counted twice, and a label reported by neither is the gap this pair
+ * exists to close.
+ */
+export function mnemonicRowsOf(file, readFile = (f) => readFileSync(f, "utf8")) {
+  return rowIdsOf(file, readFile).filter((id) => !NUMBERED.test(id));
+}
+
+/**
+ * The ids that occur more than once, each named once however many times it
+ * recurs, in first-collision order.
+ *
+ * One implementation for SP7 and SP10 for the reason `sectionLines` is one: the
+ * `already listed` guard is the clause a third occurrence tests and a second
+ * copy would eventually lose it.
+ */
+function duplicatesIn(ids) {
+  const seen = new Set();
+  const duplicated = [];
+  for (const id of ids) {
+    if (seen.has(id) && !duplicated.includes(id)) duplicated.push(id);
+    seen.add(id);
+  }
+  return duplicated;
 }
 
 /**
@@ -475,12 +578,7 @@ export function checkTestRowIds(files, readFile = (f) => readFileSync(f, "utf8")
     // size before asserting it is clean.
     if (ids.length === 0) continue;
 
-    const seen = new Set();
-    const duplicated = [];
-    for (const id of ids) {
-      if (seen.has(id) && !duplicated.includes(id)) duplicated.push(id);
-      seen.add(id);
-    }
+    const duplicated = duplicatesIn(ids);
     if (duplicated.length === 0) continue;
 
     violations.push({
@@ -493,6 +591,83 @@ export function checkTestRowIds(files, readFile = (f) => readFileSync(f, "utf8")
         `to whichever row a reader finds first, and every fail-on-revert row that ` +
         `names it names both — the number has stopped locating anything while ` +
         `nothing is missing and nothing dangles.`,
+    });
+  }
+
+  return violations;
+}
+
+// --- SP10 — a mnemonic test-row label is unique within its spec -------------
+//
+// **SP7's argument for the other half of the rows, and it was the half nobody
+// checked** (F635). A tier does not have to number its rows: C12's §9 names them
+// by mnemonic — `SK` for sankey, `HZ` for horizon, `PR` for projection — and 183
+// of the corpus's rows are declared that way across three specs. SP7 cannot see
+// one of them, because `T\d+\.` is the whole of what it matches.
+//
+// The measured instance: C12 §9 held **two** rows both called `SK10`, and
+// `make enforce` reported *338 files · 26 specs · 15 728 invariant references
+// resolved · no violations* with both in the file. It was caught by reading a
+// grep. A fail-on-revert row saying *`T6.87` → `SK10` fails* then resolves
+// against whichever of the two a reader meets first, and **neither reading is
+// wrong** — which is A03 §2's failure arriving at the citation rather than at
+// the rule, exactly as SP7 describes it.
+//
+// **This is the definition side of a rule that was already exact in the other
+// direction.** SP3 catches a bare `I112` in a run file; SP5 catches an `Fnn`
+// that resolves to nothing. Both prove a *citation* has a target. Nothing proved
+// the target was one target.
+//
+// **Stated blind spot: the scope is one document, and that is the ruling rather
+// than a limitation to be fixed.** `IF8` is declared in C09 §9 and again in C22
+// §9 today, about two different things, and both are correct: a mnemonic is a
+// two-or-three letter mark that means something inside the component that draws
+// it, so `SK` in C12 and `SK` in another spec are different subjects. A
+// corpus-wide comparison would gate legitimate reuse and be turned off. The cost
+// is real and named: a citation writing `SK10` with no spec in front of it is
+// ambiguous *across* documents and this rule cannot say so — SP3's qualified-
+// reference habit is what closes that, and only for invariants.
+//
+// **Second blind spot: the rule matches a shape, not a section.** Any bolded,
+// dashed list item whose label is two-or-more capitals then digits is read as a
+// row declaration wherever it sits in the document. Measured 2026-09-04: all 183
+// matches in `docs/components/` are test rows and all 183 are inside a Tests
+// section, so the shape is exact today and would stop being so the day a spec
+// writes a glossary in that form.
+//
+// **And there is no placeholder arm.** SP7 exempts `Tn.x` because a spec under
+// construction writes one; the mnemonic families have no such convention and the
+// corpus carries zero `- **SKx**`-shaped rows, so an exemption would be a clause
+// with nothing to be wrong about — A03 §2's own vacuity class, installed in the
+// rule against it.
+
+/**
+ * SP10, one violation per spec, in `checkTestRowIds`' shape and for its reasons.
+ */
+export function checkMnemonicRowIds(files, readFile = (f) => readFileSync(f, "utf8")) {
+  const violations = [];
+
+  for (const file of files) {
+    const ids = mnemonicRowsOf(file, readFile);
+    // SP7's vacuity arm. Most specs number every row and declare none of these,
+    // so *no labels* is the common case here rather than the suspicious one —
+    // and the fire-test asserts the corpus size before asserting it is clean.
+    if (ids.length === 0) continue;
+
+    const duplicated = duplicatesIn(ids);
+    if (duplicated.length === 0) continue;
+
+    violations.push({
+      rule: "SP10",
+      file,
+      spec: "A03 §2 · A03 §7a",
+      message:
+        `${(file.split("/").pop() ?? "").slice(0, 3)} declares ` +
+        `${duplicated.join(", ")} twice. A fail-on-revert row or a test name citing ` +
+        `one of these resolves to whichever row a reader meets first and neither ` +
+        `reading is wrong — the label has stopped locating a row while nothing is ` +
+        `missing and nothing dangles (F635). Rename the later one to the next free ` +
+        `number of its own family; a letter suffix says *variant of the row above*.`,
     });
   }
 
@@ -695,6 +870,7 @@ export const OWNERS = [
   // rows rather than a `tools/mutate` row, because a run's bare `I1` means its
   // own component's I1 and there is no single owner for the directory.
   { path: "tools/mutate/runs/c01", spec: "C01" },
+  { path: "tools/mutate/runs/c09", spec: "C09" },
   { path: "tools/mutate/runs/c22", spec: "C22" },
   { path: "src/testing", spec: "C09" },
   // C24's builders sit under `src/shell/` because `b` is L4's surface and
@@ -768,6 +944,7 @@ export const TOPICS = {
   theme: "C10",
   transcript: "C13",
   viewport: "C14",
+  "viewport-windows": "C14",
   overlay: "C15",
   transport: "C06",
   "view-model": "C04",
@@ -796,6 +973,29 @@ export const REFERENCE_EXCEPTIONS = {
     "fabricated specs — `I99` and a synthetic `I20a` that resolve against nothing by design",
   "tools/enforce/commitments.mjs":
     "this file: SP1's and SP2's worked examples, including the `(I5, I99)` hole they document",
+  // **Three dated working documents, named one by one rather than by directory.**
+  // Each cites a bare invariant in prose whose owner is plain from the paragraph
+  // and not to a resolver — `I11 forbids state that survives a render`, `I1,
+  // three lines`, `I8's the ones that fit plus a count of the rest`. This is the
+  // reason `docs/archive/` is excluded two comments down, applied to a file
+  // rather than a tree: **rewriting a dated document to cite ids the way the
+  // tool wants falsifies the record it exists to be.**
+  //
+  // Named individually because the rest of `docs/notes/` resolves today and a
+  // directory-wide exemption would stop checking it — an exemption is counted,
+  // not widened until it stops costing anything.
+  // **`CALCIUM_3D_DESIGN.md` was here and is struck**, by the bidirectional arm
+  // rather than by anyone remembering. Its reason named a condition — *the
+  // design's premise is open pending a measurement* — the measurement was taken
+  // (F431), the note was rewritten against it, and every reference in it now
+  // resolves. **A reason that names a condition is one a gate can retire**,
+  // which is the shape the deferral problem in CLAUDE.md wants and rarely gets:
+  // there, the condition is prose and nothing watches it; here it happened to be
+  // *the file being wrong*, which the rule already checks every run.
+  "docs/notes/CALCIUM_BLOCK_STATES.md":
+    "dated design note; a bare `I1` in a sentence about geometry against content",
+  "docs/notes/CALCIUM_ML_BLOCKS.md":
+    "dated design note; a bare `I8` naming a ruling that already existed when it was written",
 };
 
 /**
@@ -838,10 +1038,15 @@ export const REFERENCE_EXCEPTIONS = {
 //   like any other, and prose quoting a broken citation is a broken citation.*
 
 /** A section id a document declares — `3`, `3a`, `6a.1`. */
-const SECTION_HEADING = /^#{2,4}\s+(\d+[a-z]?(?:\.\d+)?)\.?\s/u;
+// **`[a-z]*` and not `[a-z]?`, and the difference was 612 citations** (F281).
+// One optional letter reads `3ak.12` as `3a` — a real section, so the reference
+// resolved, against a document that says something else. The heading `### 3ak.12`
+// matched nothing at all, so the whole `3a…`-suffixed family was absent from the
+// index while every citation to it was counted as resolved.
+const SECTION_HEADING = /^#{2,4}\s+(\d+[a-z]*(?:\.\d+)?)\.?\s/u;
 
-/** `§3a`, `§6a.1` — and `§ 3a`, which the corpus writes in prose. */
-const SECTION_TOKEN = /§\s?(\d+[a-z]?(?:\.\d+)?)/gu;
+/** `§3a`, `§3ak.12`, `§6a.1` — and `§ 3a`, which the corpus writes in prose. */
+const SECTION_TOKEN = /§\s?(\d+[a-z]*(?:\.\d+)?)/gu;
 
 /** Every section id a spec or architecture document declares. */
 export function sectionsOf(file, readFile = (f) => readFileSync(f, "utf8")) {
@@ -907,6 +1112,229 @@ export function scanSections(file, src, options = {}) {
  * corpus it cannot read looks exactly like one reporting zero over a clean one,
  * and this rule's whole subject is a pointer that resolves to nothing.
  */
+/**
+ * The invariants no test row names today — **debt, listed so it can only shrink**
+ * (F361, SP9).
+ *
+ * **Compared by equality and not as a subset**, which is `anchors.mjs`' rule and
+ * this repository's own finding: a subset check lets a cleared entry outlive its
+ * reason unread. So citing one of these is a build failure until it is struck
+ * from here, and an invariant added tomorrow with no row fails immediately.
+ *
+ * **C12's three are absent on purpose.** I32, I35 and I69 were the ones F357's
+ * unsound matcher reported as covered, and they are cited from the rows that
+ * cover them rather than listed — a rule's first run should clear something.
+ *
+ * **`C24 I30` was listed for exactly one commit and struck**, which is the only
+ * shape this list may grow in. It was ruled in a spec commit carrying no code —
+ * the rule this repository holds for specs — so no row could name it, and listing
+ * it said the true thing about that tree. **The equality compare is what made the
+ * strike mandatory rather than optional**; a subset check would have let the entry
+ * outlive its reason unread, which is this list's own finding.
+ *
+ * **`C09 I37` and `C09 I38` were the second instance and are struck here**, one
+ * commit after the spec that ruled them — the half-block rung and the decode-fault
+ * box, whose rows could not exist until `halfBlockRows` and the fault path did.
+ * Two instances now, both repaid on the next commit, which is the evidence that
+ * the shape is a loan rather than a way to grow the list.
+ *
+ * **`C09 I26a` and `C11 I18`–`I20` were the third and are struck here**, one
+ * commit after the spec that ruled them: the seam's `measureChild`, the action
+ * bar's pinned presence, the display order a slice can reverse, and the rule
+ * that a window holds at least one row. Three instances, all repaid on the next
+ * commit — and the loan is what keeps a spec commit honest rather than green by
+ * omission.
+ *
+ * **`C04 I75`, `C12 I83`, `C12 I84` and `C22 I71` are the fourth**, taken on the
+ * spec commit that rules the camera: the block's initial view, the context record
+ * it arrives in, the sample grid and its per-render depth buffer, and the render
+ * key's sixth axis. No row can name them yet — `CAM1`–`CAM5` and
+ * `T4.17e`–`T4.17g` are written in the specs and reference a `Camera` no file
+ * declares — and they are struck on the commit that builds it. **Fourth
+ * instance, and **four of the five are struck on the commit that builds it**:
+ * `T2.4c`, `T4.17e`–`T4.17h` name C04 I75, C12 I83, C12 I85 and C22 I71.
+ * `C12 I85` — the focusable-plot ruling the *implementation* found rather than
+ * the walk — was added to the loan and repaid within the same arc.
+ *
+ * **`C12 I84` was taken as a *conditional* loan and the condition was wrong.**
+ * It was listed on the reasoning that its subject is a renderer — *the sample
+ * grid is `width × 1` by `height × 2` and the depth buffer is allocated per
+ * render, and nothing rasterises into a sample grid yet* — with `plot3d`
+ * named as the symbol that would release it. **One commit later `PR7` and `PR8`
+ * cite it**: a grid is testable without anything drawing into it, and a buffer's
+ * allocation is testable by allocating two. `C12 I86` rode in on the same
+ * reasoning and left on the same commit.
+ *
+ * **The equality arm is what said so**, and this is the case it was built for:
+ * a subset check would have left both sitting here, correct-looking, for as long
+ * as anyone cared to look. A one-commit loan expires by being noticed; a
+ * conditional one expires only if somebody goes and looks — and here nobody had
+ * to, because the rule refused an entry that had stopped excusing anything.
+ *
+ * **So the conditional form is not a second kind of loan.** It was a wrong
+ * estimate of when a row could exist, and the honest reading is that *nothing
+ * rasterises yet* was a claim about the renderer where the invariant is about
+ * the grid.
+ *
+ * **`C04 I76`, `C12 I87`, `C12 I88` and `C12 I89` were the fifth**, taken on the
+ * spec commit that rules `plot3d` and **repaid on the next one**, which is
+ * what a one-commit loan is. They were plain rather than conditional — the
+ * paragraph above is why — and `SC1`–`SC12` name all four.
+ *
+ * **`C04 I77`, `C12 I90`, `C12 I91` and `C12 I92` were the sixth**, taken on the
+ * 3D axis layout's spec commit and repaid on the one that built it. `AX1`–`AX14`
+ * name all four.
+ *
+ * **`C04 I78` and `C12 I93` were the seventh**, taken on the polyline's spec
+ * commit and repaid on the one that built it — `LN1`–`LN6` name both. Two
+ * entries where the last two loans took four each, because that step ruled a
+ * carrier rather than a renderer: most of what it says constrains rules that
+ * already have rows, and only the two new statements needed new ones.
+ *
+ * **`C22 I60a` left the list on the same commit and was not part of the loan.**
+ * It had sat here since it was written — *the ticker is armed from what the frame
+ * drew, and C03's 100 ms window is a floor under it* — and the floor is exactly
+ * what step 8's `T4.17j` measures: 5 renders for a spinner alone against 15 with
+ * an orbit live, over the same 990 ms. An invariant can stop being uncited
+ * because something else needed the fact it states, which is the useful direction
+ * for this list to shrink in.
+ *
+ * **`C22 I72`–`I75` were the eighth**, taken on auto-orbit's spec commit and
+ * **struck here**, one commit later — `T1.28`–`T1.30b`, `T3.33`, `T3.34`,
+ * `T4.17i`–`T4.17n` and `T6.83`–`T6.88` name all four. **Four entries where the
+ * polyline's took two**, and the reason is the same one stated there in reverse:
+ * this step rules a *writer* rather than a carrier, so almost none of what it
+ * says constrains a rule that already has a row.
+ *
+ * **`C12 I96` was the ninth and is struck here**, one commit after the spec that
+ * ruled it — `GM1`–`GM9` name it.
+ *
+ * **`C12 I97` was the tenth and is struck here** — `RM1`–`RM6` name it.
+ *
+ * **`C12 I98` was the eleventh and the arc's last, and is struck here** —
+ * `AT1`–`AT5` name it. One
+ * entry, and the third step running to end on one: a field on a type that
+ * already exists constrains almost nothing that did not already have a row. One entry again, and for §6j's
+ * reason: the step adds three files and a reader, so what it rules is what a
+ * *fixture* must state rather than what the renderer must do. **One entry where the last
+ * loan took four**, and the reason is the third variation on the same theme: this
+ * step adds no mechanism at all. It is a suite, so almost everything §6j rules
+ * constrains a rule that already has rows, and the single new statement is about
+ * what a *figure* means rather than about what the renderer does.
+ *
+ * **Stated blind spot: the corpus is `.ts` only**, matching what `walk` collects,
+ * so an invariant named solely by a `.mjs` fixture reads as uncited. Widening it
+ * is not obviously right: `TOPICS["fixture"] = "C01"`, and the bare `I17` in
+ * `test/support/fixture.mjs` means **C06's** — it sits forty lines under a
+ * qualified `C06 I17` — so the wider corpus would clear `C01 I17` on a citation
+ * that is about a different component. The narrow corpus over-reports; the wide
+ * one would under-report, silently.
+ */
+const UNCITED_INVARIANTS = Object.freeze([
+  "C01 I15", "C01 I16", "C01 I17", "C03 I11", "C04 I18", "C04 I20", "C04 I21", "C04 I22", "C04 I24",
+  "C04 I32", "C04 I33", "C04 I66", "C05 I13", "C05 I14", "C06 I21", "C06 I22", "C06 I23",
+  "C07 I16", "C07 I17", "C07 I21", "C08 I16", "C09 I15", "C09 I16", "C10 I18", "C10 I19",
+  "C10 I20", "C11 I12", "C14 I11", "C14 I13", "C14 I15", "C14 I16", "C14 I22",
+  "C16 I1", "C16 I16", "C17 I10", "C17 I14", "C18 I11", "C18 I13", "C18 I23",
+  "C18 I6", "C19 I12", "C20 I11", "C20 I25", "C21 I7", "C22 I16", "C22 I39", "C22 I4a",
+  "C22 I53", "C22 I57", "C23 I13", "C23 I14", "C23 I23", "C23 I24",
+  "C23 I41", "C24 I1", "C24 I10", "C24 I11", "C24 I13", "C24 I14", "C24 I16", "C24 I19",
+  "C24 I20", "C24 I22", "C24 I25", "C24 I26", "C24 I28", "C24 I6", "C24 I7",
+  "C25 I11", "C25 I14", "C25 I15", "C25 I16", "C25 I17", "C25 I19a", "C25 I20a", "C25 I20b",
+  "C26 I1", "C26 I11", "C26 I15", "C26 I8",
+]);
+
+/**
+ * A03 SP9 — **every invariant is named by at least one test row** (F357, F361).
+ *
+ * SP1 pairs a commitment to an invariant and nothing paired an invariant to a
+ * check, so *every invariant is cited by some test* was a convention held by
+ * hand. Measured with SP3's own reading: **86 of 768 are named by no test row**,
+ * worst at C24 (14 of 28) and C26 (8 of 20). C12 I75 states a rule over the
+ * corpus and reports five figures; nothing computed one of them.
+ *
+ * **Its blind spot, and it is the finding this does not close.** This checks an
+ * invariant is *named*, never that the row naming it *checks* it. I75's only
+ * citation was `FB7`, whose subject is `layout` and whose assertions are rect
+ * widths — SP9 would call that covered, and did before AD13 existed.
+ * `docs/COMMITMENT_INVARIANT_AUDIT.md` §Fourth pass argues that half is not
+ * automatable: matching a citation against what a row asserts is the
+ * citation-resolves-against-the-wrong-thing class, which a resolver would get
+ * wrong silently.
+ *
+ * **The attribution is SP3's, and it took four attempts to get right** (F361). A
+ * bare `I59` belongs to whichever spec owns the file, and `ownerOf` reaches 6 of
+ * 2342 test files for C12 — so outside those a citation must be qualified, which
+ * SP3 already forces. `TOKENS` walks a line letting a spec id govern everything
+ * after it, because the corpus cites in run-on lists: `C04 I10, I11, I25`.
+ *
+ * **An equality-compared exemption list, not a subset one** — `anchors.mjs`'
+ * shape. A subset check lets a cleared entry outlive its reason unread, and the
+ * 86 are debt: the list may only shrink, and an eighty-seventh fails the day it
+ * is written. Two matchers agreed on the total and disagreed on the members, so
+ * the count is not the evidence and the list is.
+ */
+export function checkInvariantCoverage(
+  specs,
+  testFiles,
+  readFile = (f) => readFileSync(f, "utf8"),
+  exempt = UNCITED_INVARIANTS,
+) {
+  const cited = new Set();
+  for (const f of testFiles) {
+    const fallback = ownerOf(f);
+    let text;
+    try { text = readFile(f); } catch { continue; }
+    for (const line of text.split("\n")) {
+      let current = null;
+      for (const m of line.matchAll(/\b(C\d{2})\b|\b(I\d+[a-z]?)\b/gu)) {
+        if (m[1] !== undefined) { current = m[1]; continue; }
+        const owner = current ?? fallback;
+        if (owner !== null) cited.add(`${owner} ${m[2]}`);
+      }
+    }
+  }
+
+  const uncited = [];
+  for (const file of specs) {
+    const id = (file.split("/").pop() ?? "").slice(0, 3);
+    for (const n of invariantsOf(file, readFile)) {
+      if (!cited.has(`${id} ${n}`)) uncited.push(`${id} ${n}`);
+    }
+  }
+
+  const found = uncited.slice().sort();
+  const listed = [...exempt].sort();
+  const violations = [];
+  const fresh = found.filter((x) => !listed.includes(x));
+  const cleared = listed.filter((x) => !found.includes(x));
+  if (fresh.length > 0) {
+    violations.push({
+      rule: "SP9",
+      file: "docs/components",
+      spec: "A03 §7a · FINDINGS",
+      message:
+        `${String(fresh.length)} invariant(s) named by no test row and not on ` +
+        `the list — ${fresh.join(", ")}. An invariant nothing names is a claim ` +
+        `no row was written against, which reads exactly like one that is ` +
+        `satisfied. Cite it from the row that covers it, or add a row.`,
+    });
+  }
+  if (cleared.length > 0) {
+    violations.push({
+      rule: "SP9",
+      file: "tools/enforce/commitments.mjs",
+      spec: "A03 §7a · FINDINGS",
+      message:
+        `${String(cleared.length)} entr(y/ies) on the exemption list are now ` +
+        `cited — ${cleared.join(", ")}. The list is compared by equality so it ` +
+        `can only shrink; remove them. A subset check would let a cleared entry ` +
+        `outlive its reason unread.`,
+    });
+  }
+  return { violations, uncited: found.length, declared: specs.reduce((n, f) => n + invariantsOf(f, readFile).size, 0) };
+}
+
 export function checkSectionReferences(
   files,
   readFile = (f) => readFileSync(f, "utf8"),
@@ -957,7 +1385,28 @@ export function checkSectionReferences(
       // declares 3 and 3c and no 3a, which is this rule's largest finding and
       // a prefix rule would have hidden it.
       const parent = ref.id.includes(".") ? ref.id.slice(0, ref.id.lastIndexOf(".")) : null;
-      if (own !== null && (own.has(ref.id) || (parent !== null && own.has(parent)))) {
+      // **And the fallback is withdrawn where the parent numbers its own
+      // headings** (F281). The paragraph above is right about `§8b.7` and it
+      // made a whole class invisible: `§3ak.12` has the same *shape* and means
+      // a heading, so thirteen citations to a section that had never been
+      // written were counted as **resolved**, in the same run that reports how
+      // many resolve to nothing. One notation for two things, and the rule had
+      // to pick which to be blind to.
+      //
+      // **What tells them apart is the parent.** C12 §3ak declares `3ak.1` …
+      // `3ak.11` as headings, so a document that numbers its sub-sections that
+      // way is not also using inline numbering for the same ids — `§3ak.12`
+      // must be one of them. C26 §8b declares no `8b.N` heading at all, so
+      // `§8b.7` is an item inside it and still falls back.
+      //
+      // **Known limit, because an unrecorded one reads as strength**: a
+      // *first* sub-section still falls back. `§9c.1` under a `§9c` that has no
+      // numbered children resolves, and that is the same shape as `§8b.7`
+      // whichever it means. The rule closes the class it can see the grammar
+      // for and says so.
+      const numbered = own !== null && parent !== null
+        && [...own].some((id) => new RegExp(`^${parent.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}\\.\\d+$`, "u").test(id));
+      if (own !== null && (own.has(ref.id) || (parent !== null && !numbered && own.has(parent)))) {
         resolved += 1;
         continue;
       }
@@ -1283,4 +1732,4 @@ export function checkReferences(
 // was green throughout, because the rule *was* implemented and running; the only
 // thing that could see the gap was the suite, and the suite is not what was run.
 // That is A03 §2's own subject reaching the list that enforces it.
-export const SPEC_RULES = ["SP1", "SP2", "SP3", "SP4", "SP5", "SP6", "SP7", "SP8"];
+export const SPEC_RULES = ["SP1", "SP2", "SP3", "SP4", "SP5", "SP6", "SP7", "SP8", "SP9", "SP10"];

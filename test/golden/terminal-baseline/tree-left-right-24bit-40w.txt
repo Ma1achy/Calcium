@@ -1,0 +1,6 @@
+── tree · left-right · 24bit · 40w
+    ╭─render┬─curve────raster
+    │       ╰─paint
+root┼─layout┬─measure
+    │       ╰─wrap
+    ╰─parse

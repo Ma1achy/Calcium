@@ -19,7 +19,8 @@ import type { Block, LocalDocument } from "../../data/viewmodel/index.js";
 import type { TranscriptStore } from "../../viewport/transcript/index.js";
 import type { HistoryEntry } from "../../interaction/history/types.js";
 import type { ThemeStore } from "../../presentation/theme/index.js";
-import { blockId, compose } from "../documents.js";
+import { b } from "../builders/index.js";
+import { blockId, compose, warnNotice } from "../documents.js";
 import type { LocalHandler } from "./registry.js";
 import type { StopReason } from "../types.js";
 
@@ -157,7 +158,7 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
     clear: () => {
       deps.transcript.clear();
       return doc("/clear", [
-        block({ kind: "notice", id: blockId("cleared"), tone: "muted", text: "transcript cleared" }),
+        b.notice("muted", "transcript cleared", undefined, { id: blockId("cleared") }),
       ]);
     },
 
@@ -185,19 +186,13 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
       // validation, so a malformed invocation arrives with nothing parsed.
       if (typeof wanted !== "string") {
         return doc("/theme", [
-          block({
-            kind: "notice",
-            id: blockId("theme-usage"),
-            tone: "warn",
-            glyph: "warn",
-            // **The message names the token, and `argv` is where it is.** The
-            // decision is `args`' — one reader — but this arm is reached with
-            // nothing parsed, so quoting the parsed value would say *got ``* to
-            // someone who typed `/theme purple`. The failure arm is exactly
-            // where `args` is empty, which is why the two differ here and
-            // nowhere else.
-            text: `usage: /theme ${deps.theme.names.join("|")} — got \`${argv[0] ?? ""}\``,
-          }),
+          // **The message names the token, and `argv` is where it is.** The
+          // decision is `args`' — one reader — but this arm is reached with
+          // nothing parsed, so quoting the parsed value would say *got ``* to
+          // someone who typed `/theme purple`. The failure arm is exactly
+          // where `args` is empty, which is why the two differ here and
+          // nowhere else.
+          warnNotice(`usage: /theme ${deps.theme.names.join("|")} — got \`${argv[0] ?? ""}\``, blockId("theme-usage")),
         ]);
       }
       deps.theme.setTheme(wanted);
@@ -223,17 +218,13 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
         ctx.args["no-bg"] === true && deps.theme.current.tokens.background === "surface";
 
       return doc("/theme", [
-        block({ kind: "notice", id: blockId("theme"), tone: "muted", text: `theme: ${wanted}` }),
+        b.notice("muted", `theme: ${wanted}`, undefined, { id: blockId("theme") }),
         ...(suppressed
           ? [
-              block({
-                kind: "notice" as const,
-                id: blockId("theme-nobg"),
-                tone: "warn" as const,
-                glyph: "warn" as const,
-                text:
-                  `${wanted} assumes a ${wanted} terminal; without its background it may be unreadable`,
-              }),
+              warnNotice(
+                `${wanted} assumes a ${wanted} terminal; without its background it may be unreadable`,
+                blockId("theme-nobg"),
+              ),
             ]
           : []),
       ]);
@@ -272,13 +263,7 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
 
       if (entry === undefined) {
         return doc("/debug", [
-          block({
-            kind: "notice",
-            id: blockId("debug-none"),
-            tone: "warn",
-            glyph: "warn",
-            text: `no entry ${String(back)} back — the transcript holds ${String(entries.length)}`,
-          }),
+          warnNotice(`no entry ${String(back)} back — the transcript holds ${String(entries.length)}`, blockId("debug-none")),
         ]);
       }
 
@@ -307,7 +292,7 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
     exit: () => {
       void deps.stop("exit");
       return doc("/exit", [
-        block({ kind: "notice", id: blockId("exit"), tone: "muted", text: "exiting" }),
+        b.notice("muted", "exiting", undefined, { id: blockId("exit") }),
       ]);
     },
   };

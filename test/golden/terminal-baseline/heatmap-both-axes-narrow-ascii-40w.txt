@@ -1,0 +1,8 @@
+── heatmap · both-axes-narrow · ascii · 40w
+[2m eu-west-1-primary-db +[22m=**#@@@#*+=-....:
+[2m eu-west-1-replica-db +[22m**#@@@#*+=-:...:-
+[2m us-east-1-primary-db +[22m*#@@@@*+=-:...:-=
+[2m us-east-1-replica-db +[22m#@@@@#+=-:...:-=+
+[2map-south-1-primary-db +[22m@@@@#*=-:...:-=+*
+
+[2m-1 .:-=+*#@ 1 - 3 older not shown[22m

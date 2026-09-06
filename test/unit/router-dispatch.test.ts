@@ -7,7 +7,9 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 
 import { createFocusStore } from "../../src/interaction/router/focus.js";
-import { createKeymap } from "../../src/interaction/router/keymap.js";
+import { createKeymap, defaultKeymap } from "../../src/interaction/router/keymap.js";
+import { plotDefinition } from "../../src/presentation/plot/index.js";
+import { block, type Plot } from "../../src/data/viewmodel/index.js";
 import { createRouter, type Placed, type RouterDeps } from "../../src/interaction/router/router.js";
 import type { InputEvent, Key } from "../../src/interaction/router/types.js";
 import { addr } from "../support/focus.js";
@@ -17,12 +19,20 @@ const key = (name: string, mods: Partial<Key> = {}): InputEvent => ({
   key: { name, ctrl: false, meta: false, shift: false, sequence: name, ...mods },
 });
 const ctrlC = key("c", { ctrl: true });
-const click = (row: number, col = 0, button = "button0"): InputEvent => ({
+const click = (
+  row: number,
+  col = 0,
+  button: Extract<InputEvent, { kind: "mouse" }>["button"] = "button0",
+): InputEvent => ({
   kind: "mouse",
   row,
   col,
   button,
   press: true,
+  shift: false,
+  meta: false,
+  ctrl: false,
+  motion: false,
 });
 
 /** A `Placed` box, for the rows that ask whether a layer covers the region. */
@@ -281,7 +291,7 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
 
   it("T1.14: Ctrl-C in the live block returns focus to the prompt, keeping the buffer", () => {
     const { router, focus, calls } = harness({ promptHasText: () => true });
-    focus.enterLiveBlock(addr("r3"));
+    focus.enterLiveBlock("e1", addr("r3"));
 
     expect(router.dispatch(ctrlC)).toBe(true);
     expect(focus.current).toEqual({ at: "prompt" });
@@ -362,7 +372,7 @@ describe("C16 §7 — the arming machine observes before dispatch", () => {
 describe("C16 §4 — mouse routes by position", () => {
   it("T1.3c, T1.3d (I3): a click resolves by position, not by focus", () => {
     const { router, layer, focus } = harness();
-    focus.enterLiveBlock(addr("r0"));
+    focus.enterLiveBlock("e1", addr("r0"));
 
     router.dispatch(click(3));
     expect(router.lastStages, "row 3 of the region is row 2 of the transcript").toContain(
@@ -399,6 +409,106 @@ describe("C16 §4 — mouse routes by position", () => {
 
     router.dispatch(click(1, 4));
     expect(router.lastStages, "and the region's first row is the layer").toContain("layer:menu");
+  });
+
+  it("T1.3o (I31, §4a row j): a horizontal wheel is a wheel, and nobody's click", () => {
+    // **The shipped test named two directions of four.** `wheelUp || wheelDown`
+    // was complete when the decoder produced only those; the day it produced
+    // `wheelLeft` (I30) a horizontal wheel fell through to the entry rung and
+    // was routed to `liveBlock` as a click on the block under the pointer.
+    const { router } = harness();
+    const taken: string[] = [];
+    router.register("liveBlock", (e) => {
+      if (e.kind === "mouse") taken.push(e.button);
+      return e.kind === "mouse" && !e.button.startsWith("wheel");
+    });
+
+    // The control: a click at the same row reaches the entry and is consumed.
+    expect(router.dispatch(click(3, 0, "button0"))).toBe(true);
+    expect(taken).toEqual(["button0"]);
+
+    for (const button of ["wheelLeft", "wheelRight"] as const) {
+      expect(router.dispatch(click(3, 0, button)), `${button} is consumed by nothing`).toBe(false);
+      expect(router.lastStages, `${button} is offered as a wheel, then to the viewport`).toEqual([
+        "arming",
+        "mouse",
+        "viewport:row2",
+        "viewport:wheel",
+      ]);
+    }
+    // Offered to the entry — as a wheel, which the handler declined — and not
+    // as a click: the handler saw the two wheels and consumed neither.
+    expect(taken).toEqual(["button0", "wheelLeft", "wheelRight"]);
+  });
+
+  it("T1.3p (I31, §4a row i): an uncovered wheel goes to the entry first, and to global when it declines", () => {
+    const { router, layer } = harness();
+    const seen: string[] = [];
+    let boxTakes = false;
+    router.register("liveBlock", (e) => {
+      seen.push(`liveBlock:${e.kind === "mouse" ? e.button : "key"}`);
+      return boxTakes;
+    });
+    router.register("global", (e) => {
+      seen.push(`global:${e.kind === "mouse" ? e.button : "key"}`);
+      return true;
+    });
+
+    // Over an entry that declines — prose — the transcript takes it.
+    router.dispatch(click(3, 0, "wheelDown"));
+    expect(seen).toEqual(["liveBlock:wheelDown", "global:wheelDown"]);
+
+    // Over an entry that takes it — a `scroll` under the pointer — global never runs.
+    seen.length = 0;
+    boxTakes = true;
+    router.dispatch(click(3, 0, "wheelDown"));
+    expect(seen).toEqual(["liveBlock:wheelDown"]);
+
+    // Below the transcript there is no entry to offer it to: straight to C14.
+    seen.length = 0;
+    router.dispatch(click(8, 0, "wheelDown"));
+    expect(seen).toEqual(["global:wheelDown"]);
+    expect(router.lastStages).toEqual(["arming", "mouse", "viewport:wheel"]);
+
+    // T3.12b's half, kept: a layer covering the point takes it and nothing else sees it.
+    seen.length = 0;
+    layer.placed = [
+      { layer: { id: "menu", kind: "overlay", dismissable: true }, top: 2, left: 0, height: 1, width: 40 },
+    ];
+    router.dispatch(click(3, 4, "wheelDown"));
+    expect(seen).toEqual([]);
+    expect(router.lastStages).toContain("layer:menu");
+  });
+
+  it("T1.3q (I8, §4a): a layer that must be answered takes the mouse as it takes the keys", () => {
+    // **The keyboard path had two gates and this table had none.** A click beside
+    // a confirm reached the entry under it, and a wheel scrolled the transcript
+    // beneath one — the defect I8 was widened to close, arriving by the pointer.
+    const { router, layer } = harness();
+    const seen: string[] = [];
+    router.register("liveBlock", () => (seen.push("liveBlock"), true));
+    router.register("global", () => (seen.push("global"), true));
+    layer.top = { id: "confirm", kind: "overlay", dismissable: false };
+    layer.placed = [
+      { layer: layer.top, top: 5, left: 10, height: 3, width: 20 },
+    ];
+
+    expect(router.dispatch(click(3, 0)), "consumed, and nothing happens").toBe(true);
+    expect(router.dispatch(click(3, 0, "wheelDown"))).toBe(true);
+    expect(router.dispatch(click(12, 0)), "chrome too").toBe(true);
+    expect(seen).toEqual([]);
+    expect(router.lastStages).toEqual(["arming", "mouse", "modal"]);
+
+    // On the layer itself the click is the layer's, as before.
+    router.register("overlay", () => (seen.push("overlay"), true));
+    router.dispatch(click(6, 12));
+    expect(seen).toEqual(["overlay"]);
+
+    // A dismissable layer is not modal: the entry beneath is reachable.
+    layer.top = { id: "menu", kind: "overlay", dismissable: true };
+    layer.placed = [];
+    router.dispatch(click(3, 0));
+    expect(seen).toEqual(["overlay", "liveBlock"]);
   });
 
   it("T3.12 (I3): mouse events are dropped when the capability is absent", () => {
@@ -462,7 +572,7 @@ describe("C16 — the dispatch trace, run against the implementation", () => {
     step("down (menu open)", key("down"));
     layer.top = null;
     step("down (menu gone)", key("down"));
-    focus.enterLiveBlock(addr("r1"));
+    focus.enterLiveBlock("e1", addr("r1"));
     step("s (block keymap)", key("s"));
     step("ctrl-c (live block)", ctrlC);
     step("click row 2", click(3));
@@ -482,7 +592,10 @@ describe("C16 — the dispatch trace, run against the implementation", () => {
       "s (block keymap) → target:liveBlock,global,dropped",
       "ctrl-c (live block) → target:liveBlock",
       "click row 2 → mouse,viewport:row2",
-      "wheel → mouse,viewport:wheel",
+      // **The entry under the pointer is offered the wheel first** (§4a row i):
+      // a `scroll` block is a second thing a wheel can mean. The harness's
+      // `liveBlock` handler binds nothing, so the wheel falls to the viewport.
+      "wheel → mouse,viewport:row2,viewport:wheel",
       "f (pushed view) → target:pushedView,global,dropped",
       "ctrl-c (confirm) → target:overlay",
       "t (global, under confirm) → target:overlay,modal-blocked",
@@ -496,22 +609,27 @@ describe("C16 — the dispatch trace, run against the implementation", () => {
 
 describe("C26 §8b.8 — interaction mode is vacuous, and this is the row that says so", () => {
   /**
-   * **The premise the ⏎ ruling rests on, asserted rather than described.**
+   * **The premise the ⏎ ruling rests on, asserted rather than described — and
+   * inverted once.**
    *
    * §8b.8 rules that `⏎` does not enter interaction, because the mode has
-   * nothing in it: no block declares keys, and the target carries one binding.
-   * Both halves are facts about the tree today, and a premise recorded in prose
-   * and checked by nothing is a premise that goes quiet — F102's disposal, and
-   * T2.17's shape for the `window` × `elements` agreement.
+   * nothing in it. This row used to assert the first of two facts behind that:
+   * *no block declares keys* — `mergeBlock` had no caller in `src/`. **It fired
+   * on 2026-09-05**, when `construct.ts`'s `syncBlockKeymap` became the first
+   * caller for the plot's digit keymap (C12 I116, C22 I78), which is exactly
+   * what it was written to do. So it now asserts the other fact, the one the
+   * ruling actually needs: **merging the one producer's keymap leaves
+   * `interaction` with no binding**, because no digit collides with a built-in
+   * (C16 I27) and every one lands at `liveBlock`.
    *
-   * **This row fails the day either fact changes**, which is exactly when `⏎`'s
-   * second effect and I14's first level go live and it should be inverted.
+   * **This row fails the day a producer's key lands at `interaction`**, which is
+   * when `⏎`'s second effect and I14's first level go live and it is inverted
+   * again.
    */
-  it("T2.6a (C26 §8b.8): nothing merges a block keymap, so the mode has no bindings", () => {
-    // `mergeBlock` is the only route a `BlockKeymap` reaches the router by, and
-    // `src/index.ts` §3 records it as interior and dropped — "not public, not
-    // finished". Counted over `src/` and not over the tree, because a test
-    // calling it is not a producer.
+  it("T2.6a (C26 §8b.8, C22 I78): one caller merges a block keymap, and it puts nothing at interaction", () => {
+    // `mergeBlock` is the only route a `BlockKeymap` reaches the router by.
+    // Counted over `src/` and not over the tree, because a test calling it is
+    // not a producer.
     const callers = ["keymap.ts", "router.ts", "construct.ts", "session.ts", "keys.ts"]
       .map((f) => {
         for (const dir of ["src/interaction/router/", "src/shell/"]) {
@@ -531,8 +649,33 @@ describe("C26 §8b.8 — interaction mode is vacuous, and this is the row that s
       .filter((l) => !l.trimStart().startsWith("//") && !l.trimStart().startsWith("*"));
 
     expect(
-      callers,
-      "a block now declares keys — C26 §8b.8's premise is gone, ⏎'s second effect is owed, and this row should be inverted",
+      callers.map((l) => l.trim()),
+      "exactly one production caller — `syncBlockKeymap` in construct.ts (C22 I78)",
+    ).toEqual(["withdrawBlockKeymap = keymap.mergeBlock(declared);"]);
+
+    // **The half the ruling rests on now.** The one producer is the plot's
+    // digits; merged over the real default table they collide with nothing, so
+    // the mode is still empty and `⏎`'s second effect is still uncommitted.
+    const plot = block({
+      kind: "plot", id: "p", form: "line", height: 5,
+      series: Array.from({ length: 9 }, (_, i) => ({ values: [i, i + 1] })),
+    }) as Plot;
+    const declared = plotDefinition.keymap?.(plot) ?? [];
+    expect(declared.map((b) => b.key.name), "nine digits, one per series").toEqual(
+      ["1", "2", "3", "4", "5", "6", "7", "8", "9"],
+    );
+    const map = createKeymap(defaultKeymap);
+    const before = map.entries().length;
+    map.mergeBlock(declared);
+    const merged = map.entries().slice(before);
+    expect(merged.map((b) => b.target), "every digit at liveBlock — none collides").toEqual(
+      Array.from({ length: 9 }, () => "liveBlock"),
+    );
+    // `⌃c` on the mode is a router handler, not a keymap row (T2.6b), so the
+    // table has **zero** rows at this target before and after the merge.
+    expect(
+      map.entries().filter((b) => b.target === "interaction").map((b) => b.action),
+      "the mode has no bindings",
     ).toEqual([]);
   });
 
@@ -541,12 +684,13 @@ describe("C26 §8b.8 — interaction mode is vacuous, and this is the row that s
     // prompt and is left only by cancellation — which is why the ruling refuses
     // to enter it, rather than the reader discovering it.
     const { router, focus } = harness();
-    focus.enterLiveBlock(addr("r1"));
+    focus.enterLiveBlock("e1", addr("r1"));
     focus.setMode("interact");
 
     expect(router.dispatch(ctrlC), "⌃c leaves interaction").toBe(true);
     expect(focus.current, "and stays on the row, per the two-level shape").toEqual({
       at: "liveBlock",
+      entryId: "e1",
       element: addr("r1"),
       anchor: null,
       mode: "navigate",
@@ -562,5 +706,28 @@ describe("C26 §8b.8 — interaction mode is vacuous, and this is the row that s
     expect(focus.current.at === "liveBlock" && focus.current.mode, "still in the mode").toBe(
       "interact",
     );
+  });
+});
+
+describe("C16 §4a row t — a hover is not an input that disarms", () => {
+  it("T3.8d: a hover between two Ctrl-Cs leaves the window armed; a click in its place disarms", () => {
+    const hover: InputEvent = { ...(click(2) as Extract<InputEvent, { kind: "mouse" }>), button: "none", motion: true };
+    {
+      const { router, calls, advance } = harness();
+      router.dispatch(ctrlC);
+      router.dispatch(hover);
+      advance(10);
+      router.dispatch(ctrlC);
+      expect(calls, "a hand resting on the mouse did not close the window").toEqual(["exitConfirm"]);
+    }
+    {
+      // The control, by the same clock: the click that T3.8b already asserts.
+      const { router, calls, advance } = harness();
+      router.dispatch(ctrlC);
+      router.dispatch(click(2));
+      advance(10);
+      router.dispatch(ctrlC);
+      expect(calls, "a click disarms").toEqual([]);
+    }
   });
 });

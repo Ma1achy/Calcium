@@ -49,7 +49,7 @@ describe("C09 §6 — the registry's transition table", () => {
         createBlockRegistry({ defaults: true }),
         block({ kind: "code", id: "code-r", language: lang, text }),
         40,
-        { theme: DARK_THEME, capabilities: FULL_CAPS, focus: null, tick: 0, onAction: () => undefined },
+        { theme: DARK_THEME, capabilities: FULL_CAPS, focus: null, tick: 0 },
       ).length;
     expect(rendered("madeuplang")).toBe(rendered("json"));
   });
@@ -116,7 +116,6 @@ describe("C09 §6 — the registry's transition table", () => {
       capabilities: FULL_CAPS,
       focus: null,
       tick: 0,
-      onAction: () => undefined,
     };
     expect(ctx).not.toHaveProperty("renderChild");
 
@@ -162,7 +161,7 @@ describe("C09 §6 — the registry's transition table", () => {
     ).toHaveLength(2);
   });
 
-  it("T1.4: each of the eighteen kinds measures its documented height", () => {
+  it("T1.4: each of the nineteen kinds measures its documented height", () => {
     // §3's table, read back as assertions. The fixture is the canonical one, so
     // a change to a kind's height rule fails here with the kind named rather
     // than as one line of a conformance report.
@@ -186,6 +185,7 @@ describe("C09 §6 — the registry's transition table", () => {
       image: 3, // `height`, clamped by the width — 8x8 at 3 rows needs 6 columns (C04 I73)
       status: 7, // the declared height — six is the figure, seven shows its line
       raw: 2, // lines
+      terminal: 2, // lines, plus a row for the dropped count where one exists (C27 I7)
     };
 
     // **Compared to the registry by equality, and the guard below runs the other

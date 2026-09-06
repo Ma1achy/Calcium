@@ -1,0 +1,9 @@
+── quiver · arrows-only · ascii · 40w
+[2m0 +[22mvvvvvvvvvv\\\\\\\>>>>///////^^^^^^^^^
+[2m1 +[22mvvvvvvvvvvvvv\\\\>>>>////^^^^^^^^^^^^
+[2m2 +[22mvvvvvvvvvvvvvvvvv\\//^^^^^^^^^^^^^^^^
+[2m3 +[22mvvvvvvvvvvvvvvvvv//\\^^^^^^^^^^^^^^^^
+[2m4 +[22mvvvvvvvvvvvvv////<<<<\\\\^^^^^^^^^^^^
+[2m5 +[22mvvvvvvvvvv///////<<<<\\\\\\\^^^^^^^^^
+   [2m0                11                23[22m
+[2m0.71 .:-=+*#@ 12[22m

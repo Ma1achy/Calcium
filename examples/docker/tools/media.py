@@ -36,18 +36,35 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from beats import load, settled_before  # noqa: E402
-from capture import run  # noqa: E402
+from capture import forget_theme, run  # noqa: E402
 
 UTF8 = {"LANG": "en_GB.UTF-8"}
 TRUE = {**UTF8, "COLORTERM": "truecolor"}
 
 # **When each shot starts typing**, for the ones whose opening frame is slow to
-# settle. Default 1.5 s; see the note at the call site (F158).
+# settle. Default `TYPE_AT_DEFAULT`; see the note at the call site (F158).
+#
+# **The default was 1.5 s and every still lost its verb on 2026-09-05.** With
+# seven containers and the load generator up, the greeting's dashboard landed at
+# 3.0 s (probe: cast frames at 0.9 s, then 3.0 s), so 1.5 s typed into the F813
+# window on every shot — `/ps` never echoed, and `s3-live`'s command sat in the
+# prompt unsubmitted. The same probe typing at 4.0 s drew the table by 7 s. This
+# is the weaker fix the call-site note names, moved by a measurement; F813 still
+# owes the mechanism, and the frame is what says whether this number holds.
+TYPE_AT_DEFAULT = 4.0
 TYPE_AT: dict[str, float] = {
     # The comparison runs two `docker inspect`s and the greeting is still
     # landing at 1.5 s on a loaded host — measured, as a banner appended
     # underneath the table it was supposed to precede.
     "drift": 4.0,
+    # **Typed at 1.5 s the result never appears at all** — not late, absent. The
+    # command row is echoed and nothing follows it for the life of the shot;
+    # typed at 6.0 s the same verb draws its three hunks. Measured 2026-09-05
+    # with three captures (early / late / late at 110x34), and it is F813: a
+    # verb submitted while the greeting's dashboard fetch is in flight loses its
+    # result. Until that is fixed the shot waits it out, and the finding is where
+    # the reason lives rather than this number.
+    "config-diff": 6.0,
 }
 
 # name, cols, rows, command, hold, env, still-at (None = animate)
@@ -165,11 +182,25 @@ THEME = {"theme-light": "github-light"}
 # only interesting once they are on screen.
 AFTER: dict[str, bytes] = {
     "scroll": b"\x1b[5~\x1b[5~\x1b[6~",
-    # Ctrl-Home — `global: scrollTop`. The diff is taller than the screen and
-    # its additions are in the first hunk, so the frame that lands after the
-    # command is the *tail* of the patch: thirty deleted lines and not one
-    # added. The picture of a diff has to show both signs.
-    "config-diff": b"\x1b[1;5H",
+    # Page up. The diff is taller than the screen and its additions are in
+    # the first hunk, so the frame that lands after the command is the *tail* of
+    # the patch: thirty deleted lines and not one added. The picture of a diff
+    # has to show both signs.
+    #
+    # **This was Ctrl-Home (`scrollTop`) and the frame stopped showing a diff at
+    # all** — read off the regenerated still, 2026-09-05. The landing dashboard
+    # is a live entry above the diff, and it grew a per-container history matrix
+    # after this shot was written; at 40 rows the banner and the dashboard now
+    # fill the screen, so the top of the transcript is a picture of the
+    # dashboard. Paging up from the tail reaches the first hunk from the other
+    # end and does not depend on how tall the entries above it are.
+    # **One page-up now, not two** (2026-09-05, read off the still after the frame
+    # changed): the header's rule took a region row, every entry closes with a
+    # blank and the card's body sits under a hook, so from the tail two pages
+    # up run past the diff's head into the banner and the still showed no diff
+    # at all. A probe with no keys put the last hunk on screen by 8.4 s; one
+    # page up from there is the first hunk under the dashboard's tail.
+    "config-diff": b"\x1b[5~",
 }
 
 FONT = "13"
@@ -235,7 +266,7 @@ if __name__ == "__main__":
         # change than this row. **Recorded as the weaker fix it is** — a shot
         # whose opening is slower than its delay will drift the same way, and
         # the frame is what says so, which is why every shot is read.
-        at = TYPE_AT.get(name, 1.5)
+        at = TYPE_AT.get(name, TYPE_AT_DEFAULT)
         script = (
             [(at, pre), (at + 1.5, b"\r"), (at + 3.5, command), (at + 5.0, b"\r")]
             if pre is not None
@@ -260,7 +291,15 @@ if __name__ == "__main__":
             # Each key its own write, a second apart — two page-ups in one write
             # are a paste, not two keys (C16).
             keys = [b"\x1b" + k for k in after.split(b"\x1b") if k]
-            script += [(8.0 + i * 1.5, k) for i, k in enumerate(keys)]
+            # **Two seconds after the Enter, not at a fixed 8.0 s.** With
+            # `config-diff` typing at 6.0 the fixed figure put its first page-up
+            # in the same instant as the Enter, before the diff existed: the key
+            # paged the greeting, the diff then landed below a viewport that had
+            # stopped following, and the still was the banner (read 2026-09-05).
+            script += [(at + 4.0 + i * 1.5, k) for i, k in enumerate(keys)]
+        # Every shot opens in the set's first variant, whatever the last one
+        # typed (F811). Without this the light shot recolours everything after it.
+        forget_theme()
         run(cols, rows, script, raw, hold, env)
         cast = raw + ".cast"
         if still is not None:

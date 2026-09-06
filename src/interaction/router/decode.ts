@@ -119,21 +119,76 @@ function modifiersOf(param: string | undefined): Pick<Key, "ctrl" | "meta" | "sh
   };
 }
 
+/**
+ * kitty's modifier field, for the `u` arm alone (C02 §3, C16 §2).
+ *
+ * Plus one, like xterm's, and the low three bits agree — shift 1, alt 2, ctrl 4.
+ * **Bit 8 is folded into nothing**: it is xterm's Meta and kitty's Super, and
+ * `⌘a` arriving as `Alt-a` is the live-binding class `modifiersOf`'s comment
+ * records, one encoding over. kitty's own meta is bit 32 and joins alt in
+ * `meta`, the pair the `CSI 1;m X` arm already folds. Stated blind spot: an
+ * xterm at `formatOtherKeys=1` loses a Meta modifier here; its default format is
+ * `CSI 27;m;k ~`, which `modifiersOf` keeps.
+ */
+function kittyModifiersOf(param: string | undefined): Pick<Key, "ctrl" | "meta" | "shift"> {
+  const bits = param === undefined || param === "" ? 0 : Math.max(0, Number(param) - 1);
+  // Written as `=== bit` rather than `!== 0` so these three lines do not
+  // duplicate `modifiersOf`'s: `tools/mutate/runs/c16-modifiers.mjs` anchors on
+  // that function's text, and an anchor matching twice is a run that edits the
+  // wrong function (MA4).
+  return {
+    shift: (bits & 1) === 1,
+    meta: (bits & 2) === 2 || (bits & 32) === 32,
+    ctrl: (bits & 4) === 4,
+  };
+}
+
+/** `:1` press, `:2` repeat, `:3` release; anything else is no event field at all. */
+const KITTY_EVENT: Readonly<Record<string, "press" | "repeat" | "release">> = Object.freeze({
+  "1": "press",
+  "2": "repeat",
+  "3": "release",
+});
+
+/**
+ * The modifier keys' functional codes, so a terminal that reports a lone `⇧`
+ * yields a named key rather than a private-use glyph inserted into the prompt.
+ * The flags C01 pushes do not ask for these (C02 §3's table, bit 8); a terminal
+ * configured to send them regardless still gets a name.
+ */
+const KITTY_MODIFIER_KEYS: Readonly<Record<number, string>> = Object.freeze({
+  57441: "shift",
+  57442: "ctrl",
+  57443: "alt",
+  57444: "super",
+  57445: "hyper",
+  57446: "meta",
+  57447: "shift",
+  57448: "ctrl",
+  57449: "alt",
+  57450: "super",
+  57451: "hyper",
+  57452: "meta",
+});
+
 function key(
   name: string,
   sequence: string,
   mods: Partial<Pick<Key, "ctrl" | "meta" | "shift">> = {},
+  event?: "press" | "repeat" | "release",
 ): InputEvent {
-  return Object.freeze({
-    kind: "key",
-    key: Object.freeze({
-      name,
-      ctrl: mods.ctrl ?? false,
-      meta: mods.meta ?? false,
-      shift: mods.shift ?? false,
-      sequence,
-    }),
+  const k = Object.freeze({
+    name,
+    ctrl: mods.ctrl ?? false,
+    meta: mods.meta ?? false,
+    shift: mods.shift ?? false,
+    sequence,
   });
+  // The field is *absent*, not `undefined`, when the sequence carried no event
+  // type: `toStrictEqual` tells the two apart and every record above is legacy.
+  return event === undefined
+    ? Object.freeze({ kind: "key", key: k })
+    : Object.freeze({ kind: "key", key: k, event });
 }
 
 /**
@@ -144,6 +199,13 @@ function key(
  * bindings. In a paste it is content that would move the cursor or change the
  * colour of everything after it.
  */
+/**
+ * The wheel's four directions, indexed by `Cb & 3` when bit 64 is set (§2's
+ * table): xterm reports a horizontal wheel as buttons 6 and 7, which is 64 + 2
+ * and 64 + 3. Order is the wire encoding, not a preference.
+ */
+const WHEEL_DIRECTIONS = ["wheelUp", "wheelDown", "wheelLeft", "wheelRight"] as const;
+
 function stripControls(text: string): string {
   // eslint-disable-next-line no-control-regex
   return text.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "");
@@ -357,10 +419,25 @@ export function createDecoder(options: DecoderOptions): Decoder {
     // `CSI 27;2;13~` to `CSI_TILDE_KEYS["27"]`, both undefined, both discarded
     // as well-formed-but-unknown. Shift-Enter was unreachable in every terminal
     // that sends it, which is every terminal that has it.
+    // **`CSI code[:alt] ; mods[:event] [; text] u`**, which is both xterm's
+    // `formatOtherKeys=1` and the kitty keyboard protocol C01 pushes (C02 §3,
+    // C16 §2). Sub-parameters are split on `:` and the first of each is what
+    // this arm reads: the alternate key code and the associated text are bits
+    // C01 does not push, and the event type is carried as an optional field.
+    //
+    // The line this replaces read `params[1]` whole, so `13;2:3` — Shift-Enter
+    // released — went through `Number("2:3")`, which is `NaN`, and every
+    // modifier was lost on every repeat and release. Under the protocol a lone
+    // `Esc` is `CSI 27 u` and reaches here as a complete sequence: it is never
+    // a prefix and the 50 ms window above never runs for it.
     if (final === "u") {
-      const name = otherKeyName(params[0]);
+      const codeParam = (params[0] ?? "").split(":")[0];
+      const [modParam, eventParam] = (params[1] ?? "").split(":");
+      const code = Number(codeParam);
+      const name = KITTY_MODIFIER_KEYS[code] ?? otherKeyName(codeParam);
       if (name === null) return consumed;
-      return out.push(key(name, sequence, mods)), consumed;
+      const event = eventParam === undefined ? undefined : KITTY_EVENT[eventParam];
+      return out.push(key(name, sequence, kittyModifiersOf(modParam), event)), consumed;
     }
 
     if (final === "~") {
@@ -376,6 +453,19 @@ export function createDecoder(options: DecoderOptions): Decoder {
       if (name === undefined) return consumed; // unknown but well-formed: discard
       return out.push(key(name, sequence, mods)), consumed;
     }
+
+    // **`CSI Z` is `⇧tab`, and it was discarded as well-formed-but-unknown
+    // until a binding needed it** (C26 §4g row c, I17). Every terminal sends
+    // backtab this way and none sends a `CSI 1;2` form for it — the shift is in
+    // the final letter rather than in a parameter — so it is a row of its own
+    // rather than an entry in the letter table, whose finals carry no modifier.
+    // Found the way the other three were: T2.13 walks the keymap through this
+    // decoder, and the `⇧tab` row would have failed on arrival.
+    //
+    // **The bare form only.** `CSI 999 Z` is malformed and stays discarded
+    // (T3.13) — the first version of this line took any `Z` final and turned a
+    // malformed sequence into a keystroke, which the existing row caught.
+    if (final === "Z" && body === "") return out.push(key("tab", sequence, { shift: true })), consumed;
 
     const name = CSI_LETTER_KEYS[final];
     if (name === undefined) return consumed;
@@ -405,7 +495,19 @@ export function createDecoder(options: DecoderOptions): Decoder {
     return consumed;
   }
 
-  /** SGR mouse: `CSI < b ; x ; y M|m`. Dropped entirely when the capability is absent (I3, T3.12). */
+  /**
+   * SGR mouse: `CSI < Cb ; x ; y M|m`. Dropped entirely when the capability is
+   * absent (I3, T3.12).
+   *
+   * **`Cb` is a bit field and every bit is carried** (§2's table, I30). Bits 0–1
+   * are the button, 4/8/16 the modifiers, 32 a mode-1002 motion report, 64 the
+   * wheel with bits 0–1 selecting its four directions, 128 buttons 8–11. The
+   * line this replaces was `code >= 64 ? (code === 64 ? "wheelUp" : "wheelDown")
+   * : \`button${code & 3}\`` — two bits read of eight, so ctrl-wheel-up (80)
+   * scrolled down, shift-click was click and a drag was a stream of presses
+   * (T1.3k–T1.3n). Nothing here interprets a bit: what a modified click does is
+   * §4's and the keymap's.
+   */
   function mouse(body: string, final: string, consumed: number, out: InputEvent[]): number {
     if (!capabilities.mouse) return consumed;
 
@@ -413,7 +515,18 @@ export function createDecoder(options: DecoderOptions): Decoder {
     const code = Number(b);
     if (!Number.isFinite(code)) return consumed;
 
-    const button = code >= 64 ? (code === 64 ? "wheelUp" : "wheelDown") : `button${code & 3}`;
+    const low = code & 3;
+    const button =
+      (code & 64) !== 0
+        ? WHEEL_DIRECTIONS[low as 0 | 1 | 2 | 3]
+        : (code & 128) !== 0
+          ? (`button${8 + low}` as const)
+          // `3` in bits 0–1 outside the wheel and 128 ranges is *no button* —
+          // what 1003 sends for a pointer moving with nothing held (C01 I21).
+          // Named, not folded onto `button3`: that is a button nobody pressed.
+          : low === 3
+            ? "none"
+            : (`button${low}` as const);
     out.push(
       Object.freeze({
         kind: "mouse",
@@ -421,6 +534,10 @@ export function createDecoder(options: DecoderOptions): Decoder {
         col: Math.max(0, Number(x) - 1),
         button,
         press: final === "M",
+        shift: (code & 4) !== 0,
+        meta: (code & 8) !== 0,
+        ctrl: (code & 16) !== 0,
+        motion: (code & 32) !== 0,
       }),
     );
     return consumed;

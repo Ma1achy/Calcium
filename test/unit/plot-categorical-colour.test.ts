@@ -139,8 +139,17 @@ describe("DC7 (C12 I38): a named row keeps its slot, a sliced one does not", () 
   });
 
   it("a histogram's bins do not, however many rows it is given", () => {
-    expect([...at("histogram", 4)]).toEqual([...at("histogram", 9)]);
-    expect(at("histogram", 9).size).toBe(1);
+    // **Sturges gives eight bins, so four rows is a short frame** (C12 I8,
+    // F319) — and the `warn`-toned notice is a real colour in the picture. The
+    // row's subject is the *bins*, so the notice is named and excluded rather
+    // than filtered away by a widened `CHROME`: a reader has to be able to tell
+    // a withheld bin from a drawn one, and that is what the tone is for.
+    const WARN = "212;179;90";
+    expect(at("histogram", 4).has(WARN), "the short frame says so in warn").toBe(true);
+    expect(at("histogram", 9).has(WARN), "and the frame with room does not").toBe(false);
+    const bins = (n: number): string[] => [...at("histogram", n)].filter((c) => c !== WARN);
+    expect(bins(4)).toEqual(bins(9));
+    expect(bins(9).length, "one distribution, one colour").toBe(1); // cells-ok — a colour count
   });
 
   it("a histogram and a line of one series draw the same colour", () => {

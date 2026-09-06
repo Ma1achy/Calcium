@@ -26,6 +26,7 @@ export const FULL_CAPABILITIES: TerminalCapabilities = Object.freeze({
   bracketedPaste: true,
   mouse: true,
   imageProtocol: "none",
+  keyboardProtocol: "none",
   altScreen: true,
 });
 

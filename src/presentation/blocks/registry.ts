@@ -10,14 +10,21 @@
 import { Box, Text } from "ink";
 import { createElement, type ReactElement } from "react";
 import {
+  BORDER_INSET,
+  ROW_GUTTER,
   childWidths,
+  groupPlacements,
   hasChildren,
+  mosaicRects,
   normaliseWidth,
+  parseAreas,
+  placeable,
   sequenceHeight,
 } from "../../data/viewmodel/index.js";
 import type { Block, Status } from "../../data/viewmodel/index.js";
 import { DEFAULT_DEFINITIONS } from "./defaults.js";
-import { paint, rows, tone } from "./paint.js";
+import { clampSpans, paint, rows, tone } from "./paint.js";
+import { truncate } from "../text.js";
 import { statusDefinition, statusRowsFor } from "./kinds/status.js";
 import type {
   BlockDefinition,
@@ -26,6 +33,7 @@ import type {
   NavElement,
   RenderContext,
   RenderContextInput,
+  Windowed,
 } from "./types.js";
 
 /**
@@ -56,6 +64,64 @@ type Resolved = Readonly<{ elements: readonly NavElement[]; owned: boolean }>;
 type Measured = Readonly<{ ok: boolean; rows: number }>;
 
 /**
+ * The most rows one block may occupy before the registry caps it (C14 I24, §2b).
+ *
+ * **A reading-length policy, not a figure the measurement chose.** Paint is
+ * ~0.25 ms a row for every kind and linear with no knee (C14 §4b's table), so
+ * nothing in the figures picks a number; fifty screens of forty rows is the
+ * policy, and it is `MAX_ROWS`'s figure for the fallback adapter — one number in
+ * the tree rather than two that drift. `TuiConfig.maxBlockRows` raises it per
+ * session; nothing raises it per block, because a cap an adapter can lift is a
+ * cap on nothing.
+ */
+export const DEFAULT_MAX_BLOCK_ROWS = 2_000;
+
+/**
+ * What a capped form carries: the rows it draws and the rows the block had
+ * (C14 I24). `shown` is the window's own measured rows and **not the cap**,
+ * because a window is a unit boundary — a `table` whose boundary row is
+ * expanded keeps the whole row — and the marker names the rows on screen.
+ */
+type Capped = Readonly<{ shown: number; total: number }>;
+
+/**
+ * A block resolved to the definition that draws it, in its capped form.
+ *
+ * `capped` is `null` for every block within the cap and for every kind with no
+ * `window` (C14 I26); `block` is then the **same reference** the caller passed,
+ * so nothing downstream can observe the cap on a block it does not touch.
+ */
+type Form = Readonly<{ definition: BlockDefinition; block: Block; capped: Capped | null }>;
+
+/**
+ * `capped` is view state on `lineRange`'s argument (C04 I82, C09 I25a): written
+ * here, read here, refused from a far side. **Read through a cast until C04
+ * names the field** — the request is recorded rather than the field assumed —
+ * and the shape is checked rather than trusted, because a far side that got
+ * past validation would otherwise dictate a marker.
+ */
+function cappedOf(block: Block): Capped | null {
+  const held = (block as { capped?: unknown }).capped;
+  if (typeof held !== "object" || held === null) return null;
+  const { shown, total } = held as { shown?: unknown; total?: unknown };
+  if (!Number.isInteger(shown) || !Number.isInteger(total)) return null;
+  return { shown: shown as number, total: total as number };
+}
+
+function withCapped(block: Block, capped: Capped): Block {
+  // Through `unknown`, as every kind's registration is: `Block` is a union and
+  // an excess-property check on a union refuses a field no arm declares yet.
+  return { ...block, capped } as unknown as Block;
+}
+
+/** A block without its `capped`, so a window that stops short of the marker draws none. */
+function stripCapped(block: Block): Block {
+  if (cappedOf(block) === null) return block;
+  const { capped: _capped, ...rest } = block as Block & { capped?: unknown };
+  return rest as Block;
+}
+
+/**
  * The definition of last resort: a registry with no `raw` at all, which is
  * reachable only through `defaults: false`. One row, saying what is missing.
  */
@@ -84,11 +150,26 @@ const MISSING: BlockDefinition = {
 class Registry implements BlockRegistry {
   readonly #definitions = new Map<string, BlockDefinition>();
   readonly #onError: (fault: BlockFault) => void;
+  /** The most rows one block may occupy (C14 I24). A positive integer, checked at construction. */
+  readonly #cap: number;
   #sealed = false;
 
-  constructor(definitions: readonly BlockDefinition[], onError: (fault: BlockFault) => void) {
+  constructor(
+    definitions: readonly BlockDefinition[],
+    onError: (fault: BlockFault) => void,
+    maxBlockRows: number,
+  ) {
     for (const definition of definitions) this.#definitions.set(definition.kind, definition);
     this.#onError = onError;
+    // **Refused here rather than defaulted** (C14 T2.14). A cap of `0` would
+    // mark every block and a fraction would put the marker at a row nothing
+    // measured; both read as a working registry until a frame is read.
+    if (!Number.isInteger(maxBlockRows) || maxBlockRows < 1) {
+      throw new Error(
+        `createBlockRegistry: maxBlockRows must be a positive integer, got ${String(maxBlockRows)}`,
+      );
+    }
+    this.#cap = maxBlockRows;
   }
 
   /**
@@ -135,8 +216,12 @@ class Registry implements BlockRegistry {
     // that threw is exactly the case where the rows are most needed.
     const floor = floorOf(block);
     try {
-      const resolved = this.#resolve(block);
-      const rows = resolved.definition.measure(resolved.block, width, this.measure);
+      // **The capped form, and the marker is a row** (C14 I24). Cap first and
+      // floor after: the floor pads a short block and this bounds a tall one,
+      // and a floored block over the cap takes `max(shown + 1, floor)`.
+      const form = this.#form(block, width);
+      const rows =
+        form.definition.measure(form.block, width, this.measure) + (form.capped === null ? 0 : 1);
       return { ok: true, rows: Math.max(rows, floor) };
     } catch (error) {
       // I11 — a throwing measurer is contained and the block treated as one
@@ -198,10 +283,12 @@ class Registry implements BlockRegistry {
    */
   #elements(block: Block, width: number): Resolved {
     try {
-      const resolved = this.#resolve(block);
-      const declared = resolved.definition.elements;
+      // Over the capped form (C14 I24): nothing beyond the cap is on screen, so
+      // nothing beyond it can be focused, and the marker row declares none.
+      const form = this.#form(block, width);
+      const declared = form.definition.elements;
       if (declared === undefined) return NO_ELEMENTS;
-      return { elements: declared(resolved.block, width, this.measure), owned: true };
+      return { elements: declared(form.block, width, this.measure), owned: true };
     } catch (error) {
       this.#report(block, "elements", error);
       return NO_ELEMENTS;
@@ -266,7 +353,101 @@ class Registry implements BlockRegistry {
     };
   }
 
+  /**
+   * A block in its capped form — the definition's own `window(block, w, 0, cap)`
+   * with `capped: { shown, total }` attached — or the block itself, by reference,
+   * when it is within the cap or its kind does not divide (C14 I24, I26, §2b).
+   *
+   * **The kind's window is the cap, which is why no kind implements one.** A
+   * kind's `window` is its statement that its rows are its lines; `plot` has
+   * none and is exactly as atomic as I27 says, and a kind that declares one is
+   * capped on the day it does — no list of kinds is consulted (C14 I26).
+   *
+   * **The whole measure first, and the cap cannot avoid it.** The marker has to
+   * say *of 50 000 rows*, and knowing the total is the whole of what `measure`
+   * does. Measured before this was built: 0.6 ms for a 50 000-row `table`,
+   * 0.2 ms for `logs`, ~20 ms for `raw` and `code` (one split of the text), so
+   * the roadmap's *a 50 000-row table has to be measured before C14 can place
+   * it* named a cost that is neither large nor this cap's to bound (C14 §4b).
+   *
+   * **A block already carrying `capped` is never re-capped.** It is a piece a
+   * window produced, and its rows are its definition's plus the marker.
+   */
+  #form(block: Block, width: number): Form {
+    const resolved = this.#resolve(block);
+    const held = cappedOf(resolved.block);
+    if (held !== null) return { ...resolved, capped: held };
+    const windowable = resolved.definition.window;
+    if (windowable === undefined) return { ...resolved, capped: null };
+    const total = resolved.definition.measure(resolved.block, width, this.measure);
+    if (!(total > this.#cap)) return { ...resolved, capped: null };
+    // `this.measure` is the child seam (I26a), as `windowSequence` hands it.
+    const out = windowable(resolved.block, width, 0, this.#cap, this.measure);
+    const shown = resolved.definition.measure(out.block, width, this.measure);
+    const capped: Capped = Object.freeze({ shown, total });
+    return { definition: resolved.definition, block: withCapped(out.block, capped), capped };
+  }
+
+  /**
+   * `#form`, contained — for `windowSequence`, whose `this.measure` call has
+   * already reported a throwing measurer (I11) and must not report it twice or
+   * take the sequence with it. `null` means *keep the block whole*, which is
+   * the answer a kind declaring no `window` gets anyway.
+   */
+  #formContained(block: Block, width: number): Form | null {
+    try {
+      return this.#form(block, width);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * The marker row a capped block ends with (C14 I24): `… 2,000 of 50,000 rows`
+   * in `muted`, D40's shape (C13 I14) one axis over.
+   *
+   * **The mark is `truncate`'s own** — two cells cut to one yield exactly the
+   * marker the capability allows, `…` or `~` (C04 §5) — rather than a second
+   * literal for the mark scan to excuse. `en-GB` grouping as D40's notice.
+   * Clamped to the width so this is one row at every width the measurer counted.
+   */
+  #marker(capped: Capped, width: number, ctx: RenderContext): ReactElement {
+    const mark = truncate("..", 1, ctx.capabilities);
+    const text =
+      `${mark} ${capped.shown.toLocaleString("en-GB")} of ` +
+      `${capped.total.toLocaleString("en-GB")} rows`;
+    const style = tone("muted", ctx.theme, ctx.capabilities);
+    return rows([paint(clampSpans([{ text, style }], width, ctx.capabilities))]);
+  }
+
   measure = (block: Block, width: number): number => this.#measured(block, normaliseWidth(width)).rows;
+
+  /**
+   * A block's content width at `width` (§2c, I42) — the definition's answer,
+   * clamped to `[1, width]`, or `width` for a kind that declares none.
+   *
+   * **Asked of the capped form**, as `measure` is: the rows the cap kept are
+   * the rows that draw, and a longest line in a dropped row would have the
+   * block answer wider than anything it renders. A definition answering outside
+   * the range has described a block its cell cannot hold, and that is reported
+   * through `onError` rather than silently clamped — the clamp still happens,
+   * because a width is needed either way.
+   */
+  width = (block: Block, width: number): number => {
+    const w = normaliseWidth(width);
+    const form = this.#formContained(block, w) ?? this.#resolve(block);
+    const answer = form.definition.width;
+    if (answer === undefined) return w;
+    try {
+      const got = answer(form.block, w, this.width);
+      if (Number.isInteger(got) && got >= 1 && got <= w) return got;
+      this.#report(block, "width", new RangeError(`${block.kind}.width answered ${String(got)} at ${String(w)}`));
+      return Number.isFinite(got) ? Math.max(1, Math.min(w, Math.trunc(got))) : w;
+    } catch (error) {
+      this.#report(block, "width", error);
+      return w;
+    }
+  };
 
   /**
    * A sequence's rows: the blocks' heights plus one per `gapBefore` (C04 §3a).
@@ -321,48 +502,123 @@ class Registry implements BlockRegistry {
     blocks: readonly Block[],
     width: number,
   ): readonly Readonly<{ blockId: string; element: NavElement }>[] => {
-    const w = normaliseWidth(width);
     const out: Readonly<{ blockId: string; element: NavElement }>[] = [];
-    let row = 0; // cells-ok — a row cursor, not a width
 
-    const walk = (seq: readonly Block[], atWidth: number): void => {
-      for (const block of seq) {
-        if (block.gapBefore === true) row += 1;
-        const top = row;
-        // **One call for both questions** (I30). Asking twice is what let the
-        // two answers disagree.
-        const own = this.#elements(block, atWidth);
-        for (const element of own.elements) {
-          out.push({
-            blockId: block.id,
-            element: Object.freeze({
-              ...element,
-              rows: Object.freeze({ from: top + element.rows.from, to: top + element.rows.to }),
-            }),
-          });
+    /**
+     * One block at `(top, left)`, `atWidth` wide — its own elements lifted in
+     * **both axes**, then its children placed where the renderer places them.
+     *
+     * **The origins are the painter's, read from the same functions** (C09 §2):
+     * `childWidths` and `ROW_GUTTER` for a `row` group, `insetWidth` and the
+     * rails for a `panel`, `mosaicRects` for a `mosaic`. The walk used to lift
+     * rows and never columns, and to reset every child to the *container's*
+     * top — so two 39-wide tables in an 80-column row both answered `cols
+     * [0, 39)` and a click at column 50 focused the first (F756), and a panel's
+     * table answered its rows one above where the frame drew them (F757).
+     * Every one of those lists passed C26 §5's predicates block by block.
+     */
+    const place = (block: Block, top: number, left: number, atWidth: number): void => {
+      // **One call for both questions** (I30). Asking twice is what let the
+      // two answers disagree.
+      const own = this.#elements(block, atWidth);
+      for (const element of own.elements) {
+        out.push({
+          blockId: block.id,
+          element: Object.freeze({
+            ...element,
+            rows: Object.freeze({ from: top + element.rows.from, to: top + element.rows.to }),
+            cols: Object.freeze({ from: left + element.cols.from, to: left + element.cols.to }),
+          }),
+        });
+      }
+      // **A container that declares its own elements owns them.** `panel` and
+      // `group` declare none, so their children's are reached here; `scroll`
+      // and `mosaic` declare one element per child (C26 §4b cell 3), and
+      // descending past them would emit each child twice. The question is
+      // asked of the **definition** rather than of a list of kinds, which is
+      // the one form that stays right when a fifth container arrives — and the
+      // arms below are reached for a container whose `elements` threw (I30,
+      // T3.37), so each places children where its renderer does.
+      if (!hasChildren(block) || own.owned) return;
+      const widths = childWidths(block, atWidth);
+      switch (block.kind) {
+        case "panel": {
+          // One row below the top border, one column in from the left rail —
+          // and no rail below three columns, where the renderer drops both
+          // sides and keeps the content (C09 §3).
+          const rail = normaliseWidth(atWidth) < 3 ? 0 : BORDER_INSET / 2;
+          sequence(block.children, top + 1, left + rail, widths[0] ?? 1);
+          return;
         }
-        // **A container that declares its own elements owns them.** `panel` and
-        // `group` declare none, so their children's are reached here; `scroll`
-        // declares one element per child (C26 §4b cell 3), and descending past
-        // it would emit each child twice and at the wrong coordinates — its
-        // children are placed in content space, not in this walk's.
-        //
-        // So the question is asked of the **definition** rather than of a list
-        // of kinds, which is the one form that stays right when a fourth
-        // container arrives: whichever answer it gives, this walk follows it.
-        if (hasChildren(block) && !own.owned) {
-          const widths = childWidths(block, atWidth);
-          const before = row;
+        case "group": {
+          // **The placements are the renderer's, from the one function that
+          // computes them** (C04 I103). F816 is the alternative measured: the
+          // renderer placed a `bottom` child with Yoga and this walk placed
+          // every child at the row's top, so a chip drawn on row 3 answered
+          // `rows [0, 1)`. A child is placed at its content width when it is
+          // aligned off `left` (C04 I101) — the width the renderer draws it at.
+          const placements = groupPlacements(block, atWidth, this.measure, this.width);
+          if (block.direction === "column") {
+            // A sequence still — the gap is the run's (C04 §3a) and the step is
+            // the child's height at the column's width, which its content width
+            // agrees with (C09 I43).
+            let row = top; // cells-ok — a row cursor, not a width
+            block.children.forEach((child, i) => {
+              if (child.gapBefore === true) row += 1;
+              const at = placements[i];
+              place(child, row + (at?.top ?? 0), left + (at?.left ?? 0), at?.width ?? widths[0] ?? 1);
+              row += this.measure(child, widths[0] ?? 1);
+            });
+            return;
+          }
+          // Side by side: `childWidths` shares with `ROW_GUTTER` between each
+          // pair, the first `placeable` of them (C04 §3), and `gapBefore` is
+          // ignored here exactly as the renderer ignores it — a row has no
+          // "before" to put a gap in (C04 §3a).
+          let col = left;
+          block.children.slice(0, placeable(block, atWidth)).forEach((child, i) => {
+            const share = widths[i] ?? 1;
+            const at = placements[i];
+            place(child, top + (at?.top ?? 0), col + (at?.left ?? 0), at?.width ?? share);
+            col += share + ROW_GUTTER;
+          });
+          return;
+        }
+        case "mosaic": {
+          const parsed = parseAreas(block.areas);
+          if (!parsed.ok) return;
+          const rects = mosaicRects(parsed.grid, normaliseWidth(atWidth), block.height, block.columns, block.rows);
           block.children.forEach((child, i) => {
-            row = before;
-            walk([child], widths[i] ?? 1);
+            const rect = rects[i];
+            // A cell with no room is not drawn (C04 I72), so it holds nothing.
+            if (rect === undefined || rect.width < 1 || rect.height < 1) return;
+            place(child, top + rect.top, left + rect.left, rect.width);
           });
+          return;
         }
-        row = top + this.measure(block, atWidth);
+        case "scroll":
+          // Content rows from the box's top (C26 I3 — never the offset), which
+          // is where `childRanges` puts them.
+          sequence(block.children, top, left, widths[0] ?? 1);
+          return;
       }
     };
 
-    walk(blocks, w);
+    /**
+     * A run laid out down the screen: a document's top level, a `panel`'s
+     * children, a `column` group's. `gapBefore` is counted here and never
+     * inside a block, for `windowSequence`'s reason: the gap belongs to the run.
+     */
+    const sequence = (seq: readonly Block[], top: number, left: number, atWidth: number): void => {
+      let row = top; // cells-ok — a row cursor, not a width
+      for (const block of seq) {
+        if (block.gapBefore === true) row += 1;
+        place(block, row, left, atWidth);
+        row += this.measure(block, atWidth);
+      }
+    };
+
+    sequence(blocks, 0, 0, normaliseWidth(width));
     return Object.freeze(out);
   };
 
@@ -404,7 +660,21 @@ class Registry implements BlockRegistry {
       // Entirely above or entirely below the window, gap included.
       if (bottom <= lo || top - gap >= hi) continue;
 
-      const resolved = this.#resolve(block);
+      // **The capped form, and the window is taken over it** (C14 I25). A
+      // window below the marker is the definition's window over the form with
+      // `capped` stripped — byte-identical to the same range of the uncapped
+      // block — and a window reaching the marker row carries the field onto the
+      // piece. Both after the definition's window, never before: `patch`'s
+      // builds a fresh block and would drop it, and a field a kind can lose is
+      // not view state.
+      const form = this.#formContained(block, w);
+      // **The whole piece is the block itself unless it was capped** — the
+      // caller's reference, not `#resolve`'s conversion of an unknown kind to
+      // `raw`, so a block within the cap is handed back unchanged (C14 I24).
+      // The definition's window is handed the resolved block, as before.
+      const held = form === null || form.capped === null ? block : form.block;
+      const source = form === null ? block : form.block;
+      const capped = form === null ? null : form.capped;
       // **A block carrying a floor is kept whole** (C09 I33, C04 I68).
       //
       // The window's contract is an identity about rows the *definition* can
@@ -418,7 +688,7 @@ class Registry implements BlockRegistry {
       // every kind declaring no `window` at all — and a floored block is small
       // by construction, because the reason it has a floor is that it failed to
       // draw.
-      const windowable = floorOf(block) > 0 ? undefined : resolved.definition.window;
+      const windowable = form === null || floorOf(block) > 0 ? undefined : form.definition.window;
 
       // The gap row, when the window opens on or above it, is kept by keeping
       // the block's own `gapBefore`; when the window opens *below* it the gap is
@@ -427,12 +697,25 @@ class Registry implements BlockRegistry {
       const localFrom = Math.max(0, lo - top);
       const localTo = Math.min(height, hi - top);
 
-      let piece: Block = block;
+      let piece: Block = held;
       let dropped = localFrom;
       if (windowable !== undefined && (localFrom > 0 || localTo < height)) {
-        const out = windowable(resolved.block, w, localFrom, localTo);
-        piece = out.block;
-        dropped = out.skipRows;
+        // The rows the definition can reach are the form's; the marker is the
+        // registry's and sits at `contentRows`. A window over the marker alone
+        // takes the last content row and charges it to `skipRows`, because no
+        // kind's window returns zero rows (C11 I20).
+        const contentRows = capped === null ? height : capped.shown;
+        const reachesMarker = capped !== null && localTo > contentRows;
+        const wFrom = Math.min(localFrom, Math.max(0, contentRows - 1));
+        const wTo = Math.max(wFrom + 1, Math.min(localTo, contentRows));
+        // **`this.measure` is the child seam** (C09 I26a), the same one
+        // `#elements` hands over four members up: a kind whose unit boundaries
+        // depend on a child's height — a table row's detail — cannot compute
+        // them from `(block, width)` alone, and a window that guessed would
+        // slice at the wrong row while I26's arithmetic still balanced.
+        const out = windowable(stripCapped(source), w, wFrom, wTo, this.measure);
+        piece = reachesMarker && capped !== null ? withCapped(out.block, capped) : stripCapped(out.block);
+        dropped = out.skipRows + (localFrom - wFrom);
       }
       if (gapKept !== (block.gapBefore === true)) {
         piece = gapKept ? { ...piece, gapBefore: true } : stripGap(piece);
@@ -486,14 +769,45 @@ class Registry implements BlockRegistry {
     return createElement(Box, { flexDirection: "column", minHeight: floor }, element);
   }
 
+  /**
+   * C09 I58 — rows `[from, to)` of a child, or `null` when the slice cannot be
+   * taken without the caller paying for it.
+   *
+   * **The render-side seam beside `measureChild`**, and the three refusals are
+   * one rule. A floored or capped block draws rows the definition never
+   * produced — the floor's padding and the cap's marker are the registry's own,
+   * outside `definition.render` — so a window over the definition's rows is not
+   * a window over the block's; `windowSequence` refuses a floored block for
+   * exactly this reason (I33) and this is the same line in the other caller. A
+   * kind declaring no `window` is atomic (I27). And a residual is slack the
+   * caller drops, which `session.ts` can do to an entry's rows and an Ink
+   * subtree cannot do to a child's.
+   *
+   * The window is taken over `#form`'s block, as `windowSequence` takes it, so
+   * the rows are the same ones `measure` counted (I26a's seam, `this.measure`).
+   */
+  windowChild = (block: Block, width: number, from: number, to: number): Windowed | null => {
+    const w = normaliseWidth(width);
+    if (floorOf(block) > 0) return null;
+    const form = this.#formContained(block, w);
+    if (form === null || form.capped !== null) return null;
+    const windowable = form.definition.window;
+    if (windowable === undefined) return null;
+    const out = windowable(form.block, w, from, to, this.measure);
+    if (out.skipRows !== 0 || out.dropRows !== 0) return null;
+    return out;
+  };
+
   render = (block: Block, ctx: RenderContextInput): ReactElement => {
     const width = normaliseWidth(ctx.width);
     const childContext: RenderContext = {
       ...ctx,
       width,
       measureChild: this.measure,
+      widthChild: this.width,
       renderChild: (child: Block, childWidth: number): ReactElement =>
         this.render(child, { ...ctx, width: childWidth }),
+      windowChild: this.windowChild,
     };
 
     // **The height is committed before anything is drawn** (I11). One extra
@@ -516,8 +830,21 @@ class Registry implements BlockRegistry {
     }
 
     try {
-      const resolved = this.#resolve(block);
-      return this.#floored(block, resolved.definition.render(resolved.block, childContext));
+      // **The capped form, and the marker beneath it** (C14 I24). The same
+      // form `#measured` counted one row for, drawn from the same fields, so the
+      // frame and the height agree by construction rather than by agreement.
+      const form = this.#form(block, width);
+      const drawn = form.definition.render(form.block, childContext);
+      const element =
+        form.capped === null
+          ? drawn
+          : createElement(
+              Box,
+              { flexDirection: "column" },
+              drawn,
+              this.#marker(form.capped, width, childContext),
+            );
+      return this.#floored(block, element);
     } catch (error) {
       // I11 — a throwing renderer is contained to its block, **and the
       // containment includes the row count**. The rest of the frame is
@@ -549,7 +876,12 @@ class Registry implements BlockRegistry {
  * exception is indistinguishable from a special case.
  */
 export function createBlockRegistry(
-  opts: Readonly<{ defaults?: boolean; onError?: (fault: BlockFault) => void }> = {},
+  opts: Readonly<{
+    defaults?: boolean;
+    onError?: (fault: BlockFault) => void;
+    /** The most rows one block may occupy (C14 I24, §2b). Default `DEFAULT_MAX_BLOCK_ROWS`. */
+    maxBlockRows?: number;
+  }> = {},
 ): BlockRegistry {
   return new Registry(
     opts.defaults === false ? [] : DEFAULT_DEFINITIONS,
@@ -558,6 +890,7 @@ export function createBlockRegistry(
     // about those tests and not about a consumer's registry; the shell passes
     // one, and `test/support/render.ts` passes one that throws.
     opts.onError ?? ((): void => undefined),
+    opts.maxBlockRows ?? DEFAULT_MAX_BLOCK_ROWS,
   );
 }
 

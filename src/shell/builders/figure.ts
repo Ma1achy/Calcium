@@ -23,7 +23,17 @@ function makeSeries(values: readonly (number | null)[], opts?: SeriesOpts): Seri
     values,
     ...(opts?.label !== undefined ? { label: opts.label } : {}),
     ...(opts?.tone !== undefined ? { tone: opts.tone } : {}),
-    ...(opts?.marker !== undefined ? { marker: opts.marker } : {}),
+    ...(opts?.hidden !== undefined ? { hidden: opts.hidden } : {}),
+  };
+}
+
+/** An annotation's shared options, spread-if-present (C04 I46's `undefined` clause). */
+type AnnotationTone = Exclude<Annotation["tone"], undefined>;
+type AnnotationOpts = { tone?: AnnotationTone; hidden?: boolean };
+function annotationOpts(opts?: AnnotationOpts): { tone?: AnnotationTone; hidden?: boolean } {
+  return {
+    ...(opts?.tone !== undefined ? { tone: opts.tone } : {}),
+    ...(opts?.hidden !== undefined ? { hidden: opts.hidden } : {}),
   };
 }
 
@@ -52,10 +62,16 @@ type FigureOpts = {
   plotCorners?: Plot["plotCorners"];
 };
 
+// **No `marker`.** `Series` has no such member (C04 I76): no 2-D renderer has a
+// glyph channel for one, so the option this carried was accepted by every gate
+// and drawn by none (F207). Narrowed with the type it forwarded to, F85's
+// argument — a builder option with no reader is the public door to a field
+// nothing reads.
 type SeriesOpts = {
   label?: string;
   tone?: Series["tone"];
-  marker?: string;
+  /** Not drawn, still held — appearance, and refused where a series is not a layer (C04 I99). */
+  hidden?: boolean;
 };
 
 export class FigureBuilder {
@@ -122,34 +138,26 @@ export class FigureBuilder {
     return this;
   }
 
-  threshold(value: number, opts?: { label?: string; tone?: Annotation["tone"] }): this {
-    const a: Annotation = opts?.tone !== undefined
-      ? { kind: "line", value, tone: opts.tone }
-      : { kind: "line", value };
+  threshold(value: number, opts?: AnnotationOpts & { label?: string }): this {
+    const a: Annotation = { kind: "line", value, ...annotationOpts(opts) };
     this.annotationList.push(a);
     return this;
   }
 
-  band(from: number, to: number, opts?: { tone?: Annotation["tone"] }): this {
-    const a: Annotation = opts?.tone !== undefined
-      ? { kind: "band", from, to, tone: opts.tone }
-      : { kind: "band", from, to };
+  band(from: number, to: number, opts?: AnnotationOpts): this {
+    const a: Annotation = { kind: "band", from, to, ...annotationOpts(opts) };
     this.annotationList.push(a);
     return this;
   }
 
-  confidence(upper: readonly number[], lower: readonly number[], opts?: { tone?: Annotation["tone"] }): this {
-    const a: Annotation = opts?.tone !== undefined
-      ? { kind: "confidence", upper, lower, tone: opts.tone }
-      : { kind: "confidence", upper, lower };
+  confidence(upper: readonly number[], lower: readonly number[], opts?: AnnotationOpts): this {
+    const a: Annotation = { kind: "confidence", upper, lower, ...annotationOpts(opts) };
     this.annotationList.push(a);
     return this;
   }
 
-  whiskers(points: readonly Readonly<{ x: number; y: number; err: number }>[], opts?: { tone?: Annotation["tone"] }): this {
-    const a: Annotation = opts?.tone !== undefined
-      ? { kind: "whiskers", points, tone: opts.tone }
-      : { kind: "whiskers", points };
+  whiskers(points: readonly Readonly<{ x: number; y: number; err: number }>[], opts?: AnnotationOpts): this {
+    const a: Annotation = { kind: "whiskers", points, ...annotationOpts(opts) };
     this.annotationList.push(a);
     return this;
   }
@@ -204,6 +212,18 @@ export class FigureBuilder {
     return this;
   }
 
+  /**
+   * **The fluent form of `b.plot`'s `facets`, and for a while the only form**
+   * (C24 I30, §4b).
+   *
+   * One builder holding a member the published function lacked was not a design;
+   * it was two surfaces widened on different days. `pairplot` and
+   * `smallmultiples` are delegating forms, so a `facets` nobody could set made
+   * both unconstructible from `b.plot` while this chain could build them — a
+   * capability reachable only by knowing which of two builders to reach for.
+   * They set the same field now, and this is a convenience over it rather than
+   * the route to it.
+   */
   setFacets(facets: readonly Plot[]): this {
     this.facets_ = facets;
     return this;

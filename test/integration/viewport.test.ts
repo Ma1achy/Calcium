@@ -131,9 +131,26 @@ describe("C14 integration", () => {
     const wide = graph.viewport.scroll.totalRows;
     resize({ columns: 40, rows: 30 });
 
+    // **The shell no longer pushes a width from the signal** (C22 I34, C03 I15).
+    // `render-frame.ts` sets the viewport's size — both dimensions — from the
+    // composed frame before any row is read, and the resize handler's own call
+    // was a second writer whose only effect was to re-measure the whole
+    // transcript per `SIGWINCH` rather than per frame: 544 ms for a 30-event
+    // drag at a thousand entries (F423). This harness stubs `render` with a
+    // counter, so no frame is composed and nothing arrives.
     expect(
       graph.viewport.scroll.totalRows,
-      "narrower means more rows, so the resize reached the viewport",
+      "no frame composed, so no second writer pushed the width",
+    ).toBe(wide);
+
+    // **And the control, without which the row above is satisfied by inertness.**
+    // A fixture must be shown to respond to the thing under test before it is
+    // asserted against — `wrappingDoc` re-measures at 40 columns, so the zero
+    // above is the absence of a writer and not a viewport that ignores width.
+    graph.viewport.resize({ width: 40, height: 30 });
+    expect(
+      graph.viewport.scroll.totalRows,
+      "narrower means more rows — the fixture does respond to width",
     ).toBeGreaterThan(wide);
   });
 

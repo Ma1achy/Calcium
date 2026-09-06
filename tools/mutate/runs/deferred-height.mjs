@@ -81,8 +81,9 @@ const results = runPass({
       // rows, so I26's identity breaks outside the definition.
       name: "a floored block is windowed anyway",
       file: REG,
-      from: "      const windowable = floorOf(block) > 0 ? undefined : resolved.definition.window;",
-      to: "      const windowable = resolved.definition.window;",
+      // Re-anchored 2026-09-04: `windowSequence` windows the capped form (C14 §4b).
+      from: "      const windowable = form === null || floorOf(block) > 0 ? undefined : form.definition.window;",
+      to: "      const windowable = form === null ? undefined : form.definition.window;",
       expect: "T3.52",
     },
     {
@@ -127,6 +128,7 @@ const results = runPass({
       // answers in silence and taking the block below with it.
       name: "the over-draw is not reported",
       file: SESSION,
+      // Re-anchored 2026-09-05: the note moved into the per-run loop (C22 I83).
       from: "        graph.blockFaults.note(",
       to: "        void ((_unused) => undefined)(",
       expect: "T4.54",
@@ -137,8 +139,9 @@ const results = runPass({
       // raised — the frame stays correct and the second one never arrives.
       name: "faults are not attributed to the entry being drawn",
       file: SESSION,
-      from: "      graph.blockFaults.within(entry.id, entry.rev, () =>",
-      to: "      ((_id, _rev, f) => f())(entry.id, entry.rev, () =>",
+      // Re-anchored 2026-09-05: the scope is a ternary arm now (C22 I83).
+      from: "        ? graph.blockFaults.within(entry.id, entry.rev, () =>",
+      to: "        ? ((_id, _rev, f) => f())(entry.id, entry.rev, () =>",
       expect: "T4.49",
     },
     {

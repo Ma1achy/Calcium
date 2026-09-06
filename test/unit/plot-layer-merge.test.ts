@@ -11,6 +11,18 @@ import { describe, expect, it } from "vitest";
 import { block } from "../../src/data/viewmodel/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { radarRender } from "../../src/presentation/plot/circle.js";
+import { proportionDecisions } from "../../src/presentation/plot/figure.js";
+/**
+ * The scale the polygons are read against — **the figure's member, not a number
+ * this file chose** (§3ak.26 finding 2, F304).
+ *
+ * `radarRender` used to compute it; a test passing its own would be the
+ * reimplemented-rule class one layer up, so it reads the same member
+ * `definition.ts` reads.
+ */
+const ceilingOf = (b: Parameters<typeof proportionDecisions>[0]): number =>
+  proportionDecisions(b).value?.range.max ?? 1;
+
 import { FULL_CAPS, measurable } from "../support/render.js";
 
 const kit = (caps = FULL_CAPS) => measurable({ definitions: [plotDefinition], capabilities: caps });
@@ -95,7 +107,7 @@ describe("LM3 (C12 I44): a radar's cells hold one layer, or the layers that shar
   });
 
   it("every cell the frame inks alone is inked in the composed figure", () => {
-    const rendered = radarRender(SERIES, CATS, 80, 17, FULL_CAPS);
+    const rendered = radarRender(SERIES, CATS, 80, 17, FULL_CAPS, ceilingOf(RADAR));
     const composed = kit().renderToLines(RADAR, 80).map(plain);
     const missing: string[] = [];
     rendered.frame.forEach((row, r) => {
@@ -119,7 +131,7 @@ describe("LM3 (C12 I44): a radar's cells hold one layer, or the layers that shar
     //
     // Every layer `radarRender` returns is compared against the composed frame,
     // so no cell's owner has to be inferred.
-    const rendered = radarRender(SERIES, CATS, 80, 17, FULL_CAPS);
+    const rendered = radarRender(SERIES, CATS, 80, 17, FULL_CAPS, ceilingOf(RADAR));
     const composed = kit().renderToLines(RADAR, 80).map(plain);
     const bits = (c: string): number => (isBraille(c) ? c.codePointAt(0)! - 0x2800 : 0);
     const layers = [...rendered.polygons, rendered.frame];
@@ -172,7 +184,7 @@ describe("LM3b (C12 I44): context never tints a cell it does not own", () => {
 
   it("a cell only one polygon inks wears that polygon's slot", () => {
     const bits = (c: string): number => (isBraille(c) ? c.codePointAt(0)! - 0x2800 : 0);
-    const rendered = radarRender(SERIES, CATS, 80, 17, FULL_CAPS);
+    const rendered = radarRender(SERIES, CATS, 80, 17, FULL_CAPS, ceilingOf(RADAR));
     const composed = kit().renderToLines(RADAR, 80).map((l) => {
       const out: { ch: string; slot: string }[] = [];
       let slot = "";
@@ -232,11 +244,12 @@ describe("LM4 (C12 I40): a letter is not unioned with a polygon", () => {
 
   for (const [w, h] of [[34, 9], [28, 9]] as const) {
     it(`at ${String(w)}×${String(h)}, no letter becomes a glyph`, () => {
-      const rendered = radarRender(SERIES, CATS, w, h, FULL_CAPS);
-      const composed = kit().renderToLines(block({
+      const b = block({
         kind: "plot", id: `lm4-${String(w)}`, form: "radar", height: h,
         categories: CATS, series: SERIES,
-      }), w).map(plain);
+      });
+      const rendered = radarRender(SERIES, CATS, w, h, FULL_CAPS, ceilingOf(b));
+      const composed = kit().renderToLines(b, w).map(plain);
       const replaced: string[] = [];
       rendered.labels.forEach((row, r) => {
         [...row].forEach((ch, x) => {

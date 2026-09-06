@@ -102,6 +102,7 @@ export type {
   Raw,
   Rule,
   Series,
+  Status,
   Steps,
   Table,
   TableRow,
@@ -206,10 +207,25 @@ export type {
 
 // --- theming ----------------------------------------------------------------
 
-export { defaultTheme } from "./presentation/theme/index.js";
+/**
+ * The theme, and **the loader that makes `plotToSvg` callable** (C24 I29, §8c).
+ *
+ * `loadTheme(defaultTheme, "dark").value.current` is a `ResolvedTheme`, which is
+ * `plotToSvg`'s second parameter — published by name for a year with its
+ * argument type interior, so the function resolved and could not be called.
+ * Third instance of I19's class after `CompletionContext` and `ProducerContext`,
+ * and the one that produced a rule (MG29).
+ *
+ * **`loadTheme` rather than a pre-resolved constant.** A consumer supplying
+ * `TuiConfig.theme` has *their* theme resolved by the session; a constant would
+ * resolve the shipped one, so the second renderer would disagree with the first
+ * for exactly the consumers who customised anything.
+ */
+export { defaultTheme, loadTheme } from "./presentation/theme/index.js";
 export type {
   ColourRef,
   PaletteSpec,
+  ResolvedTheme,
   Style,
   ThemeSet,
   ThemeTokens,
@@ -274,6 +290,16 @@ export type { BlockDefinition, RenderContext } from "./presentation/blocks/index
  * has to be readable or the fallback is indistinguishable from a mistake.
  */
 export { DEFAULT_LANGUAGES, registerGrammar } from "./presentation/blocks/index.js";
+/**
+ * `registerGrammar`'s argument, re-exported from `highlight.js` (C24 I29, MG29).
+ *
+ * **A transitive dependency's type is not a published surface.** `highlight.js`
+ * is a runtime dependency, so the type is *resolvable* from a consumer's tree —
+ * and reaching it means naming a package Calcium happens to depend on, which is
+ * the coupling `exports` exists to prevent. Re-exported so the argument comes
+ * with the function, as I29 requires.
+ */
+export type { LanguageFn } from "highlight.js";
 
 /**
  * A Mermaid diagram as a `code` block (roadmap 9).
@@ -321,13 +347,76 @@ export type { ArtSpec, ArtTier } from "./presentation/art.js";
  * `RenderContext` and could not be spelled.
  */
 export type { TerminalCapabilities } from "./terminal/capabilities.js";
+
+/**
+ * **Which glyph rung an image will take on this terminal** (C09 I37, §8b).
+ *
+ * Published because a consumer captioning its own figure cannot otherwise say
+ * which arm drew it, and F394 is what that costs: the demo labelled a braille
+ * dither `pixels` and a working ladder read as a broken renderer. F415 is the
+ * same shape one rung along — the caption said *braille dither* while the half
+ * block was drawing, because the ladder grew a rung and the label named two.
+ *
+ * The protocol arm is `capabilities.imageProtocol === "kitty"`, which a consumer
+ * already has; this answers the question below it.
+ */
+export { halfBlockEligible } from "./presentation/image/index.js";
+/**
+ * The two catalogues, listable by name (C24 §6). `Status.spinner` names a
+ * spinner set and `Progress.style` a bar style; a consumer drawing a gallery or
+ * a picker reads these rather than copying the list, so a set added to the
+ * catalogue arrives without the copy going stale. The plots demo's `/spinners`
+ * and `/bars` are the first consumers.
+ */
+export { barStyleNames, spinnerSetNames } from "./presentation/blocks/index.js";
 export type { Measure, MeasureFn } from "./data/viewmodel/index.js";
 export type { BlockKeymap } from "./interaction/router/types.js";
 
 export type {
+  Fixture,
+  FixtureHandler,
   Invocation,
+  TransportDeps,
   TransportRouter,
   VerbTransport,
+} from "./data/transport/index.js";
+
+/**
+ * C06 §2's constructors, so an app can build what `TuiConfig.transport` takes.
+ *
+ * **Three types and no function that produces one.** `TuiConfig.transport` is
+ * a `TransportRouter`; the block above exported the interface and nothing that
+ * constructs it, so a consumer could name the type and could not obtain the
+ * value — C24 I2's `BlockRegistry` shape on this seam. C06 §2 publishes a
+ * three-arm `TransportDeps` union and one arm had a reachable constructor: the
+ * shell's own `subprocess` default in `construct.ts`, the only `createTransport`
+ * caller in the tree. An app wanting the emulator — C06 §1's stated purpose for
+ * that mode — had no door.
+ *
+ * `createTransport` is exported with the two arm constructors rather than
+ * instead of them: C06 §1 says one factory taking one mode value is how a verb
+ * migrates without anything else branching on mode, and an app's entry point
+ * that reads its own `*_TRANSPORT` variable (C06 I18) wants the factory, while
+ * a test constructing one arm wants the arm. `createSubprocessTransport` stays
+ * off the entry — the shell builds it from `TuiConfig.binary`, and an app
+ * building a second would be a second reader of the runner and the clock.
+ * The first consumer outside `src/` is `test/contract/transport.test.ts`'s
+ * public-surface row, which constructs every arm through the entry.
+ *
+ * **Three types came with them, and MG29 named every one.** `Fixture`,
+ * `FixtureHandler` and `TransportDeps` are the parameter types of the three
+ * constructors, and publishing a function whose argument type is interior is
+ * C24 I29's silent failure — the rule fired on the first run with the functions
+ * alone. What a `FixtureHandler` returns — `RawResult`, `RawPatch` — was
+ * already on the entry through the adapters block above. `Fixture` was already
+ * on `@fmx/calcium/fixtures`; it is here because the runtime entry may not
+ * import that one (C24 I8), and the type is C06's.
+ */
+export {
+  createEmulatedTransport,
+  createFixtureTransport,
+  createRouter,
+  createTransport,
 } from "./data/transport/index.js";
 
 /**
@@ -351,5 +440,11 @@ export type { WorldDriver } from "./data/fixtures/index.js";
  * content jumps. `planColumns` is the same argument for a table-like kind, and
  * all three are pure.
  */
+// **`AmbiguousWidth` comes with them** (C24 I29, MG29). Commitment 12 publishes
+// these two because *a custom block kind cannot be written without them*, and
+// the second parameter's type was interior — so `cells(s)` was callable and
+// `cells(s, w)` was not, on the surface whose whole reason is that a consumer
+// measures the way the framework measures.
 export { cells, truncate } from "./presentation/text.js";
+export type { AmbiguousWidth } from "./presentation/text.js";
 export { planColumns } from "./presentation/table/index.js";

@@ -2,7 +2,7 @@
 // not merely the assertion it makes.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { SCANS } from "../../tools/enforce/source-scans.mjs";
+import { checkSourceScans, SCANS } from "../../tools/enforce/source-scans.mjs";
 import { GLYPH_REQUIRED_TONES } from "../../src/data/viewmodel/index.js";
 import { resolveTone } from "../../src/presentation/theme/index.js";
 import { store } from "../support/theme.js";
@@ -24,10 +24,16 @@ describe("C02 fail-on-revert", () => {
     const ss10 = SCANS.find((s) => s.id === "SS10");
     expect(ss10, "SS10 is gone from A03").toBeDefined();
 
-    // In scope for a renderer, and exempting only C02 — the two ways SS10 could
-    // silently stop guarding anything.
+    // In scope for a renderer, and exempting nothing — C02 takes the injected
+    // record and names `process.env` only in a comment, so its allowance was
+    // never exercised and SS53 removed it. A read there fires like any other.
     expect("src/presentation/blocks/index.ts".startsWith(ss10!.scope)).toBe(true);
-    expect(ss10!.allow).toEqual(["src/terminal/capabilities.ts"]);
+    expect(ss10!.allow).toEqual([]);
+    const fired = checkSourceScans(
+      ["src/terminal/capabilities.ts"],
+      () => "const term = process.env.TERM;\n",
+    ).filter((v) => v.rule === "SS10");
+    expect(fired.map((v) => v.file)).toEqual(["src/terminal/capabilities.ts:1"]);
 
     // Every form, not just the member read. A pattern narrow enough to miss
     // destructuring or a computed key documents the hole instead of closing it.

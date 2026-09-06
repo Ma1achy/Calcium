@@ -145,15 +145,78 @@ describe("C03 contamination", () => {
     expect(render).toHaveBeenCalledTimes(1);
   });
 
-  it("T1.10 (I7): commit(resize) repaints immediately, with no explicit invalidate()", () => {
+  it("T1.10 (I7, I15): commit(resize) contaminates at once and repaints one window later", () => {
+    // **The flag is eager and the frame is not** (I7, I15). This row asserted
+    // both as immediate, because they were; the window separates them and the
+    // separation is the thing that makes coalescing safe rather than a
+    // trade-off. `contaminated` is set inside `commit` before any branch, so a
+    // frame written for *any* reason inside the window is a repaint.
     const { scheduler, render, repaint, clock } = build();
 
     scheduler.commit("resize");
+
+    expect(repaint, "nothing written before the window elapses").not.toHaveBeenCalled();
+    expect(clock.outstanding, "a timer is standing").toBe(1);
+    expect(scheduler.contaminated, "and the flag is already set").toBe(true);
+
+    clock.advance(16);
 
     expect(repaint).toHaveBeenCalledTimes(1);
     expect(render).not.toHaveBeenCalled();
     expect(clock.outstanding).toBe(0);
     expect(scheduler.contaminated).toBe(false);
+  });
+
+  it("T1.21 (I15): commit(resize) from idle arms a 16 ms window and writes nothing yet", () => {
+    // **The defect this window exists for is invisible to every assertion about
+    // what a frame contains** (F423). A frame written per SIGWINCH is correct —
+    // just thirty times over, each one re-measuring the whole transcript because
+    // width invalidates every cached height (C14 I8). Measured at 544 ms for a
+    // 30-event drag at a thousand entries, of which the index rebuild everyone
+    // named was 0.07%. So the row asserts the *timer*, which is the only
+    // observable the cost has.
+    const { scheduler, repaint, clock } = build();
+
+    scheduler.commit("resize");
+    clock.advance(15);
+    expect(repaint, "still inside the window").not.toHaveBeenCalled();
+
+    clock.advance(1);
+    expect(repaint).toHaveBeenCalledTimes(1);
+  });
+
+  it("T1.22 (I15): two resizes inside one window write once, and the deadline does not slide", () => {
+    // **A window re-armed per event never fires during a continuous drag**
+    // (C03 §8a A1) — the starvation case, and exactly what a per-event
+    // `setTimeout` in the resize handler would have produced. §3's
+    // strictly-shorter rule already gives the fixed deadline, so this row exists
+    // to hold it rather than to add a clause.
+    const { scheduler, repaint, clock } = build();
+
+    scheduler.commit("resize");
+    clock.advance(10);
+    scheduler.commit("resize");
+    clock.advance(6);
+
+    expect(repaint, "one write, at the first commit's deadline").toHaveBeenCalledTimes(1);
+  });
+
+  it("T1.23 (I15): an input commit inside the window writes at once, and as a repaint", () => {
+    // **This is why the coalescing costs no correctness** (C03 §8a A2). A
+    // keystroke mid-drag is written immediately by I2, and it is a *repaint*
+    // because the resize already contaminated — so it is never a diff against
+    // dimensions the terminal no longer has. The frame is at the current width
+    // because L4 resizes the viewport from the composed frame before reading a
+    // row (C22 I34), which is the half of the argument that lives elsewhere.
+    const { scheduler, render, repaint, clock } = build();
+
+    scheduler.commit("resize");
+    clock.advance(4);
+    scheduler.commit("input");
+
+    expect(repaint, "written before the window elapsed").toHaveBeenCalledTimes(1);
+    expect(render, "and not as an ordinary diffed frame").not.toHaveBeenCalled();
+    expect(clock.outstanding, "the resize's timer was cancelled, not left standing").toBe(0);
   });
 });
 
@@ -217,10 +280,17 @@ describe("C03 §4a — suspension", () => {
     // and a wrapped line scrolls the alternate screen, which is the one failure
     // the application can no longer see — so deferring here protects nothing
     // and costs the state.
-    const { scheduler, render, repaint } = build();
+    // **The window and the suspension are different mechanisms** (C03 §8a A4).
+    // I13 is about *whether* a contaminated frame is written; I15 is about
+    // *when*. The clock advance is not a formality — commitment 14 used to say a
+    // resize is *never deferred*, which was true of suspension and became false
+    // in a second sense the moment a window existed, and nothing about writing
+    // the window would have re-read that sentence. The walk did.
+    const { scheduler, render, repaint, clock } = build();
 
     scheduler.suspend();
     scheduler.commit("resize");
+    clock.advance(16);
 
     expect(repaint, "a resize reaches the terminal while suspended").toHaveBeenCalledTimes(1);
     expect(render).not.toHaveBeenCalled();

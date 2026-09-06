@@ -50,7 +50,13 @@
   // Nothing in the app or its tests needs it: `tools/capture.py` writes the
   // `.cast` with twenty lines of its own, and the frames are read from the raw
   // stream. `agg` only turns a recording into a picture.
-  "onCreateCommand": "sudo apt-get update && sudo apt-get install -y python3 make g++ && sudo sh -c 'curl -sL -o /usr/local/bin/agg https://github.com/asciinema/agg/releases/download/v1.9.0/agg-$(uname -m)-unknown-linux-gnu && chmod 755 /usr/local/bin/agg'",
+  //
+  // `fonts-symbola` is for one glyph: the card's hook `⎿` (U+23BF, C22 I84).
+  // No font in the base image carries it, so every still rendered before
+  // 2026-09-05 drew the card's body indented under nothing — the cast had the
+  // hook and the picture did not. `agg` falls back through fontconfig, so the
+  // package is the whole fix and no `--font-family` flag is needed.
+  "onCreateCommand": "sudo apt-get update && sudo apt-get install -y python3 make g++ fonts-symbola && sudo sh -c 'curl -sL -o /usr/local/bin/agg https://github.com/asciinema/agg/releases/download/v1.9.0/agg-$(uname -m)-unknown-linux-gnu && chmod 755 /usr/local/bin/agg'",
 
   // **Both installs, in order, and the order is load-bearing.** The app
   // resolves `@fmx/calcium` to `file:../..`, and npm packs that directory using

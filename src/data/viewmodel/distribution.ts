@@ -23,7 +23,37 @@
  * alone here and every caller keeps the arithmetic it had.
  */
 import { normalisedOf, type PinnedRange } from "./range.js";
-import type { QuartileSummary } from "./types.js";
+import type { QuartileSummary, Series } from "./types.js";
+
+/**
+ * A five-number summary derived from a series — **for the forms whose box is
+ * computed rather than given** (C12 §3l).
+ *
+ * *A violin **is** a box plot that also shows the distribution, so the box is
+ * not optional — the numbers are, and they are computable.* That sentence was
+ * `definition.ts`'s and so was this function, private beside the terminal's
+ * rasteriser, which is precisely the shape this module's own header argues
+ * against: **the SVG arm needs the computing half without the drawing.** The
+ * density figure had no way to reach it, so the second arm drew a violin with
+ * no box at all — the outline and nothing else — while the terminal drew q1,
+ * q3, the median and the mean on its spine.
+ *
+ * Undefined where nothing is finite, which is *no summary* rather than a
+ * summary of zeroes: a band with no samples must draw nothing, and
+ * `EMPTY_SUMMARY` at the origin is the plausible wrong figure it would
+ * otherwise become (the `absent` role's argument, one form along).
+ */
+export function summariseSeries(series: Series): QuartileSummary | undefined {
+  const v = series.values.filter((x): x is number => x !== null && Number.isFinite(x));
+  if (v.length === 0) return undefined; // cells-ok — a sample count
+  const sorted = [...v].sort((a, b) => a - b);
+  const at = (f: number): number => sorted[Math.min(sorted.length - 1, Math.floor(f * sorted.length))]!; // cells-ok — a sample count
+  return {
+    min: sorted[0]!, q1: at(0.25), median: at(0.5), q3: at(0.75),
+    max: sorted[sorted.length - 1]!, // cells-ok — a sample count
+    mean: v.reduce((a, b) => a + b, 0) / v.length, // cells-ok — a sample count
+  };
+}
 
 /**
  * Every position a distribution renderer draws, on `[0, 1]`, uninverted.

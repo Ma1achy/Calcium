@@ -18,7 +18,17 @@ import { fsIo, report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
 const REFRESH = "src/shell/refresh.ts";
-const EXEC = "src/shell/execution.ts";
+// **The subject moved, not the mutation, and `EXEC` went with it** (C24 I30).
+// The default `renderError`
+// chose its state from an inline `retryInMs === null` in `EXEC`; it is `b.status`
+// now, so the same decision lives here and the anchor follows it. Re-run before
+// re-anchoring, which is this repository's rule and the reason the row below
+// still names `T1.40b`: that row drives the framework's default through the real
+// pipeline, so it fails whichever file the decision is written in. The run's other four
+// anchors are all in `refresh.ts`, so `EXEC` had one user and now has none — a
+// constant kept for a file this run no longer touches would be the same shape as
+// the anchor it held.
+const BUILDERS = "src/shell/builders/index.ts";
 
 const FILES = "test/contract/refresh.test.ts test/unit/execution.test.ts test/contract/builders.test.ts";
 
@@ -110,17 +120,22 @@ const results = runPass({
       // every one-shot, and a `retrying` box with no countdown draws no activity
       // line at all — a blank row where the spinner goes.
       name: "a failure with no retry coming is still drawn as `retrying`",
-      file: EXEC,
-      from: "          retryInMs === null",
-      to: "          false",
+      file: BUILDERS,
+      from: '  const state = retryInMs === null ? "error" : "retrying";',
+      to: '  const state = "retrying" as const;',
       expect: "T1.40b",
     },
     {
       // The attempt count, which had no writer anywhere in `src/` before this.
       name: "the attempt count never reaches the box",
       file: REFRESH,
-      from: "            if (put(part.host, part, part.spec.renderError(shown, retryIn, src.failures))) any = true;",
-      to: "            if (put(part.host, part, part.spec.renderError(shown, retryIn, 0))) any = true;",
+      // **`errorArm(part)`, because the default moved into this file** (F407).
+      // `partOf` resolved it at declaration, which spent the bit the countdown
+      // sweep needs — whose block is in the panel — so the driver resolves it at
+      // the call now and the anchor follows. Re-run before re-anchoring, which is
+      // this repository's rule.
+      from: "            if (put(part.host, part, errorArm(part)(shown, retryIn, src.failures))) any = true;",
+      to: "            if (put(part.host, part, errorArm(part)(shown, retryIn, 0))) any = true;",
       expect: "T1.40",
     },
   ],

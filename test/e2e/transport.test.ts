@@ -148,8 +148,59 @@ describe("C06 e2e", () => {
     150_000,
   );
 
-  it.todo(
-    "T5.3: Ctrl-C during a real long-running verb → the child dies within the ladder's bounds and partial output survives — awaiting a ruling and therefore **not deferred on a component**; both components are built and both are correct. **the ladder cannot reach a subscription, and the two rules that make it so are both correct**: C23 I6 releases the guard for a `streams: true` verb so the prompt stays usable during a `--watch`, and C16 §5's rungs 1 and 2 discriminate on `C23.inFlight`, which *is* that guard. So `inFlight()` is null throughout a live stream, no rung fires, and Ctrl-C clears the prompt while the child runs on — measured: `/tail` reached line 171 after the interrupt. Neither spec says what Ctrl-C should mean here, and rung 1's *takes precedence over everything* cannot simply be widened to cover subscriptions, since one `--watch` would then swallow the key for the rest of the session. Awaiting a ruling on where a subscription sits in the ladder",
+  it(
+    "T5.3 (C16 §5, C23 I6): Ctrl-C during a live stream → the child dies within the ladder's bound, partial output survives, the prompt survives",
+    async () => {
+      // **Deferred as *awaiting a ruling*, and the ruling had landed.** The
+      // todo recorded the gap correctly — C23 I6 releases the guard for a
+      // `streams: true` verb, rungs 1 and 2 read that guard, so no rung fired
+      // and `/tail` reached line 171 after the interrupt. C16 §5 then ruled the
+      // subscription rung — *below the layer rungs and above the prompt rungs,
+      // newest first* — and `router.ts` built it as `cancelNewestStream()`. The
+      // todo stayed because nothing re-reads a deferral that is not failing.
+      const pty = session("subprocess");
+      try {
+        await pty.waitFor(PROMPT, 15_000);
+        pty.type("/tail\r");
+        await pty.waitForFrame((f) => /pid\s+\d+/.test(f.join("\n")), 25_000);
+
+        // The pid from the far side's own output — T5.4's rule about
+        // observation helpers, for the same reason.
+        const pid = Number(/pid\s+(\d+)/.exec(pty.frame.join("\n"))?.[1]);
+        expect(pid).toBeGreaterThan(0);
+        expect(() => process.kill(pid, 0), "alive before the interrupt").not.toThrow();
+
+        // **A real Ctrl-C through the PTY** — the byte, not a signal to the
+        // pid. The prompt is empty, so rungs 8 and 9 would take it if the
+        // subscription rung did not: the row that fails when the rung is gone
+        // is this one, and it fails on the pid still being alive.
+        pty.type("\u0003");
+        const bound = Date.now() + 5_000;
+        let alive = true;
+        while (alive && Date.now() < bound) {
+          try {
+            process.kill(pid, 0);
+            await new Promise((r) => setTimeout(r, 50));
+          } catch {
+            alive = false;
+          }
+        }
+        expect(alive, "the child died within the bound").toBe(false);
+
+        // **Partial output survives** (C06 I7) — the lines shown before the
+        // interrupt are still on the frame.
+        expect(pty.frame.join("\n")).toContain("tail 1");
+
+        // **And the exit confirm did not arm**: C16 §5 says it arms only when
+        // nothing is running, so the key that stopped the stream is not also
+        // the key that closes the session. The prompt takes the next line.
+        pty.type("/guide\r");
+        await pty.waitForFrame((f) => f.join("").includes("own local verb"), 15_000);
+      } finally {
+        pty.kill();
+      }
+    },
+    60_000,
   );
 
   it(

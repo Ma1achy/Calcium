@@ -49,6 +49,34 @@ export const BRACKET_PASTE = mode("\x1b[?2004h", "\x1b[?2004l");
 export const MOUSE = mode("\x1b[?1002h\x1b[?1006h", "\x1b[?1006l\x1b[?1002l");
 
 /**
+ * DECSET 1003 + 1006 — any-event tracking: every pointer move, button held or
+ * not (C01 I21). **Taken in place of `MOUSE`, never beside it**: ctlseqs'
+ * 9/1000/1002/1003 each *select* the terminal's one tracking mode, so a release
+ * emitting `1002l` after `1003l` would be leaving a mode never entered, and
+ * `held` would be lying about one key. Same shape and leave order as `MOUSE`,
+ * one digit apart — and the digit is here because SS15 says where digits live.
+ * Chosen by the application (`TuiConfig.hover`), not detected: C02 §3 says why.
+ */
+export const MOUSE_ANY = mode("\x1b[?1003h\x1b[?1006h", "\x1b[?1006l\x1b[?1003l");
+
+/**
+ * The kitty keyboard protocol, pushed and popped (C02 §3, C02 I12, C01 §5 step 7).
+ *
+ * **A push and a pop, not a set and a reset.** `CSI > flags u` pushes a flag set
+ * onto a stack the terminal keeps per screen; `CSI < u` pops one entry, so the
+ * terminal returns to whatever it held before we arrived — a user's own
+ * configuration or a parent's push — where `CSI = 0 u` would overwrite it. That
+ * is what makes this a `mode()`: the leave is the inverse of the enter, which is
+ * the property C01 I6 needs and a reset does not have.
+ *
+ * **`3` is `0b11`**: disambiguate escape codes (1) and report event types (2).
+ * C02 §3 tabulates the three bits not pushed with their reasons — the one that
+ * would report a lone modifier press (8) also turns every text key into an
+ * escape sequence, and is not.
+ */
+export const KITTY_KEYBOARD = mode("\x1b[>3u", "\x1b[<u");
+
+/**
  * DECSET 2026 — synchronised update. C03's, and the only mode outside C01's set.
  *
  * The pair is *transactional*, not stateful: it opens and closes around one

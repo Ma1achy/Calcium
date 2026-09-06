@@ -23,7 +23,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { b } from "@fmx/calcium";
-import type { AdapterDocument, Adapter, Block, ViewDocument } from "@fmx/calcium";
+import type { AdapterDocument, Adapter, Block, ErrorLike, ViewDocument } from "@fmx/calcium";
 import { BUSY, HOT, percent } from "./dashboard.ts";
 
 /**
@@ -164,9 +164,19 @@ export function cpuBlock(ring: Ring, trouble?: Block, unicode = true): Block {
  * *between* rules and this is a rule about what a frame contains — and the
  * containment only becomes visible when something replaces the container.
  */
-export function cpuErrorBlock(ring: Ring, message: string, retryInMs: number | null): Block {
-  const retry = retryInMs === null ? "" : ` — retrying in ${String(Math.round(retryInMs / 1000))}s`;
-  return cpuBlock(ring, b.notice.error(`${message}${retry}`, { id: "cpu-error" }));
+export function cpuErrorBlock(
+  ring: Ring,
+  err: ErrorLike,
+  retryInMs: number | null,
+  attempt: number,
+): Block {
+  // **The framework's own box, composed under the history** (F406). It was a
+  // `b.notice.error` with the countdown written into the string by hand, which
+  // is what an override could reach for before `b.status` existed — and the
+  // hand-written countdown said `— retrying in 6s` where the framework's says
+  // `⠋ retrying in 6s (attempt 2)`, so the same failure read two ways in one
+  // frame depending on which panel it was in.
+  return cpuBlock(ring, b.status(err, retryInMs, attempt, { id: "cpu-error" }));
 }
 
 /**
@@ -360,7 +370,15 @@ export function containerView(row: Row, width: number, unicode = true): readonly
       // interesting. The framework's default replaces the child outright, which
       // is right for a part whose block *is* its latest fetch and wrong for one
       // accumulating across ticks.
-      renderError: (err, retryInMs) => cpuErrorBlock(ring, err.message, retryInMs),
+      //
+      // **The failure beside the ring is `b.status` now, not a notice** (F406,
+      // C24 I30). Until the builder existed, an override's only vocabulary was a
+      // red line of text — so this app composed one under its history while the
+      // framework drew a bordered box with a painted tag two panels away, and
+      // the two failure presentations in one frame were the same failure. The
+      // other three parts here take the default and get the box; this one keeps
+      // its data and gets the same box under it.
+      renderError: (err, retryInMs, attempt) => cpuErrorBlock(ring, err, retryInMs, attempt),
     }),
     b.live({
       id: "io",

@@ -6,6 +6,15 @@ export type Scan = {
   id: string;
   spec: string;
   pattern: RegExp;
+  /**
+   * **Declared `string`, and several rows carry an array** — SS24, SS40 and
+   * SS18 use the list form `scopesOf` accepts. Widening this to
+   * `string | readonly string[]` is the honest type and it breaks three tests
+   * outside `tools/` that call `startsWith(scan.scope)` on a single-scope row
+   * (`test/contract/manifest.test.ts:445`, `view-model.test.ts:288`,
+   * `test/revert/capabilities.test.ts:29`). Left narrow, on record, until those
+   * three narrow their own reads (Lane E finding, 2026-09-03).
+   */
   scope: string;
   allow: readonly string[];
   why: string;
@@ -52,6 +61,39 @@ export declare function checkControlBytes(
   files: readonly string[],
   readFile?: (file: string) => string,
 ): Violation[];
+
+/**
+ * SS53 — every allow-list entry is exercised by the file it names. One row per
+ * `allow` entry: how many files in scope sit under it, and how many match the
+ * rule's pattern outside a comment. `matching === 0` is the violation.
+ */
+export type AllowCoverage = {
+  rule: string;
+  allow: string;
+  spec: string;
+  files: number;
+  matching: number;
+};
+export declare function allowListCoverage(
+  files: readonly string[],
+  readFile?: (file: string) => string,
+  scans?: readonly Scan[],
+): AllowCoverage[];
+export declare function checkAllowLists(
+  files: readonly string[],
+  readFile?: (file: string) => string,
+  scans?: readonly Scan[],
+): Violation[];
+
+/** SS57 — the hex ranges of `EMOJI_VARIATION_BASES`, parsed out of `text.ts`'s source (C09 I45). */
+export declare function parseEmojiBases(textSource: string): number[];
+
+/** SS57 — a non-ASCII emoji variation base inside a `src/` string literal, escapes decoded (C09 I45). */
+export declare function checkEmojiBases(
+  files: readonly string[],
+  readFile?: (file: string) => string,
+  ranges?: readonly number[],
+): (Violation & { line: number })[];
 
 /** SS47 — a mark the framework draws and cannot substitute (C09 I22). */
 export declare function checkMarks(

@@ -59,7 +59,7 @@ function thrown(over: Record<string, unknown>): string {
 const plain = (line: string): string => line.replace(/\[[0-9;]*m/gu, "");
 
 describe("MG — the mosaic's grid", () => {
-  it("MG1 (C04 I71): the pinwheel passes both gates, and is the figure a group cannot draw", () => {
+  it("MS1 (C04 I71): the pinwheel passes both gates, and is the figure a group cannot draw", () => {
     expect(errs({}), "the control, so a refusal below is about its own fault").toEqual([]);
     expect(thrown({}), "and the constructor agrees").toBe("");
 
@@ -82,7 +82,7 @@ describe("MG — the mosaic's grid", () => {
     expect(cut("row"), "and no horizontal one — so no nesting of groups expresses it").toBeNull();
   });
 
-  it("MG2 (C04 I71): the four refusals, at both gates, each naming its own part", () => {
+  it("MS2 (C04 I71): the four refusals, at both gates, each naming its own part", () => {
     // **Indexed by the rule each one breaks.** The third is the row with teeth:
     // `"ABA"` is a well-formed-looking string naming a region in two pieces, and
     // nothing about it reads as wrong.
@@ -108,7 +108,7 @@ describe("MG — the mosaic's grid", () => {
     }
   });
 
-  it("MG3 (C04 I71): `height` is required, because omitting it draws one blank row", () => {
+  it("MS3 (C04 I71): `height` is required, because omitting it draws one blank row", () => {
     for (const bad of [0, -1, 2.5, undefined]) {
       expect(errs({ height: bad }).join("\n"), `height ${String(bad)}`).toMatch(/positive integer/u);
       expect(thrown({ height: bad }), `height ${String(bad)} at construction`).toMatch(/positive integer/u);
@@ -125,7 +125,7 @@ describe("MG — the mosaic's grid", () => {
     }
   });
 
-  it("MG4 (C04 I72): a spanning region takes the sum of what it spans, and the weights are per grid line", () => {
+  it("MS4 (C04 I72): a spanning region takes the sum of what it spans, and the weights are per grid line", () => {
     const parsed = parseAreas(PINWHEEL);
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
@@ -157,7 +157,7 @@ describe("MG — the mosaic's grid", () => {
     expect(weighted[1]?.left, "and B starts after both").toBe(30);
   });
 
-  it("MG5 (C09 I35): the cell keeps its child's own rows rather than its middle", () => {
+  it("MS5 (C09 I35): the cell keeps its child's own rows rather than its middle", () => {
     // **The row count agrees whether this is right or wrong**, which is why the
     // frame is read. A six-row child in a two-row cell either keeps rows 0 and 1
     // or is squashed into rows 2 and 5 — and `measure` says 6 either way.
@@ -178,7 +178,7 @@ describe("MG — the mosaic's grid", () => {
     expect(lines[5], "down to its last").toMatch(/six/u);
   });
 
-  it("MG6 (C09 I35, C25 I1): a cell bounds an over-tall child, and F239 does not transfer", () => {
+  it("MS6 (C09 I35, C25 I1): a cell bounds an over-tall child, and F239 does not transfer", () => {
     // `scroll` draws an over-tall child whole — `measure=4 rendered=8` (F239) —
     // because it needs a slice at an arbitrary offset. A mosaic needs a clip at
     // the child's row 0, which exists, so I1 holds here rather than being
@@ -210,7 +210,7 @@ describe("MG — the mosaic's grid", () => {
     expect(lines.slice(2).join("\n"), "with nothing of the tall child in it").not.toMatch(/three|four/u);
   });
 
-  it("MG7 (C09 I35, C09 I1): no row exceeds the width, at the widths the clamp is reachable at", () => {
+  it("MS7 (C09 I35, C09 I1): no row exceeds the width, at the widths the clamp is reachable at", () => {
     // **The container's clip cannot be the guarantee**: a cell that clips its own
     // child shadows the ancestor's clip rather than intersecting it, so the
     // arithmetic is what holds the width. The floor of 1 per grid line makes this
@@ -227,7 +227,7 @@ describe("MG — the mosaic's grid", () => {
     }
   });
 
-  it("MG8 (C04 I71): a hole is drawn blank, named by no child, and exempt from the rectangle rule", () => {
+  it("MS8 (C04 I71): a hole is drawn blank, named by no child, and exempt from the rectangle rule", () => {
     // `.` in two pieces is legal where a named region in two pieces is not —
     // which is the exemption stated rather than left to be discovered.
     expect(errs({ areas: "A.B", children: [{ kind: "raw", id: "a", text: "a" }, { kind: "raw", id: "b", text: "b" }] })).toEqual([]);
@@ -240,7 +240,7 @@ describe("MG — the mosaic's grid", () => {
     expect(parsed.grid.regions.map((r) => r.name), "the hole is not a region").toEqual(["A", "B"]);
   });
 
-  it("MG9 (C04 I71): a nested mosaic is sized by its cell, and that is the general rule", () => {
+  it("MS9 (C04 I71): a nested mosaic is sized by its cell, and that is the general rule", () => {
     const inner = b.mosaic({ height: 6, areas: "XY", children: [b.raw("xxx"), b.raw("yyy")] });
     const outer = b.mosaic({ height: 2, areas: "AB", children: [inner, b.raw("right")] });
     const lines = kit.renderToLines(outer, 40);

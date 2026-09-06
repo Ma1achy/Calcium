@@ -10,6 +10,19 @@ import {
   createRouter,
   createSubprocessTransport,
 } from "../../src/data/transport/index.js";
+import {
+  createEmulatedTransport as publicEmulated,
+  createFixtureTransport as publicFixture,
+  createRouter as publicRouter,
+  createTransport as publicFactory,
+} from "../../src/index.js";
+import type {
+  Fixture as PublicFixture,
+  FixtureHandler as PublicHandler,
+  RawPatch as PublicRawPatch,
+  RawResult as PublicRawResult,
+  TransportDeps as PublicDeps,
+} from "../../src/index.js";
 import type { RawPatch, RawResult } from "../../src/data/transport/index.js";
 import { fakeClock } from "../support/fake-scheduler.js";
 import {
@@ -333,6 +346,76 @@ describe("C06 contract", () => {
     // `TuiConfig.transport`. Calcium ships no binary, and SS10 already forbids
     // the `process.env` that would be needed to read one.
     expect(offenders).toEqual([]);
+  });
+});
+
+describe("C06 §2 — the constructors are on the runtime entry (C24 §3)", () => {
+  it("T2.11: every arm of TransportDeps is constructible from `@fmx/calcium`, and a router from the result", async () => {
+    // **This row is the consumer** the export needs (CLAUDE.md: an export nothing
+    // consumes is forbidden), and it is written against the entry rather than
+    // the barrel because the barrel already had all four. The defect was that a
+    // consumer could name `TransportRouter` — `TuiConfig.transport`'s type — and
+    // no function on the entry produced one: three arms published in C06 §2,
+    // one constructor reachable, and that one the shell's own `subprocess`
+    // default. Each arm is built through the factory *and* through its own
+    // constructor, and the two answer an invocation identically (C08 I13's
+    // substitutability, read from outside the package).
+    // Annotated from the entry on purpose: MG29 fired on the functions alone,
+    // because `Fixture`, `FixtureHandler` and `TransportDeps` were interior and a
+    // consumer writing these three lines could not have named their types.
+    const corpus: readonly PublicFixture[] = [recorded()];
+    const handler: PublicHandler = (): PublicRawResult =>
+      result({ stdoutRaw: '{"rows":[1]}', stdout: { rows: [1] } });
+    const runner = fakeRunner(() => ({
+      stdout: ['{"rows":[]}\n'],
+      exit: { code: 0, signal: null },
+    }));
+    const clock = clockOf(fakeClock());
+    const deps: Readonly<Record<"fixture" | "emulated" | "subprocess", PublicDeps>> = {
+      fixture: { mode: "fixture", corpus },
+      emulated: { mode: "emulated", handler },
+      subprocess: { mode: "subprocess", binary: "widget", runner, clock },
+    };
+
+    const viaFactory = {
+      fixture: publicFactory(deps.fixture),
+      emulated: publicFactory(deps.emulated),
+      subprocess: publicFactory(deps.subprocess),
+    };
+    const direct = {
+      fixture: publicFixture(corpus),
+      emulated: publicEmulated(handler),
+    };
+
+    const inv = invocation({ verb: "ps", argv: ["ps"] });
+    expect(await viaFactory.fixture.invoke(inv)).toEqual(await direct.fixture.invoke(inv));
+    expect(await viaFactory.emulated.invoke(inv)).toEqual(await direct.emulated.invoke(inv));
+    // The three arms are distinguishable by what they answer, so this is three
+    // transports and not one constructor reached three ways.
+    expect((await viaFactory.fixture.invoke(inv)).stdoutRaw).toBe('{"rows":[]}');
+    expect((await viaFactory.emulated.invoke(inv)).stdoutRaw).toBe('{"rows":[1]}');
+    const sub = await viaFactory.subprocess.invoke(inv);
+    expect(runner.spawns, "the subprocess arm spawned").toHaveLength(1);
+    expect(sub.exitCode).toBe(0);
+
+    // The streaming half of the interface answers in the published patch type,
+    // ending in one `end` (I9) whose result is the same document.
+    const patches: PublicRawPatch[] = await drain(direct.fixture.stream(inv));
+    expect(endResultOf(patches).stdoutRaw).toBe('{"rows":[]}');
+
+    // And a router — the value `TuiConfig.transport` takes — from the entry too.
+    // `for` returns the transport wrapped in the busy latch (I13), so the
+    // routing is read from what each verb answers rather than by identity.
+    const router = publicRouter({ default: direct.fixture, overrides: { logs: direct.emulated } });
+    expect((await router.for("ps").invoke(inv)).stdoutRaw).toBe('{"rows":[]}');
+    expect((await router.for("logs").invoke(invocation({ verb: "logs", argv: ["logs"] }))).stdoutRaw).toBe(
+      '{"rows":[1]}',
+    );
+    expect(
+      (await router.for("unmapped").invoke(inv)).stdoutRaw,
+      "an unmapped verb gets the default (I14)",
+    ).toBe('{"rows":[]}');
+    expect(router.busy).toBe(false);
   });
 });
 

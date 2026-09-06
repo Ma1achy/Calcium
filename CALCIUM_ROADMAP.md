@@ -244,6 +244,30 @@ README must be run from the packaged tarball**, not the workspace, by CI.
 - **Built-in commands** — `/help`, `/clear`, `/theme`, `/history`, `/debug`, `/exit` ship
   as framework verbs; C05 appends them to every parsed manifest.
 - **Jump to bottom** — `⌃End` is already bound to `scrollBottom`, `⌃Home` to `scrollTop`.
+- **Video / GIF.** **BUILT 2026-09-04**, on the re-ruling of 2026-09-03 that said the reason this
+  row carried — *a frame scheduler built around one frame per input batch* — was false at HEAD:
+  C03 commits a `stream` rung with a 33 ms window and a 3D plot under an orbit is already a
+  continuous redraw on it (`ORBIT_RATE` in `src/shell/session.ts`, C22 I74). The re-ruling priced
+  it at a codec and ~350 lines against zero consumers and called it a cost refusal; the owed pass
+  then admitted the carrier (C04 I93: `Image.data` is PNG **or GIF**, the frame is view state), and
+  this is what it cost, measured. **(1) The decoder** — `decodeGif` in
+  `src/presentation/image/gif.ts`, **299 lines** including its comments, LZW and frame compositing
+  in-tree, no dependency row (`omggif` was the alternative at 38.5 KB); every fixture decodes pixel
+  for pixel to `sharp`'s composited pages (`test/edge/image-frames.test.ts` IF2). **(2) The
+  carrier** — no new field: a GIF is one `Image` and its frames are its own; `Frames` in
+  `src/shell/frames.ts` (**133 lines**) holds the frame each on-screen image is on, advanced by
+  elapsed time on the orbit's own wake — one timer path and one stamp (`#motionAt`), ~110 lines of
+  change in `session.ts` (C22 I77), the render key's eighth axis, and a measured wake cadence: a
+  still PNG arms **no** timer, a 100/200 ms GIF wakes **six** times in 990 ms and not thirty,
+  because the timer is armed for the next frame change and floored at the `stream` rate. **(3) The
+  kitty cost this row named does not exist**, and measuring it is what settled the ruling: a
+  retransmission at a stable id every tick would be **75 bytes a tick for an 8x8 and 29,662 for a
+  320x240** (297 KB/s at 10 fps); kitty's animation protocol (`a=f` per frame, one `a=a`) uploads
+  **once** — 116,509 bytes for four 320x240 frames — and the terminal runs the loop, so on that
+  arm the session arms no wake at all (C09 I39). **Still no consumer** in `src/`, docker-tui or
+  `examples/plots`; it was built because the owed pass admitted the member, not because one
+  arrived, and the row says so. SS54 R18 and R19 now watch it the other way round: `decodeGif(`
+  **present**, `ORBIT_RATE` present.
 
 ---
 
@@ -1391,13 +1415,54 @@ becomes free. But the first frame still renders 50,000 lines, so on its own this
 *continuous* lag into *one long stall* — better, and not enough.
 
 **3. Render only the visible window of a block.** This is the one that actually fixes it, and
-it is the heterogeneous-windowing finding from step 3 with its consumer finally present.
-`windowPatch` already proves the pattern: **reduce a `Patch` to a valid smaller `Patch`**, so
-the standard measurer measures it normally and no second height codepath appears.
+**the seam is built and wired — two kinds of five have taken it.** `C09 I25`'s
+`BlockDefinition.window` exists, `registry.windowSequence` composes it across a run counting
+`gapBefore` correctly, and `session.ts:921` calls it on the transcript render path with the
+range keyed into the render cache. A kind that declares no `window` is kept whole and paid for
+out of `skipRows`, so the seam is optional and silent — which is why its state is not
+obvious from either end.
 
-**Per divisible kind** — `patch`, `table`, `keyValue`, `logs`, `code` all reduce cleanly. The
-plot does not, and that is permanent (C12 I1: reducing a plot's data changes nothing about
-its height). **Granular where the kind divides, atomic where it does not.**
+```
+patch      WINDOWS   presentation/patch/definition.ts:214 → windowRows
+logs       WINDOWS   presentation/blocks/kinds/structured.ts:172
+code       kept whole
+table      kept whole
+keyValue   kept whole
+plot       atomic, permanently (C12 I1)
+```
+
+**MEASURED 2026-09-01, and the gap is 1 400×.** Registry against `dist/`, one block, painting
+the top 40 rows. **The render path's own figure is C14 §4a's (2026-09-03), and that is the one
+to cite**: it measures `windowSequence` as `session.ts` calls it, its absolute numbers differ from
+these by an order of magnitude because the method differs, and it carries the ruling (C14 I23) —
+the table below is kept as the measurement that first named the gap, not as the figure:
+
+```
+kind    rows      measure ms   paint 40 rows ms   window keeps
+code     5 000        2.68            82.96        5 000 of 5 000
+logs     5 000        0.00             0.35           40 of 5 000
+code    50 000       14.68           913.79       50 000 of 50 000
+logs    50 000       0.00             0.65           40 of 50 000
+```
+
+**The kind that took the seam paints a 50 000-row block in 0.65 ms; the kind that did not takes
+914 ms for the same forty rows.** `logs` also measures in 0.00 ms because its height is
+`lines.length` arithmetic, where `code` must wrap-measure every line — so the remaining cost
+splits into a `window` and a `measure` and the second is not free for every kind.
+
+**So the work is three windows, not a mechanism**: `code`, `table`, `keyValue` — **all three landed** (`table` 2026-08, `keyValue` at `structured.ts:125`, `code` with `raw` on 2026-09-04 under C14 §4a; `lineRange` is `code`'s pin). `windowPatch`
+proved the pattern and `windowRows` is the pattern *in `BlockDefinition.window`'s own shape* —
+its doc reasons the `skipRows` accounting through C25 I18 and I19 and states why the pushed
+view and the transcript need two functions rather than one parameter. That is the template the
+three follow, and the non-trivial half is `skipRows` rather than the slice.
+
+**The plot does not divide, and that is permanent** (C12 I1: reducing a plot's data changes
+nothing about its height). **Granular where the kind divides, atomic where it does not.**
+
+**A survey by directory got this wrong first.** Globbing `presentation/blocks/kinds/` reported
+`logs` alone, because `patch`'s definition lives in `presentation/patch/`. *A scan covers the
+directory and names its exceptions*; the reliable question is asked of the registry — window a
+tall block and see whether it shrank.
 
 **4. [`cells()`'s ASCII fast path](#cells-fast-path).** Only worth measuring after 1–3, because most calls
 disappear with the cache.
@@ -1411,7 +1476,10 @@ disappear with the cache.
 adapter and nothing generalises it: a default cap per block with a visible marker
 (*"2,000 of 50,000 rows"*), overridable where an app genuinely wants more. **The marker is
 what keeps it honest** — D40's eviction already carries one, for exactly this reason, and a
-silent truncation is the empty-block class again.
+silent truncation is the empty-block class again. **Built 2026-09-04 as C14 §4b** — and the
+premise above was measured wrong on the way: whole-block `measure` is 0.6 ms for 50 000 table
+rows and 20 ms for 50 000 `raw` lines, so it was never the cost; paint is ~0.25 ms/row and linear,
+so no figure picks the number and 2 000 is a reading-length policy pinned to `MAX_ROWS`.
 
 #### The acceptance test is a frame-read, not a benchmark
 
@@ -1512,25 +1580,55 @@ is rare, and the equality check costs more than the render it would save.
 
 ### Resize is never delayed, and it rebuilds the index every time
 
-**C03 I2 makes `resize` immediate** — *"input, completion and resize are never delayed"* —
-alongside the two reasons that genuinely cannot wait.
+**MEASURED 2026-09-01, and this entry named the free part. F423.** The defect is real and
+larger than the entry claimed; its stated cause is **0.07%** of it. Against `dist/`, real
+registry, real transcript, monotonic width sweep — a drag never revisits a width, so nothing
+is reusable even in principle:
 
-**But dragging a window emits dozens of SIGWINCHes**, and each one forces an immediate frame
-*and* a **full Fenwick rebuild**: `viewport.ts:202` calls `#rebuild()` on a width change,
-which is correct (heights change with width) and is the one operation the incremental index
-cannot do incrementally.
+```
+                     per drag event      a 30-event drag     Fenwick rebuild     tree's share
+N =   200 entries     3.8 – 5.8 ms            115 ms            0.001 ms            0.03%
+N = 1 000 entries    18.1 – 20.0 ms           544 ms       0.007 – 0.013 ms         0.07%
+```
 
-**So a resize drag is: N full index rebuilds, N full re-renders, N full frame writes.** The
-[render cache](#render-caching) and [output diffing](#output-diffing) do not help — every row genuinely changed.
+**The cost is `#cache.clear()`, one line above the rebuild** — a width change invalidates every
+cached height (C14 I8), so the path re-measures **every entry**. `#rebuild()` is called, it is
+correct, and the Fenwick tree over N integers is free.
 
-**A short coalescing window is the fix, and it is a C03 I2 amendment rather than a bug fix.**
-I2's reasoning is that a delayed resize means a visibly wrong frame; **the counter is that a
-delayed resize by 16 ms means one correct frame instead of thirty wrong ones**, and the final
-size is the only one anyone sees. Immediate for the *first* resize, coalesced for a run of
-them, is the shape — which is what a terminal emulator does with its own repaints.
+**The falsification condition this entry stated would have closed it.** It read *"if a rebuild
+at a realistic transcript size is sub-millisecond the whole thing is moot, and the honest
+answer is a recorded negative"* — and the rebuild **is** sub-millisecond, by three orders of
+magnitude. Rigorous, numeric, falsifiable, and pointed at the 0.07%. Kept here rather than
+deleted, because a check aimed at the wrong artefact reads exactly like a good one and this is
+the measured instance.
 
-**Measure a real drag first.** If a rebuild at a realistic transcript size is sub-millisecond
-the whole thing is moot, and the honest answer is a recorded negative.
+**And the fix is not where this entry put it.** `construct.ts:914` is the handler:
+
+```
+stores.viewport.resize(...)   ← the remeasure. 20 ms at N=1000
+refreshAnchors()
+scheduler.commit("resize")    ← the frame
+```
+
+The expensive work runs **before the scheduler is told**, so a C03 window defers the third line
+and leaves the first running per SIGWINCH: it saves the N writes and the N renders and none of
+the N measures. **The coalescing belongs in C22's handler, above `viewport.resize`.**
+
+**The asymmetry to carry**: C14 virtualises, so a resize's render is `O(visible)` — recorded
+below as checked-and-clear, correctly — but the index needs a height for every entry, so the
+measure stays `O(transcript)`. **A width change is the one event whose cost scales with the
+whole transcript rather than the screen.**
+
+**The C03 citation is also wrong.** I2's text is *"`input` and `completion` commits are never
+delayed by any amount"* — it does not mention `resize`, and this entry quoted it as though it
+did. Three places in C03 cite I2 for `resize` (§3's prose, rule 1, T3.13); `make enforce`
+resolves the citation and cannot check what the invariant says. And *never delayed* is already
+false for `resize` — T3.17 defers one arriving during a write.
+
+**Still worth doing, for the reason the entry gave**: a delayed resize by 16 ms means one
+correct frame instead of thirty wrong ones, and the final size is the only one anyone sees.
+Immediate for the first, coalesced for a run — what a terminal emulator does with its own
+repaints. The acceptance is a drag, not a benchmark.
 
 ### Checked and clear — recorded so nobody re-derives them
 
@@ -1850,9 +1948,7 @@ hand-drawn case is the one that needs the API to be good.
 
 ### Selection in the prompt — and `⌃a` stays where readline put it
 
-**Select-all in the prompt does not exist**, and neither does selection: grep finds no
-anchor, no mark, no region in C17. So there is nothing to select *into* — the binding is the
-small half.
+**Select-all in the prompt does not exist — but selection now does.** This section said *grep finds no anchor, no mark, no region in C17*; measured 2026-09-03, `selectionSpans` is exported from `src/interaction/editor/layout.ts` (C17 I18, I21) and roadmap 15 is BUILT, so there is something to select *into* and the binding below is the whole of what remains.
 
 #### `⌃a` keeps line-start; select-all takes `⌥a` — checked, and `⌃⇧a` lost
 
@@ -2428,7 +2524,7 @@ Worth doing with the [scroll-anchor rule](#scroll-anchor): both are *"the window
 follow the thing the reader is attending to"*, one in the transcript and one in the prompt.
 
 <a id="chrome-row-budget"></a>
-### Chrome is one row each, by design — and four features now want more
+### Chrome is one row each, by design — and the claimants are counted once, in entry 29
 
 `frame.ts:4`: *"Calcium owns the structure — **one chrome row each, fixed, never scrolling**."*
 Deliberate, and it is now the constraint several things are queuing behind:
@@ -2440,8 +2536,7 @@ queueing                ✳ 2 queued · 1 running
 region separators       a rule between chrome and content
 ```
 
-**Four features wanting the same one row is the signal to rule on it once**, rather than
-letting them fight. The options:
+**Several features wanting the same one row is the signal to rule on it once**, rather than letting them fight. The list above is the one this section opened with; the current count is kept in entry 29 alone (reconciled 2026-09-03), because four documents carrying four numbers was the defect. The options:
 
 - **Multi-row chrome**, app-declared height. Simple, and it costs transcript rows —
   which is the thing density was chosen against.
@@ -2861,8 +2956,15 @@ progress work wants for elapsed time.
 The transcript is already a store with a cap and eviction; persisting it is C20's shape one
 level up. Tractable.
 
-**Rewind / undo / redo is a different project** — it means every mutation is reversible, and
-nothing currently is. Split these; do not let the second block the first.
+**Rewind / undo / redo is a different project** — it means every **transcript** mutation is
+reversible, and none is. *Every mutation … and nothing currently is* was this sentence until
+2026-09-03, and it was false at HEAD: the editor's mutations are reversible —
+`src/interaction/editor/undo.ts`, two stacks, structural coalescing, `UNDO_LIMIT = 200` (C17 §6,
+I11). What has no inverse is the transcript: C13 is append-only with eviction (`op: "evict"`,
+C13 §5), `ViewPatch` has `append`, `replace`, `merge`, `status`, `expand` and `reserve` and no
+delete (C04, C25), and `settle` freezes an entry (C23 I9). Rewind is those three reversed, which
+is the same reversal of C13's shape that arc 7 (cell ordering) needs. Split these; do not let
+the second block the first. SS54 R22 holds the narrowed premise: `UNDO_LIMIT` present.
 
 ### Auto-update
 
@@ -2882,9 +2984,29 @@ By how much each fights the character grid:
 ```
 easy       bar · histogram · line (exists) · sparkline (exists) · HEATMAP
 medium     candlestick · pie (circle approximation, looks rough)
-hard       sankey (edge routing — the same problem as Mermaid layout)
-no         3D — perspective in a character grid is a novelty, not a tool
+hard       sankey (edge routing — the same problem as Mermaid layout) · 3D
+           ← sankey RE-RULED 2026-09-03: the edge-routing premise expired twice (`graph`
+             ships a layered router, `elkjs` is in the tree) and it is NOT a fold over
+             `graph` — C12 §3d, *Sankey*. A new form over `graphLayers`, no consumer
+           ← BUILT 2026-09-04 as `sankey`, C12 §3ap: the consumer arrived as C04 I92
+             (`GraphEdge.weight`), and the form is `graphLayers` plus a placement and a
+             drawing, as §3d predicted. SS54 R20 expired as designed and is removed; R21 stays
 ```
+
+**3D was the `no` row, on *perspective in a character grid is a novelty, not a tool* — and
+that is a fit argument asserted rather than measured.** Measured (F431): one surface and one
+teapot-shaped solid at 80×24 cells, three arms. Four metrics said the braille dot grid held it
+— 0.3% and 1.5% silhouette disagreement against the pixel truth, the handle's hole four dots
+clear, 163 distinct shade levels of 186 — **and the picture disagreed with all four**, because
+**6931 of 7254 lit dots are interior and every one of them is on**. A 3D form is not its
+outline; a lid seam and the trough of a ripple are shading discontinuities, and the braille
+channel is a constant inside the silhouette. On the **half-block** rung — `▀`, two full colours
+a cell, a *quarter* of braille's samples — every structure the image arm has is there.
+
+So it moves to `hard` for the reason sankey is there: **the 3D axis layout is the work.** The
+renderer is a projection, a depth buffer and one light, and the last stage is `halfBlockRows`,
+which already ships for images. `docs/notes/CALCIUM_3D_DESIGN.md` carries the design and entry
+52 orders it.
 
 **Heatmap is the sleeper.** A grid of coloured cells is *exactly* what a terminal is. It
 needs colour maps, and it degrades beautifully — colour → `░▒▓█` shading at 1-bit. For ML
@@ -2919,14 +3041,16 @@ an ML platform's TUI.
 
 ## Fights the architecture — deliberately not doing
 
-- **Video / GIF.** Redrawing a rectangle at 15 fps inside a frame scheduler built around
-  *one frame per input batch* fights the architecture at its root. **A GIF's first frame as
-  an image, with a note, gets 90% of the value for 5% of the work.**
-- **3D plots.** Perspective in a character grid is a novelty.
 - **An embedded text editor.** `/tty vim` already hands the terminal over, vim runs, you
   come back — the handoff is built and correct. An embedded editor is a much larger thing
   for less.
 - **Wrapping matplotlib** — above.
+
+**3D plots were on this list and have been retracted, not deleted.** *Perspective in a character
+grid is a novelty* was refused without measuring; the measurement overturned it (F431, above).
+Recorded here rather than removed silently, because **a refusal that vanishes is one somebody
+restores** — and because this list is the one `roadmap-status.mjs` cannot see: it skips every row
+whose order column is `—`, so a refusal outliving its reason sits outside every gate. Entry 52.
 
 ---
 
@@ -2937,8 +3061,10 @@ BUILT 0  step 8                    docker-tui packaged — README, play environm
 PART  1  PHASE 1                   producer context · change axis · builder audit · the prompt
                                    ↑ serves both destinations, must precede the freeze
       2  prism-tui's first         experiment table · training curve · one live job
-         surfaces                  ↑ the second consumer, and b.live's stream arm's first
-      3  the ML package            tensors, heatmaps. TWO CORRECTIONS, 2026-08-15, and the
+         surfaces                  ↑ the second consumer. (This said *b.live's stream arm's
+                                   first*; the arm was deleted — F78, 2026-09-03 — see
+                                   `src/shell/builders/types.ts`.)
+PART  3  the ML package            tensors, heatmaps. TWO CORRECTIONS, 2026-08-15, and the
                                    first removes this entry's gate. *Built with prism-tui as
                                    the consumer* says who validates the design, not who has to
                                    exist first — and the stronger reading is false in the tree
@@ -2993,7 +3119,7 @@ RULED 6  phase 2                   the empty-block convention · rendering flags
                                    closed-set test is answered because there are NO MEMBERS —
                                    the framework understands exactly one presentation-selecting
                                    flag and does it by RESERVING THE NAME. C05 §8b, C22 §13b
-RULED 7  THE NAVIGATION MODEL      scopes + modes + policies + pointer — design first, it subsumes
+PART  7  THE NAVIGATION MODEL      scopes + modes + policies + pointer — design first, it subsumes
                                    the small navigation items rather than sitting beside them.
                                    SPECIFIED as C26; stages 1–3 built (interaction is a focus
                                    target, blocks report elements, focus holds an address).
@@ -3039,6 +3165,12 @@ RULED 7  THE NAVIGATION MODEL      scopes + modes + policies + pointer — desig
                                    `stores.transcript.liveId`. So no element inside a view can
                                    be focused at all, and (b)'s key collision cannot occur until
                                    a second caller exists. Blocker as a symbol: `liveElements`.
+                                   LIFTED 2026-09-03, C26 §4g: `elementsOf(entryId)` has three
+                                   callers and the stored location names its entry; `tab`/`⇧tab`
+                                   move between entries. (b)'s collision cannot occur for the
+                                   reason given there and a second reason — `mergeBlock` places
+                                   a colliding key at `interaction` rather than throwing (C16
+                                   I27).
                                    (b)'s WALK IS RUN — C26 §4e, both artefacts — AND THE
                                    COLLISION CANNOT HAPPEN AT ALL: `activeTarget` returns
                                    `pushedView` whenever a view is open, BEFORE any element
@@ -3061,9 +3193,13 @@ RULED 7  THE NAVIGATION MODEL      scopes + modes + policies + pointer — desig
                                    the four global ones are closed to every adapter by
                                    construction, and interaction is the only rung where they
                                    are not. Real, expressible, UNINHABITED. §8b.8's refusal
-                                   keeps its condition and the condition is now nameable:
-                                   until a block needs a key liveBlock or global already binds,
-                                   which mergeBlock's throw reports. (b) IS CLOSED AS
+                                   kept its condition — until a block needs a key liveBlock or
+                                   global already binds — and the condition is MET BY
+                                   MECHANISM 2026-09-03, C16 I27: a colliding key is merged at
+                                   interaction and a free one at liveBlock, so mergeBlock no
+                                   longer throws and the mode has a producer route. STILL
+                                   UNINHABITED: `BlockKeymap` has no producer in `src/` (T2.6a
+                                   holds). (b) IS CLOSED AS
                                    UNINHABITED rather than deferred — both halves need a
                                    consumer that does not exist and both triggers report
                                    themselves. ALL THREE QUESTIONS ANSWERED
@@ -3095,7 +3231,7 @@ BUILT 9  mermaid (text path)       cheap once the dependency is vetted, distinct
                                    which is C02 I9's tier arriving in a renderer that already
                                    had the switch
 PART  10 question / menu primitive biggest unlock for agent UIs — lands inside the navigation model
-PART  11 markdown                  translates to existing blocks. CHECKED 2026-08-15 AND THE
+BUILT 11 markdown                  translates to existing blocks. CHECKED 2026-08-15 AND THE
                                    GREP RESOLVES AGAINST SOMETHING ELSE: `markdown` is in
                                    `src/` — as a highlight.js LANGUAGE registered by C09's
                                    `code` block, `presentation/blocks/kinds/code.ts`. That is
@@ -3198,7 +3334,23 @@ PART  11 markdown                  translates to existing blocks. CHECKED 2026-0
                                    RENDERED rather than literal. Then the view-model change goes
                                    first and the mapping follows it, in that order — the reverse
                                    builds a translator against a vocabulary that cannot express
-                                   its output
+                                   its output.
+                                   THE INLINE HALF LANDED 2026-09-04, WITH 50: `inline` in
+                                   `src/data/viewmodel/markdown.ts` — `**` → bold, `*` and `_`
+                                   → italic, as `TextSpan`s over the marker-stripped text, on
+                                   paragraphs, list items, quotes, headings and pipe cells and
+                                   never inside a fence; a backtick run is literal and an
+                                   unpaired marker is text. T2.33 and T2.34 replace T2.44.
+                                   STILL PART, AND THE RESIDUE IS NAMED. (i) AND (ii)
+                                   CLOSED 2026-09-04, the day after they were written —
+                                   `DELIMITER` now takes one cell and requires a pipe, so
+                                   `| h |` over `|---|` is a one-column table (T2.48), and
+                                   inline code is an `identifier`-toned span now that
+                                   `TextSpan.tone` exists (C04 I89, T2.33). WHAT REMAINS is
+                                   (iii): heading levels, the quote gutter and the nesting
+                                   cap, as before — none of the three has a symbol, because
+                                   each is a decision about what to draw rather than a
+                                   mechanism that is missing
 BUILT 12 OUTPUT DIFFING          ★★ the whole frame is written every keystroke — ~10,000 cells
                                    to change one. Anticipated in a comment, never built.
                                    Smallest fix, biggest effect, invalidation already exists
@@ -3447,7 +3599,10 @@ BUILT 24 more default themes      two ship and `light` WAS dark-on-dark — CLOS
                                    guarantee. A01 A.1, C10 T2.24; 15 mutations, 15 caught
 PART  25 ghost text ★            drawn since PR #27. What remains: it ghosts only a SOLE
                                    candidate, which is when the hint is least needed, and it
-                                   is static-only. Design with as-you-type — one hint, two levels
+                                   is static-only. 40 (as-you-type) is BUILT, so *design with
+                                   as-you-type* has expired (2026-09-03): `ghost()` in
+                                   `src/interaction/completion/engine.ts` is still
+                                   sole-candidate. Design the two together — one hint, two levels
       26 view trace in transcript a full-screen view leaves no record. Append on push, PATCH on
                                    pop — sidesteps B03's no-trace-on-pop ruling, one entry, D7
                                    intact. And ⏎ to re-enter is nearly free. RE-CHECKED
@@ -3475,7 +3630,7 @@ BUILT 28 prompt cursor-following  the window exists and is tail-anchored; the fi
                                    same kind of number. Both measured in a frame; neither
                                    visible to any assertion, because every number agreed with
                                    every other. C22 §6e, I62, commitment 33
-      29 chrome row budget        one row each by design, and FIVE features now want it: the
+BUILT 29 chrome row budget        one row each by design, and FIVE features now want it: the
                                    mode indicator, elapsed time, the queued count, region
                                    separators (37) and now WHERE IN THIS CONTAINER AM I (46),
                                    which is the scrollbar at container scope rather than
@@ -3486,8 +3641,9 @@ BUILT 28 prompt cursor-following  the window exists and is tail-anchored; the fi
                                    display a value that cannot change — and that is RULED
                                    rather than missing (C26 §8b.8: `⏎` does not enter
                                    interaction while the mode has no bindings and
-                                   `Keymap.mergeBlock` has no caller). The queued count still
-                                   waits on 33. So 29 is still a slot with nothing to put in
+                                   `Keymap.mergeBlock` has no caller). The queued count no
+                                   longer waits on 33: 33 closed that question and rules the counter not
+                                   owed (2026-09-03). So 29 is still a slot with nothing to put in
                                    it, and the reason is now a grep rather than a memory.
                                    RE-CHECKED A THIRD TIME 2026-08-15, unmoved, and a SIXTH
                                    consumer arrived: entry 15's boundary ruling wants a
@@ -3504,7 +3660,38 @@ BUILT 28 prompt cursor-following  the window exists and is tail-anchored; the fi
                                    value is blocked on a ruling upstream of C26 and not on a
                                    chrome row. FIVE consumers, not six, and the row is asserted
                                    rather than described: T1.3j scans `src/` and expires the
-                                   day anything sets `"interact"`
+                                   day anything sets `"interact"`. RECONCILED 2026-09-03: the
+                                   count was four here (§Chrome is one row each), five, six
+                                   and five in this entry, six then seven in
+                                   `docs/design/AGENT_TUI_DESIGN.md`. ONE LIST, kept here:
+                                   FOUR roadmap consumers — elapsed time (35), region
+                                   separators (37), where-in-this-container (46), the
+                                   selection row count (15) — the queued count having left
+                                   with 33 and the mode indicator with the fourth check.
+                                   RULED AND BUILT 2026-09-05 — C22 §6k, I79, I80,
+                                   commitments 50–51; `TuiConfig.chrome.footerRows` in
+                                   `src/shell/types.ts`, resolved in `src/shell/config.ts`,
+                                   honoured by `compose`/`heightsSum` in `src/shell/frame.ts`
+                                   and drawn on `footerRows` rows by `src/shell/paint.ts`.
+                                   The budget is DECLARED PER SESSION, default 1, at most
+                                   `MAX_FOOTER_ROWS` = `MIN_ROWS − 1 − ⌊MIN_ROWS/2⌋ − 1` (6),
+                                   derived from the size gate rather than chosen; a `ChromeFn`
+                                   returns blocks and never a height (the per-frame option was
+                                   walked in §6k.3 and refused). The default frame is
+                                   byte-identical (T3.36). WOULD LANDING THIS CLOSE IT: 35, 37
+                                   and 15 each wanted a chrome row and now have one to ask for
+                                   — closed AS A BUDGET, each still owing its content; 46 is a
+                                   scrollbar at container scope, wants no chrome row, and is
+                                   RE-FILED out of this entry (F739). Residue, named: the
+                                   activity region A7 is a fifth region and not a footer
+                                   (symbol: `Composed.activity`, absent); `footerRows: 0` is
+                                   not offered (§6k.4 E); `construct.ts:652` still calls
+                                   `initialRegionHeight(size)` without the budget and the
+                                   first frame corrects it by `footerRows − 1` rows (I34,
+                                   T1.37).
+                                   PLUS TWO from the agent-tui design, which are not roadmap
+                                   entries: the activity region (§3 A7) and the three-line
+                                   footer (§3 A8). Every other document points here.
 PART  30 paste as a chip          Claude Code's idea; Calcium can reference a BLOCK rather than
                                    a string, so the transcript renders what it actually is.
                                    MEASURED 2026-08-15 IN §8a, no code. Bracketed paste IS
@@ -3898,7 +4085,8 @@ BUILT 46 SCROLLABLE CONTAINERS     a container scrolls IF IT IS FOCUSABLE and it
                                    boundary is the part that needs ruling, with 15.
                                    WHEN TO REACH FOR ONE, because a container is a choice to
                                    hide content and after C04 §3c cell 6 it hides it
-                                   PERMANENTLY until block-to-block focus lands: a bounded
+                                   until focused — C26 §4g; a settled scroll is aimed with
+                                   `⇧tab` and paged with `PgUp`/`PgDn`: a bounded
                                    region where BOUNDING IS THE POINT — a view, the live
                                    entry, a dashboard, the activity region. IN THE SCROLLING
                                    TRANSCRIPT A LONG BLOCK IS ALREADY FINE, because the
@@ -3993,7 +4181,7 @@ BUILT 46 SCROLLABLE CONTAINERS     a container scrolls IF IT IS FOCUSABLE and it
                                    write-as-a-diff. IT ALSO WENT THE WAY THE ENTRY PREDICTS —
                                    the frame was written because a mark's PLACEMENT was wrong
                                    in a way every block-indexed assertion passed
-PART  50 INLINE EMPHASIS          span-level styling, which the vocabulary has NO
+BUILT 50 INLINE EMPHASIS          span-level styling, which the vocabulary has NO
          (span-level styling)      REPRESENTATION FOR at any depth: tone attaches to a block,
                                    a Cell, a keyValue row, an events row or a pill and never
                                    to a run inside text. FILED AND NOT IMPLEMENTED — it is a
@@ -4027,7 +4215,22 @@ PART  50 INLINE EMPHASIS          span-level styling, which the vocabulary has N
                                    again: THE TRIGGER IS A CONSUMER APPEARING, both entries name
                                    their blocker as a symbol, and a grep is what answers it. Any
                                    further round that re-checks these two is spending the
-                                   satisfier-side habit where nothing can have moved
+                                   satisfier-side habit where nothing can have moved.
+                                   BUILT 2026-09-04, AND THE ORDER WAS KEPT — spans first,
+                                   then 11's translator. `TextSpan` — `{from, to, bold?,
+                                   italic?, underline?}`, UTF-16 code units, half-open — in
+                                   `src/data/viewmodel/types.ts` on `Raw`, `Notice`, `Rule`
+                                   and `Cell`, refused to `code` (C04 §3am, I83–I88);
+                                   `checkSpans` at the gate; `src/presentation/runs.ts`
+                                   (`runsOf`, `sliceRuns`, `wrapRuns`) and `paintRuns` in
+                                   `src/presentation/blocks/paint.ts`, coalesced by style
+                                   reference so no golden frame moved (C09 §5). The first
+                                   frame that writes SGR 3 is C04 T2.31, and MG24's
+                                   `SgrStyle.italic` row is gone. Design and both walks in
+                                   `docs/notes/CALCIUM_SPANS_DESIGN.md`. DEFERRED WITH
+                                   SYMBOLS, and neither is this entry's: a span tone as
+                                   `TextSpan.tone` (inline code's, 11's residue) and a span
+                                   value as `TextSpan.value` (ML-1's)
 BUILT 51 MOTION AND MEASURE SETS ★  spinners · bar styles · A CATEGORICAL PALETTE — and one
                                    finding underneath all three. THE PALETTE IS THE
                                    FREEZE-RELEVANT HALF: *n distinct things, no order, no
@@ -4188,7 +4391,24 @@ THE SETS LANDED 2026-08-15 AND 51 IS
                                    and the band itself is a SPINNER's — a counter and a
                                    two-frame toggle are other categories, which is why one band
                                    over all three reported three false rows. T2.70–T2.75
-      —  video · 3D · embedded editor · matplotlib wrapper · rewind/undo
+BUILT 52 3D PLOTS                  RETRACTED FROM *deliberately not doing*, and the refusal
+                                   was a fit argument asserted rather than measured (F431).
+                                   HALF-BLOCK RUNG: `▀`, two full colours a cell. The sample
+                                   grid is `width × 1` by `height × 2` — 80×48 at 80×24 cells,
+                                   120×60 at 120×30 — so nothing is hardcoded to a viewport,
+                                   and every absolute figure in the design note is a
+                                   measurement at 80×24 rather than a threshold. THE DITHER IS
+                                   NOT PORTED: it is a function of `colourDepth`, not of this
+                                   form, measured at 1.09× / 1.43× / 3.51× / 7.84× and worth
+                                   nothing where the rung lives (F433). Steps 1–3 of §10 ship a
+                                   3D scatter, which is where it stops being speculative.
+                                   THE CAMERA IS THE PART WITH A SCAR: `cursorPositions` is
+                                   read in `src/presentation/plot/definition.ts` and written by
+                                   nothing in `src/` — a complete mechanism with nothing on the
+                                   other side (C12 §3s) — so a camera on `RenderContext` with no
+                                   writer repeats it exactly. The field, the cache-key axis and
+                                   one binding land together or none does.
+      —  video · embedded editor · matplotlib wrapper · rewind/undo
 ```
 
 ### How to read the status column — checked 2026-08-13
@@ -4218,59 +4438,144 @@ what landed**.
 | # | status | evidence in the tree | residue |
 |---|---|---|---|
 | 0 | BUILT | `examples/docker/README.md` (F157), the media (F158), `.github/workflows/ci.yml` `fast`/`proof` (F150, F154, F156) | — |
-| 1 | PART | **1.2 change axis** built: `change?: "unchanged" \| "changed" \| "added" \| "removed"`, `src/data/viewmodel/types.ts:597` | 1.1, 1.3, 1.4 not checked in this pass |
+| 52 | BUILT | **the field, the cache-key axis and one binding landed together, which is the condition the entry set** — `cameras` on the render context (`src/presentation/blocks/types.ts:134`), the store `Cameras` with its `key` (`src/shell/cameras.ts:59`), `nudge` bound to the orbit keys (`src/shell/construct.ts:1426`), `plot3d` a validated form (`src/data/viewmodel/validate.ts:1657`), `azimuth` and `elevation` the projection's own angles (`src/presentation/plot/project3.ts:171`) and `halfBlockRows` the rung (`src/presentation/plot/scatter3.ts`). Re-measured 2026-09-04 | the dither is still not ported and is worth nothing at this rung (F433); the fit argument the refusal rested on was asserted rather than measured (F431) and stays retracted |
+| 3 | PART | **three of the entry's four names are built** — `heatmap` (`src/presentation/plot/heatmap.ts`), `confusion`, `correlation` all in `PLOT_FORM_MEMBERS` (`src/data/viewmodel/validate.ts:2328`); the planning pass this entry said was *the real blocker* exists as `docs/notes/CALCIUM_PLOT_SYSTEM_PLAN.md` (2026-09-03) | **Gate**: `tensor` occurs zero times in `src/` — re-measured 2026-09-04, still zero, and red the day the ML half starts. Design at `docs/notes/CALCIUM_ENTRY3_KICKOFF.md` — one slice as a heatmap, plus a header |
+| 1 | PART | **1.2 change axis** built: `change?: "unchanged" \| "changed" \| "added" \| "removed"`, `src/data/viewmodel/types.ts:2553` | 1.1, 1.3, 1.4 not checked in this pass |
 | 5 | PART | **CI from the tarball** built: `.github/workflows/ci.yml` `proof` job + `make regime`. **0.x** said: `README.md:472` | error messages: F151 fixed, **F152 and F153 open**. The outside-reader test is **owed and unrunnable from inside the repository** (R01 R4.4) |
-| 7 | PART | **specified as C26, and three stages built.** `ElementAddress` — `interaction/router/types.ts:84` — and one shared resolver, `resolveFocus` — `interaction/router/focus.ts:122` — so focus holds an address and render and keys answer from the same place. Stage 1 made `interaction` a focus target, stage 2 gave blocks `elements`, stage 3 the address; the ⏎ ruling followed. `docs/components/C26_navigation.md` | **§4's policy resolution and the modes.** `ArrowPolicy` and `EscapePolicy` are absent from `src/` — withdrawn under MG24 because `NavElement.arrow` and `.escape` had no reader, **re-checked against the widened rule (F159) and the withdrawal holds**, so §4 is still a design question — **but the check it owed first has been run, and it refuses the vocabulary**: `docs/components/C26_navigation.md` §4a, four kinds against the tree, **zero fit and for two different reasons**. `table` needs *escape up, stop down* and every `ArrowPolicy` value names an axis rather than a direction; `logs`, `patch` and a scroller never step an element, so the edge question does not arise. The discrimination the vocabulary was for is already carried by which of `elements` and `window` a kind declares, and the cell that was left open — a kind declaring both — is **ruled in §4b**: elements are the unit of movement and the window is a consequence, so the cell dissolves without a field (C26 I18, commitment 12, I7 gains the content of the agreement). §4's resolution shape (global → kind → per-node) is untouched and is now what a kind wanting `↓` to scroll uses. **What §4 still owes is the boundary**, which is a different question from the interior: `table` escapes up and stops down, and no vocabulary in the tree names a direction |
+| 7 | PART | **specified as C26, and three stages built.** `ElementAddress` — `interaction/router/types.ts:84` — and one shared resolver, `resolveFocus` — `interaction/router/focus.ts:122` — so focus holds an address and render and keys answer from the same place. Stage 1 made `interaction` a focus target, stage 2 gave blocks `elements`, stage 3 the address; the ⏎ ruling followed. `docs/components/C26_navigation.md` | **§4's policy resolution and the modes.** `ArrowPolicy` and `EscapePolicy` are absent from `src/` — withdrawn under MG24 because `NavElement.arrow` and `.escape` had no reader, **re-checked against the widened rule (F159) and the withdrawal holds**, so §4 is still a design question — **but the check it owed first has been run, and it refuses the vocabulary**: `docs/components/C26_navigation.md` §4a, four kinds against the tree, **zero fit and for two different reasons**. `table` needs *escape up, stop down* and every `ArrowPolicy` value names an axis rather than a direction; `logs`, `patch` and a scroller never step an element, so the edge question does not arise. The discrimination the vocabulary was for is already carried by which of `elements` and `window` a kind declares, and the cell that was left open — a kind declaring both — is **ruled in §4b**: elements are the unit of movement and the window is a consequence, so the cell dissolves without a field (C26 I18, commitment 12, I7 gains the content of the agreement). §4's resolution shape (global → kind → per-node) is untouched and is now what a kind wanting `↓` to scroll uses. **The boundary was owed here and has since been ruled** — C26 §4c (2026-08-15): a boundary is a neighbour question, the sequence is the entry's, and §4g (2026-09-03) made that entry the *focused* one; §4d then records §4 short of nothing. **What remains is `ArrowPolicy` and `EscapePolicy`, withheld under MG24, and nothing else** — no reader for `NavElement.arrow`/`.escape` (F159), and after §4a/§4d no inhabitant for any value of either. (a)–(c) are answered in the Order entry, and the block-to-block ceiling it cited lifted 2026-09-03 (§4g) — re-read 2026-09-04 |
 | 6 | RULED | **the ruling is in the entry, and the walk is in two specs.** `docs/components/C05_tool_manifest.md` §8b and `docs/components/C22_composition_root.md` §13b. 2.2's first half is built and the prose had not caught up: `shellOnly` — `data/manifest/types.ts:88` — is absent from `argv` via `validateInvocation`, `data/manifest/validate.ts:254`, and `examples/docker/bin/docker-json` records the shim's strip being deleted rather than commented | **2.2 is closed with no field; 2.1's convention is what remains.** The convention is unwritten and its residue is an empty block whose emptiness is a *failure to compute*, which C22 cannot tell from a success. 2.2 needs nothing: `--help` replaces the result rather than selecting among renderings, and `usageBlocks` — `src/data/adapters/mapping.ts:169` — lists every flag flat |
 | 8 | BUILT | **C14 I4/I5/I6.** `src/viewport/viewport/viewport.ts:347` — `#afterContent()` restores from the anchor on **every** content change, not only on resize; `T5.3` is the tier-5 row — *a `--logs` tail at 1,000 lines/s while scrolled up → the view does not move* | the floating jump-to-bottom indicator, which is chrome and belongs to 29 |
-| 10 | PART | `ask: (opts: AskOptions) => Promise<string>` with `choices` — `src/shell/local/registry.ts:59`, reached as `ctx.ask` at `src/shell/execution.ts:616` | the in-transcript menu block, and the popup unification (16) |
+| 10 | PART | `ask: (opts: AskOptions) => Promise<string>` with `choices` — `src/shell/local/registry.ts:59`, reached as `ctx.ask` at `src/shell/execution.ts:806` | the in-transcript menu block, and the popup unification (16) |
 | 12 | BUILT | `src/shell/render-frame.ts:153` `body()` — `previous()`, per-row `cursorTo(i, 0)`, `SGR_RESET` per row (I57) | — |
 | 13 | BUILT | `src/shell/render-cache.ts`, keyed on entry · `rev` · width · **focus** · theme name | — |
 | 14 | BUILT | `src/presentation/text.ts:108` — an equality, not an approximation | — |
-| 17 | PART | `logs` — `src/presentation/blocks/kinds/structured.ts:123` — **and** `patch` — `src/presentation/patch/definition.ts:211` — declare `BlockDefinition.window` (F134, CLOSED: 13–21× opening, 90–102× per drag step) | **two implementers, not four.** `keyValue` and `code` declare none and render whole at every offset |
+| 17 | PART | **four implementers** — `keyValue` (`src/presentation/blocks/kinds/structured.ts:125`), `logs` (`src/presentation/blocks/kinds/structured.ts:217`), `patch` (`src/presentation/patch/definition.ts:213`) and `table` (`src/presentation/table/definition.ts:157`) declare `BlockDefinition.window` (F134, CLOSED: 13–21× opening, 90–102× per drag step). This cell said *two, not four; `keyValue` and `code` declare none* — re-measured 2026-09-03: `keyValue` declares, `table` was uncounted, and row 7 above already reasoned about the `table` kind this row denied | **`code` and `raw` declare `window` as of 2026-09-04** (C14 §4a, C09 I25a, C04 I82 — `lineRange` is the pin, because a parse cannot be sliced); C14 §4a carries the before/after table rather than this row restating a figure. **The cap landed 2026-09-04** under C14 §4b (I24–I26, `TuiConfig.maxBlockRows`, default 2 000, marker `… 2,000 of 50,000 rows`); F601 measured whole-block `measure` at 0.6 ms for a 50 000-row `table`, so the bound is on rows painted and not on the cost the paragraph at *And a bound* named. Residue: the `code` block's whole-text control strip per frame named in §4a (a window opening at line 0 now slices, C09 I25a) |
 | 18 | BUILT | `src/shell/refresh.ts` — `Source`, the `folds` memo (I47), stagger by source not by part | — |
 | 19 | PART | **the first claim holds and the second does not.** `resize` is an immediate commit reason, never coalesced (C03 §, I2). But *every SIGWINCH rebuilds the Fenwick index* is false: `src/viewport/viewport/viewport.ts:197` rebuilds **only when the width changed** — C14 I8, *a height change invalidates none, and doing both would make dragging a terminal's bottom edge cost a full remeasure per frame* — and step 0 refuses a resize to the size already held (C14 I21) | a **horizontal** drag is still N rebuilds + N renders + N writes, which is the half that survives |
-| 20 | BUILT | `visible: (host: RefreshHost) => boolean`, `src/shell/refresh.ts:212`, wired at `src/shell/construct.ts:760` | — |
+| 20 | BUILT | `visible: (host: RefreshHost) => boolean`, `src/shell/refresh.ts:327`, wired at `src/shell/construct.ts:1224` | — |
 | 21 | BUILT | **the user-invokable path exists and is tested.** `src/shell/execution.ts:1300` routes `--help` on both paths before any spawn; `usageDoc` — `src/shell/documents.ts:211` — composes from the manifest with `status: "ok"`; `--help` is reserved by `FRAMEWORK_FLAGS`, `src/data/manifest/framework.ts:153`, `shellOnly`; `/help` is two-level at `src/shell/local/handlers.ts:110`. T4.8 asserts the document **and** that nothing spawned | — |
-| 25 | PART | drawn: `src/shell/paint.ts:303` reads `ghost()` fresh per paint (I50) | sole-candidate only, and static |
+| 25 | PART | drawn: `src/shell/paint.ts:303` reads `ghost()` fresh per paint (I50) | sole-candidate only, and static — `ghost()` in `src/interaction/completion/engine.ts` returns a hint only when `staticCandidates` has exactly one. The *design with 40* dependency expired: 40 is BUILT (2026-09-03) |
 | 27 | PART | **16 languages** registered in `src/presentation/blocks/kinds/code.ts`, up from 2 | the entry's own target is 24 |
 | 31 | PART | **recency-first landed.** `rank` — `src/interaction/completion/engine.ts` — runs after `dedupe` at both call sites over an injected `recency`, and C22 supplies it from C20's history at `src/shell/construct.ts`. `null` sorts last and stably, so it refines source order rather than replacing it. C19 I26, §3a; five mutations in `tools/mutate/runs/c19-ranking.mjs` | **substring and subsequence.** Substring is **refused** and I27 says why: the verb source emits one word at a time, so the whole name never reaches the filter and widening it changes nothing. Subsequence wants a match-quality scorer, which is a separate ruling |
 | 34 | PART | animation exists as `RenderContext.tick` — `src/presentation/blocks/types.ts:39`, and `measure` never receives it (C09 I8) | structured export: no `exportAs`/`toJSON` anywhere in `src/` — and **that phrase is this table's own grep term, not the entry's** (F166). The entry lists *structured export* among six UX items, where it means letting a user export what is on screen. It is **not** a `ViewDocument` codec, which is what 44's row read it as |
-| 38 | BUILT | `Group` ships with `direction: "row" \| "column"` — `src/data/viewmodel/types.ts:612`, `b.group`, `groupDefinition` in `src/presentation/blocks/kinds/containers.ts` — and the weights C04 §3 deferred are built: `flex?: readonly number[]` at `src/data/viewmodel/types.ts:580`, `groupChildWidths` at `src/data/viewmodel/measure.ts:79`, refused at `b.group` and by `checkFlex` — `src/data/viewmodel/validate.ts:280`. C04 §3, I42, I43, commitments 39–40, T1.20, T3.16–T3.19, T6.20–T6.22; `tools/mutate/runs/c04-weights.mjs` — and `Share` closes it: `examples/docker/src/banner.ts:187` builds a row group whose frame is identical to the composed golden, and `examples/docker/src/dashboard.ts:434` puts it in the document, so **`direction: "row"` has a caller**. C04 I44, commitment 41, T3.20, T3.21, T6.23, T6.24 | **CHECKED FROM THE SATISFIER'S SIDE 2026-08-15 AND TWO OF THE THREE HAVE MOVED.** `align` **is built and this row said it was not**: `Valign` at `src/data/viewmodel/types.ts`, `align?: readonly Valign[]` on `Group`, accepted by `b.group` and read by `groupDefinition` — `block.align?.[index]` into `justifyContent`. **And no test names it**: zero matches for `Valign` or `align` under `test/` for a group, so a published field with a renderer shipped untested while the record said it did not exist — two documents wrong about one field in opposite directions. T3.22 is the row it lacked. **`height: "fill"`'s blocker is met**, which is the deferral CLAUDE.md already names: the condition was *the producer cannot see the height*, and `ProducerContext.height` is granted at `producerContext(deps.region().height)` in `src/shell/execution.ts`, non-null exactly on the view route and `null` for a live part inside one. **`padding` is the only one of the three still a separate step.** The wordmark's leading blank row stays the app's until `padding` lands, and that is now the whole of the remainder |
-| 35 | RULED | **the ruling is in the entry.** The spinner is one frame by a premise that has expired — `src/shell/paint.ts:110` says a ticker is *"a timer this layer does not own and must not grow"*, and the refresh driver has owned one since 18 landed; the `steps` block already animates off `ctx.tick` (`src/presentation/blocks/kinds/structured.ts:403`). The pending entry is appended blank — `src/shell/execution.ts:1097`, `blocks: []` | nothing composes the notice, and there is no elapsed-time part. **The adapter override has no surface yet** |
+| 38 | BUILT | `Group` ships with `direction: "row" \| "column"` — `src/data/viewmodel/types.ts:2029`, `b.group`, `groupDefinition` in `src/presentation/blocks/kinds/containers.ts` — and the weights C04 §3 deferred are built: `flex?: readonly Share[]` at `src/data/viewmodel/types.ts:2050`, `groupChildWidths` at `src/data/viewmodel/measure.ts:79`, refused at `b.group` and by `checkFlex` — `src/data/viewmodel/validate.ts:280`. C04 §3, I42, I43, commitments 39–40, T1.20, T3.16–T3.19, T6.20–T6.22; `tools/mutate/runs/c04-weights.mjs` — and `Share` closes it: `examples/docker/src/banner.ts:187` builds a row group whose frame is identical to the composed golden, and `examples/docker/src/dashboard.ts:434` puts it in the document, so **`direction: "row"` has a caller**. C04 I44, commitment 41, T3.20, T3.21, T6.23, T6.24 | **CHECKED FROM THE SATISFIER'S SIDE 2026-08-15 AND TWO OF THE THREE HAVE MOVED.** `align` **is built and this row said it was not**: `Valign` at `src/data/viewmodel/types.ts`, `align?: readonly Valign[]` on `Group`, accepted by `b.group` and read by `groupDefinition` — `block.align?.[index]` into `justifyContent`. **And no test names it**: zero matches for `Valign` or `align` under `test/` for a group, so a published field with a renderer shipped untested while the record said it did not exist — two documents wrong about one field in opposite directions. T3.22 is the row it lacked. **`height: "fill"`'s blocker is met**, which is the deferral CLAUDE.md already names: the condition was *the producer cannot see the height*, and `ProducerContext.height` is granted at `producerContext(deps.region().height)` in `src/shell/execution.ts`, non-null exactly on the view route and `null` for a live part inside one. **Both line citations were already wrong before they were corrected 2026-09-01** — 580 pointed at a doc comment and 612 at a member of the plot-form union, neither of them the field named — and `roadmap-status` only noticed when an unrelated edit pushed 612 onto a *blank* line. That is F401a's class: a line citation passes on non-blankness, so it is wrong silently until the file shortens under it. The type name was stale too — `flex` is `readonly Share[]`, not `readonly number[]`. **`padding` is the only one of the three still a separate step.** The wordmark's leading blank row stays the app's until `padding` lands, and that is now the whole of the remainder |
+| 35 | RULED | **the ruling is in the entry.** The spinner is one frame by a premise that has expired — `src/shell/paint.ts:110` says a ticker is *"a timer this layer does not own and must not grow"*, and the refresh driver has owned one since 18 landed; the `steps` block already animates off `ctx.tick` (`src/presentation/blocks/kinds/structured.ts:403`). The pending entry is appended blank — `src/shell/execution.ts` `compose({ … blocks: [] })` in the shell route (re-measured 2026-09-03, still so) | nothing composes the notice, and there is no elapsed-time part — **the rendering half exists** (`continuation` `⎿` is a `GLYPH_TABLE` slot with `prefixCells` in `kinds/simple.ts`), so what is missing is the composer, not the glyph. **The adapter override has no surface yet** |
 | 36 | PART | **the container half is answered, in a different shape.** C04 I49's residue row — `⋯ N above, M below`, both directions, one row, `residue` in `src/presentation/blocks/glyphs.ts` — already says *this region is bounded and there is more* at container scope. What is left is **position rather than existence** | **the transcript-scope bar is untouched**, and the constraint the answer creates is the real content: a container bar must read I49's numbers or replace the row. Two mechanisms answering *is there more* at one scope is the shape C04 I50 refuses for `copy` |
 | 42 | PART | **the seam exists and is not what the entry assumed.** `createKeymap(bindings)` takes the list rather than owning it — `src/interaction/router/keymap.ts` — with one caller passing `defaultKeymap` in `src/shell/construct.ts` | **two missing pieces of different sizes**: the conflict rule throws (`KeymapError`) where this entry says it must become a ladder, and no config surface carries overrides. Not *the table is hard-coded*, which is what the row said before it was checked |
-| 11 | PART | **the block half is built** — `markdownBlocks` in `src/data/viewmodel/markdown.ts`, exported from the barrel and reachable as `b.markdown`. Headings → `rule`, fences → `code` with the info string as the language, pipe tables → `table` with **positional** keys, bullets → `notice` with the `bullet` glyph slot and its hanging gutter, ordered items → `notice` with the number as text, quotes → muted `notice`, everything else → `raw`. Inline stays literal. T2.40–T2.47, six mutations in `tools/mutate/runs/md-subset.mjs` | **three residues, each named on the block that carries it**: heading levels collapse, because `rule` has one `label` and draws one form; a quote has no gutter, because no `Glyph` slot means *quote* and `live`'s `▌` is a homonym (F161); nesting caps at three levels. **The inline half is entry 50** and is filed rather than deferred |
+| 11 | BUILT | **the block half and the inline half are built** — `markdownBlocks` in `src/data/viewmodel/markdown.ts`, exported from the barrel and reachable as `b.markdown`. Headings → `rule`, fences → `code` with the info string as the language, pipe tables → `table` with **positional** keys, bullets → `notice` with the `bullet` glyph slot and its hanging gutter, ordered items → `notice` with the number as text, quotes → muted `notice`, everything else → `raw`. `inline` in the same file (2026-09-04, with 50): `**` → bold, `*` and `_` → italic, as `TextSpan`s over the marker-stripped text; **a backtick run is a `tone: "identifier"` span with the backticks gone** (2026-09-04, C04 I89, C09 §5 — `identifier` because the tree uses it for a name one refers back to, and `meta` for secondary detail). **A one-cell delimiter row is a table** (2026-09-04): `DELIMITER` requires a pipe somewhere and one dash cell, so `| h |` over `|---|` is a one-column table while a bare `---` and a `|` in prose over a dash line stay paragraphs (T2.48). T2.40–T2.47 with T2.44 replaced by T2.33 and T2.34, T2.48 added; mutations in `tools/mutate/runs/md-subset.mjs` **The last three residues are closed** (2026-09-04, C04 §3an, I94, I95, I96, C09 I40, I41): `Rule.level` is `1 | 2 | 3` with the **fill** as the axis — heavy, light, blank — chosen against frames at 80 and 40 in both alphabets, `#` → 1, `##` → 2, `###`–`######` → 3, and the type refuses a fourth tier so a level nothing draws differently cannot exist; `Glyph.quote` is a **rail**, drawn on *every* row of the notice rather than on the first, in the columns `prefixCells` already reserves, so it costs no geometry — `⎸` U+23B8 measured Neutral where `▌` and every box-drawing vertical are Ambiguous and draw two at `ambiguousWidth: "wide"`, which is the second reason F161's argument does not reach; `Glyph.nested` marks an item past the depth cap on both list arms, so depth 3 and depth 4 stopped being one frame. **The cap's own reason was replaced by a measurement**: uncapped at width 40 an item past about depth 15 does not draw a wide indent, it draws *none* — the leading spaces are the wrapper's break and the first row is the mark alone. T2.106–T2.109; ten further mutations in `tools/mutate/runs/md-subset.mjs`, and four of its rows re-anchored | **one thing is stated rather than built**: a blockquote's body is prose — `> # Heading` keeps its `#` — and that is unexpressible rather than unbuilt, because one notice has one `glyph` and `rule`, `code` and `table` have no slot to hold a rail (C04 I95). A recursive quote wants a block vocabulary in which every kind can carry a gutter, which is a different change from this one |
 | 51 | BUILT | **all three halves.** `ambiguousWidth: "narrow" \| "wide"` on `TerminalCapabilities`, detected from the locale's language subtag under POSIX precedence with C02 I4's override; `cells(text, ambiguous)` in `src/presentation/text.ts` with an `isAmbiguous` range table; `RAMP_BRAILLE` in `src/presentation/plot/ramp.ts` returned by `ladderFor` where the capability says wide, and `sparkline` padding with it. C02 I9, commitment 12, §3, §4's degradation row; T2.50–T2.54; `tools/mutate/runs/c02-ambiguous.mjs`, five mutations **The sweep is done** — SS50 in `tools/enforce/source-scans.mjs` fires on a `cells()` call naming neither the convention nor `// narrow-ok`, and it ran 43 → 0 with four annotated sites and three allow-listed files. **The palette is built** — `categorical` in `src/presentation/theme/tokens-dark.ts` and `src/presentation/theme/tokens-light.ts`, `CATEGORY_REFS` replacing the cycle in `src/presentation/plot/marks.ts`, C04 I50a refusing a ninth series in `src/data/viewmodel/validate.ts`. **The sets are built** — `SPINNER_SETS` in `src/presentation/blocks/glyphs.ts` with per-set intervals and shape-paired fallbacks, the refusal list turned into a narrow tier, and `glyphs` falling to ASCII on a wide terminal because box drawing is ambiguous throughout | **a third narrow-safe glyph set** is the refinement this leaves: `⋅ ∘ ◦` have no narrow form and `─ │ ┌` have none either, so a third set is mostly ASCII with a few survivors — worth building the day someone measures which survive. And the bar *styles* remain a catalogue: `Progress` has no `style` field and minting one with no consumer is the shape four entries this session were spent closing |
 | 33 | BUILT | **the refusal became a deferral and I5's property did not move.** `Settle = { line, into }` on `refuse`, `runShell`, `runHandoff`, `runLocal`, `runIntoView`, `runApp`, `start` and `route`; `appendAndCommit` settles into `into` or appends. The queue is a list in `src/shell/execution.ts`, `enqueue` at the guard, `drain` on `Guard.release()` gated on *nothing is running*, `clearQueue` before the release in `cancel`. T1.6, T1.21b, T1.46, T3.17 rewritten against the new mechanism; T3.18–T3.21 added; `tools/mutate/runs/c23-queue.mjs` — 8 mutations, 8 caught | **the seam's own branch had no row and a mutation is what said so**: `/ps` is the app route, which reuses the queued entry as its pending one and settles it directly, so ignoring `into` inside `appendAndCommit` survived every row until T1.6 queued a `builtinThenShell`. `runApp` is **not** converted to the seam — its pair differs by not calling `resetFocus` and by committing `"completion"` rather than `"input"`, and a green suite shows neither. **A third site came from reading the diff**: a queued *view* invocation owns an entry and this route has no settlement of its own, so C22 §13a's *it pops rather than settling, because there is no entry to settle* stopped covering it — true of a view submitted directly, false of a deferred one, and the entry would have streamed for ever marked *queued behind* something long finished. T3.21 |
 | 30 | PART | **the prompt half is built; the transcript half is not.** A chip is one PUA code point in the buffer — `insertChip` in `src/interaction/editor/editor.ts`, a side map to `{label, content}`, and `resolved` expanding it at `src/shell/construct.ts`'s submit and nowhere else. The walk seam is `ClusterText` in `src/interaction/editor/layout.ts`, serving `layout`, `displayRows`, `cursorCell` and `selectionSpans`. A paste of `CHIP_LINES` or more becomes one. T2.40–T2.47; `tools/mutate/runs/c17-chip.mjs` — 6 mutations, 6 caught | **the defect that happened is now the first mutation**: `clusterWidth(shown)` measures a cluster BY ITS BASE CODE POINT, right about clusters and wrong about a substituted string, so a twenty-cell label counted as `[`. Every index assertion passed while it was broken and only the two frame rows failed. **Two residues**: the wiring at `session.ts:549` has no row — T2.45 calls `selectionSpans` directly, so a seam-level row passes on the day nothing calls it — and the entry's *detect what it is* (`[JSON · 47 lines]`, one parse attempt) is a second decision with its own failure mode. **C23's half is untouched**: the transcript rendering the content as what it is needs the ENTRY's document to carry the block |
 | 51b | BUILT | **the bar half, and `ambiguousWidth` is a tier over what `barStyle` RETURNS.** `Progress.style` in `src/data/viewmodel/types.ts`, `barStyle(caps, name)` and `barStyleNames` in `src/presentation/blocks/glyphs.ts` on `spinnerFrames`'s shape, wired in `progressDefinition` and exposed by `b.progress`. T2.90–T2.93; `tools/mutate/runs/c09-bars.mjs` — 4 mutations, 4 caught | **the rows measure the returned pair, never the table** — a flag somebody wrote and a flag something consults differ exactly when the lookup is wrong, which is what caught the spinner sets. Six of seven unicode styles fall to ASCII at `wide` and `braille` does not, which `CALCIUM_BARS.md` did not say. `GlyphSet.progressFull` and `progressEmpty` are **removed**: one pair fixed in the glyph set was the single-style version of a table, and MG24 said so the moment the table arrived |
-| 50 | PART | **`Style.italic` is built and spans are not.** `italic?: boolean` in `src/presentation/theme/types.ts` beside bold · dim · inverse · underline, `SgrStyle.italic` in `src/terminal/escapes.ts` and SGR 3 written there and nowhere else. T1.19, T1.19b; `tools/mutate/runs/c10-italic.mjs` — 3 mutations, 3 caught. Entry 11's ruling (c) reversed: it decided a fallback onto `underline`, which C10 §4a already gives to word-level emphasis (C25 I10) | **the ORDER is unchanged and only its blocker moved.** Spans in the view model first, then 11's translator — a published-type change across every text-bearing kind, and `markdown.ts` already names the condition as *the day spans exist*. `SgrStyle.italic` has an `UNCONSUMED_MEMBERS` row for the right reason: nothing sets it yet, and MG24's equality arm removes the row the day something does |
+| 50 | BUILT | **spans in the view model, and italic's first writer** (2026-09-04). `TextSpan` in `src/data/viewmodel/types.ts` on `Raw`, `Notice`, `Rule` and `Cell`, refused to `code`; `checkSpans` in `src/data/viewmodel/validate.ts`; `runsOf` · `wrapRuns` · `sliceRuns` in `src/presentation/runs.ts`; `withSpan` and `paintRuns` in `src/presentation/blocks/paint.ts`, coalesced by style reference so no golden frame moved; `inline` in `src/data/viewmodel/markdown.ts` is the writer. C04 T1.23–26 · T2.31–34 · T3.62–67 · T6.81–85 and C10 T1.22 · T2.25 · T3.11 · T6.84, in the four spans test files, one per tier; T2.31 is the first frame that writes SGR 3, and MG24's `SgrStyle.italic` row came out the same day. Design and both walks: `docs/notes/CALCIUM_SPANS_DESIGN.md` | — the two deferrals this row carried are discharged (2026-09-04): `TextSpan.tone` by inline code (row 11, C04 I89) and `TextSpan.value` by the per-token channel (C04 I90), with `Run` carrying both, `paintRuns` taking the render context, `wrapCellsParts` taking atoms and `notice` measuring through the wrapper it renders with (C09 §5 *Runs*, C10 §4e). `TextOpts` is split so `b.rule` cannot take a `colormap` it has nowhere to put (F207) |
 | 22 | BUILT | **a builder in front of two existing kinds, and no seventeenth kind.** SS50 and MG24 both fired on the first `make enforce` and both were right — `art` in `src/presentation/art.ts`, published from `src/index.ts`; `ArtTier` and `ArtSpec` beside it. Selection is tier-eligible **and** fits, measured with `cells` — `widthOf` — so a `blocks` variant this terminal can draw and cannot fit falls to the next rung. The last rung is a `notice` with `tone: "accent"`, because `raw` carries no style. T2.84a–T2.84n, one per cell of §8a's table plus the two SS50 added, and `tools/mutate/runs/c09-art.mjs` — 9 mutations, 9 caught after one survivor wrote T2.84n | **three of the four validation checks were no longer this entry's**, which the walk found rather than the build: uniform line width and row-count alignment are roadmap 38's `fit` and `Valign`, and *report measured cells* is the selection rather than a report. Only the tab check survives. **MG24's answer was the consumer**: `wordmarkFor` in `examples/docker/src/banner.ts` was `art`'s loop written by hand — preference order, tier, fit — and is now the call, at the same threshold, since a composed row is `WHALE_CELLS + GAP` plus the wordmark's widest. It is `UNCONSUMED_MEMBERS`' first out-of-tree entry, a category the header counted at 1 and never wrote down. **What is NOT done**: `banner.ts` still hand-writes the vertical alignment `Valign` was added for and still says the framework has no opinion about it, and the composed `bannerRow` is a two-column group `art` cannot express — one block is its whole vocabulary |
 | 9 | BUILT | **a `code` block with a transform in front, one call wide.** `mermaidCode` in `src/presentation/mermaid.ts`, published from `src/index.ts`, calling `renderMermaidASCII` with `useAscii` from the capabilities and `colorMode: "none"`. `beautiful-mermaid` has a row in `DEPENDENCIES.md`, the first naming a non-permissive transitive licence. T2.80–T2.83 | **thin against a maintenance risk rather than a design one**: ten releases then five and a half months' silence, so a replacement costs a function body and nothing else. The rows assert the seam — the capability mapping, the colour refusal, the block's shape — and deliberately not what a flowchart looks like, which would fail on the package's next release for no reason anyone here cares about |
 | 44 | BUILT | **session resume, policy-gated.** `src/shell/construct.ts` reads `persistPolicy(manifest, config)`, and when anything is declared it loads `${stateDir}/transcript.ndjson`, seeds `createTranscriptWriter` and appends the saved documents in order. C13 I20, commitment 18; T1.28 asserts the default — an app that declares nothing persists nothing | **the ruling falls out rather than being enforced**: opening at the bottom with no offsets and no focus is what appending in order does, because none of them is written. A dropped line is announced (F35's class) rather than silently reducing the session |
 | 39 | BUILT | **the declaration is a choice**: `ThemeTokens.background: "terminal" \| "surface"` at `src/presentation/theme/types.ts:89`, painting `surfaces.bg` — the one surface every floor is already measured against, so a colour here would let a theme paint one value and prove its floor against another. `LIGHT` declares `surface` (`src/presentation/theme/tokens-light.ts`) and `DARK` inherits (`src/presentation/theme/tokens-dark.ts`). `resolveBase` and `validatePaintedFloors` at `src/presentation/theme/resolve.ts`; the 8-bit floor is recomputed against the **quantised** base, because indices 16–255 are what a terminal paints and the token is not. The base is applied by `based` in `src/shell/paint.ts` — one pass over a finished row, re-establishing it after every `toTerminalDefault()` match and **closing the row**, which is what leaves every lifecycle path untouched. `--no-bg` is a `shellOnly` `FlagDef` on `/theme` (`src/data/manifest/framework.ts`) read through `LocalContext.args`. C10 §4c I25 I26 commitments 22–23, C22 §6g I65 I66 commitments 36–37; T1.17–T1.19, T1.23–T1.23d, T4.27–T4.29, T4.34; `tools/mutate/runs/c22-background.mjs` | **the painting arm ships with one theme exercising it**, since dark inherits by decision — every golden frame is still drawn on the inheriting branch. And the foreground's own 8-bit quantisation is deliberately not in the recomputed floor: it predates this entry and is unchanged by it |
+| 29 | BUILT | **the budget, ruled and built — C22 §6k, I79, I80, commitments 50–51.** `TuiConfig.chrome.footerRows` at `src/shell/types.ts:446`, resolved with every other default in `src/shell/config.ts` and bounded by `MAX_FOOTER_ROWS` at `src/shell/config.ts:53` — derived from `MIN_ROWS` as the largest footer leaving one region row at the size gate with the prompt at its cap (6), not chosen; carried on the composed frame at `src/shell/frame.ts:44`, re-asserted by `heightsSum` at `src/shell/frame.ts:151`, drawn on `footerRows` rows by `src/shell/paint.ts:559`. A `ChromeFn` returns blocks and never a height — the per-frame option was walked in §6k.3 and refused. T1.35–T1.37, T3.38, T3.39, T6.95–T6.97; `tools/mutate/runs/c22-footer-budget.mjs`, four mutations, all killed by hand 2026-09-05. **The default frame is byte-identical** (T3.38) and the terminal baseline's chrome frames did not move. **Would landing this close it**: 35, 37 and 15 wanted a chrome row and now have one to ask for — closed as a *budget*, each still owing its content; 46 is a scrollbar at container scope and is re-filed out of this entry (F739) | the activity region A7 is a fifth region and not a footer — nothing here; `footerRows: 0` is not offered (§6k.4 E); `construct.ts:652` still calls `initialRegionHeight(size)` without the budget and the first frame corrects it by `footerRows − 1` rows (I34, T1.37) |
 | 46 | BUILT | **all three pieces exist, and the third was the one that fails silently.** `window` — `presentation/blocks/kinds/structured.ts:123` — and `elements` — `presentation/blocks/types.ts` — are both declared, which is what the entry itself says | **the third is the missing one**: nothing holds a per-container offset as view state — no `scrollOffset`, `containerOffset` or `innerOffset` in `src/`. And it stays blocked on **7 §4 specifically**, not on 7: stages 1–3 gave focus an address and none of 46's three questions is answered by one. **The check §4 owed is now run** (`docs/components/C26_navigation.md` §4a) and **§4b then answers 46's question (a)**: elements are the unit of movement and the window is a rendering consequence, so `↓`/`↑` step and the window follows (C14 I6 at block scope) while `PgDn`/`PgUp` move the window and never focus. **Two keys, not two readings of one** — so the scroller needs no interact mode and no new field, the default is read off which of `elements` and `window` the kind declares, and a focused element outside the window is a legal state. C26 I18, commitment 12. **The offset landed as view state** — `ScrollOffsets` in `src/shell/scroll-offsets.ts`, dropped on `rendered`'s own subscription, clamped at read and never at write, canonical key with zeros omitted; the `scroll` kind at `src/data/viewmodel/types.ts` with `scrollDefinition` in `src/presentation/blocks/kinds/containers.ts`; `blockPageUp`/`blockPageDown` at the `liveBlock` target; and the offset as the render cache's **fourth axis** in `src/shell/session.ts`. C04 §3c, I47–I50, commitments 44–47; T2.20–T2.36, T4.18c–T4.18f, T4.41, T4.42; `tools/mutate/runs/c04-scroll.mjs`, ten mutations. **The residue marker is the entry's own ruling made visible** (I49) | **the settled entry keeps its offset and cannot be moved**, which is a ruling rather than a remainder: block-to-block focus above the live entry is C26 §11's deferral, and the marker saying *N above, M below* is the visible symptom it did not have. **And a container in the transcript is a choice to hide content** — reach for one where bounding is the point, not to shorten a long result |
 | 40 | BUILT | `afterEdit()` — `src/shell/keys.ts:441` — called by the composition root after every printable key and every paste, static sources only (C19 I3, T2.1a), which is the boundary this entry called *"the trigger, not the engine"*. `test/e2e/editor.test.ts` watches the menu open on a flag prefix in a real PTY | — |
 | 41 | BUILT | **both populations, one suggester.** `suggestName` — `src/data/manifest/validate.ts:147` — is the single distance-2 cutoff (C05 I18), read for unknown flags at `src/data/manifest/validate.ts:284` and unknown verbs at `src/interaction/parser/parse.ts:183`, sharing the tie-break so a second implementation cannot diverge. `test/unit/parser.test.ts` asserts distance 3 outside and 2 inside | — |
 | 23 | BUILT | **a surface with its own pairing, and the ruling it corrected.** `surfaces.selection` — `src/presentation/theme/tokens-dark.ts:36`, `#264057` at 7.25 : 1 against `tone.default` — is checked by `selectionPairs`, `src/presentation/theme/contrast.ts:158`, a **sibling** of `diffPairs` rather than an entry in it. The cells come from `selectionSpans` — `src/interaction/editor/layout.ts:167` — off the same walk `layout` uses, and `washed` in `src/shell/paint.ts:291` applies them after `exact` squares the row, which is where full-row rather than text-width comes from. `inverse` is the 1-bit rung. T4.22–T4.26 and T1.37–T1.41 | a `carries: "meaning"` **palette** cannot be a wash — `resolveBackground` refuses any ref that is not `surface.*`, so the entry named a mechanism C10 does not have (C10 §4b) |
-| 45 | BUILT | **both halves, and the walk's first row was the seam that did not exist.** `DECSCUSR` is a third category in the escape file — `CURSOR_SHAPE` at `src/terminal/escapes.ts:94`, a **setting**: persistent state like a mode, no inverse like an SGR sequence, and an undo that is a third value, so writing it as a `mode()` would make `held` and C01 I6 false about the same bytes. `cursorShapeSequence` at `src/terminal/lifecycle.ts:472` holds the record and emits **on change only**, because the cursor sequence goes out with every frame. The style keys on the **focus target** — `cursorStyleFor`, `src/shell/cursor-style.ts:57` — and not on `Layer`, since `FOCUS_ORDER` has seven members and two are layers, and the prompt, the entry's own example, is not one. `TuiConfig.cursor` at `src/shell/types.ts:385`, filled in by `examples/docker/src/main.ts`. C22 §6f walks it in both artefacts; I63 and commitment 34, C01 I20 and commitment 22; T1.22–T1.22d, T1.25–T1.27c, T6.52–T6.56; `tools/mutate/runs/c22-cursor-shape.mjs`. **The blink half subtracts**: `steadyWhileTyping` — `src/shell/cursor-style.ts:104` — only ever *removes* blink, so a style declared steady is never made to blink and a `null` one is untouched, which is the shape half's boundary reached a second way. *Steady on a keystroke* is free because a keystroke already composes a frame (I27); the idle edge is a wake on the composition root's scheduler rather than a timer inside the paint, armed only where a declared style blinks, since the spinner's unconditional arm follows a *request* and this one would follow every keystroke. I64 and commitment 35; T1.22e–T1.22h, T6.57–T6.61 | **`CURSOR_BLINK_MS` is 600 ms and the declaration says it is unmeasured**, with the reasoning a re-measurement would test — and it is not the VT100's ~530 ms blink *period*, which is a coincidence worth naming. And the resolution's **argument** is untested: a listed survivor, because no tier-1-to-4 harness runs `session.ts`'s private frame deps, and the blink half wrapped that call without moving it |
-| 28 | BUILT | **one comparison, and it was holding two shipped defects at rest.** `promptWindow` — `src/shell/paint.ts:254` — takes the cursor's editor row and returns its content range; `shows()` is the membership test both consumers use, in **editor** coordinates. It was `0 ≤ within < cap`, painted coordinates, where a marker row and a content row are the same kind of number — so the editor row immediately above a marked window mapped to painted 0 and both writers landed on the elision marker: the terminal cursor drawn on it (`cursorFor`, `src/shell/paint.ts:551`) and a selection span washing it (`promptRegion`, `src/shell/paint.ts:369`). Measured in a frame at `cap` 4; neither is visible to any assertion, because the arithmetic is self-consistent throughout. Elision is now marked at **both** ends, which is what makes the clipped wash honest, and the spinner and ghost moved to the cursor's painted row — the row `out.length − 1` only was while the window was tail-anchored. C22 §6e walks it in both artefacts, I62, commitment 33; T1.21–T1.21e, T6.48–T6.51; `tools/mutate/runs/c22-prompt-window.mjs` | the ghost's **column** is unchanged: it is written into the padding after the row's text, which on a mid-buffer edit is not where the cursor is. The row is right and the column is a separate question. And at `cap` 2 mid-buffer, rows below elide with no marker — one content row beats two markers, and T1.5b already ruled that direction |
+| 45 | BUILT | **both halves, and the walk's first row was the seam that did not exist.** `DECSCUSR` is a third category in the escape file — `CURSOR_SHAPE` at `src/terminal/escapes.ts:94`, a **setting**: persistent state like a mode, no inverse like an SGR sequence, and an undo that is a third value, so writing it as a `mode()` would make `held` and C01 I6 false about the same bytes. `cursorShapeSequence` at `src/terminal/lifecycle.ts:472` holds the record and emits **on change only**, because the cursor sequence goes out with every frame. The style keys on the **focus target** — `cursorStyleFor`, `src/shell/cursor-style.ts:57` — and not on `Layer`, since `FOCUS_ORDER` has seven members and two are layers, and the prompt, the entry's own example, is not one. `TuiConfig.cursor` at `src/shell/types.ts:418`, filled in by `examples/docker/src/main.ts`. C22 §6f walks it in both artefacts; I63 and commitment 34, C01 I20 and commitment 22; T1.22–T1.22d, T1.25–T1.27c, T6.52–T6.56; `tools/mutate/runs/c22-cursor-shape.mjs`. **The blink half subtracts**: `steadyWhileTyping` — `src/shell/cursor-style.ts:104` — only ever *removes* blink, so a style declared steady is never made to blink and a `null` one is untouched, which is the shape half's boundary reached a second way. *Steady on a keystroke* is free because a keystroke already composes a frame (I27); the idle edge is a wake on the composition root's scheduler rather than a timer inside the paint, armed only where a declared style blinks, since the spinner's unconditional arm follows a *request* and this one would follow every keystroke. I64 and commitment 35; T1.22e–T1.22h, T6.57–T6.61 | **`CURSOR_BLINK_MS` is 600 ms and the declaration says it is unmeasured**, with the reasoning a re-measurement would test — and it is not the VT100's ~530 ms blink *period*, which is a coincidence worth naming. And the resolution's **argument** is untested: a listed survivor, because no tier-1-to-4 harness runs `session.ts`'s private frame deps, and the blink half wrapped that call without moving it |
+| 28 | BUILT | **one comparison, and it was holding two shipped defects at rest.** `promptWindow` — `src/shell/paint.ts:242` — takes the cursor's editor row and returns its content range; `shows()` is the membership test both consumers use, in **editor** coordinates. It was `0 ≤ within < cap`, painted coordinates, where a marker row and a content row are the same kind of number — so the editor row immediately above a marked window mapped to painted 0 and both writers landed on the elision marker: the terminal cursor drawn on it (`cursorFor`, `src/shell/paint.ts:551`) and a selection span washing it (`promptRegion`, `src/shell/paint.ts:369`). Measured in a frame at `cap` 4; neither is visible to any assertion, because the arithmetic is self-consistent throughout. Elision is now marked at **both** ends, which is what makes the clipped wash honest, and the spinner and ghost moved to the cursor's painted row — the row `out.length − 1` only was while the window was tail-anchored. C22 §6e walks it in both artefacts, I62, commitment 33; T1.21–T1.21e, T6.48–T6.51; `tools/mutate/runs/c22-prompt-window.mjs` | the ghost's **column** is unchanged: it is written into the padding after the row's text, which on a mid-buffer edit is not where the cursor is. The row is right and the column is a separate question. And at `cap` 2 mid-buffer, rows below elide with no marker — one content row beats two markers, and T1.5b already ruled that direction |
 | 16 | BUILT | **four steps, and step 3 found two shipped defects.** Step 1: the choices are a table — `choiceBlock` at `src/shell/confirm.ts:101` — so the marker is a `bullet` slot L1 resolves and `ConfirmDeps` no longer takes a capability record at all. Step 2: `assertPlaceable` at `src/viewport/overlay/manager.ts:167` refuses a centred layer with no width at **both** entry points (C15 I20), which found the tree's second instance — `clearConfirmLayer` at `src/interaction/history/layers.ts:95` declared none — and `AskOptions.placement` at `src/shell/local/registry.ts:44` is a choice between placements, resolved by `placementOf` in `src/shell/confirm.ts`. Step 4: `createChoiceSelection` at `src/shell/choice-selection.ts:36`, with `defaultStart` supplying the confirm's start and `Esc`'s answer alike. Step 3: `menuWindow` at `src/interaction/completion/menu.ts:186` windows the list to what the placement holds, and `refreshAnchors` in `src/shell/keys.ts` re-places the anchored layers on a resize. T1.21, T1.22, T4.12–T4.18, T4.28–T4.33 | — |
-| 15 | BUILT | **four steps and a step 0, and the mode is a target throughout.** Copy mode: `#setCopyMode` holds the state at `src/shell/session.ts:586`, C03 gains `suspend`/`resume` at `src/terminal/frame-scheduler.ts:263` (§4a), C01 gains `setMouseTracking` at `src/terminal/lifecycle.ts:403` because nowhere else writes an escape. The prompt: an anchor plus the cursor, with `⌥a`/`⇧←`/`⇧Home` bound after `modifiersOf` — `src/interaction/router/decode.ts:113` — learned xterm's fourth bit. One clipboard: `copyText`, `src/interaction/editor/editor.ts:377`, written by `⌥w` and by the transcript's `copyElement`, `src/shell/keys.ts:778`, over a range held by `extendRow`, `src/interaction/router/focus.ts:246`, copying `rowCopyText`'s source text, `src/presentation/table/definition.ts:290`. The wash is entry 23 | OSC 52 is a separate axis and is not built: whether a copy **also** reaches the system clipboard is a capability question about the terminal, and it changes nothing about where the text lands in-process |
+| 15 | BUILT | **four steps and a step 0, and the mode is a target throughout.** Copy mode: `#setCopyMode` holds the state at `src/shell/session.ts:586`, C03 gains `suspend`/`resume` at `src/terminal/frame-scheduler.ts:263` (§4a), C01 gains `setMouseTracking` at `src/terminal/lifecycle.ts:424` because nowhere else writes an escape. The prompt: an anchor plus the cursor, with `⌥a`/`⇧←`/`⇧Home` bound after `modifiersOf` — `src/interaction/router/decode.ts:113` — learned xterm's fourth bit. One clipboard: `copyText`, `src/interaction/editor/editor.ts:481`, written by `⌥w` and by the transcript's `copyElement`, `src/shell/keys.ts:1024`, over a range held by `extendRow`, `src/interaction/router/focus.ts:283`, copying `rowCopyText`'s source text, `src/presentation/table/definition.ts:399`. The wash is entry 23 | OSC 52 is a separate axis and is not built: whether a copy **also** reaches the system clipboard is a capability question about the terminal, and it changes nothing about where the text lands in-process |
 | 24 | BUILT | **the mechanism ships and `high-contrast` uses it.** `ThemeSet` is `Readonly<Record<string, ThemeTokens>>` — `src/presentation/theme/types.ts:125` — and the store switches by name: `setTheme` at `src/presentation/theme/store.ts:104`, with `names` beside it. `validateVariant` in `src/presentation/theme/contrast.ts:224` checks the declaration against `luminance(bg)`, which nothing did. `withThemeNames` — `src/data/manifest/parse.ts:570` — supplies `/theme`'s `enum` where the composition root holds both facts, and the parse declares none, so a manifest that skips it refuses every invocation rather than quietly accepting two. The premise is closed too: `light` declares `background: "surface"` at `src/presentation/theme/tokens-light.ts:22`, and `HIGH_CONTRAST` — `src/presentation/theme/tokens-high-contrast.ts:52` — is the set's first consumer, solved to 7 : 1 with A01 A.1 carrying every measured ratio. C10 §5a walks it in both artefacts; I27 and I28, commitments 24–25, T1.20, T1.21, T1.21a, T2.22, T2.23, T4.35, T4.36, T6.24–T6.26; `tools/mutate/runs/c10-named-set.mjs` | **a theme cannot declare a floor above the framework's minimum.** `high-contrast`'s 7 : 1 is authored and checked by one row, and `validateTokens` would accept a later edit dropping any slot to 4.5. Named as the next theme-with-a-promise's argument (C10 §5a.6). A solarised-alike and a neutral low-saturation set are unbuilt and are not blocked on anything |
 | 49 | OPEN | none, and that is the finding: **no file under `test/golden/` imports from `src/shell/`**, so nothing there reaches `paint.ts`. `test/golden/README.md` says *frames*. F163 | the whole entry — a golden frame category does not exist |
-| 43 | PART | `imageProtocol: "none" \| "iterm2" \| "kitty" \| "sixel"` detected — `src/terminal/capabilities.ts:19` | no renderer |
+| 43 | PART | `imageProtocol: "none" \| "iterm2" \| "kitty" \| "sixel"` detected — `src/terminal/capabilities.ts:19`; **and the renderer** — `src/presentation/blocks/kinds/image.ts`, `src/presentation/image/` (six files: codec, dither, halfblock, kitty, overlay, index), `src/shell/transmit-image.ts`, eight `test/unit/image-*.test.ts` (this cell said *no renderer*; re-measured 2026-09-03) | `sixel` detected and not emitted, correctly; the sample-grid kind and an image inside a `Cell` — see `docs/notes/CALCIUM_NOTE_AUDIT.md` §7 |
 
-**Checked and confirmed OPEN**, which is evidence rather than an absence of it. **Second sweep, 2026-08-13** — the symbols these entries name are absent from `src/`: **29** (and `chromeRows` in `src/viewport/viewport/types.ts:80` is C14's per-entry chrome, **not** this row's header/footer budget — it reads as coverage and is not) · **37**. **48** joins them measured rather than
-grepped, 2026-08-13: `nameExactnessSignal` reports 382 of 1171 members exact, and the
-public-surface variant this entry proposes measures 101 of 320 — no better, so the entry
-is open with its first candidate already refused. **Re-read twice on 2026-08-15: 388 of 1219, then 389 of 1220** after roadmap 51 added `ambiguousWidth` — one member, one exact, so the ratio is unchanged at 31.9%. **A base that moves with every landing and a ratio that does not is the entry's actual subject**: the blind spot is proportional, not absolute, and a figure re-read three times without moving is worth more than the first reading was. So the
-base moved with the tree and the ratio did not (32.6% → 31.8%). The variant's own figure is
-**not** re-measured here, because it is a proposal rather than a shipped signal and re-running
-it is the entry's work rather than a sweep's — said so, because a refreshed number beside a
-stale one reads as though both were taken. · **26**, **32** — the symbols the entries name are
-absent  · **49** joins them the day it is filed, measured rather than assumed: `test/golden/` holds **five** test files — four when this was written, and `fallback-docker.test.ts` since — and **not one imports from `src/shell/`**. Re-measured 2026-08-15 after roadmap 51: still five and still none, so a capability field, a palette and sixteen spinner sets all landed without a golden frame seeing one — which is the entry's claim demonstrating itself rather than being restated, so nothing in that category reaches `paint.ts` — and its README calls the snapshots frames (F163). · **3** joins them on 2026-08-15 by ceasing to be uncheckable rather than by being swept: its gate was `prism-tui` and the gate is not one, so what remains is greppable from here and was measured — `docs/notes/CALCIUM_PLOT_PRIOR_ART.md` is in the tree and lists the chart types, and `tensor` and `heatmap` occur **zero** times in the whole of `src/`, which is the entry itself rather than only its home: what is built is C12, the machinery the ML package would extend.
+**Checked and confirmed OPEN**, which is evidence rather than an absence of it. **The blanket
+sentence went 2026-09-04.** It read *the symbols these entries name are absent from `src/`* and it
+covered 26, 32 and 37, none of which had been grepped — F435's class exactly: a blanket claim
+expires unnoticed because there is nothing in it that can go red. Every clause below now carries a
+measurement, a date, and — where a symbol can carry the entry at all — a `**Gate**` that
+`roadmap-status.mjs` resolves against the tree and fails when the symbol appears. Where no symbol
+can, the clause says so and is counted rather than dropped.
+**37** — **Unverifiable by a symbol**, ruled 2026-09-04, and this entry is what the grep-reach
+signal exists to report: it names a feature and no name. The refusal register's ruling applies
+verbatim — *a negative-existence premise gets a row and a gate; a taste premise is marked
+unverifiable and is not gated* — and 37 is both at once. *Should the prompt be bracketed* is
+taste; *is it bracketed* is negative-existence and **no single symbol carries it**. A separator is
+a row the shell composes, and every candidate name measured — `separatorRow`, `regionSeparator`,
+`divider`, all zero in `src/` — is one this session would be inventing. Inventing it is F161's
+cost precisely: a symbol, a count and a date are what a ruling looks like from outside, and all
+three can be present with nothing behind them. What was measured instead is the satisfier side,
+and both halves of the entry's own correction hold: `ThemeTokens.background` is
+`"terminal" | "surface"` (`src/presentation/theme/types.ts:137`), so 39's correction landed and a
+theme may declare a fill — and `"terminal"` stays legitimate, so a separator still cannot depend
+on one. The blocker is 29's budget, not a ruling.
+**48** — re-read a sixth time, 2026-09-04, and the figure is `nameExactnessSignal`'s own:
+566 of 1759 members exact, 32.2%. The four readings before it were 382/1171 (32.6%), 388/1219,
+389/1220 (31.9%). **The composition reading the entry asked for is taken on the increment, which
+is the half that was free**: the base moved 1220 → 1759 and the exact count 389 → 566, so the 539
+members that arrived are 32.8% exact against a standing 32.2% — new members carry the ratio rather
+than diluting it, and *the blind spot is proportional* is now measured on the margin as well as on
+the whole. **What that still does not answer**, and the entry's note is right to ask for it, is
+whether members moved *out* of exactness while others moved in — `AskOptions.placement` is the one
+instance anybody has: 1177 → 1179 members, 382 → 381 exact. Reaching it needs the set and not the
+total, which is one added field on `nameExactnessSignal`'s return in
+`tools/enforce/module-graph.mjs` plus a worktree at the 2026-08-15 commit to diff against — cheap,
+not free, and named here rather than done because the signal is not this document's to change.
+The by-use signal beside it also moved: 114 of 433 published members named by neither example
+(86 of 325 when the entry was written), 170 of 302 clearings ambiguous and none able to list, and
+17 named only in an example's *tests*, which is a third category the earlier reading had no row
+for.
+**26** — **Unverifiable by a symbol**, ruled 2026-09-04, **and the entry's own recorded symbol has
+the wrong sign.** The body ends *Symbol: `documentView.open`*, and `documentView.open` is called
+at `src/shell/execution.ts:1099` — present, on the one path that pushes a view. An entry carrying
+a symbol that exists satisfies the grep-reach count above, which counts backticks and cannot count
+signs; that is the count's blind spot, found by resolving the first symbol it certified. The live
+claim measures instead, and it is a *relationship between two call sites*: the only settlement a
+view ever writes is `deps.transcript.settle(settle.into, noticeDoc(line, `${verb} opened a view`
+…))` at `src/shell/execution.ts:983`, guarded by `settle.into !== null` — so a **deferred**
+invocation leaves a record because roadmap 33 gave it an entry before it ran, and a directly
+submitted one leaves none. The direct push is `pushView` (`src/shell/actions.ts:141`) and it
+appends nothing; both pop sites — `viewPop` (`src/shell/keys.ts:900`) and `cancelThis`
+(`src/shell/execution.ts:895`) — patch nothing, and the second says so in its own comment. No
+single name can be absent for that: `append on push, patch on pop` is a pair of missing calls, not
+a missing symbol, and `DocumentViewDeps` names no transcript at all — `transcript` occurs once in
+`src/shell/document-view.ts` and the once is a comment, which is why the gate arm strips comments
+before it resolves anything.
+**32** — the retraction reached the body and **not** this clause, which is F86/F89/F92's own
+mechanism landing on the sentence that cites them. F89 retracted *CommandPolicy is exported and
+unreachable — a config field*: `CommandPolicy` is exported (`src/index.ts:278`) and reachable,
+`TuiConfig.commandPolicy` (`src/shell/types.ts:430`) threading through `src/shell/config.ts:108`
+to `src/shell/execution.ts:174`, so an app supplies its own prefix today. Confirmed at HEAD
+2026-09-04. **The surviving half is the whole entry**: prefix-*out* — prose by default, verbs by
+exception — is inexpressible, because `prefixPolicy("")` makes every token a verb
+(`src/interaction/parser/policy.ts:33`), and what it needs is a ruling about where the default
+route lives rather than a field. **Gate**: `defaultRoute` occurs zero times in `src/` — measured
+2026-09-04, and red the day the name appears, whichever way the ruling goes.
+**49** — re-measured 2026-09-04 and **the count claim was stale in the direction that flatters the
+tree**: `test/golden/` holds **twelve** test files, not five, and **two** import from `src/shell/`
+— `continuation.test.ts` (`commandRows`, `noticeDoc`, `PROMPT_GUTTER`) and `patch.test.ts` (`b`,
+a builder rather than paint). A grep for `shell/` says three; `containment.test.ts`'s hit is the
+string `shell/session.ts` inside a stack-trace fixture, which is the encoding trap this document
+has met before and the reason the figure is imports and not matches. **The gap is unmoved at one
+of eight**: chrome rows are covered and the background base, the prompt window, the elision
+markers, the selection wash, the height arithmetic, the cursor sequences and the write-as-a-diff
+are not — so seven golden files were added without a frame among them, which is the entry
+demonstrating itself a second time rather than being restated. F163.
+
+**3 left this list on 2026-09-04, and the record was disagreeing with itself in three places.**
+The evidence table said `| 3 | PART |`, the Order column said nothing — which means OPEN — and this
+paragraph both listed 3 as confirmed-OPEN and said in its own prose that *3 is PART in the table
+above … rather than open*. **`roadmap-status.mjs` agreed with all three**, because its
+two-records-of-one-fact check (F667) iterated the *marked* rows and a blank column is not one. The
+column now says PART, the arm now iterates the table and reads a blank column as OPEN, and the
+entry's residue carries a gate rather than a sentence: `tensor` occurs zero times in `src/`,
+re-measured 2026-09-04. The sentence this paragraph used to carry — *`tensor` and `heatmap` occur
+zero times in `src/`* — is kept above in the record of its own correction, and it is the second of
+the two instances that argued for the gate arm at all.
+
+**52 left this list on 2026-09-04**, by being built rather than by being re-read, and its clause is
+the measured case the gate arm was written from. It said `camera`, `azimuth`, `elevation` and
+`halfBlockRows` occur zero times in `src/presentation/plot/`; they occur 33, 7, 7 and 1. The entry
+set its own condition — *the field, the cache-key axis and one binding land together or none does*
+— and all three landed: `RenderContext.cameras` (`src/presentation/blocks/types.ts:134`),
+`Cameras.key` (`src/shell/cameras.ts:126`) and the orbit bindings (`src/shell/construct.ts:1426`).
+BUILT in the column and in the table as of 2026-09-04.
 
 **33 left this list on 2026-08-15**, and its evidence expired the moment the code landed —
 *no queue of any kind in `src/shell/`, the word does not appear* is now false by construction.
@@ -4485,7 +4790,7 @@ this question.
 |---|---|---|
 | **44** session resume | *"the transcript is already a store with a cap and eviction; **persisting it is C20's shape one level up**"* | **A kind error, and the blocker is unnamed.** C20's `persist.ts` writes two **line-oriented text files** through `commandLine`/`metaLine` codecs — `join("")` of rows, append-only, index-aligned sidecar. A transcript entry is a `ViewDocument`: a tree of blocks. The **policy** generalises beautifully — one chain, rewind rather than drop, drain from the last confirmed write — and the **codec does not**. What it actually needs is a document serialiser — **and the rest of this row was wrong, measured 2026-08-14 (F166).** *There is none in `src/`* is false in the direction that made 44 look blocked: a `ViewDocument` is **JSON by construction**, with no function, `Map`, `Set` or `Date` in the block union, and it round-trips byte-identically through `JSON.stringify` and `validateDocument` — which C13's store already calls on every append and every settle. The serialiser is `JSON.stringify`; the hard half exists. What is missing is **one export line** — `validateDocument` is in the component barrel and not in `src/index.ts` — and a round-trip row per kind, of which there are 24 and three are measured. **44 is not blocked on 34**, and it never was: 34's *structured export* is a UX item in a six-item bundle, and this row read it as a codec. **And the walk found what the row is silent about, 2026-08-14 (F168)**: C20's persistence has a *redactor*, and it does not generalise. `redact.ts` is a tokeniser over a **command line**; a transcript document holds what the far side **printed**, and `examples/docker/src/inspect.ts:152` puts every container environment variable into a `keyValue` block — so this as written puts secrets in `stateDir` in plain text, and a rendered document has no tokens to redact. **A ruling is owed and nothing is built until it is taken.** The second finding moves the design rather than blocking it: a history entry is immutable once appended and a transcript entry is **not** — it is patched and settled after it would have been written — so *persist settled entries only*, which makes the file append-only in fact and drops the `live` and `streaming` questions with it. C13 §5b carries both artefacts |
 | **24** more default themes | *`light` is dark-on-dark "**which the background ruling fixes**"* | **A deferral chain reading as availability.** The premise is exactly right and better than stated: `surfaces.bg` is declared in both themes and is read **only by the contrast checker** — `theme/contrast.ts` — so nothing paints it anywhere. But the fix it points at is entry **39**, which is RULED and **not built** (`--no-bg` matches nothing in `src/`). The row presents its blocker as done |
-| **29** chrome row budget | *rule once — "**FIVE features now want it**"* | Not falsified, and **F161 is the question to ask it**: a count of consumers is an argument only if the consumers share a shape, and two of these five are separate entries with one (46) blocked on 7. Worth checking before it is picked, not before it is read |
+| **29** chrome row budget | *rule once — "**FIVE features now want it**"* | Not falsified, and **F161 is the question to ask it**: a count of consumers is an argument only if the consumers share a shape, and two of these five are separate entries with one (46) blocked on 7. Worth checking before it is picked, not before it is read. **Asked and ruled 2026-09-05** (C22 §6k): three share a shape and got a declared footer budget (`chrome.footerRows`); 46 did not and is re-filed |
 | **45** configurable cursor | a capability-gated `DECSCUSR` escape, and a blink state machine on the refresh driver's clock | **Survives.** Every mechanism it names exists and is in the right component: `escapes.ts` already holds `mode()` pairs and a `CURSOR` show/hide, so the shape is one more constant of a kind already there; `refresh.ts` owns intervals; `Placed.cursor` is per layer (C15 I19), which is what makes *per focus target* a seam rather than a preference |
 | **48** MG24 on the public surface | *tighten the rule* | **Refused by the entry itself**, four times measured, and a fifth in the other direction when entry 16 added `AskOptions.placement`. Its own conclusion is that the fix is a **second consumer** rather than a rule change — which is phase-1 work, so it is not pickable as an entry |
 

@@ -38,11 +38,22 @@ export type RenderOptions = Readonly<{
   capabilities: TerminalCapabilities;
   tick?: number;
   focus?: RenderContext["focus"];
-  onAction?: RenderContext["onAction"];
   /** Per-container scroll offsets, in rows (C04 I48). Absent is none. */
   scrollOffsets?: RenderContext["scrollOffsets"];
   /** Per-plot cursor positions, in sample indices. Absent is no cursor. */
   cursorPositions?: RenderContext["cursorPositions"];
+  /** Per-plot live cameras (C12 I83). Absent is each block's own. */
+  cameras?: RenderContext["cameras"];
+  /** Per-image frame indices (C04 I93, C22 I77). Absent is frame 0. */
+  frames?: RenderContext["frames"];
+  /** Per-plot series overrides (C04 I99, C22 I78). Absent is each block's own `hidden`. */
+  seriesVisibility?: RenderContext["seriesVisibility"];
+  /**
+   * Caller-owned scratch (C12 I107). Absent is a miss on every lookup, which is
+   * the same frame at the same cost — a cache whose absence changes a picture
+   * is not a cache, and PR10's control asserts exactly that.
+   */
+  scratch?: RenderContext["scratch"];
 }>;
 
 /**
@@ -67,8 +78,11 @@ export function renderToLines(
     focus: options.focus ?? null,
     ...(options.scrollOffsets === undefined ? {} : { scrollOffsets: options.scrollOffsets }),
     ...(options.cursorPositions === undefined ? {} : { cursorPositions: options.cursorPositions }),
+    ...(options.cameras === undefined ? {} : { cameras: options.cameras }),
+    ...(options.frames === undefined ? {} : { frames: options.frames }),
+    ...(options.seriesVisibility === undefined ? {} : { seriesVisibility: options.seriesVisibility }),
+    ...(options.scratch === undefined ? {} : { scratch: options.scratch }),
     tick: options.tick ?? 0,
-    onAction: options.onAction ?? (() => undefined),
   };
 
   // Counted against a sentinel row rather than by splitting the output.
@@ -116,8 +130,11 @@ export function renderSequenceToLines(
     focus: options.focus ?? null,
     ...(options.scrollOffsets === undefined ? {} : { scrollOffsets: options.scrollOffsets }),
     ...(options.cursorPositions === undefined ? {} : { cursorPositions: options.cursorPositions }),
+    ...(options.cameras === undefined ? {} : { cameras: options.cameras }),
+    ...(options.frames === undefined ? {} : { frames: options.frames }),
+    ...(options.seriesVisibility === undefined ? {} : { seriesVisibility: options.seriesVisibility }),
+    ...(options.scratch === undefined ? {} : { scratch: options.scratch }),
     tick: options.tick ?? 0,
-    onAction: options.onAction ?? (() => undefined),
   };
 
   const painted = renderToString(

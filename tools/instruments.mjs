@@ -55,6 +55,15 @@ const COVERED = [
   // belongs in the raw input options. The rows assert the frames rather than the
   // encoded file, because that is the property an encoder cannot repair.
   ["tools/status-proof.mjs", ["npx", "vitest", "run", "test/unit/status-proof.test.ts"]],
+  // **The animations, split out of `status-proof.mjs` and given the fixture it
+  // could not have.** SP1 and SP2 rebuild the frames from the generator's intent
+  // and check those are distinct, which is a property of `renderSequenceToLines`
+  // — so the two status GIFs it covered held `elapsedMs` and `retryInMs` frozen
+  // across every frame, the spinner turned, the numbers stood still, and sixteen
+  // assertions agreed. AP3 and AP4 ask *these* frames whether the counter moves,
+  // and AP9 reads the bytes back out of the encoded GIF, which is the one
+  // question no frame assertion can ask (F419).
+  ["tools/animation-proof.mjs", ["npx", "vitest", "run", "test/unit/animation-proof.test.ts"]],
   // The Order column's verifier. **It caught this target's own claim a second
   // time**: `make instruments` went 19 found / 18 with a fixture and named the
   // file, which is the equality comparison paying out on the day the instrument
@@ -72,6 +81,14 @@ const COVERED = [
   // source that moves. Eighteen had rotted when the sweep was first run, one of
   // them a **control**, which makes its whole run unstartable.
   ["tools/mutate/anchors.mjs", ["npx", "vitest", "run", "test/unit/mutate-anchors.test.ts"]],
+  // **The terminal read's two halves that a container can check.** Neither's
+  // *verdict* is reachable from here — that is the whole reason the probe exists
+  // — but the properties that make a verdict readable are: that the bytes are
+  // the shipped encoder's, that the `q=2 → q=0` substitution fired, that the
+  // control is a real PNG broken on purpose, and that every case in the driver
+  // tells the reader what its failure looks like.
+  ["tools/terminal-probe/build.mjs", ["npx", "vitest", "run", "test/unit/terminal-probe.test.ts"]],
+  ["tools/terminal-read.sh", null], // same fixture — the driver's own claims
   ["tools/proof.sh", ["npx", "vitest", "run", "test/unit/proof-guards.test.ts"]],
   // **Both landed without a fixture and this target was not run**, so the gate
   // that exists to catch exactly that sat red for three commits. `catalogue-png`
@@ -79,6 +96,26 @@ const COVERED = [
   // and splitting the answer across two files is what the header argues against.
   ["tools/plot-catalogue.mjs", ["npx", "vitest", "run", "test/unit/plot-catalogue.test.ts"]],
   ["tools/catalogue-png.mjs", null], // same fixture — the catalogue pipeline
+  // The focus and selection corpus (C11 I14, arc3 Lane A). Its fixture reads the
+  // frames it writes rather than the scene table: which rows are washed, which
+  // is the head, and that the 1-bit arm carries the selection as reverse video.
+  ["tools/interaction-catalogue.mjs", ["npx", "vitest", "run", "test/unit/interaction-catalogue.test.ts"]],
+  // The key ladder as a generated table (C16 §6, arc4 Lane K). Its fixture is
+  // the drift check in both directions: the file on disk equals what the live
+  // keymap renders to, and a keymap with one binding added renders to
+  // something else that names the key.
+  ["tools/keymap-table.mjs", ["npx", "vitest", "run", "test/unit/keymap-table.test.ts"]],
+  // **Its fixture is a golden row rather than a unit one**, because what this
+  // instrument owes is not arithmetic — it is *the comparison responds to a
+  // frame that moved*, and that can only be asked of the corpus it writes.
+  // `TB5` corrupts a frame in a temporary directory and requires the diff to
+  // name it; `TB1`–`TB4` assert the count, the set equality and that the rungs
+  // are constructed at all.
+  ["tools/terminal-baseline.mjs", ["npx", "vitest", "run", "test/golden/terminal-baseline.test.ts"]],
+  // T2, and it is here for the opposite reason to T1: that gates an arm which
+  // must not move, this gates one that is supposed to. Its own fixture is
+  // `SB5`, which corrupts a frame written through the real tool (F275).
+  ["tools/svg-baseline.mjs", ["npx", "vitest", "run", "test/golden/svg-baseline.test.ts"]],
   // Covered by that same fixture all along — `plot-catalogue.test.ts` imports
   // `CATALOGUE_FORMS` and compares it against `ALL_FORMS` by equality. It was
   // simply not *seen*, being a `.ts`. See the note on `SUFFIX`.
@@ -94,6 +131,7 @@ const COVERED = [
   ["tools/catalogue-hash.mjs", ["npx", "vitest", "run", "test/unit/catalogue-tools.test.ts"]],
   ["tools/contact-defaults.mjs", null], // same fixture — the sheet's geometry
   ["tools/phase-catalogue.mjs", null], // same fixture — the refusal list and the ordering
+  ["tools/pair-catalogue.mjs", null], // same fixture — the refusal partition and the pair's geometry
   ["tools/refdiff/pair.mjs", ["npx", "vitest", "run", "test/unit/refdiff.test.ts"]],
   ["tools/refdiff/reference.py", null], // same fixture — the two halves of one grid
   ["tools/refdiff/export-fixtures.ts", null], // same fixture — our half and the grid
@@ -125,6 +163,20 @@ const NOT_INSTRUMENTS = {
   "examples/docker/tools/_fixture.py": "the fixtures' own four-line harness",
   "examples/docker/tools/registry.mjs": "the shared registry, covered by probes_test.mjs",
   "examples/docker/tools/__pycache__": "not a file",
+  // **An instrument, and untestable as written — the reason is the debt rather
+  // than an exclusion.** Its body runs at import and it opens `/dev/tty` at
+  // module scope, so nothing can import `kitty_reply` — the one pure function
+  // that decides whether the terminal said OK or named an error, and therefore
+  // the one whose wrong answer would make every reading meaningless. *An entry
+  // that starts on import is untestable*, and the suite retargeting at the
+  // pieces would read as coverage.
+  //
+  // **The expiry is a symbol**: `if __name__ == "__main__"` around the body with
+  // `TTY`/`FD` opened inside it. Not taken here, because the restructure has to
+  // be verified against a real terminal in a real Ghostty window and this
+  // repository cannot do that — a probe rewritten blind is a probe whose next
+  // reading nobody can trust. Whoever next runs the read owns the change.
+  "tools/terminal-probe/probe.py": "runs at import and opens /dev/tty at module scope, so its parsers cannot be imported; the expiry is a `__main__` guard, and it must be verified in a real terminal",
 };
 
 // **`.ts` was missing, and the omission has a history worth keeping.**

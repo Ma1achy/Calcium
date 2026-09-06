@@ -36,7 +36,6 @@ type RenderContext = Readonly<{
   capabilities: TerminalCapabilities; // C02, injected
   focus:        FocusState | null;    // C11 / C15 use it; most kinds ignore it
   tick:         number;               // monotonic animation counter — see below
-  onAction:     (a: Action) => void;
   measureChild: MeasureFn;            // Seam 1, on the render side — see below
   renderChild:  (block: Block, width: number) => ReactElement;
 }>;
@@ -68,6 +67,10 @@ interface BlockDefinition<B extends Block = Block> {
   // later edit while a branch returning `[]` can. Pure in (block, width) and never
   // in focus, which is what keeps C11 I14 true by signature. UNBUILT.
   elements?: (block: B, width: number, measureChild: MeasureFn) => readonly NavElement[];
+  // §2c — the columns the content occupies at `width`, in [1, width]. Optional on the same
+  // argument again: a kind whose drawing is its width declares nothing, and the registry
+  // answers the width for it.
+  width?: (block: B, width: number, widthChild: WidthFn) => number;
 }
 
 type Windowed<B extends Block = Block> = Readonly<{
@@ -82,13 +85,27 @@ interface BlockRegistry {
   measure(block: Block, width: number): number;
   render(block: Block, ctx: RenderContext): ReactElement;
   measureSequence(blocks: readonly Block[], width: number): number;
+  // C14 §4b — the slice of a sequence that fills rows [from, to), on block boundaries
+  // where a kind declares no `window`; the rows skipped before the first kept block.
+  windowSequence(blocks: readonly Block[], width: number, from: number, to: number):
+    Readonly<{ blocks: readonly Block[]; skipRows: number }>;
   renderSequence(blocks: readonly Block[], ctx: RenderContext): ReactElement;
+  // C26 §5 — one block's elements, block-local; and a sequence's, lifted in BOTH axes.
+  elementsOf(block: Block, width: number): readonly NavElement[];
+  elementsIn(blocks: readonly Block[], width: number):
+    readonly Readonly<{ blockId: string; element: NavElement }>[];
   readonly kinds: readonly string[];
   readonly sealed: boolean;
 }
 
 function createBlockRegistry(opts: { defaults?: boolean }): BlockRegistry;
 ```
+
+**`FocusState.selected` is the selection's extent** (C26 I16) as `(blockId, rowId)` pairs over the
+*entry's* element list, head included, **absent** when the extent is the head alone. Every block in the
+entry is handed the same list and keeps the pairs naming itself, so a block that does not hold the head
+still paints its selected rows from one value (C11 I14). Absent and `[]` draw alike and key alike
+(C22 I58). Added 2026-09-05 with the writer (`focusFor`) and the axis, per C22 I71.
 
 `measure` on the registry is the dispatcher, and it passes **itself** as each definition's `measureChild`. That is how `panel`, `group` and a table's expanded detail measure children whose kind they do not know, without any kind importing the registry.
 
@@ -103,9 +120,29 @@ that inserted spacing of its own would make a document's height unknowable from
 the document (C23 §2). A `row` group is not a sequence: its children sit side by
 side, so a gap before one of them is ignored rather than being an error.
 
+**`elementsIn` lifts a block's elements into the sequence's coordinates in both axes, and the
+origins are the painter's.** `elementsOf` answers block-local `rows` and `cols` (C26 §5);
+`elementsIn` adds each block's top row **and left column**, then descends into a container that
+declares no elements of its own (I30). The origins are read from the functions the renderers
+place children with, never restated: a `panel`'s children begin one row below its top border
+and one column in from its left rail — none when the width is under three and the rails are
+dropped — at `insetWidth`; a `column` group's follow one another down at column 0, `gapBefore`
+counted as `measureSequence` counts it; a `row` group's sit side by side at `childWidths` plus
+`ROW_GUTTER` between each pair, only the first `placeable` of them, and a `gapBefore` there is
+ignored as the renderer ignores it; a `mosaic`'s cells are `mosaicRects`' `left` and `top`, and
+a `scroll`'s children are content rows from its top (C26 I3). **Measured before the rule** (F756,
+F757): the walk lifted rows and never columns, so two 39-wide tables in an 80-column `row` group
+both answered `cols [0, 39)` and a click at column 50 focused the first; and it reset every
+child of a container to the *container's* top, so a `panel`'s table answered its rows one above
+where the frame drew them and a second table in a `column` group overlapped the first. Every
+one of those lists satisfied C26 §5's four predicates block by block, which is why the
+predicates are also asserted over the lifted list (C26 §5, T2.29–T2.31).
+
 **`renderChild` and `measureChild` are Seam 1 on the render side, and the registry passes itself for both.** A container renders children whose kind it does not know, for the same reason it measures them, and neither may import the registry (I7). `measureChild` is on the context because a container's *frame* has to be as tall as its contents: `panel` draws a border column of `measureChild(child, w - 2)` rows beside children rendered at that width, and the title lives in the top border (S13), which is why the border is drawn rather than delegated to a box-drawing option. That makes I1 visible instead of silent in the one place a violation would otherwise hide — a `panel` whose measurer and renderer disagree draws a border that does not close. **`footer` sits in the bottom border for the same reason `title` sits in the top**, and changes nothing about measurement: the row is drawn either way, so this is a use for a row that already exists rather than a new one. S12 §2 and S13 §2 both draw it, and neither can put those keys in the frame's footer — a pushed view leaves header and footer untouched (C15 T4.4).
 
 **Animation state arrives through `ctx.tick`.** `steps` shows a spinner, and a renderer must stay pure, so the frame index cannot come from a clock inside the block. `tick` is a monotonic counter incremented by C03's `spinner` commit; a renderer computes `frames[tick % frames.length]`. Nothing else in C09 reads it, and `measure` never does — animation must never change height.
+
+**There is no `onAction` on the context, and for the life of the project there was one.** `onAction: (a: Action) => void` sat in this listing as a required member, and the measurement is the same shape as F85's: **no renderer under `blocks/kinds/` read it**, the only writers were two no-op defaults in `render-lines.ts` (`options.onAction ?? (() => undefined)`), and both product call sites — `shell/paint.ts` and `shell/composite.ts` — omitted it, so the no-op was what every real frame rendered against. The route an action actually takes never touched the context: C11 renders a row's actions and C16 fires them (C11 §9), `enter` on a focused row reaches C23's dispatcher through `KeyDeps.onAction` (C23 I37), and C23 owns the dispatch. F21 recorded the gap — *no keystroke reaches the dispatcher* — and the roadmap closed it with the `enter → rowActivate` route, which is the route that made this member's emptiness permanent rather than pending. **A required member with no reader is a field every caller must invent a value for** (F58b, F85), and the only value anyone ever supplied was a stub; removing it makes supplying one fail to compile rather than fail to matter. The supplier-exclusivity clause C23 §3a and I16 carry is about the dispatcher, not about a context field, and reads that way now.
 
 **And for the life of the project nothing incremented it, which this section asserted the whole
 time.** *A monotonic counter incremented by C03's `spinner` commit* described a chain with three
@@ -135,7 +172,10 @@ exhaustiveness in **both** directions, so a kind added to the union without an e
 error and an entry naming a kind that no longer exists is one too. A `Set` of two strings compiles
 with either missing, which is F228's class: a hand-maintained list beside a generated one, where
 the hand-maintained list is the one that reads as authoritative. Two entries today — `status` and
-`steps` — and nothing else in C09 reads `ctx.tick`.
+`steps` — by kind. Since the ramps (§5 *Ramps*) a block also animates **by content**, when a span
+or its `ramp` carries an `animate` other than `none`; `tickIntervalOf` answers for both, `ANIMATES`
+stays the record of the kinds that animate by nature, and the ramp resolver is the third reader of
+`ctx.tick` (I54).
 
 **`animationIntervalOf` descends into containers, and the mutation pass is the only thing that
 said so.** Removing the descent survived every row until the fixture put the spinner inside a
@@ -196,6 +236,35 @@ same suite a consumer runs for `measure`/`render` — so an app's own arm is hel
 to it too. Without that, a consumer's window can be silently short and the frame
 describes a document nobody holds.
 
+**And the residual is a pair, because slack falls at both ends.** `skipRows` is
+leading only — its own sentence says *the leading rows of it the caller drops* —
+and that was sufficient for every kind that took the seam first: `patch`'s slack
+is a path header and a hunk header, which lead; `logs` and `keyValue` have units
+of one row and cannot overhang at all. **`table` is the first kind whose last
+unit can hang past `to`** — a range ending inside an expanded row gets the whole
+row, and the surplus is at the end (F428). So the identity is:
+
+```
+measure(w.block, width) − w.skipRows − w.dropRows  ===  to − from
+```
+
+**This names a drop the consumer has always made.** `session.ts` renders the
+window and writes `rows.slice(0, ve.takeRows)`: trailing rows past the viewport's
+own count have been discarded on every frame since the seam landed, and no
+contract said they could be. The weaker repair is worse than either — relaxing
+the identity to `≥` would let every wrong answer inside the bounds pass, which is
+the one thing the property exists to prevent.
+
+**And `window` takes `measureChild`, for the reason `elements` already states one
+member below it.** A table row's offset is `header + Σ(1 + detailHeight(row))`
+and `detailHeight` measures the expanded detail through the child seam, so the
+unit boundaries are **not a function of `(block, width)` alone** and a window
+that guessed them would slice at the wrong row. The sentence was already
+written — the right kind, the right quantity, the right reasoning — on the
+neighbouring member; `logs`, `patch` and `keyValue` have units of one row and
+never needed it, so nothing connected the two, and `table` could not divide for
+want of a parameter rather than for want of a rule.
+
 **A plot has no `window` and never will.** C12 I1 makes a plot's height a
 function of the block alone: reducing its series changes nothing and reducing its
 `height` rescales the curve rather than windowing it. **Atomicity is expressed by
@@ -204,7 +273,95 @@ removes, and an absent member is not.
 
 **No block renderer reads the environment.** Capabilities arrive through `ctx`, never from `process.env` — C02's I5 extends here, and a renderer probing for itself is the bug that produces a table in ASCII beside a sparkline in Unicode.
 
+### 2b. The cap — the registry's bound on one block's rows
+
+**Ruled in C14 §4b, held here because the code is the registry's.** `createBlockRegistry({
+maxBlockRows })` — default `DEFAULT_MAX_BLOCK_ROWS`, 2 000 — is the most rows one block may
+occupy, and the registry applies it **before any definition sees the block**: `measure`,
+`render`, `elementsOf` and `windowSequence` each resolve a block to its *capped form* first.
+
+**The capped form is the kind's own `window`, which is why no kind implements the cap.**
+For a block whose `definition.measure` exceeds the cap, the form is
+`window(block, w, 0, cap, measureChild).block` with `capped: { shown, total }` attached, where
+`shown` is the form's own measured rows and `total` the block's. `measure` answers `shown + 1`;
+`render` draws the form and then one row — `… 2,000 of 50,000 rows`, `tone("muted")`, `~` on an
+ASCII terminal — clamped to the width so it is one row at every width the measurer counted. A
+kind with no `window` has no capped form (C14 I26), so `plot` is exactly as atomic as I27 says,
+and a block within the cap is returned **by reference**, so nothing downstream can observe the
+cap on a block it does not touch.
+
+**`capped` is view state on `lineRange`'s argument** (I25a, C04 I82): written by the registry,
+read by the registry, refused from a far side. It is attached *after* the definition's window
+and re-attached by `windowSequence` when a window reaches the marker row, because a window may
+build a fresh block — `patch`'s does — and a field a kind can drop is not view state. The
+registry reads it through a cast until C04 names the field (a request is recorded, not assumed).
+
+**The composition, in the registry's own terms.** `windowSequence` measures the capped form,
+windows it for `[from, min(to, shown))`, strips `capped` when `to ≤ shown` and carries it when
+`to > shown`; a window over the marker alone asks for `[shown − 1, shown)` and charges the
+content row to `skipRows`, because no kind's window returns zero rows (C11 I20). The floor (I33)
+applies after the cap. The gap (C04 §3a) is the sequence's and survives the spread.
+
+**What the measurement said and what it did not**, because a bound owes its figures (C14 §4b):
+paint is ~0.25 ms a row for every kind and linear with no knee, so the default is a policy —
+fifty screens, and `MAX_ROWS`'s figure — rather than a number the table chose; and the
+whole-block `measure` the roadmap named as the cost is 0.6 ms for a 50 000-row `table` and
+cannot be bounded by a marker that must say *of 50 000*. `code`'s first paint tokenises the whole
+text whatever the window, 1 696 ms at 50 000 rows, and a `code` window opening at line 0 could cut
+its text because nothing precedes the slice — owed here, to `kinds/code.ts`, and not built around.
+
 ---
+
+### 2c. `width` — the content width, and the two kinds of answer
+
+```typescript
+type WidthFn = (block: Block, width: number) => number;   // the registry's `width`, handed to containers
+interface BlockDefinition<B extends Block = Block> {
+  // …
+  width?: (block: B, width: number, widthChild: WidthFn) => number;
+}
+```
+
+**`width(block, w)` is the columns the block's content occupies when rendered at `w`**, in
+`[1, normaliseWidth(w)]`, pure in `(block, width)` as `measure` is (I2). It is the answer C04 I45
+said no seam gave, and C04 §3 *Both axes* is its first consumer: a group aligning a child `centre`
+or `right` renders it at this width and offsets it by the remainder.
+
+**Two kinds of answer, and the absent member is the second.** A kind whose content has an edge —
+text, chips, a table with no flex column, a bordered box around such things — answers with the
+edge. A kind whose drawing *is* its width — a `rule`, a `progress` bar, a `plot` frame, an `image`
+scaled to its cell, a `scroll` box — has nothing narrower to report, and **declares no member**:
+the registry answers `normaliseWidth(w)` for it, and every alignment of it is a no-op that C04 I101
+states. Optional on `window?`'s argument: an absent member cannot be deleted by a later edit while
+a branch returning `w` can.
+
+**The contract that makes it safe to render at**: `measure(b, width(b, w)) === measure(b, w)`
+(I43). A block is the same height at its content width, so a group that renders a child narrower
+than its cell has not changed the row the child was measured for. The kinds that answer keep it by
+construction — a `notice` reports its longest wrapped row, so every row still fits; a `raw` its
+longest line; a `pills` block its widest chip row; a `keyValue` with no bar its key column, gap and
+longest value; a `code` block its longest row; a `table` its planned columns and gaps when it has
+rows, no action bar and no expanded row — a flex column is the plan's business, since the plan hands
+it the residual and an uncapped one sums to the width on its own while a `maxWidth`-capped one does
+not; a `column` group whose children are all
+`left` the widest child, and a `row` group whose shares are all `{cells}` their sum and gutters; a
+`panel` two more than its widest child, or its title or footer plus their furniture, whichever is
+wider (I44). A `keyValue` with a bar fills because the bar absorbs the residual; a `table` with an
+action bar, an expanded row or no rows fills because those rows are clamped to the cell rather than
+to the columns. A guard for a flex column was written and the mutation pass found it redundant on
+its first run — the plan already answers, and the guard would have answered wrongly for a capped
+flex column (F818).
+
+**A container answers only when its layout does not depend on the width it is given** — the
+clause the build added. A weighted `row` rendered at its own sum re-divides that sum, so its
+children land at different allocations and the picture is a different one; a `column` holding a
+`right` child would move that child when the column's cell shrank to the widest one. Both fill.
+A fixed-share `row` and an all-`left` `column` render identically at their content width, which is
+the property I43 guards on the vertical axis and this sentence guards on the horizontal.
+
+The registry's `width(block, w)` clamps whatever a definition returns into `[1, normaliseWidth(w)]`
+and reports a value outside it through `onError` (I8's shape): a definition that answers wider than
+its cell has described a block the cell cannot hold.
 
 ## 3. The nineteen kinds
 
@@ -213,7 +370,7 @@ Each is a `measure`/`render` pair. The measurement column restates C04 §3 as an
 | Kind | Measure | Notes on render |
 |---|---|---|
 | `rule` | 1 | Label, optional meta, then a fill to `width`. **An empty label draws an unbroken line** (I21) |
-| `notice` | `ceil(cells(text) / w)` | Glyph, then wrapped text; `error`/`warn` require the glyph (C04 I5) |
+| `notice` | `ceil(cells(text) / w)` | Glyph, then wrapped text; `error`/`warn` require the glyph (C04 I5). **Declares one block-level element — the whole notice, `activate: action`, `copy: text` — exactly when `action` is present or its glyph is in `GLYPH_ELEMENT`** (C04, C26 §5, I47), none otherwise; under focus the glyph and text go `accent` over the selection ground (C26 §7) |
 | `keyValue` | rows | Two columns; key column sized to the longest key, capped at 20 |
 | `table` | delegated to C11 | Registered by C11, not here |
 | `steps` | steps | Spinner frame while active; tick or cross when settled |
@@ -222,7 +379,7 @@ Each is a `measure`/`render` pair. The measurement column restates C04 §3 as an
 | `events` | events | Timestamp, type, message on one row; message truncated |
 | `plot` | delegated to C12 | Registered by C12 |
 | `progress` | 1 | Label, bar, percentage; bar takes the residual width. **The bar is bounded by its cells and the number is not** — see below |
-| `code` | lines, or wrapped lines when `wrap` | Syntax highlighting via the **`syntax` palette** (C10 §2), not tones — eight roles do not fit ten semantic slots. Truncates by default; wraps when `wrap: true` |
+| `code` | lines, or wrapped lines when `wrap`; **the lines in `lineRange`** when a window set one | Syntax highlighting via the **`syntax` palette** (C10 §2), not tones — eight roles do not fit ten semantic slots. Truncates by default; wraps when `wrap: true`. **Windows by source line with `text` kept whole and `lineRange` pinned** (I25a, C04 I82) |
 | `comparison` | rows + 1 | Field, a, b, comparator; three equal columns |
 | `pills` | `ceil(totalCells / w)` | One logical row that may wrap |
 | `tip` | `ceil(cells(text) / w)` | Dim, with fill actions |
@@ -230,7 +387,8 @@ Each is a `measure`/`render` pair. The measurement column restates C04 §3 as an
 | `scroll` | `height`, plus one residue row when the content overflows | A bounded box: `height` rows of content, and the marker is chrome the container adds on top (C04 I47, C04 I49). **Declares `elements` at block level and no `window`** — a region whose height is declared cannot measure less without becoming a different box |
 | `mosaic` | `height`, exactly | A declared grid of absolutely positioned cells (C04 I71). **Not a bounded box in `scroll`'s sense**: every cell bounds its own child, so I1 holds through an over-tall child rather than diverging (I35) |
 | `group` | sum or max of children | `column` sums children measured at `w`; `row` takes the max of children measured at `floor((w - gaps) / n)`, one cell of gutter between each pair (C04 §3) |
-| `raw` | lines | Pre-formatted, emitted as-is with control characters stripped |
+| `raw` | lines | Pre-formatted, emitted as-is with control characters stripped. **Windows by line**, with no pin — nothing is derived from lines outside the slice (I25) |
+| `terminal` | `lines.length`, plus one row when `dropped` is present | A child's screen (C04 §3i). **Never wrapped and never stripped**: each line is one row, truncated at `width`, and the containment gate (C04 I110) is what makes emitting the text safe. Runs paint literal colour through C10 §4i's ladder; the cursor cell is drawn `inverse`. **Windows** |
 
 **Every measure in this table is floored at 1** for a block that is present (C04 I17). `ceil(cells("") / w)` is 0, and an empty `notice` still renders as a row; the floor is a rule over the table rather than a clause in three of its entries. The one legitimate zero is a container with no children, which is the absence of content rather than empty content.
 
@@ -245,10 +403,19 @@ That it is three rather than one matters. A single privileged exception is indis
 **Three states a block can be in that are not drawn normally**, and one implementation:
 
 ```
-error       the definition's renderer threw. A bug. Terminal
+error       an operation failed and nothing more is coming. Terminal
 retrying    the far side failed and a backoff is counting down. Not a bug
 loading     no data yet, first fetch in flight. Not a failure at all
 ```
+
+**A call that fails or retries composes one of these under its head, and nothing composes a red line instead** (F827). The call grammar's states are RUNNING, WAITING, DONE, FAILED, RETRYING, DENIED and CANCELLED; the two that carry a body of their own carry this kind — the error rule, the mark, the message, at the block's committed height — and the head above it is kept, because *what ran* is the first thing a reader needs and the error is the second. The shell's composer is the one place a notice is written by hand — by literal or by builder call (A03 SS56, widened; C23), which is F406's class closed as a class rather than as twelve sites.
+
+**`error` read *the definition's renderer threw. A bug.* and that was narrower than the kind**
+(F406). `retrying`'s own line has always said *the far side failed*, so this was never scoped to
+renderer faults — and the narrow gloss is why the framework's own error documents were built out of
+`notice` for twelve call sites: a spawn that cannot find its binary, a transport that times out, a
+one-shot fetch that will not be retried. Each is terminal, none is a bug, and each drew a red line
+of text beside a kind that draws the figure above.
 
 ```
 ┌─────────────────────────────────────────┐
@@ -289,6 +456,51 @@ and they have nothing to do with a broken definition. Only their defaults become
 
 **The cost, stated**: a plot with `plotFrame: "rule"` still gets a box, and a loading plot shows
 no axes. Both are deliberate.
+
+#### The rung a box inside a border needs
+
+**The height ladder couples the tag to the border, and that made every option wrong for a box
+inside a panel** (F406). The tag first appears at the rung where the border already has, so *tag
+without border* was not expressible — and a `status` that a live part puts inside `b.live`'s own
+panel is framed already. Measured, at 72 cells:
+
+```
+h=2, today                              h=4, the tag's first rung
+┌ always failing ──────────────┐        ┌ always failing ──────────────┐
+│▲ ECONNREFUSED 127.0.0.1:9999 │        │┌────────────────────────────┐│
+│⠋ retrying in 6s (attempt 2)  │        ││────────── ERROR ───────────││
+└──────────────────────────────┘        ││▲ ECONNREFUSED 127.0.0.1:99…││
+                                        │└────────────────────────────┘│
+   no tag: reads as a red line          └──────────────────────────────┘
+                                           the tag, at two nested borders
+```
+
+**C23 I51 chose the left one and its reason was right about both options** — *at 3 the box spends a
+row on a second border inside the first and at 4 it buys the ERROR tag at two nested borders*
+(F234). What it could not choose is the figure, because the figure is neither:
+
+```
+framed, three rows
+┌ always failing ──────────────────────────────────┐
+│───────────────── ERROR ──────────────────────────│
+│▲ ECONNREFUSED 127.0.0.1:9999                     │
+│⠋ retrying in 6s (attempt 2)                      │
+└──────────────────────────────────────────────────┘
+```
+
+**So `framed` is a second ladder on the same axis, not a rung on the first.** A framed box draws no
+border at any height — its container has one — and spends the rows it saves on the tag and the
+content: the tag at two rows for the failed states, which is *tag + message*, and a third row buys
+`retrying` its activity line. **`loading` is unchanged at every height**, because it has no tag to
+gain and its whole content is the line that moves.
+
+**Who sets it is the same answer `height` has**: whoever puts the box inside a bordered container
+knows, and a consumer holding one does not. It is not on `b.status` (C24 I30, §4b) and MG27 holds
+that with a reason keyed `status.framed`.
+
+**The stated cost**: a framed box has no border of its own, so at `H ≤ 1` there is no evidence the
+height was honoured — the same clause the free-standing ladder carries at `H ≤ 2`, one rung lower
+because the border was never this box's to draw.
 
 #### The two ladders, and neither may change the row count
 
@@ -568,6 +780,7 @@ The distinction is deliberate and per-kind.
 
 **Wrapped** — `notice`, `tip`, `pills`. Prose and chips, where losing the tail loses meaning.
 **Truncated** — `logs`, `events`, table cells. Structured lines where the leading text carries the information and predictable height matters more than completeness.
+**Fitted, by token** — a `notice` carrying `step`. A call's head is one committed row (I46): a head that wraps is two heads to a reader skimming the gutter, and the design's rule is that the argument elides from the tail before anything else does — `petal_leng…` is not a word, and neither is a verb cut in half. The composer marks the argument's span `elide`, and the fitter shortens that run first through `truncate(…, "end")` and the whole row last. The kind stays wrapped; the token is what is fitted, on I41's argument.
 **Caller's choice** — `code`. A JSON dump truncates harmlessly; a YAML manifest does not, because a truncated manifest is a *different manifest* that someone will read as the real one. Only the producer knows which it is, so `wrap` is a field rather than a policy.
 
 Nothing wraps that a viewport would rather measure cheaply.
@@ -595,7 +808,44 @@ A `total` of zero has no proportion at all; the bar is empty and the percentage 
 which is a floor rather than a measurement and is recorded here so it is not rediscovered as a
 defect.
 
+**A ramp on the bar varies over the axis, and only the `on` cells take it** (I52). Cell *i* of
+the bar samples `t = i / (barWidth − 1)` whether or not it is filled, so a bar at 30% is the
+first third of the bar at 100% and not a compressed copy of it: the tip's colour reads the
+fraction, two bars in one document share a scale, and a cell painted once keeps its colour as
+the bar fills. The `off` cells stay `muted`. This answers C04 §3am.2's *RULE WHICH* — the other
+answer, the filled length, moves every painted cell on every patch for no information. **One
+wrinkle, measured on landing**: the bar takes the residual after the percent (§3), so a percent
+growing a digit — `90%` to `100%` — narrows the bar by one cell and every cell re-samples by a
+hair. T2.119 compares 30% against 90% for that reason, and the row says so.
+
 ---
+
+### `rule` — three tiers, and the axis is the fill
+
+A heading has a level and `rule` drew one figure, so `Rule.level` arrives with the
+question of what three forms are (C04 I94, §3an). The answer is **one axis**: the lead
+stays two cells, the label stays in the column every other block starts at, and only the
+fill changes.
+
+| tier | lead | fill | unicode | ascii |
+|---|---|---|---|---|
+| 1 | 2 cells, heavy | `heavyHorizontal` | `━━ Interface ━━━━━…` | `== Interface =====…` |
+| 2 | 2 cells, light | `horizontal` | `── Interface ─────…` | `-- Interface -----…` |
+| 3 | 2 cells, light | space | `── Interface` | `-- Interface` |
+
+**The fill is drawn rather than dropped**, as spaces — so the row is exactly the width at
+every tier, `meta` stays at the right edge in all three, and `measure` is 1 throughout.
+A tier that shortened the row would put a second geometry on a kind whose whole claim is
+that it has one.
+
+**An empty label never takes the blank fill.** I21 says an empty label draws an unbroken
+line, and at tier 3 the two rules meet in one cell: a two-cell lead with nothing after it
+is not a rule at all. So the fill falls back to the tier's own weight exactly when the
+label is empty — heavy at tier 1, light at 2 and 3.
+
+**Both marks are pairs the table already holds**, which is why no character is authored
+here: `heavyHorizontal` is `━`/`=` and `horizontal` is `─`/`-`, resolved through
+`glyphs(ctx.capabilities)` like every other rule character (SS47).
 
 ## 4. Capability fallbacks
 
@@ -618,7 +868,7 @@ C09 owns both renderings of every glyph a block can name (C04 §5). A block name
 | `ok` | `✓` | `+` | Succeeded, healthy, valid |
 | `warn` | `▲` | `!` | A warning that does not suppress success |
 | `error` | `✗` | `x` | Failed |
-| `info` | `ℹ` | `i` | Informational, no judgement |
+| `info` | `ⓘ` | `i` | Informational, no judgement. **U+2139 `ℹ` until F832**: it is an emoji-variation base, the same class as `⏺`, found by the derived table on its first run. U+24D8 has no emoji form and is Ambiguous, so it resolves to `i` at `wide` (I48) |
 | `pending` | `◌` | `.` | Not started |
 | `working` | `◐` | `%` | Starting, connecting, installing — in progress |
 | `running` | `●` | `*` | Running, steady state |
@@ -628,7 +878,10 @@ C09 owns both renderings of every glyph a block can name (C04 §5). A block name
 | `collapse` | `▾` | `v` | An expanded row |
 | `live` | `▌` | `\|` | The live-state gutter (D6) |
 | `bullet` | `•` | `-` | A list marker with no status meaning |
+| `quote` | `⎸` | `>` | A quotation's gutter — a **rail**, drawn on every row (C04 I95) |
+| `nested` | `⁃` | `~` | A list item nested deeper than the indent shows (C04 I96) |
 | `continuation` | `⎿` | `` ` `` | A line subordinate to the one above — the entry's own state, under its command |
+| `step` | `⏺︎` | `*` | A step in a sequence of work — a call's head (`AGENT_TUI_DESIGN.md` §9c, §10). **U+23FA BLACK CIRCLE FOR RECORD followed by U+FE0E**, the text presentation selector. The base has both a text-style and an emoji-style variation sequence in `emoji-variation-sequences.txt` 17.0.0, so a font preferring the emoji form draws it two cells; the selector says *draw the preceding character as text*, and `cells()` counts the selector zero, so the pair measures one. It carried `⬤` U+2B24 between F823 and F854 — a circle of the right size and nothing else, where U+23FA sits in Miscellaneous Technical beside `⏵` PLAY and `⏸` PAUSE and a call in progress is a recording. `running`'s `●` is Ambiguous and is a *state*, where this names a *position in a sequence* and does not change as the step runs or settles. The ASCII half is the design's `*` (§A6); it is shared with `running`, and I5 is about cell count, not uniqueness (F824) |
 
 **Why this is a closed union and not a string.** While the field was free, C09 emitted a block-supplied character verbatim — so the 1:1 guarantee held for the glyphs C09 chose and silently did not hold for the ones an adapter wrote. That is a guarantee that is mostly-true, and mostly-true fails only under `LANG=C`, only for the users least able to describe what they are seeing. It also drifted immediately: before tokenisation the tree carried `✗`, `✖`, `*`, `+` and `▲` in glyph positions, across five files, for three rôles.
 
@@ -673,6 +926,44 @@ C09 owns both renderings of every glyph a block can name (C04 §5). A block name
 **On the character, measured rather than chosen.** `⎿` is `East_Asian_Width=Neutral` — **one cell under both conventions**. The corner a reader would reach for instead is not: `└` and `╰` are Ambiguous and draw two cells wide, as do `▲` and `⋯` already in these tables. That does not buy anything *today*, because `glyphs()` discards the whole Unicode set at `ambiguousWidth: "wide"` and this table follows `unicode` alone — so it is a property of the character and not yet an argument. It is recorded because §4's own note says a third set of narrow survivors is *the better answer the day someone measures one*, and this is a measurement, filed where that note can find it.
 
 The ASCII half is `` ` ``, which is `tree(1)`'s rendering of the same hook in its ASCII mode — a precedent rather than a preference, and degradation preserving meaning rather than appearance.
+
+#### `step`, and the mark that measured right and was wrong
+
+**`⏺` U+23FA was measured with `cells()` before its row was written, and the measurement answered the wrong question** (F823). East Asian Width is silent about presentation: U+23FA is a base in `emoji-variation-sequences.txt` — `23FA FE0E ; text style` and `23FA FE0F ; emoji style` — so a terminal whose font prefers the emoji form draws it two cells wide whatever the locale says, and every table in `text.ts` reports one. **And the remedy the rule first took — refusing the character — was the wrong one** (F854). Unicode has a way to say *this glyph, as text*: U+FE0E. `cells()` counts it zero, measured rather than assumed, so `⏺︎` is one cell by every table on this side and one cell on any terminal that honours the selector. The rule is therefore an inversion of what F823 wrote: **a base must carry the selector**, and a bare base is the violation. What refusing cost is the argument for having noticed — eleven marks left the vocabulary under F832 and F833, and the head mark's replacement `⬤` U+2B24 is a circle of the right size and nothing else. So the check exists (I45): a table of variation-sequence bases derived from the Unicode file, with its version named, beside the Ambiguous and Wide tables that were themselves rebuilt from the property rather than from recollection (§5). **The residual risk, stated because an unrecorded limit reads as strength**: a terminal that ignores U+FE0E draws the emoji form anyway and the head is then one cell wider than I5 says. Nothing on this side can measure that, which is what the ASCII rung is for. **It is a test-time refusal and never a runtime branch.** Terminals disagree about presentation, and `cells()` counting it would be a guess dressed as a measurement — the check refuses a character from the tables, it does not resize one. T2.71 checked spinner frames against a seventeen-character list written from memory that opened with `·`, which is Ambiguous and has no emoji form at all; it runs over the derived table now, and I45 runs over both glyph tables and every spinner set. **The table's first run found a second member**: `info`'s `ℹ` U+2139 is a base too, and is `ⓘ` U+24D8 now (F832). It also holds the keycap bases `#`, `*` and `0`–`9`, which is why I45 is over non-ASCII characters and the table excludes the ASCII range by construction — the alphabet the tables degrade to cannot be the one the rule refuses.
+
+**The vocabulary has a width tier, because ten of its seventeen members needed one** (F825, I48). `glyphFor` read `unicode` alone where the internal set collapses wholesale at `ambiguousWidth: "wide"` and the spinner sets carry a per-set `narrowOnly`. Measured 2026-09-06 at both arms: `▲ ◌ ◐ ● ○ ⊘ ▸ ▾ ▌ •` are two cells at `wide` against a one-cell ASCII half, and T2.5b asserted I5 at `narrow` only — so more than half the table broke the 1:1 rule under the other convention and the row was green. A member measured Ambiguous resolves to its ASCII half at `wide`; the Neutral members — `✓ ✗ ⎸ ⁃ ⎿ ⏺︎` — do not move. (`ⓘ`, `info`'s mark since F832, is Ambiguous and joins the tiered set: eleven and six on the day the tier landed.) The finding that raised it named one member; the count was taken before the finding was written, and the class is the ruling.
+
+**And the separator between a head's fields is a slot** (F828, I49). `toolCallHeader` joined verb, elapsed and outcome with a literal `·`, which is non-ASCII and Ambiguous — two cells at `wide`, and the contract row for the card asserted it at the ASCII arm. `status.ts` chose parentheses and the residue row chose a comma for exactly this reason, each with the reason written beside it; the head was composed after both. `GlyphSet.separator` is `·` / `:`, resolved by the composer, which takes capabilities. **The ASCII rung was `-` for one commit** (F834): read at the ASCII arm, a dispatched head was `* run_command(npm test) - -` — the separator and the turn spinner's first frame `-` are one character, and `|`, the frame two ticks later, is the other obvious rung. A separator's ASCII half must be absent from every set's ASCII frames, and the colon is the one that is; the frame said so where the cell count could not.
+
+#### A rail — the one token property that changes what rows 1..n carry
+
+`GLYPH_INDENT` established that a **property of the token** can change what a gutter
+draws without the block schema learning anything, and `GLYPH_RAIL` is the second such
+property. A rail token is drawn on **every** row of its notice rather than on the first.
+
+**The geometry does not move, and that is what makes it safe.** `prefixCells` already
+subtracts the gutter from every row's width — the hanging indent depends on it — so the
+columns are reserved on rows 1..n whether or not anything is drawn in them. The rail
+fills columns that were already blank; `measure` is unchanged, needs no capability, and
+C09 I1 holds by construction rather than by a second argument.
+
+**One member, one frame-read.** A quotation carrying an ordinary glyph draws its mark on
+row 0 and nothing beneath it:
+
+```
+⎸ the first row of a quotation that      ⎸ the first row of a quotation that
+  wraps onto a second                    ⎸ wraps onto a second
+   ← a glyph                              ← a rail
+```
+
+Every count agrees in both frames — same rows, same width, same reserved columns — so no
+assertion about geometry separates them, and a suite indexed by blocks reports the left
+one as a working gutter. It is the same class as `continuation`'s indent, found the same
+way.
+
+**The set is here rather than on the token's declaration** for the reason `GLYPH_INDENT`
+gives: whether a mark repeats is a rendering property, and C04 owns the vocabulary while
+C09 owns both renderings.
 
 **Anything outside the vocabulary is text, not a glyph.** `↗ open`, `⊘ cancel`, `⬡ pods` and `≡ logs` are action labels and footer hints — text that happens to begin with a character, never a glyph slot — and their behaviour under ASCII is the app's. That is what keeps this table's guarantee absolute rather than nearly absolute.
 
@@ -737,13 +1028,25 @@ mark it actually wanted — and `… n more` becomes ASCII. **A vocabulary that 
 character its callers reach for stops being a vocabulary**, and the refusal is what keeps
 the 1:1 rule true.
 
-## 4c. `image` — two arms, and the dither is the first one
+## 4c. `image` — four rungs on two axes, and the dither is the one every terminal reaches
 
 **Two capability arms, not four**, and that is what this simplifies:
 
 ```
 imageProtocol: "kitty"                    the protocol arm
 "none" | "iterm2" | "sixel"               the DITHER arm
+```
+
+**The protocol axis is two arms; the glyph axis below it is three rungs**, and keeping them
+apart is what stops the ladder reading as four protocols. The protocol axis asks *can the
+terminal draw pixels*; the glyph axis asks *what can a cell be spent on* — and the answers are
+independent, which is the same two-ladders-on-two-axes shape the `status` block arrived at (§3a).
+
+```
+                        kitty            real pixels, placed by digest
+    glyph axis   ┌─     half blocks      two colours a cell — the picture is COLOUR
+                 │      braille 2x4      eight dots a cell — the picture is SHAPE
+                 └─     ascii ramp       `.:-=+*#@`, where the alphabet is nine glyphs
 ```
 
 ### iTerm2 and sixel are refused for composition, and the reason is not the obvious one
@@ -824,6 +1127,7 @@ conclusion is about a mechanism nobody had run.
 | arm | what it draws |
 |---|---|
 | `kitty` | the protocol — transmit once by digest, place with placeholders |
+| half block | `▀`, the top pixel in the foreground and the bottom in the background |
 | dither, unicode | braille 2x4, monochrome, nine intensity levels per cell |
 | dither, `ascii` | `.:-=+*#@`, ordered by the same matrix |
 | 1-bit | the same dither — **colour was never the carrier here** |
@@ -831,6 +1135,51 @@ conclusion is about a mechanism nobody had run.
 **The 1-bit row is not a further degradation.** Every other kind loses colour at 1-bit and keeps
 its shape; a dither *is* shape, so it is unchanged. Worth stating because C10 I8 vanishes surfaces
 at 1-bit and a reader would expect this to vanish with them.
+
+### The half block, and the three gates that decide it
+
+**Braille spends a cell on shape and half blocks spend it on colour**, and for a photograph
+that is not a close trade. A braille cell carries eight dots at one bit; `▀` carries **two
+pixels at twenty-four**. Against braille the half block loses three quarters of the vertical
+resolution and one half of the horizontal, and buys 2^48 against 2^8 — so a gradient that
+braille can only stipple arrives as a gradient, and a photograph stops being a texture.
+
+**It is the wrong trade for a line drawing**, and that is not a defect to fix. A diagram is
+shape, and braille's eight dots resolve a one-pixel rule that a half block averages away.
+Both are correct about different pictures and neither is chosen per image: the ladder is a
+*capability* ladder, so it takes the richest rung the terminal can honour and the content
+never votes.
+
+**Three gates, and each excludes the rung for its own reason.**
+
+**Ambiguous width, which is the one that would have shipped.** `▀` is
+`East_Asian_Width=Ambiguous` — measured by `cells()` itself, `narrow=1` and `wide=2` — so a
+terminal declaring `ambiguousWidth: "wide"` draws every cell of the picture at double width
+and the image is twice as wide as `imageCells` measured it. **Braille is not ambiguous**
+(`⣿` measures 1 at both), which is exactly why the existing arm never met this and why the
+new one must. `art.ts`'s `eligible` and `mermaid.ts`'s `useAscii` are the same switch, and
+this is the **third** consumer to need it (C02 I9, A03 SS50).
+
+**Colour depth, because the rung's whole claim is two colours a cell.** At `colourDepth: 4`
+there are sixteen and at 1 there are none, so below 8 the arm has nothing the dither lacks
+and has paid three quarters of the resolution for it. **`>= 8`**, and at 8 both channels go
+through `nearestAnsi256` — the same funnel C10's colormap already uses, so the 8-bit picture
+is the 24-bit one quantised rather than a second rendering.
+
+**The overlay, and this is the structural interaction.** A dithered image with an overlay
+puts the picture in the *glyph* and the field in the *foreground*, which works because the
+two channels are independent. A half block has **already spent both colour channels on the
+picture**, so there is nowhere for the field to go. Unlike 1-bit — where C10 I31's honest
+answer is to draw the picture plain, because the cell has nothing left at all — here there
+is a rung that can carry it. **So a block with an `overlay` skips the half block and takes
+braille**, and it is the field rather than the terminal that decides.
+
+**Neither of the two artefacts this component's walks use would have found that gate**, and
+the reason is worth recording. *Has an overlay* and *the terminal is 24-bit* both hold at
+rest with no event between them, so a sequence trace has no row for it however long it runs;
+it is the **classification table**'s shape, and the table is what was drawn (CLAUDE.md,
+*rule interactions come in two kinds*). The trace would have agreed with the code and been
+right about every sequence in it.
 
 ### The matrix, designed here because it is designed nowhere
 
@@ -865,13 +1214,82 @@ indexed as a density ramp. They look interchangeable and are not: a density ramp
 magnitude at a position, a dither ramp encodes a **threshold against a position-varying offset**.
 **The type is what tells them apart, because the eye does not.**
 
-### The blind spot, stated rather than assumed
+### A GIF is the same block with more than one frame, and the frame is never geometry
+
+**`Image.data` takes GIF bytes beside PNG, and the six-byte signature chooses the decoder** (C04
+I93, I39). `decodeImage` is the codec's front door; `decodePng` is unchanged behind it and
+`decodeGif` (`image/gif.ts`) is the second decoder — LZW, interlacing, global and local colour
+tables, transparency and the three disposal methods, **299 lines in-tree** on `decodePng`'s own
+argument (`omggif` at 38.5 KB was the alternative, and a dependency row for a function is the
+*layout engine* side of the ledger's test). **Every frame is composited onto the logical screen**
+before anything above the codec sees it, so `frames[k]` is *the screen while frame k shows* and
+not the sub-rectangle the file stored; disposal is applied before the next frame is drawn, method 2
+clears to transparent (the background colour the format names is honoured by no viewer), method 3
+restores. **Delays are milliseconds and the short ones are clamped**: under `MIN_DELAY_MS` (20) a
+delay becomes `DEFAULT_DELAY_MS` (100), which is what browsers do for the `0` and `1` hundredths
+most files carry; browsers draw the line at 10 ms and this at 20, because 20 ms is 50 fps and over
+C03's 30 fps ceiling, so a file asking for it has frames skipped by the delta arithmetic either way.
+
+**Measured against a second decoder, not against itself.** The fixtures are written by `sharp` and
+compared frame by frame with `sharp`'s own composited pages — eight frames, zero differing pixels
+— and each fixture's bytes are scanned to show it carries what its row claims (a local table, a
+sub-rectangle with a transparent index, the interlace bit). The first transcription of one blob
+carried a stray character and the decoder refused it as *LZW minimum code size 0*: a real fixture
+wrongly copied is the instrument-before-subject class arriving by another door, and the script
+that compared the constants to the generator's output is what caught it.
+
+**The frame is view state and it enters the block through the context** (C04 I93, C22 I77).
+`RenderContext.frames` names the frame each image is on, by block id; the shell's `Frames` store
+writes it on the animation wake, and the block reads it in exactly one place — **below the
+protocol arm**, where the rasterising arms take their pixels. `measure` never receives it (I8):
+`height` is declared and every frame shares the logical screen, so a GIF measures as its first
+frame does at every width (C04 T2.39), and `imageCells` reads the extent, which a corrupt frame
+does not take away (`decodeGif` reads the screen before any frame, as `decodePng` reads the IHDR).
+Absent is frame 0, so a PNG never notices the field; out of range wraps.
+
+**The kitty arm uploads every frame once and the terminal animates — ruled on the figures.** The
+roadmap priced the protocol arm as *every tick is an image upload where the orbit's tick is a text
+frame*, and that is true of the design it imagined — a retransmission at the stable id on every
+wake — and was measured before it was ruled on: **75 bytes a tick for an 8x8 GIF and 29,662 for a
+320x240 gradient, 297 KB/s at 10 fps**, for as long as the image is on screen. kitty's animation
+protocol makes the per-tick figure **zero**: frame 0 goes as the placement's own `a=T` (raw RGBA,
+`f=32,o=z`, since the terminal reads no GIF — `f=100` is PNG and would draw nothing), every later
+frame as `a=f` carrying its gap in `z`, one `a=a` sets the root frame's gap and one starts the loop
+— **116,509 bytes once** for four 320x240 frames against 296,620 every second. So `transmitImage`
+sends the frames, `#sentImages` keeps it to once per digest as for a PNG, and **the session's wake
+is not armed for an image on this arm**: `visibleRows` gathers animated images only when
+`imageProtocol` is not `kitty`. The alternative — *frame 0 on kitty, animate only where we
+rasterise* — is what this degrades to on a terminal without the animation extension, which is why
+it was not chosen: a design whose failure mode is the other design costs nothing to prefer. **Two
+protocol readings are stated as unmeasured** (the plane-16 class above): that `v=1` on `a=a` loops
+for ever, and that a terminal without `a=f` keeps frame 0. Ghostty 1.3.1, the one terminal measured
+in this repository, does not implement the animation extension, so the first real-terminal read of
+this arm is owed there and the degraded picture is what it should show.
+
+**The wake is the orbit's** (C22 I77). One timer path, one stamp, and each animation reads its own
+elapsed time from it — the frame store walks whole delays and keeps the remainder, so a GIF beside a
+33 ms orbit shows each frame for its own delay and a spinner beside a GIF does not move it. The
+timer is armed for the earliest frame change on screen, floored at the `stream` rate, so a 500 ms
+GIF costs two wakes a second and not thirty; a still — PNG or one-frame GIF — arms **nothing**.
+Frame 0 after a loop keys as untouched, on `ScrollOffsets`' zero rule, because it draws what frame
+0 drew.
+
+### The blind spot, and it has now been measured
 
 **Three width implementations matter and two are reachable here** — `cells()`, which every
 `measure` uses, and Ink's, which lays out the box. F247 measured both agreeing at n = 1, 2, 4, 8.
 **The third is the terminal's own guarantee about a plane-16 private-use character**, and it is not
 measurable in this repository. **The first real-terminal test is where it is checked**, and until
 then two of three is not three.
+
+**It was checked on 2026-08-31, in Ghostty 1.3.1, and it holds.** Twenty placeholder cells
+advanced the cursor twenty columns; sixteen cells of a placement row for an image the terminal had
+actually received advanced it sixteen. **Both forms, because the first alone is the weaker claim** —
+an untransmitted id measures a bare private-use glyph, and only the second measures an image *cell*,
+which is what the geometry is about. `docs/catalogue/images/real/README.md` holds the run.
+
+**Three of three, on one terminal and one font.** The font is part of the measurement rather than a
+note about the machine, so a repeat elsewhere is a new reading and not a confirmation of this one.
 
 ## 4a. Syntax tokenisation
 
@@ -985,6 +1403,49 @@ Iterating code units is the defect this exists to prevent. `cells()` is grapheme
 
 **The cluster stream is exported for C17, and this is the `cells()` argument one layer down.** The editor's cursor is a grapheme index, so it needs where a cluster *ends* rather than how wide a string is — a different question with the same answer underneath. Constructing a second `Intl.Segmenter` in the editor would be two answers to "where does a cluster end", agreeing today and diverging on whichever ZWJ sequence the two Unicode versions disagree about; it is also a per-call cost on a module that already builds exactly one segmenter for the whole tree, deliberately (§5). `clusterWidth` comes with it because C17's layout walks clusters and asks each its width, which is what `cells()` does internally and cannot expose by returning a total.
 
+### The Ambiguous set is the property, not a recollection of it
+
+**The authority is `EastAsianWidth-17.0.0.txt`, dated 2025-07-24**, taken from `unicode.org/Public/UCD/latest/ucd/`. `isAmbiguous` is every `; A` row of that file — 179 ranges over 138,739 code points — generated rather than typed, because the table that stood there was written by hand and nothing had ever checked it against its source.
+
+**This reverses a rule that was written down and argued for** (F665). The old table began at U+2010 and called the omission deliberate: *most of the property is Cyrillic, Greek and Latin letters that no terminal draws two cells wide, so the test of a range's inclusion is whether the tree draws from it.* Both halves fail, and the way they fail is the point.
+
+- The premise is false **about the capability it is attached to**. `ambiguousWidth: "wide"` is set when the terminal applies the wide convention (C02 I9), and an emulator that applies it applies it to the *property* — Latin-1, Greek and Cyrillic included. A sentence about whether fonts have wide forms answered a question about glyph design; the capability asks about a width convention.
+- The inclusion test is indexed to the wrong corpus. `cells()` measures what it is handed, and most of that is far-side text — an adapter's error message, a log line, a column of units. *Does the tree draw from this range* is a question about the `Glyph` tables (§4); `§` `·` `×` `°` `±` `π` `Σ` arrive from outside them. (`µ` is **Neutral** and belongs on neither list — checked rather than assumed, which is the habit this whole entry is about.)
+
+**The cost was one-directional and it is I1's hazard.** A row measured at *n* cells that draws *n+1* wraps, and a wrapped line scrolls the alternate screen. Measured against the property before the change, at `ambiguousWidth: "wide"`: **138,132 code points measured one cell where the property says two.** Three of them — `§` `·` `×` — are members of A03 SS47's `PROSE_MARKS`, the one set exempted from the substitution rule *because it is prose*, and therefore the one set that reaches a frame unconverted. **Seven of those ten marks are Ambiguous and three were in the gap**; `«` and `»` are Neutral and were right, and `⚠` is Neutral and is over-counted by the deviation below.
+
+**The deviation is recorded rather than inherited.** `DRAWN_AS_GEOMETRY` keeps the nine blocks the framework draws its own geometry from whole, even where the property says Neutral: **625 code points are Ambiguous for no reason but that list** (576 Neutral, 49 Wide). The deviation errs in the harmless direction, since an over-count pads a row and an under-count wraps it. **The premise it used to rest on is false at HEAD, and it was checked rather than inherited.** It read *§4c's gates read this answer — `halfBlockEligible`, C12's line-draw and ramp arms — so classifying those glyphs Ambiguous is what makes the wide-convention gate fire at all*, and it named its own retirement: *the day one takes the capability directly, its range is dead.* They already do. `isAmbiguous` has exactly **one** caller in the tree — `clusterCells` — and every gate named there reads `caps.ambiguousWidth` directly. The list is not dead, but what survives is the smaller, measurable claim above rather than a gate that depends on it. U+2B00..U+2B1F has **no Ambiguous member at all** in the property and is deviation entire.
+
+**The largest consequence, stated so it is re-checkable rather than rediscovered**: the property makes the private use areas Ambiguous — U+E000..U+F8FF and the two supplementary planes, 137,468 code points — so a consumer's icon font measures two cells under the wide convention. That is what the property says and what a wide-convention terminal does; it is not something measured here on a real emulator.
+
+### The Wide set is the property too, and its errors were in the default mode
+
+**Same file, same revision, same method** — `EastAsianWidth-17.0.0.txt`, 2025-07-24. `isWide` is now every `; W` and `; F` row of it, sorted and merged: **123 ranges over 182,876 code points**. Wide and Fullwidth are one table because they are one answer; the distinction is about where a glyph came from, not how many cells it takes.
+
+**This is the more dangerous half, and the reason is the mode.** `isAmbiguous`'s gap only showed at `ambiguousWidth: "wide"`. `isWide`'s showed at **narrow** — the default, and the convention every golden frame in the tree is rendered in. Measured against the property before the change:
+
+| direction | code points | runs | where |
+|---|---|---|---|
+| `W`/`F` measuring **one** cell — an under-count | **8,619** | 65 | Tangut and components 7,529 · Kana Extended/Supplement and Nushu 687 · Tai Xuan Jing and counting rods 110 · Yijing hexagrams 64 · enclosed ideographic supplement 61 · Hangul Jamo Extended-A 29 · ideographic marks and Kana Extended-B 25 · ~35 singletons, `⌚` `⏰` `⚡` `⚪` `⛄` `✅` `✨` `❌` `❗` `➕` `⭐` `⭕` `🀄` among them |
+| **not** `W`/`F` measuring **two** — an over-count | **369** | 51 | unassigned gaps the coarse blocks swallowed (U+2FD6..U+2FEF, U+31E6..U+31EE, U+A4C7..U+A4CF); 302 text-presentation emoji of plane 1 |
+
+An under-count is I1's hazard: a row measured at *n* cells that draws *n+1* wraps, and a wrapped line scrolls the alternate screen. **The 369 in the other direction had to be checked rather than argued**, because narrowing a glyph a terminal draws wide would be the same hazard introduced by the repair: of the 369, **none has `Emoji_Presentation=Yes`** (`emoji-data.txt`, 17.0.0, 2025-07-25). The text-presentation emoji are one cell until a variation selector asks for the emoji form, which `clusterCells` already answers two for.
+
+**The two tables overlapped, which the property's classes cannot, and the repair is a derivation rather than an addition.** `0x3041..0x33ff` claimed U+3248..U+324F, which the property calls Ambiguous — eight code points measuring **two at narrow where they should measure one**, an over-count sitting inside an under-counting table. Unioning a generated Wide table on top of the old blocks satisfies every row about the 8,619 and keeps all eight; deriving both tables from one file makes the disagreement impossible, because the property's classes are disjoint and `WIDE_RANGES ∩ AMBIGUOUS_RANGES = ∅` by construction (measured: 0). T1.28c is the row that refuses the union.
+
+**Where the property meets `DRAWN_AS_GEOMETRY`, the property wins — and the ordering is not what says so.** 49 code points of the geometry blocks are `W`: `⛄` `⚡` `⛔` `◽` `⚽` and the zodiac. They are two cells under both conventions. Swapping the two tests in `clusterCells` so the Ambiguous arm runs first **fails no row in the suite** — at narrow the Ambiguous arm is short-circuited by the convention and at wide both arms answer two — so a sentence resting on the order would forbid nothing. What settles it is that a glyph the property already calls Wide measures two under *every* convention, which is the whole of what the deviation was buying for it. The deviation's own figure is therefore **576** Neutral code points, not 625.
+
+**Swept against the property after the change, the remaining disagreements are exactly the recorded deviations and nothing else.**
+
+| mode | under-counts | over-counts | what they are |
+|---|---|---|---|
+| `narrow` (before) | 8,619 | 395 | |
+| `narrow` (after) | **0** | 748 | 722 zero-width (combining marks, ZWJ, BOM, variation selectors — the property is not a width table for `Mn`) · 26 regional indicators, a lone one drawn as a two-cell placeholder |
+| `wide` (before) | 8,570 | 963 | |
+| `wide` (after) | **0** | 1,324 | the same 722 and 26, plus `DRAWN_AS_GEOMETRY`'s 576 |
+
+**And the population this is indexed to is far-side text, not the tree's own literals.** The request that raised this said `⚡` appears 26 times in `src/` and `test/`; measured, it is **6** — one docstring, four a test fixture's action label, one a spinner corpus — and 36 in the whole repository, nearly all prose that never reaches a frame. **That count is not the argument in either direction.** Resting the case on it is exactly how the old table's comment went wrong: `cells()` measures whatever a far side hands it, and a container name, a log line, a commit subject or a unit column may carry any of these.
+
 Truncation is also grapheme-aware: a cut never lands inside a cluster, and a double-width glyph that would straddle the boundary is dropped rather than half-drawn.
 
 **Wrapping is not truncation, and it had been treating an unplaceable cluster as though it were.** A cluster that does not fit the remaining width moves whole to the next row; a cluster wider than the *whole* line cannot be placed at all, and the wrap dropped it — at a usable width of 1, every CJK glyph and every emoji simply left the output. Both halves called the same function, so `measure` and `render` agreed and I1 held: the frame was arithmetically consistent and describing content it did not hold, which is the failure I1 cannot see.
@@ -992,6 +1453,195 @@ Truncation is also grapheme-aware: a cut never lands inside a cluster, and a dou
 It is substituted by a one-cell `?` (I19). Three answers were available and two are worse: placing it anyway overflows the row into one nobody counted, which is the alternate-screen scroll C09 exists to prevent, and a blank loses the fact that anything was there. `?` is one cell in every capability mode, which matters because `measure` receives no capabilities and so cannot choose a marker the way `truncate` does.
 
 **How narrow this has to be, measured rather than assumed.** A cluster is at most 2 cells, so the substitution needs a usable width of exactly 1. Three of the four ways to reach it are degenerate — a 2-column terminal, a `notice` with a glyph at width 3, `panel` nesting at 2 columns a level. The fourth is not: a `row` group hands each child `floor((w − (n−1)) / n)`, floored to 1, which is 1 whenever `w ≤ 2n − 1` — sixty children at 120 columns, twenty at 40. **The boundary is child count, not terminal width.** No in-tree adapter builds a row group today, so it is latent rather than live; it is reachable through C24's public `group(direction, children)` at an ordinary terminal size as soon as an app builds one from a data list, which is R01 R4.4's reuse claim. Recorded with the figures so nobody restores the drop on the grounds that it only fires at width 1.
+
+### Runs — a span's offsets against the wrap, the cut and the cluster
+
+A `TextSpan` (C04 §3am) addresses a text member by UTF-16 code-unit offset, and this is the
+renderer's half of that contract: four mechanisms, each an existing function given the one
+property a span needs from it, and none of them a second arithmetic over the same string.
+
+**Wrapping carries a source offset, and `wrapCells` is its projection.** `wrapCellsParts(text,
+width)` returns `{ text, start }[]`, where every row is an exact contiguous slice of the source
+beginning at `start`; `wrapCells` is `wrapCellsParts(stripControl(text), …)` with the starts
+dropped, so the two cannot disagree about rows. The offset exists because the rows do **not**
+concatenate to the source — a break drops the space it broke at, and `"the quick brown fox
+jumps"` at 10 gives rows summing to 18 units of 19 — so a consumer slicing spans by prefix sums
+of row lengths is one unit early at the second row and at every row after it (C04 I86). `runsOf`
+cuts the text into runs by the offsets and strips control characters *per run*, in that order,
+because `stripControl` deletes and would move every offset after the character; `wrapRuns`
+applies the unplaceable-cluster substitution before wrapping (`placeableClusters`), so the rows
+are exact slices of what the wrapper was given and a substituted cluster keeps its span (I19).
+
+**A boundary inside a cluster snaps outward, at both ends.** The gate refuses a surrogate split
+and can see no other cluster interior (C04 I84), so `clusterEnds(text)` — the ascending code-unit
+offsets at which clusters end, empty for printable ASCII where every index is a boundary — is
+what the renderer consults: a `from` inside a cluster moves **back to the cluster's start**, a
+`to` inside one moves **on to its end**. Outward rather than inward, because a span that named
+part of a cluster meant the cluster; and width-preserving by construction, because the cluster
+is painted whole and `cells()` measures it as one either way. Painting SGR between a base and
+its combining mark, or between the members of a ZWJ sequence, changes what the terminal
+composes, and a changed composition is a changed width — the failure I1 cannot see. A span whose
+two boundaries meet after snapping is dropped rather than emitted empty.
+
+**Runs are painted coalesced by style reference, so a row with no span is byte-identical to the
+row it was.** `withSpan(style, attrs)` spreads at most `bold`, `italic` and `underline` onto the
+block's resolved tone and returns `style` *itself* when there is nothing to add; `paintRuns`
+merges adjacent runs whose style is the same reference, so an unspanned row paints as the single
+span it always was and a spanned one breaks into exactly the pieces its attributes require. That
+is what let the mechanism land without moving a golden frame: a `paint` that closed and reopened
+the same style between two plain pieces would draw the same picture in different bytes, and the
+golden gate's no-move is the evidence that it does not.
+
+**The truncation marker is measured, and it had not been.** `truncateParts` returns `{ kept,
+prefix, suffix, start }` — the exact kept slice, the marker and its padding at whichever end
+`from` names, and `kept`'s code-unit offset into the source, `0` from the end and `length −
+kept.length` from the start — so a caller slices its spans against `kept` and paints the marker
+in the block's tone and never inside a span (C04 I86). It reserved `limit − 1` cells for the
+marker where `truncate` measured the cluster: at `ambiguousWidth: "wide"` the ellipsis is two
+cells, so `kept + suffix` came to `limit + 1` — F292's shape, a row one cell wider than it was
+measured, one function along from where F292 found it. Both now read `clusterCells(marker)`,
+which is the drift a shared helper exists to prevent (I9).
+
+**A run carries a tone or a value, and each reaches colour through its owner's resolver — never
+through a value of its own** (C04 I89, C04 I90, C10 §4e). `Run` gains `tone?` and `value?`
+beside `attrs`, copied from the span by `runsOf` and carried through `sliceRuns`, `runLines` and
+`wrapRuns` unchanged. `paintRuns(runs, style, ctx)` takes the block's resolved style *and* the
+render context, and for each run: a `tone` **replaces** the block's style with `tone(run.tone,
+theme, caps)` — the same call the block made, memoised by C10, so two adjacent runs of one tone are
+one reference and coalesce as plain runs do; the attributes then spread on top by `withSpan`; and a
+`value` paints the run's **background** from the block's `colormap` through `continuousColour`,
+the resolver heatmap and image already use, so the ladder is the colormap's — `undefined` below
+8-bit, and a run whose only member is `value` then coalesces with its neighbours by reference and
+a 4-bit frame is byte-identical with and without it (C10 I31). Foreground stays whatever the tone
+(the span's or the block's) resolved. **The colormap reaches `paintRuns` by name on the context**
+(`ctx.colormap`), looked up in `COLORMAPS` there and nowhere else in this component; the gate has
+already refused a `value` on a block with no map, so a run with `value` and a context with no
+`colormap` cannot arise and is painted plain rather than thrown on.
+
+**A focused table row paints its span tones as it paints its cell tones: not at all.** C11 I14
+replaces `cell.tone` with `accent` for the focused row, and a span's `tone` is the same kind of
+claim at a finer grain, so `cells.ts` drops `tone` from the runs of a focused row before painting.
+The alternative — inline code keeping its colour inside a focused row — makes the row read as two
+things, and focus is the one time a row must read as one. Attributes and a `value` survive focus,
+because neither is a claim about the foreground.
+
+**A row that fills exactly and is followed by a space breaks at that space, and the break space is
+in no row** (C04 I86). The overflow check fires on the space — a row is exactly full when a
+one-cell space does not fit — and the break-point search then looked *backwards* for a space
+inside the row, so the last word moved down though the row it left fitted: `"aa bb cc dd"` at 5
+gave `aa` / `bb` / `cc dd` where `aa bb` / `cc dd` fits twice exactly (F591). The overflowing
+space **is** the break, whether or not the row has an earlier break point; the arm that ruled the
+no-break-point half of this (`"abcdef gh"` at 6 began the next row with the space, F590) is that
+same rule with the search's answer ignored, and is one arm rather than two. **Two guards, and each
+is another rule already stated meeting this one.** A row *already ending* in a space is at its
+second space or later, where the break was the first one and the surplus is the next row's
+content — `"abc   def"` at 5 keeps `" def"`, so the arm asks that the row not end in a space. And
+a break falling **strictly inside an atom is not a break** (C04 I90), which is `breakPoint`'s own
+test applied at this position: an atom too wide for any row is cut at a cluster boundary as an
+unbroken token is, and a cluster-boundary cut drops nothing, so `"aaa bbb ccc"` at 7 valued whole
+is `aaa bbb` / `" ccc"` and not `ccc` — the space is content inside the value, and swallowing it
+is a break inside the atom wearing a break space's clothes (F593). The general property the two
+findings instance is that **no row could have taken the first word of the next row**, and it is
+swept over a corpus at every width from 1 to 40 rather than pinned at the two strings that found
+it (T3.10b2): a row breaking early is invisible to a per-row width assertion, because a short row
+fits.
+
+**A valued run is a wrap unit, and the wrapper learns one property rather than gaining a sibling**
+(C04 I90). `wrapCellsParts(text, width, ambiguous, atoms)` takes an optional list of `[from, to)`
+code-unit intervals into the text it is given, and never places a break **strictly inside** one:
+a space inside an atom is not a break point, and where a full line has no break point outside its
+atoms the break moves to the **start of the atom the next cluster would extend** — provided
+something precedes that atom on the row. An atom that begins a row and still does not fit is
+broken at a cluster boundary as any unbroken token is, which is C04 I90's *a value wider than the row
+is broken as text is*. An explicit newline inside an atom breaks, because it is the author's.
+`wrapRuns` computes the atoms from the runs' `value` members over the **placed** text (the
+substitution is per run, so a `?` for a two-unit cluster moves no other run's offsets) and passes
+them; `wrapCells` passes none, so every caller that is not a run caller is unchanged.
+**`notice`'s `measure` and `render` now share `noticeRows`**, which is `wrapRuns(runsOf(text,
+spans), proseWidth)` for both — the file's own *one layout function for the pair* rule, applied to
+the one wrapping text member. The height is therefore the same with and without every span member
+except `value`, and differs with `value` exactly when a valued run would otherwise straddle a row:
+measured, `"aa bb cc dd"` at 5 is **two** rows plain (`aa bb` / `cc dd`, both exactly full) and
+three with `bb cc` valued, since the atom cannot straddle the break the plain wrapper takes —
+before F591 the plain answer was also three and the example showed nothing, which is what a
+fixture that does not respond to the thing under test looks like; `"x(abcde)yz"` at 6 is two rows plain and
+**three** with `abcde` valued, and `"The cat sat on the mat ."` at 12 with a value per token is
+two rows either way, because prose already breaks at the spaces between tokens. **A single-word
+valued token never changes the count** unless the row around it has no space at all — the
+interaction is between `value` and the *no-break-point* arm, not the ordinary one.
+
+**Markdown's inline code is a `tone: "identifier"` span** (C04 §3am.1, roadmap 11 residue ii).
+Of `TONES`, `identifier` is the slot the tree uses for a name one can refer back to — a container
+name, an ID, a port, an image — and `meta` is the slot for timestamps, percentages and secondary
+detail; a backtick run in an agent's markdown is a flag, a path, a symbol or a command, which is
+the first kind. The backticks are gone from the text and the span sits at the offsets of what they
+enclosed; a backtick run inside emphasis is one span carrying both the attribute and the tone
+(§3am cell 12's adjacent-disjoint rule); an unclosed backtick, and an empty pair, are literal
+characters exactly as an unpaired `*` is. Fences are untouched.
+
+
+### Ramps — the extent, the split and the five loops
+
+A `Ramp` (C04 §3am.2) is a function `[0, 1] → Colour`; this section is the renderer's half of
+that contract — what supplies the argument, where the run is split, and what `tick` does to it.
+What a sample **resolves to** at each depth is C10's (C10 §4e); C09 supplies `t'` and paints what
+comes back. The design and both walks are in `docs/notes/CALCIUM_INK_RAMPS_DESIGN.md`.
+
+**The extent is declared per kind, exhaustively** (I50). `RAMP_EXTENT` is a
+`Readonly<Record<BlockKind, "none" | "clusters" | "axis">>` in `blocks/ramp.ts`, a record and never
+a `Set` for the reason `ANIMATES` is one (§2): a kind added to the union without an entry is a type
+error and so is an entry for a kind that no longer exists. `clusters` for the span carriers —
+`raw`, `notice`, `rule`, and `table` through `Cell` — `axis` for `progress`, `none` for the rest.
+A kind marked `none` has no member to carry a ramp (C04 I108), so the record is the statement and
+the type is the gate.
+
+**A ramped run is split per grapheme cluster, in paint, after the wrap** (I51). `runsOf` gives a
+run carrying a ramp the two numbers a `Run` lacked: `ramp: { ramp, at, of }`, where `of` is the
+cluster count of the span's **drawn** text and `at` the index of the run's first cluster within
+it. Both come from the span, never from the run — a span wrapped across two rows is two runs, and
+the second row continues the ramp from where the first stopped instead of restarting at zero. A
+span the fitter has elided is measured after the cut, so `of` is what is on the screen and the
+marker takes the last cluster's colour: appearance follows geometry, never the reverse. `paintRuns`
+then emits one span per cluster, `t = of === 1 ? 0.5 : (at + i) / (of − 1)` — a single cluster
+samples the midpoint because one cell cannot show a direction — and no SGR ever lands inside a
+cluster, because the split is by `clusterEnds` and not by code unit. `measure` never sees any of
+it: the split happens in `paint`, after `wrapRuns`, and the rows are the rows they were (C04 I107).
+
+**The five loops are one term on `t`, and the static frame is `tick = 0`** (I53). `t' = f(t, tick,
+n)` is applied before C10 samples, with `n` the extent's cell count. A period is stated in
+**ticks**, and what a tick is belongs to C03: the scheduler clamps every cadence to its `spinner`
+window (100 ms, C03 I15), so one tick is one window whatever was asked for. The ramp asks through
+`spinnerIntervalMs()` — the lookup `status` and `steps` use — and carries **no millisecond literal
+of its own**; this module may not import C03 at run time (MG21) and does not need to. So the
+arithmetic is the effect's, not the caller's:
+
+| effect | `t'` | period |
+|---|---|---|
+| `shimmer` | a band of half-width `h = 1.5` cells centred at `c = (tick mod (n + 3)) − 1.5`; `t' = max(0, 1 − |i − c| / h)` — the ramp is the band's profile, `from` at rest and `to` at the peak | one cell per tick |
+| `wave` | `t' = (t + tick / n) mod 1` | one cell per tick, wrapping |
+| `breathe` | `t' = ½(1 + sin(2π · tick / 20))`, constant across the extent | 20 ticks |
+| `pulse` | `t' = (tick mod 10) < 5 ? 0 : 1` | 10 ticks |
+| `heartbeat` | `k = tick mod 12`; `t' = [1, 0.5, 0, 1, 0.5, 0, 0, 0, 0, 0, 0, 0][k]` — two beats front-loaded, then rest | 12 ticks |
+
+Every one is periodic, which is what makes them expressible with no memory: the render has no
+birth tick, so the one-shots (`sweep`, `ripple`) and the position effects (`typewriter`,
+`marquee`) are not in the union (C04 I109) and are deferred with their symbols in the design's §7.
+The GIF catalogue's determinism rests on this — the frame is a function of `tick` and of nothing
+that reads a clock.
+
+**A block animates by content as well as by kind** (I54). `tickIntervalOf` answers the default
+set's cadence for a block whose spans or `ramp` carry an `animate` other than `none`, and `ANIMATES[kind]` as it
+always did for `status` and `steps`; `animationIntervalOf` is unchanged and walks containers, so a
+shimmer inside a `panel` inside a `group` is found (§2). C22 keys the entry's cache slot on the
+tick exactly as it does for a spinner (C22 I60). **Known cost, recorded**: below 8-bit the motion
+resolves to `none` (C10 §4e) while the cadence is still declared, so a ramped entry re-renders each
+tick to identical bytes; only that entry pays, and a depth check inside the cadence would need
+capabilities the walker does not carry, for a cost nobody has measured.
+
+**Who writes a shimmer.** A far side, on anything it likes. The shell, on a **running** head only
+(→ C23): a settled head is composed without `animate`, because the framework cannot know from
+inside a render that an entry has settled and does not try. A decorative loop on a finished thing
+is noise, and the rule that prevents it is the composer's.
 
 ---
 
@@ -1045,6 +1695,209 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 
 ---
 
+## 6b. The walk — which kinds can be windowed, and the one that cannot
+
+**Two artefacts, because the question has both shapes.** The classification table asks which kinds
+divide, which is structural and holds at rest. The trace asks what a *scroll* does — two windows of
+one block, and whether they agree — which is event-mediated and is where C25 I21a's defect lived.
+
+**Measured first** (F423, F424): the seam is built and wired at `session.ts`, and painting the top
+forty rows of a 50 000-row block costs **0.65 ms** for the kind that declares a window and
+**913.79 ms** for the kind that does not. 1 400×, with every assertion passing and the frame correct.
+
+### The table — what each kind derives from rows outside the slice
+
+| kind | derived from the whole | verdict |
+|---|---|---|
+| `logs` | nothing — the level column is a constant and the message takes the residual | **windows**, exactly |
+| `terminal` | nothing — a line is a line, and the marker row is line 0 of the content | **windows**, exactly. The kind that most needs it: a 2,000-line scrollback painted whole is F423's 913 ms |
+| `patch` | the gutter, via `numberWidth` | **windows**, with the width **pinned** (C25 I21a) |
+| `keyValue` | the key column, via `widest` | **windows**, with the width **pinned** — the same argument one kind over |
+| `table` | **two things, and only one was recorded.** `planColumns` reads the column definitions and the width, never the rows (F134) — so the *column* layout is safe. But `hasActionBar` is `rows.some(r => r.actions)`, and it costs **two rows** of height | **not yet** — four interactions, below |
+| `code` | **the parse** | **windows**, with the **text kept whole** and `lineRange` pinned (C14 §4a, C04 I82) — see below for why a *sliced* text cannot |
+| `plot` | the whole series | atomic, permanently (C12 I1) |
+
+**`widest` and `numberWidth` are the same problem and `tokenise` is not**, which is the ruling this
+walk exists to make. A width can travel with a window: the block says what its parent measured and
+the renderer prefers that over deriving. **A parse cannot travel**, because it is not a number
+attached to the block — it is a function of every character before the slice. **What can travel is
+the text the parse is a function of**, and that is the ruling C14 §4a added: the window carries the
+whole `text` and a line range, so nothing is re-derived from a slice because there is no slice.
+
+### Why a sliced `code` text is refused, measured — and what the window carries instead
+
+`tokenise` runs over the whole text. Slicing lines out changes what they *are*:
+
+```
+a block comment opening at line 2 and closing at line 11, tokenised whole
+    slots present:  comment  keyword  null  number
+the same lines 4–7, tokenised as a window
+    slots present:           keyword  null  number
+```
+
+**Lines that are commented out come back as live code.** And `measure` never tokenises (C09 §3,
+T2.13), so the height is identical — **C09 I26's equality holds perfectly while the colours are
+wrong**, and no geometric assertion can see it. Containment is not correctness.
+
+**The fix is not a wider slice.** A comment can open at line 1 of a 50 000-line file, so any bounded
+context is a guess; carrying the lexical continuation means a field on `Code` holding a highlighter's
+internal mode, which is a public type carrying another library's state. **The fix is no slice**
+(C14 §4a, ruled 2026-09-03): the window keeps `text` whole — the same string, so the tokeniser's memo
+hits on every frame — and sets `lineRange: [from, to)` in source lines (C04 I82). `render` tokenises
+the whole text, as it always did, and produces only the rows in range; `measure` counts only those
+lines. The pin is two integers rather than a mode, and the parse is identical to the whole block's
+by construction rather than by context. Units are source lines, so a window never opens inside a
+wrapped line and the surplus is `skipRows`/`dropRows` (I26). Measured on the pass that built it: a
+40-row window of a 2 000-line `code` block paints **40 rows** where it painted 2 000, and a
+comment opening above the window keeps its slot on the rows inside (C14 T1.18).
+
+### What `table` owes — two fields, one parameter and a residual
+
+Written down before it was attempted, because four interactions in one window is where a rushed
+change earns its defect. **The question to ask of each is not *does a window change this* but
+*does a window change what this is derived from*** — the first needs a field, the second often
+does not, and the six answers are not the same.
+
+| what it derives | derived from | what a window moves | verdict |
+|---|---|---|---|
+| the column plan | `columns` and `width` | **neither** | **Nothing.** `planColumns(cols, width)` takes no rows at all: C11 §3 plans from *declarations* — `minWidth`, `maxWidth`, `flex`, `priority` — and never from cell content. **That is the structural reason `table` needs no width pin where `keyValue` did**, and it is a fact about the signature rather than a finding that cleared it |
+| the header | `showHeader` | neither — a declared flag | Expressible today, and the only one of the six that was |
+| the empty message | `rows.length > 0` | what it is derived from | **Nothing, once a window never goes bodyless** — the two mirror cases below |
+| the action bar's **presence** | `rows.some(r => r.actions)` | what it is derived from | **A field**, and it declares a *presence* rather than a width: `Table.actionBar` (C11 I18) |
+| the display **order** | `sortedRows`, through `kindOf(rows, key)` | what it is derived from, **and the derived thing changes** | **A field**, and the one nobody had named: `Table.presorted` (C11 I19, F429) |
+| an expanded row's unit | `detailHeight`, through `measureChild` | neither — the unit travels with its row | **A parameter and a residual**, not a field: `window` takes `measureChild` (I26a) and the surplus is paid by `dropRows` (I26) |
+
+**Row 5 is measured rather than reasoned, and it is the one that inverts an assumption.**
+`sortedRows` looks like a permutation, so slicing the sorted order and letting `render` sort the
+slice again looks idempotent. It is not: `kindOf` decides a column's comparator **from the values
+present**, so a window that drops the one non-numeric value in a numeric-looking column
+re-classifies it. Measured, a sortable column of `2 · 10 · abc` ascending — the whole block
+classifies as text and renders `10 · 2 · abc`; its first two rows, windowed, classify as numeric
+and render **`2 · 10`**. Reversed, with every count and every height correct. F426's shape one
+kind over, reached by a fix that looked like the obvious one.
+
+### The two mirror cases, and each is paid at a different end
+
+**Neither end of a table is a row, and both ends can be asked for alone.**
+
+- `[0, 1)` is the header. A window holding no rows is *bodyless*, C11 §5's empty-table rule fires,
+  and it measures `header + 1` against a range of 1 — with the surplus **after** the header, where
+  `skipRows` cannot reach.
+- `[n−2, n)` is the gap and the bar. A window holding no rows cannot draw a bar at all, because the
+  bar's existence is derived from the rows it would describe.
+
+**So a window never goes bodyless.** It keeps the nearest row unit and pays for it in whichever
+residual the row falls outside — `dropRows` for the header case, `skipRows` for the bar. The other
+way round for the first was to render the empty message and drop it, which costs the same row and
+puts a sentence on a frame that is false about the document it came from.
+
+**And the pin is an argument rather than a memory.** `actionBar` is recomputed from the block
+`window` was handed, so there is no moment at which it describes the previous document; a `true`
+carried across a patch that removed the last `actions` would be a two-row lie surviving into the
+next frame. MG27 is what keeps a producer from writing one (`BUILDER_OMISSIONS`).
+
+### The table trace — a window, and then something happens
+
+| # | window | then | rules that meet | ruling |
+|---|---|---|---|---|
+| T1 | `[10, 20)` of a sorted table | the reader sorts on another column | I8's height-neutrality · the range is in **display** space | Height-neutrality says C14 need not remeasure; the window's *contents* change completely, because the range addresses drawn rows. Both correct, about different things — and a window caching its rows against `rev` alone would still be right, since a sort moves `rev` and does not move the height |
+| T2 | any | a row **above** the window expands | I9 | Everything below shifts by the detail's height, so the same viewport offset is now a different range. The window is re-taken per frame and carries no `from` of its own |
+| T3 | one covering the bar | the last `actions` are patched away | I17 · the pin | The parent loses two rows and `rev` moves. The pin is recomputed, so it cannot be the stale half of a pair |
+| T4 | `[0, 1)`, then `[0, 2)` | the reader scrolls one row | C11 §5 · I26 | The first is bodyless-by-range and the second is not, so the residual moves while the block gains a row. **A row asserting one offset passes against a residual that is simply wrong** — the sweep is what catches it, as C25 T3.20 already says for `keyValue` |
+
+### The trace — two windows of one block, and whether they agree
+
+| # | first window | then | rules that meet | ruling |
+|---|---|---|---|---|
+| B1 | rows 0–40 | scroll to 200–240 | I25 · the kind's own layout | **The drift is a difference between two windows**, so a row asserting one window against a constant passes against a pin that is simply wrong. C25 T3.20 says the sweep and not one offset; `keyValue`'s row copies it |
+| B2 | any | the window covers the whole block | `windowSequence` | The block is passed through unsliced and carries **no pin** — and that is correct, because deriving from the whole block is what the pin would have said. Asserting the *field* rather than the effective width reports this as drift; the observable is what the renderer will use |
+| B3 | any | the kind declares no `window` | I25 | Kept whole, paid out of `skipRows`. Silent by design, and F424 is the finding that nothing reports which kinds declined |
+| B4 | rows spanning a detail block | scroll one row | C25 I19's shape in `table` | An expanded row is an indivisible unit taller than one row, so a boundary inside it is `skipRows`, not a shorter slice — the accounting `windowRows` already reasons through |
+
+### The second caller — a bound below the entry level (F855)
+
+**Every row above asks which kinds divide. None asks who does the dividing**, and the answer was
+assumed to be one place: `windowSequence`, slicing entries against the viewport. A `scroll` declares
+a bound of its own and had no way to apply it, so the whole of §6b was a correct account of a seam
+with one caller when it needed two.
+
+**The measurement.** A `scroll({ height: 6, follow: true })` over an emulator holding thirty lines:
+
+| | |
+|---|---|
+| `registry.measure` | **7** rows — `height + 1`, exactly as C04 I47 and C04 I49 say |
+| the paint | **32** rows |
+| the residue row | `⋯ 25 above, 0 below` |
+| the first row drawn | line 0 — a follow box, opened at its head |
+
+`render` filters `childRanges` by overlap and then renders each survivor **whole**. With several
+short children that is right and unavoidable: you cannot half-render an arbitrary block, which is
+the same sentence B3 writes one level up. With **one child taller than the interior** it means the
+box bounds nothing, while the residue row goes on computing against a window nobody applied.
+
+**Three symptoms and one cause.** C14 lays an entry out from `measure`, so an entry allotted seven
+rows paints thirty-two over whatever was beneath it; `follow` is inert, because the offset it
+computes is never used to choose rows; and C04 I49's counts describe a view that does not exist.
+
+**And none of that is new — the seam has been named since F239** (F856). C04 §3c trace 1 rules it
+in the words this fix uses (*taking a child's top `n` rows needs a windowing seam, and
+`RenderContext` offers `measureChild` and `renderChild` and nothing that slices*); §8a row D7
+measures it at `measure=4, rendered=8`; I34's four-line cap is partly paying for it; and T2.28b
+asserts the disagreement deliberately, with a comment saying the row expires the day the seam lands.
+**A row that expires by asserting a disagreement watches the remedy, not the condition** — it is
+green for exactly as long as the defect is, and says nothing when the defect gets worse. What
+changed is the load: 4 rows against 8 is a corner, 7 against 32 is a whole entry, and two symptoms
+were in no entry at all — `follow` inert, and C04 I49's counts against an unapplied window.
+
+**What made it invisible.** T2.1 is the headline I1 sweep — `measure` against rendered rows, every
+kind, seven widths — and it agreed throughout, because the corpus's only `scroll` is `height: 2`
+over three one-row children. Every fixture in the suite has a box whose content fits or whose
+children are shorter than the bound. **A corpus chosen for a property may not have it**, and the
+first kind that is *always* taller than its container is `terminal`: C27 holds two thousand lines
+of scrollback in a six-row box by design. Until C27 no kind routinely put more rows in a scroll
+than the scroll declares — `logs` and `patch` are windowed one level up.
+
+**And the ruling this corrects is right about the direction it examined.** C04 §3c ruled that
+`scroll` declares no `window`, because a bounded region's height is declared and cannot measure
+less without becoming a different box. That stands. What does not is the inference carried with it
+— C04 I47's *the transcript's window slices the box and never the content* — which is true of the
+window **above** the scroll and silently answers for the window **below** it. Two windows, and the
+ruling collapsed them into one because only one had a caller.
+
+### Which children a bounded container can slice
+
+**Seven kinds declare `window` and the residuals split them in two**, which is why I58's rule is
+stated on the *result* and not on the kind — a `code` window is exact for one range and costs two
+rows for the next, so *can this kind be bounded* is not a question with a per-kind answer.
+
+**The first draft of this table said six and put `table` in the atomic column.** `table` declares
+its `window` as a method rather than a property, so a grep for `window:` misses it, and the section
+two subsections up still reads *not yet — four interactions, below* because it was written before
+they were answered. T2.126 is the row that found it, on its first run: a measurement in a spec is a
+claim like any other, and a list of kinds is exactly the shape that goes stale without saying so.
+
+| child kind | `window` | residuals | a scroll can bound it |
+|---|---|---|---|
+| `raw` | a slice of the text | always 0 / 0 — a line is a row | **yes.** The commonest child of a scroll, and it overran too |
+| `terminal` | a smaller screen | always 0 / 0 | **yes.** The kind that forced the finding |
+| `logs` | a slice of the lines | always 0 / 0 — a line is a row | **yes** |
+| `keyValue` | a slice, key column pinned | always 0 / 0 | **yes** |
+| `patch` | a slice, gutter pinned | `skipRows` carries the path header and every hunk header the range misses | **only where the slice is exact** — in practice a window opening at row 0 |
+| `code` | text whole, `lineRange` pinned | non-zero at either end when the range opens or closes inside a wrapped source line | **only where the slice is exact** |
+| `table` | a slice in row units, `actionBar` and `presorted` pinned | non-zero at either end: `dropRows` for the header case, `skipRows` for the bar — a window never goes bodyless | **only where the slice is exact** |
+| `plot` | none, permanently (I27, C12 I1) | — | no — kept whole, the recorded overrun |
+| `image`, `group`, `mosaic`, `steps`, `notice`, `tip`, `rule`, `progress`, `pills`, `events`, `comparison`, `status`, `panel`, `scroll` | none | — | no — kept whole |
+
+**A slice that costs slack is refused too, and that is the part the entry level does not share.**
+`windowSequence` pays `skipRows` and `dropRows` out of the viewport's own accounting —
+`session.ts` renders the window and writes `rows.slice(0, ve.takeRows)`. A container has no such
+move: its children go into an Ink tree, and nothing there can drop the leading two rows of a
+rendered child. So a container takes a slice only when both residuals are zero, and keeps the child
+whole otherwise. **Containment is not correctness**: a slice rendered with its slack still in it is
+the same overrun in smaller form.
+
+---
+
 ## 7. Invariants
 
 - **I1** — For every registered kind, `measure(b, w)` equals the row count of `render(b, ctx)` at width `w`. The system's most load-bearing invariant.
@@ -1052,7 +1905,7 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 - **I3** — No renderer reads the environment. Capabilities and theme arrive through `ctx`.
 - **I4** — No renderer emits a colour directly; all styling comes from `resolve` against a declared palette slot.
 - **I5** — Every capability substitution is 1:1 by cell count.
-- **I6** — `cells()` is the single width implementation; no kind computes width independently.
+- **I6** — `cells()` is the single width implementation; no kind computes width independently. **Its Ambiguous set is `East_Asian_Width=Ambiguous` derived from the property with the file's version named, plus a listed deviation for the blocks the framework draws geometry from** — a hand-recalled table is a claim about terminals nobody measured, and the one it replaced under-counted 138,132 code points at `ambiguousWidth: "wide"` (§5, C02 I9).
 - **I7** — Container kinds measure children only through the injected `measureChild`. No kind imports the registry.
 - **I8** — `measure` never reads `ctx.tick`. Animation changes appearance, never geometry.
 - **I9** — Truncation never splits a grapheme cluster or leaves half a double-width glyph. **It takes the end it removes from as a parameter** — `"end"` by default, keeping the start; `"start"` keeps the tail and puts the marker at the head. Both are exactly `width` cells, both place one 1-cell marker, and neither splits a cluster: the two directions share one implementation for the same reason there is one `cells()`, because a second walk over the same grapheme stream would round differently at the boundary. Which end a column removes from is C04's `truncateFrom` (C04 I32) and the surfaces' decision; a middle truncation is not in the union — it spends its marker between two kept halves, which is different arithmetic, and it arrives with a clause here or not at all.
@@ -1073,20 +1926,44 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 - **I23** — **A grammar can be registered after construction, and registering one invalidates the memo.** §4a promised that an unregistered language is readable now and highlighted *whenever someone registers it*; the constructor shipped with a fixed pair and no registration path, so the promise had no mechanism (F93). The invalidation is half the invariant rather than an implementation note: `tokenise` caches the plain-text fallback under the same key, so registration without it leaves every block already rendered flat until an unrelated cap eviction. **Measurement is unaffected by both**, which is what makes registration safe at any time — tokens change appearance and never line count (I8, T2.13).
 - **I24** — **A grammar in the default set has its emitted classes mapped, or the omission has a reason.** Shipping a grammar whose classes `SLOTS` does not carry is indistinguishable from not shipping it — measured: `markdown` emitted four runs and coloured none. Three classes are unmapped deliberately: `hljs-params` is ordinary identifiers, `hljs-strong` and `hljs-emphasis` are appearance rather than a rôle, and **`hljs-addition` / `hljs-deletion` are a change axis, which C04's ruling says is a marker and never a tone** (F30, F81).
 - **I25** — **A kind that divides declares `window`, and a window is a valid block of the same kind plus a residual offset.** `window(b, w, from, to)` returns `{ block, skipRows }`; the caller renders `block` and drops `skipRows` leading rows, and what remains is exactly what the full rendering would have put at rows `[from, to)`. The offset is not a convenience — it is what makes an indivisible unit (C25 I19) and a sticky header (C25 I18) expressible without inventing a row C14 never measured, which is drift three components from its cause. **A window is a block and never a list of rows**, because `Block[]` is what both consumers hold and a slice of rendered output would be a second height codepath.
-- **I26** — **`measure(window(b, w, from, to).block, w) − skipRows === to − from`, checked generically over every kind that declares `window`.** The form without `skipRows` is the one the seam invites and it is false for any window that costs slack. Enforced by `measurement-conformance.ts` rather than per kind, so an application's own arm is held to it — without that a consumer's window is silently short and the frame describes a document nobody holds. It is I1's rule over a window rather than over a block.
+- **I25a** — **A kind whose layout is derived from its rows pins that layout into the window; a kind whose *parse* is pins the whole text and a line range, because a parse cannot be sliced.** **One arm slices without loss: a window opening at line 0.** Nothing precedes the slice, so the parse of the first `to` lines is the whole block's over those lines by construction, and the window hands back the sliced `text` with no `lineRange` — the tokeniser runs over `to` lines rather than all of them (measured: 1 696 ms first paint of a 500-row window of a 50 000-line block against 196 ms steady, the cost a capped `code` block paid once per entry under C14 §4b). Every window opening later pins. `patch` pins `numberWidth` and `keyValue` pins `keyWidth`, because a window whose slice happens to hold shorter values would draw a narrower column and every row would shift sideways as the reader scrolls — measured at 14 cells against 3 for `keyValue`, and 4 against 1 for `patch` (C25 I21a). **`code` was refused on the other half of the same sentence, and the refusal was about slicing the text rather than about windowing**: `tokenise` is a function of every character before the slice, so a window carrying only the sliced text is a different *parse* rather than a narrower column — lines inside a block comment come back as live code, and `measure` never tokenises, so I26 holds while the rendering is wrong (F426). A width travels with a window; a parse does not. **So the text travels instead** (C14 §4a, C04 I82): `code`'s window keeps `text` whole — the same string reference — and pins the source-line range `[from, to)` in `lineRange`; `measure` and `render` both honour it, tokenisation runs over the whole text, and only the rows in range are produced. The pin is a range rather than a highlighter's mode, which is what the earlier refusal could not find a field for.
+- **I26** — **`measure(window(b, w, from, to, measureChild).block, w) − skipRows − dropRows === to − from`, checked generically over every kind that declares `window`.** The form without the residuals is the one the seam invites and it is false for any window that costs slack. **Both terms, because slack falls at both ends**: `skipRows` is leading only, and `table` is the first kind whose last unit can hang past `to` (F428). The consumer has always dropped the trailing rows — `session.ts` writes `rows.slice(0, ve.takeRows)` — so `dropRows` names an operation the seam already relied on and could not state. Relaxing the identity to `≥` was the other option and it is the worse one: containment is satisfied by every wrong answer inside the bounds. Enforced by `measurement-conformance.ts` rather than per kind, so an application's own arm is held to it — without that a consumer's window is silently short and the frame describes a document nobody holds. It is I1's rule over a window rather than over a block.
+- **I26a** — **`window` receives `measureChild`, on `elements`' argument and for the same quantity.** A kind whose unit boundaries depend on a child's height cannot compute them from `(block, width)` alone — a table row's offset is `header + Σ(1 + detailHeight(row))` — and a window that guessed would slice at the wrong row while I26's arithmetic still balanced. Supplied by the registry, so a kind cannot reach for its own (A02 Seam 1).
 - **I27** — **A kind that does not divide has no `window` member, and that is how atomicity is expressed.** `plot` is the case and it is permanent: C12 I1 makes height a function of the block alone, so reducing the series changes nothing and reducing `height` rescales the curve. An absent member cannot be deleted by a later edit; a branch returning the block unchanged can, and reads as an oversight either way.
 - **I28** — **A progress bar clamps its fill and never its number.** The bar has no cells past its last one; the percentage is the true fraction, so `150` of `100` draws a full bar and reads `150%`. Clamping both makes `100/100` and `150/100` one picture, which is the same objection `examples/docker`'s CPU bar was built around and the reason the two now agree rather than each being defensible about its own quantity. A `total` of zero has no proportion: an empty bar and `0%`, which is a floor and not a measurement. **A negative `current` is floored for the same reason** — `repeat()` with a negative count throws, so the block would not render at all (I2). Found by the mutation pass, which is where a guard with no fixture behind it shows up.
 - **I29** — **Every containment reports what it swallowed, through a sink supplied at construction.** `createBlockRegistry({ onError })`, called by all **three** catches — `measure`, `render` and `elements` — with the block, the member and the error. **Four, when this was written**: the ownership question carried a catch of its own, and I30 folded it into `elements` because the two are one answer, so the fourth is gone rather than unreported. The implementation is the first thing that could disprove the count, and it did. A containment that reports nothing hides the bugs it exists to survive, and both of the two that shipped reported nothing at all: `measure`'s catch is bare, and `render`'s discards the error the moment it has read the message off it. **T3.14 has said `logged` for as long as the row has existed and nothing anywhere logged** — an effect named in a test row with no mechanism, satisfied by the half of the sentence that was true (F223). L4 wires the sink to C23's record of what the pipeline's bare catches swallowed (C23 I48), which exists and is already drained; the test harness supplies one that fails the run, and that is what makes a caught throw a red suite rather than a quiet frame.
 - **I30** — **`elementsOf` and the ownership question are one answer about one block.** A throwing `elements` makes *that* block atomic for the dispatch (C26 I12) and leaves its children reachable: ownership is decided by what resolution **returned**, never by whether the member is declared. The two catches disagreed — `elementsOf` caught the throw and answered *no elements*, while the ownership question answered *it owns them, do not descend* — and the pair costs a whole subtree rather than a block: measured, a container whose `elements` threw yielded **0 elements against a control's 4**, with nothing said and `↓` skipping the lot (F224). I11's class in a different member, and it is stated here rather than left to C26 because the invariant is C26's and the mechanism is this file's.
-- **I31** — **The `status` box occupies exactly `measure(b, w)` rows, and its two ladders live on different axes: height allocates rows, width decides what fills them.** The row count is never a width decision, because `measure` has already answered and I1 is what the whole error path exists to preserve — so where the width ladder drops the tag row, the row goes to the message rather than going blank. **The height ladder needs six rows for the full figure** — two borders, two blanks and the tag row — and the padding is dropped as a pair, the tag row next, the border after that; at one row the **failed** states keep the message and drop the retry line, because a countdown without its cause is a number nobody can act on — and **`loading` inverts it, keeping the line that moves.** That clause was a correct sentence about `error` and `retrying`, applied to all three: a waiting box has no cause, its message is a label the panel above already carries, and the whole of what it says is that it is still waiting. Wired up at two rows it drew `loading` over `⠋ loading` — the word twice, with `measure` saying 2 and `render` drawing 2 and no assertion about rows, wrapping or precedence able to fail (F235). **The precedence stays a rule and not a truncation**: the message's row floor is zero rather than one, because a floor of one would put it back and let the final clamp cut it, which is the defect this rung's own note records having fixed once already. **The width ladder was missing and would have shipped broken**: ` ERROR ` is 7 cells and a rule needs 9, against a `group: row` that can hand a block five columns. It is a *structural* interaction — two rules both holding at rest, no event between them — and a figure indexed on height cannot reach one however many rungs it has (C19 §8a's lesson in the other axis). **`H ≤ 2` has no border and therefore no evidence the height was honoured**; that is stated rather than left to be noticed, because it is the one place the argument for the border does not hold.
-- **I32** — **`status` animates unconditionally, its interval belongs to its set, and its numbers are fields rather than either.** No state-dependent branch: `retrying` is the error box plus a spinner line, so excluding `error` from animating breaks the state composed out of it and needs a per-state exception where a simple rule would do — and `error` drawing the same bytes every tick makes its stickiness free rather than a mechanism. The set is named by the block and defaults to what `steps` resolves to, so one glyph means *waiting* in three places; `spinnerIntervalMs` is the same lookup as `spinnerFrames`, so a caller cannot hold one set's frames against another's tick. **`retryInMs`, `attempt` and `elapsedMs` are supplied, never derived** — `tick` cannot carry a duration because C03 coalesces and drops commits under load, and this layer may not read a clock, so the only honest source is whoever holds one. **The counter advances, and for the life of the project it did not** (F227) — C03's commit is raised from C22's ticker, `visibleRows` supplies it, and the line cache carries the axis per kind. The kind was written against a working counter and drew a still frame instead, which is why sixteen tested spinner sets and a green suite said nothing: **`error` drawing the same bytes every tick is indistinguishable from `error` drawing them because nothing moved.** The property that makes stickiness free is the one that hid the break.
+- **I31** — **The `status` box occupies exactly `measure(b, w)` rows, and its two ladders live on different axes: height allocates rows, width decides what fills them.** The row count is never a width decision, because `measure` has already answered and I1 is what the whole error path exists to preserve — so where the width ladder drops the tag row, the row goes to the message rather than going blank. **The height ladder needs six rows for the full figure** — two borders, two blanks and the tag row — and the padding is dropped as a pair, the tag row next, the border after that; at one row the **failed** states keep the message and drop the retry line, because a countdown without its cause is a number nobody can act on — and **`loading` inverts it, keeping the line that moves.** That clause was a correct sentence about `error` and `retrying`, applied to all three: a waiting box has no cause, its message is a label the panel above already carries, and the whole of what it says is that it is still waiting. Wired up at two rows it drew `loading` over `⠋ loading` — the word twice, with `measure` saying 2 and `render` drawing 2 and no assertion about rows, wrapping or precedence able to fail (F235). **The precedence stays a rule and not a truncation**: the message's row floor is zero rather than one, because a floor of one would put it back and let the final clamp cut it, which is the defect this rung's own note records having fixed once already. **The width ladder was missing and would have shipped broken**: ` ERROR ` is 7 cells and a rule needs 9, against a `group: row` that can hand a block five columns. It is a *structural* interaction — two rules both holding at rest, no event between them — and a figure indexed on height cannot reach one however many rungs it has (C19 §8a's lesson in the other axis). **`H ≤ 2` has no border and therefore no evidence the height was honoured**; that is stated rather than left to be noticed, because it is the one place the argument for the border does not hold. **`framed` is a second ladder on this axis and not a rung on it** (F406): a box whose container already draws a border spends none of its own rows on one, so the tag arrives at **two** rows — *tag and message* — and a third buys `retrying` its activity line. The coupling of tag to border was what made a box inside `b.live`'s panel choose between reading as a red line and drawing two nested frames; §3a has both measured. `loading` is unchanged at every height under either ladder, because it has no tag to gain.
+- **I32** — **`status` animates unconditionally, its interval belongs to its set, and its numbers are fields rather than either.** No state-dependent branch: `retrying` is the error box plus a spinner line, so excluding `error` from animating breaks the state composed out of it and needs a per-state exception where a simple rule would do — and `error` drawing the same bytes every tick makes its stickiness free rather than a mechanism. The set is named by the block and defaults to what `steps` resolves to, so one glyph means *waiting* in three places; `spinnerIntervalMs` is the same lookup as `spinnerFrames`, so a caller cannot hold one set's frames against another's tick. **`retryInMs`, `attempt` and `elapsedMs` are supplied, never derived** — `tick` cannot carry a duration because C03 coalesces and drops commits under load, and this layer may not read a clock, so the only honest source is whoever holds one. **The counter advances, and for the life of the project it did not** (F227) — C03's commit is raised from C22's ticker, `visibleRows` supplies it, and the line cache carries the axis per kind. The kind was written against a working counter and drew a still frame instead, which is why sixteen tested spinner sets and a green suite said nothing: **`error` drawing the same bytes every tick is indistinguishable from `error` drawing them because nothing moved.** The property that makes stickiness free is the one that hid the break. **A consumer may now own one** (C24 I30, §4b) and the sentence above is unchanged by it: `b.status` relays the three numbers the driver hands a `renderError` and derives everything else, so `elapsedMs` and `spinner` stay the framework's and the ladders below never see a height a consumer chose. *An overridable rendering that could only render worse was the defect; the members that decide geometry were never the part an app wanted.*
 
 - **I33** — **The registry applies C04's `minHeight` floor on both sides, so I1 holds by construction.** `measure` returns `max(definition.measure(…), block.minHeight ?? 0)` and `render` wraps a floored element in a box with the same minimum, which pads a short child and leaves a tall one alone. **Padding and never bounding is the whole of it**, and the alternative was measured: a fixed height drops an over-full box's **first** row rather than its last, and `overflowY: "hidden"` does not change that — so a bound would silently behead a block that grew. **A block carrying a floor is not windowed** (C04 I68). I26's identity is about rows the *definition* can produce, and `windowSequence` derives its `to` from the floored height — so a `window` that can only reach the definition's own rows breaks the identity from outside the definition. Kept whole and paid out of `skipRows`, as a kind declaring no `window` already is. **The floor is applied outside the definition** so that I2 survives it and `scroll`'s §3c purity argument is not reopened.
 - **I34** — **The contained box asks for the height its message needs at the width it was given, capped at four message lines, and marks a cut.** Height fits and width does not: a block does not choose its width, the region does, and a block wider than its region is I1's over-draw in the other axis (§3a-bis). The request wraps at the **top rung's** content width — `width − 4`, the narrowest any rung offers — which dissolves the fixed point between the rung, its padding and the wrap by erring in the safe direction: every lower rung is wider, wraps to fewer lines, and still shows all of them, at a cost of at most one row of slack that the render centres. `rows = n + 2 + tagRows + lineRows`, and **the vertical blanks are not summed** — they are slack, appearing when the message is short and giving way as it grows, which is what the ladder already does with them; counting them would make a two-line failure seven rows rather than five. **The cap is measured rather than chosen** (F238): four lines holds a three-frame stack trace at 80 columns and a path and nothing else at 40, so it binds where the room is least — and it is not width-scaled, because how much a reader takes in before going to the sink is a property of the reader. **It is also a containment bound** (F239): a bounded container draws an over-tall child whole and C25 I1 is knowingly false there (C04 §3c trace 1, T2.28b), so seven rows bounds that divergence by a number rather than by the length of an exception. **A cut carries its mark** through `truncate`, so `…` at unicode and `~` at `ascii` (I22) — and **a message of exactly the cap carries none**, because a truncation that did not happen sends the reader to the sink for text already on screen. **One layout function serves `render` and the request**, on `cells()`'s argument: a second walk over the same arithmetic rounds differently at the boundary.
 - **I35** — **A mosaic's cell bounds its own child, and the two properties that do it are not interchangeable.** The cell is `overflow: "hidden"` **and** its content carries `flexShrink: 0`, in that pairing: a relative child in a cell shorter than itself is **squashed by flex before it can overflow**, so the clip alone changes nothing and the child draws rows from the *middle* of itself — measured at `row2, row5` out of six, the same mechanism F244 §5 found under `scroll`'s bottom-anchored precedent. **The row count agrees in all three arms**, so the frame is the only instrument that separates them, and the failure is at its worst on the block that most needs reading: a bare cell drew an error box's fragment and its bottom border, which looks like a complete box. **So C04 §3c trace 1's divergence does not transfer** — F239 is `scroll`'s, whose need is a windowed slice at an arbitrary offset and whose seam genuinely does not exist; a mosaic needs a clip at the child's own row 0, which is exactly what Ink offers. `measure` equals the rendered count through an over-tall child and through a throwing one, and C25 I1 holds rather than being knowingly false. **The width axis is the geometry's guarantee and not the clip's, and the build is what said so.** F244 §4 measured an absolutely positioned child running past its parent's width — 60 cells at width 40, every count agreeing — and the remedy looked like `overflowX: "hidden"` on the container, which is what the group renderer already carries. **It does not compose.** Ink keeps a stack of clipping regions and applies `clips.at(-1)`, the *innermost*, so a cell that clips its own child **shadows** the container's clip instead of intersecting with it: three 1-wide cells in a container of 1 draw `"A"` when only the container clips and `"ABC"` once the cells clip too. Since every cell must clip — the first half of this invariant — the container's clip is shadowed everywhere it matters. **So `mosaicRects` clamps** and a cell with no room is zero-wide and not drawn, which is the only one of three answers keeping both axes of I1; the container's clip stays as the cheap arm of a rule enforced by the arithmetic. **The ruling named an operation that does not do what it appears to** — C23 §8a A4's class arriving from the implementation rather than the walk, and the reachable case is the floor of 1 per grid line, which asks a three-column grid for three cells at any width including one.
 - **I36** — **An image has two arms and the dither is the first of them.** `imageProtocol: "kitty"` takes the protocol; `"none"`, `"iterm2"` and `"sixel"` take an ordered dither. **Two arms rather than four, and the refusals are for composition rather than effort.** Sixel draws at a cursor and does not participate in the grid. **iTerm2 does participate** — declared cell size, occupies cells, scrolls — and what it lacks is **per-cell addressability**: a kitty placeholder is ordinary text so any row is independently re-emittable and text can sit inside the rectangle, while an iTerm2 image is one escape at one cursor position that a row-level rewrite destroys. **That settles F248's diff measurement by construction**, since a full-frame rewrite is safe for placeholders and fatal for one blob. **The transmission does not travel in the frame**: Ink strips APC escapes — an `ESC _G` in a `Text` node renders to nothing — so the escape is written by **`transmitImage`**, prefixed to the frame's bytes at the composition root, and only the placeholders go through Ink as text. **Three measured properties make that safe**: Ink is not in the byte path, the diff baseline is `lines` rather than the write, and every frame reaches an *absolute* address before any row content — so a cursor the escape might have moved is corrected by the next byte. It **leads** the frame rather than following it, because placeholders for an unsent image draw nothing; it transmits on entry into the **document** rather than the viewport, keyed by digest so one image sends once; and `session.ts` is the only path that writes block rows, which is what makes one seam sufficient (§4c). **The dither is built first because most terminals are `"none"`** and a feature that shows nothing there is one most readers never see; **1-bit is not a further degradation**, because a dither is shape and colour was never its carrier. **The matrix is designed here because it is designed nowhere** — the note citing *the 3D renderer's ordered dither* cites a renderer the roadmap refuses — and it is an **8x8** Bayer threshold indexed in **dot** space over the 2x4 subcell grid, nine levels per cell, **varying with position so a gradient reads as texture rather than banding**. **8x8 rather than the 4x4 the note implies, and the frame chose it**: a 4x4's y-period equals a braille cell's height, so a flat region resolves identically in every cell row — and while the two are frame-identical at quarter levels, at 0.28 the 4x4 draws one glyph where the 8x8 resolves two. `plot/raster.ts` is reused rather than reimplemented. **The ramp is a third ladder axis**, and widening the `Serves` record is the check that a dither ramp cannot be indexed as a density ramp: one encodes a magnitude at a position, the other a threshold against a position-varying offset, and the type tells them apart because the eye does not (§4c).
+- **I37** — **The glyph axis is three rungs and a half block is the top one, gated on three things rather than on the terminal alone.** Below `kitty`, a cell is spent on colour or on shape: `▀` carries **two pixels at full colour**, braille carries **eight dots at one bit**, and the ASCII ramp carries nine glyphs. The half block is taken when `unicode` is not `ascii`, `ambiguousWidth` is not `wide`, `colourDepth` is at least **8**, and the block has **no `overlay`** — otherwise the dither. **Each gate has its own reason and none is a proxy for another.** `▀` is `East_Asian_Width=Ambiguous`, measured by `cells()` at `narrow=1` and `wide=2`, so a `wide` terminal draws the picture at double the width `imageCells` measured — the third consumer of `art.ts`'s switch and the first where braille's non-ambiguity is why the hazard is new (C02 I9, A03 SS50). Below `colourDepth: 8` the rung's whole claim is unfunded, and at 8 both channels go through `nearestAnsi256` so the picture is the 24-bit one quantised rather than a second rendering. **The overlay gate is the structural one**: the dither puts the picture in the glyph and the field in the foreground, and a half block has spent both colour channels on the picture — so unlike 1-bit, where C10 I31 draws the picture plain because nothing is left, there is a rung that can still carry the field and the block takes it. **A sequence trace cannot reach that gate** — *has an overlay* and *is 24-bit* both hold at rest with no event between them — which is why the artefact drawn for it was a classification table (§4c, → C04 I73, C10 I31).
+- **I38** — **A refusal to decode is drawn as the refusal, with the reason the decoder computed.** `decodePng` returns a `fault` for every rejection it makes — *not a PNG*, *interlaced PNG (Adam7)*, *bit depth 16*, *IDAT does not inflate* — and the block drew `alt` for all of them, so a reader was told the same nothing about a corrupt file and about a format this phase names as unbuilt. The **rasterising arms** draw a **`status` at `error`** carrying the fault, `alt` beneath it as the caption it always was, at the height the block committed and no more — **the arms, and not the block** (F413): the protocol arm needs the decoder only for `imageCells`'s aspect, and `decodePng` reads the IHDR before it refuses, so the extent survives what the rasteriser cannot. A picture the terminal can decode is drawn rather than described. `error` is the state and not `retrying`, because no attempt is coming: this is the widened gloss doing its work — *an operation failed and nothing more is coming* (§3a) — and the box the shell returns from twelve sites is the same box here. **The fault is not a verdict about the picture, only about this decoder**, and that is why it cannot gate the block: at the protocol arm the terminal decodes, the transmission is the bytes unchanged, and the identity is a hash of them. `Decoded`'s failure arm carries `size` so geometry and rasterising can want different things (→ C04 I73, C09 §8b G7).
+- **I39** — **A GIF is an image with more than one frame; the frame is view state read below the protocol arm, and on kitty the terminal animates.** The six-byte signature chooses `decodeGif` beside `decodePng` behind one front door (`decodeImage`), every frame is composited onto the logical screen before anything above the codec sees it, and delays under 20 ms are shown at 100 (§4c). **`measure` never sees the frame** (I8, C04 I93): `height` is declared and every frame shares the screen, so a GIF measures as its first frame does at every width, and the rasterising arms draw `frames[ctx.frames[id] ?? 0]` while the protocol arm ignores the field. **The kitty ruling is the measured one**: retransmitting a frame per tick would cost 75 bytes an 8x8 and 29,662 bytes a 320x240 per tick — 297 KB/s at 10 fps — where the animation protocol (`a=T` for frame 0 as raw RGBA, `a=f` per later frame with its gap, one `a=a` to start the loop) uploads once — 116,509 bytes for four 320x240 frames — and costs nothing per tick, so on that arm the shell arms **no wake**; a terminal without the extension keeps frame 0, which is the alternative ruling drawn by accident rather than a failure. **The fixtures are real and compared to a second decoder**: written by `sharp`, decoded pixel for pixel against `sharp`'s composited pages, with each blob's bytes scanned for the feature its row claims (→ C04 I93, C22 I77, C09 §4c).
+- **I40** — **A `rule`'s three tiers differ in one thing — the fill — and the row is exactly the width at every one of them.** The lead is two cells and the label's column is fixed, so the tiers differ where the eye already is; tier 3's fill is **drawn as spaces** rather than dropped, which keeps `meta` at the right edge and keeps `measure` a constant 1 (I1). **An empty label never takes the blank fill**: I21's unbroken line and tier 3's absent one meet in one cell, and a two-cell lead with nothing after it is not a rule — so the fill falls back to the tier's own weight there, heavy at 1 and light at 2 and 3. Every character is a pair the vocabulary already holds, resolved through `glyphs(ctx.capabilities)`, so nothing is authored in the renderer (→ C04 I94, A03 SS47).
+- **I41** — **A rail is a glyph drawn on every row of its notice, and it is a property of the token rather than of the block.** `GLYPH_RAIL` sits beside `GLYPH_INDENT` for the same reason: the schema learns nothing, and `measure` still receives no capability. **The geometry cannot move**, because `prefixCells` already subtracts the gutter from every row's width to hang the indent — so a rail fills columns that were reserved and blank, and I1 holds by construction rather than by an argument about it. **The frame is the only instrument that separates a rail from a glyph**: both draw the same rows at the same width with the same reserved columns, and a quotation whose mark appears once and whose remaining rows sit under a blank passes every count. `continuation`'s indent one property along, found the same way (→ C04 I95, C04 I96).
+- **I42** — **A kind may declare `width(block, w)`, the columns its content occupies at `w`, and one that does not fills.** The answer is in `[1, normaliseWidth(w)]` and pure in `(block, width)` as `measure` is (I2); the registry clamps a definition's answer into the range and reports the excursion. Absent is the second answer, not a missing one: a `rule`, a `progress`, a `plot`, an `image`, a `scroll` and a `mosaic` are their width, and the registry answers `normaliseWidth(w)` for them (§2c, → C04 I101).
+- **I43** — **A block is the same height at its content width**: `measure(b, width(b, w)) === measure(b, w)` for every block and width. This is what lets a container render a child at `width(child, cell)` inside a cell measured at `cell` without the row moving, and every declaring kind keeps it by construction — a `notice` answers its longest wrapped row, so no row re-wraps (§2c).
+- **I44** — **The kinds that answer are named, with the case in which each fills.** `notice`, `raw`, `pills`, `keyValue` (no bar), `code`, `table` (rows present, no action bar, no expanded row — its plan, flex columns included), `group` (a `row` whose shares are all `{cells}` sums them and the gutters; a `column` whose children are all `left` takes the widest), `panel` (its widest child plus the border, or its title or footer plus their furniture). A `keyValue` with a bar fills because the bar absorbs the residual; a weighted `row` and a `column` with an aligned child fill because their layout depends on the width — rendered at their own sum they would be a different layout (§2c). Every other kind declares no member. The list is the record a reader checks against the registry, and a kind added to one and not the other is the SP-class disagreement between spec and tree (§2c).
+- **I45** — **Every non-ASCII base of an emoji variation sequence drawn by a glyph table or a spinner set is followed by U+FE0E, the text presentation selector; a bare base is refused.** The ASCII range is excluded by construction and with its reason: `#`, `*` and the digits are keycap bases that no terminal draws as emoji without their `U+20E3`, and the alphabet the tables degrade to cannot be the alphabet the rule refuses (F832). The set is derived from `emoji-variation-sequences.txt` with its Unicode version named, held in `text.ts` beside the Ambiguous and Wide tables, and consulted by a test-time refusal only — `cells()` never counts presentation, because terminals disagree about it and a width that guesses is worse than one that is wrong the same way everywhere. `⏺` U+23FA is in the set and `⬤` U+2B24 is not, which is the whole of F823; that the remedy is the selector rather than a refusal is the whole of F854 (§4).
+- **I46** — **A `notice` carrying `step` measures one row and is fitted, not wrapped, and the run marked `elide` shortens first.** The fitter truncates the elide run from its end through `truncate` until the row fits, and only then the row; verb, duration and outcome are never shortened while any of the argument remains. A property of the token, as the indent and the rail are (I41), so the kind's wrap policy and `measure`'s signature are unchanged (§3, C04 I85).
+- **I47** — **A `notice` whose glyph is in `GLYPH_ELEMENT` declares one block-level element whether or not it carries an `action`.** `activate` is the block's `action` when present and absent otherwise; `copy` is the text unless the consumer overrides it. `step` is the one member: a call's head is the line a reader acts on, and the gate that keeps a muted status line out of the focus ring is right for every other token (F831; → C26 §5).
+- **I48** — **A member of the `Glyph` vocabulary measured Ambiguous resolves to its ASCII half at `ambiguousWidth: "wide"`, so I5 holds under both conventions.** `glyphFor` takes both fields; `glyphCells` still needs no capability because the two renderings of a slot are one cell at either arm. Eleven members moved on the day the tier landed — the ten F825 measured and `ⓘ`, which F832 put in `info`'s slot — and six Neutral ones did not (§4).
+- **I49** — **The separator between a head's fields is `GlyphSet.separator`, `·` at unicode and `:` at ASCII, one cell at both arms, a character no spinner set's ASCII frames use, and no composer joins fields with a literal.** The residue row's comma and the status box's parentheses are the two earlier answers to the same question; this is the third and it is a slot because the head is the one place a reader sees it twice per line (F828).
+- **I50** — **`RAMP_EXTENT` is an exhaustive record over `BlockKind` with three values — `none`, `clusters`, `axis` — and it is a record and never a `Set`.** `clusters` for the four span carriers, `axis` for `progress`, `none` for the rest; a kind with no entry is a type error in both directions, as `ANIMATES` is (§2). A kind marked `none` has no member to carry a ramp (C04 I108).
+- **I51** — **A ramped run is split one span per grapheme cluster in `paint`, after the wrap, with `at` and `of` taken from the span's drawn text and never from the run; `t = of === 1 ? 0.5 : (at + i) / (of − 1)`; no SGR lands inside a cluster; `measure` never sees the split.** A span across a wrap continues from where the previous row stopped; an elided span is counted after the cut and its marker takes the last cluster's colour (C04 I107).
+- **I52** — **The bar's ramp varies over the axis — `t = i / (barWidth − 1)` for cell `i` of the whole bar — and only the `on` cells take it; the `off` cells stay `muted`.** A bar at 30% is the first third of the bar at 100%, and a cell painted once keeps its colour as the bar fills. The filled-length extent is refused because it moves every painted cell on every patch (C04 I108).
+- **I53** — **The five loops are `t' = f(t, tick, n)` applied before C10 samples; each period is stated in ticks in the effect's own table, the cadence is asked through `spinnerIntervalMs()` with no millisecond literal in the module, what a tick is belongs to C03's window, and `tick = 0` is the static frame.** `shimmer` and `wave` move one cell per tick; `breathe` is 20 ticks, `pulse` 10, `heartbeat` 12 with the envelope `[1, 0.5, 0, 1, 0.5, 0, 0…]`. Every effect is periodic because the render has no birth tick (C04 I109).
+- **I54** — **A block animates by content as well as by kind: `tickIntervalOf` answers the default set's cadence for any block whose spans or `ramp` carry an `animate` other than `none`, `ANIMATES` stays the record of the kinds that animate by nature, and `animationIntervalOf` is unchanged.** Below 8-bit the cadence is still declared while the frame is stable, and that cost is recorded rather than guarded against (C10 §4e, C22 I60).
+- **I55** — **A `terminal` measures `lines.length`, plus one row when `dropped` is present, and never wraps.** A child chose its own wrap points against a width the emulator was told (C27 §4); re-wrapping them here would double-wrap a screen already laid out, and the row that is one line of a program's output would silently become two. Over-long lines truncate at `width` — the same choice `logs` makes, for the same reason: predictable height is what makes a tail scroll smoothly.
+- **I56** — **A `terminal`'s text is emitted without stripping, and the cursor is drawn `inverse` at every arm including 1-bit.** The only kind exempt from `stripControl`, and the exemption is paid for by C04 I110's gate rather than assumed. The cursor is the one thing a static log cannot show, so it survives the degradation ladder as an attribute where a colour would not.
+- **I57** — **`RAMP_EXTENT.terminal` is `"none"` and `ANIMATES.terminal` is `false`.** A ramp over a child's screen would repaint the child's colours with the application's, which is the inversion of C04 §3i's whole argument; and the block redraws when the child writes, on C23's cadence, not on a tick.
+- **I58** — **`RenderContext.windowChild` is the render-side slice seam, as `measureChild` is the render-side height seam (I7).** `windowChild(block, width, from, to)` returns the kind's `Windowed` or **`null`**, and a container that gets `null` renders the child whole. `null` has two causes and they are one rule: the kind declares no `window` (I27), or the slice it returned costs slack. **A container cannot pay slack.** `windowSequence` can — `session.ts` renders the window and drops the surplus rows itself — and a child inside an Ink tree has no equivalent, so a slice with `skipRows` or `dropRows` non-zero is refused rather than drawn with its overhang. Supplied by the registry and overwritten unconditionally, exactly as the other two are (§2), so a caller cannot hand a kind a window function of its own.
+- **I59** — **A container that declares a bound applies it to every child it can slice, and its rendered rows equal its measured rows.** This is I1 for the case its corpus never held: a `scroll` of `height: h` draws `h` interior rows plus C04 I49's residue row whatever its children measure, **including one child taller than `h`**. The children it cannot slice are the kinds declaring no `window`, and that set is compared by equality rather than membership — a kind gaining a window must move the list, and a new unsliceable kind must fail the row rather than join a subset quietly. **The overrun that remains is recorded rather than asserted correct**: a `plot` taller than the interior is drawn whole, C12 I1 makes that permanent, and a producer putting one in a smaller box has asked for something the box cannot give (F855).
 
----
 
 ## 8. Commitments
 
@@ -1125,7 +2002,106 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 33. **A mosaic's cell bounds its child with two properties rather than one, and the frame is what says so** (I35). `flexShrink: 0` before `overflow: "hidden"`, because a squashed child never overflows and draws its own middle; the container clips the width separately, because I1 is rows only. `measure` equals the rendered count through an over-tall child and a throwing one, so C25 I1 holds here where §3c's trace leaves it knowingly false (→ C04 I71, FINDINGS F244).
 34. **An image degrades to an ordered dither before it degrades to nothing, and both refusals are stated with reasons that survive checking** (I36). The dither is the first arm because most terminals are not kitty; iTerm2 is refused for per-cell addressability rather than for a participation it actually has; and the dither ramp is a third ladder axis so the type refuses what the eye would accept (→ C04 I73, FINDINGS F248).
 
+35. **The glyph axis is a ladder of three and its top rung is gated on the block as well as the terminal** (I37). A half block spends a cell on two full colours where braille spends it on eight dots, so a photograph arrives as a photograph and a diagram is better served one rung down — and the ladder takes the richest rung the terminal honours rather than asking the content. `▀` is ambiguous-width where braille is not, which is why the hazard is new at exactly this rung; and a block carrying an `overlay` skips it, because both colour channels are already the picture (→ C02 I9, C10 I31, A03 SS50).
+36. **An image that cannot be decoded says which refusal it is** (I38). The decoder computes a reason for every rejection and the block discarded all of them, so *a corrupt file* and *a format phase 1 does not read* arrived as the same `alt`. It draws the `status` box the rest of the framework draws, at `error`, with `alt` kept beneath as the caption — and the fault is scoped to **this** decoder, not to the picture (→ C04 I73, C09 §8b G7).
+
+37. **A kind whose layout is derived from its rows pins that layout into its window, and a kind whose parse is pins the whole text and a range** (I25a). `patch` pins `numberWidth`, `keyValue` pins `keyWidth`, and both are one sentence: a window says what its *parent* measured rather than deriving it from the slice, or every row shifts sideways as the reader scrolls. `code` cannot pin a parse — `tokenise` reads every character before the slice, so a *sliced* text is a different parse and lines inside a block comment render as live code, invisible to I26 because `measure` never tokenises — so its window keeps `text` whole and pins `lineRange` instead, and the parse is the whole block's by construction (→ C25 I21a, C12 I1, C04 I82, C14 §4a, FINDINGS F426).
+38. **The window's residual is a pair, and `window` is handed `measureChild`** (I26, I26a). Slack falls at both ends: `skipRows` is leading only, and `table` is the first kind whose last unit can hang past `to`. The consumer has been dropping trailing rows on every frame — `session.ts` writes `rows.slice(0, ve.takeRows)` — so `dropRows` states an operation the seam already depended on, rather than granting a new one; and the identity keeps its equality, because relaxing it to `≥` would pass every wrong answer inside the bounds (→ FINDINGS F428).
+39. **A kind pins a *presence* as readily as a width, and `table` pins two things and re-sorts nothing** (C11 I18, I19, I20). The action bar exists or does not, so a window moves it in **both** directions; the display order is not idempotent under slicing, because `kindOf` reads the values present and a slice can re-classify its own column. Neither field is a producer's, on `numberWidth`'s argument (→ C11 §5a, C25 I21a, FINDINGS F429).
+40. **A span's offsets meet the wrap, the cut and the cluster through the functions that already own them, and each gains one property rather than a sibling** (I1, I9, I19). Rows carry a source `start` and `wrapCells` projects them; a boundary inside a cluster snaps outward at both ends and the width does not move; runs coalesce by style reference so an unspanned row's bytes are unchanged; and `truncateParts` measures its marker as `truncate` does, which closed a one-cell overshoot at `ambiguousWidth: "wide"` (§5, → C04 §3am, C04 I84, C04 I86, C10 I33).
+41. **An animated image is the image block with a frame index from the context, and the kitty arm hands the terminal every frame once** (I39). The signature chooses the decoder, the frames are composited in the codec, `measure` never sees the frame, and the wake is the orbit's — a still arms nothing. The protocol ruling was taken on measured bytes rather than on the roadmap's estimate, and its degradation on a terminal without the animation extension is the ruling it replaced (→ C04 I93, C22 I77).
+42. **A rule's tiers move one thing and the empty label is the cell where two rules meet** (I40, I21). The fill carries the level and nothing else does, so `measure` is untouched and the label stays where a reader is already looking; tier 3 draws its fill as spaces rather than shortening the row, and an empty label takes the weight back because a lead with nothing after it is not a rule (→ C04 I94).
+43. **A gutter that repeats is a property of the mark, and the frame is what said so** (I41). `GLYPH_RAIL` beside `GLYPH_INDENT`: the columns are already reserved on every row for the hanging indent, so a rail costs no geometry and the block schema learns nothing — and a mark drawn once with its remaining rows blank agrees with every count there is (→ C04 I95).
+41. **A run's tone and value reach colour through the resolvers that already own them, and the one span member that is geometry is carried by the wrapper as one property** (I1, I9, → C04 I89, C04 I90, C10 I31, C10 I33). A tone replaces the block's style through the memoised `tone()` call the block made; a value paints a background through `continuousColour` and says nothing below 8-bit; `wrapCellsParts` takes atoms and `notice` measures and renders through one `noticeRows`; a focused table row drops span tones as it drops cell tones; markdown's inline code is the `identifier` tone (§5).
+42. **A block can say how wide its content is, and the seam is optional the way `window` is** (I42). The registry answers for the kinds that do not, so no consumer branches on the member's presence.
+43. **A block is the same height at its content width** (I43). The property is asserted over the catalogue's corpus rather than argued per kind, because a kind that re-wraps at its own reported width would pass every per-kind sentence.
+44. **The answering kinds are a list in the spec and a set in the registry, and the test compares them** (I44). Stated with the case in which each fills, so a reader can tell a deliberate absence from a forgotten member.
+45. **The head mark is `⏺` U+23FA qualified by U+FE0E, with `*` beneath it, and the check that admits it in that form and refuses it bare is derived from the Unicode data** (I45). A width measured before the row was written could not reach a presentation defect, so the instrument that can is a table with a version and not a list from memory (F823, F824).
+46. **A call's head is one committed row and the argument gives way first** (I46). Fitted by token rather than by kind, so `notice` stays prose everywhere else and `measure` learns nothing.
+47. **A call's head is an element, by token** (I47). `GLYPH_ELEMENT` beside `GLYPH_INDENT` and `GLYPH_RAIL` — the third property of a mark that changes what a notice does without the schema learning it (F831).
+48. **The `Glyph` vocabulary carries a width tier and I5 is asserted at both conventions** (I48). Ten of seventeen members were two cells at `wide` against a one-cell ASCII half with T2.5b green, because the row ran at one arm (F825).
+50. **An ink can vary along what it is drawn over, and the kind says over what** (I50, I51, I52). `RAMP_EXTENT` names the extent per kind; text is split per cluster in paint with the position taken from the span; the bar varies over its axis and its `off` cells are untouched (`CALCIUM_INK_RAMPS_DESIGN.md` Q3, Q5).
+51. **Motion is a term on the argument, periodic, timed in ticks by the effect** (I53, I54). Five loops, one table, C03's floor as the unit; a block animates by content through the same `tickIntervalOf` the kinds use, and the cache follows without a new axis.
+49. **A head's separator is a slot** (I49). The composer takes capabilities and joins with `glyphs(caps).separator`; the literal `·` it carried was non-ASCII at the ASCII arm and two cells at `wide` (F828).
+52. **A child's screen is drawn as it was written** (I55, I56, I57). One row per line, no wrap, no strip, no ramp and no tick — every mechanism this component applies to its own text is withheld from a screen someone else laid out.
+53. **A box bounds what it paints, not only what it measures** (I58, I59). The slice seam exists on the render context beside the height seam; a container takes an exact slice or keeps the child whole; and the kinds it cannot bound are a list held by equality rather than a silence.
+
 ---
+
+## 8b. The glyph axis — a classification table, and why it is not a trace
+
+**Every gate on this ladder holds at rest.** *The block has an overlay*, *the terminal declares
+`wide`*, *the depth is 4* — none of them is reached by anything happening, so a sequence trace has
+no row for any of them however long it runs and would have agreed with the code on every sequence
+in it. The artefact is a **classification table**, and it is indexed by the cells where **two**
+rules could both claim the answer (CLAUDE.md, *rule interactions come in two kinds*).
+
+| # | the two rules that meet | must draw | the answer a reader would give, and why it is wrong |
+|---|---|---|---|
+| G1 | protocol arm × `ambiguousWidth: "wide"` | **protocol** | *gate the ladder on `wide`* demotes a terminal that draws real pixels. **Resolved by measurement**: the placeholder is a plane-16 private-use code point carrying combining diacritics, and `cells()` measures it **1 at both conventions** — the gate has no subject on this rung |
+| G2 | protocol arm × `overlay` | **protocol**, the field composited into the pixels before transmission | already ruled (C04 §3h.2); recorded here so the row is not re-opened |
+| G3 | **placement refused** × half block eligible | **half block** | *fall back to the dither* — which is what the code did, and it is **two rungs** rather than one. A kitty terminal is non-`ascii` and at least 8-bit **by construction**, so the refusal path lands on the rung the terminal least needs. FINDINGS **F409** |
+| G4 | `unicode: "ascii"` × `colourDepth: 24` | **ASCII ramp** | *colour outbids the alphabet*. It does not: `▀` is not ASCII, so the unicode gate is a question of what can be **drawn** and depth is a question of what can be **spent** |
+| G5 | `overlay` × 24-bit, narrow, full unicode | **braille** | *the richest rung the terminal honours* — the terminal honours it and the **block** cannot use it, because both colour channels are already the picture and the field has nowhere to go |
+| G6 | `overlay` × `unicode: "ascii"` | **ASCII ramp**, field in the foreground | unchanged, and it is the row that shows G5 is about channels rather than about rungs: a ramp glyph has a free foreground exactly as braille does |
+| G7 | **bytes do not decode** × protocol arm | **the picture** — the terminal decodes, and the fault gates only the arms that rasterise | *the fault box, everywhere*, which is what F410 shipped and it was half right. The reason must reach a reader, and the block is the wrong place to gate: **measured, the protocol arm needs the decoder for exactly one thing** and the refusal does not take it away. FINDINGS **F413** |
+| G8 | `ambiguousWidth: "wide"` × 24-bit, no overlay | **braille** | nothing better is available, and the loss is worth naming: colour is present and unusable, which is the only rung where the terminal has more than the ladder can take |
+| G9 | a **1-pixel-tall** image × half block eligible | **half block**, both halves resolving to row 0 **by the arithmetic** | *index `y*2+1`*, off the end of the image — and that is a **point-sampling** implementation's hazard, which this is not. The ruling first said *clamped to the last row* and credited a guard: measured over 1.24 billion coordinates, **not one of `sampleRgb`'s four clamps ever binds**, because the coordinates are fractions of the image's own extent. Right about the cell, wrong about the mechanism — FINDINGS **F412** |
+| G10 | **protocol arm** × an image with more than one frame | **every frame uploaded once**, the terminal loops, **no wake** | *transmit the current frame each tick at the stable id* — the design the roadmap priced, and the figures refuse it: 29,662 bytes a tick for a 320x240 where the animation protocol is 116,509 once. And *frame 0 only* is what the chosen design already degrades to on a terminal without `a=f`, so it is not a second option but the first one's failure mode (I39) |
+| G11 | **placement refused** (G3) × an animated image at `kitty` | **half block, frame 0, still** | *the half block animates it* — it cannot, because the wake is not armed on the protocol arm and the store never advances; the rung is reached only past `MAX_PLACEHOLDER_SPAN`, so the picture is 298+ cells wide and the loss is a still where a still was already the honest answer. Recorded rather than repaired: arming the wake on the refusal path would mean the block telling the shell which arm it took, and no seam carries that |
+| G12 | **bytes do not decode** (G7) × a GIF at the protocol arm | **nothing drawn**, the fault box on every rasterising arm | *fall through to the bytes as for a PNG* — which is what the code does and is honest about: `f=100` with GIF data is a placement the terminal cannot decode, exactly as a corrupt PNG is, and the G7 argument (the terminal's decoder reads what ours refuses) has no GIF instance because the terminal reads no GIF at all. §4c's loud failure, and the same one the PNG path already has |
+
+### G7's other half — measurable after all, and the answer moves the refusal
+
+**Our decoder refuses interlaced and 16-bit PNGs by name** — *phase 1 reads progressive only*,
+*phase 1 reads 8-bit only* — and those refusals are about **our** decoder. At the protocol arm the
+picture is decoded by the **terminal**. So the question is not *can kitty read this*; it is
+**what does the protocol arm need the decoder for**, and that is answerable here.
+
+**Three pixel reads exist in the tree, and only one is on the protocol path.**
+
+| site | what it reads | what it needs |
+|---|---|---|
+| `imageCells` | `pixelsOf` | `px.width / px.height` — the **aspect**, and nothing else |
+| `image.ts` `render` | `pixelsOf` | real RGBA, to rasterise a glyph per cell |
+| `transmitImage` | `decodePng` | real RGBA, **and only for a composited overlay** |
+
+**The identity needs nothing.** `imageKey` is the byte digest, `imageId` hashes that string, and
+`payload` is the bytes unchanged — so a transmission is expressible for a picture we cannot read.
+
+**And the aspect survives every refusal, by the decoder's own order.** `decodePng` reads the IHDR
+in its chunk walk and refuses *after*: interlace and depth are checked with `w` and `h` already in
+hand. The only failures that take the extent are *not a PNG* and *no IHDR chunk* — which are
+failures to find a picture at all, not failures to rasterise one.
+
+**So the refusal belongs on the arms that rasterise, not on the block.** A 16-bit or interlaced
+PNG places and draws at `kitty`, and refuses — with its reason, in the `status` box — at the half
+block and the dither, which genuinely cannot read it. `Decoded`'s failure arm carries `size` so
+the geometry has what it needs without the pixels it does not.
+
+**The composited overlay is the one genuine pixel need on the path, and it already degrades
+correctly**: `transmitImage` falls through to the plain bytes, keeping the picture and losing the
+field, with its reason written where it happens. That is unchanged.
+
+**What is left for a terminal is a conformance question rather than an architecture one**:
+whether a given terminal's decoder does read Adam7 and 16-bit. If one does not, the failure is a
+placement addressing an image that failed to load — *nothing drawn*, §4c's loud one — and the
+remedy would be a capability, not a re-gate on our own decoder's opinion.
+
+**Measured in Ghostty 1.3.1 on 2026-08-31: it reads both.** A 16-bit PNG and an Adam7 PNG both
+answer `OK` to a real transmission, so the two files this repository refuses by name draw on a
+terminal that decodes them — which is the whole of what moving the refusal off the block buys.
+
+**And the reading is only evidence because a control failed.** A probe that answers `OK` to
+everything measures nothing: `palette.png` with 64 bytes of its IDAT inverted — *IDAT does not
+inflate*, by our own decoder — came back `EINVAL: invalid data`. The path reports failure when
+there is one.
+
+**One thing the measurement needed that the framework does not do**, and it is F414: the shipped
+transmission sets `q=2`, which suppresses **every** reply including errors. That is right today,
+because `decode.ts` has no APC arm and a reply would arrive in the editor as a lone `ESC` and
+literal text — but it means a failed transmission is silent at the protocol level as well as on
+screen, and the terminal *will* say what went wrong if asked.
 
 ## 8a. The fitted height — a table and a trace
 
@@ -1164,6 +2140,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 
 ### Tier 1 — unit
 
+- **IF8** (C22 I77): `Frames.advance` is a function of elapsed time — four wakes of 25 ms and one of 100 leave the index, the remainder and `due` where one wake of 200 does; a full loop is frame 0 and keys as untouched; a minute idle lands where the clock says; a still and a zero advance are no-ops. In `test/edge/image-frames.test.ts` beside the rows that consume it.
+- **IF9** (I39): `transmitAnimation` is one `a=T` as raw RGBA, one `a=f` per later frame carrying its delay in `z`, an `a=a` for the root frame's gap and an `a=a,s=3` to run — every escape under 4096 bytes — and on the 8x8 fixture the whole upload is under ten ticks of retransmission.
 - **T1.1**: `register` in open state → `get` returns it, `kinds` includes it.
 - **T1.2**: `seal` → `sealed` true, existing kinds still resolve.
 - **T1.3**: `measure`/`render` after seal → work normally.
@@ -1180,11 +2158,17 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T1.12**: `steps` renders a spinner frame while active and a settled glyph after.
 - **T1.13** (§5): the five ways naïve length is wrong — CJK, fullwidth, combining marks, ZWJ clusters, variation selectors — each a different wrong answer from `.length`.
 - **T1.14** (I18): control characters are stripped before measuring, so a measured row and a rendered row cannot disagree.
+- **T1.27** (I6, C02 I9, §5): the Ambiguous set against its source. Every one of the 44 Latin-1 characters the property calls Ambiguous is **two cells at `wide` and one at `narrow`** — the fabricated violation is any table whose lowest range starts at U+2010, which reports 1 for all 44. **T1.27b is its control**: the other 52 Latin-1 characters are Neutral and one cell under both conventions, so a repair that admits the *block* rather than the *property* satisfies T1.27 and fails here. **T1.27c** accounts SS47's `PROSE_MARKS` one mark at a time rather than by a total — the finding said four of eight and the correction said five of ten, and the property says seven of ten are Ambiguous with three of them (`§` `·` `×`) in the gap, `«` `»` Neutral and right, and `⚠` Neutral and over-counted by the geometry deviation. **T1.27d** asserts that deviation where it is claimed, so a generated table dropped in without it fails here rather than in fifteen golden frames; **T1.27e** pins U+E0100..U+E01EF at zero, the over-count the derivation itself created before `isZeroWidth` grew the range (F665).
 - **T1.15**: an empty string is zero cells. The floor at 1 is a rule over the block table (§3), not a property of the width function.
 - **T3.20** (I21): a `rule` with an empty label renders as an unbroken line at its full width, with a labelled rule beside it as the control. Reachable only by rendering: the block is present, `measure` says one row, and the row is exactly the width in both.
 - **T1.16** (I20, §5a): `sliceCells` over a line carrying SGR — the window measures exactly `to − from` cells by `displayCells`, the escapes in the skipped prefix are re-emitted at its head, and a cut that lands mid-escape is impossible because the escape is copied whole. The failure is not a wrong width: it is `[38;5` reaching the terminal as text with the SGR never terminated, so the colour bleeds down every row below.
 - **T1.16b** (I20): a double-width cluster straddling either boundary is dropped and its cell blanked, in both directions — the window is still exactly `to − from` cells and never `to − from ± 1`. Asserted at the left edge as well as the right, because the two are different code paths and only the right one resembles `truncate`.
 - **T1.16c** (I20): the composition law over a styled line, for every split point — `sliceCells(t, 0, a)` and `sliceCells(t, a, b)` measure `b` together. A property over the splits rather than three chosen ones, because the case that breaks it is whichever `a` lands inside a cluster and no chosen `a` is that one by construction.
+- **T1.17** (I9, I19, C04 I84, C04 I86): the four mechanisms of §5's *Runs* — `wrapCellsParts`'s rows are exact source slices from `start` with the break space in no row, and equal `wrapCells`'s; `runsOf` concatenates to `stripControl(text)` with a control character inside a span; a boundary inside a ZWJ family snaps outward and a span that collapses onto one boundary is dropped; `truncateParts` reports `start` from either end and, at `ambiguousWidth: "wide"`, `kept` plus a two-cell marker fits the limit. **Covered today by `test/unit/spans.test.ts` §*C09 — runs*, whose rows cite C04 I84 and C04 I86 and carry no C09 number** — the number is owed to those rows, not to a second file.
+
+- **T1.28** (I53): each effect's `t'` at `tick = 0` equals the static table; `shimmer`'s band centre moves one cell per tick and wraps at `n + 3`; `wave` at `tick = n` equals `tick = 0`; `breathe` is 1 at tick 5 and 0 at tick 15; `pulse` flips at tick 5 and returns at 10; `heartbeat` follows its envelope over twelve ticks and repeats; `rampCadenceMs()` is `spinnerIntervalMs()` by identity of value, and a comment-stripped scan of `blocks/ramp.ts` finds no millisecond literal.
+- **T1.19** (I9, C04 I89, C04 I90): the tone-and-value half of §5's *Runs* — `runsOf` copies `tone` and `value` onto the run and `sliceRuns`, `runLines` and `wrapRuns` carry them; `wrapCellsParts` with an atom never breaks strictly inside it — a space inside the atom is skipped, a full row with no outside break point breaks at the atom's start when something precedes it, and an atom wider than the row is broken as text **and drops nothing**, since a cluster-boundary cut is not a break space (`"aaa bbb ccc"` at 7 valued whole is `aaa bbb` / `" ccc"`, F593); a row that fills exactly and is followed by a space breaks **at that space** whether or not it has an earlier break point (F590, F591), and the plain answer for `"aa bb cc dd"` at 5 is two rows where the valued one is three; `wrapRuns` derives the atoms from `value` alone, so a bold run is not one. Asserted on the row texts and starts, beside the plain wrapper's answer for the same string.
+- **T1.29** (I55): a `terminal` of 40 lines measures 40; with `dropped: 12` it measures 41; a line of 200 characters at width 80 still measures one row.
 
 ### Tier 2 — contract / interface
 
@@ -1206,11 +2190,40 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.11** (I7): the module graph shows no kind importing the registry; container kinds resolve children solely through `measureChild`.
 - **T2.16** (§3): over the adversarial corpus — CJK, ZWJ sequences, variation selectors, combining marks — `cells(s)` equals the width Ink lays `s` out at. The one number two implementations compute, held to agreement rather than assumed into it.
 - **T2.17** (I4, §3): a source scan finds no `color=` or `backgroundColor=` prop in `src/presentation/` (A03 SS37), and no import from `src/terminal/` beyond `escapes.js` and type-only capability imports.
+- **T2.20** (I26): the row property has a subject — a window of the **right size and the wrong rows**. T2.15 shortens a window and `window-height` fires; this reverses the content and keeps the count, and `window-rows` fires while `window-height` does not. That is the shape of every real failure at this seam: a different parse (F426), a slice in declaration order, a comparator re-derived from the slice (F429).
+- **T2.22** (I25, I26, C14 I23): `code` and `raw` declare `window`, and the I26 identity and the row-for-row comparison hold over both at every offset — a `code` block with a block comment spanning lines, a wrapped one whose every line is three rows, a `raw` block with a trailing newline and blank lines. The row that pinned *code and raw do not window* is rewritten as this one on the day it expired (C14 §4a).
+- **T2.21** (I26a): `tableDefinition.window` handed the registry's measurer and handed a stub returning 1 cuts in different places — `dropRows` of 2 against 1 for the same range. Asserting the signature would pass against a window that accepted the parameter and ignored it, which is how `table` came to be unwindowable for want of one (F428).
 - **T2.18** (I17, C04 I25): a sequence measures `Σ` its blocks plus one row per `gapBefore`, and renders exactly that many; a `row` group ignores the field.
+- **T2.109** (I40, I41, I1): the headline row at the two new members — a `rule` at each of the three tiers measures 1 and renders exactly 1 row of exactly the width at every width of the sweep and in both alphabets, `meta` landing at the right edge in all three; and a notice carrying a rail measures exactly what the same notice measures without it, at every width, while the rendered rows differ only in the reserved columns.
+- **T2.110** (I42): the sealed registry answers `width(b, w) === normaliseWidth(w)` for a `rule`, a `progress`, a `plot`, an `image`, a `scroll` and a `mosaic` at 40 and at 7; and a definition returning `w + 5` is clamped to `w` with `onError` called once naming the kind.
+- **T2.111** (I44): the set of default definitions declaring `width` equals `{notice, raw, pills, keyValue, code, table, group, panel}` — compared by equality, so a member added or dropped on either side fails the row.
+- **T2.112** (I45): every non-ASCII base in `GLYPH_TABLE`'s unicode column, `UNICODE`'s slots and every spinner set's frames is followed by U+FE0E; the control asserts `⏺` U+23FA and `ℹ` U+2139 **are** in the derived set and `*` is not, so an empty table cannot pass the row, and a second arm asserts the bare base is still a violation — the remedy is the selector, not an exemption. T2.71 in `spinners.test.ts` runs over the same set in place of its hand list.
+- **T2.113** (I46): a `step` notice whose text overflows the width measures 1 and renders 1 row at 80, 40 and 20 cells in both alphabets; with the argument span marked `elide`, the argument ends in the marker and the verb, duration and outcome are intact; without the span the row is cut from its end. The control is the same text under `info`, which wraps to two rows.
+- **T2.114** (I47): `elementsIn` over a `step` notice with no `action` yields one element spanning the block with `copy` equal to the text and no `activate`; with an `action`, `activate` is that action; an `info` notice with no `action` yields none.
+- **T2.115** (I48): T2.5b's assertion — `cells(unicode) === cells(ascii)` — over the whole vocabulary at **both** `ambiguousWidth` arms, through `glyphFor` at `WIDE_CAPS`; the eleven Ambiguous members resolve to their ASCII half at wide and the six Neutral ones do not, compared by equality against the two named sets so a member moving between them fails the row.
+- **T2.118** (I50): `RAMP_EXTENT` has an entry for every `BlockKind`; `clusters` for `raw`, `notice`, `rule` and `table`, `axis` for `progress`, `none` for the rest; the record's key set equals the kind union's.
+- **T2.119** (I51, I52): a `raw` whose gradient span covers `héllo 👨‍👩‍👧 ok` paints one span per cluster and no SGR inside the ZWJ family; the same span wrapped across two rows has row two's first `at` equal to row one's cluster count; five palette spans over five words paint five colours, each word whole, the second `categorical.c2` (C04 §3am.2's *the identity is the span*); a `progress` with a colormap ramp at 30% and at **90%** agree byte-for-byte on the first 30% of the bar's cells — not 100%, whose extra digit narrows the bar by a cell (§3) — and the `off` cells carry `muted`.
+- **T2.120** (I54): `tickIntervalOf` on a `notice` with a `shimmer` span is `spinnerIntervalMs()`; with `animate: "none"`, or with a ramp and no `animate`, it is `null`; `animationIntervalOf` finds the same block inside a `panel` inside a `group`; `ANIMATES` still has exactly two `true` entries.
+- **T2.116** (I49): `glyphs(caps).separator` is one cell at both arms and both alphabets; a source scan finds no `" · "` literal in `src/shell/`.
 - **T2.10**: golden frames for every kind at four widths in both themes and both unicode modes.
+- **T2.121** (I55, C09 §6b): `terminalDefinition` declares `window`, and a window of rows 10–15 of a 2,000-line block renders exactly those six, with the same bytes the whole-block render puts on those rows.
+- **T2.122** (I57): `RAMP_EXTENT.terminal` is `"none"` and `ANIMATES.terminal` is `false`; `tickIntervalOf` a `terminal` returns null whatever its runs carry.
+- **T2.123** (I58, §6b): a probe definition records the context it is rendered with, and its `windowChild` **is** the registry's own function — the same assertion `measureChild` and `renderChild` carry, and the reason `RenderContextInput` omits all three rather than making them optional (§2, F85).
+- **T2.124** (I58, §6b): over the whole corpus at three widths, `windowChild` returns `null` exactly when the definition declares no `window` **or** its result carries a non-zero `skipRows` or `dropRows` — the predicate computed from the definition rather than restated, and both answers exercised (measured: more than ten of each). A sweep and not one offset, because the residual is the half a single window cannot see (B1's argument).
+- **T2.125** (I59, §6b): a `scroll({ height: 6, follow: true })` over one 30-line `terminal` measures 7 and renders **7**, and the rows drawn are the block's lines 24–29 — the tail, because the box follows. As it shipped this rendered 32 rows opened at line 0 (F855).
+- **T2.126** (I59, §6b): over the full twenty-two-kind registry, the kinds declaring no `window` are compared **by equality** against the recorded list — a kind gaining a window fails the row, and so does a new kind that cannot be bounded. **This row found the table above wrong on its first run**: `table` declares its `window` as a method rather than a property, so the draft's grep missed it and the draft said six kinds where there are seven.
 
 ### Tier 3 — edge cases
 
+- **IF1** (C04 I93): a PNG, a two-frame GIF, a one-frame GIF and neither are four answers from `decodeImage` — a still has no `animation`, a GIF's `pixels` is its frame 0, and `decodePng`'s own refusal wording is untouched behind the front door (HB8 reads it).
+- **IF2** (I39): every fixture decodes pixel for pixel to `sharp`'s composited pages, **eight frames compared and the count asserted**; each fixture's bytes are scanned for what its row claims — A's local table, B's sub-rectangles and transparent index, C's interlace bit, D's per-frame tables. Its control flips a byte of LZW data, which must change or refuse the frame.
+- **IF3** (I39): B's bytes carry delays of 0, 1 and 5 hundredths and arrive as 100, 100 and 50 ms; clearing C's interlace bit permutes its rows, so the flag is read rather than assumed.
+- **IF4** (I39): disposal 2, reached by patching B's control byte at an offset the scan finds, leaves frame 2's rectangle transparent under frame 3 where frame 3 does not paint; disposal 3 restores frame 1's dot. Its control is the unpatched bytes — disposal 1 — where the same cell is opaque.
+- **IF5** (I39, I38): a header cut short refuses with no extent; a zero logical screen refuses; a forbidden LZW code size refuses **with the extent**, and the block draws that reason in the `status` box.
+- **IF6** (C04 I93, I39): the half-block arm, read in colour — frame 0 is `38;2;255;0;0` and never green, frame 1 the reverse, no field is frame 0, index 2 of two wraps to 0.
+- **IF7** (I39): the dither arm draws a different picture at frame 2 than at frame 0 with the same row count; the kitty arm's placeholders are identical at both; `framesOf` answers the delays for the GIF and `null` for a still.
+- **IF10** (I39): `transmitImage` at `kitty` sends a GIF as `a=f` frames and never under `f=100`, a PNG beside it as its bytes, neither twice, nothing off the protocol arm, and an overlaid GIF composites into every frame.
+- **C04 T2.39**'s GIF half (C04 I93): `measure` and `imageCells` of the GIF equal the PNG of its first frame at widths 1, 2, 3, 8, 40 and 120, and the rows drawn at frames 0, 1, 2 and 7 all equal `measure`. Landed here rather than in `owed-gate.test.ts` because before the decoder a GIF fell to `alt` and measured 1 where the PNG measured 3.
 - **T3.1**: `measure` before `seal` → works.
 - **T3.53** (I33, → C04 I67): `measure` returns `max(definition.measure(…), minHeight)`. A block already taller keeps its own number, which is the arm a floor-always-wins implementation passes the other rows with.
 - **T3.54** (I33, I1): **the render pads and never bounds.** A one-row block with a floor of three draws three; a four-row block with a floor of three draws **four, first row included**. The second half is the row that matters — a fixed height drops an over-full box's *first* row, measured, and `overflowY: "hidden"` does not change it.
@@ -1229,6 +2242,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T3.8**: width 1 → every kind returns ≥1 and renders something.
 - **T3.9**: width 0 → treated as 1; no division by zero, no infinite loop.
 - **T3.10**: text exactly `w`, `w-1`, `w+1` cells → 1, 1, 2 rows for wrapped kinds.
+- **T3.10b2** (C04 I86, §5): the sweep — over fourteen strings at every width from 1 to 40, **no row could have taken the first word of the next row**, counted only where the join is legitimate (the rows are separated by exactly one source space, the next opens on content rather than whitespace, and its first word is whole rather than the head of a cut token). This is the property F590 and F591 are each one instance of, and it is a sweep rather than two pinned strings because **a row that breaks early is invisible to T3.10b**: a short row fits. Measured before the arm: 161 violating joins over 102 of the 560 pairs; after, 0. The same sweep carries the two properties the arm must not move — **no row overflows** (T3.10b over 560 pairs rather than 4) and **every row is an exact slice from its `start`** (C04 I86, on the ASCII members, since a substituted cluster is deliberately not a slice).
 - **T3.11**: `panel` at width 2 → children measured at 0, clamped to 1; no negative width reaches a child.
 - **T3.12**: `group` nested five deep → correct total, no stack overflow.
 - **T3.31** (I23): tokenise a `dockerfile` block before registering the grammar — one run, no slot — then register it and tokenise the same text again. The second call is highlighted. **The memo is the subject**: without the invalidation the second call returns the first's answer, and every assertion about `registerGrammar` existing still passes. The control is that `measure` returns the same row count across both, or the invariant's other half is untested.
@@ -1259,15 +2273,32 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.10a** (I34, I11): **golden frames for the contained failure**, three messages × three widths × three variants, both frames of the two-frame path. **There were none**, through three commits about this path: nothing in `test/golden/` rendered a definition that throws, so golden passed each time on the absence of a subject rather than the absence of a change. Frame 1 is recorded too, because F230's ruling makes the short box a specified state rather than a transient.
 - **T3.48** (I31): `status` declares no `window`, and `windowSequence` keeps it whole and pays for it out of `skipRows` — `plot`'s and `scroll`'s case, and the same assertion.
 
+- **T3.65** (I19, C04 I86): the bytes rows for the same mechanisms — a span across a wrap, a span straddling a cut with the marker outside it in both directions, a boundary inside a cluster, a substituted cluster at width 1 — are C04 T3.62–T3.65 in `test/edge/spans.test.ts`, asserted on the painted row and never on a count, because every height assertion passes for a span sliced one unit early. C09's number is owed to them on T1.17's terms.
+
+- **T3.66** (I1, C04 I89, C04 I90, C10 I31): **the frames** — `"The cat sat on the mat ."` with a value per token at width 12 and at 80 paints one `48;5` background per token at 8-bit and none between them, two rows at 12 and one at 80, and the same document at 4-bit is byte-identical to the unvalued one; `"x(abcde)yz"` at 6 is two rows plain and three valued, and the valued row is the whole token; a `tone: "identifier"` span on a table cell paints the identifier colour on an unfocused row and the accent colour, unbroken, on the focused one; `measure` equals the rendered row count in every case.
+- **T3.67** (I43): over every block in the catalogue's corpus and widths 7…80, `measure(b, width(b, w)) === measure(b, w)` — the property, with the failing block and width in the message.
+- **T3.68** (I42, I44): a `notice` of nine cells answers 9 at 40 and 7 at 7; a `raw` of lines 3, 12 and 5 answers 12; a `pills` row of two chips answers the chips plus the gap; a `keyValue` with a bar answers the cell; a `table` with an uncapped flex column, or with an action bar, or with no rows answers the cell; one with a `maxWidth`-capped flex column answers its plan, which is narrower; and one with none of those answers its planned columns and gaps.
+- **T3.69** (I44): a `row` group of a nine-cell `notice` and a twelve-cell `raw` with shares `{cells: 9}, {cells: 12}` at 40 answers `9 + 1 + 12`, and the same two under weights `1, 1` answers 40; a `column` group of the two answers 12, and with the `raw` aligned `right` answers 40; a `panel` around the column answers 14, and around a title of twenty cells answers **25** — the walk said 24 and the build said five cells of furniture, not four: `railPart` truncates to `inner − 3` and wraps the title in a space each side, so the row asserts the border at the answered width carries the whole title and one cell narrower does not, rather than trusting either count.
+- **T3.71** (I51, C10 I36): a slot-pair gradient at 4-bit paints exactly two distinct colours, `from` in the first half of the extent and `to` in the second; at 1-bit the frame is byte-identical to the block toned `from`; a colormap bar at 4-bit is byte-identical to the same bar with no ramp.
+- **T3.72** (I51, I53): a single-cluster ramped span samples the midpoint at `tick = 0`; under `shimmer` its frames over ticks 0–4 carry at most two distinct colours, which is the honest degenerate; under `wave` every tick is the midpoint.
+- **T3.70** (I42): a `row` group at a width that drops its second child answers only the first child's width — the unplaced child is measured by neither half and counted by neither (C04 §3).
+- **T3.73** (I56): a `terminal` line whose text is a lone `\uFFFD` renders it; the definition calls no strip function, asserted by a source scan of `kinds/terminal.ts`.
+- **T3.74** (I56): the cursor cell is `inverse` at 24-bit, 8-bit, 4-bit, 1-bit and ASCII — five arms, one assertion each, and at 1-bit it is the only mark distinguishing the cell.
+- **T3.75** (I59, §6b): the corpus's `scroll` fixtures include one whose child is taller than its interior, so T2.1's sweep sees the case — asserted on the corpus itself, because the sweep agreed for as long as no fixture had the property (F855). Two children and not one: a box whose only over-tall child is also its only child cannot tell *slice the child* from *draw the first child only*.
+- **T3.76** (I59, §6b): an atomic child taller than the box still over-draws, and the row carries the number — a `plot` of height 8 in a box of 2 measures 3 and paints 9. **The record, and T2.126 is the watch**: F856's lesson is that a row asserting a disagreement stays green for exactly as long as the defect does, so what stops this one growing is the equality-compared list of kinds, not this row.
+
 ### Tier 4 — integration
 
+- **C22 T4.17o, T4.17q** (C22 I77) — the wake, in `test/edge/image-frames.test.ts`, runnable since the validator accepted a GIF (F619, the gate landed with F628): a still arms no wake in 990 ms; a 100/200 ms GIF renders six times in 990 ms and not thirty, seeing frames `1 0 1 0 1 0`; at `kitty` the same document arms nothing; beside an 80 ms spinner the frame does not move at 80 ms and has at 120.
 - **T4.1** (with C11, C12): `table` and `plot` register through the public mechanism and satisfy the T2 suite identically to built-ins.
 - **T4.2** (with C10): the same block in both themes produces identical row counts.
 - **T4.3** (with C10): under `colourDepth: 1`, every tone resolves to a typographic style and status remains distinguishable by glyph alone (D29).
 - **T4.4** (with C02): a `TERM=dumb` capability record drives every kind to its ASCII fallback consistently — no kind renders Unicode while another renders ASCII.
 - **T4.5** (with C14): summed measured heights of a visible range equal the viewport height exactly.
 - **T4.6** (with C14): expanding a table row shifts subsequent blocks by exactly the measured delta.
+- **T4.8** (I54, C22 I60): a real session with a `shimmer` on a head and a plain entry beside it — over three spinner commits the head is rewritten each tick with a different picture and the plain entry's text is never written again, **read from the diff writer's output**: the folded screen strips SGR, so a colour-only animation is invisible to it, and the render cache exposes no counters — a row that asserted on counters would have needed a member nothing else consumes.
 - **T4.7** (with C04): every document in C07's adaptation corpus measures and renders without error.
+- **T4.57** (with C04, C27): a snapshot of a real `pytest`-shaped byte script, inside a scroll of height 6, renders the tail at five arms; the frames are read as pictures and the colours are the child's.
 
 ### Tier 5 — e2e
 
@@ -1278,6 +2309,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 
 ### Tier 6 — fail-on-revert
 
+- **T6.85** (I39): `decodeImage` never dispatching to `decodeGif` → IF1 fails, every GIF refused as *not a PNG*; disposal never applied → **IF4** fails while IF2's disposal-1 fixtures all pass, which is why IF4 patches the byte; interlace read as progressive, the transparent index painted, or the KwKwK case dropped → **IF2** fails against `sharp`'s pages; the delay clamp removed → IF3; the renderer reading frame 0 regardless of the context → **IF6**'s green arm fails while every row count passes; a GIF sent under `f=100` → IF10; later frames not uploaded → IF9. `tools/mutate/runs/c09-gif.mjs`, with `canvas[d + 3] = 0` as its control.
 - **T6.1** (I1): a measurer that under-counts wrapped lines by one → T2.1 fails at the wrapping width.
 - **T6.75** (I33): the `max` removed from `registry.measure` → T3.53 fails, and T4.49's second frame draws the one-row figure again — which is the defect as it shipped.
 - **T6.76** (I33, I1): the padding removed from `registry.render` → T3.54 fails. `measure` returns the floor and the element draws its own height, which is an I1 violation created by the mechanism built to keep I1 whole.
@@ -1299,13 +2331,33 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.16** (§3): letting Ink wrap or truncate rather than pre-breaking through `cells()` → T2.1 fails at the wrapping widths, and T3.4's ASCII marker becomes `…` again.
 - **T6.18** (I20): dropping the skipped prefix's SGR from `sliceCells` → T1.16 fails, and a layer composited over a themed row leaves the row's tail drawn in the terminal's default colour, which reads as the layer having bled rather than as the base having lost its style.
 - **T6.19** (I20): windowing by `slice` on code units instead of by cells → T1.16 and T1.16c fail; a frame composited from three pieces measures `columns + 1` and wraps into a row nobody counted.
+- **T6.86** (I6, §5): dropping `AMBIGUOUS_RANGES` and leaving `isAmbiguous` the hand-written geometry blocks alone → **T1.27 fails on all 44 rows and T1.27c on `§` `·` `×`, while T1.27b and T1.27d pass** — the state the table shipped in, and the two that stay green are what says the row is about the property rather than about Latin-1. Admitting Latin-1 as a *block* (`cp >= 0xa0 && cp <= 0xff`) instead → **T1.27 passes and T1.27b fails**, which is the over-shooting repair the control exists for. Removing U+E0100..U+E01EF from `isZeroWidth` → T1.27e fails at two cells, and a combining mark widens every cluster that carries one.
+- **T6.87** (I43): making `notice.width` return the text's unwrapped cells → T3.67 fails on a wrapped notice, which is the case the property exists for.
+- **T6.88** (I44): declaring `width` on `rule` returning `w` → T2.111 fails on the set; the clamp and T2.110 still pass, which is why the row is an equality over names.
 - **T6.20** (I19): dropping a cluster wider than the line, as both wrappers did → T3.9d and T3.9e fail, and CJK leaves the output at a usable width of 1 with every measurement still agreeing.
 - **T6.21** (I11): the error path returning one row regardless of what `measure` committed — **the code as it shipped** — → T3.33 and T3.34 both fail. A revert row restoring a defect that happened rather than one imagined, which is the strongest form this tier takes.
 - **T6.22** (I29): a catch that swallows without calling the sink → T3.35 fails, and a run with a caught throw in it goes green.
 - **T6.23** (I30): deciding ownership from the member's declaration rather than from what resolution returned → T3.37 fails, and a `scroll` whose `elements` throws takes its whole subtree out of the focus walk with nothing said.
 - **T6.24** (I31): letting the width ladder drop a row instead of reassigning it → T3.40 fails, and a narrow `status` block is shorter than `measure` committed. **The row count moving with the width is I1's divergence reintroduced through the path built to prevent it.**
 - **T6.25** (I31): labelling the height ladder's top rung `≥ 5` → T3.39 fails at exactly five rows. **The rung as it was first written**: two borders, two blanks and a tag row is six, and the figure was specified at five for as long as it existed on paper — caught by drawing it rather than by any assertion, which is why this row exists at all.
+- **T6.77** (I9, C04 I86): restoring `limit − 1` in `truncateParts` → T1.17's wide arm fails, `kept + suffix` at `limit + 1`; slicing wrapped spans by prefix sums of row lengths → C04 T3.62 fails on the second row, one unit early, and C04 T6.83 shows the reverted arithmetic beside the ruled one; `paintRuns` closing and reopening the same style between two plain pieces → every golden frame moves while drawing the same picture, which is the gate's no-move read as a row rather than as luck.
+- **T6.84** (C04 I89, C04 I90): `paintRuns` ignoring `run.tone` → C04 T2.35's rendering half fails on the run's colour while every attribute row still passes; ignoring `run.value` → C04 T2.36's rendering half fails on the missing `48`; `wrapRuns` passing no atoms → T1.19 and T3.66 fail on `"x(abcde)yz"`, and `notice`'s measure still equals its render because both go through `noticeRows` — which is the row that says the pair was kept honest by sharing the function and not by two sides agreeing; `notice.measure` restored to `wrapCells(stripControl(text))` → T3.66's `measure` arm fails at 6 by one row, with every frame still drawn; `cells.ts` keeping a span tone on a focused row → T3.66's focus arm fails on a `38` inside the accent run.
+- **T6.89** (I45): dropping the selector from `step` → T2.112 fails on U+23FA and A03 SS57 fails on the same character, and **the mutation is invisible in a diff read as glyphs**, which is the argument for the rule being mechanical; emptying the derived table → T2.112's control fails, which is the row that says the table has members.
+- **T6.90** (I46): fitting the row from its end before the elide run → T2.113 fails on the verb being cut while the argument is whole; wrapping a `step` notice like any other → T2.113 fails on the row count at 20 cells.
+- **T6.91** (I47): removing `step` from `GLYPH_ELEMENT` → T2.114 fails, and a card's head leaves the focus ring while its body's scroll children stay in it — the frame as it shipped.
+- **T6.92** (I48): `glyphFor` reading `unicode` alone → T2.115 fails at `WIDE_CAPS` on all eleven Ambiguous members while T2.5b at narrow still passes, which is why the row runs both arms.
+- **T6.94** (I50): `RAMP_EXTENT` rewritten as a `Set` of the two carriers → T2.118's key-set row fails; `rule` flipped to `none` → T2.118 fails on the carrier row.
+- **T6.95** (I51): `at` counted from the run's start rather than the span's → T2.119's two-row row fails while the one-row rows pass; splitting by code unit → T2.119's ZWJ row finds SGR inside the family.
+- **T6.96** (I52): the bar's extent taken as the filled length → T2.119's 30%/100% row fails on the first cell; painting the `off` cells through the ramp → its `muted` assertion fails.
+- **T6.97** (I53): a period written in milliseconds → T1.28's `breathe` row fails at tick 5; a `100` written in `ramp.ts` in place of the lookup → T1.28's literal scan names the line.
+- **T6.98** (I54): `tickIntervalOf` reading `ANIMATES` alone → T2.120 answers `null` for the shimmer and T4.8's head serves one frame for the life of the session, which is F227 restored by content.
+- **T6.93** (I49): the composer joining with a literal `" · "` → T2.116's scan fails, and the card's contract rows at the ASCII arm draw a character the alphabet does not have.
 - **T6.26** (I32): excluding `error` from animating → T3.43 fails, and `retrying` — which is `error` plus a line — loses its spinner. A per-state branch is the exception the composition immediately needs.
+- **T6.99** (I55): wrapping a `terminal`'s lines → T1.29's 200-character row measures three and the tail of a running block jumps by two rows per long line.
+- **T6.100** (I56): stripping the text → T3.73 loses the replacement character and a child's SGR would silently vanish rather than being refused at the gate.
+- **T6.101** (I57): setting `ANIMATES.terminal` true → T2.122 fails and the block repaints on a tick nobody asked for.
+- **T6.102** (I58): returning the slice when it costs slack → T2.124's sweep fails at `patch`, and a box painting a windowed `code` draws the leading rows the residual said to drop.
+- **T6.103** (I59): rendering every overlapping child whole again → T2.125 paints 31 rows in a 7-row box and T3.75's fixture is what makes the sweep say so, which is F855 exactly as it shipped.
 
 ---
 

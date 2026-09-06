@@ -9,6 +9,10 @@ import { describe, expect, it } from "vitest";
 import { compose, gutterMatchesPrompt } from "../../src/shell/frame.js";
 import { PROMPT_GUTTER } from "../../src/shell/config.js";
 import type { ChromeContext, SessionSnapshot } from "../../src/shell/types.js";
+import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
+
+/** C09's measurer, for the footer's height (C22 I82). */
+const MEASURE = createBlockRegistry({ defaults: true }).measureSequence;
 
 const SESSION: SessionSnapshot = Object.freeze({
   cwd: "/work",
@@ -60,6 +64,7 @@ describe("C22 §6 — the frame", () => {
 
     compose({
       chrome: { header: record, footer: record },
+      measureSequence: MEASURE,
       session: () => SESSION,
       copyMode: () => false,
       now: tickingClock(),
@@ -79,6 +84,7 @@ describe("C22 §6 — the frame", () => {
 
     compose({
       chrome: { header: () => [], footer: () => [] },
+      measureSequence: MEASURE,
       session: () => SESSION,
       copyMode: () => false,
       now: () => 1000,
@@ -102,6 +108,7 @@ describe("C22 §6 — the frame", () => {
         },
         footer: () => [],
       },
+      measureSequence: MEASURE,
       session: () => SESSION,
       copyMode: () => false,
       now: () => 1000,
@@ -124,6 +131,7 @@ describe("C22 §6 — the frame", () => {
     const at = (rows: number, promptRows: number) =>
       compose({
         chrome: { header: () => [], footer: () => [] },
+        measureSequence: MEASURE,
         session: () => SESSION,
         copyMode: () => false,
         now: () => 1000,
@@ -131,10 +139,11 @@ describe("C22 §6 — the frame", () => {
         promptRows: () => promptRows,
       });
 
-    expect(at(30, 1).region).toEqual({ top: 1, height: 27 });
+    // 30 − header 1 − its rule 1 (C22 I87) − rules 2 − prompt 1 − footer 0 (`[]`, C22 I82).
+    expect(at(30, 1).region).toEqual({ top: 2, height: 25 });
     expect(at(30, 4).region, "a wrapped prompt takes the rows from the transcript").toEqual({
-      top: 1,
-      height: 24,
+      top: 2,
+      height: 22,
     });
 
     // Clamped, not negative. The size gate normally prevents this and normally
@@ -157,6 +166,7 @@ describe("C22 §6 — the frame", () => {
     // drew a `Placed` at all. The shapes differ; the heights must not.
     const f = compose({
       chrome: { header: () => [], footer: () => [] },
+      measureSequence: MEASURE,
       session: () => SESSION,
       copyMode: () => false,
       now: () => 1000,
@@ -164,8 +174,8 @@ describe("C22 §6 — the frame", () => {
       promptRows: () => 1,
     });
 
-    expect(f.overlayRegion).toEqual({ width: 100, height: 27 });
-    expect(f.region).toEqual({ top: 1, height: 27 });
+    expect(f.overlayRegion).toEqual({ width: 100, height: 25 });
+    expect(f.region).toEqual({ top: 2, height: 25 });
     expect(f.overlayRegion.height, "one number, not two").toBe(f.region.height);
   });
 });

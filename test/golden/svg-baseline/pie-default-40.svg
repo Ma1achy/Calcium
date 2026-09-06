@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
+<rect width="100%" height="100%" fill="#1a1a1a"/>
+<rect x="498.4" y="15.2" width="9.6" height="9.6" fill="#e69f00"/>
+<text x="512" y="24.8" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">Chrome 65%</text>
+<rect x="498.4" y="34.4" width="9.6" height="9.6" fill="#56b4e9"/>
+<text x="512" y="44" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">Firefox 15%</text>
+<rect x="498.4" y="53.6" width="9.6" height="9.6" fill="#3cbf9a"/>
+<text x="512" y="63.2" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">Safari 12%</text>
+<rect x="498.4" y="72.8" width="9.6" height="9.6" fill="#f0e442"/>
+<text x="512" y="82.4" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">Other 8%</text>
+<path d="M288 150.4 L288 12.8 A137.6 137.6 0 1 1 176.679 231.279 Z" fill="#e69f00"/>
+<path d="M288 150.4 L176.679 231.279 A137.6 137.6 0 0 1 157.135 107.879 Z" fill="#56b4e9"/>
+<path d="M288 150.4 L157.135 107.879 A137.6 137.6 0 0 1 221.711 29.82 Z" fill="#3cbf9a"/>
+<path d="M288 150.4 L221.711 29.82 A137.6 137.6 0 0 1 288 12.8 Z" fill="#f0e442"/>
+</svg>

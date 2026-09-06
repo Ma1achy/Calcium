@@ -21,6 +21,7 @@ import { validateDocument } from "../viewmodel/validate.js";
 import { block } from "../viewmodel/construct.js";
 import type { Block, DocumentMeta, ViewDocument, ViewPatch } from "../viewmodel/types.js";
 import { createFallbackAdapter } from "./fallback.js";
+import { withOverflowNotice } from "./overflow.js";
 import { exitCodeOf, mapResult } from "./mapping.js";
 import { createPatchAdapter } from "./stream.js";
 import {
@@ -113,15 +114,18 @@ function lastResortDocument(raw: RawResult, ctx: AdapterContext, detail: string)
     command: ctx.command,
     status: "error",
     error: { message: `Could not render this result: ${detail}`, code: "ADAPT_FAILED" },
-    blocks: [
-      {
-        kind: "notice",
-        id: "adapt-failed",
-        tone: "error",
-        glyph: "error",
-        text: "Could not render this result.",
-      },
-    ],
+    blocks: withOverflowNotice(
+      [
+        {
+          kind: "notice",
+          id: "adapt-failed",
+          tone: "error",
+          glyph: "error",
+          text: "Could not render this result.",
+        },
+      ],
+      raw.overflowed,
+    ),
     meta: authoritativeMeta(undefined, raw, ctx, "last-resort"),
   };
 }
@@ -172,8 +176,15 @@ export function createAdapterRegistry(
     // consumer of the public validator are all handling documents already
     // inside the system, and a blanket refusal there would drop a restored
     // entry a reader had expanded.
+    // **The overflow notice is appended here and nowhere else** (§4, I22) —
+    // the funnel is the one place every route passes, so no route can omit it,
+    // and the last resort below rebuilds its blocks and appends it again.
     const validity = validateDocument(
-      { ...candidate, command: ctx.command },
+      {
+        ...candidate,
+        command: ctx.command,
+        blocks: withOverflowNotice(candidate.blocks, raw.overflowed),
+      },
       { from: "farSide" },
     );
     if (validity.ok) return validity.value;

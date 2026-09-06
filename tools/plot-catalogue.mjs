@@ -13,6 +13,7 @@ import { createBlockRegistry } from "../src/presentation/blocks/index.js";
 import { plotDefinition } from "../src/presentation/plot/index.js";
 import { renderToLines } from "../src/presentation/render-lines.js";
 import { defaultTheme, loadTheme } from "../src/presentation/theme/index.js";
+import { slot } from "../src/presentation/blocks/paint.js";
 import { block } from "../src/data/viewmodel/index.js";
 import { CATALOGUE_FORMS } from "./catalogue-forms.js";
 
@@ -55,6 +56,28 @@ const registry = createBlockRegistry({});
 registry.register(plotDefinition);
 
 export const FORMS = CATALOGUE_FORMS;
+
+/**
+ * The plot's own ground, as `[r, g, b]` — resolved from the same theme the
+ * frames are drawn with (F501).
+ *
+ * **A frame carries this colour as a *foreground*, and a reader cannot see it.**
+ * Unicode's block elements fill from the bottom, so a cell whose covered mass
+ * sits at the top is drawn as its complement with the two colours exchanged —
+ * and the exchange needs an ink for the empty part. Left unset the terminal
+ * paints it in the default foreground, which streaked a Gaussian's base white.
+ * So the ground goes in explicitly, painting exactly what was already there.
+ *
+ * Exported because two test files were counting it as a distinct colour and
+ * reading a third face on a two-faced cube. **Resolved rather than written
+ * down**, so a theme change moves the frames and this together.
+ */
+export function groundRgb(caps) {
+  const c = slot("surface.bg", theme, caps).colour;
+  if (c === undefined || c.kind !== "rgb") return null;
+  const v = Number.parseInt(c.hex.replace("#", ""), 16);
+  return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
+}
 
 export function stripSgr(s) {
   return s.replace(/\x1b\[[0-9;]*m/g, "");
@@ -103,12 +126,78 @@ export function frameFor(spec, caps, width, id = "cat") {
 export function clearGenerated(dir) {
   let removed = 0;
   for (const f of readdirSync(dir)) {
-    if (/\.(txt|plain|png)$/.test(f)) {
+    // `.svg` joined when T2 landed: the SVG baseline is generated the same way
+    // and a removed fixture must leave a deletion in the diff there too (F275).
+    if (/\.(txt|plain|png|svg)$/.test(f)) {
       rmSync(join(dir, f));
       removed += 1;
     }
   }
   return removed;
+}
+
+/**
+ * The catalogue's width policy — **one width per capability set.**
+ *
+ * The wide arm draws every ambiguous glyph two cells, so a figure needs the
+ * narrower frame to stay inside a comparable footprint. `ascii` is narrow and
+ * takes the ordinary width, which it never could before.
+ */
+export const CATALOGUE_WIDTHS = (capsName) => [capsName === "wide" ? 60 : 80];
+
+/**
+ * **The variant that stands for a form**, when a reader wants one tile per form.
+ *
+ * `default` if the form has one, else its first variant — and it is a function
+ * because the rule was written three times and one copy was a **filename match**
+ * (F313). `contact-defaults.mjs` collected `*-default-24bit.png`, which drops
+ * every form with no variant by that name and picks up every *variant* whose
+ * name ends in `-default`. Measured: `horizon` and `pie` absent, `violin` twice
+ * as `violin` and `violin-bimodal`, and the sheet reporting **45 forms** for 44.
+ *
+ * `catalogue-png.mjs` carries a comment saying this filter *silently excluded
+ * `histogram` and `horizon` entirely — so the sheet showed 24 of 34 forms and
+ * read as complete.* It was fixed there and not in the sibling, which is the same
+ * pair and the same relationship F261 already caught once.
+ *
+ * **A rule about the corpus is answered from the corpus**, never from the names
+ * of files a previous step happened to write.
+ */
+export function representativeVariant(form) {
+  const variants = FORMS[form];
+  if (variants === undefined) throw new Error(`no fixtures for form ${form}`);
+  return "default" in variants ? "default" : Object.keys(variants)[0];
+}
+
+/**
+ * Every form × variant × capability set × width, as frames — **the loop, once.**
+ *
+ * `frameFor` already exists so that nobody renders a second way; this exists so
+ * that nobody *enumerates* a second way. The catalogue and the terminal baseline
+ * want the same corpus at different widths, and the difference between them is
+ * `widthsFor` and nothing else. A second copy of this loop is how the two corpora
+ * come to disagree about which forms they cover, which is the drift
+ * `CATALOGUE_FORMS` was made a `Record<PlotForm, …>` to stop one level up.
+ *
+ * **The header is part of the frame**, so a frame that moved between widths is
+ * not silently comparable with one that did not.
+ */
+export function* everyFrame(widthsFor = CATALOGUE_WIDTHS) {
+  for (const [formName, variants] of Object.entries(FORMS)) {
+    for (const [variantName, spec] of Object.entries(variants)) {
+      for (const { name: capsName, caps } of CAPS) {
+        for (const width of widthsFor(capsName)) {
+          const id = `cat-${formName}-${variantName}`;
+          const lines = frameFor(spec, caps, width, id);
+          const header = `── ${formName} · ${variantName} · ${capsName} · ${width}w`;
+          yield {
+            formName, variantName, capsName, width,
+            frame: [header, ...lines].join("\n"),
+          };
+        }
+      }
+    }
+  }
 }
 
 /**
@@ -128,24 +217,11 @@ const stale = clearGenerated(outDir);
 
 let totalFiles = 0;
 
-for (const [formName, variants] of Object.entries(FORMS)) {
-  for (const [variantName, spec] of Object.entries(variants)) {
-    for (const { name: capsName, caps } of CAPS) {
-      const id = `cat-${formName}-${variantName}`;
-      // The wide arm draws every ambiguous glyph two cells, so a figure needs
-      // the narrower frame to stay inside a comparable footprint. `ascii` is
-      // narrow and takes the ordinary width, which it never could before.
-      const width = capsName === "wide" ? 60 : 80;
-      const lines = frameFor(spec, caps, width, id);
-      const header = `── ${formName} · ${variantName} · ${capsName} · ${width}w`;
-      const frame = [header, ...lines].join("\n");
-
-      const basename = `${formName}-${variantName}-${capsName}`;
-      writeFileSync(join(outDir, `${basename}.txt`), frame + "\n");
-      writeFileSync(join(outDir, `${basename}.plain`), stripSgr(frame) + "\n");
-      totalFiles += 2;
-    }
-  }
+for (const { formName, variantName, capsName, frame } of everyFrame(CATALOGUE_WIDTHS)) {
+  const basename = `${formName}-${variantName}-${capsName}`;
+  writeFileSync(join(outDir, `${basename}.txt`), frame + "\n");
+  writeFileSync(join(outDir, `${basename}.plain`), stripSgr(frame) + "\n");
+  totalFiles += 2;
 }
 
 console.log(`catalogue: ${totalFiles} files written to docs/catalogue/ (${stale} stale cleared first)`);

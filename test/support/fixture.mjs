@@ -40,11 +40,19 @@ const makeScheduler = (lifecycle, render) =>
 /** One JSON line, after release, so it never lands in the frame stream. */
 const report = (data) => process.stdout.write(`\nSCHEDULER_RESULT ${JSON.stringify(data)}\n`);
 
-const make = () =>
+/**
+ * `caps` is the record the lifecycle acquires from. **Defaulted from the
+ * environment, and the `caps` mode passes its forced record in** — the first
+ * version of C02 T5.6 forced `keyboardProtocol` and captured no push, because
+ * the override reached the renderer (T5.5's subject) and this constructor
+ * re-detected without it. A fixture has to be shown to respond to the thing
+ * under test before it is asserted against (`test/support/README.md`).
+ */
+const make = (caps = detectCapabilities(process.env).capabilities) =>
   createTerminalLifecycle({
     stdout: process.stdout,
     stdin: process.stdin,
-    capabilities: detectCapabilities(process.env).capabilities,
+    capabilities: caps,
     onFatal: (err) => {
       process.stderr.write(`fatal: ${String(err)}\n`);
       process.exit(2);
@@ -128,18 +136,22 @@ switch (mode) {
   // real PTY. The environment is the input: each test sets TERM, LANG or TMUX
   // and asserts on what reached the terminal.
   //
-  // The frame is composed here rather than by the shell, because C22 does not
-  // exist. That is a real limitation and it bounds what these tests prove: they
+  // The frame is composed here rather than by the shell — a choice kept after C22
+  // was built (2026-09-03; this said *because C22 does not exist*). It still bounds what these tests prove: they
   // assert that a detected record reaches the renderer and changes its output,
   // not that the application wires it that way. The wiring is C22's own T4.5.
 
   case "caps": {
-    const { capabilities } = detectCapabilities(
-      process.env,
-      process.env["FORCE_DEPTH"] === undefined
-        ? undefined
-        : { colourDepth: Number(process.env["FORCE_DEPTH"]) },
-    );
+    const { capabilities } = detectCapabilities(process.env, {
+      ...(process.env["FORCE_DEPTH"] === undefined
+        ? {}
+        : { colourDepth: Number(process.env["FORCE_DEPTH"]) }),
+      // C02 T5.6: the PTY is no kitty, so the protocol is declared over the top
+      // (I4) and the bytes C01 writes are what the row reads.
+      ...(process.env["FORCE_KEYBOARD"] === undefined
+        ? {}
+        : { keyboardProtocol: process.env["FORCE_KEYBOARD"] }),
+    });
 
     // C02 I7 — `altScreen` alone decides whether a shell can open. A terminal
     // that cannot take the alternate screen gets help on the primary screen and
@@ -152,7 +164,7 @@ switch (mode) {
       process.exit(0);
     }
 
-    const lifecycle = make();
+    const lifecycle = make(capabilities);
     lifecycle.acquire();
 
     const registry = createBlockRegistry();
@@ -797,6 +809,35 @@ switch (mode) {
             },
           ]),
         },
+        {
+          // **The view verb** (C22 §13a, C15 T5.3/T5.5). `--watch` is declared
+          // `view: true` in the manifest, so the shell pushes a `kind: "view"`
+          // layer before the transport runs; this is what fills it. A miss here
+          // filled the view with the corpus's own refusal, which opened and
+          // popped exactly like a document and proved nothing about one.
+          id: "ps-watch",
+          verb: "ps",
+          argv: ["ps", "--watch"],
+          provenance: "authored",
+          capturedAt: null,
+          cliVersion: null,
+          note: "the far side is not the subject of these rows",
+          result: raw(["ps", "--watch"], [
+            { kind: "notice", id: "ps-watching", tone: "info", text: "watching 2 processes" },
+            {
+              kind: "table",
+              id: "ps-watch-table",
+              columns: [
+                { key: "uuid", label: "uuid", align: "left", priority: 10, minWidth: 8, sortable: false },
+                { key: "status", label: "status", align: "left", priority: 5, minWidth: 6, sortable: false },
+              ],
+              rows: [
+                { id: "a3f9b21", cells: { uuid: { text: "a3f9b21" }, status: { text: "running" } } },
+                { id: "7c2d4e1", cells: { uuid: { text: "7c2d4e1" }, status: { text: "failed" } } },
+              ],
+            },
+          ]),
+        },
     ];
 
     const transport = createRouter({ default: createFixtureTransport(corpus) });
@@ -841,6 +882,13 @@ switch (mode) {
       }),
     }[farSide];
 
+    const forcedCapabilities = {
+      ...(process.env["FORCE_DEPTH"] === undefined
+        ? {}
+        : { colourDepth: Number(process.env["FORCE_DEPTH"]) }),
+      ...(process.env["FORCE_MOUSE"] === undefined ? {} : { mouse: process.env["FORCE_MOUSE"] === "1" }),
+    };
+
     const tui = createTui({
       name: "prism",
       // `farside.mjs` is spawned as a single argv element, which is why it
@@ -856,6 +904,18 @@ switch (mode) {
       theme: defaultTheme,
       ...(transportFor === undefined ? {} : { transport: transportFor }),
       env: process.env,
+      // **C22 I49's producer, driven from outside** (C10 T5.3). `TERM=dumb` is
+      // the only detected route to depth 1 and it also fails C01's gate, so a
+      // 1-bit *session* exists only through the override — the same variable
+      // the `caps` mode above already reads.
+      //
+      // **`FORCE_MOUSE` rides the same record** (C16 T5.8, F759). One override
+      // object rather than two spreads, because two spreads of `capabilities`
+      // would each win over the other and a row forcing both would force one.
+      // The override reaches `createTui`, which is the one path the lifecycle
+      // acquires from — forcing it anywhere else forces the renderer and leaves
+      // `1002h` on the wire, which is the shape F759 records.
+      ...(Object.keys(forcedCapabilities).length === 0 ? {} : { capabilities: forcedCapabilities }),
       stateDir: mkdtempSync(join(tmpdir(), "calcium-session-")),
       // **The manifest's two app-local verbs** (C22 I3a). C23 I27 refuses a
       // manifest verb marked `local` with no handler, and this is the route

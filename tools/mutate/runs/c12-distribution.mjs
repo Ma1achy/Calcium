@@ -25,6 +25,11 @@ const SHARED = "src/data/viewmodel/distribution.ts";
 const GLYPH = "src/presentation/plot/glyph-row.ts";
 const KDE = "src/presentation/plot/kde.ts";
 const SVG = "src/presentation/plot/svg.ts";
+// **`rangeFor` is gone and its two rows moved here** (C12 §3ak.10). The
+// decision it held — which datum a distribution ranges over — is
+// `distributionFigure`'s now, read by both arms. The defects are unchanged; only
+// the file they can be written in is.
+const FIGURE = "src/presentation/plot/figure.ts";
 
 const FILES =
   "test/unit/plot-distribution-geometry.test.ts test/unit/plot.test.ts " +
@@ -112,14 +117,17 @@ const results = runPass({
       expect: "D3",
     },
     {
-      // **The SVG arm ranging over `series` like every other family.** A
-      // boxplot's `series` is `[]`, so `seriesRange` answers `null` and the
-      // fallback furnishes 0..1 — the figure draws, entirely inside the plot
-      // area, at a scale nothing in the block has.
+      // **The family ranging over `series` like every other one.** A boxplot's
+      // `series` is `[]`, so `seriesRange` answers `null` and the fallback
+      // furnishes 0..1 — the figure draws, entirely inside the plot area, at a
+      // scale nothing in the block has.
+      //
+      // Re-anchored onto `distributionFigure`: the choice of datum is the
+      // figure's now, so the defect is one place instead of two.
       name: "the distribution family takes seriesRange like everything else",
-      file: SVG,
-      from: "  if (svgFamilyOf(block.form) !== \"distribution\" || block.form === \"dumbbell\") {",
-      to: "  if (true) {",
+      file: FIGURE,
+      from: "  const extent = block.form === \"dumbbell\"\n    ? seriesRange(block.series, block)\n    : quartileRange(qs, block.form === \"forest\");",
+      to: "  const extent = seriesRange(block.series, block);",
       expect: "G6",
     },
     {
@@ -132,9 +140,9 @@ const results = runPass({
       // `normalisedOf` clamps. The row now reads the estimate, where the two
       // arms genuinely differ.
       name: "the SVG arm ranges a forest plot over its whiskers",
-      file: SVG,
-      from: "  return quartileRange(block.quartiles ?? [], block.form === \"forest\");",
-      to: "  return quartileRange(block.quartiles ?? []);",
+      file: FIGURE,
+      from: "    : quartileRange(qs, block.form === \"forest\");",
+      to: "    : quartileRange(qs);",
       expect: "G6c4",
     },
     {
@@ -145,10 +153,14 @@ const results = runPass({
       // **Also survived first.** A mirrored figure has the same extremes, so
       // the rows that read min and max agreed with both readings — containment
       // one level up. The killer is *which* median is drawn higher.
+      // **Re-anchored to the projector** (§3ak.13). `summaryMarks` had its own
+      // `at()` and the walk replaced it: the inversion is one expression now,
+      // read by every family, so the mutation is against the shared one and a
+      // vertical boxplot is no longer the only thing that can catch it.
       name: "the vertical arm stops inverting its value axis",
       file: SVG,
-      from: "    vertical ? value.to - (value.to - value.from) * t : value.from + (value.to - value.from) * t;",
-      to: "    value.from + (value.to - value.from) * t;",
+      from: "      : ([box.left + wide * along, box.top + tall * (up ? 1 - y : y)] as const);",
+      to: "      : ([box.left + wide * along, box.top + tall * y] as const);",
       expect: "G6c2",
     },
     {
@@ -158,8 +170,12 @@ const results = runPass({
       // separate. Still inside the area, still one figure per category.
       name: "a category's figure takes the whole slot",
       file: SVG,
-      from: "  return { centre: from + slot * (index + 0.5), half: (slot * 0.6) / 2 };",
-      to: "  return { centre: from + slot * (index + 0.5), half: slot / 2 };",
+      // **The fraction became a named constant when the bar family crossed and
+      // this arm turned out to hold two of them** — `0.6` here and `0.7` in the
+      // bar loop, one arm and two answers to *how wide is a categorical figure*
+      // (F280). Anchored on the constant, so the mutation reaches both.
+      from: "const SLOT_SHARE = 0.6;",
+      to: "const SLOT_SHARE = 1;",
       expect: "G6c",
     },
     {
@@ -168,10 +184,14 @@ const results = runPass({
       // the median of every summary that has neither — which is the reading
       // *the mean coincides with the median*, said about data that never had a
       // mean (C04 I53).
+      // Re-anchored to the emitter: the guard is the shared layer's now, and the
+      // distinction it keeps is `normalisedSummary`'s rather than a renderer's
+      // (C04 I53) — *no mean* and *a non-finite one* are one absent member, so
+      // three renderers do not each write the condition.
       name: "a summary with no mean gets one at its median",
-      file: SVG,
-      from: "  if (ns.mean !== undefined) {\n    const r = Math.max(2, slot.half * 0.3);",
-      to: "  {\n    const r = Math.max(2, slot.half * 0.3);\n    ns = { ...ns, mean: ns.mean ?? ns.median };",
+      file: FIGURE,
+      from: "        if (sm.mean !== undefined) marks.push(dot(centre, sm.mean, \"mean\", i));",
+      to: "        marks.push(dot(centre, sm.mean ?? sm.median, \"mean\", i));",
       expect: "G6c3",
     },
     {

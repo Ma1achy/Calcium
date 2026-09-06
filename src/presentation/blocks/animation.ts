@@ -8,11 +8,14 @@
  * F228's class: a hand-maintained list beside a generated one, where the
  * hand-maintained list is the one that reads as authoritative.
  *
- * **Two entries, and that is the whole population.** `status` animates
- * unconditionally (C09 I32) and `steps` draws a spinner frame while a step is
- * active. Nothing else in the tree reads `ctx.tick`.
+ * **Two entries by kind, and that is the whole population of kinds.** `status`
+ * animates unconditionally (C09 I32) and `steps` draws a spinner frame while a
+ * step is active. A block also animates **by content** — a span or a bar whose
+ * ramp carries an `animate` (C09 I54) — and `tickIntervalOf` answers for both;
+ * this record stays what it was, the kinds that animate by nature.
  */
 import { spinnerIntervalMs } from "./glyphs.js";
+import { animatesByContent, rampCadenceMs } from "./ramp.js";
 import type { Block, BlockKind, Status } from "../../data/viewmodel/index.js";
 
 export const ANIMATES: Readonly<Record<BlockKind, boolean>> = Object.freeze({
@@ -22,6 +25,9 @@ export const ANIMATES: Readonly<Record<BlockKind, boolean>> = Object.freeze({
   group: false,
   keyValue: false,
   image: false,
+  // A terminal redraws when the child writes, on C23's stream cadence, not on a
+  // tick (C09 I57). Animating it would repaint a screen nobody changed.
+  terminal: false,
   logs: false,
   mosaic: false,
   notice: false,
@@ -57,8 +63,13 @@ function childrenOf(block: Block): readonly Block[] {
  * about which kinds are in scope.
  */
 export function tickIntervalOf(block: Block): number | null {
-  if (ANIMATES[block.kind] !== true) return null;
-  return block.kind === "status" ? spinnerIntervalMs((block as Status).spinner) : spinnerIntervalMs();
+  if (ANIMATES[block.kind] === true) {
+    return block.kind === "status" ? spinnerIntervalMs((block as Status).spinner) : spinnerIntervalMs();
+  }
+  // By content (C09 I54): a moving ramp asks for the default set's cadence
+  // through the lookup the kinds use; its periods are counted in the ticks C03
+  // then delivers.
+  return animatesByContent(block) ? rampCadenceMs() : null;
 }
 
 /**

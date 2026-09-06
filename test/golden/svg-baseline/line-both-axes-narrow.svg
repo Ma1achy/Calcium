@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
+<rect width="100%" height="100%" fill="#1a1a1a"/>
+<line x1="89.6" y1="12.8" x2="89.6" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="89.6" y1="288" x2="420.667" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="420.667" y1="12.8" x2="420.667" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="89.6" y1="12.8" x2="420.667" y2="12.8" stroke="#2c2c2c" stroke-width="1"/>
+<text x="83.6" y="292" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">0</text>
+<text x="83.6" y="154.4" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">50</text>
+<text x="426.667" y="154.4" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">50</text>
+<text x="83.6" y="16.8" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">100</text>
+<text x="426.667" y="16.8" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">100</text>
+<text x="89.6" y="300" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">0</text>
+<text x="157.165" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">10</text>
+<text x="224.729" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">20</text>
+<text x="292.294" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">30</text>
+<text x="359.859" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">40</text>
+<text x="420.667" y="300" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">49</text>
+<path d="M89.6 150.4 L96.356 136.663 L103.113 123.063 L109.869 109.736 L116.626 96.816 L123.382 84.431 L130.139 72.705 L136.895 61.756 L143.652 51.692 L150.408 42.614 L157.165 34.614 L163.921 27.77 L170.678 22.151 L177.434 17.814 L184.19 14.802 L190.947 13.145 L197.703 12.859 L204.46 13.947 L211.216 16.399 L217.973 20.189 L224.729 25.281 L231.486 31.622 L238.242 39.151 L244.999 47.791 L251.755 57.456 L258.512 68.05 L265.268 79.467 L272.024 91.593 L278.781 104.306 L285.537 117.479 L292.294 130.982 L299.05 144.679 L305.807 158.432 L312.563 172.106 L319.32 185.562 L326.076 198.668 L332.833 211.291 L339.589 223.305 L346.346 234.592 L353.102 245.037 L359.859 254.536 L366.615 262.995 L373.371 270.329 L380.128 276.464 L386.884 281.34 L393.641 284.908 L400.397 287.132 L407.154 287.989 L413.91 287.472 L420.667 285.585" fill="none" stroke="#e69f00" stroke-width="2"/>
+<text x="426.667" y="289.585" text-anchor="start" font-size="12" font-family="monospace" fill="#e69f00">eu-west-1-primary-p99-late…</text>
+</svg>

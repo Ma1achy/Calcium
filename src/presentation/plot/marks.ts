@@ -23,12 +23,13 @@
  * rung that has now produced four defects in this component.
  */
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
-import type { PlotForm } from "../../data/viewmodel/index.js";
+import type { PlotForm, Series } from "../../data/viewmodel/index.js";
 import type { ColourRef } from "../theme/index.js";
+import { refOf } from "../theme/categorical.js";
 
 type Caps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth" | "colourDepth">;
 /** Choosing the ladder needs the alphabet; choosing *within* it needs the depth. */
-type Alphabet = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">;
+export type Alphabet = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">;
 
 /**
  * The categorical palette's slots, in order (C10, roadmap 51).
@@ -39,16 +40,10 @@ type Alphabet = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">;
  * `definition.ts` while the legend, which needs it, lives in `furniture.ts`, and
  * `definition.ts` imports `furniture.ts`.
  */
-export const CATEGORY_REFS: readonly ColourRef[] = Object.freeze([
-  "categorical.c1",
-  "categorical.c2",
-  "categorical.c3",
-  "categorical.c4",
-  "categorical.c5",
-  "categorical.c6",
-  "categorical.c7",
-  "categorical.c8",
-]);
+// **`CATEGORY_REFS` and `refOf` live in `theme/categorical.ts` now** (C10 I37) —
+// moved, not copied: a slot table is C10's, and C09's ramp resolver reads it too.
+// Re-exported so no call site moves and so there is still one copy (F382).
+export { CATEGORY_REFS, refOf } from "../theme/categorical.js";
 
 /**
  * The slot for category `index`.
@@ -72,8 +67,30 @@ export const CATEGORY_REFS: readonly ColourRef[] = Object.freeze([
  * tell *named* from *acted on*, and that is a real blind spot rather than an
  * oversight here.
  */
-export function refOf(index: number): ColourRef {
-  return CATEGORY_REFS[index % CATEGORY_REFS.length] ?? "categorical.c1"; // cells-ok — a palette size
+
+/**
+ * A **series'** colour: its declared `tone` if it has one, else its slot (F382).
+ *
+ * **This existed twice under one name, and the copies disagreed.** `refOf(index)`
+ * above is the slot and knows nothing about a series; `definition.ts` had a
+ * private `refOf(series, index)` that read `series.tone` first. The terminal's
+ * curve renderer imported the second and the legend the first, so a series
+ * declaring a tone was **drawn in that tone and named in its slot colour** —
+ * `tone.ok` green on the line, `categorical.c1` orange in the swatch.
+ *
+ * `legendEntries`' own comment says *a legend whose swatch is a different colour
+ * from the thing it names is worse than none*, four lines from the call that
+ * makes it one. Both functions read as correct; which one a call site got
+ * depended on which module it imported from.
+ *
+ * **Shared rather than fixed in place**, because the SVG arm had the third
+ * answer — it used the slot for both, so it agreed with itself and ignored
+ * `tone` altogether. One resolver is what makes three call sites unable to
+ * disagree.
+ */
+export function seriesRefOf(series: Pick<Series, "tone"> | undefined, index: number): ColourRef {
+  const tone = series?.tone;
+  return tone === undefined ? refOf(index) : `tone.${tone}`;
 }
 
 /** The depth at or above which the categorical palette separates its entries. */
@@ -134,10 +151,34 @@ const ASCII_MARKS: readonly string[] = Object.freeze([
  * counted where the blind spot is declared.
  *
  * Spaced, so `+2 more - a - b` reads as a list rather than as arithmetic.
+ *
+ * **It takes the whole alphabet because `·` is Ambiguous** (F665, U6f). U+00B7 is
+ * two cells under the wide convention, so a separator chosen on `unicode` alone
+ * put five plot sites one cell over their measurement on a wide terminal — and it
+ * was invisible while `cells()` under-counted Latin-1, which is the shape of F292
+ * four functions along: a mark measured by a function that cannot see the
+ * capability the mark's width depends on. `categoryMarks` twelve lines below
+ * already took the whole record and already substituted at that rung.
+ *
+ * **The wide arm is the ASCII form**, not a third literal: the hyphen is Neutral
+ * and one cell under both conventions, it is already in this function, and a new
+ * mark would owe SS47 a justification for a distinction no reader of a wide
+ * terminal can see.
  */
-export function partSeparator(caps: Pick<TerminalCapabilities, "unicode">): string {
-  return caps.unicode === "ascii" ? " - " : " \u00b7 ";
+export function partSeparator(caps: Alphabet): string {
+  return caps.unicode === "ascii" || caps.ambiguousWidth === "wide" ? " - " : " \u00b7 ";
 }
+
+/**
+ * The same separator for the arm that has no cell grid (C12 §3aj hazard 4, G4).
+ *
+ * An SVG measures in user units, so no width convention applies and `·` is
+ * simply the mark. It is resolved **here** rather than in `svg.ts` because that
+ * file may not name a terminal fact — G4 scans it for `ambiguousWidth` and
+ * `TerminalCapabilities` precisely so the image path cannot acquire one, and a
+ * capability record passed in to be ignored is how it would.
+ */
+export const IMAGE_SEPARATOR: string = partSeparator({ unicode: "full", ambiguousWidth: "narrow" });
 
 export function categoryMarks(caps: Alphabet): readonly string[] {
   if (caps.unicode === "ascii") return ASCII_MARKS;
@@ -212,6 +253,9 @@ export function markOf(index: number, caps: Caps, always = false): string {
  * Total over `PlotForm`, so the thirty-fifth form declares which it is.
  */
 export const HAS_POSITION_AXIS: Readonly<Record<PlotForm, boolean>> = Object.freeze({
+  // **The abscissa is a projected x, not a sample index** (C12 I87). Two
+  // samples adjacent in the array land wherever the camera puts them.
+  plot3d: false,
   // Sample index across the area — one column per position (C12 I41).
   line: true, scatter: true, step: true, ecdf: true, density: true,
   slope: true, bubble: true, stackedarea: true, streamgraph: true,
@@ -230,7 +274,7 @@ export const HAS_POSITION_AXIS: Readonly<Record<PlotForm, boolean>> = Object.fre
   // No cartesian abscissa at all — a disc, a polygon, a mosaic, a tree.
   pie: false, radar: false, waffle: false, flame: false, icicle: false, treemap: false,
   tree: false,
-  graph: false,
+  graph: false, sankey: false,
   // One row, no furniture.
   sparkline: false, horizon: false,
   // Composition: each facet answers this for itself.
@@ -238,6 +282,10 @@ export const HAS_POSITION_AXIS: Readonly<Record<PlotForm, boolean>> = Object.fre
 });
 
 export const ROW_IS_AN_IDENTITY: Readonly<Record<PlotForm, boolean>> = Object.freeze({
+  // **A `Point3Series` is a thing the caller named** (C04 I76). Whether colour
+  // *carries* that identity is `colourBy`'s decision and a different question —
+  // this record asks whether a row is a thing at all.
+  plot3d: true,
   // **The two the renderer cuts.** `binValues` makes the bins and the lags are
   // offsets into one series — neither is anything the caller named.
   histogram: false, autocorrelation: false,
@@ -253,7 +301,7 @@ export const ROW_IS_AN_IDENTITY: Readonly<Record<PlotForm, boolean>> = Object.fr
   // the honest answer if it ever becomes live, on `contour`'s and `quiver`'s
   // reason one family along.
   tree: false,
-  graph: false,
+  graph: false, sankey: false,
   // A curve is not a row. These have no per-row category axis, so the entry is
   // stated rather than meaningful — which is what a total record costs and why
   // it is worth it: nothing here is answered by omission.
@@ -272,6 +320,11 @@ export const ROW_IS_AN_IDENTITY: Readonly<Record<PlotForm, boolean>> = Object.fr
 });
 
 export const SHARES_CELLS: Readonly<Record<PlotForm, boolean>> = Object.freeze({
+  // **The depth buffer keeps one of two** (C12 I89). Two clouds' samples land
+  // in one cell and the nearer wins it, so nothing in the picture says which
+  // series the cell belongs to — which is what makes the legend load-bearing
+  // rather than polite, and what makes this entry observable at all.
+  plot3d: true,
   // The geometric family: segments and polygons in one figure, no gutter at all.
   pie: true, radar: true, waffle: true,
   // Layers inside one bar, and one row per category — the row is labelled and
@@ -286,7 +339,7 @@ export const SHARES_CELLS: Readonly<Record<PlotForm, boolean>> = Object.freeze({
   // One row per category, named in the gutter.
   boxplot: false, violin: false, ridgeline: false, forest: false, dumbbell: false,
   lollipop: false, dotplot: false, funnel: false, gantt: false, waterfall: false,
-  flame: true, icicle: true, treemap: true, tree: true, graph: true,
+  flame: true, icicle: true, treemap: true, tree: true, graph: true, sankey: true,
   autocorrelation: false, timeline: false, bullet: false, utilisation: false,
   // One row per series, named in the gutter, and a scale legend beneath.
   heatmap: false, calendar: false, correlation: false, confusion: false,

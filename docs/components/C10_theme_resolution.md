@@ -184,6 +184,10 @@ Every tone is checked **at theme load**, not at render. A theme that fails is re
 
 **`bgDeep` is excluded, and the exclusion is stated rather than left to omission**: it sits behind dim chrome and carries no text. If a surface ever paints text on it, then either that surface is wrong or this exclusion is — and the sentence makes that a decision someone has to take rather than a gap someone discovers.
 
+**The conditional has fired, and the answer was *the surface is wrong*** (§4f, F632). The SVG plot arm painted its page in `bgDeep` and wrote every axis label, legend row, callout, notice and node label onto it, for long enough that C12 §3ap.7 filed a note owed to this section and nothing here moved. The page is `surfaces.bg` now, so the exclusion is true again by the route it names — a surface that carries text is not `bgDeep`.
+
+**And the same conditional exists on the other axis, where it has also fired.** A floor is a pairing of an ink with a ground, and this section's table is written over the `meaning` palettes because those are the inks it knew about. A `decoration` palette is exempt from it — from the check over *every* surface, which is not the same as an exemption from every floor, and the difference was invisible for as long as no decoration slot was text. `categorical` is text at ten sites in both plot arms. §4g is that ruling and I35 the pairing it adds; the shape is §4a's, §4b's and §4d's — a named pairing rather than a wider list.
+
 | Slot group | Minimum ratio |
 |---|---|
 | `default` `ok` `warn` `info` `accent` `meta` `identifier` | 4.5 : 1 |
@@ -293,6 +297,66 @@ terminals below 8-bit, where a colormap is an ordering over indices whose lumina
 and that is the rung where the density ramp takes over.
 
 **The measured figures, because they are what would tempt a widening.** On the light theme `muted` is 2.14–2.42 : 1 against every candidate wash, under its own 2.5 floor — so pairing it would reject a theme for a failure nobody can see, and the fix would look like weakening the check. §4's argument for excluding `bgDeep`, in the mirror: do not validate a slot against a surface that slot never lands on.
+
+### 4c.1. The picture cell — and *text* was the wrong word
+
+**I21's fourth admitted case was written by analogy to `wash` and the analogy does not hold.** §4c
+above says the word that decides the widening is *text*, and §4g.4 leaves the picture cell owed on
+exactly that word: *a cell that carries no text*, with the remedy stated as a `wash`-shaped helper
+returning a blank `Span` so the rule is unforgeable rather than remembered.
+
+**Measured, every premise of that remedy is false.** The two sites are `sankey.ts` and
+`scatter3.ts`, and they are the only two constructions in `src/presentation/plot/` and
+`src/presentation/image/` that set a `background` at all:
+
+| what the owed entry said | what the tree does |
+|---|---|
+| the cell carries no text | **both cells always carry a glyph**, and it is load-bearing. Read off the 24-bit goldens: every background-bearing sankey cell is `▀` U+2580 (28 across the shipped set) and `sankey.ts`'s own header says the glyph "carries bar against ribbon at every depth (I17)" — it is the 1-bit carrier, the half that survives when colour does not. `plot3d`'s are `▀▁▂▃▅▆▇▌` and the braille block. A blank `Span` erases the drawing |
+| both reach it through `slot(...).colour` | **neither does.** `sankey.ts` names `ColourRef`s (`cell()`, line 506) and resolves nothing; the `slot()` call is in `definition.ts`'s `sankeyRows`. `scatter3.ts` holds resolved `ColourValue`s by the time a cell is built — under the default `colourBy: "depth"` they come from a colormap, which is §4e's case already, and only under `colourBy: "series"` is the background a palette slot |
+| a `pictureCell(ref)` mirroring `wash` | fits neither site: one has refs and no resolver, the other has no refs. And it cannot live in `src/presentation/theme/**`, because `Span`, `slot` and `wash` are all in `blocks/paint.ts`, which imports `../theme/index.js` — a `Span`-returning helper in `theme/` is the cycle MG1 and MG22 refuse |
+
+**So the reason is rewritten rather than the wording tightened, and the new reason is stronger.**
+A floor is a property of *ink on a ground* — one colour in front, one behind, and a reader
+recovering a character out of an open set. In these cells there is no front and no behind: the
+glyph is a **fill from a closed alphabet** — block elements and braille — whose *shape* is the
+geometry, and the two colours are two **regions of one cell** lying side by side. Nothing is
+occluding anything, so there is no pair to measure. That reason survives the glyph being
+non-blank, which *carries no text* never could.
+
+**And it is checkable, which *carries no text* was not.** The admission is a property of the
+glyph, so `isPictureGlyph` is the keeper: `U+0020`, the Block Elements `U+2580`–`U+259F`, and
+Braille Patterns `U+2800`–`U+28FF`. Both constructors refuse a background on anything else.
+
+- **The brand is required on the background channel, not on the alphabet**, and that is the ruling
+  rather than a convenience. `sankey.ts`'s ASCII arm draws `#`, `=` and `-`, none of them fills —
+  and `cellOf` never passes a lower owner on that arm, so no ASCII cell ever carries a background.
+  A brand over the alphabet would have had to admit `-`; a brand over the channel admits nothing.
+- **It refuses by throwing, and what the throw leaves behind is nothing.** Both `sankeyArea` and
+  `mixedRows` are pure builders over local arrays; the abandoned row is discarded with the call.
+  No input the tree produces can reach it — that is what the golden read measures — so it is an
+  assertion about the programmer and not a path a user takes.
+- **It is a runtime keeper and not a type**, and the difference is stated because the owed entry
+  promised a type. `QUADRANTS` and `foldBraille` live in `linedraw.ts` and `raster.ts`, so
+  branding the glyph at its source would mean editing two files this ruling does not own; and
+  `SankeyCell` is one type serving **two** kinds of cell — label cells (`{ text: ch }`, real text,
+  no ref) and picture cells — so it cannot forbid text, half its inhabitants being text. The
+  expressible guarantee there is a discriminated union, and `definition.ts` reads `.text`, `.ref`
+  and `.background` off it. Owed, with the file named, in §4g.4.
+
+**What the frame says that no arithmetic could.** In `plot3d-colour-series` at 24-bit, seventeen
+cells carry `▀` with **fg and bg the same categorical slot** — `#3cbf9a` on `#3cbf9a`. The 1.00
+figure repeated in §4f, §4g.2, I35 and §4g.4 is a claim about the *palette* (the worst pair within
+`categorical`); the shipped frame's 1.00 is a different object and is **correct** — two adjacent
+half-cells of one surface are one region, and a solid block is what should be drawn. A hazard read
+off the palette and an intended reading in the frame print the same number.
+
+**And one pair no document names.** The same frame draws braille outlines in `tone.muted` over a
+`categorical` or colormap background — `#626262` on `#3cbf9a`. That is a **text tone as ink on a
+picture background**, so it is neither `categorical × categorical` nor a foreground on a surface,
+and both §4f's sweep and §4g.2's table miss it: the sweep is indexed by *text sites* and a
+wireframe is not one. It is left as a reading question for C12 rather than a floor here — a cage
+drawn over a shaded face is judged by whether the cage reads, and `ratio` answers a question about
+recovering a character.
 
 Shipped values, measured against `tone.default`'s 4.5 floor: dark `#264057` at **7.25**, light `#c9ddf5` at **8.18**.
 
@@ -457,6 +521,314 @@ above are what tell them which.
 defect. The `▲` mark and the painted word `ERROR` both survive it, and both survive 1-bit where
 the colour does not (F34's two channels). A floor is a promise about text being readable; this
 one is being kept by a quieter promise, in a box whose whole subject is already visible.
+## 4e. Span attributes — set from the span, never from a slot, and lost rather than compensated where a depth cannot show them; and a span touches colour only through a named slot or the block's colormap
+
+C04 §3am gives four text members a `spans?: readonly TextSpan[]`, and a span carries three
+attributes — `bold`, `italic`, `underline` — and, since §3am.1 (2026-09-04), two members that
+*name* colour without *carrying* one: `tone`, a palette slot, and `value`, a reading through the
+block's `colormap`. This section is the ruling on how the attributes meet a `Style` this component
+produced, and it extends the rule already written beside `Style.italic` (`theme/types.ts`): *an
+attribute a renderer sets, never a palette slot's fallback*. The two colour-naming members are
+ruled at the end, and the ruling is that they add nothing to this component: each is resolved by
+the resolver its owner already has.
+
+**The merge is a spread, and it touches neither colour channel.** The renderer resolves the
+block's tone exactly as it does today — `tone(block.tone, theme, caps)` — and a run inside a
+span paints with `{ ...toneStyle, ...spanAttrs }`. The span contributes at most three boolean
+members; `colour` and `background` come from the tone and from `withBackground` and are
+never read or written by the span path. So a span cannot enter `MONO`, cannot consult the
+degradation ladder and cannot be the subject of a contrast floor — there is no colour for a
+floor to be about. That is the whole reason it can be three fields rather than a fourth
+palette family, and it is the same reason `Style.italic` could be one field (roadmap 50).
+
+**At 1-bit the collapse and the span write the same bits, and the loss is accepted.** §3's
+three classes carry tone as `bold` and `dim`. A span's `bold` on an emphasised-class block
+(`ok` · `warn` · `error` · `accent`) is SGR 1 on a run already inside SGR 1 — invisible, and
+**not compensated**: there is no fallback onto `underline`, which C25 I10 has spoken for, and
+no return to literal markers, which the view model cannot choose because a block is built
+before any capability is known (C04 I85). A span's `bold` on a normal-class block shows. On a
+de-emphasised block both `dim` and `bold` are written, in `sgr()`'s numeric order, and what a
+terminal draws for `1;2` is the terminal's — nothing here promises a rendering, only the
+bytes. The measured pair is C04 T3.67: at 1-bit an `ok` notice with and without a bold span
+paints byte-identical frames, and the row exists so that a compensation added later is a
+visible change rather than a quiet one.
+
+**Italic and underline survive every depth, and the `unicode` axis does not gate them.**
+`sgr()` writes attributes unconditionally and consults no depth, because an attribute is not
+a colour; the ASCII rung is about glyphs, and SGR 3 costs no cells. A terminal that ignores
+SGR 3 shows plain text, which is the same loss `bold` takes on the same terminal, and the
+row still measures what it measured. **No typographic fallback is owed** — 11(c)'s reversal
+stands (I33).
+
+**`underline` meets `underline` nowhere, and that is by construction rather than by luck.**
+C25 I10 gives word-level diff emphasis to `underline`; a markdown span may also say
+`underline`. The two would be one attribute meaning two things only on a text that had both
+writers, and no member has both: `Hunk.lines` carries no `spans` in the first pass (C04 I88)
+and when it does, its writer is the intra-line diff and not the markdown translator. The
+day a diff line can carry markdown, this paragraph is the row to reopen.
+
+**A span touches colour only through a named slot, resolved as any tone is** (C04 I89). A
+`tone` on a span is a `Tone`, and the renderer resolves it with the same `resolveTone(tone,
+theme, caps)` call the block made for its own — so it walks the same ladder, takes the same
+curated 4-bit index, collapses to the same `MONO` class at 1-bit and is memoised under the same
+key. It **replaces** the block's resolved style for the run rather than composing with it (a run
+cannot be two tones), and the span's attributes then spread on top exactly as above. Nothing here
+gains an entry: no `MONO` row, no floor, no ladder arm — a span never names a colour value, it
+names a slot, and C04's *a block names a palette slot; it never embeds a colour value* is now true
+of a run as well. The 1-bit consequence is the one §3 already states for every tone: a
+`tone: "identifier"` run is `normal` class, so on an `ok` block at 1-bit the run is the one *not*
+bold — the tone collapsed and was not compensated, which is I33's accepted loss with the sign
+reversed. The measured pair is C04 T2.35: at 24-bit the run's `38` is `identifier`'s and the rest
+of the row is the block's; at 1-bit the run's bytes are `identifier`'s collapse and nothing else.
+
+**And through the block's colormap, as a background, on the colormap's ladder** (C04 I90, I31). A
+`value` paints the run's background from `continuousColour(COLORMAPS[block.colormap], value,
+caps)` — heatmap's and image's resolver, unchanged — so it is `undefined` below 8-bit and the run
+paints plain there, `48;5` at 8-bit and `48;2` at 24. This is the **second** case I21's *a
+background only from a surface ref* admits, after the matrix cell (§4c): the background is the
+reading and no floor is measured for the text over it, and the ruling accepts that for the same
+reason it did there — a floor would delete the half of the map's range a map exists to encode
+(I31). The foreground is untouched: it is the block's tone or the span's, resolved above. A span
+carrying both `tone` and `value` takes its `38` from the slot and its `48` from the map, two
+channels from two owners, which is `withBackground`'s composition in the one other place it
+happens.
+
+
+## 4h. A ramp — an ink that is a function, sampled here, on this component's ladder
+
+C04 §3am.2 admits a `Ramp` on a span and on the bar, and C09 §5 *Ramps* supplies its argument
+`t'` per cluster or per axis cell. **This section is what a sample resolves to**, and the rule is
+that a ramp adds no ladder: each backing is resolved by the resolver its slot or map already has,
+and the one new piece of arithmetic — a mix of two resolved slots — is stated with its rungs. The
+design is `docs/notes/CALCIUM_INK_RAMPS_DESIGN.md` (Q4, Q6, Q7, Q11).
+
+**One entry point, `rampColour(ramp, t, theme, caps)`, and it returns a `ColourValue` or
+`undefined`** (I36). `undefined` means *say nothing*: the run paints as its neighbours do and
+coalesces with them by reference, which is `continuousColour`'s existing answer below its floor
+and is what makes a 4-bit frame byte-identical with and without a colormap ramp (I31). The
+ladder, per backing:
+
+| backing | 24-bit | 8-bit | 4-bit | 1-bit |
+|---|---|---|---|---|
+| slot pair — `gradient`, `step` | `mixHex(from, to, t)`: linear in sRGB between the two **resolved** hexes, the interpolation `sample` already uses between colormap stops | `nearestAnsi256` of the mix | **a step of two**: `t < 0.5` → `from`'s curated index, else `to`'s | **`from`**, resolved as the slot is — `undefined` here, so the run takes the block's collapse |
+| colormap — `progress` only (C04 I107) | `sample` | `COLORMAPS_256` | `undefined` (I31) | `undefined` |
+| palette | `categorical.c((i mod 8) + 1)` resolved as a slot — *i* the span's ordinal on text, the cell on the bar (C04 §3am.2) | as a slot | as a slot — the curated map separates them at 4-bit, which is `CATEGORY_COLOUR_FLOOR` | `undefined` |
+| `animate` | as designed | as designed | **resolves to `none`** — C09 evaluates `t'` at `tick = 0` | `none` |
+
+**Why a step of two and not three or four, and why `from` and not a midpoint.** The brief's §6
+offered *three or four distinguishable steps at best* at 4-bit and *the midpoint* at 1-bit. At
+4-bit the two ends resolve to two of the theme's sixteen curated indices; a third between them
+would be a third slot's index wearing a different name, and the curated map exists so that no
+tone lands on another's colour uninvited (§3). At 1-bit there is no colour, and a midpoint of two
+slots is a colour this component never named — `from` is a slot with a floor the resolver has
+proven, and the run reads as that slot reads. Two departures from the brief, each recorded with
+its reason, which is the record the *record why a catalogue diverged* rule asks for.
+
+**Motion below 8-bit is a rung, stated here, not discovered in a frame** (I36). Three colours
+moving is a flicker and a flicker is worse than a static tone; `animate` resolves to `none` below
+8-bit and C09 samples the static frame. The cadence is still declared by content (C09 I54), so
+the entry re-renders to identical bytes — a recorded cost, not a defect.
+
+**The floor is why colormaps stop at the bar** (I26, C04 I107). A slot's contrast against its
+surface is proven by the resolver; a sampled colour passes through no floor, and this component
+does not gain one for it — a floor would delete the half of a map's range the map exists to encode
+(I31, §4e). A slot-pair mix is bounded by two proven colours and the middle is unmeasured but
+between them; a colormap on text would be unbounded. The bar's `on` cells fill their cell and read
+by area, which is the picture-cell case §4c.1 already rules on, so the same backing is admitted
+there. The deferral's symbol is a floor-aware lift for a sampled colour, `liftToFloor(hex,
+surface, slot)`, beside `floorFor` in `theme/contrast.ts`.
+
+**The categorical cycle moves down, and it moves rather than copies** (I37). `CATEGORY_REFS` and
+`refOf(index)` were C12's (`plot/marks.ts`); a `palette` ramp needs them from C09. **The design
+note first said C09 could not import C12 without closing a cycle, and the row written to assert it
+disproved it**: `blocks/kinds/image.ts` and `structured.ts` already import `plot/` files at run
+time, MG1 and MG22 are acyclic over *files*, and `marks.ts` imports nothing of C09's — so the edge
+was open. The move stands on the other reason, which was always the stronger one: **a slot table
+is this component's**, two components read it now, and a ramp resolver that reached into the plot
+arm for a palette would make an ink depend on a chart. `theme/categorical.ts` holds it and
+`marks.ts` re-exports it so no plot call site changes; one copy, because F382 is the measured
+record of what two copies of this function did — a legend swatch in one colour and the line it
+named in another. The direction that *would* be a cycle is `theme/` importing `blocks/` or `plot/`,
+and T2.30 asserts that one.
+
+
+---
+
+## 4f. The page a figure is painted on — the `bgDeep` exclusion's conditional, fired
+
+§4 wrote the exclusion as a decision someone would have to take: *"if a surface ever paints text on it, that surface is wrong or the exclusion is."* A surface does. `plotToSvg` fills its page with `surface.bgDeep` and writes **every** label onto it — axis ticks and titles, the legend's rows, a line's end-of-series callout, the `n reversed` notice, the empty-figure message, and a sankey node's name over a halo of the same slot. C12 §3ap.7 recorded the debt — *"a note owed to C10, and it is not this component's to fix"* — and this is the payment.
+
+**Both halves of the conditional went unacted-on, which is the thing worth naming.** The exclusion was not wrong and was not right; it was never asked. A sentence that names a trigger and no watcher is satisfied by nobody looking, exactly like a rule with nothing to be wrong about (A03 §2).
+
+### 4f.1 — the measurement, before the ruling
+
+Every slot in `tone`, `categorical` and `syntax` — the three families the framework itself resolves against (I30) — measured against `bgDeep` and against `bg`, on all three shipped themes, at its own floor. `spectrum` is out because it is declared art and lands on no page. Against `bg` **everything passes on all three**. Against `bgDeep`, dark and high-contrast pass and **light fails twelve times**:
+
+| light slot | floor | on `bgDeep` `#e8e8e8` | on `bg` `#fafafa` |
+|---|---|---|---|
+| `tone.muted` | 2.5 | **2.44** | 2.86 |
+| `tone.ok` | 4.5 | **4.29** | 5.04 |
+| `tone.warn` | 4.5 | **4.30** | 5.04 |
+| `tone.info` | 4.5 | **4.29** | 5.03 |
+| `tone.accent` | 4.5 | **4.30** | 5.04 |
+| `tone.identifier` | 4.5 | **4.31** | 5.06 |
+| `categorical.c4` | 4.5 | **4.41** | 5.17 |
+| `syntax.string` | 4.5 | **4.29** | 5.04 |
+| `syntax.comment` | 3 | **2.89** | 3.39 |
+| `syntax.number` | 4.5 | **4.30** | 5.04 |
+| `syntax.function` | 4.5 | **4.30** | 5.04 |
+| `syntax.operator` | 4.5 | **4.29** | 5.03 |
+
+The direction is a property of each theme's own `bgDeep` and not of the slot: dark recesses (`#141414` under `#1a1a1a`) so every ratio *rises*, light recesses the other way (`#e8e8e8` under `#fafafa`) so every ratio *falls*, and high-contrast's `bgDeep` is **lighter** than its pure-black `bg` and still clears. **A surface excluded from the check is a surface whose polarity nobody constrained**, which is why one theme in three fails and the other two look like evidence that it is fine.
+
+The slots that actually land on the page, measured under both grounds:
+
+| what is painted on the page | dark | light | high-contrast |
+|---|---|---|---|
+| `tone.muted` — ticks, titles, legend, empty message | 3.02 → **2.85** | 2.44 → **2.86** | 6.44 → **7.93** |
+| `tone.warn` — the `n reversed` notice | 9.12 → **8.62** | 4.30 → **5.04** | 6.42 → **7.91** |
+| `tone.default` — a sankey node label on its halo | 12.43 → **11.74** | 9.25 → **10.86** | 17.04 → **21.00** |
+| worst `categorical` — a callout at a line's end | 6.63 → **6.26** | 4.41 → **5.17** | 6.13 → **7.55** |
+| worst tile label, where the ground is the **ink** | 6.63 → **6.26** | 4.41 → **5.17** | 6.13 → **7.55** |
+
+### 4f.2 — the classification table: which rule owns a cell
+
+Structural, not a trace — nothing here happens in sequence; every row is two rules that both hold at rest (A03, *index the artefact by rule interaction*).
+
+| the cell | rule A | rule B | which owns it |
+|---|---|---|---|
+| the page's fill | §4 — `bgDeep` carries no text | C12 §3ak — the arm paints its own page because an SVG has nothing underneath it | **B names the need, A names the slot, and the slot was chosen without A.** The comment beside it says the arm "cannot follow `resolveBase`" — and `resolveBase` resolves `surface.bg`, so the principle was cited and the wrong slot taken |
+| a sankey node label's halo | C12 I112 — the halo is the terminal's cell substitution, in the other medium | §4 — the ink's floor is measured against the surface behind it | **Both, and they agree**: the halo *is* the page, so it moves with the page and C12 I112's figures move with it. The ruling on the ink stands untouched |
+| a treemap tile's label | C12 — the label is inked in the page's ground so it reads as a hole in the tile | §4 — a floor is a foreground on a surface | **Neither, today.** The ground is used as *ink* over a series fill, which is a pair no §4 pairing holds. Left owed below rather than fixed here |
+| a callout at a line's end | C12 F382 — a callout takes its series' colour so both arms agree with the legend | §4 — every slot painted as text clears its floor against its ground | **B, and it is what kills arm 2**: the page carries `categorical` text, so widening `textSurfaces` binds `categorical` *and* `tone` *and* `syntax` to `bgDeep`, which is §4a's twelve-slot argument inverted |
+| a separator stroke between two tiles | C12 — adjacent fills are parted by a stroke in the page's ground | §4 — surfaces are painted, not written on | **A alone.** It carries no text, so it is out of §4 either way, and it moves with the page because it *is* the page showing through |
+| `figure.ts`'s violin box | C12 F389 — the box and whisker take the ground so they are not the series' colour | §4 — `bgDeep` is a surface | **A**, in the terminal arm, where `bgDeep` is a *mark ink* over a violin body. Untouched by this ruling and noted so the next reader does not read it as a page |
+
+Two of the six cells are ones no reader checking statements one at a time reaches: the callout row is the whole cost of arm 2 and is invisible if you enumerate *slots* rather than *text sites*, and the halo row is why one constant cannot be split.
+
+### 4f.3 — the ruling
+
+**The page is `surface.bg`.** The exclusion in §4 stands; the surface was wrong.
+
+**Why not the other arm.** Widening `textSurfaces` to include `bgDeep` costs twelve token changes on the light theme, and they are not twelve independent nudges: light's `ok`, `warn`, `info`, `accent`, `identifier`, `string`, `number`, `function` and `operator` all sit within 0.03 of **5.04** against `bg` — an equal-luminance set, authored that way — so clearing 4.5 against `bgDeep` means darkening the whole family, and the light theme's every surface, panel and transcript moves to satisfy a page only one arm paints. §4a's rule read forward: *do not validate a slot against a surface it never lands on.* Nine tones and nine syntax slots never land on an SVG page.
+
+**Why not a third surface.** `surfaces.page`, distinct from both, was the obvious third answer and it is worse than either. It would have to be in `textSurfaces` anyway, so its value would be constrained to something the tokens already clear — which is `bg`. It would be a tenth surface every theme must declare and every rung must answer, and F240 records what a surface list does when it acquires a member nobody gave an index: an unanswered slot and a deliberately unpainted one resolve identically. And its only freedom — a page that deliberately differs from the transcript's ground — is the one thing the two-arm contract exists to prevent, since D11's whole claim is that the two arms draw the same figure. **A slot whose sole degree of freedom is to break the rule it was added under is not a slot.**
+
+**What it costs, and the cost is on dark.** Every dark ratio falls by 5.5% — `muted` 3.02 → 2.85, the worst callout 6.63 → 6.26, a node label 12.43 → 11.74. Light gains 17% and high-contrast 23%, and the light `muted` failure at 2.44 is repaired at 2.86. So the trade is stated plainly: **the page gives up a ratio nothing checked for a slightly lower one that is checked on every load, on every theme, for ever.** 2.85 is `muted`'s number against `bg` — the surface it was authored against — and a figure exported from a transcript now sits on the ground the transcript sits on, which is the second thing this buys.
+
+**No floor moves.** Nothing here is bought by lowering a number; the check is unchanged and the surface came to it.
+
+### 4f.4 — what the ruling leaves behind
+
+- **The exclusion still has no watcher, and now it has one for this instance only.** T2.27 asserts the page's fill is a hex some member of `textSurfaces` carries — so any future ground that is not a text surface fails, which closes the class rather than the instance. What it does not reach is a *new* text site on some *other* excluded surface; that is the same prose-matching problem A03 declines to automate.
+- **`categorical` is a `decoration` palette and the page carries it as text.** A callout at a line's end takes its series' colour (F382), so `categorical.cN` is painted as a `<text>` fill — and I15 exempts a decoration palette from every floor, so C10 checks it against nothing on any surface. It clears comfortably today (worst 6.26 dark, 5.17 light, 7.55 high-contrast) and **T2.27 was the only row that asked**, because it reads the fills off the document rather than the palettes off the theme. Whether the exemption should survive a decoration slot becoming text is C10's question, and **§4g answers it**: the exemption is from the family-wide check and not from a floor, and I35's pairing binds `categorical` to both text surfaces at the meaning floor. The sweep that ruling ran found this is one of **ten** such sites and not one of two.
+- **A ground used as ink is measured by nothing — and it is the row above, backwards.** A tile label is painted in the page's ground over a series fill, and no §4 pairing held `surface × categorical`. The figures are 6.26 dark, 5.17 light and 7.55 high-contrast — **the same three numbers the row above carries**, because `ratio` is symmetric and these are the same two colours in the other order. That identity sat in this table unread and is what §4g's ruling turns on: one pairing pays both, and the debt was never C12's.
+- **`figure.ts` still names `surface.bgDeep`** for the violin's box and whisker, in the terminal arm, as a mark ink over a filled body. That is not a page and the exclusion is not about it — recorded because the next reader grepping the slot will find it and should not read it as a second instance of this defect.
+
+---
+
+## 4g. A decoration palette painted as text — the exemption's own conditional, fired (F652, F653)
+
+§4f closed the surface and left two lines owed, one under each half of the same question: **what holds a floor when the pair is not `meaning palette × surface`?** A callout at a line's end is `categorical.cN` on the page, and a treemap tile's label is the page's own ground painted **over** a `categorical` fill. Neither is a pairing §4 holds, so both are checked by nothing on any theme.
+
+**They are one pairing and not two, and the evidence was already in §4f.1.** `ratio(a, b)` is symmetric, so *fill on ground* and *ground on fill* are the same two colours and the same number — which is why that section's last two rows carry **identical figures on all three themes** (6.26 / 5.17 / 7.55) and why nobody read them as one row. Two findings were filed because the two sites look different; the constraint behind them does not. Re-measured here rather than carried: worst `categorical` against `bg` is **6.26** dark (`c6`), **5.17** light (`c4`), **7.55** high-contrast (`c6`); against `bgElev` **5.72**, **4.74**, **6.74**.
+
+**Everything clears today**, so this is a ruling about what is *checked*. The question a vacuous version of it would skip is what would have to change for it to stop clearing, and whether anything would notice — and the answer is in the palette's own construction. A `categorical` palette is authored for **hue** separation, not luminance separation: the worst pair *within* it measures **1.00** on all three shipped themes (dark and high-contrast `c2`/`c3`, light `c3`/`c6`). So the family has no internal luminance discipline at all, and the only thing holding these four text sites up is that every slot happens to have been authored against `bg` by hand. Nothing says so, and I17 — the only rule the family has — forbids two slots being *equal* and permits two slots being one luminance apart from each other and from anything else.
+
+### 4g.1 — the sweep, because two instances are the minimum for noticing a rule
+
+**Every text site in both arms, and its ink and ground.** Indexed by *text site* rather than by slot, which is the enumeration §4f.2 found the callout with.
+
+| where | ink | ground | a validated pair? |
+|---|---|---|---|
+| `svg.ts` axis ticks and titles, key ends, legend rows, empty message (nine sites) | `tone.muted` | the page, `surface.bg` | yes — §4 |
+| `svg.ts` `n reversed` notice (two sites) | `tone.warn` | the page | yes — §4 |
+| `svg.ts` sankey node label | `tone.default`, haloed in the page's own ground | the page | yes — §4, C12 I112 |
+| `svg.ts` callout at a line's end | **`categorical.cN`** (or `tone.*`, where the series declares one) | the page | **no** — F652 |
+| `svg.ts` treemap / heatmap tile label | the page's ground, **`surface.bg`** | the tile's **`categorical`** fill | **no** — F653 |
+| `svg.ts` graph node label | the page's ground, **`surface.bg`** | the node rect's **`categorical`** fill | **no — a third instance** |
+| `svg.ts` outline label, one slot per depth | **`categorical.cN`** | the page | **no — a fourth instance** |
+| `svg.ts` label at a point, where a hierarchy label has no box | **`categorical.cN`** | the page | **no — a fifth, reachable rather than drawn today** |
+| `definition.ts` the callout column | **`categorical.cN`** | the transcript's ground | **no — and it is the same figure as the SVG callout, which is what D11 requires** |
+| `definition.ts` a flame or icicle frame's name inside its own bar | **`categorical.cN`** | the transcript's ground | **no** |
+| `definition.ts` a pie's legend rows and a run's label, through `markedSpans` | **`categorical.cN`** | the transcript's ground | **no** |
+| `sankey.ts` a node's own label | no ref — the default foreground | the transcript's ground | out of scope: unstyled |
+
+**Ten sites, not two, and four of them are in the arm the findings did not name.** The terminal draws the same callout in the same slot, which is D11 holding — so a ruling that moved the *sites* would have to move ten of them in two arms, and a ruling that moves the *check* moves one function. That is the sweep's finding and it decides the arm below.
+
+**And the cells that are not text, recorded so the next reader does not count them as instances.** `sankey.ts`'s half-block puts one owner's slot in the foreground and the lower owner's in the **background**, and `scatter3.ts`'s braille and quadrant cells do the same; **neither goes through `slot()`** — `sankey.ts` names refs and `definition.ts` resolves them, and `scatter3.ts` holds resolved values by the time a cell is built (§4c.1 corrects this sentence, which said both did). They are art and carry no glyph a reader reads — and the margin says how much rests on that: `categorical × categorical` is **1.00** at worst, so the cell is invisible in greyscale and legible only by hue. **The alphabet now enforces it** (§4c.1): both constructors refuse a background on a glyph outside `U+0020`, Block Elements and Braille Patterns. What is still owed is the *type* — see below.
+
+### 4g.2 — the classification table: which rule owns a cell
+
+Structural, not a trace: every row is two rules that hold at rest with no event between them (A03, *index the artefact by rule interaction*, and C18's shape rather than C16's — nothing here happens in sequence).
+
+| the cell | rule A | rule B | which owns it |
+|---|---|---|---|
+| a callout at a line's end | I15 — a `decoration` palette is not contrast-validated, and is lint-restricted to declared art | §4 — every slot painted as text clears its floor against its ground | **B, and A is the defect.** The callout is the only thing naming that series in that arm, so it is a label and not art. I15's exemption is from the **family-wide** check and was written as an exemption from *every* floor |
+| a tile label, and a graph node label | C12 — the page's ground is the ink, so the label reads as a hole in the tile | §4 — a floor is a foreground on a surface | **Both, and they are one constraint.** `ratio` is symmetric, so this is the row above with the two colours exchanged. §4f.1 measured them separately and printed the same three numbers twice |
+| a `spectrum` stop | I16, SS21 — declared art, and the scan holds it there | §4g — a `decoration` slot the framework paints as text | **A, measured rather than assumed.** No `spectrum.` reference exists in `src/` outside the palette record, and binding the family would **reject the light theme**: 7 of its 9 stops sit under 4.5 against `bg`, worst 2.36. That is §4a's argument for a *named pairing* rather than a widened list, arriving from the palette's side instead of the surface's |
+| a sankey half-block, a braille cell | I21 — a picture cell may take a palette ref as a background, because its glyph is a fill and the two colours are two regions of one cell | §4 — a foreground on a surface clears a floor | **A, and the reason changed under measurement** (§4c.1): the row used to read *because it carries no text*, and both shipped sites always draw a glyph — sankey's `▀` is the 1-bit carrier. The worst `categorical × categorical` pair is 1.00, and `isPictureGlyph` is what now holds the argument |
+| a braille outline over a shaded face | I21 — the background is a picture cell's | §4 — `tone.muted` is a slot authored as **text**, and here it is the ink | **Neither, and that is the finding** (§4c.1). Measured in `plot3d-colour-series` at 24-bit: `#626262` on `#3cbf9a`. §4f's sweep is indexed by text *sites* and a wireframe is not one, so no row of either artefact reaches it. Left to C12 as a reading question, because `ratio` answers *can a character be recovered* and a cage is judged on whether it reads |
+| a series that declares its own `tone` | F382 — a callout takes its **series'** colour, which is `tone.*` where the series names one | §4g — the pairing is over the `categorical` slots | **Both, and they agree.** A `tone.*` ink on the page is §4's own pairing already, so the new one need cover only the slots §4 cannot reach — which is why it is a pairing over a *palette* and not over a *site* |
+| a `categorical` slot on `bgElev` | §4 — text lands on `bg` **and** `bgElev`, and a floor checked against one has a gap where nobody inspects | §4a — do not validate a slot against a surface it never lands on | **A, with the limit stated.** Nothing in `src/` resolves `surface.bgElev` at all today, so the second surface is a claim about where blocks land rather than a measured site. Included because the cost is nil — worst 4.74, clearing 4.5 — and because the alternative is §4's own named gap |
+| a ninth `categorical` slot a theme declares | I30 — the framework's own reference set is closed and checkable | §4g — the pairing is over the slots the framework can resolve | **B, and it inherits I30's stated limit.** `refOf` returns one of eight, so a `c9` a theme declares is painted by nothing and checked by nothing — the same blind spot I30 records for a slot inside a family that exists |
+
+Three of the seven are rows no reader checking statements one at a time reaches: the symmetry row is why two findings are one rule, the `spectrum` row is the whole cost of the widest arm, and the half-block row is the exemption this ruling must **not** close.
+
+### 4g.3 — the ruling
+
+**A `decoration` palette is exempt from the family-wide check and not from a floor. A decoration slot the framework paints as text is bound by a named pairing, at the meaning floor, against both text surfaces.** `decorationTextPairs` is that pairing: the eight `categorical` slots × `textSurfaces`, at 4.5 : 1, checked at load like every other floor.
+
+**The name is the mechanism and not the site**, deliberately. Ten sites in four figure families and two arms produce one pairing, and a name like `figureTextPairs` would have to be re-read every time a new form draws a series' name.
+
+**It is not vacuous.** Light `c4` measures **4.74** against `bgElev` — 5% of headroom over its floor, the tightest margin in the pairing and tighter than anything §4a or §4b ships. A `categorical` family authored the way palettes usually are — for hue distance, at a comfortable mid lightness — fails this immediately, and would previously have shipped.
+
+**Why not move the sites.** The callout's ink is F382's ruling: a callout takes its *series'* colour so the two arms and the legend agree, and that finding exists because they once did not. Repainting it `tone.muted` re-creates exactly the defect — a name in a colour the thing it names is not drawn in. And the tile label cannot take a fixed ink at all: it lands on eight different fills whose worst internal ratio is 1.00, so one ink for all of them is strictly worse than the ground it uses now. Ten sites in two arms, against one function.
+
+**Why not drop the `decoration` skip.** Removing `carries === "decoration"`'s `continue` from `validatePalette` binds `spectrum` too, and the light theme fails **7 of its 9 stops**, worst 2.36 : 1 — a theme rejected for a failure nobody can see, on a palette whose entire content is a ramp that must have a low end (I31 measured the same thing from the colormap's side: the floor deletes 130 of 256 luminance steps, and they are the low ones). This is §4a's twelve-slot argument and §4's own `bgDeep` argument, both in the mirror: **do not validate a slot against a ground it never lands on, and do not validate a palette against a rôle it does not have.**
+
+**Why not a third `carries` value.** An `identity` palette — named things, no meaning, but text — is the tidy answer and is F240's shape: a vocabulary member every theme must answer and every rung must map, whose only observable difference from `decoration` is this one pairing. It also re-opens `classes`, since I15 makes the 1-bit typographic fallback a property of `carries`, and a categorical slot has no meaning to collapse *to*. One pairing against one vocabulary change that touches every theme, every rung and the 1-bit ladder.
+
+**Why not widen T2.27's exemption.** That row skips a `<text>` fill equal to the page because the ratio is 1.00 by construction, and the skip is correct — it just recorded that a rule could not see something. With the pairing in place the skip becomes a **delegation**: the row asserts that the page is a ground `decorationTextPairs` covers, and *then* skips. An exemption that names the check which does hold the case is a different object from one that names nobody.
+
+**No floor moves, and no token moves.** The check came to the pair, as in §4f.
+
+### 4g.4 — what the ruling leaves behind
+
+- **A picture cell's background is held by an alphabet and not by a type** (§4c.1, and this entry replaces the one that asked for a `wash`-shaped helper — every premise of that remedy measured false). `isPictureGlyph` refuses a background on a glyph outside `U+0020`, Block Elements and Braille Patterns at both constructors, which closes *nothing enforces it*. What is still owed is compile-time refusal, and the two blockers are named rather than described: `QUADRANTS` is in `linedraw.ts` and `foldBraille` in `raster.ts`, so branding the glyph at its source is a two-file edit; and `SankeyCell` is one type serving label cells and picture cells both, so the guarantee there is a discriminated union and `definition.ts` reads `.text`, `.ref` and `.background` off it. **Grep `isPictureGlyph` when picking this up** — the runtime keeper is the condition, and it exists.
+- **A picture cell's ink is a text tone and nothing measures the pair** — `#626262` on `#3cbf9a` in `plot3d-colour-series`. Neither §4f's sweep nor §4g.2's table reaches it, for the reason the table row gives. Owed to C12 as a reading question and not to C10 as a floor.
+- **Half the pairing is a claim rather than a measurement.** No `surface.bgElev` reference exists in `src/`, so *text lands on both surfaces* is true of the design and unmeasured in the tree. It costs nothing today (worst 4.74) and it is recorded here rather than defended: the day a panel paints its own ground, this half stops being a claim.
+- **A ninth `categorical` slot is unchecked**, exactly as I30 records for an unknown slot in a known family. The pairing is derived from the eight the framework can resolve, so it grows with `refOf` and not with a theme's ambition.
+- **`svg.ts`'s `fill="${ground ?? ink}"` falls back to painting a label in the exact colour of the fill behind it** — a ratio of 1.00 by construction, and the one state this section exists to forbid. It is unreachable today, because `surface.bg` is required of a theme and `validateTokens` refuses a non-hex surface, so this is recorded rather than repaired: a fallback whose failure mode is the rule's own negation is worth a reader knowing about even when nothing can reach it.
+
+---
+
+
+## 4i. A child's colours — a literal `ColourValue` on the same ladder
+
+A `terminal` block's runs carry a colour the theme did not choose (C04 §3i). It is still C10 that
+decides what reaches the screen, and it decides it with the ladder it already has.
+
+| the run carries | 24-bit | 8-bit | 4-bit | 1-bit |
+|---|---|---|---|---|
+| `rgb` | the hex, as written | `nearestAnsi256` — the function the ramp already uses | `nearestAnsi16` | dropped |
+| `ansi256` | the index | the index | `nearestAnsi16` of the index's own hex | dropped |
+| `ansi16` | the index | the index | the index | dropped |
+
+**`ansi16` passes through at every arm above 1-bit, and that is a ruling rather than an omission.**
+A child writing `\x1b[31m` asked for *the terminal's red*, not for a particular red, and the outer
+terminal's palette is the right answer to that question. Resolving it to a hex and back would
+substitute our idea of red for the user's.
+
+**At 1-bit the colour goes and the attributes stay** — bold, dim, italic, underline, inverse,
+strike — which is I31's rule for tones, applied unchanged to a colour that has no tone.
+`degradeColour(value, caps)` is the one entry point, beside `rampColour`, and it adds no rung:
+every arm above is a function that already existed or, for `nearestAnsi16`, the same arithmetic
+one table smaller.
+
+**Nothing here reads the theme.** A child's colour is not a slot and has no dark/light form, so
+`degradeColour` takes capabilities alone — which is what makes it safe to call from a measurer's
+neighbour and impossible to make theme-dependent by accident.
 
 ---
 
@@ -619,13 +991,13 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 - **I12** — C10 reads no environment; capabilities are injected (C02 I5).
 - **I13** — `ThemeTokens` is authored in 24-bit hex only; no token file contains an ANSI index or a terminal-specific value. The curated 4-bit map is not token data and lives in its own module (§2), which is SS19's single named exception.
 - **I14** — A block names a palette slot and never embeds a colour value.
-- **I15** — Every palette declares `carries` and `monochrome`; a `meaning` palette is contrast-validated and declares its typographic fallback as `classes`, one entry per slot, a `decoration` palette does neither and is lint-restricted to declared art.
+- **I15** — Every palette declares `carries` and `monochrome`; a `meaning` palette is contrast-validated against every text surface and declares its typographic fallback as `classes`, one entry per slot; a `decoration` palette declares neither and is exempt from the **family-wide** check — not from a floor. **A decoration slot the framework paints as text is bound by a named pairing instead (I35, §4g)**, and one it paints as art is bound by nothing, which is what `spectrum` is and why SS21 holds it there. The clause this replaces read *lint-restricted to declared art* over the whole class, and the lint is SS21, which matches `spectrum` alone: `categorical` is the other decoration palette, the framework paints it as text at ten sites in both arms, and no rule reached any of them.
 - **I16** — `syntax` is consumed only by `code` and `patch` blocks; `spectrum` only by declared art. The list is closed at two; a third consumer is a spec change to §3, I16, T2.8 and A03 SS20 together.
 - **I17** — Within one palette and one variant, no two slots carry the same 24-bit value, and at 8-bit no two of `{ok, warn, error, info, accent}` resolve to the same index. A slot that renders as another slot bought nothing.
 - **I18** — A `defaultTheme` ships and satisfies every contrast floor, so the one required config field is one line to fill. A framework whose only required field has no working value is a framework nobody starts.
-- **I19** — Contrast is validated against `bg` and `bgElev`, the two surfaces text lands on, and never against `bgDeep`, which carries none. Validating against a surface no text meets would reject themes for a failure that cannot be seen.
+- **I19** — Contrast is validated against `bg` and `bgElev`, the two surfaces text lands on, and never against `bgDeep`, which carries none. Validating against a surface no text meets would reject themes for a failure that cannot be seen. **The exclusion's own conditional has been fired once and answered** — see I34: the SVG arm painted text on `bgDeep`, and the ruling was that the surface was wrong, not the exclusion.
 - **I20** — The shipped tokens are A01 Appendix A.1's catalogue, and T2.4 recomputes every ratio from them rather than trusting the recorded figures. The table is an assertion the suite upholds, not a record of intent.
-- **I21** — `Style` has exactly two colour channels, `colour` and `background`, and both are `ColourValue` or absent. `background` is set only by `resolveBackground` from a `surface` ref, **or by `wash`, which returns a blank `Span` and never a bare `Style`** (§4c). A palette slot still never resolves into it: a tone painted behind *text* is a tone nothing checked the floor for. `wash` is admitted because it carries no text — the floor is a property of a foreground on a surface, and a painted matrix cell has no foreground. The `Span` return is what makes that unforgeable: there is no way to hand the colour to a glyph.
+- **I21** — `Style` has exactly two colour channels, `colour` and `background`, and both are `ColourValue` or absent. `background` is set only by `resolveBackground` from a `surface` ref, **or by `wash`, which returns a blank `Span` and never a bare `Style`** (§4c), **or by a valued span through the block's colormap** (§4e, C04 I90 — the second admitted case after the matrix cell, and like it a framework channel rather than a palette slot), **or by a picture cell, whose glyph `isPictureGlyph` admits** (§4c.1 — the fourth case, and the only one that is a palette slot). A palette slot still never resolves into it *through `resolveBackground`*: a tone painted behind *text* is a tone nothing checked the floor for. `wash` is admitted because it carries no text — the floor is a property of a foreground on a surface, and a painted matrix cell has no foreground. The `Span` return is what makes that unforgeable: there is no way to hand the colour to a glyph. **The picture cell is admitted for a different reason and it is not `wash`'s** (§4c.1): its glyph is a fill from a closed alphabet — `U+0020`, Block Elements, Braille Patterns — so the two colours are two *regions of one cell* rather than ink and ground, and there is no occluding pair to measure a floor across. `carries no text` was the wrong word and would have been false of both shipped sites, each of which always draws a glyph. What makes *this* one unforgeable is the alphabet: the two constructors that set a background refuse a glyph `isPictureGlyph` does not admit, so a text-bearing picture cell is refused rather than discouraged.
 - **I22** — The two diff surfaces are text-bearing, and every `syntax` slot and every gutter tone (`ok`, `error`, `muted`) clears its floor against both in both variants (§4a) — **those twelve slots and no others**, asserted on the pairing rather than on its results, because a widened pairing passes on the tokens as shipped and only costs something later. There is no third or fourth: §4a measured a stronger pair for word-level emphasis and found under ten units of one channel between it and the plain pair, so word-level emphasis is `underline`'s and not a background's. `bgDeep` remains excluded because it carries no text; the criterion is text, not the word "surface".
 - **I23** — A diff background is the third signal and never the only one. At 1-bit it is absent, and the marker and the toned gutter carry the distinction alone (→ C25 I13, → A01 D29).
 - **I24** — A resolved colour always names its depth. There is no untagged form: `Style.colour` is absent or a `ColourValue`, never a bare string anywhere in the tree. The tag exists so a writer cannot guess, and a tag that is droppable is a tag that will be dropped.
@@ -640,6 +1012,13 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 ---
 
 - **I32** — **`errorGround` and `errorInk` are one pair, minted together, checked together at the full meaning floor — and the floor on `error` is 2.5 because the slot now answers to two constraints that a dark page cannot satisfy at once.** The tag is the only painted run in C09's `status` box, and `tone.error` cannot stand in as its ground: it is authored as a foreground for a dark page, which is I21's rule from the other direction. The **ground is `tone.error` itself**, so text and box are one red by construction rather than by two literals kept in step by hand. **Measured over the whole 8-bit cube rather than over reds**: on dark and on high-contrast, **zero of 262,144** colours are both legible on `bgElev` and dark enough to hold white at 4.5; on light, **81,907** are, which is why light clears 4.5 unaided at 6.42–7.01. So 2.5 buys `#c62828` at **5.62 : 1** in the tag and costs the message text **2.83** against `bgElev` — `muted`'s standard, the quietest thing that must still be readable. **The alternative is real and is shipped**: high-contrast takes a light ground with dark ink, `#3d0000` on `#ff7171`, and needs no exception; the same would work on dark and gives up the dark red, which reads as a warning rather than a failure. **So this is a preference honoured, not a constraint discovered** — stated here because someone lightening the red to satisfy `FLOORS` would be undoing a decision rather than repairing an oversight. What keeps it honest is that the text is never the only carrier: the `▲` and the painted word both survive it, and both survive 1-bit where colour does not (§4d, F34). **And the pair has a 4-bit rung, which it was shipped without** (F240). The ground is `tone.error`'s **index** there for the same reason it is `tone.error`'s hex at 24-bit — one red by construction rather than two values kept in step — and the ink is the half that reads on it, which flips dark's from white to black because `tone.error` is a dark red at 24-bit and the bright one at four. **No ratio is claimed and none can be**: I26 rules the floor best-effort at this rung, 0-15 being the emulator's own values, so what is curated is a decision and not a measurement. **1-bit is untouched and is not the same case** — I8 leaves nothing to arrive, so the tag is distinguishable by being the one run that carries no styling, which is C09 §3a's rule and correct there alone.
+- **I33** — **A span's attributes are set by the renderer from the span, never resolved from a slot; they compose with the resolved tone by spread; where a depth cannot show them they are lost and not compensated; and a span touches colour only through a named slot, resolved as any tone is, or through the block's colormap, resolved as any map is.** The merge `{ ...tone, ...spanAttrs }` writes at most `bold`, `italic`, `underline` and never `colour` or `background`; the tone it spreads onto is the block's, or the span's own `tone` resolved by the same `resolveTone` call and replacing the block's for the run (C04 I89); a `value` writes `background` through `continuousColour` and nothing below 8-bit (C04 I90, I31). So a span never enters `MONO`, the ladder or a floor **on its own account** — it names a slot or a reading, and the owner of each does the entering (§4e). At 1-bit a bold span on an emphasised-class block is absorbed — no fallback onto `underline` (C25 I10's) and no return to literal markers (C04 I85). The `unicode` axis gates glyphs and not attributes: SGR 3 is written at `ascii` exactly as at `full` (§4e, C04 §3am).
+- **I34** — **A renderer that paints its own page paints it in a surface `textSurfaces` holds, and `surface.bg` is the one it has.** §4's exclusion of `bgDeep` names a trigger — *if a surface ever paints text on it* — and the SVG plot arm was that surface for as long as it has existed: page, sankey halo, tile-label ink and separator stroke all read one constant, and every axis tick, legend row, callout, notice and node label lands on it (C12 §3ap.7's note owed, F632). **Measured before the ruling, all three themes and all 27 slots against both grounds**: against `bg` everything clears; against `bgDeep` dark and high-contrast clear and **light fails twelve times**, `tone.muted` at 2.44 under its own 2.5 floor and `syntax.comment` at 2.89 under 3 — because dark's `bgDeep` recesses *away* from its tones and light's recesses *toward* them, and a surface outside the check is a surface whose polarity nobody constrained. **The surface moved, not the floor and not the check**: widening `textSurfaces` would bind `tone`, `categorical` *and* `syntax` to a page only one arm paints — `categorical` because a callout at a line's end takes its series' colour (F382) — which is §4a's twelve-slot argument inverted, and it would cost a recolouring of light's whole equal-luminance family, every slot of which sits within 0.03 of 5.04. A third surface `surfaces.page` is worse than either: it must be in `textSurfaces` anyway, so its value is constrained to `bg`; it is a tenth surface every rung must answer (F240); and its only freedom is a page that differs from the transcript's, which is what D11's two-arm agreement exists to forbid. **The cost is named rather than absorbed**: dark loses 5.5% uniformly — `muted` 3.02 → 2.85, a node label 12.43 → 11.74 — and light gains 17%, high-contrast 23%. 2.85 is `muted`'s own number against `bg`, so the page now clears a floor that is checked on every load instead of a better one that was checked never (§4f, → C12 I112, → I19).
+
+- **I35** — **A `decoration` slot the framework paints as text clears the meaning floor against both text surfaces, and the pairing is derived from the slots the framework can resolve.** `decorationTextPairs` is `categorical.c1`–`c8` × `textSurfaces`, at 4.5 : 1, checked at load like every other floor — a **fourth** named pairing beside §4a's diff surfaces, §4b's wash and §4d's tag, and a sibling of them rather than an entry in any. **F652 and F653 are one pairing and not two**: `ratio` is symmetric, so a callout painted in a series' slot on the page and a tile label painted in the page's ground *over* that slot are the same two colours, which is why §4f.1's last two rows print the same three figures. **The sweep is what decides the arm**: ten text sites in four figure families and both arms take a `categorical` slot as ink or as ground — the SVG callout, tile label, graph node label, outline label and unboxed hierarchy label, and the terminal's callout column, flame and icicle frame names, pie legend rows and run labels — so moving the sites means moving ten of them across a seam D11 requires to agree, and moving the check means one function. **It is not vacuous**: light `c4` measures 4.74 against `bgElev`, 5% over its floor and the tightest margin the framework ships, and the palette itself has no luminance discipline — the worst pair *within* `categorical` is **1.00** on all three themes, because a categorical palette is authored for hue. **The two wider arms are refused by measurement**: dropping `validatePalette`'s `decoration` skip binds `spectrum` and rejects the light theme on 7 of its 9 stops, worst 2.36 (I31's own measurement from the colormap's side); a third `carries` value is F240's shape and re-opens `classes` for slots with no meaning to collapse to. **What it does not reach, stated because an unrecorded limit reads as strength**: a ninth `categorical` slot a theme declares (I30's limit, inherited); a picture cell's background, where I21 admits a palette ref for a cell carrying no text and *carrying no text* is the caller's property rather than the type's — `sankey.ts` and `scatter3.ts` both reach it through `slot()`, and the worst pair there is 1.00; and `surface.bgElev`, which nothing in `src/` resolves, so half the pairing is a claim about where blocks land rather than a measured site (§4g).
+- **I36** — **`rampColour(ramp, t, theme, caps)` is the one entry point for a ramp's sample; it adds no ladder, and each backing degrades on the ladder its slot or map already has: a slot pair mixes linearly in sRGB at 24-bit, quantises through `nearestAnsi256` at 8-bit, steps to two at 4-bit (`t < 0.5` → `from`, else `to`) and resolves to `from` at 1-bit; a colormap is `continuousColour` unchanged; a palette is the categorical slot; and `animate` resolves to `none` below 8-bit.** `undefined` means *say nothing* and the run paints as its neighbours do (I31). Not three steps at 4-bit and not a midpoint at 1-bit, each with its reason in §4h.
+- **I37** — **`CATEGORY_REFS` and `refOf` live in `theme/categorical.ts`, one copy, re-exported by C12's `marks.ts`; a palette ramp cycles them and no data palette; and `theme/` imports nothing from `blocks/` or `plot/`.** The move is a homing — a slot table is this component's and two components read it — and not a cycle avoidance: the claimed cycle was disproved by the row written to assert it (§4h). A move and not a copy because F382 measured two copies disagreeing. C10 I16's one categorical palette is what makes `palette` a fill with no name (C04 I106, F837).
+- **I38** — **`degradeColour(value, caps)` is the one entry point for a literal colour, takes no theme, and adds no rung: `rgb` steps down through `nearestAnsi256` then `nearestAnsi16`, `ansi256` steps to `nearestAnsi16`, `ansi16` passes through unchanged above 1-bit, and at 1-bit every colour is dropped while every attribute is kept.** A child's `\x1b[31m` names the user's red, so resolving it to a hex would substitute ours; and a colour with no slot has no dark/light form, which is why the theme is not a parameter.
 
 
 ## 8. Commitments
@@ -662,7 +1041,7 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 16. The `syntax` and `spectrum` palettes have closed consumer lists — `code` and `patch` for one, declared art for the other. A third consumer is a spec change in four places rather than a permission, because a palette used casually stops carrying what it declares (I16). Enforced by SS20 and SS21; C25 is the one widening, and it went through the spec.
 17. A resolved colour always names its depth. There is no untagged form and no bare string, so a 4-bit index and a 24-bit hex can never be confused at a call site that has already forgotten which it asked for (I24). Enforced by SS36.
 18. The shipped tokens are the catalogue in A01 A.1, and T2.4 recomputes its ratios rather than trusting them (I20).
-19. `Style` has two colour channels and no more. `background` comes only from a `surface` ref through `resolveBackground`, because the floors are measured for surfaces and not for tones in that role (I21).
+19. `Style` has two colour channels and no more. `background` comes only from a `surface` ref through `resolveBackground`, because the floors are measured for surfaces and not for tones in that role — or from one of the three admitted framework channels: `wash`, a valued span, and a **picture cell**, whose glyph `isPictureGlyph` admits so that a text-bearing one is refused rather than merely discouraged (I21, §4c.1).
 20. The two diff surfaces are text-bearing, so the §4 floors extend to them — for the twelve slots that land on them and no others, the background covering the whole row (I22). A second, stronger level was specified, measured and withdrawn; the floors left no room for it, and `underline` is what word-level emphasis has instead (§4a). The `bgDeep` exclusion is the criterion doing its job in the other direction.
 21. A diff background is a third signal that vanishes at 1-bit, where the marker and the toned gutter carry the distinction alone (I23, → A01 D29).
 22. **A theme declares whether it paints, as a choice and not as a colour** — `"terminal" | "surface"`, painting `surfaces.bg` — and the user's `--no-bg` is a per-invocation session flag rather than an override, so no token changes and no cache keyed on theme identity is disturbed (I25, §4c).
@@ -672,6 +1051,11 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 26. **A theme is refused for a family the framework will ask for and it does not have** — a missing palette and a collapsed one are one value at paint time, so the check is at resolve time, and it found the high-contrast theme drawing every plot series in one colour (I29, I30, F172, F179).
 27. **A colormap is framework data, a second channel, and vacuous below 8-bit** — not a palette family, `decoration` because the contrast floor would delete the half of the range a map exists to encode, and nothing at 4-bit because an ordering over unknown luminances is not an ordering (I31, §6).
 28. **A ground and its foreground are one thing, and a floor lowered to buy one says what it bought** (I32, §4d). The `status` tag's pair is minted and measured together at the meaning floor, because a ground without its matched ink is how a contrast floor goes unmeasured; the exception on `error` carries its figures, the cube sweep behind them and the alternative it declined, so the next reader can tell a decision from an oversight.
+29. **A span's attributes are the renderer's, compose by spread, and are lost rather than compensated where a depth cannot show them; a span's colour is a slot's or a map's and never its own** (I33, §4e). Three booleans and no colour value, so no floor, no ladder and no `MONO` entry of the span's; a `tone` is resolved by `resolveTone` exactly as the block's is and replaces it for the run, a `value` by `continuousColour` as a background on the colormap's ladder; the 1-bit absorption of a bold span on an emphasised block is asserted as an identical pair so a later compensation is visible; italic is written at every depth and on every `unicode` rung.
+30. **A renderer's own page is a surface `textSurfaces` holds** (I34, §4f). §4's exclusion named a trigger and nothing watched it; the SVG arm had been painting every label on `bgDeep` since it was written, and light's `muted` measured 2.44 there against a 2.5 floor no check could see. The page becomes `surface.bg`, the exclusion stays true, no floor moves, and the row that keeps it asserts the page's fill is a hex some member of `textSurfaces` carries — so the next ground that is not a text surface fails rather than waiting for someone to notice.
+32. **A ramp is sampled here and adds no ladder** (I36, I37). One entry point, each backing on the rung its slot or map already has, two departures from the brief recorded with their reasons, the categorical cycle moved down once so two components share one copy (`CALCIUM_INK_RAMPS_DESIGN.md` Q7, Q11).
+31. **A palette that carries no meaning still clears a floor where it is painted as text** (I35, §4g). `decoration` exempts a palette from the check over *every* surface, and it was read as exempting it from every floor — so `categorical` names a series at ten sites in two arms and was measured by nothing on any theme. The pairing is `categorical` × the text surfaces at the meaning floor, a fourth sibling of §4a, §4b and §4d rather than a widening of any; the two arms that would have covered more are refused by the light theme's `spectrum` failing 7 of 9 stops; and the two findings behind it are one pairing, because a ratio is symmetric and a ground used as ink is its own pair read backwards.
+33. **A colour the theme did not choose still degrades here** (I38). One entry point, the existing rungs, no theme parameter — and `ansi16` left alone, because the child named the user's palette rather than a colour.
 
 ---
 
@@ -703,6 +1087,13 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T1.20** (I28): a theme declaring `light` over a dark `bg` is rejected at load, with both the declaration and the measured luminance in the message. **The state that is legal today**, so the row is a new refusal rather than a restatement.
 - **T1.21** (I27): a set of three loads, `names` is every key in declaration order, and switching between two themes of the **same** polarity is a switch — the case a variant-keyed store could not express. An unknown name **throws** and says what the set holds, because a silent no-op reports a change that did not happen.
 - **T1.21a** (I27): a set with no `dark` in it opens on its first key, and an empty set is refused. The literal default would be a name this component requires of every app's set; the empty case is the one failure a token check cannot see, because it is about the collection.
+- **T1.34** (I34, §4f.1): for every shipped theme and every slot in `tone`, `categorical` and `syntax`, the ratio against `surfaces.bg` clears the slot's floor **and** the ratio against `surfaces.bgDeep` is reported — the twelve light slots that fail on `bgDeep` are asserted by name with their figures, so §4f.1's table is recomputed from the tokens rather than read from the document. The failing set is asserted **as a set**, not by its first member: an arm that collapses onto one slot survives a `.some()` and is what makes the table look like evidence.
+- **T1.35** (I21, §4c.1): `isPictureGlyph` admits `U+0020`, every Block Element `U+2580`–`U+259F` and every Braille Pattern `U+2800`–`U+28FF`, and refuses a letter, a digit, the box-drawing and arrow glyphs, and the ASCII fill set `#`, `=`, `-` that `sankeyAlphabet` falls to — the last named because it is the case the brand would have had to admit had it been put on the alphabet instead of on the background channel.
+- **T1.38** (I36): `rampColour` on a `default`→`accent` gradient at 24-bit returns `from`'s hex at `t = 0`, `to`'s at `t = 1`, and the sRGB midpoint at `0.5`, equal to `mixHex` and to what `sample` returns for a two-stop map of the same ends; at 8-bit the index is `nearestAnsi256` of the same mix; at 4-bit `0.49` is `from`'s curated index and `0.51` is `to`'s, and no `t` yields a third; at 1-bit every `t` is `undefined`; a `palette` ramp at index 9 is `categorical.c2`; a colormap ramp at 4-bit is `undefined`.
+- **T1.36** (I21, §4c.1, C12): the glyph set the two shipped picture-cell constructors actually emit **in a cell that carries a background** is read off the 24-bit and 8-bit terminal goldens for `sankey-*` and `plot3d-*`, and every one of it is admitted by `isPictureGlyph`. The set is asserted as a set and its size reported: sankey's is exactly `{▀}` and `plot3d`'s is the block elements plus braille. **The row that makes the alphabet evidence rather than a stipulation** — an admission list derived from the same table the constructors read agrees with itself and passes on any addition, which is T2.20's reason one artefact along.
+- **T1.37** (I21, §4c.1): **the fabricated violation, at both constructors.** A sankey cell built with a lower owner and a letter in it, and a `plot3d` mixed cell built with a background and a letter in it, are each **refused** — and the same call with the alphabet's own glyph is accepted, which is the control the refusal needs to not be vacuous. Asserted at the constructor rather than through a rendered figure, because no figure the tree can produce reaches the guard; that is the point of it.
+- **T1.22** (I33): for each of `bold`, `italic`, `underline` and for each tone at depths 24, 8, 4 and 1, merging a span onto the resolved tone yields a `Style` whose `colour` and `background` are **identical** to the tone's and whose attribute is set — asserted on the pair, so a merge that routed through a slot fails on the colour and one that dropped the tone fails on the same line. **The tone arm** (C04 I89): for each pair of tones at each depth, a run whose span names the second tone paints with the second tone's `colour` — the object `resolveTone` returns, by reference — with the attribute still set on top, and the block's tone nowhere on the run.
+- **T1.39** (I38): `degradeColour` on `{kind:"rgb", hex:"#0ac81e"}` returns the hex at 24-bit, an `ansi256` index at 8-bit, an `ansi16` index at 4-bit and undefined at 1-bit; on `{kind:"ansi16", index:1}` it returns index 1 at 24-bit, 8-bit and 4-bit, and undefined at 1-bit.
 
 ### Tier 2 — contract / interface
 
@@ -712,6 +1103,9 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.24** (roadmap 24, A01 A.1): `high-contrast` clears **7 : 1** on every `meaning` slot against both grounds, `muted` is named separately because a passing sweep does not say which slot was in question, and the three greys stay ordered — quieter than `dim`, quieter than `default`. **The only thing standing between the name and a claim**, since the framework holds every theme to the minimum and has no way to be told about a promise.
 - **T2.2** (I11): with the cache warm, results are identical to cold results for every key.
 - **T2.3** (I5): for every shipped theme, the 4-bit mapping is injective across `{ok, warn, error, info, accent}` — the tones whose confusion would be misleading rather than merely dull.
+- **T2.27** (I34, §4f.3): the SVG arm's page rect carries a fill equal to a hex **some member of `textSurfaces` holds**, on all three shipped themes — asserted against `textSurfaces(tokens)` rather than against `#1a1a1a`, so it is the property and not the value. Paired with the second half, because one without the other is satisfied by a page nobody paints: every `<text>` fill the arm emits is a slot whose floor clears against that same page hex.
+- **T2.30** (I37): `refOf` and `CATEGORY_REFS` are exported from `theme/categorical.ts` and `plot/marks.ts` exports the **same** references — identity, not equality; `theme/**` imports nothing at run time from `blocks/**` or `plot/**`, read from comment-stripped sources. **The row's first draft asserted `blocks/**` imports nothing from `plot/**`, and it failed on `kinds/image.ts` — the measurement that corrected §4h's reason.**
+- **T2.28** (I34, §4f.2): the page, the sankey halo, the tile-label ink and the inter-tile separator stroke are **one hex** in the emitted document. Four sites and one constant, asserted as an equality across the four rather than four assertions against a literal — the halo is the page showing through, and a change that moved one of them would leave a visible dark rim no byte-compare can name.
 - **T2.4** (I3): every shipped theme passes every contrast floor, on `bg` **and** `bgElev`, recomputing the ratio from the shipped token rather than reading A01 A.1's recorded figure. A theme cannot ship failing its own rule, and the catalogue is an assertion this test upholds rather than a record of what someone intended.
 - **T2.5** (I13): a source scan over `theme/` finds no ANSI index or terminal-specific value, with `four-bit.ts` as the one named exception (A03 SS19) — and the rule is shown to fire against a fabricated violation, not only to pass against the tree.
 - **T2.6** (I12): a source scan finds no `process.env` read in `theme/`.
@@ -724,6 +1118,9 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.14f** (I32, §4d): **the tag's own check fires, by fabricated violation.** The mutation pass asked for this row — removing the floor comparison from `validateErrorTag` survived every other assertion about the pair, which is a check that cannot fire dressed as one that passes. Two arms: an ink set to its own ground is caught and named by `path`, and a ground that does not resolve produces **no pair** rather than a half-pair measured against a default. The second is how it was first written — reading foregrounds from `tokens.palettes` where this one lives in `surfaces`, and `continue`ing on the miss.
 - **T2.14c** (I22, §4a, §4d): `surfaces` has exactly **ten** entries — eight, plus the tag's pair (§4d) — and `diffAddStrong` and `diffRemoveStrong` are not among them. The withdrawn pair asserted absent rather than merely unmentioned: a spec that measured something out and a token file that quietly kept it is the drift this suite exists to stop. **The count is the row's whole subject**, so it moves whenever a surface does and is the reason the pair could not land as one member.
 - **T2.14e** (I32, §4d): **the tag's ground *is* `tone.error`, asserted by equality in every theme.** Two hex literals in two files, tuned toward each other by eye, drifted for five rounds and no assertion about either could see it — a red is correct on its own and wrong beside another. Equality is the only form that catches it, and it is what makes *text and box are one red* true by construction rather than by care.
+- **T2.29** (I35, §4g.3): the decoration pairing is **exactly** the eight `categorical` slots against exactly the two members of `textSurfaces`, in every shipped theme, asserted by equality on the pairing rather than on its results — T2.14b's form, and for its reason: the widened alternatives pass or fail on grounds the results cannot show. `spectrum` is asserted **absent** from it, since a palette measured out of the pairing and quietly kept in it is the drift T2.14c exists to stop.
+- **T2.29a** (I35, §4g.1): every pair the pairing names clears 4.5 : 1, recomputed from the shipped tokens rather than read from A01 A.1 — 48 ratios, the same shape as T2.4 and T2.14a. The tightest is named separately (light `c4` on `bgElev`, 4.74), because a passing sweep does not say which slot was in question.
+- **T2.29b** (I35, §4g.2, → C12): every `<text>` fill the SVG arm emits is a slot **either** `textSurfaces` pairs at §4's floor **or** `decorationTextPairs` pairs at its own — asserted over the catalogue, which is the generalising cell of §4g.2's table and the row that would have found the outline label, the graph node label and the unboxed hierarchy label had it existed. It replaces T2.27's page-coloured exemption with a delegation: a fill equal to the page is skipped only after the page is shown to be a ground the pairing covers.
 - **T2.14b** (I22): the diff surfaces are checked against **exactly** those twelve slots and no others. Asserted on the pairing itself rather than on its results: widening the check to every `meaning` slot would fail on tones that never land on a diff background, and narrowing it to `syntax` alone would leave the gutter unchecked on the surface it is drawn on.
 - **T2.20** (I21): over every ref × every depth, a returned `background` is absent or a `ColourValue` — the T2.18 assertion for the second channel, with the kinds written out literally for the same reason.
 - **T2.16** (I17): per palette, per variant, no two slots share a 24-bit value. This is the test that caught `key`/`number` and, less obviously, light `number`/`type` — the second was created by the contrast correction itself, so nothing but recomputation could have found it.
@@ -731,6 +1128,9 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.19** (I24): a source scan finds no string literal assigned to a `colour` field anywhere in `src/` (A03 SS36). Types stop this inside the tree; the scan is what stops it arriving through a cast, which is how a tag gets dropped in practice.
 - **T2.17** (I17): at depth 8, `{ok, warn, error, info, accent}` resolve to five distinct values, per variant. I17's 24-bit half and T2.3's 4-bit half both miss this: two tones distinct in hex can quantise onto one 256-colour index, and that failure is invisible in truecolour — which is where every value was authored and every golden will be reviewed. `dim`, `muted` and `default` collapsing at low depth is acceptable and is deliberately not asserted.
 - **T2.15** (§3): at depth 1, every `syntax` slot collapses to a typographic class and emits no colour code — including `syntax.key`.
+- **T2.26** (I33, I31, C04 I89, C04 I90): at depth 1 a `tone: "identifier"` run on an `ok` notice paints with **no** SGR 1 where the rest of the row has it — the tone's collapse, uncompensated; at depth 4 a valued run writes no `48` and the row's bytes equal the unvalued row's; at depth 8 it writes `48;5;<n>` where `n` is `continuousColour`'s index for the same value, and at 24 `48;2` with `sample`'s hex — the same resolver a heatmap cell went through, asserted by calling it.
+- **T2.25** (I33): at depth 1, `ok` with a bold span resolves to exactly `{ bold: true }` — the same object the tone alone gives — `default` with a bold span to `{ bold: true }`, and `muted` with a bold span to `{ dim: true, bold: true }`, painted as `1;2` in `sgr()`'s numeric order.
+- **T2.36** (I38): `degradeColour`'s signature takes no theme, asserted at compile time; and a source scan finds no theme reference in its module.
 
 ### Tier 3 — edge cases
 
@@ -744,6 +1144,10 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T3.8**: `colourDepth` changing at runtime via a config override → the cache is keyed on depth, so results change without a stale hit.
 - **T3.9**: a tone token with an alpha channel (`#rrggbbaa`) → rejected; terminals have no alpha.
 - **T3.10**: contrast computed against a `bg` the emulator will actually override → documented as a floor, not a guarantee; the test asserts the check runs, not that the user's terminal complies.
+- **T3.35** (I36, C09 I53): a `shimmer` span rendered at 4-bit over ticks 0–4 is five byte-identical frames, each two colours; the same block at 24-bit is five distinct frames; at 1-bit the five frames equal the block toned `from`.
+- **T3.34** (I34, §4f.1): a theme whose `bgDeep` is authored *toward* its tones rather than away from them loads and passes every floor — the light theme is that case at 2.44 for `muted` — because `bgDeep` is not checked and must not be. The row exists so that a later widening of `textSurfaces` fails here first, where the reason is written down, rather than in the token files where it reads as a bad colour.
+- **T3.11** (I33): `unicode: "ascii"` with an italic span still paints SGR `3` — the attribute is not on the glyph axis — and the painted row's `cells()` equals the plain row's.
+- **T3.72** (I38): at 1-bit, a run with a colour and all six attributes paints every attribute and no colour; a run with a colour alone paints nothing and is not emitted.
 
 ### Tier 4 — integration
 
@@ -755,6 +1159,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T4.6** (with C22, → C22 I40): a corrupt persisted variant → base theme retained, notice committed, session opens normally. C20's repair-at-open precedent one component up; the notice is the half that stops "absent" and "corrupt" looking the same (C22 T1.19b).
 - **T4.35** (I27, with C23): `/theme high-contrast` on a three-theme session switches, and commits no usage notice. **The handler, the enum and the store on one path**, and the mutation pass is why it is not a store-level row: reading the variant against two literals passes every row that asks for one of those two names, which is every row that existed.
 - **T4.36** (I27, → C22 I40): a persisted `high-contrast` is restored, and a persisted name the set does not hold leaves the opening theme in place. **The only shape that separates a membership test from a literal pair**, since both names a literal knows are in the shipped set.
+- **T4.37** (I38, with C04, C09): one `terminal` document rendered at all five arms yields five frames whose text is identical and whose SGR differs exactly by the ladder — the block itself is byte-identical across the five, so a persisted document replays in full colour on a better terminal.
 
 ### Tier 5 — e2e
 
@@ -770,6 +1175,15 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.81** (I32, §4d): skipping `validateErrorTag`'s floor comparison → T2.14f fails. The pair ships unmeasured, which is where a ground authored without its ink always ends up: both halves look considered and neither was compared to the other.
 - **T6.82** (I32, §4d): reading the tag's ground from anywhere but `surfaces` → T2.14f fails, and the pair comes back empty rather than wrong — the failure mode that reads as coverage.
 - **T6.83** (I32, §4d): moving `errorGround` off `tone.error` → T2.14e fails. Two hex literals in two files, tuned toward each other by eye, drifted four times in one sitting and no assertion about either colour could see it.
+- **T6.86** (I34, §4f.3): reverting the SVG arm's page to `surface.bgDeep` → **T2.27 fails**, because `bgDeep` is not a member of `textSurfaces` — the property fails whatever hex the theme happens to hold, which is the class rather than the instance. T2.28 stays green under the same revert, since all four sites move together, and that is the row saying the two are asking different questions.
+- **T6.87** (I34, §4f.2): moving the sankey halo, the tile-label ink or the separator stroke onto a slot of its own while the page stays `bg` → **T2.28 fails**. The halo is the page showing through a glyph; a second constant is a rim that a byte-compare golden records and cannot object to.
+- **T6.88** (I35, §4g.3): restoring `validatePalette`'s blanket `decoration` exemption — that is, deleting the pairing rather than the `continue` — → **T2.29 fails**, and nothing else does. Every shipped ratio clears, so the revert is invisible in results and visible only in the pairing, which is T6.17's shape one palette over.
+- **T6.89** (I35, §4g.3): taking the wide arm instead — dropping the `carries === "decoration"` skip so the family is checked against every surface → **T2.4 fails on the light theme**, on 7 of `spectrum`'s 9 stops, worst 2.36. The revert that looks like the simpler rule, and the measurement is the whole argument against it.
+- **T6.93** (I36): a third band at 4-bit → T1.38's *no third index* row fails; a midpoint at 1-bit → T1.38's 1-bit row returns a value and C09 T3.71's byte-identity fails; motion surviving 4-bit → T3.35's five frames differ.
+- **T6.94** (I37): a second `refOf` inside `blocks/ramp.ts` → T2.30's identity row fails; `theme/ramp.ts` importing the cycle from `plot/marks.ts` → T2.30's direction row names the file.
+- **T6.91** (I21, §4c.1): widening `isPictureGlyph` to admit any non-alphanumeric — the shape a reader reaches for when the ASCII arm's `-` is noticed → **T1.35 fails on `#`, `=` and `-`**, and the brand slides from the background channel back onto the alphabet, which is the ruling §4c.1 turns on.
+- **T6.92** (I21, §4c.1): dropping the refusal at either constructor — `sankey.ts`'s `cell` or `scatter3.ts`'s `span` — and keeping `isPictureGlyph` exported → **T1.37 fails on that site alone**, and every golden stays byte-identical. This is the revert that is invisible in results: no input the tree produces reaches the guard, so the whole of its value is that a *later* caller cannot get a word into a painted cell, and a green suite is exactly what a removed guard looks like.
+- **T6.90** (I35, §4g.1, → C12): repainting the callout in `tone.muted` so both arms take a furniture slot → **T2.29b passes** and C12's own agreement rows fail, which is F382 arriving again: a name in a colour the thing it names is not drawn in. Recorded here because this is the revert §4g.3 refuses, and the row that catches it is not this component's.
 - **T6.3** (I3): validating contrast at render instead of load → T1.7 fails, and a broken theme reaches the screen.
 - **T6.4** (I4): applying an override before validating → T3.4 fails.
 - **T6.5** (I11): keying the cache on tone alone → T3.8 returns a stale style after a depth change.
@@ -794,6 +1208,10 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.24** (I27): declaring `/theme`'s `enum` values at module scope again → T2.22 fails, and a theme the session holds becomes a validation error. **The revert review cannot see**: the type change is visible in a diff and the enum is not, and every existing test asks for one of the two names a literal already has.
 - **T6.25** (I28): dropping the `variant`-against-`bg` pairing → T1.20 passes on a theme that lies about itself, and the field goes back to being a second record nothing checks.
 - **T6.26** (I28, §5a.4): restoring `VARIANTS` as a literal in the contrast suite → T2.23 fails. **Nothing else does**, which is the point: a third theme ships unchecked and eleven rows stay green.
+- **T6.84** (I33): resolving a span attribute through `resolve` or a slot → T1.22 fails on `colour`; gating italic on `caps.unicode` → T3.11 fails; adding an `underline` fallback for an absorbed 1-bit bold → C04 T3.67's identical pair fails, which is the row that says the absorption is a ruling and not an oversight.
+- **T6.85** (I33, C04 I89, C04 I90): composing a span's tone *with* the block's (`{ ...block, ...spanTone }`) rather than replacing it → T1.22's tone arm still passes on `colour` and **T2.26 fails at 1-bit**, where the `ok` block's `bold` survives under the `identifier` run — the row that shows composition and replacement differ only where a tone carries an attribute; painting a valued background at 4-bit through `nearestAnsi16` or a fixed index → T2.26's 4-bit pair fails, and C09 T3.66's 4-bit identity with it; a valued background written through `withBackground` from a surface ref → T2.26's 8-bit arm fails on the index.
+- **T6.95** (I38): resolving `ansi16` through a hex round trip → T1.39's second row returns a different index and a child's red becomes ours.
+- **T6.96** (I38): dropping attributes with the colour at 1-bit → T3.72 fails and an inverse cursor becomes invisible.
 
 ---
 

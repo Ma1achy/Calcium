@@ -14,7 +14,7 @@
  * apart, and identity is what makes that checkable.
  */
 
-import type { Binding, BlockKeymap, BuiltinBinding, FocusTarget, Key } from "./types.js";
+import type { Binding, BlockKeymap, BuiltinBinding, FocusTarget, Key, KeyAction } from "./types.js";
 
 export class KeymapError extends Error {
   override readonly name = "KeymapError";
@@ -66,10 +66,15 @@ export interface Keymap {
    */
   entries(): readonly Binding[];
   /**
-   * A live block's own bindings, merged into `liveBlock` (A01 D4).
+   * A live block's own bindings, merged into `liveBlock` (A01 D4) — **and into
+   * `interaction` where a key collides** (C16 §6, I27; C26 §4f).
    *
-   * Refused rather than shadowed when it collides — see below. Returns a
-   * withdrawal, called when the block freezes.
+   * A key `global` or `liveBlock` already binds is not refused and not
+   * shadowed: it lands at the `interaction` target, the one rung where the
+   * built-ins are out of scope, so it fires only once the reader has entered
+   * the block. Everything else lands at `liveBlock` and works from the first
+   * `↓`. Two keys inside one block keymap is still a construction error.
+   * Returns a withdrawal, called when the block freezes.
    */
   mergeBlock(blockKeymap: BlockKeymap): () => void;
 }
@@ -312,6 +317,12 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   { target: "liveBlock", key: { name: "up", shift: true }, action: "extendRowUp" },
   { target: "liveBlock", key: { name: "down", shift: true }, action: "extendRowDown" },
   { target: "liveBlock", key: { name: "y" }, action: "copyElement" },
+  // **`⌃a`, free at this target and measured so** (C26 §5c): dispatching it
+  // with focus on a row left the store unchanged before this row existed. At
+  // `prompt` the same byte is `home`, which is why the transcript's select-all
+  // is a different action from the editor's `⌥a`. Wire form `0x01`, the byte
+  // T2.13 already walks for `prompt c+a`.
+  { target: "liveBlock", key: { name: "a", ctrl: true }, action: "selectAllElements" },
 
   // --- copy mode (C16 §5b, entry 15 step 1) --------------------------------
   //
@@ -331,6 +342,9 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // (C26 I14) and a framework binding there shadows one — C16 §5a row A4.
   { target: "prompt", key: { name: "v", meta: true }, action: "enterCopyMode" },
   { target: "liveBlock", key: { name: "v", meta: true }, action: "enterCopyMode" },
+  // The target's own dismissal, as `viewPop` is the view's (C16 §5c). `⌃c` stays
+  // the ladder's; both exist for `pushedView` too, and I24 defends the pair.
+  { target: "copyMode", key: { name: "escape" }, action: "exitCopyMode" },
 
   { target: "global", key: { name: "pageup" }, action: "scrollPageUp" },
   { target: "global", key: { name: "pagedown" }, action: "scrollPageDown" },
@@ -358,9 +372,181 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // **Movement moves focus; paging moves the window** (C26 I18). These never
   // touch focus, which is what makes a focused element outside the box a legal
   // state rather than a thing to correct.
+  // **The camera's one writer, and `[` `]` rather than `←` `→`** (C22 I71).
+  // The design's manual scheme is arrows and step 8 owns it; claiming them here
+  // would take two keys from every focused block for a feature one block kind
+  // has — and `←` at `liveBlock` was said to fall through to the prompt, which
+  // was never measured and is false: see the horizontal pair below. `[` and `]`
+  // are free at this target, and a plain printable owned by a focused block is
+  // `y`'s precedent and C26 I2's ruling — *the block owns its keys while the
+  // reader is inside it*.
+  //
+  // **The effect is a no-op on a block with no camera**, which is a key consumed
+  // and nothing drawn. That is the cost of binding before the form exists, and
+  // it is smaller than the alternative: a field nothing can move is
+  // `cursorPositions` (C12 §3s).
+  //
+  // **Step 8 completes the family and the arrows still do not survive** (C22
+  // I75, §6i.3). The design note's scheme is `← →` azimuth, `↑ ↓` elevation,
+  // `+ −` distance, `r` resets: `↑` and `↓` are `rowUp` and `rowDown` two rows
+  // up and the duplicate check refuses them, and `← →` were dropped at this
+  // target (not passed to the prompt, whatever the record said) — so the
+  // shifted brackets take the elevation, which keeps the sign
+  // convention of the key they are shifted from. `{` lowers and `}` raises,
+  // exactly as `[` turns one way and `]` the other.
+  //
+  // **`=` beside `+` because `+` is shifted on every layout this ships to**, and
+  // two keys for one action is not the duplicate the conflict rule refuses —
+  // that is one key at one target with two actions.
+  { target: "liveBlock", key: { name: "[" }, action: "orbitLeft" },
+  { target: "liveBlock", key: { name: "]" }, action: "orbitRight" },
+  { target: "liveBlock", key: { name: "{" }, action: "tiltDown" },
+  { target: "liveBlock", key: { name: "}" }, action: "tiltUp" },
+  { target: "liveBlock", key: { name: "+" }, action: "dollyIn" },
+  { target: "liveBlock", key: { name: "=" }, action: "dollyIn" },
+  { target: "liveBlock", key: { name: "-" }, action: "dollyOut" },
+  { target: "liveBlock", key: { name: "r" }, action: "cameraReset" },
+  { target: "liveBlock", key: { name: "o" }, action: "orbitToggle" },
   { target: "liveBlock", key: { name: "pagedown" }, action: "blockPageDown" },
   { target: "liveBlock", key: { name: "pageup" }, action: "blockPageUp" },
+
+  // --- between entries (C26 I21, §4g) --------------------------------------
+  //
+  // **The only two keys that move focus out of an entry without leaving the
+  // transcript.** `tab` was free at this target — the prompt's `tab` is
+  // `complete` and the overlay's is `menuNext`, one key at three targets
+  // resolved by the ladder. `⇧tab`'s wire form is `CSI Z`, which the decoder
+  // did not produce until this row needed it (C16 §2): T2.13 is what would
+  // have refused the row, and adding the form rather than picking another key
+  // is the ruling I17 leaves room for when the form is one every terminal sends.
+  { target: "liveBlock", key: { name: "tab" }, action: "entryNext" },
+  { target: "liveBlock", key: { name: "tab", shift: true }, action: "entryPrev" },
+
+  // --- the horizontal pair (C22 I76, C12 §3s) -------------------------------
+  //
+  // **`←` and `→` did nothing at this target, and the comment above said they
+  // fell through to the prompt.** They did not: dispatch runs the target's
+  // handlers and then `global`, and neither binds an arrow, so both were
+  // dropped (C16 §4 step 3). A claim carried through two rulings — C22 I71 chose
+  // `[` `]` on it — and measured by nothing until a row wanted the keys. The
+  // vertical pair steps elements; this pair is the horizontal axis of the same
+  // movement, with the plot's crosshair as its first consumer and a table's
+  // column cursor the second (C26 §11), which is why it is a built-in at
+  // `liveBlock` rather than one kind's key.
+  { target: "liveBlock", key: { name: "left" }, action: "cursorLeft" },
+  { target: "liveBlock", key: { name: "right" }, action: "cursorRight" },
+
+  // --- re-run the focused entry (C23 I18) -----------------------------------
+  //
+  // **The prompt's own newline pair, at the other target, meaning *run*.** A
+  // notebook's convention for *run this cell* is `⇧⏎`, and it is the pair the
+  // prompt already binds to `insertNewline` — both wire forms are pressed
+  // through the decoder there (I17, T2.13), so nothing new has to be. Two keys
+  // for one action is not the duplicate the conflict rule refuses, and the
+  // terminal-dependent one is kept for I12's reason: the meta form works
+  // everywhere and the shift form is better where it exists.
+  { target: "liveBlock", key: { name: "enter", shift: true }, action: "rerunEntry" },
+  { target: "liveBlock", key: { name: "enter", meta: true }, action: "rerunEntry" },
 ];
+
+/**
+ * The union, as a value (I19).
+ *
+ * **Not "the actions the default rows bind", which was the first cut and was
+ * wrong by nine.** `toggleSeries1` … `toggleSeries9` are in `KeyAction` and in
+ * L4's effect table, and no default row binds them: they reach the keymap only
+ * through the plot's `mergeBlock` (C12 I116). Measured with the digits counted —
+ * 78 in the union, 69 bound by a default row, 78 in the effect table — after a
+ * first measurement whose `[A-Za-z]+` silently excluded every name with a digit
+ * and reported 69 of 69. A check against the rows refused the plot's own digits.
+ *
+ * **Total by type, so it cannot drift**: `satisfies Record<KeyAction, true>`
+ * fails to compile on a missing member and on a name outside the union, which is
+ * the same guarantee `keys.ts`'s table carries for the executors. L3 still holds
+ * no copy of L4's *table* — this is the vocabulary, which is C16's own (I19).
+ */
+const BUILTIN_ACTIONS: ReadonlySet<string> = new Set(
+  Object.keys({
+    insertNewline: true,
+    complete: true,
+    acceptGhostOrForward: true,
+    menuNext: true,
+    menuPrev: true,
+    menuAccept: true,
+    dismiss: true,
+    historyPrev: true,
+    historyNext: true,
+    reverseSearch: true,
+    searchOlder: true,
+    backspace: true,
+    delete: true,
+    killWordLeft: true,
+    killWordRight: true,
+    killToStart: true,
+    killToEnd: true,
+    yank: true,
+    undo: true,
+    redo: true,
+    wordLeft: true,
+    wordRight: true,
+    home: true,
+    end: true,
+    left: true,
+    extendCharLeft: true,
+    extendCharRight: true,
+    extendWordLeft: true,
+    extendWordRight: true,
+    extendLineStart: true,
+    extendLineEnd: true,
+    selectAll: true,
+    copySelection: true,
+    extendRowUp: true,
+    extendRowDown: true,
+    copyElement: true,
+    selectAllElements: true,
+    focusPrompt: true,
+    rowUp: true,
+    rowDown: true,
+    entryPrev: true,
+    entryNext: true,
+    cursorLeft: true,
+    cursorRight: true,
+    rerunEntry: true,
+    orbitLeft: true,
+    orbitRight: true,
+    tiltDown: true,
+    tiltUp: true,
+    dollyIn: true,
+    dollyOut: true,
+    cameraReset: true,
+    orbitToggle: true,
+    toggleSeries1: true,
+    toggleSeries2: true,
+    toggleSeries3: true,
+    toggleSeries4: true,
+    toggleSeries5: true,
+    toggleSeries6: true,
+    toggleSeries7: true,
+    toggleSeries8: true,
+    toggleSeries9: true,
+    blockPageDown: true,
+    blockPageUp: true,
+    rowActivate: true,
+    scrollPageUp: true,
+    scrollPageDown: true,
+    scrollTop: true,
+    scrollBottom: true,
+    viewNextHunk: true,
+    viewPrevHunk: true,
+    viewTop: true,
+    viewBottom: true,
+    viewPageUp: true,
+    viewPageDown: true,
+    viewPop: true,
+    enterCopyMode: true,
+    exitCopyMode: true,
+  } satisfies Readonly<Record<KeyAction, true>>),
+);
 
 /**
  * Construction-time duplicate detection (I10, T2.4).
@@ -411,24 +597,41 @@ export function createKeymap(bindings: readonly Binding[]): Keymap {
     mergeBlock(blockKeymap) {
       const next = new Map<string, Binding>();
       for (const entry of blockKeymap) {
-        const binding: Binding = Object.freeze({
-          target: "liveBlock" as const,
-          key: entry.key,
-          action: entry.action,
-        });
-        const s = slot("liveBlock", entry.key);
-
-        // The global always wins, and a silent shadow would be worse than a loud
-        // refusal (§6). Checked against `global` *and* against an existing
-        // `liveBlock` binding: the spec names the global case because that is the
-        // one an adapter author will hit, and a block shadowing the built-in
-        // `liveBlock` navigation is the same defect with a smaller blast radius.
-        const globalClash = bySlot.get(slot("global", entry.key)) ?? bySlot.get(s);
-        if (globalClash !== undefined) {
+        // **A collision is a placement, not a refusal** (I27). This used to
+        // throw on a key `global` or `liveBlock` already bound — *the global
+        // wins and the refusal is loud* — and its first consumer would have
+        // tripped it on every key it has: the widget design binds `↑` `↓`
+        // `PgUp` `PgDn` and `Esc`, all five of which are built-ins here. The
+        // mode C26 §4f describes exists for exactly these keys: `interaction`
+        // is the one rung where the built-ins are out of scope, so a colliding
+        // key is bound there and fires once the reader has entered the block
+        // (`⏎`, C26 I14), while a free key stays at `liveBlock` and works from
+        // the first `↓` (A01 D4). Neither half is shadowed and nothing is
+        // silent: `/help` lists both, at their targets.
+        // **An action no built-in row binds is refused, not placed** (I19). The
+        // sentence this implements used to promise a C23 §3a route for an open
+        // string, and there is none: the binding would resolve and then execute
+        // nothing, silently, at every press.
+        if (!BUILTIN_ACTIONS.has(entry.action)) {
           throw new KeymapError(
-            `block keymap binds ${entry.key.name}, which ${describe(globalClash)} already binds. ` +
-              `Raised when the block is committed rather than at startup, because the block ` +
-              `does not exist until then — the global wins and the refusal is loud.`,
+            `block keymap binds ${entry.key.name} to "${entry.action}", which names no built-in action ` +
+              `(C16 I19). L4's effect table has no entry for it, so the key would resolve and do nothing; ` +
+              `refused here, where the block's author can see it.`,
+          );
+        }
+        const collides =
+          bySlot.has(slot("global", entry.key)) || bySlot.has(slot("liveBlock", entry.key));
+        const target: FocusTarget = collides ? "interaction" : "liveBlock";
+        const binding: Binding = Object.freeze({ target, key: entry.key, action: entry.action });
+        const s = slot(target, entry.key);
+
+        // Two keys inside one block keymap is still the construction error it
+        // always was (I10): the block's author wrote both, and neither can win.
+        const twice = next.get(s);
+        if (twice !== undefined) {
+          throw new KeymapError(
+            `block keymap binds ${entry.key.name} twice: ${describe(twice)} and ${describe(binding)}. ` +
+              `Two bindings for one key in one block is a construction error rather than a last-wins.`,
           );
         }
         next.set(s, binding);

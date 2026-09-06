@@ -17,8 +17,10 @@ import { cells as width } from "../../src/presentation/text.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-expect-error — a `.mjs` instrument with no declarations, like its siblings.
 import { CAPS, FORMS, clearGenerated, frameFor, stripSgr } from "../../tools/plot-catalogue.mjs";
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-expect-error — a `.mjs` instrument with no declarations, like its siblings.
+// **This carried a `@ts-expect-error` and no longer needs one**: `catalogue-png`
+// gained a `.d.mts` when `animation-proof.test.ts` came to consume `gifFrom`,
+// and `tsc` reported the directive as unused — which is the declaration file
+// doing exactly what it is for. `plot-catalogue.mjs` above still has none.
 import { ansiToSvg, colour256, parseLine, sheetBg, unparsedSgr } from "../../tools/catalogue-png.mjs";
 import { CATALOGUE_FORMS } from "../../tools/catalogue-forms.js";
 
@@ -64,7 +66,7 @@ describe("plot-catalogue — the corpus renders", () => {
     // thirty-two of the wide ones were committed catalogue files nobody read.
     const base = { colourDepth: 1, unicode: "ascii", ambiguousWidth: "narrow",
       synchronisedUpdate: true, bracketedPaste: true, mouse: true,
-      imageProtocol: "none", altScreen: true } as const;
+      imageProtocol: "none", keyboardProtocol: "none", altScreen: true } as const;
 
     const offenders: string[] = [];
     let rendered = 0; // cells-ok — a frame count
@@ -89,6 +91,37 @@ describe("plot-catalogue — the corpus renders", () => {
     expect(offenders.join("\n")).toBe("");
   });
 
+  it("AA1b (C12 I54, F364): caller text is not degraded, and AA1 is clean because the corpus has none", () => {
+    // **C12 I54 is vacuous over this corpus and AA1 inherits it** — *a gate
+    // phrased over a corpus inherits its blind spots*. Every frame at the ascii
+    // rung is ASCII because no fixture puts a non-ASCII character in a string
+    // the *caller* supplied; the renderer degrades its own glyph tables and
+    // passes the caller's words through.
+    //
+    // **Measured on five members, and all five leak**, so it is a class rather
+    // than one path. Asserted as the measured state, naming the finding, so the
+    // day caller text is degraded this row moves rather than quietly agreeing.
+    const base = { colourDepth: 1, unicode: "ascii", ambiguousWidth: "narrow",
+      synchronisedUpdate: true, bracketedPaste: true, mouse: true,
+      imageProtocol: "none", keyboardProtocol: "none", altScreen: true } as const;
+    const leaks = (spec: Record<string, unknown>): boolean =>
+      [...frame(spec, base, 60).map(strip).join("\n")].some((c) => (c.codePointAt(0) ?? 0) > 127);
+
+    const cases: readonly (readonly [string, Record<string, unknown>])[] = [
+      ["emptyMessage", { form: "line", height: 5, axes: true, series: [{ values: [] }], emptyMessage: "wait\u2026" }],
+      ["xTitle", { form: "line", height: 6, axes: true, series: [{ values: [1, 2, 3] }], xLabels: ["a", "b", "c"], xTitle: "sec\u2026" }],
+      ["xLabels", { form: "line", height: 6, axes: true, series: [{ values: [1, 2, 3] }], xLabels: ["a\u2026", "b", "c"] }],
+      ["series label", { form: "line", height: 6, axes: true, legend: "right", series: [{ label: "al\u2026", values: [1, 2, 3] }] }],
+      ["categories", { form: "bar", height: 5, axes: true, categories: ["c\u2026"], series: [{ values: [3] }] }],
+    ];
+    expect(cases.map(([name, spec]) => `${name} ${leaks(spec) ? "leaks" : "degraded"}`),
+      "F364: every caller-supplied string reaches the ascii frame unchanged")
+      .toEqual([
+        "emptyMessage leaks", "xTitle leaks", "xLabels leaks",
+        "series label leaks", "categories leaks",
+      ]);
+  });
+
   it("AA2 (C12 I54): a line at ASCII is still *connected*, in `+ - |`", () => {
     // **Falling back to the density ramp satisfies AA1 and loses the figure.**
     // `plotStyle: "line"` means *draw this as a connected line*, so the row
@@ -101,7 +134,7 @@ describe("plot-catalogue — the corpus renders", () => {
     };
     const ascii = { colourDepth: 1, unicode: "ascii", ambiguousWidth: "narrow",
       synchronisedUpdate: true, bracketedPaste: true, mouse: true,
-      imageProtocol: "none", altScreen: true } as const;
+      imageProtocol: "none", keyboardProtocol: "none", altScreen: true } as const;
 
     const body = frame(spec, ascii, 60).map(strip).join("\n");
     expect(body).toContain("+");
@@ -128,7 +161,7 @@ describe("plot-catalogue — the corpus renders", () => {
     // terminal and fail on another for a reason the author cannot act on.
     const ascii = { colourDepth: 1, unicode: "ascii", ambiguousWidth: "narrow",
       synchronisedUpdate: true, bracketedPaste: true, mouse: true,
-      imageProtocol: "none", altScreen: true } as const;
+      imageProtocol: "none", keyboardProtocol: "none", altScreen: true } as const;
 
     const cases = {
       "violin braille": {
@@ -516,20 +549,49 @@ describe("catalogue-png — the parser that failed silently", () => {
     expect(ys[1]! - ys[0]!).toBeLessThanOrEqual(1.143 * size);
   });
 
-  it("PC5: a braille glyph goes through the font, on the same path as any other", () => {
-    // **This row asserted a dot map, and the dot map is gone** (F204). Braille
-    // was the one glyph class this file *modelled* rather than rendered — eight
-    // circles from a bitmask, at a radius nothing could check without measuring
-    // the font, and it was out by 2.4× in area for the tool's whole life. The
-    // claim now is that no such model exists: a braille cell emits a `<text>`
-    // at its own column, exactly as a box-drawing glyph does.
+  it("PC5: a braille cell is drawn from its own mask, because the mono face has none", () => {
+    // **F204 was right about the defect and wrong about the remedy, and the
+    // font is what says so** (F502).
+    //
+    // It found braille modelled as eight circles at a guessed radius, out by
+    // 2.4× in area for the tool's whole life, and ruled that the model go and
+    // the glyph emit a `<text>` *exactly as a box-drawing glyph does*. The
+    // second half assumed a fact nobody had measured. Measured:
+    //
+    //     fc-list ":charset=2502" → DejaVu Sans Mono, among others
+    //     fc-list ":charset=2800" → DejaVu Sans, DejaVu Serif — and **no mono face**
+    //
+    // Box drawing, the block elements, the quadrants and the markers all resolve
+    // in the family this stylesheet asks for. Braille alone falls through to a
+    // **proportional** font, whose dots are small and widely spaced. So every
+    // braille frame the instrument has produced since showed that fallback's
+    // design, and a reader — including the one who wrote the ruling — read it as
+    // the renderer drawing a thin dotted line.
+    //
+    // **The remedy that survives both findings is geometry that is not a
+    // guess.** A braille cell *is* a 2×4 coverage mask; eight rects laid on the
+    // cell's own halves and quarters is the character's definition rather than
+    // an estimate of a font's design, which is the property F204 actually
+    // wanted and could not get from a radius.
     const svg = (ansiToSvg as (l: string) => string)("\u001b[38;2;255;0;0m⣿⠁\u001b[0m");
-    expect(svg).not.toContain("<circle");
-    for (const ch of ["⣿", "⠁"]) expect(svg).toContain(`>${ch}</text>`);
-    // At its own column, which is the property the per-glyph path exists for.
-    const xs = [...svg.matchAll(/<text x="([\d.]+)"[^>]*>[⣿⠁]<\/text>/gu)].map((m) => Number(m[1]));
-    expect(xs.length).toBe(2); // cells-ok — a glyph count
-    expect(xs[1]! - xs[0]!).toBeCloseTo(8.41, 1);
+    expect(svg, "no radius, which is the finding that stands").not.toContain("<circle");
+    expect(svg, "and no text, which is the half that did not").not.toContain(">⣿</text>");
+
+    // **Eight dots and one**, read off the two masks rather than counted loosely
+    // — `⣿` is every dot and `⠁` is the first alone.
+    const rects = [...svg.matchAll(/<rect x="([\d.]+)" y="([\d.]+)"/gu)]
+      .map((m) => [Number(m[1]), Number(m[2])] as const);
+    expect(rects.length, "eight dots and one").toBe(9); // cells-ok — a dot count
+
+    // **Derived from the cell, which is the whole claim.** The two glyphs sit a
+    // cell apart and the dots divide that cell in halves across and quarters
+    // down; nothing here is a measurement of a typeface.
+    const xs = [...new Set(rects.map(([x]) => x))].sort((a, b) => a - b);
+    expect(xs.length, "two dot columns in the full cell and one in the sparse").toBe(3); // cells-ok — a column count
+    expect(xs[1]! - xs[0]!, "half a cell between the dot columns").toBeCloseTo(8.41 / 2, 1);
+    expect(xs[2]! - xs[0]!, "and a whole cell between the glyphs").toBeCloseTo(8.41, 1);
+    const ys = [...new Set(rects.map(([, y]) => y))].sort((a, b) => a - b);
+    expect(ys.length, "four dot rows").toBe(4); // cells-ok — a row count
   });
 
   it("PC10 (F227): bold survives to the SVG, and it is all a one-bit frame has", () => {
@@ -554,12 +616,14 @@ describe("catalogue-png — the parser that failed silently", () => {
   });
 
   it("PC11 (F227): nothing in the catalogue emits an SGR code the parser drops", () => {
-    // **The watcher on the one arm deliberately not built.** `7m` has no
-    // producer — `Style.inverse` is written nowhere in `src/` — so an arm for it
-    // would be a mechanism with nothing to exercise it. A deferral naming a
-    // condition with nothing watching it is how a simplification outlives its
-    // excuse, so the condition is asserted here rather than described in a
-    // comment: the day a renderer emits inverse, this names the number.
+    // **This was the watcher on the one arm deliberately not built, and it paid
+    // out.** `7m` had *no producer — `Style.inverse` is written nowhere in
+    // `src/`* — so no arm was built and this row named the number the day one
+    // appeared. It appeared with arc3's interaction catalogue (the transcript's
+    // selection is reverse video at 1-bit, C11 I14), the 1-bit PNG showed no
+    // selection while the bytes carried one, and the arm landed in
+    // `catalogue-png.mjs`. The row stays: it is the same watcher over the next
+    // code nobody has built an arm for.
     const unknown = new Set<number>();
     let swept = 0;
     let withSgr = 0;

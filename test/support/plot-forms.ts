@@ -35,6 +35,14 @@ export const ONE_PER_FORM: Readonly<Record<PlotForm, Plot>> = Object.freeze({
       { values: [2, 2, 3, 3], label: "c" },
     ],
   }),
+  plot3d: block({
+    kind: "plot", id: "form-plot3d", form: "plot3d", height: 6,
+    series: [],
+    points3: [
+      { label: "a", points: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 1, z: 1 }, { x: -1, y: 1, z: 0 }] },
+      { label: "b", points: [{ x: 1, y: -1, z: -1 }, { x: -1, y: -1, z: 1 }] },
+    ],
+  }),
   quiver: block({
     kind: "plot", id: "form-quiver", form: "quiver", height: 3, axes: true,
     series: [],
@@ -192,6 +200,24 @@ export const ONE_PER_FORM: Readonly<Record<PlotForm, Plot>> = Object.freeze({
   // across two layers, so a dummy node is inserted, and `render -> layout` with
   // `layout -> render` is a cycle, so the reversal pass fires and the notice row
   // has something to say (C12 §3ai).
+  // Three sources into two sinks with **unequal** flows (C12 §3ap): every bar
+  // and every ribbon is a different height, so a slice drawn at the wrong
+  // weight, a bar drawn at the wrong side's total, or two sinks swapped each
+  // move the frame. Equal flows are the degenerate input on which all of those
+  // agree. `SK1` in `plot-sankey.test.ts` is the row that shows it responds.
+  sankey: block({
+    kind: "plot", id: "form-sankey", form: "sankey", height: 9,
+    series: [],
+    graph: {
+      nodes: [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "x" }, { id: "y" }],
+      edges: [
+        { from: "a", to: "x", weight: 5 },
+        { from: "a", to: "y", weight: 1 },
+        { from: "b", to: "y", weight: 3 },
+        { from: "c", to: "x", weight: 2 },
+      ],
+    },
+  }),
   graph: block({
     kind: "plot", id: "form-graph", form: "graph", height: 9,
     series: [],
