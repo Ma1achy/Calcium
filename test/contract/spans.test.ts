@@ -197,3 +197,13 @@ describe("C04 §3am.1 — `elide`", () => {
   });
   it.todo("T2.117 (C04 I106, I109): RAMP_KEYS has six members; a seventh key and animate: sweep are refused by name; a ramped document round-trips through JSON — not deferred on a component: lands with the Ramp type");
 });
+
+describe("C09 §5 — ramps, the extent and the split", () => {
+  it.todo("T2.118 (C09 I50): RAMP_EXTENT is exhaustive over BlockKind — clusters for the four carriers, axis for progress, none for the rest — not deferred on a component: lands with blocks/ramp.ts");
+  it.todo("T2.119 (C09 I51, I52): one span per cluster and none inside a ZWJ family; a wrapped span continues its at; a bar at 30% and 100% agree on the first 30% of cells — not deferred on a component: lands with the ramp resolver");
+  it.todo("T2.120 (C09 I54): tickIntervalOf answers the floor for a shimmer span, null for none, and finds it inside a panel; ANIMATES keeps two true entries — not deferred on a component: lands with the content-aware cadence");
+});
+
+describe("C10 §4h — the categorical cycle, one copy", () => {
+  it.todo("T2.30 (C10 I37): refOf and CATEGORY_REFS from theme/categorical.ts are the same references marks.ts re-exports; blocks/** imports nothing from plot/** — not deferred on a component: lands with theme/categorical.ts");
+});

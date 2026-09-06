@@ -157,3 +157,16 @@ describe("C10 §4e — span attributes, tier 6", () => {
   it.todo("T6.94 (C04 I109): widening RampAnimation with sweep → T2.117's refusal row admits an event the render cannot time — not deferred on a component: lands with the Ramp type");
   it.todo("T6.95 (C04 I108): dropping ramp from progress's keys → T1.30's accepted row fails; adding it to rule → RAMP_EXTENT's exhaustiveness names the kind — not deferred on a component: lands with RAMP_EXTENT");
 });
+
+describe("C09 §5 — ramps, fail-on-revert", () => {
+  it.todo("C09 T6.94 (C09 I50): RAMP_EXTENT as a Set → T2.118's key-set row fails — not deferred on a component: lands with blocks/ramp.ts");
+  it.todo("C09 T6.95 (C09 I51): at from the run's start → T2.119's two-row row fails; a code-unit split → SGR inside the ZWJ family — not deferred on a component: lands with the ramp resolver");
+  it.todo("C09 T6.96 (C09 I52): the filled-length extent → T2.119's 30%/100% row fails on the first cell — not deferred on a component: lands with the progress painter");
+  it.todo("C09 T6.97 (C09 I53): a period in milliseconds → T1.28's breathe row fails at tick 5; a literal 100 beside the import → the identity assertion fails — not deferred on a component: lands with blocks/ramp.ts");
+  it.todo("C09 T6.98 (C09 I54): tickIntervalOf reading ANIMATES alone → T2.120 answers null and T4.8 serves one frame for the session — not deferred on a component: lands with the content-aware cadence");
+});
+
+describe("C10 §4h — ramps, fail-on-revert", () => {
+  it.todo("C10 T6.93 (C10 I36): a third band at 4-bit → T1.38 fails; a midpoint at 1-bit → T1.38 and C09 T3.71 fail; motion at 4-bit → T3.35's frames differ — not deferred on a component: lands with theme/ramp.ts");
+  it.todo("C10 T6.94 (C10 I37): a second refOf in blocks/ramp.ts → T2.30's identity row fails; importing from plot/marks.ts → MG1 names the cycle — not deferred on a component: lands with theme/categorical.ts");
+});

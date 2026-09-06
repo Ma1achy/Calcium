@@ -202,3 +202,12 @@ describe("C10 §4e — attributes are not on the glyph axis", () => {
     expect(cells(visible(row ?? ""))).toBe(cells(text));
   });
 });
+
+describe("C09 §5 — ramps at the rungs", () => {
+  it.todo("T3.71 (C09 I51, C10 I36): a slot-pair gradient at 4-bit is two colours; 1-bit is byte-identical to the block toned from; a colormap bar at 4-bit is byte-identical to no ramp — not deferred on a component: lands with the ramp resolver");
+  it.todo("T3.72 (C09 I51, I53): a single-cluster span samples the midpoint; under shimmer its five frames carry at most two colours; under wave every tick is the midpoint — not deferred on a component: lands with the ramp resolver");
+});
+
+describe("C10 §4h — motion at the rungs", () => {
+  it.todo("T3.35 (C10 I36, C09 I53): a shimmer at 4-bit is five identical two-colour frames; at 24-bit five distinct; at 1-bit equal to the block toned from — not deferred on a component: lands with the ramp resolver");
+});

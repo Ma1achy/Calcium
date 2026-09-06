@@ -328,3 +328,11 @@ describe("C10 §4e — span attributes and the resolved tone", () => {
     }
   });
 });
+
+describe("C09 §5 — ramps, the five loops", () => {
+  it.todo("T1.28 (C09 I53): each effect's t' at tick 0 is the static table; shimmer moves one cell per tick; breathe is 1 at tick 5 and 0 at 15; the unit is C03's spinner floor by identity — not deferred on a component: lands with blocks/ramp.ts");
+});
+
+describe("C10 §4h — a ramp sampled on the ladder", () => {
+  it.todo("T1.38 (C10 I36): a slot-pair gradient is from at 0, to at 1, the sRGB midpoint at 0.5; 8-bit is nearestAnsi256 of the mix; 4-bit is two indices and never a third; 1-bit is undefined; palette index 9 is categorical.c2 — not deferred on a component: lands with theme/ramp.ts");
+});
