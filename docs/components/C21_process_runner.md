@@ -112,6 +112,13 @@ test we run — because the devcontainer builds it by name in `make install`. An
 colours and no cause. The fallback belongs to the caller that can explain it — C23's shell route
 chooses between `spawnPty` and `spawnShell` before it calls either, and says which arm it is on.
 
+**And the choice needs something to read, so the runner reports it** (I18). `hasPty` is true
+exactly when a factory was injected — the one condition under which `spawnPty` throws for want of
+one. Without it the route's only way to learn its arm is to call `spawnPty` and catch, which makes
+a configuration error indistinguishable from a child that failed to start, and turns *chooses
+before it calls* into *falls back after it throws*. A ruling that names an operation is owed a seam
+to perform it from.
+
 **`spawnPty` is a third method rather than a flag on `spawnShell`**, on I1's own argument: the
 distinction is visible at the call site or it is invisible everywhere. Its handle is smaller than
 `ChildHandle` because a terminal has one stream by nature — there is no `stderr` to keep separate,
@@ -223,6 +230,7 @@ Per child handle.
 - **I15** — The PTY factory is a structural port: C21 imports no PTY package, and every member of `PtyProcess` and `PtyFactory` is satisfied by `node-pty`'s own shape.
 - **I16** — `spawnPty` with no factory injected throws naming `pty`, and never falls back to a pipe.
 - **I17** — A PTY child is signalled by group, counted by `killAll`, and ignores writes after exit, exactly as a piped child is.
+- **I18** — `hasPty` is true exactly when a PTY factory was injected, so an arm can be chosen without calling `spawnPty` and catching.
 
 ---
 
@@ -233,7 +241,7 @@ Per child handle.
 3. `spawnShell` resolves the user's shell rather than assuming one; which variable it reads and what it falls back to is §2 detail (I1).
 4. Children are detached and signalled by group, so pipelines die whole (I2).
 5. stdout and stderr stay separate and never reach the terminal (I3).
-6. A child that needs a terminal gets one through an injected port, and the framework depends on no PTY package to offer it (I15, I16, I17).
+6. A child that needs a terminal gets one through an injected port, and the framework depends on no PTY package to offer it (I15, I16, I17), I18).
 6. Decoding is streaming and multi-byte-safe (I4).
 7. Buffers are bounded at 8 MiB per stream; overflow drains rather than blocking (I5).
 8. `handoff` inherits stdio, does not detach, and refuses if raw mode is still set (I6, I7).
@@ -263,6 +271,7 @@ Six tiers. Every cell of the §7 table is covered. Tiers 1–3 use real short-li
 - **T1.9** (I13): spawning a non-existent binary → `exited` resolves, `pid` null, no unhandled rejection.
 - **T1.10**: `env` overrides are visible to the child; the rest of the environment is inherited.
 - **T1.11** (I15, I16): `spawnPty` with no `pty` in the deps throws, and the message names `pty`; with a fake factory it calls `spawn` once with the given `cols`, `rows`, `cwd` and `env`.
+- **T1.13** (I18): a runner built with no `pty` in its deps reports `hasPty === false` and `spawnPty` throws; one built with a fake factory reports `true` and `spawnPty` returns a handle — the flag and the throw are asserted against the same runner, so a flag that answers independently of the deps fails.
 - **T1.12** (I17): a fake PTY child that has exited → `signal` returns false, `write` is a no-op, and `exited` has resolved.
 
 ### Tier 2 — contract / interface
@@ -337,6 +346,7 @@ Six tiers. Every cell of the §7 table is covered. Tiers 1–3 use real short-li
 - **T6.13** (I12): importing anything from `terminal/`, type-only included → T2.3 fails. The type-only form is the one to watch: it erases at build, so it would pass a rule that only counted runtime edges while being exactly the dependency that ends L0's independence.
 - **T6.14**: ending the streams when the child exits rather than when its stdio closes → T3.18 fails. `exit` and `close` are separate events because the first can precede the delivery of output, and conflating them loses a short command's entire stdout under load.
 - **T6.15** (I16): falling back to `spawnShell` when no factory is injected → T1.11's throw becomes a handle, and a caller that asked for a terminal gets a pipe with no cause.
+- **T6.17** (I18): `hasPty` hard-coded to `true` → T1.13's no-factory arm fails, and the shell route chooses the PTY arm on a runner that cannot spawn one.
 - **T6.16** (I15): importing `node-pty` in `runner.ts` → T2.8's scan fails and the package becomes a runtime dependency by accident.
 
 ---

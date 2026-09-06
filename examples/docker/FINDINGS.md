@@ -30157,3 +30157,195 @@ route change; the fix is not deferred to the round after.
 
 ---
 
+## F845 — `DEPENDENCIES.md`'s heading said *four* over a table of five, and nothing could see it ★☆☆☆☆
+
+**What.** The runtime section is headed *Runtime — four* and has listed five packages since
+`highlight.js` landed (`d1fef2a3`). SS31 compares the file's **rows** against `package.json` and
+agrees exactly; the number in the heading is prose and is gated by nothing, so the two halves of
+one section disagreed through every green run.
+
+**Why it matters.** Small, and the class is not: this is the compression shape F86, F89 and F92
+record — a summary that keeps a body's claim and loses what made it true — arriving in a heading
+rather than an abstract. **Read the abstract against its own section before reading the section
+against the code**: the body was correct the whole time, so nothing that checks the body could
+find it, and a reader who trusts the heading carries *four* into the next argument about
+dependency weight. A03 §2's vacuity class in one word.
+
+**Ruling.** Corrected to six with the new row, and the heading now says what gates it and what
+does not. Not made into a rule: a count in a heading is one instance, and *two instances is the
+minimum for noticing a rule* — the second, if it comes, argues for deriving the number.
+
+**Where**: `DEPENDENCIES.md:9`; `tools/enforce/dependencies.mjs` (SS31);
+`docs/architecture/A04_repo_scaffolding.md` §2.
+
+---
+
+## F846 — the design named `ColourValue` for a block that cannot import it: the type was in the layer above ★★★☆☆
+
+**What.** `CALCIUM_LIVE_TERMINAL_DESIGN.md` Q5 ruled that a `terminal` block's runs carry a
+`ColourValue`, *which `theme/types.ts:174` already has in the three shapes it needs*. True, and in
+`src/presentation/` — L1. The block is C04's, in `src/data/` — L0 — and L0 imports nothing from
+above. The first `tsc` run said so, in three lines, before any test existed.
+
+**Why it matters.** It is F838's class again and it arrived at the same place in the arc: a design
+measurement that resolved a **symbol** without resolving its **layer**. A grep for `ColourValue`
+finds the type, its shape, its doc comment and its consumers, and every one of those confirms the
+ruling; nothing in the answer carries the directory. The measurement that would have caught it is
+the one the tree already writes down — *ask what a claim resolves to at HEAD* — extended by one
+question: **which layer does it resolve in.**
+
+**Ruling.** The type is **homed to C04** and re-exported from `theme/types.ts`, so all fifty-six
+call sites are unchanged and there is one declaration. It is `refOf`'s move (C10 §4h) in the
+opposite direction and for the same reason: the vocabulary belongs to the layer that needs it
+lowest, and a duplicated shape is the reimplemented-rule hazard rather than a second opinion. The
+doc comment moved with it and now says why it sits below the component that hands one out.
+
+**And the ruling survived its own falsification, which is the part worth keeping.** Q5's *reason*
+— a child's colour is data, not a slot — was never in question; only the sentence about where the
+type lived. Look for the ruling's other reason before abandoning the ruling.
+
+**Where**: `src/data/viewmodel/types.ts` (the declaration); `src/presentation/theme/types.ts:174`
+(the re-export); `docs/notes/CALCIUM_LIVE_TERMINAL_DESIGN.md` Q4, Q5.
+
+---
+
+## F847 — three things the emulator's first run corrected, and each was written down before it was measured ★★★☆☆
+
+**What.** The C27 wrapper was written from the spec and the spec from a probe. Three of its
+statements were wrong, and all three failed within one test run:
+
+| stated | measured |
+|---|---|
+| the buffer API is available | every accessor throws *you must set the allowProposedApi option* — the probe passed `allowProposedApi: true` and the wrapper did not, so the flag was invisible in the transcription |
+| `dropped` counts lines lost at the cap | a line feed under the cap loses nothing. 30 feeds at `scrollback: 20, rows: 4` leaves **24** lines whose first is *line 8*, so **7** are gone; the spec row said 6 and *line 7*, and the code written from it counted 1 |
+| `cells("wide 漢字 x")` is 10 | 11 |
+
+**Why it matters.** The first is *a probe rebuilt from intent agrees* in miniature: the probe and
+the wrapper were written by the same author from the same understanding, and the difference
+between them was a line the second did not carry. The second is the sharper one — **the invariant
+was worded as an effect (*lines lost at the cap*) rather than as a relation, and an effect is
+satisfied by a count of feeds**, which is exactly what the first implementation did while reading
+as correct. I7 now states `feeds + 1 − length`, and the `+ 1` is the row the buffer starts on that
+no feed made. The third is arithmetic done in prose.
+
+**Ruling.** The figures in C27 §9 are now measured and say so; I7 states the relation; the flag is
+set at construction with the pin's reason beside it — a proposed API is one the package may change
+between minors, which is why the version is exact rather than caret-ranged.
+
+**Where**: `src/data/emulator/emulator.ts`; `docs/components/C27_terminal_emulator.md` I7, T1.4,
+T1.6; `docs/notes/CALCIUM_LIVE_TERMINAL_DESIGN.md` M2a.
+
+---
+
+## F848 — SS47 refused U+FFFD and was right: the sanitiser's stand-in is a mark the framework draws ★★☆☆☆
+
+**What.** C27's containment gate replaced a control character with U+FFFD, the obvious choice and
+what every transcoder reaches for. A03 SS47 refused it: *a mark the framework draws is a `Glyph`
+slot, or a pair resolved where the capability is in hand, or ASCII* (C09 I22). C27 is L0 and has
+no capabilities to resolve a slot with.
+
+**Why it matters.** The rule caught a real defect rather than an inconvenience. U+FFFD is East
+Asian Ambiguous and absent from most ASCII-only fonts, so the character chosen to mean *this could
+not be carried* is itself one the terminal may not carry — and at the ASCII arm the substitution
+would have needed a substitution. **The obvious character was obvious because the question had
+been asked at the wrong layer**: a stand-in in a *data* structure is not chrome and cannot degrade,
+so it has to be a character that needs no rung.
+
+**Ruling.** An ASCII question mark, which measures 1 cell at every arm and is what `iconv` puts in
+the same position. Recorded in C27 I2 with the rule that refused the alternative, so the next
+person does not re-derive U+FFFD from first principles.
+
+**Where**: `src/data/emulator/snapshot.ts` (`UNREPRESENTABLE`); `tools/enforce/source-scans.mjs`
+SS47; `docs/components/C27_terminal_emulator.md` I2.
+
+---
+
+## F849 — an exemption removed by a name it shares ★★★☆☆
+
+MG24's exemption list carried `FrameScheduler.pending` and `CompletionEngine.pending`, both as
+published members with no consumer. C23's shell route began reading `deps.scheduler.pending` to
+coalesce its snapshots, and **both entries failed the equality arm in the same run** — the first
+correctly, the second for a member nobody has ever read.
+
+**The rule resolves a member by its bare name**, which its own header records as a blind spot: the
+`Basis` note says `right`, `up`, `f` and `aspect` are absent from the list because their names are
+shared with other owners. That was written about violations the rule cannot *see*. This is the same
+mechanism from the other side, and it is the direction nobody had stated — a shared name does not
+only hide a defect, it can evict a true exemption, and the eviction reads exactly like a member
+having been wired.
+
+**Neither direction is fixable inside a scan.** Qualifying `pending` by its owner is a type
+resolution, and the rule is deliberately textual (F83's measurement is what set that). So the
+disposition is the reason, not the entry: `CompletionEngine.pending` left with a comment in the
+list's own body saying it went for the collision rather than for a consumer. An entry the equality
+arm refuses cannot be kept, and a reason with nowhere to live is how the next reader concludes C19's
+member was wired.
+
+**The figure the gate already prints**, unread until now: *MG24 is exact for 598/1901 members; the
+rest share a name with another owner — id (40), kind (30), text (27), label (24), width (20)*. Two
+thirds of the corpus is in the inexact half. That line was a diagnostic; it is the population of
+this defect.
+
+**Where**: `tools/enforce/module-graph.mjs` `UNCONSUMED_MEMBERS`; the count line in `index.mjs`.
+
+---
+
+## F850 — the settle read a screen the parser had not reached ★★★★☆
+
+C23's shell route wrote each chunk into the emulator with a floating promise and awaited the
+child's *streams*. Those are two different things: a `for await` over `stdout` finishes when the
+generator stops yielding, and `Emulator.write` resolves when the parser has taken the bytes (C27
+I3). The route awaited the first and settled.
+
+**Measured**: a hundred-line command settled with sixteen lines, and a command whose whole output
+was one line settled with a blank screen. **Every assertion about the exit code, the status and the
+error field passed**, because none of them is about the screen.
+
+Two defects from one cause, and the second is the one that threw. A write resolving *after* the
+route disposed the emulator ran its continuation against a disposed screen — C27's refusal, out of a
+floating promise, which vitest reports as an unhandled error attributed to whichever test was
+running. The route now chains every write into one promise it can await, and guards the
+continuations with a `finished` flag.
+
+**Neither walk artefact could reach it.** §4's classification table indexes the head's states at
+rest; §5's sequence trace indexes events between rules. This is the *continuation of an operation
+the settle did not await* — no row of either shape asks what is still in flight when a component
+decides it is done. The nearest existing rule is *ask who sees the refusal*; the missing one is **ask
+what the settle is awaiting, and whether it is the thing that carries the state**.
+
+**Found by the suite**, on a row written for a different claim: T3.17 asserts that the shell's own
+line reaches the document, and it was the only assertion in the file that reads the screen rather
+than the exit.
+
+**Where**: `src/shell/execution.ts` `runShell` (`writes`, `finished`); C23 §3c.
+
+---
+
+## F851 — a poll for `null` is satisfied by the instant before the start ★★★☆☆
+
+The test helper that lets a `void`-ed route settle was one `setImmediate`. The live shell route
+outlives that — it awaits a real emulator — so the helper was given the pipeline and told to wait
+while `inFlight` was non-null.
+
+**It returned immediately, every time.** `submit` had not yet taken the guard, so `inFlight` was
+already `null` on the first read and the loop never ran: the helper waited *less* than the version
+it replaced. The row it was written for asserted a hundred lines, read sixteen, and **passed the
+count it was checking** — `toBeLessThan(20)` is true of zero.
+
+Two more corrections came out of it, and both are the same shape as the first:
+
+- **Wait for the guard to be taken before waiting for it to be released.** A single-phase poll
+  cannot tell *not started* from *finished*.
+- **Bound the wait by the clock, not by a turn count.** Five thousand `setImmediate`s were not
+  enough for a hundred writes, because the emulator's parser resolves on a timer; a fixed count is a
+  guess about a dependency's scheduling, and a deadline is a guess about nothing.
+
+**And the exception, which is a third phase of the same mistake**: rows that deliberately park a
+route — two queued submissions with one completion, a call waiting on approval — must use the bare
+helper. Given the pipeline they wait the whole deadline three times and fail as a timeout with no
+sentence in it.
+
+**Where**: `test/support/execution.ts` and `test/unit/execution.test.ts` (`settled`).
+
+---
+

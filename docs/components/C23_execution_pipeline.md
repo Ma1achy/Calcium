@@ -1041,10 +1041,10 @@ Per submission.
 - **I62** — **A call's children are appended in start order and never reordered, a running child is head only, a settled child's body is collapsed, and the parent's outcome is derived by `rollUp` on every child's settlement while its duration is its own readout.** Same-unit counts sum; otherwise `k of N`, with `· m failed` when any did; the parent never adopts a child's message. The children's durations do not add up to the parent's and are not made to (§8f P13, §8g rows 20–21, → C22 I89).
 ---
 - **I63** — **The shell route chooses its arm before it spawns and never switches: `spawnPty` when a factory is injected, `spawnShell` into one emulator when not, and a failure on either arm is reported rather than retried on the other.** A caller that asked for a terminal and silently got a pipe sees a child with no colours and no cause (C21 I16's reason, one layer up).
-- **I64** — **One snapshot per committed frame, taken when the frame is composed.** Not one per chunk: the emulator is marked dirty and C03's `stream` window decides the cadence, which is the same seam the readout re-renders a head through.
+- **I64** — **One snapshot per committed frame, and no chunk snapshots while a frame is pending.** Not one per chunk: a chunk arriving against `scheduler.pending` marks the emulator dirty and returns, and the first chunk after the frame lands carries the accumulation. The 1 Hz readout is the backstop for a quiet tail, and is not the cadence.
 - **I65** — **On a width change the child is resized before the emulator.** The reverse order gives the child a SIGWINCH for a size the emulator has not taken, and one frame is drawn from a repaint against the old grid.
 - **I66** — **The shell route registers a cancel, and the screen survives it.** The ladder's first rung signals the child's group and the card settles `cancelled` holding what it had drawn.
-- **I67** — **A settled terminal block carries no cursor, and what it keeps is decided by the screen flag: the scrollback in `lines` mode, the grid in `grid` mode.** Two artefacts, and the flag the child itself set says which one it left behind.
+- **I67** — **Every write is awaited before the final snapshot, and a settled terminal block carries no cursor, and what it keeps is decided by the screen flag: the scrollback in `lines` mode, the grid in `grid` mode.** Two artefacts, and the flag the child itself set says which one it left behind.
 
 
 ## 8. Commitments
@@ -1117,7 +1117,12 @@ appended one `raw` block: nothing appeared until the child was done, and `⌃c` 
 because no cancel was registered (F843, F844). Both are fixed here, and the second is not deferred
 to a later round — a key that stops two routes of three is a key nobody can predict.
 
-**The arms, chosen before either is called** (I63). With a `PtyFactory` injected the route calls
+**The arms, chosen before either is called** (I63), and the runner is asked rather than tried:
+`hasPty` (C21 I18) reports whether a factory was injected. Calling `spawnPty` to see whether it
+throws is the same fallback under another name, and it cannot tell a missing factory from a child
+that failed to start.
+
+With a `PtyFactory` injected the route calls
 `spawnPty` and the child gets a terminal: `isatty` is true, so it keeps its colours, its spinner
 and its progress bar. With none it calls `spawnShell` and writes **both** streams into the same
 emulator in arrival order. C21 I3 is not weakened — the handle's streams are still separate, and
@@ -1135,14 +1140,28 @@ width change the route resizes the **child first and the emulator second** (I65)
 sends the child a SIGWINCH for a size the emulator does not have, and its repaint lands on the old
 grid for one frame.
 
-**One snapshot per committed frame** (I64). Each chunk marks the emulator dirty and asks C03 for a
-`stream` commit; the snapshot is taken when the frame is composed, through the seam the readout
-already uses to re-render a head on a tick. A snapshot per chunk would push a 2,000-line value
-into C13 for every write, which is the cost C03 exists to prevent.
+**One snapshot per committed frame** (I64), and the signal that decides it is C03's own
+`pending`. A chunk arriving while a frame is already scheduled adds nothing a reader can see, so it
+marks the emulator dirty and returns; the first chunk after the frame lands carries everything
+accumulated since. A snapshot per chunk would push a 2,000-line value into C13 for every write,
+which is the cost C03 exists to prevent.
+
+**The readout is the backstop for the tail, not the cadence.** A child that writes a last chunk
+into a scheduled frame and then goes quiet has nothing left to trigger the catch-up, so the 1 Hz
+readout re-renders the block on its wake — the same registration a head's elapsed figure uses. It
+is named as the backstop rather than as the mechanism because *the snapshot is taken when the frame
+is composed* would be satisfied by a route that only ever drew at 1 Hz.
 
 **Cancel** (I66). The route registers `cancelInFlight` like the app and local routes do. Rung one
 signals the child's group (C21 I2); the card settles `cancelled` and **the screen is kept**,
 because a cancelled build's last lines are the reason it was cancelled.
+
+**Every write is awaited before the screen is read** (I67, C27 I3). The child's streams and the
+emulator's parser are two different things to wait for: a `for await` finishes when the generator
+stops yielding, and `write` resolves when the bytes have been taken. A route that awaits only the
+first settles from a screen its last chunks have not reached — measured at a hundred lines settling
+as sixteen, with every assertion about the exit code passing (F850). The writes are therefore one
+chain the settle can await, which fixes their order as well.
 
 **Settling** (I67). The final snapshot is taken before the emulator is disposed, with `cursor`
 dropped — a settled screen has nobody writing to it. In `lines` mode the block keeps the
@@ -1914,6 +1933,7 @@ Fake transport, fake stores.
 - **T1.49** (→ C04 I13): `/debug` renders `origin` for a fault notice. **The arm's justification, made durable** — `defect` earns a fifth arm on a public union only because it separates a contained failure from a verb that did nothing *in the one field that could say so*, and that holds only while something displays it. Checked by reading the handler before the arm landed; this is the same answer for whoever edits that handler next.
 - **T1.48** (I1, §8b B1): a swallowed append → the transcript holds **one** entry, and it is the fault notice rather than the submission's. The count and the identity, because a row asserting only the count passes on the day the notice is the wrong document.
 - **T1.51** (I64): 100 chunks written inside one `stream` window produce **one** `replace` patch, and its block holds all 100 lines.
+- **T1.53** (I64): a chunk written while `scheduler.pending` is true produces no patch; the next chunk after the frame lands produces one holding both. Then a child that goes quiet with a pending frame → the readout's wake renders the missing lines, asserted with no further chunk written.
 - **T1.52** (I63): with a factory injected the route calls `spawnPty` and never `spawnShell`; with none it calls `spawnShell` and never `spawnPty`. Two spies, four assertions.
 
 ### Tier 2 — contract / interface
@@ -2099,6 +2119,7 @@ Fake transport, fake stores.
 - **T6.92** (I62): children sorted by settlement → T4.53's order assertion fails; `rollUp` restating the first child's outcome → T4.53's `2 of 3 · 1 failed` fails; the parent's figure summed from the children → T4.53's wall-clock assertion fails.
 - **T6.83** (I54): registering the readout at enqueue, or leaving the queued notice in place at the route → T4.41 fails on one half each: a queued line counts its wait as its run, or runs reading *queued behind*.
 - **T6.53** (I53): dropping the readout's arming clause from `armParts` → T3.61 fails at its second assertion — the figure never moves because no wake is armed, F227's class one row over — while every `elapsedNeeded` row stays green. Dropping the `settled` deletion → T3.61 fails at its third: the settled header keeps counting.
+- **T6.98** (I64): dropping the readout registration → T1.53's tail arm fails and a child's last lines wait for a chunk that never comes.
 - **T6.93** (I64): snapshotting per chunk → T1.51 counts 100 patches and a 2,000-line value enters the store per write.
 - **T6.94** (I65): resizing the emulator first → T4.64's call order fails and one frame is drawn from the old grid.
 - **T6.95** (I66): dropping the cancel registration → T3.62 fails, which is the defect F844 records as shipped.

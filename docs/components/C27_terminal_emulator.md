@@ -118,8 +118,8 @@ settle is the route's (C23), by omission, not the emulator's.
 dropped*.
 
 **Containment** (I2). The dependency interprets C0 controls and never stores them as cells, and
-the snapshot **re-checks every character** it emits: a C0 or C1 control that reaches the walk is
-replaced by U+FFFD. C04's validator refuses a `Terminal` whose text carries one regardless, so a
+the snapshot **re-checks every character** it emits: a C0 or C1 control that reaches the walk, and an unpaired surrogate, is
+replaced by an ASCII question mark. C04's validator refuses a `Terminal` whose text carries one regardless, so a
 snapshot from any source — this component, the far side, a persisted document — cannot carry an
 escape to the outer terminal. Two gates for one property, because the property is the one that
 corrupts state the application can no longer see.
@@ -148,7 +148,7 @@ new width (design S8). C27 only reflows; it does not know a child exists.
 | `?1000h` … (mouse tracking), `?2004h` (bracketed paste) | records the mode in the dependency; nothing reads it this round. The attach round reads it to say *this program wants the mouse* |
 | `CSI c`, `CSI 6 n`, `DCS … ST` queries | **no answer**. The dependency would emit a response through `onData` and nothing subscribes, so a child that waits for one waits. `vim` waits about a second for its `t_RV` reply and then proceeds; the attach round wires `onData` to `PtyProcess.write` and the wait goes away. Recorded in design §7 as the deferral's fourth row |
 | an unknown CSI, DCS or OSC | dropped, not stored (I9, design M5). **Passing an unknown sequence through is how a block corrupts the frame around it** — the tempting implementation is a passthrough default and it is wrong on the twentieth program |
-| a C1 control in the text | replaced by U+FFFD at the walk (I2) |
+| a C1 control, or an unpaired surrogate, in the text | replaced by `?` at the walk (I2) |
 
 ---
 
@@ -170,7 +170,7 @@ takes its final snapshot **before** disposing (C23).
 ## 7. Invariants
 
 - **I1** — C27 emits no bytes. It writes to no stream, subscribes to no `onData`, and has no reference to the real `process.stdout` or `process.stdin`.
-- **I2** — Every `TerminalLine.text` in a snapshot is free of C0 and C1 controls. A control that reaches the cell walk is replaced by U+FFFD.
+- **I2** — Every `TerminalLine.text` in a snapshot is free of C0 and C1 controls and of unpaired surrogates; each is replaced by an ASCII question mark. **ASCII rather than U+FFFD**, because a mark the framework draws needs a `Glyph` slot with a rung (C09 I22, A03 SS47) and C27 is L0 with no capabilities in hand — the rule refused the obvious character and was right.
 - **I3** — A `write` whose promise has resolved is visible in the next `snapshot`; a snapshot is a frozen value unaffected by later writes.
 - **I4** — In `lines` mode `lines` is the scrollback then the screen, trimmed to the later of the last non-empty line and the cursor's line; in `grid` mode `lines` has exactly `rows` entries. `screen` names the active buffer and `cursor` indexes into `lines`.
 - **I5** — A run covers a maximal range of adjacent cells with one style; a default-styled cell is in no run; colours are `ColourValue`s formatted from the cell's integer.
@@ -209,7 +209,7 @@ literal: `src/data/emulator/` writes none (A03's escape rule is about `src/`).
 - **T1.1** (I3): `write("hi")` then `snapshot` → one line `hi`; the snapshot taken before the promise resolved may be empty and the one after is not.
 - **T1.2** (I5): `\x1b[38;2;10;200;30mrgb\x1b[38;5;208m256\x1b[31m16\x1b[0m` → three runs: `rgb` `{kind:"rgb", hex:"#0ac81e"}`, `ansi256` 208, `ansi16` 1; the text is `rgb25616`.
 - **T1.3** (I5): `\x1b[1;3;4;7;9;2m` → one run with all six booleans true; `\x1b[5m` (blink) and `\x1b[8m` (invisible) produce no run.
-- **T1.4** (I6): `wide 漢字 x` → text is that string, `cells(text)` is 10, and no line contains U+0000 or an empty filler.
+- **T1.4** (I6): `wide 漢字 x` → text is that string, `cells(text)` is 11, and no character of the text is empty. **The second assertion is the one that bites**: `cells()` reads the same 11 whether or not the filler is emitted, so a width check alone cannot see the defect.
 - **T1.5** (I4): `?1049h` → `screen` is `"grid"` and `lines.length === rows`; `?1049l` → `"lines"` and the earlier lines are intact.
 - **T1.6** (I7): `scrollback: 20, rows: 4`, 30 `\r\n`-terminated lines → `lines.length === 24`, `dropped === 6`; the first line kept is `line 7`. The two figures are asserted separately — a conservation total is satisfied by redistribution.
 - **T1.7** (I10): 40 columns, seven lines including a 60-character one → `resize(20, 4)` → nine lines, the same characters in order when the texts are concatenated.
@@ -233,7 +233,7 @@ literal: `src/data/emulator/` writes none (A03's escape rule is about `src/`).
 - **T3.1** (I6): `漢` written at column 39 of 40 → it begins the next line; no line has `cells(text) > 40`.
 - **T3.2** (I9): `\x1bPunknown\x1b\\` and `\x1b[?9999z` between two words → the text is the two words.
 - **T3.3** (I4): a chunk split inside an escape — `\x1b[3` then `1mred` — → one run, `ansi16` 1, over `red`.
-- **T3.4** (I4): a chunk split inside a wide cluster's bytes (UTF-8 `Uint8Array` halves) → one `漢`, not two replacement marks.
+- **T3.4** (I4): a chunk split inside a wide cluster's bytes (UTF-8 `Uint8Array` halves) → one `漢`, not two stand-ins.
 - **T3.5** (I7): `scrollback: 0` → `lines.length ≤ rows` always and `dropped` counts everything scrolled out.
 - **T3.6** (I12): `write` after `dispose` throws and the message names `dispose`.
 - **T3.7** (I12): `snapshot` after `dispose` throws; it does not return the last value.
@@ -249,20 +249,20 @@ literal: `src/data/emulator/` writes none (A03's escape rule is about `src/`).
 
 ### Tier 5 — e2e
 
-- **T5.1**: under the devcontainer's `node-pty`, `sh -c 'printf "a\\r\\033[Kb\\n"; printf "\\033[32mok\\033[0m\\n"'` piped into `write` → two lines, `b` and `ok`, the second with an `ansi16` 2 run. Real bytes from a real tty, not a string constant.
-- **T5.2**: `sh -c 'seq 1 30'` at `scrollback: 20, rows: 4` → `dropped === 6`, matching T1.6 from a real child.
+- **T5.1** (I4, I5): under the devcontainer's `node-pty`, a child's `\r`, `\x1b[K` and SGR arrive as one screen — two lines, `b` and `ok`, the second with an `ansi16` 2 run. Real bytes from a real tty, not a string constant.
+- **T5.2** (I7): `sh -c 'seq 1 30'` at `scrollback: 20, rows: 4` → 24 lines, `dropped === 7`, first kept `8` — T1.6's figures from a real child through a real pty.
 
 ### Tier 6 — fail-on-revert
 
-- **T6.1** (I2): removing the U+FFFD replacement from the walk → T2.4 fails on the first corpus string carrying a C1.
-- **T6.2** (I3): resolving `write`'s promise before the parser callback → T1.1's second snapshot is empty on a slow parse.
+- **T6.1** (I2): removing the replacement from the walk → T2.4 fails on the first corpus string carrying a C1.
+- **T6.2** (I3): resolving `write`'s promise before the parser callback → T1.1's second snapshot is empty on a slow parse. **Stated, not written**: the harness cannot slow the parser without reaching inside the package, so this row is the mutation pass's rather than the suite's — `c27-emulator.mjs` makes the change and T1.1 and T3.10 are what die.
 - **T6.3** (I5): emitting a run for default-styled cells → T1.2's run count is four, not three.
 - **T6.4** (I6): including the wide cluster's filler cell as an empty character → T1.4's no-empty-character assertion fails; `cells(text)` alone would still read 10, which is why T1.4 asserts both.
 - **T6.5** (I7): counting `dropped` from `onLineFeed` instead of from scrolls at the cap → T1.6 reads 30, not 6.
 - **T6.6** (I4): returning `rows` lines in `lines` mode → T1.1 has six lines for one write.
 - **T6.7** (I8): subscribing `onTitleChange` and storing the title on the block → T2.3's deep-equal fails.
 - **T6.8** (I12): `snapshot` after `dispose` returning the last value → T3.7 fails.
-- **T6.9** (I11): importing `@xterm/headless` from `snapshot.ts` → T2.1 fails.
+- **T6.9** (I11): importing `@xterm/headless` from `snapshot.ts` → T2.1 fails. The mutation pass makes the edit; the assertion is T2.1's, over the stripped source (a comment naming the package is prose, and counting it would measure the documentation).
 - **T6.10** (I10): applying the cap before the reflow → T1.7 loses a line when the reflow lands over the cap at `scrollback: 8`.
 
 ---
