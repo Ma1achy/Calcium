@@ -423,6 +423,60 @@ describe("C23 — the shell route as a live screen, spec-first rows", () => {
     expect(h.calls, "falling back would hide it behind a duller child").not.toContain("spawnShell");
   });
 
+  it("T3.64 (C23 I67, C27 I11): a chunk arriving as the child exits is dropped, not written to a disposed screen", async () => {
+    // **The window CI opened and this machine did not** (F850's second
+    // instance). `finished` is set *after* the drain, so a chunk accepted while
+    // `writes` is being awaited chains onto it past the await and runs against
+    // a disposed emulator — C27's refusal, thrown out of a floating promise,
+    // which vitest reports as an unhandled error against whichever test was
+    // running. One scheduler turn wide, and a loaded runner is what opens it.
+    let emit: ((c: string) => void) | null = null;
+    let done: ((e: { code: number | null; signal: string | null }) => void) | null = null;
+    const h = pipelineHarness({
+      hasPty: true,
+      spawnPty: () => ({
+        pid: 1,
+        exited: new Promise((r) => {
+          done = r as (e: { code: number | null; signal: string | null }) => void;
+        }),
+        running: true,
+        onData: (cb) => {
+          emit = cb;
+        },
+        write: () => undefined,
+        resize: () => undefined,
+        signal: () => true,
+      }),
+    });
+    const errors: unknown[] = [];
+    const onRejection = (e: unknown): void => void errors.push(e);
+    process.on("unhandledRejection", onRejection);
+
+    h.pipeline.submit("make");
+    await settled();
+    (emit as unknown as (c: string) => void)("before the exit\r\n");
+    for (let i = 0; i < 40; i += 1) await new Promise((r) => void setTimeout(r, 0));
+
+    // **Emitted across the turns that follow the exit, not only on it.** A chunk
+    // sent in the same turn is drained normally and proves nothing; the window
+    // is the one turn where the route has resumed from `await child.exited` and
+    // is awaiting the chain. Which turn that is depends on the emulator's own
+    // scheduling, so the fixture covers several rather than guessing one.
+    (done as unknown as (e: { code: number | null; signal: string | null }) => void)({ code: 0, signal: null });
+    for (let i = 0; i < 8; i += 1) {
+      (emit as unknown as (c: string) => void)(`after the exit ${String(i)}\r\n`);
+      await new Promise((r) => void setTimeout(r, 0));
+    }
+    await settled(h.pipeline);
+    for (let i = 0; i < 40; i += 1) await new Promise((r) => void setTimeout(r, 0));
+    process.off("unhandledRejection", onRejection);
+
+    expect(errors, "a write reached a disposed emulator").toEqual([]);
+    const doc = h.transcript.entries[0]?.doc;
+    expect(doc?.status, "the route settled").toBe("ok");
+    expect(JSON.stringify(doc?.blocks), "what the child wrote before it exited").toContain("before the exit");
+  });
+
   it("T4.64 (C23 I65): the child and the emulator are told the same width", async () => {
     // **Two spies, because one cannot see an agreement.** The first version of
     // this row watched only the child's call and asserted its position in a

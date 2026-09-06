@@ -729,9 +729,25 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
      * cannot be reordered.
      */
     let writes: Promise<void> = Promise.resolve();
+    /**
+     * **Two flags, because `finished` guards the wrong moment on its own.**
+     *
+     * `finished` is set after the drain, and a chunk arriving *during* the drain
+     * chains onto `writes` after the settle has already captured it — so the
+     * link runs against a disposed emulator, which is C27's refusal thrown out
+     * of a floating promise. It reproduced on CI and not here: the window is one
+     * scheduler turn wide and a loaded runner is what opens it.
+     *
+     * `accepting` closes at the exit, before anything is awaited, so the chain
+     * cannot grow past what the drain will wait for.
+     */
+    let accepting = true;
     const onChunk = (chunk: string): void => {
-      if (finished) return;
+      if (!accepting) return;
       writes = writes.then(async () => {
+        // Re-checked inside the link: `accepting` closes between the queue and
+        // the run, which is the whole of the window above.
+        if (!accepting) return;
         await emulator.write(chunk);
         if (!deps.scheduler.pending) draw();
       });
@@ -825,6 +841,9 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
        * decided by the screen the child left — the scrollback for a log, the
        * grid for a program that owned the screen.
        */
+      // **The gate closes before the drain, not after it** — a chunk accepted
+      // while `writes` is being awaited extends the chain past the await.
+      accepting = false;
       // **Before anything reads the screen** — the child has exited, and what it
       // wrote last may still be in the parser.
       await writes;
@@ -876,6 +895,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         { line, into: pendingId },
       );
     } catch (cause) {
+      accepting = false;
       finished = true;
       refresh.settled(pendingId);
       emulator.dispose();

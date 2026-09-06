@@ -30307,6 +30307,19 @@ floating promise, which vitest reports as an unhandled error attributed to which
 running. The route now chains every write into one promise it can await, and guards the
 continuations with a `finished` flag.
 
+**A second instance, and the guard was in the wrong place rather than missing** (2026-09-06, CI).
+`finished` is set *after* the drain, so a chunk accepted while `writes` is being awaited chains onto
+it past the await and runs against a disposed emulator anyway. The window is one scheduler turn wide;
+it reproduced on the runner and not on the machine that wrote the fix. The gate now closes at the
+exit, before anything is awaited, and the chained link re-checks it — because `accepting` closes
+between a link being queued and being run, which is the whole of the window.
+
+**The row that catches it had to be widened before it could.** Emitting a chunk in the same turn as
+the exit proves nothing: it is drained normally. The fixture emits across the eight turns that follow,
+because which turn falls inside the drain depends on the emulator's own scheduling — a fixture aimed
+at one guessed turn is a fixture that has not been shown to respond. With the gate removed it
+reports seven rejections; with it, none.
+
 **Neither walk artefact could reach it.** §4's classification table indexes the head's states at
 rest; §5's sequence trace indexes events between rules. This is the *continuation of an operation
 the settle did not await* — no row of either shape asks what is still in flight when a component

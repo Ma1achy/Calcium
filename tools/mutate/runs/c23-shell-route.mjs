@@ -124,6 +124,18 @@ const results = runPass({
       expect: "T1.53",
     },
     {
+      // **The accept gate, back where it does not close the window** (F850's
+      // second instance). `finished` is set after the drain, so a chunk accepted
+      // while `writes` is awaited chains onto it past the await and writes to a
+      // disposed emulator. One scheduler turn wide: it reproduced on CI and not
+      // on the machine that wrote it.
+      name: "the accept gate closes after the drain rather than before it",
+      file: FILE,
+      from: "      accepting = false;\n      // **Before anything reads the screen**",
+      to: "      // **Before anything reads the screen**",
+      expect: "T3.64",
+    },
+    {
       // **The settle reading a screen the parser has not caught up with**
       // (C27 I3). Measured: a command whose whole output was one line settled
       // blank, and every assertion about its exit code passed.
