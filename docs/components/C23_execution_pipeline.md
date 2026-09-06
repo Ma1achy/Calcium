@@ -1042,7 +1042,7 @@ Per submission.
 ---
 - **I63** — **The shell route chooses its arm before it spawns and never switches: `spawnPty` when a factory is injected, `spawnShell` into one emulator when not, and a failure on either arm is reported rather than retried on the other.** A caller that asked for a terminal and silently got a pipe sees a child with no colours and no cause (C21 I16's reason, one layer up).
 - **I64** — **One snapshot per committed frame, and no chunk snapshots while a frame is pending.** Not one per chunk: a chunk arriving against `scheduler.pending` marks the emulator dirty and returns, and the first chunk after the frame lands carries the accumulation. The 1 Hz readout is the backstop for a quiet tail, and is not the cadence.
-- **I65** — **On a width change the child is resized before the emulator.** The reverse order gives the child a SIGWINCH for a size the emulator has not taken, and one frame is drawn from a repaint against the old grid.
+- **I65** — **A width change tells the child and the emulator the same number, computed once, from one signal.** Not an order: the child's repaint reaches the emulator through the write queue, so it cannot arrive between the two calls however they are sequenced, and an ordering claim here constrains nothing. What can be wrong is the figure — the region's width where the body's belongs, or two computations that disagree by `BODY_INDENT` — and a child wrapping at a column the grid does not have puts every line after the first in the wrong place.
 - **I66** — **The shell route registers a cancel, and the screen survives it.** The ladder's first rung signals the child's group and the card settles `cancelled` holding what it had drawn.
 - **I67** — **Every write is awaited before the final snapshot, and a settled terminal block carries no cursor, and what it keeps is decided by the screen flag: the scrollback in `lines` mode, the grid in `grid` mode.** Two artefacts, and the flag the child itself set says which one it left behind.
 
@@ -1136,9 +1136,20 @@ strip colour we are able to draw.
 **The block, its size and its resize.** The body is `scroll({ height, follow: true, children: [the
 terminal] })`, `height` defaulting to six. `cols` is the body's inner width, handed down from C01
 through the shell — this route reads no terminal width — and `rows` is the declared height. On a
-width change the route resizes the **child first and the emulator second** (I65): the other order
-sends the child a SIGWINCH for a size the emulator does not have, and its repaint lands on the old
-grid for one frame.
+width change the route tells **both the child and the emulator the same number**, computed once
+(I65).
+
+**This was an ordering rule, twice, and neither version was a property this code can have** (F852).
+It first read *child before emulator*, justified by a sentence that argues for the opposite order;
+correcting the order left a rule the mutation pass still could not kill, and the third attempt —
+deferring the emulator's resize by a microtask, so a queued write could land between — passed too.
+The reason is structural: a child's repaint arrives as bytes on the write queue, which resolves well
+after both calls have returned, so **no write can be applied between them at any granularity**. An
+ordering claim here is A03 §2's vacuity class in an invariant.
+
+What is left is the figure, and it is worth stating: `cols` is the body's inner width, not the
+region's, and the child and the emulator are told the same one. A child wrapping at a column the
+grid does not have puts every line after the first in the wrong place.
 
 **One snapshot per committed frame** (I64), and the signal that decides it is C03's own
 `pending`. A chunk arriving while a frame is already scheduled adds nothing a reader can see, so it
@@ -2077,7 +2088,7 @@ Fake transport, fake stores.
 - **T6.36** (I21): retrying a `render` throw → T1.33 fails; the screen flickers at the interval and the outcome never changes.
 - **T4.23** (I38, C05 I23): a manifest declaring `run` interactive with `detach` carrying the arm. `/run -d nginx` reaches the transport and its document carries the far side's output; `/run -it alpine sh` reaches `handoff`. **Both halves in one row**, because a route that always spawns satisfies the first and a route that always hands off satisfies the second.
 - **T4.24** (I38): `/exec` with its required argument missing → an error document, and `runner.handoff` is never called. The fake's call count is the assertion; a test checking only the document passes on the ordering that spawns first and reports afterwards.
-- **T4.64** (I65, with C27): a width change mid-run → `resize` on the child precedes `resize` on the emulator, asserted by call order on one spy; the next frame's line count matches the reflow.
+- **T4.64** (I65, with C27): a width change mid-run → the child's `resize` spy records the width it was given, the settled block's `cols` records the emulator's, and the two are the same number and equal to the body's inner width. **Two spies, because one cannot see an agreement**: the first version of this row watched only the child, and every ordering mutation survived it.
 - **T4.65** (I63, I67, with C21, C27): the same byte script on both arms → the PTY arm's document carries the child's colours and the pipe arm's does not, and both settle with the same text.
 - **T3.55b** (I52): `elapsedNeeded` refuses a `null` panel, a non-`status` block, and a `retrying` box — **the arms the sweep cannot reach**, since the caller has just checked the block is a loading `status`. §8a-bis B3's ruling asked directly.
 - **T3.55c** (I52, F234): the comparison is the **rendered figure** and never the clock — nothing under a second, nothing across 1000→1900 ms, a write at 2000, and `1m 40s` → `1m 41s` past ninety-nine. The range where a clock comparison and a figure comparison disagree, which is the mutation that survived the first pass.
@@ -2121,7 +2132,7 @@ Fake transport, fake stores.
 - **T6.53** (I53): dropping the readout's arming clause from `armParts` → T3.61 fails at its second assertion — the figure never moves because no wake is armed, F227's class one row over — while every `elapsedNeeded` row stays green. Dropping the `settled` deletion → T3.61 fails at its third: the settled header keeps counting.
 - **T6.98** (I64): dropping the readout registration → T1.53's tail arm fails and a child's last lines wait for a chunk that never comes.
 - **T6.93** (I64): snapshotting per chunk → T1.51 counts 100 patches and a 2,000-line value enters the store per write.
-- **T6.94** (I65): resizing the emulator first → T4.64's call order fails and one frame is drawn from the old grid.
+- **T6.94** (I65): the child told the region's width while the emulator takes the body's → T4.64's two figures differ by `BODY_INDENT` and a real child wraps four columns late.
 - **T6.95** (I66): dropping the cancel registration → T3.62 fails, which is the defect F844 records as shipped.
 - **T6.96** (I67): keeping the cursor on settle → T2.47 fails and a settled block draws a cursor nobody is writing at.
 - **T6.97** (I63): falling back to the pipe arm when `spawnPty` throws → T3.63 fails and a configuration error becomes a child that quietly lost its colours.

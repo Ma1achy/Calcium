@@ -30349,3 +30349,181 @@ sentence in it.
 
 ---
 
+## F852 — the rule and its reason named opposite orders ★★★★☆
+
+C23 I65 read: **on a width change the child is resized before the emulator.** Its reason read: *the
+reverse order gives the child a SIGWINCH for a size the emulator has not taken, and one frame is
+drawn from a repaint against the old grid.*
+
+**That sentence is true about resizing the child first**, which is what the invariant required. The
+rule and its justification named opposite orders, and each half reads as correct on its own — which
+is why it survived the design note, the spec, an invariant, a test row and a code comment, all
+citing one another.
+
+**Only the mutation pass asked.** Swapping the two calls failed nothing, and the survivor is what
+sent me back to the sentence. The row could not see it because it asserted `order[0] ===
+"child:56"` against a spy that records **only the child's call** — true whichever call went first. A
+one-sided spy on a two-sided ordering is an assertion about a count wearing an ordering's clothes.
+
+**Correcting the order was still wrong, and the second mutation is what said so.** With the calls
+swapped the run survived again. A third attempt — deferring the emulator's resize by a microtask, so
+a queued write could land between the two — passed as well. The reason is structural: a child's
+repaint arrives as **bytes on the write queue**, which resolves long after both calls have returned,
+so no write can be applied between them at any granularity. **The ordering is unobservable, so no
+row can assert it and no defect can consist of getting it wrong.** That is A03 §2's vacuity class
+arriving in an invariant rather than in a rule or a sentence.
+
+**Three dispositions were on the table and the right one was not among them.** Child first, emulator
+first, and *the row is too weak* — the third being the one a survivor usually indicts. The answer was
+that the axis was wrong: what a resize can get wrong is not the sequence but **the number**. `cols`
+is the body's inner width, and the region is four columns wider; a child told the region's figure
+wraps late and every line after the first is in the wrong place. I65 now says the child and the
+emulator are told the same number, computed once, and the row carries two spies — because one cannot
+see an agreement.
+
+**The class**: *a mutation that survives can indict the invariant, not only the test.* The register
+already holds *a mutation that fails nothing can indict the spec* — a sentence that cannot be
+violated. This is its neighbour, and the stronger form: the sentence reads as falsifiable, is
+believed by five documents, and describes a property the implementation cannot have either way.
+Review cannot reach it, because review asks whether a justification is true and this one was.
+
+**And the survivor is not spent after one reading.** The first correction kept the shape and moved
+the order; the second kept the shape and deferred a call; only the third asked whether the shape was
+right. A mutation that survives its own fix is saying the axis is wrong, not that the fix was.
+
+**And a second thing fell out of reading the route for it**: a `dirty` flag written in three places
+and read in none. It looked like the coalescing mechanism while the emulator was doing the work — the
+same vacuity class one level down, in a variable rather than a rule.
+
+**Where**: `docs/components/C23_execution_pipeline.md` I65 and §3c; `src/shell/execution.ts`
+`onResize`; `test/unit/emulator.test.ts` T4.64; `tools/mutate/runs/c23-shell-route.mjs`.
+
+---
+
+## F853 — React's development reconciler leaks a performance entry per render ★★★★★
+
+A long `plots-tui` session warned: **`MaxPerformanceEntryBufferExceededWarning: 1000001 measure
+entries added to the global performance entry buffer`**. The 3-D plots were on screen when it fired
+and are not the cause; it was reported elsewhere without them.
+
+**Measured, with no Calcium in the picture** — a bare Ink app rendering sixty frames into a
+`PassThrough`:
+
+| `NODE_ENV` | `performance.measure` entries per render | heap after 60 frames |
+|---|---|---|
+| unset | **3.1** | 18.3 MB |
+| `production` | **0.0** | 16.8 MB |
+
+**The mechanism.** `ink` depends on `react-reconciler`, whose entry is
+`process.env.NODE_ENV === "production" ? production build : development build` — decided at require
+time, with no `exports` condition to select it another way. The development build instruments React's
+Performance Track: `logComponentTrigger` and its siblings call `performance.measure` on every commit,
+gated only by `supportsUserTiming`, which is `typeof console.timeStamp === "function" && typeof
+performance.measure === "function"` — **both true under Node**, where `console.timeStamp` exists as a
+no-op. Node's global performance buffer never releases user-timing entries, so every frame a Calcium
+app draws costs about three permanently retained objects. The warning is at a million; the growth
+starts at the first frame.
+
+**It is per render, so it scales with animation, not with content.** A 3-D mesh at 365 ms a frame
+reaches a million entries in about a day of orbiting; a spinner at 10 Hz reaches it in nine hours.
+The 365 ms itself is an honest rasterisation cost the entry reports, and is a different subject.
+
+**Whose fix it is.** Calcium cannot set the variable for a consumer, and must not: it is an
+application's decision, and `process.env` is not the framework's to write (CLAUDE.md's *Never*
+list). What it can do is set it where it ships applications and say so where a consumer will read
+it. Every example's `start` script now carries `NODE_ENV=production`, and the `ink` row in
+`DEPENDENCIES.md` carries the mechanism and both figures.
+
+**What is not fixed.** A globally installed `plots-tui` invoked through its `bin` shim gets no
+environment from npm, so it is back to the development build. Closing that needs the entry point to
+set the variable before the first `import` of `ink` resolves — which in ESM means a launcher and a
+dynamic import, and it is a separate ruling.
+
+**Where**: `examples/*/package.json` `start`; `DEPENDENCIES.md`, the `ink` row.
+
+---
+
+## F854 — the rule refused the character when Unicode had a remedy ★★★★☆
+
+F823 found that `⏺` U+23FA has an emoji presentation form: a base in
+`emoji-variation-sequences.txt`, so a font preferring the emoji form draws it two cells where every
+width table says one. The finding was right, and the remedy was wrong. **I45 refused the character**,
+and eleven marks left the vocabulary under it — the head mark, `info`'s `ℹ`, four arrows in a
+spinner, four bar squares, a warning sign.
+
+**Unicode has a way to say *this glyph, as text*: U+FE0E.** `cells()` already counts it zero —
+measured here, not assumed — so `⏺\ufe0e` is one cell by every table on this side, and one cell on
+any terminal that honours the selector. The rule therefore inverts: **a base must carry the
+selector**, and a bare base is the violation. The hazard is unchanged; the remedy now keeps the
+character.
+
+**What the refusal cost is the argument for noticing.** `⬤` U+2B24, which held the head slot between
+F823 and this, is a circle of the right size and nothing else. U+23FA is in Miscellaneous Technical
+beside `⏵` PLAY and `⏸` PAUSE — a call in progress is a recording, and the mark says so. A rule that
+can only refuse turns every finding into a vocabulary loss.
+
+**The class**: *a rule's remedy is a decision, not a consequence of its finding.* SS57 was built the
+day the hazard was found, and the shape it took — a refusal — was never separately argued. It read as
+the only option because the finding was framed as *this character is dangerous* rather than *this
+character needs qualifying*. The neighbour in the register is *a choice between two bad options means
+a third is missing*; here there was one option and the third was in the standard.
+
+**The residual risk, stated because an unrecorded limit reads as strength**: a terminal that ignores
+U+FE0E draws the emoji form anyway, and the head is then one cell wider than C09 I5 says. Nothing on
+this side can measure that. The ASCII rung `*` is what a terminal without the character gets, and it
+is unaffected.
+
+**Where**: `tools/enforce/source-scans.mjs` SS57; `src/presentation/blocks/glyphs.ts`;
+`docs/components/C09_block_library.md` §4, §5, I45.
+
+---
+
+## F855 — a scroll windows by child, so one tall child paints past the box ★★★★★
+
+Reading the live terminal's frames at five arms, the pictures did not match the numbers. On the
+route's own block — an emulator holding thirty lines inside `scroll({ height: 6, follow: true })`:
+
+| | |
+|---|---|
+| `registry.measure` | **7** rows — `height + 1`, exactly as C09 says |
+| the paint | **32** rows |
+| the residue row | `⋯ 25 above, 0 below` |
+| the first row drawn | `build step 1 of 30` — a follow box, opened at its head |
+
+**One cause under three symptoms.** `scroll`'s render windows by *child*: `ranges.filter((r) => r.to
+> offset && r.from < offset + interior)` keeps every child that overlaps the window and then renders
+each one whole. With several short children that is right and unavoidable — you cannot half-render an
+arbitrary block. With **one child taller than the interior** it means the box does not bound
+anything, while the residue row goes on computing against the window that was never applied.
+
+**The claim it falsifies is written in the file, three functions up**: *a scroll is at most `height +
+1` rows by construction* — the reason `containers.ts` gives for the kind declaring no `window` of its
+own. It is true of the scroll's own chrome and false of what it paints, and no assertion could tell,
+because `measure` is right. **This is the measured-height-is-the-painted-height property that C22
+T4.48 asserts for a card, and nothing asserts for a box.**
+
+**Why it shipped.** Until C27 there was no kind that routinely put more rows in a scroll than the
+scroll declares — `logs` and `patch` are windowed one level up by the transcript, and every fixture
+in the suite has a scroll whose content fits or whose children are short. C27's terminal holds two
+thousand lines of scrollback in a six-row box by design, so it is the first child that is *always*
+taller than its container.
+
+**What it breaks, in order of severity.** C14 lays out an entry from `measure`, so an entry allotted
+seven rows paints thirty-two and the frame runs over whatever was beneath it. `follow` is inert. The
+residue's counts describe a window nobody applied.
+
+**The fix, named**: a container needs to be able to ask for a slice of a child, not only to render it
+— `RenderContext` has `measureChild` and `renderChild` and no `windowChild`, and the registry already
+holds the per-kind `window` that `windowSequence` uses at the entry level (`registry.ts`). The
+terminal kind declares one. That is a C09 seam and an invariant, and it lands spec-first rather than
+inside the round that found it.
+
+**How it was found**: reading a frame, on the step whose whole purpose is reading frames — after the
+suite, the mutation pass and `make enforce` were all green. The numbers were self-consistent
+throughout; only the picture disagreed.
+
+**Where**: `src/presentation/blocks/kinds/containers.ts` (`scroll`'s `render`, and the note at its
+`window` entry); `src/presentation/blocks/types.ts` `RenderContext`.
+
+---
+
