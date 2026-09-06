@@ -30757,3 +30757,88 @@ at the one moment nobody runs it: after a merge, read the run on the ref that wa
 
 ---
 
+## F861 — the clear was sent before the drive; the guarantee belongs on the keystroke ★★★☆☆
+
+`full` went red on run 34043277411 — a commit that changed two markdown files — at T5.7:
+
+```
+AssertionError: a lone Esc is `CSI 27 u` — not a prefix
+  Expected: "\e[27u"
+  Received: "\e[27;2u\e[27;2:3u\e[13;2u\e[13;2:3uk\e[107;1:3u"
+```
+
+`;2` is `1 + shift`, and the Escape is the **first** key the drive presses — before its own
+`keydown shift`, which lands four events later and is what the passing `13;2u` reports. So a Shift
+was held before the drive pressed one.
+
+**The remedy for this exact symptom was already in the file, and it did not hold.** `b8cfa17a` — whose
+subject is *modifiers cleared* — added three keyups to the preamble, citing F812 and describing this
+same failure. *A fix that changes nothing indicts the diagnosis*, so the first question is whether the
+clear runs at all. It does: `xdotool keyup shift` exits **0** with empty stderr on a fresh Xvfb, and
+the alias resolves the same as `Shift_L`. The fixture discards both (`stdio: "ignore"`), so a silent
+failure was the cheap hypothesis and it is false.
+
+**It does not reproduce here, and the number is worth stating**: 24 captures, six concurrent workers,
+ten busy loops saturating an 11-core container — **24 of 24 byte-identical and clean**, matching the
+row's expectation exactly (2026-09-06). The runner is 2 cores. A defect measured once on CI and
+never in 24 loaded local runs is not diagnosable by waiting for it.
+
+**So it was manufactured instead, and the fabrication reproduces the runner byte for byte.** Holding
+`Shift_L` before the drive begins gives
+`\e[27;2u\e[27;2:3u\e[13;2u\e[13;2:3uk\e[107;1:3u` — **exactly** the received string above, not a
+string of the same shape. That settles the mechanism: a stray Shift at drive start. It does not
+settle the **source**, which remains unmeasured. Three things narrow it and none names it: nothing in
+the tree presses Shift except T5.7's own drive; each capture gets a private X server, killed in
+`finally`; and `npm run e2e` passes `--no-file-parallelism`, so **one capture exists at a time in the
+whole run** — there is no concurrent driver to have pressed it. The likeliest source is therefore
+also ruled out, and what is left is the emulator or the server, unmeasured.
+
+**The class, and it is F56's shape again.** A stray modifier does not only break this row. The three
+xterm captures in `mouse.test.ts` count SGR bytes exactly — `\e[<35;` for a rest, `\e[<32;` for a
+drag — and a held Shift sets `Cb & 4`, turning those into `<39` and `<36`. T5.9's counts would go to
+**zero** and the row would report *1003 reports no rest*: a mouse-mode defect, in a mouse spec,
+caused by a keyboard modifier. Repairing T5.7's Escape alone would leave that standing, which is
+precisely how F56 was closed for one app of three.
+
+**The repair moves the guarantee from a moment to each keystroke.** The preamble clears once, 200 ms
+before the drive, into an emulator that may not be reading yet; `--clearmodifiers` clears at the
+instant the key is sent. The fixture's `xdo` now adds it to every input verb **while the drive holds
+no modifier of its own** — a two-line tracker over `keydown`/`keyup` of a modifier key — so a
+deliberate Shift-Enter is untouched and a modifier's own press and release never take the flag
+(clearing Shift to press Shift is a contradiction; clearing it to release it restores it after).
+Which verbs accept the flag was **measured, not recalled**: all eight input verbs exit 0, and
+`windowfocus` and `getdisplaygeometry` reject it with exit 1 and `unrecognized option`, so it is
+gated on the verb.
+
+**The fabricated violation needed a witness, and the first run was vacuous.** Fabricating through the
+fixture's own `xdo` is impossible by construction — pressing Shift there marks it as deliberate — so
+the fabrication presses `Shift_L` on the raw display, outside the wrapper. The first attempt reported
+the remedy working while pressing nothing: the display resolver's `grep -o 'Xvfb :[0-9]*'` matched
+**its own command line**, returned `":"`, and every raw call failed with `Can't open display` into a
+discarded status. That is `pgrep -f` matching its own waiter, in a different tool. The witness is a
+raw unflagged `key z` mid-drive that must come back **uppercase**; with it, the run reads
+`\e[27u\e[27;1:3u` **Z** `\e[122;2:3u\e[13;2u\e[13;2:3uk\e[107;1:3u` — the Escape clean and the
+stray Shift provably still down through it.
+
+**Both measurements are real and the preamble keeps its place.** `--clearmodifiers` *suppresses* a
+stray modifier for the duration of one command; the three keyups *remove* it. They are the only thing
+in the fixture that repairs the state rather than working around it, they cost three `spawnSync`
+calls, and a stray modifier read as a protocol defect costs a session — this one.
+
+**One load figure arrived by accident and is worth keeping.** The first verification run of the whole
+tier happened, unnoticed, under ten stray busy loops — load 13.7 on an 11-core container. T5.7 and
+T5.9 both passed; the row that failed was `view-model` T5.2, which touches no emulator, and it would
+have been attributed to the fixture edit sitting in the working tree had the container not been asked
+what was still spinning. So the wrapper holds at roughly the contention that produced the original
+red, and *ask the container, not the harness* keeps its place.
+
+**Known limit, stated rather than left to be discovered.** No committed row fails if the wrapper is
+removed, because the state does not go dirty locally: 24 of 24. The mutation that would kill it
+cannot be run here, and its evidence is the fabrication above rather than a red suite. That is a
+guard whose trigger does not fire, recorded with both figures and the date.
+
+**Where**: `test/support/x-emulator.ts` `xdo` and the preamble; `test/e2e/capabilities.test.ts` T5.7;
+`test/e2e/mouse.test.ts` T5.9; run 34043277411; `xdotool` 3.20160805.1.
+
+---
+

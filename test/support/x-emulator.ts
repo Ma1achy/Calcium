@@ -48,6 +48,24 @@ export type Drive = (
 ) => Promise<void>;
 
 /**
+ * **The commands that take `--clearmodifiers`, measured rather than recalled.**
+ * `xdotool` 3.20160805.1 in this container accepts it on all eight input verbs
+ * and rejects it with exit 1 on `windowfocus` and `getdisplaygeometry`
+ * (`unrecognized option`), so the flag is gated on the verb rather than passed
+ * blindly.
+ */
+const CLEARABLE: ReadonlySet<string> = new Set([
+  "key", "keydown", "keyup", "type", "click", "mousemove", "mousedown", "mouseup",
+]);
+
+/** Both spellings: the drive uses the aliases, a keysym reaches the same key. */
+const MODIFIER_KEYS: ReadonlySet<string> = new Set([
+  "shift", "ctrl", "control", "alt", "super", "meta",
+  "Shift_L", "Shift_R", "Control_L", "Control_R", "Alt_L", "Alt_R",
+  "Super_L", "Super_R", "Meta_L", "Meta_R",
+]);
+
+/**
  * Run `enter`, capture for `seconds`, run `mid`, capture for `seconds` again,
  * run `leave`. `drive` is called once per phase with the emulator's window
  * focused; the returned strings are the captured bytes as latin1.
@@ -89,8 +107,24 @@ export async function captureFromEmulator(opts: {
   const termLog = openSync(join(work, "term.log"), "w");
   const xvfb = spawn("Xvfb", [display, "-screen", "0", "1024x768x24"], { stdio: ["ignore", xvfbLog, xvfbLog] });
   const xvfbExited = new Promise<void>((r) => xvfb.on("exit", () => r()));
+  // **Every keystroke the drive does not itself modify is sent unmodified**, and
+  // the guarantee rides the keystroke rather than a clear sent once, 200 ms
+  // earlier, into an emulator that may not be reading yet (F861). `held` is what
+  // the drive is holding *on purpose*: while it holds nothing, each input verb
+  // carries `--clearmodifiers`, which suppresses a stray modifier for the
+  // duration of that one command; while it holds Shift for a Shift-Enter, the
+  // flag is withheld and the intent survives. A modifier key's own press and
+  // release never take the flag — clearing Shift to press Shift is a
+  // contradiction, and clearing it to release it restores it afterwards.
+  const held = new Set<string>();
   const xdo = (...args: readonly string[]): void => {
-    spawnSync("xdotool", [...args], { env, stdio: "ignore" });
+    const [verb, ...rest] = args;
+    const target = rest[0] ?? "";
+    const isModifier = MODIFIER_KEYS.has(target) && (verb === "keydown" || verb === "keyup");
+    if (verb === "keydown" && isModifier) held.add(target);
+    const flag = CLEARABLE.has(verb ?? "") && !isModifier && held.size === 0 ? ["--clearmodifiers"] : [];
+    spawnSync("xdotool", [verb ?? "", ...flag, ...rest], { env, stdio: "ignore" });
+    if (verb === "keyup" && isModifier) held.delete(target);
   };
   const read = (name: string): string =>
     existsSync(join(work, name)) ? readFileSync(join(work, name)).toString("latin1") : "";
@@ -128,6 +162,16 @@ export async function captureFromEmulator(opts: {
     // every key of T5.7 with Shift set — `CSI 27;2 u` for a lone Esc — before the
     // drive had pressed Shift; the fixture asserts the state it needs rather
     // than inheriting one (F812).
+    //
+    // **This clear did not hold, and it keeps its place on asymmetry** (F861).
+    // The symptom recurred on run 34043277411, and the two measurements are
+    // both real: 24 captures under six-way concurrency on a saturated
+    // 11-core container came back byte-identical and clean (2026-09-06), and
+    // the runner produced the dirty state anyway. Unlike `--clearmodifiers`,
+    // which suppresses a stray modifier for one command, this removes it — so
+    // it is the only thing here that repairs the state rather than working
+    // around it. Three `spawnSync` calls against a session lost to a stray
+    // modifier read as a protocol defect.
     xdo("keyup", "shift"); xdo("keyup", "ctrl"); xdo("keyup", "alt");
     await sleep(200);
     await opts.drive(xdo, window, 1);
