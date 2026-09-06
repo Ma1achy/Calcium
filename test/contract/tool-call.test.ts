@@ -81,12 +81,12 @@ describe("§9c — the header, the body, and the row the body already has", () =
     expect(toolCallHeader({ name: "run_command", args: "npm test", elapsedMs: 4_200, settled: true }, FULL_CAPS), "settled with no count: the duration alone, tone carries success").toBe(
       "run_command(npm test) · 4s",
     );
-    // F828: the separator is a GlyphSet slot resolved against the arm — `-` at ASCII.
+    // F828: the separator is a GlyphSet slot resolved against the arm — `:` at ASCII (F834: not `-`, the spinner's frame).
     const ascii = spinnerFrames(ASCII_CAPS);
     expect(toolCallHeader({ name: "run_command", args: "npm test", elapsedMs: 4_200, outcome: "exit 0" }, ASCII_CAPS)).toBe(
-      "run_command(npm test) - 4s - exit 0",
+      "run_command(npm test) : 4s : exit 0",
     );
-    expect(toolCallHeader({ name: "run_command", args: "npm test", elapsedMs: 400 }, ASCII_CAPS)).toBe(`run_command(npm test) - ${ascii[0] ?? ""}`);
+    expect(toolCallHeader({ name: "run_command", args: "npm test", elapsedMs: 400 }, ASCII_CAPS)).toBe(`run_command(npm test) : ${ascii[0] ?? ""}`);
   });
 
   it("T2.47 (C04 I3, I6): every state composes a valid document, and `error` carries its own message", () => {
@@ -112,7 +112,7 @@ describe("§9c — the header, the body, and the row the body already has", () =
       const mark = ascii ? "*" : "⬤";
       const hook = ascii ? "`" : "⎿";
       const more = ascii ? "~" : "⋯";
-      const sep = ascii ? "-" : "·";
+      const sep = ascii ? ":" : "·";
       const spin = spinnerFrames(caps)[0] ?? "";
 
       const r = frame(running, width, ascii);

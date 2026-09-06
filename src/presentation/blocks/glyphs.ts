@@ -244,7 +244,9 @@ const UNICODE: GlyphSet = Object.freeze({
 
 const ASCII: GlyphSet = Object.freeze({
   residue: "~",
-  separator: "-",
+  // `:` and not `-` (F834): `-` is `TURN_ASCII`'s first frame, and a dispatched
+  // head read `verb - -`. The rung is a character no set's ASCII frames use.
+  separator: ":",
   horizontal: "-",
   vertical: "|",
   dashedVertical: ":",

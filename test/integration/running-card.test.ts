@@ -426,12 +426,12 @@ describe("C23 — the call grammar's head states", () => {
     seconds(h, 3);
     expect(head()).toBe("tail(web.log) · 2s");
 
-    // **The ASCII arm draws the set's ASCII pair, and `-` for the separator**
+    // **The ASCII arm draws the set's ASCII pair, and `:` for the separator**
     // (F828) — through the composer the route calls, at the arm it would pass.
     const ascii = { ...FULL_CAPS, unicode: "ascii" as const };
     const asciiFrames = spinnerFrames(ascii);
     const asciiHead = callHead({ name: "tail", args: "web.log", elapsedMs: 1_000, id: "step" }, ascii, 1);
-    expect(asciiHead.kind === "notice" && asciiHead.text).toBe(`tail(web.log) - ${asciiFrames[1 % asciiFrames.length] ?? ""} 1s`);
+    expect(asciiHead.kind === "notice" && asciiHead.text).toBe(`tail(web.log) : ${asciiFrames[1 % asciiFrames.length] ?? ""} 1s`);
     expect(asciiFrames.every((f) => /^[\x20-\x7e]+$/u.test(f)), "the ASCII pair is ASCII").toBe(true);
   });
 

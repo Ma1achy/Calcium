@@ -409,11 +409,18 @@ describe("C09 §4 — the call grammar's glyph rows", () => {
     // and two cells at wide — and the contract row asserted it under ASCII
     // (F828). A slot, so the composer resolves it where the capability is.
     expect(glyphs(FULL_CAPS).separator).toBe("·");
-    expect(glyphs(ASCII_CAPS).separator).toBe("-");
-    expect(glyphs(WIDE_CAPS).separator, "the internal set collapses at wide (C02 I9)").toBe("-");
+    expect(glyphs(ASCII_CAPS).separator).toBe(":");
+    expect(glyphs(WIDE_CAPS).separator, "the internal set collapses at wide (C02 I9)").toBe(":");
     for (const caps of [FULL_CAPS, WIDE_CAPS, ASCII_CAPS]) {
       const sep = glyphs(caps).separator;
       expect(cells(sep, caps.ambiguousWidth), `separator at ${caps.unicode}/${caps.ambiguousWidth}`).toBe(1);
+      // **Beside the spinner, not alone** (F834): the rung was `-`, which is the
+      // turn set's first frame, and a dispatched head read `verb - -`. Against
+      // every set, so a new pair carrying the separator fails here before it lands.
+      for (const [name, set] of Object.entries(SPINNER_SETS)) {
+        expect(set.ascii, `set ${name}'s ASCII frames must not carry the separator ${sep}`).not.toContain(sep);
+        if (caps.unicode !== "ascii") expect(set.frames, `set ${name}'s frames`).not.toContain(sep);
+      }
     }
     // **And no composer joins with the literal**: the slot exists so that
     // `src/shell/` never writes ` · ` into a head again. Comments stripped
