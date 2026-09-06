@@ -17,3 +17,14 @@ describe("C27 terminal emulator — tier 1", () => {
   it.todo("T1.11 (C27 I4): `cursor` after `abc` is `{ line: 0, col: 3 }`; after `\\r\\n` it is `{ line: 1, col: 0 }`; in `grid` mode after `\\x1b[3;5H` it is `{ line: 2, col: 4 }`. — not deferred on a component: lands with C27's emulator");
   it.todo("T1.12 (C27 I6): a line ending in `\\x1b[41m   \\x1b[0m` keeps its three background blanks with a run; a line ending in three plain blanks is trimmed. — not deferred on a component: lands with C27's emulator");
 });
+
+describe("C04 — the terminal kind, spec-first rows", () => {
+  it.todo("T1.31 (C04 I110): a terminal whose line text contains an escape, a bell or a C1 is refused by validateDocument naming the line; the same text with U+FFFD in their place is admitted — not deferred on a component: lands with the Terminal type");
+  it.todo("T1.32 (C04 I111): overlapping, out-of-range, out-of-order and adjacent-equal runs are each refused; a maximal ordered set is admitted — not deferred on a component: lands with the Terminal type");
+  it.todo("T1.33 (C04 I113): grid mode with dropped is refused; dropped: 0 is refused in both modes; a positive dropped in lines mode is admitted — not deferred on a component: lands with the Terminal type");
+});
+
+describe("C09 · C10 — the terminal block and a literal colour, spec-first rows", () => {
+  it.todo("T1.29 (C09 I55): a terminal of 40 lines measures 40; with dropped it measures 41; a 200-character line at width 80 still measures one row — not deferred on a component: lands with the terminal definition");
+  it.todo("T1.39 (C10 I38): degradeColour steps rgb through ansi256 and ansi16 to undefined at 1-bit, and passes an ansi16 index through unchanged above 1-bit — not deferred on a component: lands with degradeColour");
+});

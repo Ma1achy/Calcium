@@ -803,6 +803,35 @@ Three of the seven are rows no reader checking statements one at a time reaches:
 
 ---
 
+
+## 4i. A child's colours — a literal `ColourValue` on the same ladder
+
+A `terminal` block's runs carry a colour the theme did not choose (C04 §3i). It is still C10 that
+decides what reaches the screen, and it decides it with the ladder it already has.
+
+| the run carries | 24-bit | 8-bit | 4-bit | 1-bit |
+|---|---|---|---|---|
+| `rgb` | the hex, as written | `nearestAnsi256` — the function the ramp already uses | `nearestAnsi16` | dropped |
+| `ansi256` | the index | the index | `nearestAnsi16` of the index's own hex | dropped |
+| `ansi16` | the index | the index | the index | dropped |
+
+**`ansi16` passes through at every arm above 1-bit, and that is a ruling rather than an omission.**
+A child writing `\x1b[31m` asked for *the terminal's red*, not for a particular red, and the outer
+terminal's palette is the right answer to that question. Resolving it to a hex and back would
+substitute our idea of red for the user's.
+
+**At 1-bit the colour goes and the attributes stay** — bold, dim, italic, underline, inverse,
+strike — which is I31's rule for tones, applied unchanged to a colour that has no tone.
+`degradeColour(value, caps)` is the one entry point, beside `rampColour`, and it adds no rung:
+every arm above is a function that already existed or, for `nearestAnsi16`, the same arithmetic
+one table smaller.
+
+**Nothing here reads the theme.** A child's colour is not a slot and has no dark/light form, so
+`degradeColour` takes capabilities alone — which is what makes it safe to call from a measurer's
+neighbour and impossible to make theme-dependent by accident.
+
+---
+
 ## 5. Switching
 
 `/theme` switches variant. The change is **atomic**: the store swaps a resolved theme in one assignment, so no frame is ever half-themed.
@@ -989,6 +1018,8 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 - **I35** — **A `decoration` slot the framework paints as text clears the meaning floor against both text surfaces, and the pairing is derived from the slots the framework can resolve.** `decorationTextPairs` is `categorical.c1`–`c8` × `textSurfaces`, at 4.5 : 1, checked at load like every other floor — a **fourth** named pairing beside §4a's diff surfaces, §4b's wash and §4d's tag, and a sibling of them rather than an entry in any. **F652 and F653 are one pairing and not two**: `ratio` is symmetric, so a callout painted in a series' slot on the page and a tile label painted in the page's ground *over* that slot are the same two colours, which is why §4f.1's last two rows print the same three figures. **The sweep is what decides the arm**: ten text sites in four figure families and both arms take a `categorical` slot as ink or as ground — the SVG callout, tile label, graph node label, outline label and unboxed hierarchy label, and the terminal's callout column, flame and icicle frame names, pie legend rows and run labels — so moving the sites means moving ten of them across a seam D11 requires to agree, and moving the check means one function. **It is not vacuous**: light `c4` measures 4.74 against `bgElev`, 5% over its floor and the tightest margin the framework ships, and the palette itself has no luminance discipline — the worst pair *within* `categorical` is **1.00** on all three themes, because a categorical palette is authored for hue. **The two wider arms are refused by measurement**: dropping `validatePalette`'s `decoration` skip binds `spectrum` and rejects the light theme on 7 of its 9 stops, worst 2.36 (I31's own measurement from the colormap's side); a third `carries` value is F240's shape and re-opens `classes` for slots with no meaning to collapse to. **What it does not reach, stated because an unrecorded limit reads as strength**: a ninth `categorical` slot a theme declares (I30's limit, inherited); a picture cell's background, where I21 admits a palette ref for a cell carrying no text and *carrying no text* is the caller's property rather than the type's — `sankey.ts` and `scatter3.ts` both reach it through `slot()`, and the worst pair there is 1.00; and `surface.bgElev`, which nothing in `src/` resolves, so half the pairing is a claim about where blocks land rather than a measured site (§4g).
 - **I36** — **`rampColour(ramp, t, theme, caps)` is the one entry point for a ramp's sample; it adds no ladder, and each backing degrades on the ladder its slot or map already has: a slot pair mixes linearly in sRGB at 24-bit, quantises through `nearestAnsi256` at 8-bit, steps to two at 4-bit (`t < 0.5` → `from`, else `to`) and resolves to `from` at 1-bit; a colormap is `continuousColour` unchanged; a palette is the categorical slot; and `animate` resolves to `none` below 8-bit.** `undefined` means *say nothing* and the run paints as its neighbours do (I31). Not three steps at 4-bit and not a midpoint at 1-bit, each with its reason in §4h.
 - **I37** — **`CATEGORY_REFS` and `refOf` live in `theme/categorical.ts`, one copy, re-exported by C12's `marks.ts`; a palette ramp cycles them and no data palette; and `theme/` imports nothing from `blocks/` or `plot/`.** The move is a homing — a slot table is this component's and two components read it — and not a cycle avoidance: the claimed cycle was disproved by the row written to assert it (§4h). A move and not a copy because F382 measured two copies disagreeing. C10 I16's one categorical palette is what makes `palette` a fill with no name (C04 I106, F837).
+- **I38** — **`degradeColour(value, caps)` is the one entry point for a literal colour, takes no theme, and adds no rung: `rgb` steps down through `nearestAnsi256` then `nearestAnsi16`, `ansi256` steps to `nearestAnsi16`, `ansi16` passes through unchanged above 1-bit, and at 1-bit every colour is dropped while every attribute is kept.** A child's `\x1b[31m` names the user's red, so resolving it to a hex would substitute ours; and a colour with no slot has no dark/light form, which is why the theme is not a parameter.
+
 
 ## 8. Commitments
 
@@ -1024,6 +1055,7 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 30. **A renderer's own page is a surface `textSurfaces` holds** (I34, §4f). §4's exclusion named a trigger and nothing watched it; the SVG arm had been painting every label on `bgDeep` since it was written, and light's `muted` measured 2.44 there against a 2.5 floor no check could see. The page becomes `surface.bg`, the exclusion stays true, no floor moves, and the row that keeps it asserts the page's fill is a hex some member of `textSurfaces` carries — so the next ground that is not a text surface fails rather than waiting for someone to notice.
 32. **A ramp is sampled here and adds no ladder** (I36, I37). One entry point, each backing on the rung its slot or map already has, two departures from the brief recorded with their reasons, the categorical cycle moved down once so two components share one copy (`CALCIUM_INK_RAMPS_DESIGN.md` Q7, Q11).
 31. **A palette that carries no meaning still clears a floor where it is painted as text** (I35, §4g). `decoration` exempts a palette from the check over *every* surface, and it was read as exempting it from every floor — so `categorical` names a series at ten sites in two arms and was measured by nothing on any theme. The pairing is `categorical` × the text surfaces at the meaning floor, a fourth sibling of §4a, §4b and §4d rather than a widening of any; the two arms that would have covered more are refused by the light theme's `spectrum` failing 7 of 9 stops; and the two findings behind it are one pairing, because a ratio is symmetric and a ground used as ink is its own pair read backwards.
+33. **A colour the theme did not choose still degrades here** (I38). One entry point, the existing rungs, no theme parameter — and `ansi16` left alone, because the child named the user's palette rather than a colour.
 
 ---
 
@@ -1061,6 +1093,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T1.36** (I21, §4c.1, C12): the glyph set the two shipped picture-cell constructors actually emit **in a cell that carries a background** is read off the 24-bit and 8-bit terminal goldens for `sankey-*` and `plot3d-*`, and every one of it is admitted by `isPictureGlyph`. The set is asserted as a set and its size reported: sankey's is exactly `{▀}` and `plot3d`'s is the block elements plus braille. **The row that makes the alphabet evidence rather than a stipulation** — an admission list derived from the same table the constructors read agrees with itself and passes on any addition, which is T2.20's reason one artefact along.
 - **T1.37** (I21, §4c.1): **the fabricated violation, at both constructors.** A sankey cell built with a lower owner and a letter in it, and a `plot3d` mixed cell built with a background and a letter in it, are each **refused** — and the same call with the alphabet's own glyph is accepted, which is the control the refusal needs to not be vacuous. Asserted at the constructor rather than through a rendered figure, because no figure the tree can produce reaches the guard; that is the point of it.
 - **T1.22** (I33): for each of `bold`, `italic`, `underline` and for each tone at depths 24, 8, 4 and 1, merging a span onto the resolved tone yields a `Style` whose `colour` and `background` are **identical** to the tone's and whose attribute is set — asserted on the pair, so a merge that routed through a slot fails on the colour and one that dropped the tone fails on the same line. **The tone arm** (C04 I89): for each pair of tones at each depth, a run whose span names the second tone paints with the second tone's `colour` — the object `resolveTone` returns, by reference — with the attribute still set on top, and the block's tone nowhere on the run.
+- **T1.39** (I38): `degradeColour` on `{kind:"rgb", hex:"#0ac81e"}` returns the hex at 24-bit, an `ansi256` index at 8-bit, an `ansi16` index at 4-bit and undefined at 1-bit; on `{kind:"ansi16", index:1}` it returns index 1 at 24-bit, 8-bit and 4-bit, and undefined at 1-bit.
 
 ### Tier 2 — contract / interface
 
@@ -1097,6 +1130,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.15** (§3): at depth 1, every `syntax` slot collapses to a typographic class and emits no colour code — including `syntax.key`.
 - **T2.26** (I33, I31, C04 I89, C04 I90): at depth 1 a `tone: "identifier"` run on an `ok` notice paints with **no** SGR 1 where the rest of the row has it — the tone's collapse, uncompensated; at depth 4 a valued run writes no `48` and the row's bytes equal the unvalued row's; at depth 8 it writes `48;5;<n>` where `n` is `continuousColour`'s index for the same value, and at 24 `48;2` with `sample`'s hex — the same resolver a heatmap cell went through, asserted by calling it.
 - **T2.25** (I33): at depth 1, `ok` with a bold span resolves to exactly `{ bold: true }` — the same object the tone alone gives — `default` with a bold span to `{ bold: true }`, and `muted` with a bold span to `{ dim: true, bold: true }`, painted as `1;2` in `sgr()`'s numeric order.
+- **T2.36** (I38): `degradeColour`'s signature takes no theme, asserted at compile time; and a source scan finds no theme reference in its module.
 
 ### Tier 3 — edge cases
 
@@ -1113,6 +1147,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T3.35** (I36, C09 I53): a `shimmer` span rendered at 4-bit over ticks 0–4 is five byte-identical frames, each two colours; the same block at 24-bit is five distinct frames; at 1-bit the five frames equal the block toned `from`.
 - **T3.34** (I34, §4f.1): a theme whose `bgDeep` is authored *toward* its tones rather than away from them loads and passes every floor — the light theme is that case at 2.44 for `muted` — because `bgDeep` is not checked and must not be. The row exists so that a later widening of `textSurfaces` fails here first, where the reason is written down, rather than in the token files where it reads as a bad colour.
 - **T3.11** (I33): `unicode: "ascii"` with an italic span still paints SGR `3` — the attribute is not on the glyph axis — and the painted row's `cells()` equals the plain row's.
+- **T3.72** (I38): at 1-bit, a run with a colour and all six attributes paints every attribute and no colour; a run with a colour alone paints nothing and is not emitted.
 
 ### Tier 4 — integration
 
@@ -1124,6 +1159,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T4.6** (with C22, → C22 I40): a corrupt persisted variant → base theme retained, notice committed, session opens normally. C20's repair-at-open precedent one component up; the notice is the half that stops "absent" and "corrupt" looking the same (C22 T1.19b).
 - **T4.35** (I27, with C23): `/theme high-contrast` on a three-theme session switches, and commits no usage notice. **The handler, the enum and the store on one path**, and the mutation pass is why it is not a store-level row: reading the variant against two literals passes every row that asks for one of those two names, which is every row that existed.
 - **T4.36** (I27, → C22 I40): a persisted `high-contrast` is restored, and a persisted name the set does not hold leaves the opening theme in place. **The only shape that separates a membership test from a literal pair**, since both names a literal knows are in the shipped set.
+- **T4.37** (I38, with C04, C09): one `terminal` document rendered at all five arms yields five frames whose text is identical and whose SGR differs exactly by the ladder — the block itself is byte-identical across the five, so a persisted document replays in full colour on a better terminal.
 
 ### Tier 5 — e2e
 
@@ -1174,6 +1210,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.26** (I28, §5a.4): restoring `VARIANTS` as a literal in the contrast suite → T2.23 fails. **Nothing else does**, which is the point: a third theme ships unchecked and eleven rows stay green.
 - **T6.84** (I33): resolving a span attribute through `resolve` or a slot → T1.22 fails on `colour`; gating italic on `caps.unicode` → T3.11 fails; adding an `underline` fallback for an absorbed 1-bit bold → C04 T3.67's identical pair fails, which is the row that says the absorption is a ruling and not an oversight.
 - **T6.85** (I33, C04 I89, C04 I90): composing a span's tone *with* the block's (`{ ...block, ...spanTone }`) rather than replacing it → T1.22's tone arm still passes on `colour` and **T2.26 fails at 1-bit**, where the `ok` block's `bold` survives under the `identifier` run — the row that shows composition and replacement differ only where a tone carries an attribute; painting a valued background at 4-bit through `nearestAnsi16` or a fixed index → T2.26's 4-bit pair fails, and C09 T3.66's 4-bit identity with it; a valued background written through `withBackground` from a surface ref → T2.26's 8-bit arm fails on the index.
+- **T6.95** (I38): resolving `ansi16` through a hex round trip → T1.39's second row returns a different index and a child's red becomes ours.
+- **T6.96** (I38): dropping attributes with the colour at 1-bit → T3.72 fails and an inverse cursor becomes invisible.
 
 ---
 

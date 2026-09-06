@@ -15,3 +15,17 @@ describe("C27 terminal emulator — tier 6", () => {
   it.todo("T6.9 (C27 I11): importing `@xterm/headless` from `snapshot.ts` → T2.1 fails. — not deferred on a component: lands with C27's emulator");
   it.todo("T6.10 (C27 I10): applying the cap before the reflow → T1.7 loses a line when the reflow lands over the cap at `scrollback: 8`. — not deferred on a component: lands with C27's emulator");
 });
+
+describe("C04 — the terminal kind, spec-first rows", () => {
+  it.todo("T6.96 (C04 I110): dropping the control check from the gate → T1.31 admits an escape and T4.56's frame gains a real one — not deferred on a component: lands with the Terminal validator");
+  it.todo("T6.97 (C04 I111): admitting adjacent equal-styled runs → T1.32's last row passes and two snapshots of one screen stop comparing equal — not deferred on a component: lands with the Terminal validator");
+  it.todo("T6.98 (C04 I113): allowing dropped: 0 → T1.33 admits it and the marker row draws zero lines dropped — not deferred on a component: lands with the Terminal validator");
+});
+
+describe("C09 · C10 — the terminal block and a literal colour, spec-first rows", () => {
+  it.todo("T6.99 (C09 I55): wrapping a terminal's lines → T1.29's 200-character row measures three and a running block's tail jumps two rows per long line — not deferred on a component: lands with the terminal definition");
+  it.todo("T6.100 (C09 I56): stripping the text → T3.73 loses the replacement character and a child's SGR vanishes rather than being refused at the gate — not deferred on a component: lands with the terminal definition");
+  it.todo("T6.101 (C09 I57): setting ANIMATES.terminal true → T2.122 fails and the block repaints on a tick nobody asked for — not deferred on a component: lands with the terminal definition");
+  it.todo("T6.95 (C10 I38): resolving ansi16 through a hex round trip → T1.39's second row returns a different index and a child's red becomes ours — not deferred on a component: lands with degradeColour");
+  it.todo("T6.96 (C10 I38): dropping attributes with the colour at 1-bit → T3.72 fails and an inverse cursor becomes invisible — not deferred on a component: lands with degradeColour");
+});

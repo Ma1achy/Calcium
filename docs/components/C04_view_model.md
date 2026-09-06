@@ -2450,6 +2450,88 @@ y-log arm has a frame: `100` mid-way between `10` and `999`, and the curve is th
 line variants draw, because the data is `10^(1 + v/50)`. `line/x-log` did not move — the
 arithmetic `xPositionOf` held is the one `scaled` holds.
 
+## 3i. `terminal` — a child's screen, and the one kind that carries literal colour
+
+A child process given a terminal draws with escapes: `\r` to return, `\x1b[K` to erase, SGR to
+colour, cursor motion to repaint. **C27 interprets those into a screen and hands back this block**
+(C27 §3); nothing here parses anything. What C04 owns is the shape the screen arrives in, and the
+gate that keeps an escape from reaching the outer terminal.
+
+```typescript
+export type TerminalRun = Readonly<{
+  from: number;
+  to: number;
+  fg?: ColourValue;
+  bg?: ColourValue;
+  bold?: boolean;
+  dim?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  inverse?: boolean;
+  strike?: boolean;
+}>;
+
+export type TerminalLine = Readonly<{
+  /** Control-free (I110). A wide cluster is one sequence, with no filler cell. */
+  text: string;
+  /** Maximal ranges by code-unit offset, `TextSpan`'s convention (I83). A default cell is in none. */
+  runs?: readonly TerminalRun[];
+}>;
+
+export type Terminal = Readonly<{
+  kind: "terminal";
+  id: string;
+  /** The emulator's width when the snapshot was taken. A positive integer. */
+  cols: number;
+  /** `"lines"` is the normal buffer with its scrollback; `"grid"` is the alternate screen. */
+  screen: "lines" | "grid";
+  lines: readonly TerminalLine[];
+  /** Where the child is writing. Appearance, never geometry (I112). Absent once settled. */
+  cursor?: Readonly<{ line: number; col: number }>;
+  /** Lines lost above the cap. Present only when at least one was (I113). */
+  dropped?: number;
+}> & Gap & Floor;
+```
+
+**The colours are literal, and this is the one kind where that is right.** *A block names a
+palette slot; C10 resolves it* is a rule about the application's colours — the theme owns them
+because a block that hard-codes one cannot be re-themed. A child's `38;2;10;200;30` is not the
+application's colour and no palette slot means it: it is the child's data, exactly as an image's
+pixels are, and `Image` is the precedent (§3g). So a run carries a `ColourValue` and C10 degrades
+it down the ladder at render (C10 §4i). **The block is unchanged by the degradation**, so a
+document persisted at 4-bit replays in full colour on a better terminal.
+
+**The containment gate is the reason this section exists** (I110). `TerminalLine.text` carries no
+C0 or C1 control, and `validateDocument` refuses a document whose text does — from any source,
+including the far side and a persisted row. C27 replaces controls at the walk (C27 I2) and this
+gate refuses them again, two gates for one property, because the property is the one failure that
+corrupts state the application can no longer see. **The renderer therefore does not strip**; it
+trusts the gate, which is what makes a terminal block's colour survive at all — `raw` strips and
+could never carry one (F842).
+
+**A `terminal` is not a container and declares no elements.** It goes inside a `scroll` (§3c) when
+it wants a bound, which is how the offset, the residue row, `follow` and `collapsed` are inherited
+rather than restated. In `"grid"` mode the content height equals the box's declared height by
+construction, so the residue row never draws — I49 and this rule meet in a cell where arithmetic
+settles it and no flag is needed.
+
+### 3i.1 — the two counts, and why they are not one
+
+A capped terminal has two numbers and they answer different questions.
+
+| the count | where it is drawn | what it counts |
+|---|---|---|
+| `dropped` | inside the block, as its first row, muted — *⋯ 12,481 lines dropped at the cap* | rows nobody can reach, ever |
+| the scroll's residue | the container's own row (I49) — *⋯ 1,994 above* | rows the reader can reach by scrolling |
+
+I104 fixes the residue row's text and a second count there would be two mechanisms for two facts
+in one place. The marker row is content: the block measures `lines.length + 1` when `dropped` is
+present, so the scroll counts it among the rows it can show. `dropped` is **absent** when nothing
+was lost — I98's convention, declare by presence — because a present zero would draw *0 lines
+dropped at the cap*, which names a distinction that does not exist.
+
+---
+
 ## 3am. Spans — a styled run inside a text member, addressed by offset
 
 Nothing in the vocabulary styles a run *inside* text: tone attaches to a block, a `Cell`, a
@@ -3156,6 +3238,11 @@ persisted document rests on.
 - **I107** — **`TextSpan.ramp` is the ninth member and is appearance only: `measure` never reads it, it replaces the run's foreground colour and nothing else, it is refused beside `value`, and a colormap backing is refused on a span.** A slot pair is bounded by two colours whose floors C10 I26 proves; a sampled colour passes through no floor. The bar's ink reads by area (C10 I31), which is why the same backing is admitted there. The deferral's symbol is a floor-aware lift in `theme/contrast.ts`.
 - **I108** — **`Progress.ramp` is the one block-level carrier; `RAMP_EXTENT` is exhaustive over `BlockKind`, and a kind marked `none` has no member to carry a ramp.** The `on` cells take the ramp over the axis (→ C09), the `off` cells stay `muted`. Every other kind is a deferral with its symbol (`CALCIUM_INK_RAMPS_DESIGN.md` §7), admitted by a consumer appearing and never by symmetry.
 - **I109** — **`RampAnimation` is a closed union of five loops and `none`; period and easing are never members; absent is `none`, and the static frame is `tick = 0` of the same evaluation.** A one-shot is an event and needs a birth tick the render lacks; a position effect is a text window and not a colour. Timing lives in the effect (→ C09), as the spinner's lives in the set.
+- **I110** — **A `TerminalLine.text` carries no C0 or C1 control, and `validateDocument` refuses a document that breaks it, whatever the source.** The second of two gates — C27 I2 replaces controls at the cell walk — and the one that holds for a far-side envelope and a persisted row, neither of which passed through C27. The renderer does not strip, so this gate is what lets a terminal block carry colour at all: `raw`, which strips, cannot.
+- **I111** — **A `terminal`'s runs are maximal, non-overlapping, ordered, and within the text; a default-styled cell is in no run.** `TextSpan`'s offset convention (I83) and its bounds gate, with one addition: two adjacent runs with equal styles are refused, because merging is the producer's job and a snapshot that fails to merge measures the same and diffs differently on every frame.
+- **I112** — **`cursor`, when present, indexes a line that exists and a column within `cols`; and `measure` never reads it.** Appearance, never geometry — the cursor moves on every keystroke the child receives and a height that moved with it would reflow the transcript.
+- **I113** — **`screen: "grid"` means the snapshot is the whole screen and `dropped` cannot be present; `dropped`, when present, is a positive integer.** The alternate screen has no scrollback to lose lines from, so the two fields are mutually exclusive by meaning rather than by convention, and the gate says so.
+
 
 
 ## 7. Commitments
@@ -3264,6 +3351,8 @@ persisted document rests on.
 98. **An ink can be a function, and the function is data** (I106, I109). A `Ramp` is three fills, a backing the gate checks the arity of, and a closed set of loops with their timing in the effect; it carries no colour value, no period and no easing, so a far side can send one and the gate can refuse one (`CALCIUM_INK_RAMPS_DESIGN.md`).
 99. **Two carriers, each with an extent, and the rest refused by type** (I107, I108). A span's clusters and the bar's axis; a colormap on the bar and slot pairs on text, because a floor is proven per slot and a bar reads by area; every other kind is `none` in `RAMP_EXTENT` until a consumer appears.
 ---
+100. **A child's screen is a block, and its colours are its own** (I110, I111). The one kind carrying a literal `ColourValue`, on `image`'s argument that a child's bytes are data rather than the application's taste — with the containment gate that makes it safe to render without stripping.
+101. **Two counts, two places, two questions** (I113). What the reader can scroll to is the container's; what is gone for good is the block's, drawn on presence so a zero is never written.
 
 ## 8. Tests
 
@@ -3301,6 +3390,9 @@ Six tiers. No state machine, so no transition table.
 - **T1.29** (I106): the arity table at the gate — a `gradient` with a slot pair is admitted, with a `colormap` on `progress` is admitted, with both backings is refused, with neither is refused; a `palette` with a pair, with a `colormap`, or with `bands` is refused; a `step` with `bands` 1, 9 or 2.5 is refused and with 2 or 8 admitted; `bands` on a `gradient` is refused; each refusal's message names the rule it broke.
 - **T1.30** (I107, I108): a span carrying `value` and `ramp` is refused; a span whose ramp has a `colormap` backing is refused while the same ramp on a `progress` block is admitted; a `ramp` on a hunk line is refused; a `progress` without `ramp` validates as it did.
 - **T1.26** (I87): a document carrying spans on all four members satisfies §5a's round trip: `validateDocument(JSON.parse(JSON.stringify(d)))` is valid and structurally equal.
+- **T1.31** (I110): a `terminal` whose line text contains `\x1b[31m`, `\x07` or `\u009b` is refused by `validateDocument`, each naming the line index; the same text with those characters replaced by U+FFFD is admitted.
+- **T1.32** (I111): runs that overlap, that run past the text, that are out of order, or that are adjacent with equal styles are each refused; a maximal ordered set is admitted.
+- **T1.33** (I113): `screen: "grid"` with `dropped: 3` is refused; `dropped: 0` is refused in both modes; `dropped: 3` in `"lines"` mode is admitted.
 
 ### Tier 2 — contract / interface
 
@@ -3345,6 +3437,7 @@ The generic suite. **These run against every registered block kind, including ap
 - **T2.117** (I106, I109): `RAMP_KEYS` has six members and a seventh key is refused by name; `animate: "sweep"` is refused with a message naming the six; a document carrying a ramped span on every carrier and a ramped `progress` satisfies §5a's round trip.
 - **T2.114** (I105, I107): `TEXT_SPAN_KEYS` has nine members and admits `elide` and `ramp`; a `notice` under `info` with an `elide` span measures and renders identically to the same block without it at every width of the sweep; on a `step` notice the marked run ends in the marker at a width that cannot hold the row, and the runs outside it are byte-identical to the unfitted text.
 - **T2.34** (§3am): the same translation on a list item and on a blockquote lands the spans on the `notice`, on a heading on the `rule`'s `label`, and on a pipe-table cell on the `Cell` — the four members of I88 — and on a fenced block **does not** run: `**` inside a fence is seven characters.
+- **T2.118** (I110, §5a): a `terminal` carrying every run field and both modes round-trips through `JSON.parse(JSON.stringify(...))` deep-equal, and `TERMINAL_KEYS` refuses a seventh block key and an eleventh run key by name.
 
 ### Tier 3 — edge cases
 
@@ -3407,6 +3500,8 @@ The generic suite. **These run against every registered block kind, including ap
 - **T3.76** (I101, C09 I43): a `notice` whose text wraps in a 60-cell cell, aligned `right`, renders exactly its own render at its content width shifted by the offset, and measures the same at both widths.
 - **T3.77** (I107, I108): over the golden sweep's widths, a `raw`, a `notice` and a `Cell` carrying a ramped span measure identically with and without the ramp, with `animate` at tick 0 and at tick 7; a `progress` with a colormap ramp measures 1 at every width; the frames differ at 24-bit where the heights do not.
 - **T3.67** (I85) — **the accepted loss, asserted so a change is visible.** At 1-bit an `ok` notice (emphasised → bold) with a bold span paints a frame byte-identical to the same block without the span; at 8-bit the two differ. A row that starts failing is a compensation that has been added, and the ruling says there is none.
+- **T3.78** (I112): a `terminal` measures the same with `cursor` present and absent, at every position including the last line's last column; a `cursor` naming a line that does not exist, or a column at `cols`, is refused.
+- **T3.79** (I110): a wide cluster split across the gate — text ending mid-surrogate — is refused as malformed rather than passed, and a line of only styled blanks is admitted.
 
 ### Tier 4 — integration
 
@@ -3418,6 +3513,7 @@ The generic suite. **These run against every registered block kind, including ap
 - **T4.49** (I67, I68, with C09 and C22): **a `rule` whose renderer throws draws one row, then three, and the block after it is on the frame in both.** Read from a session's frame rather than from a count — the second frame is the whole subject and no arithmetic shows it.
 - **T4.55** (I68): a far-side patch replacing the block between the frame and the request **discards the request**. Without it the shell floors a block that never threw, addressed by an id the far side has just reused.
 - **T4.6** (with C10): the same document rendered under both themes produces identical line counts.
+- **T4.56** (with C09, C10): a `terminal` inside a `scroll` of height 6 with 40 lines renders the tail six rows and the residue reads `⋯ 34 above`; with `dropped: 12` present, the marker row is row 0 of the content and the residue reads `⋯ 34 above` still — the marker is counted as content, and the two numbers are asserted separately.
 
 ### Tier 5 — e2e
 
@@ -3479,6 +3575,9 @@ The generic suite. **These run against every registered block kind, including ap
 - **T6.94** (I109): widening `RampAnimation` with `sweep` → T2.117's refusal row admits an event the render cannot time.
 - **T6.95** (I108): the `progress` arm of `validate.ts` dropping its `checkRamp` call → T1.29's bar half admits every ramp the span half refuses, **measured** on landing — the mechanism is a call and not a key list, which is why the row runs the table on both carriers; adding `ramp` to `rule` → the `RAMP_EXTENT` exhaustiveness check names a kind marked `none` with a carrier (→ C09).
 - **T6.85** (§3am): reverting the translator to literal markers → T2.33 fails on `text`; adding a text-only `ViewPatch` arm → T1.26 still passes and **nothing fails**, which is the row that says the closure in I87 is by type and the day the union widens this row wants a test.
+- **T6.96** (I110): dropping the control check from the gate → T1.31 admits `\x1b[31m` and the golden frame for T4.7 gains a real escape.
+- **T6.97** (I111): admitting adjacent equal-styled runs → T1.32's last row passes and two snapshots of one screen stop comparing equal.
+- **T6.98** (I113): allowing `dropped: 0` → T1.33 admits it and the marker row draws *0 lines dropped*.
 
 ---
 

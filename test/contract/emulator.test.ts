@@ -11,3 +11,13 @@ describe("C27 terminal emulator — tier 2", () => {
   it.todo("T2.5 (C27 I5): a snapshot round-trips through `JSON.parse(JSON.stringify(...))` deep-equal, and `validateDocument` (C04) admits a document holding it. — not deferred on a component: lands with C27's emulator");
   it.todo("T2.6 (C27 I7): `dropped` is absent from the snapshot when `dropped === 0` and present otherwise — a `Terminal` never carries `dropped: 0`. — not deferred on a component: lands with C27's emulator");
 });
+
+describe("C04 — the terminal kind, spec-first rows", () => {
+  it.todo("T2.118 (C04 I110, §5a): a terminal carrying every run field and both modes round-trips through JSON deep-equal, and TERMINAL_KEYS refuses a seventh block key and an eleventh run key by name — not deferred on a component: lands with the Terminal type");
+});
+
+describe("C09 · C10 — the terminal block and a literal colour, spec-first rows", () => {
+  it.todo("T2.121 (C09 I55, C09 §6b): terminalDefinition declares window, and a window of six rows of a 2,000-line block renders exactly those rows with the whole-block bytes — not deferred on a component: lands with the terminal definition");
+  it.todo("T2.122 (C09 I57): RAMP_EXTENT.terminal is none, ANIMATES.terminal is false, and tickIntervalOf a terminal returns null whatever its runs carry — not deferred on a component: lands with the terminal definition");
+  it.todo("T2.36 (C10 I38): degradeColour's signature takes no theme, at compile time, and a source scan finds no theme reference in its module — not deferred on a component: lands with degradeColour");
+});

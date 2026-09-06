@@ -15,3 +15,14 @@ describe("C27 terminal emulator — tier 3", () => {
   it.todo("T3.9 (C27 I10): `resize` to the same size → a deep-equal snapshot. — not deferred on a component: lands with C27's emulator");
   it.todo("T3.10 (C27 I3): 100 `write` calls without awaiting, then `await` the last → the snapshot holds all 100 lines in order. — not deferred on a component: lands with C27's emulator");
 });
+
+describe("C04 — the terminal kind, spec-first rows", () => {
+  it.todo("T3.78 (C04 I112): a terminal measures the same with cursor present and absent at every position; a cursor naming a missing line or a column at cols is refused — not deferred on a component: lands with the Terminal type");
+  it.todo("T3.79 (C04 I110): text ending mid-surrogate is refused as malformed; a line of only styled blanks is admitted — not deferred on a component: lands with the Terminal type");
+});
+
+describe("C09 · C10 — the terminal block and a literal colour, spec-first rows", () => {
+  it.todo("T3.73 (C09 I56): a lone replacement character renders, and a source scan of kinds/terminal.ts finds no strip call — not deferred on a component: lands with the terminal definition");
+  it.todo("T3.74 (C09 I56): the cursor cell is inverse at all five arms, and at 1-bit it is the only mark distinguishing the cell — not deferred on a component: lands with the terminal definition");
+  it.todo("T3.72 (C10 I38): at 1-bit a run with a colour and six attributes paints every attribute and no colour; a colour-only run is not emitted — not deferred on a component: lands with degradeColour");
+});

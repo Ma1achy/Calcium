@@ -388,6 +388,7 @@ Each is a `measure`/`render` pair. The measurement column restates C04 §3 as an
 | `mosaic` | `height`, exactly | A declared grid of absolutely positioned cells (C04 I71). **Not a bounded box in `scroll`'s sense**: every cell bounds its own child, so I1 holds through an over-tall child rather than diverging (I35) |
 | `group` | sum or max of children | `column` sums children measured at `w`; `row` takes the max of children measured at `floor((w - gaps) / n)`, one cell of gutter between each pair (C04 §3) |
 | `raw` | lines | Pre-formatted, emitted as-is with control characters stripped. **Windows by line**, with no pin — nothing is derived from lines outside the slice (I25) |
+| `terminal` | `lines.length`, plus one row when `dropped` is present | A child's screen (C04 §3i). **Never wrapped and never stripped**: each line is one row, truncated at `width`, and the containment gate (C04 I110) is what makes emitting the text safe. Runs paint literal colour through C10 §4i's ladder; the cursor cell is drawn `inverse`. **Windows** |
 
 **Every measure in this table is floored at 1** for a block that is present (C04 I17). `ceil(cells("") / w)` is 0, and an empty `notice` still renders as a row; the floor is a rule over the table rather than a clause in three of its entries. The one legitimate zero is a container with no children, which is the absence of content rather than empty content.
 
@@ -1709,6 +1710,7 @@ forty rows of a 50 000-row block costs **0.65 ms** for the kind that declares a 
 | kind | derived from the whole | verdict |
 |---|---|---|
 | `logs` | nothing — the level column is a constant and the message takes the residual | **windows**, exactly |
+| `terminal` | nothing — a line is a line, and the marker row is line 0 of the content | **windows**, exactly. The kind that most needs it: a 2,000-line scrollback painted whole is F423's 913 ms |
 | `patch` | the gutter, via `numberWidth` | **windows**, with the width **pinned** (C25 I21a) |
 | `keyValue` | the key column, via `widest` | **windows**, with the width **pinned** — the same argument one kind over |
 | `table` | **two things, and only one was recorded.** `planColumns` reads the column definitions and the width, never the rows (F134) — so the *column* layout is safe. But `hasActionBar` is `rows.some(r => r.actions)`, and it costs **two rows** of height | **not yet** — four interactions, below |
@@ -1874,6 +1876,10 @@ next frame. MG27 is what keeps a producer from writing one (`BUILDER_OMISSIONS`)
 - **I52** — **The bar's ramp varies over the axis — `t = i / (barWidth − 1)` for cell `i` of the whole bar — and only the `on` cells take it; the `off` cells stay `muted`.** A bar at 30% is the first third of the bar at 100%, and a cell painted once keeps its colour as the bar fills. The filled-length extent is refused because it moves every painted cell on every patch (C04 I108).
 - **I53** — **The five loops are `t' = f(t, tick, n)` applied before C10 samples; each period is stated in ticks in the effect's own table, the cadence is asked through `spinnerIntervalMs()` with no millisecond literal in the module, what a tick is belongs to C03's window, and `tick = 0` is the static frame.** `shimmer` and `wave` move one cell per tick; `breathe` is 20 ticks, `pulse` 10, `heartbeat` 12 with the envelope `[1, 0.5, 0, 1, 0.5, 0, 0…]`. Every effect is periodic because the render has no birth tick (C04 I109).
 - **I54** — **A block animates by content as well as by kind: `tickIntervalOf` answers the default set's cadence for any block whose spans or `ramp` carry an `animate` other than `none`, `ANIMATES` stays the record of the kinds that animate by nature, and `animationIntervalOf` is unchanged.** Below 8-bit the cadence is still declared while the frame is stable, and that cost is recorded rather than guarded against (C10 §4e, C22 I60).
+- **I55** — **A `terminal` measures `lines.length`, plus one row when `dropped` is present, and never wraps.** A child chose its own wrap points against a width the emulator was told (C27 §4); re-wrapping them here would double-wrap a screen already laid out, and the row that is one line of a program's output would silently become two. Over-long lines truncate at `width` — the same choice `logs` makes, for the same reason: predictable height is what makes a tail scroll smoothly.
+- **I56** — **A `terminal`'s text is emitted without stripping, and the cursor is drawn `inverse` at every arm including 1-bit.** The only kind exempt from `stripControl`, and the exemption is paid for by C04 I110's gate rather than assumed. The cursor is the one thing a static log cannot show, so it survives the degradation ladder as an attribute where a colour would not.
+- **I57** — **`RAMP_EXTENT.terminal` is `"none"` and `ANIMATES.terminal` is `false`.** A ramp over a child's screen would repaint the child's colours with the application's, which is the inversion of C04 §3i's whole argument; and the block redraws when the child writes, on C23's cadence, not on a tick.
+
 
 ## 8. Commitments
 
@@ -1933,6 +1939,7 @@ next frame. MG27 is what keeps a producer from writing one (`BUILDER_OMISSIONS`)
 50. **An ink can vary along what it is drawn over, and the kind says over what** (I50, I51, I52). `RAMP_EXTENT` names the extent per kind; text is split per cluster in paint with the position taken from the span; the bar varies over its axis and its `off` cells are untouched (`CALCIUM_INK_RAMPS_DESIGN.md` Q3, Q5).
 51. **Motion is a term on the argument, periodic, timed in ticks by the effect** (I53, I54). Five loops, one table, C03's floor as the unit; a block animates by content through the same `tickIntervalOf` the kinds use, and the cache follows without a new axis.
 49. **A head's separator is a slot** (I49). The composer takes capabilities and joins with `glyphs(caps).separator`; the literal `·` it carried was non-ASCII at the ASCII arm and two cells at `wide` (F828).
+52. **A child's screen is drawn as it was written** (I55, I56, I57). One row per line, no wrap, no strip, no ramp and no tick — every mechanism this component applies to its own text is withheld from a screen someone else laid out.
 
 ---
 
@@ -2076,6 +2083,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 
 - **T1.28** (I53): each effect's `t'` at `tick = 0` equals the static table; `shimmer`'s band centre moves one cell per tick and wraps at `n + 3`; `wave` at `tick = n` equals `tick = 0`; `breathe` is 1 at tick 5 and 0 at tick 15; `pulse` flips at tick 5 and returns at 10; `heartbeat` follows its envelope over twelve ticks and repeats; `rampCadenceMs()` is `spinnerIntervalMs()` by identity of value, and a comment-stripped scan of `blocks/ramp.ts` finds no millisecond literal.
 - **T1.19** (I9, C04 I89, C04 I90): the tone-and-value half of §5's *Runs* — `runsOf` copies `tone` and `value` onto the run and `sliceRuns`, `runLines` and `wrapRuns` carry them; `wrapCellsParts` with an atom never breaks strictly inside it — a space inside the atom is skipped, a full row with no outside break point breaks at the atom's start when something precedes it, and an atom wider than the row is broken as text **and drops nothing**, since a cluster-boundary cut is not a break space (`"aaa bbb ccc"` at 7 valued whole is `aaa bbb` / `" ccc"`, F593); a row that fills exactly and is followed by a space breaks **at that space** whether or not it has an earlier break point (F590, F591), and the plain answer for `"aa bb cc dd"` at 5 is two rows where the valued one is three; `wrapRuns` derives the atoms from `value` alone, so a bold run is not one. Asserted on the row texts and starts, beside the plain wrapper's answer for the same string.
+- **T1.29** (I55): a `terminal` of 40 lines measures 40; with `dropped: 12` it measures 41; a line of 200 characters at width 80 still measures one row.
 
 ### Tier 2 — contract / interface
 
@@ -2113,6 +2121,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.120** (I54): `tickIntervalOf` on a `notice` with a `shimmer` span is `spinnerIntervalMs()`; with `animate: "none"`, or with a ramp and no `animate`, it is `null`; `animationIntervalOf` finds the same block inside a `panel` inside a `group`; `ANIMATES` still has exactly two `true` entries.
 - **T2.116** (I49): `glyphs(caps).separator` is one cell at both arms and both alphabets; a source scan finds no `" · "` literal in `src/shell/`.
 - **T2.10**: golden frames for every kind at four widths in both themes and both unicode modes.
+- **T2.121** (I55, C09 §6b): `terminalDefinition` declares `window`, and a window of rows 10–15 of a 2,000-line block renders exactly those six, with the same bytes the whole-block render puts on those rows.
+- **T2.122** (I57): `RAMP_EXTENT.terminal` is `"none"` and `ANIMATES.terminal` is `false`; `tickIntervalOf` a `terminal` returns null whatever its runs carry.
 
 ### Tier 3 — edge cases
 
@@ -2183,6 +2193,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T3.71** (I51, C10 I36): a slot-pair gradient at 4-bit paints exactly two distinct colours, `from` in the first half of the extent and `to` in the second; at 1-bit the frame is byte-identical to the block toned `from`; a colormap bar at 4-bit is byte-identical to the same bar with no ramp.
 - **T3.72** (I51, I53): a single-cluster ramped span samples the midpoint at `tick = 0`; under `shimmer` its frames over ticks 0–4 carry at most two distinct colours, which is the honest degenerate; under `wave` every tick is the midpoint.
 - **T3.70** (I42): a `row` group at a width that drops its second child answers only the first child's width — the unplaced child is measured by neither half and counted by neither (C04 §3).
+- **T3.73** (I56): a `terminal` line whose text is a lone `\uFFFD` renders it; the definition calls no strip function, asserted by a source scan of `kinds/terminal.ts`.
+- **T3.74** (I56): the cursor cell is `inverse` at 24-bit, 8-bit, 4-bit, 1-bit and ASCII — five arms, one assertion each, and at 1-bit it is the only mark distinguishing the cell.
 
 ### Tier 4 — integration
 
@@ -2195,6 +2207,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T4.6** (with C14): expanding a table row shifts subsequent blocks by exactly the measured delta.
 - **T4.8** (I54, C22 I60): a real session with a `shimmer` on a head and a plain entry beside it — over three spinner commits the head is rewritten each tick with a different picture and the plain entry's text is never written again, **read from the diff writer's output**: the folded screen strips SGR, so a colour-only animation is invisible to it, and the render cache exposes no counters — a row that asserted on counters would have needed a member nothing else consumes.
 - **T4.7** (with C04): every document in C07's adaptation corpus measures and renders without error.
+- **T4.57** (with C04, C27): a snapshot of a real `pytest`-shaped byte script, inside a scroll of height 6, renders the tail at five arms; the frames are read as pictures and the colours are the child's.
 
 ### Tier 5 — e2e
 
@@ -2249,6 +2262,9 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.98** (I54): `tickIntervalOf` reading `ANIMATES` alone → T2.120 answers `null` for the shimmer and T4.8's head serves one frame for the life of the session, which is F227 restored by content.
 - **T6.93** (I49): the composer joining with a literal `" · "` → T2.116's scan fails, and the card's contract rows at the ASCII arm draw a character the alphabet does not have.
 - **T6.26** (I32): excluding `error` from animating → T3.43 fails, and `retrying` — which is `error` plus a line — loses its spinner. A per-state branch is the exception the composition immediately needs.
+- **T6.99** (I55): wrapping a `terminal`'s lines → T1.29's 200-character row measures three and the tail of a running block jumps by two rows per long line.
+- **T6.100** (I56): stripping the text → T3.73 loses the replacement character and a child's SGR would silently vanish rather than being refused at the gate.
+- **T6.101** (I57): setting `ANIMATES.terminal` true → T2.122 fails and the block repaints on a tick nobody asked for.
 
 ---
 
