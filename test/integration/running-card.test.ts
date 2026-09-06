@@ -632,7 +632,14 @@ describe("C23 — the call grammar's head states", () => {
       toolCallDoc("agent", { name: "agent", args: "review", elapsedMs: 8_000, children, ...rest }, META, FULL_CAPS);
 
     // The third dispatched settles first: `1 of 3`, and the order is still the dispatch order.
-    const oneDone = parent([child("search", "a"), child("search", "b"), child("search", "c", { elapsedMs: 3_000, outcome: "12 matches", settled: true, result: "…" })]);
+    // **The first running child has output** — the mutation pass found the row
+    // could not see a body drawn for a running child when no running child had
+    // anything to draw: a fixture that cannot construct its subject tests nothing.
+    const oneDone = parent([
+      child("search", "a", { output: [b.raw("src/a.ts:12", { id: "o-a" })], height: 3 }),
+      child("search", "b"),
+      child("search", "c", { elapsedMs: 3_000, outcome: "12 matches", settled: true, result: "…" }),
+    ]);
     expect(validateDocument(oneDone).ok).toBe(true);
     expect(heads(oneDone.blocks)[0], "running: spinner, wall clock, `k of N`").toBe(`agent(review) · ${SPIN(0)} 8s · 1 of 3`);
     const cards = oneDone.blocks.filter((blk) => blk.kind === "group");

@@ -204,16 +204,19 @@ patch target, so the streamed body on this route is what it always was, one row 
 (I55, ruled 2026-09-05). Two settlements exist (C13 §5), and until this ruling only one kept the
 card. `settle(id)` — step 7, the stream route's `end`, its two error arms, and Ctrl-C — keeps what
 accumulated, so the header is patched **before** the settle with its final figure and a one-word
-verdict: `exit N` from `end`'s `RawResult.exitCode`, `cancelled`, `truncated`, `failed`. `settle(id,
+verdict: `exit N` from `end`'s `RawResult.exitCode` when it is non-zero — **a zero is no outcome**
+(I59) — `cancelled`, `truncated`, `failed`. `settle(id,
 doc)` — step 6, the invoke route and its error arm, and the local route — *replaces* the document,
 and **the replacement is composed with the card**: `{ ...doc, blocks: [header(elapsed, outcome),
-...doc.blocks] }`, where `outcome` is `exit N` when the adapted result's exit code is **non-zero**, `ok`
-for a document whose status is `ok`, and `failed` for one whose status is `error` with no such code.
+...doc.blocks] }`, where `outcome` is `exit N` when the adapted result's exit code is **non-zero**, a
+count where the document has one (`3 rows`, the first table's), `failed` for one whose status is
+`error` with no such code, and **nothing** for a document with neither — `verb · duration`, the
+tone carrying success (I59; `ok` was this slot's placeholder until 2026-09-06).
 (The first draft said *when the adapted result carries an exit code* — every adapted document does,
 the registry writes `meta.exitCode` on every route (F58), so that clause made row 10's `ok`
-unreachable. A zero exit is not a fact worth a word beside `ok`; a non-zero one is the fact.) The result's
+unreachable. A zero exit is not a fact worth a word; a non-zero one is the fact.) The result's
 blocks become the card's body and hang under the hook four cells in, the hook at the header's text column (C22 I83, C22 I84). So `⬤ tail(web.log)
-· 2m 31s · exit 0` is what a finished follow reads **and `⬤ ps(--all) · 0.4s · ok` over an
+· 2m 31s` is what a finished follow reads **and `⬤ ps(--all) · 0.4s · 3 rows` over an
 indented table is what a finished listing reads** — §9c's settled state, on every route.
 
 **The call grammar, 2026-09-06** (`AGENT_TUI_DESIGN.md` §9e; F823–F831). The head is
@@ -1786,7 +1789,7 @@ interaction**; the events are the mechanism and the cells are where two rules me
 | 3 | patch → `append` body | step 4 × §9c body | the block lands *after* the header — C13 `append` is positional and the header is block 0 |
 | 4 | 120 s silent → stall notice | I25 × §9c body | `⎿ no output for 2m` appended after the body; the header is `· 2m 0s` on the same frame — two writers, two block ids, one entry |
 | 5 | patch → `sawPatch` | A4 × I53 | stall row → `resumed after 2m` in place; the readout untouched |
-| 6 | `end` → **final header** → `settled` → `settle(id)` | I54 × C13 §6 × C13 §5b.2 | **the order is the ruling**: header patched with `· 2m 31s · exit 0` first; `settled` drops the readout; `settle` freezes it and persistence writes what it sees. Reversed, the patch still lands — the shell may write to a settled entry — and the persisted row has no verdict (T6.82) |
+| 6 | `end` → **final header** → `settled` → `settle(id)` | I54 × C13 §6 × C13 §5b.2 | **the order is the ruling**: header patched with `· 2m 31s` first — the spinner leaves the slot with the same replace; `settled` drops the readout; `settle` freezes it and persistence writes what it sees. Reversed, the patch still lands — the shell may write to a settled entry — and the persisted row has no verdict (T6.82) |
 | 7 | a wake after 6 | I53 × C13 I13 | the readout is gone, nothing is written — a settled card keeps its final figure |
 | 8 | Ctrl-C at 3 instead | C16 rung 1 × I54 × §8a row 7 | header `· Ns · cancelled` then `settle(id)`; the abort's rejection reaches a settled entry and is refused |
 | 9 | `/ps` queued behind 1, routed at 6 | roadmap 33 × I53 × P2 | the notice is replaced by `ps()`'s header, same id; its clock starts at 6 not at enqueue |
@@ -1922,7 +1925,7 @@ Fake transport, fake stores.
 - **T4.7** (with C16): Ctrl-C during a verb cancels; during a piped shell child forwards `SIGINT`.
 - **T4.7b** (with C16, C13): a submission made while focus is in the live block calls `router.resetFocus` after `transcript.append` and before `commit` — asserted on the call order, since a reset issued before the append would be undone by nothing and a reset issued after the commit paints one frame with focus in a frozen block.
 - **T4.8** (with C22): `cd` updates session state and the next spawn lands there.
-- **T4.40** (I54, with C13, §3d-bis): through `submit` and a real transcript, a streaming verb's entry reads `tail(web.log)` at t=0, `tail(web.log) · 4s` after four one-second wakes, holds the streamed blocks *under* the header, and reads `· 4s · exit 0` after `end` — unchanged by any wake after it. Driven through the pipeline's own route, never by calling `readout`: *a test that calls the mechanism misses the wiring*.
+- **T4.40** (I54, with C13, §3d-bis): through `submit` and a real transcript, a streaming verb's entry reads `tail(web.log) · ⠋` at t=0, `tail(web.log) · ⠼ 4s` after four one-second wakes, holds the streamed blocks *under* the header, and reads `· 4s` after `end` — no spinner, no `exit 0` (I59) — unchanged by any wake after it. Driven through the pipeline's own route, never by calling `readout`: *a test that calls the mechanism misses the wiring*.
 - **T4.41** (I54): a line queued behind a running verb reads `queued behind tail` while it waits, gains no figure however far the clock advances, and reads `tail(web.log)` — the same entry id — the moment it is routed, its figure counting from there and not from the enqueue. Before the fix the entry settled still reading *queued behind*.
 - **T4.42** (I54, with C16): Ctrl-C on a running stream → the header reads `· Ns · cancelled` and the entry is settled; a later wake changes nothing.
 - **T4.43** (I54, I55): the invoke route → the card is on screen while the transport runs and the settled document is the adapter's blocks under the card's header — one `step` block, at block 0. (Read *with no `step` block in it* until 2026-09-05; I55 reversed it.)
@@ -1951,7 +1954,7 @@ Fake transport, fake stores.
 - **T4.25** (I44, with C22, C13, C14): the reference app's shape through a real session — two parts of **one document** sharing a key, read from **one composed frame**, showing one value. The frame and not the fetch count: an arithmetically consistent driver can still be patching two panels from two samples, and only the frame says which was on screen. This is the row `tools/bench/pollers.mjs` measured `19 vs 20` against before the change.
 - **T4.26** (I46, with C14): the same document scrolled out of the viewport → the fetch count stops advancing; scrolled back → it advances again and the first frame after the return is current. The count is taken from a spy on `fetch` rather than from the panel, because a paused part still draws whatever it last held.
 - **T4.27** (I48, with C22, C24): **the row belongs at the public entry**, because every driver-level assertion could already see these throws and no app author ever could. Through `createTui`: a local handler returning F15's exact document, the frame read for a fault notice carrying the store's sentence, then `stop()` and the **restored primary screen** read for the same reason among the diagnostics. One row spanning both channels, since either alone is satisfied by the half that is easy.
-- **T4.49** (I58, §8f P9): a stream dispatched under the harness clock reads `⬤ tail(web.log) · ⠋` at 0 s, `· ⠋ 1s` after one wake with the spinner's frame advanced by exactly one, `· 2m 31s · exit 0` at `end` with no spinner; the frame at ASCII is the set's ASCII pair.
+- **T4.49** (I58, §8f P9): a stream dispatched under the harness clock reads `⬤ tail(web.log) · ⠋` at 0 s, `· ⠙ 1s` after one wake with the spinner's frame advanced by exactly one, `· 2s` at `end` with no spinner and no `exit 0` (I59); the frame at ASCII is the set's ASCII pair, joined by `:` (C09 I49).
 - **T4.50** (I59): a listing whose adapted document carries a row count settles to `· 0.4s · 12 rows`; one with no count settles to `· 0.4s` and no third field; a non-zero exit is `exit N`; the string `ok` appears in no settled head across the seven routes.
 - **T4.51** (I60, §8f P10, P12; C04 §3c S4): a call needing approval reads `· ⠋ waiting` with no readout registered; *approve* pops the layer and the first wake after it reads `· ⠋ 1s`; *deny* settles the card reading `· denied` with history code 126 and no body. And row 18's cell: `⏎` on a running card's head folds and unfolds the body, an unpaged box reopening at its tail and a paged one where it was.
 - **T4.52** (I61, §8f P8, P11): a stream throw settles the card over a `status` box at `error`; a retry appends a box at `retrying` whose countdown moves while the head's figure counts elapsed, and the resuming patch replaces the box in place — the block count is unchanged across the resume.
@@ -2023,7 +2026,7 @@ Fake transport, fake stores.
 - **T6.52** (I30, C07 I15): pinning `seq` to a constant in `streamInto` → T1.7b fails on both halves. This was the tree's state: the second `data` patch of every stream collided with the first under C04 I14, so a streaming verb could render exactly one block, and the per-stream reset fired on every patch. Found by the first tier-5 row to drive a `streams: true` verb through a real session; the unit suite passed throughout, because its `adaptPatch` double took no arguments and so could not see the one that was wrong.
 - **T6.80** (I54): appending `compose({ blocks: [] })` at step 3, as the tree did → T4.40 fails at its first assertion. The revert that is the whole of the old behaviour, and every other C23 row stays green because none read the pending document's blocks.
 - **T6.81** (I54): dropping the `readout` call at step 3 → T4.40 fails at its second: the header is composed once and never moves, F771 exactly, one component over from T6.53.
-- **T6.82** (I54): writing the final header **after** `transcript.settle` rather than before → T4.40 fails at its fourth: the document carried by the `settle` change — the one persistence writes (C13 §5b.2) — reads `· 4s` with no verdict, while the store's final state reads `· 4s · exit 0`. **Invisible to any assertion on the final state**, because a `"shell"` patch on a settled entry is accepted (C13 §6); the first draft of this row claimed a refusal and would have survived its own mutation. The natural order to write — *finish, then annotate* — is the wrong one.
+- **T6.82** (I54): writing the final header **after** `transcript.settle` rather than before → T4.40 fails at its fourth: the document carried by the `settle` change — the one persistence writes (C13 §5b.2) — still carries the spinner — `· ⠼ 4s` — while the store's final state reads `· 4s`. **Invisible to any assertion on the final state**, because a `"shell"` patch on a settled entry is accepted (C13 §6); the first draft of this row claimed a refusal and would have survived its own mutation. The natural order to write — *finish, then annotate* — is the wrong one.
 - **T6.84** (I25, §3b): measuring the resume record from `stalledAt` rather than from the last patch → T4.44 fails at its resumed frame: `resumed after 1m` under `no output for 2m`. This was the tree's state, and T1.30 and the §3b rows all match the phrase without the figure.
 - **T6.85** (I55): the invoke route settling with the adapted document alone → **T4.47** fails on block 0's kind; the error arm settling `errorDoc` bare → **T4.47**'s second case fails; the local route → its third.
 - **T6.86** (I56): the shell prefixing the body itself rather than composing the document → **T4.48** fails on a doubled indent.

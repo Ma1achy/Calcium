@@ -30,6 +30,41 @@ const run = () => {
 };
 
 const MUTATIONS = [
+  // --- C22 I88–I90 — the gutter language (T1.48–T1.50, T4.63) ------------------
+  {
+    // C22 T1.48 (I88) — the bar drawn on row 0 too: the hook is gone from every card.
+    name: "bar on row 0",
+    file: LAYOUT,
+    from: "  return run.gutter.map((column) => gutterCell(row === 0 ? column.first : column.rest, options)).join(\"\");",
+    to: "  return run.gutter.map((column) => gutterCell(column.rest, options)).join(\"\");",
+    expect: "T1.48",
+  },
+  {
+    // C22 T1.49 (I89) — the gutter unit drifts from the body indent: a nested head lands at five cells.
+    name: "GUTTER_UNIT is not BODY_INDENT",
+    file: LAYOUT,
+    from: "export const GUTTER_UNIT = BODY_INDENT;",
+    to: "export const GUTTER_UNIT = BODY_INDENT + 1;",
+    expect: "T1.49",
+  },
+  {
+    // C22 T1.49 (I89) — the gutter's corner taken from the plot theme's axis: the
+    // elbow rounds, and the function shared by measurer and renderer depends on theme.
+    name: "gutter corners are round",
+    file: LAYOUT,
+    from: "        : `${glyphForMask(cell === \"branch\" ? LINE_UP | LINE_DOWN | LINE_RIGHT : LINE_UP | LINE_RIGHT, \"sharp\", caps)}${glyphForMask(LINE_LEFT | LINE_RIGHT, \"sharp\", caps)}`;",
+    to: "        : `${glyphForMask(cell === \"branch\" ? LINE_UP | LINE_DOWN | LINE_RIGHT : LINE_UP | LINE_RIGHT, \"round\", caps)}${glyphForMask(LINE_LEFT | LINE_RIGHT, \"round\", caps)}`;",
+    expect: "T1.49",
+  },
+  {
+    // C22 T1.50 (I90) — the head copies its own text, not the invocation.
+    name: "the head's copy is its text",
+    file: LAYOUT,
+    from: "          ...(blockId === headId && command !== undefined ? { copy: command } : {}),",
+    to: "          ...(blockId === headId && command !== undefined ? {} : {}),",
+    expect: "T1.50",
+  },
+
   {
     // C22 T6.103 (I84) — the hook back under the header's mark: two forms, two columns.
     name: "hook indent set to 0",

@@ -144,6 +144,88 @@ const results = runPass({
       to: '        block: b.notice("muted", `resumed after ${String(gap)}m`, undefined, { id: STALL_BLOCK }),',
       expect: "N8",
     },
+
+    // --- C23 I58–I62 — the call grammar's head states (T4.49–T4.53) ---------
+    {
+      // C23 I59 (T4.49, T4.40) — a zero exit said as `exit 0`: `ok` with a number on it.
+      name: "exit 0 is an outcome again",
+      file: EX,
+      from: "          finishCard(patch.result.exitCode === 0 ? \"\" : `exit ${String(patch.result.exitCode)}`);",
+      to: "          finishCard(`exit ${String(patch.result.exitCode)}`);",
+      expect: "T4.49",
+    },
+    {
+      // C23 I59 (T4.50) — the placeholder word back in every settled head.
+      name: "outcomeOf says ok where it has no count",
+      file: DOC,
+      from: '  return "";\n}\n\n/**\n * A settled document composed with its card',
+      to: '  return "ok";\n}\n\n/**\n * A settled document composed with its card',
+      expect: "T4.50",
+    },
+    {
+      // C23 I59 (T4.50) — the count arm gone: a listing settles to duration alone.
+      name: "outcomeOf never counts a table's rows",
+      file: DOC,
+      from: '  const table = doc.blocks.find((blk) => blk.kind === "table");',
+      to: '  const table = doc.blocks.find((blk) => blk.kind === "never");',
+      expect: "T4.50",
+    },
+    {
+      // C23 I60 (T4.51) — the head never says `waiting`: the layer is up and the card reads as dispatched.
+      name: "approval does not put the head in waiting",
+      file: EX,
+      from: "      deps.transcript.patch(pendingId, { op: \"replace\", blockId: call.id, block: header(0, undefined, true) }, \"shell\");\n      deps.scheduler.commit(\"input\");",
+      to: "      deps.scheduler.commit(\"input\");",
+      expect: "T4.51",
+    },
+    {
+      // C23 I60 (T4.51) — the clock starts at submit, not at approval: the head reads 5s after 2s of running.
+      name: "the tool's clock starts at submit, not approval",
+      file: EX,
+      from: "      startedAt = deps.clock();\n      // The word goes with the wait",
+      to: "      // The word goes with the wait",
+      expect: "T4.51",
+    },
+    {
+      // C23 I60 (T4.51) — a denial recorded as an ordinary failure.
+      name: "denied is recorded as exit 1",
+      file: EX,
+      from: "        deps.history.append(line, 126);",
+      to: "        deps.history.append(line, 1);",
+      expect: "T4.51",
+    },
+    {
+      // C23 I61 (T4.52) — the failure box in the wrong state: a stream throw reads as loading.
+      name: "a stream throw is a loading box",
+      file: EX,
+      from: "        block: callStatus(\"error\", `stream failed: ${String(cause)}`, { id: blockId(\"stream-error\") }),",
+      to: "        block: callStatus(\"loading\", `stream failed: ${String(cause)}`, { id: blockId(\"stream-error\") }),",
+      expect: "T4.52",
+    },
+    {
+      // C23 I62 (T4.53) — same-unit counts never sum: three searches read `3 of 3`.
+      name: "rollUp never sums same-unit counts",
+      file: DOC,
+      from: "  if (settled.length === total && failures.size === 0 && oneUnit && total > 0) { // cells-ok — counts",
+      to: "  if (false) { // cells-ok — counts",
+      expect: "T4.53",
+    },
+    {
+      // C23 I62 (T4.53) — children sorted by completion: the settled one first.
+      name: "children are ordered by settlement",
+      file: DOC,
+      from: "  for (const child of call.children ?? []) {",
+      to: "  for (const child of [...(call.children ?? [])].sort((a, b) => Number(isSettled(b)) - Number(isSettled(a)))) {",
+      expect: "T4.53",
+    },
+    {
+      // C23 I62 (T4.53) — a running child gets its body: the head-only rule dropped.
+      name: "a running child draws its body",
+      file: DOC,
+      from: "    const childBody = isSettled(child) ? callBody(child, true) : [];",
+      to: "    const childBody = callBody(child, true);",
+      expect: "T4.53",
+    },
   ],
 });
 

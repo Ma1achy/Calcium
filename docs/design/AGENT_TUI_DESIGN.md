@@ -584,8 +584,9 @@ a real reasoning stream in front of it.
 ```
 
 > **The settled state is every route's, 2026-09-05** — C23 I55/I56. The invoke route, its error
-> arm and the local route settle the header over the result, so `⬤ ps(--all) · 0.4s · ok` above an
-> indented table is what a finished listing reads. C23 had ruled the opposite for the shell's own
+> arm and the local route settle the header over the result, so `⬤ ps(--all) · 0.4s · 3 rows` above an
+> indented table is what a finished listing reads (the count since I59, 2026-09-06 — `ok` was the
+> placeholder for *no count*). C23 had ruled the opposite for the shell's own
 > verbs (*the card was the waiting and the document is the answer*); the reversal and its reason
 > are recorded there.
 
@@ -608,7 +609,7 @@ line 11
 line 12
 ⋯ 9 above, 0 below                             ← the hidden rows are ABOVE a following box
 
-⬤ run_command(npm test) · 4s · exit 0          ← settled: the outcome is in the header
+⬤ run_command(npm test) · 4s                   ← settled: a zero exit is no outcome (correction 9)
   ⎿ 118 passed, 2 todo                         ← the result under the hook, at the header's text column
 
 ⬤ run_command(npm test)                        ← folded: a collapsed scroll
@@ -644,6 +645,10 @@ line 12
    and the settled head an outcome that is a count, never `ok` (C23 I58, I59). The separator is a
    glyph slot resolved by the composer, because the frames above drew a literal `·` at the ASCII
    arm and nobody saw it (F828).
+9. **A zero exit is no outcome, and the ASCII separator is `:`.** `exit 0` was `ok` with a number
+   on it: the settled head reads `⬤ run_command(npm test) · 4s` and the tone carries success
+   (C23 I59). The separator's first ASCII rung, `-`, was the turn spinner's first frame, and a
+   dispatched head at that arm read `* verb - -`; read in the frame, ruled `:` (F834, C09 I49).
 
 **What had no mechanism on 2026-09-05, and has one now** (C22 §6l.6, §6l.8): the `⎿` hook in
 front of a *table* or a *logs* block, and the left rule beneath it, are drawn by the shell's
