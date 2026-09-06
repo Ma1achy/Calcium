@@ -29885,3 +29885,30 @@ A03 are corrected to the measured count. T2.71 gains the diagonals as controls.
 
 ---
 
+## F834 — the ASCII separator was the ASCII spinner's frame, and the head read `verb - -` ★★★☆☆
+
+**What.** C1 gave the head's separator a slot — `·` at unicode, `-` at ASCII (C09 I49, F828) —
+and C4 put the spinner in the duration slot. Reading T2.48's frames at the ASCII arm, the
+dispatched head is `* run_command(npm test) - -` and the running head `* run_command(npm test) - - 4s`:
+the separator and `TURN_ASCII`'s first frame are the same character, and `|`, its third, is the
+other rung a middle dot would plausibly take. Every assertion passed — the separator is one cell,
+the spinner is the set's pair, the frame literal was written from the same two facts — and the
+picture reads as a stutter.
+
+**Why it survived.** The two rulings were each measured alone: the separator for its cell count
+(T2.116), the spinner for its pair (T2.71). Neither row asks what the two look like *beside each
+other*, which is the property only a set has, and the frame is the only instrument that composes
+them. The rung was chosen by analogy to the residue mark's `~` — a character that reads as the
+unicode one — and not against the table of what else can appear in the slot next to it.
+
+**Ruling.** The ASCII rung is `:` — one cell, in no spinner set's ASCII frames, not a residue or
+gutter mark, and a separator by convention (`label: value`). I49 gains the condition as a
+sentence: *a character no spinner set's ASCII frames use*, and T2.116 asserts it against every
+set rather than against the one default, so a new set with `:` in its pair fails the row before it
+lands. The paste chip and the stale part's title move with it, as they share the slot.
+
+**Where**: `src/presentation/blocks/glyphs.ts` `separator`; C09 I49, §*the separator*;
+`docs/design/AGENT_TUI_DESIGN.md` §10; T2.116, T2.46, T2.48, T4.49.
+
+---
+

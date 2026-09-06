@@ -888,7 +888,7 @@ attribution, and the transcript already carries it.
 ▲   the warning mark       ASCII: !   — ▲ in this tree, not ⚠
 ⠋   the spinner            ASCII: the set's own pair
 …   the truncation mark    ASCII: ~
-·   the separator          ASCII: -
+·   the separator          ASCII: :   — not `-`, which is the turn spinner's frame (F834)
 ```
 
 **From the glyph table, never as literals**, and every one measured for ambiguous width *and*
