@@ -8,7 +8,7 @@
     "node": ">=22"
   },
   "bin": {
-    "plots-tui": "./main.ts"
+    "plots-tui": "./bin/plots-tui.js"
   },
   "scripts": {
     "check": "tsc --noEmit",

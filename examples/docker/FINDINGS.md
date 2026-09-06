@@ -30447,10 +30447,15 @@ list). What it can do is set it where it ships applications and say so where a c
 it. Every example's `start` script now carries `NODE_ENV=production`, and the `ink` row in
 `DEPENDENCIES.md` carries the mechanism and both figures.
 
-**What is not fixed.** A globally installed `plots-tui` invoked through its `bin` shim gets no
-environment from npm, so it is back to the development build. Closing that needs the entry point to
-set the variable before the first `import` of `ink` resolves — which in ESM means a launcher and a
-dynamic import, and it is a separate ruling.
+**~~What is not fixed.~~ Closed the same day.** A globally installed command gets no environment
+from npm, so the `bin` path was back on the development build. Each app's launcher now sets it —
+`process.env.NODE_ENV ??= "production"` followed by `await import(…)`, and **the dynamic import is
+the whole of it**: ESM evaluates every static import before the module body runs, so the assignment
+above a static `import "../main.ts"` would execute *after* `ink` had resolved `react-reconciler` and
+chosen its build. A line that reads as the fix and cannot be one. `??=` so a consumer who sets the
+variable deliberately keeps it, and `test/contract/example-bins.test.ts` asserts the ordering on the
+source rather than the assignment's presence — two of the three launchers did not exist before this
+(F858).
 
 **Where**: `examples/*/package.json` `start`; `DEPENDENCIES.md`, the `ink` row.
 
@@ -30627,6 +30632,78 @@ adding an owner row for their own reasons, which is how these two sat unread.
 
 **Where**: `tools/enforce/commitments.mjs` `COMPONENT_SOURCES`; `tools/enforce/index.mjs`'s summary
 line; `tools/mutate/runs/c09-image.mjs`, `tools/mutate/runs/c09-ink-ramps.mjs`.
+
+---
+
+## F858 — F56 was closed at the instance: two of three shipped commands could never run ★★★★☆
+
+F56 found that `docker-tui`'s `bin` pointed at a `.ts` file with no shebang, so the kernel handed it
+to `sh`. It was fixed with a `.js` launcher and a test file whose whole subject is *is the thing npm
+is about to put on someone's `PATH` executable*. **Two other manifests declared the same thing and
+were not touched.** Measured, on the tree as it stood:
+
+| command | `bin` | mode | what happens |
+|---|---|---|---|
+| `docker-tui` | `./bin/docker-tui.js` | 755 | works |
+| `plots-tui` | `./main.ts` | 755 | `sh` parses TypeScript: **`./main.ts: line 1: /bin: Is a directory`** — the docstring's opening `/**` is a glob, expanded against the filesystem |
+| `svc-tui` | `./main.ts` | 644 | **`Permission denied`**, exit 126 |
+
+**The two failed differently for one reason, and the mode is what chose.** npm chmods a bin target to
+755 on install, so `svc-tui` becomes `plots-tui`'s failure the moment anybody installs it — the same
+defect wearing the exit code of a different one.
+
+**Why the instance was closed and the class was not.** F56's remedy was a file — `bin/docker-tui.js`
+— and its test was `examples/docker/test/bin.test.ts`, which reads its target *from the manifest* so
+that repointing the field moves the test with it. That is careful, and it is careful **about one
+app**. Nothing asked the same question of the set, and the two other manifests were never read again.
+A per-app row is a per-app guarantee, and the defect it was written for is a property of *declaring a
+bin at all*.
+
+**The repair is the sweep, not three files.** `test/contract/example-bins.test.ts` reads
+`examples/*/package.json`, and every command it finds must be a `.js` launcher, carry a shebang, hold
+the execute bit, set `NODE_ENV` before a dynamic import (F853), and reach its application when
+spawned as a program. An example added tomorrow is covered without anyone remembering the file.
+**Measured against the shipped state: ten of sixteen rows fail**, five for each of the two apps, and
+the docker app's six pass — which is the shape of a class closed at one instance.
+
+**Where**: `examples/plots/bin/plots-tui.js`, `examples/minimal/bin/svc-tui.js` (both new);
+`examples/{plots,minimal}/package.json`; `examples/docker/bin/docker-tui.js`;
+`test/contract/example-bins.test.ts`.
+
+---
+
+## F859 — `TuiConfig.binary` is a spawn target and a display name, and the piped surface prints the path ★★☆☆☆
+
+Running any of the three commands with stdout a pipe — the one surface a stranger sees before they
+have a terminal — prints:
+
+```
+plots-tui — a terminal interface for /workspace/examples/plots/bin/plots
+
+Usage: /workspace/examples/plots/bin/plots [command]        run /workspace/examples/plots/bin/plots directly
+       plots-tui                    open the interactive shell
+```
+
+**Both readers are right about the field and they want different values.** `TuiConfig.binary` is
+documented as *for rewriting `/verb` inside a delegated command (C18 I5)* — a spawn target, and the
+examples correctly supply an absolute path (`new URL("bin/svc", import.meta.url).pathname`) so the
+sibling binary is found however the command was invoked. `usageText(name, binary)` then prints that
+same value to a person, three times, as the thing to type.
+
+**Nothing was wrong at either end.** C18 needs a path; the help needs a name; one field carries both
+and the path wins because the path is the load-bearing job. It is the paired-reader shape: a
+consumer table asking *who consumes `binary`* finds two answers and no disagreement, because the
+disagreement is about the **value**, not the member.
+
+**Not fixed here.** The remedy is a public-type decision — a display name on `TuiConfig`, or
+`usageText` taking the basename, which is a guess about intent for an app that legitimately ships its
+binary elsewhere. Recorded with the measurement so the decision is made rather than inherited.
+
+**How it was found**: running the three launchers to prove F858's fix, and reading the output rather
+than the exit code. F56's own row asserts `toContain("docker-tui")` and `toContain("needs a
+terminal")`, both of which pass over this.
+
+**Where**: `src/shell/usage.ts`; `src/shell/types.ts` `TuiConfig.binary`; `examples/minimal/main.ts:59`.
 
 ---
 

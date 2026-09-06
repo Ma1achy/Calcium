@@ -29,5 +29,20 @@
  * which is what lets `bin/docker-json` be found by `new URL("../bin/…",
  * import.meta.url)` in `manifest.ts` no matter which directory you type the
  * command from.
+ *
+ * **`NODE_ENV`, set here and imported dynamically — the second half of F853.**
+ * `react-reconciler`'s entry picks its build from `process.env.NODE_ENV` at
+ * require time, and the development build calls `performance.measure` about
+ * three times per commit into a buffer Node never releases. `npm start` sets the
+ * variable; a globally installed command gets no environment from npm, so this
+ * path was back on the development build and leaking three objects a frame.
+ *
+ * **The import is dynamic because a static one hoists.** ESM evaluates every
+ * static import before the module body runs, so `process.env.NODE_ENV = …`
+ * above `import "../src/main.ts"` would execute *after* `ink` had already
+ * resolved `react-reconciler` and chosen its build — a correct-looking line that
+ * cannot do its job. `??=` rather than `=`, so a consumer who sets the variable
+ * deliberately keeps it.
  */
-import "../src/main.ts";
+process.env.NODE_ENV ??= "production";
+await import("../src/main.ts");
