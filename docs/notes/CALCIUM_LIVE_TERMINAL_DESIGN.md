@@ -266,7 +266,8 @@ A row governed by one rule restates it and is left out. Arms: 24-bit, 8-bit, 4-b
 | deferred | why not now | the symbol |
 |---|---|---|
 | attach — a pushed view over the emulator, keys to `PtyProcess.write` | no input path this round; the pushed-view seam is `createDocumentView`, which pushes a `ViewDocument`, and a live emulator view is a second kind of pushed content | `ACTION_KINDS` gaining `"attach"` (A8 — a C04 spec change); `PtyProcess.write` acquiring a caller in `src/shell/` |
-| the mouse-tracking notice — *this program wants the mouse; attach to give it one* | the message is about attach | `emulator.modes().mouseTrackingMode` acquiring a reader outside C27's tests |
+| the mouse-tracking notice — *this program wants the mouse; attach to give it one* | the message is about attach; an `Emulator` member nothing reads would be an export nothing consumes | `Emulator` gaining a `modes()` member, with the notice as its first reader |
+| terminal queries answered — `CSI c`, `CSI 6 n`, DCS — so a `vim` does not wait a second for its `t_RV` reply | the answer is bytes to the child, and nothing writes to the child this round | the dependency's `onData` acquiring a subscriber in C27 that forwards to `PtyProcess.write` |
 | the what-changed line on detach (brief §4a) | no detach | `TranscriptEntry` gaining a timestamp (A9) |
 | `⌃c` to the child in the view (brief §4b) | no view | the attach entry |
 | a border on the attached block (brief §6b) | no attached state; borderless is the only state | `plotFrame`'s generalisation (A18) |

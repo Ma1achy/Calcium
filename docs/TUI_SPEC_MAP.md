@@ -129,6 +129,7 @@ Every component is Calcium except **C08**. Where a row says *+ app*, the framewo
 | | Component | Pkg | Owns |
 |---|---|---|---|
 | C21 | Process runner | kit | argv-array spawn, `spawnShell`, process groups, stream decoding, handoff, signal delivery |
+| C27 | Terminal emulator | kit | a child's bytes interpreted into a `Terminal` block — cells with the child's colours, the alternate screen, a capped scrollback, containment (spec'd 2026-09-06, unbuilt) |
 
 ### Shell (L4)
 

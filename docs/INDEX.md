@@ -28,6 +28,7 @@
 | C24 | Public API | L4 | kit | [spec](components/C24_public_api.md) |
 | C25 | Patch renderer | L1 | kit | [spec](components/C25_patch_renderer.md) |
 | C26 | Navigation | L3 | kit | [spec](components/C26_navigation.md) — **design only, unbuilt** |
+| C27 | Terminal emulator | L0 data | kit | [spec](components/C27_terminal_emulator.md) — **spec'd, unbuilt** |
 
 `kit + app` means the framework owns the mechanism and a consuming app supplies the
 content — the five extension hooks of A02 §6.

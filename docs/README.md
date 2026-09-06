@@ -77,7 +77,7 @@ import each other, so they can be built in parallel.
 
 ```
 terminal    C01 lifecycle → C02 capabilities → C03 scheduler
-data        C04 view model → C05 manifest → C06 transport → C07 adapters → C21 process
+data        C04 view model → C05 manifest → C06 transport → C07 adapters → C21 process → C27 emulator
                     ↓
 presentation        C09 blocks → C10 theme → C11 table → C12 plot → C25 patch
                     ↓
