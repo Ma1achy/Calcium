@@ -30752,6 +30752,12 @@ branch's.
 branch and the branch carries the prerequisite. The residue is the habit, and it is one command run
 at the one moment nobody runs it: after a merge, read the run on the ref that was merged **into**.
 
+**Measured rather than left as a prediction, 2026-09-06.** #44 merged as `f00c53c2`; `main`'s run
+**34047626261** is green on all six jobs, `fast` — the job that had been failing for fifteen days —
+included. The habit was run at the moment it names, and this paragraph is what it returned. The one
+above it would otherwise still be a forecast sitting in a findings file, which is the shape this
+group is about.
+
 **Where**: `Makefile` `instruments:` on `origin/main` against this branch's `instruments: catalogue`;
 `.github/workflows/ci.yml`'s comment above `make instruments`; run 32609169943.
 
