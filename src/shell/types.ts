@@ -340,6 +340,15 @@ export type PipelineDeps = Readonly<{
    * rendering.
    */
   confirm: ConfirmHost;
+  /**
+   * Whether a call needs a decision before it runs, and what the layer says
+   * (C23 I60). `null` runs the call; a record puts the card in `waiting`, asks
+   * through `confirm`, and a denial settles it with code 126. **Optional and
+   * unset by the composition root**: no far side asks today, and the emitter
+   * lands with its test consumer rather than a producer nothing calls.
+   */
+  approval?: (call: Readonly<{ name: string; args: string }>) =>
+    Readonly<{ consequence?: string; choices?: readonly Readonly<{ key: string; label: string; default?: true }>[] }> | null;
   theme: ThemeStore;
   /** Persist the chosen variant (C22 I40). Absent in harnesses with no state directory. */
   persistTheme?: (name: string) => void;

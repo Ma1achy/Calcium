@@ -29,6 +29,7 @@ import { withThemeNames } from "../../src/data/manifest/index.js";
 import { doc, localDoc } from "./blocks.js";
 import { result } from "./transport.js";
 import type { RefreshHost } from "../../src/shell/refresh.js";
+import type { ConfirmHost } from "../../src/shell/confirm.js";
 import type { Pipeline, PipelineDeps } from "../../src/shell/types.js";
 import type { RawPatch, RawResult } from "../../src/data/transport/index.js";
 import type { ViewDocument, ViewPatch } from "../../src/data/viewmodel/index.js";
@@ -53,10 +54,14 @@ export type PipelineScript = Readonly<{
   handoff?: (argv: readonly string[]) => Promise<Exit>;
   /** C23 I46 — for the rows about the off-screen pause. Everything visible by default. */
   visible?: (host: RefreshHost) => boolean;
+  /** C23 I60's test consumer: which calls need a decision, and what the layer says. */
+  approval?: PipelineDeps["approval"];
 }>;
 
 export type PipelineHarness = Readonly<{
   pipeline: Pipeline;
+  /** The real confirm host, so a row can answer the approval layer through its handler. */
+  confirm: ConfirmHost;
   transcript: ReturnType<typeof createTranscriptStore>;
   session: ReturnType<typeof createSessionStore>;
   theme: ThemeStore;
@@ -125,6 +130,7 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
   const timers: { fn: () => void; at: number; live: boolean }[] = [];
 
   const harnessOverlays = createOverlayManager({ registry: overlayRegistry });
+  const harnessConfirm = createConfirmHost({ overlays: harnessOverlays, anchor: () => ({ row: 0, rows: 1 }), overlayRegion: () => ({ width: 80, height: 24 }), invalidate: () => undefined });
   const deps = {
     session: () => session.snapshot,
     writes: session.execution,
@@ -209,7 +215,8 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
      * answer, so a handler that asks and ignores the reply would pass — and the
      * one test that matters is whether declining stops the command.
      */
-    confirm: createConfirmHost({ overlays: harnessOverlays, anchor: () => ({ row: 0, rows: 1 }), overlayRegion: () => ({ width: 80, height: 24 }), invalidate: () => undefined }),
+    confirm: harnessConfirm,
+    ...(script.approval === undefined ? {} : { approval: script.approval }),
     theme,
     // `append` is real, because C23 I29 records every settled submission
     // through it — a fake without it throws inside the append funnel and the
@@ -299,6 +306,7 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
 
   return {
     pipeline,
+    confirm: harnessConfirm,
     transcript,
     session,
     theme,

@@ -43,6 +43,7 @@
  * indivisible units, and each further reducer is that work again. They wait for
  * a consumer, like everything else here.
  */
+import { hiddenRowsNotice } from "./documents.js";
 import { applyPatch } from "../data/viewmodel/index.js";
 import type { Block, ErrorLike, ViewDocument, ViewPatch } from "../data/viewmodel/index.js";
 import type { Layer, OverlayManager } from "../viewport/overlay/index.js";
@@ -244,12 +245,7 @@ export function createDocumentView(deps: DocumentViewDeps): DocumentView {
    * overstate what the reader can see by exactly the rows the wrap cost.
    */
   const notice = (rows: number, height: number, width: number): Block => {
-    const build = (hidden: number): Block =>
-      b.notice.warn(
-        `${String(hidden)} more rows — this block is taller than the screen, and `
-          + `n/p move by block so they cannot reach them`,
-        { id: TRUNCATED_ID },
-      );
+    const build = (hidden: number): Block => hiddenRowsNotice(hidden, TRUNCATED_ID);
     let self = 1;
     for (let pass = 0; pass < 2; pass += 1) {
       const candidate = build(rows - Math.max(0, height - self));

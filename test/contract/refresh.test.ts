@@ -21,8 +21,9 @@ import { block } from "../../src/data/viewmodel/index.js";
 import type { Block, ViewDocument } from "../../src/data/viewmodel/index.js";
 
 import { producerContext } from "../support/producer-context.js";
-import { b } from "../../src/shell/builders/index.js";
-import { toolCallHeader } from "../../src/shell/documents.js";
+import { callHead } from "../../src/shell/documents.js";
+import { spinnerFrames } from "../../src/presentation/blocks/glyphs.js";
+import { FULL_CAPS } from "../support/render.js";
 const SWEEP = STALL_MS / 4;
 
 const raw = (id: string, text: string): Block => block({ kind: "raw", id, text });
@@ -66,6 +67,7 @@ function harness() {
   const driver = createRefreshDriver({
     transcript,
     clock: () => now,
+    capabilities: FULL_CAPS,
     producerContext: () => producerContext(),
     schedule: (fn, ms) => {
       const t = { fn, at: now + ms, live: true };
@@ -1391,8 +1393,11 @@ describe("C23 I53 — the running card's readout rides the one-second wake", () 
    * timer, which is F227's class and the reason T3.56 drives the clock too.
    */
   const call = { name: "run_command", args: "npm test" };
-  const header = (ms: number): Block =>
-    b.notice("info", toolCallHeader({ ...call, elapsedMs: ms }), "step", { id: "step" });
+  // `tick` is the elapsed second and the spinner's frame (C23 I58); `SPIN(n)` is
+  // the frame the head at `n` seconds carries.
+  const FRAMES = spinnerFrames(FULL_CAPS);
+  const SPIN = (second: number): string => FRAMES[second % FRAMES.length] ?? "";
+  const header = (ms: number, tick = 0): Block => callHead({ ...call, elapsedMs: ms, id: "step" }, FULL_CAPS, tick);
   const running = (h: ReturnType<typeof harness>): string => {
     const id = h.transcript.append(docWith([header(0)]), { streaming: true });
     h.driver.readout(id, "step", header);
@@ -1412,20 +1417,20 @@ describe("C23 I53 — the running card's readout rides the one-second wake", () 
     return blk?.kind === "notice" ? blk.text : undefined;
   };
 
-  it("T3.61 (I53): bare at dispatch, `· 4s` after four seconds and a wake, and still `· 4s` after settle", async () => {
+  it("T3.61 (I53, I58): the spinner alone at dispatch, `· ⠠ 4s` after four seconds and a wake, and the same after settle", async () => {
     const h = harness();
     const id = running(h);
     await h.tick(0);
-    expect(headerOf(h, id), "below one second no figure is drawn (T2.46)").toBe("run_command(npm test)");
+    expect(headerOf(h, id), "below one second the spinner alone, no figure (T2.46)").toBe(`run_command(npm test) · ${SPIN(0)}`);
     expect(h.nextTimer(), "the wake is armed a second out, by the readout alone").toBe(1_000);
 
     await h.tick(4_000);
-    expect(headerOf(h, id)).toBe("run_command(npm test) · 4s");
+    expect(headerOf(h, id), "the frame is the fourth: a function of the clock, not of how many sweeps ran").toBe(`run_command(npm test) · ${SPIN(4)} 4s`);
     const commits = h.commits.length;
 
     h.driver.settled(id);
     await h.tick(10_000);
-    expect(headerOf(h, id), "a settled card keeps its final figure").toBe("run_command(npm test) · 4s");
+    expect(headerOf(h, id), "a settled readout writes no more; the route's `finishCard` is what replaces the spinner").toBe(`run_command(npm test) · ${SPIN(4)} 4s`);
     expect(h.commits.length, "and nothing is committed for it").toBe(commits);
     expect(wakeWithinASecond(h), "the last readout gone, no one-second wake is armed").toBe(false);
   });
@@ -1439,9 +1444,9 @@ describe("C23 I53 — the running card's readout rides the one-second wake", () 
     // guard renders once per figure, the clock guard renders at every sweep.
     const h = harness();
     const rendered: number[] = [];
-    const counting = (ms: number): Block => {
+    const counting = (ms: number, tick: number): Block => {
       rendered.push(ms);
-      return header(ms);
+      return header(ms, tick);
     };
     const id = h.transcript.append(docWith([header(0), panel("a", "containers", raw("a-c", "x"))]), {
       streaming: true,
@@ -1450,7 +1455,7 @@ describe("C23 I53 — the running card's readout rides the one-second wake", () 
     h.driver.readout(id, "step", counting);
     for (let i = 0; i < 8; i += 1) await h.tick(250);
 
-    expect(headerOf(h, id)).toBe("run_command(npm test) · 2s");
+    expect(headerOf(h, id)).toBe(`run_command(npm test) · ${SPIN(2)} 2s`);
     expect(rendered.length, "sweeps ran every quarter second and the figure moved twice").toBeGreaterThanOrEqual(2);
     const figures = rendered.map((ms) => Math.floor(ms / 1000));
     expect(new Set(figures).size, `one render per figure, never one per sweep: ${String(rendered)}`).toBe(
@@ -1465,8 +1470,8 @@ describe("C23 I53 — the running card's readout rides the one-second wake", () 
     await h.tick(0);
     expect(h.nextTimer(), "one wake for both").toBe(1_000);
     await h.tick(3_000);
-    expect(headerOf(h, a)).toBe("run_command(npm test) · 3s");
-    expect(headerOf(h, b2), "written in the same sweep").toBe("run_command(npm test) · 3s");
+    expect(headerOf(h, a)).toBe(`run_command(npm test) · ${SPIN(3)} 3s`);
+    expect(headerOf(h, b2), "written in the same sweep").toBe(`run_command(npm test) · ${SPIN(3)} 3s`);
 
     // **One hidden, one visible — the cell the two gates share.** `visible` is
     // read twice in the driver: once to decide whether any card arms the wake,
@@ -1478,20 +1483,20 @@ describe("C23 I53 — the running card's readout rides the one-second wake", () 
     h.hidden.add(`entry:${a}`);
     h.driver.visibilityChanged();
     await h.tick(2_000);
-    expect(headerOf(h, a), "hidden while its sibling is not: no write").toBe("run_command(npm test) · 3s");
-    expect(headerOf(h, b2), "the visible sibling keeps counting").toBe("run_command(npm test) · 5s");
+    expect(headerOf(h, a), "hidden while its sibling is not: no write").toBe(`run_command(npm test) · ${SPIN(3)} 3s`);
+    expect(headerOf(h, b2), "the visible sibling keeps counting").toBe(`run_command(npm test) · ${SPIN(5)} 5s`);
     expect(wakeWithinASecond(h), "the wake stays armed for the visible one").toBe(true);
 
     h.hidden.add(`entry:${b2}`);
     h.driver.visibilityChanged();
     await h.tick(2_000);
-    expect(headerOf(h, a), "off screen, no write").toBe("run_command(npm test) · 3s");
+    expect(headerOf(h, a), "off screen, no write").toBe(`run_command(npm test) · ${SPIN(3)} 3s`);
     expect(wakeWithinASecond(h), "and no one-second wake armed").toBe(false);
 
     h.hidden.clear();
     h.driver.visibilityChanged();
     await h.tick(1_000);
-    expect(headerOf(h, a), "back on screen, the figure catches up").toBe("run_command(npm test) · 8s");
+    expect(headerOf(h, a), "back on screen, the figure catches up").toBe(`run_command(npm test) · ${SPIN(8)} 8s`);
   });
 
   it("T3.61d (I53, I21): an entry evicted underneath its readout drops it on the refused patch", async () => {

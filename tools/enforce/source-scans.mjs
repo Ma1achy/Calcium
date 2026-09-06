@@ -1041,8 +1041,26 @@ export const SCANS = [
   // cannot tell a composition from a type guard written as an object literal
   // (`{ kind: "notice" } satisfies Pick<…>`), which errs towards reporting. And
   // it says nothing about *which* member of the family a site should call.
-  { id: "SS56", spec: "C22 T2.40 · C24 I5",
-    pattern: /\bkind:\s*"notice"/,
+  //
+  // **Widened to the builder call, 2026-09-06** (F827, C23 I61, A03 §SS56).
+  // The nine sites the rule was written for passed it: `b.notice.warn(…)` and
+  // `b.notice.error(…)` in `confirm.ts`, `document-view.ts`, `execution.ts` ×4
+  // and `local/handlers.ts` ×3 are builder calls, which the discriminant does
+  // not see. The premise was *call the family instead of composing the object*,
+  // and the widened premise is *the composition lives in `documents.ts`*: a
+  // failure, a refusal, a usage line each have one composer function there.
+  // Widened rather than doubled — a second rule on one subject keeps two sets
+  // of birthday clauses. `src/testing/expect-document.ts` was going to join the
+  // allow-list for a `b.notice.ok` it names — SS53 said the name is in a comment
+  // and the exemption would have been dead on arrival.
+  //
+  // **Stated blind spot, the widened arm's**: the bare form `b.notice(tone, …)`
+  // passes — it is the family's general call and every remaining site is a
+  // muted status line or the view route's `finish`. A `b.notice.warn` held in
+  // a variable, or the member read by bracket, passes as the literal in a
+  // constant does.
+  { id: "SS56", spec: "C22 T2.40 · C24 I5 · C23 I61",
+    pattern: /\bkind:\s*"notice"|\bb\.notice\./,
     scope: "src/",
     allow: [
       "src/shell/documents.ts",
@@ -1058,7 +1076,7 @@ export const SCANS = [
       "src/interaction/history/layers.ts",
       "src/presentation/art.ts",
     ],
-    why: "one grammar for a notice — `noticeDoc` or `b.notice`, never a hand-composed `kind: \"notice\"`; a site that rolls its own chooses its own glyph and the ones that forgot produced no entry at all" },
+    why: "one grammar for a notice — composed in `documents.ts`, never a hand-composed `kind: \"notice\"` or a `b.notice.warn`/`.error` call outside it (C23 I61, F827); a site that rolls its own chooses its own glyph and the ones that forgot produced no entry at all" },
 
   { id: "SS35", spec: "C04 §4 · C05 §2",
     pattern: /^\s*(?:export\s+)?type Result\s*[<=]/m,

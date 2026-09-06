@@ -9,6 +9,7 @@
  * layer is absent altogether, which is exactly the answer these rows exist to
  * check. A fake must not supply the behaviour.
  */
+import { FULL_CAPS } from "../support/render.js";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { b } from "../../src/shell/builders/index.js";
@@ -351,6 +352,7 @@ describe("C22 §13a — a live part hosted by a pushed view", () => {
     const driver = createRefreshDriver({
       transcript,
       clock: () => now,
+      capabilities: FULL_CAPS,
       schedule: (fn, ms) => {
         const t = { fn, at: now + ms, live: true };
         timers.push(t);

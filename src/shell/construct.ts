@@ -76,6 +76,7 @@ import { createPatchView } from "./patch-view.js";
 import type { FocusTarget, InputEvent, Key, KeyAction } from "../interaction/router/types.js";
 import { openHistory, SEARCH_ID } from "../interaction/history/index.js";
 import { detectCapabilities, type TerminalCapabilities } from "../terminal/capabilities.js";
+import { glyphs } from "../presentation/blocks/index.js";
 import { createFrameScheduler } from "../terminal/frame-scheduler.js";
 import {
   createTerminalLifecycle,
@@ -2215,7 +2216,7 @@ export async function constructGraph(
         if (lines >= CHIP_LINES) {
           chipCount += 1;
           stores.editor.insertChip({
-            label: `[#${String(chipCount)} pasted · ${String(lines)} lines]`,
+            label: `[#${String(chipCount)} pasted ${glyphs(detection.capabilities).separator} ${String(lines)} lines]`,
             content: e.text,
           });
         } else {

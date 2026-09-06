@@ -29,7 +29,7 @@ import type { RawPatch } from "../data/transport/index.js";
 import type { Exit } from "../data/process/types.js";
 import { block } from "../data/viewmodel/index.js";
 import type { Block, ViewDocument } from "../data/viewmodel/index.js";
-import { blockId, cardOver, completeLocal, compose, errorDoc, noticeDoc, toolCallDoc, toolCallHeader, usageDoc } from "./documents.js";
+import { approvalPrompt, blockId, callHead, callStatus, cardOver, completeLocal, compose, DENY_KEY, errorDoc, noticeDoc, refusalNotice, toolCallDoc, usageDoc } from "./documents.js";
 import { createActionDispatcher } from "./actions.js";
 import { createRefreshDriver } from "./refresh.js";
 import { DOCUMENT_VIEW_ID } from "./document-view.js";
@@ -654,7 +654,10 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
           blocks: withOverflowNotice(
             failed
               ? [
-                  b.notice.error(message, { id: blockId("shell-failed") }),
+                  // **A failure is a `status` box** (C23 I61, C09 §3a), composed by
+                  // `documents.ts` — the kind that draws the figure, not a red line
+                  // beside it.
+                  callStatus("error", message, { id: blockId("shell-failed") }),
                   ...(out === "" ? [] : [block({ kind: "raw", id: blockId("raw"), text: out })]),
                   ...(err === "" ? [] : [block({ kind: "raw", id: blockId("raw-err"), text: err })]),
                 ]
@@ -782,7 +785,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     // header over the handler's blocks. `argv` here is already the arguments —
     // the caller sliced the verb off — so it is the header's `args` as it stands.
     const call = { name: verb, args: argv.join(" ") };
-    const carded = (doc: ViewDocument): ViewDocument => cardOver(doc, call, deps.clock() - startedAt);
+    const carded = (doc: ViewDocument): ViewDocument => cardOver(doc, call, deps.clock() - startedAt, deps.capabilities);
     try {
       const handler = local.get(verb);
       if (handler === undefined) {
@@ -1117,16 +1120,25 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     // below with this header's id; below one second `elapsed()` draws nothing,
     // so the card is bare at dispatch and gains `· 1s` on the first wake.
     const call = { name: verb, args: result.argv.slice(1).join(" "), id: blockId("step") };
-    const header = (elapsedMs: number, outcome?: string): Block =>
-      b.notice(
-        "info",
-        toolCallHeader({ ...call, elapsedMs, ...(outcome === undefined ? {} : { outcome }) }),
-        "step",
-        { id: call.id },
+    // **Composed by `documents.ts`, with the capabilities** (C23 I61, F828): the
+    // separator is a slot and the duration slot is the spinner's while the call
+    // runs (I58) — `tick` is the readout's, so the frame moves at I53's cadence.
+    const header = (elapsedMs: number, outcome?: string, waiting = false, tick = 0): Block =>
+      callHead(
+        {
+          ...call,
+          elapsedMs,
+          ...(outcome === undefined ? {} : { outcome, settled: true }),
+          ...(waiting ? { waiting: true } : {}),
+        },
+        deps.capabilities,
+        tick,
       );
     // The card's clock. C23's own (`deps.clock`, C22-injected), never `tick`:
-    // C03 coalesces and drops that under load (C04 I66, C09 I32).
-    const startedAt = deps.clock();
+    // C03 coalesces and drops that under load (C04 I66, C09 I32). `let`,
+    // because an approval restarts it (I60, §8f P1): the figure counts from
+    // when the tool starts, not from when the question was asked.
+    let startedAt = deps.clock();
 
     // **A deferred submission already has one, and this is the site the compiler
     // could not check** (roadmap 33). `into` type-checks at every one of the
@@ -1144,7 +1156,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     let pendingId: EntryId;
     if (settle.into === null) {
       pendingId = deps.transcript.append(
-        toolCallDoc(displayed, call, { origin: "user", verb, transport: "subprocess", argv: [...result.argv] }),
+        toolCallDoc(displayed, call, { origin: "user", verb, transport: "subprocess", argv: [...result.argv] }, deps.capabilities),
         { streaming: true },
       );
     } else {
@@ -1158,11 +1170,6 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     deps.scheduler.commit("input");
     // §3b — from here the entry can go quiet, so it is watched for silence.
     refresh.watch(pendingId);
-    // I54 — the readout, before the transport is invoked (I3's order, one line
-    // over): the header's figure moves on the one-second wake and `settled`
-    // stops it. `readout` writes with `origin: "shell"`, as the shell speaking
-    // about an entry it holds.
-    refresh.readout(pendingId, call.id, (ms) => header(ms));
     /**
      * The verdict, into the header, **before** `settle` (I54, §8g row 6).
      *
@@ -1181,6 +1188,41 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         "shell",
       );
     };
+
+    // **A call that needs a decision waits for it** (I60, §8f P10, P12, §8g rows
+    // 15–17). The head reads `· ⠋ waiting`, the confirm layer carries the
+    // invocation, the consequence and the choices, and **no readout is
+    // registered yet** — the figure starts when the tool does. A denial settles
+    // the card with `denied` and code 126, the shell's convention for *not
+    // permitted*. No producer in `src/` asks today: `approval` is optional on
+    // the deps and the composition root leaves it unset; the far side's signal
+    // is the named blocker, and the emitter lands with its test consumer.
+    const approval = deps.approval?.(call) ?? null;
+    if (approval !== null) {
+      deps.transcript.patch(pendingId, { op: "replace", blockId: call.id, block: header(0, undefined, true) }, "shell");
+      deps.scheduler.commit("input");
+      const answer = await deps.confirm.ask(approvalPrompt(call, approval.consequence, approval.choices));
+      if (answer === DENY_KEY) {
+        finishCard("denied");
+        refresh.settled(pendingId);
+        deps.transcript.settle(pendingId);
+        deps.history.append(line, 126);
+        deps.scheduler.commit("completion");
+        guard.release();
+        return;
+      }
+      startedAt = deps.clock();
+      // The word goes with the wait: the head reads the spinner alone until the
+      // readout's first wake brings the figure — the readout's own first write
+      // is a second away, and a head still saying `waiting` while the tool runs
+      // is a state the walk's table has no row for.
+      deps.transcript.patch(pendingId, { op: "replace", blockId: call.id, block: header(0) }, "shell");
+    }
+    // I54 — the readout, before the transport is invoked (I3's order, one line
+    // over): the header's figure moves on the one-second wake and `settled`
+    // stops it. `readout` writes with `origin: "shell"`, as the shell speaking
+    // about an entry it holds. Its tick is the spinner's frame (I58).
+    refresh.readout(pendingId, call.id, (ms, tick) => header(ms, undefined, false, tick));
 
     const controller = new AbortController();
     const cancelThis = (): void => {
@@ -1258,7 +1300,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       // this the settle replaced the card wholesale and `❯ /ps` over a table
       // was what a finished listing read — §9c's settled state on this route
       // was reached by no path.
-      settleWithDocument(pendingId, cardOver(doc, call, deps.clock() - startedAt));
+      settleWithDocument(pendingId, cardOver(doc, call, deps.clock() - startedAt, deps.capabilities));
       recordHistory(line, doc); // I29 — the app route's settlement.
 
       // C23 I7 — declared, never inferred. A verb declaring none leaves `$_`
@@ -1277,7 +1319,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       );
       // I55, §8g row 11 — the status box is the body and the verdict is the
       // header's: two statements of one fact, and the header is the one 1-bit keeps.
-      settleWithDocument(pendingId, cardOver(failed, call, deps.clock() - startedAt));
+      settleWithDocument(pendingId, cardOver(failed, call, deps.clock() - startedAt, deps.capabilities));
       recordHistory(line, failed); // I29 — a failure is a settlement.
       deps.scheduler.commit("completion");
     } finally {
@@ -1468,8 +1510,10 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
           }
           // I54 — the verdict is the stream's own exit code, into the header,
           // before the settle. The code is the `tail` process's and is said as
-          // such — `exit 1` — not as a claim about what it was following.
-          finishCard(`exit ${String(patch.result.exitCode)}`);
+          // such — `exit 1` — not as a claim about what it was following. **A
+          // zero is no outcome** (I59): the head reads `verb · 4s` and the tone
+          // carries the verdict; `exit 0` was `ok` with a number on it.
+          finishCard(patch.result.exitCode === 0 ? "" : `exit ${String(patch.result.exitCode)}`);
           // C23 I8 — settlement flushes at `"completion"`. §8a A4: settling
           // clears the stall state, so a notice does not outlive its condition.
           refresh.settled(id);
@@ -1515,13 +1559,13 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
           // Malformed. Settle with what was kept, say why, and stop the child:
           // the entry is final, so a subprocess still streaming into it spends a
           // process on output nothing can consume (§8a A3).
+          // **A `status` box under the kept head** (I61, §8f P8): the reason is
+          // the body's and the word is the head's.
           deps.transcript.patch(id, {
             op: "append",
-            block: b.notice.warn(`output truncated: ${outcome.error.message}`, {
-              id: blockId("truncated"),
-            }),
+            block: callStatus("error", `output truncated: ${outcome.error.message}`, { id: blockId("truncated") }),
           });
-          finishCard("truncated"); // I54, §8f P8 — the notice carries the why
+          finishCard("truncated"); // I54, §8f P8 — the box carries the why
           deps.transcript.settle(id);
           deps.scheduler.commit("completion");
           return;
@@ -1533,9 +1577,10 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         return;
       }
     } catch (cause) {
+      // §8g row 13 — the throw settles over a `status` box (I61); the head is kept.
       deps.transcript.patch(id, {
         op: "append",
-        block: b.notice.error(`stream failed: ${String(cause)}`, { id: blockId("stream-error") }),
+        block: callStatus("error", `stream failed: ${String(cause)}`, { id: blockId("stream-error") }),
       });
       finishCard("failed"); // I54, §8f P8
       deps.transcript.settle(id);
@@ -1749,7 +1794,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         from,
         {
           op: "append",
-          block: b.notice.warn(text, { id: blockId("refused") }),
+          block: refusalNotice(text, blockId("refused")),
         },
         // **The whole of why this works now.** A refusal notice *is* data, so a
         // gate reading the operation refused it on every settled entry — which
@@ -1903,6 +1948,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
   const refresh = createRefreshDriver({
     transcript: deps.transcript,
     clock: deps.clock,
+    capabilities: deps.capabilities,
     schedule: deps.schedule,
     commit: (reason) => void deps.scheduler.commit(reason),
     // One builder for every route (C23 I40) — this file's.

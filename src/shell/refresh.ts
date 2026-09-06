@@ -26,7 +26,8 @@
 
 import { block, hasChildren } from "../data/viewmodel/index.js";
 import type { Block, ErrorLike, Panel, Status } from "../data/viewmodel/index.js";
-import { countdown, elapsed } from "../presentation/blocks/index.js";
+import { countdown, elapsed, glyphs } from "../presentation/blocks/index.js";
+import type { TerminalCapabilities } from "../terminal/capabilities.js";
 import { b, framedStatus } from "./builders/index.js";
 import type { ProducerContext } from "../data/adapters/types.js";
 import type { EntryId, TranscriptStore } from "../viewport/transcript/index.js";
@@ -278,6 +279,8 @@ export function backoffOf(intervalMs: number, consecutiveFailures: number): numb
 export type RefreshDeps = Readonly<{
   transcript: TranscriptStore;
   clock: () => number;
+  /** The arm the stale title's separator resolves against (C09 I49, F828). */
+  capabilities: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">;
   schedule: (fn: () => void, ms: number) => Disposable;
   commit: (reason: "stream" | "input") => void;
   /**
@@ -350,7 +353,8 @@ export interface RefreshDriver {
    * `settle`, and `settled` below drops the readout. Until 2026-09-05 this
    * comment said *no producer in `src/` yet* and named the agent example.
    */
-  readout(id: EntryId, blockId: string, render: (elapsedMs: number) => Block): void;
+  /** `tick` is the elapsed whole second, the spinner's frame (C23 I58). */
+  readout(id: EntryId, blockId: string, render: (elapsedMs: number, tick: number) => Block): void;
   /** C22's identity loop signalling a transition worth saying out loud. */
   identityNotice(text: string): void;
   /**
@@ -606,7 +610,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
   const titleOf = (part: Part): string => {
     if (!part.stale) return part.spec.title;
     const secs = Math.max(0, Math.round((deps.clock() - (part.lastOk ?? 0)) / 1000));
-    return `${part.spec.title} · ${String(secs)}s ago`;
+    return `${part.spec.title} ${glyphs(deps.capabilities).separator} ${String(secs)}s ago`;
   };
 
   const settleSource = (src: Source, at: number): void => {
@@ -853,9 +857,13 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
       const since = now - r.startedAt;
       const figure = elapsed(since);
       if (figure === r.last) continue;
+      // **The tick is the elapsed second** (C23 I58): the spinner's frame is a
+      // function of the clock and not of how often the sweep ran, so a live part
+      // waking every 250 ms does not spin the head four times as fast, and I52's
+      // guard — one write per figure — stands as it was.
       const outcome = deps.transcript.patch(
         id,
-        { op: "replace", blockId: r.blockId, block: r.render(since) },
+        { op: "replace", blockId: r.blockId, block: r.render(since, Math.floor(since / 1000)) },
         "shell",
       );
       if (!outcome.ok) {
@@ -941,7 +949,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
    */
   const readouts = new Map<
     EntryId,
-    { blockId: string; render: (elapsedMs: number) => Block; startedAt: number; last: string }
+    { blockId: string; render: (elapsedMs: number, tick: number) => Block; startedAt: number; last: string }
   >();
 
   const release = (host: RefreshHost): void => {

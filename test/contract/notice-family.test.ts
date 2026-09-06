@@ -47,9 +47,8 @@ const runLocal = async (line: string): Promise<readonly string[]> => {
   h.pipeline.submit(line);
   await settled();
   // **Without the card's header** (C23 I55): a local verb settles as a card
-  // since 2026-09-05, and block 0 is the shell's `⏺ verb · ok` — the family's
-  // bytes are the handler's, under it. The stream rows (N11, N13) keep theirs:
-  // there the header was always part of the literal.
+  // since 2026-09-05, and block 0 is the shell's `⬤ verb` — the family's bytes
+  // are the handler's, under it.
   return frame(lastBlocks(h).filter((blk, i) => !(i === 0 && blk.kind === "notice" && blk.glyph === "step")));
 };
 
@@ -92,27 +91,16 @@ const BEFORE: Record<string, readonly string[]> = {
   resumed: [
     "\u001b[38;2;98;98;98m  ⎿ resumed after 2m\u001b[39m",
   ],
-  // C23 I54 — block 0 is the running card's header, and the verdict is in it:
-  // `truncated` and `failed` are the two error arms' one-word outcomes (§8f P8).
-  truncated: [
-    // `tail`, not `tail()`: F795 ruled a bare verb a bare header (C23 §3), the one
-    // deliberate byte change in this table since it was captured.
-    "\u001b[38;2;127;174;207m⬤ tail · truncated\u001b[39m",
-    "\u001b[38;2;127;174;207mt1\u001b[39m",
-    "\u001b[38;2;212;179;90m▲ output truncated: append: id \"same\" is already in the document (C04 I14) —\u001b[39m",
-    "\u001b[38;2;212;179;90m  ViewPatch addresses blocks by id, so a duplicate has no correct target\u001b[39m",
-  ],
-  "shell-failed": [
-    "\u001b[38;2;198;40;40m✗ The command exited with code 1.\u001b[39m",
-    "cat: nothing: No such file or directory",
-    "",
-  ],
-  "stream-error": [
-    "\u001b[38;2;127;174;207m⬤ tail · failed\u001b[39m",
-    "\u001b[38;2;198;40;40m✗ stream failed: Error: socket closed\u001b[39m",
-  ],
 };
 
+/** The `status` box a site composes now, where its literal drew an error notice (C23 I61). */
+const statusBox = (blocks: readonly Block[]): { state: string; message: string } | null => {
+  const box = blocks.find((blk) => blk.kind === "status");
+  return box?.kind === "status" ? { state: box.state, message: box.message } : null;
+};
+
+// **Eleven of the fourteen** draw the family's bytes still; three (N10, N11,
+// N13) became `status` boxes under C23 I61 and assert the kind instead.
 describe("SS56 — the fourteen notices draw the same bytes through the family", () => {
   it("N1 `confirm.ts` — `confirm-question`", () => {
     const overlays = createOverlayManager({ registry: overlayRegistry });
@@ -208,7 +196,16 @@ describe("SS56 — the fourteen notices draw the same bytes through the family",
     h.pipeline.submit("/tail");
     await settled();
     await settled();
-    check("truncated", frame(lastBlocks(h)));
+    // **Moved to the `status` kind** (C23 I61, §8f P8): the head keeps `truncated`
+    // and the box carries the why — the literal's error notice is gone, and
+    // the site composes through `callStatus`.
+    const blocks = lastBlocks(h);
+    expect(blocks[0]?.kind === "notice" && blocks[0].text).toBe("tail · truncated");
+    expect(statusBox(blocks)).toEqual({
+      state: "error",
+      message: 'output truncated: append: id "same" is already in the document (C04 I14) — ViewPatch addresses blocks by id, so a duplicate has no correct target',
+    });
+    expect(blocks.some((blk) => blk.kind === "notice" && blk.tone === "error"), "no error notice").toBe(false);
   });
 
   it("N10 `execution.ts` — `shell-failed`", async () => {
@@ -227,7 +224,11 @@ describe("SS56 — the fourteen notices draw the same bytes through the family",
     h.pipeline.submit("cat nothing");
     await settled();
     await settled();
-    check("shell-failed", frame(lastBlocks(h)));
+    // A shell command's non-zero exit: the `status` kind over the stderr it kept (C23 I61).
+    const blocks = lastBlocks(h);
+    expect(statusBox(blocks)).toEqual({ state: "error", message: "The command exited with code 1." });
+    expect(blocks.some((blk) => blk.kind === "raw" && blk.text.includes("cat: nothing")), "stderr under it").toBe(true);
+    expect(blocks.some((blk) => blk.kind === "notice" && blk.tone === "error"), "no error notice").toBe(false);
   });
 
   it("N11 `execution.ts` — `stream-error`", async () => {
@@ -241,6 +242,10 @@ describe("SS56 — the fourteen notices draw the same bytes through the family",
     h.pipeline.submit("/tail");
     await settled();
     await settled();
-    check("stream-error", frame(lastBlocks(h)));
+    // The head kept with `failed`; the throw is a `status` box (C23 I61, §8f P8).
+    const blocks = lastBlocks(h);
+    expect(blocks[0]?.kind === "notice" && blocks[0].text).toBe("tail · failed");
+    expect(statusBox(blocks)).toEqual({ state: "error", message: "stream failed: Error: socket closed" });
+    expect(blocks.some((blk) => blk.kind === "notice" && blk.tone === "error"), "no error notice").toBe(false);
   });
 });

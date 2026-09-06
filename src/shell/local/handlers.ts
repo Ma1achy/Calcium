@@ -20,7 +20,7 @@ import type { TranscriptStore } from "../../viewport/transcript/index.js";
 import type { HistoryEntry } from "../../interaction/history/types.js";
 import type { ThemeStore } from "../../presentation/theme/index.js";
 import { b } from "../builders/index.js";
-import { blockId, compose } from "../documents.js";
+import { blockId, compose, warnNotice } from "../documents.js";
 import type { LocalHandler } from "./registry.js";
 import type { StopReason } from "../types.js";
 
@@ -192,9 +192,7 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
           // someone who typed `/theme purple`. The failure arm is exactly
           // where `args` is empty, which is why the two differ here and
           // nowhere else.
-          b.notice.warn(`usage: /theme ${deps.theme.names.join("|")} — got \`${argv[0] ?? ""}\``, {
-            id: blockId("theme-usage"),
-          }),
+          warnNotice(`usage: /theme ${deps.theme.names.join("|")} — got \`${argv[0] ?? ""}\``, blockId("theme-usage")),
         ]);
       }
       deps.theme.setTheme(wanted);
@@ -223,9 +221,9 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
         b.notice("muted", `theme: ${wanted}`, undefined, { id: blockId("theme") }),
         ...(suppressed
           ? [
-              b.notice.warn(
+              warnNotice(
                 `${wanted} assumes a ${wanted} terminal; without its background it may be unreadable`,
-                { id: blockId("theme-nobg") },
+                blockId("theme-nobg"),
               ),
             ]
           : []),
@@ -265,9 +263,7 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
 
       if (entry === undefined) {
         return doc("/debug", [
-          b.notice.warn(`no entry ${String(back)} back — the transcript holds ${String(entries.length)}`, {
-            id: blockId("debug-none"),
-          }),
+          warnNotice(`no entry ${String(back)} back — the transcript holds ${String(entries.length)}`, blockId("debug-none")),
         ]);
       }
 

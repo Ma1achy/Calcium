@@ -13,6 +13,7 @@ import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { GLYPH_TOKENS, glyphCells, glyphFor } from "../../src/presentation/blocks/glyphs.js";
 import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
 import { toolCallDoc, toolCallHeader } from "../../src/shell/documents.js";
+import { spinnerFrames } from "../../src/presentation/blocks/glyphs.js";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS, visible } from "../support/render.js";
 import { cells } from "../../src/presentation/text.js";
 
@@ -62,19 +63,37 @@ describe("§9c — the header, the body, and the row the body already has", () =
     expect(cardBody([plain, second])[0], "no gap: the same object").toBe(plain);
   });
 
-  it("T2.46: the header is `name(args) · elapsed · outcome`, and below one second no figure is drawn", () => {
-    expect(toolCallHeader({ name: "run_command", args: "npm test", elapsedMs: 4_200, outcome: "exit 0" })).toBe(
+  it("T2.46 (C23 I58): the header is `name(args) · duration · outcome`; running, the spinner owns the duration slot, alone below one second", () => {
+    const spin = spinnerFrames(FULL_CAPS);
+    expect(toolCallHeader({ name: "run_command", args: "npm test", elapsedMs: 4_200, outcome: "exit 0" }, FULL_CAPS)).toBe(
       "run_command(npm test) · 4s · exit 0",
     );
-    expect(toolCallHeader({ name: "run_command", args: "npm test", elapsedMs: 400 })).toBe("run_command(npm test)");
-    expect(toolCallHeader({ name: "search", args: '"cursorCell"' })).toBe('search("cursorCell")');
+    expect(toolCallHeader({ name: "run_command", args: "npm test", elapsedMs: 400 }, FULL_CAPS), "dispatched: the spinner alone, no figure").toBe(
+      `run_command(npm test) · ${spin[0] ?? ""}`,
+    );
+    expect(toolCallHeader({ name: "search", args: '"cursorCell"' }, FULL_CAPS)).toBe(`search("cursorCell") · ${spin[0] ?? ""}`);
+    expect(toolCallHeader({ name: "run_command", args: "npm test", elapsedMs: 4_200 }, FULL_CAPS, 4), "running: the frame is the tick, the figure beside it").toBe(
+      `run_command(npm test) · ${spin[4 % spin.length] ?? ""} 4s`,
+    );
+    expect(toolCallHeader({ name: "run_command", args: "npm test", waiting: true }, FULL_CAPS), "waiting: the spinner and the word, never a figure").toBe(
+      `run_command(npm test) · ${spin[0] ?? ""} waiting`,
+    );
+    expect(toolCallHeader({ name: "run_command", args: "npm test", elapsedMs: 4_200, settled: true }, FULL_CAPS), "settled with no count: the duration alone, tone carries success").toBe(
+      "run_command(npm test) · 4s",
+    );
+    // F828: the separator is a GlyphSet slot resolved against the arm — `-` at ASCII.
+    const ascii = spinnerFrames(ASCII_CAPS);
+    expect(toolCallHeader({ name: "run_command", args: "npm test", elapsedMs: 4_200, outcome: "exit 0" }, ASCII_CAPS)).toBe(
+      "run_command(npm test) - 4s - exit 0",
+    );
+    expect(toolCallHeader({ name: "run_command", args: "npm test", elapsedMs: 400 }, ASCII_CAPS)).toBe(`run_command(npm test) - ${ascii[0] ?? ""}`);
   });
 
   it("T2.47 (C04 I3, I6): every state composes a valid document, and `error` carries its own message", () => {
-    const running = toolCallDoc("run_command", { name: "run_command", args: "npm test", elapsedMs: 4_000, output: out(12), height: 3 }, META);
-    const settled = toolCallDoc("run_command", { name: "run_command", args: "npm test", elapsedMs: 4_200, outcome: "exit 0", result: "118 passed, 2 todo" }, META);
-    const folded = toolCallDoc("run_command", { name: "run_command", args: "npm test", output: out(392), height: 3, collapsed: true }, META);
-    const failed = toolCallDoc("run_command", { name: "run_command", args: "npm test", outcome: "exit 1" }, META, "error");
+    const running = toolCallDoc("run_command", { name: "run_command", args: "npm test", elapsedMs: 4_000, output: out(12), height: 3 }, META, FULL_CAPS);
+    const settled = toolCallDoc("run_command", { name: "run_command", args: "npm test", elapsedMs: 4_200, outcome: "exit 0", result: "118 passed, 2 todo" }, META, FULL_CAPS);
+    const folded = toolCallDoc("run_command", { name: "run_command", args: "npm test", output: out(392), height: 3, collapsed: true }, META, FULL_CAPS);
+    const failed = toolCallDoc("run_command", { name: "run_command", args: "npm test", outcome: "exit 1" }, META, FULL_CAPS, "error");
     for (const doc of [running, settled, folded, failed]) expect(validateDocument(doc).ok, doc.command).toBe(true);
     expect(failed.error?.message).toBe("run_command(npm test) · exit 1");
     expect(running.blocks[0]?.kind === "notice" && running.blocks[0].glyph).toBe("step");
@@ -83,27 +102,30 @@ describe("§9c — the header, the body, and the row the body already has", () =
   });
 
   it("T2.48 (C04 I97, I98): the four frames — the body opens at its tail, the fold is the residue row", () => {
-    const running = toolCallDoc("run_command", { name: "run_command", args: "npm test", elapsedMs: 4_000, output: out(12), height: 3 }, META).blocks;
-    const settled = toolCallDoc("run_command", { name: "run_command", args: "npm test", elapsedMs: 4_200, outcome: "exit 0", result: "118 passed, 2 todo" }, META).blocks;
-    const folded = toolCallDoc("run_command", { name: "run_command", args: "npm test", output: out(392), height: 3, collapsed: true }, META).blocks;
-
     const captured: string[] = [];
     for (const [width, ascii] of [[80, false], [40, false], [80, true], [40, true]] as const) {
+      const caps = ascii ? ASCII_CAPS : FULL_CAPS;
+      // The composer takes the arm (F828): the separator and the spinner resolve against it.
+      const running = toolCallDoc("run_command", { name: "run_command", args: "npm test", elapsedMs: 4_000, output: out(12), height: 3 }, META, caps).blocks;
+      const settled = toolCallDoc("run_command", { name: "run_command", args: "npm test", elapsedMs: 4_200, outcome: "exit 0", result: "118 passed, 2 todo" }, META, caps).blocks;
+      const folded = toolCallDoc("run_command", { name: "run_command", args: "npm test", output: out(392), height: 3, collapsed: true }, META, caps).blocks;
       const mark = ascii ? "*" : "⬤";
       const hook = ascii ? "`" : "⎿";
       const more = ascii ? "~" : "⋯";
+      const sep = ascii ? "-" : "·";
+      const spin = spinnerFrames(caps)[0] ?? "";
 
       const r = frame(running, width, ascii);
-      expect(r[0]).toBe(`${mark} run_command(npm test) · 4s`);
+      expect(r[0], "running: the spinner in the duration slot (C23 I58)").toBe(`${mark} run_command(npm test) ${sep} ${spin} 4s`);
       expect(r.slice(1), "the streamed body shows its tail, the hidden rows above").toEqual([
         "line 10", "line 11", "line 12", `${more} 9 above, 0 below`,
       ]);
 
       const s = frame(settled, width, ascii);
-      expect(s).toEqual([`${mark} run_command(npm test) · 4s · exit 0`, `  ${hook} 118 passed, 2 todo`]);
+      expect(s).toEqual([`${mark} run_command(npm test) ${sep} 4s ${sep} exit 0`, `  ${hook} 118 passed, 2 todo`]);
 
       const f = frame(folded, width, ascii);
-      expect(f, "+N more is the residue row (C04 I104)").toEqual([`${mark} run_command(npm test)`, `${more} +392 more`]);
+      expect(f, "+N more is the residue row (C04 I104)").toEqual([`${mark} run_command(npm test) ${sep} ${spin}`, `${more} +392 more`]);
 
       captured.push(
         `--- ${String(width)} cols · ${ascii ? "ascii" : "24-bit"}`,

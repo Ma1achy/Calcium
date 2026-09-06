@@ -554,9 +554,10 @@ describe("C23 §8a A2/A3 — the three PatchOutcome arms", () => {
 
     const entry = h.transcript.entries[0];
     expect(entry?.streaming, "settled with what it had").toBe(false);
+    // A `status` box since C23 I61 — the truncation's why under a kept head, never a notice.
     expect(
-      entry?.doc.blocks.some((b) => b.kind === "notice" && /output truncated/.test(b.text)),
-      "and a notice carries the message",
+      entry?.doc.blocks.some((b) => b.kind === "status" && /output truncated/.test(b.message)),
+      "and a status box carries the message",
     ).toBe(true);
   });
 

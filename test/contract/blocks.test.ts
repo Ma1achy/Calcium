@@ -415,5 +415,21 @@ describe("C09 §4 — the call grammar's glyph rows", () => {
       const sep = glyphs(caps).separator;
       expect(cells(sep, caps.ambiguousWidth), `separator at ${caps.unicode}/${caps.ambiguousWidth}`).toBe(1);
     }
+    // **And no composer joins with the literal**: the slot exists so that
+    // `src/shell/` never writes ` · ` into a head again. Comments stripped
+    // first — the prose about the separator is exactly where the bytes appear.
+    const offenders: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir)) {
+        const file = `${dir}/${entry}`;
+        if (statSync(file).isDirectory()) walk(file);
+        else if (file.endsWith(".ts") && !file.endsWith(".d.ts")) {
+          const code = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//gu, "").replace(/\/\/.*$/gmu, "");
+          if (/["'`][^"'`\n]*\s\u00b7\s[^"'`\n]*["'`]/u.test(code)) offenders.push(file);
+        }
+      }
+    };
+    walk("src/shell");
+    expect(offenders, "a head joined with a literal `·` (F828)").toEqual([]);
   });
 });

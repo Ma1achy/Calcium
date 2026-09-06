@@ -42,8 +42,8 @@ const results = runPass({
   // once and T4.40's second assertion (`· 4s`) cannot be met.
   control: {
     file: EX,
-    from: "    refresh.readout(pendingId, call.id, (ms) => header(ms));",
-    to: "    // refresh.readout(pendingId, call.id, (ms) => header(ms));",
+    from: "    refresh.readout(pendingId, call.id, (ms, tick) => header(ms, undefined, false, tick));",
+    to: "    // refresh.readout(pendingId, call.id, (ms, tick) => header(ms, undefined, false, tick));",
     why: "T4.40 asserts the header reads · 4s after four wakes; nothing registered means nothing moves — F771 at the route",
   },
   mutations: [
@@ -53,7 +53,7 @@ const results = runPass({
       // `❯ /ps` over a table, §9c's settled state reached by no path.
       name: "the invoke route settles the adapted document without the card",
       file: EX,
-      from: "      settleWithDocument(pendingId, cardOver(doc, call, deps.clock() - startedAt));",
+      from: "      settleWithDocument(pendingId, cardOver(doc, call, deps.clock() - startedAt, deps.capabilities));",
       to: "      settleWithDocument(pendingId, doc);",
       expect: "T4.47",
     },
@@ -61,7 +61,7 @@ const results = runPass({
       // **T6.85, second arm.** The error arm settles `errorDoc` bare.
       name: "the invoke route's error arm settles the error document without the card",
       file: EX,
-      from: "      settleWithDocument(pendingId, cardOver(failed, call, deps.clock() - startedAt));",
+      from: "      settleWithDocument(pendingId, cardOver(failed, call, deps.clock() - startedAt, deps.capabilities));",
       to: "      settleWithDocument(pendingId, failed);",
       expect: "T4.47",
     },
@@ -88,23 +88,23 @@ const results = runPass({
       // F795 as it shipped: `ps()` for a bare verb.
       name: "the header keeps its parentheses with no arguments",
       file: DOC,
-      from: "  const parts = [call.args === \"\" ? call.name : `${call.name}(${call.args})`];",
-      to: "  const parts = [`${call.name}(${call.args})`];",
+      from: "  return call.args === \"\" ? call.name : `${call.name}(${call.args})`;",
+      to: "  return `${call.name}(${call.args})`;",
       expect: "T4.46",
     },
     {
       // The tree's state until 2026-09-05: a pending entry with no blocks.
       name: "step 3 appends compose({ blocks: [] }) — the old pending entry",
       file: EX,
-      from: '        toolCallDoc(displayed, call, { origin: "user", verb, transport: "subprocess", argv: [...result.argv] }),',
+      from: '        toolCallDoc(displayed, call, { origin: "user", verb, transport: "subprocess", argv: [...result.argv] }, deps.capabilities),',
       to: '        compose({ command: displayed, blocks: [], meta: { origin: "user", verb, transport: "subprocess", argv: [...result.argv] } }),',
       expect: "T4.40",
     },
     {
       name: "the readout is never registered",
       file: EX,
-      from: "    refresh.readout(pendingId, call.id, (ms) => header(ms));",
-      to: "    // refresh.readout(pendingId, call.id, (ms) => header(ms));",
+      from: "    refresh.readout(pendingId, call.id, (ms, tick) => header(ms, undefined, false, tick));",
+      to: "    // refresh.readout(pendingId, call.id, (ms, tick) => header(ms, undefined, false, tick));",
       expect: "T4.40",
     },
     {
@@ -114,8 +114,8 @@ const results = runPass({
       // lacks the verdict. T4.40's fourth assertion reads exactly that.
       name: "the verdict is written after the settle",
       file: EX,
-      from: "          finishCard(`exit ${String(patch.result.exitCode)}`);\n          // C23 I8 — settlement flushes at `\"completion\"`. §8a A4: settling\n          // clears the stall state, so a notice does not outlive its condition.\n          refresh.settled(id);\n          deps.transcript.settle(id);",
-      to: "          refresh.settled(id);\n          deps.transcript.settle(id);\n          finishCard(`exit ${String(patch.result.exitCode)}`);",
+      from: "          finishCard(patch.result.exitCode === 0 ? \"\" : `exit ${String(patch.result.exitCode)}`);\n          // C23 I8 — settlement flushes at `\"completion\"`. §8a A4: settling\n          // clears the stall state, so a notice does not outlive its condition.\n          refresh.settled(id);\n          deps.transcript.settle(id);",
+      to: "          refresh.settled(id);\n          deps.transcript.settle(id);\n          finishCard(patch.result.exitCode === 0 ? \"\" : `exit ${String(patch.result.exitCode)}`);",
       expect: "T4.40",
     },
     {

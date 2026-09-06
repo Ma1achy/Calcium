@@ -511,6 +511,15 @@ const FABRICATED: readonly Fabrication[] = [
     source: 'block({ kind: "notice", id: blockId("copied"), tone: "warn", glyph: "warn", text }),',
   },
   {
+    // **The widened arm's fabrication is the call that shipped** (F827, C23
+    // I61): `execution.ts` appended `b.notice.error("stream failed: …")` for a
+    // stream throw, and the rule as first written did not see it. The file is
+    // not on the allow-list, so the row is about the pattern and not the scope.
+    rule: "SS56",
+    file: "src/shell/execution.ts",
+    source: 'block: b.notice.error(`stream failed: ${String(cause)}`, { id: blockId("stream-error") }),',
+  },
+  {
     // **The move the type cannot refuse.** `ladderFor("density", caps)` cannot
     // return a height ladder — the mapped type rejects it, TS2322 — but nothing
     // in the type system makes a renderer *ask*. This is the import that skips
