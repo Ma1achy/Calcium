@@ -33,6 +33,7 @@ import type {
   NavElement,
   RenderContext,
   RenderContextInput,
+  Windowed,
 } from "./types.js";
 
 /**
@@ -768,6 +769,35 @@ class Registry implements BlockRegistry {
     return createElement(Box, { flexDirection: "column", minHeight: floor }, element);
   }
 
+  /**
+   * C09 I58 — rows `[from, to)` of a child, or `null` when the slice cannot be
+   * taken without the caller paying for it.
+   *
+   * **The render-side seam beside `measureChild`**, and the three refusals are
+   * one rule. A floored or capped block draws rows the definition never
+   * produced — the floor's padding and the cap's marker are the registry's own,
+   * outside `definition.render` — so a window over the definition's rows is not
+   * a window over the block's; `windowSequence` refuses a floored block for
+   * exactly this reason (I33) and this is the same line in the other caller. A
+   * kind declaring no `window` is atomic (I27). And a residual is slack the
+   * caller drops, which `session.ts` can do to an entry's rows and an Ink
+   * subtree cannot do to a child's.
+   *
+   * The window is taken over `#form`'s block, as `windowSequence` takes it, so
+   * the rows are the same ones `measure` counted (I26a's seam, `this.measure`).
+   */
+  windowChild = (block: Block, width: number, from: number, to: number): Windowed | null => {
+    const w = normaliseWidth(width);
+    if (floorOf(block) > 0) return null;
+    const form = this.#formContained(block, w);
+    if (form === null || form.capped !== null) return null;
+    const windowable = form.definition.window;
+    if (windowable === undefined) return null;
+    const out = windowable(form.block, w, from, to, this.measure);
+    if (out.skipRows !== 0 || out.dropRows !== 0) return null;
+    return out;
+  };
+
   render = (block: Block, ctx: RenderContextInput): ReactElement => {
     const width = normaliseWidth(ctx.width);
     const childContext: RenderContext = {
@@ -777,6 +807,7 @@ class Registry implements BlockRegistry {
       widthChild: this.width,
       renderChild: (child: Block, childWidth: number): ReactElement =>
         this.render(child, { ...ctx, width: childWidth }),
+      windowChild: this.windowChild,
     };
 
     // **The height is committed before anything is drawn** (I11). One extra

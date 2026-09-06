@@ -192,7 +192,7 @@ const results = runPass({
     {
       // **The 8-bit floor removed by drawing the ramp's top everywhere below
       // it.** A binary mask wearing a continuous field's clothes, which is the
-      // substitution I74 refuses.
+      // substitution C04 I74 refuses.
       name: "the overlay draws a fixed tone below the colour floor",
       file: OVERLAY,
       from: "  return map === undefined ? undefined : continuousColour(map, t, caps);",

@@ -264,6 +264,26 @@ export const ADVERSARIAL: readonly Block[] = Object.freeze([
     emptyMessage: "No data.",
   }),
   block({ kind: "progress", id: "adv-zero-total", label: "Nothing", current: 0, total: 0 }),
+  // **A box whose single child is taller than its interior** (C09 I59, T3.75).
+  //
+  // The corpus's only `scroll` was `height: 2` over three one-row children, so
+  // every child fitted and no fixture had the property T2.1's sweep needed. The
+  // headline `measure` = rendered-rows check agreed for as long as that was
+  // true, while a six-row box over a thirty-line screen measured 7 and painted
+  // 32 (F855). A corpus chosen for a property may not have it.
+  //
+  // Two children rather than one, and the first is short: a sweep whose only
+  // over-tall case is also the only case is one where *slice the child* and
+  // *drop every child but the first* draw the same thing.
+  block({
+    kind: "scroll",
+    id: "adv-overfull-scroll",
+    height: 3,
+    children: [
+      { kind: "raw", id: "adv-overfull-head", text: "head" },
+      { kind: "raw", id: "adv-overfull-tall", text: Array.from({ length: 12 }, (_u, i) => `row ${String(i)}`).join("\n") },
+    ],
+  }),
 ]);
 
 /** Every fixture the contract suite runs over. */

@@ -11,7 +11,13 @@ import { SUBSTITUTIONS } from "../../src/presentation/blocks/index.js";
 import { sgr } from "../../src/terminal/escapes.js";
 import { checkModuleGraph } from "../../tools/enforce/module-graph.mjs";
 import { checkSourceScans } from "../../tools/enforce/source-scans.mjs";
-import { ASCII_CAPS, FULL_CAPS, QUIET, measurable, visible } from "../support/render.js";
+import { ASCII_CAPS, DARK_THEME, FULL_CAPS, QUIET, measurable, visible } from "../support/render.js";
+import { CORPUS } from "../support/blocks.js";
+import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
+import { renderToLines } from "../../src/presentation/render-lines.js";
+import { patchDefinition } from "../../src/presentation/patch/index.js";
+import type { Block } from "../../src/data/viewmodel/index.js";
+import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
 
 const FULL = { unicode: "full" } as const;
 const ASCII = { unicode: "ascii" } as const;
@@ -318,5 +324,58 @@ describe("C09 §2c width — fail-on-revert", () => {
   });
 });
 
-  it.todo("T6.102 (C09 I58): returning the slice when it costs slack → T2.124's sweep fails at patch and a box painting a windowed code draws the leading rows the residual said to drop — not deferred on a component: lands with windowChild");
-  it.todo("T6.103 (C09 I59): rendering every overlapping child whole again → T2.125 paints 31 rows in a 7-row box, which is F855 exactly as it shipped — not deferred on a component: lands with windowChild");
+  it("T6.102 (C09 I58): returning a slice that costs slack → the seam answers where the caller cannot pay", () => {
+    // **A container cannot drop rows the way `session.ts` does**, so a slice
+    // with a residual is the same over-draw in smaller form. This row asserts
+    // the refusal against a block whose window really does cost slack, which is
+    // what makes the guard falsifiable: dropping it from `windowChild` returns
+    // a block measuring more rows than the range asked for.
+    const kit = measurable({ definitions: [patchDefinition as unknown as BlockDefinition<never>] });
+    const withSlack = CORPUS.flatMap((blk) =>
+      [20, 40, 80].flatMap((width) => {
+        const total = kit.measure(blk, width);
+        if (total < 3) return [];
+        const from = 1;
+        const to = total - 1;
+        const direct = kit.window(blk, width, from, to);
+        return direct !== undefined && (direct.skipRows !== 0 || direct.dropRows !== 0)
+          ? [{ blk, width, from, to, direct }]
+          : [];
+      }),
+    );
+
+    expect(withSlack.length, "the corpus has a window that costs slack at all").toBeGreaterThan(0); // cells-ok
+    for (const { blk, width, from, to, direct } of withSlack) {
+      expect(kit.registry.windowChild(blk, width, from, to), `${blk.id} @${String(width)}`).toBeNull();
+      expect(
+        kit.measure(direct.block, width), // cells-ok — row counts
+        "and the slice it refused really is taller than the range, which is what the caller would have to pay",
+      ).toBeGreaterThan(to - from);
+    }
+  });
+
+  it("T6.103 (C09 I59): drawing every overlapping child whole again → the box paints what F855 measured", () => {
+    // **The revert this holds shut is one line in `scroll`'s render**: filter by
+    // overlap, then `renderChild(r.child)` instead of the slice. With it, a
+    // six-row box over a thirty-line screen measures 7 and paints 32 (F855).
+    // Here the numbers are the box's own: the paint equals the measure, and the
+    // whole child would be four times it.
+    const registry = createBlockRegistry({ defaults: true });
+    const tall: Block = {
+      kind: "terminal",
+      id: "t",
+      cols: 40,
+      screen: "lines",
+      lines: Array.from({ length: 30 }, (_u, i) => ({ text: `row ${String(i)}`, runs: [] })),
+    } as unknown as Block;
+    const box: Block = { kind: "scroll", id: "s", height: 6, follow: true, children: [tall] } as unknown as Block;
+
+    const drawn = renderToLines(registry, box, 40, { theme: DARK_THEME, capabilities: FULL_CAPS });
+
+    expect(registry.measure(box, 40)).toBe(7);
+    expect(drawn.length).toBe(7); // cells-ok
+    expect(
+      registry.measure(tall, 40), // cells-ok
+      "and the child whole is what the box used to paint",
+    ).toBe(30);
+  });

@@ -1866,9 +1866,15 @@ ruling collapsed them into one because only one had a caller.
 
 ### Which children a bounded container can slice
 
-**Six kinds declare `window` and the residuals split them in two**, which is why I58's rule is
+**Seven kinds declare `window` and the residuals split them in two**, which is why I58's rule is
 stated on the *result* and not on the kind — a `code` window is exact for one range and costs two
 rows for the next, so *can this kind be bounded* is not a question with a per-kind answer.
+
+**The first draft of this table said six and put `table` in the atomic column.** `table` declares
+its `window` as a method rather than a property, so a grep for `window:` misses it, and the section
+two subsections up still reads *not yet — four interactions, below* because it was written before
+they were answered. T2.126 is the row that found it, on its first run: a measurement in a spec is a
+claim like any other, and a list of kinds is exactly the shape that goes stale without saying so.
 
 | child kind | `window` | residuals | a scroll can bound it |
 |---|---|---|---|
@@ -1878,8 +1884,9 @@ rows for the next, so *can this kind be bounded* is not a question with a per-ki
 | `keyValue` | a slice, key column pinned | always 0 / 0 | **yes** |
 | `patch` | a slice, gutter pinned | `skipRows` carries the path header and every hunk header the range misses | **only where the slice is exact** — in practice a window opening at row 0 |
 | `code` | text whole, `lineRange` pinned | non-zero at either end when the range opens or closes inside a wrapped source line | **only where the slice is exact** |
+| `table` | a slice in row units, `actionBar` and `presorted` pinned | non-zero at either end: `dropRows` for the header case, `skipRows` for the bar — a window never goes bodyless | **only where the slice is exact** |
 | `plot` | none, permanently (I27, C12 I1) | — | no — kept whole, the recorded overrun |
-| `image`, `table`, `group`, `mosaic`, `steps`, `notice`, `tip`, `rule`, `progress`, `pills`, `events`, `comparison`, `status`, `panel`, `scroll` | none | — | no — kept whole |
+| `image`, `group`, `mosaic`, `steps`, `notice`, `tip`, `rule`, `progress`, `pills`, `events`, `comparison`, `status`, `panel`, `scroll` | none | — | no — kept whole |
 
 **A slice that costs slack is refused too, and that is the part the entry level does not share.**
 `windowSequence` pays `skipRows` and `dropRows` out of the viewport's own accounting —
@@ -2201,10 +2208,10 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.10**: golden frames for every kind at four widths in both themes and both unicode modes.
 - **T2.121** (I55, C09 §6b): `terminalDefinition` declares `window`, and a window of rows 10–15 of a 2,000-line block renders exactly those six, with the same bytes the whole-block render puts on those rows.
 - **T2.122** (I57): `RAMP_EXTENT.terminal` is `"none"` and `ANIMATES.terminal` is `false`; `tickIntervalOf` a `terminal` returns null whatever its runs carry.
-- **T2.123** (I58, §6b): `windowChild` is on the context every definition receives, is the registry's own, and a caller's value is discarded — the same assertion `measureChild` and `renderChild` carry, made against a context built with all three set to throwing stubs.
-- **T2.124** (I58, §6b): over every registered kind, `windowChild(b, w, from, to)` returns `null` exactly when the definition declares no `window` **or** its result carries a non-zero `skipRows` or `dropRows`, and returns the definition's block otherwise — a sweep, not one kind, because the residual is the half a single offset cannot see (B1's argument).
+- **T2.123** (I58, §6b): a probe definition records the context it is rendered with, and its `windowChild` **is** the registry's own function — the same assertion `measureChild` and `renderChild` carry, and the reason `RenderContextInput` omits all three rather than making them optional (§2, F85).
+- **T2.124** (I58, §6b): over the whole corpus at three widths, `windowChild` returns `null` exactly when the definition declares no `window` **or** its result carries a non-zero `skipRows` or `dropRows` — the predicate computed from the definition rather than restated, and both answers exercised (measured: more than ten of each). A sweep and not one offset, because the residual is the half a single window cannot see (B1's argument).
 - **T2.125** (I59, §6b): a `scroll({ height: 6, follow: true })` over one 30-line `terminal` measures 7 and renders **7**, and the rows drawn are the block's lines 24–29 — the tail, because the box follows. As it shipped this rendered 32 rows opened at line 0 (F855).
-- **T2.126** (I59, §6b): the registered kinds declaring no `window` are compared **by equality** against the recorded list; a kind gaining a window fails the row, and so does a new kind that cannot be bounded.
+- **T2.126** (I59, §6b): over the full twenty-two-kind registry, the kinds declaring no `window` are compared **by equality** against the recorded list — a kind gaining a window fails the row, and so does a new kind that cannot be bounded. **This row found the table above wrong on its first run**: `table` declares its `window` as a method rather than a property, so the draft's grep missed it and the draft said six kinds where there are seven.
 
 ### Tier 3 — edge cases
 
@@ -2277,7 +2284,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T3.70** (I42): a `row` group at a width that drops its second child answers only the first child's width — the unplaced child is measured by neither half and counted by neither (C04 §3).
 - **T3.73** (I56): a `terminal` line whose text is a lone `\uFFFD` renders it; the definition calls no strip function, asserted by a source scan of `kinds/terminal.ts`.
 - **T3.74** (I56): the cursor cell is `inverse` at 24-bit, 8-bit, 4-bit, 1-bit and ASCII — five arms, one assertion each, and at 1-bit it is the only mark distinguishing the cell.
-- **T3.75** (I59, §6b): the corpus's `scroll` fixtures include one whose single child is taller than its interior, so T2.1's sweep sees the case — asserted on the corpus itself, because the sweep agreed for as long as no fixture had the property (F855).
+- **T3.75** (I59, §6b): the corpus's `scroll` fixtures include one whose child is taller than its interior, so T2.1's sweep sees the case — asserted on the corpus itself, because the sweep agreed for as long as no fixture had the property (F855). Two children and not one: a box whose only over-tall child is also its only child cannot tell *slice the child* from *draw the first child only*.
+- **T3.76** (I59, §6b): an atomic child taller than the box still over-draws, and the row carries the number — a `plot` of height 8 in a box of 2 measures 3 and paints 9. **The record, and T2.126 is the watch**: F856's lesson is that a row asserting a disagreement stays green for exactly as long as the defect does, so what stops this one growing is the equality-compared list of kinds, not this row.
 
 ### Tier 4 — integration
 

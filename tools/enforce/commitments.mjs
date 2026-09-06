@@ -870,6 +870,7 @@ export const OWNERS = [
   // rows rather than a `tools/mutate` row, because a run's bare `I1` means its
   // own component's I1 and there is no single owner for the directory.
   { path: "tools/mutate/runs/c01", spec: "C01" },
+  { path: "tools/mutate/runs/c09", spec: "C09" },
   { path: "tools/mutate/runs/c22", spec: "C22" },
   { path: "src/testing", spec: "C09" },
   // C24's builders sit under `src/shell/` because `b` is L4's surface and

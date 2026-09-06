@@ -226,13 +226,38 @@ export type RenderContext = Readonly<{
   /** The registry's `width` (§2c) — a container asks a child's content width through this and never imports the registry. */
   widthChild: WidthFn;
   renderChild: (block: Block, width: number) => ReactElement;
+  /**
+   * The registry's slice of a child, or `null` when it cannot take one (I58, §6b).
+   *
+   * **The seam a bounded container needs, and the one `RenderContext` did not
+   * have.** `measureChild` answers *how tall*, `renderChild` answers *draw it*,
+   * and nothing answered *draw rows `[from, to)` of it* — so a `scroll` filtered
+   * its children by overlap and then drew each survivor whole. With short
+   * children that is right; with one child taller than the interior the box
+   * bounds nothing, and the route's own terminal measured 7 rows and painted 32
+   * (F855). C04 §3c trace 1 named this missing operation in these words, and
+   * C09 §8a D7, I34's cap and T2.28b were each written around its absence
+   * (F856).
+   *
+   * **`null` has three causes and they are one rule: the container must not have
+   * to pay for the slice.** The kind declares no `window` (I27); the block
+   * carries a floor or a cap, whose extra rows are drawn outside the definition
+   * (I33, C14 I24); or the slice came back with a non-zero `skipRows` or
+   * `dropRows`. `windowSequence` can pay a residual — `session.ts` renders the
+   * window and drops the surplus itself — and a child inside an Ink tree has no
+   * equivalent, so a slice with its overhang still attached is the same
+   * over-draw in smaller form. A container that gets `null` renders the child
+   * whole, which is what every container did before this existed.
+   */
+  windowChild: (block: Block, width: number, from: number, to: number) => Windowed | null;
 }>;
 
 /**
  * What a *caller* of the registry supplies — everything a renderer may read
  * except the two fields the registry owns.
  *
- * **The registry overwrites `measureChild` and `renderChild` unconditionally**
+ * **The registry overwrites `measureChild`, `renderChild` and `windowChild`
+ * unconditionally**
  * (`registry.ts`, `{ ...ctx, measureChild: this.measure, renderChild: … }`), so
  * a caller's values were discarded on every call. The type demanded them anyway,
  * and the only way to satisfy it was to write something untrue: `render-lines.ts`
@@ -247,7 +272,7 @@ export type RenderContext = Readonly<{
  * honours three — which is what says it generalises past one surface.
  * FINDINGS F85.
  */
-export type RenderContextInput = Omit<RenderContext, "measureChild" | "widthChild" | "renderChild">;
+export type RenderContextInput = Omit<RenderContext, "measureChild" | "widthChild" | "renderChild" | "windowChild">;
 
 /**
  * A block reduced to a smaller one, plus the leading rows of it the caller drops
@@ -520,6 +545,17 @@ export interface BlockRegistry {
     from: number,
     to: number,
   ): Readonly<{ blocks: readonly Block[]; skipRows: number }>;
+  /**
+   * One block's slice, for a container that bounds its own rows (I58, §6b).
+   *
+   * **The single form beside the sequence form**, and it is published for the
+   * reason `measure` and `width` are: the registry supplies it to every renderer
+   * as `RenderContext.windowChild`, and a member reachable only through a
+   * context is one no row can sweep. `null` when the slice cannot be taken
+   * without the caller paying for it — see the context member for the three
+   * causes.
+   */
+  windowChild(block: Block, width: number, from: number, to: number): Windowed | null;
   renderSequence(blocks: readonly Block[], ctx: RenderContextInput): ReactElement;
   readonly kinds: readonly string[];
   readonly sealed: boolean;

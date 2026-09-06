@@ -372,6 +372,16 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
    * `windowSequence` keeps a kind declaring none whole and pays for it out of
    * `skipRows`, which is exactly right for a block that is already small.
    *
+   * **The last sentence was true of the box and false of what it painted, for
+   * as long as no child was taller than the box** (F855). `height + 1` is the
+   * measure, and `render` drew every overlapping child whole — so a six-row box
+   * over a thirty-line screen measured 7 and painted 32, and the residue row
+   * went on counting against a window nobody had applied. The ruling above is
+   * unchanged: this kind still declares no `window`, because a bounded region's
+   * height is declared. What was missing is the window in the other direction —
+   * a scroll is not sliced, and it must slice — and that is C09 I58's
+   * `windowChild`, taken in `render` below.
+   *
    * **The correction this forces is in the classification, not here.** C26 §4a's
    * 2 × 2 sorted kinds by whether they declare `BlockDefinition.window` and read
    * that as *the container has a viewport*. Those are two senses of one word: a
@@ -389,13 +399,26 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
     const ranges = childRanges(block, width, ctx.measureChild);
     const shown = ranges.filter((r) => r.to > offset && r.from < offset + interior);
 
-    const children: ReactElement[] = shown.map((r) =>
-      createElement(
+    // **Each survivor is sliced to the part of it the window holds** (C09 I58,
+    // I59). Filtering by overlap and then drawing each child whole is right for
+    // several short children and bounds nothing when one child is taller than
+    // the interior: the route's own terminal measured 7 rows and painted 32,
+    // with `follow` inert and the residue counting against a window that was
+    // never applied (F855). `windowChild` returns `null` where the slice would
+    // cost the container something — an atomic kind, a floor, a cap, a residual
+    // — and the child is then kept whole, which is what every child got before.
+    const children: ReactElement[] = shown.map((r) => {
+      const height = r.to - r.from;
+      const from = Math.max(0, offset - r.from); // cells-ok — a row index
+      const to = Math.min(height, offset + interior - r.from); // cells-ok — a row index
+      const piece =
+        from === 0 && to === height ? r.child : (ctx.windowChild(r.child, width, from, to)?.block ?? r.child);
+      return createElement(
         Box,
         { key: r.child.id, width, flexDirection: "column" },
-        ctx.renderChild(r.child, width),
-      ),
-    );
+        ctx.renderChild(piece, width),
+      );
+    });
 
     const residue: ReactElement[] = [];
     // **The residue, both directions** (C04 I49). A settled container keeps the

@@ -30596,3 +30596,37 @@ already hold, because the record is where the last person who read that frame wr
 
 ---
 
+## F857 — a file with no owner puts its citations in a counted bucket rather than a checked one ★★☆☆☆
+
+Adding one row to `COMPONENT_SOURCES` — `{ path: "tools/mutate/runs/c09", spec: "C09" }`, so a new
+run's bare invariant numbers would resolve — turned **two silent citations into violations**:
+
+| file | cites | reality |
+|---|---|---|
+| `tools/mutate/runs/c09-image.mjs:195` | *the substitution `I74` refuses* | C09 stops at I57; the invariant is **C04 I74** |
+| `tools/mutate/runs/c09-ink-ramps.mjs:1` | `C04 I106–I109` | the range's far end is bare, so it resolved as `C09 I109`, which does not exist |
+
+**The bucket is the finding, not the two rows.** `enforce`'s summary carries
+*section citations · 290 of 8464 resolve to no section … **581 more name no document** (SP8,
+reported not gated)*, and that second number is where a citation goes when nothing says which
+document owns its file. Seven of those 581 were in `tools/mutate/runs/c09*`; two were wrong. The
+line reads as an inventory and is also a **hiding place**, because a green gate beside it says *no
+violations*.
+
+**F636 is the sibling and it fires the other way.** There, a bare `I112` in an unowned run file did
+resolve — the resolver falls back to the filename's component — and SP3 caught it. Here the same
+shape is silent, because these citations name a *document* that does not own the file rather than an
+*invariant* the owner does not declare. Two adjacent mechanisms, one gated and one counted, and the
+difference is not visible from the summary line.
+
+**What this does not argue for.** Not owning every directory: `docs/notes/`, `CLAUDE.md` and the
+audit are excluded deliberately, and a rule that gated all 574 remaining would be a rule nobody could
+land. What it argues for is reading the second number the way the first is read — 574 citations
+resolve against nothing today, and the only thing that moves one into the checked set is somebody
+adding an owner row for their own reasons, which is how these two sat unread.
+
+**Where**: `tools/enforce/commitments.mjs` `COMPONENT_SOURCES`; `tools/enforce/index.mjs`'s summary
+line; `tools/mutate/runs/c09-image.mjs`, `tools/mutate/runs/c09-ink-ramps.mjs`.
+
+---
+

@@ -39,7 +39,7 @@ type change.
 | **8** | [Absence indistinguishable from failure](#8) | 29 | **7 open** (7 closed) | partly | real Calcium work · **7 of 10 fixed** — F151 is the class F35 closed in the half an app-side test cannot reach, and **F167 is the class arriving in a *value*: a validator agreeing twice about two different documents** |
 | **9** | [**The instrument was wrong**](#9) | 103 | **17** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
 | **10** | [**A claim carried without a record**](#10) | 68 | **11** | — | **new at F80** · method — six findings disproved, and **F166 unblocked an entry while F168 found what the same row was silent about**; F184 is the first where the unrecorded claim was a *rule* rather than a fact, governing thirty forms from a parameter's doc comment |
-| **11** | [A gate that passes without checking](#11) | 304 | **16** | — | **105 closed · 117 open** of 223 keyed — the heading was out by 66 and this row's count column by 1, which cannot be corrected alone (§11) · four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
+| **11** | [A gate that passes without checking](#11) | 305 | **16** | — | **105 closed · 117 open** of 223 keyed — the heading was out by 66 and this row's count column by 1, which cannot be corrected alone (§11) · four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
 | **12** | [**A time-based assertion under contention**](#12) | 6 | **3** | — | **new at F80** · Calcium's own suite |
 | **13** | [Text the framework emits](#13) | 6 | **4** | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
 | **14** | [A constant, a channel or a rule that outlived its configuration](#14) | 28 | **13 open** | ⚠ C12 | **new at F492** · real Calcium work — every member reads as deliberate, which is why review found none of them |
@@ -1605,6 +1605,8 @@ reads goes through the entry point a user has.
 **F855** — a scroll windows by child, so one child taller than the interior paints whole: measured 7 against 32 rows on the route's own block, `follow` inert, the residue describing a window nobody applied. Found by reading a frame with every gate green. Needs a `windowChild` seam.
 
 **F856** — that defect was already in the repository four times: C04 §3c trace 1 names the missing operation in the fix's own words, C09 §8a D7 measures it at 4 against 8, C09 I34's cap partly pays for it, and T2.28b asserts the disagreement on purpose. **A row that expires by asserting the disagreement watches the remedy, not the condition** — it stays green for as long as the defect does and says nothing when the defect gets worse. What was new is the threshold and two unrecorded symptoms. Ask where a *finding* was written down, not only a claim.
+
+**F857** — adding one owner row for `tools/mutate/runs/c09*` turned two silent citations into violations: a bare `I74` that is C04's, and a range whose far end resolved against a spec that stops at I57. The `581 more name no document (SP8, reported not gated)` line is an inventory and a hiding place; F636 is the sibling where the same shape *is* gated. 574 citations resolve against nothing today.
 
 <a id="12"></a>
 

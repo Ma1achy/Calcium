@@ -1,4 +1,5 @@
-// C04 I106–I109, C09 I50–I54, C10 I36–I37 — the ink ramps, mutated at the gate,
+// C04 I106, C04 I107, C04 I108, C04 I109, C09 I50–I54, C10 I36–I37 — the ink
+// ramps, mutated at the gate,
 // the split, the bar, the cadence and the ladder.
 //
 // Every mutation is a shape the design walked past or the landing measured: the

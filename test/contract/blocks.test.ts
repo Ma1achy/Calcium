@@ -16,7 +16,12 @@ import { ADVERSARIAL, CORPUS, ONE_PER_KIND } from "../support/blocks.js";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LIGHT_THEME, measurable, visible } from "../support/render.js";
 import { cells, hasEmojiForm, TEXT_PRESENTATION } from "../../src/presentation/text.js";
 import { SPINNER_SETS } from "../../src/presentation/blocks/glyphs.js";
-import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
+import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
+import { renderToLines } from "../../src/presentation/render-lines.js";
+import { Text } from "ink";
+import { createElement } from "react";
+import type { Block } from "../../src/data/viewmodel/index.js";
+import type { BlockDefinition, RenderContext } from "../../src/presentation/blocks/index.js";
 import { patchDefinition } from "../../src/presentation/patch/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
@@ -277,6 +282,46 @@ describe("C09 contract — measurement", () => {
       expect(defaults.has(kind), `${kind} must not be a default`).toBe(false);
     }
   });
+
+  it("T2.126 (I59, §6b): the kinds a bounded container cannot slice, compared by equality", () => {
+    // **An exemption list held by equality, not by membership** — a kind that
+    // gains a `window` has to move this list, and a new kind that cannot be
+    // bounded has to fail here rather than join a subset quietly. The overrun
+    // those kinds keep inside a `scroll` is recorded by I59 rather than asserted
+    // correct: `plot` is atomic permanently (I27, C12 I1) and the rest simply
+    // have no window yet.
+    const kit = measurable({
+      definitions: [
+        tableDefinition as unknown as BlockDefinition<never>,
+        plotDefinition as unknown as BlockDefinition<never>,
+        patchDefinition as unknown as BlockDefinition<never>,
+      ],
+    });
+    const atomic = [...kit.kinds]
+      .filter((kind) => kit.registry.get(kind)?.window === undefined)
+      .sort();
+
+    expect(atomic).toEqual([
+      "comparison",
+      "events",
+      "group",
+      "image",
+      "mosaic",
+      "notice",
+      "panel",
+      "pills",
+      "plot",
+      "progress",
+      "rule",
+      "scroll",
+      "status",
+      "steps",
+      "tip",
+    ]);
+
+    const plot = { kind: "plot", id: "p", form: "curve", series: [], height: 30 } as unknown as Block;
+    expect(kit.registry.windowChild(plot, 40, 0, 6), "and an atomic child gets no slice").toBeNull();
+  });
 });
 
 describe("C09 contract — the source rules", () => {
@@ -459,6 +504,97 @@ describe("C09 §4 — the call grammar's glyph rows", () => {
 });
 
 describe("C09 contract — the slice seam", () => {
-  it.todo("T2.123 (C09 I58): windowChild is on every definition's context, is the registry's own, and a caller's value is discarded — the assertion measureChild and renderChild already carry — not deferred on a component: lands with windowChild");
-  it.todo("T2.124 (C09 I58): over every registered kind, windowChild returns null exactly when the kind declares no window or its result carries a non-zero skipRows or dropRows — a sweep, because a single offset cannot see the residual — not deferred on a component: lands with windowChild");
+  it("T2.123 (I58): windowChild reaches every definition, and it is the registry's own", () => {
+    // **The same assertion `measureChild` and `renderChild` carry** (§2): the
+    // registry overwrites all three unconditionally, so a caller cannot hand a
+    // kind a windowing function of its own — which is why `RenderContextInput`
+    // omits the three rather than making them optional (F85).
+    const seen: RenderContext[] = [];
+    const probe: BlockDefinition = {
+      kind: "probe-ctx",
+      measure: () => 1,
+      render: (_block: Block, ctx: RenderContext) => {
+        seen.push(ctx);
+        return createElement(Text, null, "x");
+      },
+    } as unknown as BlockDefinition;
+    const r = createBlockRegistry({ defaults: true });
+    r.register(probe);
+
+    renderToLines(r, { kind: "probe-ctx", id: "q" } as unknown as Block, 40, {
+      theme: DARK_THEME,
+      capabilities: FULL_CAPS,
+    });
+
+    expect(seen.length, "the probe drew").toBe(1); // cells-ok
+    expect(seen[0]?.windowChild, "and it is the registry's own function").toBe(r.windowChild);
+  });
+
+  it("T2.124 (I58): over every corpus block, windowChild is null exactly where the slice would cost the caller", () => {
+    // **A sweep, because a single offset cannot see the residual** (B1's
+    // argument): a row asserting one window against a constant passes against a
+    // residual that is simply wrong. The predicate is the whole of I58 —
+    // atomic kind, or non-zero `skipRows`/`dropRows` — and it is computed from
+    // the definition rather than restated, so the two sides cannot drift.
+    const kit = measurable({
+      definitions: [
+        tableDefinition as unknown as BlockDefinition<never>,
+        plotDefinition as unknown as BlockDefinition<never>,
+        patchDefinition as unknown as BlockDefinition<never>,
+      ],
+    });
+    // **Two fixtures the corpus does not hold, and the mutation pass is what
+    // said so.** Removing the floor guard and removing the cap guard both
+    // survived: no corpus block carries `minHeight` or `capped`, so the sweep
+    // could not see either. A corpus chosen for a property may not have it —
+    // third instance in this change, after T3.75's and the atomic one.
+    //
+    // Both extra rows are *sliceable kinds*, so the only thing stopping the
+    // slice is the guard: a `logs` whose window is always exact, floored in one
+    // and capped in the other.
+    const lines = (id: string, n: number): Block =>
+      ({
+        kind: "logs",
+        id,
+        lines: Array.from({ length: n }, (_u, i) => ({ ts: "00:00:00", level: "info" as const, message: `l${String(i)}` })),
+      }) as unknown as Block;
+    const floored = { ...(lines("floored", 6) as object), minHeight: 12 } as unknown as Block;
+    const capped = { ...(lines("capped", 6) as object), capped: { shown: 6, total: 900 } } as unknown as Block;
+
+    const disagreed: string[] = [];
+    let refused = 0;
+    let sliced = 0;
+    for (const blk of [...CORPUS, floored, capped]) {
+      for (const width of [20, 40, 80]) {
+        const total = kit.measure(blk, width);
+        if (total < 2) continue;
+        const from = Math.floor(total / 3);
+        const to = Math.max(from + 1, total - 1);
+        const direct = kit.window(blk, width, from, to);
+        // **The predicate is the whole of I58**, computed rather than restated:
+        // atomic kind, a residual the container cannot pay, a floor whose
+        // padding is drawn outside the definition, or a cap whose marker is.
+        const exact =
+          direct !== undefined &&
+          direct.skipRows === 0 &&
+          direct.dropRows === 0 &&
+          ((blk as { minHeight?: number }).minHeight ?? 0) === 0 &&
+          (blk as { capped?: unknown }).capped === undefined;
+        const got = kit.registry.windowChild(blk, width, from, to);
+        if (exact) sliced += 1;
+        else refused += 1;
+        if (exact !== (got !== null)) disagreed.push(`${blk.kind} ${blk.id} @${String(width)}`);
+      }
+    }
+
+    expect(disagreed, "the seam and the definition agree on every block").toEqual([]);
+    expect(sliced, "and the corpus exercises both answers — some slices are taken").toBeGreaterThan(10); // cells-ok
+    expect(refused, "and some are refused").toBeGreaterThan(10); // cells-ok
+    // The two added blocks are refused for their own reason and not because
+    // their kind cannot window: `logs` slices exactly at every offset.
+    expect(kit.registry.windowChild(floored, 40, 2, 5), "a floored block is kept whole").toBeNull();
+    expect(kit.registry.windowChild(capped, 40, 2, 5), "and so is a capped one").toBeNull();
+    expect(kit.window(lines("plain", 6), 40, 2, 5)?.skipRows, "while the same kind, unfloored, slices").toBe(0);
+    expect(kit.registry.windowChild(lines("plain", 6), 40, 2, 5), "and the seam takes it").not.toBeNull();
+  });
 });
