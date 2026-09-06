@@ -76,10 +76,12 @@ const results = runPass({
     {
       // **T6.86.** The composer prefixes every body row with the hook rather
       // than the first alone — the indent doubled into the rows below.
+      // Re-anchored with C22 I88: the gutter is a column with a `first` and a
+      // `rest` cell, and the mutation draws the first on every row.
       name: "the hook is drawn on every body row",
       file: "src/shell/entry-layout.ts",
-      from: '  if (row !== 0) return " ".repeat(run.indent);',
-      to: '  if (row !== 0) return `${glyphFor("continuation", options.capabilities)} `;',
+      from: "  return run.gutter.map((column) => gutterCell(row === 0 ? column.first : column.rest, options)).join(\"\");",
+      to: "  return run.gutter.map((column) => gutterCell(column.first, options)).join(\"\");",
       expect: "T4.48",
     },
     {

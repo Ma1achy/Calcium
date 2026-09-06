@@ -22,6 +22,7 @@ import { block as rebuild } from "../data/viewmodel/index.js";
 import { glyphFor } from "../presentation/blocks/index.js";
 import type { BlockRegistry, NavElement } from "../presentation/blocks/index.js";
 import { paint as paintSpans, tone } from "../presentation/blocks/paint.js";
+import { glyphForMask, LINE_DOWN, LINE_LEFT, LINE_RIGHT, LINE_UP } from "../presentation/plot/linedraw.js";
 import { renderSequenceToLines } from "../presentation/render-lines.js";
 
 /**
@@ -41,6 +42,26 @@ export const HOOK_INDENT = 2;
 export const BODY_INDENT = HOOK_INDENT + 2;
 
 /**
+ * One gutter column per level of nesting, and it is the body's indent (C22 I89,
+ * §6l.8 rows 23–25). A nested card's head sits where its parent's body text
+ * does; its own body is one unit further in. Held to `BODY_INDENT` by T1.49
+ * drawing both, because two constants agreeing is not the claim.
+ */
+export const GUTTER_UNIT = BODY_INDENT;
+
+/**
+ * What one gutter column draws on a row (C22 I88, I89): the hook under a head,
+ * the bar continuing a line past body rows, the tree's branch and elbow at a
+ * nested head, or nothing — under the last child, where no line continues.
+ */
+export type GutterCell = "hook" | "bar" | "branch" | "elbow" | "blank";
+
+/** A gutter column's cell on the run's first row and on every row after. */
+export type GutterColumn = Readonly<{ first: GutterCell; rest: GutterCell }>;
+
+const NO_GUTTER: readonly GutterColumn[] = Object.freeze([]);
+
+/**
  * The blank row that closes every entry (I85). The entry's own, so C14 measures
  * it through the wrapper and the frame draws it through the same layout — a
  * composer adding spacing of its own is the C04 I25 shape one layer up.
@@ -51,10 +72,12 @@ export const ENTRY_GAP = 1;
 export type EntryRun = Readonly<{
   blocks: readonly Block[];
   width: number;
-  /** Cells the run sits in from the entry's left edge; an indented run hangs under the hook. */
+  /** Cells the run sits in from the entry's left edge — `gutter.length × GUTTER_UNIT`. */
   indent: number;
   /** The entry's closing blank row (I85): one row, no blocks, drawn empty. */
   blank: boolean;
+  /** The columns drawn before every row of the run, outermost first (I88, I89). */
+  gutter: readonly GutterColumn[];
 }>;
 
 /** A run's rows — the blank's one, or the sequence's measured height. */
@@ -72,6 +95,16 @@ export function isCard(blocks: readonly Block[]): boolean {
 }
 
 /**
+ * A nested card (C22 I89): a `group` column whose first block is a `step`
+ * notice. The composer builds one per child call (C23 I62); the layout reads the
+ * shape and never a flag, so a producer cannot declare a card it did not draw.
+ */
+function nestedCard(block: Block): Block extends infer B ? (B & { kind: "group" }) | null : never {
+  if (block.kind !== "group" || block.direction !== "column") return null;
+  return isCard(block.children) ? block : null;
+}
+
+/**
  * The runs an entry's blocks lay out as, at `width`.
  *
  * A card with a body is two runs; everything else is one. The body's width has
@@ -79,26 +112,93 @@ export function isCard(blocks: readonly Block[]): boolean {
  * keeps this unreachable, and a clamp is cheaper than a claim about the gate.
  */
 export function entryLayout(blocks: readonly Block[], width: number): readonly EntryRun[] {
-  const gap = Object.freeze({ blocks: [], width, indent: 0, blank: true });
+  const gap = Object.freeze({ blocks: [], width, indent: 0, blank: true, gutter: NO_GUTTER });
   // **An entry with no blocks reserves no blank** (I85): the closing row
   // separates content, and a pending entry that is only its command line has
   // nothing to close — it is one row until its first block lands (T4.10).
   if (blocks.length === 0) {
-    return [Object.freeze({ blocks, width, indent: 0, blank: false })];
+    return [Object.freeze({ blocks, width, indent: 0, blank: false, gutter: NO_GUTTER })];
   }
   if (!isCard(blocks) || blocks.length < 2) {
-    return [Object.freeze({ blocks, width, indent: 0, blank: false }), gap];
+    return [Object.freeze({ blocks, width, indent: 0, blank: false, gutter: NO_GUTTER }), gap];
   }
   return [
-    Object.freeze({ blocks: blocks.slice(0, 1), width, indent: 0, blank: false }),
-    Object.freeze({
-      blocks: cardBody(blocks.slice(1)),
-      width: Math.max(1, width - BODY_INDENT),
-      indent: BODY_INDENT,
-      blank: false,
-    }),
+    Object.freeze({ blocks: blocks.slice(0, 1), width, indent: 0, blank: false, gutter: NO_GUTTER }),
+    ...bodyRuns(cardBody(blocks.slice(1)), width, NO_GUTTER, 1),
     gap,
   ];
+}
+
+/** A run under `gutter` columns, at the width those columns leave. */
+function bodyRun(blocks: readonly Block[], width: number, gutter: readonly GutterColumn[]): EntryRun {
+  const indent = gutter.length * GUTTER_UNIT;
+  return Object.freeze({ blocks, width: Math.max(1, width - indent), indent, blank: false, gutter });
+}
+
+/**
+ * A card body's runs (I88, I89): its plain blocks under the hook and then the
+ * bar, and each nested card as a head run under a tree glyph followed by its own
+ * body one column further in.
+ *
+ * **Recurses exactly once.** `depth` is the body's: the top card's body is 1 and
+ * may hold cards; a child's body is 2 and a `step` column inside it is body
+ * text — *three levels is a composition problem wearing a rendering problem's
+ * clothes* (§6l.8 row 24), and a layout that drew it would hide the finding.
+ *
+ * **The tree's glyphs are the plot's line table** (`glyphForMask`, F293), not
+ * new `Glyph` tokens: it already flattens to ASCII at `ascii || wide`, which is
+ * the width tier the glyph table lacked until C09 I48, and a gutter is chrome
+ * rather than a figure, so `corners` is fixed `"sharp"` — the function the
+ * measurer and renderer share must not depend on a theme.
+ */
+function bodyRuns(
+  body: readonly Block[],
+  width: number,
+  outer: readonly GutterColumn[],
+  depth: number,
+): readonly EntryRun[] {
+  const cards = depth < 2 ? body.filter((b) => nestedCard(b) !== null) : [];
+  const last = cards[cards.length - 1];
+  // **The line ends only where the body does.** `└─` says *nothing continues
+  // below*, and a body row after the last child would draw the bar under it —
+  // an elbow with a line through it. So the last child takes the elbow only
+  // when it is also the body's last block; followed by text it is a branch,
+  // and the parent's bar runs past its body as it runs past any other row.
+  const tail = body[body.length - 1];
+  const runs: EntryRun[] = [];
+  let plain: Block[] = [];
+  // The body's first run hangs under the hook; every later run continues the bar.
+  const lead = (): GutterCell => (runs.length === 0 ? "hook" : "bar");
+  const flush = (): void => {
+    if (plain.length === 0) return; // cells-ok — a block count
+    runs.push(bodyRun(plain, width, [...outer, { first: lead(), rest: "bar" }]));
+    plain = [];
+  };
+  for (const b of body) {
+    // **Read at this depth, not only counted at it**: the first cut filtered
+    // `cards` by depth and read every block as a card in the loop, and a
+    // grandchild drew a third gutter column — found by the frame, not a count.
+    const card = depth < 2 ? nestedCard(b) : null;
+    if (card === null) {
+      plain.push(b);
+      continue;
+    }
+    flush();
+    // **One child keeps `⎿` — a tree of one is a corner** (row 23); with
+    // siblings, `├─` for every child but the last and `└─` for the last.
+    const closes = b === last && b === tail;
+    const cell: GutterCell = cards.length === 1 && runs.length === 0 ? "hook" : closes ? "elbow" : "branch"; // cells-ok — a card count
+    const [head, ...rest] = card.children;
+    if (head !== undefined) runs.push(bodyRun([head], width, [...outer, { first: cell, rest: cell }]));
+    if (rest.length > 0) { // cells-ok — a block count
+      // The parent's line continues past a child's body and stops under the
+      // last child (row 25): nothing below it to connect to.
+      const through: GutterColumn = closes ? { first: "blank", rest: "blank" } : { first: "bar", rest: "bar" };
+      runs.push(...bodyRuns(cardBody(rest), width, [...outer, through], depth + 1));
+    }
+  }
+  flush();
+  return runs;
 }
 
 /**
@@ -144,8 +244,14 @@ export function elementsOfEntry(
   registry: Pick<BlockRegistry, "elementsIn" | "measureSequence">,
   blocks: readonly Block[],
   width: number,
+  command?: string,
 ): readonly Readonly<{ blockId: string; element: NavElement }>[] {
   const out: Readonly<{ blockId: string; element: NavElement }>[] = [];
+  // **The head copies the invocation** (I90): `y` on a card's head yields what
+  // ran, and `⌃a y` yields it first, followed by the body's own copies through
+  // C26 I16's one aggregator. Every other element's `copy` is its block's — a
+  // nested head included, whose invocation the parent's command does not name.
+  const headId = command !== undefined && isCard(blocks) ? blocks[0]?.id : undefined;
   let top = 0;
   for (const run of entryLayout(blocks, width)) {
     for (const { blockId, element } of registry.elementsIn(run.blocks, run.width)) {
@@ -153,6 +259,7 @@ export function elementsOfEntry(
         blockId,
         element: Object.freeze({
           ...element,
+          ...(blockId === headId && command !== undefined ? { copy: command } : {}),
           rows: Object.freeze({ from: top + element.rows.from, to: top + element.rows.to }),
           cols: Object.freeze({
             from: run.indent + element.cols.from,
@@ -213,16 +320,35 @@ export function windowEntry(
 type RenderOptions = Parameters<typeof renderSequenceToLines>[3];
 
 /**
- * The gutter a body row carries: `HOOK_INDENT` blanks, the hook, muted, and a
- * space on the run's first row; blanks on every row after — both `BODY_INDENT`
- * cells, because C09 I5 keeps `continuation`'s two forms 1:1 by cell.
+ * One gutter cell's text, `GUTTER_UNIT` cells wide (I88, I89): `HOOK_INDENT`
+ * blanks, then the glyph or glyphs, muted, padded to the unit. Every glyph is
+ * one cell at both width conventions — `continuation` is Neutral (C09 I5) and
+ * `glyphForMask` flattens to ASCII where box drawing would double (F293) — so
+ * the geometry the measurer committed is the geometry drawn.
+ */
+function gutterCell(cell: GutterCell, options: RenderOptions): string {
+  if (cell === "blank") return " ".repeat(GUTTER_UNIT);
+  const caps = options.capabilities;
+  const glyphs =
+    cell === "hook"
+      ? glyphFor("continuation", caps)
+      : cell === "bar"
+        ? glyphForMask(LINE_UP | LINE_DOWN, "sharp", caps)
+        : `${glyphForMask(cell === "branch" ? LINE_UP | LINE_DOWN | LINE_RIGHT : LINE_UP | LINE_RIGHT, "sharp", caps)}${glyphForMask(LINE_LEFT | LINE_RIGHT, "sharp", caps)}`;
+  const painted = paintSpans([{ text: glyphs, style: tone("muted", options.theme, caps) }]);
+  const pad = GUTTER_UNIT - HOOK_INDENT - [...glyphs].length; // cells-ok — every gutter glyph is one cell by construction (C09 I5, F293)
+  return `${" ".repeat(HOOK_INDENT)}${painted}${" ".repeat(Math.max(0, pad))}`;
+}
+
+/**
+ * The gutter a body row carries (I88, I89): each column's `first` cell on the
+ * run's first row and its `rest` on every row after — the hook, then the bar
+ * down the body; a tree glyph at a nested head; the parent's bar or nothing
+ * past a child's body. Always `run.indent` cells, so I83 holds by construction.
  */
 export function bodyGutter(run: EntryRun, row: number, options: RenderOptions): string {
-  if (run.indent === 0) return "";
-  if (row !== 0) return " ".repeat(run.indent);
-  const hook = glyphFor("continuation", options.capabilities);
-  const lead = " ".repeat(HOOK_INDENT);
-  return `${lead}${paintSpans([{ text: hook, style: tone("muted", options.theme, options.capabilities) }])} `;
+  if (run.gutter.length === 0) return ""; // cells-ok — a column count
+  return run.gutter.map((column) => gutterCell(row === 0 ? column.first : column.rest, options)).join("");
 }
 
 /**

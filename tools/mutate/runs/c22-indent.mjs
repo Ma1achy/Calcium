@@ -42,8 +42,8 @@ const MUTATIONS = [
     // C22 T6.104 (I85) — the closing blank dropped from every non-card entry.
     name: "blank run dropped from a plain entry",
     file: LAYOUT,
-    from: "    return [Object.freeze({ blocks, width, indent: 0, blank: false }), gap];",
-    to: "    return [Object.freeze({ blocks, width, indent: 0, blank: false })];",
+    from: "    return [Object.freeze({ blocks, width, indent: 0, blank: false, gutter: NO_GUTTER }), gap];",
+    to: "    return [Object.freeze({ blocks, width, indent: 0, blank: false, gutter: NO_GUTTER })];",
     expect: "T1.45",
   },
   {
@@ -89,8 +89,8 @@ const results = await runPass({
   run,
   control: {
     file: LAYOUT,
-    from: "  const gap = Object.freeze({ blocks: [], width, indent: 0, blank: true });",
-    to: "  const gap = Object.freeze({ blocks: [], width, indent: 0, blank: true });\n  if (width >= 0) throw new Error(\"control\");",
+    from: "  const gap = Object.freeze({ blocks: [], width, indent: 0, blank: true, gutter: NO_GUTTER });",
+    to: "  const gap = Object.freeze({ blocks: [], width, indent: 0, blank: true, gutter: NO_GUTTER });\n  if (width >= 0) throw new Error(\"control\");",
     why:
       "no entry can lay out at all — if this survives, nothing in the set reaches " +
       "`entryLayout` and every kill below is unearned",

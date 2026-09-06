@@ -321,8 +321,9 @@ describe("C04 e2e — the drift tests", () => {
       // numbered, the stream's are `tail N`, so the two are told apart by what
       // is on the screen and not by a row count.
       expect(
-        // The older entry is a card (C23 I55), its rows four cells in under the hook (C22 I83, I84).
-        before.filter((r) => /^(  ⎿ |    )?\d{7}\b/.test(r)).length,
+        // The older entry is a card (C23 I55), its rows four cells in under the
+        // hook and then the bar (C22 I83, I84, I88).
+        before.filter((r) => /^(  ⎿ |  │ |    )?\d{7}\b/.test(r)).length,
         "detached inside the older entry",
       ).toBeGreaterThan(5);
       expect(before.join("\n"), "and not at the live stream").not.toContain("tail ");

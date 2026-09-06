@@ -434,7 +434,9 @@ describe("C22 integration — the frame's viewport", () => {
     // instead: it fails on an empty screen, which is its job, and it does not
     // fail on the next binding anybody adds — which the old form would have,
     // for whoever added it rather than for whoever wrote this.
-    const bindingRows = frame.filter((r) => /^\S+\s+\w+: \w+/u.test(r.trim())).length;
+    // The keymap is a card's body since C22 I88, so each row arrives under the
+    // hook or the bar; the gutter is stripped before the binding shape is read.
+    const bindingRows = frame.filter((r) => /^\S+\s+\w+: \w+/u.test(r.replace(/^\s*[⎿│]\s/u, "").trim())).length;
     expect(bindingRows, "the keymap document is on the frame").toBeGreaterThan(10);
 
     for (const shown of ["pageup", "pagedown", "c+home", "c+end"]) {
@@ -904,7 +906,7 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
     const at = rows.findIndex((r) => r.includes("⬤ wide · ok"));
     expect(at, "the card's header is on the screen").toBeGreaterThan(0);
     expect(rows[at + 1]?.startsWith(`  ⎿ ${"a".repeat(96)}`), "the body's first row: the hook at 2 and 96 cells").toBe(true);
-    expect(rows[at + 2]?.trimEnd(), "the wrapped cells, under four blanks").toBe("    aaa");
+    expect(rows[at + 2]?.trimEnd(), "the wrapped cells, under the bar (C22 I88)").toBe("  │ aaa");
     expect(rows[at + 3]?.trim(), "the entry's blank row (I85)").toBe("");
     expect(/^[─-]{20,}/u.test(rows[at + 4] ?? ""), "then the upper rule — nothing dropped between").toBe(true);
     expect(rows[at + 5]?.trimStart().startsWith("❯"), "and the prompt").toBe(true);
@@ -973,7 +975,7 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
     // I83) — required, not optional: a `visibleRows` that skipped the layout
     // survived this row while the hook was `(⎿ )?`.
     expect(/^\s*⎿ ┌/u.test(rows[at - 1] ?? ""), "the box opens above it, under the hook").toBe(true);
-    expect(rows[at + 1]?.trimStart().startsWith("└"), "and closes below it").toBe(true);
+    expect(/^\s*│ └/u.test(rows[at + 1] ?? ""), "and closes below it, under the bar (C22 I88)").toBe(true);
     // **The prompt directly below the closing border is the height assertion.**
     // Three rows measured, three drawn, and nothing between the box and what
     // follows it — a stronger claim than a blank row, which a box one row short

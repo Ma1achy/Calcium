@@ -1300,9 +1300,11 @@ export async function constructGraph(
     if (id === null) return [];
     const entry = stores.transcript.entries.find((e) => e.id === id);
     if (entry === undefined) return [];
-    // Through the entry's layout (C22 I83): a card's body elements sit two
-    // cells in, and their rows follow the header measured at the full width.
-    return elementsOfEntry(built.blocks, entry.doc.blocks, deps.frame.overlayRegion().width);
+    // Through the entry's layout (C22 I83): a card's body elements sit a gutter
+    // in, and their rows follow the header measured at the full width. The
+    // entry's recorded command rides along so a head's `copy` is the invocation
+    // (C22 I90).
+    return elementsOfEntry(built.blocks, entry.doc.blocks, deps.frame.overlayRegion().width, entry.doc.command);
   };
   /** The live entry's — what `↓` from the prompt enters (C16 I22). */
   const liveElements = (): readonly Readonly<{ blockId: string; element: NavElement }>[] =>

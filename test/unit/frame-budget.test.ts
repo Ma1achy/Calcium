@@ -25,7 +25,7 @@ import {
   type Ambient,
 } from "../../src/shell/config.js";
 import { clusterCells, foldHome, formatClock, makeDefaultChrome } from "../../src/shell/chrome.js";
-import { BODY_INDENT, ENTRY_GAP, HOOK_INDENT, elementsOfEntry, entryLayout, measureEntry, renderEntryPieces, windowEntry } from "../../src/shell/entry-layout.js";
+import { BODY_INDENT, ENTRY_GAP, GUTTER_UNIT, HOOK_INDENT, elementsOfEntry, entryLayout, measureEntry, renderEntryPieces, windowEntry } from "../../src/shell/entry-layout.js";
 import type { Chrome, SessionSnapshot, TuiConfig } from "../../src/shell/types.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
@@ -266,7 +266,8 @@ describe("C22 §6l — the frame's default look", () => {
     expect(card).toHaveLength(header.length + bodyAt36.length + ENTRY_GAP);
     expect(card.slice(0, header.length)).toEqual(header);
     expect(strip(card[header.length] ?? "")).toBe(`  ⎿ ${strip(bodyAt36[0] ?? "")}`);
-    expect(strip(card[header.length + 1] ?? "")).toBe(`    ${strip(bodyAt36[1] ?? "")}`);
+    // Rows after the first carry the bar (C22 I88) in the cells that were blank.
+    expect(strip(card[header.length + 1] ?? "")).toBe(`  │ ${strip(bodyAt36[1] ?? "")}`);
     const hookRow = card[header.length] ?? "";
     expect(hasSgr(hookRow.slice(0, hookRow.indexOf("⎿"))), "the hook is muted — an SGR opens before it").toBe(true);
     // Rendered lines are not squared off — `paint`'s `exact` does that — so the
@@ -365,7 +366,7 @@ describe("C22 §6l — the frame's default look", () => {
     const tail = renderEntryPieces(REGISTRY, windowEntry(entryLayout([step, body], 40), 1, measured, REGISTRY), options);
     expect(tail.rows).toHaveLength(measured - 1);
     expect(strip(tail.rows[0] ?? "").startsWith("  ⎿ ")).toBe(true);
-    expect(strip(tail.rows[1] ?? "").startsWith("    a")).toBe(true);
+    expect(strip(tail.rows[1] ?? "").startsWith("  │ a"), "the bar, since C22 I88").toBe(true);
   });
 
   it("T1.43 (C22 §6l.4 E): the default footer is one muted pills row — `/help`, the cwd with $HOME as `~`, and `stopping` when the session says so — and no key name", () => {
@@ -413,14 +414,107 @@ describe("C22 §6l — the frame's default look", () => {
   });
 });
 
-describe("C22 §6l.8 — the gutter carries the call, owed at the spec commit", () => {
-  it.todo(
-    "T1.48 (C22 I88, §6l.8 row 22): a card whose body wraps to three rows at 40 renders row 0 as the hook and rows 1–2 as the bar before the body's text, in unicode, ASCII and at WIDE_CAPS; measureEntry is unchanged; a one-row body draws no bar — not deferred on a component: bodyGutter's bar lands with C3 of the call grammar",
-  );
-  it.todo(
-    "T1.49 (C22 I89, §6l.8 rows 23–25): three step-headed group columns in a body render branch, branch, elbow at BODY_INDENT with a bar past the first child's body and none under the last; one child renders the hook alone; depth 3 is text; ASCII branches are +-; GUTTER_UNIT === BODY_INDENT — not deferred on a component: the recursion lands with C3 of the call grammar",
-  );
-  it.todo(
-    "T1.50 (C22 I90, §6l.8 row 26): elementsOfEntry with a command yields a head element whose copy is the command and body elements whose copy is each block's own; copyElement over the card yields the command first — not deferred on a component: the override lands with C3 of the call grammar",
-  );
+describe("C22 §6l.8 — the gutter carries the call", () => {
+  const WIDE_CAPS = { ...FULL_CAPS, ambiguousWidth: "wide" as const };
+  const head = (id: string, text: string): Block => block({ kind: "notice", id, tone: "info", glyph: "step", text });
+  const body = (id: string, text: string): Block => block({ kind: "notice", id, tone: "muted", text });
+  const card = (id: string, text: string, ...rest: Block[]): Block =>
+    block({ kind: "group", id: `g-${id}`, direction: "column", children: [head(id, text), ...rest] });
+  const draw = (blocks: readonly Block[], width: number, capabilities = FULL_CAPS): readonly string[] => {
+    const options = { theme: DARK_THEME, capabilities };
+    const layout = entryLayout(blocks, width);
+    const total = measureEntry(REGISTRY.measureSequence, blocks, width);
+    return renderEntryPieces(REGISTRY, windowEntry(layout, 0, total, REGISTRY), options).rows.map(strip);
+  };
+
+  it("T1.48 (C22 I88, §6l.8 row 22): a body that wraps to three rows draws the hook on row 0 and the bar on rows 1–2, at three arms; measure is unchanged; one row draws no bar", () => {
+    const long = body("b", "a body row long enough to wrap three times at the width the card leaves it");
+    const blocks = [head("h", "ps · ok"), long];
+    expect(REGISTRY.measureSequence([long], 40 - BODY_INDENT), "the fixture responds: three rows").toBe(3);
+    // The hook is Neutral and keeps its form at wide (C09 I5); the bar is box
+    // drawing and flattens there (F293) — two tiers, one column.
+    for (const [caps, hook, bar] of [[FULL_CAPS, "⎿", "│"], [ASCII_CAPS, "`", "|"], [WIDE_CAPS, "⎿", "|"]] as const) {
+      const rows = draw(blocks, 40, caps);
+      expect(rows[1]?.startsWith(`  ${hook} `), `row 0 under the hook (${caps.unicode}/${caps.ambiguousWidth})`).toBe(true);
+      expect(rows[2]?.startsWith(`  ${bar} `), "row 1 carries the bar").toBe(true);
+      expect(rows[3]?.startsWith(`  ${bar} `), "row 2 carries the bar").toBe(true);
+      expect(rows[4], "the closing blank carries nothing").toBe("");
+      for (const row of rows) expect(displayCells(row)).toBeLessThanOrEqual(40);
+    }
+    // **Measure is unchanged**: the bar fills cells C22 I84 reserved.
+    expect(measureEntry(REGISTRY.measureSequence, blocks, 40)).toBe(1 + 3 + ENTRY_GAP);
+    // A one-row body draws the hook and no bar.
+    const one = draw([head("h", "ps · ok"), body("b", "one row")], 40);
+    expect(one).toEqual(["⬤ ps · ok", "  ⎿ one row", ""]);
+  });
+
+  it("T1.49 (C22 I89, §6l.8 rows 23–25): three nested cards draw branch, branch, elbow; the bar runs past a child's body and stops under the last; one child keeps the hook; depth 3 is text; ASCII is +-", () => {
+    const three = [
+      head("p", "parent · 8s · 2 of 3"),
+      card("c1", "first · 2s · 41 matches", body("c1b", "first body")),
+      card("c2", "second · 1s · exit 0"),
+      card("c3", "third · 3s · exit 1", body("c3b", "third body")),
+    ];
+    expect(draw(three, 60)).toEqual([
+      "⬤ parent · 8s · 2 of 3",
+      "  ├─⬤ first · 2s · 41 matches",
+      "  │   ⎿ first body",
+      "  ├─⬤ second · 1s · exit 0",
+      "  └─⬤ third · 3s · exit 1",
+      "      ⎿ third body",
+      "",
+    ]);
+    // Every glyph one cell, so the frame's columns are the layout's: the child
+    // heads at GUTTER_UNIT, their bodies at two units.
+    for (const run of entryLayout(three, 60)) expect(run.indent).toBe(run.gutter.length * GUTTER_UNIT);
+    expect(GUTTER_UNIT).toBe(BODY_INDENT);
+    expect(draw(three, 60, ASCII_CAPS)).toEqual([
+      "* parent · 8s · 2 of 3",
+      "  +-* first · 2s · 41 matches",
+      "  |   ` first body",
+      "  +-* second · 1s · exit 0",
+      "  +-* third · 3s · exit 1",
+      "      ` third body",
+      "",
+    ]);
+    // One child: the hook alone, and its body one unit further in.
+    expect(draw([head("p", "parent"), card("c", "only child", body("cb", "its body"))], 60)).toEqual([
+      "⬤ parent",
+      "  ⎿ ⬤ only child",
+      "      ⎿ its body",
+      "",
+    ]);
+    // Depth 3 is body text: a `step` column inside a child's body lays out as
+    // the group it is — the head drawn by C09 inside the child's body, no
+    // third gutter column.
+    const deep = [head("p", "parent"), card("c", "child", card("gc", "grandchild", body("gcb", "deep body")))];
+    const rows = draw(deep, 60);
+    expect(rows[1]).toBe("  ⎿ ⬤ child");
+    expect(rows[2]?.startsWith("      ⎿ ⬤ grandchild"), "the grandchild's head is the child's body text").toBe(true);
+    expect(entryLayout(deep, 60).every((run) => run.gutter.length <= 2), "two gutter columns at most").toBe(true);
+    // Plain body before and after a nested card: the hook, then a **branch** —
+    // the elbow closes the body, not the child list (C22 I89), so a child followed
+    // by text takes `├─` and the bar runs past it.
+    const mixed = [head("p", "parent"), body("a", "before"), card("c", "child"), body("z", "after")];
+    expect(draw(mixed, 60)).toEqual(["⬤ parent", "  ⎿ before", "  ├─⬤ child", "  │ after", ""]);
+  });
+
+  it("T1.50 (C22 I90, §6l.8 row 26): with a command the head element copies the invocation and body elements copy their own text", () => {
+    const blocks = [head("h", "ps --all · 4s · 3 rows"), body("b", "the body row")];
+    const withCommand = elementsOfEntry(REGISTRY, blocks, 60, "/ps --all");
+    const headElement = withCommand.find((e) => e.blockId === "h");
+    expect(headElement?.element.copy, "the head copies what ran").toBe("/ps --all");
+    // A muted body notice declares no element (C09 I47's gate), so the body's
+    // copy is read through a block that does: an actionable notice.
+    const actionable = block({ kind: "notice", id: "b", tone: "muted", text: "the body row", action: { kind: "fill", label: "again", command: "/ps" } });
+    const both = elementsOfEntry(REGISTRY, [blocks[0]!, actionable], 60, "/ps --all");
+    expect(both.map((e) => e.element.copy)).toEqual(["/ps --all", "the body row"]);
+    // Without a command every copy is the block's own — the head's included.
+    expect(elementsOfEntry(REGISTRY, [blocks[0]!, actionable], 60).map((e) => e.element.copy)).toEqual([
+      "ps --all · 4s · 3 rows",
+      "the body row",
+    ]);
+    // `⌃a y`'s aggregator joins copies in element order, so the command is first.
+    expect(both.map((e) => e.element.copy).filter((c): c is string => c !== undefined).join("\n")).toBe("/ps --all\nthe body row");
+  });
 });

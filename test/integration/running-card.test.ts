@@ -382,7 +382,7 @@ describe("C23 I54 — the pending entry is the running card", () => {
     const rows = drawn.rows.map((l) => visible(l).trimEnd());
     expect(rows[0]?.startsWith("⬤ ps · ok"), "the header at column 0").toBe(true);
     expect(rows[1]?.startsWith("  ⎿ "), "the body's first row under the hook, the hook at column 2").toBe(true);
-    for (const row of rows.slice(2)) expect(row === "" || row.startsWith("    "), "every body row indented").toBe(true);
+    for (const row of rows.slice(2)) expect(row === "" || row.startsWith("  │ "), "every body row after the first under the bar (C22 I88)").toBe(true);
     // **The indent is the shell's, not the document's** (I56): the blocks carry
     // no gutter of their own, so a second composer does not indent twice.
     expect(blocks.slice(1).every((blk) => blk.kind !== "notice" || blk.glyph !== "continuation")).toBe(true);
