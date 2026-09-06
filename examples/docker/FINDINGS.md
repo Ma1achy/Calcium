@@ -30042,6 +30042,12 @@ rather than for a duration; and the modifier state should be read (`xdotool` has
 `xset q` or an XTEST release-all through `xdotool keyup` of both Shift keycodes by number, not
 by the `shift` keysym, which maps to one of them). `full` is red on PR 44 for this row alone.
 
+**Third run, next commit.** `45487fab` (run 34011181269, ramps, no change to the fixture or the
+test) ran `full` **green** — T5.7 passed. Two red, one green across three runs of an unchanged
+fixture is the figure that matters: the row is intermittent on the runner, it is not fixed, and a
+green `full` on a later push is not evidence the ordering is sound. Both counts stand together, per
+the load-guard rule in `CLAUDE.md` — the asymmetry keeps the ruling, not the odds.
+
 **Where**: `test/e2e/capabilities.test.ts` T5.7; `test/support/x-emulator.ts:127-135`; F812;
 runs 34007480654 and its rerun, 2026-09-06.
 
