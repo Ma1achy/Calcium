@@ -48,7 +48,7 @@ commit as `it.todo`.
 | M11 | there is no env switch and there must not be | SS10 bans `process.env` under `src/` with **zero** exceptions; SS33 bans `console.*` outright; `config.ts:99` and `data/transport/factory.ts:8` refuse `CALCIUM_*`/`PRISM_TUI_*` toggles by name | here; SS10, SS33 |
 | M12 | the replay precedent already exists | `src/data/fixtures/record.ts` records by **composing over** the transport rather than spawning for itself, and says why: *"recording cannot drift from replay: there is no second implementation of what a run looks like."* One of the four seams replay needs is already done, by the technique the other three want | here; C08's own rows |
 | M13 | what can be drawn | `PlotForm` (`data/viewmodel/types.ts:1185`) carries **48** members, including `bullet`, `forest`, `dumbbell`, `slope`, `funnel`, `autocorrelation`, `latency`, `utilisation`, `icicle`, `waterfall`, `horizon`, `ecdf`, `spectrogram`. `sparkline` and `valueBar` are exported functions (`plot/index.ts:22-23`) | here; the panes' own rows |
-| M14 | the capture directory needs no `.gitignore` change | `.calcium/` is already ignored (`.gitignore:12`) as the C22 §3 state directory | here; no row |
+| M14 | the capture directory needs no `.gitignore` change | `.calcium/` is ignored **twice**: `.gitignore:11` in this repository, and **C22 I67** — `stateDir` is created holding a `.gitignore` of `*`, so a consuming project's own rules cannot expose it. Re-read while writing the spec: the line is 11 and the section is I67, not `:12` and not §3 (§3 is Construction order) | here; no row |
 
 ### The Node surface the profiler sits on
 
@@ -184,10 +184,60 @@ Structural: cells where two rulings both hold with no event between them.
 
 ---
 
+## 5a · Three rulings taken while writing the spec
+
+**R14 · The recorder lives at `src/shell/profiling/`, not `src/profiling/`.** This note said the
+latter; the spec says the former. Under `src/shell/` it is L4 by construction, so **MG1 already
+forbids every layer below it from importing the profiler** — *nothing below L4 changes* stops being
+an intention and becomes an enforced rule, with no new rule and no new rank.
+
+A top-level directory is worse in all three of its forms, and **the unranked one is worst rather than
+neutral**: `layerOf` returns `null` for a path with no entry in `tools/enforce/layers.mjs` — the
+comment reads *outside the layer rule* — so `src/profiling/` with no entry is importable from every
+layer with nothing checking. Ranked at 0 it becomes a **third L0 half**, the structure CLAUDE.md names
+as most easily broken by accident. Ranked at 4 it is `src/shell/` with an extra step.
+
+The cost is one line of bookkeeping: `C28`'s `COMPONENT_SOURCES` entry names
+`src/shell/profiling/recorder.ts` and is added on the commit that makes that path real, **not before**
+— a mapped path that does not exist reads as *not implemented* forever and silently exempts every
+deferral pointing at it (TD3). Until then the spec-first rows carry the explicit no-blocker marker.
+
+**R15 · Seven of this note's twenty-one walk rulings had no invariant, and now do.** Resolving §3's
+D1–D10 and §4's S1–S11 against C28 §8 while writing the spec gives **twelve already carried, seven
+carried by nothing, one correctly deferred (S10) and one that is a defect in a test row rather than a
+missing invariant (D2)**. The seven are D1 (the view raises the tier; a pane with no data draws a
+notice), D3 (`byEntry` is a *work* histogram), D6 (the canary is a count with no attribution), S1 (a
+span crossing a resize), S3 (a suspended sample is a gap, not a zero), S4 (`handoff()` — `cpuUsage`
+excludes the child) and S11 (a live `fetch` rejecting mid-poll). They are C28 I23–I29.
+
+**This is *a ruling lands as a spec edit immediately* arriving one document early.** A walk's output
+is a set of rulings, and a ruling that leaves no invariant behind has evaporated — but it does not
+*read* as evaporated, because it is still written here. **The note is what made the misses invisible:
+all seven read as covered precisely because they were recorded somewhere.** Nothing about D3 or S4
+announces that no invariant carries it, and a reader checking this note against the plan would find
+both artefacts present and complete. What reaches it is resolving every row against the spec rather
+than asserting that the walk was carried — the same instrument as *ask where a settled claim is
+written down*, pointed at one's own artefact one step before the code.
+
+**D2 is the eighth, and it is a defect in a test row.** It rules `nothing-changed` deterministic
+*only over a replayed input*; the spec's draft T4.2 asserted it over a live session, which is the
+assertion D2 says cannot be made. The zero moved to T5.4, on the replay.
+
+**R16 · The instrument's own fixture runs on the real clock, and only it does.** Every other row uses
+the injected one because that is what makes a figure exact. These two give it up because exactness is
+what makes them vacuous: a span measured by a clock that was *told* to advance 5 ms reports 5 ms by
+construction, so the fake supplies the behaviour under test and the row passes with the timing
+removed. The bound that buys the assertion is a **400× separation** rather than a percentage — M15's
+50.8 ns per `performance.now()` puts an empty span near 100 ns against a 5 ms subject — so the rows
+assert *≥ 4 ms* and *≤ 10 µs* and print both. A row asserting *5 ms ± 10 %* would be the flakiness
+this repository has recorded four times, on a runner already measured at 2.7× this host (F809).
+
+---
+
 ## 6 · Build order — spec commits alone, each before its code
 
 `S1` findings F862–F864 · `S0` this note · `S2` `docs/components/C28_profiler.md` · `S3` the seams
-in A02, C22, C03, C14, C24 · `C1` `src/profiling/` · `C2` seams wired · **`C3` record and replay,
+in A02, C22, C03, C14, C24 · `C1` `src/shell/profiling/` (R14) · `C2` seams wired · **`C3` record and replay,
 before the panes, because a number that is not reproducible is not worth drawing and a dashboard
 built on irreproducible numbers teaches wrong conclusions with a picture's authority** · `C4`
 samplers, `alloc`, `deep`, SS-P · `C5` the headless face and `make profile` · `C6` Appendix B

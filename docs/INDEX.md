@@ -28,7 +28,8 @@
 | C24 | Public API | L4 | kit | [spec](components/C24_public_api.md) |
 | C25 | Patch renderer | L1 | kit | [spec](components/C25_patch_renderer.md) |
 | C26 | Navigation | L3 | kit | [spec](components/C26_navigation.md) — **design only, unbuilt** |
-| C27 | Terminal emulator | L0 data | kit | [spec](components/C27_terminal_emulator.md) — **spec'd, unbuilt** |
+| C27 | Terminal emulator | L0 data | kit | [spec](components/C27_terminal_emulator.md) — **built; integration rows owed** (60 live rows across six tiers; `test/integration/emulator.test.ts` is 0 of 8) |
+| C28 | Profiler | L4 | kit | [spec](components/C28_profiler.md) — **spec'd, unbuilt** |
 
 `kit + app` means the framework owns the mechanism and a consuming app supplies the
 content — the five extension hooks of A02 §6.
@@ -38,11 +39,11 @@ content — the five extension hooks of A02 §6.
 | Path | Components |
 |---|---|
 | `src/terminal/` | C01 C02 C03 |
-| `src/data/` | C04 C05 C06 C07 C08 C21 |
+| `src/data/` | C04 C05 C06 C07 C08 C21 · C27 (`emulator/`) |
 | `src/presentation/` | C09 C10 C11 C12 C25 |
 | `src/viewport/` | C13 C14 C15 |
 | `src/interaction/` | C16 C17 C18 C19 C20 · C26 (`navigation/`, unbuilt) |
-| `src/shell/` | C22 C23 |
+| `src/shell/` | C22 C23 · C28 (`profiling/`, unbuilt) |
 | `src/index.ts` | C24 |
 
 ## Generated references

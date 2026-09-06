@@ -435,7 +435,7 @@ implementation is the cheapest kind to fix.
 | `src/presentation/` | C09 blocks · C10 theme · C11 table · C12 plot · C25 patch |
 | `src/viewport/` | C13 transcript · C14 viewport · C15 overlays |
 | `src/interaction/` | C16 router · C17 editor · C18 parser · C19 completion · C20 history |
-| `src/shell/` | C22 composition · C23 execution |
+| `src/shell/` | C22 composition · C23 execution · C28 profiler |
 | `src/index.ts` | C24 public API |
 
 Full index at [`docs/INDEX.md`](docs/INDEX.md).
