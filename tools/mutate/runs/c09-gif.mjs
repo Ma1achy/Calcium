@@ -107,7 +107,7 @@ const results = runPass({
       // a correct still — the symptom C22 I77 names.
       name: "the renderer ignores the context's frame",
       file: IMAGE,
-      from: "    const px = pixelsOf(block, ctx.frames?.[block.id] ?? 0);",
+      from: "    const px = pixelsOf(block, ctx.frames?.[block.id] ?? 0, ctx.probe);",
       to: "    const px = pixelsOf(block, 0);",
       expect: "IF6",
     },

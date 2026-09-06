@@ -30,6 +30,7 @@ import { decodeImage } from "../presentation/image/index.js";
 import { imageCells } from "../presentation/blocks/kinds/image.js";
 import type { Block, Image } from "../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
+import type { Probe } from "../data/viewmodel/index.js";
 
 /**
  * Which digests this session has already sent.
@@ -78,6 +79,8 @@ export function transmitImage(
    * was one computation and one constant.
    */
   width: number,
+  /** C28's seam (I30) — `imageCells` decodes, and the decode map has no cap. */
+  probe?: Probe,
 ): string {
   if (capabilities.imageProtocol !== "kitty") return "";
   const found: Image[] = [];
@@ -105,7 +108,7 @@ export function transmitImage(
     // placeholders spanning 56 columns, and **nothing drawn**, which is the
     // failure this file's own header warns about arriving through the box
     // rather than through a missing transmission.
-    const box = imageCells(image, width);
+    const box = imageCells(image, width, probe);
     // **A PNG with no overlay is the bytes unchanged**, which needs no decoder
     // at all — the terminal's reads formats ours refuses (C09 §8b G7).
     const isPng = image.data.startsWith("iVBORw0KGgo");

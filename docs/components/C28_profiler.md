@@ -271,6 +271,7 @@ expensive failure available to this design.
 | a self-inflicted frame | excluded, **and the exclusion is displayed**, or a reader watching cost rise as they open the profiler concludes the framework is slow (I12) |
 | a container's cost | self time. `measureChild` recurses, so an inclusive figure counts every child twice (I7) |
 | the loop-delay p50 | **not a reading.** Its floor is the sampler's own resolution — idle reads 2.00 ms at `resolution: 1`, 13.00 at `10`, 21.00 at `20` (design M17). The `max` and the high percentiles are real, and the resolution travels with them (I13) |
+| `nothing-changed` | **not "no axis moved"** — that cannot happen: both caches return a hit when every axis matches, so the naive reading is a counter that can never fire. It is the recomputed value comparing equal to the discarded one, which costs one comparison on a miss and is the only form of the question the caches can answer (I8) |
 | the user-timing count | sampled at most once per sampler interval. Reading it costs 3 µs at 0 entries and **449 µs at 10 000** (design M19), so the canary gets more expensive exactly as its subject gets worse (I19) |
 | spans, below tier `spans` | **absent from the report, not zeroed** (I11). A zeroed histogram reads as measured-and-fast |
 
@@ -296,11 +297,11 @@ histograms describes neither, and the report states the point at which it was re
 - **I1** — At tier `off` the profiler allocates nothing, reads no clock, schedules nothing and registers no finaliser; every decorated seam costs one `undefined` check.
 - **I2** — C28 reads no clock and no process figure of its own: `elapsed` and the `ResourceProbe` are injected, and the probe is a `Disposable` rather than a bare function because `monitorEventLoopDelay` is stateful and must be started to mean anything.
 - **I3** — Spans are `elapsed()` deltas. Nothing under `src/` calls `performance.mark` or `performance.measure` — F853 measured that Node's user-timing buffer never releases entries, so a profiler built on the User Timing API becomes the defect it exists to find.
-- **I4** — `work`, `wait` and `total` are three members, and no report, pane, table or export sums them into one.
+- **I4** — `work` and `wait` are two independent members and **no third member holds their sum**. Not "three numbers, never summed": a `total` on the record *was* the sum, published on the type, and a reader who sees three numbers where two are independent quotes the third. A frame that waited 100 ms in the coalescing window and rendered in 3 ms has a scheduling problem, and one 103 ms figure hides which. No report, pane, table or export produces one either.
 - **I5** — `wait` is measured from the **earliest commit still unserved** when the frame starts, not from the last, because that is the one the reader has been waiting on.
 - **I6** — A frame whose composition returned `fallback` is counted, carries `outcome: "fallback"`, and is excluded from every duration histogram.
 - **I7** — Attribution is self time: a container's recorded cost excludes its children's, and inclusive cost is derived from the tree.
-- **I8** — A miss carries exactly one `MissReason`; `nothing-changed` is a distinct member and its count is reported separately from every other reason.
+- **I8** — A miss carries exactly one `MissReason`, and the reason is the **first** axis the cache's own comparison rejected, in the order it compares them. `nothing-changed` is not one of those axes: it means **the value recomputed after the miss equalled the value the miss discarded**, and it is reported separately from every axis reason.
 - **I9** — The ring is bounded, and `dropped` counts every record the bound discarded, per kind.
 - **I10** — Every `Histogram` carries the relative error of its bucketing, and the report's `regime` repeats it; a percentile taken over a ring with `dropped.frames > 0` is labelled as over-the-window rather than over the session.
 - **I11** — Below tier `spans` the report **omits** `spans` and `latency` rather than emitting zeroed histograms.
@@ -322,6 +323,11 @@ histograms describes neither, and the report states the point at which it was re
 - **I27** — A sample taken while the session is suspended carries `suspended: true`, and no consumer reads a suspended sample as an idle figure or draws it as a zero.
 - **I28** — No CPU figure is reported across a `handoff()` interval: `process.cpuUsage()` excludes the child, so an idle reading there is false rather than merely imprecise.
 - **I29** — A live part's `fetch` rejecting mid-poll closes its span with the rejection as its outcome; the profiler records the rejection and does not participate in the backoff C24 §5 owns.
+- **I30** — **The instrumentation interface is declared at L0 and implemented only at L4.** `Probe` lives in `src/data/viewmodel/probe.ts` beside `Measure`, carries no clock and no implementation, and is the only thing a component below `src/shell/` ever names. No file under `src/terminal/`, `src/data/`, `src/presentation/`, `src/viewport/` or `src/interaction/` imports `src/shell/profiling/`, and MG1 is what makes that checkable rather than intended.
+- **I31** — **An element's cost is measured per element, never divided out of a total.** Attribution comes from a span entered once per block through the registry seam. A figure obtained by apportioning a sequence's duration across the blocks in it is not an attribution: a `plot` measures 260× a `rule`, so an equal share reports how many blocks of each kind were on screen while reading as what they cost. `calls` is kept beside `frames` so a node recomputed *within* one frame is distinguishable from one measured once per frame.
+- **I32** — **A span tree is built for every frame and retained only for the frames kept as worst.** The tree is the allocation the spans already made; retention is what is unbounded, and which frames are worst is not knowable until the session ends — so the decision is made at report time and the record for an ordinary frame carries no `tree` member at all rather than an empty one.
+- **I33** — **A span survives an `await`, and the store that makes that true is constructed lazily.** Closing is per node against its own parent, so an out-of-order close is correct rather than discarded — the previous shape held one pointer and dropped any close that did not match it, which is precisely what interleaving produces, so every async span it could have recorded reported nothing and reported it silently. The `AsyncLocalStorage` is built on the first transition to a tier that records durations and never at import: measured on Node v22.23.2, an `await` costs 38 ns with none constructed and **59 ns with one constructed and never used**, so an eager store taxes every promise in every application by about 55 % to profile one of them.
+- **I34** — **The report prices the instrument.** `overhead` carries the spans opened, this machine's measured `elapsed()` cost, the product as an estimate labelled one, and whether the async store is built. An instrument that does not report its own cost invites a reader to assume zero, and an instrument reporting its own cost *as its subject's* is the failure class this component exists to end.
 
 ---
 
@@ -333,12 +339,16 @@ histograms describes neither, and the report states the point at which it was re
 4. **Wait is not work.** Three numbers, never summed, and the wait is dated from the earliest commit still unserved. (I4, I5)
 5. **What is excluded is said.** A fallback frame and a self-inflicted frame are both counted and both kept out of the durations, and both counts are in the report. (I6, I12)
 6. **A cost belongs to one owner.** Self time at every level, so a recursive measurement is not counted twice. (I7)
-7. **A miss says why.** One reason per miss, and *nothing changed* is its own member — the counter that would have found F227 in a day. (I8)
+7. **A miss says why, and *nothing changed* is measured rather than inferred.** One axis reason per miss, taken from the comparison the cache already performs; and separately, whether the recomputed value equalled the discarded one — which is wasted work reporting itself. (I8)
 8. **A figure carries what it cannot say.** Its error bound, its sampling resolution, what the bound dropped, and absence rather than a zero. (I9, I10, I11, I13, I18)
 9. **A replay is byte-identical, or the framework has a defect.** And a truncated recording is reported as truncated rather than as a divergence. (I14, I15)
 10. **A capture is bounded and disposal is final.** (I16, I17, I20, I22)
 11. **A number is refused rather than guessed.** Where the reading would be false — a suspended sample, a handoff interval, a pane with nothing behind it — the profiler reports the gap instead, because a plausible zero is worse than an absence. (I23, I27, I28)
 12. **A figure is labelled with what it is *of*.** Work rather than latency, a count rather than an attribution, the width a span opened at, and a rejection rather than a duration. (I24, I25, I26, I29)
+13. **A component reports on itself and imports nothing to do it.** The interface is at the bottom of the tree and the implementation at the top, so a plot can name its own phases without an edge to L4. (I30)
+14. **An element's cost is measured, never apportioned.** Per block, at every depth, with the call count beside the duration so thrash and expense are different readings. (I31, I32)
+15. **A span survives an `await`, or the tier that would record it is not on.** Correct across interleaving, and the machinery that costs every promise is built only when something is actually being recorded. (I33)
+16. **The instrument prices itself.** (I34)
 
 ---
 
@@ -429,6 +439,16 @@ machine noise closes, on a runner measured at 2.7× this host's timings (F809). 
 - **T1.14** (I22): `dispose`, then `span`, `count`, `mark`, `report` → no-ops; `dispose` again → no-op; `capture` → throws naming `dispose`.
 - **T1.15** (I17): a capture exceeding the cap → the written file stops at the cap and `dropped.captureBytes` reports the excess, asserted separately — a total is satisfied by redistribution.
 - **T1.16** (I23): `setTier("spans")` from `counters`, then the view closes → the tier is `counters` again, not `off`; and a report with an empty ring renders a notice rather than a plot with no series.
+- **T1.30** (I30): `NO_PROBE` answers every member of `Probe`, is frozen, returns the shared `NO_SPAN`, and records nothing — the seam a component below `src/shell/` actually holds, so a missing member is a renderer throwing rather than degrading.
+- **T1.31** (I30): a span taken through `asProbe()` reaches the same recorder as one taken on the profiler — a narrowing view, not a second implementation, because two implementations of a span are two things obliged to agree and the disagreement is silent.
+- **T1.32** (I31, **the fabrication control**, real clock): one 200-point plot and fifty rules → the plot's self time is several times a *mean rule's*. Equal division across the sequence gives every block the same figure, so the ratio it produces is exactly 1. Against the *sum* of fifty rules the claim is false and is not made: fifty rules cost more than one plot, which is arithmetic rather than attribution.
+- **T1.33** (I31): one document measured three times inside one frame → `frames` is 1 and `calls` is at least 3, so `calls / frames` is above 1. A node measured four times cheaply and one measured once expensively carry the same self time, and only this column separates them.
+- **T1.34** (I31): a parent span of 11 ms containing a child of 8 → the parent's `self` is 3 and its `total` is 11, both published. An inclusive parent makes the outermost node the widest bar in every tree ever drawn.
+- **T1.35** (I32): two frames at `worst: 1` → the kept record has a `tree` and the other has **no `tree` member at all**. Absence reads as *not retained*; an empty tree reads as *this frame was not nested*, which is a measurement that was never taken.
+- **T1.36** (I32): three nested spans inside one frame → the retained tree's root is `frame`, the nesting is `frame → compose → measure → elements`, and `Σ self` over it equals the frame's work with nothing double-counted.
+- **T1.37** (I33): two `trace` calls interleaved across an `await` → both report their own duration and the two are distinguishable. This is the case the single-pointer shape recorded as nothing, with no error.
+- **T1.38** (I33): `off` and `counters` → `overhead.asyncEnabled` is false; `spans` → true before any `trace` runs. The tier is the line, not the first trace: deferring construction to the first call would put the cost of every `await` in the process starting inside whichever call happened to be first.
+- **T1.39** (I34): five spans → `overhead` carries the count, this machine's measured `elapsed()` cost, and the product as an estimate labelled one. `clockNs` is measured against the *injected* clock, so the row asserts it was taken rather than what it came to — asserting a duration here asserts the host.
 - **T1.17** (I24): a frame with `work: 3`, `wait: 97` attributed to entry `e1` → `byEntry.e1.sum` is 3. The 97 appears in no entry and in no kind.
 
 ### Tier 2 — contract

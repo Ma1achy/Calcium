@@ -6,7 +6,7 @@
  * renderer (C09 §1).
  */
 import type { ReactElement } from "react";
-import type { Action, Block, Camera, Measure, MeasureFn, WidthFn } from "../../data/viewmodel/index.js";
+import type { Action, Block, Camera, Measure, MeasureFn, Probe, WidthFn } from "../../data/viewmodel/index.js";
 import type { ResolvedTheme } from "../theme/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 
@@ -109,6 +109,20 @@ export type RenderContext = Readonly<{
   width: number;
   theme: ResolvedTheme;
   capabilities: TerminalCapabilities;
+  /**
+   * Where a renderer reports what it spent time on (C28 I30).
+   *
+   * Absent is the overwhelming case and means *nobody is recording* — a call
+   * site writes `ctx.probe?.span(...)` and pays one check. The type comes from
+   * L0 beside `Measure`, so naming it adds no import edge and C09 still knows
+   * nothing about C28.
+   *
+   * **The wrapper around the registry cannot replace this.** Decoration from L4
+   * sees a block enter and leave; it cannot see that two thirds of a plot's
+   * time went to rasterising and none to its axes. That distinction is only
+   * available inside the renderer, and this is how the renderer says it.
+   */
+  probe?: Probe;
   /**
    * Scroll offsets by block id, in **rows** (C04 I48).
    *

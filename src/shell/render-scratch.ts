@@ -30,11 +30,26 @@
  * `blocks/` into `plot/` where the reverse already exists.
  */
 import type { RenderScratch } from "../presentation/blocks/types.js";
+import { NO_PROBE } from "../data/viewmodel/index.js";
+import type { Probe } from "../data/viewmodel/index.js";
 
 type Slot = Readonly<{ key: string; value: unknown }>;
 
 export class RenderScratchStore implements RenderScratch {
   readonly #slots = new WeakMap<object, Slot>();
+  readonly #probe: Probe;
+
+  /**
+   * C28's seam, or none (C28 I30).
+   *
+   * **Constructor-injected here where the registry's is mutable**, because this
+   * store is built at `construct.ts` step 5 with everything else the session
+   * owns, and nothing has to exist before it. The registry's slot is late only
+   * because the profiler is installed after the seal.
+   */
+  constructor(probe: Probe = NO_PROBE) {
+    this.#probe = probe;
+  }
 
   /**
    * What is held for `owner`, or `undefined` if the slot is empty or holds
@@ -46,7 +61,31 @@ export class RenderScratchStore implements RenderScratch {
    */
   get(owner: object, key: string): unknown {
     const slot = this.#slots.get(owner);
-    return slot === undefined || slot.key !== key ? undefined : slot.value;
+    if (slot === undefined) {
+      // **`absent` and `evicted` are the same observation from here.** The
+      // `WeakMap` drops a slot when the document holding the carrier is
+      // collected, and a reader cannot distinguish that from a first look — so
+      // this reports the one it can defend. A separate `evicted` count would be
+      // a guess with a name.
+      this.#probe.miss("scratch", "absent");
+      return undefined;
+    }
+    if (slot.key !== key) {
+      // **`rev`, because that is what the key is.** It is a validity token that
+      // moved, which is the same thing `RenderCache` and `HeightCache` call
+      // `rev`; reporting the *diagnosis* instead would make one cache's
+      // vocabulary different from the other two.
+      //
+      // The diagnosis is worth stating and is not the reason: on an orbit the
+      // key moves because the camera did and the rebuild is owed, while on a
+      // still frame it means a key recomputed rather than held — and the 194 ms
+      // this file exists to avoid comes straight back. The counter cannot tell
+      // those apart; the counter beside a still frame can.
+      this.#probe.miss("scratch", "rev");
+      return undefined;
+    }
+    this.#probe.hit("scratch");
+    return slot.value;
   }
 
   set(owner: object, key: string, value: unknown): void {

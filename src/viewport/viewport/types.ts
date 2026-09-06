@@ -9,7 +9,8 @@
  * commits, which is the same orchestration pattern C01 and C10 follow.
  */
 
-import type { Block, EntryId, TranscriptEntry } from "./deps.js";
+import type { Block, EntryId, Probe, TranscriptEntry } from "./deps.js";
+import type { HeightMisses } from "./cache.js";
 
 export type ScrollState = Readonly<{
   topRow: number;
@@ -78,6 +79,18 @@ export type ViewportOptions = Readonly<{
    * chrome says.
    */
   chromeRows?: (entry: TranscriptEntry, width: number) => number;
+  /**
+   * C28's instrumentation seam, or absent (C28 I30).
+   *
+   * **The L0 type, so C14 still imports nothing from `src/shell/`.** SS4 bans a
+   * clock here with no exceptions and this does not give C14 one: it names
+   * regions and counts events, and only L4 knows when any of it happened.
+   *
+   * What it is here for is the height cache. Its three-axis predicate is the
+   * one place C14 can be wrong about work rather than about arithmetic, and a
+   * `width` miss with no resize means the whole index rebuilt for nothing.
+   */
+  probe?: Probe;
 }>;
 
 export interface Viewport {
@@ -116,6 +129,20 @@ export interface Viewport {
   subscribe(cb: (change: ViewportChange) => void): Disposable;
   dispose(): void;
 
-  /** Cache and index sizes, for the post-conditions I3 and I9 state. */
-  readonly stats: Readonly<{ cacheSize: number; indexCapacity: number; entryCount: number }>;
+  /**
+   * Cache and index sizes for the post-conditions I3 and I9 state, **and the
+   * cache's hit rate by reason** (I27).
+   *
+   * A size says how much is held; only a rate says whether holding it was worth
+   * anything, and only the reason says whether a miss was legitimate. The three
+   * travel together because the size alone has been the whole diagnostic and it
+   * cannot distinguish a cache working from one thrashing (F863).
+   */
+  readonly stats: Readonly<{
+    cacheSize: number;
+    indexCapacity: number;
+    entryCount: number;
+    hits: number;
+    misses: HeightMisses;
+  }>;
 }

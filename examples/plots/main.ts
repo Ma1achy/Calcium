@@ -25,8 +25,8 @@
  * suite tested the pieces instead, and passed for a session while `/all` and
  * `/form` drew nothing.
  */
-import { createTui, defaultTheme } from "@fmx/calcium";
-import type { Adapter, Block, LocalHandler } from "@fmx/calcium";
+import { b, createTui, defaultTheme, PANES, profilePane } from "@fmx/calcium";
+import type { Adapter, Block, LocalHandler, PaneName } from "@fmx/calcium";
 import {
   adaptSample, barStyles, compare, everyForm, faults, formFull, formIn, greetingDocument, images, liveFor,
   monitor, mosaics, rungs, spinners, unknown,
@@ -62,6 +62,11 @@ const tui = createTui({
   // at the height the block committed, which is the only way to see the ladder
   // above two rows.
   blocks: [faultyDefinition],
+  // **C28, on and at the tier that records durations.** A demo is exactly the
+  // case the profiler was built for: every figure `/profile` draws below is
+  // measured off this session's own frames, so the numbers move when the
+  // terminal is resized, a plot is scrolled, or `/all` draws thirty-six forms.
+  profile: { tier: "spans", sampleMs: 500 },
   // **Each handler names `LocalHandler`**, which is C24 §8b's finding applied
   // rather than restated: a handler written with inferred parameters is legal
   // TypeScript that compiles, registers, runs, and can never see a field the
@@ -91,6 +96,30 @@ const tui = createTui({
     faults: ((_argv, ctx) => doc(ctx.command, [faults()])) satisfies LocalHandler,
 
     monitor: ((_argv, ctx) => doc(ctx.command, [monitor()])) satisfies LocalHandler,
+
+    /**
+     * **The framework profiling itself, drawn with the framework's own plots.**
+     *
+     * `ctx.profile` is `undefined` unless `TuiConfig.profile` was set, so the
+     * absent arm is real rather than defensive — and it is what every app that
+     * does not ask for a profiler sees.
+     */
+    profile: ((argv, ctx) => {
+      const report = ctx.profile?.();
+      if (report === undefined) {
+        return doc(ctx.command, [
+          b.notice("warn", "no profiler on this session — set `profile` in the config", undefined, {
+            id: "prof-off",
+          }),
+        ]);
+      }
+      const asked = (argv[0] ?? "overview") as PaneName;
+      const pane: PaneName = PANES.includes(asked) ? asked : "overview";
+      return doc(ctx.command, [
+        b.notice("info", `pane \`${pane}\` · ${PANES.join(" · ")}`, undefined, { id: "prof-nav" }),
+        ...profilePane(report, pane, ctx.capabilities),
+      ]);
+    }) satisfies LocalHandler,
 
     rungs: ((_argv, ctx) => doc(ctx.command, [rungs()])) satisfies LocalHandler,
 

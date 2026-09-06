@@ -162,6 +162,15 @@ export function validateConfig(config: TuiConfig): void {
 export type Ambient = Readonly<{
   /** `Date.now`, from the one file SS1 allows to name it. */
   clock: () => number;
+  /**
+   * A monotonic, sub-millisecond clock — `performance.now`, from the same file.
+   *
+   * **A second clock rather than a widening of the first** (C22 §2c). `clock`
+   * is wall-clock, is drawn as a time of day by the default chrome, and has
+   * millisecond resolution: it cannot measure a 0.3 ms paint. Read only when a
+   * profiler exists, which at tier `off` is never (C22 I92).
+   */
+  elapsed: () => number;
   /** `process.cwd()`, for the same reason: one file performs the read. */
   cwd: string;
   /** The real filesystem — `node:fs` at the boundary, which is C22 (A04 §2). */
@@ -214,6 +223,10 @@ export function resolveConfig(config: TuiConfig, ambient: Ambient) {
 
     // Absent, nothing is retained. Present without a count, 50 (§2).
     retainPayloads: config.debug === undefined ? 0 : (retain ?? DEFAULT_RETAIN_PAYLOADS),
+    // C28, unresolved on purpose: every member has a default and the recorder
+    // is where they are applied, so the root does not hold a second copy.
+    profile: config.profile,
+    elapsed: ambient.elapsed,
 
     env: config.env ?? {},
     // **Undefined, not `{}`** (C22 I49). C02 distinguishes an absent overrides

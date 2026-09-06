@@ -347,6 +347,14 @@ export type { ArtSpec, ArtTier } from "./presentation/art.js";
  * `RenderContext` and could not be spelled.
  */
 export type { TerminalCapabilities } from "./terminal/capabilities.js";
+/**
+ * The two capability fields a glyph resolution reads (C24 I29, MG29).
+ *
+ * Published because `profilePane` takes one, and a consumer with no name for a
+ * parameter's type cannot supply it. A whole `TerminalCapabilities` satisfies
+ * it, which is what every caller inside the framework hands over.
+ */
+export type { GlyphCaps } from "./presentation/blocks/index.js";
 
 /**
  * **Which glyph rung an image will take on this terminal** (C09 I37, §8b).
@@ -448,3 +456,28 @@ export type { WorldDriver } from "./data/fixtures/index.js";
 export { cells, truncate } from "./presentation/text.js";
 export type { AmbiguousWidth } from "./presentation/text.js";
 export { planColumns } from "./presentation/table/index.js";
+
+// --- C28, the profiler ------------------------------------------------------
+
+/**
+ * **The report types and the panes, and nothing that runs a profiler** (C24
+ * I31). A recorder is reached through `createTui`'s `profile` field and only
+ * there; what is published here is what a surface needs to *read* a report and
+ * draw it. An entry point shipping behaviour the runtime surface cannot reach
+ * would be a second way in.
+ *
+ * `profilePane` is a pure function from a report to blocks, which is why it is
+ * safe to publish: it composes the same builders an application already has.
+ */
+export { profilePane, paneTitle, PANES } from "./shell/profiling/panes.js";
+export type { PaneName } from "./shell/profiling/panes.js";
+export type {
+  FrameRecord,
+  Histogram as ProfileHistogram,
+  MissReason,
+  ProfileOptions,
+  ProfileReport,
+  ResourceSample,
+  SpanName,
+  Tier,
+} from "./shell/profiling/types.js";

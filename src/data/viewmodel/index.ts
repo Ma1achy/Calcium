@@ -142,3 +142,12 @@ export { overlayFault, overlayRange, DEFAULT_OVERLAY_COLORMAP } from "./overlay.
 export { pinnedRange, sharedRange, type PinnedRange, type RangePin } from "./range.js";
 
 export { digestOf } from "./digest.js";
+
+/**
+ * C28's instrumentation seam (I34).
+ *
+ * Exported from L0 so every layer can name `Probe` without importing a
+ * profiler, which is the whole point of declaring it here rather than in
+ * `src/shell/profiling/`.
+ */
+export { NO_PROBE, NO_SPAN, type MissReason, type Probe } from "./probe.js";

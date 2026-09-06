@@ -34,7 +34,7 @@ import typescript from "highlight.js/lib/languages/typescript";
 import xml from "highlight.js/lib/languages/xml";
 import yaml from "highlight.js/lib/languages/yaml";
 import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
-import type { Code } from "../../../data/viewmodel/index.js";
+import type { Code, Probe } from "../../../data/viewmodel/index.js";
 import { cells, expandTabs, hardWrapCells, stripControl, truncateParts } from "../../text.js";
 import { sliceRuns } from "../../runs.js";
 import { paint, rows, slot, tone, type Span } from "../paint.js";
@@ -153,7 +153,7 @@ const memo = new Map<string, readonly Token[]>();
 /** Bounded, so a long session cannot grow the cache without limit. */
 const MEMO_CAP = 256;
 
-export function tokenise(text: string, language: string): readonly Token[] {
+export function tokenise(text: string, language: string, probe?: Probe): readonly Token[] {
   // `\u0000` explicitly, and it is the right separator rather than an accident:
   // a NUL cannot occur in a language name, so no pair of (language, text) can
   // collide with another by straddling it. Written as an escape because it was a
@@ -161,14 +161,30 @@ export function tokenise(text: string, language: string): readonly Token[] {
   // diff.
   const key = `${language}\u0000${text}`;
   const held = memo.get(key);
-  if (held !== undefined) return held;
+  if (held !== undefined) {
+    probe?.hit("tokens");
+    return held;
+  }
+  // `absent` is the only reason this memo has: the key is the whole input, so a
+  // slot either exists or the text has never been seen. There is no axis to
+  // disagree on, and that is a property of the key rather than an omission.
+  probe?.miss("tokens", "absent");
 
   const tokens = lowlight.registered(language)
     ? flatten(lowlight.highlight(language, text) as HastNode, null)
     : [{ text, slot: null }];
 
-  if (memo.size >= MEMO_CAP) memo.clear();
+  if (memo.size >= MEMO_CAP) {
+    // **A cliff, not an eviction** — the cap clears all 256 at once, so the
+    // frame after it re-highlights every code block on screen. The counter is
+    // what makes that visible: one clear in a session is the cache working, one
+    // per frame is a working set larger than the cap and a periodic stall no
+    // duration alone would explain.
+    probe?.count("tokens.memo.cleared");
+    memo.clear();
+  }
   memo.set(key, tokens);
+  probe?.gauge("tokens.memo.size", memo.size);
   return tokens;
 }
 
@@ -373,7 +389,7 @@ export const codeDefinition: BlockDefinition<Code> = {
   render(block: Code, ctx: RenderContext): ReactElement {
     const width = normaliseWidth(ctx.width);
     const source = expandTabs(stripControl(block.text));
-    const perLine = tokenLines(tokenise(source, block.language));
+    const perLine = tokenLines(tokenise(source, block.language, ctx.probe));
     const defaultStyle = tone("default", ctx.theme, ctx.capabilities);
 
     return rows(

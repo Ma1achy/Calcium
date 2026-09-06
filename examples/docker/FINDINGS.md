@@ -30915,12 +30915,28 @@ diagnostic surface that **is** drained is `BlockFaultLog`, through `graph.diagno
 `size` getter and no hit or miss counter. A size says how much is held; **a hit rate is the only
 number that says whether holding it was worth anything**, and neither cache can answer it.
 
-**A count would not be enough either, which is the sharper half.** The cache failure this tree has
-actually had is F227's — a key axis that moves when nothing changed — and a miss produced that way is
-**indistinguishable by count** from a legitimate miss after an edit. What separates them is the
-*reason*: `RenderCache`'s key already carries `id, rev, width, focus, theme` plus range and offsets,
-so it can say which axis moved, and a miss where **none** moved is a defect reporting itself. The
-counter that would have found F227 in a day is one comparison the cache is already positioned to make.
+**A count would not be enough either, which is the sharper half.** `RenderCache.get` compares five
+axes in order — `absent`, then `rev`/`width`, then `focus`/`theme` — and `HeightCache.get` compares
+three. Every one of those comparisons already happens; **which of them rejected** is the reason, and
+it is free. A count says the cache misses; the reason says whether it misses for a cause anyone
+intended.
+
+**Corrected on 2026-09-06, while writing C28 §4 against the code.** This paragraph first read *the
+cache failure this tree has actually had is F227's — a key axis that moves when nothing changed*, and
+**F227 is the opposite of that in both halves.** Its mechanism is an axis that **never** moves:
+`commit("spinner")` appears in six test files and in no `src/` file, so `tick` holds at 0 and a
+`steps` block renders `⠋` ten times where a direct harness renders ten distinct frames. In cache
+terms that is a **stale hit**, not a spurious miss — the wrong direction entirely, and a miss-reason
+counter is not what finds it. What would have found F227 is a miss count reading **zero** on an entry
+that is supposed to animate.
+
+**And the repair the wrong premise implied is vacuous.** *A miss where **none** of the axes moved is
+a defect reporting itself* cannot fire: both caches return a hit when every axis matches, so
+"no axis moved" is not a reachable state and the counter would have been A03 §2's own class installed
+in the instrument written to catch a defect. The form that does fire is **the recomputed value
+comparing equal to the discarded one** — wasted work, measured rather than inferred, one comparison on
+a miss. That is C28 I8, and the distinction is why it is worded as a value comparison and not as an
+axis.
 
 **This is F395's shape one level out.** F395 found three numbers the framework does not have. This
 finds ten it has and nobody reads — and the two together are why the profiler's snapshot must

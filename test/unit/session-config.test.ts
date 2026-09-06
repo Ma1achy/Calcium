@@ -33,6 +33,7 @@ const minimal = (): TuiConfig => ({
 /** The five ambient values, faked. `session.ts` supplies the real ones. */
 const AMBIENT = Object.freeze({
   clock: (): number => 1_700_000_000_000,
+  elapsed: () => 0,   // profiling is off in this fixture; never read
   cwd: "/ambient",
   fs: {} as unknown as FileSystem,
   schedule: (): Disposable => ({ [Symbol.dispose]: () => undefined }),

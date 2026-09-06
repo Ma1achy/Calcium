@@ -19,6 +19,7 @@ export const manifest = {
     { name: "compare", local: true, summary: "Terminal beside SVG, as pixels", args: [{ name: "form", type: "string", required: false, summary: "which form" }], flags: [] },
     { name: "faults", local: true, summary: "A failing source, and the way back", args: [], flags: [] },
     { name: "monitor", local: true, summary: "This machine, live", args: [], flags: [] },
+    { name: "profile", local: true, summary: "This framework, measured — C28's own report", args: [{ name: "pane", type: "string", required: false, summary: "overview · frame · distribution · memory" }], flags: [] },
     { name: "rungs", local: true, summary: "The failure box at every height and width rung", args: [], flags: [] },
     { name: "mosaic", local: true, summary: "Layouts named as a picture", args: [], flags: [] },
     { name: "image", local: true, summary: "Eight fixtures — five about placement, three about the decoder", args: [], flags: [] },

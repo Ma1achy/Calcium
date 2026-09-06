@@ -22,7 +22,7 @@ import { imageId, imageKey, placementRows } from "../../image/kitty.js";
 import { overlayColour, overlayField } from "../../image/overlay.js";
 import { paint, type Span } from "../paint.js";
 import { statusDefinition } from "./status.js";
-import type { Image, Status } from "../../../data/viewmodel/index.js";
+import type { Image, MeasureFn, Probe, Status } from "../../../data/viewmodel/index.js";
 import { truncate } from "../../text.js";
 import type { BlockDefinition, RenderContext } from "../types.js";
 
@@ -44,9 +44,13 @@ const DECODED = new Map<string, Decoded>();
  * the reader as the same `alt`. The reason is computed for every refusal; it
  * cost nothing to keep and a reader could never see one.
  */
-function decodedOf(block: Image): Decoded {
+function decodedOf(block: Image, probe?: Probe): Decoded {
   const held = DECODED.get(block.digest);
-  if (held !== undefined) return held;
+  if (held !== undefined) {
+    probe?.hit("decode");
+    return held;
+  }
+  probe?.miss("decode", "absent");
   let decoded: Decoded;
   try {
     decoded = decodeImage(Uint8Array.from(Buffer.from(block.data, "base64")));
@@ -56,6 +60,12 @@ function decodedOf(block: Image): Decoded {
     decoded = { ok: false, fault: "the block's data is not base64" };
   }
   DECODED.set(block.digest, decoded);
+  // **This map has no cap** — see the header above. The gauge is the whole
+  // finding: every distinct digest a session ever renders stays decoded for the
+  // life of the process, so a `--watch` on a directory of images grows it
+  // without bound and nothing else in the tree would say so. A hit rate cannot
+  // show it; occupancy can.
+  probe?.gauge("decode.entries", DECODED.size);
   return decoded;
 }
 
@@ -68,8 +78,8 @@ function decodedOf(block: Image): Decoded {
  * than refusing — the store keeps the index inside the count, and a block whose
  * bytes changed under a held index has a new digest and a new slot.
  */
-function pixelsOf(block: Image, frame = 0): Pixels | null {
-  const decoded = decodedOf(block);
+function pixelsOf(block: Image, frame = 0, probe?: Probe): Pixels | null {
+  const decoded = decodedOf(block, probe);
   if (!decoded.ok) return null;
   if (decoded.animation === undefined || frame === 0) return decoded.pixels;
   const frames = decoded.animation.frames;
@@ -84,8 +94,8 @@ function pixelsOf(block: Image, frame = 0): Pixels | null {
  * what delays — the block knows, the store does not, and the decoder is
  * already memoised on the digest so the question costs a map lookup.
  */
-export function framesOf(block: Image): Animation | null {
-  const decoded = decodedOf(block);
+export function framesOf(block: Image, probe?: Probe): Animation | null {
+  const decoded = decodedOf(block, probe);
   return decoded.ok ? (decoded.animation ?? null) : null;
 }
 
@@ -104,8 +114,8 @@ export function framesOf(block: Image): Animation | null {
  * signature, no IHDR, a zero dimension — and then the 20-column placeholder is
  * still the honest answer.
  */
-function extentOf(block: Image): Readonly<{ width: number; height: number }> | null {
-  const decoded = decodedOf(block);
+function extentOf(block: Image, probe?: Probe): Readonly<{ width: number; height: number }> | null {
+  const decoded = decodedOf(block, probe);
   return decoded.ok ? decoded.pixels : (decoded.size ?? null);
 }
 
@@ -121,10 +131,14 @@ function extentOf(block: Image): Readonly<{ width: number; height: number }> | n
  * outside its rectangle addresses part of an image the terminal is not drawing
  * there, so over-drawing here is worse than wrong.
  */
-export function imageCells(block: Image, width: number): { cols: number; rows: number } {
+export function imageCells(
+  block: Image,
+  width: number,
+  probe?: Probe,
+): { cols: number; rows: number } {
   // **The extent and not the pixels** (F413) — this is the whole of what the
   // geometry wants, and it survives a refusal the rasterisers cannot.
-  const px = extentOf(block);
+  const px = extentOf(block, probe);
   const w = Math.max(1, Math.floor(width)); // cells-ok — a cell count
   const declared = Math.max(1, block.height); // cells-ok — a row count
   if (px === null) return { cols: Math.min(w, 20), rows: declared }; // cells-ok — a cell count
@@ -154,12 +168,12 @@ export const imageDefinition: BlockDefinition<Image> = {
   kind: "image",
 
   /** The clamped row count — never the declared one when the width bites. */
-  measure(block: Image, width: number): number {
-    return imageCells(block, width).rows;
+  measure(block: Image, width: number, _measureChild: MeasureFn, probe?: Probe): number {
+    return imageCells(block, width, probe).rows;
   },
 
   render(block: Image, ctx: RenderContext): ReactElement {
-    const { cols, rows } = imageCells(block, ctx.width);
+    const { cols, rows } = imageCells(block, ctx.width, ctx.probe);
 
     // **The protocol arm comes first, and that is the F413 ordering.** It used
     // to sit below the decode gate, so a PNG this repository cannot rasterise
@@ -198,7 +212,7 @@ export const imageDefinition: BlockDefinition<Image> = {
     // **And this is where the frame enters** (C04 I93, C22 I77): the protocol
     // arm above transmitted every frame once and the terminal is animating it,
     // so the index is read only by the arms that draw a glyph per cell.
-    const px = pixelsOf(block, ctx.frames?.[block.id] ?? 0);
+    const px = pixelsOf(block, ctx.frames?.[block.id] ?? 0, ctx.probe);
 
     // **A block whose bytes do not decode draws the refusal, with the reason**
     // (I38, F410). It drew `alt` for every one of them, and the ruling that put
@@ -215,7 +229,7 @@ export const imageDefinition: BlockDefinition<Image> = {
     // the box says which refusal and `alt` says what the picture was, and the
     // first is the one a reader cannot recover any other way.
     if (px === null) {
-      const decoded = decodedOf(block);
+      const decoded = decodedOf(block, ctx.probe);
       const fault = decoded.ok ? "" : decoded.fault;
       const boxRows = rows >= 2 ? rows - 1 : rows; // cells-ok — a row count
       const box = statusDefinition.render(faultStatus(block, fault, boxRows), ctx);

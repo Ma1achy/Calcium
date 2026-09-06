@@ -13,6 +13,7 @@
  * and shutdown (§8, below).
  */
 
+import { availableParallelism } from "node:os";
 import { appendFileSync } from "node:fs";
 import {
   appendFile,
@@ -30,6 +31,9 @@ import { compose, type Composed } from "./frame.js";
 import { commandRows, type PaintDeps } from "./paint.js";
 import { transmitImage, type SentImages } from "./transmit-image.js";
 import { composeFrame } from "./render-frame.js";
+import { createProfiler, isRecording, isSpanning } from "./profiling/recorder.js";
+import { createResourceProbe } from "./profiling/node.js";
+import type { CommitReason, Profiler } from "./profiling/types.js";
 import { focusKey } from "./render-cache.js";
 import { reserveNeeded } from "./block-faults.js";
 import { descendants } from "../data/viewmodel/index.js";
@@ -122,6 +126,11 @@ function unusableCause(env: Readonly<NodeJS.ProcessEnv>): string {
 function ambient(): Ambient {
   return {
     clock: () => Date.now(),
+    // **A second clock, and not a widening of the first** (C22 §2c). `clock` is
+    // wall-clock, is drawn as a time of day by the default chrome, and has
+    // millisecond resolution — it cannot measure a 0.3 ms paint. SS1's
+    // allow-list does not grow: this file was already its only entry.
+    elapsed: () => performance.now(),
     cwd: process.cwd(),
     fs: nodeFileSystem,
     schedule: (fn, ms) => {
@@ -184,6 +193,21 @@ const NOTHING_ANIMATES: Animated = Object.freeze({
  * tunes at construction; the *reason* is what binds them, and that is asserted.
  */
 const ORBIT_MS = 33;
+
+/**
+ * The span a `null` profiler yields — one frozen object, so the `using` form
+ * reads the same on both arms and the unprofiled path allocates nothing.
+ */
+const NO_SPAN: Disposable = Object.freeze({ [Symbol.dispose]: () => undefined });
+
+/**
+ * The core count, read here because this is the file SS10's sibling rules allow
+ * an ambient read in. Reported in the regime, never used for a threshold — a
+ * budget is a claim about a machine and this is the machine.
+ */
+function cpuCount(): number {
+  return availableParallelism();
+}
 const ORBIT_MS_TORN = 100;
 
 /**
@@ -279,6 +303,15 @@ class Session implements TuiInstance {
    * `activeTarget` does the rest — it is a *target*, not a third mode beside
    * navigate and interact (roadmap 15's ruling, C26 I2's argument unchanged).
    */
+  /**
+   * C28, or `null` — and `null` is the overwhelming case (C22 I92).
+   *
+   * At tier `off` there is no object at all rather than an object with an early
+   * return in every method, so what an unprofiled session pays is one
+   * `undefined` check at each seam.
+   */
+  #profiler: Profiler | null = null;
+
   #copyMode = false;
 
   constructor(private readonly config: ResolvedConfig) {}
@@ -313,8 +346,38 @@ class Session implements TuiInstance {
       return;
     }
 
+    // **C28, constructed here and nowhere else** (C22 I93). The seams below are
+    // functions this root was going to hand down anyway, so nothing under
+    // `src/shell/` imports the profiler and no import edge is added. With no
+    // `profile` field there is no object, and each seam costs one check (I92).
+    //
+    // **Gated on the tier, not on the field being present** (C28 I1). This read
+    // `this.config.profile !== undefined`, so `profile: { tier: "off" }` built
+    // the recorder *and* called `createResourceProbe`, which enables
+    // `monitorEventLoopDelay` and connects a GC `PerformanceObserver` for the
+    // life of the process. An application that had explicitly asked for nothing
+    // got the whole apparatus, and two files carried a comment saying it did
+    // not. The tier is the switch; the field only says which tier.
+    //
+    // The probe is constructed only at a tier that samples, for the same
+    // reason one level down: below `spans` nothing reads it, and enabling a
+    // histogram nobody snapshots is cost with no reader.
+    const profileTier = this.config.profile?.tier ?? "counters";
+    if (this.config.profile !== undefined && isRecording(profileTier)) {
+      this.#profiler = createProfiler(this.config.profile, {
+        elapsed: this.config.elapsed,
+        ...(isSpanning(profileTier)
+          ? { probe: createResourceProbe(this.config.elapsed) }
+          : {}),
+        schedule: this.config.schedule,
+        node: process.version,
+        cpus: cpuCount(),
+      });
+    }
+
     this.#graph = await constructGraph(this.config, {
       stop: (reason) => this.stop(reason),
+      ...(this.#profiler === null ? {} : { profiler: this.#profiler }),
       // **Two functions now, and they were one** (I55). C03 has distinguished
       // them since it was written — `writeFrame` calls `repaint` when the
       // screen's contents are unknown and `render` otherwise — and L4 handed it
@@ -322,10 +385,10 @@ class Session implements TuiInstance {
       // nothing. `frame-scheduler.ts` reasons about *"diffing against a screen
       // whose contents nobody knows"*, which only means something once one of
       // these two diffs and the other does not.
-      render: () => this.#render(),
-      repaint: () => {
+      render: (reason) => this.#render(reason),
+      repaint: (reason) => {
         this.#lastFrame = null;
-        this.#render();
+        this.#render(reason);
       },
       frame: this.#frameQueries(),
       onFatal: (err) => {
@@ -547,6 +610,16 @@ class Session implements TuiInstance {
     // ordering argument as `killAll()` before `history.drain()` at step 2a.
     graph.pipeline.dispose();
 
+    // **1a — C28, and it had no call site at all** (C28 I2). `createProfiler`
+    // was constructed in `start()` and disposed by nothing, so
+    // `monitorEventLoopDelay`'s histogram stayed enabled and the GC
+    // `PerformanceObserver` stayed connected for the whole life of the process
+    // — a profiler leaking two process-wide handles is the defect it exists to
+    // find. Beside `pipeline.dispose()` for the same reason: the sampler
+    // re-arms itself off the injected timer, so a session that stops between
+    // two ticks holds a timer that holds the process open.
+    this.#profiler?.dispose();
+
     // 2 — release, which runs `beforeRelease` (the cleanup) and then restores
     // the terminal. C01's own guard makes the cleanup once-only.
     graph.lifecycle.release();
@@ -582,9 +655,16 @@ class Session implements TuiInstance {
    * a short frame: `paint` refuses, and one row too few leaves the previous
    * frame showing through while one too many scrolls the alternate screen.
    */
-  #render(): void {
+  #render(reason: CommitReason = "input"): void {
     const graph = this.#graph;
     if (graph === null || !graph.lifecycle.acquired) return;
+
+    // **The frame's brackets, and the reason C03 chose** (C28 I16). Decoration:
+    // the profiler is `null` unless the app asked for one, so an unprofiled
+    // session pays one check here.
+    const prof = this.#profiler;
+    prof?.beginFrame(reason);
+    const frameSpan = prof?.span("frame");
 
     // **The composition is `render-frame.ts`'s and this calls it** (C22 I54,
     // C24 I25). It lived here as a private method returning `void`, which made
@@ -594,7 +674,10 @@ class Session implements TuiInstance {
     // through `expectDocument().lines()` stays on the production path across
     // all four only if there is one composition. A03's SS48 says so.
     const result = composeFrame({
-      composed: () => this.#composed(),
+      composed: () => {
+        using _s = prof?.span("compose") ?? NO_SPAN;
+        return this.#composed();
+      },
       paintDeps: (frame) => this.#paintDeps(graph, frame),
       resizeViewport: (size) => void graph.viewport.resize(size),
       cursorSequence: (cursor) => graph.lifecycle.cursorSequence(cursor),
@@ -626,9 +709,12 @@ class Session implements TuiInstance {
     // question C22 §4a leaves open, and this is the boundary it had.
     if (result.kind === "fallback") {
       // The fallback put something else on the screen, so no record describes
-      // it (I55).
+      // it (I55). A fallback is a frame's *absence* — counted, and kept out of
+      // every duration histogram (C28 I6).
       this.#lastFrame = null;
       drawFallback(result.size, (s) => void graph.lifecycle.writer.write(s));
+      frameSpan?.[Symbol.dispose]();
+      prof?.endFrame("fallback");
       return;
     }
 
@@ -658,7 +744,7 @@ class Session implements TuiInstance {
     // at the moment it appears. Keying on the windowed set instead would put a
     // transmission in a frame where nothing else changed — a scroll that emits
     // a payload — which is the worse of the two.
-    graph.lifecycle.writer.write(
+    const bytes =
       transmitImage(
         graph.transcript.entries.flatMap((e) => e.doc.blocks),
         graph.capabilities,
@@ -666,8 +752,16 @@ class Session implements TuiInstance {
         // The frame's width — the declared cell box is a render-time fact and
         // was a hardcoded `1` (F380).
         graph.lifecycle.size().columns,
-      ) + result.write,
-    );
+        graph.probe,
+      ) + result.write;
+    {
+      // The write seam — A01 Appendix B's first row, and the one figure that
+      // cannot be taken from outside the process.
+      using _write = prof?.span("write") ?? NO_SPAN;
+      graph.lifecycle.writer.write(bytes);
+    }
+    prof?.count("bytes.written", bytes.length);
+    prof?.count("rows.written", result.lines.length);
     this.#lastFrame = result.lines;
 
     // **After the write, and that is the whole of why the frame stays one pass**
@@ -682,6 +776,9 @@ class Session implements TuiInstance {
     // is the same rule `anyoneLooking` applies to a refresh source, and for the
     // same reason (C23 I46).
     this.#armSpinner();
+
+    frameSpan?.[Symbol.dispose]();
+    prof?.endFrame("frame");
   }
 
   /**
@@ -834,6 +931,7 @@ class Session implements TuiInstance {
       registry: graph.blocks,
       theme: graph.theme.current,
       capabilities: graph.capabilities,
+      ...(graph.probe === undefined ? {} : { probe: graph.probe }),
       // **The layer host, and it is the one `/live` draws into** (C12 I107).
       scratch: graph.scratch,
       // C14 selected these at this width; the paint pads them and never
@@ -1186,7 +1284,7 @@ function visibleRows(
       if (rasterising) {
         for (const b of [blk, ...descendants(blk)]) {
           if (b.kind !== "image") continue;
-          const animation = framesOf(b as Image);
+          const animation = framesOf(b as Image, graph.probe);
           if (animation === null) continue;
           frames.push({ entryId: entry.id, blockId: b.id, delays: animation.delays });
         }
@@ -1209,6 +1307,7 @@ function visibleRows(
             renderEntryPieces(graph.blocks, pieces, {
         theme: graph.theme.current,
         capabilities: graph.capabilities,
+        ...(graph.probe === undefined ? {} : { probe: graph.probe }),
         // **The third field, and the context was shipped with two** (C16 §3).
         // Focus was stored, derived and routed, and a focused row rendered
         // exactly like an unfocused one because nothing ever put it in the

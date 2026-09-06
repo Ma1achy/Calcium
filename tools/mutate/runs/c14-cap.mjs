@@ -41,8 +41,9 @@ const results = runPass({
       // one row taller than the index says — C09 I1 broken by the registry itself.
       name: "COUNT-DROPPED: `measure` stops counting the marker row",
       file: REGISTRY,
-      from: "form.definition.measure(form.block, width, this.measure) + (form.capped === null ? 0 : 1);",
-      to: "form.definition.measure(form.block, width, this.measure);",
+      from:
+        "form.definition.measure(form.block, width, this.measure, this.probe) +\n        (form.capped === null ? 0 : 1);",
+      to: "form.definition.measure(form.block, width, this.measure, this.probe);",
       expect: "T6.22", // and T1.19
     },
     {
@@ -68,7 +69,8 @@ const results = runPass({
       // boundary unit is kept whole and the marker then lies by two.
       name: "SHOWN-IS-CAP: the marker names the cap and not the window's rows",
       file: REGISTRY,
-      from: "    const shown = resolved.definition.measure(out.block, width, this.measure);",
+      from:
+        "    const shown = resolved.definition.measure(out.block, width, this.measure, this.probe);",
       to: "    const shown = this.#cap;",
       expect: "T3.20",
     },

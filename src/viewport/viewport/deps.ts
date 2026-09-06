@@ -8,5 +8,5 @@
  * middle of the arithmetic.
  */
 
-export type { Block } from "../../data/viewmodel/index.js";
+export type { Block, Probe } from "../../data/viewmodel/index.js";
 export type { Change, EntryId, TranscriptEntry, TranscriptView } from "../transcript/index.js";

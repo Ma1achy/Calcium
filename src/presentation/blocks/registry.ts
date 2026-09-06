@@ -21,7 +21,8 @@ import {
   placeable,
   sequenceHeight,
 } from "../../data/viewmodel/index.js";
-import type { Block, Status } from "../../data/viewmodel/index.js";
+import { NO_PROBE } from "../../data/viewmodel/index.js";
+import type { Block, Probe, Status } from "../../data/viewmodel/index.js";
 import { DEFAULT_DEFINITIONS } from "./defaults.js";
 import { clampSpans, paint, rows, tone } from "./paint.js";
 import { truncate } from "../text.js";
@@ -154,6 +155,25 @@ class Registry implements BlockRegistry {
   readonly #cap: number;
   #sealed = false;
 
+  /**
+   * C28's seam, handed to a definition's `measure` (C28 I32).
+   *
+   * **Mutable and public, deliberately.** Everything else here is either
+   * constructor-injected or private, and this is neither, because the profiler
+   * is installed after the registry is built and sealed — `construct.ts` step 4a
+   * — and by the same mechanism that replaces the arrow properties. A
+   * constructor parameter would require the profiler to exist before the
+   * registry, which inverts the build order for no gain.
+   *
+   * `NO_PROBE` rather than `undefined`, so the call sites below stay
+   * straight-line: one frozen object for the process, every member a no-op.
+   *
+   * Absent from `BlockRegistry`: a consumer has no reason to set it, and MG24
+   * would be right to ask who reads a published member nothing calls.
+   * `ProbeableRegistry` in `src/shell/profiling/` names it structurally.
+   */
+  probe: Probe = NO_PROBE;
+
   constructor(
     definitions: readonly BlockDefinition[],
     onError: (fault: BlockFault) => void,
@@ -221,7 +241,8 @@ class Registry implements BlockRegistry {
       // and a floored block over the cap takes `max(shown + 1, floor)`.
       const form = this.#form(block, width);
       const rows =
-        form.definition.measure(form.block, width, this.measure) + (form.capped === null ? 0 : 1);
+        form.definition.measure(form.block, width, this.measure, this.probe) +
+        (form.capped === null ? 0 : 1);
       return { ok: true, rows: Math.max(rows, floor) };
     } catch (error) {
       // I11 — a throwing measurer is contained and the block treated as one
@@ -379,11 +400,11 @@ class Registry implements BlockRegistry {
     if (held !== null) return { ...resolved, capped: held };
     const windowable = resolved.definition.window;
     if (windowable === undefined) return { ...resolved, capped: null };
-    const total = resolved.definition.measure(resolved.block, width, this.measure);
+    const total = resolved.definition.measure(resolved.block, width, this.measure, this.probe);
     if (!(total > this.#cap)) return { ...resolved, capped: null };
     // `this.measure` is the child seam (I26a), as `windowSequence` hands it.
     const out = windowable(resolved.block, width, 0, this.#cap, this.measure);
-    const shown = resolved.definition.measure(out.block, width, this.measure);
+    const shown = resolved.definition.measure(out.block, width, this.measure, this.probe);
     const capped: Capped = Object.freeze({ shown, total });
     return { definition: resolved.definition, block: withCapped(out.block, capped), capped };
   }

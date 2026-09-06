@@ -15,6 +15,7 @@ export { ANIMATES, animationIntervalOf, tickIntervalOf } from "./animation.js";
 export { countdown, elapsed, statusRowsFor } from "./kinds/status.js";
 export {
   glyphs,
+  type GlyphCaps,
   glyphFor,
   glyphCells,
   spinnerFrames,

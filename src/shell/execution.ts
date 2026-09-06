@@ -1033,6 +1033,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         // one is open would replace the layer under the first handler's promise
         // — the host owns that, not this call site.
         ask: deps.confirm.ask,
+        ...(deps.profile === undefined ? {} : { profile: deps.profile }),
         args,
       });
       // **C23 states the command, not the handler** (I15, C22 I33) — the same

@@ -14,7 +14,7 @@
  * (I4).
  */
 
-import { HeightCache } from "./cache.js";
+import { HeightCache, type HeightMisses } from "./cache.js";
 import { HeightIndex } from "./index-tree.js";
 import { atTail } from "./tail.js";
 import type {
@@ -26,13 +26,15 @@ import type {
   VisibleRange,
   Viewport,
 } from "./types.js";
-import type { Change, EntryId, TranscriptEntry, TranscriptView } from "./deps.js";
+import type { Change, EntryId, Probe, TranscriptEntry, TranscriptView } from "./deps.js";
+import { NO_PROBE } from "../../data/viewmodel/index.js";
 
 class ViewportImpl implements Viewport {
   readonly #view: TranscriptView;
   readonly #measureSequence: ViewportOptions["measureSequence"];
   readonly #chromeRows: NonNullable<ViewportOptions["chromeRows"]>;
-  readonly #cache = new HeightCache();
+  readonly #probe: Probe;
+  readonly #cache: HeightCache;
   readonly #index = new HeightIndex();
   readonly #subscribers = new Set<(change: ViewportChange) => void>();
   readonly #unsubscribe: Disposable;
@@ -51,6 +53,11 @@ class ViewportImpl implements Viewport {
     this.#height = opts.height;
     this.#measureSequence = opts.measureSequence;
     this.#chromeRows = opts.chromeRows ?? ((): number => 0);
+    // Defaulted into rather than branched on at each call site: `NO_PROBE` is
+    // one frozen object for the process and every member is a no-op, so the
+    // arithmetic below reads the same whether or not anyone is recording.
+    this.#probe = opts.probe ?? NO_PROBE;
+    this.#cache = new HeightCache(this.#probe);
 
     this.#rebuild();
     this.#unsubscribe = view.subscribe((c) => this.#onChange(c));
@@ -69,11 +76,22 @@ class ViewportImpl implements Viewport {
     return this.#anchor;
   }
 
-  get stats(): Readonly<{ cacheSize: number; indexCapacity: number; entryCount: number }> {
+  get stats(): Readonly<{
+    cacheSize: number;
+    indexCapacity: number;
+    entryCount: number;
+    hits: number;
+    misses: HeightMisses;
+  }> {
     return Object.freeze({
       cacheSize: this.#cache.size,
       indexCapacity: this.#index.capacity,
       entryCount: this.#view.entries.length,
+      // **The hit rate beside the size** (I27). A size says how much is held;
+      // only the rate says whether holding it was worth anything, and only the
+      // reason says whether a miss was legitimate (F863).
+      hits: this.#cache.hits,
+      misses: this.#cache.misses,
     });
   }
 
@@ -374,6 +392,12 @@ class ViewportImpl implements Viewport {
 
   #rebuild(): void {
     const entries = this.#view.entries;
+    // **The multiplier on a `width` miss** (C28 I8). One rebuild measures every
+    // entry, so the interesting figure is not the rebuild's cost but how often
+    // it runs: `#width` moving invalidates the whole cache at once, and this
+    // gauge against the miss counts is what separates a resize from a width
+    // being recomputed rather than held.
+    this.#probe.gauge("height.rebuild.entries", entries.length);
     this.#index.rebuild(entries.map((e) => this.#heightOf(e)));
     this.#ids = entries.map((e) => e.id);
   }

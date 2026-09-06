@@ -300,9 +300,17 @@ export const SUBSTITUTIONS: readonly (readonly [string, string])[] = Object.free
  * never from the environment (I3) — a renderer probing for itself is the bug
  * that draws a table in ASCII beside a sparkline in Unicode.
  */
-export function glyphs(
-  caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
-): GlyphSet {
+/**
+ * What resolving a glyph actually needs — two fields of `TerminalCapabilities`.
+ *
+ * **Named rather than written inline**, because `glyphs` is not the only caller
+ * any more: `profilePane` takes one and is exported, and MG29 is right that a
+ * consumer with no name for a parameter's type cannot supply it. Every existing
+ * caller hands over a whole capability record, which this still accepts.
+ */
+export type GlyphCaps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">;
+
+export function glyphs(caps: GlyphCaps): GlyphSet {
   if (caps.unicode === "ascii") return ASCII;
   // **The ASCII set is also the wide set, and that is a ruling** (C02 I9,
   // roadmap 51).

@@ -1851,6 +1851,24 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
     "C16 diagnostics — the dispatch trace for the last event, published so " +
     "`test/unit/router-dispatch.test.ts` can assert the ladder was walked in order. " +
     "A component reading it would be a second priority list, which C16 §8a rules out",
+  "OpenNode.childTime":
+    "C28 — the self-time accumulator on an *open* span. `tree.ts` adds a child's " +
+    "total to it at close and subtracts it to get self time; `OpenNode` is exported " +
+    "because the recorder holds one, and this field is that file's arithmetic rather " +
+    "than a seam. Nothing outside should read a span mid-flight",
+  "ProfileOptions.captureDir":
+    "C28 §7 — where an inspector capture is written. The specified consumer is the " +
+    "`node:inspector` path, which writes `.cpuprofile` and `.heapprofile` into it; " +
+    "no capture exists to place yet. `Profiler.addCapture` is its other half",
+  "Profiler.addCapture":
+    "C28 I17 — records a capture the inspector produced so the report can name it " +
+    "and count what the cap dropped. Same blocker as `ProfileOptions.captureDir`: " +
+    "there is no capture path yet, and the member is what the report is written against",
+  "Profiler.setTier":
+    "C28 I18, I23 — the runtime tier change, and the ring reset that goes with it. " +
+    "The specified consumer is the profiler surface's own tier control; the panes " +
+    "render a report and do not yet change what is recorded. T1.12 and T1.16 are the " +
+    "rows written against it",
   "Rng.fork":
     "C08 — a child stream for a nested generator. The fixture recorder is the " +
     "specified consumer and records linearly today, so `fork` is a capability the " +
@@ -2298,6 +2316,8 @@ export function checkSeamConsumers(
 ) {
   const violations = [];
   const unconsumed = new Set();
+  /** The equality arm's set — see the asymmetry argued at the consumer test. */
+  const unconsumedByOwner = new Set();
   const sources = new Map(files.map((f) => [f, readFile(f)]));
 
   // **Comments stripped before counting a consumer, as MG25 does.**
@@ -2383,11 +2403,32 @@ export function checkSeamConsumers(
     const consumer = record
       ? new RegExp(`[.?]\\s*${name}\\b|(?:^|[{,(\\s])${name}\\s*:`, "m")
       : new RegExp(`[.?]\\s*${name}\\b`);
+    //
+    // **The equality arm asks a stricter question, and the asymmetry is why.**
+    // `owned` additionally requires the consuming file to name the owning type.
+    // On the violation arm that scoping was measured and rejected — 19 false
+    // accusations, recorded above — because there a false verdict accuses a
+    // member of being dead. Here the direction reverses: a false *stale* verdict
+    // deletes a written reason and stops tracking a member that is genuinely
+    // unconsumed, while a false *still unconsumed* only keeps an exemption one
+    // release too long. Cheap in one direction, expensive in the other.
+    //
+    // It exists because the loose test has a third outcome the arm's message
+    // does not name. *Wired now or gone* were the two on offer; the third is
+    // **still unconsumed, with a homonym elsewhere masking it**, and three of
+    // four listed entries were in it at once — `contexts.fork` retiring
+    // `Rng.fork`, `cpu.user` retiring `Identity.user`. The blind spot is F105's,
+    // recorded there as having no cheap remedy; that was true of the arm it was
+    // found on.
+    const ownerPattern = new RegExp(`\\b${owner}\\b`);
     let consumed = false;
+    let owned = false;
     for (const [other, src] of stripped) {
       if (other === file) continue;
-      if (consumer.test(src)) {
-        consumed = true;
+      if (!consumer.test(src)) continue;
+      consumed = true;
+      if (ownerPattern.test(src)) {
+        owned = true;
         break;
       }
     }
@@ -2395,6 +2436,7 @@ export function checkSeamConsumers(
     // see that a listed member is *still* unconsumed. Skipping early would make
     // every entry permanently justified by its own presence.
     if (!consumed) unconsumed.add(key);
+    if (!owned) unconsumedByOwner.add(key);
 
     if (allowed[key] !== undefined) continue;
     if (consumed) continue;
@@ -2424,14 +2466,14 @@ export function checkSeamConsumers(
   // It only means anything because the loop above records `unconsumed` before
   // consulting the list.
   for (const key of Object.keys(allowed)) {
-    if (unconsumed.has(key)) continue;
+    if (unconsumedByOwner.has(key)) continue;
     violations.push({
       rule: "MG24",
       file: "tools/enforce/module-graph.mjs",
       message:
         `UNCONSUMED_MEMBERS names ${key}, which is no longer an unconsumed published ` +
-        `member — it is either wired now or gone. Remove the entry: an exemption that ` +
-        `outlives its reason is how the list stops being read`,
+        `member — a file that also names ${key.split(".")[0]} reads it. Remove the ` +
+        `entry: an exemption that outlives its reason is how the list stops being read`,
       spec: "A03 §3, MG24",
     });
   }
@@ -2492,8 +2534,12 @@ export function componentSeamSignal(files, readFile = (f) => readFileSync(f, "ut
  *   anywhere in `src/`, declares a field with the same name and something reads it.
  *
  * **Two measured instances of one mechanism, so this closes the class rather than
- * the second instance.** What closes it is not a tightening — three were measured
- * and all three are rejected, with the figures, so nobody re-derives them:
+ * the second instance.** What closes it is not a tightening of the violation arm
+ * — three were measured and all three are rejected, with the figures, so nobody
+ * re-derives them. **The count was written down as four in two summaries and
+ * enumerated as three here**, which is the summary-drops-the-condition shape
+ * (F86, F89, F92) applied to a tally: the body carries the figures and the
+ * abstract carried a number nobody could resolve against them. Three:
  *
  *   scope the shorthand arm to files naming the owner   19 false violations (F105)
  *   key by (owner, name) exactly                        needs a receiver's TYPE;
@@ -2577,8 +2623,8 @@ export function nameExactnessSignal(files, readFile = (f) => readFileSync(f, "ut
 /**
  * **The public surface by use — roadmap 48, A03 §9.** Reported, never gated.
  *
- * F105 and F160 closed MG24's name-matching as a class: four tightenings
- * measured, four refused. What F160 left is a residue, and it named the shape
+ * F105 and F160 closed MG24's name-matching as a class: three tightenings
+ * measured, three refused. What F160 left is a residue, and it named the shape
  * that could work — *a second consumer written from the public surface names
  * every field it uses, and the residue is the candidates, by **use** rather than
  * by name.* This is that measurement.

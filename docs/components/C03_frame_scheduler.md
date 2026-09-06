@@ -36,8 +36,8 @@ interface FrameScheduler {
 }
 
 function createFrameScheduler(opts: {
-  render:       () => void;                       // paint current state
-  repaint:      () => void;                       // clear, then paint from blank
+  render:       (reason: CommitReason) => void;   // paint current state (I16)
+  repaint:      (reason: CommitReason) => void;   // clear, then paint from blank (I16)
   capabilities: TerminalCapabilities;
   lifecycle:    { readonly acquired: boolean };
   write:        (s: string) => void;              // C01's writer, bound by L4
@@ -51,6 +51,10 @@ function createFrameScheduler(opts: {
 `write` exists because C03 emits the synchronised-update markers itself and A01 D32 requires every write to go through C01's `writer`. L4 supplies `lifecycle.writer.write.bind(lifecycle.writer)`; C03 never holds the stream, only a bound call. It is also the observation point for T1.12, T1.13 and T4.3 — what reached the terminal is what was passed here.
 
 **The seam is two strings wide.** `write` carries `SYNC_UPDATE.enter` and `SYNC_UPDATE.leave` and nothing else; frame content leaves through `render()`, which C03 does not own. That narrowness is the evidence the seam is cut in the right place, so T2.7 asserts it over the whole unit and edge corpus. A third string means something has moved into C03 that belongs elsewhere.
+
+**`render` and `repaint` are handed the reason that drove the frame, and that is F395's row rather than a convenience.** C03 chooses which of the coalesced reasons wins — by strictness, at flush (§3) — and it is the only component that can know. The finding's wording is exact: *the scheduler knows `input · completion · resize · stream · spinner` and **hands it to nothing***. L4 could count what it commits by wrapping `commit`, and could count frames by wrapping `render`, but it cannot recover **which** reason a coalesced frame was drawn for, because that is a decision taken inside this unit.
+
+**And that is the whole of what C03 owes the profiler — one argument, no counter.** With the reason arriving at `render`, commits-by-reason and frames-by-reason are both L4's to count at the seams it already wraps, and *coalesced* is their difference rather than a third number kept here. C03 stores one `state` and one `deferred` reason today and stores no count of anything; adding one would be a second place the arithmetic lives, and a stored total is satisfied by redistribution in a way a derived one is not. **C03 still reads no clock**, so `wait` is not C03's either: it is stamped at the wrapped `commit` and the wrapped `render`, both in L4, both on `elapsed`.
 
 `lifecycle` is injected as a read-only view rather than the full `TerminalLifecycle`. C03 needs to know whether writing is safe; it must not be able to acquire or release.
 
@@ -224,6 +228,7 @@ Orthogonal: a write while `contaminated` calls `repaint()` rather than `render()
 - **I14** — **Suspension introduces no queue.** `flush()` while suspended forces nothing beyond what I13 already allows, and `resume()` writes an ordinary frame rather than a repaint: suspension writes nothing, so the terminal still holds the last frame written and the diff's model of it is still true. C03's memory of deferred work stays one `state` and one `deferred` reason under suspension, exactly as without it.
 
 - **I15** — **`resize` is coalesced on a fixed 16 ms window, and the window is not configurable.** It is not immediate and it is not tunable, and those are two rulings with two reasons. *Not immediate*, because the cost of a resize is not the frame: the width is what invalidates every cached height (C14 I8), so a drag of thirty `SIGWINCH`es was thirty re-measures of the whole transcript — **544 ms at a thousand entries, of which the index rebuild everyone named was 0.07%** (F423). *Not tunable*, because `stream` and `spinner` windows make a frame **stale** where this one makes it **wrong**, and I2's reasoning — a config may not introduce lag — reaches the second case for a different reason than the first. **Contamination is set eagerly at commit and never at flush** (I7, §5), which is what lets an `input` commit arriving inside the window write a correct frame rather than a diff against dimensions that no longer exist.
+- **I16** — **`render` and `repaint` are called with the `CommitReason` that drove the frame**, chosen by strictness among the coalesced reasons at flush. It is the one thing about a frame that only C03 knows: a caller wrapping `commit` sees every reason committed and a caller wrapping `render` sees every frame, and neither can recover which reason a coalesced frame was drawn for. C03 keeps no count of its own coalescing — commits and frames are counted at the seams above, and *coalesced* is their difference (→ C28 I8).
 
 ---
 
@@ -245,6 +250,7 @@ Orthogonal: a write while `contaminated` calls `repaint()` rather than `render()
 14. `suspend()` holds the screen still without letting it become unknown: ordinary frames wait, contaminated ones are written, and **suspension therefore never holds a resize back** (I13). *Never deferred* is what this said, and the walk falsified it: a resize is deferred by its own window (I15), and by a write in progress (I10), and neither is suspension. The claim is about which mechanism may hold it, not about whether anything can — C03 §8a A4.
 15. Suspension is bounded state, not a buffer: `flush()` forces nothing while suspended and `resume()` writes an ordinary diffed frame, not a repaint (I14). **`suspend()` and `resume()` are new members on a published L0 interface and are freeze-relevant.**
 16. **A resize is coalesced on a fixed, non-configurable 16 ms window, and the frame is where the viewport learns its size** (I15). L4 composes from `lifecycle.size()` read fresh and resizes the viewport from the composed frame before any row is read, so a commit of any reason arriving inside the window writes a frame at the *current* width — the wrong-frame hazard is closed by that ordering rather than by immediacy. C22 I34 owns that ordering and §8a A2 is the row that checked it.
+17. **The frame's reason travels with it, and nothing else about coalescing does** (I16, → C28 I8). C03 chooses the winning reason and is the only component that can, so it passes it; it keeps no count, because commits and frames are counted at the seams above and *coalesced* is their difference. F395's row named the reason, not a count — the scheduler holds one `deferred` reason and no total, so a total added here would be a second place the arithmetic lives.
 
 ---
 
@@ -253,6 +259,9 @@ Orthogonal: a write while `contaminated` calls `repaint()` rather than `render()
 Six tiers. Every cell of the §5 transition table is covered; fake clock throughout.
 
 ### Tier 1 — unit
+
+- **T1.24** (I16): five commits of different reasons coalesced into one frame → `render` is called once, with the **strictest** reason and not the first or the last. The three are distinguishable only when the arrival order and the strictness order disagree, so the row constructs that state rather than the convenient one.
+- **T1.25** (I16): a contaminated frame → `repaint` receives the reason too, and it is the same one `render` would have had.
 
 Fake `schedule`, spy `render`/`repaint`, fabricated capabilities.
 
@@ -340,6 +349,8 @@ PTY harness, real timers, real terminal.
 - **T5.6**: idle for sixty seconds → zero writes and no measurable CPU. There is no polling render loop.
 
 ### Tier 6 — fail-on-revert
+
+- **T6.17** (I16): calling `render()` with no argument → T1.24 and T1.25 fail, and the profiler's frames-by-reason collapses to one bucket. **The structural half is named**: nothing prevents a caller ignoring the argument, and what would catch that is the L4 counter disagreeing with itself rather than a row here.
 
 - **T6.1** (I2): giving `input` a non-zero window → T1.1 and T3.13 fail.
 - **T6.2** (I3): restarting the timer on each coalesced commit (a sliding window) → T1.4 fails, catching the bug where a continuous stream never renders at all.

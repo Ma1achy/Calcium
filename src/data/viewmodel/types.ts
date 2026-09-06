@@ -13,6 +13,8 @@
  * dependency I11 exists to prevent.
  */
 
+import type { Probe } from "./probe.js";
+
 // --- the document ---------------------------------------------------------
 
 export type ViewDocument = Readonly<{
@@ -3513,4 +3515,18 @@ export type Measure<B extends Block = Block> = (
   block: B,
   width: number,
   measureChild: MeasureFn,
+  /**
+   * C28's seam, or absent (C28 I30, I32).
+   *
+   * **Fourth and optional so every existing definition still compiles**, which
+   * is not laziness: a definition that does not instrument itself is not a
+   * defect, and a required parameter would make twenty-five files change to say
+   * nothing. `render` gets the same object as `ctx.probe`.
+   *
+   * It is here because measure is the half a decorator cannot reach. Wrapping
+   * the registry's dispatch catches every *call*, and the registry makes three
+   * of its own that never go through it — two of them in `#form`, for any block
+   * over the row cap, which is precisely the expensive case.
+   */
+  probe?: Probe,
 ) => number;

@@ -42,6 +42,7 @@ type TuiConfig = Readonly<{
   pty?:               PtyFactory;   // §2b — a child that needs a terminal; unset means the pipe arm (C21 I16)
 
   debug?:   Readonly<{ retainPayloads?: number }>;   // off by default; 50 when enabled without a count
+  profile?: ProfileOptions;   // §2c — off by default; C28 (I92, I93, I94, I95)
 
   env?:      Readonly<NodeJS.ProcessEnv>;  // the app's; `{}` refuses at gate 3b (I20, I61)
   capabilities?: Partial<TerminalCapabilities> | undefined;   // C02's overrides, wired (I49)
@@ -184,6 +185,30 @@ This is a structural interaction rather than an oversight, which is why it survi
 `openUrl` is injected for the same reason as `clock` and `fs`: it is a side effect, and a component that shells out to `xdg-open` cannot be unit-tested. C23 scheme-checks before calling it (C23 §3a).
 
 `clock` and `fs` are injectable because **every component below refuses to read them ambiently** — C03, C08, C13, C16, C17, C19, C20 each say so. C22 is where the real ones enter, and where a test substitutes fakes for the entire graph at once.
+
+### 2c. `profile` — one field, off by default
+
+```typescript
+type ProfileOptions = Readonly<{
+  tier?: Tier;              // "off" | "counters" | "spans" | "alloc" | "deep"; default "off"
+  elapsed?: () => number;   // monotonic, sub-millisecond; default performance.now
+  probe?: ResourceProbe;    // default the one file allowed to read the process (C28 I21)
+  ring?: number;            // frames held; default 512
+  worst?: number;           // whole frames kept beside the histograms; default 10
+  captureDir?: string;      // default `${stateDir}/profile`
+  captureBytes?: number;    // the `deep` cap
+  record?: string;          // NDJSON path; recording is on when set
+  replay?: string;          // recording to replay; refused alongside `record`
+}>;
+```
+
+**One field, and every member optional, because A02 commitment 5 is the rule and a profiler is exactly the thing that grows a second one.** `elapsed` and `probe` live here rather than beside `clock` and `fs` for a reason C28 I1 makes concrete: at tier `off` nothing reads them at all, so a top-level `elapsed` would be a required-looking injection with no reader in the overwhelming case, and a fake for it would have nothing to be a fake of.
+
+**`elapsed` is a second clock and not a widening of the first.** `TuiConfig.clock` is wall-clock, is drawn as a time of day by the default chrome (§6), and has millisecond resolution — it cannot measure a 0.3 ms paint. SS1's allow-list does not grow: `session.ts` is already its only entry, and `config.ts:133` argues that widening it to two files *"would have been the smaller diff and the worse one."*
+
+**`captureDir` defaults under `stateDir` deliberately.** I67 creates that directory holding a `.gitignore` of `*`, so a heap snapshot cannot be committed by a consuming project whose own ignore rules never anticipated one (I95).
+
+**`record` and `replay` are refused together at the gate rather than resolved by precedence** (I94). Either order of precedence is defensible and both are silent: a session that recorded nothing because it was replaying, or replayed nothing because it was recording, looks like a working session with an empty artefact.
 
 ---
 
@@ -2248,6 +2273,10 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I89** — **A `group` column whose first block is a `step` notice, inside a card's body, lays out as a card one unit further in, and the layout recurses exactly once.** A single child hangs under `⎿`; with siblings the gutter draws `├─` for every child but the last, `└─` for the last **when nothing in the body follows it**, and `│` past a child's body, every glyph from `glyphForMask` with corners fixed `"sharp"`; the last child's body has no bar above it. A last child followed by body text takes `├─` and the bar runs past it, because `└─` says *nothing continues below* and the parent's rule (I88) would then draw through it — the frame said so before the first row did. A `step` at depth 3 is laid out as body text. `GUTTER_UNIT === BODY_INDENT` (§6l.8 rows 23–25).
 - **I90** — **A card head's `copy` is the entry's command.** `elementsOfEntry` receives `command` and overrides the `step` element's `copy` with it; every other element's `copy` is the block's own, so `⌃a y` over a card yields the invocation followed by the body's sources through C26 I16's aggregator and no second one (§6l.8 row 26).
 - **I91** — **`TuiConfig.pty` is passed through to C21's deps unchanged and read nowhere else.** The composition root's whole job for it: the framework depends on no PTY package (C21 I15), so the only way one reaches a child is a consumer handing it in, and a root that inspected or wrapped it would be a second place the port's shape is known.
+- **I92** — **`profile` absent means no profiler exists.** The constructed graph is identical to one built from a config without the field: nothing is allocated, `elapsed` and the probe are never called, no timer is scheduled and no `FinalizationRegistry` is registered. Every decorated seam costs one `undefined` check (→ C28 I1).
+- **I93** — **The root is the only place the profiler enters, and it enters by decoration.** `elapsed` and the `ResourceProbe` are read here and nowhere else; every instrumented seam receives a function C22 wrapped before handing it down, so no component below `src/shell/` imports C28 and no new import edge is created (→ A02 §2 Seam 6).
+- **I94** — **`record` and `replay` set together is refused at the configuration gate**, with a message naming both fields; neither takes precedence, because both silent resolutions produce a session that looks correct and an artefact that is empty.
+- **I95** — **A capture is written under `stateDir`**, so I67's self-ignoring directory covers it and no consuming project's ignore rules need to have anticipated a heap snapshot (→ C28 I17).
 
 
 
@@ -2336,6 +2365,11 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 60. **Nesting is one recursion and the tree's own glyphs** (I89). The vocabulary the plot's outline already draws, from the function that already degrades at both arms; two levels by construction, sharp by ruling.
 61. **The head copies what ran** (I90). The layout supplies the command; the block library never learns it.
 
+62. **Off is free, and free is asserted rather than assumed** (I92, → C28 I1). A config without `profile` builds the same graph it always did; the profiler's cost when unused is one `undefined` check per seam.
+63. **The profiler enters by decoration, at this root, once** (I93, → A02 §2 Seam 6). Every instrumented seam is a function C22 wrapped before handing it down, so nothing below `src/shell/` imports C28 and no import edge is added.
+64. **Two artefacts asked for at once is a refusal, not a precedence** (I94). Recording and replaying together resolves silently either way, and both silences produce an empty artefact beside a session that looks correct.
+65. **A capture lands where the directory already ignores itself** (I95, → C28 I17). `stateDir` is created holding a `.gitignore` of `*` (I67), so a heap snapshot cannot be committed by a project that never anticipated one.
+
 41. **A frame that cannot hold what it was given complains rather than dies** (I70, F230). The per-entry trim was reconciling two components' answers in silence and taking the next block with it; it reports through the sink that already exists for a block giving way, and it does not refuse — the region check one level up can refuse only because nothing can reach it.
 
 ---
@@ -2349,6 +2383,10 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T1.1**: `start` with valid config → running; every component constructed once.
 - **T1.2** (I1): construction order is asserted on an event log — stores and runner before lifecycle.
 - **T1.3** (I2): the lifecycle's handler registration precedes the first acquire.
+- **T1.51** (I92): a graph built with `profile` absent → identical to one built from a config object that never had the key; the injected `elapsed` and probe are never called, `schedule` gains no registration, and no `FinalizationRegistry` exists. Asserted on the fakes' call counts, not on a timing figure.
+- **T1.52** (I93): every decorated seam → the function the component receives is not the one the config supplied, and `src/` holds no import of `shell/profiling/` outside `src/shell/`. The second half is the source scan, because the first passes on the day nothing calls the seam.
+- **T1.53** (I94): `record` and `replay` both set → refused at the gate, and the message names **both** fields. A refusal naming one reads as that field being invalid.
+- **T1.54** (I95): `captureDir` unset → resolves under `stateDir`, and the directory it resolves to is the one I67 wrote a `.gitignore` of `*` into. The two are asserted together, because either alone is satisfied by a path that happens to look right.
 - **T1.19** (I40): `/theme light` writes the variant, and a session constructed against the same `stateDir` opens light. Driven through two real sessions over one fake filesystem rather than by reading the file — the file's contents are an implementation detail and the claim is that the choice survives.
 - **T1.22** (I63, §6f table row 1): a style declared for `prompt` and a different one for `pushedView` → each resolves for its own target, and a **declared `null` is an answer rather than an absence**: `targets: { prompt: null }` means *leave the prompt's cursor alone* and must not fall through to a fallback that would override it. **The row that fails against a style on `Layer`**, because the prompt has no `Placed` — the entry's own example, so a design that cannot express it is refused by the case that motivated it.
 - **T1.22a** (I63, §6f table row 6): every member of `FOCUS_ORDER` is a key, driven off the union rather than a list written in the test — so a target added without a decision fails this row instead of resolving to the fallback for ever. Seven, asserted, because a `Partial<Record<…>>` invites *which of these are real*.

@@ -65,6 +65,8 @@
  * bounds the first frame.
  */
 
+import { NO_PROBE } from "../data/viewmodel/index.js";
+import type { Probe } from "../data/viewmodel/index.js";
 import type { EntryId } from "../viewport/transcript/index.js";
 
 type Slot = Readonly<{
@@ -108,8 +110,55 @@ export function focusKey(
   return `${focus.blockId}\u0000${focus.rowId ?? ""}\u0000${extent}`;
 }
 
+/** `HeightCache`'s two axes and the three this one adds (C28 I8, C14 I27). */
+export type RenderMisses = Readonly<
+  Record<"absent" | "rev" | "width" | "theme" | "focus" | "nothing-changed", number>
+>;
+
+/**
+ * Row for row, and **only ever on a miss**.
+ *
+ * A whole-document comparison in the hot path would be the wrong trade; this
+ * runs once per re-render that already happened, so it is paid out of work
+ * already spent rather than added to work about to be. Escapes and all, because
+ * a re-render producing the same bytes is the thing being counted — two visually
+ * identical rows differing in an SGR reset are two different writes.
+ */
+function sameLines(a: readonly string[], b: readonly string[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) if (a[i] !== b[i]) return false;
+  return true;
+}
+
 export class RenderCache {
   readonly #slots = new Map<EntryId, Slot>();
+  readonly #probe: Probe;
+  #hits = 0;
+  readonly #misses = { absent: 0, rev: 0, width: 0, theme: 0, focus: 0, "nothing-changed": 0 };
+
+  /** The slot `get` most recently rejected, and its lines — see `set` (C14 I28). */
+  #discarded: Readonly<{ id: EntryId; lines: readonly string[] }> | null = null;
+
+  /**
+   * C28's seam, or none (C28 I30).
+   *
+   * **Counted here rather than at the caller**, which is `HeightCache`'s ruling
+   * carried over: the comparison that knows the axis is here, and the value
+   * comparison `nothing-changed` needs is one only this class can make. A store
+   * that reported to a caller and was counted by another would be two
+   * comparisons obliged to agree.
+   */
+  constructor(probe: Probe = NO_PROBE) {
+    this.#probe = probe;
+  }
+
+  get hits(): number {
+    return this.#hits;
+  }
+
+  get misses(): RenderMisses {
+    return Object.freeze({ ...this.#misses });
+  }
 
   /** Live slots. Bounded by the entry count, by construction (I58). */
   get size(): number {
@@ -131,10 +180,30 @@ export class RenderCache {
     theme: string,
   ): readonly string[] | undefined {
     const slot = this.#slots.get(id);
-    if (slot === undefined) return undefined;
-    if (slot.rev !== rev || slot.width !== width) return undefined;
-    if (slot.focus !== focus || slot.theme !== theme) return undefined;
+    if (slot === undefined) return this.#miss(id, "absent", undefined);
+    // **The order is the invariant** (C28 I8). A slot can disagree on several
+    // axes at once and the reason reported is the first checked, so this
+    // sequence is what a count means. Coarsest first: `rev` moves on any content
+    // change at all, so an entry that changed reports `rev` even if the width
+    // moved too — right, because the re-render was owed either way.
+    if (slot.rev !== rev) return this.#miss(id, "rev", slot.lines);
+    if (slot.width !== width) return this.#miss(id, "width", slot.lines);
+    if (slot.theme !== theme) return this.#miss(id, "theme", slot.lines);
+    if (slot.focus !== focus) return this.#miss(id, "focus", slot.lines);
+    this.#hits += 1;
+    this.#probe.hit("render");
     return slot.lines;
+  }
+
+  #miss(
+    id: EntryId,
+    reason: "absent" | "rev" | "width" | "theme" | "focus",
+    discarded: readonly string[] | undefined,
+  ): undefined {
+    this.#misses[reason] += 1;
+    this.#probe.miss("render", reason);
+    this.#discarded = discarded === undefined ? null : { id, lines: discarded };
+    return undefined;
   }
 
   set(
@@ -145,6 +214,15 @@ export class RenderCache {
     theme: string,
     lines: readonly string[],
   ): void {
+    // **C14 I28's comparison, on lines rather than a height.** `slot` above is
+    // seven fields joined per entry per frame, so a key that churns while the
+    // screen is still spends a full re-render and produces identical output.
+    // The axis says what invalidated; this says whether it needed to.
+    const d = this.#discarded;
+    if (d !== null && d.id === id && sameLines(d.lines, lines)) {
+      this.#misses["nothing-changed"] += 1;
+    }
+    this.#discarded = null;
     this.#slots.set(id, Object.freeze({ rev, width, focus, theme, lines }));
   }
 

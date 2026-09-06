@@ -99,6 +99,7 @@ const BASE: TuiConfig = {
 
 const AMBIENT: Ambient = {
   clock: () => NOW,
+  elapsed: () => 0,   // profiling is off in this fixture; never read
   cwd: "/work",
   fs: {} as Ambient["fs"],
   schedule: () => ({ [Symbol.dispose]: () => undefined }),

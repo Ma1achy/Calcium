@@ -1029,11 +1029,56 @@ the entry is what a reader consults instead of the source. The cheapest guard is
 the one that found it: keep the violation list short enough that someone opens
 the file it names.
 
+### The equality arm asks a stricter question — the fourth tightening, accepted
+
+The three refusals above are all about the **violation** arm, whose verdict is
+*this member is unconsumed*. The equality arm's verdict is the opposite one —
+*this exemption is stale* — and the same looseness has the opposite cost there.
+
+A member reads as consumed the moment any unrelated type anywhere declares that
+name and something reads it. On the violation arm that produces a **false
+clearing**, which is silent and merely lets a dead member live. On the equality
+arm it produces a **false retirement**: the arm demands the removal of an entry
+whose reason still holds, and following it deletes a written justification and
+stops tracking a member that genuinely has no consumer.
+
+Four entries were in that state at once — three of them created by C28's own
+modules landing:
+
+| entry | what cleared it | still unconsumed? |
+|---|---|---|
+| `Rng.fork` | `contexts.fork(…)` in `shell/profiling/recorder.ts` | yes |
+| `Identity.user` | `cpu.user` in `shell/profiling/node.ts` | yes |
+| `FrameScheduler.contaminated` | `inner.contaminated`, a getter in `construct.ts` forwarding it | yes — a pass-through is not a consumer |
+| `EngineOptions.cache` | `opts.cache` in the declaring file's own body | yes |
+
+**The arm's message offers two dispositions and the real one is a third.**
+*Wired now or gone* were on offer; this is *still unconsumed, with a homonym
+elsewhere masking it*, and no reader following the message would arrive at it.
+
+So the equality arm additionally requires the consuming file to **name the
+owning type**. That is textually the first refused tightening, and the arm is
+what makes the difference: there a false verdict accuses a member of being dead
+and cost 19 false accusations; here a false *still unconsumed* only keeps an
+exemption one release too long, while a false *stale* destroys a reason. Cheap
+in one direction, expensive in the other — which is the same reasoning the
+residue below rests on, applied to a gate rather than a signal.
+
+Measured on the tree the day it landed: **four staleness reports before, zero
+after, and all four hand-checked as false.** The fabricated violation and its
+controls are four rows — a genuine retirement fires; a homonym alone does not;
+the same homonym in a file that also names the owner fires again (the control
+that proves the corpus is not simply empty); and an unlisted member with no
+consumer is still reported unwired.
+
 ### The public surface by use — a residue, not a rule
 
-F105 and F160 closed MG24's name-matching as a class: four tightenings measured,
-four refused, because a coherent API reuses its vocabulary across types
-deliberately and narrowing to the public surface selects *for* that population.
+F105 and F160 closed MG24's name-matching as a class for the **violation** arm:
+three tightenings measured, three refused, because a coherent API reuses its
+vocabulary across types deliberately and narrowing to the public surface selects
+*for* that population. (Two summaries said *four*; `module-graph.mjs` enumerates
+three, with figures. The enumeration is the measurement and the count was a
+summary nobody could resolve against it — F86's shape applied to a tally.)
 What F160 left is a residue rather than a bug, and it named the shape that could
 work — *a second consumer written from the public surface names every field it
 uses, and the residue is the candidates, by **use** rather than by name.* Both

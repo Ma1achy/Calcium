@@ -69,6 +69,7 @@ const FRAME: FrameQueries = {
 function ambient(platform: NodeJS.Platform = "linux"): Ambient {
   return {
     clock: () => 1_700_000_000_000,
+    elapsed: () => 0,   // profiling is off in this fixture; never read
     cwd: "/work",
     fs: fakeFs(),
     schedule: () => ({ [Symbol.dispose]: () => undefined }),
@@ -158,6 +159,7 @@ describe("C22 §6f — the cursor's blink edge (I64)", () => {
       },
       {
         clock: () => now,
+        elapsed: () => 0,   // profiling is off in this fixture; never read
         cwd: "/work",
         fs: fakeFs(),
         schedule: (fn: () => void, ms: number) => {

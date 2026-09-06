@@ -44,11 +44,16 @@ import type { Placed } from "../viewport/overlay/index.js";
 import type { BlockRegistry } from "../presentation/blocks/index.js";
 import type { ResolvedTheme } from "../presentation/theme/index.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
+import type { Probe } from "../data/viewmodel/index.js";
 
 export type CompositeDeps = Readonly<{
   registry: BlockRegistry;
   theme: ResolvedTheme;
   capabilities: TerminalCapabilities;
+  /**
+   * C28's seam (I30). Absent is not recording, and that is the usual case.
+   */
+  probe?: Probe;
   /** Where the viewport region starts, in frame rows. C15 knows nothing of it. */
   regionTop: number;
   /** The region C15 placed against — its own coordinates (I28). */
@@ -134,6 +139,7 @@ function layerRows(p: Placed, deps: CompositeDeps): readonly string[] {
           theme: deps.theme,
           capabilities: deps.capabilities,
           ...(deps.scratch === undefined ? {} : { scratch: deps.scratch }),
+          ...(deps.probe === undefined ? {} : { probe: deps.probe }),
         });
 
   const out: string[] = [];

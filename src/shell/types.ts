@@ -10,6 +10,7 @@
  * C23 satisfies it structurally when it lands.
  */
 
+import type { ProfileOptions, ProfileReport } from "./profiling/types.js";
 import type { ConfirmHost } from "./confirm.js";
 import type { Adapter, AdapterRegistry, ProducerContext } from "../data/adapters/index.js";
 import type { ManifestDocument, ManifestStore } from "../data/manifest/index.js";
@@ -351,6 +352,8 @@ export type PipelineDeps = Readonly<{
    * rendering.
    */
   confirm: ConfirmHost;
+  /** C28's report, when a profiler exists (C22 I93). Absent otherwise. */
+  profile?: () => ProfileReport;
   /**
    * Whether a call needs a decision before it runs, and what the layer says
    * (C23 I60). `null` runs the call; a record puts the card in `waiting`, asks
@@ -479,6 +482,17 @@ export type TuiConfig = Readonly<{
 
   /** Off by default; 50 when enabled without a count (C13 §5a). */
   debug?: Readonly<{ retainPayloads?: number }>;
+
+  /**
+   * C28 — off by default, and *off* means no object at all (C22 I92).
+   *
+   * One field with every member optional, because A02 commitment 5 is the rule
+   * and a profiler is exactly the thing that grows a second one. `elapsed` and
+   * `probe` live here rather than beside `clock` and `fs` because at tier `off`
+   * nothing reads them, so a top-level injection would be a required-looking
+   * seam with no reader in the overwhelming case.
+   */
+  profile?: ProfileOptions;
 
   /**
    * The process environment, supplied by the app (I20).

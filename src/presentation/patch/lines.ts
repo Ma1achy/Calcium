@@ -174,7 +174,11 @@ export function textSpans(
   // width, with nothing saying it had been cut, which is the one truncation defect a
   // reader cannot detect. `code.ts` reaches for the same helper for the same reason.
   const { kept, suffix } = truncateParts(text, budget, ctx.capabilities);
-  const tokens: readonly Token[] = sliceTokens(tokenise(text, language), 0, kept.length); // cells-ok
+  const tokens: readonly Token[] = sliceTokens(
+    tokenise(text, language, ctx.probe),
+    0,
+    kept.length, // cells-ok
+  );
   const fallback = tone("default", ctx.theme, ctx.capabilities);
 
   const styled = (token: Token): Span => ({

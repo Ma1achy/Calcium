@@ -812,6 +812,47 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     ]);
   });
 
+  it("MG24's equality arm is not satisfied by a homonym, so an exemption keeps its reason", () => {
+    // **The third state the arm's message does not name.** It offers *wired now
+    // or gone*; the real disposition here is *still unconsumed, with a homonym
+    // elsewhere masking it*, and four listed entries were in it at once —
+    // `contexts.fork(…)` retiring `Rng.fork`, `cpu.user` retiring
+    // `Identity.user`. Following the message deletes a written reason and stops
+    // tracking a member that genuinely has no consumer.
+    //
+    // The arm therefore requires the consuming file to name the **owning type**.
+    // That is textually the first tightening A03 records as refused, and the arm
+    // is the difference: on the violation arm a false verdict accuses and cost
+    // 19 false accusations; here a false *still unconsumed* keeps an exemption
+    // one release too long while a false *stale* destroys a reason.
+    const decl =
+      "export interface Rng {\n" + "  next(): number;\n" + "  fork(seed: number): Rng;\n" + "}\n";
+    const listed = { "Rng.fork": "a capability the spec commits to with no caller" };
+    const stale = (consumer: string): readonly string[] => {
+      const files: Record<string, string> = {
+        "src/data/fixtures/rng.ts": decl,
+        "src/other.ts": consumer,
+      };
+      return checkSeamConsumers(Object.keys(files), (f) => files[f] ?? "", listed)
+        .filter((v) => v.message.includes("UNCONSUMED_MEMBERS names"))
+        .map((v) => v.message.split(" ")[2] ?? "");
+    };
+
+    // The fabricated violation: a real consumer, in a file that names the owner.
+    expect(stale('import type { Rng } from "./rng.js";\nr.fork(1);\n')).toEqual(["Rng.fork,"]);
+
+    // The third state — the same access, from a file that never mentions `Rng`.
+    expect(stale("contexts.fork(() => 1);\n")).toEqual([]);
+
+    // **The control, and the row is vacuous without it.** If the line above
+    // passed because the corpus was empty rather than because the owner test
+    // fired, adding a mention of `Rng` to the *same* file would change nothing.
+    expect(
+      stale('import type { Rng } from "./rng.js";\ncontexts.fork(() => 1);\n'),
+      "the owner named in the same file retires it again",
+    ).toEqual(["Rng.fork,"]);
+  });
+
   it("MG24 reads a member on any line, so formatting does not decide what is watched", () => {
     // **F159.** The walk read one member per line, so a declaration written on
     // one line presented exactly one member and every later one was outside the

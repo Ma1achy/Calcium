@@ -219,6 +219,16 @@ The rule lands with its implementation, per A03 commitment 14b.
 
 Manifest content, adapters, theme tokens, prefix policy, dynamic completion sources. Full shapes in §6.
 
+### Seam 6 — profiling decorates the seams above; it does not instrument the units
+
+C28 measures what a frame costs by **wrapping the functions the composition root already hands down** — the write, `composeFrame`, Seam 1's `measureChild`, the input decoder, Seam 2's `VerbTransport`, `LiveSpec.fetch` and `Ambient.schedule`. It is the same move Seam 1 makes for its own reason: the registry passes *itself*, so no kind imports the registry; here the root passes a wrapped function, so **no component imports the profiler**.
+
+That is why C28 is L4 (`src/shell/profiling/`) rather than a directory of its own. A profiler reaching into L1's paint or L2's cache would need a clock there, and SS1 bans that across `src/` while SS4 bans it in `src/viewport/` with no exception at all. Under `src/shell/` MG1 already forbids every lower layer from importing it, so *nothing below L4 changes* is an enforced rule rather than an intention.
+
+**Its stated blind spot is why the deep tier exists.** Decoration measures a unit from outside: it can say the plot block cost 8 ms and not which of `figure.ts`'s 3 747 lines did. What decoration cannot reach at all is a small, named set of **integers** — C03's coalescing count, and the hit and miss counts of the two caches that publish a `size` and no hit (F863). Those are counters on interfaces that already exist, carrying no clock and importing nothing.
+
+Full shape in C28 §2 and §4; this seam records only that the mechanism is decoration and that the direction of the dependency is downward from L4.
+
 ## 3. Composition root
 
 ```typescript
@@ -345,16 +355,16 @@ Plus `blocks` for extra block types (F1) and `transport` for per-verb overrides 
 
 ### Performance
 
-| Budget | Target |
-|---|---|
-| Keystroke → frame | < 16 ms p95 |
-| Command commit → frame | < 33 ms p95, excluding subprocess time |
-| Page Down through 10,000 blocks | < 50 ms |
-| Streaming at 1,000 lines/s | ≤ 30 frames/s, < 25% of one core |
-| Resize → correct frame | < 33 ms, zero corruption |
-| Idle CPU | ~0% — no polling render loop |
+| Budget | Target | Measured where, at HEAD |
+|---|---|---|
+| Keystroke → frame | < 16 ms p95 | **T5.2**, through a PTY |
+| Command commit → frame | < 33 ms p95, excluding subprocess time | **nowhere** — no assertion exists |
+| Page Down through 10,000 blocks | < 50 ms | **nowhere** — `test/e2e/viewport.test.ts:12` asserts the rows match at every screenful and reads no clock |
+| Streaming at 1,000 lines/s | ≤ 30 frames/s, < 25% of one core | **T5.1**, both halves |
+| Resize → correct frame | < 33 ms, zero corruption | **T5.4, the corruption half only** — one width per frame, the right height, not empty, not the fallback; never timed |
+| Idle CPU | ~0% — no polling render loop | **T5.6** |
 
-Measured in M-T3 and recorded in A01 Appendix B.
+Measured in M-T3 and recorded in A01 Appendix B. **This column is the finding rather than the plan** (F862): three budgets hold, one holds in half, two are not asserted at all, and **every one that is measured is taken from outside, through a PTY, because the framework exposes no number of its own.** A01 Appendix B's six Layer A cells are all empty, and three of them — bytes per frame, and the median and p95 of frame construction — cannot be filled from outside at any effort. C28 is what closes those three; the other three are owed to diligence.
 
 ### Compatibility
 
@@ -433,3 +443,4 @@ Those entries **say which category they are in and name the structure that carri
 18. Every stateful component enumerates its transition table; invalid transitions are tier-3 tests.
 19. Cross-layer effects are sequenced by L4; no component reaches sideways or upward to cause one. Seam 4's table names **every** such sequence and which of the two L4 components owns it — a seam specified only in the component that needs it is not checkable as a rule.
 20. **Every commitment cites an invariant, several, or another spec's.** §1's two rules for whose claim a commitment is are mechanical, not advisory: A03 SP1 fails the build on a commitment with no marker, on a citation naming an invariant its spec does not declare, and on a cross-reference that does not resolve. Self-referential deliberately — this is the document that states the rule, so it is the document that commits to it.
+21. **Profiling is decoration at the seams this document already declares, and the dependency runs downward from L4.** No component below `src/shell/` imports C28; what decoration cannot reach is a named set of integers on interfaces that already exist. §7's table says where each budget is measured **including where it is not**, because a target with no column reads as a target that is met.

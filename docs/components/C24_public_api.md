@@ -24,15 +24,18 @@ The test it serves: Phase 1 is done when someone who is not its author builds a 
 
 ## 2. Entry points
 
-Three, split by what ships to production.
+Four, split by what ships to production.
 
 ```
 @fmx/calcium            runtime — createTui, builders, types, defaultTheme
+@fmx/calcium/profiling  the report types and Tier; C28 (I31)
 @fmx/calcium/testing    adapter harness, document assertions, fakes
 @fmx/calcium/fixtures   recording tooling and the Fixture model
 ```
 
 `testing` and `fixtures` are dev-only. One entry with everything would drag a golden-frame differ into every production install for nothing.
+
+**`profiling` is not dev-only, and that is the difference from the two above it.** The profiler ships and is off by default, so a consumer reading a `ProfileReport` in production — a `--profile` flag on their own CLI, a support bundle — needs the types at runtime. It is a separate entry rather than part of the root because it is **types plus one enum and no behaviour**: a consumer who never profiles imports none of it, and the root's surface does not grow by twenty names for a feature most sessions never switch on. Its `exports` target is `./dist/shell/profiling/index.js`, because C28 is L4 and the subpath is flat where the source is not (C22 §2c, C28 §1).
 
 ---
 
@@ -1066,6 +1069,8 @@ the renderer's, and the reason has to say so on its own rather than by counting 
 
 - **I29** — **A published function's arguments are constructible from the published surface.** A parameter whose type is interior makes the function itself interior, whatever the export list says — and the failure is silent in exactly the direction that matters, because the export *is* there and the signature *does* resolve until a consumer tries to supply the argument. **Three instances and the third is why this is a rule** (§8a, §8b, §8c): `CompletionContext` shipped with `completionContext`, `ProducerContext` with `producerContext`, and `plotToSvg` was published for a year with `ResolvedTheme` and `loadTheme` both interior. **`RenderContext.theme` is why it survived** — one published route to the type existed, inside a synchronous `render`, which is the one place an SVG cannot be used. A route that exists and does not reach the callers is indistinguishable from a route that works, from the export list. **Checked rather than promised**: MG29 reads every exported function's parameter types and asks whether each is exported or reachable from an exported type, which is the same question §3's refusal list already answers by hand for the exports it removes. **Its stated blind spot is the one that hid this**: a type reachable through *some* published route counts as constructible, and `ResolvedTheme` was — through `RenderContext`, into a synchronous `render`. The rule reports reachability and cannot ask whether the route reaches the caller who needs it, so it would have found this only once `RenderContext` did not exist.
 - **I30** — **A published builder constructs every block kind, and every member of a kind, that the published types declare — except a value only the framework can compute.** I29's dual, and it fails in the same silent direction: the type is exported, the member resolves, and the gap appears only when a consumer tries to set it. **The exception is `who computes`, not `who holds`** — a value the framework *hands* a consumer, as `renderError` hands `err`, `retryInMs` and `attempt`, is relayed rather than claimed, and relaying it is not the thing MG27 refuses. Derived members stay underivable: `state` follows from whether a countdown is present, and `height` is C23's frame read, so neither is a parameter. **Three instances, and each had been recorded as owed its own commit**, which is how a queue nobody drains gets made: `status` had no builder at all, `b.plot` omitted eight of `Plot`'s 58 — four of them a form's only datum, so four forms were unconstructible and three reduced — and `FigureBuilder.setFacets` set a field the published function could not. **Checked by MG27 in both directions**, which is why the rule can be widened safely: an omission needs a reason keyed `Kind.field`, and an entry whose builder now sets the field is itself a violation, so the reasons cannot outlive their subject. **Stated blind spot**: MG27 is per *member* and this rule is also about *kinds*, and a kind with no builder has no member row to be missing — `status` was invisible to it for that reason, and what found it was writing a consumer that needed one.
+- **I31** — **`@fmx/calcium/profiling` publishes types, `Tier`, and nothing that runs.** No recorder, no probe, no capture: a consumer imports it to *read* a report, and everything that produces one is reached through `createTui`. An entry point that ships behaviour nothing on the runtime surface can reach is a second way in (→ C22 I93).
+- **I32** — **`ChromeContext.lastFrame` carries the previous frame's cost and its name says so.** The current frame's total cannot be known while composing it, so a member named for the current frame would hold a number it cannot have — the shape this repository keeps finding. It is `undefined` at tier `off` and for the first frame of a session, and a chrome that draws it says which frame it is describing.
 ---
 
 ## 10. Commitments
@@ -1099,12 +1104,17 @@ the renderer's, and the reason has to say so on its own rather than by counting 
 27. A live part does not poll while nothing is looking at it, for every part and not only the sharing ones — a stated behaviour change, unconditional, and releasing nothing (I28).
 28. A published function's arguments are constructible from the published surface, checked mechanically rather than found by a consumer for the third time (I29, §8c, MG29).
 29. A published builder constructs every kind and member the published types declare, except a value only the framework can compute — and the test is who computes it, not who holds it (I30, §4b, §8d, MG27).
+30. **A fourth entry point, for types a consumer reads rather than behaviour they run** (I31). `profiling` ships because the profiler ships; it holds no recorder, so importing it cannot start one.
+31. **The context carries the *last* frame's cost, and the member is named for it** (I32). A frame's total is unknowable while it is being composed, so the honest member is the one that says which frame it describes.
 
 ---
 
 ## 11. Tests
 
 ### Tier 1 — unit
+
+- **T1.9** (I31): every runtime value exported from `@fmx/calcium/profiling` → `Tier`'s members and nothing callable; importing the module constructs no recorder, registers no timer and touches no process figure. Asserted on the module's own exports rather than on a written list, because a list is satisfied by the list.
+- **T1.10** (I32): a chrome called at tier `off` → `lastFrame` is `undefined`; at `spans`, the first frame's is `undefined` and the second's is the first's cost, not the second's.
 
 - **T1.1**: each builder produces a block passing `validateBlock` — twenty cases.
 - **T1.2**: an omitted id is generated and unique within a document; a supplied one is preserved.
@@ -1171,6 +1181,8 @@ the renderer's, and the reason has to say so on its own rather than by counting 
 - **T5.5**: `degradesTo1Bit` run over every document the reference app produces → passes.
 
 ### Tier 6 — fail-on-revert
+
+- **T6.16** (I32): renaming `lastFrame` to `frame`, or filling it with the frame being composed → T1.10 fails on the second frame, and every consumer drawing it reports a number taken before the work it names.
 
 - **T6.1** (I2): exporting one of the eleven absent components → T2.1 fails, and the layering starts leaking.
 - **T6.12** (I15): dropping a builder's `gapBefore` default → T2.9 fails on that kind. Without the enumeration the surfaces render dense while the S-series draws them spaced, which is the gap the audit found.

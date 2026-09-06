@@ -47,12 +47,17 @@ import { resolveBase } from "../presentation/theme/index.js";
 import type { ResolvedTheme } from "../presentation/theme/index.js";
 import type { Style } from "../presentation/theme/index.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
+import type { Probe } from "../data/viewmodel/index.js";
 import { spinnerFrames } from "../presentation/blocks/index.js";
 
 export type PaintDeps = Readonly<{
   registry: BlockRegistry;
   theme: ResolvedTheme;
   capabilities: TerminalCapabilities;
+  /**
+   * C28's seam (I30). Absent is not recording, and that is the usual case.
+   */
+  probe?: Probe;
   /** The visible transcript rows, already selected by C14 at this width. */
   transcriptRows: () => readonly string[];
   /** C17's display rows, already wrapped and gutter-aware (C17 §2, I18). */
@@ -184,6 +189,7 @@ function region(
       : renderSequenceToLines(deps.registry, blocks, width, {
           theme: deps.theme,
           capabilities: deps.capabilities,
+          ...(deps.probe === undefined ? {} : { probe: deps.probe }),
         });
 
   const out: string[] = [];

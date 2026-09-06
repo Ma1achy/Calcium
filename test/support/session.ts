@@ -15,6 +15,7 @@ import { createTui } from "../../src/shell/session.js";
 import type { FileSystem, TuiConfig, TuiInstance } from "../../src/shell/types.js";
 import { fakeStdin, fakeStdout, type FakeStdin, type FakeStdout } from "./fake-terminal.js";
 import { screenFrom, type Screen } from "./screen.js";
+import type { Profiler } from "../../src/shell/profiling/types.js";
 
 /**
  * **What an author writes, and nothing more** (C22 I23a).
@@ -143,6 +144,7 @@ export function fakeClock(): { now: () => number; advance: (ms: number) => void 
 export function fakeAmbient(clock = fakeClock()): Ambient {
   return {
     clock: clock.now,
+    elapsed: () => 0,   // profiling is off in this fixture; never read
     cwd: "/work",
     fs: fakeFs(),
     schedule: (fn, ms) => {
@@ -199,6 +201,7 @@ export async function buildSession(
     env: { TERM: "xterm-256color", LANG: "en_GB.UTF-8" },
     cwd: "/work",
     clock: clock.now,
+    elapsed: () => 0,   // profiling is off in this fixture; never read
     fs: fakeFs(),
     stdout: stdout as unknown as NodeJS.WriteStream,
     stdin: fakeStdin(),
@@ -223,6 +226,16 @@ export async function buildSession(
 export async function buildGraph(
   overrides: Partial<TuiConfig> = {},
   size = { columns: 100, rows: 30 },
+  /**
+   * C28's recorder, injected as the root's own caller does (C22 I93).
+   *
+   * **Here rather than through `overrides.profile`**, because that field makes
+   * `Session` build one and keep it private — there is no public accessor yet —
+   * and a row that cannot read the report cannot assert the wiring. Passing the
+   * object is the same edge `session.ts` uses, and the row then reads what the
+   * root actually handed down rather than what it could have.
+   */
+  profiler?: Profiler,
 ): Promise<{
   graph: Graph;
   stdout: FakeStdout;
@@ -284,6 +297,7 @@ export async function buildGraph(
     onFatal: (err) => {
       throw err;
     },
+    ...(profiler === undefined ? {} : { profiler }),
   });
 
   return {

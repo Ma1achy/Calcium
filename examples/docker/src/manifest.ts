@@ -24,6 +24,7 @@ import { DESTRUCTIVE_TOOLS } from "./manifest/destructive.ts";
 import { REGISTRY_TOOLS } from "./manifest/registry.ts";
 import { RESOURCE_TOOLS } from "./manifest/resources.ts";
 import { EXEC_TOOLS } from "./manifest/exec.ts";
+import { PROFILING_TOOLS } from "./manifest/profiling.ts";
 
 /**
  * F1's shim, not `docker`.
@@ -53,6 +54,7 @@ export function buildManifest(engineVersion: string): ManifestDocument {
       ...REGISTRY_TOOLS,
       ...RESOURCE_TOOLS,
       ...EXEC_TOOLS,
+      ...PROFILING_TOOLS,
     ],
   };
 }
