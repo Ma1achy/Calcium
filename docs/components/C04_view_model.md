@@ -105,7 +105,7 @@ type Logs     = Readonly<{ kind: "logs"; id: string;
 type Events   = Readonly<{ kind: "events"; id: string;
                            events: readonly Readonly<{ ts: string; type: string; message: string }>[] }> & Gap;
 type Progress = Readonly<{ kind: "progress"; id: string; label: string;
-                           current: number; total: number }> & Gap;
+                           current: number; total: number; ramp?: Ramp }> & Gap;   // `ramp`: §3am.2
 type Code     = Readonly<{ kind: "code"; id: string; language: string; text: string;
                            wrap?: boolean;             // default false — truncate
                            lineRange?: readonly [number, number] }> & Gap;
@@ -2585,6 +2585,91 @@ row shortens nothing. Admitted by one consumer, the head, and the member the fir
 have named because the token it serves did not exist.
 
 
+### 3am.2 — a ramp: an ink that is a function of position, on a span and on the bar
+
+An ink names a slot. A **ramp** names a function `[0, 1] → Colour` and lets the extent it is
+drawn over supply the argument — a gradient across a title, a shimmer along a running head's
+argument, a bar whose tip reads its own fraction. The design, its fourteen measurements and
+both walk artefacts are in `docs/notes/CALCIUM_INK_RAMPS_DESIGN.md`; this section is the
+contract, and it is this component's because a `Ramp` is document data a far side sends and
+the gate refuses. What a ramp varies *over* is C09's to rule (C09 §5, `RAMP_EXTENT`); how a
+colour degrades is C10's (C10 §4e). This section says what one **is**.
+
+```typescript
+type RampFill      = "gradient" | "step" | "palette";
+type RampAnimation = "none" | "shimmer" | "wave" | "breathe" | "pulse" | "heartbeat";
+
+/** An ink that is a function of position (I106–I109). */
+type Ramp = Readonly<{
+  fill:      RampFill;
+  from?:     Tone;            // a slot pair — `gradient` and `step`
+  to?:       Tone;
+  colormap?: ColormapName;    // `gradient` and `step`; on `progress` only (I107)
+  bands?:    number;          // `step` only; integer, 2 ≤ bands ≤ 8
+  animate?:  RampAnimation;   // absent is "none"
+}>;
+
+type TextSpan = Readonly<{ …; elide?: true; ramp?: Ramp }>;                        // the ninth member
+type Progress = Readonly<{ …; current: number; total: number; ramp?: Ramp }> & Gap;
+```
+
+**Three fills, because they mean three things, and the backing's arity is the gate's** (I106).
+A `gradient` says *this varies continuously*, a `step` says *these are N groups*, a `palette`
+says *these are unordered identities*; drawing one as another is the encoding violation C12's
+ramp types already refuse (C12 §3b). `gradient` and `step` take **exactly one** backing — a
+`from`/`to` pair of slots, or a `colormap` — and `palette` takes neither; `bands` rides on
+`step` alone. `RAMP_KEYS` is the key gate, six members, asserted as `TEXT_SPAN_KEYS` is. **No
+member can hold a colour value**: the type is closed to `Tone` and `ColormapName`, so §3's
+*never embeds a colour* holds here by construction and no source scan is owed for it.
+
+**`palette` takes no name** (I106). The brief offered *a palette name*, citing the waffle and
+the pie; measured, both cycle the **theme's** categorical slots through `refOf`, and
+`QUALITATIVE_PALETTES` has no consumer in `src/` (F837). C10 I16 rules that a document draws
+its categories from that one palette, so a field naming another has one legal value, and a
+field with one legal value is not a choice. Cluster *i* of a palette ramp is
+`categorical.c((i mod 8) + 1)`, and the data palettes stay the plot arm's.
+
+**On a span, a ramp is appearance and only appearance** (I107). `measure` never reads it —
+the ninth member of `TEXT_SPAN_KEYS`, and the golden sweep asserts the same height with and
+without one on every carrier. It replaces the run's **foreground** and nothing else: the
+span's `tone` still supplies `bold`/`dim`, its attributes still spread on top. Two refusals
+at the gate. A span carrying both `value` and `ramp` is refused: a background from the value
+and a foreground from the ramp is two unmeasured colours on one cell. And a **colormap backing
+is refused on a span this round**: C10 I26's contrast floor is proven per slot by the
+resolver, a sampled colour passes through no floor, and viridis's dark end over a dark
+surface is a run nobody can read and nothing measures. A slot pair is bounded by two proven
+colours. The bar's ink fills its cell and reads by area, which is how a heatmap already
+earns a colormap under C10 I31 — so a colormap on the bar is a heatmap of one row and the
+floor argument does not apply. The deferral's symbol is a floor-aware lift for a sampled
+colour in `theme/contrast.ts` (design §7).
+
+**The bar is the one block-level carrier** (I108). `Progress.ramp` colours the `on` cells;
+the `off` cells stay `muted`; C09 rules the extent as the **axis**, so a bar at 30% is not a
+compressed copy of the bar at 100% and its already-painted cells keep their colour as it
+fills (design Q5, answering the brief's *RULE WHICH*). `RAMP_EXTENT` is exhaustive over
+`BlockKind` and says `none` for every kind but the two carriers; a kind marked `none` has no
+member to put a ramp in, so that refusal is by type and not by gate. `rule`, `panel` borders
+and plot series are deferred with symbols in design §7, admitted by a consumer appearing and
+never by symmetry — the same rule I88 applies to spans.
+
+**`animate` is a closed union of six, and timing is not a member** (I109). Five loops and
+`none`. A one-shot — `sweep`, `ripple` — is an event and needs a birth tick the render does
+not have (design Q8; the symbol is `RenderContext.since`); `typewriter` and `marquee` change
+which clusters show, a text-window mechanism that belongs beside `elide` and not inside a
+colour. No period and no easing: a caller choosing a period is two callers choosing
+differently for one meaning, which is the drift the spinner sets already refused (C09 §4),
+and easing is a function, and a function is not serialisable. The static frame is `tick = 0`
+of the same evaluation (C09 §5), so a document with `animate` and one without measure and
+serialise alike and neither is a mode.
+
+**What the gate refuses**, each a construction error at the document gate (C13 I10) and
+nothing else: a `gradient` or `step` with both backings or neither; a `palette` with a
+backing or with `bands`; `bands` on anything but `step`, or outside `2..8`, or non-integer;
+an unknown `fill`, `animate` or key; a `colormap` on a span; `value` and `ramp` on one span;
+`ramp` on a hunk line, whose two palettes are already spoken for (I91). A `Ramp` round-trips
+through JSON unchanged (§5a).
+
+
 ## 3an. The markdown subset's last three residues — three tiers, a rail, and a bounded depth
 
 Roadmap 11 named four residues, closed two, and left three that are one sentence three
@@ -3041,7 +3126,7 @@ persisted document rests on.
 - **I82** — **`lineRange` is view state written only by `code`'s `window`, refused on an inbound document, and honoured by both halves of the definition.** The window keeps `text` whole — the same string, no copy — and sets the source-line range `[from, to)`; `measure` counts the lines in range and `render` tokenises the whole text and produces only those rows, so a block comment opening above the window still colours the rows inside it (C09 I25a, F426). Units are source lines and never rows, so a window never opens inside a wrapped line and the surplus is `skipRows`/`dropRows` (C09 I26). It is the third member of I67's refused set and the first whose writer is a definition rather than an op; `raw` windows by slicing `text` and carries no field (§3d, C14 §4a, C14 I23).
 - **I83** — **A span is a parallel decoration and never a second carrier of text.** `spans?: readonly TextSpan[]` sits beside `text` (or `label`) and addresses it by offset; the member's string is unchanged and every existing reader of it stays valid. A span carries no characters, so the measurer's input is the string it always was — §5's *independent of theme* clause holds by construction and no kind's `measure` reads `spans` (→ C09 I1, C09 I8). The union form `text: string | readonly Run[]` was measured against 17 readers and 57 writers and refused on that count; the run list is what a renderer *builds* and is C09's `Span`, not this type's (§3am).
 - **I84** — **Offsets are UTF-16 code units, half-open, and the gate refuses every malformation it can decide.** `from` and `to` are integers with `0 ≤ from < to ≤ text.length`; the array is sorted by `from` and no two spans overlap; a boundary between the halves of a surrogate pair is refused. Each fault is one error naming the span's index. What the gate cannot see — a boundary inside a grapheme cluster that is not a surrogate split — is snapped outward by the renderer — `from` to the cluster's start, `to` to its end — which preserves the width (→ C09). The unit is the one `Token`, `sliceTokens`, `truncateParts.kept.length` and `codeRows.start` already use, so the row-slicing mechanism is shared rather than reimplemented.
-- **I85** — **A span's attributes are `bold`, `italic`, `underline`, set by the renderer from the span and never resolved from a palette slot; its three other members are I89's, I90's and I105's.** No `tone`: it would collapse at 1-bit onto the attributes the span itself uses and its one consumer is ruled onto `underline` (C25 I10). No colour, no `dim`, no `inverse`, no `value` — each a deferral with a symbol, and each admitted only by a consumer appearing (F85's narrower type). At 1-bit a span's `bold` on a block whose tone already collapses to bold is **absorbed and not compensated**: no fallback onto `underline`, which is spoken for, and no return to literal markers, which the view model cannot decide because it never sees a capability (→ C10 I33).
+- **I85** — **A span's attributes are `bold`, `italic`, `underline`, set by the renderer from the span and never resolved from a palette slot; its four other members are I89's, I90's, I105's and I107's.** No `tone`: it would collapse at 1-bit onto the attributes the span itself uses and its one consumer is ruled onto `underline` (C25 I10). No colour, no `dim`, no `inverse`, no `value` — each a deferral with a symbol, and each admitted only by a consumer appearing (F85's narrower type). At 1-bit a span's `bold` on a block whose tone already collapses to bold is **absorbed and not compensated**: no fallback onto `underline`, which is spoken for, and no return to literal markers, which the view model cannot decide because it never sees a capability (→ C10 I33).
 - **I86** — **A span changes no geometry at any stage: it continues across a wrap, clips to the kept text at a cut, and follows a substituted cluster.** A wrapped span is carried by source offset — every wrapped row is an exact contiguous slice of the source from a known `start`, and `wrapCells` drops break spaces, so prefix sums of row lengths drift one unit per break and are the wrong arithmetic. A truncated span is clipped to `truncateParts.kept`; the marker and its padding are never inside a span. A cluster the wrapper replaces with `?` keeps its span. `measure` is the same number with and without `spans` at every width (→ C09 I1, I19).
 - **I87** — **A span travels with its text through every patch and stops at the copy buffer.** `replace` carries a whole `Block` and `merge` a whole `Cell`, so no `ViewPatch` arm can write `text` without its `spans`; a patch that widened to a text-only arm would reopen the class this closes. Copy takes `text` and drops `spans`, as it drops tone. A `TextSpan` is plain data and survives `JSON.parse(JSON.stringify(d))` (§5a). C17's `CellSpan` is a result in display cells over the editor's rows and shares a name only.
 - **I88** — **Four members carry spans in the first pass and `code` is refused one.** `Raw.text`, `Notice.text`, `Rule.label` and `Cell.text` — the four the markdown translator emits text into. A `code` block with `spans` is refused at the gate: its syntax tokens are a run stream over the same text, and two streams over one string is the collision the mechanism exists to prevent. Every other text member is deferred with its symbol (`CALCIUM_SPANS_DESIGN.md` §7) and admitted by a writer appearing, never by symmetry.
@@ -3062,6 +3147,10 @@ persisted document rests on.
 - **I103** — **A child's placement is computed once and read by the renderer and the element walk alike.** The offsets on both axes come from one function in `measure.ts`; the renderer applies them as margins and `elementsIn` lifts the child's elements by them, so an element sits where the frame drew it. F816 measured the alternative at HEAD: a `bottom` child drawn on row 3 whose chips answered `rows [0, 1)` (§3 *Both axes* R5, C09 I30, C26 §5).
 - **I104** — **The residue row's text is fixed by state and names no key: an open box reads `⋯ N above, M below`, a collapsed box reads `⋯ +N more`.** One mechanism for *what is hidden* (I49) and two texts, because the open box's direction was measured to matter (§3c T6) and the collapsed box has no direction to state — *0 above* on zero visible rows is a clause nothing can falsify (F826). No key name on either row: the affordance is `activate` and the footer shows its label (C16 I19).
 - **I105** — **`elide` is a span member marking the run a fitter shortens first, from its end; it is a boundary and never an appearance, and it is inert outside a fitted token.** `TEXT_SPAN_KEYS` admits it as the eighth member; `measure` reads it as it reads `from` and `to` (I83), so a `step` notice is one row with or without it and a wrapped notice wraps as it did. The consumer is the call's head, whose argument gives way before its verb, duration and outcome (C09 I46).
+- **I106** — **`Ramp` is a closed data type: three fills whose backing arity the gate checks, six keys in `RAMP_KEYS`, no member that can hold a colour value, and `palette` names nothing.** `gradient` and `step` take exactly one of a slot pair or a `colormap`; `palette` takes neither and no `bands`; `bands` is `step`'s alone, an integer in `2..8`. The type is closed to `Tone` and `ColormapName`, so §3's *never embeds a colour* holds by construction. A palette ramp cycles the theme's categorical slots and no other (C10 I16, F837).
+- **I107** — **`TextSpan.ramp` is the ninth member and is appearance only: `measure` never reads it, it replaces the run's foreground colour and nothing else, it is refused beside `value`, and a colormap backing is refused on a span.** A slot pair is bounded by two colours whose floors C10 I26 proves; a sampled colour passes through no floor. The bar's ink reads by area (C10 I31), which is why the same backing is admitted there. The deferral's symbol is a floor-aware lift in `theme/contrast.ts`.
+- **I108** — **`Progress.ramp` is the one block-level carrier; `RAMP_EXTENT` is exhaustive over `BlockKind`, and a kind marked `none` has no member to carry a ramp.** The `on` cells take the ramp over the axis (→ C09), the `off` cells stay `muted`. Every other kind is a deferral with its symbol (`CALCIUM_INK_RAMPS_DESIGN.md` §7), admitted by a consumer appearing and never by symmetry.
+- **I109** — **`RampAnimation` is a closed union of five loops and `none`; period and easing are never members; absent is `none`, and the static frame is `tick = 0` of the same evaluation.** A one-shot is an event and needs a birth tick the render lacks; a position effect is a text window and not a colour. Timing lives in the effect (→ C09), as the spinner's lives in the set.
 
 
 ## 7. Commitments
@@ -3167,6 +3256,8 @@ persisted document rests on.
 95. **One placement, both readers** (I103). The offset arithmetic lives in `measure.ts` beside `childWidths`, for the reason `childWidths` does: two halves that each compute it are two halves free to disagree, and F816 is the disagreement measured.
 96. **Two texts for one residue mechanism, and no key on either** (I104). The collapsed form's *0 above* was a sentence that could not be violated, and the design's `⏎ to expand` was a second keymap; the count survives from each and the rest does not (F826).
 97. **A span can say which run gives way first** (I105). `elide` is admitted by the call's head, the one consumer that knows which run is the argument; a boundary, read by `measure` as offsets are, inert wherever nothing is fitted.
+98. **An ink can be a function, and the function is data** (I106, I109). A `Ramp` is three fills, a backing the gate checks the arity of, and a closed set of loops with their timing in the effect; it carries no colour value, no period and no easing, so a far side can send one and the gate can refuse one (`CALCIUM_INK_RAMPS_DESIGN.md`).
+99. **Two carriers, each with an extent, and the rest refused by type** (I107, I108). A span's clusters and the bar's axis; a colormap on the bar and slot pairs on text, because a floor is proven per slot and a bar reads by area; every other kind is `none` in `RAMP_EXTENT` until a consumer appears.
 ---
 
 ## 8. Tests
@@ -3202,6 +3293,8 @@ Six tiers. No state machine, so no transition table.
 - **T1.24** (I84): each malformation is refused with **one error naming the span's index** — a non-integer `from`, a negative `from`, `from === to`, `from > to`, `to` past `text.length`, two spans out of `from` order, two spans that overlap by one unit, a boundary between the two halves of a surrogate pair, and an unknown attribute — nine documents, nine errors, and a tenth carrying all nine faults reports nine.
 - **T1.25** (I83): for every width in the golden sweep, `measure` of a `raw`, a `notice`, a `rule` and a one-column `table` is the **same number** with `spans` and with the same block stripped of them — the assertion is on the pair, so a measurer that started reading `spans` fails here before any frame does.
 - **T1.27** (I99): a two-series line plot measures the same height with `hidden: true` on one series, on both, and on neither, at widths 20, 40 and 80; an annotation `hidden` likewise. In `test/unit/plot-hidden.test.ts`.
+- **T1.29** (I106): the arity table at the gate — a `gradient` with a slot pair is admitted, with a `colormap` on `progress` is admitted, with both backings is refused, with neither is refused; a `palette` with a pair, with a `colormap`, or with `bands` is refused; a `step` with `bands` 1, 9 or 2.5 is refused and with 2 or 8 admitted; `bands` on a `gradient` is refused; each refusal's message names the rule it broke.
+- **T1.30** (I107, I108): a span carrying `value` and `ramp` is refused; a span whose ramp has a `colormap` backing is refused while the same ramp on a `progress` block is admitted; a `ramp` on a hunk line is refused; a `progress` without `ramp` validates as it did.
 - **T1.26** (I87): a document carrying spans on all four members satisfies §5a's round trip: `validateDocument(JSON.parse(JSON.stringify(d)))` is valid and structurally equal.
 
 ### Tier 2 — contract / interface
@@ -3244,7 +3337,8 @@ The generic suite. **These run against every registered block kind, including ap
 - **T2.111** (I102): `minRows: 6` constructs and the group measures 6 with two-row children; `minRows: 0`, `-1`, `2.5` and `"6"` are each refused naming the field.
 - **T2.112** (I100, I45): every one of the fifteen entries constructs on a one-child row, and each measures the same height as no `align` at all — the vertical half of T3.23 restated over the widened vocabulary.
 - **T2.113** (I104): a collapsed scroll of 392 children renders exactly `⋯ +392 more` in unicode and `~ +392 more` in ASCII at 80 and 20 cells; the same box expanded and paged to its middle renders `⋯ N above, M below` with `N + M + interior === 392`; neither row contains `⏎` or the word `expand`.
-- **T2.114** (I105): `TEXT_SPAN_KEYS` has eight members and admits `elide`; a `notice` under `info` with an `elide` span measures and renders identically to the same block without it at every width of the sweep; on a `step` notice the marked run ends in the marker at a width that cannot hold the row, and the runs outside it are byte-identical to the unfitted text.
+- **T2.117** (I106, I109): `RAMP_KEYS` has six members and a seventh key is refused by name; `animate: "sweep"` is refused with a message naming the six; a document carrying a ramped span on every carrier and a ramped `progress` satisfies §5a's round trip.
+- **T2.114** (I105, I107): `TEXT_SPAN_KEYS` has nine members and admits `elide` and `ramp`; a `notice` under `info` with an `elide` span measures and renders identically to the same block without it at every width of the sweep; on a `step` notice the marked run ends in the marker at a width that cannot hold the row, and the runs outside it are byte-identical to the unfitted text.
 - **T2.34** (§3am): the same translation on a list item and on a blockquote lands the spans on the `notice`, on a heading on the `rule`'s `label`, and on a pipe-table cell on the `Cell` — the four members of I88 — and on a fenced block **does not** run: `**` inside a fence is seven characters.
 
 ### Tier 3 — edge cases
@@ -3306,6 +3400,7 @@ The generic suite. **These run against every registered block kind, including ap
 - **T3.74** (I103): the F816 fixture — a four-line `raw` beside a `pills` block aligned `bottom` — answers the chip's element at `rows [3, 4)`; the same block aligned `right` answers `cols` ending at its **cell's** right edge, which at 40 under equal weights is 39 and not 40 because the remainder is unspent (I42); both compared to where the rendered frame carries the chip's label.
 - **T3.75** (I102, §3d): a group with `minRows: 4` and a reserved `minHeight: 6` measures 6 through the registry, and its `bottom` child draws on row 3, not row 5 — table row 6.
 - **T3.76** (I101, C09 I43): a `notice` whose text wraps in a 60-cell cell, aligned `right`, renders exactly its own render at its content width shifted by the offset, and measures the same at both widths.
+- **T3.77** (I107, I108): over the golden sweep's widths, a `raw`, a `notice` and a `Cell` carrying a ramped span measure identically with and without the ramp, with `animate` at tick 0 and at tick 7; a `progress` with a colormap ramp measures 1 at every width; the frames differ at 24-bit where the heights do not.
 - **T3.67** (I85) — **the accepted loss, asserted so a change is visible.** At 1-bit an `ok` notice (emphasised → bold) with a bold span paints a frame byte-identical to the same block without the span; at 8-bit the two differ. A row that starts failing is a compensation that has been added, and the ruling says there is none.
 
 ### Tier 4 — integration
@@ -3374,6 +3469,10 @@ The generic suite. **These run against every registered block kind, including ap
 - **T6.89** (I103): reverting the element walk to place every child at the row's top → T3.74 fails; the render is untouched, which is F816 restored.
 - **T6.90** (I104): restoring `⋯ 0 above, N below` on the collapsed form → T2.113 fails on the collapsed text while every open-box row passes; putting `⏎` back on the row → T2.113's key assertion fails and C16 I19's scan names the row.
 - **T6.91** (I105): `validate.ts` refusing `elide` → T2.114 fails at construction; the fitter reading `elide` as an appearance and skipping it in `measure` → T2.114's `info` arm still passes and its `step` arm fails on the row count, which is why the row has both arms.
+- **T6.92** (I106): dropping the arity check from `validate.ts` → T1.29's both-backings row admits a ramp with two answers; admitting a `bands` of 1 → T1.29's bands row passes a step with one band, which is a gradient wearing a different name.
+- **T6.93** (I107): the validator admitting a `colormap` on a span → T1.30 fails at construction; `measure` reading `ramp` → T3.77 fails on the height while every render row still passes, which is why the row compares heights and not frames.
+- **T6.94** (I109): widening `RampAnimation` with `sweep` → T2.117's refusal row admits an event the render cannot time.
+- **T6.95** (I108): `validate.ts` dropping `ramp` from `progress`'s admitted keys → T1.30's accepted row fails; adding `ramp` to `rule` → the `RAMP_EXTENT` exhaustiveness check names a kind marked `none` with a carrier (→ C09).
 - **T6.85** (§3am): reverting the translator to literal markers → T2.33 fails on `text`; adding a text-only `ViewPatch` arm → T1.26 still passes and **nothing fails**, which is the row that says the closure in I87 is by type and the day the union widens this row wants a test.
 
 ---

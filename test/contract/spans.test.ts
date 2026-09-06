@@ -195,4 +195,5 @@ describe("C04 §3am.1 — `elide`", () => {
     expect(narrow).toContain("…) · 4s · 12 rows");
     expect(narrow.length, "shorter, and only in the marked run").toBeLessThan(wide.length);
   });
+  it.todo("T2.117 (C04 I106, I109): RAMP_KEYS has six members; a seventh key and animate: sweep are refused by name; a ramped document round-trips through JSON — not deferred on a component: lands with the Ramp type");
 });

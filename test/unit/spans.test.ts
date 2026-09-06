@@ -102,6 +102,8 @@ describe("C04 §3am — spans, the gate", () => {
     expect(outcome.ok).toBe(true);
     expect(back).toEqual(d);
   });
+  it.todo("T1.29 (C04 I106): the arity table at the gate — one backing for gradient and step, none for palette, bands on step alone in 2..8, each refusal naming its rule — not deferred on a component: lands with the ramp validator");
+  it.todo("T1.30 (C04 I107, I108): value and ramp on one span refused; a colormap backing refused on a span and admitted on progress; a ramp on a hunk line refused — not deferred on a component: lands with the ramp validator");
 });
 
 describe("C04 §3am — spans and the measurer", () => {

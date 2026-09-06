@@ -152,4 +152,8 @@ describe("C10 §4e — span attributes, tier 6", () => {
     expect(sgr(withSpan(base, { italic: true }))).toMatch(/\x1b\[3;/u);
     expect(gated(withSpan(base, { italic: true }), ASCII_CAPS.unicode === "ascii" ? "ascii" : "full")).not.toMatch(/\x1b\[3;/u);
   });
+  it.todo("T6.92 (C04 I106): dropping the arity check → T1.29's both-backings row admits two answers — not deferred on a component: lands with the ramp validator");
+  it.todo("T6.93 (C04 I107): admitting a colormap on a span → T1.30 fails; measure reading ramp → T3.77 fails on height — not deferred on a component: lands with the ramp resolver");
+  it.todo("T6.94 (C04 I109): widening RampAnimation with sweep → T2.117's refusal row admits an event the render cannot time — not deferred on a component: lands with the Ramp type");
+  it.todo("T6.95 (C04 I108): dropping ramp from progress's keys → T1.30's accepted row fails; adding it to rule → RAMP_EXTENT's exhaustiveness names the kind — not deferred on a component: lands with RAMP_EXTENT");
 });

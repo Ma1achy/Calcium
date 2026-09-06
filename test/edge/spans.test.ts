@@ -119,6 +119,7 @@ describe("C04 §3am — spans at the edges", () => {
       full.renderToLines(block({ kind: "notice", id: "n", tone: "ok", text }), 30),
     );
   });
+  it.todo("T3.77 (C04 I107, I108): a ramped span measures the same as its plain twin over the sweep, at tick 0 and tick 7; a colormap-ramped progress measures 1 — not deferred on a component: lands with the ramp resolver");
 });
 
 describe("C09 §5 — tone and value, the frames", () => {
