@@ -30053,3 +30053,107 @@ runs 34007480654 and its rerun, 2026-09-06.
 
 ---
 
+## F840 — *node-pty in the tree* is true of the harness and not of the product, and the class it hides is a native build on the consumer's machine ★★★☆☆
+
+**What.** `CALCIUM_LIVE_TERMINAL.md` §1 lists `node-pty` under *already built* — *in the tree, the
+e2e suite spawns PTYs today*. Measured: a **devDependency** (`package.json:59`), 63 MB installed
+with its build tree, prebuilds for darwin and win32 only, and **zero importers in `src/`** — the
+one importer is `test/support/pty.ts:16`. `CALCIUM_NOTE_AUDIT.md` §2 had already said as much in
+its framing paragraph; this finding is about what follows from it.
+
+**Why it matters.** A live terminal block at runtime needs a PTY at runtime, and promoting
+`node-pty` to `dependencies` would make R01 R4.4 — *clean clone → `npm install` → running shell,
+no further steps* — false on Linux: `--ignore-scripts` is set for the whole tree (A04 §3), so the
+native build never runs, and the module fails to load. A04 §3 already names `node-pty` as A03
+SS32's single exception *because* it needs the toolchain; the exception was scoped to
+contributors, and a runtime promotion would silently extend it to every consumer. The brief's
+*already built* row is the sixth blind spot's shape — a true sentence about the harness carried
+as a premise about the product.
+
+**Ruling.** `CALCIUM_LIVE_TERMINAL_DESIGN.md` Q1: the PTY is an **injected port** on C21
+(`PtyFactory`, structurally typed after `node-pty`'s `IPty`, no import), passed by the consumer
+through `TuiConfig.pty`; with none injected the shell route falls back to pipes into the same
+emulator (Q2). `node-pty` stays a devDependency and SS32's list is unchanged. An
+`optionalDependency` was considered and refused: it downloads 63 MB to fail.
+
+**Where**: `package.json:59`; `DEPENDENCIES.md` `node-pty` row; `docs/architecture/A04_repo_scaffolding.md` §3;
+`docs/notes/CALCIUM_LIVE_TERMINAL.md` §1; `docs/notes/CALCIUM_LIVE_TERMINAL_DESIGN.md` M10, Q1.
+
+---
+
+## F841 — `@xterm/headless` 6.0.0 ships an ESM entry that names a file the package does not contain ★★☆☆☆
+
+**What.** `package.json` in the published package has `"main": "lib-headless/xterm-headless.js"`
+and `"module": "lib/xterm.mjs"`. The `lib/` directory is not in the tarball — the contents are
+`lib-headless/`, `typings/` and `README.md`. Node ignores `module` and resolves the CJS `main`,
+whose ESM view is `{ default: { Terminal } }`; `import { Terminal } from "@xterm/headless"`
+therefore yields *Terminal is not a constructor* at the first `new`, and only
+`import xh from "@xterm/headless"; xh.Terminal` works. Measured in the devcontainer with
+`--input-type=module` and with `require`.
+
+**Why it matters.** It decides the import shape of the one file allowed to import the package
+(design Q3), and a bundler that honours `module` would fail differently from Node. Recorded in
+the dependency row so the next person does not read the default-import as carelessness.
+
+**Where**: `/tmp/xh/node_modules/@xterm/headless/package.json:5-7` in the devcontainer;
+`docs/notes/CALCIUM_LIVE_TERMINAL_DESIGN.md` M9.
+
+---
+
+## F842 — no shipped kind can carry a child's bytes: `raw` strips controls and no span carries a literal colour ★★☆☆☆
+
+**What.** The brief's step 3 — *the block: a scroll container whose content is the emulator's
+scrollback* — reads as composition over existing kinds. It is not. `kinds/simple.ts:13` imports
+`stripControl` and every `raw` line goes through it, so a `raw` cannot hold an SGR; and
+`TextSpan` (`types.ts:324-341`) carries `tone`, a palette slot, and no `ColourValue` — a
+child's `38;2;10;200;30` has no field to land in. The emulator's cells can only reach the screen
+through a **new kind** carrying literal colours, which is a C04 type change and a deliberate
+exception to *a block names a palette slot* (design Q4: the colours are the child's data, as an
+image's pixels are).
+
+**Why it matters.** The brief's §1 *already built* list has `the scroll container` and the audit's
+A6 says *the container is done*; both are true and neither is the block. The distinction is the
+one between a box and what goes in it, and it moves the first spec commit from C23 to C04.
+
+**Where**: `src/presentation/blocks/kinds/simple.ts:13`; `src/data/viewmodel/types.ts:324-341`;
+`docs/notes/CALCIUM_LIVE_TERMINAL_DESIGN.md` M11, Q4, Q5.
+
+---
+
+## F843 — the brief says a subprocess renders as `logs`; it renders as `raw`, after the child exits ★★☆☆☆
+
+**What.** `CALCIUM_LIVE_TERMINAL.md` opens: *today a subprocess's output is captured and rendered
+as `logs`*. The shell route (`runShell`, `src/shell/execution.ts:614-672`) drains stdout and
+stderr to completion, awaits `exited`, and appends **one `raw` block** — two on failure, one per
+stream. Nothing streams; the first frame with output is the frame after exit. `logs` is a kind
+for structured `{ ts, level, message }` rows (`types.ts:723`) and no route in `src/shell/`
+produces one from a subprocess.
+
+**Why it matters.** The brief's *what is new* list omits streaming because its premise had it
+built, and streaming is most of the route's change (design Q9, S1–S3). A survey claim about the
+current state, restated as the baseline, moved the cost estimate.
+
+**Where**: `src/shell/execution.ts:614-672`; `docs/notes/CALCIUM_LIVE_TERMINAL.md:22`;
+`docs/notes/CALCIUM_LIVE_TERMINAL_DESIGN.md` M12.
+
+---
+
+## F844 — `⌃c` reaches nothing on a running `!cmd`: the shell route never registers a cancel ★★★☆☆
+
+**What.** `cancelInFlight` is assigned at `execution.ts:906` and `:1241` — the local-tool and
+far-side routes — and nowhere between `runShell`'s open at `:614` and its close at `:672`. The
+ladder's rung 1 (`:2052`, `cancelInFlight?.()`) therefore finds `null` while `!sleep 100` runs,
+and the entry sits pending until the child exits on its own. Read from the code; the row that
+constructs it is owed as C23 T3.62 and is written into the spec commit rather than asserted here.
+
+**Why it matters.** Entry 33's ruling — *one press stops everything* — is stated over every route
+and holds on two of three. The route that is about to become the live terminal's consumer is the
+one where a reader most wants to stop something, and a cancel that works on the new body and not
+on the old one would be two behaviours for one key. Design Q14 makes the registration part of the
+route change; the fix is not deferred to the round after.
+
+**Where**: `src/shell/execution.ts:614-672`, `:906`, `:1241`, `:2052`;
+`docs/notes/CALCIUM_LIVE_TERMINAL_DESIGN.md` M12, Q14, S7.
+
+---
+

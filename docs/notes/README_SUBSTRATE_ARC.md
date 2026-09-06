@@ -18,6 +18,7 @@
 > | *spans — THE LAST BIG ONE* | **landed 2026-09-04** as `TextSpan` (C04 §3am), with inline emphasis, inline code, the intra-line diff and the per-token `value` as its consumers — four, not one. The README's sequence starts one item later than it says: ink ramps is the next substrate item and its prerequisite is met |
 > | *the interaction arc — seven steps, planned against HEAD* | landed 2026-09-05; step 6 is the call grammar, landed 2026-09-06 |
 > | *ink ramps — the gradient and animation set. Needs spans* | **landed 2026-09-06, round one**: a text run and the progress bar, three fills, five loops; design `CALCIUM_INK_RAMPS_DESIGN.md`, contract C04 §3am.2 · C09 §5 *Ramps* · C10 §4h. One-shots, position effects, plot series, borders and colormap text are deferred with symbols (design §7). Next in the sequence: the live terminal |
+> | *the live terminal — a PTY block* | **design landed 2026-09-06**: `CALCIUM_LIVE_TERMINAL_DESIGN.md`, fifteen measurements, fifteen rulings, both walks. §10's question is answered — `@xterm/headless` is a dependency (183 KB runtime, zero transitive, MIT), a new C27 wraps it, and the PTY is an injected port because `node-pty` is a devDependency with no Linux prebuild (F840). Round one is a live, scrollable, coloured `!cmd` block with resize, settle and the alt screen; attach is round two (design §7). Spec commits next |
 
 # Calcium — the substrate arc
 

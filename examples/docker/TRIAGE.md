@@ -39,7 +39,7 @@ type change.
 | **8** | [Absence indistinguishable from failure](#8) | 29 | **7 open** (7 closed) | partly | real Calcium work · **7 of 10 fixed** — F151 is the class F35 closed in the half an app-side test cannot reach, and **F167 is the class arriving in a *value*: a validator agreeing twice about two different documents** |
 | **9** | [**The instrument was wrong**](#9) | 103 | **17** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
 | **10** | [**A claim carried without a record**](#10) | 68 | **11** | — | **new at F80** · method — six findings disproved, and **F166 unblocked an entry while F168 found what the same row was silent about**; F184 is the first where the unrecorded claim was a *rule* rather than a fact, governing thirty forms from a parameter's doc comment |
-| **11** | [A gate that passes without checking](#11) | 287 | **16** | — | **105 closed · 117 open** of 223 keyed — the heading was out by 66 and this row's count column by 1, which cannot be corrected alone (§11) · four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
+| **11** | [A gate that passes without checking](#11) | 292 | **16** | — | **105 closed · 117 open** of 223 keyed — the heading was out by 66 and this row's count column by 1, which cannot be corrected alone (§11) · four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
 | **12** | [**A time-based assertion under contention**](#12) | 6 | **3** | — | **new at F80** · Calcium's own suite |
 | **13** | [Text the framework emits](#13) | 6 | **4** | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
 | **14** | [A constant, a channel or a rule that outlived its configuration](#14) | 28 | **13 open** | ⚠ C12 | **new at F492** · real Calcium work — every member reads as deliberate, which is why review found none of them |
@@ -1580,6 +1580,11 @@ reads goes through the entry point a user has.
 **F838** — the ramps design measured *blocks imports nothing from plot* with a grep one directory too shallow, and ruled `refOf`'s move on the cycle it implied; C10 T2.30, written to assert the measurement, failed on `kinds/image.ts` first run. The ruling survives on its other reason and every place that carried the false one says so.
 
 **F839** — T5.7 (kitty under Xvfb) failed twice on the runner for one commit with different bytes: Shift held once (F812's shape, its guard in place and not reaching it), a bare `ESC` the second time (the protocol not yet on when the key landed). Two blockers read as one; recorded for the keyboard-protocol arc, the repair sketched, not written blind.
+**F840** — *node-pty in the tree* is true of the harness, not the product: a devDependency, 63 MB, darwin/win32 prebuilds only, zero importers in `src/`. A runtime promotion would break R01 R4.4 on Linux under `--ignore-scripts`; ruled as an injected port (`TuiConfig.pty`) with a pipe fallback.
+**F841** — `@xterm/headless` 6.0.0's `module` field names `lib/xterm.mjs`, which the tarball does not contain; only the CJS `main` via default interop loads. Recorded in the dependency row.
+**F842** — no shipped kind can carry a child's bytes: `raw` strips controls and `TextSpan` has no literal colour. The live terminal is a new kind and a C04 type change, not composition over the scroll.
+**F843** — the brief says a subprocess renders as `logs`; `runShell` drains both streams to completion and appends `raw` after exit. Nothing streams today, and streaming is most of the route change.
+**F844** — `⌃c` reaches nothing on a running `!cmd`: `cancelInFlight` is registered on the two tool routes and never on the shell route. Read from the code; the constructing row is owed as C23 T3.62 with the live-terminal route change.
 
 <a id="12"></a>
 
