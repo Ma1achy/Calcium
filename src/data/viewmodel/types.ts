@@ -311,6 +311,12 @@ export const ACTION_KINDS: ReadonlySet<Action["kind"]> = new Set<Action["kind"]>
  * day; a valued span is a wrap unit, so `measure` reads its boundaries and
  * nothing else about it (I90 narrows I83 to appearance).
  *
+ * **And `elide`, a boundary and never an appearance** (I105). The call grammar's
+ * head is one committed row whose argument gives way first (C09 I46), and which
+ * run is the argument is something only the composer knows — so the span says
+ * it. `measure` reads it as it reads `from` and `to`; outside a fitted token it
+ * is inert, because a wrapped row shortens nothing.
+ *
  * **It carries no text**, which is what keeps `measure` honest by construction:
  * the member's string is unchanged and no measurer reads `spans` (I83, I86).
  */
@@ -324,10 +330,12 @@ export type TextSpan = Readonly<{
   tone?: Tone;
   /** A reading in `[0, 1]`, mapped through the block's `colormap` (I90). Refused where the block has none. */
   value?: number;
+  /** The run a fitter shortens first, from its end (I105, C09 I46). Inert on a wrapped token. */
+  elide?: boolean;
 }>;
 
-/** The members of a span, for a gate that cannot silently take an eighth (I85). */
-export const TEXT_SPAN_KEYS: ReadonlySet<string> = new Set(["from", "to", "bold", "italic", "underline", "tone", "value"]);
+/** The members of a span, for a gate that cannot silently take a ninth (I85) — the eighth, `elide`, arrived with I105. */
+export const TEXT_SPAN_KEYS: ReadonlySet<string> = new Set(["from", "to", "bold", "italic", "underline", "tone", "value", "elide"]);
 
 // --- table ----------------------------------------------------------------
 
@@ -2957,7 +2965,7 @@ export type Scroll = Readonly<{
    * A collapsed form, declared by the field's presence (I98).
    *
    * Collapsed, the box has zero interior rows and draws its residue row alone —
-   * *⋯ 0 above, N below*, the design's *+N more* sharing I49's mechanism — and
+   * *⋯ +N more* (I104), the design's *+N more* sharing I49's mechanism — and
    * every element carries the `expand` action that toggles it. The toggle is a
    * shell-origin `replace` with the flag inverted, never `op: "expand"`, whose
    * arm names a row.

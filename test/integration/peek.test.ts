@@ -225,6 +225,7 @@ describe("C15 §2a — the frame", () => {
     expect(bare.join("\n"), "the cell is cut on screen").not.toContain(LONG_A);
     const rowA = rowOf(bare, "alpha-with-");
 
+    await s.type(DOWN); // the card's head is the first element (C09 I47)
     await s.type(DOWN); // a
     const withPeek = s.screen().rows;
     const text = withPeek.join("\n");

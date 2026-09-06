@@ -166,6 +166,7 @@ describe("C22 I78 — the pair, through a frame", () => {
     };
     await type("/plot\r");
     await Promise.resolve();
+    await type(DOWN); // the card's head is the first element (C09 I47)
     await type(DOWN);
     const before = built.screen().text.join("\n");
     expect(before, "both series named, neither hollow").toMatch(/█ val/u);
@@ -186,7 +187,9 @@ describe("C22 I78 — the pair, through a frame", () => {
     await type("2");
     expect(built.screen().text.join("\n"), "the override to shown draws the first frame").toBe(before);
 
-    // B6 — out of the plot, the keymap is withdrawn and `1` is a character at the prompt.
+    // B6 — out of the plot, the keymap is withdrawn and `1` is a character at the
+    // prompt. Two presses: the first lands on the card's head (C09 I47).
+    await type(UP);
     await type(UP);
     await type("1");
     const after = built.screen().text.join("\n");

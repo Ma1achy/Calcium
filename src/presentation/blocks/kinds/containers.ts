@@ -258,7 +258,7 @@ function contentHeight(block: Scroll, width: number, measureChild: MeasureFn): n
 function offsetOf(block: Scroll, ctx: RenderContext, content: number): number {
   const interior = interiorOf(block);
   // **Collapsed, the offset is forced to zero** (C04 §3c S2): the residue row
-  // then reads *0 above, N below*, which is the fold's whole statement. A
+  // then reads *+N more*, which is the fold's whole statement (C04 I104). A
   // collapsed follow box has nothing to follow.
   if (interior === 0) return 0;
   const most = Math.max(0, content - interior);
@@ -418,7 +418,15 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
       // non-ASCII character in the very row written to keep the *mark* out of
       // the source. F6's class, one token to the right of where it was watched
       // for, and a comma needs no slot because it is the same everywhere.
-      const text = `${g.residue} ${String(above)} above, ${String(below)} below`;
+      // **Two texts, one mechanism** (C04 I104). An open box says which way the
+      // hidden rows lie, because the direction was measured to matter (§3c T6);
+      // a collapsed box shows nothing, so *0 above* names a distinction that
+      // does not exist (F826) and the fold reads *+N more*. Neither names a key:
+      // the affordance is `activate`, and the footer shows its label (C16 I19).
+      const text =
+        interior === 0
+          ? `${g.residue} +${String(content)} more`
+          : `${g.residue} ${String(above)} above, ${String(below)} below`;
       residue.push(
         createElement(
           Text,

@@ -95,6 +95,7 @@ describe("C04 I48 — the offset reaches the frame", () => {
     // Focus into the live block, or `pagedown` resolves at `global` and scrolls
     // the transcript instead — which is the behaviour this binding changes and
     // the reason the row below exists.
+    await type(DOWN); // the card's head is the first element (C09 I47)
     await type(DOWN);
 
     const first = rows();
@@ -157,6 +158,7 @@ describe("C04 I48 — the offset reaches the frame", () => {
     const rows = (): string => session.screen().rows.join("\n");
 
     await type("/wrapped\r");
+    await type(DOWN); // the card's head is the first element (C09 I47)
     await type(DOWN);
 
     const first = rows();

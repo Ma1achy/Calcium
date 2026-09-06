@@ -35,7 +35,7 @@ export type SpanAttrs = Readonly<{ bold?: boolean; italic?: boolean; underline?:
  * has. `value` is the one member the wrapper reads — a valued run is an atom
  * (C09 §5) — which is why it rides on the run and not only on the style.
  */
-export type Run = Readonly<{ text: string; attrs?: SpanAttrs; tone?: Tone; value?: number }>;
+export type Run = Readonly<{ text: string; attrs?: SpanAttrs; tone?: Tone; value?: number; elide?: true }>;
 
 /**
  * A boundary that falls inside a grapheme cluster is moved to the cluster's end
@@ -79,6 +79,8 @@ function runOf(text: string, span: TextSpan): Run {
     ...(attrs === undefined ? {} : { attrs }),
     ...(span.tone === undefined ? {} : { tone: span.tone }),
     ...(span.value === undefined ? {} : { value: span.value }),
+    // A boundary the fitter reads and the painter never does (C04 I105).
+    ...(span.elide === true ? { elide: true as const } : {}),
   };
 }
 

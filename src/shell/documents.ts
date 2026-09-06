@@ -233,7 +233,7 @@ export function noticeDoc(
  * body is either the settled result under `continuation` (`⎿`, the same slot
  * `noticeDoc`'s muted notices take) or the streamed output in a `scroll` that
  * opens at its tail (C04 I97). *+N more* is **not** a fourth count string: a
- * folded body is a `collapsed` scroll, whose residue row *⋯ 0 above, N below*
+ * folded body is a `collapsed` scroll, whose residue row *⋯ +N more* (C04 I104)
  * is that line (C04 I98), and `⏎` on it toggles the fold through the `expand`
  * action every one of its elements carries.
  *

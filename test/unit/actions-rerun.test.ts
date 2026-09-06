@@ -77,7 +77,8 @@ describe("C23 I18 — refused, and the notice names the command", () => {
     expect(graph.transcript.liveId).not.toBe(settled);
 
     graph.router.dispatch(press({ name: "down" }));
-    graph.router.dispatch(press({ name: "tab", shift: true }));
+    graph.router.dispatch(press({ name: "tab", shift: true })); // lands on the card's head is the first element (C09 I47)
+    graph.router.dispatch(press({ name: "down" })); // and the row is the next
     expect(graph.focusedEntryId(), "focus is in the settled entry").toBe(settled);
 
     graph.router.dispatch(press({ name: "enter" }));

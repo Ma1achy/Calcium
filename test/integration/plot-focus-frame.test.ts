@@ -63,6 +63,7 @@ describe("C26 §7 — a focused plot's frame, read from a session's screen", () 
     // **The fixture responds before it is asserted against**: the lid is muted with focus at the prompt.
     expect(styleAt(lid()!, "─")!.fg, "unfocused: the lid is muted").toBe(muted);
 
+    await type(DOWN); // the card's head is the first element (C09 I47)
     await type(DOWN);
     expect(styleAt(lid()!, "─")!.fg, "focused from the keyboard: the lid is accent").toBe(accent);
     expect(styleAt(lid()!, "┐")!.fg, "and its corner with it").toBe(accent);

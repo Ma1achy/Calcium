@@ -66,17 +66,13 @@ const results = runPass({
       expect: "T1.27",
     },
     {
+      // Re-anchored with C09 I47: the gate is `declaresElement` — an action, or
+      // a `GLYPH_ELEMENT` token — and the `activate` spread is now the shipped
+      // form, so the `also` it carried is gone.
       name: "NOTICE-ALWAYS: the element is declared with or without an action",
       file: "src/presentation/blocks/kinds/simple.ts",
-      from: "  if (block.action === undefined) return Object.freeze([]);\n  const w = normaliseWidth(width);\n",
+      from: "  if (!declaresElement(block)) return Object.freeze([]);\n  const w = normaliseWidth(width);\n",
       to: "  const w = normaliseWidth(width);\n",
-      also: [
-        {
-          file: "src/presentation/blocks/kinds/simple.ts",
-          from: "      activate: block.action,\n      copy: block.text,\n",
-          to: "      ...(block.action === undefined ? {} : { activate: block.action }),\n      copy: block.text,\n",
-        },
-      ],
       expect: "T4.17",
     },
     {

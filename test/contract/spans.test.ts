@@ -1,13 +1,16 @@
 // Spans — the contract rows: the bytes a span produces, and the member `code` refuses.
 import { describe, expect, it } from "vitest";
 import { block, validateBlock } from "../../src/data/viewmodel/index.js";
+import { TEXT_SPAN_KEYS } from "../../src/data/viewmodel/types.js";
+import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
+import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
 import type { Block, TextSpan } from "../../src/data/viewmodel/index.js";
 import { paint, paintRuns, withSpan } from "../../src/presentation/blocks/paint.js";
 import { runsOf } from "../../src/presentation/runs.js";
 import { resolveTone } from "../../src/presentation/theme/index.js";
 import { COLORMAPS, continuousColour, sample } from "../../src/presentation/theme/colormap.js";
 import { SGR_RESET, sgr } from "../../src/terminal/escapes.js";
-import { FULL_CAPS, MONO_CAPS, measurable } from "../support/render.js";
+import { DARK_THEME, FULL_CAPS, MONO_CAPS, measurable } from "../support/render.js";
 import { caps, store } from "../support/theme.js";
 
 const at = (depth: 1 | 4 | 8 | 24) => ({ ...FULL_CAPS, colourDepth: depth });
@@ -156,8 +159,40 @@ describe("C10 §4e — span attributes at one bit", () => {
   });
 });
 
-describe("C04 §3am.1 — `elide`, owed at the spec commit", () => {
-  it.todo(
-    "T2.114 (C04 I105): TEXT_SPAN_KEYS has eight members and admits elide; an info notice with an elide span measures and renders identically to the block without it at every width; on a step notice the marked run ends in the marker at a width that cannot hold the row and the runs outside it are byte-identical — not deferred on a component: the fitter lands with C2 of the call grammar",
-  );
+describe("C04 §3am.1 — `elide`", () => {
+  const registry = createBlockRegistry({ defaults: true });
+  const rows = (b: Block, width: number): readonly string[] =>
+    renderSequenceToLines(registry, [b], width, { theme: DARK_THEME, capabilities: FULL_CAPS })
+      .map((line) => line.replace(/\u001b\[[0-9;]*m/gu, "").trimEnd());
+  const TEXT = "verb(a-rather-long-argument-that-will-not-fit) · 4s · 12 rows";
+  const ARG: TextSpan = { from: TEXT.indexOf("(") + 1, to: TEXT.indexOf(")"), elide: true };
+
+  it("T2.114 (C04 I105): the eighth member is admitted, inert on a wrapped token, and the boundary the fitter shortens first on a fitted one", () => {
+    expect(TEXT_SPAN_KEYS.size).toBe(8);
+    expect(TEXT_SPAN_KEYS.has("elide")).toBe(true);
+    const marked = block({ kind: "notice", id: "n", tone: "info", glyph: "info", text: TEXT, spans: [ARG] });
+    expect(validateBlock(marked).ok).toBe(true);
+    const typed = validateBlock({ ...marked, spans: [{ ...ARG, elide: "yes" }] } as unknown as Block);
+    expect(typed.ok).toBe(false);
+    if (!typed.ok) expect(typed.error.join(" ")).toMatch(/"elide" must be a boolean/u);
+
+    // **Inert on a wrapped token**: measure and frame identical with and without.
+    const plain = block({ kind: "notice", id: "n", tone: "info", glyph: "info", text: TEXT });
+    for (const width of [80, 40, 24, 12]) {
+      expect(registry.measure(marked, width), `measure at ${String(width)}`).toBe(registry.measure(plain, width));
+      expect(rows(marked, width), `frame at ${String(width)}`).toEqual(rows(plain, width));
+    }
+
+    // **On a fitted token the marked run gives way first** (C09 I46): the run
+    // ends in the marker and the runs outside it are byte-identical.
+    const head = block({ kind: "notice", id: "h", tone: "info", glyph: "step", text: TEXT, spans: [ARG] });
+    const wide = rows(head, 80)[0] ?? "";
+    const narrow = rows(head, 40)[0] ?? "";
+    expect(wide).toBe(`⬤ ${TEXT}`);
+    expect(rows(head, 40)).toHaveLength(1);
+    expect(narrow.startsWith("⬤ verb(")).toBe(true);
+    expect(narrow.endsWith(") · 4s · 12 rows")).toBe(true);
+    expect(narrow).toContain("…) · 4s · 12 rows");
+    expect(narrow.length, "shorter, and only in the marked run").toBeLessThan(wide.length);
+  });
 });

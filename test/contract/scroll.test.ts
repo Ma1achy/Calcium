@@ -15,7 +15,7 @@ import { applyPatch, descendants, validateDocument } from "../../src/data/viewmo
 import { b } from "../../src/shell/builders/index.js";
 import { liveParts } from "../../src/testing/live-parts.js";
 import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
-import { DARK_THEME, FULL_CAPS } from "../support/render.js";
+import { ASCII_CAPS, DARK_THEME, FULL_CAPS } from "../support/render.js";
 import type { Block, Scroll, ViewDocument } from "../../src/data/viewmodel/index.js";
 import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
 
@@ -495,8 +495,27 @@ describe("C04 §3c cell 5 — refused at parse", () => {
   });
 });
 
-describe("C04 §3c — the residue row's two texts, owed at the spec commit", () => {
-  it.todo(
-    "T2.113 (C04 I104): a collapsed scroll of 392 children renders exactly `⋯ +392 more` (`~ +392 more` in ASCII) at 80 and 20; expanded and paged to its middle it renders `⋯ N above, M below` with N + M + interior === 392; neither row contains ⏎ or the word expand — not deferred on a component: the text lands with C2 of the call grammar",
-  );
+describe("C04 §3c — the residue row's two texts", () => {
+  const render = (block: Scroll, width: number, caps = FULL_CAPS, scrollOffsets: Readonly<Record<string, number>> = {}): readonly string[] =>
+    renderSequenceToLines(registry, [block], width, { theme: DARK_THEME, capabilities: caps, focus: null, scrollOffsets })
+      .map((line) => line.replace(/\u001b\[[0-9;]*m/gu, "").trimEnd());
+
+  it("T2.113 (C04 I104): a collapsed box reads `⋯ +N more`, an open box paged to its middle reads `⋯ N above, M below`, and neither names a key", () => {
+    const children = Array.from({ length: 392 }, (_u, i) => flat(`c${String(i)}`));
+    const folded = { ...scroll(5, children), collapsed: true } as Scroll;
+    for (const width of [80, 20]) {
+      expect(render(folded, width)).toEqual(["⋯ +392 more"]);
+      expect(render(folded, width, ASCII_CAPS)).toEqual(["~ +392 more"]);
+    }
+    const open = scroll(5, children);
+    const paged = render(open, 80, FULL_CAPS, { s: 200 });
+    expect(paged).toHaveLength(6);
+    const m = /^⋯ (\d+) above, (\d+) below$/u.exec(paged[5] ?? "");
+    expect(m, "the open box states both directions").not.toBeNull();
+    expect(Number(m?.[1]) + Number(m?.[2]) + 5, "N + M + interior is the content").toBe(392);
+    for (const row of [...render(folded, 80), ...paged]) {
+      expect(row).not.toContain("⏎");
+      expect(row).not.toMatch(/expand/iu);
+    }
+  });
 });

@@ -158,15 +158,15 @@ describe("C04 I97 — the field says *start following*", () => {
 });
 
 describe("C04 I98 — the collapsed form is the residue row and nothing else", () => {
-  it("T2.42 (C04 I98, §3c S1 S2): collapsed, the box measures 1 and draws *⋯ 0 above, N below* at every width", () => {
+  it("T2.42 (C04 I98, I104, §3c S1 S2): collapsed, the box measures 1 and draws *⋯ +N more* at every width", () => {
     const folded = box(rows(5), { follow: true, collapsed: true });
     for (const width of [80, 40]) {
       expect(scrollDefinition.measure(folded, width, measureChild)).toBe(1);
-      expect(lines([folded], width)).toEqual(["⋯ 0 above, 5 below"]);
+      expect(lines([folded], width)).toEqual(["⋯ +5 more"]);
     }
-    expect(lines([folded], 40, undefined, ASCII_CAPS)).toEqual(["~ 0 above, 5 below"]);
+    expect(lines([folded], 40, undefined, ASCII_CAPS)).toEqual(["~ +5 more"]);
     // S2: a held offset does not move a fold — the residue is the fold's statement.
-    expect(lines([folded], 40, { s: 3 })).toEqual(["⋯ 0 above, 5 below"]);
+    expect(lines([folded], 40, { s: 3 })).toEqual(["⋯ +5 more"]);
     // Expanded again it is an ordinary follow box.
     const open = box(rows(5), { follow: true, collapsed: false });
     expect(scrollDefinition.measure(open, 40, measureChild)).toBe(3);

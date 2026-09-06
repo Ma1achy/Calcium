@@ -696,8 +696,10 @@ describe("C22 §4 step 7 — the greeting (I44)", () => {
     expect(screen().rows.join("\n"), "the row is on screen").toContain("alpha");
     expect(promptOf(), "and the prompt is empty before the action").not.toContain("/inspect");
 
-    // `↓` from the bottom of history enters the live block (C16 I22), then
-    // `enter` activates — the binding that did not exist.
+    // `↓` from the bottom of history enters the live block (C16 I22) on the
+    // card's head (C09 I47), `↓` again reaches the row, then `enter` activates
+    // — the binding that did not exist.
+    await type("\u001b[B");
     await type("\u001b[B");
     await type("\r");
 

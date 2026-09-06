@@ -110,9 +110,11 @@ async function session(
   await type("/rows\r");
   await Promise.resolve();
   await Promise.resolve();
-  // `Down` from the prompt lands on the first focusable element, which is the
-  // plot: the counter declares none, and a plot declares one exactly when it
-  // declares a camera (C12 I85).
+  // `Down` from the prompt lands on the first focusable element — the card's
+  // `step` head, since C09 I47 made every call's head an element — and a
+  // second `Down` reaches the plot: the counter declares none, and a plot
+  // declares one exactly when it declares a camera (C12 I85).
+  await type(DOWN);
   await type(DOWN);
   return { ...built, type };
 }

@@ -273,7 +273,10 @@ describe("C02 e2e — the environment decides, and the terminal shows it", () =>
         expect(before.length, "both rows are on the screen").toBe(2);
 
         // `↓` at the prompt: history has nothing further to offer, so this is
-        // the keystroke's second effect (C16 I22).
+        // the keystroke's second effect (C16 I22). It lands on the card's head
+        // (C09 I47), which is not one of the two rows, so a second `↓` is what
+        // reaches the table.
+        pty.type("\u001b[B");
         pty.type("\u001b[B");
         await pty.waitForFrame(() => rawRows().join("\n") !== before.join("\n"), 15_000);
 

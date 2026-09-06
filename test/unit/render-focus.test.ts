@@ -126,8 +126,9 @@ describe("C11 I14 — the selection is painted, read from a session's screen", (
       expect(s.toneOf(name), `${name} before any key`).toEqual({ fg: plain, bg: "", attrs: [] });
     }
 
+    await s.type(DOWN); // the card's head is the first element (C09 I47)
     await s.type(DOWN);
-    expect(s.toneOf("alpha"), "↓ focuses alpha").toEqual({ fg: accent, bg: "", attrs: [] });
+    expect(s.toneOf("alpha"), "↓ ↓ focuses alpha").toEqual({ fg: accent, bg: "", attrs: [] });
 
     await s.type(SHIFT_DOWN);
     await s.type(SHIFT_DOWN);

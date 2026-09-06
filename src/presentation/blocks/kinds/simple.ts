@@ -90,6 +90,30 @@ const GLYPH_INDENT: ReadonlyMap<Glyph, number> = new Map<Glyph, number>([
 const GLYPH_RAIL: ReadonlySet<Glyph> = new Set<Glyph>(["quote"]);
 
 /**
+ * The tokens whose notice is one block-level element with or without an
+ * `action` (C09 I47, F831). A call's head is the line a reader acts on — `⏎`
+ * folds its body, `y` copies its invocation — and `noticeElements`' gate,
+ * *no action, no element*, is right for every other token: a muted status line
+ * is not a place to stand. One member, and a property of the token as the
+ * indent and the rail are.
+ */
+const GLYPH_ELEMENT: ReadonlySet<Glyph> = new Set<Glyph>(["step"]);
+
+/**
+ * The tokens whose notice is **one committed row, fitted rather than wrapped**
+ * (C09 I46). A head that wraps is two heads to a reader skimming the gutter, so
+ * the run its spans mark `elide` gives way first, from its end, and the whole
+ * row last. `measure` answers 1 without a capability; the fitting happens where
+ * the capabilities are, in `render`. The kind's wrap policy is untouched.
+ */
+const GLYPH_ONE_ROW: ReadonlySet<Glyph> = new Set<Glyph>(["step"]);
+
+/** Whether a notice stands in the focus ring (I47): an action, or a token in `GLYPH_ELEMENT`. */
+function declaresElement(block: Notice): boolean {
+  return block.action !== undefined || (block.glyph !== undefined && GLYPH_ELEMENT.has(block.glyph));
+}
+
+/**
  * The exact string a glyph draws on a notice's first row.
  *
  * **The one place the lead exists**, because `prefixCells` below is its cell
@@ -198,8 +222,48 @@ export const ruleDefinition: BlockDefinition<Rule> = {
  * `wrapCells`, or the two halves would disagree by a row exactly where a token
  * moved.
  */
-function noticeRows(block: Notice, width: number): readonly (readonly Run[])[] {
-  return wrapRuns(runsOf(block.text, block.spans), proseWidth(width, prefixCells(block.glyph)));
+function noticeRows(
+  block: Notice,
+  width: number,
+  caps?: RenderContext["capabilities"],
+): readonly (readonly Run[])[] {
+  const runs = runsOf(block.text, block.spans);
+  const budget = proseWidth(width, prefixCells(block.glyph));
+  if (block.glyph !== undefined && GLYPH_ONE_ROW.has(block.glyph)) {
+    // One row by construction (I46). Without capabilities — the measurer's
+    // call — the runs are returned unfitted: a row count of one is the whole of
+    // what `measure` needs, and the marker's width is a capability's to say.
+    return [caps === undefined ? runs : fitRuns(runs, budget, caps)];
+  }
+  return wrapRuns(runs, budget);
+}
+
+/**
+ * The fitter (C09 I46, C04 I105): the runs marked `elide` shorten first, the
+ * last of them first, each from its end through `truncate`; the whole row is
+ * cut only when every elide run is down to its marker. A run outside the mark
+ * is byte-identical to what it was for as long as any of the argument remains.
+ */
+function fitRuns(runs: readonly Run[], budget: number, caps: RenderContext["capabilities"]): readonly Run[] {
+  const width = (r: Run): number => cells(r.text, caps.ambiguousWidth);
+  let excess = runs.reduce((n, r) => n + width(r), 0) - budget;
+  if (excess <= 0) return runs;
+  const out = [...runs];
+  for (let i = out.length - 1; i >= 0 && excess > 0; i -= 1) { // cells-ok — an array index
+    const run = out[i];
+    if (run === undefined || run.elide !== true) continue;
+    const have = width(run);
+    // At least the marker: an argument reduced to `…` still says *there was
+    // one*, where an empty run leaves two separators touching.
+    const shortened = { ...run, text: truncate(run.text, Math.max(1, have - excess), caps, "end") };
+    out[i] = shortened;
+    excess -= have - width(shortened);
+  }
+  if (excess <= 0) return out;
+  // The whole row last, sliced against `kept` so the spans ride inside it and
+  // the marker sits outside them (C04 I86) — `rule`'s label does the same.
+  const { kept, suffix } = truncateParts(runsText(out), budget, caps);
+  return [...sliceRuns(out, 0, kept.length), { text: suffix }]; // cells-ok — a code-unit length
 }
 
 /**
@@ -211,7 +275,10 @@ function noticeRows(block: Notice, width: number): readonly (readonly Run[])[] {
  * The rows are `noticeRows`' own, so the element is where the block is drawn.
  */
 function noticeElements(block: Notice, width: number): readonly NavElement[] {
-  if (block.action === undefined) return Object.freeze([]);
+  // **Or its token is in `GLYPH_ELEMENT`** (I47): a call's head stands in the
+  // ring whether or not the composer gave it a fold to toggle; `activate` is
+  // the action when there is one and absent otherwise.
+  if (!declaresElement(block)) return Object.freeze([]);
   const w = normaliseWidth(width);
   return Object.freeze([
     Object.freeze({
@@ -219,7 +286,7 @@ function noticeElements(block: Notice, width: number): readonly NavElement[] {
       level: "block" as const,
       rows: Object.freeze({ from: 0, to: atLeastOne(noticeRows(block, w).length) }), // cells-ok — a row count
       cols: Object.freeze({ from: 0, to: w }),
-      activate: block.action,
+      ...(block.action === undefined ? {} : { activate: block.action }),
       copy: block.text,
     }),
   ]);
@@ -248,15 +315,15 @@ export const noticeDefinition: BlockDefinition<Notice> = {
     // channel no notice datum uses. The tone is dropped under focus as a table
     // row drops its cell tones (C11 I14) and the glyph keeps its character. The
     // id tested is the one the session writes — the element's, which is the
-    // block's (`noticeElements`, `focusFor`) — and only a notice with an action
-    // declares one, so a notice without one cannot reach this arm.
+    // block's (`noticeElements`, `focusFor`) — and only a notice that declares
+    // an element (an action, or a `GLYPH_ELEMENT` token — I47) can reach this arm.
     const focused =
-      block.action !== undefined && ctx.focus !== null && ctx.focus.blockId === block.id && ctx.focus.rowId === block.id;
+      declaresElement(block) && ctx.focus !== null && ctx.focus.blockId === block.id && ctx.focus.rowId === block.id;
     const style = focused
       ? { ...tone("accent", ctx.theme, ctx.capabilities), ...selectionStyle(ctx.theme, ctx.capabilities) }
       : tone(block.tone, ctx.theme, ctx.capabilities);
     const prefix = prefixCells(block.glyph);
-    const wrapped = noticeRows(block, ctx.width);
+    const wrapped = noticeRows(block, ctx.width, ctx.capabilities);
     // The block's colormap reaches the painter by name; a valued run reads it
     // there and nowhere else (C04 I90).
     const paintCtx = { theme: ctx.theme, capabilities: ctx.capabilities, ...(block.colormap === undefined ? {} : { colormap: block.colormap }) };

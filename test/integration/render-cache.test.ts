@@ -204,6 +204,7 @@ describe("C22 §6c — the render cache", () => {
       },
     };
     const { type } = await session(watcher, PLOT_DOC);
+    await type("\u001b[B"); // the card's head is the first element (C09 I47)
     await type("\u001b[B");
     seen.length = 0;
 
@@ -245,6 +246,7 @@ describe("C22 §6c — the render cache", () => {
     // first.
     const { definition, count } = counting();
     const { type } = await session(definition, PLOT_DOC);
+    await type("\u001b[B"); // the card's head is the first element (C09 I47)
     await type("\u001b[B");
 
     const before = count();

@@ -212,6 +212,7 @@ describe("C22 I76 — the pair, through a frame", () => {
     };
     await type("/plot\r");
     await Promise.resolve();
+    await type(DOWN); // the card's head is the first element (C09 I47)
     await type(DOWN);
     const before = built.screen().text.join("\n");
     expect(before, "no readout without a cursor").not.toMatch(/train: \d/);

@@ -99,6 +99,7 @@ describe("C04 I98 — ⏎ on a folded body toggles it", () => {
     const live = graph.transcript.liveId as string;
     expect(foldIn(graph, live, "body")?.collapsed).toBe(true);
 
+    graph.router.dispatch(press({ name: "down" })); // the card's head is the first element (C09 I47)
     graph.router.dispatch(press({ name: "down" }));
     expect(graph.focus.current.at, "focus is on a child of the fold").toBe("liveBlock");
     graph.router.dispatch(press({ name: "enter" }));
@@ -119,6 +120,7 @@ describe("C04 I98 — ⏎ on a folded body toggles it", () => {
     graph.pipeline.submit("/wrapped");
     await settle();
     const live = graph.transcript.liveId as string;
+    graph.router.dispatch(press({ name: "down" })); // the card's head is the first element (C09 I47)
     graph.router.dispatch(press({ name: "down" }));
     graph.router.dispatch(press({ name: "enter" }));
     await settle();
@@ -135,7 +137,8 @@ describe("C04 I98 — ⏎ on a folded body toggles it", () => {
     expect(graph.transcript.liveId).not.toBe(settled);
 
     graph.router.dispatch(press({ name: "down" }));
-    graph.router.dispatch(press({ name: "tab", shift: true }));
+    graph.router.dispatch(press({ name: "tab", shift: true })); // lands on the card's head is the first element (C09 I47)
+    graph.router.dispatch(press({ name: "down" })); // and the fold is the next
     expect(graph.focusedEntryId(), "focus is in the settled entry").toBe(settled);
     const blocksBefore = graph.transcript.entries.find((e) => e.id === settled)?.doc.blocks.length;
 

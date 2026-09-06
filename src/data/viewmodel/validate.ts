@@ -787,7 +787,7 @@ function checkSpans(b: Record<string, unknown>, member: string, e: string[], at:
     }
     for (const key of Object.keys(span)) {
       if (!TEXT_SPAN_KEYS.has(key)) {
-        e.push(`${where}: unknown member "${key}" — a span carries from, to, bold, italic, underline, tone, value and nothing else (C04 I85)`);
+        e.push(`${where}: unknown member "${key}" — a span carries from, to, bold, italic, underline, tone, value, elide and nothing else (C04 I85)`);
         return;
       }
       if (key === "tone") {

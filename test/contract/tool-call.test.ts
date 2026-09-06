@@ -8,12 +8,13 @@ import { describe, expect, it } from "vitest";
 
 import { block, validateDocument } from "../../src/data/viewmodel/index.js";
 import { cardBody, entryLayout } from "../../src/shell/entry-layout.js";
-import type { Block } from "../../src/data/viewmodel/index.js";
+import type { Action, Block, TextSpan } from "../../src/data/viewmodel/index.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { GLYPH_TOKENS, glyphCells, glyphFor } from "../../src/presentation/blocks/glyphs.js";
 import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
 import { toolCallDoc, toolCallHeader } from "../../src/shell/documents.js";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS, visible } from "../support/render.js";
+import { cells } from "../../src/presentation/text.js";
 
 const registry = createBlockRegistry({ defaults: true });
 const META = { origin: "agent" } as const;
@@ -102,7 +103,7 @@ describe("§9c — the header, the body, and the row the body already has", () =
       expect(s).toEqual([`${mark} run_command(npm test) · 4s · exit 0`, `  ${hook} 118 passed, 2 todo`]);
 
       const f = frame(folded, width, ascii);
-      expect(f, "+N more is the residue row").toEqual([`${mark} run_command(npm test)`, `${more} 0 above, 392 below`]);
+      expect(f, "+N more is the residue row (C04 I104)").toEqual([`${mark} run_command(npm test)`, `${more} +392 more`]);
 
       captured.push(
         `--- ${String(width)} cols · ${ascii ? "ascii" : "24-bit"}`,
@@ -113,11 +114,57 @@ describe("§9c — the header, the body, and the row the body already has", () =
   });
 });
 
-describe("C09 §4 — the head is fitted and is an element, owed at the spec commit", () => {
-  it.todo(
-    "T2.113 (C09 I46): a step notice whose text overflows measures 1 and renders 1 row at 80, 40 and 20 in both alphabets; with the argument span marked elide the argument ends in the marker and verb, duration and outcome are intact; the control under info wraps to two rows — not deferred on a component: the fitter lands with C2 of the call grammar",
-  );
-  it.todo(
-    "T2.114 (C09 I47): elementsIn over a step notice with no action yields one element with copy equal to the text and no activate; with an action, activate is that action; an info notice with no action yields none — not deferred on a component: GLYPH_ELEMENT lands with C2 of the call grammar",
-  );
+describe("C09 §4 — the head is fitted and is an element", () => {
+  const LONG = "run_command(pytest tests/unit/test_something_rather_long.py --maxfail=1 -k not_slow) · 4s · exit 0";
+  const ARGS = { from: LONG.indexOf("(") + 1, to: LONG.indexOf(")") };
+  const head = (spans?: readonly TextSpan[], action?: Action): Block =>
+    block({ kind: "notice", id: "h", tone: "info", glyph: "step", text: LONG, ...(spans === undefined ? {} : { spans }), ...(action === undefined ? {} : { action }) });
+  const rows = (b: Block, width: number, ascii = false): readonly string[] => frame([b], width, ascii);
+
+  it("T2.113 (C09 I46): a step notice is one row at 80, 40 and 20 in both alphabets; the elide run gives way first and the control wraps", () => {
+    for (const ascii of [false, true]) {
+      const marker = ascii ? "~" : "…";
+      for (const width of [80, 40, 20]) {
+        const plain = head();
+        expect(registry.measure(plain, width), `measure at ${String(width)}`).toBe(1);
+        expect(rows(plain, width, ascii), `rendered rows at ${String(width)}`).toHaveLength(1);
+        expect(cells(visible(rows(plain, width, ascii)[0] ?? ""), "narrow"), "and it fits").toBeLessThanOrEqual(width);
+
+        const marked = rows(head([{ ...ARGS, elide: true }]), width, ascii)[0] ?? "";
+        expect(marked.startsWith(`${ascii ? "*" : "⬤"} run_command(`), `the verb is intact at ${String(width)}`).toBe(true);
+        expect(cells(visible(marked), "narrow"), `and the marked row fits at ${String(width)}`).toBeLessThanOrEqual(width);
+        if (width >= 40) {
+          // The row can hold verb, marker, duration and outcome: the argument
+          // alone gives way, and everything outside it is intact.
+          expect(marked.endsWith(") · 4s · exit 0"), `duration and outcome are intact at ${String(width)}`).toBe(true);
+          if (width < 80) expect(marked, `the argument ends in the marker at ${String(width)}`).toContain(`${marker}) · 4s · exit 0`);
+        } else {
+          // Twenty cells cannot hold `⬤ run_command(…) · 4s · exit 0` (29), so
+          // the whole row is cut last — after the argument is down to its marker.
+          expect(marked, "the argument is its marker before the row is cut").toContain(`(${marker}`);
+        }
+      }
+    }
+    // **The control**: the same text under `info` wraps, so the row is about
+    // the token and not about the width.
+    const control = block({ kind: "notice", id: "c", tone: "info", glyph: "info", text: LONG });
+    expect(registry.measure(control, 40)).toBeGreaterThan(1);
+    expect(rows(control, 40)).toHaveLength(registry.measure(control, 40));
+  });
+
+  it("T2.114 (C09 I47): a step notice is one element with or without an action; an info notice without one is none", () => {
+    const bare = registry.elementsIn([head()], 80);
+    expect(bare).toHaveLength(1);
+    expect(bare[0]?.element.copy).toBe(LONG);
+    expect(bare[0]?.element.activate, "no action, no activate — and still a place to stand").toBeUndefined();
+    expect(bare[0]?.element.rows).toEqual({ from: 0, to: 1 });
+
+    const action: Action = { kind: "expand", label: "expand", target: "body" };
+    const acting = registry.elementsIn([head(undefined, action)], 80);
+    expect(acting).toHaveLength(1);
+    expect(acting[0]?.element.activate).toEqual(action);
+
+    const info = block({ kind: "notice", id: "i", tone: "info", glyph: "info", text: LONG });
+    expect(registry.elementsIn([info], 80), "the gate that keeps a status line out of the ring").toEqual([]);
+  });
 });

@@ -155,6 +155,17 @@ describe("C26 §4g — the frame side of the ceiling", () => {
     // entry — the second one — and the frame says so: its probe saw a focus
     // and the settled entry's saw none. Without this the row below could pass
     // on a frame that never drew focus anywhere.
+    // **The card's head is the first element** (C09 I47): `↓` from the prompt
+    // lands on it, and the table's first row is one more `↓` along.
+    const onHead = (focus: ReturnType<typeof lastFocus>): void => {
+      expect(focus, "a focus was drawn").not.toBeNull();
+      expect(focus, "a focus was drawn").not.toBe("never rendered");
+      if (focus === null || focus === "never rendered") return;
+      expect(focus.blockId, "a `step` head").toMatch(/^step-/u);
+      expect(focus.rowId, "a block-level element").toBe(focus.blockId);
+    };
+    await s.type(DOWN);
+    onHead(lastFocus(s.seen(), "q2"));
     await s.type(DOWN);
     expect(lastFocus(s.seen(), "q2"), "the live entry holds focus").toEqual({ blockId: "t2", rowId: "a2" });
     expect(lastFocus(s.seen(), "q1"), "and the settled one does not").toBeNull();
@@ -163,30 +174,32 @@ describe("C26 §4g — the frame side of the ceiling", () => {
     // **The row this file exists for.** Before §4g `focusFor` compared against
     // `liveId`, so whatever the store held the settled entry drew no highlight.
     await s.type(SHIFT_TAB);
+    onHead(lastFocus(s.seen(), "q1"));
+    expect(lastFocus(s.seen(), "q2"), "and the live entry has let go").toBeNull();
+    await s.type(DOWN);
     expect(lastFocus(s.seen(), "q1"), "the settled entry's first row is focused, on screen").toEqual({
       blockId: "t1",
       rowId: "a1",
     });
-    expect(lastFocus(s.seen(), "q2"), "and the live entry has let go").toBeNull();
 
     // `↓` steps inside the settled entry (C26 I19 — the sequence is the entry's).
     await s.type(DOWN);
     expect(lastFocus(s.seen(), "q1")).toEqual({ blockId: "t1", rowId: "b1" });
 
     // **`↑` at its head stops** (§4g row b): only the live entry's head
-    // neighbours the prompt. Two presses — one to the head, one at it.
+    // neighbours the prompt. Three presses — two to the head, one at it.
     await s.type(UP);
     await s.type(UP);
-    expect(lastFocus(s.seen(), "q1"), "still on the first row, not at the prompt").toEqual({
-      blockId: "t1",
-      rowId: "a1",
-    });
+    await s.type(UP);
+    onHead(lastFocus(s.seen(), "q1"));
+    expect(lastFocus(s.seen(), "q2"), "still in the settled entry, not at the prompt").toBeNull();
 
     // `tab` walks back to the live entry; a second `tab` has nowhere to go.
     await s.type(TAB);
-    expect(lastFocus(s.seen(), "q2")).toEqual({ blockId: "t2", rowId: "a2" });
+    onHead(lastFocus(s.seen(), "q2"));
     await s.type(TAB);
-    expect(lastFocus(s.seen(), "q2"), "the newest entry is the end").toEqual({ blockId: "t2", rowId: "a2" });
+    onHead(lastFocus(s.seen(), "q2"));
+    expect(lastFocus(s.seen(), "q1"), "the newest entry is the end").toBeNull();
 
     // And `↑` at the **live** entry's head leaves, as C16 I22 always said.
     await s.type(UP);
@@ -197,7 +210,8 @@ describe("C26 §4g — the frame side of the ceiling", () => {
   it("T3.41 (C26 §4g row e, C23 I18): ⏎ on a settled row reaches the refusal, patched into that entry", async () => {
     const s = await painting(true);
     await s.type(DOWN);
-    await s.type(SHIFT_TAB);
+    await s.type(SHIFT_TAB); // the settled entry's head (C09 I47)
+    await s.type(DOWN); // its first row
     expect(lastFocus(s.seen(), "q1")).toEqual({ blockId: "t1", rowId: "a1" });
 
     await s.type(ENTER);
