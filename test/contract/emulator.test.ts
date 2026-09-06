@@ -21,3 +21,12 @@ describe("C09 · C10 — the terminal block and a literal colour, spec-first row
   it.todo("T2.122 (C09 I57): RAMP_EXTENT.terminal is none, ANIMATES.terminal is false, and tickIntervalOf a terminal returns null whatever its runs carry — not deferred on a component: lands with the terminal definition");
   it.todo("T2.36 (C10 I38): degradeColour's signature takes no theme, at compile time, and a source scan finds no theme reference in its module — not deferred on a component: lands with degradeColour");
 });
+
+describe("C21 · C22 — the PTY port, spec-first rows", () => {
+  it.todo("T2.8 (C21 I15): no node-pty import anywhere in src/, and a compile-level check that node-pty's IPty is assignable to PtyProcess; skipped with a reported reason when node-pty is absent — not deferred on a component: lands with the PtyFactory port");
+  it.todo("T2.100 (C22 I91): TuiConfig.pty reaches the runner's deps by object identity, and config.pty is read at exactly one site in src/shell/ — not deferred on a component: lands with TuiConfig.pty");
+});
+
+describe("C23 — the shell route as a live screen, spec-first rows", () => {
+  it.todo("T2.47 (C23 I67): a settled terminal document carries no cursor at any position, and dispose is called after snapshot, asserted by call order — not deferred on a component: lands with the route's settle");
+});

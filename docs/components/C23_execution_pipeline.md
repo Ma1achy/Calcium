@@ -32,7 +32,7 @@ C18 classifies; C23 routes. Seven kinds, seven paths.
 | `builtinThenShell` | Apply, **then** delegate the remainder (C18 §4 rule 2b) |
 | `local` | Run an in-process handler, append its document |
 | `app` | Transport → adapt → append (§3) |
-| `shell` | `spawnShell` → `raw` document (C18 §5); **on a non-zero exit, an error document carrying the shell's own stderr** (I50) |
+| `shell` | a live terminal block, streamed (§3c); `spawnPty` when a factory is injected, `spawnShell` into the same emulator when not; **on a non-zero exit, an error document carrying the shell's own stderr** (I50) |
 
 ### Composition inserts no spacing of its own
 
@@ -1040,6 +1040,12 @@ Per submission.
 - **I61** — **A call's failure and retry are `status` boxes under a kept head, composed by `documents.ts`, and no file in `src/shell/` outside the composer and the builders constructs a `notice` — by literal or by builder call.** The retry's countdown is the box's and the elapsed is the head's; on resume the box is replaced in place. A03 SS56, widened to the builder call, is the gate and F827's nine sites are what it closed (§8f P8, P11).
 - **I62** — **A call's children are appended in start order and never reordered, a running child is head only, a settled child's body is collapsed, and the parent's outcome is derived by `rollUp` on every child's settlement while its duration is its own readout.** Same-unit counts sum; otherwise `k of N`, with `· m failed` when any did; the parent never adopts a child's message. The children's durations do not add up to the parent's and are not made to (§8f P13, §8g rows 20–21, → C22 I89).
 ---
+- **I63** — **The shell route chooses its arm before it spawns and never switches: `spawnPty` when a factory is injected, `spawnShell` into one emulator when not, and a failure on either arm is reported rather than retried on the other.** A caller that asked for a terminal and silently got a pipe sees a child with no colours and no cause (C21 I16's reason, one layer up).
+- **I64** — **One snapshot per committed frame, taken when the frame is composed.** Not one per chunk: the emulator is marked dirty and C03's `stream` window decides the cadence, which is the same seam the readout re-renders a head through.
+- **I65** — **On a width change the child is resized before the emulator.** The reverse order gives the child a SIGWINCH for a size the emulator has not taken, and one frame is drawn from a repaint against the old grid.
+- **I66** — **The shell route registers a cancel, and the screen survives it.** The ladder's first rung signals the child's group and the card settles `cancelled` holding what it had drawn.
+- **I67** — **A settled terminal block carries no cursor, and what it keeps is decided by the screen flag: the scrollback in `lines` mode, the grid in `grid` mode.** Two artefacts, and the flag the child itself set says which one it left behind.
+
 
 ## 8. Commitments
 
@@ -1100,6 +1106,53 @@ Per submission.
 54. **Approval is a layer and a denial is a record** (I60). The wait is not the run; the card stands with `denied`; history says 126 until the far side says otherwise.
 55. **Failure is a box under a kept head, and one file composes notices** (I61). F406's class closed by a scan widened to the builder call rather than by twelve repairs.
 56. **A parent's head is written by nobody** (I62). Derived from the children in start order, wall clock for its own figure, and never the sum.
+57. **A command's output is a screen, live** (I63, I64, I66, I67). One arm chosen and kept, one snapshot per frame, a cancel that works, and a settled block that keeps what the child left rather than what the route captured.
+
+---
+
+## 3c. The shell route — a live screen rather than a captured string
+
+**What this replaces.** The route drained both streams to completion, awaited the exit, and
+appended one `raw` block: nothing appeared until the child was done, and `⌃c` reached nothing
+because no cancel was registered (F843, F844). Both are fixed here, and the second is not deferred
+to a later round — a key that stops two routes of three is a key nobody can predict.
+
+**The arms, chosen before either is called** (I63). With a `PtyFactory` injected the route calls
+`spawnPty` and the child gets a terminal: `isatty` is true, so it keeps its colours, its spinner
+and its progress bar. With none it calls `spawnShell` and writes **both** streams into the same
+emulator in arrival order. C21 I3 is not weakened — the handle's streams are still separate, and
+merging is this route's choice about one block, because a terminal has one stream by nature.
+
+**The child's environment names our emulator, not the outer terminal**: `TERM=xterm-256color` and
+`COLORTERM=truecolor`, set over the injected environment (C21 I14). C27 interprets 24-bit SGR, and
+what the outer terminal can show is decided at render by C10 §4i. A child told `TERM=dumb` would
+strip colour we are able to draw.
+
+**The block, its size and its resize.** The body is `scroll({ height, follow: true, children: [the
+terminal] })`, `height` defaulting to six. `cols` is the body's inner width, handed down from C01
+through the shell — this route reads no terminal width — and `rows` is the declared height. On a
+width change the route resizes the **child first and the emulator second** (I65): the other order
+sends the child a SIGWINCH for a size the emulator does not have, and its repaint lands on the old
+grid for one frame.
+
+**One snapshot per committed frame** (I64). Each chunk marks the emulator dirty and asks C03 for a
+`stream` commit; the snapshot is taken when the frame is composed, through the seam the readout
+already uses to re-render a head on a tick. A snapshot per chunk would push a 2,000-line value
+into C13 for every write, which is the cost C03 exists to prevent.
+
+**Cancel** (I66). The route registers `cancelInFlight` like the app and local routes do. Rung one
+signals the child's group (C21 I2); the card settles `cancelled` and **the screen is kept**,
+because a cancelled build's last lines are the reason it was cancelled.
+
+**Settling** (I67). The final snapshot is taken before the emulator is disposed, with `cursor`
+dropped — a settled screen has nobody writing to it. In `lines` mode the block keeps the
+scrollback and the scroll keeps the reader's offset; in `grid` mode it keeps the screen, because
+the program left a screen rather than a log. The alternate-screen flag decides it (C27 I4), which
+is the argument for reading the flag rather than adding a field.
+
+**A spawn failure on the PTY arm does not retry on the pipe arm** (I63). An injected factory that
+fails is a configuration error, and switching arms silently would hide it behind a child that
+merely lost its colours.
 
 ---
 
@@ -1860,6 +1913,8 @@ Fake transport, fake stores.
 - **T1.50** (I57, F821): `cardBody` over a body whose first block declares `gapBefore` and whose second does too → the first has none, the second keeps it; `entryLayout` on `[step, first, second]` holds the cleared copy in its body run while the card's own array still holds the original object with its gap — identity kept, so a live declaration keyed by it survives; a body whose first block has no gap is returned by identity.
 - **T1.49** (→ C04 I13): `/debug` renders `origin` for a fault notice. **The arm's justification, made durable** — `defect` earns a fifth arm on a public union only because it separates a contained failure from a verb that did nothing *in the one field that could say so*, and that holds only while something displays it. Checked by reading the handler before the arm landed; this is the same answer for whoever edits that handler next.
 - **T1.48** (I1, §8b B1): a swallowed append → the transcript holds **one** entry, and it is the fault notice rather than the submission's. The count and the identity, because a row asserting only the count passes on the day the notice is the wrong document.
+- **T1.51** (I64): 100 chunks written inside one `stream` window produce **one** `replace` patch, and its block holds all 100 lines.
+- **T1.52** (I63): with a factory injected the route calls `spawnPty` and never `spawnShell`; with none it calls `spawnShell` and never `spawnPty`. Two spies, four assertions.
 
 ### Tier 2 — contract / interface
 
@@ -1876,6 +1931,7 @@ Fake transport, fake stores.
 - **T2.22** (I22, SS46): every append in `src/` carrying `origin: "refresh"` is one of the four §3a names, and every one of the four is reached. A count alone passes for a fifth site added beside an existing one.
 - **T2.23** (I44): **one commit per source tick**, whatever the number of parts sharing it — one, two and five, so the row is a property rather than a case. The frame count is already coalesced by C03's 33 ms `stream` window, so the assertion is on the commit calls: the thing this constrains is `rev` bumps and C14 invalidations, and only the commit count can see them.
 - **T2.24** (I46, I33): pausing releases **nothing**. Across a scroll away and back the host stays declared, its part set is unchanged, and I33's five triggers remain the only teardown — enumerated from the same trigger list T2.20 uses, so a pause implemented as a release fails both rows.
+- **T2.47** (I67): a settled terminal document carries no `cursor` at any position the child could have left it, and the emulator was disposed after the snapshot, not before — asserted by a spy on `dispose` ordered against `snapshot`.
 
 ### Tier 3 — edge cases
 
@@ -1969,6 +2025,7 @@ Fake transport, fake stores.
 - **T5.5**: an app verb piped to `jq` → delegated whole, raw output rendered.
 - **T5.6**: `cd` into a directory, run a verb, `cd -`, run it again → each lands in the right place.
 - **T5.20**: a real session with a live part whose source fails and recovers → the placeholder, the data, the error with a visible countdown, and the data again, with the rest of the screen unmoved throughout.
+- **T5.21** (I64, I66): a real `sh -c 'for i in $(seq 1 200); do echo $i; sleep 0.01; done'` under the devcontainer → frames arrive while it runs, the frame count is far below 200, and `⌃c` at the halfway point settles the card `cancelled` with the lines so far.
 
 ### Tier 6 — fail-on-revert
 
@@ -2000,12 +2057,16 @@ Fake transport, fake stores.
 - **T6.36** (I21): retrying a `render` throw → T1.33 fails; the screen flickers at the interval and the outcome never changes.
 - **T4.23** (I38, C05 I23): a manifest declaring `run` interactive with `detach` carrying the arm. `/run -d nginx` reaches the transport and its document carries the far side's output; `/run -it alpine sh` reaches `handoff`. **Both halves in one row**, because a route that always spawns satisfies the first and a route that always hands off satisfies the second.
 - **T4.24** (I38): `/exec` with its required argument missing → an error document, and `runner.handoff` is never called. The fake's call count is the assertion; a test checking only the document passes on the ordering that spawns first and reports afterwards.
+- **T4.64** (I65, with C27): a width change mid-run → `resize` on the child precedes `resize` on the emulator, asserted by call order on one spy; the next frame's line count matches the reflow.
+- **T4.65** (I63, I67, with C21, C27): the same byte script on both arms → the PTY arm's document carries the child's colours and the pipe arm's does not, and both settle with the same text.
 - **T3.55b** (I52): `elapsedNeeded` refuses a `null` panel, a non-`status` block, and a `retrying` box — **the arms the sweep cannot reach**, since the caller has just checked the block is a loading `status`. §8a-bis B3's ruling asked directly.
 - **T3.55c** (I52, F234): the comparison is the **rendered figure** and never the clock — nothing under a second, nothing across 1000→1900 ms, a write at 2000, and `1m 40s` → `1m 41s` past ninety-nine. The range where a clock comparison and a figure comparison disagree, which is the mutation that survived the first pass.
 - **T3.56** (I52): the elapsed figure advances while the first fetch is in flight, driven through `declare` and the sweep rather than by calling the writer — a row that reached in and computed a duration would pass on the day nothing armed a timer, which is F227 one layer up.
 - **T3.57** (I52, F234): a write the figure would not show is not made at all, asserted on the **figure** across two sub-second sweeps. **The sibling part that polls every 300 ms is load-bearing and the mutation pass is why**: without it no sweep runs between the two whole seconds, so the row passed on the real code *and* on a guard comparing the clock instead of the figure — for the same reason both times, that nothing asked the guard.
 - **T3.58** (I52, C24 §5): a declarer's own `renderLoading` block is never written into, with the fixture returning **exactly the shape the framework builds** — so a guard that inspected the block rather than reading `renderLoading` passes every other row and fails only this one.
 - **T3.59** (I52, I46, F234): a box nobody is looking at is not written to, and the counter resumes on `visibilityChanged` with the **whole** wait rather than the watched part. §8a-bis B7, and the condition F234's 0.4-frames measurement was taken under and could not name.
+- **T3.62** (I66): `!sleep 100` then the ladder's first rung → the child receives `SIGINT`, the card settles `cancelled`, and the block holds the lines written before the press. **The row F844 was written for**: today `cancelInFlight` is null on this route and the entry sits pending.
+- **T3.63** (I63): a `spawnPty` that throws → the card settles `failed` naming the error, and `spawnShell` is never called.
 - **T1.40b** (I51, F234): a one-shot's failure draws `error` at one row, not `retrying` at two — the classification table's C1, where the second row would be blank because `activityLine` draws nothing for a countdown that is not coming.
 - **T6.72** (I52, F234): removing the visibility gate → **T3.59 fails and nothing else does.** The counter still advances and the figure is still right; the only difference is that an off-screen box writes a whole frame a second where it wrote nothing, and no assertion about what the box *says* can see that.
 - **T6.37** (I12): moving the driver's release into `beforeRelease` → T4.22 fails. The ordering C22 §8 already keeps for `killAll`, arriving for the mechanism that has a promise in flight.
@@ -2038,6 +2099,11 @@ Fake transport, fake stores.
 - **T6.92** (I62): children sorted by settlement → T4.53's order assertion fails; `rollUp` restating the first child's outcome → T4.53's `2 of 3 · 1 failed` fails; the parent's figure summed from the children → T4.53's wall-clock assertion fails.
 - **T6.83** (I54): registering the readout at enqueue, or leaving the queued notice in place at the route → T4.41 fails on one half each: a queued line counts its wait as its run, or runs reading *queued behind*.
 - **T6.53** (I53): dropping the readout's arming clause from `armParts` → T3.61 fails at its second assertion — the figure never moves because no wake is armed, F227's class one row over — while every `elapsedNeeded` row stays green. Dropping the `settled` deletion → T3.61 fails at its third: the settled header keeps counting.
+- **T6.93** (I64): snapshotting per chunk → T1.51 counts 100 patches and a 2,000-line value enters the store per write.
+- **T6.94** (I65): resizing the emulator first → T4.64's call order fails and one frame is drawn from the old grid.
+- **T6.95** (I66): dropping the cancel registration → T3.62 fails, which is the defect F844 records as shipped.
+- **T6.96** (I67): keeping the cursor on settle → T2.47 fails and a settled block draws a cursor nobody is writing at.
+- **T6.97** (I63): falling back to the pipe arm when `spawnPty` throws → T3.63 fails and a configuration error becomes a child that quietly lost its colours.
 
 ---
 

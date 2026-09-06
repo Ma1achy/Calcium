@@ -62,6 +62,79 @@ interface ChildHandle {
 }
 ```
 
+## 2a. The PTY port — declared here, injected by the consumer
+
+A child given a pipe behaves differently from a child given a terminal: `isatty` is false, so it
+drops its colours, its spinner and its progress bar. **A live terminal block wants the second
+child**, and getting one needs a pseudo-terminal, which Node does not have.
+
+```typescript
+type PtySize = Readonly<{ cols: number; rows: number }>;
+
+interface PtyProcess {
+  readonly pid: number;
+  onData(cb: (chunk: string) => void): void;
+  onExit(cb: (e: Readonly<{ exitCode: number; signal?: number }>) => void): void;
+  write(data: string): void;
+  resize(cols: number, rows: number): void;
+  kill(signal?: string): void;
+}
+
+type PtyFactory = Readonly<{
+  spawn(
+    file: string,
+    args: readonly string[],
+    opts: PtySize & Readonly<{ cwd: string; env: Readonly<NodeJS.ProcessEnv> }>,
+  ): PtyProcess;
+}>;
+
+// on ProcessRunnerDeps
+pty?: PtyFactory;
+
+// on ProcessRunner
+spawnPty(command: string, opts: SpawnOptions & PtySize): PtyHandle;
+```
+
+**The port is structural and names no package** (I15). Its members are the ones `node-pty`'s
+`IPty` already has, so a consumer passes `node-pty` itself and nothing is adapted — and C21
+imports nothing, which is what keeps the framework installable.
+
+**`node-pty` cannot be a runtime dependency, and the reason is a requirement rather than a
+preference** (F840). It ships prebuilds for darwin and win32 only; on Linux the toolchain
+compiles one, and `--ignore-scripts` is set for the whole tree (A04 §3), so the build never runs.
+R01 R4.4 commits that a clean clone plus `npm install` gives a working shell with no further
+steps, and a runtime `node-pty` would make that false on every Linux consumer while passing every
+test we run — because the devcontainer builds it by name in `make install`. An
+`optionalDependency` was considered and refused: it downloads 63 MB in order to fail.
+
+**With no factory injected, `spawnPty` throws naming the field** (I16). It does not fall back to
+`spawnShell`: a caller that asked for a terminal and silently got a pipe would see a child with no
+colours and no cause. The fallback belongs to the caller that can explain it — C23's shell route
+chooses between `spawnPty` and `spawnShell` before it calls either, and says which arm it is on.
+
+**`spawnPty` is a third method rather than a flag on `spawnShell`**, on I1's own argument: the
+distinction is visible at the call site or it is invisible everywhere. Its handle is smaller than
+`ChildHandle` because a terminal has one stream by nature — there is no `stderr` to keep separate,
+and I3's separation is not weakened but inapplicable.
+
+```typescript
+interface PtyHandle {
+  readonly pid: number | null;
+  readonly exited: Promise<Exit>;
+  readonly running: boolean;
+  onData(cb: (chunk: string) => void): void;
+  write(data: string): void;
+  resize(cols: number, rows: number): void;
+  signal(sig: string): boolean;
+}
+```
+
+Signals reach the child's process group as they do for `spawn` (I2); `killAll` kills PTY children
+too (I11), and the state machine's exited row applies unchanged — writes after exit are ignored,
+signals return false.
+
+---
+
 `spawn` and `spawnShell` are **separate methods, not a flag**, because the distinction is the security-relevant one (D18) and a boolean makes it invisible at the call site. `spawn` takes an argv array and no shell is involved. `spawnShell` takes a string the *user typed* and hands it to their shell (C18 §5) — the TUI never assembles that string from data it composed.
 
 The shell is `$SHELL` when set and executable, otherwise `/bin/sh`.
@@ -147,6 +220,9 @@ Per child handle.
 - **I12** — C21 imports nothing from `terminal/` and writes nothing to the real stdout.
 - **I13** — `exited` always resolves, including on spawn failure.
 - **I14** — The environment, the raw-mode probe and the warning sink are injected. C21 reads no ambient global.
+- **I15** — The PTY factory is a structural port: C21 imports no PTY package, and every member of `PtyProcess` and `PtyFactory` is satisfied by `node-pty`'s own shape.
+- **I16** — `spawnPty` with no factory injected throws naming `pty`, and never falls back to a pipe.
+- **I17** — A PTY child is signalled by group, counted by `killAll`, and ignores writes after exit, exactly as a piped child is.
 
 ---
 
@@ -157,6 +233,7 @@ Per child handle.
 3. `spawnShell` resolves the user's shell rather than assuming one; which variable it reads and what it falls back to is §2 detail (I1).
 4. Children are detached and signalled by group, so pipelines die whole (I2).
 5. stdout and stderr stay separate and never reach the terminal (I3).
+6. A child that needs a terminal gets one through an injected port, and the framework depends on no PTY package to offer it (I15, I16, I17).
 6. Decoding is streaming and multi-byte-safe (I4).
 7. Buffers are bounded at 8 MiB per stream; overflow drains rather than blocking (I5).
 8. `handoff` inherits stdio, does not detach, and refuses if raw mode is still set (I6, I7).
@@ -185,6 +262,8 @@ Six tiers. Every cell of the §7 table is covered. Tiers 1–3 use real short-li
 - **T1.8** (I2): `signal("SIGTERM")` → delivered; the child exits.
 - **T1.9** (I13): spawning a non-existent binary → `exited` resolves, `pid` null, no unhandled rejection.
 - **T1.10**: `env` overrides are visible to the child; the rest of the environment is inherited.
+- **T1.11** (I15, I16): `spawnPty` with no `pty` in the deps throws, and the message names `pty`; with a fake factory it calls `spawn` once with the given `cols`, `rows`, `cwd` and `env`.
+- **T1.12** (I17): a fake PTY child that has exited → `signal` returns false, `write` is a no-op, and `exited` has resolved.
 
 ### Tier 2 — contract / interface
 
@@ -197,6 +276,7 @@ Six tiers. Every cell of the §7 table is covered. Tiers 1–3 use real short-li
 - **T2.5** (I1): `spawn` has no parameter that could carry a shell string; `spawnShell` has no argv form. A compile-level test.
 - **T2.6** (I13): across a hundred spawns including failures, `exited` resolves every time.
 - **T2.7** (I14): a source scan finds no `process.env`, no `console.` and no reference to the real `process.stdin` in `process/`. The environment arrives as a record and the probe as an object.
+- **T2.8** (I15): a source scan finds no `node-pty` import anywhere in `src/`, and a compile-level test asserts `node-pty`'s `IPty` is assignable to `PtyProcess` — the port's shape is checked against the package it was cut from without depending on it. The row is skipped when `node-pty` is not installed, and the skip is reported rather than silent.
 
 ### Tier 3 — edge cases
 
@@ -218,6 +298,7 @@ Six tiers. Every cell of the §7 table is covered. Tiers 1–3 use real short-li
 - **T3.16**: a child spawning its own grandchild that outlives it → group signalling reaches the grandchild.
 - **T3.17**: output containing a null byte → passed through the decoder without truncating the stream.
 - **T3.18**: fifty short-lived children spawned at once → every one of them yields its whole output. Node's `exit` can fire before the stdio `data` events are delivered, so a runner that ends its streams on exit drops output still in flight — and the failure appears only under enough load to reorder the two.
+- **T3.19** (I16): `spawnPty` throwing leaves no child, no handle and no listener — asserted by a spy on the factory that is never called.
 
 ### Tier 4 — integration
 
@@ -236,6 +317,8 @@ Six tiers. Every cell of the §7 table is covered. Tiers 1–3 use real short-li
 - **T5.3**: `Ctrl-C` during `sleep 30 | cat` → both die within the ladder's bounds, the prompt returns, nothing orphaned.
 - **T5.4**: a real streaming verb at 1,000 lines/s for sixty seconds → no memory growth, no dropped output, clean exit.
 - **T5.5**: quitting the session with three children running → all reaped, terminal restored.
+- **T5.6** (I15, I17): under the devcontainer's `node-pty`, `spawnPty("sh -c 'tty; printf \"\\033[32mgreen\\033[0m\\n\"'")` → the first line is a device path rather than *not a tty*, and the second carries the SGR the child would have dropped on a pipe. **Facts a fake cannot have**: the row asserts the tty's own name.
+- **T5.7** (I17): a PTY child signalled by group dies with its pipeline, matching T3.1 on the PTY arm.
 
 ### Tier 6 — fail-on-revert
 
@@ -253,6 +336,8 @@ Six tiers. Every cell of the §7 table is covered. Tiers 1–3 use real short-li
 - **T6.12** (I14): reading `process.env.SHELL` or `process.stdin` directly → T2.7 fails, SS10's allow-list gains its second entry, and T3.8 can no longer be asserted without a test putting its own terminal into raw mode.
 - **T6.13** (I12): importing anything from `terminal/`, type-only included → T2.3 fails. The type-only form is the one to watch: it erases at build, so it would pass a rule that only counted runtime edges while being exactly the dependency that ends L0's independence.
 - **T6.14**: ending the streams when the child exits rather than when its stdio closes → T3.18 fails. `exit` and `close` are separate events because the first can precede the delivery of output, and conflating them loses a short command's entire stdout under load.
+- **T6.15** (I16): falling back to `spawnShell` when no factory is injected → T1.11's throw becomes a handle, and a caller that asked for a terminal gets a pipe with no cause.
+- **T6.16** (I15): importing `node-pty` in `runner.ts` → T2.8's scan fails and the package becomes a runtime dependency by accident.
 
 ---
 

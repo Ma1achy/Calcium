@@ -17,3 +17,8 @@ describe("C09 · C10 — the terminal block at the arms, spec-first rows", () =>
   it.todo("T4.57 (C09 I55, with C04, C27): a real pytest-shaped byte script inside a scroll of height 6 renders the tail at five arms, read as pictures, with the child's colours — not deferred on a component: lands with the terminal definition");
   it.todo("T4.37 (C10 I38, with C04, C09): one terminal document at five arms yields identical text and SGR differing exactly by the ladder, the block byte-identical across them — not deferred on a component: lands with degradeColour");
 });
+
+describe("C23 — the shell route as a live screen, spec-first rows", () => {
+  it.todo("T4.64 (C23 I65, with C27): a width change mid-run resizes the child before the emulator, asserted by call order on one spy, and the next frame matches the reflow — not deferred on a component: lands with the route's resize");
+  it.todo("T4.65 (C23 I63, C23 I67, with C21, C27): one byte script on both arms — the PTY arm carries the child's colours, the pipe arm does not, and both settle with the same text — not deferred on a component: lands with the route's arms");
+});

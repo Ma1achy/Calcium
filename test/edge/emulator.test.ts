@@ -26,3 +26,12 @@ describe("C09 · C10 — the terminal block and a literal colour, spec-first row
   it.todo("T3.74 (C09 I56): the cursor cell is inverse at all five arms, and at 1-bit it is the only mark distinguishing the cell — not deferred on a component: lands with the terminal definition");
   it.todo("T3.72 (C10 I38): at 1-bit a run with a colour and six attributes paints every attribute and no colour; a colour-only run is not emitted — not deferred on a component: lands with degradeColour");
 });
+
+describe("C21 — the PTY port, spec-first rows", () => {
+  it.todo("T3.19 (C21 I16): spawnPty throwing leaves no child, no handle and no listener, with the factory spy never called — not deferred on a component: lands with spawnPty");
+});
+
+describe("C23 — the shell route as a live screen, spec-first rows", () => {
+  it.todo("T3.62 (C23 I66): a running shell command then the ladder's first rung → the child receives SIGINT, the card settles cancelled, and the block holds the lines written before the press — the row F844 was written for — not deferred on a component: lands with the route's cancel");
+  it.todo("T3.63 (C23 I63): a spawnPty that throws → the card settles failed naming the error and spawnShell is never called — not deferred on a component: lands with the route's arm choice");
+});

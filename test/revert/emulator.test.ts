@@ -29,3 +29,16 @@ describe("C09 · C10 — the terminal block and a literal colour, spec-first row
   it.todo("T6.95 (C10 I38): resolving ansi16 through a hex round trip → T1.39's second row returns a different index and a child's red becomes ours — not deferred on a component: lands with degradeColour");
   it.todo("T6.96 (C10 I38): dropping attributes with the colour at 1-bit → T3.72 fails and an inverse cursor becomes invisible — not deferred on a component: lands with degradeColour");
 });
+
+describe("C21 — the PTY port, spec-first rows", () => {
+  it.todo("T6.15 (C21 I16): falling back to spawnShell when no factory is injected → T1.11's throw becomes a handle and a caller that asked for a terminal gets a pipe with no cause — not deferred on a component: lands with spawnPty");
+  it.todo("T6.16 (C21 I15): importing node-pty in runner.ts → T2.8's scan fails and the package becomes a runtime dependency by accident — not deferred on a component: lands with the PtyFactory port");
+});
+
+describe("C23 — the shell route as a live screen, spec-first rows", () => {
+  it.todo("T6.93 (C23 I64): snapshotting per chunk → T1.51 counts 100 patches and a 2,000-line value enters the store per write — not deferred on a component: lands with the route's snapshot seam");
+  it.todo("T6.94 (C23 I65): resizing the emulator first → T4.64's call order fails and one frame is drawn from the old grid — not deferred on a component: lands with the route's resize");
+  it.todo("T6.95 (C23 I66): dropping the cancel registration → T3.62 fails, which is the defect F844 records as shipped — not deferred on a component: lands with the route's cancel");
+  it.todo("T6.96 (C23 I67): keeping the cursor on settle → T2.47 fails and a settled block draws a cursor nobody is writing at — not deferred on a component: lands with the route's settle");
+  it.todo("T6.97 (C23 I63): falling back to the pipe arm when spawnPty throws → T3.63 fails and a configuration error becomes a child that quietly lost its colours — not deferred on a component: lands with the route's arm choice");
+});

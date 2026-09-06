@@ -39,6 +39,7 @@ type TuiConfig = Readonly<{
   hover?:             boolean;   // C01 I21 — mouse mode 1003 in 1002's place; config, not a capability (C02 §3); default off; `capabilities.mouse` false still takes neither
   blocks?:            readonly BlockDefinition[];
   transport?:         TransportRouter;
+  pty?:               PtyFactory;   // §2b — a child that needs a terminal; unset means the pipe arm (C21 I16)
 
   debug?:   Readonly<{ retainPayloads?: number }>;   // off by default; 50 when enabled without a count
 
@@ -2246,6 +2247,8 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I88** — **A card's body rows after the first carry a left rule in the hook's column, and it costs no geometry.** `bodyGutter` draws `glyphForMask(LINE_UP | LINE_DOWN, "sharp", caps)` muted at column `HOOK_INDENT` on every body row whose run-local index is not 0, padded to `BODY_INDENT`; row 0 keeps the hook. The bar fills cells I84 reserved, so `measureEntry` is unchanged and I83 holds by construction (§6l.8 row 22).
 - **I89** — **A `group` column whose first block is a `step` notice, inside a card's body, lays out as a card one unit further in, and the layout recurses exactly once.** A single child hangs under `⎿`; with siblings the gutter draws `├─` for every child but the last, `└─` for the last **when nothing in the body follows it**, and `│` past a child's body, every glyph from `glyphForMask` with corners fixed `"sharp"`; the last child's body has no bar above it. A last child followed by body text takes `├─` and the bar runs past it, because `└─` says *nothing continues below* and the parent's rule (I88) would then draw through it — the frame said so before the first row did. A `step` at depth 3 is laid out as body text. `GUTTER_UNIT === BODY_INDENT` (§6l.8 rows 23–25).
 - **I90** — **A card head's `copy` is the entry's command.** `elementsOfEntry` receives `command` and overrides the `step` element's `copy` with it; every other element's `copy` is the block's own, so `⌃a y` over a card yields the invocation followed by the body's sources through C26 I16's aggregator and no second one (§6l.8 row 26).
+- **I91** — **`TuiConfig.pty` is passed through to C21's deps unchanged and read nowhere else.** The composition root's whole job for it: the framework depends on no PTY package (C21 I15), so the only way one reaches a child is a consumer handing it in, and a root that inspected or wrapped it would be a second place the port's shape is known.
+
 
 
 ## 11. Commitments
@@ -2642,6 +2645,7 @@ PTY harness.
 - **T1.50** (I90, §6l.8 row 26): `elementsOfEntry` with `command: "/ps --all"` yields a head element whose `copy` is `/ps --all` and body elements whose `copy` is each block's own; `copyElement` over the whole card yields the command first.
 - **T1.43** (§6l.4 E): the default footer is one `pills` row naming `/help` and the snapshot's `cwd` with `$HOME` folded to `~`, gaining `stopping` when the snapshot says so and carrying no key name.
 - **T2.40** (SS56): the source scan finds no hand-composed `kind: "notice"` under `src/` outside the sixteen files the rule excuses by name — two are the family (`documents.ts`, `builders/`), two the kind's declaration and definition, eight below L4 where the family is unreachable (A02), four L4 surfaces **owed** a migration and allowed so SS53 retires each entry when its last literal goes. The rule is imported from the enforcement tool, not restated (C01 T2.10's shape), and its fabricated violation is a notice literal in `src/shell/keys.ts`.
+- **T2.100** (I91): a `TuiConfig.pty` reaches `createProcessRunner`'s deps identically — asserted by object identity — and a source scan finds `config.pty` read at exactly one site in `src/shell/`.
 - **T3.38** (I80, §6k.4 F): **frame read.** At 24 rows with `footerRows: 2` and a footer returning three one-row blocks, rows 22 and 23 carry the first two blocks and the third is on no row; the region is 20 and the prompt is on row 21. With one block, row 23 is blank. And the default — `footerRows` omitted — paints byte-for-byte the frame that `footerRows: 1` paints, which is the frame HEAD painted: the golden claim, asserted here rather than by regenerating anything.
 - **T3.39** (I28, §6k.2 row 8): with `footerRows: 3`, `overlayRegion.height` equals `region.height` and `paint` returns exactly `rows` lines.
 - **T6.95** (I80): `heightsSum` reading a constant `1` for the footer instead of `f.footerRows` → **T1.36** fails at every budget above one. Anchor in `tools/mutate/runs/c22-footer-budget.mjs`.

@@ -28,3 +28,13 @@ describe("C09 · C10 — the terminal block and a literal colour, spec-first row
   it.todo("T1.29 (C09 I55): a terminal of 40 lines measures 40; with dropped it measures 41; a 200-character line at width 80 still measures one row — not deferred on a component: lands with the terminal definition");
   it.todo("T1.39 (C10 I38): degradeColour steps rgb through ansi256 and ansi16 to undefined at 1-bit, and passes an ansi16 index through unchanged above 1-bit — not deferred on a component: lands with degradeColour");
 });
+
+describe("C21 · C22 — the PTY port, spec-first rows", () => {
+  it.todo("T1.11 (C21 I15, C21 I16): spawnPty with no pty in the deps throws naming pty; with a fake factory it calls spawn once with the given cols, rows, cwd and env — not deferred on a component: lands with spawnPty");
+  it.todo("T1.12 (C21 I17): a fake PTY child that has exited returns false from signal, ignores write, and has resolved exited — not deferred on a component: lands with spawnPty");
+});
+
+describe("C23 — the shell route as a live screen, spec-first rows", () => {
+  it.todo("T1.51 (C23 I64): 100 chunks inside one stream window produce one replace patch holding all 100 lines — not deferred on a component: lands with the route's snapshot seam");
+  it.todo("T1.52 (C23 I63): with a factory injected the route calls spawnPty and never spawnShell, and the reverse with none — two spies, four assertions — not deferred on a component: lands with the route's arm choice");
+});
