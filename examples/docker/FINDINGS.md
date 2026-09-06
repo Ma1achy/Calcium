@@ -29938,3 +29938,51 @@ after a push is what found it, which is the close-out rule doing its job.
 
 ---
 
+## F836 — a comment that states the absence of the axis it is keyed on ★★☆☆☆
+
+**What.** `src/shell/render-cache.ts:52` reads *`ctx.tick` is not here and no transcript render
+receives one (I60)*, and goes on: *the day something threads a tick through, an animating entry
+serves its first frame for the life of the session*. Both were true when written. C22 I60 was
+resolved by F233 — `session.ts:1196` computes `animationIntervalOf(windowed.blocks)` and keys the
+slot on the tick when it is non-null — and T4.35 measures every spinner frame arriving through
+that path. The comment describing the cache's one deliberate omission now describes the axis the
+cache **has**, in the file that implements the key.
+
+**Why it matters.** The ink-ramps design (`docs/notes/CALCIUM_INK_RAMPS_DESIGN.md` M8) needed to
+know whether a transcript entry can animate, and the first answer the tree gave was *no*, from
+the file whose job is to say. The record and the tree disagreed, and the tree was right. This is
+the sixth blind spot's shape at a comment's scale: a true sentence outlived the ruling that
+falsified it because nothing re-reads a comment when the invariant it cites changes tense — I60's
+own text records that its *tense was wrong*, and the comment is a second copy of the old tense.
+
+**Ruling.** The comment is rewritten to say what the key does: the tick is keyed per kind, only
+for entries whose blocks animate, and lands with the ramps' content-aware cadence (C5 of the
+build order) because that step is what widens who animates.
+
+**Where**: `src/shell/render-cache.ts:52`; C22 I60; F233; F227.
+
+---
+
+## F837 — the brief's palette fill names a mechanism the tree does not use ★★☆☆☆
+
+**What.** `CALCIUM_INK_RAMPS.md` §2 says a `palette` fill *cycles a categorical palette — the
+waffle and the pie already do it* and §2's vocabulary line gives it *a palette name*. Measured:
+`QUALITATIVE_PALETTES` has **no consumer in `src/`** outside its own module — one unit test reads
+it. The waffle and pie cycle the **theme's** categorical slots through `refOf(index)` in
+`plot/marks.ts:75`, and C10 I16 rules that a document draws its categories from that one palette.
+
+**Why it matters.** A `palette: "okabe-ito"` field would have been the first production consumer
+of the data palettes, in a component two layers from the plot arm, and it would have put a
+second categorical vocabulary beside the theme's — the picture I16 exists to refuse. The
+sentence *already do it* was a citation read as coverage: the mechanism named exists, is used by
+the two forms named, and is not the mechanism it was cited for.
+
+**Ruling.** `palette` takes no name. Cluster `i` is `categorical.c((i mod 8) + 1)`, and
+`refOf` moves down into `theme/` so C09 can call it without importing C12 (design Q6, Q11).
+`QUALITATIVE_PALETTES` stays data for the plot arm, which is where its one reader is.
+
+**Where**: `docs/notes/CALCIUM_INK_RAMPS.md` §2; `src/presentation/plot/marks.ts:42-77`;
+`src/data/colormaps/qualitative/index.ts`; C10 I16.
+
+---
+
