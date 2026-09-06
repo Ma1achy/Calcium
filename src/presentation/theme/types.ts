@@ -170,11 +170,18 @@ export type ColourRef = `${string}.${string}`;
  * `terminal/escapes.ts` alone — so it hands out a description, and the tag is
  * what stops the consumer re-deriving the depth from the format and emitting a
  * truecolour sequence to a 16-colour terminal (§2).
+ *
+ * **Declared in C04 and re-exported here** (F846). It was C10's until a
+ * `terminal` block needed to carry a child's literal colour: C04 is L0 and
+ * cannot import a presentation type, so the vocabulary moved down to the layer
+ * that owns the document and every consumer kept its import. The same homing as
+ * `refOf`'s (§4h), for the same reason — the type is needed below the component
+ * that first declared it, and a duplicate of an identical shape is the
+ * reimplemented-rule hazard rather than a second opinion.
  */
-export type ColourValue =
-  | Readonly<{ kind: "rgb"; hex: string }>
-  | Readonly<{ kind: "ansi256"; index: number }>
-  | Readonly<{ kind: "ansi16"; index: number }>;
+import type { ColourValue } from "../../data/viewmodel/types.js";
+
+export type { ColourValue };
 
 export type Style = Readonly<{
   colour?: ColourValue;

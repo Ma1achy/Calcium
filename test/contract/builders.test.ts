@@ -202,10 +202,16 @@ const BUILDERS: readonly Readonly<{
     kind: "status",
     make: (o) => b.status({ message: "the far side is gone" }, null, 1, o),
   },
+  {
+    name: "terminal",
+    gaps: false,
+    kind: "terminal",
+    make: (o) => b.terminal(40, [{ text: "=== test session starts ===" }], o),
+  },
 ];
 
-describe("C24 §4 — the twenty-three builders", () => {
-  it("T2.9: the enumeration covers every block-returning builder, and twenty-three is the count", () => {
+describe("C24 §4 — the twenty-four builders", () => {
+  it("T2.9: the enumeration covers every block-returning builder, and twenty-four is the count", () => {
     // The count is asserted so that adding a builder without a row fails here
     // rather than silently going untested — which is exactly how §4's paragraph
     // came to name two builders that did not exist.

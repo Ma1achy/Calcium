@@ -91,7 +91,7 @@ describe("C23 I54 — the pending entry is the running card", () => {
     const h = pipelineHarness({ stream: gate.stream, adaptPatch: appender() });
 
     h.pipeline.submit("/tail web.log");
-    await settled();
+    await settled(h.pipeline);
 
     const entry = () => h.transcript.entries[0];
     expect(entry()?.streaming, "step 3 appended a streaming entry").toBe(true);
@@ -107,9 +107,9 @@ describe("C23 I54 — the pending entry is the running card", () => {
 
     // Third — the streamed body is the entry's own blocks, appended under the header.
     await gate.data({ a: 1 });
-    await settled();
+    await settled(h.pipeline);
     await gate.data({ a: 2 });
-    await settled();
+    await settled(h.pipeline);
     expect(entry()?.doc.blocks.map((blk) => blk.id).slice(1), "body blocks follow the header").toEqual(["o1", "o2"]);
     expect(headerOf(entry()?.doc.blocks ?? [])?.text, "the header is untouched by the body").toBe(`tail(web.log) · ${SPIN(4)} 4s`);
 
@@ -123,7 +123,7 @@ describe("C23 I54 — the pending entry is the running card", () => {
       atSettle = headerOf(h.transcript.entries.find((e) => e.id === change.id)?.doc.blocks ?? [])?.text;
     });
     await gate.end({ exitCode: 0 });
-    await settled();
+    await settled(h.pipeline);
     sub[Symbol.dispose]();
     expect(entry()?.streaming, "settled by `end`").toBe(false);
     expect(atSettle, "what persistence writes already carries the final head — the duration, and no `exit 0` (C23 I59)").toBe("tail(web.log) · 4s");
@@ -138,10 +138,10 @@ describe("C23 I54 — the pending entry is the running card", () => {
     const gate = gatedStream();
     const h = pipelineHarness({ stream: gate.stream, adaptPatch: appender() });
     h.pipeline.submit("/tail web.log");
-    await settled();
+    await settled(h.pipeline);
     seconds(h, 2);
     await gate.end({ exitCode: 1 });
-    await settled();
+    await settled(h.pipeline);
     expect(headerOf(h.transcript.entries[0]?.doc.blocks ?? [])?.text).toBe("tail(web.log) · 2s · exit 1");
   });
 
@@ -158,9 +158,9 @@ describe("C23 I54 — the pending entry is the running card", () => {
     });
 
     h.pipeline.submit("/ps");
-    await settled();
+    await settled(h.pipeline);
     h.pipeline.submit("/tail web.log");
-    await settled();
+    await settled(h.pipeline);
 
     const queued = h.transcript.entries[1];
     expect(queued?.streaming, "the queue is visible: appended streaming when typed").toBe(true);
@@ -176,8 +176,8 @@ describe("C23 I54 — the pending entry is the running card", () => {
     // Routed: the header *replaces* the notice on the same entry (P2), and the
     // clock starts here — two seconds later it reads 2s, not 7s (T6.83).
     held.release?.();
-    await settled();
-    await settled();
+    await settled(h.pipeline);
+    await settled(h.pipeline);
     const routed = h.transcript.entries[1];
     expect(routed?.id, "same entry").toBe(queued?.id);
     expect(routed?.doc.blocks, "one block: the header replaced the notice").toHaveLength(1);
@@ -186,7 +186,7 @@ describe("C23 I54 — the pending entry is the running card", () => {
     expect(headerOf(h.transcript.entries[1]?.doc.blocks ?? [])?.text).toBe(`tail(web.log) · ${SPIN(2)} 2s`);
 
     await gate.end({ exitCode: 0 });
-    await settled();
+    await settled(h.pipeline);
     expect(headerOf(h.transcript.entries[1]?.doc.blocks ?? [])?.text, "never *queued behind* once it ran").toBe(
       "tail(web.log) · 2s",
     );
@@ -196,11 +196,11 @@ describe("C23 I54 — the pending entry is the running card", () => {
     const gate = gatedStream();
     const h = pipelineHarness({ stream: gate.stream, adaptPatch: appender() });
     h.pipeline.submit("/tail web.log");
-    await settled();
+    await settled(h.pipeline);
     seconds(h, 3);
 
     h.pipeline.cancel();
-    await settled();
+    await settled(h.pipeline);
     const entry = h.transcript.entries[0];
     expect(entry?.streaming, "cancel settles the entry (C23 I10)").toBe(false);
     expect(headerOf(entry?.doc.blocks ?? [])?.text).toBe("tail(web.log) · 3s · cancelled");
@@ -218,14 +218,14 @@ describe("C23 I54 — the pending entry is the running card", () => {
     // `--quiet` is a flag the fixture declares; the first draft typed `--all`, which is
     // not, and read the error route's document as a missing card.
     h.pipeline.submit("/ps --quiet");
-    await settled();
+    await settled(h.pipeline);
 
     expect(headerOf(h.transcript.entries[0]?.doc.blocks ?? [])).toEqual({ glyph: "step", text: `ps(--quiet) · ${SPIN(0)}` });
     seconds(h, 2);
     expect(headerOf(h.transcript.entries[0]?.doc.blocks ?? [])?.text).toBe(`ps(--quiet) · ${SPIN(2)} 2s`);
 
     held.release?.();
-    await settled();
+    await settled(h.pipeline);
     const entry = h.transcript.entries[0];
     expect(entry?.streaming).toBe(false);
     expect(entry?.doc.command, "the adapter's document replaced the card (C13 §5)").toBe("adapted");
@@ -242,22 +242,22 @@ describe("C23 I54 — the pending entry is the running card", () => {
       invoke: () => new Promise((r) => { held.release = () => r(result({ exitCode: 0 })); }),
     });
     h.pipeline.submit("/ps");
-    await settled();
+    await settled(h.pipeline);
     expect(headerOf(h.transcript.entries[0]?.doc.blocks ?? []), "no arguments, no parentheses").toEqual({ glyph: "step", text: `ps · ${SPIN(0)}` });
     seconds(h, 2);
     expect(headerOf(h.transcript.entries[0]?.doc.blocks ?? [])?.text).toBe(`ps · ${SPIN(2)} 2s`);
     // The control is T4.43 above: `ps(--quiet)` keeps its parentheses.
     held.release?.();
-    await settled();
+    await settled(h.pipeline);
   });
 
   it("T4.44 (C23 I54, I25, with §3b): the stall notice is the card's last row while the header counts on; a patch resumes it in place; `end` finishes above both", async () => {
     const gate = gatedStream();
     const h = pipelineHarness({ stream: gate.stream, adaptPatch: appender() });
     h.pipeline.submit("/tail web.log");
-    await settled();
+    await settled(h.pipeline);
     await gate.data({ a: 1 });
-    await settled();
+    await settled(h.pipeline);
 
     // 121 one-second wakes: the stall detector fires at two minutes of silence.
     seconds(h, 121);
@@ -269,7 +269,7 @@ describe("C23 I54 — the pending entry is the running card", () => {
     expect(blocks.map((blk) => blk.kind), "header, body, stall — in that order").toEqual(["notice", "raw", "notice"]);
 
     await gate.data({ a: 2 });
-    await settled();
+    await settled(h.pipeline);
     const resumed = h.transcript.entries[0]?.doc.blocks ?? [];
     expect(resumed.map((blk) => (blk.kind === "notice" ? blk.text : blk.id)), "resumed in place, the new body row after it").toEqual([
       `tail(web.log) · ${SPIN(121)} 2m 1s`,
@@ -279,7 +279,7 @@ describe("C23 I54 — the pending entry is the running card", () => {
     ]);
 
     await gate.end({ exitCode: 0 });
-    await settled();
+    await settled(h.pipeline);
     expect(headerOf(h.transcript.entries[0]?.doc.blocks ?? [])?.text).toBe("tail(web.log) · 2m 1s");
   });
 
@@ -302,20 +302,20 @@ describe("C23 I54 — the pending entry is the running card", () => {
     };
 
     h.pipeline.submit("/tail web.log");
-    await settled();
+    await settled(h.pipeline);
     await gate.data({ a: 1 });
-    await settled();
+    await settled(h.pipeline);
     await gate.data({ a: 2 });
-    await settled();
+    await settled(h.pipeline);
     seconds(h, 4);
     capture("running · 4s");
     seconds(h, 117);
     capture("stalled · 2m 1s");
     await gate.data({ a: 3 });
-    await settled();
+    await settled(h.pipeline);
     capture("resumed");
     await gate.end({ exitCode: 0 });
-    await settled();
+    await settled(h.pipeline);
     capture("settled");
 
     console.log(`LANEP-FRAMES\n${captured.join("\n")}\nLANEP-FRAMES-END`);
@@ -338,10 +338,10 @@ describe("C23 I54 — the pending entry is the running card", () => {
       if (change.kind === "settle") atSettle.push([...(h.transcript.entries.find((e) => e.id === change.id)?.doc.blocks ?? [])]);
     });
     h.pipeline.submit("/ps");
-    await settled();
+    await settled(h.pipeline);
     seconds(h, 2);
     held.release?.();
-    await settled();
+    await settled(h.pipeline);
     const blocks = h.transcript.entries[0]?.doc.blocks ?? [];
     expect(headerOf(blocks), "the header is block 0, with the duration; no count, so no outcome (C23 I59)").toEqual({ glyph: "step", text: "ps · 2s" });
     expect(blocks.slice(1).map((blk) => blk.id), "the result's own blocks follow it, in order").toEqual(["r1", "r2"]);
@@ -352,8 +352,8 @@ describe("C23 I54 — the pending entry is the running card", () => {
     // A throwing adapter: `ps · failed` over the status box.
     const h2 = pipelineHarness({ invoke: () => Promise.reject(new Error("boom")) });
     h2.pipeline.submit("/ps --quiet");
-    await settled();
-    await settled();
+    await settled(h2.pipeline);
+    await settled(h2.pipeline);
     const failed = h2.transcript.entries[0]?.doc.blocks ?? [];
     expect(headerOf(failed)).toEqual({ glyph: "step", text: "ps(--quiet) · failed" });
     expect(failed[1]?.kind, "the status box is the body").toBe("status");
@@ -362,7 +362,7 @@ describe("C23 I54 — the pending entry is the running card", () => {
     // A local verb: the header over the handler's blocks — a local verb is a call.
     const h3 = pipelineHarness();
     h3.pipeline.submit("/guide");
-    await settled();
+    await settled(h3.pipeline);
     const local = h3.transcript.entries[0]?.doc.blocks ?? [];
     expect(headerOf(local), "a local verb below one second with no count: the verb alone").toEqual({ glyph: "step", text: "guide" });
     expect(h3.transcript.entries[0]?.doc.meta.transport, "a local document's verdict is its status").toBe("local");
@@ -374,8 +374,8 @@ describe("C23 I54 — the pending entry is the running card", () => {
       adapt: () => doc({ command: "adapted", blocks: [b.raw("NAME   STATUS", { id: "r1" }), b.raw("web    running", { id: "r2" })] }),
     });
     h.pipeline.submit("/ps");
-    await settled();
-    await settled();
+    await settled(h.pipeline);
+    await settled(h.pipeline);
     const settledDoc = h.transcript.entries[0]?.doc;
     expect(settledDoc).toBeDefined();
     const blocks = settledDoc?.blocks ?? [];
@@ -412,7 +412,7 @@ describe("C23 — the call grammar's head states", () => {
     const gate = gatedStream();
     const h = pipelineHarness({ stream: gate.stream });
     h.pipeline.submit("/tail web.log");
-    await settled();
+    await settled(h.pipeline);
     const head = () => headerOf(h.transcript.entries[0]?.doc.blocks ?? [])?.text;
     expect(head(), "dispatched: the spinner alone, no figure").toBe(`tail(web.log) · ${SPIN(0)}`);
     seconds(h, 1);
@@ -420,7 +420,7 @@ describe("C23 — the call grammar's head states", () => {
     seconds(h, 1);
     expect(head(), "the frame is the second, not the sweep").toBe(`tail(web.log) · ${SPIN(2)} 2s`);
     await gate.end({ exitCode: 0 });
-    await settled();
+    await settled(h.pipeline);
     expect(head(), "settled: the duration alone — no spinner, and no `exit 0` (I59)").toBe("tail(web.log) · 2s");
     // A wake after settlement moves nothing: the readout is gone with the spinner.
     seconds(h, 3);
@@ -444,18 +444,18 @@ describe("C23 — the call grammar's head states", () => {
       }),
     });
     counted.pipeline.submit("/ps");
-    await settled();
-    await settled();
+    await settled(counted.pipeline);
+    await settled(counted.pipeline);
     expect(headerOf(counted.transcript.entries[0]?.doc.blocks ?? [])?.text, "the count, singular or plural by the number").toBe("ps · 3 rows");
 
     // No count: duration alone, once there is a figure.
     const held: { release: (() => void) | null } = { release: null };
     const plain = pipelineHarness({ invoke: () => new Promise((r) => { held.release = () => r(result({ exitCode: 0 })); }) });
     plain.pipeline.submit("/ps");
-    await settled();
+    await settled(plain.pipeline);
     seconds(plain, 3);
     held.release?.();
-    await settled();
+    await settled(plain.pipeline);
     expect(headerOf(plain.transcript.entries[0]?.doc.blocks ?? [])?.text).toBe("ps · 3s");
 
     // A far side's non-zero code is the outcome, and it wins over a count. **Not
@@ -468,8 +468,8 @@ describe("C23 — the call grammar's head states", () => {
       adapt: () => doc({ command: "adapted", status: "error", error: { message: "ps failed" }, blocks: [tableOf(1, "t")], meta: { ...doc().meta, exitCode: 3 } }),
     });
     failed.pipeline.submit("/ps");
-    await settled();
-    await settled();
+    await settled(failed.pipeline);
+    await settled(failed.pipeline);
     expect(headerOf(failed.transcript.entries[0]?.doc.blocks ?? [])?.text).toBe("ps · exit 3");
 
     // **`ok` in no settled head, over the routes the harness can drive**: invoke,
@@ -479,22 +479,22 @@ describe("C23 — the call grammar's head states", () => {
     const gate = gatedStream();
     const streamed = pipelineHarness({ stream: gate.stream });
     streamed.pipeline.submit("/tail web.log");
-    await settled();
+    await settled(streamed.pipeline);
     await gate.end({ exitCode: 0 });
-    await settled();
+    await settled(streamed.pipeline);
     const thrown = pipelineHarness({ invoke: () => Promise.reject(new Error("boom")) });
     thrown.pipeline.submit("/ps --quiet");
-    await settled();
-    await settled();
+    await settled(thrown.pipeline);
+    await settled(thrown.pipeline);
     const local = pipelineHarness();
     local.pipeline.submit("/guide");
-    await settled();
+    await settled(local.pipeline);
     const streamThrow = pipelineHarness({
       stream: () => (async function* () { yield { kind: "data", value: {} } as RawPatch; throw new Error("socket closed"); })(),
     });
     streamThrow.pipeline.submit("/tail");
-    await settled();
-    await settled();
+    await settled(streamThrow.pipeline);
+    await settled(streamThrow.pipeline);
     const shell = pipelineHarness({
       spawnShell: () => ({
         stdout: (async function* () { yield "hello\n"; })(),
@@ -504,8 +504,8 @@ describe("C23 — the call grammar's head states", () => {
       }) as never,
     });
     shell.pipeline.submit("echo hello");
-    await settled();
-    await settled();
+    await settled(shell.pipeline);
+    await settled(shell.pipeline);
     const every = [counted, plain, failed, streamed, thrown, local, streamThrow, shell].flatMap((x) =>
       x.transcript.entries.flatMap((e) => heads(e.doc.blocks)),
     );
@@ -551,10 +551,10 @@ describe("C23 — the call grammar's head states", () => {
       approval: () => ({}),
     });
     d.pipeline.submit("/ps");
-    await settled();
+    await settled(d.pipeline);
     d.confirm.answerHandler()?.(key("n"));
-    await settled();
-    await settled();
+    await settled(d.pipeline);
+    await settled(d.pipeline);
     const denied = d.transcript.entries[0];
     expect(headerOf(denied?.doc.blocks ?? [])?.text).toBe("ps · denied");
     expect(denied?.doc.blocks, "no body — it never ran").toHaveLength(1);
@@ -566,8 +566,8 @@ describe("C23 — the call grammar's head states", () => {
     // **A call nobody asks about runs as before**: the emitter is a seam, not a gate.
     const free = pipelineHarness({ approval: () => null });
     free.pipeline.submit("/ps");
-    await settled();
-    await settled();
+    await settled(free.pipeline);
+    await settled(free.pipeline);
     expect(free.calls).toContain("invoke");
     expect(free.confirm.answerHandler()).toBeNull();
 
@@ -590,8 +590,8 @@ describe("C23 — the call grammar's head states", () => {
       stream: () => (async function* () { yield { kind: "data", value: {} } as RawPatch; throw new Error("socket closed"); })(),
     });
     h.pipeline.submit("/tail");
-    await settled();
-    await settled();
+    await settled(h.pipeline);
+    await settled(h.pipeline);
     const blocks = h.transcript.entries[0]?.doc.blocks ?? [];
     expect(headerOf(blocks)?.text, "the head is kept, with the word").toBe("tail · failed");
     const box = blocks.at(-1);

@@ -45,7 +45,7 @@ const lastBlocks = (h: ReturnType<typeof pipelineHarness>): readonly Block[] =>
 const runLocal = async (line: string): Promise<readonly string[]> => {
   const h = pipelineHarness();
   h.pipeline.submit(line);
-  await settled();
+  await settled(h.pipeline);
   // **Without the card's header** (C23 I55): a local verb settles as a card
   // since 2026-09-05, and block 0 is the shell's `⬤ verb` — the family's bytes
   // are the handler's, under it.
@@ -166,7 +166,7 @@ describe("SS56 — the fourteen notices draw the same bytes through the family",
         })(),
     });
     h.pipeline.submit("/tail");
-    await settled();
+    await settled(h.pipeline);
     h.tick(60_000);
     h.tick(70_000);
     const stall = (): readonly Block[] => lastBlocks(h).filter((b) => b.id === "stall-notice");
@@ -174,7 +174,7 @@ describe("SS56 — the fourteen notices draw the same bytes through the family",
     check("stalled", frame(stall()));
 
     resume?.();
-    await settled();
+    await settled(h.pipeline);
     check("resumed", frame(stall()));
   });
 
@@ -194,8 +194,8 @@ describe("SS56 — the fourteen notices draw the same bytes through the family",
       },
     });
     h.pipeline.submit("/tail");
-    await settled();
-    await settled();
+    await settled(h.pipeline);
+    await settled(h.pipeline);
     // **Moved to the `status` kind** (C23 I61, §8f P8): the head keeps `truncated`
     // and the box carries the why — the literal's error notice is gone, and
     // the site composes through `callStatus`.
@@ -222,12 +222,15 @@ describe("SS56 — the fourteen notices draw the same bytes through the family",
       }) as never,
     });
     h.pipeline.submit("cat nothing");
-    await settled();
-    await settled();
+    await settled(h.pipeline);
+    await settled(h.pipeline);
     // A shell command's non-zero exit: the `status` kind over the stderr it kept (C23 I61).
     const blocks = lastBlocks(h);
     expect(statusBox(blocks)).toEqual({ state: "error", message: "The command exited with code 1." });
-    expect(blocks.some((blk) => blk.kind === "raw" && blk.text.includes("cat: nothing")), "stderr under it").toBe(true);
+    // **The stderr line, now on the screen rather than in a captured string**
+    // (C23 §3c). The pipe arm writes both streams into one emulator, so the
+    // sentence is a terminal line — the assertion is the same fact one shape on.
+    expect(JSON.stringify(blocks).includes("cat: nothing"), "stderr under it").toBe(true);
     expect(blocks.some((blk) => blk.kind === "notice" && blk.tone === "error"), "no error notice").toBe(false);
   });
 
@@ -240,8 +243,8 @@ describe("SS56 — the fourteen notices draw the same bytes through the family",
         })(),
     });
     h.pipeline.submit("/tail");
-    await settled();
-    await settled();
+    await settled(h.pipeline);
+    await settled(h.pipeline);
     // The head kept with `failed`; the throw is a `status` box (C23 I61, §8f P8).
     const blocks = lastBlocks(h);
     expect(blocks[0]?.kind === "notice" && blocks[0].text).toBe("tail · failed");

@@ -1,19 +1,128 @@
-// C27 — terminal emulator (docs/components/C27_terminal_emulator.md §9). Spec-first rows:
-// every one lands as a real test with the emulator (SP9 meets spec-alone at each new
-// invariant, and the not-deferred marker is the ruled route — F814).
-import { describe, it } from "vitest";
+// C27 — terminal emulator (docs/components/C27_terminal_emulator.md §9), tier 3.
+import { describe, expect, it } from "vitest";
+
+import { createEmulator } from "../../src/data/emulator/emulator.js";
+import { cells } from "../../src/presentation/text.js";
+import { readFileSync } from "node:fs";
+
+import { b } from "../../src/shell/builders/index.js";
+import {
+  ASCII_CAPS,
+  FULL_CAPS,
+  MONO_CAPS,
+  MONO_UNICODE_CAPS,
+  measurable,
+  visible,
+} from "../support/render.js";
+
+const feed = async (
+  term: ReturnType<typeof createEmulator>,
+  ...chunks: readonly (string | Uint8Array)[]
+): Promise<void> => {
+  for (const chunk of chunks) await term.write(chunk);
+};
 
 describe("C27 terminal emulator — tier 3", () => {
-  it.todo("T3.1 (C27 I6): `漢` written at column 39 of 40 → it begins the next line; no line has `cells(text) > 40`. — not deferred on a component: lands with C27's emulator");
-  it.todo("T3.2 (C27 I9): `\\x1bPunknown\\x1b\\\\` and `\\x1b[?9999z` between two words → the text is the two words. — not deferred on a component: lands with C27's emulator");
-  it.todo("T3.3 (C27 I4): a chunk split inside an escape — `\\x1b[3` then `1mred` — → one run, `ansi16` 1, over `red`. — not deferred on a component: lands with C27's emulator");
-  it.todo("T3.4 (C27 I4): a chunk split inside a wide cluster's bytes (UTF-8 `Uint8Array` halves) → one `漢`, not two replacement marks. — not deferred on a component: lands with C27's emulator");
-  it.todo("T3.5 (C27 I7): `scrollback: 0` → `lines.length ≤ rows` always and `dropped` counts everything scrolled out. — not deferred on a component: lands with C27's emulator");
-  it.todo("T3.6 (C27 I12): `write` after `dispose` throws and the message names `dispose`. — not deferred on a component: lands with C27's emulator");
-  it.todo("T3.7 (C27 I12): `snapshot` after `dispose` throws; it does not return the last value. — not deferred on a component: lands with C27's emulator");
-  it.todo("T3.8 (C27 I4): `grid` mode with nothing drawn → `rows` lines, each `text === \"\"`, no runs. — not deferred on a component: lands with C27's emulator");
-  it.todo("T3.9 (C27 I10): `resize` to the same size → a deep-equal snapshot. — not deferred on a component: lands with C27's emulator");
-  it.todo("T3.10 (C27 I3): 100 `write` calls without awaiting, then `await` the last → the snapshot holds all 100 lines in order. — not deferred on a component: lands with C27's emulator");
+  it("T3.1 (C27 I6): a wide cluster at the last column wraps rather than splitting", async () => {
+    const term = createEmulator({ cols: 6, rows: 4 });
+    await feed(term, "abcde漢");
+    const lines = term.snapshot("t").lines;
+    expect(lines[0]?.text).toBe("abcde");
+    expect(lines[1]?.text).toBe("漢");
+    for (const line of lines) expect(cells(line.text)).toBeLessThanOrEqual(6);
+    term.dispose();
+  });
+
+  it("T3.2 (C27 I9): an unknown DCS and an unknown CSI change no cell", async () => {
+    const term = createEmulator({ cols: 20, rows: 4 });
+    await feed(term, "one \u001bPunknown\u001b\\\u001b[?9999ztwo");
+    expect(term.snapshot("t").lines[0]?.text).toBe("one two");
+    term.dispose();
+  });
+
+  it("T3.3 (C27 I4): a chunk split inside an escape is still one run", async () => {
+    const term = createEmulator({ cols: 20, rows: 4 });
+    await feed(term, "\u001b[3", "1mred\u001b[0m");
+    const line = term.snapshot("t").lines[0];
+    expect(line?.text).toBe("red");
+    expect(line?.runs).toEqual([{ from: 0, to: 3, fg: { kind: "ansi16", index: 1 } }]);
+    term.dispose();
+  });
+
+  it("T3.4 (C27 I4): a chunk split inside a wide cluster's bytes yields one character", async () => {
+    const term = createEmulator({ cols: 20, rows: 4 });
+    const bytes = new TextEncoder().encode("漢");
+    await feed(term, bytes.slice(0, 2), bytes.slice(2));
+    expect(term.snapshot("t").lines[0]?.text).toBe("漢");
+    term.dispose();
+  });
+
+  it("T3.5 (C27 I7): scrollback 0 keeps at most the screen", async () => {
+    const term = createEmulator({ cols: 20, rows: 4, scrollback: 0 });
+    for (let i = 1; i <= 12; i += 1) await term.write(`line ${String(i)}\r\n`);
+    const snap = term.snapshot("t");
+    expect(snap.lines.length).toBeLessThanOrEqual(4);
+    expect(term.dropped).toBeGreaterThan(0);
+    term.dispose();
+  });
+
+  it("T3.6 (C27 I12): write after dispose throws, naming dispose", async () => {
+    const term = createEmulator({ cols: 10, rows: 2 });
+    await term.write("x");
+    term.dispose();
+    await expect(term.write("y")).rejects.toThrow(/dispose/u);
+  });
+
+  it("T3.7 (C27 I12): snapshot after dispose throws rather than returning the last value", async () => {
+    const term = createEmulator({ cols: 10, rows: 2 });
+    await term.write("x");
+    term.dispose();
+    expect(() => term.snapshot("t")).toThrow(/dispose/u);
+    expect(() => {
+      term.resize(20, 2);
+    }).toThrow(/dispose/u);
+  });
+
+  it("T3.8 (C27 I4): a grid with nothing drawn is rows of empty lines", async () => {
+    const term = createEmulator({ cols: 20, rows: 4 });
+    await feed(term, "\u001b[?1049h");
+    const snap = term.snapshot("t");
+    expect(snap.screen).toBe("grid");
+    expect(snap.lines).toHaveLength(4);
+    expect(snap.lines.every((l) => l.text === "" && l.runs === undefined)).toBe(true);
+    term.dispose();
+  });
+
+  it("T3.9 (C27 I10): a resize to the same size changes nothing", async () => {
+    const term = createEmulator({ cols: 20, rows: 4 });
+    await feed(term, "content\r\n");
+    const before = term.snapshot("t");
+    term.resize(20, 4);
+    expect(term.snapshot("t")).toEqual(before);
+    term.dispose();
+  });
+
+  it("T3.10 (C27 I3): a hundred unawaited writes all land, in order", async () => {
+    const term = createEmulator({ cols: 20, rows: 4, scrollback: 200 });
+    const writes = [];
+    for (let i = 0; i < 100; i += 1) writes.push(term.write(`line ${String(i)}\r\n`));
+    await Promise.all(writes);
+    const texts = term.snapshot("t").lines.map((l) => l.text);
+    expect(texts[0]).toBe("line 0");
+    expect(texts[99]).toBe("line 99");
+    term.dispose();
+  });
+
+  it("T3.11 (C27 I2): a lone surrogate becomes the ASCII stand-in", async () => {
+    const term = createEmulator({ cols: 20, rows: 4 });
+    await feed(term, `a${String.fromCharCode(0xd800)}b`);
+    const text = term.snapshot("t").lines[0]?.text ?? "";
+    for (let i = 0; i < text.length; i += 1) {
+      const unit = text.charCodeAt(i);
+      expect(unit >= 0xd800 && unit <= 0xdfff).toBe(false);
+    }
+    term.dispose();
+  });
 });
 
 describe("C04 — the terminal kind, spec-first rows", () => {
@@ -21,10 +130,51 @@ describe("C04 — the terminal kind, spec-first rows", () => {
   it.todo("T3.79 (C04 I110): text ending mid-surrogate is refused as malformed; a line of only styled blanks is admitted — not deferred on a component: lands with the Terminal type");
 });
 
-describe("C09 · C10 — the terminal block and a literal colour, spec-first rows", () => {
-  it.todo("T3.73 (C09 I56): a lone replacement character renders, and a source scan of kinds/terminal.ts finds no strip call — not deferred on a component: lands with the terminal definition");
-  it.todo("T3.74 (C09 I56): the cursor cell is inverse at all five arms, and at 1-bit it is the only mark distinguishing the cell — not deferred on a component: lands with the terminal definition");
-  it.todo("T3.72 (C10 I38): at 1-bit a run with a colour and six attributes paints every attribute and no colour; a colour-only run is not emitted — not deferred on a component: lands with degradeColour");
+describe("C09 · C10 — the terminal block and a literal colour", () => {
+  it("T3.73 (C09 I56): the definition strips nothing", () => {
+    const code = readFileSync("src/presentation/blocks/kinds/terminal.ts", "utf8")
+      .replace(/\/\*[\s\S]*?\*\//gu, "")
+      .replace(/\/\/[^\n]*/gu, "");
+    expect(code).not.toContain("stripControl");
+    // And the text it is handed reaches the frame: the ASCII stand-in the
+    // emulator writes is a character like any other here.
+    const painted = measurable({}).renderToLines(b.terminal(20, [{ text: "a?b" }]), 20);
+    expect(visible(painted[0] ?? "")).toContain("a?b");
+  });
+
+  it("T3.74 (C09 I56): the cursor cell is inverse at every arm", () => {
+    const block = b.terminal(20, [{ text: "abc" }], { cursor: { line: 0, col: 1 } });
+    for (const capabilities of [FULL_CAPS, ASCII_CAPS, MONO_CAPS, MONO_UNICODE_CAPS]) {
+      const line = measurable({ capabilities }).renderToLines(block, 20)[0] ?? "";
+      // SGR 7 is the mark, and at 1-bit it is the only one distinguishing the
+      // cell — a colour would have gone.
+      expect(line, JSON.stringify(capabilities.colourDepth)).toMatch(/\u001b\[(?:[0-9;]*;)?7(?:;[0-9;]*)?m/u);
+    }
+  });
+
+  it("T3.72 (C10 I38): at 1-bit the attributes stay and the colour goes", () => {
+    const block = b.terminal(20, [
+      {
+        text: "loud",
+        runs: [
+          {
+            from: 0,
+            to: 4,
+            fg: { kind: "rgb", hex: "#0ac81e" },
+            bold: true,
+            italic: true,
+            underline: true,
+            inverse: true,
+          },
+        ],
+      },
+    ]);
+    const line = measurable({ capabilities: MONO_CAPS }).renderToLines(block, 20)[0] ?? "";
+    expect(line).not.toMatch(/38;[25]/u);
+    for (const attribute of ["1", "3", "4", "7"]) {
+      expect(line, attribute).toMatch(new RegExp(`\\u001b\\[(?:[0-9;]*;)?${attribute}(?:;[0-9;]*)?m`, "u"));
+    }
+  });
 });
 
 describe("C21 — the PTY port, spec-first rows", () => {

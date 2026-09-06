@@ -93,7 +93,7 @@ describe("C10 integration", () => {
     const before = h.theme.current.tokens.variant;
 
     h.pipeline.submit("/theme light");
-    await settled();
+    await settled(h.pipeline);
 
     expect(h.theme.current.tokens.variant, "C10 switched").toBe("light");
     expect(h.calls, "and L4 invalidated").toContain("invalidate");
@@ -116,11 +116,11 @@ describe("C10 integration", () => {
     const h = pipelineHarness();
 
     h.pipeline.submit("/theme light --no-bg");
-    await settled();
+    await settled(h.pipeline);
     const after = h.commits.length;
 
     h.pipeline.submit("/theme light");
-    await settled();
+    await settled(h.pipeline);
 
     expect(h.commits.length - after, "the second invocation commits").toBeGreaterThan(0);
     expect(h.calls, "and invalidates on the verb, not on the variant").toContain("invalidate");
@@ -136,7 +136,7 @@ describe("C10 integration", () => {
     // handler was given.
     const h = pipelineHarness();
     h.pipeline.submit("/theme --no-bg light");
-    await settled();
+    await settled(h.pipeline);
 
     expect(h.theme.current.tokens.variant, "the flag is not read as the variant").toBe("light");
     expect(
@@ -153,9 +153,9 @@ describe("C10 integration", () => {
     // reads the sequence.
     const h = pipelineHarness();
     h.pipeline.submit("/theme light --no-bg");
-    await settled();
+    await settled(h.pipeline);
     h.pipeline.submit("/theme dark");
-    await settled();
+    await settled(h.pipeline);
 
     expect(h.suppressed, "set, then cleared").toEqual([true, false]);
   });
@@ -167,7 +167,7 @@ describe("C10 integration", () => {
     // other.
     const warned = pipelineHarness();
     warned.pipeline.submit("/theme light --no-bg");
-    await settled();
+    await settled(warned.pipeline);
     const painting = warned.transcript.entries.at(-1);
     expect(
       painting?.doc.blocks.some((b) => b.kind === "notice" && b.tone === "warn"),
@@ -176,7 +176,7 @@ describe("C10 integration", () => {
 
     const quiet = pipelineHarness();
     quiet.pipeline.submit("/theme dark --no-bg");
-    await settled();
+    await settled(quiet.pipeline);
     const inheriting = quiet.transcript.entries.at(-1);
     expect(
       inheriting?.doc.blocks.some((b) => b.kind === "notice" && b.tone === "warn"),
@@ -198,7 +198,7 @@ describe("C10 integration", () => {
 
     const h = pipelineHarness({ theme: three.value });
     h.pipeline.submit("/theme high-contrast");
-    await settled();
+    await settled(h.pipeline);
 
     expect(h.theme.current.tokens.name, "the switch happened").toBe("hc");
     const last = h.transcript.entries.at(-1);

@@ -141,7 +141,7 @@ const MUTATIONS = [
     // corrected by whatever comes next.
     name: "the anchors are refreshed after the commit",
     file: CONSTRUCT,
-    from: "      refreshAnchors();\n      scheduler.commit(\"resize\");",
+    from: "      pipeline.resized();\n      scheduler.commit(\"resize\");",
     to: "      scheduler.commit(\"resize\");\n      refreshAnchors();",
     expect: "T4.33",
   },

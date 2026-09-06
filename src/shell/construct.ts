@@ -981,6 +981,8 @@ export async function constructGraph(
     createProcessRunner({
       env: config.env,
       stdin: config.stdin,
+      // C22 I91 — the one site that reads it, and it hands the same object on.
+      ...(config.pty === undefined ? {} : { pty: config.pty }),
       ...(deps.debug === undefined ? {} : { debug: deps.debug }),
     }),
   );
@@ -1076,6 +1078,10 @@ export async function constructGraph(
       // clamps, so nothing faults and no number disagrees; the menu is simply
       // in the wrong place, which is a frame's finding and not an assertion's.
       refreshAnchors();
+      // **A live child is told, before the frame** (C23 I65). The route resizes
+      // its child and then its emulator; composing first would draw one frame
+      // from a grid that is about to be reflowed.
+      pipeline.resized();
       scheduler.commit("resize");
     });
     // `SIGCONT` re-acquires and says so through `onResume`; C01 sets no

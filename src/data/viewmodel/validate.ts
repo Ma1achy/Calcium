@@ -41,6 +41,8 @@ import {
   MARKER3_MEMBERS,
   STYLE_ARMS,
   TEXT_SPAN_KEYS,
+  TERMINAL_KEYS,
+  TERMINAL_RUN_KEYS,
   type OHLC,
   type Plot,
   type PlotForm,
@@ -749,6 +751,100 @@ function checkAction(raw: unknown, where: string, e: string[]): void {
  * neither `tone` nor `value`, because the line's gutter and syntax palettes are
  * already the two a row may carry (C25 §3).
  */
+/**
+ * C04 I110, I111 — a screen line's text and its runs.
+ *
+ * **Two gates for one property.** C27 replaces controls at the cell walk and
+ * this refuses them again, because a `terminal` can arrive from a far-side
+ * envelope or a persisted row without passing through C27 — and the renderer
+ * does not strip, which is what lets the block carry colour at all.
+ */
+function checkTerminalLine(line: Record<string, unknown>, e: string[], at: string): void {
+  const text = line["text"];
+  if (typeof text !== "string") {
+    e.push(`${at}: "text" must be a string (C04 I110)`);
+    return;
+  }
+  for (let i = 0; i < text.length; i += 1) {
+    const unit = text.charCodeAt(i);
+    if (unit < 0x20 || (unit >= 0x7f && unit <= 0x9f)) {
+      e.push(
+        `${at}: "text" carries a control character at ${String(i)} (C04 I110) — a terminal line is emitted without stripping, so an escape here would reach the outer terminal`,
+      );
+      return;
+    }
+    if (unit >= 0xd800 && unit <= 0xdbff) {
+      const next = text.charCodeAt(i + 1);
+      if (Number.isNaN(next) || next < 0xdc00 || next > 0xdfff) {
+        e.push(`${at}: "text" carries an unpaired surrogate at ${String(i)} (C04 I110)`);
+        return;
+      }
+      i += 1;
+      continue;
+    }
+    if (unit >= 0xdc00 && unit <= 0xdfff) {
+      e.push(`${at}: "text" carries an unpaired surrogate at ${String(i)} (C04 I110)`);
+      return;
+    }
+  }
+  const runs = line["runs"];
+  if (runs === undefined) return;
+  if (!isArray(runs)) {
+    e.push(`${at}: "runs" must be an array (C04 I111)`);
+    return;
+  }
+  let previousEnd = 0;
+  let previous: Record<string, unknown> | null = null;
+  runs.forEach((run, ri) => {
+    const where = `${at}.runs[${String(ri)}]`;
+    if (!isRecord(run)) {
+      e.push(`${where}: must be an object (C04 I111)`);
+      return;
+    }
+    for (const key of Object.keys(run)) {
+      if (!TERMINAL_RUN_KEYS.has(key)) e.push(`${where}: unknown key "${key}" on a run (C04 I111)`);
+    }
+    const from = run["from"];
+    const to = run["to"];
+    if (typeof from !== "number" || typeof to !== "number" || !Number.isInteger(from) || !Number.isInteger(to)) {
+      e.push(`${where}: "from" and "to" must be integers (C04 I111)`);
+      return;
+    }
+    if (from < 0 || to > text.length || to <= from) {
+      e.push(`${where}: [${String(from)}, ${String(to)}) is outside the text (C04 I111)`);
+      return;
+    }
+    if (from < previousEnd) {
+      e.push(`${where}: runs overlap or are out of order (C04 I111)`);
+      return;
+    }
+    if (previous !== null && from === previousEnd && sameRunStyle(previous, run)) {
+      e.push(
+        `${where}: adjacent runs share a style (C04 I111) — merging is the producer's job, and an unmerged pair measures the same and diffs differently on every frame`,
+      );
+      return;
+    }
+    previousEnd = to;
+    previous = run;
+  });
+}
+
+/** Style equality for I111's adjacency check — every member but the offsets. */
+function sameRunStyle(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
+  for (const key of TERMINAL_RUN_KEYS) {
+    if (key === "from" || key === "to") continue;
+    const left = a[key];
+    const right = b[key];
+    if (isRecord(left) && isRecord(right)) {
+      if (left["kind"] !== right["kind"]) return false;
+      if (left["hex"] !== right["hex"] || left["index"] !== right["index"]) return false;
+      continue;
+    }
+    if (left !== right) return false;
+  }
+  return true;
+}
+
 function checkSpans(b: Record<string, unknown>, member: string, e: string[], at: string, attributesOnly = false): void {
   const spans = b["spans"];
   if (spans === undefined) return;
@@ -957,6 +1053,60 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
       e.push(`${at}: "colormap" is refused on rule — a rule has no valued span to read it (C04 I90)`);
     }
     checkSpans(b, "label", e, at);
+  },
+  terminal: (b, e, at) => {
+    const cols = b["cols"];
+    if (typeof cols !== "number" || !Number.isInteger(cols) || cols < 1) {
+      e.push(`${at}: "cols" must be a positive integer (C04 §3i) — the width the emulator painted to`);
+    }
+    const screen = b["screen"];
+    if (screen !== "lines" && screen !== "grid") {
+      e.push(`${at}: "screen" must be "lines" or "grid" (C04 I113) — the alternate screen has no scrollback, and the flag is what says which artefact a settled block keeps`);
+    }
+    requireArray(b, "lines", e, at);
+    const lines = b["lines"];
+    if (isArray(lines)) {
+      lines.forEach((line, li) => {
+        const where = `${at}.lines[${String(li)}]`;
+        if (!isRecord(line)) {
+          e.push(`${where}: must be an object with "text" (C04 I110)`);
+          return;
+        }
+        checkTerminalLine(line, e, where);
+      });
+    }
+    // C04 I113 — the two fields are exclusive by meaning, not by convention: a
+    // grid has nothing above it to lose.
+    const dropped = b["dropped"];
+    if (dropped !== undefined) {
+      if (typeof dropped !== "number" || !Number.isInteger(dropped) || dropped < 1) {
+        e.push(`${at}: "dropped" must be a positive integer when present (C04 I113) — declared by presence, so a zero would draw "0 lines dropped at the cap"`);
+      } else if (screen === "grid") {
+        e.push(`${at}: "dropped" is refused on a grid screen (C04 I113) — the alternate screen has no scrollback to lose lines from`);
+      }
+    }
+    // C04 I112 — appearance, and it still has to point at something that exists.
+    const cursor = b["cursor"];
+    if (cursor !== undefined) {
+      if (!isRecord(cursor)) {
+        e.push(`${at}: "cursor" must be an object with "line" and "col" (C04 I112)`);
+      } else {
+        const line = cursor["line"];
+        const col = cursor["col"];
+        const height = isArray(lines) ? lines.length : 0;
+        if (typeof line !== "number" || !Number.isInteger(line) || line < 0 || line >= height) {
+          e.push(`${at}.cursor: "line" must index a line that exists (C04 I112) — ${String(height)} line(s)`);
+        }
+        if (typeof col !== "number" || !Number.isInteger(col) || col < 0 || (typeof cols === "number" && col >= cols)) {
+          e.push(`${at}.cursor: "col" must be within "cols" (C04 I112)`);
+        }
+      }
+    }
+    for (const key of Object.keys(b)) {
+      if (!TERMINAL_KEYS.has(key)) {
+        e.push(`${at}: unknown key "${key}" on terminal (C04 I110)`);
+      }
+    }
   },
   notice: (b, e, at) => {
     requireString(b, "text", e, at);

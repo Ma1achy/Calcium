@@ -2969,6 +2969,127 @@ export type Halign = "left" | "centre" | "right";
  */
 export type Align = Valign | Halign | `${Valign}-${Halign}`;
 
+/**
+ * A colour with its depth named (C04 §3i, C10 §2).
+ *
+ * **C10's type, homed here** (F846): C10 hands one out as the result of
+ * resolution — it cannot write an escape, so it describes — and a `terminal`
+ * block carries one as a child's own data. The second consumer is L0 and cannot
+ * import a presentation type, so the declaration is here and `theme/types.ts`
+ * re-exports it; the tag is what stops a consumer re-deriving the depth from the
+ * format and emitting truecolour to a 16-colour terminal.
+ */
+export type ColourValue =
+  | Readonly<{ kind: "rgb"; hex: string }>
+  | Readonly<{ kind: "ansi256"; index: number }>
+  | Readonly<{ kind: "ansi16"; index: number }>;
+
+/**
+ * One styled range of a child's screen line (C04 §3i, I111).
+ *
+ * **The colours are literal, and this is the one type where that is right.** *A
+ * block names a palette slot* is a rule about the application's colours; a
+ * child's `38;2;10;200;30` is the child's data, as an image's pixels are, and no
+ * slot means it. C10 §4i degrades the value at render and this is unchanged by
+ * it, so a document persisted at 4-bit replays in full colour on a better
+ * terminal.
+ */
+export type TerminalRun = Readonly<{
+  /** Code-unit offsets into the line's text — `TextSpan`'s convention (I83). */
+  from: number;
+  to: number;
+  fg?: ColourValue;
+  bg?: ColourValue;
+  bold?: boolean;
+  dim?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  inverse?: boolean;
+  strike?: boolean;
+}>;
+
+/** One line of a child's screen (C04 §3i). */
+export type TerminalLine = Readonly<{
+  /**
+   * **Control-free** (I110), and the gate is what makes rendering it without
+   * stripping safe — `raw` strips and could therefore never carry colour.
+   *
+   * A wide cluster is one code-point sequence with no filler cell, so
+   * `cells(text)` is the width the emulator painted.
+   */
+  text: string;
+  /**
+   * Maximal, ordered, non-overlapping (I111). A default-styled cell is in no
+   * run, and two adjacent runs with equal styles are refused: merging is the
+   * producer's job, and a snapshot that fails to merge measures the same and
+   * diffs differently on every frame.
+   */
+  runs?: readonly TerminalRun[];
+}>;
+
+/**
+ * A child process's screen, interpreted (C04 §3i, C27).
+ *
+ * **Not a captured string**: `\r`, `\x1b[K`, SGR and cursor motion have already
+ * been applied, so what is here is what the program drew rather than what it
+ * emitted. It goes inside a `scroll` when it wants a bound, which is how the
+ * offset, the residue row, `follow` and `collapsed` are inherited rather than
+ * restated.
+ */
+export type Terminal = Readonly<{
+  kind: "terminal";
+  id: string;
+  /** The emulator's width when the snapshot was taken. A positive integer. */
+  cols: number;
+  /**
+   * `"lines"` is the normal buffer with its scrollback; `"grid"` is the
+   * alternate screen, where `lines` is the whole screen and there is no
+   * scrollback to have (I113).
+   */
+  screen: "lines" | "grid";
+  lines: readonly TerminalLine[];
+  /**
+   * Where the child is writing. **Appearance, never geometry** (I112): the
+   * cursor moves on every keystroke the child receives, and a height that moved
+   * with it would reflow the transcript. Absent once the child has exited.
+   */
+  cursor?: Readonly<{ line: number; col: number }>;
+  /**
+   * Lines lost above the cap, **present only when at least one was** (I113).
+   *
+   * Declared by presence, I98's convention: the marker row C09 draws is drawn on
+   * presence, and a present zero would draw *0 lines dropped at the cap*.
+   */
+  dropped?: number;
+}> & Gap & Floor;
+
+/** The block's own keys, for the far-side gate (I110). */
+export const TERMINAL_KEYS: ReadonlySet<string> = new Set([
+  "kind",
+  "id",
+  "cols",
+  "screen",
+  "lines",
+  "cursor",
+  "dropped",
+  "gapBefore",
+  "minHeight",
+]);
+
+/** A run's keys — ten, and an eleventh is refused by name (I111). */
+export const TERMINAL_RUN_KEYS: ReadonlySet<string> = new Set([
+  "from",
+  "to",
+  "fg",
+  "bg",
+  "bold",
+  "dim",
+  "italic",
+  "underline",
+  "inverse",
+  "strike",
+]);
+
 /** The escape hatch, and load-bearing: the vocabulary never has to be complete. */
 export type Raw = Readonly<{
   kind: "raw";
@@ -3306,6 +3427,7 @@ export type Block =
   | Mosaic
   | Image
   | Status
+  | Terminal
   | Raw;
 
 export type BlockKind = Block["kind"];

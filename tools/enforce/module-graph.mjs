@@ -1555,6 +1555,117 @@ export function checkOneStorePerComponent(files, readFile = (f) => readFileSync(
 
 /** Members whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_MEMBERS = Object.freeze({
+  // --- C27's structural port, landing with the emulator ---------------------
+  //
+  // **Sixteen members at once, and the count is the argument rather than a
+  // smell.** `CellLike` is not an interface this tree implements; it is the
+  // shape of somebody else's object, written down so the walk can be driven by
+  // a fake and the package can stay in one file. Every member is read by
+  // `styleOf` or `lineOf` in `snapshot.ts` — MG24 asks whether a name appears
+  // *elsewhere in `src/`*, and for a port cut from a dependency the answer is
+  // structurally no and always will be.
+  "CellLike.getChars":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
+  "CellLike.getWidth":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
+  "CellLike.getFgColor":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
+  "CellLike.getBgColor":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
+  "CellLike.isFgRGB":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
+  "CellLike.isBgRGB":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
+  "CellLike.isFgPalette":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
+  "CellLike.isBgPalette":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
+  "CellLike.isFgDefault":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
+  "CellLike.isBgDefault":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
+  "CellLike.isBold":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
+  "CellLike.isDim":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
+  "CellLike.isItalic":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
+  "CellLike.isUnderline":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
+  "CellLike.isInverse":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
+  "CellLike.isStrikethrough":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
+  "LineLike.getCell":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
   "EntryPiece.localFrom":
     "C22 §6l.4 D — the run-local row a window opens at, carried from `windowEntry` to " +
     "`renderEntryPieces` in the same file so the hook lands on the body's first row only. " +
@@ -1826,14 +1937,23 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
     "counts seventeen call sites until it, so the tree documents the deletion twice and " +
     "the member is still declared. Kept listed rather than deleted until C06 rules, because " +
     "removing a member two comments describe as removed wants the spec edit first",
-  "CompletionEngine.pending":
-    "C19 diagnostics — whether a dynamic source is in flight, published so the spinner's " +
-    "sequence-as-token-of-validity is assertable. `src/shell` reads the spinner state C19 " +
-    "derives, not this",
-  "FrameScheduler.pending":
-    "C03 diagnostics — whether a commit is scheduled. Sibling of `contaminated` above and " +
-    "listed for the same reason: `frame-scheduler.ts` drives it and a revert test is the " +
-    "only outside reader",
+  // **`FrameScheduler.pending` and `CompletionEngine.pending` both left here on
+  // 2026-09-06, and only one of them for a consumer** (F849). C23's shell route
+  // reads `deps.scheduler.pending` to coalesce its snapshots (C23 I64), which is
+  // a real consumer for the first. The second has none — it went because MG24
+  // resolves a member by its bare name, so one new reader of `pending` anywhere
+  // in `src/` answers for every interface that declares one.
+  //
+  // That is this rule's own stated blind spot (see `Basis.right` above) arriving
+  // from the other side: the header records it as a source of *missed*
+  // violations, and here it forced a true exemption out. Both directions are the
+  // same defect, and neither is fixable without qualifying the member by its
+  // owner — which the rule deliberately does not do, because a member's owner is
+  // a type resolution and this is a scan.
+  //
+  // Left as a comment rather than as an entry: an entry the equality arm refuses
+  // cannot be kept, and a reason with nowhere to live is how the next reader
+  // concludes C19's member was wired.
   "LineEditor.displayRows":
     "C17 diagnostics — the wrapped row count, asserted by the prompt-window tests. The " +
     "shell measures the prompt through C09 rather than asking the editor, which is C17 §1's " +

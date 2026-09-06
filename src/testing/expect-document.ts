@@ -143,6 +143,19 @@ const KINDS_WITH_NOTHING_TO_CHECK: ReadonlyMap<BlockKind, Exemption> = new Map<
     },
   ],
   [
+    "terminal",
+    {
+      premise: "by-rendering",
+      why:
+        "the one kind whose colours are the child's data rather than a palette slot (C04 §3i), " +
+        "and the text stands without them: a run is decoration over characters that are " +
+        "already on the line, degraded by C10 §4i and dropped entirely at one bit. **The limit, " +
+        "stated**: a child that distinguishes two things by colour alone loses that distinction " +
+        "here, and nothing on this side can restore it — the sweep asks whether *our* fields " +
+        "carry meaning by colour, and these are not ours",
+    },
+  ],
+  [
     "mosaic",
     {
       premise: "no-field",

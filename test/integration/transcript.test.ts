@@ -151,11 +151,11 @@ describe("C13 integration", () => {
     });
 
     h.pipeline.submit("/ps");
-    await settled();
+    await settled(h.pipeline);
     expect(h.transcript.entries.length, "something to clear").toBeGreaterThan(0);
 
     h.pipeline.submit("/clear");
-    await settled();
+    await settled(h.pipeline);
 
     // The `/clear` entry itself is what remains: the command ran and said so.
     expect(
@@ -164,7 +164,7 @@ describe("C13 integration", () => {
     ).toEqual(["/clear"]);
 
     h.pipeline.submit("/history");
-    await settled();
+    await settled(h.pipeline);
     const listing = h.transcript.entries.at(-1);
     expect(
       JSON.stringify(listing?.doc.blocks),

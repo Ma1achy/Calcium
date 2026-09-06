@@ -74,11 +74,81 @@ export type ProcessRunnerDeps = Readonly<{
   env: Readonly<NodeJS.ProcessEnv>;
   stdin: Readonly<{ isRaw?: boolean }>;
   debug?: (line: string) => void;
+  /**
+   * The pseudo-terminal factory, injected by the consumer (C21 §2a, I15).
+   *
+   * **Absent is the ordinary case** and `spawnPty` refuses rather than falling
+   * back (I16): a caller that asked for a terminal and silently got a pipe sees
+   * a child with no colours and no cause.
+   */
+  pty?: PtyFactory;
 }>;
+
+/** A terminal's size, in cells and rows. */
+export type PtySize = Readonly<{ cols: number; rows: number }>;
+
+/**
+ * The five members a pseudo-terminal has, **named here and imported from
+ * nowhere** (C21 I15).
+ *
+ * Cut from `node-pty`'s `IPty` so a consumer passes that package itself with
+ * nothing adapted — and Calcium depends on no PTY package, which is what keeps
+ * a clean clone installable on a platform with no prebuild (F840).
+ */
+export interface PtyProcess {
+  readonly pid: number;
+  onData(cb: (chunk: string) => void): void;
+  onExit(cb: (e: Readonly<{ exitCode: number; signal?: number }>) => void): void;
+  write(data: string): void;
+  resize(cols: number, rows: number): void;
+  kill(signal?: string): void;
+}
+
+export type PtyFactory = Readonly<{
+  spawn(
+    file: string,
+    args: readonly string[],
+    opts: PtySize & Readonly<{ cwd: string; env: Readonly<NodeJS.ProcessEnv> }>,
+  ): PtyProcess;
+}>;
+
+/**
+ * A PTY child's handle (C21 §2a).
+ *
+ * **Smaller than `ChildHandle`, and the difference is not a weakening.** A
+ * terminal has one stream by nature, so there is no `stderr` to keep separate
+ * and I3's separation is inapplicable rather than relaxed.
+ */
+export interface PtyHandle {
+  readonly pid: number | null;
+  readonly exited: Promise<Exit>;
+  readonly running: boolean;
+  onData(cb: (chunk: string) => void): void;
+  write(data: string): void;
+  resize(cols: number, rows: number): void;
+  signal(sig: string): boolean;
+}
 
 export interface ProcessRunner {
   spawn(argv: readonly string[], opts: SpawnOptions): ChildHandle;
   spawnShell(command: string, opts: SpawnOptions): ChildHandle;
+  /**
+   * A shell command with a terminal of its own (C21 §2a, I16).
+   *
+   * **A third method rather than a flag on `spawnShell`**, on I1's argument: the
+   * distinction is visible at the call site or it is invisible everywhere.
+   * Throws naming `pty` when no factory was injected.
+   */
+  spawnPty(command: string, opts: SpawnOptions & PtySize): PtyHandle;
+  /**
+   * Whether a PTY factory was injected (I18).
+   *
+   * **The seam the arm choice is made from.** C23 I63 rules that the shell route
+   * picks its arm before it calls either, and calling `spawnPty` to see whether
+   * it throws is that fallback under another name — it cannot tell a missing
+   * factory from a child that failed to start.
+   */
+  readonly hasPty: boolean;
   handoff(argv: readonly string[], opts: SpawnOptions): Promise<Exit>;
   readonly live: readonly ChildHandle[];
   killAll(): Promise<void>;

@@ -329,7 +329,44 @@ function harness(script: Scripted = {}) {
 }
 
 /** Lets every `void`-ed async route settle before assertions. */
-const settled = () => new Promise((r) => setImmediate(r));
+const turn = (): Promise<void> => new Promise((r) => void setImmediate(r));
+
+/**
+ * One turn for every route but `shell`, and for that one, until it lets go.
+ *
+ * **A fixed count would be a fixture that has not been shown to respond.** The
+ * shell route awaits the emulator's parser as well as the child's streams
+ * (C27 I3), so the number of turns it needs is a property of a dependency
+ * rather than of this file — and a count chosen to pass today is the shape a
+ * flake takes. Passing the pipeline asks the thing itself: the guard is held
+ * for exactly the life of the route (C23 I5), so `inFlight` going null is the
+ * route having finished, from the one witness that cannot be a turn out of date.
+ */
+const settled = async (p?: { readonly inFlight: unknown }): Promise<void> => {
+  await turn();
+  if (p === undefined) return;
+  // Capped so a route that never releases fails as an assertion rather than as
+  // a timeout with no sentence in it.
+  // **Wait for the route to take the guard before waiting for it to let go.**
+  // A poll that only watches for `null` is satisfied by the instant *before* the
+  // route starts, which is the reading that made a hundred-chunk screen assert
+  // against sixteen lines and pass on the count it was checking.
+  //
+  // **Bounded by the clock rather than by a turn count**, because the emulator's
+  // parser resolves on a timer of its own: a fixed number of `setImmediate`s is
+  // a guess about a dependency's scheduling, and the guess was wrong by an order
+  // of magnitude. A deadline is a guess about nothing.
+  const wait = (): Promise<void> => new Promise((r) => void setTimeout(r, 0));
+  // Phase one is short on purpose: a route that takes the guard does so within a
+  // turn or two of `submit`, and most routes here never take it at all — waiting
+  // the full deadline for those would be ten seconds a call site.
+  const started = Date.now() + 20;
+  while (p.inFlight === null && Date.now() < started) await wait();
+  const deadline = Date.now() + 10_000;
+  while (p.inFlight !== null && Date.now() < deadline) await wait();
+  await turn();
+  await turn();
+};
 
 describe("C23 §6 — the guard, as a property over every exit", () => {
   it("T1.6b (I5): no route leaves the guard held, on success or on failure", async () => {
@@ -356,7 +393,7 @@ describe("C23 §6 — the guard, as a property over every exit", () => {
     for (const [name, line, script] of scripts) {
       const h = harness(script);
       h.pipeline.submit(line);
-      await settled();
+      await settled(h.pipeline);
       expect(h.pipeline.inFlight, `${name} left the guard held`).toBeNull();
     }
   });
@@ -369,7 +406,7 @@ describe("C23 §6 — the guard, as a property over every exit", () => {
     const h = harness();
     for (const line of ["cd /tmp", "/help", "echo hi", "/ps"]) {
       h.pipeline.submit(line);
-      await settled();
+      await settled(h.pipeline);
       expect(h.pipeline.inFlight, `after ${line}`).toBeNull();
     }
 
@@ -396,7 +433,7 @@ describe("C23 §3 — the app path", () => {
     });
 
     h.pipeline.submit("/ps");
-    await settled();
+    await settled(h.pipeline);
 
     expect(h.calls).toContain("invoke");
     expect(h.transcript.entries).toHaveLength(1);
@@ -405,7 +442,7 @@ describe("C23 §3 — the app path", () => {
   it("T1.1: an app submission runs, then settles with the adapted document", async () => {
     const h = harness({ adapt: () => doc({ command: "/ps", status: "ok" }) });
     h.pipeline.submit("/ps");
-    await settled();
+    await settled(h.pipeline);
 
     const entry = h.transcript.entries[0];
     expect(entry?.streaming, "settled").toBe(false);
@@ -420,13 +457,13 @@ describe("C23 §3 — the app path", () => {
       adapt: () => doc({ command: "/ps", meta: { ...doc().meta, resultId: "uuid-1" } }),
     });
     withId.pipeline.submit("/ps");
-    await settled();
+    await settled(withId.pipeline);
     expect(withId.session.snapshot.lastUuid).toBe("uuid-1");
 
     const without = harness({ adapt: () => doc({ command: "/ps" }) });
     without.session.execution.setLastUuid("earlier");
     without.pipeline.submit("/ps");
-    await settled();
+    await settled(without.pipeline);
     expect(without.session.snapshot.lastUuid, "a verb declaring none leaves it alone").toBe(
       "earlier",
     );
@@ -438,7 +475,7 @@ describe("C23 §3 — the app path", () => {
     // recomputing it.
     const h = harness();
     h.pipeline.submit("/ps --status=nonsense");
-    await settled();
+    await settled(h.pipeline);
 
     expect(h.calls, "nothing spawned").not.toContain("invoke");
     expect(h.transcript.entries, "and it still produced exactly one entry").toHaveLength(1);
@@ -455,7 +492,7 @@ describe("C23 §3 — the app path", () => {
     });
 
     h.pipeline.submit("/tail");
-    await settled();
+    await settled(h.pipeline);
     expect(h.pipeline.inFlight, "released before the loop, not after it").toBeNull();
   });
 
@@ -478,7 +515,7 @@ describe("C23 §3 — the app path", () => {
     });
 
     h.pipeline.submit("/tail");
-    await settled();
+    await settled(h.pipeline);
 
     expect(h.seqs, "the patch's position in its stream").toEqual([0, 1, 2]);
 
@@ -511,7 +548,7 @@ describe("C23 §3 — the app path", () => {
     });
 
     h.pipeline.submit("/tail   a.log    b.log");
-    await settled();
+    await settled(h.pipeline);
 
     // Every hand-off, patches and settle alike, carried the same string — and
     // it is the resolved argv, because that is what ran.
@@ -550,7 +587,7 @@ describe("C23 §8a A2/A3 — the three PatchOutcome arms", () => {
     });
 
     h.pipeline.submit("/tail");
-    await settled();
+    await settled(h.pipeline);
 
     const entry = h.transcript.entries[0];
     expect(entry?.streaming, "settled with what it had").toBe(false);
@@ -581,7 +618,7 @@ describe("C23 §8a A2/A3 — the three PatchOutcome arms", () => {
     await new Promise((r) => setTimeout(r, 0));
     const id = h.transcript.entries[0]?.id ?? "";
     h.transcript.settle(id);
-    await settled();
+    await settled(h.pipeline);
 
     const entry = h.transcript.entries[0];
     expect(
@@ -604,7 +641,7 @@ describe("C23 §2 — the seven routes", () => {
   it("T1.12 (I11): a built-in applies to session state before any delegation", async () => {
     const h = harness();
     h.pipeline.submit("cd /tmp && echo hi");
-    await settled();
+    await settled(h.pipeline);
 
     expect(h.session.snapshot.cwd, "applied first").toBe("/tmp");
     expect(h.calls, "then delegated").toContain("spawnShell");
@@ -613,7 +650,7 @@ describe("C23 §2 — the seven routes", () => {
   it("T3.13: a built-in that fails does not delegate", async () => {
     const h = harness();
     h.pipeline.submit("export NOEQUALS && echo hi");
-    await settled();
+    await settled(h.pipeline);
 
     expect(h.calls, "the remainder is not delegated").not.toContain("spawnShell");
     expect(h.transcript.entries[0]?.doc.status).toBe("error");
@@ -646,7 +683,7 @@ describe("C23 §2 — the seven routes", () => {
     h.pipeline.submit("/ps");
     await new Promise((r) => setTimeout(r, 0));
     h.pipeline.submit("cd /tmp && echo hi");
-    await settled();
+    await settled(h.pipeline);
 
     expect(h.session.snapshot.cwd, "nothing half-happened").toBe("/work");
     const queued = h.transcript.entries.at(-1);
@@ -661,8 +698,8 @@ describe("C23 §2 — the seven routes", () => {
     // **And the deferral is a deferral rather than a loss**, which is the half a
     // refusal did not have: the `cd` runs once its predecessor settles.
     release?.();
-    await settled();
-    await settled();
+    await settled(h.pipeline);
+    await settled(h.pipeline);
     expect(h.session.snapshot.cwd, "it ran, in the order it was typed").toBe("/tmp");
 
     // **This route is what exercises the seam's own branch**, and the mutation
@@ -686,7 +723,7 @@ describe("C23 §2 — the seven routes", () => {
     }) as typeof realAppend;
 
     h.pipeline.submit("/help");
-    await settled();
+    await settled(h.pipeline);
 
     expect(order[0]).toBe("append");
     expect(h.resets.length, "and focus was reset").toBeGreaterThan(0);
@@ -713,7 +750,7 @@ describe("C23 §2 — the seven routes", () => {
     }) as typeof realFor;
 
     h.pipeline.submit("/ps");
-    await settled();
+    await settled(h.pipeline);
 
     expect(h.pipeline.inFlight, "and the guard is not stranded by it").toBeNull();
     expect(
@@ -737,7 +774,7 @@ describe("C23 §2 — the seven routes", () => {
     }) as typeof h.transcript.append;
 
     h.pipeline.submit("/help");
-    await settled();
+    await settled(h.pipeline);
 
     expect(h.pipeline.faults.join("\n")).toContain('id "running" appears 2 times');
   });
@@ -756,7 +793,7 @@ describe("C23 §2 — the seven routes", () => {
     // row is about the fault collection, and the queue must not change what it
     // counts — which it would if the five became one route and four appends.
     for (let i = 0; i < 5; i += 1) h.pipeline.submit("/help");
-    await settled();
+    await settled(h.pipeline);
 
     // **One per stage, and the stages are two now.** The first `/help` routes and
     // its append throws; the four behind it take the guard, so they enqueue and
@@ -787,7 +824,7 @@ describe("C23 §2 — the seven routes", () => {
     const h = harness({ focusThrows: true });
 
     h.pipeline.submit("/help");
-    await settled();
+    await settled(h.pipeline);
 
     // Two entries: the submission's, which the append *did* produce, and the
     // fault notice beside it. The count is what says this is a later row of §8e
@@ -823,7 +860,7 @@ describe("C23 §2 — the seven routes", () => {
     }) as typeof real;
 
     h.pipeline.submit("/help");
-    await settled();
+    await settled(h.pipeline);
 
     expect(h.transcript.entries).toHaveLength(1);
     const only = h.transcript.entries[0]?.doc;
@@ -849,9 +886,9 @@ describe("C23 §2 — the seven routes", () => {
     }) as typeof real;
 
     h.pipeline.submit("/help");
-    await settled();
+    await settled(h.pipeline);
     h.pipeline.submit("/debug 1");
-    await settled();
+    await settled(h.pipeline);
 
     const shown = h.transcript.entries.at(-1)?.doc.blocks.flatMap((b) =>
       b.kind === "keyValue" ? b.rows.map((r) => `${r.label}=${r.value}`) : [],
@@ -875,7 +912,7 @@ describe("C23 §2 — the seven routes", () => {
       verb: null, adapter: "none", exitCode: 0, durationMs: 0, truncated: false,
       argv: [], stderr: "", transport: "local", origin: "user",
     } });
-    await settled();
+    await settled(h.pipeline);
 
     expect(h.pipeline.faults.join("\n")).toContain("refused while stopping");
     expect(h.transcript.entries, "and nothing was appended after shutdown began").toHaveLength(0);
@@ -892,7 +929,7 @@ describe("C23 §2 — the seven routes", () => {
     }) as typeof h.transcript.append;
 
     h.pipeline.submit("/help");
-    await settled();
+    await settled(h.pipeline);
 
     expect(h.transcript.entries, "nothing could be appended at all").toHaveLength(0);
     expect(h.pipeline.faults.join("\n")).toContain("everything is refused");
@@ -917,7 +954,7 @@ describe("C23 tier 2 — contract", () => {
     for (const [kind, line] of Object.entries(byKind)) {
       const h = harness();
       h.pipeline.submit(line);
-      await settled();
+      await settled(h.pipeline);
 
       const produced = h.transcript.entries.length;
       if (kind === "empty") {
@@ -941,7 +978,7 @@ describe("C23 tier 2 — contract", () => {
     const h = harness();
     for (const line of lines) {
       h.pipeline.submit(line);
-      await settled();
+      await settled(h.pipeline);
     }
 
     expect(h.transcript.entries).toHaveLength(lines.length - empties);
@@ -956,7 +993,7 @@ describe("C23 tier 2 — contract", () => {
     });
 
     h.pipeline.submit("/tail");
-    await settled();
+    await settled(h.pipeline);
 
     expect(h.commits, "the patch").toContain("stream");
     expect(h.commits.at(-1), "and the end flushes").toBe("completion");
@@ -976,7 +1013,7 @@ describe("C23 tier 2 — contract", () => {
     for (const [stage, line, script] of faults) {
       const h = harness(script);
       h.pipeline.submit(line);
-      await settled();
+      await settled(h.pipeline);
 
       expect(h.transcript.entries, `${stage}: no document`).toHaveLength(1);
       expect(h.pipeline.inFlight, `${stage}: guard stranded`).toBeNull();
@@ -997,7 +1034,7 @@ describe("C23 tier 3 — edges", () => {
     // way to show the result was a second append.
     const h = harness({ adapt: () => doc({ command: "/ps", status: "ok" }) });
     h.pipeline.submit("/ps");
-    await settled();
+    await settled(h.pipeline);
 
     expect(h.transcript.entries, "one entry").toHaveLength(1);
     expect(h.transcript.entries[0]?.streaming, "and it is settled").toBe(false);
@@ -1123,11 +1160,11 @@ describe("C23 tier 3 — edges", () => {
     await new Promise((r) => setTimeout(r, 0));
     h.pipeline.submit("/ps");
     h.pipeline.submit("/ps");
-    await settled();
+    await settled(h.pipeline);
 
     h.pipeline.cancel();
-    await settled();
-    await settled();
+    await settled(h.pipeline);
+    await settled(h.pipeline);
 
     const texts = h.transcript.entries.flatMap((e) =>
       e.doc.blocks.filter((b) => b.kind === "notice").map((b) => (b as { text: string }).text),
@@ -1163,17 +1200,17 @@ describe("C23 tier 3 — edges", () => {
     await new Promise((r) => setTimeout(r, 0));
     const before = h.transcript.entries.length;
     h.pipeline.submit("/ps");
-    await settled();
+    await settled(h.pipeline);
 
     expect(h.transcript.entries.length, "the queued entry, and no third").toBe(before + 1);
     const queuedId = h.transcript.entries.at(-1)?.id;
 
     release?.();
-    await settled();
+    await settled(h.pipeline);
     // The drain starts the second route *after* the first settles, so its own
     // async chain is a turn behind — one `settled()` covers the release and the
     // second covers what the release started.
-    await settled();
+    await settled(h.pipeline);
 
     // **The same id, still, and no fourth entry.** Asserting only the count
     // would pass for a build that removed the queued row and appended a fresh
@@ -1204,7 +1241,7 @@ describe("C23 tier 3 — edges", () => {
     });
 
     h.pipeline.submit("list");
-    await settled();
+    await settled(h.pipeline);
 
     expect(h.transcript.entries, "the failing command produced no entry").toHaveLength(1);
     const doc = h.transcript.entries[0]?.doc;
@@ -1216,12 +1253,16 @@ describe("C23 tier 3 — edges", () => {
 
     // **And the sentence that names what happened.** `ChildHandle` delivers the
     // two streams separately (C21 I3) and the route read only `stdout`, so the
-    // one line identifying the token was produced, delivered and dropped —
-    // leaving a raw block that was empty as well as unappendable.
+    // one line identifying the token was produced, delivered and dropped. It
+    // now reaches the screen through the emulator, which is the pipe arm's
+    // whole reason for writing both streams into one grid (C23 I63).
     const text = JSON.stringify(doc?.blocks);
     expect(text, "the shell's own line never reached the document").toContain("list: not found");
-    // The empty stdout is not drawn as a blank row beside the notice.
-    expect(doc?.blocks, "an empty stream became a block").toHaveLength(2);
+    // The status box and the screen, and nothing between them.
+    expect(doc?.blocks, "the failure is a status box over one screen").toHaveLength(2);
+    expect(doc?.blocks[1]).toMatchObject({ kind: "scroll" });
+    const screen = (doc?.blocks[1] as { children: readonly { kind: string }[] }).children[0];
+    expect(screen?.kind, "the body is a terminal, not a captured string").toBe("terminal");
   });
 
   it("T3.18 (I50, F151): a signal is named, and a success is unchanged", async () => {
@@ -1234,7 +1275,7 @@ describe("C23 tier 3 — edges", () => {
       }),
     });
     killed.pipeline.submit("sleep 99");
-    await settled();
+    await settled(killed.pipeline);
     expect(killed.transcript.entries[0]?.doc.error?.message).toBe("Killed by SIGTERM.");
 
     // **The control, and it is what stops this row from being satisfied by a
@@ -1242,12 +1283,12 @@ describe("C23 tier 3 — edges", () => {
     // be exactly what it was: one raw block, no notice, no `error`.
     const ok = harness();
     ok.pipeline.submit("echo hi");
-    await settled();
+    await settled(ok.pipeline);
     const doc = ok.transcript.entries[0]?.doc;
     expect(doc?.status).toBe("ok");
     expect(doc?.error).toBeUndefined();
     expect(doc?.blocks).toHaveLength(1);
-    expect(doc?.blocks[0]?.kind).toBe("raw");
+    expect(doc?.blocks[0]?.kind).toBe("scroll");
 
     // **A command that succeeds and says nothing, which is the arm the
     // mutation pass found missing.** "The success path is unchanged" was
@@ -1264,11 +1305,18 @@ describe("C23 tier 3 — edges", () => {
       }),
     });
     silent.pipeline.submit("true");
-    await settled();
+    await settled(silent.pipeline);
     const quiet = silent.transcript.entries[0]?.doc;
     expect(quiet?.status).toBe("ok");
     expect(quiet?.blocks, "a silent success lost its block").toHaveLength(1);
-    expect(quiet?.blocks[0]).toMatchObject({ kind: "raw", text: "" });
+    // **The screen a silent command leaves is still a screen.** Eliding it
+    // would make one block become none for every `true`, `cd` and `touch` —
+    // the change the mutation pass found nothing watching, restated against
+    // the shape the route produces now.
+    expect(quiet?.blocks[0]).toMatchObject({ kind: "scroll" });
+    const blank = (quiet?.blocks[0] as { children: readonly { kind: string; lines: readonly { text: string }[] }[] }).children[0];
+    expect(blank?.kind).toBe("terminal");
+    expect(blank?.lines.every((l) => l.text.trim() === ""), "a silent child wrote nothing").toBe(true);
   });
 
   it("T3.20 (C07 I22): a shell child that overflowed produces a notice, and not meta.truncated", async () => {
@@ -1285,14 +1333,14 @@ describe("C23 tier 3 — edges", () => {
       }),
     });
     h.pipeline.submit("yes");
-    await settled();
+    await settled(h.pipeline);
 
     const doc = h.transcript.entries[0]?.doc;
     expect(doc?.status, "the command succeeded; the cut is not a failure").toBe("ok");
     expect(doc?.meta.truncated, "the cut is not recorded as the fallback's row cap").toBe(false);
     const notices = (doc?.blocks ?? []).filter((b) => b.kind === "notice");
-    expect(notices, "one notice, after the raw block").toHaveLength(1);
-    expect(doc?.blocks[0]?.kind).toBe("raw");
+    expect(notices, "one notice, after the screen").toHaveLength(1);
+    expect(doc?.blocks[0]?.kind).toBe("scroll");
     expect(notices[0]).toMatchObject({ tone: "warn", glyph: "warn" });
     expect((notices[0] as { text: string }).text).toContain("Output was cut");
 
@@ -1300,7 +1348,7 @@ describe("C23 tier 3 — edges", () => {
     // asserts that route is one raw block; here the same fact from this side.
     const ok = harness();
     ok.pipeline.submit("echo hi");
-    await settled();
+    await settled(ok.pipeline);
     expect(ok.transcript.entries[0]?.doc.blocks.filter((b) => b.kind === "notice" && b.glyph !== "step")).toHaveLength(0); // C23 I54: block 0 is the card's header
   });
 
@@ -1318,7 +1366,7 @@ describe("C23 tier 3 — edges", () => {
       adaptPatch: () => ({ op: "append", block: block({ kind: "raw", id: "l", text: "x" }) }),
     });
     h.pipeline.submit("/tail");
-    await settled();
+    await settled(h.pipeline);
 
     const doc = h.transcript.entries[0]?.doc;
     expect(h.transcript.entries[0]?.streaming, "settled").toBe(false);
@@ -1339,7 +1387,7 @@ describe("C23 tier 3 — edges", () => {
       adaptPatch: () => ({ op: "append", block: block({ kind: "raw", id: "l", text: "x" }) }),
     });
     ok.pipeline.submit("/tail");
-    await settled();
+    await settled(ok.pipeline);
     expect(ok.transcript.entries[0]?.doc.blocks.filter((b) => b.kind === "notice" && b.glyph !== "step")).toHaveLength(0); // C23 I54: block 0 is the card's header
   });
 
@@ -1362,11 +1410,11 @@ describe("C23 tier 3 — edges", () => {
 
     expect(h.pipeline.inFlight, "a shell route is in flight").toBe("shell");
     h.pipeline.submit("/ps");
-    await settled();
+    await settled(h.pipeline);
     expect(h.calls, "the second submission never reached the transport").not.toContain("invoke");
 
     finish?.();
-    await settled();
+    await settled(h.pipeline);
   });
 
   it("T3.8: a stream that never settles holds nothing", async () => {
@@ -1381,7 +1429,7 @@ describe("C23 tier 3 — edges", () => {
     });
 
     h.pipeline.submit("/tail");
-    await settled();
+    await settled(h.pipeline);
 
     expect(h.pipeline.inFlight, "the guard is free").toBeNull();
     expect(h.transcript.entries[0]?.streaming, "and the entry is still open").toBe(true);
@@ -1398,9 +1446,9 @@ describe("C23 tier 3 — edges", () => {
     });
 
     h.pipeline.submit("/tail");
-    await settled();
+    await settled(h.pipeline);
     h.pipeline.submit("/ps");
-    await settled();
+    await settled(h.pipeline);
 
     expect(h.calls, "the app verb ran").toContain("invoke");
     expect(
@@ -1459,7 +1507,7 @@ describe("C23 §3a — action dispatch", () => {
     ] as const) {
       const h = withTable();
       h.pipeline.onAction({ kind: "open", label: "x", url }, h.id);
-      await settled();
+      await settled(h.pipeline);
 
       expect(
         h.transcript.entries.some((e) =>
@@ -1472,7 +1520,7 @@ describe("C23 §3a — action dispatch", () => {
     // And the one that is allowed reaches the opener rather than a refusal.
     const ok = withTable();
     ok.pipeline.onAction({ kind: "open", label: "docs", url: "https://example.com/" }, ok.id);
-    await settled();
+    await settled(ok.pipeline);
     expect(
       ok.transcript.entries.some((e) =>
         e.doc.blocks.some((b) => b.kind === "notice" && /refusing|not a URL/.test(b.text)),
@@ -1487,7 +1535,7 @@ describe("C23 §3a — action dispatch", () => {
     // Not a shortcut past the guard: same routes, same refusal, same entry.
     const h = withTable();
     h.pipeline.onAction({ kind: "exec", label: "run", command: "/ps" }, h.id);
-    await settled();
+    await settled(h.pipeline);
 
     expect(h.calls, "it went through the app route").toContain("invoke");
   });
@@ -1615,7 +1663,7 @@ describe("C23 §3b — time-driven updates", () => {
     });
 
     h.pipeline.submit("/tail");
-    await settled();
+    await settled(h.pipeline);
 
     h.tick(60_000);
     const early = h.transcript.entries[0]?.doc.blocks.some(
@@ -1688,7 +1736,7 @@ describe("C23 §3b — time-driven updates", () => {
     });
 
     h.pipeline.submit("/tail");
-    await settled();
+    await settled(h.pipeline);
 
     // First silence: stepped, so the check at 60 s finds nothing and the check
     // that matters is a later firing of the same timer.
@@ -1703,7 +1751,7 @@ describe("C23 §3b — time-driven updates", () => {
     // Speak, then go quiet again. The second notice can only arrive from a timer
     // that armed itself after the first one fired.
     resume?.();
-    await settled();
+    await settled(h.pipeline);
     expect(texts(), "resumption spends the row").toEqual([expect.stringMatching(/resumed after/)]);
 
     h.tick(60_000);
@@ -1724,7 +1772,7 @@ describe("C23 §3b — time-driven updates", () => {
       })(),
     });
     h.pipeline.submit("/tail");
-    await settled();
+    await settled(h.pipeline);
 
     for (let i = 0; i < 8; i += 1) h.tick(60_000);
 
@@ -1752,7 +1800,7 @@ describe("C23 §3b — time-driven updates", () => {
     });
 
     h.pipeline.submit("/tail");
-    await settled();
+    await settled(h.pipeline);
     h.tick(130_000);
 
     const stalled = h.transcript.entries[0]?.doc.blocks.filter((b) => b.kind === "notice");
@@ -1768,7 +1816,7 @@ describe("C23 §3b — time-driven updates", () => {
     expect(stallBlocks(stalled ?? []), "one stall block").toBe(1);
 
     resume?.();
-    await settled();
+    await settled(h.pipeline);
 
     const blocks = h.transcript.entries[0]?.doc.blocks ?? [];
     expect(
@@ -1800,7 +1848,7 @@ describe("C23 §3b — time-driven updates", () => {
     });
 
     h.pipeline.submit("/tail");
-    await settled();
+    await settled(h.pipeline);
     h.tick(130_000);
 
     const entry = h.transcript.entries[0];
@@ -1835,7 +1883,7 @@ describe("C23 §4 — the submit row's two other steps", () => {
       expect(h.editor.text, "the prompt holds the line before the submit").toBe(line);
 
       h.pipeline.submit(line);
-      await settled();
+      await settled(h.pipeline);
       expect(h.editor.text, `${kind} left the line under the cursor`).toBe("");
     }
 
@@ -1844,7 +1892,7 @@ describe("C23 §4 — the submit row's two other steps", () => {
     const h = harness();
     h.editor.setText("   ");
     h.pipeline.submit("   ");
-    await settled();
+    await settled(h.pipeline);
     expect(h.editor.text, "a blank Enter is not a submission").toBe("   ");
     expect(h.recorded, "and nothing reaches C20").toEqual([]);
   });
@@ -1853,7 +1901,7 @@ describe("C23 §4 — the submit row's two other steps", () => {
     for (const [kind, line] of Object.entries(byKind)) {
       const h = harness();
       h.pipeline.submit(line);
-      await settled();
+      await settled(h.pipeline);
 
       expect(h.recorded.map((r) => r.command), `${kind} recorded ${String(h.recorded.length)}`).toEqual([
         line,
@@ -1896,18 +1944,18 @@ describe("C23 §4 — the submit row's two other steps", () => {
 
     // Control: the local route, which was never broken.
     h.pipeline.submit("/guide");
-    await settled();
+    await settled(h.pipeline);
     h.tick(1500);
-    await settled();
+    await settled(h.pipeline);
     expect(ticks.local, "the control must tick, or the row below proves nothing").toBeGreaterThan(
       0,
     );
 
     // The route the document reaches by settling rather than by appending.
     h.pipeline.submit("/ps");
-    await settled();
+    await settled(h.pipeline);
     h.tick(1500);
-    await settled();
+    await settled(h.pipeline);
     expect(ticks.adapter, "an adapter's b.live must be driven too (I33a)").toBeGreaterThan(0);
   });
 
@@ -1918,7 +1966,7 @@ describe("C23 §4 — the submit row's two other steps", () => {
     // A grant nothing observes is a grant nothing can be wrong about.
     const entry = harness();
     entry.pipeline.submit("/ps");
-    await settled();
+    await settled(entry.pipeline);
 
     const onEntry = entry.contexts.find((c) => c.where === "adapt")?.ctx;
     expect(onEntry, "the adapter route ran").toBeDefined();
@@ -1934,7 +1982,7 @@ describe("C23 §4 — the submit row's two other steps", () => {
       adaptPatch: () => ({ op: "append", block: block({ kind: "raw", id: "l", text: "x" }) }),
     });
     view.pipeline.submit("/tail --screen");
-    await settled();
+    await settled(view.pipeline);
 
     const onView = view.contexts.find((c) => c.where === "adaptPatch")?.ctx;
     expect(onView, "the view route ran").toBeDefined();
@@ -1947,7 +1995,7 @@ describe("C23 §4 — the submit row's two other steps", () => {
     // nothing anywhere in the suite.
     const h = harness();
     h.pipeline.submit("/ps");
-    await settled();
+    await settled(h.pipeline);
 
     const ctx = h.contexts.find((c) => c.where === "adapt")?.ctx;
     expect(ctx?.capabilities, "the record C22 resolved, not a re-detection").toBe(FULL_CAPABILITIES);
@@ -1982,7 +2030,7 @@ describe("C23 §4 — the submit row's two other steps", () => {
     });
 
     h.pipeline.submit("/tail --screen");
-    await settled();
+    await settled(h.pipeline);
 
     // The patches reached the *view*, and the transcript is untouched — B03 §2
     // in the strong sense §13a took it.
@@ -2020,17 +2068,17 @@ describe("C23 §4 — the submit row's two other steps", () => {
     });
 
     h.pipeline.submit("/tail --screen");
-    await settled();
+    await settled(h.pipeline);
     expect(h.pipeline.liveStreams, "registered before the loop was awaited").toBe(1);
 
     // And cancelling it pops the view — the asymmetry the walk ruled: Ctrl-C is
     // the reader saying stop, where `end` is the far side saying it.
     h.pipeline.cancelNewestStream();
-    await settled();
+    await settled(h.pipeline);
     expect(h.overlays.stack, "a cancelled view pops").toHaveLength(0);
 
     stop();
-    await settled();
+    await settled(h.pipeline);
     expect(h.pipeline.liveStreams, "and the `finally` forgets its canceller").toBe(0);
   });
 
@@ -2047,7 +2095,7 @@ describe("C23 §4 — the submit row's two other steps", () => {
     });
 
     h.pipeline.submit("/tail --screen");
-    await settled();
+    await settled(h.pipeline);
 
     expect(h.overlays.stack, "the view is still there").toHaveLength(1);
     const content = h.overlays.stack[0]?.content ?? [];
@@ -2071,7 +2119,7 @@ describe("C23 §4 — the submit row's two other steps", () => {
     });
 
     h.pipeline.submit("/tail --screen");
-    await settled();
+    await settled(h.pipeline);
 
     const content = h.overlays.stack[0]?.content ?? [];
     const notice = content.find((bl) => bl.kind === "notice");
@@ -2090,7 +2138,7 @@ describe("C23 §4 — the submit row's two other steps", () => {
       },
     });
     h2.pipeline.submit("/tail --screen");
-    await settled();
+    await settled(h2.pipeline);
     const n2 = (h2.overlays.stack[0]?.content ?? []).find((bl) => bl.kind === "notice");
     expect(n2?.kind === "notice" ? n2.text : "").toContain("No such container");
   });
@@ -2105,7 +2153,7 @@ describe("C23 §4 — the submit row's two other steps", () => {
     });
 
     h.pipeline.submit("/tail --screen");
-    await settled();
+    await settled(h.pipeline);
 
     const content = h.overlays.stack[0]?.content ?? [];
     const notice = content.find((bl) => bl.kind === "notice");
@@ -2155,9 +2203,9 @@ describe("C23 §4 — the submit row's two other steps", () => {
     // the ordinary way does not tick, the arm below failing says nothing about
     // routes. T1.38's structure, one host over.
     h.pipeline.submit("/ps");
-    await settled();
+    await settled(h.pipeline);
     h.tick(1500);
-    await settled();
+    await settled(h.pipeline);
     expect(ticks.entry, "the control must tick, or the row below proves nothing").toBeGreaterThan(
       0,
     );
@@ -2165,13 +2213,13 @@ describe("C23 §4 — the submit row's two other steps", () => {
     // `--watch` declares `view: true` on the fixture's `ps` (C05 I20), so this
     // submission pushes a view instead of appending an entry.
     h.pipeline.submit("/ps --watch");
-    await settled();
+    await settled(h.pipeline);
     expect(h.transcript.entries.map((e) => e.doc.command), "and no entry was appended").not.toContain(
       "/ps --watch",
     );
 
     h.tick(1500);
-    await settled();
+    await settled(h.pipeline);
     expect(ticks.view, "a live part inside a pushed view is driven (gap 7)").toBeGreaterThan(0);
   });
 
@@ -2208,9 +2256,9 @@ describe("C23 §4 — the submit row's two other steps", () => {
     });
 
     h.pipeline.submit("/ps");
-    await settled();
+    await settled(h.pipeline);
     h.tick(1500);
-    await settled();
+    await settled(h.pipeline);
 
     const panel = h.transcript.entries
       .flatMap((e) => e.doc.blocks)
@@ -2260,9 +2308,9 @@ describe("C23 §4 — the submit row's two other steps", () => {
     });
 
     h.pipeline.submit("/ps");
-    await settled();
+    await settled(h.pipeline);
     h.tick(1500);
-    await settled();
+    await settled(h.pipeline);
 
     const panel = h.transcript.entries
       .flatMap((e) => e.doc.blocks)
@@ -2320,7 +2368,7 @@ describe("C23 §4 — the submit row's two other steps", () => {
     h.pipeline.submit("/ps");
     await new Promise((r) => setTimeout(r, 0));
     h.pipeline.submit("/ps --mine");
-    await settled();
+    await settled(h.pipeline);
 
     expect(
       h.recorded.map((r) => r.command),
@@ -2328,7 +2376,7 @@ describe("C23 §4 — the submit row's two other steps", () => {
     ).not.toContain("/ps --mine");
 
     release?.();
-    await settled();
+    await settled(h.pipeline);
 
     expect(h.recorded.map((r) => r.command), "and now it is in C20").toContain("/ps --mine");
   });

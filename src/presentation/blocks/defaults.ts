@@ -11,6 +11,7 @@ import { codeDefinition } from "./kinds/code.js";
 import { groupDefinition, mosaicDefinition, panelDefinition, scrollDefinition } from "./kinds/containers.js";
 import { imageDefinition } from "./kinds/image.js";
 import { statusDefinition } from "./kinds/status.js";
+import { terminalDefinition } from "./kinds/terminal.js";
 import {
   comparisonDefinition,
   eventsDefinition,
@@ -45,6 +46,7 @@ export const DEFAULT_DEFINITIONS: readonly BlockDefinition[] = Object.freeze([
   scrollDefinition,
   mosaicDefinition,
   imageDefinition,
+  terminalDefinition,
   statusDefinition,
   rawDefinition,
 ] as BlockDefinition[]);

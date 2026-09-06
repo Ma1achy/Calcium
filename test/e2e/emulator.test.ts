@@ -1,11 +1,60 @@
-// C27 — terminal emulator (docs/components/C27_terminal_emulator.md §9). Spec-first rows:
-// every one lands as a real test with the emulator (SP9 meets spec-alone at each new
-// invariant, and the not-deferred marker is the ruled route — F814).
-import { describe, it } from "vitest";
+// C27 — terminal emulator (docs/components/C27_terminal_emulator.md §9), tier 5.
+//
+// **Real bytes from a real terminal**, not a string constant: a probe rebuilt
+// from intent agrees with the intent, so these rows capture what a child
+// actually wrote through a pty.
+import { spawn } from "node-pty";
+import { describe, expect, it } from "vitest";
+
+import { createEmulator } from "../../src/data/emulator/emulator.js";
+
+/** Run a command under a pty, feeding every chunk into the emulator. */
+const through = async (
+  command: string,
+  opts: Readonly<{ cols: number; rows: number; scrollback?: number }>,
+): Promise<ReturnType<typeof createEmulator>> => {
+  const term = createEmulator(opts);
+  const child = spawn("/bin/sh", ["-c", command], {
+    name: "xterm-256color",
+    cols: opts.cols,
+    rows: opts.rows,
+    cwd: process.cwd(),
+    env: { ...process.env, TERM: "xterm-256color" },
+  });
+  const writes: Promise<void>[] = [];
+  child.onData((chunk) => {
+    writes.push(term.write(chunk));
+  });
+  await new Promise<void>((resolve) => {
+    child.onExit(() => {
+      resolve();
+    });
+  });
+  await Promise.all(writes);
+  return term;
+};
 
 describe("C27 terminal emulator — tier 5", () => {
-  it.todo("T5.1: under the devcontainer's `node-pty`, `sh -c 'printf \"a\\\\r\\\\033[Kb\\\\n\"; printf \"\\\\033[32mok\\\\033[0m\\\\n\"'` piped into `write` → two lines, `b` and `ok`, the second with an `ansi16` 2 run. Real bytes from a real tty, not a string constant. — not deferred on a component: lands with C27's emulator");
-  it.todo("T5.2: `sh -c 'seq 1 30'` at `scrollback: 20, rows: 4` → `dropped === 6`, matching T1.6 from a real child. — not deferred on a component: lands with C27's emulator");
+  it("T5.1 (C27 I4, C27 I5): a real child's carriage return and SGR arrive as one screen", async () => {
+    const term = await through(
+      String.raw`printf 'a\r\033[Kb\n'; printf '\033[32mok\033[0m\n'`,
+      { cols: 20, rows: 4 },
+    );
+    const lines = term.snapshot("t").lines;
+    expect(lines[0]?.text).toBe("b");
+    expect(lines[1]?.text).toBe("ok");
+    expect(lines[1]?.runs).toEqual([{ from: 0, to: 2, fg: { kind: "ansi16", index: 2 } }]);
+    term.dispose();
+  }, 20_000);
+
+  it("T5.2 (C27 I7): a real child overruns the cap by the same figure the unit row measured", async () => {
+    const term = await through("seq 1 30", { cols: 20, rows: 4, scrollback: 20 });
+    const snap = term.snapshot("t");
+    expect(snap.lines).toHaveLength(24);
+    expect(term.dropped).toBe(7);
+    expect(snap.lines[0]?.text).toBe("8");
+    term.dispose();
+  }, 20_000);
 });
 
 describe("C21 — the PTY port, spec-first rows", () => {

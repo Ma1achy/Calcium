@@ -63,6 +63,8 @@ import type {
   Notice,
   Panel,
   Image,
+  Terminal as TerminalBlock,
+  TerminalLine,
   Mosaic,
   Scroll,
   Patch,
@@ -1441,6 +1443,49 @@ function group(
   );
 }
 
+/**
+ * A child's screen (C04 §3i).
+ *
+ * **The one builder whose content is somebody else's** — an app composing this
+ * by hand is unusual, and the usual producer is C27's `snapshot`. It exists
+ * because a field a consumer cannot reach is a surface the spec describes and
+ * the API does not (MG27), and because a test or a fixture wants a screen
+ * without an emulator.
+ */
+function terminal(
+  cols: number,
+  lines: readonly TerminalLine[],
+  opts?: BlockOpts & {
+    screen?: "lines" | "grid";
+    cursor?: Readonly<{ line: number; col: number }>;
+    dropped?: number;
+  },
+): TerminalBlock {
+  if (!Number.isInteger(cols) || cols < 1) {
+    throw new TypeError(`b.terminal: cols is a positive integer — got ${JSON.stringify(cols)}`);
+  }
+  const dropped = opts?.dropped;
+  if (dropped !== undefined && (!Number.isInteger(dropped) || dropped < 1)) {
+    throw new TypeError(
+      `b.terminal: dropped is a positive integer when present (C04 I113) — declared by presence, ` +
+        `so a zero would draw "0 lines dropped at the cap"; got ${JSON.stringify(dropped)}`,
+    );
+  }
+  return finish<TerminalBlock>(
+    {
+      kind: "terminal",
+      id: idOf(opts, "terminal"),
+      cols,
+      screen: opts?.screen ?? "lines",
+      lines,
+      ...(opts?.cursor === undefined ? {} : { cursor: opts.cursor }),
+      ...(dropped === undefined ? {} : { dropped }),
+    } as TerminalBlock,
+    opts,
+    false,
+  );
+}
+
 function raw(text: string, opts?: ValuedTextOpts): Raw {
   return finish<Raw>(
     {
@@ -1740,6 +1785,7 @@ export const b = {
   image,
   samples,
   raw,
+  terminal,
   spinner,
   status,
 

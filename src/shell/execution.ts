@@ -27,7 +27,6 @@ import { parse } from "../interaction/parser/index.js";
 import type { Builtin, ParseResult } from "../interaction/parser/index.js";
 import type { RawPatch } from "../data/transport/index.js";
 import type { Exit } from "../data/process/types.js";
-import { block } from "../data/viewmodel/index.js";
 import type { Block, ViewDocument } from "../data/viewmodel/index.js";
 import { approvalPrompt, blockId, callHead, callStatus, cardOver, completeLocal, compose, DENY_KEY, errorDoc, noticeDoc, refusalNotice, toolCallDoc, usageDoc } from "./documents.js";
 import { createActionDispatcher } from "./actions.js";
@@ -35,6 +34,8 @@ import { createRefreshDriver } from "./refresh.js";
 import { DOCUMENT_VIEW_ID } from "./document-view.js";
 import type { ProducerContext } from "../data/adapters/types.js";
 import { overflowNotice, withOverflowNotice } from "../data/adapters/overflow.js";
+import { createEmulator } from "../data/emulator/emulator.js";
+import { BODY_INDENT } from "./entry-layout.js";
 import { isViewInvocation } from "../data/manifest/index.js";
 import type { ValidationResult } from "../data/manifest/index.js";
 import { b } from "./builders/index.js";
@@ -49,6 +50,15 @@ import {
 } from "./local/registry.js";
 import type { Pipeline, PipelineDeps } from "./types.js";
 import type { EntryId } from "../viewport/transcript/index.js";
+
+/**
+ * The live screen's height in rows (C23 §3c).
+ *
+ * Six: enough that a build's tail reads as progress and short enough that a
+ * card is not the whole viewport. The scroll bounds it and the residue row
+ * says what is above.
+ */
+const TERMINAL_ROWS = 6;
 
 /** Which foreground route holds the guard. `null` is idle (C23 §6). */
 export type InFlight = "app" | "local" | "shell" | null;
@@ -611,82 +621,267 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
    * What is here instead is true under every policy: the exit code, and the
    * shell's own line naming the token it could not find.
    */
+  /**
+   * What a resize has to reach (C23 I65).
+   *
+   * A set rather than a single slot: the guard permits one foreground route at a
+   * time today, and a set costs nothing while making the day that changes not a
+   * defect. Each entry removes itself when its child exits.
+   */
+  const resizeListeners = new Set<() => void>();
+
   const runShell = async (settle: Settle, command: string): Promise<void> => {
     // `line` is read throughout; `settle` carries where its document goes.
     const { line } = settle;
 
     guard.take("shell", headOf(command));
-    try {
-      const child = deps.runner.spawnShell(command, { cwd: () => deps.session().cwd });
-      const drain = async (stream: AsyncIterable<string>): Promise<string> => {
-        let text = "";
-        for await (const chunk of stream) text += chunk;
-        return text;
-      };
-      const [out, err] = await Promise.all([drain(child.stdout), drain(child.stderr)]);
-      const exit = await child.exited;
 
-      const failed = exit.code !== 0 || exit.signal !== null;
-      const message =
-        exit.signal !== null
+    /**
+     * The body's inner width, handed down (C23 §3c, C22 I91's neighbour).
+     *
+     * **Nothing here reads the terminal's width**: `region()` is C01's figure
+     * arriving through the composition root, and `BODY_INDENT` is the layout's
+     * own constant. A child told a width the box does not have wraps its output
+     * against the wrong column and every line after the first is wrong.
+     */
+    const cols = Math.max(20, deps.region().width - BODY_INDENT);
+    let lastCols = cols;
+    const rows = TERMINAL_ROWS;
+    const emulator = createEmulator({ cols, rows });
+    const terminalId = blockId("terminal");
+    const scrollId = blockId("term-scroll");
+
+    const snapshot = (): Block =>
+      b.scroll(rows, [emulator.snapshot(terminalId)], { follow: true, id: scrollId });
+
+    const pendingId =
+      settle.into === null
+        ? deps.transcript.append(
+            compose({
+              command: line,
+              status: "ok",
+              blocks: [snapshot()],
+              meta: { origin: "user", transport: "subprocess", argv: [command] },
+            }),
+            { streaming: true },
+          )
+        : settle.into;
+    if (settle.into !== null) {
+      const queued = deps.transcript.entries.find((e) => e.id === pendingId)?.doc.blocks[0];
+      if (queued !== undefined) {
+        deps.transcript.patch(pendingId, { op: "replace", blockId: queued.id, block: snapshot() }, "shell");
+      }
+    }
+    deps.resetFocus();
+    deps.scheduler.commit("input");
+    refresh.watch(pendingId);
+
+    /**
+     * **One snapshot per committed frame** (C23 I64), and the coalescing signal
+     * is C03's own `pending`.
+     *
+     * A chunk that arrives while a frame is already waiting to be drawn adds
+     * nothing a reader can see, so it marks the emulator dirty and returns; the
+     * next chunk after the frame lands carries everything accumulated. No second
+     * timer, and no per-chunk write of a two-thousand-line value into the store —
+     * which is the cost C03 exists to prevent.
+     *
+     * The 1 Hz readout is the backstop for the tail: a child that writes and
+     * then goes quiet would otherwise show its last chunk one frame late for as
+     * long as it stayed quiet.
+     */
+    let dirty = false;
+    /**
+     * **The emulator outlives the writes that were in flight when it settled.**
+     *
+     * A chunk written into the parser resolves after the child has exited and
+     * the route has disposed, and its continuation would snapshot a screen that
+     * is gone — C27's refusal, thrown out of a floating promise. Found by the
+     * suite rather than by the trace: no row of either walk artefact indexes the
+     * continuation of an operation the settle did not await.
+     */
+    let finished = false;
+    const draw = (): void => {
+      if (finished) return;
+      dirty = false;
+      deps.transcript.patch(pendingId, { op: "replace", blockId: scrollId, block: snapshot() }, "shell");
+      deps.scheduler.commit("stream");
+    };
+    refresh.readout(pendingId, scrollId, () => {
+      dirty = false;
+      return snapshot();
+    });
+    // The readout is dropped by `settled(id)` in the driver; this is the same
+    // window `draw` guards, for the same reason.
+
+    /**
+     * **Every write, as one chain the settle can await** (C27 I3).
+     *
+     * `write` resolves after the parser has taken the chunk, and a route that
+     * only awaits the *stream* has awaited the wrong thing: the drains finish
+     * when iteration ends, the child's exit resolves, and the final snapshot is
+     * taken from a screen the last chunks have not reached. Measured: a command
+     * whose whole output was one line settled with a blank screen, and every
+     * assertion about the exit code passed.
+     *
+     * Chaining also fixes the order. Two floating writes resolve in whatever
+     * order the parser finishes them, and the block is the one place that
+     * cannot be reordered.
+     */
+    let writes: Promise<void> = Promise.resolve();
+    const onChunk = (chunk: string): void => {
+      if (finished) return;
+      writes = writes.then(async () => {
+        await emulator.write(chunk);
+        dirty = true;
+        if (!deps.scheduler.pending) draw();
+      });
+    };
+
+    let cancelled = false;
+    /**
+     * The pipe arm's stream cap, kept as a separate report from the emulator's.
+     *
+     * **Two losses, and `dropped` names only one of them.** The emulator's cap
+     * says which lines its scrollback let go; a bounded stream that overflowed
+     * says bytes never arrived, so the screen is wrong in a way no count on the
+     * block can state. C07 I22's notice is the one that can.
+     */
+    let pipeOverflowed = false;
+    try {
+      /**
+       * **The arm is chosen before the spawn and never switched** (C23 I63).
+       *
+       * With a factory the child gets a terminal and keeps its colours; without
+       * one both streams go into the same emulator in arrival order — C21 I3 is
+       * inapplicable rather than relaxed, because a terminal has one stream by
+       * nature. A `spawnPty` that throws is a configuration error and is
+       * reported: retrying on pipes would hide it behind a child that merely
+       * looked duller.
+       */
+      const env = { TERM: "xterm-256color", COLORTERM: "truecolor" };
+      /**
+       * **The child is resized first, the emulator second** (I65).
+       *
+       * A SIGWINCH for a width the emulator has not taken means the child's
+       * repaint lands on the old grid, and one frame is drawn from a screen
+       * described two ways. Registered per arm because only the PTY arm has a
+       * child that can be told; the pipe arm reflows the emulator alone.
+       */
+      const onResize = (resizeChild: ((c: number, r: number) => void) | null): (() => void) => {
+        const listener = (): void => {
+          const next = Math.max(20, deps.region().width - BODY_INDENT);
+          if (next === lastCols) return;
+          lastCols = next;
+          resizeChild?.(next, rows);
+          emulator.resize(next, rows);
+        };
+        resizeListeners.add(listener);
+        return () => resizeListeners.delete(listener);
+      };
+      let dropResize = (): void => undefined;
+      const usePty = deps.runner.hasPty;
+      let exit: Exit;
+      if (usePty) {
+        const child = deps.runner.spawnPty(command, { cwd: () => deps.session().cwd, env, cols, rows });
+        dropResize = onResize((c, r) => child.resize(c, r));
+        cancelInFlight = (): void => {
+          cancelled = true;
+          child.signal("SIGINT");
+        };
+        child.onData(onChunk);
+        exit = await child.exited;
+      } else {
+        const child = deps.runner.spawnShell(command, { cwd: () => deps.session().cwd, env });
+        dropResize = onResize(null);
+        cancelInFlight = (): void => {
+          cancelled = true;
+          child.signal("SIGINT");
+        };
+        const drain = async (stream: AsyncIterable<string>): Promise<void> => {
+          for await (const chunk of stream) onChunk(chunk);
+        };
+        await Promise.all([drain(child.stdout), drain(child.stderr)]);
+        exit = await child.exited;
+        pipeOverflowed = child.overflowed;
+      }
+
+      // The last chunk is in the emulator but not necessarily on screen: a
+      // child that wrote and exited inside one frame window leaves `dirty` set.
+      void dirty;
+      const failed = cancelled || exit.code !== 0 || exit.signal !== null;
+      const message = cancelled
+        ? "Cancelled."
+        : exit.signal !== null
           ? `Killed by ${exit.signal}.`
           : `The command exited with code ${String(exit.code ?? 1)}.`;
+
+      /**
+       * **The final snapshot, then the disposal** (C23 I67, C27 §6): the cursor
+       * is dropped because nobody is writing at it, and what the block keeps is
+       * decided by the screen the child left — the scrollback for a log, the
+       * grid for a program that owned the screen.
+       */
+      // **Before anything reads the screen** — the child has exited, and what it
+      // wrote last may still be in the parser.
+      await writes;
+      dropResize();
+      finished = true;
+      // The readout stops before the settle: a wake between the two would
+      // re-render a block from an emulator this line is about to dispose.
+      refresh.settled(pendingId);
+      const final = { ...emulator.snapshot(terminalId) };
+      // Deleted rather than set to `undefined`: C04 I85 refuses an unknown key
+      // and `cursor: undefined` is a key. The same trap as the window rebuild.
+      delete final.cursor;
+      const settled: Block = b.scroll(rows, [final], { follow: true, id: scrollId });
+      emulator.dispose();
 
       appendAndCommit(
         compose({
           command: line,
           status: failed ? "error" : "ok",
-          // **The success path is byte-identical to what it was**: one raw
-          // block, emitted whether or not the command said anything. Eliding
-          // an empty one there would change every silent command's entry from
-          // one block to none, which is a rendering change this row has no
-          // reason to make and no test covering it.
-          //
-          // The failure path is new, so it chooses: the notice carries the
-          // sentence, and a raw block appears only when it has content — an
-          // empty one is a blank row the reader has to account for, and on
-          // this route both streams are routinely empty.
-          // **An overflowed child is a notice, not `meta.truncated`** (C07 §4,
-          // I22). This route does not pass through the registry's funnel, so it
-          // appends the same block itself; the line it replaces was
-          // `truncated: child.overflowed`, written while C07 §4 read *not yet
-          // made*, and it made one field mean two things that nothing drew.
           blocks: withOverflowNotice(
             failed
-              ? [
-                  // **A failure is a `status` box** (C23 I61, C09 §3a), composed by
-                  // `documents.ts` — the kind that draws the figure, not a red line
-                  // beside it.
-                  callStatus("error", message, { id: blockId("shell-failed") }),
-                  ...(out === "" ? [] : [block({ kind: "raw", id: blockId("raw"), text: out })]),
-                  ...(err === "" ? [] : [block({ kind: "raw", id: blockId("raw-err"), text: err })]),
-                ]
-              : [block({ kind: "raw", id: blockId("raw"), text: out })],
-            child.overflowed,
+              ? [callStatus("error", message, { id: blockId("shell-failed") }), settled]
+              : [settled],
+            pipeOverflowed,
           ),
           ...(failed
             ? {
                 error: {
                   message,
-                  code: exit.signal !== null ? "KILLED_BY_SIGNAL" : "UNEXPECTED_EXIT",
+                  code: cancelled
+                    ? "CANCELLED"
+                    : exit.signal !== null
+                      ? "KILLED_BY_SIGNAL"
+                      : "UNEXPECTED_EXIT",
                 },
               }
             : {}),
           meta: {
             origin: "user",
-            exitCode: exit.code ?? 1,
+            exitCode: cancelled ? 130 : (exit.code ?? 1),
             transport: "subprocess",
             argv: [command],
           },
         }),
-        settle,
+        // **The pending entry is the destination, always** (C23 I3's order read
+        // forwards). This route appends before it spawns, so `into` is never
+        // null by the time it settles — passing the caller's `settle` would
+        // append a second entry beside the one the reader has been watching.
+        { line, into: pendingId },
       );
     } catch (cause) {
+      finished = true;
+      refresh.settled(pendingId);
+      emulator.dispose();
       appendAndCommit(
         errorDoc(line, { message: String(cause), stage: "spawn" }, { origin: "user" }),
-        settle,
+        { line, into: pendingId },
       );
     } finally {
+      cancelInFlight = null;
       // C23 §8a A5 — every exit releases it, this one included.
       guard.release();
     }
@@ -2008,6 +2203,11 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     identityNotice: (text) => void refresh.identityNotice(text),
     releaseView: () => void refresh.release({ kind: "view", id: DOCUMENT_VIEW_ID }),
     visibilityChanged: () => void refresh.visibilityChanged(),
+    // C23 I65 — the listeners resize the child first and the emulator second;
+    // this is only the delivery.
+    resized: () => {
+      for (const listener of [...resizeListeners]) listener();
+    },
     // C22 I53 — the greeting is a producer, and this is the one builder.
     producerContext: () => producerContext(null),
 

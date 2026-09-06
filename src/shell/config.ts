@@ -237,6 +237,8 @@ export function resolveConfig(config: TuiConfig, ambient: Ambient) {
     openUrl: config.openUrl,
     stdout: config.stdout ?? process.stdout,
     stdin: config.stdin ?? process.stdin,
+    // C22 I91 — carried, never inspected: the root's whole job for it.
+    ...(config.pty === undefined ? {} : { pty: config.pty }),
 
     cluster: config.cluster ?? "",
     version: config.version ?? "",

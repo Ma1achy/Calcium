@@ -13,7 +13,7 @@
 import type { ConfirmHost } from "./confirm.js";
 import type { Adapter, AdapterRegistry, ProducerContext } from "../data/adapters/index.js";
 import type { ManifestDocument, ManifestStore } from "../data/manifest/index.js";
-import type { ProcessRunner } from "../data/process/types.js";
+import type { ProcessRunner, PtyFactory } from "../data/process/types.js";
 import type { TransportRouter } from "../data/transport/index.js";
 import type { Action, Block, ViewDocument } from "../data/viewmodel/index.js";
 import type { EntryId } from "../viewport/transcript/index.js";
@@ -217,6 +217,17 @@ export interface Pipeline {
    * resume at all.
    */
   visibilityChanged(): void;
+  /**
+   * The region changed size (C23 I65).
+   *
+   * **Heard rather than polled, for the same reason `visibilityChanged` is.** A
+   * live child holds a grid whose width came from the body, and a child that has
+   * gone quiet has nothing left to notice the change on — polling on the next
+   * chunk resizes only the children that were about to redraw anyway. The order
+   * inside is the invariant: the child first, so its SIGWINCH names a size the
+   * emulator has already taken by the time the repaint arrives.
+   */
+  resized(): void;
   /**
    * The producer context, for C22's greeting (C22 I53, C23 I40).
    *
@@ -556,6 +567,22 @@ export type TuiConfig = Readonly<{
   openUrl?: (url: URL) => Promise<void>;
   stdout?: NodeJS.WriteStream;
   stdin?: NodeJS.ReadStream;
+
+  /**
+   * A pseudo-terminal factory, for children that need a terminal (C22 I91,
+   * C21 §2a).
+   *
+   * **Passed through to C21 unchanged and read nowhere else.** Calcium depends
+   * on no PTY package — `node-pty` ships prebuilds for two platforms and this
+   * tree installs with `--ignore-scripts` (F840) — so the only way a child gets
+   * a terminal is a consumer handing one in. `node-pty` satisfies the shape
+   * without adaptation.
+   *
+   * Unset, the shell route runs commands on pipes and interprets their output
+   * with the same emulator: the child sees no tty and behaves as it does under
+   * `| cat`, which is what it did before this field existed.
+   */
+  pty?: PtyFactory;
 
   cluster?: string;
   version?: string;

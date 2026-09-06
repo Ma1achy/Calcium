@@ -189,6 +189,8 @@ export function fakeRunner(
       return child;
     },
     spawnShell: notHere,
+    spawnPty: notHere,
+    hasPty: false,
     handoff: notHere,
     get live() {
       return children.filter((c) => c.running);

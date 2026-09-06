@@ -207,7 +207,7 @@ describe("C03 integration", () => {
     const h = pipelineHarness();
 
     h.pipeline.submit("/ps");
-    await settled();
+    await settled(h.pipeline);
     expect(
       h.commits.filter((c: string) => c === "input"),
       "one submission, one input commit — not one per block",
@@ -223,7 +223,7 @@ describe("C03 integration", () => {
         })(),
     });
     streamed.pipeline.submit("/tail");
-    await settled();
+    await settled(streamed.pipeline);
 
     expect(
       streamed.commits.filter((c: string) => c === "input"),

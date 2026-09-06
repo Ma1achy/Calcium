@@ -66,8 +66,9 @@ const EXPECTED_KINDS = [
   "image",
   "scroll",
   "status",
+  "terminal",
 ] as const;
-const _exhaustive: readonly BlockKind[] & { length: 21 } = EXPECTED_KINDS;
+const _exhaustive: readonly BlockKind[] & { length: 22 } = EXPECTED_KINDS;
 void _exhaustive;
 
 /**
@@ -131,7 +132,7 @@ describe("C04 contract", () => {
     expect(validateBlock({ kind: "patch", id: "p2", path: "a", language: "", hunks: [] }).ok).toBe(true);
   });
 
-  it("T2.10: every member of the Block union is validated, and the corpus covers all 21", () => {
+  it("T2.10: every member of the Block union is validated, and the corpus covers all 22", () => {
     // The kinds ship (commitment 2; the union is 21 at HEAD, nineteen when this
     // was written). The corpus is what C09's T2.1 runs over (C09 is built; this
     // said *once C09 exists* until 2026-09-03), so a kind missing from it is a kind the headline

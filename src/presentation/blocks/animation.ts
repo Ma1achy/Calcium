@@ -25,6 +25,9 @@ export const ANIMATES: Readonly<Record<BlockKind, boolean>> = Object.freeze({
   group: false,
   keyValue: false,
   image: false,
+  // A terminal redraws when the child writes, on C23's stream cadence, not on a
+  // tick (C09 I57). Animating it would repaint a screen nobody changed.
+  terminal: false,
   logs: false,
   mosaic: false,
   notice: false,

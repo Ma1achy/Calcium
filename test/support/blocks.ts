@@ -26,6 +26,20 @@ export const ONE_PER_KIND: Readonly<Record<BlockKind, Block>> = Object.freeze({
 
   notice: block({ kind: "notice", id: "notice-1", tone: "info", text: "Nothing to do." }),
 
+  // C04 §3i — a child's screen. Two lines, one styled run, a cursor, and no
+  // `dropped`: the representative is the shape a running command has.
+  terminal: block({
+    kind: "terminal",
+    id: "terminal-1",
+    cols: 40,
+    screen: "lines",
+    lines: [
+      { text: "=== test session starts ===" },
+      { text: "..... [ 4%]", runs: [{ from: 0, to: 5, fg: { kind: "ansi16", index: 2 } }] },
+    ],
+    cursor: { line: 1, col: 11 },
+  }),
+
   keyValue: block({
     kind: "keyValue",
     id: "kv-1",

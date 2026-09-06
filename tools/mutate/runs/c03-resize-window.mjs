@@ -92,11 +92,11 @@ const results = runPass({
       // frames, correct rows, and the transcript re-measured per signal.
       name: "HANDLER-RESIZE-BACK: the resize handler writes the width again",
       file: SHELL,
-      from: "      refreshAnchors();\n      scheduler.commit(\"resize\");",
+      from: "      pipeline.resized();\n      scheduler.commit(\"resize\");",
       to:
         "      stores.viewport.resize({ width: lifecycle.size().columns, " +
         "height: stores.viewport.scroll.viewportHeight });\n" +
-        "      refreshAnchors();\n      scheduler.commit(\"resize\");",
+        "      pipeline.resized();\n      scheduler.commit(\"resize\");",
       expect: "T4.7",
     },
   ],

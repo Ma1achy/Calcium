@@ -167,6 +167,91 @@ export function shadeColour(colour: ColourValue, intensity: number): ColourValue
   return overChannels(colour, (c) => toSrgb(toLinear(c) * k));
 }
 
+/**
+ * The sixteen ANSI colours, as the xterm defaults (C10 §4i, I38).
+ *
+ * **A table rather than a computation**, because there is nothing to compute: a
+ * terminal's low sixteen are whatever the user's palette says, and these are the
+ * reference values the mapping measures distance against. A child asking for
+ * *the terminal's red* keeps its index and never reaches this table (I38); it is
+ * consulted only when an `rgb` or an `ansi256` has to come down to four bits.
+ */
+const ANSI16_HEX: readonly string[] = Object.freeze([
+  "#000000", "#800000", "#008000", "#808000", "#000080", "#800080", "#008080", "#c0c0c0",
+  "#808080", "#ff0000", "#00ff00", "#ffff00", "#0000ff", "#ff00ff", "#00ffff", "#ffffff",
+]);
+
+/** The 256-colour cube and greys as hexes, for the `ansi256` → 4-bit step. */
+function hexOfAnsi256(index: number): string {
+  if (index < 16) return ANSI16_HEX[index] ?? "#000000";
+  if (index >= 232) {
+    const level = 8 + (index - 232) * 10; // cells-ok — a grey ramp step
+    const part = level.toString(16).padStart(2, "0");
+    return `#${part}${part}${part}`;
+  }
+  const n = index - 16;
+  const parts = [Math.floor(n / 36) % 6, Math.floor(n / 6) % 6, n % 6].map((step) => {
+    const level = step === 0 ? 0 : 55 + step * 40; // cells-ok — the cube's levels
+    return level.toString(16).padStart(2, "0");
+  });
+  return `#${parts.join("")}`;
+}
+
+/**
+ * The nearest of the sixteen, by squared distance in sRGB (C10 I38).
+ *
+ * `nearestAnsi256`'s sibling one table smaller, and deliberately the same
+ * arithmetic: two quantisers disagreeing about which red is nearest would put a
+ * child's colour in one place at 8-bit and another at 4-bit for no reason a
+ * reader could name.
+ */
+export function nearestAnsi16(hex: string): number {
+  const channel = (h: string, i: number): number => parseInt(h.slice(1 + i * 2, 3 + i * 2), 16);
+  let best = 0;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < ANSI16_HEX.length; i += 1) { // cells-ok — a palette index
+    const candidate = ANSI16_HEX[i] ?? "#000000";
+    let distance = 0;
+    for (let c = 0; c < 3; c += 1) { // cells-ok — a colour channel
+      const d = channel(hex, c) - channel(candidate, c);
+      distance += d * d;
+    }
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = i;
+    }
+  }
+  return best; // cells-ok — a palette index
+}
+
+/**
+ * A literal colour, down C10's ladder (§4i, I38).
+ *
+ * **The theme is not a parameter and cannot become one.** A child's colour is
+ * not a slot, has no dark and light form, and nothing about the application's
+ * taste applies to it — so this takes capabilities alone, which is what makes it
+ * safe to call beside a measurer and impossible to make theme-dependent by
+ * accident.
+ *
+ * `ansi16` passes through above 1-bit: the child asked for *the terminal's red*,
+ * and the user's palette is the right answer to that question. Resolving it to a
+ * hex and back would substitute our red for theirs.
+ */
+export function degradeColour(
+  value: ColourValue,
+  caps: Readonly<Pick<TerminalCapabilities, "colourDepth">>,
+): ColourValue | undefined {
+  const depth = caps.colourDepth;
+  if (depth === 1) return undefined;
+  if (value.kind === "ansi16") return value;
+  if (value.kind === "ansi256") {
+    return depth === 4 ? { kind: "ansi16", index: nearestAnsi16(hexOfAnsi256(value.index)) } : value;
+  }
+  if (depth === 24) return value;
+  if (depth === 4) return { kind: "ansi16", index: nearestAnsi16(value.hex) };
+  return { kind: "ansi256", index: nearestAnsi256(value.hex) };
+}
+
 /** The nearest cube index to a hex colour — the greyscale ramp is not searched. */
 export function nearestAnsi256(hex: string): number {
   const at = (i: number): number => {

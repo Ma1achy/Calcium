@@ -161,7 +161,7 @@ describe("C05 integration", () => {
     const before = h.spawned.length;
 
     h.pipeline.submit("/ps --help");
-    await settled();
+    await settled(h.pipeline);
 
     const doc = h.transcript.entries.at(-1)?.doc;
     const rendered = JSON.stringify(doc?.blocks);
@@ -180,7 +180,7 @@ describe("C05 integration", () => {
     // live case, since the framework marks it hidden (C05 §3).
     const h = pipelineHarness();
     h.pipeline.submit("/help");
-    await settled();
+    await settled(h.pipeline);
 
     const rendered = JSON.stringify(h.transcript.entries.at(-1)?.doc.blocks);
     const manifest = fixture();
@@ -204,7 +204,7 @@ describe("C05 integration", () => {
     expect(rendered, "and does not carry the keymap itself").not.toContain("c+c");
 
     h.pipeline.submit("/help keys");
-    await settled();
+    await settled(h.pipeline);
     const keys = JSON.stringify(h.transcript.entries.at(-1)?.doc.blocks);
     expect(keys, "bindings come from the same table dispatch uses").toContain("c+c");
     expect(keys, "and the verb list is not repeated there").not.toContain("/promote");

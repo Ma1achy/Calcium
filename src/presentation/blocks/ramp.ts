@@ -26,6 +26,9 @@ export const RAMP_EXTENT: Readonly<Record<BlockKind, RampExtent>> = Object.freez
   group: "none",
   keyValue: "none",
   image: "none",
+  // A ramp over a child's screen would repaint the child's colours with the
+  // application's, which inverts C04 §3i's whole argument (C09 I57).
+  terminal: "none",
   logs: "none",
   mosaic: "none",
   notice: "clusters",

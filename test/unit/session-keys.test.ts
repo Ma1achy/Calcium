@@ -356,7 +356,7 @@ describe("C22 §3 step 11 — the effect table", () => {
     expect(unreached, "a C17 editing method no key can reach").toEqual([]);
   });
 
-  it("T1.4l (C09 I13): a constructed graph can render all twenty-one kinds", async () => {
+  it("T1.4l (C09 I13): a constructed graph can render all twenty-two kinds", async () => {
     // **`table`, `plot` and `patch` register through the public mechanism, and
     // nobody called it.** `defaults: true` ships C09's sixteen; the other
     // three came from C11, C12 and C25 and no composition root registered them,
@@ -381,7 +381,7 @@ describe("C22 §3 step 11 — the effect table", () => {
     // C04 T2.10 holds the derivable half -- a literal list checked against
     // `BlockKind` at compile time, where adding a kind is a type error. This row
     // is the runtime half and it can only count.
-    expect(graph.blocks.kinds.length, "C09's eighteen and the three registered").toBe(21);
+    expect(graph.blocks.kinds.length, "C09's nineteen and the three registered").toBe(22);
   });
 
   it("T2.15 (C16 I22): ↓ into the live block, ↑ and Esc back out — as one sequence", async () => {
@@ -622,6 +622,7 @@ describe("C22 §3 step 11 — the effect table", () => {
         identityNotice: () => undefined,
         releaseView: () => undefined,
         visibilityChanged: () => undefined,
+      resized: () => undefined,
         producerContext: () => producerContext(),
     greeting: () => undefined,
       dispose: () => undefined,
@@ -716,6 +717,7 @@ describe("C22 §3 step 12 — the read loop", () => {
       },
       releaseView: () => void order.push("release"),
       visibilityChanged: () => undefined,
+      resized: () => undefined,
       manifest: null,
       viewport: recordingViewport().viewport,
       anchor: () => ({ row: 10, rows: 1 }),
@@ -836,6 +838,7 @@ describe("C26 §8b.6/§8b.7 — focus is an address, through the key effects", (
       },
       releaseView: () => undefined,
       visibilityChanged: () => undefined,
+      resized: () => undefined,
       manifest: null,
       viewport: recordingViewport().viewport,
       anchor: () => ({ row: 10, rows: 1 }),
@@ -992,6 +995,7 @@ describe("C26 §5c — the transcript's selection and semantic copy", () => {
       },
       releaseView: () => undefined,
       visibilityChanged: () => undefined,
+      resized: () => undefined,
       manifest: null,
       viewport: recordingViewport().viewport,
       anchor: () => ({ row: 10, rows: 1 }),
