@@ -519,3 +519,7 @@ describe("C04 §3c — the residue row's two texts", () => {
     }
   });
 });
+
+  it.todo("T2.125 (C09 I59): a scroll(6, follow) over one 30-line terminal measures 7 and renders 7, drawing lines 24-29 — as it shipped this rendered 32 rows opened at line 0 (F855) — not deferred on a component: lands with windowChild");
+  it.todo("T2.126 (C09 I59): the registered kinds declaring no window, compared by equality against the recorded list — a kind gaining a window fails the row, and so does a new kind that cannot be bounded — not deferred on a component: lands with windowChild");
+  it.todo("T3.75 (C09 I59): the corpus holds a scroll whose single child is taller than its interior, so T2.1's sweep sees the case at all — not deferred on a component: lands with windowChild");

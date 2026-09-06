@@ -30535,8 +30535,64 @@ inside the round that found it.
 suite, the mutation pass and `make enforce` were all green. The numbers were self-consistent
 throughout; only the picture disagreed.
 
+**Correction, on writing the spec — this was already known, in four places** (F856). C04 §3c trace 1
+rules it and names the missing operation in the words the fix uses: *taking a child's top `n` rows
+needs a windowing seam, and `RenderContext` offers `measureChild` and `renderChild` and nothing that
+slices.* C09 §8a row D7 measures it at `measure=4, rendered=8`. C09 I34's four-line cap exists partly
+to bound it. And `test/contract/scroll.test.ts` T2.28b asserts the disagreement deliberately, with a
+comment saying the row expires the day the seam lands. So the finding is not the defect — it is the
+threshold, and two symptoms nobody had recorded: **`follow` is inert**, which C04 I97's whole tail
+mechanism depends on, and **the residue row counts against a window that was never applied**. The
+severity stands on those and on the scale: 4 against 8 rows is a corner, 7 against 32 is an entire
+entry, and C27 is the first kind for which it is the normal case rather than a corner.
+
 **Where**: `src/presentation/blocks/kinds/containers.ts` (`scroll`'s `render`, and the note at its
 `window` entry); `src/presentation/blocks/types.ts` `RenderContext`.
+
+---
+
+## F856 — the seam was named, measured, capped for and held open by a self-expiring test, and nothing watched it ★★★★☆
+
+F855 was written as a new defect after reading a frame. Writing its spec found the defect already in
+the repository, four times, each entry correct:
+
+| where | what it says |
+|---|---|
+| C04 §3c trace 1 | **RULING NAMES AN OPERATION THAT DOES NOT EXIST** — *taking a child's top `n` rows needs a windowing seam, and `RenderContext` offers `measureChild` and `renderChild` and nothing that slices* |
+| C09 §8a row D7 | *Neither clipped nor kept whole: over-drawn*, measured at `measure=4, rendered=8` |
+| C09 I34 | the four-line message cap *is also a containment bound (F239)* — *seven rows bounds that divergence by a number rather than by the length of an exception* |
+| `test/contract/scroll.test.ts` T2.28b | asserts the disagreement on purpose: *this row expires by itself — the day the seam lands and the box windows its children, it fails and has to be rewritten as the assertion it should have been* |
+
+**CLAUDE.md's deferral rule, and the fourth row for its table.** The three recorded instances share a
+shape — the condition is written where the deferral is, and the thing satisfying it is written
+somewhere else. **This one is the other failure of the same rule and it is worse**: the condition was
+never satisfied, so no grep from the satisfier could reach it, and the deferral simply stood. What
+changed was not the tree but the *load*: C27 puts two thousand lines of scrollback in a six-row box,
+so a corner became the normal case, and nothing re-reads a deferral when its subject grows.
+
+**T2.28b is the instrument that was supposed to catch this and it is not one.** A row that expires by
+asserting the disagreement fires the day someone *fixes* the thing — which is the wrong direction. It
+watches the remedy, not the condition, so it stays green for as long as the defect does and says
+nothing when the defect gets worse. It is a good row and it is not a watch.
+
+**The cost, in the currency nobody totals.** I34's cap of four message lines is a real design
+decision measured against a stack trace at 80 columns — and it is *also* paying for this seam. I35
+rules a mosaic's cell separately and has to explain, at length, why F239's divergence *does not*
+transfer to it. C25 I1 is knowingly false for one case. Three components carry a clause each because
+one seam is missing.
+
+**What was genuinely new in F855, and it is what the severity rests on**: `follow` is inert on a
+single-child box, which no entry records and which C04 I97's whole tail mechanism assumes; the
+residue row's counts describe a window nobody applied; and the scale — 7 against 32 rows rather than
+4 against 8.
+
+**The habit this argues for** is the one already written down, pointed one step earlier: *ask where a
+settled claim is written down* is run on claims about to be carried forward. Run it on a **finding**
+too, before writing the number — a defect found by reading a frame is exactly the kind the record may
+already hold, because the record is where the last person who read that frame wrote it down.
+
+**Where**: `docs/components/C04_view_model.md` §3c trace 1; `docs/components/C09_block_library.md`
+§8a D7 and I34; `test/contract/scroll.test.ts` T2.28b; `CLAUDE.md`'s deferral table.
 
 ---
 

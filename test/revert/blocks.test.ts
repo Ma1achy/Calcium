@@ -317,3 +317,6 @@ describe("C09 §2c width — fail-on-revert", () => {
     expect(kit.registry.width(block({ kind: "rule", id: "r", label: "x" }), 40)).toBe(40);
   });
 });
+
+  it.todo("T6.102 (C09 I58): returning the slice when it costs slack → T2.124's sweep fails at patch and a box painting a windowed code draws the leading rows the residual said to drop — not deferred on a component: lands with windowChild");
+  it.todo("T6.103 (C09 I59): rendering every overlapping child whole again → T2.125 paints 31 rows in a 7-row box, which is F855 exactly as it shipped — not deferred on a component: lands with windowChild");

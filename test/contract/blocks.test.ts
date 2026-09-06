@@ -457,3 +457,8 @@ describe("C09 §4 — the call grammar's glyph rows", () => {
     expect(offenders, "a head joined with a literal `·` (F828)").toEqual([]);
   });
 });
+
+describe("C09 contract — the slice seam", () => {
+  it.todo("T2.123 (C09 I58): windowChild is on every definition's context, is the registry's own, and a caller's value is discarded — the assertion measureChild and renderChild already carry — not deferred on a component: lands with windowChild");
+  it.todo("T2.124 (C09 I58): over every registered kind, windowChild returns null exactly when the kind declares no window or its result carries a non-zero skipRows or dropRows — a sweep, because a single offset cannot see the residual — not deferred on a component: lands with windowChild");
+});

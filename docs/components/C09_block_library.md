@@ -1814,6 +1814,81 @@ next frame. MG27 is what keeps a producer from writing one (`BUILDER_OMISSIONS`)
 | B3 | any | the kind declares no `window` | I25 | Kept whole, paid out of `skipRows`. Silent by design, and F424 is the finding that nothing reports which kinds declined |
 | B4 | rows spanning a detail block | scroll one row | C25 I19's shape in `table` | An expanded row is an indivisible unit taller than one row, so a boundary inside it is `skipRows`, not a shorter slice — the accounting `windowRows` already reasons through |
 
+### The second caller — a bound below the entry level (F855)
+
+**Every row above asks which kinds divide. None asks who does the dividing**, and the answer was
+assumed to be one place: `windowSequence`, slicing entries against the viewport. A `scroll` declares
+a bound of its own and had no way to apply it, so the whole of §6b was a correct account of a seam
+with one caller when it needed two.
+
+**The measurement.** A `scroll({ height: 6, follow: true })` over an emulator holding thirty lines:
+
+| | |
+|---|---|
+| `registry.measure` | **7** rows — `height + 1`, exactly as C04 I47 and C04 I49 say |
+| the paint | **32** rows |
+| the residue row | `⋯ 25 above, 0 below` |
+| the first row drawn | line 0 — a follow box, opened at its head |
+
+`render` filters `childRanges` by overlap and then renders each survivor **whole**. With several
+short children that is right and unavoidable: you cannot half-render an arbitrary block, which is
+the same sentence B3 writes one level up. With **one child taller than the interior** it means the
+box bounds nothing, while the residue row goes on computing against a window nobody applied.
+
+**Three symptoms and one cause.** C14 lays an entry out from `measure`, so an entry allotted seven
+rows paints thirty-two over whatever was beneath it; `follow` is inert, because the offset it
+computes is never used to choose rows; and C04 I49's counts describe a view that does not exist.
+
+**And none of that is new — the seam has been named since F239** (F856). C04 §3c trace 1 rules it
+in the words this fix uses (*taking a child's top `n` rows needs a windowing seam, and
+`RenderContext` offers `measureChild` and `renderChild` and nothing that slices*); §8a row D7
+measures it at `measure=4, rendered=8`; I34's four-line cap is partly paying for it; and T2.28b
+asserts the disagreement deliberately, with a comment saying the row expires the day the seam lands.
+**A row that expires by asserting a disagreement watches the remedy, not the condition** — it is
+green for exactly as long as the defect is, and says nothing when the defect gets worse. What
+changed is the load: 4 rows against 8 is a corner, 7 against 32 is a whole entry, and two symptoms
+were in no entry at all — `follow` inert, and C04 I49's counts against an unapplied window.
+
+**What made it invisible.** T2.1 is the headline I1 sweep — `measure` against rendered rows, every
+kind, seven widths — and it agreed throughout, because the corpus's only `scroll` is `height: 2`
+over three one-row children. Every fixture in the suite has a box whose content fits or whose
+children are shorter than the bound. **A corpus chosen for a property may not have it**, and the
+first kind that is *always* taller than its container is `terminal`: C27 holds two thousand lines
+of scrollback in a six-row box by design. Until C27 no kind routinely put more rows in a scroll
+than the scroll declares — `logs` and `patch` are windowed one level up.
+
+**And the ruling this corrects is right about the direction it examined.** C04 §3c ruled that
+`scroll` declares no `window`, because a bounded region's height is declared and cannot measure
+less without becoming a different box. That stands. What does not is the inference carried with it
+— C04 I47's *the transcript's window slices the box and never the content* — which is true of the
+window **above** the scroll and silently answers for the window **below** it. Two windows, and the
+ruling collapsed them into one because only one had a caller.
+
+### Which children a bounded container can slice
+
+**Six kinds declare `window` and the residuals split them in two**, which is why I58's rule is
+stated on the *result* and not on the kind — a `code` window is exact for one range and costs two
+rows for the next, so *can this kind be bounded* is not a question with a per-kind answer.
+
+| child kind | `window` | residuals | a scroll can bound it |
+|---|---|---|---|
+| `raw` | a slice of the text | always 0 / 0 — a line is a row | **yes.** The commonest child of a scroll, and it overran too |
+| `terminal` | a smaller screen | always 0 / 0 | **yes.** The kind that forced the finding |
+| `logs` | a slice of the lines | always 0 / 0 — a line is a row | **yes** |
+| `keyValue` | a slice, key column pinned | always 0 / 0 | **yes** |
+| `patch` | a slice, gutter pinned | `skipRows` carries the path header and every hunk header the range misses | **only where the slice is exact** — in practice a window opening at row 0 |
+| `code` | text whole, `lineRange` pinned | non-zero at either end when the range opens or closes inside a wrapped source line | **only where the slice is exact** |
+| `plot` | none, permanently (I27, C12 I1) | — | no — kept whole, the recorded overrun |
+| `image`, `table`, `group`, `mosaic`, `steps`, `notice`, `tip`, `rule`, `progress`, `pills`, `events`, `comparison`, `status`, `panel`, `scroll` | none | — | no — kept whole |
+
+**A slice that costs slack is refused too, and that is the part the entry level does not share.**
+`windowSequence` pays `skipRows` and `dropRows` out of the viewport's own accounting —
+`session.ts` renders the window and writes `rows.slice(0, ve.takeRows)`. A container has no such
+move: its children go into an Ink tree, and nothing there can drop the leading two rows of a
+rendered child. So a container takes a slice only when both residuals are zero, and keeps the child
+whole otherwise. **Containment is not correctness**: a slice rendered with its slack still in it is
+the same overrun in smaller form.
+
 ---
 
 ## 7. Invariants
@@ -1879,6 +1954,8 @@ next frame. MG27 is what keeps a producer from writing one (`BUILDER_OMISSIONS`)
 - **I55** — **A `terminal` measures `lines.length`, plus one row when `dropped` is present, and never wraps.** A child chose its own wrap points against a width the emulator was told (C27 §4); re-wrapping them here would double-wrap a screen already laid out, and the row that is one line of a program's output would silently become two. Over-long lines truncate at `width` — the same choice `logs` makes, for the same reason: predictable height is what makes a tail scroll smoothly.
 - **I56** — **A `terminal`'s text is emitted without stripping, and the cursor is drawn `inverse` at every arm including 1-bit.** The only kind exempt from `stripControl`, and the exemption is paid for by C04 I110's gate rather than assumed. The cursor is the one thing a static log cannot show, so it survives the degradation ladder as an attribute where a colour would not.
 - **I57** — **`RAMP_EXTENT.terminal` is `"none"` and `ANIMATES.terminal` is `false`.** A ramp over a child's screen would repaint the child's colours with the application's, which is the inversion of C04 §3i's whole argument; and the block redraws when the child writes, on C23's cadence, not on a tick.
+- **I58** — **`RenderContext.windowChild` is the render-side slice seam, as `measureChild` is the render-side height seam (I7).** `windowChild(block, width, from, to)` returns the kind's `Windowed` or **`null`**, and a container that gets `null` renders the child whole. `null` has two causes and they are one rule: the kind declares no `window` (I27), or the slice it returned costs slack. **A container cannot pay slack.** `windowSequence` can — `session.ts` renders the window and drops the surplus rows itself — and a child inside an Ink tree has no equivalent, so a slice with `skipRows` or `dropRows` non-zero is refused rather than drawn with its overhang. Supplied by the registry and overwritten unconditionally, exactly as the other two are (§2), so a caller cannot hand a kind a window function of its own.
+- **I59** — **A container that declares a bound applies it to every child it can slice, and its rendered rows equal its measured rows.** This is I1 for the case its corpus never held: a `scroll` of `height: h` draws `h` interior rows plus C04 I49's residue row whatever its children measure, **including one child taller than `h`**. The children it cannot slice are the kinds declaring no `window`, and that set is compared by equality rather than membership — a kind gaining a window must move the list, and a new unsliceable kind must fail the row rather than join a subset quietly. **The overrun that remains is recorded rather than asserted correct**: a `plot` taller than the interior is drawn whole, C12 I1 makes that permanent, and a producer putting one in a smaller box has asked for something the box cannot give (F855).
 
 
 ## 8. Commitments
@@ -1940,6 +2017,7 @@ next frame. MG27 is what keeps a producer from writing one (`BUILDER_OMISSIONS`)
 51. **Motion is a term on the argument, periodic, timed in ticks by the effect** (I53, I54). Five loops, one table, C03's floor as the unit; a block animates by content through the same `tickIntervalOf` the kinds use, and the cache follows without a new axis.
 49. **A head's separator is a slot** (I49). The composer takes capabilities and joins with `glyphs(caps).separator`; the literal `·` it carried was non-ASCII at the ASCII arm and two cells at `wide` (F828).
 52. **A child's screen is drawn as it was written** (I55, I56, I57). One row per line, no wrap, no strip, no ramp and no tick — every mechanism this component applies to its own text is withheld from a screen someone else laid out.
+53. **A box bounds what it paints, not only what it measures** (I58, I59). The slice seam exists on the render context beside the height seam; a container takes an exact slice or keeps the child whole; and the kinds it cannot bound are a list held by equality rather than a silence.
 
 ---
 
@@ -2123,6 +2201,10 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.10**: golden frames for every kind at four widths in both themes and both unicode modes.
 - **T2.121** (I55, C09 §6b): `terminalDefinition` declares `window`, and a window of rows 10–15 of a 2,000-line block renders exactly those six, with the same bytes the whole-block render puts on those rows.
 - **T2.122** (I57): `RAMP_EXTENT.terminal` is `"none"` and `ANIMATES.terminal` is `false`; `tickIntervalOf` a `terminal` returns null whatever its runs carry.
+- **T2.123** (I58, §6b): `windowChild` is on the context every definition receives, is the registry's own, and a caller's value is discarded — the same assertion `measureChild` and `renderChild` carry, made against a context built with all three set to throwing stubs.
+- **T2.124** (I58, §6b): over every registered kind, `windowChild(b, w, from, to)` returns `null` exactly when the definition declares no `window` **or** its result carries a non-zero `skipRows` or `dropRows`, and returns the definition's block otherwise — a sweep, not one kind, because the residual is the half a single offset cannot see (B1's argument).
+- **T2.125** (I59, §6b): a `scroll({ height: 6, follow: true })` over one 30-line `terminal` measures 7 and renders **7**, and the rows drawn are the block's lines 24–29 — the tail, because the box follows. As it shipped this rendered 32 rows opened at line 0 (F855).
+- **T2.126** (I59, §6b): the registered kinds declaring no `window` are compared **by equality** against the recorded list; a kind gaining a window fails the row, and so does a new kind that cannot be bounded.
 
 ### Tier 3 — edge cases
 
@@ -2195,6 +2277,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T3.70** (I42): a `row` group at a width that drops its second child answers only the first child's width — the unplaced child is measured by neither half and counted by neither (C04 §3).
 - **T3.73** (I56): a `terminal` line whose text is a lone `\uFFFD` renders it; the definition calls no strip function, asserted by a source scan of `kinds/terminal.ts`.
 - **T3.74** (I56): the cursor cell is `inverse` at 24-bit, 8-bit, 4-bit, 1-bit and ASCII — five arms, one assertion each, and at 1-bit it is the only mark distinguishing the cell.
+- **T3.75** (I59, §6b): the corpus's `scroll` fixtures include one whose single child is taller than its interior, so T2.1's sweep sees the case — asserted on the corpus itself, because the sweep agreed for as long as no fixture had the property (F855).
 
 ### Tier 4 — integration
 
@@ -2265,6 +2348,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.99** (I55): wrapping a `terminal`'s lines → T1.29's 200-character row measures three and the tail of a running block jumps by two rows per long line.
 - **T6.100** (I56): stripping the text → T3.73 loses the replacement character and a child's SGR would silently vanish rather than being refused at the gate.
 - **T6.101** (I57): setting `ANIMATES.terminal` true → T2.122 fails and the block repaints on a tick nobody asked for.
+- **T6.102** (I58): returning the slice when it costs slack → T2.124's sweep fails at `patch`, and a box painting a windowed `code` draws the leading rows the residual said to drop.
+- **T6.103** (I59): rendering every overlapping child whole again → T2.125 paints 31 rows in a 7-row box and T3.75's fixture is what makes the sweep say so, which is F855 exactly as it shipped.
 
 ---
 
