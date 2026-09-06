@@ -29912,3 +29912,29 @@ lands. The paste chip and the stale part's title move with it, as they share the
 
 ---
 
+## F835 — the seventh matcher the bar broke was reachable only at the runner's width ★★☆☆☆
+
+**What.** C3 drew a bar down every body row after the first (C22 I88) and widened six frame
+matchers that read body rows by their leading spaces. The seventh was T5.5's: it rejoins a wrapped
+far-side notice by squashing whitespace out of the frame, so `argv=ps` on one row and `--search=`
+on the next read as one token. With the bar, the rejoined text is `argv=ps│--search=` and the
+predicate never resolves. Locally the notice does not wrap — the devcontainer's `cwd=/workspace` is
+short — so every local tier-5 run was green and the row failed on the first push, where the cwd is
+`/home/runner/work/Calcium/Calcium`.
+
+**Why it survived.** The other six were found by running the suite; this one has a precondition
+the suite cannot meet here. Its own comment already records the same shape from the other side —
+*it passed everywhere it was run and failed in CI twice consecutively, because where the notice
+wraps depends on the width of the `cwd=`* — so the row knew it was width-dependent and the
+widening pass did not grep for the property, it grepped for the pattern.
+
+**Ruling.** The rows strip the gutter prefix before rejoining (`  ⎿ `, `  │ `, four spaces), the
+same alternation the six carry. The lesson is the habit: when a layout change moves a column,
+grep the e2e tier for every matcher that *rejoins rows*, not only for the ones that *match a
+prefix* — a join is where a new column lands between two halves of one token. And the CI read
+after a push is what found it, which is the close-out rule doing its job.
+
+**Where**: `test/e2e/parser.test.ts` T5.5; C22 I88.
+
+---
+

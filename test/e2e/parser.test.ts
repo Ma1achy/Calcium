@@ -169,8 +169,16 @@ describe("C18 tier 5 — in a real session", () => {
       // `/home/runner/work/Calcium/Calcium` on the runner. Deterministic in each
       // environment and different between them — the shape that reads as
       // flakiness and is not.
+      //
+      // **And the gutter is stripped before the join** (C22 I88, 2026-09-06): a
+      // body row after the first carries the card's bar — `  │ --search=` — so a
+      // wrapped notice rejoined as `argv=ps│--search=` and this row failed on the
+      // runner alone, where the cwd is long enough to wrap it, one push after the
+      // bar landed. The seventh matcher widened for the bar; the first six were in
+      // the tree, and this one was reachable only at the runner's width.
       const squash = (s: string): string => s.replace(/\s+/gu, "");
-      const joined = (f: readonly string[]): string => squash(f.join(""));
+      const ungutter = (r: string): string => r.replace(/^(  ⎿ |  │ |    )/u, "");
+      const joined = (f: readonly string[]): string => squash(f.map(ungutter).join(""));
       await pty.waitForFrame((f) => joined(f).includes(squash("argv=ps --search=")), 20_000);
       const frame = pty.frame.join("\n");
 
