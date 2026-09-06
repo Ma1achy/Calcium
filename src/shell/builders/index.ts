@@ -69,6 +69,7 @@ import type {
   Pills,
   Plot,
   Progress,
+  Ramp,
   Raw,
   Rule,
   Series,
@@ -1015,9 +1016,9 @@ function spark(values: readonly number[], opts?: BlockOpts): Plot {
  * decoration over a number that is already correct.
  */
 function progress(
-  spec: BlockOpts & { label: string; current: number; total: number; style?: string },
+  spec: BlockOpts & { label: string; current: number; total: number; style?: string; ramp?: Ramp },
 ): Progress {
-  const { label, current, total, style } = spec;
+  const { label, current, total, style, ramp } = spec;
   return finish<Progress>(
     {
       kind: "progress",
@@ -1026,6 +1027,8 @@ function progress(
       current,
       total,
       ...(style === undefined ? {} : { style }),
+      // An ink over the bar's `on` cells, along the axis (C04 I108).
+      ...(ramp === undefined ? {} : { ramp }),
     } as Progress,
     spec,
     false,

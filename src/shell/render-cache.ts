@@ -49,11 +49,15 @@
  * blocks (`rev`), the width, the window range, the theme, the focus, the
  * capabilities. Six keyed, one constant, none unaccounted for.
  *
- * **`ctx.tick` is not here and no transcript render receives one** (I60).
- * `visibleRows` passes none, so every entry renders at 0. The day something
- * threads a tick through, an animating entry serves its first frame for the life
- * of the session and nothing in the suite would fail — so the axis is absent and
- * the value is constant *together*, and threading either obliges the other.
+ * **`ctx.tick` is keyed per kind, and only where something moves** (I60, F233,
+ * F836). `visibleRows` asks `animationIntervalOf(windowed.blocks)` and puts the
+ * tick in the slot's key when the answer is not `null` — a `status`, a `steps`,
+ * or since the ramps any block whose content carries an `animate` (C09 I54) —
+ * so an entry holding nothing that moves keys exactly as it did and only the
+ * entries that move pay for moving. This comment said the opposite for one
+ * commit after the wiring landed, which is F836: the axis and its absence were
+ * described in the file that implements the key, and nothing re-reads a comment
+ * when the invariant it cites changes tense.
  *
  * **This makes the second frame free and the first no cheaper** (I59). A
  * 5,000-line block still renders every one of its lines the first time it is

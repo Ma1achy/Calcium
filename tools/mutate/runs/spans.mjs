@@ -36,8 +36,8 @@ const MUTATIONS = [
     // break space precedes, which is the first row of every paragraph.
     name: "wrapped spans are sliced by prefix sums of row lengths",
     file: RUNS,
-    from: "  return wrapCellsParts(text, width, ambiguous, atomsOf(placed)).map((row) =>\n    sliceRuns(placed, row.start, row.text.length), // cells-ok — a code-unit length\n  );",
-    to: "  let sum = 0;\n  return wrapCellsParts(text, width, ambiguous, atomsOf(placed)).map((row) => {\n    const out = sliceRuns(placed, sum, row.text.length);\n    sum += row.text.length;\n    return out;\n  });",
+    from: "  return wrapCellsParts(text, width, ambiguous, atomsOf(placed)).map((row) =>\n    sliceRuns(placed, row.start, row.text.length, \"wrap\"), // cells-ok — a code-unit length\n  );",
+    to: "  let sum = 0;\n  return wrapCellsParts(text, width, ambiguous, atomsOf(placed)).map((row) => {\n    const out = sliceRuns(placed, sum, row.text.length, \"wrap\");\n    sum += row.text.length;\n    return out;\n  });",
     expect: "T3.62",
   },
   {

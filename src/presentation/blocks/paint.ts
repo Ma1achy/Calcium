@@ -20,6 +20,9 @@ import type { ColormapName, Tone } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { cells, truncate } from "../text.js";
 import type { Run, SpanAttrs } from "../runs.js";
+import { graphemes } from "../text.js";
+import { rampStyle } from "../theme/ramp.js";
+import { animateT, effectiveTick, extentT } from "./ramp.js";
 
 /** A run of text and the style it carries. Width is the text's, never the run's. */
 export type Span = Readonly<{ text: string; style?: Style }>;
@@ -48,6 +51,8 @@ export type RunContext = Readonly<{
   theme: ResolvedTheme;
   capabilities: TerminalCapabilities;
   colormap?: ColormapName;
+  /** C03's spinner counter, for a ramp that moves (C09 I53); absent is the static frame. */
+  tick?: number;
 }>;
 
 /**
@@ -85,13 +90,62 @@ export function runStyle(run: Run, style: Style, ctx: RunContext): Style {
  */
 export function paintRuns(runs: readonly Run[], style: Style, ctx: RunContext): readonly Span[] {
   const out: { text: string; style: Style }[] = [];
+  const push = (text: string, merged: Style): void => {
+    const last = out[out.length - 1]; // cells-ok — an array index
+    if (last !== undefined && (last.style === merged || sameColour(last.style, merged))) last.text += text;
+    else out.push({ text, style: merged });
+  };
   for (const run of runs) {
     const merged = runStyle(run, style, ctx);
-    const last = out[out.length - 1]; // cells-ok — an array index
-    if (last !== undefined && last.style === merged) last.text += run.text;
-    else out.push({ text: run.text, style: merged });
+    if (run.ramp === undefined) {
+      push(run.text, merged);
+      continue;
+    }
+    // **A ramped run is one span per cluster, split here and nowhere earlier**
+    // (C09 I51): `measure` saw the run whole, the wrap saw it whole, and the
+    // position comes from the span through `at`/`of` rather than from this
+    // run's own index — so a span wrapped across two rows continues rather
+    // than restarting. No SGR lands inside a cluster because the split is by
+    // grapheme. Where C10 says nothing (`undefined`) the cluster keeps `merged`
+    // and coalesces with its neighbours by reference, which is how a 1-bit
+    // colormap bar is byte-identical with and without its ramp (C10 I31).
+    const { ramp, at, of, ordinal } = run.ramp;
+    const clusters = graphemes(run.text);
+    const tick = effectiveTick(ctx.tick, ctx.capabilities);
+    clusters.forEach((cluster, i) => {
+      const index = at + i;
+      const t = animateT(ramp.animate, extentT(index, of), tick, of, index);
+      // A palette cycles identities, and on text the identity is the span
+      // (C04 §3am.2): the ordinal, not the cluster — per cluster is confetti.
+      const sampled = rampStyle(ramp, t, ramp.fill === "palette" ? ordinal : index, ctx.theme, ctx.capabilities);
+      push(cluster, sampled === undefined ? merged : { ...merged, ...sampled });
+    });
   }
   return out;
+}
+
+/**
+ * Two ramp samples that resolved to the same colour and carry the same
+ * attributes — so a 4-bit step of two paints two spans and not one per cluster.
+ * Reference equality is what the plain path relies on and stays first; this is
+ * the by-value arm the split needs, and it compares every member `Style` has.
+ */
+function sameColour(a: Style, b: Style): boolean {
+  return (
+    sameValue(a.colour, b.colour) &&
+    sameValue(a.background, b.background) &&
+    a.bold === b.bold &&
+    a.dim === b.dim &&
+    a.italic === b.italic &&
+    a.inverse === b.inverse &&
+    a.underline === b.underline
+  );
+}
+
+function sameValue(a: ColourValue | undefined, b: ColourValue | undefined): boolean {
+  if (a === undefined || b === undefined) return a === b;
+  if (a.kind !== b.kind) return false;
+  return a.kind === "rgb" ? a.hex === (b as { hex: string }).hex : a.index === (b as { index: number }).index;
 }
 
 /** A tone, resolved. The only way a renderer obtains a style (I4). */

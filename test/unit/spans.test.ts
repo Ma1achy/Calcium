@@ -8,14 +8,19 @@
 // see them.
 import { describe, expect, it } from "vitest";
 import { block, validateBlock, validateDocument } from "../../src/data/viewmodel/index.js";
-import type { Block, TextSpan, ViewDocument } from "../../src/data/viewmodel/index.js";
+import type { Block, Ramp, TextSpan, ViewDocument } from "../../src/data/viewmodel/index.js";
 import { stripControl } from "../../src/data/text.js";
 import { atomsOf, runLines, runsOf, runsText, sliceRuns, wrapRuns } from "../../src/presentation/runs.js";
 import { clusterEnds, truncateParts, wrapCells, wrapCellsParts } from "../../src/presentation/text.js";
 import { runStyle, withSpan } from "../../src/presentation/blocks/paint.js";
-import { resolveTone } from "../../src/presentation/theme/index.js";
+import { resolve, resolveTone, type Style } from "../../src/presentation/theme/index.js";
+import { COLORMAPS, continuousColour, nearestAnsi256, sample } from "../../src/presentation/theme/colormap.js";
+import { mixHex, rampStyle, stepOf } from "../../src/presentation/theme/ramp.js";
+import { animateT, extentT, rampCadenceMs } from "../../src/presentation/blocks/ramp.js";
+import { spinnerIntervalMs } from "../../src/presentation/blocks/glyphs.js";
+import { readFileSync } from "node:fs";
 import { doc } from "../support/blocks.js";
-import { FULL_CAPS, measurable } from "../support/render.js";
+import { DARK_THEME, FULL_CAPS, measurable } from "../support/render.js";
 import { caps, DEPTHS, store, TONES } from "../support/theme.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
 
@@ -102,8 +107,76 @@ describe("C04 §3am — spans, the gate", () => {
     expect(outcome.ok).toBe(true);
     expect(back).toEqual(d);
   });
-  it.todo("T1.29 (C04 I106): the arity table at the gate — one backing for gradient and step, none for palette, bands on step alone in 2..8, each refusal naming its rule — not deferred on a component: lands with the ramp validator");
-  it.todo("T1.30 (C04 I107, I108): value and ramp on one span refused; a colormap backing refused on a span and admitted on progress; a ramp on a hunk line refused — not deferred on a component: lands with the ramp validator");
+  // **A ramp at the gate** (C04 §3am.2). The span arm and the bar arm share one
+  // checker; the rows below run each ramp through **both**, so a rule that held
+  // on one carrier and not the other is a row that fails on one arm only.
+  const span = (ramp: unknown): unknown => ({ kind: "notice", id: "n", tone: "info", text: "abcdef", spans: [{ from: 0, to: 3, ramp }] });
+  const bar = (ramp: unknown): unknown => ({ kind: "progress", id: "p", label: "build", current: 3, total: 10, ramp });
+
+  it("T1.29 (C04 I106): the arity table at the gate — one backing for gradient and step, none for palette, bands on step alone in 2..8, each refusal naming its rule", () => {
+    const table: readonly Readonly<{ name: string; ramp: unknown; ok: boolean; names?: RegExp }>[] = [
+      { name: "gradient, slot pair", ramp: { fill: "gradient", from: "default", to: "accent" }, ok: true },
+      { name: "step, slot pair, bands 2", ramp: { fill: "step", from: "default", to: "accent", bands: 2 }, ok: true },
+      { name: "step, slot pair, bands 8", ramp: { fill: "step", from: "default", to: "accent", bands: 8 }, ok: true },
+      { name: "palette, bare", ramp: { fill: "palette" }, ok: true },
+      { name: "gradient, animated", ramp: { fill: "gradient", from: "default", to: "accent", animate: "shimmer" }, ok: true },
+      { name: "gradient, both backings", ramp: { fill: "gradient", from: "default", to: "accent", colormap: "viridis" }, ok: false, names: /one backing.*not both.*C04 I106/u },
+      { name: "gradient, no backing", ramp: { fill: "gradient" }, ok: false, names: /one backing.*C04 I106/u },
+      { name: "half a pair", ramp: { fill: "gradient", from: "default" }, ok: false, names: /a pair.*C04 I106/u },
+      { name: "a pair naming no slot", ramp: { fill: "gradient", from: "default", to: "#ff0000" }, ok: false, names: /"from" and "to" must each be one of.*C04 I106/u },
+      { name: "palette with a pair", ramp: { fill: "palette", from: "default", to: "accent" }, ok: false, names: /no backing.*names nothing.*C10 I16/u },
+      { name: "palette with a colormap", ramp: { fill: "palette", colormap: "viridis" }, ok: false, names: /no backing.*C04 I106/u },
+      { name: "palette with bands", ramp: { fill: "palette", bands: 3 }, ok: false, names: /"bands" rides on "step" alone/u },
+      { name: "bands on a gradient", ramp: { fill: "gradient", from: "default", to: "accent", bands: 3 }, ok: false, names: /"bands" rides on "step" alone/u },
+      { name: "bands 1", ramp: { fill: "step", from: "default", to: "accent", bands: 1 }, ok: false, names: /2\.\.8.*one band is a gradient/u },
+      { name: "bands 9", ramp: { fill: "step", from: "default", to: "accent", bands: 9 }, ok: false, names: /2\.\.8/u },
+      { name: "bands 2.5", ramp: { fill: "step", from: "default", to: "accent", bands: 2.5 }, ok: false, names: /2\.\.8/u },
+      { name: "an unknown fill", ramp: { fill: "rainbow" }, ok: false, names: /"fill" must be one of gradient, step, palette/u },
+      { name: "an unknown key", ramp: { fill: "palette", easing: "ease-in" }, ok: false, names: /unknown member "easing".*C04 I106/u },
+      { name: "not a record", ramp: "viridis", ok: false, names: /must be a record with a "fill"/u },
+    ];
+    for (const row of table) {
+      const errors = errorsOf(span(row.ramp));
+      if (row.ok) expect(errors, `span: ${row.name}`).toEqual([]);
+      else {
+        expect(errors, `span: ${row.name}`).toHaveLength(1);
+        expect(errors[0], `span: ${row.name}`).toMatch(row.names ?? /C04 I106/u);
+        expect(errors[0], `span: ${row.name} names the span`).toMatch(/spans\[0\]\.ramp/u);
+      }
+    }
+    // The same table on the bar — every row agrees, because the arity is the
+    // ramp's and not the carrier's.
+    for (const row of table) {
+      const errors = errorsOf(bar(row.ramp));
+      if (row.ok) expect(errors, `bar: ${row.name}`).toEqual([]);
+      else expect(errors, `bar: ${row.name}`).toHaveLength(1);
+    }
+  });
+
+  it("T1.30 (C04 I107, I108): value and ramp on one span refused; a colormap backing refused on a span and admitted on progress; a ramp on a hunk line refused; a bar without a ramp validates as it did", () => {
+    const both = errorsOf({
+      kind: "notice", id: "n", tone: "info", text: "abcdef", colormap: "viridis",
+      spans: [{ from: 0, to: 3, value: 0.5, ramp: { fill: "palette" } }],
+    });
+    expect(both).toHaveLength(1);
+    expect(both[0]).toMatch(/"value" and "ramp" on one span.*two unmeasured colours.*C04 I107/u);
+
+    const mapped = { fill: "gradient", colormap: "viridis" };
+    const onSpan = errorsOf(span(mapped));
+    expect(onSpan).toHaveLength(1);
+    expect(onSpan[0]).toMatch(/colormap backing is refused on a span.*proven per slot.*C04 I107, C10 I26/u);
+    expect(errorsOf(bar(mapped)), "the bar admits the same backing").toEqual([]);
+    expect(errorsOf(bar({ fill: "step", colormap: "magma", bands: 4 }))).toEqual([]);
+
+    const hunk = errorsOf({
+      kind: "patch", id: "d", path: "a.ts", language: "ts",
+      hunks: [{ header: "@@", lines: [{ kind: "add", text: "abcdef", spans: [{ from: 0, to: 3, ramp: { fill: "palette" } }] }] }],
+    });
+    expect(hunk).toHaveLength(1);
+    expect(hunk[0]).toMatch(/"ramp" is refused on this member.*C04 I107, I91/u);
+
+    expect(errorsOf({ kind: "progress", id: "p", label: "build", current: 3, total: 10 })).toEqual([]);
+  });
 });
 
 describe("C04 §3am — spans and the measurer", () => {
@@ -330,9 +403,130 @@ describe("C10 §4e — span attributes and the resolved tone", () => {
 });
 
 describe("C09 §5 — ramps, the five loops", () => {
-  it.todo("T1.28 (C09 I53): each effect's t' at tick 0 is the static table; shimmer moves one cell per tick; breathe is 1 at tick 5 and 0 at 15; the unit is C03's spinner floor by identity — not deferred on a component: lands with blocks/ramp.ts");
+  it("T1.28 (C09 I53): each effect's t' at tick 0 is the static table; shimmer moves one cell per tick; breathe is 1 at tick 5 and 0 at 15; rampCadenceMs is spinnerIntervalMs and ramp.ts carries no millisecond literal", () => {
+    const n = 10;
+    const ts = Array.from({ length: n }, (_, i) => extentT(i, n));
+    expect(ts[0]).toBe(0);
+    expect(ts[n - 1]).toBe(1);
+    expect(extentT(0, 1), "one cell is the midpoint").toBe(0.5);
+
+    // **`none` and `undefined` are the identity**, at every tick.
+    for (const tick of [0, 1, 7, 23]) {
+      ts.forEach((t, i) => {
+        expect(animateT("none", t, tick, n, i)).toBe(t);
+        expect(animateT(undefined, t, tick, n, i)).toBe(t);
+      });
+    }
+
+    // **`shimmer`**: the band's centre is at −1.5 at tick 0 (just off the left
+    // edge), one cell further each tick, wrapping at n + 3.
+    const band = (tick: number): number[] => ts.map((t, i) => animateT("shimmer", t, tick, n, i));
+    expect(band(0)).toEqual(ts.map((_, i) => (i === 0 ? 0 : 0)));
+    expect(band(2)[0]).toBeCloseTo(1 - 0.5 / 1.5); // centre at 0.5: cell 0 is 0.5 away
+    expect(band(3)[1]).toBeCloseTo(1 - 0.5 / 1.5); // centre at 1.5: cells 1 and 2 are 0.5 away
+    expect(band(4)[2]).toBeCloseTo(1 - 0.5 / 1.5);
+    // The peak sits on a cell when the centre does: centre = k − 1.5 is integral for no k,
+    // so every cell is at least 0.5 from it and the maximum is 2/3 — asserted, so a
+    // change to the half-width shows here rather than in a frame.
+    for (let k = 1; k <= n + 1; k += 1) expect(Math.max(...band(k)), `tick ${String(k)}`).toBeCloseTo(2 / 3);
+    // At the two ticks where the band is off the edge nothing is lit — the rest, not a hold.
+    expect(Math.max(...band(0))).toBe(0);
+    expect(Math.max(...band(n + 2))).toBe(0);
+    expect(band(n + 3), "wraps").toEqual(band(0));
+    // One cell per tick: the argmax advances by one.
+    const peakAt = (k: number): number => band(k).indexOf(Math.max(...band(k)));
+    expect(peakAt(3)).toBe(1);
+    expect(peakAt(4)).toBe(2);
+    expect(peakAt(5)).toBe(3);
+
+    // **`wave`**: a translation of 1/n per tick, wrapping at n.
+    expect(animateT("wave", 0, 1, n, 0)).toBeCloseTo(0.1);
+    expect(animateT("wave", 0.95, 1, n, 9)).toBeCloseTo(0.05);
+    ts.forEach((t, i) => expect(animateT("wave", t, n, n, i)).toBeCloseTo(animateT("wave", t, 0, n, i)));
+
+    // **`breathe`**: 20 ticks, constant across the extent.
+    expect(animateT("breathe", 0, 0, n, 0)).toBeCloseTo(0.5);
+    expect(animateT("breathe", 0, 5, n, 0)).toBeCloseTo(1);
+    expect(animateT("breathe", 0, 15, n, 0)).toBeCloseTo(0);
+    expect(animateT("breathe", 0.2, 5, n, 2)).toBe(animateT("breathe", 0.9, 5, n, 9));
+    expect(animateT("breathe", 0, 20, n, 0)).toBeCloseTo(animateT("breathe", 0, 0, n, 0));
+
+    // **`pulse`**: two states, five ticks each.
+    expect([0, 4, 5, 9, 10].map((k) => animateT("pulse", 0.3, k, n, 3))).toEqual([0, 0, 1, 1, 0]);
+
+    // **`heartbeat`**: the envelope, and it repeats at 12.
+    const beat = Array.from({ length: 13 }, (_, k) => animateT("heartbeat", 0.3, k, n, 3));
+    expect(beat).toEqual([1, 0.5, 0, 1, 0.5, 0, 0, 0, 0, 0, 0, 0, 1]);
+
+    // **The cadence is the kinds' lookup and the module carries no literal.**
+    expect(rampCadenceMs()).toBe(spinnerIntervalMs());
+    const source = readFileSync(new URL("../../src/presentation/blocks/ramp.ts", import.meta.url), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//gu, "")
+      .replace(/\/\/.*$/gmu, "");
+    expect(source, "no millisecond literal — the cadence is a lookup").not.toMatch(/\b(100|80|120)\b\s*;|_MS\s*=\s*\d/u);
+  });
 });
 
 describe("C10 §4h — a ramp sampled on the ladder", () => {
-  it.todo("T1.38 (C10 I36): a slot-pair gradient is from at 0, to at 1, the sRGB midpoint at 0.5; 8-bit is nearestAnsi256 of the mix; 4-bit is two indices and never a third; 1-bit is undefined; palette index 9 is categorical.c2 — not deferred on a component: lands with theme/ramp.ts");
+  const theme = DARK_THEME;
+  const hexAt = (tone: "default" | "accent", depth: 24 | 8 | 4 | 1): string | number | undefined => {
+    const c = resolveTone(tone, theme, caps(depth)).colour;
+    return c === undefined ? undefined : c.kind === "rgb" ? c.hex : c.index;
+  };
+
+  it("T1.38 (C10 I36): a slot-pair gradient is from at 0, to at 1, the sRGB midpoint at 0.5; 8-bit is nearestAnsi256 of the mix; 4-bit is two indices and never a third; 1-bit is from's class; palette index 9 is categorical.c2; a colormap at 4-bit is undefined", () => {
+    const pair: Ramp = { fill: "gradient", from: "default", to: "accent" };
+    const from = hexAt("default", 24) as string;
+    const to = hexAt("accent", 24) as string;
+    expect(from).not.toBe(to);
+    const at = (t: number, depth: 24 | 8 | 4 | 1): Style | undefined => rampStyle(pair, t, 0, theme, caps(depth));
+
+    expect(at(0, 24)).toEqual({ colour: { kind: "rgb", hex: from } });
+    expect(at(1, 24)).toEqual({ colour: { kind: "rgb", hex: to } });
+    const mid = at(0.5, 24)?.colour;
+    expect(mid?.kind).toBe("rgb");
+    if (mid?.kind === "rgb") {
+      expect(mid.hex).toBe(mixHex(from, to, 0.5));
+      // The same arithmetic `sample` applies between two stops (C10 §4h).
+      const two = { name: "two", kind: "sequential" as const, data: [channelsOf(from), channelsOf(to)] };
+      expect(mid.hex).toBe(sample(two as never, 0.5));
+    }
+    expect(at(0.5, 8)).toEqual({ colour: { kind: "ansi256", index: nearestAnsi256(mixHex(from, to, 0.5)) } });
+
+    // **4-bit is a step of two and never a third.**
+    const fourFrom = hexAt("default", 4);
+    const fourTo = hexAt("accent", 4);
+    expect(at(0.49, 4)).toEqual({ colour: { kind: "ansi16", index: fourFrom } });
+    expect(at(0.51, 4)).toEqual({ colour: { kind: "ansi16", index: fourTo } });
+    const indices = new Set(Array.from({ length: 101 }, (_, i) => (at(i / 100, 4)?.colour as { index: number }).index));
+    expect([...indices].sort()).toEqual([fourFrom, fourTo].sort());
+
+    // **1-bit is `from`, resolved as the slot is** — a class, not a colour.
+    for (const t of [0, 0.3, 0.7, 1]) expect(at(t, 1)).toEqual(resolveTone("default", theme, caps(1)));
+
+    // **`step`** quantises first: three bands over a pair are three colours at 24-bit.
+    const stepped: Ramp = { fill: "step", from: "default", to: "accent", bands: 3 };
+    const hexes = new Set(Array.from({ length: 101 }, (_, i) => (rampStyle(stepped, i / 100, 0, theme, caps(24))?.colour as { hex: string }).hex));
+    expect(hexes.size).toBe(3);
+    expect(stepOf(0.99, 3)).toBe(1);
+    expect(stepOf(0.34, 3)).toBe(0.5);
+
+    // **`palette`** is the categorical slot, cycling past eight.
+    const palette: Ramp = { fill: "palette" };
+    expect(rampStyle(palette, 0, 9, theme, caps(24))).toEqual({ colour: resolve("categorical.c2", theme, caps(24)).colour });
+    expect(rampStyle(palette, 0, 9, theme, caps(4))?.colour?.kind).toBe("ansi16");
+    expect(rampStyle(palette, 0, 9, theme, caps(1))).toBeUndefined();
+
+    // **A colormap** is `continuousColour` unchanged: something at 8, nothing at 4.
+    const mapped: Ramp = { fill: "gradient", colormap: "viridis" };
+    expect(rampStyle(mapped, 0.5, 0, theme, caps(24))).toEqual({ colour: continuousColour(COLORMAPS["viridis"]!, 0.5, caps(24)) });
+    expect(rampStyle(mapped, 0.5, 0, theme, caps(8))?.colour?.kind).toBe("ansi256");
+    expect(rampStyle(mapped, 0.5, 0, theme, caps(4))).toBeUndefined();
+    expect(rampStyle(mapped, 0.5, 0, theme, caps(1))).toBeUndefined();
+  });
 });
+
+function channelsOf(hex: string): readonly [number, number, number] {
+  const n = Number.parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff];
+}

@@ -25,6 +25,7 @@
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import type { PlotForm, Series } from "../../data/viewmodel/index.js";
 import type { ColourRef } from "../theme/index.js";
+import { refOf } from "../theme/categorical.js";
 
 type Caps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth" | "colourDepth">;
 /** Choosing the ladder needs the alphabet; choosing *within* it needs the depth. */
@@ -39,16 +40,10 @@ export type Alphabet = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">;
  * `definition.ts` while the legend, which needs it, lives in `furniture.ts`, and
  * `definition.ts` imports `furniture.ts`.
  */
-export const CATEGORY_REFS: readonly ColourRef[] = Object.freeze([
-  "categorical.c1",
-  "categorical.c2",
-  "categorical.c3",
-  "categorical.c4",
-  "categorical.c5",
-  "categorical.c6",
-  "categorical.c7",
-  "categorical.c8",
-]);
+// **`CATEGORY_REFS` and `refOf` live in `theme/categorical.ts` now** (C10 I37) —
+// moved, not copied: a slot table is C10's, and C09's ramp resolver reads it too.
+// Re-exported so no call site moves and so there is still one copy (F382).
+export { CATEGORY_REFS, refOf } from "../theme/categorical.js";
 
 /**
  * The slot for category `index`.
@@ -72,9 +67,6 @@ export const CATEGORY_REFS: readonly ColourRef[] = Object.freeze([
  * tell *named* from *acted on*, and that is a real blind spot rather than an
  * oversight here.
  */
-export function refOf(index: number): ColourRef {
-  return CATEGORY_REFS[index % CATEGORY_REFS.length] ?? "categorical.c1"; // cells-ok — a palette size
-}
 
 /**
  * A **series'** colour: its declared `tone` if it has one, else its slot (F382).

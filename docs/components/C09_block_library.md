@@ -812,7 +812,10 @@ the bar samples `t = i / (barWidth − 1)` whether or not it is filled, so a bar
 first third of the bar at 100% and not a compressed copy of it: the tip's colour reads the
 fraction, two bars in one document share a scale, and a cell painted once keeps its colour as
 the bar fills. The `off` cells stay `muted`. This answers C04 §3am.2's *RULE WHICH* — the other
-answer, the filled length, moves every painted cell on every patch for no information.
+answer, the filled length, moves every painted cell on every patch for no information. **One
+wrinkle, measured on landing**: the bar takes the residual after the percent (§3), so a percent
+growing a digit — `90%` to `100%` — narrows the bar by one cell and every cell re-samples by a
+hair. T2.119 compares 30% against 90% for that reason, and the row says so.
 
 ---
 
@@ -1604,9 +1607,12 @@ cluster, because the split is by `clusterEnds` and not by code unit. `measure` n
 it: the split happens in `paint`, after `wrapRuns`, and the rows are the rows they were (C04 I107).
 
 **The five loops are one term on `t`, and the static frame is `tick = 0`** (I53). `t' = f(t, tick,
-n)` is applied before C10 samples, with `n` the extent's cell count. One tick is one window of
-C03's `spinner` floor — 100 ms, imported from the scheduler's table and never a second literal —
-so a period is stated in ticks and the arithmetic is the effect's, not the caller's:
+n)` is applied before C10 samples, with `n` the extent's cell count. A period is stated in
+**ticks**, and what a tick is belongs to C03: the scheduler clamps every cadence to its `spinner`
+window (100 ms, C03 I15), so one tick is one window whatever was asked for. The ramp asks through
+`spinnerIntervalMs()` — the lookup `status` and `steps` use — and carries **no millisecond literal
+of its own**; this module may not import C03 at run time (MG21) and does not need to. So the
+arithmetic is the effect's, not the caller's:
 
 | effect | `t'` | period |
 |---|---|---|
@@ -1622,8 +1628,8 @@ birth tick, so the one-shots (`sweep`, `ripple`) and the position effects (`type
 The GIF catalogue's determinism rests on this — the frame is a function of `tick` and of nothing
 that reads a clock.
 
-**A block animates by content as well as by kind** (I54). `tickIntervalOf` answers the C03 floor
-for a block whose spans or `ramp` carry an `animate` other than `none`, and `ANIMATES[kind]` as it
+**A block animates by content as well as by kind** (I54). `tickIntervalOf` answers the default
+set's cadence for a block whose spans or `ramp` carry an `animate` other than `none`, and `ANIMATES[kind]` as it
 always did for `status` and `steps`; `animationIntervalOf` is unchanged and walks containers, so a
 shimmer inside a `panel` inside a `group` is found (§2). C22 keys the entry's cache slot on the
 tick exactly as it does for a spinner (C22 I60). **Known cost, recorded**: below 8-bit the motion
@@ -1866,8 +1872,8 @@ next frame. MG27 is what keeps a producer from writing one (`BUILDER_OMISSIONS`)
 - **I50** — **`RAMP_EXTENT` is an exhaustive record over `BlockKind` with three values — `none`, `clusters`, `axis` — and it is a record and never a `Set`.** `clusters` for the four span carriers, `axis` for `progress`, `none` for the rest; a kind with no entry is a type error in both directions, as `ANIMATES` is (§2). A kind marked `none` has no member to carry a ramp (C04 I108).
 - **I51** — **A ramped run is split one span per grapheme cluster in `paint`, after the wrap, with `at` and `of` taken from the span's drawn text and never from the run; `t = of === 1 ? 0.5 : (at + i) / (of − 1)`; no SGR lands inside a cluster; `measure` never sees the split.** A span across a wrap continues from where the previous row stopped; an elided span is counted after the cut and its marker takes the last cluster's colour (C04 I107).
 - **I52** — **The bar's ramp varies over the axis — `t = i / (barWidth − 1)` for cell `i` of the whole bar — and only the `on` cells take it; the `off` cells stay `muted`.** A bar at 30% is the first third of the bar at 100%, and a cell painted once keeps its colour as the bar fills. The filled-length extent is refused because it moves every painted cell on every patch (C04 I108).
-- **I53** — **The five loops are `t' = f(t, tick, n)` applied before C10 samples; each period is stated in ticks in the effect's own table, one tick is C03's `spinner` floor imported and never a second literal, and `tick = 0` is the static frame.** `shimmer` and `wave` move one cell per tick; `breathe` is 20 ticks, `pulse` 10, `heartbeat` 12 with the envelope `[1, 0.5, 0, 1, 0.5, 0, 0…]`. Every effect is periodic because the render has no birth tick (C04 I109).
-- **I54** — **A block animates by content as well as by kind: `tickIntervalOf` answers the C03 floor for any block whose spans or `ramp` carry an `animate` other than `none`, `ANIMATES` stays the record of the kinds that animate by nature, and `animationIntervalOf` is unchanged.** Below 8-bit the cadence is still declared while the frame is stable, and that cost is recorded rather than guarded against (C10 §4e, C22 I60).
+- **I53** — **The five loops are `t' = f(t, tick, n)` applied before C10 samples; each period is stated in ticks in the effect's own table, the cadence is asked through `spinnerIntervalMs()` with no millisecond literal in the module, what a tick is belongs to C03's window, and `tick = 0` is the static frame.** `shimmer` and `wave` move one cell per tick; `breathe` is 20 ticks, `pulse` 10, `heartbeat` 12 with the envelope `[1, 0.5, 0, 1, 0.5, 0, 0…]`. Every effect is periodic because the render has no birth tick (C04 I109).
+- **I54** — **A block animates by content as well as by kind: `tickIntervalOf` answers the default set's cadence for any block whose spans or `ramp` carry an `animate` other than `none`, `ANIMATES` stays the record of the kinds that animate by nature, and `animationIntervalOf` is unchanged.** Below 8-bit the cadence is still declared while the frame is stable, and that cost is recorded rather than guarded against (C10 §4e, C22 I60).
 
 ## 8. Commitments
 
@@ -2068,7 +2074,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T1.16c** (I20): the composition law over a styled line, for every split point — `sliceCells(t, 0, a)` and `sliceCells(t, a, b)` measure `b` together. A property over the splits rather than three chosen ones, because the case that breaks it is whichever `a` lands inside a cluster and no chosen `a` is that one by construction.
 - **T1.17** (I9, I19, C04 I84, C04 I86): the four mechanisms of §5's *Runs* — `wrapCellsParts`'s rows are exact source slices from `start` with the break space in no row, and equal `wrapCells`'s; `runsOf` concatenates to `stripControl(text)` with a control character inside a span; a boundary inside a ZWJ family snaps outward and a span that collapses onto one boundary is dropped; `truncateParts` reports `start` from either end and, at `ambiguousWidth: "wide"`, `kept` plus a two-cell marker fits the limit. **Covered today by `test/unit/spans.test.ts` §*C09 — runs*, whose rows cite C04 I84 and C04 I86 and carry no C09 number** — the number is owed to those rows, not to a second file.
 
-- **T1.28** (I53): each effect's `t'` at `tick = 0` equals the static table; `shimmer`'s band centre moves one cell per tick and wraps at `n + 3`; `wave` at `tick = n` equals `tick = 0`; `breathe` is 1 at tick 5 and 0 at tick 15; `pulse` flips at tick 5 and returns at 10; `heartbeat` follows its envelope over twelve ticks and repeats; the unit is the scheduler's `spinner` floor read from C03's table, asserted by identity and not by value.
+- **T1.28** (I53): each effect's `t'` at `tick = 0` equals the static table; `shimmer`'s band centre moves one cell per tick and wraps at `n + 3`; `wave` at `tick = n` equals `tick = 0`; `breathe` is 1 at tick 5 and 0 at tick 15; `pulse` flips at tick 5 and returns at 10; `heartbeat` follows its envelope over twelve ticks and repeats; `rampCadenceMs()` is `spinnerIntervalMs()` by identity of value, and a comment-stripped scan of `blocks/ramp.ts` finds no millisecond literal.
 - **T1.19** (I9, C04 I89, C04 I90): the tone-and-value half of §5's *Runs* — `runsOf` copies `tone` and `value` onto the run and `sliceRuns`, `runLines` and `wrapRuns` carry them; `wrapCellsParts` with an atom never breaks strictly inside it — a space inside the atom is skipped, a full row with no outside break point breaks at the atom's start when something precedes it, and an atom wider than the row is broken as text **and drops nothing**, since a cluster-boundary cut is not a break space (`"aaa bbb ccc"` at 7 valued whole is `aaa bbb` / `" ccc"`, F593); a row that fills exactly and is followed by a space breaks **at that space** whether or not it has an earlier break point (F590, F591), and the plain answer for `"aa bb cc dd"` at 5 is two rows where the valued one is three; `wrapRuns` derives the atoms from `value` alone, so a bold run is not one. Asserted on the row texts and starts, beside the plain wrapper's answer for the same string.
 
 ### Tier 2 — contract / interface
@@ -2103,8 +2109,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.114** (I47): `elementsIn` over a `step` notice with no `action` yields one element spanning the block with `copy` equal to the text and no `activate`; with an `action`, `activate` is that action; an `info` notice with no `action` yields none.
 - **T2.115** (I48): T2.5b's assertion — `cells(unicode) === cells(ascii)` — over the whole vocabulary at **both** `ambiguousWidth` arms, through `glyphFor` at `WIDE_CAPS`; the eleven Ambiguous members resolve to their ASCII half at wide and the six Neutral ones do not, compared by equality against the two named sets so a member moving between them fails the row.
 - **T2.118** (I50): `RAMP_EXTENT` has an entry for every `BlockKind`; `clusters` for `raw`, `notice`, `rule` and `table`, `axis` for `progress`, `none` for the rest; the record's key set equals the kind union's.
-- **T2.119** (I51, I52): a `raw` whose gradient span covers `héllo 👨‍👩‍👧 ok` paints one span per cluster and no SGR inside the ZWJ family; the same span wrapped across two rows has row two's first `at` equal to row one's cluster count; a `progress` with a colormap ramp at 30% and at 100% agree byte-for-byte on the first 30% of the bar's cells, and the `off` cells carry `muted`.
-- **T2.120** (I54): `tickIntervalOf` on a `notice` with a `shimmer` span is C03's `spinner` floor; with `animate: "none"`, or with a ramp and no `animate`, it is `null`; `animationIntervalOf` finds the same block inside a `panel` inside a `group`; `ANIMATES` still has exactly two `true` entries.
+- **T2.119** (I51, I52): a `raw` whose gradient span covers `héllo 👨‍👩‍👧 ok` paints one span per cluster and no SGR inside the ZWJ family; the same span wrapped across two rows has row two's first `at` equal to row one's cluster count; five palette spans over five words paint five colours, each word whole, the second `categorical.c2` (C04 §3am.2's *the identity is the span*); a `progress` with a colormap ramp at 30% and at **90%** agree byte-for-byte on the first 30% of the bar's cells — not 100%, whose extra digit narrows the bar by a cell (§3) — and the `off` cells carry `muted`.
+- **T2.120** (I54): `tickIntervalOf` on a `notice` with a `shimmer` span is `spinnerIntervalMs()`; with `animate: "none"`, or with a ramp and no `animate`, it is `null`; `animationIntervalOf` finds the same block inside a `panel` inside a `group`; `ANIMATES` still has exactly two `true` entries.
 - **T2.116** (I49): `glyphs(caps).separator` is one cell at both arms and both alphabets; a source scan finds no `" · "` literal in `src/shell/`.
 - **T2.10**: golden frames for every kind at four widths in both themes and both unicode modes.
 
@@ -2187,7 +2193,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T4.4** (with C02): a `TERM=dumb` capability record drives every kind to its ASCII fallback consistently — no kind renders Unicode while another renders ASCII.
 - **T4.5** (with C14): summed measured heights of a visible range equal the viewport height exactly.
 - **T4.6** (with C14): expanding a table row shifts subsequent blocks by exactly the measured delta.
-- **T4.8** (I54, C22 I60): a real session with a `shimmer` on a running head and a plain entry beside it — over three spinner commits the head's rows differ frame to frame and the plain entry's slot is served from the cache, read from the cache's counters and not inferred from the bytes.
+- **T4.8** (I54, C22 I60): a real session with a `shimmer` on a head and a plain entry beside it — over three spinner commits the head is rewritten each tick with a different picture and the plain entry's text is never written again, **read from the diff writer's output**: the folded screen strips SGR, so a colour-only animation is invisible to it, and the render cache exposes no counters — a row that asserted on counters would have needed a member nothing else consumes.
 - **T4.7** (with C04): every document in C07's adaptation corpus measures and renders without error.
 
 ### Tier 5 — e2e
@@ -2239,7 +2245,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.94** (I50): `RAMP_EXTENT` rewritten as a `Set` of the two carriers → T2.118's key-set row fails; `rule` flipped to `none` → T2.118 fails on the carrier row.
 - **T6.95** (I51): `at` counted from the run's start rather than the span's → T2.119's two-row row fails while the one-row rows pass; splitting by code unit → T2.119's ZWJ row finds SGR inside the family.
 - **T6.96** (I52): the bar's extent taken as the filled length → T2.119's 30%/100% row fails on the first cell; painting the `off` cells through the ramp → its `muted` assertion fails.
-- **T6.97** (I53): a period written in milliseconds → T1.28's `breathe` row fails at tick 5; the floor as a literal `100` beside the import → T1.28's identity assertion fails when the table's value is changed under it.
+- **T6.97** (I53): a period written in milliseconds → T1.28's `breathe` row fails at tick 5; a `100` written in `ramp.ts` in place of the lookup → T1.28's literal scan names the line.
 - **T6.98** (I54): `tickIntervalOf` reading `ANIMATES` alone → T2.120 answers `null` for the shimmer and T4.8's head serves one frame for the life of the session, which is F227 restored by content.
 - **T6.93** (I49): the composer joining with a literal `" · "` → T2.116's scan fails, and the card's contract rows at the ASCII arm draw a character the alphabet does not have.
 - **T6.26** (I32): excluding `error` from animating → T3.43 fails, and `retrying` — which is `error` plus a line — loses its spinner. A per-state branch is the exception the composition immediately needs.

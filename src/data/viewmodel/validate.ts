@@ -23,6 +23,9 @@ import {
   type DocumentStatus,
   type Glyph,
   COLORMAP_NAMES,
+  RAMP_ANIMATIONS,
+  RAMP_FILLS,
+  RAMP_KEYS,
   TONES,
   HAS_CALLOUT,
   HAS_HIDEABLE_SERIES,
@@ -785,10 +788,25 @@ function checkSpans(b: Record<string, unknown>, member: string, e: string[], at:
       e.push(`${where}: a boundary falls between the two halves of a surrogate pair (C04 I84)`);
       return;
     }
+    // C04 I107 — two colour channels from two owners on one cell, neither floored.
+    if (span["value"] !== undefined && span["ramp"] !== undefined) {
+      e.push(`${where}: "value" and "ramp" on one span — a background from the map and a foreground from the ramp is two unmeasured colours on one cell (C04 I107)`);
+      return;
+    }
     for (const key of Object.keys(span)) {
       if (!TEXT_SPAN_KEYS.has(key)) {
-        e.push(`${where}: unknown member "${key}" — a span carries from, to, bold, italic, underline, tone, value, elide and nothing else (C04 I85)`);
+        e.push(`${where}: unknown member "${key}" — a span carries from, to, bold, italic, underline, tone, value, elide, ramp and nothing else (C04 I85)`);
         return;
+      }
+      if (key === "ramp") {
+        if (attributesOnly) {
+          e.push(`${where}: "ramp" is refused on this member — its palettes are spoken for (C04 I107, I91)`);
+          return;
+        }
+        const before = e.length; // cells-ok — an error count
+        checkRamp(span[key], e, `${where}.ramp`, true);
+        if (e.length !== before) return; // cells-ok — an error count
+        continue;
       }
       if (key === "tone") {
         if (!attributesOnly && typeof span[key] === "string" && TONE_SET.has(span[key])) continue;
@@ -824,6 +842,91 @@ function checkSpans(b: Record<string, unknown>, member: string, e: string[], at:
 }
 
 const TONE_SET: ReadonlySet<string> = new Set<string>(TONES);
+const RAMP_FILL_SET: ReadonlySet<string> = new Set<string>(RAMP_FILLS);
+const RAMP_ANIMATION_SET: ReadonlySet<string> = new Set<string>(RAMP_ANIMATIONS);
+
+/**
+ * A `Ramp` at the gate (C04 §3am.2, I106–I109). One error per fault, the first
+ * fault only, each naming the rule it broke.
+ *
+ * `onSpan` is the text arm: a colormap backing is refused there because the
+ * contrast floor is proven per slot and a sampled colour passes through no floor
+ * (I107); the bar's ink fills its cell and reads by area, so the same backing is
+ * admitted on `progress` (I108).
+ */
+function checkRamp(value: unknown, e: string[], where: string, onSpan: boolean): void {
+  if (!isRecord(value)) {
+    e.push(`${where} must be a record with a "fill" (C04 I106)`);
+    return;
+  }
+  for (const key of Object.keys(value)) {
+    if (!RAMP_KEYS.has(key)) {
+      e.push(`${where}: unknown member "${key}" — a ramp carries fill, from, to, colormap, bands, animate and nothing else (C04 I106)`);
+      return;
+    }
+  }
+  const fill = value["fill"];
+  if (typeof fill !== "string" || !RAMP_FILL_SET.has(fill)) {
+    e.push(`${where}: "fill" must be one of ${RAMP_FILLS.join(", ")} (C04 I106)`);
+    return;
+  }
+  const from = value["from"];
+  const to = value["to"];
+  const colormap = value["colormap"];
+  const bands = value["bands"];
+  const animate = value["animate"];
+  if ((from === undefined) !== (to === undefined)) {
+    e.push(`${where}: "from" and "to" are a pair — one without the other is half a backing (C04 I106)`);
+    return;
+  }
+  if (from !== undefined && (typeof from !== "string" || !TONE_SET.has(from) || typeof to !== "string" || !TONE_SET.has(to))) {
+    e.push(`${where}: "from" and "to" must each be one of ${TONES.join(", ")} (C04 I106)`);
+    return;
+  }
+  if (colormap !== undefined && (typeof colormap !== "string" || !COLORMAP_SET.has(colormap))) {
+    e.push(`${where}: "colormap" must be one of ${COLORMAP_NAMES.join(", ")} (C04 I106, C10 I31)`);
+    return;
+  }
+  const hasPair = from !== undefined;
+  const hasMap = colormap !== undefined;
+  if (fill === "palette") {
+    if (hasPair || hasMap) {
+      e.push(`${where}: a "palette" fill takes no backing — it cycles the theme's categorical slots and names nothing (C04 I106, C10 I16)`);
+      return;
+    }
+    if (bands !== undefined) {
+      e.push(`${where}: "bands" rides on "step" alone (C04 I106)`);
+      return;
+    }
+  } else {
+    if (hasPair === hasMap) {
+      e.push(
+        hasPair
+          ? `${where}: a "${fill}" takes one backing — a from/to pair or a colormap, not both (C04 I106)`
+          : `${where}: a "${fill}" takes one backing — a from/to pair or a colormap (C04 I106)`,
+      );
+      return;
+    }
+    if (hasMap && onSpan) {
+      e.push(`${where}: a colormap backing is refused on a span — the contrast floor is proven per slot and a sample passes through none; a slot pair is bounded by two proven colours (C04 I107, C10 I26)`);
+      return;
+    }
+    if (bands !== undefined) {
+      if (fill !== "step") {
+        e.push(`${where}: "bands" rides on "step" alone (C04 I106)`);
+        return;
+      }
+      if (typeof bands !== "number" || !Number.isInteger(bands) || bands < 2 || bands > 8) {
+        e.push(`${where}: "bands" must be an integer in 2..8 — one band is a gradient wearing a different name (C04 I106)`);
+        return;
+      }
+    }
+  }
+  if (animate !== undefined && (typeof animate !== "string" || !RAMP_ANIMATION_SET.has(animate))) {
+    e.push(`${where}: "animate" must be one of ${RAMP_ANIMATIONS.join(", ")} — a one-shot is an event the render cannot time (C04 I109)`);
+    return;
+  }
+}
 
 /** `i` lies strictly between a high and a low surrogate — the one cluster interior L0 can see. */
 function splitsSurrogate(text: string, i: number): boolean {
@@ -1199,6 +1302,9 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     requireString(b, "label", e, at);
     if (!isFiniteNumber(b["current"])) e.push(`${at}: "current" must be a finite number`);
     if (!isFiniteNumber(b["total"])) e.push(`${at}: "total" must be a finite number`);
+    // C04 I108 — the one block-level carrier, and the one place a colormap
+    // backing is admitted: the bar's ink fills its cell and reads by area.
+    if (b["ramp"] !== undefined) checkRamp(b["ramp"], e, `${at}.ramp`, false);
   },
   code: (b, e, at) => {
     requireString(b, "language", e, at);

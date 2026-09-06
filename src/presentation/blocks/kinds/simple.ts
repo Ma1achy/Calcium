@@ -13,7 +13,8 @@ import type { Glyph, Notice, Pills, Progress, Raw, Rule, Tip } from "../../../da
 import { cells, stripControl, truncate, truncateParts, wrapCells } from "../../text.js";
 import type { Run } from "../../runs.js";
 import { runLines, runsOf, runsText, sliceRuns, wrapRuns } from "../../runs.js";
-import { NO_STYLE } from "../../theme/index.js";
+import { NO_STYLE, rampStyle } from "../../theme/index.js";
+import { animateT, effectiveTick, extentT } from "../ramp.js";
 import { barStyle, glyphFor, glyphCells, glyphs } from "../glyphs.js";
 import { clampSpans, pad, paint, paintRuns, rows, selectionStyle, tone, type Span } from "../paint.js";
 import type { BlockDefinition, NavElement, RenderContext, Windowed } from "../types.js";
@@ -326,7 +327,7 @@ export const noticeDefinition: BlockDefinition<Notice> = {
     const wrapped = noticeRows(block, ctx.width, ctx.capabilities);
     // The block's colormap reaches the painter by name; a valued run reads it
     // there and nowhere else (C04 I90).
-    const paintCtx = { theme: ctx.theme, capabilities: ctx.capabilities, ...(block.colormap === undefined ? {} : { colormap: block.colormap }) };
+    const paintCtx = { theme: ctx.theme, capabilities: ctx.capabilities, tick: ctx.tick, ...(block.colormap === undefined ? {} : { colormap: block.colormap }) };
 
     // A hanging indent: the glyph sits on the first row and the continuation
     // aligns under the text rather than under the glyph. That alignment is why
@@ -418,15 +419,27 @@ export const progressDefinition: BlockDefinition<Progress> = {
     const barWidth = Math.max(0, width - cells(labelColumn, ctx.capabilities.ambiguousWidth) - cells(percent, ctx.capabilities.ambiguousWidth) - 2);
     const filled = Math.round(fill * barWidth);
 
+    // **The ramp varies over the axis, and only the `on` cells take it** (I52).
+    // Cell `i` samples `i / (barWidth − 1)` whether or not it is filled, so a
+    // bar at 30% is the first third of the bar at 100% and a cell painted once
+    // keeps its colour as the bar fills. The other answer — the filled length —
+    // moves every painted cell on every patch for no information (C04 I108).
+    const accent = tone("accent", ctx.theme, ctx.capabilities);
+    const onCells: Span[] =
+      block.ramp === undefined
+        ? [{ text: bar.on.repeat(filled), style: accent }]
+        : Array.from({ length: filled }, (_, i) => {
+            const t = animateT(block.ramp?.animate, extentT(i, barWidth), effectiveTick(ctx.tick, ctx.capabilities), barWidth, i);
+            const sampled = block.ramp === undefined ? undefined : rampStyle(block.ramp, t, i, ctx.theme, ctx.capabilities);
+            return { text: bar.on, style: sampled === undefined ? accent : { ...accent, ...sampled } };
+          });
+
     return rows([
       paint(
         clampSpans(
           [
             { text: `${labelColumn} `, style: tone("default", ctx.theme, ctx.capabilities) },
-            {
-              text: bar.on.repeat(filled),
-              style: tone("accent", ctx.theme, ctx.capabilities),
-            },
+            ...onCells,
             {
               text: bar.off.repeat(barWidth - filled),
               style: tone("muted", ctx.theme, ctx.capabilities),
@@ -662,7 +675,7 @@ export const rawDefinition: BlockDefinition<Raw> = {
     // marker outside every span (C04 I86); `raw` carries no tone, so the pieces
     // differ only where a span says so and a plain line is the bytes it was.
     const lines = runLines(runsOf(block.text, block.spans));
-    const paintCtx = { theme: ctx.theme, capabilities: ctx.capabilities, ...(block.colormap === undefined ? {} : { colormap: block.colormap }) };
+    const paintCtx = { theme: ctx.theme, capabilities: ctx.capabilities, tick: ctx.tick, ...(block.colormap === undefined ? {} : { colormap: block.colormap }) };
     return rows(
       rawLines(block).map((line, i) => {
         const { kept, suffix } = truncateParts(line, width, ctx.capabilities);

@@ -1,14 +1,22 @@
 // Spans — the contract rows: the bytes a span produces, and the member `code` refuses.
 import { describe, expect, it } from "vitest";
-import { block, validateBlock } from "../../src/data/viewmodel/index.js";
-import { TEXT_SPAN_KEYS } from "../../src/data/viewmodel/types.js";
+import { block, validateBlock, validateDocument } from "../../src/data/viewmodel/index.js";
+import { RAMP_ANIMATIONS, RAMP_KEYS, TEXT_SPAN_KEYS } from "../../src/data/viewmodel/types.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
-import type { Block, TextSpan } from "../../src/data/viewmodel/index.js";
+import type { Block, Ramp, TextSpan } from "../../src/data/viewmodel/index.js";
+import { doc } from "../support/blocks.js";
 import { paint, paintRuns, withSpan } from "../../src/presentation/blocks/paint.js";
 import { runsOf } from "../../src/presentation/runs.js";
 import { resolveTone } from "../../src/presentation/theme/index.js";
 import { COLORMAPS, continuousColour, sample } from "../../src/presentation/theme/colormap.js";
+import { NO_STYLE, CATEGORY_REFS, refOf, resolve } from "../../src/presentation/theme/index.js";
+import * as marks from "../../src/presentation/plot/marks.js";
+import { ANIMATES, animationIntervalOf, tickIntervalOf } from "../../src/presentation/blocks/index.js";
+import { RAMP_EXTENT } from "../../src/presentation/blocks/ramp.js";
+import { spinnerIntervalMs } from "../../src/presentation/blocks/glyphs.js";
+import { sliceRuns, wrapRuns } from "../../src/presentation/runs.js";
+import { readFileSync, readdirSync } from "node:fs";
 import { SGR_RESET, sgr } from "../../src/terminal/escapes.js";
 import { DARK_THEME, FULL_CAPS, MONO_CAPS, measurable } from "../support/render.js";
 import { caps, store } from "../support/theme.js";
@@ -167,9 +175,10 @@ describe("C04 §3am.1 — `elide`", () => {
   const TEXT = "verb(a-rather-long-argument-that-will-not-fit) · 4s · 12 rows";
   const ARG: TextSpan = { from: TEXT.indexOf("(") + 1, to: TEXT.indexOf(")"), elide: true };
 
-  it("T2.114 (C04 I105): the eighth member is admitted, inert on a wrapped token, and the boundary the fitter shortens first on a fitted one", () => {
-    expect(TEXT_SPAN_KEYS.size).toBe(8);
+  it("T2.114 (C04 I105, I107): the eighth and ninth members are admitted, inert on a wrapped token, and the boundary the fitter shortens first on a fitted one", () => {
+    expect(TEXT_SPAN_KEYS.size).toBe(9);
     expect(TEXT_SPAN_KEYS.has("elide")).toBe(true);
+    expect(TEXT_SPAN_KEYS.has("ramp")).toBe(true);
     const marked = block({ kind: "notice", id: "n", tone: "info", glyph: "info", text: TEXT, spans: [ARG] });
     expect(validateBlock(marked).ok).toBe(true);
     const typed = validateBlock({ ...marked, spans: [{ ...ARG, elide: "yes" }] } as unknown as Block);
@@ -195,15 +204,162 @@ describe("C04 §3am.1 — `elide`", () => {
     expect(narrow).toContain("…) · 4s · 12 rows");
     expect(narrow.length, "shorter, and only in the marked run").toBeLessThan(wide.length);
   });
-  it.todo("T2.117 (C04 I106, I109): RAMP_KEYS has six members; a seventh key and animate: sweep are refused by name; a ramped document round-trips through JSON — not deferred on a component: lands with the Ramp type");
+
+  it("T2.117 (C04 I106, I109): RAMP_KEYS has six members; a seventh key and animate: sweep are refused by name; a ramped document round-trips through JSON", () => {
+    expect(RAMP_KEYS.size).toBe(6);
+    expect([...RAMP_KEYS].sort()).toEqual(["animate", "bands", "colormap", "fill", "from", "to"]);
+    expect(RAMP_ANIMATIONS).toEqual(["none", "shimmer", "wave", "breathe", "pulse", "heartbeat"]);
+
+    const ramped = (ramp: unknown): unknown => ({ kind: "notice", id: "n", tone: "info", text: "abcdef", spans: [{ from: 0, to: 3, ramp }] });
+    const seventh = validateBlock(ramped({ fill: "palette", period: 200 }));
+    expect(seventh.ok).toBe(false);
+    if (!seventh.ok) expect(seventh.error.join(" ")).toMatch(/unknown member "period" — a ramp carries fill, from, to, colormap, bands, animate and nothing else/u);
+    const sweep = validateBlock(ramped({ fill: "gradient", from: "default", to: "accent", animate: "sweep" }));
+    expect(sweep.ok).toBe(false);
+    if (!sweep.ok) expect(sweep.error.join(" ")).toMatch(/"animate" must be one of none, shimmer, wave, breathe, pulse, heartbeat.*C04 I109/u);
+
+    // §5a — a ramp on every carrier and on the bar survives the round trip.
+    const R: Ramp = { fill: "gradient", from: "default", to: "accent", animate: "wave" };
+    const S: readonly TextSpan[] = [{ from: 0, to: 3, ramp: R }];
+    const d = doc({
+      blocks: [
+        block({ kind: "notice", id: "n", tone: "info", text: "a bc d", spans: S }),
+        block({ kind: "raw", id: "r", text: "a bc d", spans: S }),
+        block({ kind: "rule", id: "h", label: "a bc d", spans: [{ from: 0, to: 3, ramp: { fill: "palette" } }] }),
+        block({
+          kind: "table",
+          id: "t",
+          columns: [{ key: "c0", label: "c", align: "left", priority: 50, minWidth: 4, sortable: false }],
+          rows: [{ id: "r0", cells: { c0: { text: "a bc d", spans: [{ from: 0, to: 3, ramp: { fill: "step", from: "muted", to: "ok", bands: 3 } }] } } }],
+        }),
+        block({ kind: "progress", id: "p", label: "build", current: 3, total: 10, ramp: { fill: "gradient", colormap: "viridis" } }),
+      ],
+    });
+    const back: unknown = JSON.parse(JSON.stringify(d));
+    expect(validateDocument(back).ok).toBe(true);
+    expect(back).toEqual(d);
+  });
 });
 
 describe("C09 §5 — ramps, the extent and the split", () => {
-  it.todo("T2.118 (C09 I50): RAMP_EXTENT is exhaustive over BlockKind — clusters for the four carriers, axis for progress, none for the rest — not deferred on a component: lands with blocks/ramp.ts");
-  it.todo("T2.119 (C09 I51, I52): one span per cluster and none inside a ZWJ family; a wrapped span continues its at; a bar at 30% and 100% agree on the first 30% of cells — not deferred on a component: lands with the ramp resolver");
-  it.todo("T2.120 (C09 I54): tickIntervalOf answers the floor for a shimmer span, null for none, and finds it inside a panel; ANIMATES keeps two true entries — not deferred on a component: lands with the content-aware cadence");
+  const theme = DARK_THEME;
+  const fgOf = (span: string): string => {
+    // The foreground parameter of a painted span's opening SGR, or "" for none.
+    const m = /\x1b\[([0-9;]*)m/u.exec(span);
+    if (m === null) return "";
+    const params = m[1] ?? "";
+    const fg = /(?:^|;)(38;2;\d+;\d+;\d+|38;5;\d+|3[0-7]|9[0-7])(?:;|$)/u.exec(params);
+    return fg?.[1] ?? "";
+  };
+
+  it("T2.118 (C09 I50): RAMP_EXTENT is exhaustive over BlockKind — clusters for the four carriers, axis for progress, none for the rest", () => {
+    const kinds = Object.keys(ANIMATES).sort();
+    expect(Object.keys(RAMP_EXTENT).sort(), "the record's key set is the kind union's — the same population ANIMATES is checked against").toEqual(kinds);
+    const carriers = Object.entries(RAMP_EXTENT).filter(([, v]) => v !== "none").map(([k]) => k).sort();
+    expect(carriers).toEqual(["notice", "progress", "raw", "rule", "table"]);
+    expect(RAMP_EXTENT.progress).toBe("axis");
+    for (const k of ["notice", "raw", "rule", "table"] as const) expect(RAMP_EXTENT[k]).toBe("clusters");
+  });
+
+  it("T2.119 (C09 I51, I52): one span per cluster and none inside a ZWJ family; a wrapped span continues its at; a bar at 30% and 90% agree on the first 30% of cells and the off cells carry muted", () => {
+    const registry = createBlockRegistry();
+    const ctx = { theme, capabilities: FULL_CAPS };
+    const text = "héllo 👨‍👩‍👧 ok";
+    const ramp: Ramp = { fill: "gradient", from: "default", to: "accent" };
+    const runs = runsOf(text, [{ from: 0, to: text.length, ramp }]);
+    expect(runs).toHaveLength(1);
+    expect(runs[0]?.ramp).toEqual({ ramp, at: 0, of: 10, ordinal: 0 });
+    const painted = paintRuns(runs, NO_STYLE, ctx);
+    // One span per cluster: ten, and the family is one of them, whole.
+    expect(painted.map((s) => s.text)).toEqual(["h", "é", "l", "l", "o", " ", "👨‍👩‍👧", " ", "o", "k"]);
+    expect(painted.map((s) => s.text).join("")).toBe(text);
+    for (const s of painted) expect(s.text, "no split inside a cluster").not.toMatch(/^\u200d|\u200d$/u);
+    const row = paint(painted);
+    expect(row).not.toMatch(/\u200d\x1b/u);
+    // The ends are the slots, the middle is between them, and ten distinct colours.
+    const fgs = painted.map((s) => fgOf(sgr(s.style ?? {})));
+    expect(new Set(fgs).size).toBe(painted.length);
+
+    // **A wrapped span continues**: the second row's first run starts where the
+    // first row's cluster count ends.
+    const prose = "alpha beta gamma";
+    const wrapped = wrapRuns(runsOf(prose, [{ from: 0, to: prose.length, ramp }]), 11, "narrow");
+    expect(wrapped.map((r) => r.map((x) => x.text).join(""))).toEqual(["alpha beta", "gamma"]);
+    expect(wrapped[0]?.[0]?.ramp).toEqual({ ramp, at: 0, of: 16, ordinal: 0 });
+    expect(wrapped[1]?.[0]?.ramp).toEqual({ ramp, at: 11, of: 16, ordinal: 0 });
+    // and a **cut** shortens `of` to what is drawn.
+    const cut = sliceRuns(runsOf(prose, [{ from: 0, to: prose.length, ramp }]), 0, 5);
+    expect(cut[0]?.ramp).toEqual({ ramp, at: 0, of: 5, ordinal: 0 });
+
+    // **A palette cycles identities, and on text the identity is the span**: five
+    // words, five palette spans, five colours — each word whole. The first frame
+    // read on landing showed five rainbows, which is the per-cluster answer.
+    const words = "alpha beta gamma delta epsilon";
+    const wordSpans = ((): TextSpan[] => { const out: TextSpan[] = []; let a = 0; for (const w of words.split(" ")) { out.push({ from: a, to: a + w.length, ramp: { fill: "palette" } }); a += w.length + 1; } return out; })(); // cells-ok — code-unit offsets
+    const wordRuns = runsOf(words, wordSpans);
+    expect(wordRuns.filter((r) => r.ramp !== undefined).map((r) => r.ramp?.ordinal)).toEqual([0, 1, 2, 3, 4]);
+    const wordSpansPainted = paintRuns(wordRuns, NO_STYLE, ctx).filter((s) => s.text.trim() !== "");
+    expect(wordSpansPainted.map((s) => s.text)).toEqual(["alpha", "beta", "gamma", "delta", "epsilon"]);
+    expect(new Set(wordSpansPainted.map((s) => fgOf(sgr(s.style ?? {})))).size).toBe(5);
+    expect(fgOf(sgr(wordSpansPainted[1]?.style ?? {}))).toBe(fgOf(sgr(resolve("categorical.c2", theme, FULL_CAPS))));
+
+    // **The bar over the axis.** At 30% and at 90% the first 30% of cells agree
+    // byte for byte, and the `off` cells carry `muted`. Not 100%: the percent
+    // gains a digit there and the bar loses a cell, so the axis itself moves —
+    // measured on landing, and recorded beside C09 I52.
+    const bar = (current: number): string =>
+      renderSequenceToLines(registry, [block({ kind: "progress", id: "p", label: "build", current, total: 10, ramp: { fill: "gradient", colormap: "viridis" } })], 40, { theme, capabilities: FULL_CAPS })[0] ?? "";
+    const spansOf = (line: string): string[] => line.split(/(?=\x1b\[[0-9;]*m)/u).filter((s) => s.includes("█"));
+    const at30 = spansOf(bar(3));
+    const at100 = spansOf(bar(9));
+    expect(at30.length).toBeGreaterThan(2);
+    expect(at100.length).toBeGreaterThan(at30.length);
+    for (let i = 0; i < at30.length; i += 1) expect(fgOf(at30[i] ?? ""), `cell ${String(i)}`).toBe(fgOf(at100[i] ?? ""));
+    const muted = fgOf(sgr(resolveTone("muted", theme, FULL_CAPS)));
+    expect(bar(3)).toContain(muted);
+    expect(bar(10), "a full bar has no off cell").not.toContain(muted);
+    expect(bar(10).length, "a full bar still draws").toBeGreaterThan(20);
+  });
+
+  it("T2.120 (C09 I54): tickIntervalOf answers spinnerIntervalMs() for a shimmer span, null for none or no animate, finds it inside a panel; ANIMATES keeps two true entries", () => {
+    const moving = block({ kind: "notice", id: "n", tone: "info", text: "abcdef", spans: [{ from: 0, to: 3, ramp: { fill: "palette", animate: "shimmer" } }] });
+    const still = block({ kind: "notice", id: "n", tone: "info", text: "abcdef", spans: [{ from: 0, to: 3, ramp: { fill: "palette", animate: "none" } }] });
+    const plain = block({ kind: "notice", id: "n", tone: "info", text: "abcdef", spans: [{ from: 0, to: 3, ramp: { fill: "palette" } }] });
+    expect(tickIntervalOf(moving)).toBe(spinnerIntervalMs());
+    expect(tickIntervalOf(still)).toBeNull();
+    expect(tickIntervalOf(plain)).toBeNull();
+    const bar = block({ kind: "progress", id: "p", label: "l", current: 1, total: 2, ramp: { fill: "gradient", colormap: "magma", animate: "wave" } });
+    expect(tickIntervalOf(bar)).toBe(spinnerIntervalMs());
+    const table = block({
+      kind: "table",
+      id: "t",
+      columns: [{ key: "c0", label: "c", align: "left", priority: 50, minWidth: 4, sortable: false }],
+      rows: [{ id: "r0", cells: { c0: { text: "a bc d", spans: [{ from: 0, to: 1, ramp: { fill: "palette", animate: "pulse" } }] } } }],
+    });
+    expect(tickIntervalOf(table)).toBe(spinnerIntervalMs());
+    const nested = block({ kind: "group", id: "g", direction: "column", children: [block({ kind: "panel", id: "pn", title: "t", children: [moving] })] } as never);
+    expect(animationIntervalOf([nested])).toBe(spinnerIntervalMs());
+    expect(animationIntervalOf([block({ kind: "panel", id: "pn", title: "t", children: [still] } as never)])).toBeNull();
+    expect(Object.values(ANIMATES).filter((v) => v).length, "by kind, still two").toBe(2);
+  });
 });
 
 describe("C10 §4h — the categorical cycle, one copy", () => {
-  it.todo("T2.30 (C10 I37): refOf and CATEGORY_REFS from theme/categorical.ts are the same references marks.ts re-exports; blocks/** imports nothing from plot/** — not deferred on a component: lands with theme/categorical.ts");
+  it("T2.30 (C10 I37): refOf and CATEGORY_REFS from theme/categorical.ts are the same references marks.ts re-exports; theme/** imports nothing from blocks/** or plot/**", () => {
+    expect(marks.refOf).toBe(refOf);
+    expect(marks.CATEGORY_REFS).toBe(CATEGORY_REFS);
+    expect(refOf(9)).toBe("categorical.c2");
+    // **The direction that would be a cycle**, read from the sources with
+    // comments stripped: `theme/` is below both `blocks/` and `plot/`, and
+    // imports nothing from either at run time. The first draft of this row
+    // asserted the other direction — `blocks/` importing nothing from `plot/` —
+    // and failed on `kinds/image.ts`, which is how §4h's reason was corrected.
+    const dir = new URL("../../src/presentation/theme/", import.meta.url);
+    const files = readdirSync(dir, { recursive: true, encoding: "utf8" }).filter((f) => f.endsWith(".ts"));
+    expect(files.length).toBeGreaterThan(8);
+    for (const f of files) {
+      const source = readFileSync(new URL(f, dir), "utf8").replace(/\/\*[\s\S]*?\*\//gu, "").replace(/\/\/.*$/gmu, "");
+      expect(source, f).not.toMatch(/^import (?!type )[^;]*from "[./]*\/(?:plot|blocks)\//mu);
+    }
+  });
 });

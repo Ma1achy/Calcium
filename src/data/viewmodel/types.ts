@@ -332,10 +332,66 @@ export type TextSpan = Readonly<{
   value?: number;
   /** The run a fitter shortens first, from its end (I105, C09 I46). Inert on a wrapped token. */
   elide?: boolean;
+  /**
+   * An ink that is a function of position along the run (§3am.2, I107).
+   * Appearance only: it replaces the run's foreground and `measure` never reads
+   * it. Refused beside `value`, and refused with a `colormap` backing — a slot
+   * pair is bounded by two colours whose floors C10 I26 proves, a sample is not.
+   */
+  ramp?: Ramp;
 }>;
 
-/** The members of a span, for a gate that cannot silently take a ninth (I85) — the eighth, `elide`, arrived with I105. */
-export const TEXT_SPAN_KEYS: ReadonlySet<string> = new Set(["from", "to", "bold", "italic", "underline", "tone", "value", "elide"]);
+/** The members of a span, for a gate that cannot silently take a tenth (I85) — the eighth, `elide`, arrived with I105 and the ninth, `ramp`, with I107. */
+export const TEXT_SPAN_KEYS: ReadonlySet<string> = new Set(["from", "to", "bold", "italic", "underline", "tone", "value", "elide", "ramp"]);
+
+// --- ramps ----------------------------------------------------------------
+
+/**
+ * The three fills, because they mean three things (§3am.2, I106): a `gradient`
+ * says *this varies continuously*, a `step` says *these are N groups*, a
+ * `palette` says *these are unordered identities*.
+ */
+export type RampFill = "gradient" | "step" | "palette";
+export const RAMP_FILLS: readonly RampFill[] = Object.freeze(["gradient", "step", "palette"]);
+
+/**
+ * Five loops and `none` (I109). No one-shot — `sweep`, `ripple` — because the
+ * render has no birth tick to time an event from; no position effect —
+ * `typewriter`, `marquee` — because those change which clusters show and belong
+ * beside `elide`, not inside a colour. Timing lives in the effect (C09 §5).
+ */
+export type RampAnimation = "none" | "shimmer" | "wave" | "breathe" | "pulse" | "heartbeat";
+export const RAMP_ANIMATIONS: readonly RampAnimation[] = Object.freeze([
+  "none",
+  "shimmer",
+  "wave",
+  "breathe",
+  "pulse",
+  "heartbeat",
+]);
+
+/**
+ * An ink that is a function `[0, 1] → Colour` (§3am.2, I106–I109). What it
+ * varies *over* is C09's per-kind `RAMP_EXTENT`; what a sample resolves to at
+ * each depth is C10 §4h. This type says what one **is**, and it is closed to
+ * `Tone` and `ColormapName` so no member can hold a colour value.
+ *
+ * `gradient` and `step` take exactly one backing — a `from`/`to` pair of slots
+ * or a `colormap`; `palette` takes neither and cycles the theme's categorical
+ * slots (no name: C10 I16 leaves one legal value, F837). `bands` is `step`'s
+ * alone, an integer in `2..8`. Absent `animate` is `"none"`.
+ */
+export type Ramp = Readonly<{
+  fill: RampFill;
+  from?: Tone;
+  to?: Tone;
+  colormap?: ColormapName;
+  bands?: number;
+  animate?: RampAnimation;
+}>;
+
+/** The members of a ramp, for a gate that cannot silently take a seventh (I106). */
+export const RAMP_KEYS: ReadonlySet<string> = new Set(["fill", "from", "to", "colormap", "bands", "animate"]);
 
 // --- table ----------------------------------------------------------------
 
@@ -2601,6 +2657,14 @@ export type Progress = Readonly<{
    * because a bar is decoration over a number that is already correct.
    */
   style?: string;
+  /**
+   * An ink over the bar's `on` cells, varying along the **axis** (§3am.2,
+   * I108; C09 I52): cell *i* samples `i / (barWidth − 1)` whether or not it is
+   * filled, so the tip's colour reads the fraction and a cell painted once keeps
+   * its colour as the bar fills. The one block-level carrier, and the one place
+   * a colormap backing is admitted — the ink fills its cell and reads by area.
+   */
+  ramp?: Ramp;
 }> & Gap & Floor;
 
 export type Code = Readonly<{

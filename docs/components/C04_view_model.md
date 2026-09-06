@@ -2626,8 +2626,13 @@ member can hold a colour value**: the type is closed to `Tone` and `ColormapName
 the pie; measured, both cycle the **theme's** categorical slots through `refOf`, and
 `QUALITATIVE_PALETTES` has no consumer in `src/` (F837). C10 I16 rules that a document draws
 its categories from that one palette, so a field naming another has one legal value, and a
-field with one legal value is not a choice. Cluster *i* of a palette ramp is
-`categorical.c((i mod 8) + 1)`, and the data palettes stay the plot arm's.
+field with one legal value is not a choice. **The unit a palette cycles over is the identity, and
+on text the identity is the span**: the *i*-th ramped span of a member takes
+`categorical.c((i mod 8) + 1)`, so a list of five words carrying five palette spans is five
+colours, each word whole. Per cluster it would be confetti — a rainbow inside one word says
+nothing about identities — and the first frame read on landing showed exactly that, which is
+why the sentence names the span. On the bar the only unit is the cell, and a palette bar is a
+stripe. The data palettes stay the plot arm's.
 
 **On a span, a ramp is appearance and only appearance** (I107). `measure` never reads it —
 the ninth member of `TEXT_SPAN_KEYS`, and the golden sweep asserts the same height with and
@@ -3472,7 +3477,7 @@ The generic suite. **These run against every registered block kind, including ap
 - **T6.92** (I106): dropping the arity check from `validate.ts` → T1.29's both-backings row admits a ramp with two answers; admitting a `bands` of 1 → T1.29's bands row passes a step with one band, which is a gradient wearing a different name.
 - **T6.93** (I107): the validator admitting a `colormap` on a span → T1.30 fails at construction; `measure` reading `ramp` → T3.77 fails on the height while every render row still passes, which is why the row compares heights and not frames.
 - **T6.94** (I109): widening `RampAnimation` with `sweep` → T2.117's refusal row admits an event the render cannot time.
-- **T6.95** (I108): `validate.ts` dropping `ramp` from `progress`'s admitted keys → T1.30's accepted row fails; adding `ramp` to `rule` → the `RAMP_EXTENT` exhaustiveness check names a kind marked `none` with a carrier (→ C09).
+- **T6.95** (I108): the `progress` arm of `validate.ts` dropping its `checkRamp` call → T1.29's bar half admits every ramp the span half refuses, **measured** on landing — the mechanism is a call and not a key list, which is why the row runs the table on both carriers; adding `ramp` to `rule` → the `RAMP_EXTENT` exhaustiveness check names a kind marked `none` with a carrier (→ C09).
 - **T6.85** (§3am): reverting the translator to literal markers → T2.33 fails on `text`; adding a text-only `ViewPatch` arm → T1.26 still passes and **nothing fails**, which is the row that says the closure in I87 is by type and the day the union widens this row wants a test.
 
 ---

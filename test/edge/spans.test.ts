@@ -12,7 +12,7 @@
 // alone; the colour's presence is asserted separately where it matters.
 import { describe, expect, it } from "vitest";
 import { block } from "../../src/data/viewmodel/index.js";
-import type { Block, TextSpan } from "../../src/data/viewmodel/index.js";
+import type { Block, Ramp, TextSpan } from "../../src/data/viewmodel/index.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
 import { cells } from "../../src/presentation/text.js";
 import { ASCII_CAPS, FULL_CAPS, MONO_CAPS, measurable, visible } from "../support/render.js";
@@ -119,7 +119,37 @@ describe("C04 §3am — spans at the edges", () => {
       full.renderToLines(block({ kind: "notice", id: "n", tone: "ok", text }), 30),
     );
   });
-  it.todo("T3.77 (C04 I107, I108): a ramped span measures the same as its plain twin over the sweep, at tick 0 and tick 7; a colormap-ramped progress measures 1 — not deferred on a component: lands with the ramp resolver");
+  it("T3.77 (C04 I107, I108): over the sweep a raw, a notice and a Cell carrying a ramped span measure identically to their plain twins, at tick 0 and tick 7; a colormap-ramped progress measures 1 at every width; the frames differ at 24-bit where the heights do not", () => {
+    const text = "the quick brown fox jumps over the lazy dog";
+    const ramp: Ramp = { fill: "gradient", from: "default", to: "accent", animate: "wave" };
+    // From the first cluster, because a table column with no `flex` gets its
+    // `minWidth` and nothing more (F50): a span starting at 4 would be cut away
+    // whole in a four-cell column and the two frames would agree for the wrong
+    // reason — measured, and it is why the span begins at 0.
+    const span: TextSpan = { from: 0, to: 25, ramp };
+    const pairs: readonly (readonly [Block, Block])[] = [
+      [block({ kind: "raw", id: "r", text }), block({ kind: "raw", id: "r", text, spans: [span] })],
+      [block({ kind: "notice", id: "n", tone: "info", text }), block({ kind: "notice", id: "n", tone: "info", text, spans: [span] })],
+      [
+        block({ kind: "table", id: "t", columns: [{ key: "c0", label: "c", align: "left", priority: 50, minWidth: 4, sortable: false }], rows: [{ id: "r0", cells: { c0: { text } } }] }),
+        block({ kind: "table", id: "t", columns: [{ key: "c0", label: "c", align: "left", priority: 50, minWidth: 4, sortable: false }], rows: [{ id: "r0", cells: { c0: { text, spans: [span] } } }] }),
+      ],
+    ];
+    const widths = [80, 40, 24, 12, 8];
+    for (const tick of [0, 7]) {
+      const kit = measurable({ tick, definitions: [tableDefinition as never] });
+      for (const [plain, ramped] of pairs) {
+        for (const w of widths) {
+          expect(kit.measure(ramped, w), `${ramped.kind} at ${String(w)}, tick ${String(tick)}`).toBe(kit.measure(plain, w));
+          expect(kit.renderToLines(ramped, w).length, `${ramped.kind} rows at ${String(w)}`).toBe(kit.measure(ramped, w));
+        }
+        // Non-vacuous: the ramp reached the renderer.
+        expect(kit.renderToLines(ramped, 80)).not.toEqual(kit.renderToLines(plain, 80));
+      }
+      const bar = block({ kind: "progress", id: "p", label: "build", current: 3, total: 10, ramp: { fill: "step", colormap: "magma", bands: 4, animate: "pulse" } });
+      for (const w of widths) expect(kit.measure(bar, w)).toBe(1);
+    }
+  });
 });
 
 describe("C09 §5 — tone and value, the frames", () => {
@@ -204,10 +234,67 @@ describe("C10 §4e — attributes are not on the glyph axis", () => {
 });
 
 describe("C09 §5 — ramps at the rungs", () => {
-  it.todo("T3.71 (C09 I51, C10 I36): a slot-pair gradient at 4-bit is two colours; 1-bit is byte-identical to the block toned from; a colormap bar at 4-bit is byte-identical to no ramp — not deferred on a component: lands with the ramp resolver");
-  it.todo("T3.72 (C09 I51, I53): a single-cluster span samples the midpoint; under shimmer its five frames carry at most two colours; under wave every tick is the midpoint — not deferred on a component: lands with the ramp resolver");
+  const text = "gradient title";
+  const pair: Ramp = { fill: "gradient", from: "default", to: "accent" };
+  const ramped = block({ kind: "raw", id: "r", text, spans: [{ from: 0, to: text.length, ramp: pair }] });
+  const toned = block({ kind: "raw", id: "r", text, spans: [{ from: 0, to: text.length, tone: "default" }] });
+  const at = (depth: 1 | 4 | 8 | 24, tick = 0): ReturnType<typeof measurable> => measurable({ capabilities: { ...FULL_CAPS, colourDepth: depth }, tick });
+  /** The foreground parameters a row opens, in order — the colours it uses. */
+  const foregrounds = (line: string): string[] =>
+    [...line.matchAll(/\x1b\[([0-9;]*)m/gu)]
+      .map((m) => /(?:^|;)(38;2;\d+;\d+;\d+|38;5;\d+|3[0-7]|9[0-7])(?:;|$)/u.exec(m[1] ?? "")?.[1])
+      .filter((x): x is string => x !== undefined);
+
+  it("T3.71 (C09 I51, C10 I36): a slot-pair gradient at 24-bit is one colour per cluster; at 4-bit exactly two, from then to; at 1-bit byte-identical to the block toned from; a colormap bar at 4-bit byte-identical to no ramp", () => {
+    const full = at(24).renderToLines(ramped, 40)[0] ?? "";
+    expect(new Set(foregrounds(full)).size).toBe(text.length);
+    const four = at(4).renderToLines(ramped, 40)[0] ?? "";
+    const fours = foregrounds(four);
+    expect(new Set(fours).size).toBe(2);
+    // `from` in the first half of the extent and `to` in the second, so the row
+    // is two spans in that order and not an alternation.
+    expect(fours).toEqual([fours[0], fours[fours.length - 1]]);
+    expect(visible(four)).toBe(visible(full));
+    // 1-bit: `from`'s class, which for `default` is no attribute — identical to a `default` tone span.
+    expect(at(1).renderToLines(ramped, 40)).toEqual(at(1).renderToLines(toned, 40));
+
+    const bar = (ramp?: Ramp): Block => block({ kind: "progress", id: "p", label: "build", current: 3, total: 10, ...(ramp === undefined ? {} : { ramp }) });
+    expect(at(4).renderToLines(bar({ fill: "gradient", colormap: "viridis" }), 40)).toEqual(at(4).renderToLines(bar(), 40));
+    expect(at(24).renderToLines(bar({ fill: "gradient", colormap: "viridis" }), 40)).not.toEqual(at(24).renderToLines(bar(), 40));
+  });
+
+  it("T3.72 (C09 I51, I53): a single-cluster span samples the midpoint; under shimmer its five frames carry at most two colours; under wave every tick is the midpoint", () => {
+    const one = (animate: Ramp["animate"]): Block =>
+      block({ kind: "raw", id: "r", text: "x rest", spans: [{ from: 0, to: 1, ramp: { ...pair, ...(animate === undefined ? {} : { animate }) } }] });
+    const fg = (b: Block, tick: number): string => foregrounds(at(24, tick).renderToLines(b, 20)[0] ?? "")[0] ?? "";
+    const from = foregrounds(sgr(resolveTone("default", DARK_THEME, FULL_CAPS)))[0];
+    const to = foregrounds(sgr(resolveTone("accent", DARK_THEME, FULL_CAPS)))[0];
+    const midpoint = fg(one(undefined), 0);
+    expect(midpoint).not.toBe(from);
+    expect(midpoint).not.toBe(to);
+    // wave: a translation of 0 for n = 1, so every tick is the midpoint.
+    for (const tick of [0, 1, 2, 3, 4]) expect(fg(one("wave"), tick)).toBe(midpoint);
+    // shimmer on one cell: the band passes and the cell pulses — two colours at most across five frames.
+    const seen = new Set([0, 1, 2, 3, 4].map((tick) => fg(one("shimmer"), tick)));
+    expect(seen.size).toBeGreaterThan(1);
+    expect(seen.size).toBeLessThanOrEqual(2);
+  });
 });
 
 describe("C10 §4h — motion at the rungs", () => {
-  it.todo("T3.35 (C10 I36, C09 I53): a shimmer at 4-bit is five identical two-colour frames; at 24-bit five distinct; at 1-bit equal to the block toned from — not deferred on a component: lands with the ramp resolver");
+  it("T3.35 (C10 I36, C09 I53): a shimmer at 4-bit is five identical two-colour frames; at 24-bit five distinct; at 1-bit equal to the block toned from", () => {
+    const text = "shimmering head";
+    const moving = block({ kind: "raw", id: "r", text, spans: [{ from: 0, to: text.length, ramp: { fill: "gradient", from: "default", to: "accent", animate: "shimmer" } }] });
+    const toned = block({ kind: "raw", id: "r", text, spans: [{ from: 0, to: text.length, tone: "default" }] });
+    const frame = (depth: 1 | 4 | 24, tick: number): string => measurable({ capabilities: { ...FULL_CAPS, colourDepth: depth }, tick }).renderToLines(moving, 40)[0] ?? "";
+    const ticks = [0, 1, 2, 3, 4];
+    const fours = ticks.map((t) => frame(4, t));
+    expect(new Set(fours).size, "4-bit: motion resolves to none").toBe(1);
+    expect(new Set([...(fours[0] ?? "").matchAll(/\x1b\[([0-9;]*)m/gu)].map((m) => m[1])).size).toBeLessThanOrEqual(3);
+    const fulls = ticks.map((t) => frame(24, t));
+    expect(new Set(fulls).size, "24-bit: five frames, five pictures").toBe(5);
+    const ones = ticks.map((t) => frame(1, t));
+    expect(new Set(ones).size).toBe(1);
+    expect(ones[0]).toBe(measurable({ capabilities: { ...FULL_CAPS, colourDepth: 1 } }).renderToLines(toned, 40)[0]);
+  });
 });

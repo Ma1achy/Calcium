@@ -20,9 +20,9 @@
  * nothing outside it, and the runs still concatenate to `stripControl(text)`,
  * which is what the measurer wrapped (C09 I1).
  */
-import type { TextSpan, Tone } from "../data/viewmodel/index.js";
+import type { TextSpan, Tone, Ramp } from "../data/viewmodel/index.js";
 import { stripControl } from "../data/text.js";
-import { clusterEnds, placeableClusters, wrapCellsParts, type AmbiguousWidth, type Atom } from "./text.js";
+import { clusterEnds, placeableClusters, wrapCellsParts, type AmbiguousWidth, type Atom, graphemes } from "./text.js";
 
 /** What a span contributes to a `Style` — and nothing a palette resolves (C10 I33). */
 export type SpanAttrs = Readonly<{ bold?: boolean; italic?: boolean; underline?: boolean }>;
@@ -35,7 +35,18 @@ export type SpanAttrs = Readonly<{ bold?: boolean; italic?: boolean; underline?:
  * has. `value` is the one member the wrapper reads — a valued run is an atom
  * (C09 §5) — which is why it rides on the run and not only on the style.
  */
-export type Run = Readonly<{ text: string; attrs?: SpanAttrs; tone?: Tone; value?: number; elide?: true }>;
+export type Run = Readonly<{ text: string; attrs?: SpanAttrs; tone?: Tone; value?: number; elide?: true; ramp?: RunRamp }>;
+
+/**
+ * A run's place in its ramped span (C09 I51): `at` is the grapheme index of the
+ * run's first cluster within the span, `of` the span's cluster count, and
+ * `ordinal` the span's position among the member's ramped spans — the unit a
+ * `palette` cycles over, because on text the identity is the span (C04 §3am.2).
+ * **All three come from the span and never from the run** — a span wrapped
+ * across two rows is two runs, and the second continues from where the first
+ * stopped.
+ */
+export type RunRamp = Readonly<{ ramp: Ramp; at: number; of: number; ordinal: number }>;
 
 /**
  * A boundary that falls inside a grapheme cluster is moved to the cluster's end
@@ -72,7 +83,7 @@ function attrsOf(span: TextSpan): SpanAttrs | undefined {
 }
 
 /** A run carrying what its span said — and no member the span did not set. */
-function runOf(text: string, span: TextSpan): Run {
+function runOf(text: string, span: TextSpan, ordinal: number): Run {
   const attrs = attrsOf(span);
   return {
     text,
@@ -81,6 +92,8 @@ function runOf(text: string, span: TextSpan): Run {
     ...(span.value === undefined ? {} : { value: span.value }),
     // A boundary the fitter reads and the painter never does (C04 I105).
     ...(span.elide === true ? { elide: true as const } : {}),
+    // The extent is the span's drawn text, counted in clusters (C09 I51).
+    ...(span.ramp === undefined ? {} : { ramp: { ramp: span.ramp, at: 0, of: graphemes(text).length, ordinal } }), // cells-ok — a cluster count
   };
 }
 
@@ -100,10 +113,16 @@ export function runsOf(text: string, spans: readonly TextSpan[] | undefined): re
   const ends = clusterEnds(text);
   const out: Run[] = [];
   let at = 0;
+  let ramped = 0;
   const push = (piece: string, span: TextSpan | undefined): void => {
     const clean = stripControl(piece);
     if (clean === "") return;
-    out.push(span === undefined ? { text: clean } : runOf(clean, span));
+    if (span === undefined) {
+      out.push({ text: clean });
+      return;
+    }
+    out.push(runOf(clean, span, ramped));
+    if (span.ramp !== undefined) ramped += 1;
   };
 
   for (const span of spans) {
@@ -132,10 +151,11 @@ export function runsText(runs: readonly Run[]): string {
  * Generic over anything carrying a `text`, so a syntax token and a span run are
  * cut by one arithmetic; the other members ride along unchanged.
  */
-export function sliceRuns<T extends Readonly<{ text: string }>>(
+export function sliceRuns<T extends Readonly<{ text: string; ramp?: RunRamp }>>(
   runs: readonly T[],
   start: number,
   length: number,
+  mode: "cut" | "wrap" = "cut",
 ): readonly T[] {
   const out: T[] = [];
   let at = 0;
@@ -144,12 +164,32 @@ export function sliceRuns<T extends Readonly<{ text: string }>>(
     const size = run.text.length; // cells-ok — a code-unit cursor
     const from = Math.max(start, at);
     const to = Math.min(start + length, at + size);
-    if (to > from) out.push({ ...run, text: run.text.slice(from - at, to - at) });
+    if (to > from) out.push(rampSliced({ ...run, text: run.text.slice(from - at, to - at) }, run, from - at, to - at, mode));
     at += size;
     if (at >= start + length) break;
   }
 
   return out;
+}
+
+/**
+ * A sliced run's place in its ramp (C09 I51). The clusters dropped before the
+ * slice advance `at`; a **cut** — truncation — also drops what is after it from
+ * `of`, so the extent is what is drawn and the marker takes the last cluster's
+ * colour. A **wrap** keeps `of`: the rest of the span is on the next row.
+ */
+function rampSliced<T extends Readonly<{ text: string; ramp?: RunRamp }>>(
+  sliced: T,
+  run: T,
+  from: number,
+  to: number,
+  mode: "cut" | "wrap",
+): T {
+  const ramp = run.ramp;
+  if (ramp === undefined) return sliced;
+  const before = from === 0 ? 0 : graphemes(run.text.slice(0, from)).length; // cells-ok — a cluster count
+  const after = to >= run.text.length || mode === "wrap" ? 0 : graphemes(run.text.slice(to)).length; // cells-ok — a cluster count
+  return { ...sliced, ramp: { ramp: ramp.ramp, at: ramp.at + before, of: ramp.of - after, ordinal: ramp.ordinal } };
 }
 
 /** The runs, cut at every `\n` — one list per line, as `tokenLines` does for tokens. */
@@ -191,7 +231,7 @@ export function wrapRuns(
   const placed = runs.map((run) => ({ ...run, text: placeableClusters(run.text, width) }));
   const text = runsText(placed);
   return wrapCellsParts(text, width, ambiguous, atomsOf(placed)).map((row) =>
-    sliceRuns(placed, row.start, row.text.length), // cells-ok — a code-unit length
+    sliceRuns(placed, row.start, row.text.length, "wrap"), // cells-ok — a code-unit length
   );
 }
 

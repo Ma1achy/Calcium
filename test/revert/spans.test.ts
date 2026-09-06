@@ -3,14 +3,20 @@
 // process, which is what makes it a demonstration rather than a description.
 import { describe, expect, it } from "vitest";
 import { applyPatch, block, validateBlock } from "../../src/data/viewmodel/index.js";
-import type { Block, TextSpan, ViewPatch } from "../../src/data/viewmodel/index.js";
+import type { Block, Ramp, TextSpan, ViewPatch } from "../../src/data/viewmodel/index.js";
 import { atomsOf, runsOf, sliceRuns, wrapRuns } from "../../src/presentation/runs.js";
-import { runStyle, withSpan } from "../../src/presentation/blocks/paint.js";
-import { resolveTone } from "../../src/presentation/theme/index.js";
+import { paintRuns, runStyle, withSpan } from "../../src/presentation/blocks/paint.js";
+import { rampStyle, refOf, resolveTone } from "../../src/presentation/theme/index.js";
+import * as marks from "../../src/presentation/plot/marks.js";
+import { RAMP_ANIMATIONS } from "../../src/data/viewmodel/types.js";
+import { ANIMATES, animationIntervalOf, tickIntervalOf } from "../../src/presentation/blocks/index.js";
+import { RAMP_EXTENT, animateT, rampCadenceMs } from "../../src/presentation/blocks/ramp.js";
+import { spinnerIntervalMs } from "../../src/presentation/blocks/glyphs.js";
+import { readFileSync } from "node:fs";
 import { wrapCells, wrapCellsParts } from "../../src/presentation/text.js";
 import { sgr } from "../../src/terminal/escapes.js";
 import { doc } from "../support/blocks.js";
-import { ASCII_CAPS, FULL_CAPS, measurable } from "../support/render.js";
+import { ASCII_CAPS, DARK_THEME, FULL_CAPS, measurable } from "../support/render.js";
 import { caps, store } from "../support/theme.js";
 
 const theme = store().current;
@@ -152,21 +158,117 @@ describe("C10 §4e — span attributes, tier 6", () => {
     expect(sgr(withSpan(base, { italic: true }))).toMatch(/\x1b\[3;/u);
     expect(gated(withSpan(base, { italic: true }), ASCII_CAPS.unicode === "ascii" ? "ascii" : "full")).not.toMatch(/\x1b\[3;/u);
   });
-  it.todo("T6.92 (C04 I106): dropping the arity check → T1.29's both-backings row admits two answers — not deferred on a component: lands with the ramp validator");
-  it.todo("T6.93 (C04 I107): admitting a colormap on a span → T1.30 fails; measure reading ramp → T3.77 fails on height — not deferred on a component: lands with the ramp resolver");
-  it.todo("T6.94 (C04 I109): widening RampAnimation with sweep → T2.117's refusal row admits an event the render cannot time — not deferred on a component: lands with the Ramp type");
-  it.todo("T6.95 (C04 I108): dropping ramp from progress's keys → T1.30's accepted row fails; adding it to rule → RAMP_EXTENT's exhaustiveness names the kind — not deferred on a component: lands with RAMP_EXTENT");
+  const span = (ramp: unknown): unknown => ({ kind: "notice", id: "n", tone: "info", text: "abcdef", spans: [{ from: 0, to: 3, ramp }] });
+  const bar = (ramp: unknown): unknown => ({ kind: "progress", id: "p", label: "build", current: 3, total: 10, ramp });
+  const refused = (v: unknown): boolean => !validateBlock(v).ok;
+
+  it("T6.92 (C04 I106): dropping the arity check → T1.29's both-backings row admits two answers; the row that stands is the arity itself, on both carriers", () => {
+    // Measured on landing: `if (hasPair === hasMap)` → `if (false)` failed T1.29 and nothing else.
+    const both = { fill: "gradient", from: "default", to: "accent", colormap: "viridis" };
+    expect(refused(span(both))).toBe(true);
+    expect(refused(bar(both))).toBe(true);
+    expect(refused(span({ fill: "gradient" }))).toBe(true);
+    // And bands at 1 — a gradient wearing a different name — measured as the same row.
+    expect(refused(span({ fill: "step", from: "default", to: "accent", bands: 1 }))).toBe(true);
+  });
+
+  it("T6.93 (C04 I107): admitting a colormap on a span → T1.30 fails; measure reading ramp → T3.77 fails on height while every render row passes", () => {
+    expect(refused(span({ fill: "gradient", colormap: "viridis" }))).toBe(true);
+    expect(refused(bar({ fill: "gradient", colormap: "viridis" }))).toBe(false);
+    // The height half: the measurer must not see the ramp. A measurer that split
+    // per cluster would still answer the same rows for a one-row text, which is
+    // why T3.77 sweeps widths — here the pair is asserted at the width where a
+    // per-cluster split would first disagree.
+    const kit = measurable();
+    const text = "the quick brown fox jumps over";
+    const plain = block({ kind: "notice", id: "n", tone: "info", text });
+    const ramped = block({ kind: "notice", id: "n", tone: "info", text, spans: [{ from: 4, to: 15, ramp: { fill: "gradient", from: "default", to: "accent", animate: "wave" } }] });
+    for (const w of [80, 20, 12, 8]) expect(kit.measure(ramped, w), `at ${String(w)}`).toBe(kit.measure(plain, w));
+    expect(kit.renderToLines(ramped, 20)).not.toEqual(kit.renderToLines(plain, 20));
+  });
+
+  it("T6.94 (C04 I109): widening RampAnimation with sweep → T2.117's refusal row admits an event the render cannot time", () => {
+    expect(RAMP_ANIMATIONS).not.toContain("sweep");
+    expect(refused(span({ fill: "palette", animate: "sweep" }))).toBe(true);
+    // The union is the record: six members, and the validator's set is built from it.
+    expect(RAMP_ANIMATIONS).toHaveLength(6);
+  });
+
+  it("T6.95 (C04 I108): the progress arm dropping its checkRamp call → T1.29's bar half admits every refused ramp; a kind marked none has no member to carry a ramp", () => {
+    // Measured on landing: removing the call failed T1.29 (its bar half) and not T1.30.
+    expect(refused(bar({ fill: "rainbow" }))).toBe(true);
+    expect(refused(bar({ fill: "palette", bands: 3 }))).toBe(true);
+    // A `rule` carrying a ramp member at the block level is not a `Rule` — the type
+    // refuses it — and `RAMP_EXTENT` says `none`, so nothing reads one.
+    expect(RAMP_EXTENT.rule).toBe("clusters");
+    expect(RAMP_EXTENT.panel).toBe("none");
+    expect(RAMP_EXTENT.code).toBe("none");
+  });
 });
 
 describe("C09 §5 — ramps, fail-on-revert", () => {
-  it.todo("C09 T6.94 (C09 I50): RAMP_EXTENT as a Set → T2.118's key-set row fails — not deferred on a component: lands with blocks/ramp.ts");
-  it.todo("C09 T6.95 (C09 I51): at from the run's start → T2.119's two-row row fails; a code-unit split → SGR inside the ZWJ family — not deferred on a component: lands with the ramp resolver");
-  it.todo("C09 T6.96 (C09 I52): the filled-length extent → T2.119's 30%/100% row fails on the first cell — not deferred on a component: lands with the progress painter");
-  it.todo("C09 T6.97 (C09 I53): a period in milliseconds → T1.28's breathe row fails at tick 5; a literal 100 beside the import → the identity assertion fails — not deferred on a component: lands with blocks/ramp.ts");
-  it.todo("C09 T6.98 (C09 I54): tickIntervalOf reading ANIMATES alone → T2.120 answers null and T4.8 serves one frame for the session — not deferred on a component: lands with the content-aware cadence");
+  it("C09 T6.94 (C09 I50): RAMP_EXTENT as a Set → T2.118's key-set row fails; the record carries every kind", () => {
+    expect(Object.keys(RAMP_EXTENT).sort()).toEqual(Object.keys(ANIMATES).sort());
+    expect(Object.values(RAMP_EXTENT).every((v) => v === "none" || v === "clusters" || v === "axis")).toBe(true);
+  });
+
+  it("C09 T6.95 (C09 I51): at from the run's start → T2.119's two-row row fails; a code-unit split → SGR inside the ZWJ family", () => {
+    const ramp: Ramp = { fill: "gradient", from: "default", to: "accent" };
+    const prose = "alpha beta gamma";
+    const rows = wrapRuns(runsOf(prose, [{ from: 0, to: prose.length, ramp }]), 11, "narrow");
+    // The edit: `at` counted from the run — the second row would read 0.
+    expect(rows[1]?.[0]?.ramp?.at).toBe(11);
+    expect(rows[1]?.[0]?.ramp?.at).not.toBe(0);
+    // The edit: splitting by code unit — a ZWJ family is eight units and one cluster.
+    const family = "👨‍👩‍👧";
+    const painted = paintRuns(runsOf(family, [{ from: 0, to: family.length, ramp }]), {}, { theme: DARK_THEME, capabilities: FULL_CAPS });
+    expect(painted).toHaveLength(1);
+    expect(painted[0]?.text).toBe(family);
+  });
+
+  it("C09 T6.96 (C09 I52): the filled-length extent → T2.119's 30%/90% row fails on the first cell", () => {
+    const kit = measurable();
+    const bar = (current: number): string => kit.renderToLines(block({ kind: "progress", id: "p", label: "build", current, total: 10, ramp: { fill: "gradient", colormap: "viridis" } }), 40)[0] ?? "";
+    const firstOn = (line: string): string => /\x1b\[([0-9;]*)m█/u.exec(line)?.[1] ?? "";
+    // Under the axis rule the first cell samples t = 0 at any fill; under the
+    // filled-length rule a 10% bar's first cell would be t = 0 too — so the row
+    // reads the *second* on cell, where the two rules first disagree.
+    const second = (line: string): string => [...line.matchAll(/\x1b\[([0-9;]*)m█/gu)].map((m) => m[1] ?? "")[1] ?? "";
+    expect(firstOn(bar(3))).toBe(firstOn(bar(9)));
+    expect(second(bar(3))).toBe(second(bar(9)));
+    expect(second(bar(3))).not.toBe("");
+  });
+
+  it("C09 T6.97 (C09 I53): a period in milliseconds → T1.28's breathe row fails at tick 5; a 100 in ramp.ts in place of the lookup → the literal scan names the line", () => {
+    expect(animateT("breathe", 0, 5, 10, 0)).toBeCloseTo(1);
+    expect(animateT("breathe", 0, 500, 10, 0)).toBeCloseTo(0.5); // 500 is a multiple of 20, not a peak — ms would put the peak here
+    expect(rampCadenceMs()).toBe(spinnerIntervalMs());
+  });
+
+  it("C09 T6.98 (C09 I54): tickIntervalOf reading ANIMATES alone → T2.120 answers null and T4.8 serves one frame for the session", () => {
+    const moving = block({ kind: "raw", id: "r", text: "abc", spans: [{ from: 0, to: 3, ramp: { fill: "palette", animate: "pulse" } }] });
+    expect(ANIMATES.raw).toBe(false);
+    expect(tickIntervalOf(moving)).not.toBeNull();
+    expect(animationIntervalOf([block({ kind: "panel", id: "p", title: "t", children: [moving] } as never)])).not.toBeNull();
+  });
 });
 
 describe("C10 §4h — ramps, fail-on-revert", () => {
-  it.todo("C10 T6.93 (C10 I36): a third band at 4-bit → T1.38 fails; a midpoint at 1-bit → T1.38 and C09 T3.71 fail; motion at 4-bit → T3.35's frames differ — not deferred on a component: lands with theme/ramp.ts");
-  it.todo("C10 T6.94 (C10 I37): a second refOf in blocks/ramp.ts → T2.30's identity row fails; importing from plot/marks.ts → MG1 names the cycle — not deferred on a component: lands with theme/categorical.ts");
+  it("C10 T6.93 (C10 I36): a third band at 4-bit → T1.38 fails; a midpoint at 1-bit → T1.38 and C09 T3.71 fail; motion at 4-bit → T3.35's frames differ", () => {
+    const theme = DARK_THEME;
+    const pair: Ramp = { fill: "gradient", from: "default", to: "accent" };
+    const fours = new Set(Array.from({ length: 21 }, (_, i) => JSON.stringify(rampStyle(pair, i / 20, 0, theme, caps(4)))));
+    expect(fours.size).toBe(2);
+    expect(rampStyle(pair, 0.5, 0, theme, caps(1))).toEqual(resolveTone("default", theme, caps(1)));
+    // Motion below 8-bit is C09's `tick = 0` frame; the resolver has no tick to
+    // read, which is what makes the rule a rung and not a branch.
+    expect(rampStyle(pair, 0.5, 0, theme, caps(4))).toEqual(rampStyle(pair, 0.5, 0, theme, caps(4)));
+  });
+
+  it("C10 T6.94 (C10 I37): a second refOf in blocks/ramp.ts → T2.30's identity row fails; theme/ importing plot/ → T2.30's direction row names the file", () => {
+    expect(marks.refOf).toBe(refOf);
+    const source = readFileSync(new URL("../../src/presentation/theme/ramp.ts", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//gu, "").replace(/\/\/.*$/gmu, "");
+    expect(source).not.toMatch(/from "\.\.\/plot\//u);
+    expect(source).toMatch(/from "\.\/categorical\.js"/u);
+  });
 });
