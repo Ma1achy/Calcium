@@ -30848,3 +30848,123 @@ guard whose trigger does not fire, recorded with both figures and the date.
 
 ---
 
+## F862 — the architecture's six performance budgets: three are measured, and the table they fill is empty ★★★★☆
+
+A02 §7 states six performance budgets and A02 commitment 16 says they are *"measured in M-T3, not
+asserted"*. A01 Appendix B is the table those measurements fill, and A01 commitment 8 gates the M-T6
+compositor decision on it being *"measured, not estimated"* — *"Fill this from real numbers; do not
+estimate."*
+
+**Every Layer A result cell in that table is empty** (`A01:392-399`), and has been since it was
+written.
+
+**The budgets, resolved against the suite rather than assumed.** The first count taken for this was
+*four of six* and it was wrong, which is why the row is here with its working:
+
+| A02 §7 budget | measured? | where |
+|---|---|---|
+| Keystroke → frame < 16 ms p95 | **yes** | T5.2, `test/e2e/frame-scheduler.test.ts:52` |
+| Command commit → frame < 33 ms p95 | **no** | no assertion anywhere in the suite |
+| Page Down through 10 000 blocks < 50 ms | **no** | `test/e2e/viewport.test.ts:12` asserts rows match at every screenful and `screens > 400`, and **reads no clock**; the `30_000` beside it is a vitest timeout |
+| Streaming 1 000 l/s ≤ 30 fps, < 25% of one core | **yes**, both halves | T5.1, `frame-scheduler.test.ts:42,48` |
+| Resize → correct frame < 33 ms, zero corruption | **half** | T5.4 asserts one width per frame, the right height, not empty and not the fallback — the corruption half. Nothing times it |
+| Idle CPU ~0% | **yes** | T5.6 |
+
+**And every budget that is measured is measured from outside, through a PTY**, byte-stamping the
+terminal. That is not a stylistic choice, and the coincidence in the two columns is the finding: the
+three Appendix B rows that **cannot** be taken from outside — bytes written per frame, median frame
+construction, p95 frame construction — are exactly the three that are blank. The framework exposes no
+number about itself, so a measurement that cannot be taken by watching its output cannot be taken at
+all, and the table's empty cells are a map of that gap rather than of anybody's inattention.
+
+**The class is a claim carried without a record.** *"Measured in M-T3 and recorded in A01 Appendix B"*
+is a present-tense sentence pointing at a table with nothing in it, and it has been read by every pass
+over A02 without anyone following the pointer — the same shape as F58 and F66, where the record turned
+out to be a previous plan rather than a measurement. Here the record exists, is correctly named, and
+is empty.
+
+**What this is not.** It is not a claim that Calcium is slow, or fast. Three of the six budgets hold
+where they are measured. The other three are unknown, and the point is that they are unknown rather
+than that they are bad — A01 commitment 8 makes an entire architectural decision conditional on
+numbers nobody has, so *unknown* is the state that blocks something.
+
+---
+
+## F863 — ten diagnostic members across six components, and nothing reads any of them ★★★☆☆
+
+Every component that could say something about its own state already does. Nothing collects it,
+nothing displays it, and no consumer can reach it.
+
+| member | file:line |
+|---|---|
+| `Store.blockCount` · `droppedBlocks` · `overCap` | `src/viewport/transcript/store.ts:69,73,77` |
+| `Viewport.stats` — `{ cacheSize, indexCapacity, entryCount }` | `src/viewport/viewport/types.ts:120` |
+| `CompletionEngine.inFlight` | `src/interaction/completion/engine.ts:71` |
+| `InputRouter.lastStages` | `src/interaction/router/router.ts:121` |
+| `EditorHandle.undoDepth` · `redoDepth` | `src/interaction/editor/editor.ts:163-164` |
+| `Pipeline.liveStreams` · `inFlight` | `src/shell/types.ts:175,173` |
+
+Ten members, six components, and several carry a doc comment saying what they are for —
+`lastStages` is *"which stages the last dispatch consulted, in order"*, `inFlight` is
+*"diagnostics: how many source calls are in flight"*. They were written to be read. The only
+diagnostic surface that **is** drained is `BlockFaultLog`, through `graph.diagnostics()`
+(`construct.ts:313`), printed at shutdown (`session.ts:564`); the other ten reach nothing.
+
+**And two caches count their size while neither counts a hit.** `HeightCache.size`
+(`viewport/viewport/cache.ts:32`) and `RenderCache.size` (`shell/render-cache.ts:115`) both publish a
+`size` getter and no hit or miss counter. A size says how much is held; **a hit rate is the only
+number that says whether holding it was worth anything**, and neither cache can answer it.
+
+**A count would not be enough either, which is the sharper half.** The cache failure this tree has
+actually had is F227's — a key axis that moves when nothing changed — and a miss produced that way is
+**indistinguishable by count** from a legitimate miss after an edit. What separates them is the
+*reason*: `RenderCache`'s key already carries `id, rev, width, focus, theme` plus range and offsets,
+so it can say which axis moved, and a miss where **none** moved is a defect reporting itself. The
+counter that would have found F227 in a day is one comparison the cache is already positioned to make.
+
+**This is F395's shape one level out.** F395 found three numbers the framework does not have. This
+finds ten it has and nobody reads — and the two together are why the profiler's snapshot must
+*aggregate* these rather than add an eleventh.
+
+---
+
+## F864 — the debug sink is wired end to end, has seven writers, and nothing has ever fed it ★★★☆☆
+
+`ConstructDeps.debug?: (line: string) => void` is declared at `src/shell/construct.ts:250`, forwarded
+into two subsystems at `:986` and `:1011`, and called from **seven real sites** that narrate genuine
+failures:
+
+| site | what it says |
+|---|---|
+| `terminal/lifecycle.ts:361` | anything written to the real `stdout` while the shell holds the terminal, redirected here instead of corrupting the live screen |
+| `terminal/lifecycle.ts:475` | `beforeRelease threw: …` |
+| `terminal/lifecycle.ts:520` | `release: N sequence(s) failed: …` |
+| `terminal/lifecycle.ts:659` | `acquire failed midway: …` |
+| `data/process/runner.ts:72` | `SHELL=… is not executable; falling back to …` |
+| `data/process/runner.ts:339,345` | `handoff failed to spawn: …` |
+
+**`Session.start()` passes five deps and `debug` is not one of them.** The call at `session.ts:316`
+supplies `stop`, `render`, `repaint`, `frame` and `onFatal`, so `deps.debug` is `undefined`, both
+forwards are skipped by their own `=== undefined` guards, and all seven sites default to a no-op in
+every real session. The first of them is the one that costs something: output that would corrupt the
+alternate screen is caught, handed to the sink, and dropped.
+
+**The code reasons about it as the sanctioned channel while nothing receives it.** `construct.ts:1235`
+says *"Best effort. A03 SS33 bans `console.*` and the debug sink is C01's."* SS33 does ban
+`console.*`, with zero exceptions, so that sentence is correct about the ban and wrong about the
+alternative it names.
+
+**Why no rule sees it.** MG24 catches a published member nobody names; MG25 catches an exported
+function nobody calls. This is neither: every member is named, every function is called, and what is
+missing is an **argument at one call site for an optional parameter**. `debug?:` is optional at every
+hop, so every hop compiles, every hop is correct in isolation, and the chain is complete in the one
+direction nobody checks — from the writer down. Nothing in the enforcement suite asks *which optional
+parameters no caller ever supplies*.
+
+**And there is a homonym two hundred lines away.** `TuiConfig.debug` (`src/shell/types.ts:481`) is
+`Readonly<{ retainPayloads?: number }>` — payload retention, a different thing entirely, on the type a
+reader looking for *how do I turn on debugging* would find first. F161's class: the name resolves, and
+to the wrong thing.
+
+---
+
