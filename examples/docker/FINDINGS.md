@@ -31517,6 +31517,39 @@ Found by reading the table against the paragraph above it while adding a member 
 the same instrument as *read the abstract against its own section before reading the section against
 the code*, applied to a constant.
 
+## F884 — seven defects carried in a plan, and four of their citations do not resolve ★★★☆☆
+
+The profiler's plan lists seven defects for P11 to fix, each with a file and a line. They were
+written by reading code, in a plan, and the plan is where they have lived since. Running *ask where
+a settled claim is written down* over all seven before touching any of them:
+
+| # | the plan's claim | at HEAD |
+|---|---|---|
+| 1 | `editor.layout` runs 4x per frame — `frame.ts:107`, `paint.ts:550`, `:370`, `:644` | two call sites, `session.ts:996` and `:1175`; **`paint.ts` has none**, only three comments mentioning layout. The count is unverified |
+| 2 | a `group` measures every child 3x | **measured**, and it is worse: `make profile` reports 2.0–4.0 calls per frame per element, with `pills#chrome.footer.left` at 4.0 |
+| 3 | O(entries) scan per visible entry per frame — `session.ts:1141` | confirmed, at `:1218` |
+| 4 | overlay `place()` twice per frame — `paint.ts:584`, `:624` | `composite.ts`'s header says the two `overlays.layout()` calls were **hit-testing and a remainder count**, both on the input path, and **neither drew** — which is the defect that header records fixing. One per-frame call today. Unverified |
+| 5 | whole-transcript `flatMap`, dead on non-kitty — `session.ts:724` | confirmed, at `:799`. `transmitImage` returns `""` on its first line for every non-kitty terminal, and the caller builds the array first |
+| 6 | `#form` measures twice for any capped block — `registry.ts:382`, `:386` | confirmed, at `:403` and `:407` |
+| 7 | a regex `.replace` per row per frame — `paint.ts:502-508` | confirmed at `:508`, **and free on the arm every session runs**: `based()` returns `lines` unchanged when `base === ""`, which the plan's line does not carry |
+
+**Three of the four failures are line drift and one is a dissolution.** Drift is cheap — the symbol
+is still there and a grep finds it. Number 4 is the other kind: the sites named are comments, the
+mechanism they described has been repaired, and the entry would have been *fixed* by a reader who
+went to the line, found nothing, and moved on — or, worse, re-fixed.
+
+**Number 7 is the one that would have cost real work.** The claim is true and the condition is
+missing: a regex allocated per row per frame, on sessions that paint a background. `toTerminalDefault`
+is `(): RegExp => /…/gu`, so it is a fresh `RegExp` on every call — a real defect — but the arm every
+session runs today is one comparison. Optimising it without measuring the two arms would have been a
+change with no before figure and no after one.
+
+**The class is F58's, one level out.** F58 was one claim in four documents citing each other; this is
+seven claims in one document, and the document is a *plan* — which reads as a settled artefact
+because it was approved. Nothing in the repository holds these seven except the plan, and a plan is
+where beliefs live, not rulings. The instrument's total: **three claims disproved and five produced**,
+counting this one.
+
 ## F883 — an ordering clause whose mechanism does not exist, and the row written from it agreed ★★★★☆
 
 C28 I38 put `onReport` **before** `this.#profiler?.dispose()` and gave a reason: `report()` reads
