@@ -20,7 +20,7 @@ import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
 const CMD =
-  "npx vitest run test/unit/profiler-tree.test.ts test/unit/profiler-seams.test.ts test/unit/profiler.test.ts test/unit/profiler-export.test.ts test/unit/profiler-async.test.ts test/unit/profiler-budget.test.ts";
+  "npx vitest run test/unit/profiler-tree.test.ts test/unit/profiler-seams.test.ts test/unit/profiler.test.ts test/unit/profiler-export.test.ts test/unit/profiler-async.test.ts test/unit/profiler-budget.test.ts test/unit/profiler-recorder.test.ts";
 const REC = "src/shell/profiling/recorder.ts";
 const NODE = "src/shell/profiling/node.ts";
 const SCANS = "tools/enforce/source-scans.mjs";
@@ -553,11 +553,24 @@ const results = runPass({
       // no time in it, so every *was it opened* assertion stays green and only
       // the residue moves — which is why T1.61 asserts the sum as well as the
       // four counts.
-      name: "OVERLAYS-BESIDE: the span closes before the call it names",
+      // Replaced `OVERLAYS-BESIDE`, which survived. That mutation closed the
+      // span before the call it names, and the harness T1.61 runs under injects
+      // a counter clock: every leaf span reads 1 whether it brackets its subject
+      // or not, so the report is byte-identical either way. Bracketing is now
+      // T1.2's row over a stepping clock; what a counter clock still sees is the
+      // wiring, so this mutation takes the second call site out of the wrapper.
+      name: "WRAPPER-BYPASSED: the second overlay layout is not measured",
       file: PAINT,
-      from: '  using _s = deps.probe?.span("overlays") ?? NO_SPAN;\n  return deps.overlays();',
-      to: '  { using _s = deps.probe?.span("overlays") ?? NO_SPAN; }\n  return deps.overlays();',
+      from: "  const placed = placedLayers(deps);",
+      to: "  const placed = deps.overlays();",
       expect: "T1.61",
+    },
+    {
+      name: "SPAN-ZERO: a span records nothing between its ends",
+      file: TREE,
+      from: "  const total = Math.max(0, at - node.startedAt);",
+      to: "  const total = Math.max(0, node.startedAt - node.startedAt);",
+      expect: "T1.2",
     },
     {
       name: "EAGER-ALS: the async store is built at construction",

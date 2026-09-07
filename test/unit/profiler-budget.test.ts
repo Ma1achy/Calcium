@@ -327,14 +327,29 @@ describe("C28 — every declared span is opened", () => {
       expect(spans[name]?.count ?? 0, `${name} was opened`).toBeGreaterThan(0);
     }
 
-    // **The residue is the row that matters.** Four counts prove the spans were
-    // called; only the sum says they were called *around* the work rather than
-    // beside it — a span opened and closed next to the thing it names has a
-    // count and no time in it.
+    // **What this harness can and cannot say.** `profiled()` injects a counter
+    // clock — `() => (t += 1)` — which advances once per *read*, not per unit of
+    // work. Under it every leaf span records exactly 1 whether it brackets its
+    // subject or closes beside it: `overlays` here is count 6, sum 6, max 1. So
+    // no sum asserted from this session distinguishes a span from an adjacency,
+    // and an earlier version of this row claimed one did. Bracketing is T1.2's
+    // row, over a clock the callee advances.
+    //
+    // What survives the counter clock is containment — a read inside a span is a
+    // read inside the frame — and the call **count**, which is what says the
+    // wiring reaches both sites.
     const work = report.latency?.work.sum ?? 0;
     const parts = Object.entries(spans).reduce((n, [, h]) => n + (h?.sum ?? 0), 0);
     expect(parts, "every span together fits inside the frames' work").toBeLessThanOrEqual(work);
-    expect(parts, "and accounts for most of it").toBeGreaterThan(work * 0.5);
+
+    // `paint()` and `cursorFor()` both lay the overlays out, and both go through
+    // one wrapper so that the second is measured rather than invisible. Two per
+    // frame is the defect P11 names; the row is here so that a call site
+    // reaching `deps.overlays()` directly cannot go unnoticed either way.
+    expect(
+      spans.overlays?.count ?? 0,
+      "both overlay layouts go through the measured wrapper",
+    ).toBe(2 * report.frames);
   });
 });
 

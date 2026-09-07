@@ -31517,6 +31517,57 @@ Found by reading the table against the paragraph above it while adding a member 
 the same instrument as *read the abstract against its own section before reading the section against
 the code*, applied to a constant.
 
+## F887 — a counter clock makes a span and an adjacency record the same number ★★★★☆
+
+`OVERLAYS-BESIDE` moved `paint.ts`'s overlay span so it closed *before* the call it names, and the
+C28 mutation pass reported it a survivor. The row written to catch it, T1.61, carried this
+sentence: *four counts prove the spans were called; only the sum says they were called around the
+work rather than beside it.*
+
+**The sum says nothing of the kind, in that harness.** `profiled()` injects
+`elapsed: () => (t += 1)` — a clock that advances once per **read**. A leaf span reads it twice,
+once at open and once at close, and records the difference. Whether a millisecond of work happened
+between those two reads is not a thing the clock can see. Measured on the session T1.61 builds:
+
+| span | count | sum | max |
+|---|---|---|---|
+| `overlays` | 6 | 6 | 1 |
+| `react` | 6 | 6 | 1 |
+| `chrome` | 3 | 3 | 1 |
+| `write` | 3 | 3 | 1 |
+
+Every leaf span is exactly 1 per call. `assemble` reads 18 over 3 calls only because six nested
+opens and closes happened inside it — the number is a **count of reads**, not a duration, and the
+mutation changes no read.
+
+So the mutation is invisible **in principle** here, not below a threshold. No strengthening of
+`parts > work * 0.5` reaches it; the bound was also within 4.5 units of failing on its own
+(102 against 97.5) while measuring nothing anyone wanted.
+
+**This is F883's shape a second time, and the pair is worth naming.** F883 was a justification
+whose mechanism did not exist in the tree. This is a *test comment* whose mechanism does not exist
+in the harness — falsifiable in principle, unfalsifiable under the clock actually injected. Both
+read as correct because the sentence describes something a real clock genuinely does.
+
+**The repair is three things and only one is the test.**
+
+- **T1.2 lands**, over a clock the callee advances: `let now = 0`, `work = (ms) => (now += ms)`. A
+  span around `work(5)` records 5; the same span closed beside it records 0 with a count of 1. Both
+  arms, because the zero arm is what makes the five mean anything — a recorder returning 0 for
+  everything satisfies one of them. It was an `it.todo` carrying the no-blocker marker while the
+  recorder it named had existed for the whole round, which is the deferral class again.
+- **T1.61 asserts what a counter clock can see** — containment, and the call **count**:
+  `spans.overlays.count` is twice `report.frames`, because `paint()` and `cursorFor()` both lay the
+  overlays out and both go through one wrapper. Clock-independent and exact.
+- **The mutation is replaced** by `WRAPPER-BYPASSED`, which takes `cursorFor` off the wrapper and
+  halves that count, plus `SPAN-ZERO` at `tree.ts` for T1.2.
+
+**And the general rule, because this will recur wherever a fake clock is injected.** A counter
+clock measures *the instrument*, not the subject: it answers *how many times did you read me*,
+which is a faithful reading of span overhead and a useless one of span content. It is the right
+fake for a row about call structure and the wrong one for any row about duration — and nothing
+distinguishes the two at the call site, because both read `.sum`.
+
 ## F886 — `assemble` is at least as expensive as React, and five of P11's seven live in a 1.5 % slice ★★★★☆
 
 With all nineteen spans opened (I39), `make profile` over 14 frames of a 500-line patch plus a
