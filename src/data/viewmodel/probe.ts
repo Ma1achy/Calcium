@@ -106,6 +106,27 @@ export interface Probe {
   miss(cache: string, reason: MissReason): void;
 
   /**
+   * Watch one object, and report how many of its class are still live.
+   *
+   * `probe.track("render-cache-entry", lines)` — the profiler registers it
+   * weakly and counts the class; nothing here holds a reference, and nothing a
+   * component does can make it hold one.
+   *
+   * **This is the instrument for a `WeakMap`**, whose whole premise is *the
+   * slot dies with the key* and which has no way to say whether that happened.
+   * A memo keyed weakly and kept alive by something else is a cache that grows
+   * for the life of the process while every reading about it looks correct.
+   *
+   * **What comes back is bounded, not exact** (C28 I43): `finalised` is a lower
+   * bound on what died, `live` an upper bound on what remains, and `live` has a
+   * floor of one that no correct code removes — the most recent registration is
+   * never reported, deterministically, at every size measured (F893). The
+   * reading is the *shape over a session*: a class whose `live` climbs without
+   * limit is leaking whatever the runtime's timing.
+   */
+  track(name: string, held: object): void;
+
+  /**
    * Whether anything is recording.
    *
    * Read it before building a label or walking a structure purely to describe
@@ -137,5 +158,6 @@ export const NO_PROBE: Probe = Object.freeze({
   mark: (): void => undefined,
   hit: (): void => undefined,
   miss: (): void => undefined,
+  track: (): void => undefined,
   on: false,
 });

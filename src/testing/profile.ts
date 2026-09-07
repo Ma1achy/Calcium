@@ -574,3 +574,95 @@ export function formatPhases(phases: PhaseReport): string {
   }
   return out.join("\n");
 }
+
+// --- leaks -------------------------------------------------------------------
+
+/** One tracked class, with the reading the figures support. */
+export type LeakRow = Readonly<{
+  name: string;
+  created: number;
+  finalised: number;
+  live: number;
+  /** `live / created` — the shape, which is the only thing a single run says. */
+  liveShare: number;
+  note: string;
+}>;
+
+export type LeakReport = Readonly<{
+  rows: readonly LeakRow[];
+  /**
+   * Whether a collection was ever observed at all.
+   *
+   * **The distinguisher a reader needs before believing any row.** Every
+   * `finalised` at zero and every `live` at its `created` is what a leaking
+   * process looks like, and it is also what a process that has not collected
+   * looks like — a short run, a large heap, no pressure. One says fix
+   * something; the other says measure for longer.
+   */
+  collected: boolean;
+  /**
+   * The floor, stated rather than left as an off-by-one.
+   *
+   * Exactly one registration is never reported — always the most recent, at
+   * every size measured, and it does not shrink with more collections. It
+   * belongs to the report and not to a class: whichever registered last is the
+   * one short (C28 I43, F893).
+   */
+  floor: number;
+}>;
+
+/**
+ * What the leak counters support saying (C28 I43).
+ *
+ * **A `live` figure alone is not a finding, and this is where that is enforced
+ * rather than hoped for.** One class holding one object is the floor; every
+ * class holding everything is either a leak or a process that has not collected
+ * yet, and `collected` is what separates those two.
+ */
+export function checkLeaks(report: ProfileReport): LeakReport {
+  const rows: LeakRow[] = [];
+  let anyFinalised = 0;
+  for (const stat of Object.values(report.leaks)) anyFinalised += stat.finalised;
+  for (const [name, stat] of Object.entries(report.leaks)) {
+    const liveShare = stat.created === 0 ? 0 : stat.live / stat.created;
+    const note =
+      anyFinalised === 0
+        ? "nothing collected in this run — not a reading about this class"
+        : stat.live <= 1
+          ? "at the floor: one registration is never reported"
+          : liveShare > 0.9
+            ? "held: almost nothing this class made was let go"
+            : "";
+    rows.push(Object.freeze({ name, ...stat, liveShare, note }));
+  }
+  rows.sort((a, b) => b.live - a.live);
+  return Object.freeze({ rows: Object.freeze(rows), collected: anyFinalised > 0, floor: 1 });
+}
+
+/** `checkLeaks` as a table. */
+export function formatLeaks(leaks: LeakReport): string {
+  const out: string[] = [];
+  out.push("## Objects made and let go — per tracked class (C28 I43)");
+  out.push("");
+  if (leaks.rows.length === 0) {
+    out.push("Nothing tracked. `probe.track(name, obj)` is what fills this.");
+    return out.join("\n");
+  }
+  out.push("| class | created | reported collected | live | live share | reading |");
+  out.push("|---|---|---|---|---|---|");
+  for (const r of leaks.rows) {
+    out.push(
+      `| \`${r.name}\` | ${String(r.created)} | ${String(r.finalised)} | ${String(r.live)} | ` +
+        `${(r.liveShare * 100).toFixed(0)}% | ${r.note} |`,
+    );
+  }
+  out.push("");
+  out.push(
+    leaks.collected
+      ? `\`live\` is an upper bound with a floor of ${String(leaks.floor)}: the most recent registration is never ` +
+        "reported, whichever class it belongs to. Read the shape over a session, not one figure."
+      : "**No collection was observed in this run**, so every figure here is `created` and says nothing about " +
+        "retention. A short run and a leak look identical from this table.",
+  );
+  return out.join("\n");
+}

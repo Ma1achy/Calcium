@@ -2094,6 +2094,13 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   "UnansweredRow.needs": "C28 I37 — what a refused row would require, which is the whole content of a refusal; asserted by T1.26 and T1.27",
   "PhaseReport.inFrame":
     "C28 I41 - the spans opened inside a frame, the only population `latency.work` contains. `make profile` reads it and `tools/` is outside this scan; asserted by T1.65 and T1.66",
+  "LeakReport.collected":
+    "C28 I43 - whether any collection happened at all, which is the only thing separating a leak " +
+    "from a run under no memory pressure: identical figures, opposite readings. `make profile` " +
+    "reads it through `formatLeaks` and `tools/` is outside this scan; asserted by T1.74",
+  "LeakRow.liveShare":
+    "C28 I43 - `live / created`, the shape a single run supports where an absolute figure does not " +
+    "(the floor is one and means nothing). Read by `formatLeaks` and by `make profile`; asserted by T1.74",
   "BudgetReport.crossed": "C28 I37 — the crossed rows, for a caller deciding; asserted by T1.28",
   "BudgetReport.unanswered": "C28 I37 — the rows with no answer, which is what makes the verdict `undecided`; asserted by T1.27 and T1.29",
   "ConformanceReport.kindsCovered": "C09 §7 — measurement-conformance coverage, asserted by the harness's own row",

@@ -33,6 +33,8 @@ import { checkSourceScans } from "../../tools/enforce/source-scans.mjs";
 import { HeightCache, createViewport } from "../../src/viewport/viewport/index.js";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { RenderCache } from "../../src/shell/render-cache.js";
+import { RenderScratchStore } from "../../src/shell/render-scratch.js";
+import { NO_PROBE, type Probe } from "../../src/data/viewmodel/index.js";
 import { createProfiler } from "../../src/shell/profiling/recorder.js";
 import { createInspector, type CaptureIo } from "../../src/shell/profiling/node.js";
 import type { Profiler } from "../../src/shell/profiling/types.js";
@@ -667,5 +669,43 @@ describe("C22 — the root hands the probe down, and the seam is not the wiring"
     // The other half of the same claim: the viewport publishes the same figures
     // on its own surface (C14 I27), and the two are written at one site.
     expect(graph.viewport.stats.hits).toBe(report.hits.height);
+  });
+});
+
+describe("C28 I43 — the leak counters' call sites", () => {
+  /** A probe that records what it was asked to watch, and nothing else. */
+  const recording = (): { probe: Probe; tracked: { name: string; held: object }[] } => {
+    const tracked: { name: string; held: object }[] = [];
+    const probe: Probe = {
+      ...NO_PROBE,
+      track: (name, held) => void tracked.push({ name, held }),
+    };
+    return { probe, tracked };
+  };
+
+  it("T1.75 (C28 I43): each store registers the object whose lifetime is in question", () => {
+    // **The wiring, not the mechanism.** Every other I43 row calls `track`
+    // itself and would pass on the day nothing in `src/` did.
+    const scratch = recording();
+    const store = new RenderScratchStore(scratch.probe);
+    const carrier = { blocks: [] };
+    store.set(carrier, "k", { held: true });
+
+    expect(scratch.tracked.map((t) => t.name), "the carrier, under a name").toStrictEqual([
+      "scratch.carrier",
+    ]);
+    // **The identity, not the count.** Registering the *slot* rather than the
+    // key would count the same number of objects and answer a question nobody
+    // asked: the slot dies when this store drops it, and the whole premise of a
+    // `WeakMap` is what happens to the key.
+    expect(scratch.tracked[0]?.held, "and it is the key, not the slot").toBe(carrier);
+
+    const render = recording();
+    const cache = new RenderCache(render.probe);
+    const lines = ["a", "b"];
+    cache.set("e1", 1, 80, "f", "t", lines);
+
+    expect(render.tracked.map((t) => t.name)).toStrictEqual(["render-cache.lines"]);
+    expect(render.tracked[0]?.held, "the array, which is the allocation").toBe(lines);
   });
 });

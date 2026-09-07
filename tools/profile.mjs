@@ -28,7 +28,7 @@
 import { writeFileSync } from "node:fs";
 
 import { b, createTui, defaultTheme } from "../dist/index.js";
-import { checkBudget, checkPhases, formatBudget, formatPhases } from "../dist/testing/index.js";
+import { checkBudget, checkLeaks, checkPhases, formatBudget, formatLeaks, formatPhases } from "../dist/testing/index.js";
 import { fakeStdin, fakeStdout, screenRows } from "./bench/fakes.mjs";
 import { liveness } from "./bench/liveness.mjs";
 
@@ -319,6 +319,8 @@ console.log(
     `${nodeSelf === 0 ? "—" : `${(((nodeSelf - entrySelf) / nodeSelf) * 100).toFixed(1)}%`} | — | ` +
     `chrome, prompt and overlays — measured every frame and belonging to no entry |`,
 );
+
+console.log(`\n${formatLeaks(checkLeaks(report))}`);
 
 // --- the instrument's own cost -----------------------------------------------
 

@@ -66,6 +66,14 @@ function decodedOf(block: Image, probe?: Probe): Decoded {
   // without bound and nothing else in the tree would say so. A hit rate cannot
   // show it; occupancy can.
   probe?.gauge("decode.entries", DECODED.size);
+  // **The gauge says how many are held; this says whether any was ever let go**
+  // (C28 I43). They are not — the map has no cap and nothing deletes from it —
+  // so `created` and `live` moving together is this map's *known* answer, and
+  // the counter is here as the one that would notice if that changed. A leak
+  // counter is worth as much on a leak that is understood as on one that is
+  // not: it is the difference between a decision recorded and a decision
+  // assumed to still hold.
+  probe?.track("image.decoded", decoded);
   return decoded;
 }
 

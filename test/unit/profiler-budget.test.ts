@@ -15,7 +15,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { BUDGET, checkBudget, checkPhases, formatBudget } from "../../src/testing/index.js";
+import { BUDGET, checkBudget, checkLeaks, checkPhases, formatBudget, formatLeaks } from "../../src/testing/index.js";
 import { SPAN_SITE } from "../../src/shell/profiling/types.js";
 import type { Histogram, ProfileReport, SpanName, TreeNode } from "../../src/shell/profiling/types.js";
 import { buildSession } from "../support/session.js";
@@ -43,6 +43,7 @@ function report(over: Partial<ProfileReport> = {}): ProfileReport {
     nodes: [],
     byKind: {},
     byEntry: {},
+    leaks: {},
     counters: {},
     gauges: {},
     misses: {},
@@ -547,5 +548,40 @@ describe("C28 — the report's way out", () => {
     expect(crossed.residue, "a residue below zero is reported, not clamped").toBeCloseTo(-31, 6);
     const row = crossed.inFrame.find((r) => r.group === "unaccounted");
     expect(row?.note, "and it says what a negative one means").toContain("below zero");
+  });
+});
+
+describe("C28 — the leak table", () => {
+  const stat = (created: number, finalised: number) => ({ created, finalised, live: created - finalised });
+
+  it("T1.74 (C28 I43): a run that collected nothing and a leak are the same figures, and `collected` is what tells them apart", () => {
+    // **Identical rows, opposite readings.** Both say *this class made a
+    // thousand and let none go*. One is a leak; the other is a process that has
+    // not been under memory pressure. No per-row figure separates them, which is
+    // why the distinguisher is on the report.
+    const quiet = checkLeaks(report({ leaks: { thing: stat(1000, 0) } }));
+    expect(quiet.collected, "nothing was collected anywhere in this run").toBe(false);
+    expect(quiet.rows[0]?.note, "so the row refuses to be a reading about the class").toContain(
+      "not a reading about this class",
+    );
+
+    const held = checkLeaks(
+      report({ leaks: { thing: stat(1000, 0), other: stat(50, 49) } }),
+    );
+    expect(held.collected, "something was collected, so retention means something").toBe(true);
+    const row = held.rows.find((r) => r.name === "thing");
+    expect(row?.liveShare, "the share is the shape, and one run only supports a shape").toBe(1);
+    expect(row?.note, "and now the row will say it").toContain("held");
+
+    // The floor, named rather than left as an off-by-one for a reader to chase.
+    const floor = held.rows.find((r) => r.name === "other");
+    expect(floor?.live, "one short, which is the floor and not a leak").toBe(1);
+    expect(floor?.note).toContain("at the floor");
+    expect(held.floor, "and the report states it").toBe(1);
+
+    // The formatter carries the caveat in both directions, because a table
+    // whose caveat only appears in one state is a table nobody reads twice.
+    expect(formatLeaks(quiet)).toContain("No collection was observed");
+    expect(formatLeaks(held)).toContain("floor of 1");
   });
 });

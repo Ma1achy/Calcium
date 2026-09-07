@@ -37,6 +37,8 @@ const BUDGET = "src/testing/profile.ts";
 const SESSION = "src/shell/session.ts";
 const PAINT = "src/shell/paint.ts";
 const VIEWPORT = "src/viewport/viewport/viewport.ts";
+const LEAKS = "src/shell/profiling/leaks.ts";
+const SCRATCH = "src/shell/render-scratch.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -659,6 +661,61 @@ const results = runPass({
       from: "      this.#measureSequence(entry.doc.blocks, this.#width, entry.id);",
       to: "      this.#measureSequence(entry.doc.blocks, this.#width);",
       expect: "T2.15",
+    },
+    {
+      // The registry built at construction rather than on the first `track`.
+      // A session at `off` then holds a process-wide handle for a feature it
+      // never uses, and no report can show it.
+      name: "EAGER-REGISTRY: the leak tracker arms before anything is tracked",
+      file: LEAKS,
+      from: "  #registry: FinalizationRegistry<string> | null = null;",
+      to: "  #registry: FinalizationRegistry<string> | null = new FinalizationRegistry<string>(() => undefined);",
+      expect: "T1.73",
+    },
+    {
+      // The tracker holds what it watches. Every figure stays plausible and the
+      // instrument built to find leaks becomes one.
+      name: "STRONG-TRACKER: the tracker keeps a reference to everything it watches",
+      file: LEAKS,
+      from: "    this.#created.set(name, (this.#created.get(name) ?? 0) + 1);",
+      to: "    this.#created.set(name, (this.#created.get(name) ?? 0) + 1);\n    (this as unknown as { keep?: object[] }).keep = [...((this as unknown as { keep?: object[] }).keep ?? []), held];",
+      expect: "T1.73",
+    },
+    {
+      // Counting at `off`. The registry arms for a session that never profiles.
+      name: "TRACK-UNGATED: `off` counts and registers like every other tier",
+      file: REC,
+      from: "      if (disposed || !counting()) return;\n      leaks.track(name, held);",
+      to: "      if (disposed) return;\n      leaks.track(name, held);",
+      expect: "T1.73",
+    },
+    {
+      // `live` reported as what was collected. Every figure is a number, the
+      // table fills, and the column means the opposite of its heading.
+      name: "LIVE-INVERTED: live reports what died rather than what remains",
+      file: LEAKS,
+      from: "      out[name] = Object.freeze({ created, finalised, live: created - finalised });",
+      to: "      out[name] = Object.freeze({ created, finalised, live: finalised });",
+      expect: "T1.71",
+    },
+    {
+      // The distinguisher removed: a run that collected nothing reads as a
+      // report about retention, which is the first reading and the wrong one.
+      name: "COLLECTED-ASSUMED: the table assumes a collection happened",
+      file: BUDGET,
+      from: "  return Object.freeze({ rows: Object.freeze(rows), collected: anyFinalised > 0, floor: 1 });",
+      to: "  return Object.freeze({ rows: Object.freeze(rows), collected: true, floor: 1 });",
+      expect: "T1.74",
+    },
+    {
+      // The scratch store registers its slot instead of its key. Same count,
+      // same table, and it answers a question nobody asked — the slot dies when
+      // the store drops it, and the `WeakMap`'s premise is about the key.
+      name: "TRACK-THE-SLOT: the store watches what it holds rather than what it is keyed by",
+      file: SCRATCH,
+      from: '    this.#probe.track("scratch.carrier", owner);',
+      to: '    this.#probe.track("scratch.carrier", { key, value });',
+      expect: "T1.75",
     },
     {
       name: "EAGER-ALS: the async store is built at construction",

@@ -89,6 +89,16 @@ export class RenderScratchStore implements RenderScratch {
   }
 
   set(owner: object, key: string, value: unknown): void {
+    // **The `WeakMap`'s own premise, counted** (C28 I43). The header above says
+    // the slot dies with the document holding the carrier; nothing anywhere
+    // checked that it does. A carrier retained by something else keeps its slot
+    // for the life of the process, and every reading about this store — hits,
+    // misses, occupancy — stays correct while it happens.
+    //
+    // `live` climbing across a session is the finding. A single-figure `live`
+    // is not: the most recent registration is never reported, so one is the
+    // floor and means nothing (F893).
+    this.#probe.track("scratch.carrier", owner);
     this.#slots.set(owner, Object.freeze({ key, value }));
   }
 }

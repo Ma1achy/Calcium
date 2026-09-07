@@ -13,9 +13,10 @@
 import type { MissReason, Probe } from "../../data/viewmodel/probe.js";
 import type { CommitReason } from "../../terminal/frame-scheduler.js";
 import type { HeapSpace } from "./node.js";
+import type { LeakStat } from "./leaks.js";
 import type { NodeStat, TreeNode } from "./tree.js";
 
-export type { CommitReason, HeapSpace, NodeStat, TreeNode, Probe };
+export type { CommitReason, HeapSpace, LeakStat, NodeStat, TreeNode, Probe };
 
 export type Tier = "off" | "counters" | "spans" | "alloc" | "deep";
 
@@ -353,6 +354,16 @@ export type ProfileReport = Readonly<{
   samples: readonly ResourceSample[];
   captures: readonly CaptureResult[];
   excluded: Readonly<{ selfInflicted: number; fallback: number }>;
+  /**
+   * Per tracked class — made, reported collected, and what that leaves.
+   *
+   * **Bounded rather than exact, and the bound is stated** (C28 I43): a
+   * `FinalizationRegistry` callback is a promise the runtime may keep late or
+   * not at all, so `finalised` is a lower bound and `live` an upper one — with
+   * a floor of one object across the whole map, belonging to whichever class
+   * registered last (F893). Read the shape over a session, not the instant.
+   */
+  leaks: Readonly<Record<string, LeakStat>>;
   dropped: Readonly<{ frames: number; samples: number; marks: number; captureBytes: number }>;
   overhead: Overhead;
   /** Empty below tier `spans`, where there is no resource probe to ask. */

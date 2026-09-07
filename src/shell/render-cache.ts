@@ -223,6 +223,13 @@ export class RenderCache {
       this.#misses["nothing-changed"] += 1;
     }
     this.#discarded = null;
+    // **The largest per-entry allocation in the shell, watched** (C28 I43). The
+    // slots are a strong map keyed by entry id and `delete` empties them, so a
+    // retained array is not this cache's doing — it is a closure somewhere else
+    // still holding a frame that was replaced or evicted. Nothing else could
+    // say so: occupancy counts slots, and a slot that was overwritten leaves no
+    // trace in it at all.
+    this.#probe.track("render-cache.lines", lines);
     this.#slots.set(id, Object.freeze({ rev, width, focus, theme, lines }));
   }
 

@@ -31,6 +31,7 @@ import { NO_SPAN, type Probe } from "../../data/viewmodel/probe.js";
 import { createContexts } from "./async-context.js";
 import { Hist, HISTOGRAM_ERROR } from "./histogram.js";
 import { Ring } from "./ring.js";
+import { Leaks } from "./leaks.js";
 import { Aggregate, closeNode, freezeTree, openNode, type OpenNode } from "./tree.js";
 import type { Inspector } from "./node.js";
 import {
@@ -138,6 +139,7 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
   const hits = new Map<string, number>();
   const captures: CaptureResult[] = [];
   const nodes = new Aggregate();
+  const leaks = new Leaks();
 
   const workH = new Hist();
   const waitH = new Hist();
@@ -256,6 +258,7 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
     byReason.clear();
     byKind.clear();
     byEntry.clear();
+    leaks.clear();
     nodes.clear();
     ringResetAt = elapsed() - started;
   };
@@ -422,6 +425,15 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
       marks.push({ at: elapsed() - started, label });
     },
 
+    track(name: string, held: object): void {
+      // **Gated on `counting()`, so `off` arms nothing** (C28 I1, I43). The
+      // registry is built inside `Leaks` on the first call that gets here, so a
+      // profiler raised to `counters` and never asked to track holds none
+      // either — two conditions, both wanted, and T1.73 asserts the first.
+      if (disposed || !counting()) return;
+      leaks.track(name, held);
+    },
+
     commit(reason: CommitReason, own: boolean): void {
       if (disposed || !counting()) return;
       counters.set(`commit.${reason}`, (counters.get(`commit.${reason}`) ?? 0) + 1);
@@ -512,6 +524,9 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
         miss: (cache: string, reason: MissReason) => {
           self.miss(cache, reason);
         },
+        track: (name: string, held: object) => {
+          self.track(name, held);
+        },
         get on() {
           return self.on;
         },
@@ -567,6 +582,7 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
         nodes: nodes.snapshot(),
         byKind: Object.freeze(snapshotAll(byKind)),
         byEntry: Object.freeze(snapshotAll(byEntry)),
+        leaks: leaks.snapshot(),
         counters: Object.freeze(Object.fromEntries(counters)),
         gauges: Object.freeze(snapshotAll(gaugeHists)),
         misses: Object.freeze(missOut),

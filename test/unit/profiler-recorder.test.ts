@@ -18,8 +18,12 @@
 // reports 0 for every span would satisfy the second row alone.
 //
 // This is the recorder-core file. T1.1 and T1.3–T1.17 land here.
+import { setFlagsFromString } from "node:v8";
+import { runInNewContext } from "node:vm";
+
 import { describe, expect, it } from "vitest";
 
+import { Leaks } from "../../src/shell/profiling/leaks.js";
 import { createProfiler } from "../../src/shell/profiling/recorder.js";
 
 describe("C28 — the recorder's span, over a clock its subject advances", () => {
@@ -226,6 +230,147 @@ describe("C28 I42 — an element belongs to the entry it was drawn for", () => {
     // **A clear would put this in no entry at all** — and a shortfall reads as
     // chrome, which is where the wrong answer hides (F892b).
     expect(r.byEntry.e1?.sum, "and the outer one resumes after it").toBe(4);
+
+    p.dispose();
+  });
+});
+
+describe("C28 I43 — leak counting, and the floor it cannot get under", () => {
+  /**
+   * A collector, supplied by the row rather than by the runner.
+   *
+   * **`--expose-gc` is not on the suite's command line and this row does not
+   * ask for it.** A flag the runner supplies is a flag `npx vitest run <file>`
+   * omits, and the row would then read zero finalised — which is a real reading
+   * of a real registry and says nothing at all. Acquiring it here means the row
+   * cannot silently stop measuring. `node:v8` is allowed in a test; C28 I21
+   * scopes its ban to `src/`.
+   */
+  const collector = (): (() => void) => {
+    setFlagsFromString("--expose-gc");
+    return runInNewContext("gc") as () => void;
+  };
+
+  /**
+   * Give the runtime turns to run the callbacks.
+   *
+   * **`setImmediate`, never `setTimeout`.** The suite fakes `setTimeout` (see
+   * `vitest.config.ts`), so a drain written the obvious way runs synchronously,
+   * finalisation callbacks never fire, and the row reads **0 finalised** —
+   * a fixture defect indistinguishable from a registry that does not work.
+   * Measured while writing this: 0 with `setTimeout`, 99 with `setImmediate`.
+   */
+  const drain = async (turns = 5): Promise<void> => {
+    for (let i = 0; i < turns; i += 1) await new Promise((r) => setImmediate(r));
+  };
+
+  it("T1.71 (C28 I43): a thousand tracked, dropped and collected → 999 finalised, and the one that stays is the floor", async () => {
+    const gc = collector();
+    const p = createProfiler({ tier: "counters" }, { elapsed: () => 0 });
+
+    let held: object[] = [];
+    for (let i = 0; i < 1000; i += 1) {
+      const o = { i };
+      p.track("thing", o);
+      held.push(o);
+    }
+    held = [];
+    gc();
+    await drain();
+
+    const leaks = p.report().leaks;
+    expect(leaks.thing?.created, "created is exact — it is a counter").toBe(1000);
+    // **Asserted as 999 and not as a range**, because the residue is
+    // deterministic: always the most recent registration, at N = 1, 2, 10, 100,
+    // 1 000 and 5 000, over eight repeats, and further collections do not shrink
+    // it. A row written `>= 990` would pass a registry that reported half.
+    expect(leaks.thing?.finalised, "one short, and always the last registered").toBe(999);
+    expect(leaks.thing?.live, "so `live` has a floor of one that no correct code removes").toBe(1);
+
+    p.dispose();
+  });
+
+  it("T1.71b (C28 I43): the control — the same fixture without a collection reports nothing finalised", async () => {
+    // **The arm above is only a measurement if this one is zero.** It says the
+    // count follows reachability rather than registration, and it is what a
+    // registry that fired on `register` would fail (F893).
+    const p = createProfiler({ tier: "counters" }, { elapsed: () => 0 });
+
+    let held: object[] = [];
+    for (let i = 0; i < 1000; i += 1) {
+      const o = { i };
+      p.track("thing", o);
+      held.push(o);
+    }
+    held = [];
+    await drain();
+
+    const leaks = p.report().leaks;
+    expect(leaks.thing?.created, "all thousand were registered").toBe(1000);
+    expect(leaks.thing?.finalised, "and none reported without a collection").toBe(0);
+
+    p.dispose();
+  });
+
+  it("T1.72 (C28 I43): the floor is one object in the whole report, not one per class", async () => {
+    const gc = collector();
+    const p = createProfiler({ tier: "counters" }, { elapsed: () => 0 });
+
+    let held: object[] = [];
+    for (const name of ["alpha", "beta", "gamma"]) {
+      for (let i = 0; i < 50; i += 1) {
+        const o = { name, i };
+        p.track(name, o);
+        held.push(o);
+      }
+    }
+    held = [];
+    gc();
+    await drain();
+
+    const leaks = p.report().leaks;
+    const finalised = Object.values(leaks).map((l) => l.finalised);
+    // **The multiset, not the names.** Which class comes up short is
+    // registration order, so a row naming `gamma` would be asserting an
+    // accident — it is the last one registered and nothing more.
+    expect([...finalised].sort((a, b) => a - b), "two whole, one short by one").toStrictEqual([49, 50, 50]);
+    expect(finalised.reduce((a, b) => a + b, 0), "149 of 150 across the report").toBe(149);
+
+    p.dispose();
+  });
+
+  it("T1.73 (C28 I43, C28 I1): at off nothing is armed, and nothing is retained", async () => {
+    const gc = collector();
+
+    // The lazy half, on the tracker itself: a registry built at construction
+    // would make `off` cost a process-wide handle for a session that never
+    // profiles, and nothing in a report could show it.
+    const idle = new Leaks();
+    expect(idle.armed, "no registry until something is tracked").toBe(false);
+    idle.track("x", {});
+    expect(idle.armed, "and one as soon as something is").toBe(true);
+
+    // **The retention half, which is the one that matters.** A tracker holding
+    // a strong reference to everything it watches is a leak inside the
+    // instrument built to find leaks — and it would report `live: 0` for ever
+    // while being the cause. Asserted through a registry of the row's own, so
+    // the thing under test is not also the witness.
+    const p = createProfiler({ tier: "off" }, { elapsed: () => 0 });
+    let outside = 0;
+    const witness = new FinalizationRegistry(() => { outside += 1; });
+    let held: object[] = [];
+    for (let i = 0; i < 1000; i += 1) {
+      const o = { i };
+      p.track("thing", o);
+      witness.register(o, "thing");
+      held.push(o);
+    }
+    held = [];
+    gc();
+    await drain();
+
+    expect(p.report().leaks, "off counts nothing").toStrictEqual({});
+    expect(outside, "and holds nothing — 999, the same floor the arm has").toBe(999);
 
     p.dispose();
   });
