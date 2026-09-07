@@ -62,6 +62,8 @@ export type PushedSurface = Readonly<{
 export interface PushedSurfaceHandle {
   readonly id: string;
   readonly inputFidelity: SurfaceInputFidelity;
+  /** Monotonic milliseconds since this surface opened, from the host clock. */
+  readonly elapsedMs: number;
   readonly closed: Promise<SurfaceCloseOutcome>;
   invalidate(): void;
   close(): Promise<SurfaceCloseOutcome>;
@@ -305,6 +307,9 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
       id: surface.id,
       get inputFidelity() {
         return fidelity;
+      },
+      get elapsedMs() {
+        return Math.max(0, options.now() - openedAt);
       },
       closed,
       invalidate,

@@ -100,7 +100,9 @@ render callback receives a fresh producer context on every invalidation and
 resize, plus the currently observed input-fidelity mode. Its keymap is data and
 its actions are delivered serially with monotonic timestamps and ordinals.
 Native CSI-u events retain press/repeat/release; legacy bytes use deterministic
-50 ms release synthesis. A second surface, duplicate binding, malformed surface,
+50 ms release synthesis. The handle exposes `elapsedMs` from that same host-clock
+origin so an application can schedule frames without opening a competing clock.
+A second surface, duplicate binding, malformed surface,
 or failed initial render is a typed `SurfaceError`. Later render/action failures
 close the surface and resolve `closed` with a typed fault. Close is idempotent,
 restores enhanced keyboard mode, and removes the pushed view before the session

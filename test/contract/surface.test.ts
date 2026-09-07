@@ -56,6 +56,7 @@ describe("PushedSurface public contract", () => {
     const handle = h.graph.surface.open(surface(actions, fidelities, closes));
 
     expect(handle.inputFidelity).toBe("legacy_terminal");
+    expect(handle.elapsedMs).toBeGreaterThanOrEqual(0);
     expect(h.graph.overlays.top?.id).toBe("game");
 
     h.stdin.emit("a");
