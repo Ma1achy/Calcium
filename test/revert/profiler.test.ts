@@ -27,5 +27,6 @@ describe("C28 — profiler, tier 6 spec-first rows", () => {
   it.todo("T6.7 (C28 I18): merging the ring across a setTier → T1.12 fails — not deferred on a component: lands with the module each row names");
   it.todo("T6.8 (C28 I15): reporting a truncated recording as a divergence → T3.6 fails, and the failure names the false-positive it would have caused — not deferred on a component: lands with the module each row names");
   it.todo("T6.9 (C28 I24): folding wait into byEntry → T1.17 and T4.2 fail. The same hazard as T6.1 one level down: an attribution table with a latency column in it reads as more complete, not less true — not deferred on a component: lands with the module each row names");
+  it.todo("T6.11 (C28 I42): dropping the entry from the aggregate's key → T1.67 fails, and T1.17's byEntry has one row per block id rather than one per entry. The mutation is what a reader would write believing kind#id were an identity, which it is within one document and only there (C04 I14) — not deferred on a component: lands with the module each row names");
   it.todo("T6.10 (C28 I27): drawing a suspended sample as 0 rather than as a gap → T3.10 fails. A zero in a utilisation series is a reading, and this one is an absence — not deferred on a component: lands with the module each row names");
 });

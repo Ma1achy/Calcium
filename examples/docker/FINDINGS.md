@@ -31517,6 +31517,58 @@ Found by reading the table against the paragraph above it while adding a member 
 the same instrument as *read the abstract against its own section before reading the section against
 the code*, applied to a constant.
 
+## F892 — the per-element table merges four blocks into one row and manufactures the reading it exists to give ★★★★★
+
+`ProfileReport.nodes` is C28 I31's answer to *which element is slow*, keyed `kind#id` and sorted by
+self time because **the order is the answer** — a reader opens it to find what to fix. C04 I14 makes
+block ids unique **within a document**, and a transcript entry is a document. So two entries holding
+a block with the same id are one row.
+
+**Measured, the same scripted session twice, four transcript entries, only the ids differing:**
+
+| | rows | `calls` | `frames` | `calls / frames` |
+|---|---|---|---|---|
+| ids suffixed per entry | **12** | 27 · 21 · 15 | 12 · 9 · 6 | 2.3 – 2.5 |
+| the same ids in every entry | **4** | **63** | 12 | **5.3** |
+
+63 is exactly 27 + 21 + 15. `frames` cannot rise past the frames that held any of them, so the
+divisor stays and the quotient is the sum of three numerators over one denominator — **F888's
+mechanism at the row level**, a year of arithmetic later in the same report.
+
+**The harm is not that a figure is inflated. It is that the fabricated one is the signal.** C28 I31
+keeps `calls` beside `frames` precisely so a node recomputed *within* one frame is distinguishable
+from one measured once per frame, and the formatter prints `<-- measured more than once per frame`
+against the ratio. At 5.3 it prints that against a block whose true figure is 2.3 and where there is
+nothing to fix. The instrument does not merely misreport; it names a defect that does not exist, in
+the one column it was built to be trusted on.
+
+**And the ranking moves.** The table is truncated, so merged rows outrank real ones: in the collided
+run two `bench` rows displaced work that the control shows ahead of them. A reader who fixes the top
+of a truncated list is being steered by the collision.
+
+**Why every fixture in the repository hides it.** `tools/profile.mjs` mints `bench-table-${n}` — the
+harness this was found with could not have found it. The docker example is the counter-case and is
+the realistic one: `resources.ts` and `verbs.ts` name blocks `"running"`, `"images"`, `"ports"`,
+`"processes"`, `"events"`, `"details"`, `"io"` — literals, because they are unique within their own
+document and C04 I14 asks no more. **Run `docker ps` twice and the second entry collides with the
+first.** This is [[a-corpus-chosen-for-a-property-may-not-have-it]] with the property supplied by the
+person who wrote the corpus, which is the version that does not announce itself.
+
+**The seam exists and is one line from the id.** Every colliding span was measured, over twenty
+retained trees, to open under `paint > assemble` — inside `visibleRows`, whose loop holds
+`entry.id`; not one opened under `compose > measure`, C14's height loop, whose cache was warm
+throughout. So the repair needs no widening of C14's injected `measureSequence` seam, which is what
+the block-id ambiguity first appeared to demand. **The obstruction was in the aggregate's key, not in
+the layering** — [[right-about-the-layers-wrong-about-who-holds-the-data]].
+
+**What this makes of `byEntry`.** C28's spec declares it in six places (§type block, I24, D3, T1.17,
+T4.2, T6.9) and the implementation has no such member; the standing reading was *a block id is not an
+entry id, so `byEntry` is not derivable*. That reading is right about the derivation and wrong about
+the disposition: the entry is not missing from the report, it is missing from the **key**, and once
+the key carries it `byEntry` is a projection of `nodes` rather than a second accumulator. T1.17 was
+unwritable for the whole round because the member it asserts on does not exist, and the reason it
+does not exist is this defect.
+
 ## F891 — two Status lines read as current for a component that shipped, and the stale clause was load-bearing ★★★★☆
 
 `COMPONENT_SOURCES` has a row per component naming the file whose existence means that component
