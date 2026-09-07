@@ -90,4 +90,5 @@ describe("C28 — profiler, tier 6 spec-first rows", () => {
   });
 
   it.todo("T6.10 (C28 I27): drawing a suspended sample as 0 rather than as a gap → T3.10 fails. A zero in a utilisation series is a reading, and this one is an absence — not deferred on a component: lands with the module each row names");
+  it.todo("T6.12 (C28 I43): reporting live with no floor, or asserting finalised === created → T1.71 fails. The revert is the natural row rather than a mistake: everything registered was collected is what a reader writes, it is red by exactly one for ever, and the fix that follows is to widen the assertion until it cannot see anything — not deferred on a component: lands with the module each row names");
 });
