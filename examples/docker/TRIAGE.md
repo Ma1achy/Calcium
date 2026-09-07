@@ -907,7 +907,13 @@ ones the filter cannot see. Diffing the two filters' uncited sets through the ch
 the figure is **16, reported as 13**, and `C15 I24` and `C26 I23` have had nothing running behind
 them while the signal said otherwise. The same file then showed a second hole — a `describe` title
 naming an invariant is coverage too. **Fixed** — a paren-depth walk in `commitments.mjs`, exported so
-it has rows, with EC2 as the control a blanket filter would fail; three mutations, three catches.
+it has rows, with EC2 as the control a blanket filter would fail; three mutations, three catches. **Then the same laundering happened again in the
+same file, inside the comment written to warn about it** — which is the evidence that a header
+naming what a file is about is the natural thing to write and a signal counting it will keep being
+laundered. Comments stripped too, wording follows: **17 → 50, with 49 invariants across fifteen
+components newly revealed as having no row that runs**, spot-checked against `C23 I9`, `C04 I19` and
+`C09 I14`. The sibling of *a citation reads as coverage*, one level down: the reference is real, the
+disposition is absent.
 
 **F906** — *the block kinds carrying no probe* was measured three times and wrong twice. The third
 reading took its population from `DEFAULT_DEFINITIONS.map(d => d.kind)` and returned **19 kinds, 18

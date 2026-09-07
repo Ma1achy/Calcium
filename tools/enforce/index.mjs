@@ -247,8 +247,8 @@ if (violations.length === 0) {
       // verdict — most of it is legitimate — so what it is good for is movement.
       `  ${DIM}invariant coverage · ${String(coverage.uncited)} of ` +
       `${String(coverage.declared)} invariants named by no test row, all listed ` +
-      `(SP9, gated by equality); ${String(deferredOnly)} more are named only by an ` +
-      `it.todo, so nothing that runs stands behind them (F896, reported not gated)${RESET}\n` +
+      `(SP9, gated by equality); ${String(deferredOnly)} more are named by no row that ` +
+      `runs — an it.todo, a describe title or a comment (F896, F907, reported not gated)${RESET}\n` +
       `  ${DIM}section citations · ${String(sectionsDangling.length)} of ` +
       `${String(sectionRefs.resolved + sectionsDangling.length)} resolve to no section, across ` +
       `${String(sectionTargets)} targets; ${String(sectionsUnowned)} more name no document ` +

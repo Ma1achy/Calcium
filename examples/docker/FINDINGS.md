@@ -31606,6 +31606,42 @@ everything would report every invariant as uncited and read as a very thorough g
 **Three mutations, three catches**: line-matching restored → EC1, EC3, EC4 fail; every line blanked
 → EC1, EC2, EC3 fail; a lazy `[\s\S]*?\)` → EC3 alone fails.
 
+### The second half, which is much larger, and which the first found by repeating itself
+
+The `describe`-title hole above was fixed by hand, in one file, with a comment saying why. **The same
+laundering then happened again in the same file, inside that comment**, five minutes later: the next
+invariants were introduced with
+
+    // C28 I46, I47 — record and replay. The rows land with the apparatus …
+
+and the figure did not move. Twice in one session, the second time in the sentence written to warn
+about the first, is not a lapse of attention — it is evidence that a file header naming what the
+file is about is the *natural* thing to write, and that a signal counting it will keep being
+laundered by people doing nothing wrong.
+
+So the filter takes comments too, and the wording follows it: what the number claims is that
+**nothing that runs** stands behind the invariant, and a corpus holding prose cannot support that
+claim however carefully the todos are stripped.
+
+**Measured: the figure goes 17 → 50, and 49 invariants are newly revealed.** Spot-checked and real —
+`C23 I9` appears in `test/` twice, both times inside a comment; `C04 I19` twice, both comments;
+`C09 I14` is declared in the spec and appears in no test row under any spelling, having been
+resolved through a bare `(I14)` in a comment in a C09-owned file. The list spans fifteen components:
+
+    C01 I17 · C04 I19 I58 I110–I113 · C06 I17 · C09 I14 I17 · C12 I71 I74 I77 I78 · C13 I16
+    C14 I20 · C15 I10 I11 I24 · C16 I9 I13 I14 · C20 I13 I28 I29 · C21 I15 I16 I17
+    C22 I25 I33 I54 I91 I94 · C23 I9 I26 I27 I38 I40 I66 · C24 I5 · C26 I9 I13 I20 I23
+    C28 I14 I15 I26 I46 I47
+
+**Reported and not gated**, as F896 ruled for the same reason: a gate red on arrival is a gate
+edited to fit. What changed is that the number now means what its sentence says.
+
+**And the shape is worth naming, because it is the sibling of *a citation reads as coverage*.** That
+rule is about a roadmap entry mentioning a finding; this is about a *file* mentioning an invariant.
+Both fail the same way — the reference is real, the disposition is absent, and a reader skimming for
+the number sees it and moves on. The test is the same one: not *does this name the invariant*, but
+*would it fail if the invariant were violated*.
+
 ---
 
 ## F906 — the kind had a gauge, and the gauge was of the cache ★★★★☆

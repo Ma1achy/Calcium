@@ -142,7 +142,7 @@ describe("per-kind input gauges", () => {
   });
 });
 
-// C28 I46, I47 — record and replay. The rows land with the apparatus; this is
+// Record and replay. The rows land with the apparatus; this is
 // the spec commit's half (A03 §7a, F814). The invariants are named only inside
 // the todo titles, so the coverage signal reports them honestly (F907).
 describe("record and replay", () => {

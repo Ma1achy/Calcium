@@ -1529,12 +1529,28 @@ describe("withoutTodos — the deferral filter behind the coverage signal (F907)
     expect(withoutTodos(oneLine), "the form the old filter could see").not.toContain("C99 I9");
   });
 
-  it("EC2: the control — a file with no todo is returned line-for-line", () => {
+  it("EC2: the control — code survives, and only prose is blanked", () => {
     // **The control the rule owes**: a filter that blanked everything would pass
     // EC1 completely, and a coverage signal computed over an empty corpus reports
     // every invariant as uncited, which reads as a very thorough gate.
-    const clean = ["const a = 1;", "it('T9.4 (C99 I10): runs', () => {});", "// it.todoish — a near miss with no paren, which must survive"].join("\n");
+    const clean = ["const a = 1;", "it('T9.4 (C99 I10): runs', () => {});"].join("\n");
     expect(withoutTodos(clean), "nothing to strip, nothing stripped").toBe(clean);
+
+    // Comments go, because a citation in one is not a row — the second half of
+    // F907, found by laundering an invariant inside the comment written to warn
+    // about laundering it.
+    const prose = [
+      "// C99 I11 — what this file is about",
+      "/** C99 I12, in a block */",
+      "/*",
+      " * C99 I13, across lines",
+      " */",
+      "it('T9.5 (C99 I14): runs', () => {});",
+      "// it.todoish — a near miss with no paren",
+    ].join("\n");
+    const out = withoutTodos(prose);
+    expect(out, "no citation from a comment survives").not.toMatch(/C99 I11|C99 I12|C99 I13/u);
+    expect(out, "and the row does").toContain("C99 I14");
   });
 
   it("EC3: parens inside a title do not end the call early", () => {

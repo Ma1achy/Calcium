@@ -1298,7 +1298,29 @@ const UNCITED_INVARIANTS = Object.freeze([
 export function withoutTodos(text) {
   const out = [];
   let depth = 0;
+  let block = false;
   for (const line of text.split("\n")) {
+    // **Comments go too, and the signal's wording follows.** A citation in a
+    // `describe` title or a file header is not a row either, and this was found
+    // by laundering the same invariant twice inside one session — the second
+    // time in the comment written to warn about the first (F907). What the
+    // number claims is that nothing *runs* behind the invariant, and a corpus
+    // holding prose cannot support that claim however the todos are stripped.
+    const trimmed = line.trim();
+    if (block) {
+      if (trimmed.includes("*/")) block = false;
+      out.push("");
+      continue;
+    }
+    if (trimmed.startsWith("//")) {
+      out.push("");
+      continue;
+    }
+    if (trimmed.startsWith("/*")) {
+      if (!trimmed.includes("*/")) block = true;
+      out.push("");
+      continue;
+    }
     const opens = depth > 0 || /\bit\.todo\(/u.test(line);
     if (!opens) {
       out.push(line);
