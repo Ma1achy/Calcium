@@ -35,6 +35,7 @@ const TYPES = "src/shell/profiling/types.ts";
 const CONSTRUCT = "src/shell/construct.ts";
 const BUDGET = "src/testing/profile.ts";
 const SESSION = "src/shell/session.ts";
+const PAINT = "src/shell/paint.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -525,6 +526,38 @@ const results = runPass({
       from: "        cpus: cpuCount(),\n      });\n    }",
       to: "        cpus: cpuCount(),\n      });\n      this.config.profile.onReport?.(this.#profiler.report());\n    }",
       expect: "T1.58",
+    },
+    {
+      // **A span's histogram fed inclusive time instead of self.** Every sum
+      // still adds up, every per-row figure is still a duration, and
+      // `spans.frame` becomes the frame's whole cost — which is exactly what a
+      // reader assumes it already is. F885 is what that denominator published.
+      name: "SPAN-INCLUSIVE: a span records its children's time as its own",
+      file: REC,
+      from: "    hist(spanHists, node.name).add(self);",
+      to: "    hist(spanHists, node.name).add(node.total ?? self);",
+      expect: "T1.62",
+    },
+    {
+      // A declared `SpanName` with no opener. The phase table keeps its row and
+      // the row reads zero, which is the one thing a breakdown must not say
+      // about work that happened.
+      name: "NO-ASSEMBLE: the draw phase's larger half is never opened",
+      file: PAINT,
+      from: '  using _assemble = deps.probe?.span("assemble") ?? NO_SPAN;',
+      to: "",
+      expect: "T1.60", // and T1.61, and MG30
+    },
+    {
+      // **The span beside the work rather than around it.** It has a count and
+      // no time in it, so every *was it opened* assertion stays green and only
+      // the residue moves — which is why T1.61 asserts the sum as well as the
+      // four counts.
+      name: "OVERLAYS-BESIDE: the span closes before the call it names",
+      file: PAINT,
+      from: '  using _s = deps.probe?.span("overlays") ?? NO_SPAN;\n  return deps.overlays();',
+      to: '  { using _s = deps.probe?.span("overlays") ?? NO_SPAN; }\n  return deps.overlays();',
+      expect: "T1.61",
     },
     {
       name: "EAGER-ALS: the async store is built at construction",

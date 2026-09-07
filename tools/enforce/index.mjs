@@ -6,6 +6,7 @@ import { checkFindings, checkTriageInventory } from "./findings.mjs";
 import {
   checkExportedArguments,
   checkFunctionConsumers,
+  checkSpanNamesOpened,
   checkLayerCycles,
   checkModuleGraph,
   checkOneStorePerComponent,
@@ -136,6 +137,7 @@ const violations = [
   ...checkOneStorePerComponent(files),
   ...checkSeamConsumers(files),
   ...checkFunctionConsumers(files),
+  ...checkSpanNamesOpened(files),
   // MG29 — a published function whose parameter type is interior (C24 I29, §8c).
   ...checkExportedArguments(files),
   ...checkSourceScans(files),

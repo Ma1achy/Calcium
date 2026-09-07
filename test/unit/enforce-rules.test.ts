@@ -34,6 +34,7 @@ import {
   MODULE_GRAPH_RULES,
   checkExportedArguments,
   checkFunctionConsumers,
+  checkSpanNamesOpened,
   checkBuilderCoverage,
   checkSeamConsumers,
   publicSurfaceUseSignal,
@@ -721,6 +722,10 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       // allow-list rather than about the tree, and that half needs two runs of
       // the same fixture with different lists.
       "MG25",
+      // MG30 likewise: its corpus is a union declaration in one file measured
+      // against call sites in every other, so a fabrication is a *set* — the
+      // union plus the files that do and do not open its members.
+      "MG30",
       // SS47 likewise: its subject is a string literal's contents rather than a
       // line, and its exemptions carry reasons the shared shape has nowhere to put.
       "SS47",
@@ -1424,6 +1429,55 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       stale.some((v) => v.message.includes("which the builder now sets")),
       "an exemption that outlives its reason is a violation of its own",
     ).toBe(true);
+  });
+
+  it("MG30 fires: a SpanName member nothing opens", () => {
+    // **The shape this rule exists for**: a member added to the union and never
+    // wired. `PHASE_GROUP` is total over `SpanName`, so it still gets a phase
+    // and still reads as *this phase cost nothing* in every breakdown drawn
+    // from the report (C28 I39).
+    const tree: Record<string, string> = {
+      "src/shell/profiling/types.ts":
+        'export type SpanName = "frame" | "paint" | "assemble";\n',
+      "src/shell/session.ts": 'prof?.span("frame");\n',
+      // **The comment arm, which MG25 has and MG24 did not.** A member named
+      // only in the prose explaining why it is dead would otherwise count as
+      // its own opener.
+      "src/shell/paint.ts": '// span("paint") is not opened yet\nprof?.span("assemble");\n',
+    };
+    const files = Object.keys(tree);
+    const read = (f: string): string => tree[f] ?? "";
+
+    const violations = checkSpanNamesOpened(files, read);
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.rule).toBe("MG30");
+    expect(violations[0]?.message, "names the member, not just the count").toContain("`paint`");
+    expect(violations[0]?.message).not.toContain("`frame`");
+  });
+
+  it("MG30's control: every member opened is no violation, and the corpus is not empty", () => {
+    // **An empty corpus passes the rule above exactly**, so the control is what
+    // says the fixture can be seen at all: the same union with the third member
+    // wired, and nothing reported.
+    const tree: Record<string, string> = {
+      "src/shell/profiling/types.ts":
+        'export type SpanName = "frame" | "paint" | "assemble";\n',
+      "src/shell/session.ts": 'prof?.span("frame");\n',
+      "src/shell/paint.ts": 'prof?.span("paint");\nprof?.span("assemble");\n',
+    };
+    expect(checkSpanNamesOpened(Object.keys(tree), (f: string) => tree[f] ?? "")).toEqual([]);
+  });
+
+  it("MG30 reports rather than passes when it cannot find the union", () => {
+    // **The vacuity arm.** A rule whose corpus is a declaration it failed to
+    // parse has nothing to be wrong about, and returns green — which is A03 §2's
+    // class arriving in the rule written to close C28 I39's version of it.
+    const tree: Record<string, string> = {
+      "src/shell/profiling/types.ts": "export type Tier = 'off';\n",
+    };
+    const violations = checkSpanNamesOpened(Object.keys(tree), (f: string) => tree[f] ?? "");
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.message).toContain("vacuous rather than satisfied");
   });
 
   it("MG25 fires: an exported function no other file in src/ names", () => {

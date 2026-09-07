@@ -32,7 +32,7 @@ import { initialRegionHeight } from "./frame.js";
 import { elementsOfEntry, measureEntry } from "./entry-layout.js";
 import { createManifestStore, parseManifest, withThemeNames } from "../data/manifest/index.js";
 import type { ManifestError } from "../data/manifest/index.js";
-import { block as makeBlock, descendants } from "../data/viewmodel/index.js";
+import { NO_SPAN, block as makeBlock, descendants } from "../data/viewmodel/index.js";
 import type { Block, Plot, Result } from "../data/viewmodel/index.js";
 import { createProcessRunner } from "../data/process/runner.js";
 import {
@@ -1220,7 +1220,13 @@ export async function constructGraph(
       // own fix.
       // A thunk: `entryAtRegionRow` is declared below, with the other pointer
       // helpers, and the router is built here. Called at dispatch, never now.
-      deps: routerDeps(stores, runner, scheduler, deps.frame, () => pipeline, confirm, (row) => entryAtRegionRow(row)),
+      deps: {
+        ...routerDeps(stores, runner, scheduler, deps.frame, () => pipeline, confirm, (row) => entryAtRegionRow(row)),
+        // C28 I39 — the `handler` span. Spread in here rather than threaded
+        // through `routerDeps`, whose seven parameters are all C16's own and
+        // none of which the profiler belongs among.
+        ...(deps.profiler === undefined ? {} : { probe: deps.profiler.asProbe() }),
+      },
     }),
   );
 
@@ -2467,9 +2473,27 @@ export async function constructGraph(
   // Startup step 8's mechanism (I24). C16's decoder owns no timer and C01
   // delivers bytes and interprets none; neither is wired to the other by
   // existing, and nothing else in the tree may read stdin.
+  // C28 I30 — the narrowing view, taken once. `asProbe()` builds an object, and
+  // the two seams below are on the input path.
+  const probe = deps.profiler?.asProbe();
+
   const decoder = at("decoder", () =>
     createDecoder({ capabilities: detection.capabilities, now: config.clock }),
   );
+
+  /**
+   * The `decode` span — bytes to events (C28 I39).
+   *
+   * **A wrapper rather than a decoration of the decoder**, because the two
+   * things worth timing are `push` and `poll` and they are the same work
+   * reached two ways: a chunk arriving, and the disambiguation deadline
+   * expiring. One name over both is what makes `spans.decode.count` the number
+   * of times bytes were interpreted.
+   */
+  const decoded = (read: () => readonly InputEvent[]): readonly InputEvent[] => {
+    using _s = probe?.span("decode") ?? NO_SPAN;
+    return read();
+  };
 
   at("input", () => {
     let wake: Disposable | null = null;
@@ -2490,9 +2514,18 @@ export async function constructGraph(
      * The commit still belongs to a non-empty batch: nothing changed, so
      * nothing needs drawing.
      */
+    // **The `route` span, per event and not per batch** (C28 I39). A batch is
+    // whatever one read of stdin held, so a per-batch figure moves with how the
+    // OS chunked the input rather than with what a key cost to route — and a
+    // paste of two hundred characters would read as one very slow route.
+    const routed = (e: InputEvent): void => {
+      using _s = probe?.span("route") ?? NO_SPAN;
+      router.dispatch(e);
+    };
+
     const deliver = (events: readonly InputEvent[]): void => {
       if (events.length > 0) {
-        for (const e of events) router.dispatch(e);
+        for (const e of events) routed(e);
         // After the keys and before the frame: the peek follows the focus the
         // keys just moved (C15 §2a).
         syncPeek();
@@ -2549,11 +2582,11 @@ export async function constructGraph(
       if (at === null) return;
       wake = config.schedule(() => {
         wake = null;
-        deliver(decoder.poll());
+        deliver(decoded(() => decoder.poll()));
       }, Math.max(0, at - config.clock()));
     }
 
-    lifecycle.onInput((chunk) => void deliver(decoder.push(chunk)));
+    lifecycle.onInput((chunk) => void deliver(decoded(() => decoder.push(chunk))));
   });
 
   return Object.freeze({

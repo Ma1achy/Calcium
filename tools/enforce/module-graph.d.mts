@@ -100,6 +100,12 @@ export declare function checkFunctionConsumers(
   allowed?: Readonly<Record<string, string>>,
 ): Violation[];
 
+/** MG30 — a `SpanName` member nothing opens under `src/` (C28 I39). */
+export declare function checkSpanNamesOpened(
+  files: readonly string[],
+  readFile?: (f: string) => string,
+): Violation[];
+
 /**
  * MG27 — a field a block type carries that no builder sets (C24 I20, F114).
  *

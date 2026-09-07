@@ -1159,6 +1159,9 @@ class Session implements TuiInstance {
     const graph = this.#graph;
     return compose({
       chrome: this.config.chrome,
+      // C28 I39 — the `chrome` span, so the app's own header and footer are a
+      // phase of their own rather than Calcium's.
+      ...(graph?.probe === undefined ? {} : { probe: graph.probe }),
       session: () => graph?.session.snapshot ?? emptySnapshot(this.config),
       copyMode: () => this.#copyMode,
       now: this.config.clock,

@@ -35,7 +35,7 @@ export function componentOf(file) {
  * the vacuity suite can assert every one of them has been shown to fire; a rule
  * added here without a fabricated violation fails A03 commitment 14.
  */
-export const MODULE_GRAPH_RULES = ["MG1", "MG2", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG14", "MG15", "MG16", "MG17", "MG18", "MG19", "MG20", "MG21", "MG22", "MG23", "MG24", "MG25", "MG26", "MG27", "MG28", "MG29"];
+export const MODULE_GRAPH_RULES = ["MG1", "MG2", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG14", "MG15", "MG16", "MG17", "MG18", "MG19", "MG20", "MG21", "MG22", "MG23", "MG24", "MG25", "MG26", "MG27", "MG28", "MG29", "MG30"];
 
 /**
  * MG6 is a **third kind of rule**, and saying so is the point of this comment.
@@ -3128,6 +3128,80 @@ export function checkDevEntryIsolation(files, readFile = (f) => readFileSync(f, 
   }
 
   return violations;
+}
+
+/**
+ * MG30 — every `SpanName` is opened somewhere under `src/`, or removed (C28 I39).
+ *
+ * **`PHASE_GROUP` is total over the union by construction**, so a member nobody
+ * opens is still given a phase, still appears in a compute-versus-draw
+ * breakdown, and still reads as *this phase cost nothing*. Seven of nineteen
+ * were in that state when this landed — `chrome`, `overlays`, `paint`,
+ * `assemble`, `decode`, `route` and `handler` — leaving `draw` with one opener
+ * of three and `input` with one of four.
+ *
+ * **By equality against the union's own members, not against a written list.**
+ * A list is satisfied by the list, which is the shape this rule exists to
+ * refuse: a member added to `SpanName` and never wired passes any check whose
+ * corpus is the check's own table.
+ *
+ * **Known limit.** It matches `span("name")` and `trace("name"` textually, so a
+ * call built from a variable is invisible to it and would read as a dead member.
+ * There is none today; the day there is, the disposition is to name it here
+ * rather than to widen the match, because a matcher that accepts an expression
+ * accepts anything.
+ *
+ * Comments are stripped before counting, as MG25 does and MG24 did not: a
+ * member named only in the prose explaining why it is dead would otherwise
+ * count as its own opener (F84's class).
+ */
+export function checkSpanNamesOpened(files, readFile = (f) => readFileSync(f, "utf8")) {
+  const TYPES = "src/shell/profiling/types.ts";
+  if (!files.includes(TYPES)) return [];
+
+  const source = readFile(TYPES);
+  const union = /export type SpanName =([\s\S]*?);/.exec(source);
+  if (union === null) {
+    return [
+      {
+        rule: "MG30",
+        file: TYPES,
+        message:
+          "no `export type SpanName = …;` to read — the rule's corpus is the union itself, so a " +
+          "declaration it cannot find makes it vacuous rather than satisfied (C28 I39)",
+        spec: "A03 §3, MG30 · C28 I39",
+      },
+    ];
+  }
+  const declared = [...union[1].matchAll(/"([a-z]+)"/g)].map((m) => m[1]);
+
+  const opened = new Set();
+  for (const raw of files) {
+    const file = raw.replaceAll("\\", "/");
+    if (!file.startsWith("src/")) continue;
+    // Comments stripped before counting, as MG25 does and MG24 did not: a
+    // member named only in the prose explaining why it is dead would otherwise
+    // count as its own opener.
+    const body = readFile(file)
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/(^|[^:])\/\/.*$/gm, "$1");
+    for (const m of body.matchAll(/\b(?:span|trace)\(\s*"([a-z.]+)"/g)) opened.add(m[1]);
+  }
+
+  const dead = declared.filter((n) => !opened.has(n));
+  if (dead.length === 0) return [];
+  return [
+    {
+      rule: "MG30",
+      file: TYPES,
+      message:
+        `SpanName declares ${String(dead.length)} member(s) nothing opens — ${dead.map((n) => `\`${n}\``).join(", ")}. ` +
+        "`PHASE_GROUP` maps every member, so an unopened one is a row of zero in a table that reads as " +
+        "a measurement. Open it, or delete it: a union member with no call site is a declaration " +
+        "nothing can violate (C28 I39)",
+      spec: "A03 §3, MG30 · C28 I39",
+    },
+  ];
 }
 
 export function checkFunctionConsumers(

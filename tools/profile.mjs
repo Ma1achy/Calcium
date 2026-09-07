@@ -176,6 +176,8 @@ console.log(`\n## A01 Appendix B\n`);
 const budget = checkBudget(report);
 console.log(formatBudget(budget));
 
+const share = (part, of) => (of === 0 ? "-" : `${((part / of) * 100).toFixed(1)}%`);
+
 // --- where the frame went ---------------------------------------------------
 //
 // **The compute/draw split, which is the question the component exists for.**
@@ -184,16 +186,32 @@ console.log(formatBudget(budget));
 
 const spans = report.spans ?? {};
 const groups = new Map();
+let unphased = 0;
 for (const [name, hist] of Object.entries(spans)) {
   const group = PHASE_GROUP[name];
-  // `frame` is the whole, not a phase — adding it to the parts double-counts.
-  if (group === undefined || group === "total") continue;
+  // `frame` is not a phase: it is the *self* time of the frame span, meaning
+  // the shell's own per-frame work outside every other span (C28 I40). It gets
+  // a row below rather than a share of itself.
+  if (group === "total") continue;
+  // A component's own sub-span — `group.place` and its kin, from `ctx.probe`.
+  // `PHASE_GROUP` is total over `SpanName` and these are not members, so they
+  // have no phase and would vanish from a table that skipped them silently.
+  if (group === undefined) {
+    unphased += hist.sum;
+    continue;
+  }
   groups.set(group, (groups.get(group) ?? 0) + hist.sum);
 }
-const whole = spans.frame?.sum ?? 0;
+// **The whole is `latency.work`, not `spans.frame`** (C28 I40, F885). Every
+// histogram in `spans` carries self time, so `spans.frame` is the frame's work
+// outside every other span — a real number, an order of magnitude smaller, and
+// entirely plausible as a denominator. Dividing by it published `react` at 96%
+// of a frame it is 72% of.
+const whole = report.latency?.work.sum ?? 0;
+const frameSelf = spans.frame?.sum ?? 0;
 
-console.log(`\n## Where the frame went — ${String(report.frames)} frames, ${whole.toFixed(0)} ms in \`frame\`\n`);
-console.log("| phase | ms | share of `frame` | spans |");
+console.log(`\n## Where the frame went — ${String(report.frames)} frames, ${whole.toFixed(0)} ms of work\n`);
+console.log("| phase | ms | share of work | spans |");
 console.log("|---|---|---|---|");
 for (const [group, ms] of [...groups].sort((a, x) => x[1] - a[1])) {
   const members = Object.keys(spans)
@@ -201,16 +219,26 @@ for (const [group, ms] of [...groups].sort((a, x) => x[1] - a[1])) {
     .sort()
     .map((n) => `\`${n}\` ${(spans[n]?.sum ?? 0).toFixed(1)}`)
     .join(", ");
-  const share = whole === 0 ? "—" : `${((ms / whole) * 100).toFixed(1)}%`;
-  console.log(`| ${group} | ${ms.toFixed(1)} | ${share} | ${members} |`);
+  console.log(`| ${group} | ${ms.toFixed(1)} | ${share(ms, whole)} | ${members} |`);
 }
+if (unphased > 0) {
+  console.log(
+    `| *no phase* | ${unphased.toFixed(1)} | ${share(unphased, whole)} | a component's own sub-spans, which \`PHASE_GROUP\` does not map |`,
+  );
+}
+console.log(
+  `| *the frame itself* | ${frameSelf.toFixed(1)} | ${share(frameSelf, whole)} | \`frame\`'s self time — per-frame work no other span brackets |`,
+);
 // **Unattributed, printed rather than left as a gap in the arithmetic.** The
 // phases are the spans that exist; what `frame` holds and they do not is the
 // work between them, and a table whose rows do not sum to the whole invites the
 // reader to assume they do.
-const attributed = [...groups.values()].reduce((n, x) => n + x, 0);
+const attributed = [...groups.values()].reduce((n, x) => n + x, 0) + unphased + frameSelf;
 if (whole > 0) {
-  console.log(`| *unattributed* | ${(whole - attributed).toFixed(1)} | ${(((whole - attributed) / whole) * 100).toFixed(1)}% | work inside \`frame\` that no span brackets |`);
+  const left = whole - attributed;
+  console.log(
+    `| *unaccounted* | ${left.toFixed(1)} | ${share(left, whole)} | work in a frame that no span reaches at all |`,
+  );
 }
 
 // --- which component ---------------------------------------------------------

@@ -47,6 +47,7 @@ import { resolveBase } from "../presentation/theme/index.js";
 import type { ResolvedTheme } from "../presentation/theme/index.js";
 import type { Style } from "../presentation/theme/index.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
+import { NO_SPAN } from "../data/viewmodel/index.js";
 import type { Probe } from "../data/viewmodel/index.js";
 import { spinnerFrames } from "../presentation/blocks/index.js";
 
@@ -512,6 +513,20 @@ function based(lines: readonly string[], base: string): readonly string[] {
   );
 }
 
+/**
+ * C15's placed layers, bracketed (C28 I39).
+ *
+ * **One wrapper for both call sites**, so `spans.overlays.count` is the number
+ * of times the layout actually ran. It runs twice per frame today — once here
+ * for the composite and once in `cursorFor` — and a per-call-site span would
+ * report two names each firing once, which is the same fact written so that
+ * nobody notices it.
+ */
+function placedLayers(deps: PaintDeps): readonly Placed[] {
+  using _s = deps.probe?.span("overlays") ?? NO_SPAN;
+  return deps.overlays();
+}
+
 /** The screen's base, or the empty string where nothing is painted. */
 function baseSequence(deps: PaintDeps): string {
   if (deps.suppressBackground()) return "";
@@ -519,6 +534,11 @@ function baseSequence(deps: PaintDeps): string {
 }
 
 export function paint(frame: Composed, deps: PaintDeps): readonly string[] {
+  // **The `draw` phase, and `using` is fine here** (C28 I39). F867's argument
+  // against `using` is about a wrapper entered once per block — an array
+  // allocation is invisible beside a 2 ms plot and dominates a rule's 220 ns
+  // measure. This runs once per frame.
+  using _paint = deps.probe?.span("paint") ?? NO_SPAN;
   if (!heightsSum(frame)) {
     throw new FrameError(
       `frame heights do not sum to ${String(frame.size.rows)} rows: ` +
@@ -568,6 +588,10 @@ export function paint(frame: Composed, deps: PaintDeps): readonly string[] {
   // take no rows — that is why `heightsSum` above holds identically with three
   // overlays open and with none, and why nothing could see that for the whole
   // life of C15 no component drew one at all (S01 §3a).
+  // **`assemble` covers building the rows as well as compositing them**, because
+  // the region calls below are arguments and run inside it either way. Naming it
+  // for the narrower half would put the wider cost under a name that denies it.
+  using _assemble = deps.probe?.span("assemble") ?? NO_SPAN;
   const lines = composite(
     [
       ...region(frame.header, HEADER_ROWS, width, deps),
@@ -587,7 +611,7 @@ export function paint(frame: Composed, deps: PaintDeps): readonly string[] {
       // (§6l.2 row 5) and one of zero rows takes nothing.
       ...region(frame.footer, frame.footerRows, width, deps),
     ],
-    deps.overlays(),
+    placedLayers(deps),
     {
       registry: deps.registry,
       theme: deps.theme,
@@ -627,7 +651,7 @@ export function paint(frame: Composed, deps: PaintDeps): readonly string[] {
  * genuinely is not on the screen, and a clamped one would claim otherwise.
  */
 export function cursorFor(frame: Composed, deps: PaintDeps): Cell | null {
-  const placed = deps.overlays();
+  const placed = placedLayers(deps);
   const top = placed[placed.length - 1];
   if (top !== undefined) {
     if (top.cursor !== undefined) {

@@ -31517,6 +31517,43 @@ Found by reading the table against the paragraph above it while adding a member 
 the same instrument as *read the abstract against its own section before reading the section against
 the code*, applied to a constant.
 
+## F886 — `assemble` is at least as expensive as React, and five of P11's seven live in a 1.5 % slice ★★★★☆
+
+With all nineteen spans opened (I39), `make profile` over 14 frames of a 500-line patch plus a
+40-row table and a 200-point plot, three runs:
+
+| phase | ms (3 runs) | share |
+|---|---|---|
+| draw — `assemble` 127.5 / 129.2 / 145.9, `react` 105.4 / 119.4 / 143.3, `paint` 0.3–0.5 | 233 / 249 / 290 | **86.5–87.9 %** |
+| compute — `chrome`, `compose`, `elements`, `measure`, `overlays` together | 3.9 / 4.4 / 6.6 | **1.5–2.0 %** |
+| input — `decode`, `route`, `handler` | 2.5 | 0.9 % |
+| a component's own sub-spans, which `PHASE_GROUP` does not map | 15.1 | 5.7 % |
+| `frame` itself, and work no span reaches | 11.3 | 4.3 % |
+
+**The plan's headline was half right and the half nobody claimed is the larger one.** P4 said
+Ink's `renderToString` — a full React mount, Yoga layout, render, unmount per call — is *almost
+certainly where the frame goes*. It is 40 % of the frame. Building and compositing the rows is
+another 47 %, and it had no span at all, so it was invisible in every reading taken before today.
+The two are within 20 % of each other in all three runs.
+
+**And the consequence for P11.** Five of its seven defects are repeated computation — a `group`
+measuring its children two to four times, `#form` measuring twice, `editor.layout`, the overlay
+`place()`, the `based()` regex. Every one of them lands in `compute` or in `frame`'s own work,
+which together are **under 7 ms of 265**. Removing every repeat halves a slice that is 1.5 % of the
+frame.
+
+**Two of the seven this fixture cannot size at all, and that is the more useful half.** The
+O(entries) scan is O(visible × entries) and the whole-transcript `flatMap` is O(every block in
+every entry); the profile fixture holds **one** transcript entry. Both are correct-for-small-n by
+construction here, which is a property of the fixture and not of the code — so their cost is not
+small, it is **unmeasured**. Sizing them needs a many-entry document, and building one is the next
+step rather than fixing them blind.
+
+**What this does not say.** It does not say the five are not defects — a node measured four times
+per frame is wrong whatever it costs, and the count is the finding. It says the ordering was
+written before anything measured it, and that a session spent removing repeats would have moved
+about 1 % while the 87 % kept its two spans between them.
+
 ## F885 — a self time read as a whole, in the table built to answer *computing or drawing* ★★★★☆
 
 `make profile`'s phase table divided each phase by `spans.frame.sum` and called the result *share

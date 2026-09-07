@@ -26,6 +26,8 @@
  * makes structural.
  */
 
+import { NO_SPAN } from "../data/viewmodel/index.js";
+import type { Probe } from "../data/viewmodel/index.js";
 import { cells } from "../presentation/text.js";
 import {
   DEFAULT_FOOTER_ROWS,
@@ -69,6 +71,15 @@ export type Composed = Readonly<{
 
 export type ComposeDeps = Readonly<{
   chrome: Chrome;
+  /**
+   * C28's seam (C28 I30, C28 I39). Absent is not recording, and that is the usual case.
+   *
+   * Here so the `chrome` span brackets **the app's own header and footer
+   * builders**, which run inside the frame and were being attributed to
+   * Calcium — the one phase in the breakdown whose cost is not this
+   * framework's.
+   */
+  probe?: Probe;
   session: () => SessionSnapshot;
   /** Copy mode, for the chrome. A frame property, like `size` (C16 §5b). */
   copyMode: () => boolean;
@@ -84,6 +95,21 @@ export type ComposeDeps = Readonly<{
   measureSequence: (blocks: readonly Block[], width: number) => number;
 }>;
 
+/**
+ * The app's header and footer, bracketed (C28 I39).
+ *
+ * **Both under one span**, because the question the phase answers is *how much
+ * of this frame is the application's chrome* and two spans firing once each is
+ * the same answer written so that nobody adds them up.
+ */
+function chromeOf(
+  deps: ComposeDeps,
+  ctx: Parameters<Chrome["header"]>[0],
+): { header: readonly Block[]; footer: readonly Block[] } {
+  using _s = deps.probe?.span("chrome") ?? NO_SPAN;
+  return { header: deps.chrome.header(ctx), footer: deps.chrome.footer(ctx) };
+}
+
 export function compose(deps: ComposeDeps): Composed {
   // The two single reads. Everything below takes these values.
   const size = deps.size();
@@ -91,8 +117,7 @@ export function compose(deps: ComposeDeps): Composed {
   const session = deps.session();
   const ctx = { session, now, columns: size.columns, copyMode: deps.copyMode() };
 
-  const header = deps.chrome.header(ctx);
-  const footer = deps.chrome.footer(ctx);
+  const { header, footer } = chromeOf(deps, ctx);
   // **The footer is its content** (I82, §6l.4 B): measured at this frame's
   // width, clamped to the maximum the size gate can hold, and zero for `[]` —
   // the lower rule is the prompt's edge, not the footer's head, so a frame

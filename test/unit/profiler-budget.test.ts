@@ -11,6 +11,8 @@
 // it would keep agreeing on the day `session.ts` renames its counter, and the
 // failure that produces is an *unanswerable*, which is this module's
 // honest-looking answer and therefore the one nothing would question.
+import { readFileSync, readdirSync, statSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import { BUDGET, checkBudget, formatBudget } from "../../src/testing/index.js";
@@ -69,6 +71,31 @@ function sample(at: number, cpuMs: number): ProfileReport["samples"][number] {
     timingEntries: 0,
     suspended: false,
   };
+}
+
+/**
+ * A real session that painted, with a report out of it.
+ *
+ * Shared by the rows below rather than built in each: what they assert about is
+ * one session's arithmetic, and three sessions would let a row pass against a
+ * shape a sibling never saw.
+ */
+async function profiled(): Promise<{ report: ProfileReport }> {
+  let seen: ProfileReport | null = null;
+  const { tui } = await buildSession({
+    profile: {
+      tier: "spans",
+      elapsed: (() => {
+        let t = 0;
+        return () => (t += 1);
+      })(),
+      onReport: (r) => void (seen = r),
+    },
+  });
+  await tui.stop("exit");
+  const got = seen as ProfileReport | null;
+  if (got === null) throw new Error("no report arrived");
+  return { report: got };
 }
 
 const row = (b: ReturnType<typeof checkBudget>, name: string) => {
@@ -223,13 +250,92 @@ describe("C28 — the budget table", () => {
 });
 
 describe("C28 — a part is self time and the whole is the frame's work", () => {
-  it.todo("T1.62 (C28 I40): a session at tier spans with nested spans — spans.frame.sum is strictly less than latency.work.sum by more than the histogram's own error, and spans.frame.sum plus every other span does not exceed it; the strict inequality is the half that bites, because feeding record the node's total instead of its self time makes the two equal and a conservation bound alone is satisfied by that — not deferred on a component: lands with the phase seams");
-  it.todo("T1.63 (C28 I40): make profile's phase table — its shares are taken against latency.work and the residue row is work minus the parts minus frame; a share against spans.frame is larger, sums to more than 100% once the seven dead spans are wired, and is the shape the first version shipped — not deferred on a component: lands with the phase seams");
+  it("T1.62 (C28 I40): spans.frame is self time, strictly below the frame's work", async () => {
+    const { report } = await profiled();
+    const spans = report.spans ?? {};
+    const work = report.latency?.work;
+    if (work === undefined) throw new Error("no latency at tier spans");
+
+    const frame = spans.frame;
+    if (frame === undefined) throw new Error("no frame span");
+
+    // **Strictly below, by more than the bucketing can explain.** A conservation
+    // bound alone is satisfied by feeding `record` the node's `total` — the two
+    // become equal and every sum still adds up (F885).
+    expect(frame.sum).toBeLessThan(work.sum * (1 - work.error));
+
+    const parts = Object.entries(spans)
+      .filter(([name]) => name !== "frame")
+      .reduce((n, [, h]) => n + (h?.sum ?? 0), 0);
+    expect(frame.sum + parts, "the parts and the frame's own work fit inside it").toBeLessThanOrEqual(
+      work.sum * (1 + work.error),
+    );
+  });
+
+  it("T1.63 (C28 I40): make profile takes its shares against the work, not against the frame span", () => {
+    // The tool is `dist/`-facing and T5.3 runs it. What is asserted here is the
+    // shape of its arithmetic, from the source, because the defect it encodes is
+    // a denominator and a running tool prints only the quotient.
+    const tool = readFileSync("tools/profile.mjs", "utf8");
+    expect(tool, "the whole is latency.work").toContain("report.latency?.work.sum");
+    expect(tool, "and never the frame span's self time").not.toMatch(
+      /const whole = spans\.frame/,
+    );
+    expect(tool, "and the residue is printed rather than absorbed").toContain("*unaccounted*");
+  });
 });
 
 describe("C28 — every declared span is opened", () => {
-  it.todo("T1.60 (C28 I39): the shipped SpanName union against the members a scan finds opened under src/ — equal sets, by equality and not by containment, because a member added to the union and never wired is exactly the case this exists for and a subset check passes on it — not deferred on a component: lands with the phase seams");
-  it.todo("T1.61 (C28 I39): a frame composed at tier spans — chrome, overlays, paint and assemble all carry a non-zero count, and the phases sum to within the frame span's own histogram error of frame itself; four spans firing proves they were called and the residue is what says they were called around the work rather than beside it — not deferred on a component: lands with the phase seams");
+  it("T1.60 (C28 I39): every SpanName member is opened somewhere under src/", () => {
+    // **By equality against the union's own members.** A written list is
+    // satisfied by the list, which is exactly the case this exists for: a member
+    // added to `SpanName` and never wired passes any check whose corpus is its
+    // own table. The scan is MG30 and this row is the same question asked of the
+    // shipped tree, so a rule accidentally disabled is still caught here.
+    const declared = new Set(
+      [...(/export type SpanName =([\s\S]*?);/.exec(
+        readFileSync("src/shell/profiling/types.ts", "utf8"),
+      )?.[1] ?? "").matchAll(/"([a-z]+)"/g)].map((m) => m[1] ?? ""),
+    );
+    expect(declared.size, "the union was read, not an empty match").toBeGreaterThan(10);
+
+    const opened = new Set<string>();
+    const walk = (dir: string): void => {
+      for (const name of readdirSync(dir)) {
+        const path = `${dir}/${name}`;
+        if (statSync(path).isDirectory()) {
+          walk(path);
+          continue;
+        }
+        if (!path.endsWith(".ts")) continue;
+        const body = readFileSync(path, "utf8")
+          .replace(/\/\*[\s\S]*?\*\//g, "")
+          .replace(/(^|[^:])\/\/.*$/gm, "$1");
+        for (const m of body.matchAll(/\b(?:span|trace)\(\s*"([a-z.]+)"/g)) opened.add(m[1] ?? "");
+      }
+    };
+    walk("src");
+
+    expect([...declared].filter((n) => !opened.has(n)), "declared and never opened").toEqual([]);
+  });
+
+  it("T1.61 (C28 I39): the four frame-path spans fire, and the phases fit inside the work", async () => {
+    const { report } = await profiled();
+    const spans = report.spans ?? {};
+
+    for (const name of ["chrome", "overlays", "paint", "assemble"]) {
+      expect(spans[name]?.count ?? 0, `${name} was opened`).toBeGreaterThan(0);
+    }
+
+    // **The residue is the row that matters.** Four counts prove the spans were
+    // called; only the sum says they were called *around* the work rather than
+    // beside it — a span opened and closed next to the thing it names has a
+    // count and no time in it.
+    const work = report.latency?.work.sum ?? 0;
+    const parts = Object.entries(spans).reduce((n, [, h]) => n + (h?.sum ?? 0), 0);
+    expect(parts, "every span together fits inside the frames' work").toBeLessThanOrEqual(work);
+    expect(parts, "and accounts for most of it").toBeGreaterThan(work * 0.5);
+  });
 });
 
 describe("C28 — the report's way out", () => {
