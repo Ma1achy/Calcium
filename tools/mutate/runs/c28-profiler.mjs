@@ -20,7 +20,7 @@ import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
 const CMD =
-  "npx vitest run test/unit/profiler-tree.test.ts test/unit/profiler-seams.test.ts test/unit/profiler.test.ts test/unit/profiler-export.test.ts test/unit/profiler-async.test.ts test/unit/profiler-budget.test.ts test/unit/profiler-recorder.test.ts test/integration/profiler.test.ts test/revert/profiler.test.ts";
+  "npx vitest run test/unit/profiler-tree.test.ts test/unit/profiler-seams.test.ts test/unit/profiler.test.ts test/unit/profiler-export.test.ts test/unit/profiler-async.test.ts test/unit/profiler-budget.test.ts test/unit/profiler-recorder.test.ts test/edge/profiler.test.ts test/integration/profiler.test.ts test/revert/profiler.test.ts";
 const REC = "src/shell/profiling/recorder.ts";
 const NODE = "src/shell/profiling/node.ts";
 const SCANS = "tools/enforce/source-scans.mjs";
@@ -40,6 +40,10 @@ const VIEWPORT = "src/viewport/viewport/viewport.ts";
 const LEAKS = "src/shell/profiling/leaks.ts";
 const SCRATCH = "src/shell/render-scratch.ts";
 const PANES = "src/shell/profiling/panes.ts";
+const RING = "src/shell/profiling/ring.ts";
+const LEAKSRC = "src/shell/profiling/leaks.ts";
+const CHROME = "src/shell/chrome.ts";
+const SCHED = "src/terminal/frame-scheduler.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -770,6 +774,213 @@ const results = runPass({
       from: "    dropped > 0",
       to: "    true",
       expect: "T1.10",
+    },
+    {
+      // The tier-3 rows, whose deferrals said they landed with the recorder and
+      // did not (F896). Every one below was written against a subject that had
+      // existed all round.
+      name: "WAIT-FROM-LATEST: the wait runs from the last commit, not the earliest",
+      file: REC,
+      from: "      if (earliestUnserved === null) earliestUnserved = elapsed();",
+      to: "      earliestUnserved = elapsed();",
+      expect: "T3.1",
+    },
+    {
+      // The other half: the mark outlives the frame it belonged to, so a
+      // repaint reports the wait of a frame that was already served.
+      name: "WAIT-MARK-KEPT: endFrame does not clear the unserved mark",
+      file: REC,
+      from: "      earliestUnserved = null;",
+      to: "      // earliestUnserved = null;",
+      expect: "T3.1",
+    },
+    {
+      name: "DROP-UNCOUNTED: the ring discards without counting",
+      file: RING,
+      from: "    if (this.#held === this.#items.length) this.#dropped += 1;",
+      to: "    if (false) this.#dropped += 1;",
+      expect: "T3.2",
+    },
+    {
+      // The guard that refuses the tier a caller is least likely to be on and
+      // passes the three they are — which is why T3.4 runs over all four.
+      name: "CAPTURE-OFF-ONLY: capture refuses at `off` and runs at every other tier",
+      file: REC,
+      from: '      if (TIER_RANK[tier] < TIER_RANK.deep) {',
+      to: '      if (tier === "off") {',
+      expect: "T3.4",
+    },
+    {
+      name: "SETTIER-AFTER-DISPOSE: the tier can still be changed after dispose",
+      file: REC,
+      from: "      if (disposed || next === tier) return;",
+      to: "      if (next === tier) return;",
+      expect: "T3.8",
+    },
+    {
+      name: "COMMIT-AFTER-DISPOSE: a commit still counts after dispose",
+      file: REC,
+      from: "    commit(reason: CommitReason, own: boolean): void {\n      if (disposed || !counting()) return;",
+      to: "    commit(reason: CommitReason, own: boolean): void {\n      if (!counting()) return;",
+      expect: "T3.8",
+    },
+    {
+      // A fallback is a frame's absence, not its cost: counted in the durations
+      // it reports the framework as fast on the frames where it gave up.
+      name: "FALLBACK-IN-DURATIONS: a frame that gave up is timed like one that drew",
+      file: REC,
+      from: '      if (outcome === "fallback") {\n        excludedFallback += 1;\n        return;\n      }',
+      to: '      if (outcome === "fallback") {\n        excludedFallback += 1;\n      }',
+      expect: "T3.7",
+    },
+    {
+      // Recorded on the success path only, so the span is missing for exactly
+      // the polls that went wrong.
+      name: "TRACE-RECORDS-ON-SUCCESS-ONLY: a rejecting trace records nothing",
+      file: REC,
+      from: "        try {\n          return await fn();\n        } finally {\n          record(node, end(node, ctx));\n        }",
+      to: "        const out = await fn();\n        record(node, end(node, ctx));\n        return out;",
+      expect: "T3.11",
+    },
+    {
+      // F900: the headline from the newest sample whatever its flag, so a
+      // stopped clock is drawn as the present state.
+      name: "SUSPENDED-UNREAD: the memory pane headlines the newest sample, suspended or not",
+      file: PANES,
+      from: "  const last = running[running.length - 1];",
+      to: "  const last = r.samples[r.samples.length - 1];",
+      expect: "T3.10",
+    },
+    {
+      // Its control: a caveat on every report is a caveat nobody reads, and it
+      // passes every assertion about the suspended case.
+      name: "CAVEAT-ALWAYS: every report says some samples were suspended",
+      file: PANES,
+      from: "        suspendedCount === 0",
+      to: "        false",
+      expect: "T3.10",
+    },
+    {
+      name: "RESOLUTION-ZEROED: a delay figure travels with a resolution of zero, qualifying nothing",
+      file: NODE,
+      from: "        loopDelayResolutionMs: RESOLUTION_MS,",
+      to: "        loopDelayResolutionMs: 0,",
+      expect: "T3.3",
+    },
+    {
+      // The tier-6 reverts, each a change someone would plausibly make. Their
+      // deferrals said *lands with the module each row names*; every module
+      // landed and nothing watched (F896).
+      name: "TOTAL-AS-WORK: work is published as work plus wait",
+      file: REC,
+      from: "        work,",
+      to: "        work: work + frameWait,",
+      expect: "T6.1",
+    },
+    {
+      name: "CANARY-DEAD: the timing-entry count is a constant",
+      file: NODE,
+      from: "        timingEntries: performance.getEntries().length,",
+      to: "        timingEntries: 0,",
+      expect: "T6.2",
+    },
+    {
+      name: "FALLBACK-TIMED: a frame that gave up is timed like one that drew",
+      file: REC,
+      from: '      if (outcome === "fallback") {\n        excludedFallback += 1;\n        return;\n      }',
+      to: '      if (outcome === "fallback") {\n        excludedFallback += 1;\n      }',
+      expect: "T6.3",
+    },
+    {
+      name: "INCLUSIVE-AS-SELF: a container is charged its children's time",
+      file: REC,
+      from: "      nodes.add(this.node.name, this.entry, spent, this.node.total ?? spent, seq);",
+      to: "      nodes.add(this.node.name, this.entry, this.node.total ?? spent, this.node.total ?? spent, seq);",
+      expect: "T6.4",
+    },
+    {
+      name: "SPANS-AT-EVERY-TIER: the duration keys are emitted zeroed below `spans`",
+      file: REC,
+      from: "        ...(spanning()",
+      to: "        ...(true",
+      expect: "T6.5",
+    },
+    {
+      name: "COUNTING-AT-OFF: the disabled tier records like every other",
+      file: REC,
+      from: '  const counting = (): boolean => tier !== "off";',
+      to: "  const counting = (): boolean => true;",
+      expect: "T6.6",
+    },
+    {
+      name: "RING-KEPT-ACROSS-TIER: a tier change leaves the ring alone",
+      file: REC,
+      from: "      resetRing();\n      tier = next;",
+      to: "      tier = next;",
+      expect: "T6.7",
+    },
+    {
+      name: "CAPTUREDIR-LITERAL: the recorder's default stands in for the resolution",
+      file: SESSION,
+      from: "captureDir: this.config.profile.captureDir ?? `${this.config.stateDir}/profile`,",
+      to: "",
+      expect: "T1.54",
+    },
+    {
+      name: "LASTFRAME-KEPT-ACROSS-TIER: a figure from the tier before the change",
+      file: REC,
+      from: "    lastWork = undefined;\n    samples.clear();",
+      to: "    samples.clear();",
+      expect: "T1.10",
+    },
+    {
+      name: "LASTFRAME-DRAWN-ONLY: a run of fallbacks holds the last drawn frame's figure",
+      file: REC,
+      from: "      lastWork = work;",
+      to: '      if (outcome === "frame") lastWork = work;',
+      expect: "T1.10",
+    },
+    {
+      name: "CHROME-COST-UNLABELLED: the number without the word that says which frame",
+      file: CHROME,
+      from: "return ms < 0.05 ? \"last <0.1ms\" : `last ${ms.toFixed(1)}ms`;",
+      to: "return ms < 0.05 ? \"<0.1ms\" : `${ms.toFixed(1)}ms`;",
+      expect: "T1.10b",
+    },
+    {
+      name: "SUSPEND-UNSET: the writer writes the constant it replaced",
+      file: REC,
+      from: "      suspended = on;",
+      to: "      suspended = false;",
+      expect: "T4.5",
+    },
+    {
+      name: "SUSPEND-NO-UNWIND: a refused suspend strands the flag",
+      file: CONSTRUCT,
+      from: "      profiler.setSuspended(false);\n      throw err;",
+      to: "      throw err;",
+      expect: "T4.5",
+    },
+    {
+      name: "STRICTEST-AS-FIRST: the reason that arrived first, not the strictest",
+      file: SCHED,
+      from: "      driving === null || strictness(reason) > strictness(driving) ? reason : driving;",
+      to: "      driving === null ? reason : driving;",
+      expect: "T1.24",
+    },
+    {
+      name: "STRICTEST-AS-LAST: the reason that arrived last",
+      file: SCHED,
+      from: "      driving === null || strictness(reason) > strictness(driving) ? reason : driving;",
+      to: "      reason;",
+      expect: "T1.24",
+    },
+    {
+      name: "LIVE-IS-FINALISED: what remains is reported as what was collected",
+      file: LEAKSRC,
+      from: "live: created - finalised",
+      to: "live: finalised",
+      expect: "T6.12",
     },
     {
       name: "EAGER-ALS: the async store is built at construction",

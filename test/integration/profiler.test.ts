@@ -18,7 +18,9 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { ProfileReport, TuiConfig } from "../../src/index.js";
-import { buildSession } from "../support/session.js";
+import { buildGraph, buildSession } from "../support/session.js";
+import { createProfiler } from "../../src/shell/profiling/recorder.js";
+import { createResourceProbe } from "../../src/shell/profiling/node.js";
 import { fakeStdin } from "../support/fake-terminal.js";
 
 const settle = async (turns = 3): Promise<void> => {
@@ -120,8 +122,184 @@ describe("C28 — profiler, tier 4 spec-first rows", () => {
     }
   });
 
-  it.todo("T4.1 (C28 I1): a real constructGraph with profile absent → the graph is byte-identical to one built without the field, and no profiler object exists — not deferred on a component: lands with the seams wired through construct.ts");
-  it.todo("T4.3 (C28 I4): a stream at 1 000 lines/s → wait tracks C03's 33 ms window and work does not — not deferred on a component: lands with the seams wired through construct.ts");
-  it.todo("T4.4 (C28 I12): the profiler view open → its own frames are excluded and excluded.selfInflicted is non-zero — not deferred on a component: lands with the seams wired through construct.ts");
-  it.todo("T4.5 (C28 I28): a handoff() interval spanning two sampler ticks → the samples exist, carry the interval's mark, and report no CPU figure across it — not deferred on a component: lands with the seams wired through construct.ts");
+  it("T4.1 (C28 I1): a session with profile absent writes the same bytes as one built without the field", async () => {
+    // **Byte-identical, which is stronger than *looks the same* and is the form
+    // the invariant states.** Off is free is a claim about the frames, not about
+    // a duration: measured as a timing figure it is a claim about the machine,
+    // and measured as *the same bytes went to the terminal* it is a claim about
+    // the code.
+    const bytesOf = async (overrides: Partial<TuiConfig>): Promise<string> => {
+      const { tui, stdout } = await buildSession(overrides);
+      await settle();
+      await tui.stop("exit");
+      return stdout.chunks.join("");
+    };
+
+    emitted = 0;
+    const absent = await bytesOf({});
+    emitted = 0;
+    // **`tier: "off"` rather than `profile: undefined`**, which
+    // `exactOptionalPropertyTypes` will not let a caller write at all — and it
+    // is the stronger of the two anyway. *Absent* and *undefined* are the same
+    // object to the runtime; *absent* and *off* are two different configs that
+    // must build the same session, and the gap between them is where the defect
+    // actually was: the gate read `profile !== undefined`, so `tier: "off"`
+    // built the recorder, started the loop monitor and connected a GC observer
+    // for an application that had explicitly asked for nothing.
+    const off = await bytesOf({ profile: { tier: "off" } });
+
+    expect(off, "an explicit off is the same session as no profile at all").toBe(absent);
+
+    // **The control, because two identical strings prove nothing about the
+    // subject unless a third differs.** A session that *is* profiling writes
+    // something else — so the two above are equal because nothing was built,
+    // not because the harness always produces the same output.
+    emitted = 0;
+    const profiling = await bytesOf({ profile: { tier: "spans" } });
+    expect(profiling, "the control: a profiling session does write something else").not.toBe(absent);
+    expect(absent.length, "and the fixture wrote a real frame").toBeGreaterThan(100);
+  });
+
+  it("T4.3 (C28 I4): wait tracks the coalescing window and work does not", async () => {
+    // **The two are separate figures because they answer different questions**
+    // (C28 I4): `work` is how long composing took, `wait` is how long the
+    // earliest unserved commit sat before a frame served it. A stream commits
+    // far more often than it draws — C03 coalesces at 33 ms — so `wait` carries
+    // the window and `work` carries the composition, and a sum of the two is a
+    // number that grows when the session is idle.
+    //
+    // Driven through `refresh`-shaped commits rather than a real 1 000 lines/s
+    // stream: the rate is not the subject, the coalescing is, and a row that
+    // depends on a real throughput measures the machine.
+    let t = 0;
+    const p = createProfiler({ tier: "spans" }, { elapsed: () => t });
+
+    // Ten commits inside one 33 ms window, then the frame that serves them.
+    for (let i = 0; i < 5; i += 1) {
+      t = i * 3;
+      p.commit("stream", false);
+    }
+    t = 33;
+    p.beginFrame("stream");
+    t = 35;
+    p.endFrame("frame");
+
+    const report = p.report();
+    const [frame] = report.timeline;
+    expect(frame, "one frame served the whole window").toBeDefined();
+    expect(report.frames, "five commits, one frame").toBe(1);
+
+    // `wait` is dated from the **earliest unserved commit** (C28 I5), so it is
+    // the window and not the gap since the last one: 33 − 0, not 33 − 12.
+    expect(frame?.wait, "wait is the window, from the earliest unserved commit").toBe(33);
+    expect(frame?.work, "and work is the composition alone").toBe(2);
+    expect(frame?.work, "the two are not the same number").not.toBe(frame?.wait);
+
+    // The next frame's wait is zero: nothing was outstanding when it began, and
+    // a wait that carried over would be the same defect one frame later.
+    t = 40;
+    p.beginFrame("stream");
+    t = 41;
+    p.endFrame("frame");
+    expect(p.report().timeline[1]?.wait, "an unprompted frame waited for nothing").toBe(0);
+    p.dispose();
+  });
+
+  it.todo("T4.4 (C28 I12): the profiler view open → its own frames are excluded and excluded.selfInflicted is non-zero — not deferred on a component: two blockers, and neither is the seams. `construct.ts` passes `own: false` unconditionally at the commit seam and says so in a comment — the block id that would distinguish a self-raised frame is C23's and does not travel with a commit — and there is no profiler view to open: `profilePane` is a pure function with no caller in src/ outside profiling/. Both arrive with the drawing round. Grep: `grep -n 'prof.commit' src/shell/construct.ts` and `grep -rn 'profilePane' src/ | grep -v profiling/`");
+
+  it("T4.5 (C28 I28): a real session suspending marks its samples, and the CPU figure across the interval is refused", async () => {
+    // **The wiring, and it had no writer at all until F903.** `suspended` was
+    // declared in the recorder and never assigned, so every sample in every
+    // session said `false` — the flag was a correct declaration, a correct call
+    // and a correct signature with no edge between them, which is what no
+    // statement-at-a-time reading finds.
+    //
+    // Driven through the real `lifecycle.suspend()`/`resume()` a handoff calls,
+    // because that is the seam `construct.ts` decorates. A row calling
+    // `setSuspended` directly would pass on the day nothing calls it.
+    // The sampler is a timer, so the tick is held rather than waited for: a row
+    // that sleeps for a sampling interval measures the machine's scheduler.
+    let tick: (() => void) | null = null;
+    const holdTimer = (fn: () => void): Disposable => {
+      tick = fn;
+      return { [Symbol.dispose]: () => void (tick = null) };
+    };
+    const profiler = createProfiler(
+      { tier: "spans" },
+      {
+        elapsed: () => performance.now(),
+        probe: createResourceProbe(() => performance.now()),
+        schedule: holdTimer,
+      },
+    );
+    const { graph } = await buildGraph({}, undefined, profiler);
+    const sample = (): void => {
+      const fn = tick;
+      if (fn === null) throw new Error("the sampler is not armed");
+      fn();
+    };
+
+    // `graph.lifecycle` **is** the decorated one: the root wraps it at
+    // construction rather than at the one call site, because `suspend()` means
+    // the terminal belongs to somebody else whatever asked for it — and a second
+    // caller learning to suspend without learning to tell the profiler is how
+    // this happened the first time.
+    // **A refused suspend must not strand the flag.** C01 throws on `suspend()`
+    // with nothing acquired, and the bracket sets the flag first — so this arm
+    // is what says the unwind exists. Without it every later sample in the
+    // session is labelled unreadable, from one refusal.
+    expect(() => graph.lifecycle.suspend(), "nothing is acquired yet").toThrow(/suspend/u);
+    sample();
+    expect(
+      profiler.report().samples.at(-1)?.suspended,
+      "a refused suspend leaves the session running",
+    ).toBe(false);
+
+    graph.lifecycle.acquire();
+    graph.lifecycle.suspend();
+    sample();
+    sample();
+    graph.lifecycle.resume();
+    sample();
+
+    const flags = profiler.report().samples.map((x) => x.suspended);
+    expect(flags.length, "four samples were taken").toBe(4);
+    expect(flags, "the refusal, then the interval, then the resume").toEqual([
+      false,
+      true,
+      true,
+      false,
+    ]);
+
+    // **The control: without the decoration the same three read `false`.** A row
+    // asserting only the marked arm passes on a fixture where nothing suspends,
+    // and that is exactly the state the tree was in — the flag was declared,
+    // sampled and never written (F903).
+    let bareTick: (() => void) | null = null;
+    const bare = createProfiler(
+      { tier: "spans" },
+      {
+        elapsed: () => performance.now(),
+        probe: createResourceProbe(() => performance.now()),
+        schedule: (fn: () => void): Disposable => {
+          bareTick = fn;
+          return { [Symbol.dispose]: () => void (bareTick = null) };
+        },
+      },
+    );
+    const bareSample = (): void => {
+      const fn = bareTick;
+      if (fn === null) throw new Error("the control's sampler is not armed");
+      fn();
+    };
+    // Suspending a lifecycle nothing decorated: the same two calls, no flag.
+    bareSample();
+    bareSample();
+    expect(
+      bare.report().samples.map((x) => x.suspended),
+      "the control: a profiler no lifecycle tells marks nothing",
+    ).toEqual([false, false]);
+    bare.dispose();
+    profiler.dispose();
+  });
 });

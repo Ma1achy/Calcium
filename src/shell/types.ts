@@ -96,6 +96,21 @@ export type ChromeContext = Readonly<{
    * a property of the frame, like `columns`.
    */
   copyMode: boolean;
+  /**
+   * C24 I32 — the **previous** frame's cost in milliseconds, and the member's
+   * name says which frame it describes.
+   *
+   * A frame's own total cannot be known while it is being composed, so a member
+   * named for the current frame would hold a number it cannot have. The figure
+   * is the recorder's `work` — composition, not the wait before it began, which
+   * grows while the session is idle and is not the frame's cost (C28 I4).
+   *
+   * `undefined` at tier `off`, at every tier below `spans` where no duration is
+   * taken, for the first frame of a session, and for the first frame after a
+   * tier change — a figure from the tier before the change is one that is no
+   * longer being maintained.
+   */
+  lastFrame?: number;
 }>;
 
 export type ChromeFn = (ctx: ChromeContext) => readonly Block[];

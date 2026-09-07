@@ -83,6 +83,16 @@ export type ComposeDeps = Readonly<{
   session: () => SessionSnapshot;
   /** Copy mode, for the chrome. A frame property, like `size` (C16 §5b). */
   copyMode: () => boolean;
+  /**
+   * C24 I32 — the previous frame's cost, for the chrome.
+   *
+   * Optional on the same terms as `probe`: a caller with no profiler has no
+   * figure, and `undefined` is the value the invariant names for that case
+   * rather than a stand-in for one. A row asserting the absence must therefore
+   * drive a real session at a real tier, because a fixture that omits this dep
+   * answers `undefined` whatever the tier is.
+   */
+  lastFrame?: () => number | undefined;
   now: () => number;
   size: () => TerminalSize;
   /** C17's `displayRows`, already gutter-aware. C22 passes the gutter (I13). */
@@ -115,7 +125,17 @@ export function compose(deps: ComposeDeps): Composed {
   const size = deps.size();
   const now = deps.now();
   const session = deps.session();
-  const ctx = { session, now, columns: size.columns, copyMode: deps.copyMode() };
+  const lastFrame = deps.lastFrame?.();
+  const ctx = {
+    session,
+    now,
+    columns: size.columns,
+    copyMode: deps.copyMode(),
+    // Spread rather than assigned, so `exactOptionalPropertyTypes` sees the
+    // member as absent rather than present-and-undefined: a chrome doing
+    // `"lastFrame" in ctx` gets the same answer as one doing `!== undefined`.
+    ...(lastFrame === undefined ? {} : { lastFrame }),
+  };
 
   const { header, footer } = chromeOf(deps, ctx);
   // **The footer is its content** (I82, §6l.4 B): measured at this frame's

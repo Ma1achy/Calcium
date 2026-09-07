@@ -403,12 +403,32 @@ function memory(r: ProfileReport, sep: string): readonly Block[] {
       ),
     ];
   }
-  const last = r.samples[r.samples.length - 1];
-  if (last === undefined) return [];
+  // **The headline comes from the last sample that was actually running**
+  // (C28 I27, F900). Every figure in `me-kv` below is `last`'s, and a sample
+  // taken while the session is suspended has a loop that was not turning and a
+  // process that was not working — so drawing its zeroes as the present state
+  // reports an idle machine, which is the reading I27 names. `suspended` was on
+  // `ResourceSample` from the start and no consumer read it.
+  const running = r.samples.filter((s) => !s.suspended);
+  const suspendedCount = r.samples.length - running.length;
+  const last = running[running.length - 1];
+  if (last === undefined) {
+    return [
+      b.notice(
+        "info",
+        `every one of the ${String(r.samples.length)} samples was taken while the session was suspended — there is no reading of a running process here, and the figures a suspended sample carries are a stopped clock rather than an idle one`,
+        undefined, { id: "me-suspended" },
+      ),
+    ];
+  }
 
   const out: Block[] = [
     caption(
-      `memory${sep}${String(r.samples.length)} samples — the sawtooth is the reading: GC drops with a rising floor is a leak`,
+      `memory${sep}${String(r.samples.length)} samples${
+        suspendedCount === 0
+          ? ""
+          : `, ${String(suspendedCount)} of them suspended — the series is not continuous and the figures below skip them`
+      } — the sawtooth is the reading: GC drops with a rising floor is a leak`,
       "me-cap",
     ),
     b.plot({

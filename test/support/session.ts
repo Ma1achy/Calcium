@@ -236,6 +236,16 @@ export async function buildGraph(
    * root actually handed down rather than what it could have.
    */
   profiler?: Profiler,
+  /**
+   * The ambient values, when a row is about one of them.
+   *
+   * **`elapsed` and `schedule` have no other injection point.** They live on
+   * `Ambient`, not on `TuiConfig`, so a row asserting *the injected `elapsed` is
+   * never called* could not reach the function it was asserting about — it
+   * passed on a fake nothing was ever going to read, which is the shape an
+   * absence assertion fails in silently (C22 T1.51).
+   */
+  ambient?: Ambient,
 ): Promise<{
   graph: Graph;
   stdout: FakeStdout;
@@ -286,7 +296,7 @@ export async function buildGraph(
       stdin,
       ...overrides,
     },
-    fakeAmbient(clock),
+    ambient ?? fakeAmbient(clock),
   );
 
   const graph = await constructGraph(config, {

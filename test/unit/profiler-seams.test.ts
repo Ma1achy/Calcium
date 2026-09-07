@@ -40,15 +40,220 @@ import { RenderScratchStore } from "../../src/shell/render-scratch.js";
 import { NO_PROBE, type Probe } from "../../src/data/viewmodel/index.js";
 import { createProfiler } from "../../src/shell/profiling/recorder.js";
 import { createInspector, createResourceProbe, type CaptureIo } from "../../src/shell/profiling/node.js";
-import type { Profiler } from "../../src/shell/profiling/types.js";
-import { buildGraph, fakeClock } from "../support/session.js";
+import type { Profiler, ProfileReport } from "../../src/shell/profiling/types.js";
+import { buildGraph, buildSession, fakeAmbient, fakeClock } from "../support/session.js";
+import { harness } from "../support/fake-scheduler.js";
 import { W, measureSequence, rowsDoc, wrappingDoc } from "../support/viewport.js";
 
 describe("C22 — the root's injection, refusal and capture path", () => {
-  it.todo("T1.51 (C22 I92): a graph built with profile absent is identical to one built from a config that never had the key — the injected elapsed and probe are never called, schedule gains no registration, and no FinalizationRegistry exists; asserted on the fakes' call counts and not on a timing figure — not deferred on a component: lands with the seams wired through construct.ts");
-  it.todo("T1.52 (C22 I93): every decorated seam hands down a function the root wrapped, and src/ holds no import of shell/profiling/ outside src/shell/ — the second half is the source scan, because the first passes on the day nothing calls the seam — not deferred on a component: lands with the seams wired through construct.ts");
-  it.todo("T1.53 (C22 I94): record and replay both set is refused at the gate and the message names both fields — a refusal naming one reads as that field being invalid — not deferred on a component: lands with record and replay");
-  it.todo("T1.54 (C22 I95): captureDir unset resolves under stateDir, and that is the directory I67 wrote a .gitignore of * into; the two are asserted together because either alone is satisfied by a path that happens to look right — not deferred on a component: lands with the deep tier");
+  it("T1.51 (C22 I92): a graph built with profile absent allocates nothing, and the arms are shown to respond", async () => {
+    // **Asserted on call counts and a constructor count, never on a timing
+    // figure.** "Off is free" measured as a duration is a claim about the
+    // machine; measured as *`elapsed` was called zero times* it is a claim
+    // about the code, and it is the same claim the invariant makes.
+    const Real = globalThis.FinalizationRegistry;
+    let made = 0;
+    let calls = 0;
+    let scheduled = 0;
+
+    // **Through `Ambient`, because that is where the two live.** `elapsed` and
+    // `schedule` are not `TuiConfig` fields, so a row passing them in the config
+    // overrides hands the graph a function it will never call and then asserts
+    // that it was not called. The first draft of this row did exactly that and
+    // was green; `tsc` is what said so.
+    const clock = fakeClock();
+    const ambient = {
+      ...fakeAmbient(clock),
+      elapsed: (): number => (calls += 1),
+      schedule: (fn: () => void, ms: number) => {
+        scheduled += 1;
+        const t = setTimeout(fn, ms);
+        return { [Symbol.dispose]: () => void clearTimeout(t) };
+      },
+    };
+
+    try {
+      globalThis.FinalizationRegistry = function FakeRegistry(this: unknown, cb: never) {
+        made += 1;
+        return new Real(cb);
+      } as unknown as typeof Real;
+
+      made = 0;
+      calls = 0;
+      const before = scheduled;
+      const { graph } = await buildGraph({}, undefined, undefined, ambient);
+      expect(graph.probe, "no profile, so nothing to hand down").toBeUndefined();
+      expect(calls, "the injected elapsed is never called").toBe(0);
+      expect(made, "and no FinalizationRegistry is registered").toBe(0);
+      const withoutProfile = scheduled - before;
+
+      // **The control, and it is the whole row.** Every arm above is an absence,
+      // and an absence assertion passes on a harness that could never produce
+      // the thing — a graph that never has a probe, a fake `elapsed` nothing was
+      // ever going to read, a counter patched onto the wrong global. So each is
+      // taken again with a profiler built over the same ambient, and must move.
+      made = 0;
+      calls = 0;
+      const during = scheduled;
+      // **With a probe, because the sampler is what registers.** A profiler at
+      // `spans` with no `ResourceProbe` schedules nothing, so a control without
+      // one reads zero and says nothing about the seam.
+      const profiler = createProfiler(
+        { tier: "spans" },
+        {
+          elapsed: ambient.elapsed,
+          schedule: ambient.schedule,
+          probe: createResourceProbe(ambient.elapsed),
+        },
+      );
+      const profilerUnderControl = profiler;
+      expect(calls, "the control: a profiler reads the injected elapsed").toBeGreaterThan(0);
+
+      // **The registry is built on the first `track`, not on construction**, so
+      // the control has to reach it — and the difference is the invariant one
+      // rung down: a profiler raised to `counters` and never asked to track
+      // holds none either. A control that stopped at `createProfiler` would
+      // read zero here and would have been rewritten as a weaker assertion.
+      expect(made, "a profiler that has tracked nothing registers none either").toBe(0);
+      profilerUnderControl.track("Control", { held: true });
+      expect(made, "the control: tracking one class registers one").toBeGreaterThan(0);
+      expect(
+        scheduled - during,
+        "the control: a sampling profiler registers with the injected schedule",
+      ).toBeGreaterThan(0);
+      // …and the graph without one added no registration of its own beyond the
+      // session's, which is the figure the first arm is measured against.
+      expect(withoutProfile, "the unprofiled graph schedules only what it always did").toBeLessThan(
+        scheduled - during + withoutProfile,
+      );
+
+      const withProfiler = await buildGraph({}, undefined, profiler, ambient);
+      expect(withProfiler.graph.probe, "the control: a probe does reach the graph").toBeDefined();
+      profiler.dispose();
+    } finally {
+      globalThis.FinalizationRegistry = Real;
+    }
+  });
+
+  it("T1.52 (C22 I93): no component below src/shell/ imports the profiler, the two edges above it are named, and the scan is shown to fire", () => {
+    // **The second half of the invariant, and the half that can be checked.**
+    // The first — every decorated seam hands down a function the root wrapped —
+    // is what T1.57 drives with a real graph; asserted here it would pass on the
+    // day nothing calls the seam, which is the failure mode the row's own text
+    // names. What a corpus scan can say is the structural claim: the import edge
+    // does not exist.
+    const files: string[] = [];
+    const walk = (dir: string): void => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const full = `${dir}/${e.name}`;
+        if (e.isDirectory()) walk(full);
+        else if (full.endsWith(".ts")) files.push(full);
+      }
+    };
+    walk("src");
+
+    const IMPORTS_PROFILING = /from\s+"[^"]*(?:shell\/)?profiling\/[^"]*"/u;
+
+    // **`below src/shell/`, which is the five component layers and not
+    // "everywhere else".** Written as *outside `src/shell/`* the scan names two
+    // files, and both are correct: `src/index.ts` is C24's published surface,
+    // which must name the report's types and the pane and export helpers C24 I31
+    // puts on the root, and `src/testing/profile.ts` is the headless harness,
+    // which reads a report exactly as a consumer does. Neither is below L4 —
+    // they are the surface above it — so the wider reading finds two files that
+    // are not the subject and misses nothing that is.
+    const LAYERS = ["src/data/", "src/terminal/", "src/presentation/", "src/viewport/", "src/interaction/"];
+    const below = (path: string): boolean => LAYERS.some((d) => path.startsWith(d));
+    const offenders = (corpus: readonly { path: string; text: string }[]): string[] =>
+      corpus.filter((f) => below(f.path) && IMPORTS_PROFILING.test(f.text)).map((f) => f.path);
+
+    const corpus = files.map((path) => ({ path, text: readFileSync(path, "utf8") }));
+    // The corpus reaches the layers the rule is about — a scan over nothing
+    // agrees with every rule.
+    expect(corpus.filter((f) => below(f.path)).length, "the five layers are in the corpus").toBeGreaterThan(100);
+    expect(offenders(corpus), "no component below src/shell/ imports the profiler").toEqual([]);
+
+    // **The two edges above L4, compared by equality and not by containment.**
+    // A subset check lets a third appear unread, and a third would be the
+    // interesting one: these two are the surface and the harness, and any other
+    // file naming the profiler outside `src/shell/` is a component that learnt
+    // about it by a route this row was written to close.
+    expect(
+      corpus.filter((f) => !f.path.startsWith("src/shell/") && IMPORTS_PROFILING.test(f.text)).map((f) => f.path).sort(),
+      "the profiler is named above L4 in exactly two places, both by design",
+    ).toEqual(["src/index.ts", "src/testing/profile.ts"]);
+
+    // The fabricated violation: one file below L4 given the edge the rule
+    // forbids. A rule that cannot name this is a rule that names nothing.
+    const fabricated = [
+      ...corpus,
+      {
+        path: "src/presentation/blocks/kinds/plot.ts",
+        text: 'import type { Profiler } from "../../../shell/profiling/types.js";\n',
+      },
+    ];
+    expect(offenders(fabricated), "and it fires when the edge appears").toEqual([
+      "src/presentation/blocks/kinds/plot.ts",
+    ]);
+  });
+
+  it.todo("T1.53 (C22 I94): record and replay both set is refused at the gate and the message names both fields — a refusal naming one reads as that field being invalid — not deferred on a component: the blocker is that neither field exists. ProfileOptions has no `record` or `replay` field and there is no recording apparatus to refuse a second of — every hit for `replay` in src/ is C06's fixture transport, which replays a captured process invocation and not a session's input. Grep: `grep -n \"record\\?:\\|replay\\?:\" src/shell/profiling/types.ts`");
+
+  it("T1.54 (C22 I95): an unset captureDir resolves under stateDir, and that is the directory the .gitignore of * was written into", async () => {
+    // **At a stateDir that is not the default, deliberately.** `DEFAULT_STATE_DIR`
+    // is `.calcium` and the recorder's fallback literal is `.calcium/profile`,
+    // so at the default every wrong answer is also the right one — which is
+    // exactly how F901 survived: two strings agreeing for five characters, with
+    // nothing resolving either against the other. `grep -rn stateDir
+    // src/shell/profiling/` returns zero lines, and it still does; the
+    // resolution belongs to the root, which is the only place that knows both.
+    const stateDir = "/state/elsewhere";
+    const written = new Map<string, string>();
+    const dirs = new Set<string>();
+    let seen: ProfileReport | null = null;
+
+    const { tui } = await buildSession({
+      stateDir,
+      fs: {
+        readFile: () =>
+          Promise.reject(Object.assign(new Error("ENOENT"), { code: "ENOENT" })),
+        writeFile: (path: string, data: string) => {
+          written.set(path, data);
+          return Promise.resolve();
+        },
+        appendFile: () => Promise.resolve(),
+        appendFileSync: () => undefined,
+        mkdir: (path: string) => {
+          dirs.add(path);
+          return Promise.resolve();
+        },
+        readDir: () => Promise.resolve([]),
+      } as never,
+      profile: { tier: "spans", onReport: (r) => void (seen = r) },
+    });
+    for (let i = 0; i < 4; i += 1) await new Promise((r) => setImmediate(r));
+    await tui.stop("exit");
+
+    const report = seen as ProfileReport | null;
+    if (report === null) throw new Error("no report arrived");
+
+    // **The two halves, together, as the invariant states them.** Either alone
+    // is satisfied by a path that happens to look right: a capture directory
+    // under a state directory nobody ignored, or an ignored directory captures
+    // never reach.
+    expect(dirs.has(stateDir), "the state directory was created").toBe(true);
+    expect(written.get(`${stateDir}/.gitignore`), "and it ignores itself (C22 I67)").toBe("*\n");
+    expect(
+      report.regime.captureDir.startsWith(`${stateDir}/`),
+      `captures land under it — ${report.regime.captureDir}`,
+    ).toBe(true);
+
+    // The control: the two are not the same string, so the assertion above is
+    // about a resolution and not about an identity. A capture directory equal
+    // to the state directory would satisfy `startsWith` and put snapshots in
+    // among the preferences.
+    expect(report.regime.captureDir, "a directory of its own beneath it").not.toBe(stateDir);
+  });
 
   it("T1.55 (C22 I58, C28 I8): the render cache reports the first axis that rejected, in its own order", () => {
     // Five axes here against C14's two, and the order is the invariant: a slot
@@ -115,9 +320,94 @@ describe("C22 — the root's injection, refusal and capture path", () => {
 });
 
 describe("C03 — the reason the frame was drawn for", () => {
-  it.todo("T1.24 (C03 I16): five commits of different reasons coalesced into one frame call render once, with the strictest reason and not the first or the last — the three are distinguishable only when arrival order and strictness order disagree, so the row constructs that state rather than the convenient one — not deferred on a component: lands with the seams wired through construct.ts");
-  it.todo("T1.25 (C03 I16): a contaminated frame gives repaint the reason too, and it is the same one render would have had — not deferred on a component: lands with the seams wired through construct.ts");
-  it.todo("T6.17 (C03 I16): calling render() with no argument fails T1.24 and T1.25, and the profiler's frames-by-reason collapses to one bucket; the structural half is named — nothing prevents a caller ignoring the argument, and what catches that is the L4 counter disagreeing with itself — not deferred on a component: lands with the seams wired through construct.ts");
+  it("T1.24 (C03 I16): five coalesced commits render once, for the strictest reason and not the first or the last", () => {
+    // **The state is constructed, not stumbled on.** *Strictest*, *first* and
+    // *last* are three different answers only when arrival order and strictness
+    // order disagree; a sequence that arrives in strictness order is satisfied
+    // by all three readings and finds nothing. Among coalesced reasons
+    // strictness is the shorter window — `resize` 16, `stream` 33,
+    // `spinner` 100 — so the sequence below puts the strictest third of five.
+    const { scheduler, render, repaint, clock } = harness();
+
+    scheduler.commit("spinner"); // first — the weakest
+    scheduler.commit("stream");
+    scheduler.commit("resize"); // strictest, and neither end
+    scheduler.commit("spinner");
+    scheduler.commit("stream"); // last
+
+    expect(render, "nothing renders while the window is open").not.toHaveBeenCalled();
+    clock.advance(16);
+
+    // Five commits, one frame — which is the coalescing half of the invariant.
+    expect(render.mock.calls.length + repaint.mock.calls.length, "five commits, one frame").toBe(1);
+    // `resize` contaminates (C03 I7), so the one frame is the repaint arm. The
+    // reason is what this row is about and the arm is where it is delivered.
+    const [reason] = (repaint.mock.calls[0] ?? render.mock.calls[0]) as [unknown];
+    expect(reason, "the strictest, not the first").not.toBe("spinner");
+    expect(reason, "the strictest, not the last").not.toBe("stream");
+    expect(reason, "the strictest").toBe("resize");
+  });
+
+  it("T1.25 (C03 I16): a contaminated frame gives repaint the reason, and it is the reason render would have had", () => {
+    // **Two runs of the same sequence, one contaminated and one not.** The
+    // invariant is that the arm does not change the answer, and a row asserting
+    // only the contaminated arm cannot say that: it would pass on an
+    // implementation that computed the reason twice, differently.
+    const contaminatedRun = harness();
+    contaminatedRun.scheduler.commit("spinner");
+    contaminatedRun.scheduler.commit("stream");
+    contaminatedRun.scheduler.invalidate(); // contamination without a resize commit
+    contaminatedRun.clock.advance(33);
+
+    const cleanRun = harness();
+    cleanRun.scheduler.commit("spinner");
+    cleanRun.scheduler.commit("stream");
+    cleanRun.clock.advance(33);
+
+    expect(contaminatedRun.repaint, "contaminated: the repaint arm").toHaveBeenCalledTimes(1);
+    expect(contaminatedRun.render, "and not the render arm").not.toHaveBeenCalled();
+    expect(cleanRun.render, "clean: the render arm").toHaveBeenCalledTimes(1);
+
+    expect(
+      contaminatedRun.repaint.mock.calls[0],
+      "and the reason is the same one render was given",
+    ).toEqual(cleanRun.render.mock.calls[0]);
+    expect(cleanRun.render.mock.calls[0]?.[0], "which is the stricter of the two").toBe("stream");
+  });
+
+  it("T6.17 (C03 I16): dropping the argument collapses the profiler's frames-by-reason to one bucket", () => {
+    // **Fail-on-revert, and the change it names is at the call site rather than
+    // in the scheduler.** `render(reason)` hands the reason across; nothing
+    // prevents a caller writing `() => this.#render()` and ignoring it. The
+    // scheduler stays green — every one of its own rows asserts what it *passed*
+    // — and what catches it is the counter one layer up disagreeing with itself:
+    // a session drawing for four different reasons reporting one.
+    let t = 0;
+    const p = createProfiler({ tier: "spans" }, { elapsed: () => (t += 1) });
+    const reasons = ["input", "stream", "resize", "spinner"] as const;
+
+    // The wiring as it is: the reason C03 chose reaches `beginFrame`.
+    for (const reason of reasons) {
+      p.beginFrame(reason);
+      p.endFrame("frame");
+    }
+    const wired = Object.keys(p.report().byReason).sort();
+    expect(wired, "four reasons, four buckets").toEqual(["input", "resize", "spinner", "stream"]);
+
+    // The reverted wiring: a caller that ignores the argument and always passes
+    // its own default. Every frame is still counted and the totals still add up,
+    // which is why no count-based assertion sees it.
+    const q = createProfiler({ tier: "spans" }, { elapsed: () => (t += 1) });
+    for (const _ of reasons) {
+      q.beginFrame("input");
+      q.endFrame("frame");
+    }
+    const dropped = q.report();
+    expect(Object.keys(dropped.byReason), "the reverted wiring: one bucket").toEqual(["input"]);
+    expect(dropped.frames, "with the same number of frames in it").toBe(p.report().frames);
+    p.dispose();
+    q.dispose();
+  });
 });
 
 describe("C14 — a cache that publishes its size publishes its hit rate", () => {
@@ -628,8 +918,118 @@ describe("C24 — the public surface", () => {
     expect(Object.values(ranks), "as a total order from zero").toEqual([0, 1, 2, 3, 4]);
   });
 
-  it.todo("T1.10 (C24 I32): a chrome called at tier off gets lastFrame undefined; at spans the first frame's is undefined and the second's is the first's cost, not the second's — not deferred on a component: lands with the seams wired through construct.ts");
-  it.todo("T6.16 (C24 I32): renaming lastFrame to frame, or filling it with the frame being composed, fails T1.10 on the second frame and every consumer drawing it reports a number taken before the work it names — not deferred on a component: lands with the seams wired through construct.ts");
+  it("T1.10 (C24 I32): lastFrame is undefined before the first frame, is the previous frame's work after it, and clears with a tier change", () => {
+    // **At the recorder, because the four clauses are four states and only one
+    // of them is reachable from a session.** A driven session has already
+    // composed several frames by the time anything can read a footer, so *the
+    // first frame's is undefined* cannot be constructed there — the state is
+    // gone before the harness exists. T1.10b drives the wiring; this drives the
+    // states.
+    let t = 0;
+    const p = createProfiler({ tier: "spans" }, { elapsed: () => t });
+    expect(p.lastFrame(), "before any frame, there is no previous frame").toBeUndefined();
+
+    t = 0;
+    p.beginFrame("input");
+    t = 12.4;
+    p.endFrame("frame");
+    expect(p.lastFrame(), "after one frame, that frame's work").toBe(12.4);
+
+    // **The second frame's figure is the first's, which is the whole invariant.**
+    // A member filled with the frame being composed would read 3 here, and 3 is
+    // a number this frame cannot have while it is being composed.
+    t = 20;
+    p.beginFrame("input");
+    t = 23;
+    p.endFrame("frame");
+    expect(p.lastFrame(), "and it is the frame before, not the one just ended, once more").toBe(3);
+
+    // A fallback frame is still the most recent measurement. `report()` filters
+    // fallbacks out of `timeline` and `worst` because those are projections over
+    // frames that drew (F899); this is not a projection. Holding the last
+    // *drawn* frame's figure through a run of fallbacks is F900's stopped clock.
+    t = 30;
+    p.beginFrame("resize");
+    t = 31.5;
+    p.endFrame("fallback");
+    expect(p.lastFrame(), "a fallback frame cost what it cost").toBe(1.5);
+
+    // The tier change clears it with the ring: a figure from the tier before is
+    // one nothing is maintaining any more.
+    p.setTier("counters");
+    expect(p.lastFrame(), "a tier change clears it").toBeUndefined();
+    t = 40;
+    p.beginFrame("input");
+    t = 45;
+    p.endFrame("frame");
+    expect(p.lastFrame(), "and below spans no duration is taken at all").toBeUndefined();
+    p.dispose();
+
+    // The control at `off`, which is the tier the invariant names first.
+    const off = createProfiler({ tier: "off" }, { elapsed: () => t });
+    off.beginFrame("input");
+    off.endFrame("frame");
+    expect(off.lastFrame(), "tier off records nothing to report").toBeUndefined();
+    off.dispose();
+  });
+
+  it("T1.10b (C24 I32): a real session hands the figure to the chrome, and only at a tier that measures", async () => {
+    // **The wiring, which the row above cannot see.** `ComposeDeps.lastFrame` is
+    // optional, so a fixture that omits it answers `undefined` at every tier and
+    // a row built on one would pass on the day nothing is wired. This drives
+    // `createTui` and reads the footer off the screen.
+    const footerOf = async (tier: "off" | "counters" | "spans"): Promise<string> => {
+      const { tui, screen } = await buildSession({ profile: { tier } });
+      for (let i = 0; i < 4; i += 1) await new Promise((r) => setImmediate(r));
+      const row = screen().rows.filter((r) => r.includes("/help")).at(-1) ?? "";
+      await tui.stop("exit");
+      return row;
+    };
+
+    // A tier that takes no durations has no figure, so an application that did
+    // not ask to be profiled sees no cell — which is also why this moves no
+    // golden frame.
+    expect(await footerOf("off"), "tier off draws no cost").not.toMatch(/last /u);
+    expect(await footerOf("counters"), "counters takes no durations either").not.toMatch(/last /u);
+
+    // At `spans` it is there, it says which frame it describes, and it carries a
+    // unit. The figure itself is the machine's and is not asserted.
+    expect(await footerOf("spans"), "at spans the footer carries the previous frame's cost").toMatch(
+      /last (?:<0\.1|\d+\.\d)ms/u,
+    );
+  });
+
+  it("T6.16 (C24 I32): a member filled with the frame being composed reports a number that frame cannot have", () => {
+    // **Fail-on-revert, and the change it names is one line.** Setting
+    // `lastWork = work` *before* `endFrame` computes the record — or naming the
+    // member `frame` and filling it from the frame in flight — makes the figure
+    // the current frame's. Every consumer drawing it then reports a number taken
+    // before the work it names, and it is a plausible number, which is why no
+    // arithmetic check finds it: it is a real duration of a real frame, one
+    // frame early.
+    //
+    // The state that distinguishes the two is a pair of frames with *different*
+    // costs. Two frames of equal cost agree under both readings, which is the
+    // convenient fixture and the one that finds nothing.
+    let t = 0;
+    const p = createProfiler({ tier: "spans" }, { elapsed: () => t });
+    t = 0;
+    p.beginFrame("input");
+    t = 10;
+    p.endFrame("frame");
+    t = 20;
+    p.beginFrame("input");
+    const duringSecond = p.lastFrame();
+    t = 27;
+    p.endFrame("frame");
+
+    // Read *while the second frame is open*: the invariant's whole point is that
+    // this is answerable at all, and the answer is the first frame's 10.
+    expect(duringSecond, "during the second frame, the first frame's cost").toBe(10);
+    expect(p.lastFrame(), "and once it closes, the second's").toBe(7);
+    expect(duringSecond, "the two are different, so the row can tell them apart").not.toBe(p.lastFrame());
+    p.dispose();
+  });
 });
 
 describe("C22 — the root hands the probe down, and the seam is not the wiring", () => {

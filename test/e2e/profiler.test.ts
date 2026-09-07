@@ -20,8 +20,8 @@ import { execFileSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 
 describe("C28 — profiler, tier 5 spec-first rows", () => {
-  it.todo("T5.1 (C28 I14): a recorded PTY session that types, submits, streams, scrolls and resizes → replayed, the frames are byte-identical to the recording's — not deferred on a component: lands with record and replay");
-  it.todo("T5.2 (C28 I14): the same recording replayed twice → the two runs' frames are identical to each other — not deferred on a component: lands with record and replay");
+  it.todo("T5.1 (C28 I14): a recorded PTY session that types, submits, streams, scrolls and resizes → replayed, the frames are byte-identical to the recording's — not deferred on a component: the blocker is that no recording apparatus exists. ProfileOptions has no `record` or `replay` field and `grep -rn \"replay\" src/shell/\" is empty — every hit for `replay` in src/ is C06's fixture transport, which replays a captured *process invocation* and not a session's input. Grep: `grep -n \"record\\?:\\|replay\\?:\" src/shell/profiling/types.ts`");
+  it.todo("T5.2 (C28 I14): the same recording replayed twice → the two runs' frames are identical to each other — not deferred on a component: the blocker is that no recording apparatus exists. ProfileOptions has no `record` or `replay` field and `grep -rn \"replay\" src/shell/\" is empty — every hit for `replay` in src/ is C06's fixture transport, which replays a captured *process invocation* and not a session's input. Grep: `grep -n \"record\\?:\\|replay\\?:\" src/shell/profiling/types.ts`");
   it("T5.3 (C28 I37, A01 Appendix B): make profile fills all six appendix rows against dist/", () => {
     // **Tier 5 because the subject is `dist/`.** `checkBudget` has tier-1 rows
     // over report literals; what those cannot ask is whether a session driven
@@ -74,5 +74,5 @@ describe("C28 — profiler, tier 5 spec-first rows", () => {
       "Where the frame went",
     );
   }, 120_000);
-  it.todo("T5.4 (C28 I8): the T5.1 recording replayed → misses['nothing-changed'] is 0. On a replayed input the count is deterministic, which is the only regime in which asserting it is honest (D2) — not deferred on a component: lands with record and replay");
+  it.todo("T5.4 (C28 I8): the T5.1 recording replayed → misses['nothing-changed'] is 0. On a replayed input the count is deterministic, which is the only regime in which asserting it is honest (D2) — not deferred on a component: the blocker is that no recording apparatus exists. ProfileOptions has no `record` or `replay` field and `grep -rn \"replay\" src/shell/\" is empty — every hit for `replay` in src/ is C06's fixture transport, which replays a captured *process invocation* and not a session's input. Grep: `grep -n \"record\\?:\\|replay\\?:\" src/shell/profiling/types.ts`. T5.1 is the recording it reads, so that row is the other half");
 });

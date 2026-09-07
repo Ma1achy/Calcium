@@ -252,8 +252,32 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
     sampler = deps.schedule(tick, every);
   };
 
+  /**
+   * C24 I32 — the last **completed** frame's work, for `ChromeContext`.
+   *
+   * **`work`, not `work + wait`.** C28 I4 refuses the sum as a stored figure
+   * because the wait is time before the frame began — the scheduler's or the
+   * terminal's — and adding it to the cost gives a number that grows when the
+   * session is idle. A chrome drawing `last 12.4ms` is answering *how long did
+   * composing that frame take*, which is `work` alone.
+   *
+   * **Any outcome, including `fallback`.** `report()` filters fallbacks out of
+   * `timeline` and `worst` because those are projections over frames that drew
+   * (F899); this is not a projection, it is the most recent measurement. A
+   * session repeatedly falling back would otherwise hold the last *drawn*
+   * frame's figure on screen indefinitely, presenting a stale number as the
+   * present one.
+   */
+  let lastWork: number | undefined;
+
   const resetRing = (): void => {
     frames.clear();
+    // **The chrome's figure clears with the ring** (C24 I32). Histograms from
+    // two tiers describe neither, and a single figure from the tier before the
+    // change is the same statement with one sample: a footer reading `last
+    // 12.4ms` after a drop to `counters` is a number no longer being maintained,
+    // which is F900's stopped clock in one cell.
+    lastWork = undefined;
     samples.clear();
     spanHists.clear();
     gaugeHists.clear();
@@ -358,6 +382,15 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
       tier = next;
       if (spanning()) contexts.enable();
       startSampler();
+    },
+
+    setSuspended(on: boolean): void {
+      // **Not gated on the tier.** The flag is a fact about the process, and a
+      // tier raised mid-handoff would otherwise begin sampling a suspended
+      // session while reporting it as running. Setting a boolean at any tier
+      // costs a store.
+      if (disposed) return;
+      suspended = on;
     },
 
     span(name: string): Disposable {
@@ -485,6 +518,7 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
       contexts.current().parent = null;
       seq += 1;
       framesDrawn += 1;
+      lastWork = work;
 
       // **The tree is built for every frame and kept for few.** Building it is
       // the same allocation the spans already made; keeping it is what is
@@ -516,6 +550,10 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
       workH.add(work);
       waitH.add(frameWait);
       hist(byReason, frameReason).add(work);
+    },
+
+    lastFrame(): number | undefined {
+      return lastWork;
     },
 
     asProbe(): Probe {
@@ -581,6 +619,7 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
           durationMs: elapsed() - started,
           histogramError: HISTOGRAM_ERROR,
           ringReset: ringResetAt,
+          captureDir: opts.captureDir ?? DEFAULTS.captureDir,
         }),
         // Absent, not zeroed (C28 I11): a zeroed histogram reads as
         // measured-and-fast.

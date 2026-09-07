@@ -103,6 +103,48 @@ import { anyBlinking, CURSOR_BLINK_MS } from "./cursor-style.js";
 import { createSessionStore, type SessionStore } from "./state.js";
 
 /** Where the chosen variant lives (I40). One value, one file. */
+/**
+ * C28 I28 — a lifecycle whose suspension is visible to the profiler.
+ *
+ * Delegating through the prototype rather than copying: `acquired` is a getter
+ * over live state, and every other member is C01's to answer.
+ */
+function suspendAware<T extends { suspend(): void; resume(): void }>(
+  lifecycle: T,
+  profiler: Profiler | undefined,
+): T {
+  if (profiler === undefined) return lifecycle;
+  const view = Object.create(lifecycle) as T;
+  view.suspend = (): void => {
+    // Set **before** the terminal is released, so a tick landing between the
+    // two is already labelled. The other order leaves a window whose width is
+    // whatever `suspend()` costs, and a sample in it is exactly the reading the
+    // invariant exists to refuse.
+    //
+    // **And cleared again if the suspend is refused.** C01's transition table
+    // throws on `suspend()` from a state with nothing acquired, and a flag set
+    // before a throw strands the session as permanently suspended in the
+    // report — every subsequent sample labelled unreadable, from one refusal.
+    // The set is the cheap half and the unwind is the correct half; keeping
+    // both is what makes ordering the calls this way safe.
+    profiler.setSuspended(true);
+    try {
+      lifecycle.suspend();
+    } catch (err) {
+      profiler.setSuspended(false);
+      throw err;
+    }
+  };
+  view.resume = (): void => {
+    // And cleared **after** the terminal is reacquired, for the mirror of the
+    // same reason. A refused `resume()` leaves the flag set, which is right:
+    // nothing was reacquired, so the session is still not the foreground.
+    lifecycle.resume();
+    profiler.setSuspended(false);
+  };
+  return view;
+}
+
 export function themePath(stateDir: string): string {
   return `${stateDir}/theme`;
 }
@@ -1076,8 +1118,13 @@ export async function constructGraph(
   // After 5 and 6 (I1): `beforeRelease` closes over the history store and the
   // runner, and C01's signal handlers exit the process after releasing — so
   // cleanup not wired by now never runs on a signal path at all.
+  // **Decorated once, here** (C22 I93, C28 I28). Every consumer of `lifecycle`
+  // gets the suspend-aware view, not only the handoff path: `suspend()` means
+  // the terminal belongs to somebody else whatever asked for it, and a second
+  // caller learning to suspend without learning to tell the profiler is exactly
+  // how F903 happened the first time.
   const lifecycle = at("lifecycle", () =>
-    createTerminalLifecycle({
+    suspendAware(createTerminalLifecycle({
       stdout: config.stdout,
       stdin: config.stdin,
       capabilities: detection.capabilities,
@@ -1087,7 +1134,7 @@ export async function constructGraph(
       onFatal: deps.onFatal,
       beforeRelease: makeBeforeRelease(runner, stores.history, [stores.transcriptWriter]),
       ...(deps.debug === undefined ? {} : { debug: deps.debug }),
-    }),
+    }), deps.profiler),
   );
 
   // --- 8. the frame scheduler -----------------------------------------------

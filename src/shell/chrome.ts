@@ -123,12 +123,34 @@ export function foldHome(cwd: string, home: string | undefined): string {
  * itself answers, so it is right in every app. An app that wants no footer
  * returns `[]` and gets none (I82).
  */
+/**
+ * C24 I32's figure, as one cell.
+ *
+ * **One decimal, and the unit attached.** A frame budget is 16 ms, so the
+ * digit after the point is the one that separates a comfortable frame from a
+ * tight one and everything below it is noise a reader would have to ignore.
+ * `<0.1ms` rather than `0.0ms` for a frame too fast to resolve, because a
+ * rounded zero reads as *not measured* and that is the one thing it is not.
+ */
+export function formatFrameCost(ms: number): string {
+  return ms < 0.05 ? "last <0.1ms" : `last ${ms.toFixed(1)}ms`;
+}
+
 const footer = (ctx: ChromeContext): readonly Block[] => [
   clusters(
     "chrome.footer",
     [
       { label: "/help", tone: "muted" },
       ...(ctx.session.stopping ? [{ label: "stopping", tone: "warn" as const }] : []),
+      // **C24 I32 — present only while something is measuring.** An application
+      // that did not ask to be profiled has no figure and gets no cell, so this
+      // moves no frame that was not already profiling. The label carries `last`
+      // rather than the bare number: a frame's own cost is unknowable while it
+      // composes, and an unqualified `12.4ms` beside a live clock reads as the
+      // frame you are looking at.
+      ...(ctx.lastFrame === undefined
+        ? []
+        : [{ label: formatFrameCost(ctx.lastFrame), tone: "muted" as const }]),
     ],
     [{ label: foldHome(ctx.session.cwd, ctx.session.env["HOME"]), tone: "muted" }],
   ),

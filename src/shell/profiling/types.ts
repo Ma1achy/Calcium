@@ -311,6 +311,20 @@ export type ProfileReport = Readonly<{
   regime: Readonly<{
     node: string; cpus: number; tier: Tier; durationMs: number;
     histogramError: number; ringReset: number;
+    /**
+     * Where a capture would be written (C22 I95, C28 I17).
+     *
+     * **A condition of the run, like `node` and `cpus`.** A reader handed a
+     * report naming a 60 MB heap snapshot needs the directory to find it, and
+     * a report that names a file nobody can locate is a file nobody reads.
+     *
+     * It is also the only place the resolution is observable. `session.ts`
+     * resolves it against `stateDir` so the capture lands inside the
+     * self-ignoring directory C22 I67 creates; before this member the two were
+     * separate strings that agreed by coincidence, and nothing could compare
+     * them (F901).
+     */
+    captureDir: string;
   }>;
   /** Absent, not zeroed, below tier `spans` (C28 I11). */
   spans?: Readonly<Partial<Record<string, Histogram>>>;
@@ -405,6 +419,17 @@ export interface ResourceProbe {
 export interface Profiler extends Probe {
   readonly tier: Tier;
   setTier(tier: Tier): void;
+  /**
+   * C28 I27, C28 I28 — the session is not the foreground process.
+   *
+   * `process.cpuUsage()` counts this process and not its children, so a sampler
+   * tick landing inside a `handoff()` reports a near-idle machine while a
+   * compiler saturates the terminal. That reading is **false rather than merely
+   * imprecise**, which is why the sample carries the flag instead of the
+   * sampler skipping the tick: a gap in the series is indistinguishable from a
+   * sampler that stopped, and a consumer that knows the reason can say so.
+   */
+  setSuspended(on: boolean): void;
 
   /**
    * A span that survives an `await`.
@@ -456,6 +481,18 @@ export interface Profiler extends Probe {
   endFrame(outcome: FrameOutcome): void;
 
   /** The L0 view, for handing to anything below `src/shell/`. */
+  /**
+   * C24 I32 — the last completed frame's `work`, or `undefined` before the
+   * first frame of a session and at any tier below `spans`, where no duration
+   * was taken.
+   *
+   * **An accessor rather than a field on `report()`** because the caller is the
+   * frame composer, once per frame: `report()` builds every projection, and
+   * taking one number from it per frame would make the chrome the most
+   * expensive thing on the screen.
+   */
+  lastFrame(): number | undefined;
+
   asProbe(): Probe;
 
   /** A capture the inspector produced, recorded so the report can name it. */

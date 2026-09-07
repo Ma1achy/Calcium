@@ -259,6 +259,60 @@ describe("roadmap-status — the Order column's verifier", () => {
     ).toBe("{}");
   });
 
+  it("RS14 (F904): the anchorage signal separates a citation that names its subject from one that drifted", () => {
+    // **The gate's two halves and what falls between them.** A `path:line`
+    // citation is checked for existing and for being non-blank; the backticked
+    // symbol beside it is checked against the whole file. Neither asks whether
+    // they are the same place, so a line number drifts silently while the file
+    // grows above it — roadmap 20 named `refresh.ts:327` for a declaration at
+    // 344 and `construct.ts:1224` for a wiring at 1352, and the gate reported
+    // *every claim resolves* over both.
+    //
+    // **Reported and never gated**, because the window is a judgement: a symbol
+    // declared over four lines of doc comment is legitimately cited at any of
+    // them, and a rule that has to guess a radius gets widened until it says
+    // nothing. What it can honestly be is a figure a reader compares.
+    const r = run();
+    expect(r.ok).toBe(true);
+    const m = /citation anchorage · (\d+)\/(\d+) line citations/u.exec(r.out);
+    expect(m, "the signal line").not.toBeNull();
+    const [anchored, total] = [Number(m?.[1]), Number(m?.[2])];
+    expect(total, "the document has line citations to look at").toBeGreaterThan(40);
+    expect(anchored, "and a real share of them name their subject").toBeGreaterThan(20);
+    expect(anchored, "not all of them — 31 were adrift when this was written").toBeLessThan(total);
+
+    // **The fabricated violation, and it moves the counter by exactly one.** A
+    // citation repointed at a line that carries none of its cell's symbols is
+    // the whole defect, and the run still exits 0 — which is the point: the
+    // signal reports, and the gate has nothing to say about it.
+    // **Entry 16's citation, not entry 20's.** Row 20 is where F904 was found and
+    // it is the wrong fabrication subject: its only backticked symbol is the
+    // multi-word signature `visible: (host: RefreshHost) => boolean`, which the
+    // identifier pattern excludes by design, so that citation is not in the
+    // population at all and mutating it moves nothing. **The cell that motivated
+    // the signal cannot exercise it** — which is itself the signal's stated
+    // limit: a citation whose cell names no single-word symbol is unmeasured
+    // here, and reads in the report exactly like one that has none adrift.
+    const anchoredCite = "`src/shell/confirm.ts:101`";
+    // Line 200 — inside the file (354 lines) and non-blank, so the *gate* has
+    // nothing to say about it. A line past the end or on a blank one fails for
+    // the gate's own reasons and would prove the wrong thing.
+    const drifted = run(mutate(anchoredCite, "`src/shell/confirm.ts:200`"));
+    expect(drifted.ok, "the run still passes — this is a signal, not a gate").toBe(true);
+    const d = /citation anchorage · (\d+)\/(\d+) line citations/u.exec(drifted.out);
+    expect(Number(d?.[2]), "the population is unchanged").toBe(total);
+    expect(
+      Number(d?.[1]),
+      "and exactly one citation stopped naming its subject",
+    ).toBe(anchored - 1);
+
+    // The control in the other direction: the same cell pointed back at a line
+    // that does carry the symbol restores the count, so the counter is reading
+    // the citation rather than the edit.
+    const back = run(mutate(anchoredCite, "`src/shell/confirm.ts:102`"));
+    expect(Number(/citation anchorage · (\d+)\//u.exec(back.out)?.[1]), "the control").toBe(anchored);
+  });
+
   it("RS9: the grep-reach signal counts the sweep's own evidence, not the Order row", () => {
     // **The sixth sweep's finding, made countable.** Every earlier sweep claimed
     // *the symbols these entries name are absent from `src/`*, which is exact when

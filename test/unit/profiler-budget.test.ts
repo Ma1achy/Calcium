@@ -36,7 +36,7 @@ function report(over: Partial<ProfileReport> = {}): ProfileReport {
   return {
     regime: {
       node: "v22.0.0", cpus: 8, tier: "spans", durationMs: 1000,
-      histogramError: 1 / 64, ringReset: 0,
+      histogramError: 1 / 64, ringReset: 0, captureDir: ".calcium/profile",
     },
     byReason: {},
     timeline: [],

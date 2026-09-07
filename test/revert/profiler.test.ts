@@ -1,33 +1,238 @@
 // C28 — profiler (docs/components/C28_profiler.md §10), tier 6.
 //
-// Spec-first rows. C28's spec landed alone, ahead of its code, so every
-// invariant it declares is named here and nowhere else yet — SP9 is what makes
-// that a requirement rather than a courtesy: an invariant no row names is a
-// claim nothing was written against, and it reads exactly like one that is
-// satisfied.
+// **A fail-on-revert row names the change that makes it fail, not the
+// assertion.** Each of these enacts a revert someone would plausibly make — a
+// tidier collapsing two numbers, a reader writing the obvious assertion — and
+// shows what it costs, so the comment is the row's subject and the expectations
+// are its evidence.
 //
-// Each row carries the explicit no-blocker marker rather than a "waits on C28"
-// clause, and that is TD3's ruling rather than an omission: COMPONENT_SOURCES
-// may not name a path before the path exists, because a missing path reads as
-// "not implemented" forever and silently exempts every deferral pointing at it.
-// C28 gains its entry on the commit that makes src/shell/profiling/recorder.ts
-// real, and from then on these expire the way every other deferral does.
-//
-// Generated from the spec's own §10 rows, so the two cannot drift apart by
-// transcription; a row edited here and not there is a diff a reader can see.
+// These ten were deferred on *lands with the module each row names*. Every
+// module landed; nothing watched, because the marker named no component for
+// TD1–TD6 to expire and SP9 counts a deferral's citation exactly like an
+// assertion's (F896). What each still-deferred row waits on is now written as a
+// symbol to grep.
 import { describe, expect, it } from "vitest";
 
 import { createProfiler } from "../../src/shell/profiling/recorder.js";
+import { createResourceProbe } from "../../src/shell/profiling/node.js";
+import { profilePane } from "../../src/shell/profiling/panes.js";
+import type { ProfileReport, ResourceSample } from "../../src/shell/profiling/types.js";
+
+/** A report carrying nothing but the samples under test (as tier 3's). */
+function reportWith(samples: readonly ResourceSample[]): ProfileReport {
+  return {
+    regime: { node: "v22.0.0", cpus: 8, tier: "spans", durationMs: 1000, histogramError: 1 / 64, ringReset: 0, captureDir: ".calcium/profile" },
+    byReason: {}, timeline: [], worst: [], nodes: [], byKind: {}, byEntry: {}, leaks: {},
+    counters: {}, gauges: {}, misses: {}, hits: {}, marks: [], samples, captures: [],
+    excluded: { selfInflicted: 0, fallback: 0 },
+    dropped: { frames: 0, samples: 0, marks: 0, captureBytes: 0 },
+    overhead: { spans: 0, clockNs: 0, estimateMs: 0, asyncEnabled: false },
+    heapSpaces: [], frames: 0,
+  };
+}
 
 describe("C28 — profiler, tier 6 spec-first rows", () => {
-  it.todo("T6.1 (C28 I4): summing wait into work → T1.3 and T4.3 fail. The number most likely to be helpfully collapsed by someone tidying a table, which is why it has a row rather than a paragraph — not deferred on a component: lands with the module each row names");
-  it.todo("T6.2 (C28 I3): recording a span with performance.measure → T1.2 fails on the entry count, not on the duration — not deferred on a component: lands with the module each row names");
-  it.todo("T6.3 (C28 I6): counting a fallback frame in the durations → T1.6 fails — not deferred on a component: lands with the module each row names");
-  it.todo("T6.4 (C28 I7): reporting inclusive cost at a container → T1.7 fails — not deferred on a component: lands with the module each row names");
-  it.todo("T6.5 (C28 I11): zeroing spans at counters instead of omitting it → T1.5 fails — not deferred on a component: lands with the module each row names");
-  it.todo("T6.6 (C28 I1): constructing the ring at off → T1.1 and T4.1 fail — not deferred on a component: lands with the module each row names");
-  it.todo("T6.7 (C28 I18): merging the ring across a setTier → T1.12 fails — not deferred on a component: lands with the module each row names");
-  it.todo("T6.8 (C28 I15): reporting a truncated recording as a divergence → T3.6 fails, and the failure names the false-positive it would have caused — not deferred on a component: lands with the module each row names");
+  it("T6.1 (C28 I4): a frame is three members and a `total` is the one a tidier adds", () => {
+    // **The revert**: publish `total = work + wait` beside them. It reads as a
+    // convenience and it is the number most likely to be quoted, because it is
+    // the biggest — and it answers no question anyone has. A slow far side and
+    // a slow framework produce the same total and want opposite remedies, and
+    // the sum is exactly the figure that cannot tell them apart. T1.3 and T4.3
+    // are what fail; this row says why the field is absent rather than private.
+    let now = 0;
+    const p = createProfiler({ tier: "spans" }, { elapsed: () => now });
+    now = 0; p.commit("input", false);
+    now = 90; p.beginFrame("input");
+    now = 96; p.endFrame("frame");
+
+    const f = p.report().timeline[0];
+    expect(f?.wait, "the far side's share").toBe(90);
+    expect(f?.work, "and the framework's").toBe(6);
+    // Asserted over the record's own keys, not against a name: a `total` added
+    // under any other spelling is the same defect, and a row checking
+    // `f.total === undefined` sees only the spelling it guessed.
+    const sums = Object.entries(f ?? {}).filter(([, v]) => v === 96);
+    expect(sums, "no member of the record is the sum of the two").toEqual([]);
+    p.dispose();
+  });
+
+  it("T6.2 (C28 I3): recording spans through the User Timing API taxes the canary it also reports", () => {
+    // **The revert**: `performance.mark` at open, `performance.measure` at
+    // close. It is the standard way, it is what a reader expects, and the
+    // durations would be right. What breaks is not the duration — it is that
+    // every span becomes an entry in the process's own timing buffer, which
+    // the profiler *reports* as a leak canary (`timingEntries`, C28 I19). The
+    // instrument would then be the largest contributor to the number it exists
+    // to watch, and the reading rises with the profiling rather than with the
+    // application. T1.2 fails on the entry count, not on the duration.
+    const probe = createResourceProbe(() => 0);
+    try {
+      const before = probe.sample(false).timingEntries;
+      let now = 0;
+      const p = createProfiler({ tier: "spans" }, { elapsed: () => now });
+      p.beginFrame("input");
+      for (let i = 0; i < 200; i += 1) {
+        using _s = p.asProbe().span("paint");
+        now += 1;
+      }
+      p.endFrame("frame");
+      const after = probe.sample(false).timingEntries;
+
+      expect(p.report().spans?.paint?.count, "two hundred spans really were recorded").toBe(200);
+      expect(after - before, "and not one of them reached the timing buffer").toBe(0);
+
+      // **The canary must be shown to sing.** `after - before === 0` is what a
+      // dead counter returns too — a `timingEntries` stuck at any constant
+      // passes the line above with nothing measured. So a real mark is raised
+      // and the count has to move, which is the only thing separating *the
+      // spans stayed out of the buffer* from *the buffer is not being read*.
+      performance.mark("t6.2-control");
+      expect(probe.sample(false).timingEntries - after, "the counter does respond").toBe(1);
+      performance.clearMarks("t6.2-control");
+      p.dispose();
+    } finally {
+      probe.dispose();
+    }
+  });
+
+  it("T6.3 (C28 I6): counting a fallback in the durations reports the framework fast where it gave up", () => {
+    // **The revert**: drop the early return that excludes a fallback, so the
+    // frame joins `workH` like any other. It looks like a frame — it has a
+    // start, an end and a duration — and a fallback frame is *quick*, because
+    // giving up is cheap. So the histogram improves exactly as the shell gets
+    // worse, and the p95 a reader quotes is best on the sessions where
+    // composition kept failing. T1.6 is what fails.
+    let now = 0;
+    const p = createProfiler({ tier: "spans" }, { elapsed: () => now });
+
+    now = 0; p.beginFrame("input"); now = 40; p.endFrame("frame");   // a real one, slow
+    now = 50; p.beginFrame("input"); now = 51; p.endFrame("fallback"); // giving up, fast
+
+    const r = p.report();
+    expect(r.latency?.work.count, "one frame is in the durations").toBe(1);
+    expect(r.latency?.work.max, "and it is the slow one — the cheap failure did not flatter it").toBe(40);
+    expect(r.excluded.fallback, "the other is counted where it belongs").toBe(1);
+    expect(r.frames, "both drew something").toBe(2);
+    p.dispose();
+  });
+
+  it("T6.4 (C28 I7): inclusive cost at a container makes the outermost node the widest bar in every tree", () => {
+    // **The revert**: report `total` where `self` is reported. It is the easier
+    // number — no subtraction — and it is *true*, which is what makes it
+    // durable: a group really did take that long. But every tree then has its
+    // root as the widest bar and the answer is always *the thing containing
+    // everything is expensive*, which a reader knew before opening it. T1.7 is
+    // what fails.
+    let now = 0;
+    const p = createProfiler({ tier: "spans" }, { elapsed: () => now });
+    p.beginFrame("input");
+    {
+      using _outer = p.element("group", "g1");
+      now += 2;
+      {
+        using _inner = p.element("plot", "pl-1");
+        now += 30;
+      }
+      now += 1;
+    }
+    p.endFrame("frame");
+
+    const nodes = p.report().nodes;
+    const group = nodes.find((n) => n.key === "group#g1");
+    const plot = nodes.find((n) => n.key === "plot#pl-1");
+    expect(group?.self, "the container is charged its own 3 ms").toBe(3);
+    expect(plot?.self, "and the child its 30").toBe(30);
+    // The whole is kept, so nothing is lost by charging self time — the tree
+    // still knows the group cost 33 inclusive.
+    expect(group?.total, "while the tree keeps the whole").toBe(33);
+    // And the ordering is the point: heaviest first means the child, not the
+    // box it sits in.
+    expect(nodes[0]?.key, "the heaviest row is the one to fix").toBe("plot#pl-1");
+    p.dispose();
+  });
+
+  it("T6.5 (C28 I11): zeroing the span keys at `counters` reads as measured-and-fast", () => {
+    // **The revert**: emit `spans` and `latency` at every tier, zeroed below
+    // `spans`. It makes the report's shape constant, which is what a consumer
+    // wants and what a type wants — no optional keys, no branch. The cost is
+    // that *nothing was measured* and *everything was instant* become the same
+    // report, and the second is the reading a zero gets. T1.5 is what fails.
+    let now = 0;
+    const p = createProfiler({ tier: "counters" }, { elapsed: () => now });
+    p.commit("input", false);
+    p.beginFrame("input");
+    now = 12;
+    p.endFrame("frame");
+
+    const r = p.report();
+    expect(r.latency, "absent, not zeroed").toBeUndefined();
+    expect(r.spans, "and so are the spans").toBeUndefined();
+    // The counters are the tier's whole point and they are present, so the
+    // absence above is about durations and not about the tier recording
+    // nothing — which is the distinction a zeroed histogram destroys.
+    expect(r.counters["frame.input"], "while the tier does count").toBe(1);
+    expect(r.frames, "and frames are counted at every recording tier").toBe(1);
+    p.dispose();
+  });
+
+  it("T6.6 (C28 I1): constructing the ring at `off` makes the disabled tier pay for the enabled one", () => {
+    // **The revert**: build the rings and histograms in the constructor and
+    // gate only the writes. It is the tidier shape — one construction path, no
+    // lazy fields — and it means an application that never profiles still
+    // allocates the ring, starts the sampler and holds the structures for the
+    // process's life. T1.1 and T4.1 are what fail.
+    let now = 0;
+    const p = createProfiler({ tier: "off" }, { elapsed: () => now });
+    p.commit("input", false);
+    p.beginFrame("input");
+    { using _e = p.element("plot", "pl-1"); now += 5; }
+    now = 20;
+    p.endFrame("frame");
+
+    const r = p.report();
+    expect(r.timeline, "nothing was recorded").toHaveLength(0);
+    expect(r.nodes, "no element was attributed").toHaveLength(0);
+    expect(Object.keys(r.counters), "and no counter was raised").toEqual([]);
+    // **The control, and it is what the row is for**: every assertion above is
+    // equally satisfied by a recorder that does nothing at any tier. The same
+    // calls one tier up must record, or `off` proves nothing.
+    let m = 0;
+    const q = createProfiler({ tier: "counters" }, { elapsed: () => m });
+    q.commit("input", false);
+    q.beginFrame("input");
+    m = 20;
+    q.endFrame("frame");
+    expect(q.report().counters["frame.input"], "the tier above does record").toBe(1);
+    expect(q.report().frames, "and counts the frame").toBe(1);
+    p.dispose();
+    q.dispose();
+  });
+
+  it("T6.7 (C28 I18): keeping the ring across a setTier merges histograms that describe neither tier", () => {
+    // **The revert**: leave the ring alone when the tier changes, so no data is
+    // "lost". Losing it is the point — the frames before and after were
+    // measured under different instruments, and a percentile over both
+    // describes no session that happened. The merged p95 is not wrong about
+    // either half; it is about a session nobody ran. T1.12 is what fails.
+    let now = 0;
+    const p = createProfiler({ tier: "spans" }, { elapsed: () => now });
+    now = 0; p.beginFrame("input"); now = 100; p.endFrame("frame");
+    expect(p.report().timeline, "one frame under the first tier").toHaveLength(1);
+
+    now = 150;
+    p.setTier("alloc");
+    now = 160; p.beginFrame("input"); now = 162; p.endFrame("frame");
+
+    const r = p.report();
+    expect(r.timeline, "only the frame measured under the tier in force").toHaveLength(1);
+    expect(r.timeline[0]?.work, "the 100 ms frame is gone, not averaged in").toBe(2);
+    // **And the report says where the reset happened**, so a reader seeing one
+    // frame in a long session is not left to conclude the session was short.
+    expect(r.regime.ringReset, "the moment is named").toBe(150);
+    p.dispose();
+  });
+
+  it.todo("T6.8 (C28 I15): reporting a truncated recording as a divergence → T3.6 fails, and the failure names the false-positive it would have caused — not deferred on a component: the blocker is that record and replay do not exist, so there is no truncation to misreport and T3.6 is deferred on the same absence. Grep: `grep -rn 'replay' src/`");
   it("T6.9 (C28 I24): an attribution table with a latency in it reads as more complete, not less true", () => {
     // **The revert is a tidier's move.** `byEntry` sums to less than the frame,
     // visibly, and folding the wait in makes the columns add up — which is the
@@ -89,6 +294,54 @@ describe("C28 — profiler, tier 6 spec-first rows", () => {
     p.dispose();
   });
 
-  it.todo("T6.10 (C28 I27): drawing a suspended sample as 0 rather than as a gap → T3.10 fails. A zero in a utilisation series is a reading, and this one is an absence — not deferred on a component: lands with the module each row names");
-  it.todo("T6.12 (C28 I43): reporting live with no floor, or asserting finalised === created → T1.71 fails. The revert is the natural row rather than a mistake: everything registered was collected is what a reader writes, it is red by exactly one for ever, and the fix that follows is to widen the assertion until it cannot see anything — not deferred on a component: lands with the module each row names");
+  it("T6.10 (C28 I27): drawing a suspended sample as zero turns an absence into a reading", () => {
+    // **The revert**: take the memory pane's headline from the newest sample,
+    // whatever its flag. It is one line shorter and it is what the pane did
+    // until F900. A suspended sample's zeroes are a stopped clock, and drawn as
+    // the present state they say the process is idle — so a paused session and
+    // a quiet one produce the same picture, and the one figure that separates
+    // them was on the sample the whole time. T3.10 is what fails.
+    const probe = createResourceProbe(() => 0);
+    try {
+      const running = probe.sample(false);
+      const paused = probe.sample(true);
+      const drawn = JSON.stringify(profilePane(reportWith([running, paused]), "memory"));
+      expect(drawn, "the series is declared discontinuous").toContain("1 of them suspended");
+      expect(drawn, "and the reader is told why that matters").toContain("not continuous");
+      // A gap, not a zero: with every sample suspended there is no running
+      // reading to headline and the pane refuses rather than drawing one.
+      const none = JSON.stringify(profilePane(reportWith([paused]), "memory"));
+      expect(none, "it says so").toContain("no reading of a running process");
+      expect(none, "and draws no series at all").not.toContain("me-heap");
+    } finally {
+      probe.dispose();
+    }
+  });
+
+  it("T6.12 (C28 I43): asserting everything registered was collected is red by one for ever", () => {
+    // **The revert is the natural row rather than a mistake.** *Everything I
+    // dropped was finalised* is what a reader writes, and it cannot pass: a
+    // `FinalizationRegistry` never reports its most recent registration —
+    // measured at N = 1, 2, 10, 100, 1 000 and 5 000, always the last, and more
+    // collections do not shrink it (F893). So the row is red by exactly one,
+    // and the fix that follows is to widen the assertion until it can no longer
+    // see anything. The floor belongs to the **report** and not to a class, so
+    // it is one across the whole snapshot however many classes are tracked.
+    // T1.71 is what fails.
+    const p = createProfiler({ tier: "alloc" }, { elapsed: () => 0 });
+    for (let i = 0; i < 3; i += 1) p.track("a", { i });
+    for (let i = 0; i < 3; i += 1) p.track("b", { i });
+
+    const leaks = p.report().leaks;
+    expect(leaks.a?.created, "both classes are counted as they are made").toBe(3);
+    expect(leaks.b?.created).toBe(3);
+    // Nothing has been collected, so `live` is `created` — and this is the
+    // state in which `finalised === created` is most obviously false, which is
+    // the point: the natural assertion is wrong before any collection and after
+    // every one.
+    expect(leaks.a?.live, "live is created minus finalised, not a guess").toBe(3);
+    expect(leaks.a?.finalised, "nothing has been reported yet").toBe(0);
+    p.dispose();
+  });
+
 });

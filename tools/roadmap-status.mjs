@@ -218,6 +218,25 @@ function locate(path) {
   return null;
 }
 
+/**
+ * Every `path:line` citation, with whether the cited line carries one of its own
+ * cell's symbols — reported, never gated (F904).
+ *
+ * **A line number is checked for existing and for being non-blank, and the
+ * symbol beside it is checked against the whole file.** Neither asks whether
+ * they are the same place, so a citation drifts silently for as long as the file
+ * grows above it: roadmap 20 named `refresh.ts:327` for a declaration at 344 and
+ * `construct.ts:1224` for a wiring at 1352, and the gate was green until an
+ * unrelated edit pushed the second onto a blank line.
+ *
+ * Not a gate, because the window is a judgement: a symbol declared over four
+ * lines of doc comment is legitimately cited at any of them, and a rule that has
+ * to guess a radius fails in the direction that makes people widen it. A figure a
+ * reader compares against the last run is what this can honestly be.
+ */
+const anchorage = [];
+const ANCHOR_WINDOW = 6;
+
 function resolve(cell) {
   const cites = [...cell.matchAll(CITE)].map(([, path, line]) => ({
     path,
@@ -248,6 +267,23 @@ function resolve(cell) {
   }
 
   if (cites.length === 0) problems.push("no file cited — a status with no evidence is a memory");
+
+  const idents = [...cell.matchAll(IDENT)]
+    .map(([, id]) => id)
+    .filter((id) => !NOT_SYMBOLS.has(id))
+    .map((id) => id.split(".").pop() ?? id);
+  for (const c of cites) {
+    if (c.line === null || idents.length === 0) continue;
+    const found = locate(c.path);
+    if (found === null) continue;
+    const lines = readFileSync(join(ROOT, found), "utf8").split("\n");
+    const from = Math.max(0, c.line - 1 - ANCHOR_WINDOW);
+    const near = lines.slice(from, c.line - 1 + ANCHOR_WINDOW).join("\n");
+    anchorage.push({
+      where: `${c.path}:${String(c.line)}`,
+      anchored: idents.some((id) => near.includes(id)),
+    });
+  }
 
   for (const [, ident] of cell.matchAll(IDENT)) {
     if (NOT_SYMBOLS.has(ident)) continue;
@@ -687,6 +723,20 @@ console.log(
     `${String(unverifiable.length)} confirmed-OPEN entries ruled unverifiable by a symbol` +
     (unverifiable.length === 0 ? "" : ` — ${unverifiable.sort((x, y) => Number(x) - Number(y)).join(", ")}`),
 );
+// F904 — the citation-anchorage signal. See `anchorage` above for why this is a
+// figure and not a rule.
+{
+  const adrift = anchorage.filter((a) => !a.anchored);
+  console.log(
+    `  citation anchorage · ${String(anchorage.length - adrift.length)}/${String(anchorage.length)} ` +
+      `line citations carry one of their own cell's symbols within ${String(ANCHOR_WINDOW)} lines` +
+      (adrift.length === 0
+        ? ""
+        : ` — adrift: ${adrift.slice(0, 6).map((a) => a.where).join(", ")}` +
+          (adrift.length > 6 ? ` and ${String(adrift.length - 6)} more` : "")) +
+      " (F904, reported not gated)",
+  );
+}
 for (const f of fail) console.error(`  ${f}`);
 if (fail.length > 0) {
   console.error(`\n${String(fail.length)} problems.`);

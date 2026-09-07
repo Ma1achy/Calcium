@@ -399,9 +399,23 @@ class Session implements TuiInstance {
     // is a 2.6-second stall and a 60 MB file at the sizes measured in
     // `node.ts`, so the apparatus that can take one is not present at a tier
     // that did not ask for it.
+    //
+    // **`captureDir` is resolved here because this is the only place that knows
+    // both halves** (C22 I95, F901). The recorder's default is the literal
+    // `.calcium/profile`, which agreed with the invariant only because
+    // `DEFAULT_STATE_DIR` is `.calcium` — an application setting
+    // `stateDir: "/var/lib/app"` got its heap snapshots in `./.calcium/profile`,
+    // outside the directory it asked its state to live in and outside the
+    // `.gitignore` of `*` that C22 I67 writes there. The recorder keeps its
+    // literal for a profiler constructed without a session; a session supplies
+    // the resolved path, so the two cannot disagree about which directory the
+    // ignore rule covers.
     const profileTier = this.config.profile?.tier ?? "counters";
     if (this.config.profile !== undefined && isRecording(profileTier)) {
-      this.#profiler = createProfiler(this.config.profile, {
+      this.#profiler = createProfiler({
+        ...this.config.profile,
+        captureDir: this.config.profile.captureDir ?? `${this.config.stateDir}/profile`,
+      }, {
         elapsed: this.config.elapsed,
         ...(isSpanning(profileTier)
           ? { probe: createResourceProbe(this.config.elapsed) }
@@ -1182,6 +1196,10 @@ class Session implements TuiInstance {
       ...(graph?.probe === undefined ? {} : { probe: graph.probe }),
       session: () => graph?.session.snapshot ?? emptySnapshot(this.config),
       copyMode: () => this.#copyMode,
+      // C24 I32 — read per frame from the recorder rather than kept here. A
+      // second copy of the figure is a second place for the tier change to miss
+      // it, and the recorder is where the ring reset already clears it.
+      lastFrame: () => this.#profiler?.lastFrame(),
       now: this.config.clock,
       size: () => graph?.lifecycle.size() ?? { columns: 80, rows: 24 },
       // **The same number the paint path reads** (S01 §3, commitment 4 and 13).
