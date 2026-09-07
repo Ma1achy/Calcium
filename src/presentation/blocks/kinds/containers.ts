@@ -636,11 +636,18 @@ export const groupDefinition: BlockDefinition<Group> = {
     const widths = childWidths(block, width);
     // A child that cannot be placed is measured by neither half (C04 §3).
     const placed = block.children.slice(0, placeable(block, width));
-    const heights = childHeights(placed, widths, measureChild);
 
     // An empty container measures 0, and is the one legitimate zero: it is the
     // absence of content rather than empty content (C04 I17, T3.5).
-    if (heights.length === 0) return 0; // cells-ok
+    //
+    // **Asked of `placed` and not of the measured heights.** `childHeights` is
+    // a `.map`, so its length is `placed.length` and nothing else — and asking
+    // it that way measured every child, threw the answers away in the column
+    // branch, and measured them all again in `sequenceHeight`. Twice per
+    // `measure`, for a `.length`. `measure` is pure (C09 I2), so both readings
+    // agree and no assertion about a height could tell them apart; the profiler's
+    // calls-per-frame column is what separates them (C28 I31).
+    if (placed.length === 0) return 0; // cells-ok
 
     if (block.direction === "column") {
       // A column group is a sequence; a row group is not (C04 §3a). Children
@@ -650,8 +657,12 @@ export const groupDefinition: BlockDefinition<Group> = {
       return atLeastOne(groupRows(block, sequenceHeight(block.children, widths[0] ?? width, measureChild)));
     }
 
+    // Measured here, where the heights are read. A row group is the only branch
+    // that wants them.
     let tallest = 0;
-    for (const height of heights) tallest = Math.max(tallest, height);
+    for (const height of childHeights(placed, widths, measureChild)) {
+      tallest = Math.max(tallest, height);
+    }
     // The author's floor (C04 I102): the row is its tallest child, or `minRows`
     // if that is taller — and the cells are that tall, which is what lets a
     // single child sit in a corner.

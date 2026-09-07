@@ -2,6 +2,8 @@
 import { describe, expect, it } from "vitest";
 import { displayCells } from "../../src/presentation/text.js";
 import { block, validateBlock } from "../../src/data/viewmodel/index.js";
+import type { Group, MeasureFn } from "../../src/data/viewmodel/index.js";
+import { groupDefinition } from "../../src/presentation/blocks/kinds/containers.js";
 import {
   createBlockRegistry,
   DEFAULT_DEFINITIONS,
@@ -462,6 +464,49 @@ describe("C09 §6 — kinds", () => {
     expect(kit.measure(row, 80), "max(1, 3)").toBe(3);
     expect(kit.renderToLines(column, 80)).toHaveLength(4);
     expect(kit.renderToLines(row, 80)).toHaveLength(3);
+  });
+
+  it("T1.9b (C28 I31): a column group measures each child once per `measure`, not twice", () => {
+    // **The count, because no height can tell the two apart.** `measure` is pure
+    // (I2), so measuring a child twice gives the same answer twice — every
+    // assertion in T1.9 above passes either way, and the profiler's
+    // calls-per-frame column is what separated them (C28 I31).
+    //
+    // What it was: `childHeights` measured every placed child, the column branch
+    // used the result only for its `.length`, and `sequenceHeight` then measured
+    // them all again. A `.map`'s length is its input's, so `placed.length`
+    // answers the same question for nothing.
+    //
+    // The definition is called directly rather than through the registry, so the
+    // count is this container's own and not the sum of a dispatch chain.
+    const calls: string[] = [];
+    const counting: MeasureFn = (child, _width) => {
+      calls.push(child.id);
+      return 1;
+    };
+    const kids = [
+      { kind: "raw", id: "c-a", text: "one" },
+      { kind: "raw", id: "c-b", text: "two" },
+      { kind: "raw", id: "c-c", text: "three" },
+    ] as const;
+
+    const column = block({ kind: "group", id: "g-c", direction: "column", children: [...kids] });
+    expect(groupDefinition.measure(column as Group, 80, counting), "1 + 1 + 1").toBe(3);
+    expect(calls, "each child measured once").toEqual(["c-a", "c-b", "c-c"]);
+
+    // The row branch reads the heights, so it measures once and this is the arm
+    // that says the fix moved the call rather than deleting it.
+    calls.length = 0;
+    const row = block({ kind: "group", id: "g-r", direction: "row", children: [...kids] });
+    expect(groupDefinition.measure(row as Group, 80, counting), "max(1, 1, 1)").toBe(1);
+    expect(calls, "each child measured once here too").toEqual(["c-a", "c-b", "c-c"]);
+
+    // And the empty case still measures nothing at all, which is the branch the
+    // `.length` question was being asked for.
+    calls.length = 0;
+    const empty = block({ kind: "group", id: "g-e", direction: "column", children: [] });
+    expect(groupDefinition.measure(empty as Group, 80, counting)).toBe(0);
+    expect(calls, "an empty container measures no children").toEqual([]);
   });
 
   it("T1.10 (I10): an unknown kind renders through raw and never throws", () => {

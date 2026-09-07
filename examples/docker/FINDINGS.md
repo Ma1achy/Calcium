@@ -31517,6 +31517,107 @@ Found by reading the table against the paragraph above it while adding a member 
 the same instrument as *read the abstract against its own section before reading the section against
 the code*, applied to a constant.
 
+## F890 — P11's seven, resolved: two were not defects, two were free, one is refused with figures ★★★★★
+
+The plan listed seven defects to fix, each with a site. F884 found four of the seven citations do
+not resolve at HEAD. F886 and F889 measured all seven. Going to each one:
+
+| # | the plan said | at HEAD |
+|---|---|---|
+| 1 | `editor.layout` runs 4× per frame, no memo | **not a defect** — two readers, deliberately |
+| 2 | a `group` measures every child 3× | **half fixed free**, half refused with figures |
+| 3 | O(entries) scan per visible entry per frame | real, **18.2 µs** at 2 000 entries |
+| 4 | overlay `place()` twice per frame | real, **measured and now asserted** |
+| 5 | whole-transcript `flatMap`, dead on non-kitty | **fixed free** |
+| 6 | `#form` measures twice for any capped block | **not a defect** |
+| 7 | a regex `.replace` per row per frame | **fixed free**, and not where the plan said |
+
+**1 is the design, and fixing it would remove a check.** The two `editor.layout` calls are
+`#paintDeps`' `promptRows` and `#frameQueries`' — two readers of one number, and `session.ts:1169`
+says why in its own comment: a constant there once made the frame reserve one row while `paint`
+was handed three, so a wrapped prompt drew as a single elision marker. T1.5c refuses a frame whose
+`promptWanted` disagrees with the rows painted. **Merging the readers removes the disagreement the
+row exists to catch**, which is a worse trade than the second call.
+
+**2 is two mechanisms and the plan named neither site.** The free half: `groupDefinition.measure`
+measured every placed child into `heights`, used it in the `column` branch for **its `.length`
+alone**, and then measured them all again in `sequenceHeight`. `childHeights` is a `.map`, so
+`placed.length` is the same answer for nothing. Fixed; T1.9b counts the calls and shows 6 → 3 for
+three children, and no height assertion could have separated them because `measure` is pure (C09
+I2). The substantive half is `groupPlacements` re-measuring every child during `render`, having
+measured them in `measure` — that is where `pills#chrome.footer.left`'s 4.0 calls per frame comes
+from, and it needs a cache **across** `measure` and `render`. **Refused, with figures**: C11 I11
+rules `planColumns` *pure and not memoised* and T6.15 is its revert row, the whole class is under
+7 ms of 265 (F886), and a cache in the measurement path is where correctness defects live.
+
+**And the fix that changed nothing is what found the real mechanism.** The column-branch repair
+moved `pills#chrome.footer.left` not at all, because the chrome's groups are **row** groups and the
+row branch already read the heights it measured. A fix that changes nothing indicts the diagnosis;
+following that gave `groupPlacements`, which the plan's three citations — all stale — did not name.
+
+**6 is not a repeat.** `#form`'s two `measure` calls take **different blocks**: `total` is the
+whole block and `shown` is the window, and both numbers are the `… 2 000 of 50 000 rows` marker.
+An uncapped block is measured once, because the second call is behind `total > cap`.
+
+**7 was free but not where it was said.** `based()` returns `lines` unchanged when `base === ""`,
+so the regex costs nothing in that case — the plan's premise. When `base` is not empty,
+`toTerminalDefault()` was called **inside the `.map`**, one fresh regexp per row per frame. Hoisted
+to one per call; `replace` with a global pattern resets `lastIndex`, so reuse within a pass is
+safe. **No frame changes by a byte**, so no output assertion and no mutation can see it — T1.5f is
+a source row, and says so.
+
+**The accounting.** Of seven named defects: two were not defects, three are fixed, one is
+measured and negligible, one is refused with a number. **None of them is where the frame goes** —
+`assemble` and `react` are 87% (F886) — and the ordering was written before anything measured it.
+
+## F889 — P11's two unmeasured defects, measured: 108 µs at two thousand entries ★★★★☆
+
+F886 sized five of P11's seven defects at under 7 ms of 265 and said the other two were
+**unmeasured rather than small** — the profile fixture held one transcript entry, and both are
+O(entries). The fixture now takes an entry count, so they can be sized.
+
+**The whole-session comparison does not work, and the reason is worth keeping.** Growing the
+transcript changes *what is on screen*, because the viewport follows the tail: at one entry the
+visible content is a 200-line patch, at a hundred it is the last few `/bench` documents. Measured
+over the trailing 25 keystroke frames — the same work, one `x` typed against a built transcript:
+
+| entries | median frame | `assemble` | `react` |
+|---|---|---|---|
+| 1 | 13.286 ms | 10.074 | 2.415 |
+| 100 | 2.532 ms | 1.223 | 1.796 |
+| 400 | 3.404 ms | 1.249 | 1.360 |
+
+**More entries makes frames cheaper**, by a factor of four, in the opposite direction from the
+defect — so the confound is larger than the thing being measured and no session-level reading can
+separate them.
+
+**Sized directly instead**, at the shapes `session.ts` holds, with `find` scanning from the head
+while the viewport shows the tail — so every visible entry is found near the end and this is the
+worst case every time rather than an average:
+
+| entries | `flatMap` µs/frame | `find` × 3 visible µs/frame | together, of a 16 ms budget |
+|---|---|---|---|
+| 1 | 2.2 | 4.0 | 0.039% |
+| 10 | 0.7 | 2.8 | 0.022% |
+| 100 | 5.5 | 1.1 | 0.042% |
+| 400 | 19.1 | 4.7 | 0.149% |
+| 2000 | 90.3 | 18.2 | **0.678%** |
+
+The first two rows are noise — a one-element `flatMap` cannot cost 2.2 µs — and from 100 the trend
+is clean and linear: ×20 the entries gives ×16.4 the `flatMap` and ×16.5 the `find`.
+
+**So both are real and both are cheap, and that is the finding.** The remedy F886 asked for was a
+many-entry fixture *before fixing them blind*, and the fixture's answer is that at a transcript
+length nobody will reach they are two thirds of one percent of one frame.
+
+**With this, every one of P11's seven is measured, and none of them is where the frame goes.**
+Five are under 7 ms of 265 (F886), two are under 0.11 ms of 16 at two thousand entries, and
+`assemble` plus `react` are 87%. The plan ordered P11 before anything measured it; the ordering
+was wrong and the defects are still defects — a node measured four times per frame is wrong
+whatever it costs, and `flatMap` builds an eight-thousand-element array every frame to hand it to
+a function that returns `""` on its first line. They are worth fixing as correctness, and the
+figures are recorded here so the ordering is not re-litigated from the same intuition.
+
 ## F888 — the phase table sums two populations and divides by one, and the residue went negative ★★★★★
 
 `make profile`'s *Where the frame went* divides every span's self time by `latency.work`. That is

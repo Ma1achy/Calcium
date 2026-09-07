@@ -64,6 +64,24 @@ function imagesIn(block: Block, out: Image[]): void {
  * remains and its expiry is the third diacritic — which widens the space to 32
  * bits and is the same symbol `placementRows` bounds itself by.
  */
+/**
+ * The one condition under which `transmitImage` writes anything.
+ *
+ * **Exported so the caller can skip building its argument, not so it can decide
+ * anything.** `transmitImage` reads it too, on its first line, so there is one
+ * implementation and the two cannot drift — the alternative is a second
+ * `imageProtocol !== "kitty"` in `session.ts`, which is the shape C09 I1 exists
+ * to forbid.
+ *
+ * The argument it lets the caller skip is a `flatMap` over **every block in
+ * every transcript entry**, built every frame and handed to a function that
+ * returns `""` on its first line: 90 µs per frame at two thousand entries, and
+ * an eight-thousand-element array of garbage with it (F889).
+ */
+export function transmits(capabilities: TerminalCapabilities): boolean {
+  return capabilities.imageProtocol === "kitty";
+}
+
 export function transmitImage(
   blocks: readonly Block[],
   capabilities: TerminalCapabilities,
@@ -82,7 +100,7 @@ export function transmitImage(
   /** C28's seam (I30) — `imageCells` decodes, and the decode map has no cap. */
   probe?: Probe,
 ): string {
-  if (capabilities.imageProtocol !== "kitty") return "";
+  if (!transmits(capabilities)) return "";
   const found: Image[] = [];
   for (const block of blocks) imagesIn(block, found);
   let out = "";

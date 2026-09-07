@@ -24,7 +24,17 @@ import { renderToLines } from "../../src/presentation/render-lines.js";
 import { DARK_THEME, FULL_CAPS } from "../support/render.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
 import { ONE_PER_KIND } from "../support/blocks.js";
-import { transmitImage } from "../../src/shell/transmit-image.js";
+import { transmitImage, transmits } from "../../src/shell/transmit-image.js";
+import { readFileSync } from "node:fs";
+
+/**
+ * Source with comments removed, because a source assertion over prose measures
+ * the prose: every mechanism named below is also *described* in a comment two
+ * lines away, so an unstripped match is satisfied by the explanation of the
+ * thing it is meant to find.
+ */
+const strip = (src: string): string =>
+  src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 import { b } from "../../src/shell/builders/index.js";
 
 const ESC = String.fromCharCode(27);
@@ -233,5 +243,37 @@ describe("IK — the kitty arm, as properties", () => {
     const out = transmitImage([wrapped], KITTY_CAPS, new Set<string>(), 80);
     expect(out, "an image inside a mosaic still transmits").toContain(`${ESC}_G`);
     expect(out).toContain(`i=${String(imageId(block.digest))}`);
+  });
+  it("IK12 (F889): the transmit guard is one implementation, and the caller asks it before building its argument", () => {
+    // **The argument is a `flatMap` over every block in every transcript entry,
+    // built every frame.** `transmitImage`'s first line returns `""` unless the
+    // terminal speaks kitty, so on every other terminal that array was built
+    // and thrown away — 90 µs and eight thousand elements of garbage per frame
+    // at two thousand entries (F889).
+    expect(transmits(KITTY_CAPS), "kitty transmits").toBe(true);
+    expect(transmits({ ...KITTY_CAPS, imageProtocol: "sixel" }), "nothing else does").toBe(false);
+    expect(transmits({ ...KITTY_CAPS, imageProtocol: "none" })).toBe(false);
+
+    // The predicate is exported so the caller can skip building the argument,
+    // never so it can decide: `transmitImage` reads it too, and a second
+    // `imageProtocol !== "kitty"` in `session.ts` is the drift C09 I1 forbids.
+    const seam = strip(readFileSync("src/shell/transmit-image.ts", "utf8"));
+    expect(seam, "the seam asks the same predicate").toMatch(/if \(!transmits\(capabilities\)\) return "";/);
+    expect(seam, "and holds the only comparison").not.toMatch(/imageProtocol !== "kitty"/);
+
+    // **The ordering is the row.** Reverting the caller to an unconditional
+    // call restores the cost with no output change at all, on every terminal
+    // that is not kitty — which is why nothing else here can see it.
+    //
+    // **Not asserted as "session.ts compares the protocol nowhere".** It does,
+    // once, at `rasterising` — and that asks a different question (whether an
+    // animated frame is a text frame) that happens to have the same test. A
+    // negative over the file would fail for a reason it does not name, which is
+    // the shape this row exists to avoid rather than to join.
+    const caller = strip(readFileSync("src/shell/session.ts", "utf8"));
+    expect(
+      caller,
+      "the flatMap is inside the guard, not before it",
+    ).toMatch(/transmits\(graph\.capabilities\)[^;]{0,200}transmitImage\(\s*graph\.transcript\.entries\.flatMap/);
   });
 });

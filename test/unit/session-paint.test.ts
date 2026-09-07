@@ -9,6 +9,7 @@
 //     composed at two widths is coherent at neither, and the wrap it causes
 //     scrolls the alternate screen.
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 
 import { compose, heightsSum, type Composed } from "../../src/shell/frame.js";
 import { paint, type PaintDeps } from "../../src/shell/paint.js";
@@ -644,5 +645,27 @@ describe("C22 §6g — the theme's background is a base, not a span (C22 I65)", 
 
     const rows = paint(frameAt(40, 6), deps({ theme: LIGHT_THEME, capabilities: mono }));
     for (const row of rows) expect(row.includes("\x1b[")).toBe(false);
+  });
+  it("T1.5f (F889): the base-colour pass builds one regexp per call, not one per row", () => {
+    // **A source row, and the reason is that there is nothing else to read.**
+    // `toTerminalDefault()` is a factory — a `/g` pattern carries `lastIndex`
+    // and a shared one is a hazard across independent scans — so calling it
+    // inside the `.map` allocated a fresh regexp for every row of every frame.
+    // Moving the call out changes no byte of any frame, so no assertion about
+    // output can see it and no mutation of it fails a test: the shape is the
+    // only observable, and without this row it regresses in silence.
+    //
+    // Reuse is safe *within one pass* because `String.replace` with a global
+    // pattern sets `lastIndex` to 0 before it iterates and leaves it there.
+    const src = readFileSync("src/shell/paint.ts", "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/(^|[^:])\/\/.*$/gm, "$1");
+    const body = /function based\([\s\S]*?\n}/.exec(src)?.[0] ?? "";
+    expect(body, "the function was found, not an empty match").toContain("toTerminalDefault");
+    expect(body.match(/toTerminalDefault\(\)/g) ?? [], "called once").toHaveLength(1);
+    expect(body, "and bound before the map").toMatch(
+      /const toDefault = toTerminalDefault\(\);[\s\S]*\.map\(/,
+    );
+    expect(body, "the map uses the bound one").toMatch(/line\.replace\(toDefault,/);
   });
 });

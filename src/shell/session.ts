@@ -30,7 +30,7 @@ import { isUsable } from "../terminal/capabilities.js";
 import { usageText } from "./usage.js";
 import { compose, type Composed } from "./frame.js";
 import { commandRows, type PaintDeps } from "./paint.js";
-import { transmitImage, type SentImages } from "./transmit-image.js";
+import { transmitImage, transmits, type SentImages } from "./transmit-image.js";
 import { composeFrame } from "./render-frame.js";
 import { createProfiler, isRecording, isSpanning } from "./profiling/recorder.js";
 import { createInspector, createResourceProbe, type CaptureIo } from "./profiling/node.js";
@@ -794,16 +794,23 @@ class Session implements TuiInstance {
     // at the moment it appears. Keying on the windowed set instead would put a
     // transmission in a frame where nothing else changed — a scroll that emits
     // a payload — which is the worse of the two.
+    // **The guard is asked before the argument is built** (F889). The `flatMap`
+    // below walks every block in every transcript entry, every frame, to hand
+    // the result to a function whose first line returns `""` unless the
+    // terminal speaks kitty — 90 µs and an eight-thousand-element array at two
+    // thousand entries, for nothing, on every terminal that does not.
     const bytes =
-      transmitImage(
-        graph.transcript.entries.flatMap((e) => e.doc.blocks),
-        graph.capabilities,
-        this.#sentImages,
-        // The frame's width — the declared cell box is a render-time fact and
-        // was a hardcoded `1` (F380).
-        graph.lifecycle.size().columns,
-        graph.probe,
-      ) + result.write;
+      (transmits(graph.capabilities)
+        ? transmitImage(
+            graph.transcript.entries.flatMap((e) => e.doc.blocks),
+            graph.capabilities,
+            this.#sentImages,
+            // The frame's width — the declared cell box is a render-time fact
+            // and was a hardcoded `1` (F380).
+            graph.lifecycle.size().columns,
+            graph.probe,
+          )
+        : "") + result.write;
     {
       // The write seam — A01 Appendix B's first row, and the one figure that
       // cannot be taken from outside the process.

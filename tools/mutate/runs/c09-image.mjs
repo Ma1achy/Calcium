@@ -124,8 +124,8 @@ const results = runPass({
       // cannot read — printed as text on anything but kitty.
       name: "the seam transmits at every protocol",
       file: SEAM,
-      from: '  if (capabilities.imageProtocol !== "kitty") return "";',
-      to: '  if (false) return "";',
+      from: "  if (!transmits(capabilities)) return \"\";",
+      to: "  if (false) return \"\";",
       expect: "IK7",
     },
     {

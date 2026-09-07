@@ -508,8 +508,14 @@ function ghostStyle(deps: PaintDeps): Style {
  */
 function based(lines: readonly string[], base: string): readonly string[] {
   if (base === "") return lines;
+  // **One regexp per call, not one per row.** `toTerminalDefault()` is a
+  // factory because a `/g` pattern carries `lastIndex` and a shared one is a
+  // hazard across independent scans — but `String.replace` with a global
+  // pattern sets `lastIndex` to 0 before it iterates and leaves it there, so
+  // reuse inside a single pass is safe and the allocation was per row per frame.
+  const toDefault = toTerminalDefault();
   return lines.map(
-    (line) => `${base}${line.replace(toTerminalDefault(), (seq) => `${seq}${base}`)}${SGR_RESET}`,
+    (line) => `${base}${line.replace(toDefault, (seq) => `${seq}${base}`)}${SGR_RESET}`,
   );
 }
 
