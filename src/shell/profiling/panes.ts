@@ -22,6 +22,7 @@ import { b } from "../builders/index.js";
 import { glyphs } from "../../presentation/blocks/index.js";
 import type { GlyphCaps } from "../../presentation/blocks/index.js";
 import type { Block } from "../../data/viewmodel/index.js";
+import { TIER_RANK } from "./types.js";
 import type { CommitReason, Histogram, ProfileReport, SpanName } from "./types.js";
 
 export type PaneName = "overview" | "frame" | "distribution" | "memory";
@@ -29,6 +30,17 @@ export type PaneName = "overview" | "frame" | "distribution" | "memory";
 export const PANES: readonly PaneName[] = Object.freeze([
   "overview", "frame", "distribution", "memory",
 ]);
+
+/**
+ * Is the tier high enough to have durations?
+ *
+ * The recorder holds the same predicate as a closure over its own `tier`, and
+ * this is the reader's copy over a report's. Written against `TIER_RANK` rather
+ * than as a list of names because a list is a rule with a birthday: it is
+ * correct until a fifth tier is added and then silently answers `false` for it,
+ * which here would print *raise the tier* to someone already above it.
+ */
+const spanning = (r: ProfileReport): boolean => TIER_RANK[r.regime.tier] >= TIER_RANK.spans;
 
 const ms = (v: number): string => (v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v.toFixed(2));
 const mib = (v: number): number => Number((v / 1024 ** 2).toFixed(1));
@@ -85,6 +97,19 @@ function overview(r: ProfileReport, sep: string): readonly Block[] {
         "info",
         "tier is below `spans`, so there are no durations — the report omits them rather than reporting zeroes, because a zeroed histogram reads as measured-and-fast",
         undefined, { id: "ov-no-spans" },
+      ),
+    );
+  } else if (lat.work.count === 0) {
+    // The **data** axis, which is not the tier axis (C28 I23, F895). At `spans`
+    // with nothing in the ring every percentile is 0, and four zero bars read as
+    // *measured, and fast* — the reading I11 omits the whole key to avoid one
+    // tier lower. Telling a reader to raise a tier that is already `spans` would
+    // also be a wrong instruction, so the two cases get different sentences.
+    out.push(
+      b.notice(
+        "info",
+        "no frame has been recorded yet — the tier is `spans` and the ring is empty, so there is nothing to draw rather than nothing to find",
+        undefined, { id: "ov-no-frames" },
       ),
     );
   } else {
@@ -192,7 +217,20 @@ function frame(r: ProfileReport, sep: string): readonly Block[] {
   const out: Block[] = [caption("frame — self time per phase, so a container is not counted twice", "fr-cap")];
 
   if (names.length === 0) {
-    return [...out, b.notice("info", "no spans recorded — raise the tier to `spans`", undefined, { id: "fr-none" })];
+    // One guard, two states, and until F895 one sentence for both: at `spans`
+    // with an empty ring this told a reader to *raise the tier to `spans`* —
+    // the tier they were already on. This pane reads the data axis, which is
+    // the right axis, and its message was still answering the tier one.
+    return [
+      ...out,
+      b.notice(
+        "info",
+        spanning(r)
+          ? "no spans recorded — the tier is high enough and nothing has been measured yet"
+          : "no spans recorded — raise the tier to `spans`",
+        undefined, { id: "fr-none" },
+      ),
+    ];
   }
 
   out.push(
@@ -297,22 +335,34 @@ function distribution(r: ProfileReport, sep: string): readonly Block[] {
   const drawn = r.worst.length > 0 ? r.worst : [];
   const { names, p50, p95 } = spanSeries(r);
 
-  const out: Block[] = [
-    caption(
-      `distribution${sep}${String(lat.work.count)} frames, +/-${(r.regime.histogramError * 100).toFixed(1)}% bucket error`,
-      "di-cap",
-    ),
-    b.plot({
-      id: "di-quantiles", form: "bar", height: 6, axes: true,
-      categories: ["min", "p50", "p95", "p99", "max"],
-      series: [
-        {
-          values: [lat.work.min, lat.work.p50, lat.work.p95, lat.work.p99, lat.work.max].map((v) => Number(ms(v))),
-          label: "work ms",
-        },
-      ],
-    }),
-  ];
+  // Empty ring, not low tier (C28 I23, F895). The quantile plot is the only
+  // part of this pane sourced from the frame histogram; `spans` is fed by every
+  // closed span, including ones outside a frame, so returning early here would
+  // hide rows that do have data. The plot is replaced, not the pane.
+  const out: Block[] = lat.work.count === 0
+    ? [
+        b.notice(
+          "info",
+          "no frame has been recorded yet — the tier is `spans` and the ring is empty, so there are no quantiles to take",
+          undefined, { id: "di-no-frames" },
+        ),
+      ]
+    : [
+        caption(
+          `distribution${sep}${String(lat.work.count)} frames, +/-${(r.regime.histogramError * 100).toFixed(1)}% bucket error`,
+          "di-cap",
+        ),
+        b.plot({
+          id: "di-quantiles", form: "bar", height: 6, axes: true,
+          categories: ["min", "p50", "p95", "p99", "max"],
+          series: [
+            {
+              values: [lat.work.min, lat.work.p50, lat.work.p95, lat.work.p99, lat.work.max].map((v) => Number(ms(v))),
+              label: "work ms",
+            },
+          ],
+        }),
+      ];
 
   if (names.length > 0) {
     out.push(

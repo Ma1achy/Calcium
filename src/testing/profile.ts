@@ -221,10 +221,22 @@ function frameConstruction(report: ProfileReport, row: "median-frame" | "p95-fra
   if (latency.work.count === 0) return unanswerable(s, "no frame was committed in this session");
   const value = row === "median-frame" ? latency.work.p50 : latency.work.p95;
   const err = latency.work.error;
+  // **A percentile over a ring that dropped frames is over the window, not over
+  // the session** (C28 I10). The ring is the sample and the session is the
+  // population; once the bound has discarded anything, the two are different
+  // and the figure describes only the frames still held. Said in the text
+  // rather than left to `dropped.frames`, because a reader quoting a p95 is
+  // reading this line and not the report — and a tail is exactly what a bound
+  // drops first, so the number is wrong in the direction that reassures.
+  const dropped = report.dropped.frames;
+  const over =
+    dropped > 0
+      ? ` — over the window, not the session: the ring dropped ${String(dropped)} earlier frames`
+      : "";
   return measured(
     s,
     value,
-    `${value.toFixed(2)} ms +/- ${(value * err).toFixed(2)} (${latency.work.count} frames)`,
+    `${value.toFixed(2)} ms +/- ${(value * err).toFixed(2)} (${latency.work.count} frames)${over}`,
     err,
   );
 }

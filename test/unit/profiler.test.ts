@@ -1,38 +1,115 @@
 // C28 — profiler (docs/components/C28_profiler.md §10), tier 1.
 //
-// Spec-first rows. C28's spec landed alone, ahead of its code, so every
-// invariant it declares is named here and nowhere else yet — SP9 is what makes
-// that a requirement rather than a courtesy: an invariant no row names is a
-// claim nothing was written against, and it reads exactly like one that is
-// satisfied.
+// **This file was fifteen spec-first todos and is now one row and one deferral.**
+// Every one of them carried the explicit no-blocker marker — TD3's ruling, since
+// COMPONENT_SOURCES may not name a path before the path exists — and the clause
+// they carried said *lands with the recorder in `src/shell/profiling/`*. The
+// recorder landed. Nothing expired them, because TD1–TD6 watch a **component
+// id** and these named none, so the marker that was correct on the day it was
+// written became the reason nobody looked again.
 //
-// Each row carries the explicit no-blocker marker rather than a "waits on C28"
-// clause, and that is TD3's ruling rather than an omission: COMPONENT_SOURCES
-// may not name a path before the path exists, because a missing path reads as
-// "not implemented" forever and silently exempts every deferral pointing at it.
-// C28 gains its entry on the commit that makes src/shell/profiling/recorder.ts
-// real, and from then on these expire the way every other deferral does.
-//
-// Generated from the spec's own §10 rows, so the two cannot drift apart by
-// transcription; a row edited here and not there is a diff a reader can see.
-import { describe, it } from "vitest";
+// That is the deferral class at its fifth instance and its worst shape: not a
+// condition satisfied elsewhere, but a condition phrased so that no rule has a
+// subject to watch. The remedy is not a new gate — matching *"lands with the
+// recorder"* against *the recorder exists* is the citation-resolving-against-
+// the-wrong-thing class the audit argues against automating. It is the habit:
+// picking up an entry begins by grepping what its claims resolve to at HEAD.
+import { describe, expect, it } from "vitest";
+
+import { createProfiler } from "../../src/shell/profiling/recorder.js";
+import { PANES, profilePane } from "../../src/shell/profiling/panes.js";
+import type { Block, Notice } from "../../src/data/viewmodel/index.js";
+import type { Tier } from "../../src/shell/profiling/types.js";
+
+/** A counter clock. Every row here asks *what was drawn*, never *how long*. */
+const counterClock = (): (() => number) => {
+  let t = 0;
+  return () => (t += 1);
+};
+
+const noticesIn = (blocks: readonly Block[]): readonly Notice[] =>
+  blocks.filter((x): x is Notice => x.kind === "notice");
+
+const plotIds = (blocks: readonly Block[]): readonly string[] =>
+  blocks.filter((x) => x.kind === "plot").map((x) => x.id ?? "?");
 
 describe("C28 — profiler, tier 1 spec-first rows", () => {
-  it.todo("T1.1 (C28 I1): at off, a decorated write, measure and span → the ring is never constructed, schedule is never called, and no FinalizationRegistry is registered — not deferred on a component: lands with the recorder in src/shell/profiling/");
-  it.todo("T1.3 (C28 I4): a FrameRecord with work: 3, wait: 97 → the report exposes three members and no member equals 100 — not deferred on a component: lands with the recorder in src/shell/profiling/");
-  it.todo("T1.4 (C28 I5): two commits at t=0 and t=90, one frame at t=100 → wait is 100, not 10 — not deferred on a component: lands with the recorder in src/shell/profiling/");
-  it.todo("T1.5 (C28 I11): at counters, report() has no spans key and no latency key — 'spans' in report is false, asserted rather than spans being empty — not deferred on a component: lands with the recorder in src/shell/profiling/");
-  it.todo("T1.6 (C28 I6): a composition returning fallback → counted in excluded.fallback, absent from spans.frame — not deferred on a component: lands with the recorder in src/shell/profiling/");
-  it.todo("T1.7 (C28 I7): a group of three children measured through measureChild → the parent's recorded cost is its own, and the derived inclusive figure is the sum — not deferred on a component: lands with the recorder in src/shell/profiling/");
-  it.todo("T1.8 (C28 I8): a key differing only in theme → misses.theme is 1 and misses['nothing-changed'] is 0; an identical key that missed → the reverse — not deferred on a component: lands with the recorder in src/shell/profiling/");
-  it.todo("T1.9 (C28 I9): a ring of 8 given 20 frames → 8 held, dropped.frames is 12. The two are asserted separately, because a conservation total is satisfied by redistribution — not deferred on a component: lands with the recorder in src/shell/profiling/");
-  it.todo("T1.10 (C28 I10): a report over a ring with dropped.frames > 0 → the percentile is labelled over-the-window; with none → it is not — not deferred on a component: lands with the recorder in src/shell/profiling/");
-  it.todo("T1.11 (C28 I16): each of 1, 4, 8, 16 → minor, major, incremental, weakcb; the map is total and a fifth number does not compile — not deferred on a component: lands with the recorder in src/shell/profiling/");
-  it.todo("T1.12 (C28 I18): setTier from spans to alloc → the ring is empty and the report names the reset — not deferred on a component: lands with the recorder in src/shell/profiling/");
-  it.todo("T1.13 (C28 I20): a mark raised between two spans → it is in marks and in no FrameRecord — not deferred on a component: lands with the recorder in src/shell/profiling/");
-  it.todo("T1.14 (C28 I22): dispose, then span, count, mark, report → no-ops; dispose again → no-op; capture → throws naming dispose — not deferred on a component: lands with the recorder in src/shell/profiling/");
-  it.todo("T1.16 (C28 I23): setTier('spans') from counters, then the view closes → the tier is counters again, not off; and a report with an empty ring renders a notice rather than a plot with no series — not deferred on a component: lands with the recorder in src/shell/profiling/");
-  it.todo("T1.71 (C28 I43): a thousand objects tracked under one name, dropped, and collected → created is 1000, finalised is 999, live is 1. The residue is asserted as one and not tolerated as a range, because it is deterministic — always the most recent registration, at every size measured — and a row written as >= 990 would pass a registry reporting half. Runs under --expose-gc; without it the same fixture reports 0 finalised, which is the control — not deferred on a component: lands with the recorder in src/shell/profiling/");
-  it.todo("T1.72 (C28 I43): objects tracked under three names, fifty each, dropped and collected → two names report 50 and one reports 49, and the report's own floor names the shortfall as one object rather than one per class. The class it lands on is registration order, so a row naming which of the three is short would be asserting an accident — not deferred on a component: lands with the recorder in src/shell/profiling/");
-  it.todo("T1.73 (C28 I43, C28 I1): at off, a thousand track calls → no FinalizationRegistry is constructed, leaks is empty, and the objects are not retained. The retention half is the one that matters: a tracker holding a strong reference to everything it watches is a leak in the instrument that finds leaks — not deferred on a component: lands with the recorder in src/shell/profiling/");
+  it("T1.16 (C28 I23): an empty ring at `spans` draws a notice in every pane and no plot at all", () => {
+    // **T1.16.** C28 I23's second clause is *a pane with no data draws a notice
+    // and never an empty plot, because an empty plot reads as* measured, and
+    // zero. `overview` and `distribution` implemented it against the **tier**,
+    // which is a different question with the same answer in every state the
+    // suite had ever built: `latency` is emitted whenever the tier is `spans`
+    // or above, so an empty ring makes it present at `count: 0` with every
+    // percentile 0, and the panes drew four and five zero bars (F895).
+    //
+    // **Over the whole of `PANES`, not the pane that broke.** The two that were
+    // right were right by accident of what they had to hand — `frame` and
+    // `memory` have no tier-shaped field to reach for — so a row naming
+    // `overview` would have been satisfied by the accident and blind to the
+    // next pane written from the same template.
+    const p = createProfiler({ tier: "spans" }, { elapsed: counterClock() });
+    const report = p.report();
+
+    // The state the row is about, asserted rather than assumed: a fixture that
+    // quietly recorded a frame would make every assertion below vacuous.
+    expect(report.timeline, "nothing was recorded").toHaveLength(0);
+    expect(report.latency?.work.count, "and `latency` is present anyway — the defect's premise").toBe(0);
+
+    for (const pane of PANES) {
+      const blocks = profilePane(report, pane);
+      expect(plotIds(blocks), `${pane} draws no plot over an empty ring`).toEqual([]);
+      expect(noticesIn(blocks).length, `${pane} says so`).toBeGreaterThan(0);
+    }
+  });
+
+  it("T1.16b (C28 I23): the empty-ring notice is not the low-tier notice, in either direction", () => {
+    // **The half that counting notices cannot see, and the half that found the
+    // third instance.** `frame` guards on the data and printed *raise the tier
+    // to `spans`* while the tier was `spans` — correct branch, tier's sentence,
+    // green under any row that asserts a notice exists. So the assertion is the
+    // text: at a spanning tier no notice may instruct a raise, and below one
+    // every notice that mentions the tier must still do so.
+    const at = (tier: Tier): readonly string[] => {
+      const p = createProfiler({ tier }, { elapsed: counterClock() });
+      const report = p.report();
+      return PANES.flatMap((pane) => noticesIn(profilePane(report, pane)).map((n) => n.text));
+    };
+
+    for (const text of at("spans")) {
+      expect(text, "nothing tells a reader on `spans` to raise the tier").not.toMatch(/raise the tier/iu);
+      expect(text, "nor that the tier is below `spans`").not.toMatch(/tier is below/iu);
+    }
+
+    // The control, and it is the one that stops the repair being *delete the
+    // sentence*: below a spanning tier the tier is the true answer and has to
+    // survive. A guard widened until it says the same neutral thing everywhere
+    // passes the arm above perfectly.
+    const low = at("counters");
+    expect(low.some((t) => /raise the tier/iu.test(t)), "`counters` still says to raise it").toBe(true);
+    expect(low.some((t) => /tier is below/iu.test(t)), "and still says why").toBe(true);
+  });
+
+  it("T1.16c (C28 I23): its control — a recorded session still draws every plot", () => {
+    // A guard widened until it refuses everything passes both rows above. This
+    // is the arm that fails if the empty-ring branch is taken when there is
+    // data, and it names the ids rather than counting them: a pane that drew
+    // one plot instead of two would pass a count and be missing the answer.
+    const p = createProfiler({ tier: "spans" }, { elapsed: counterClock() });
+    for (let i = 0; i < 6; i += 1) {
+      p.beginFrame("input");
+      {
+        using _s = p.span("paint");
+      }
+      p.endFrame("frame");
+    }
+    const report = p.report();
+    expect(report.latency?.work.count, "six frames are in the ring").toBe(6);
+
+    expect(plotIds(profilePane(report, "overview"))).toEqual(["ov-latency", "ov-coalesce"]);
+    expect(plotIds(profilePane(report, "frame"))).toEqual(["fr-spans"]);
+    expect(plotIds(profilePane(report, "distribution"))).toEqual(["di-quantiles", "di-spans", "di-worst"]);
+  });
+
+  it.todo("T1.16d (C28 I23): setTier('spans') from counters, then the view closes → the tier is counters again, not off — not deferred on a component: the blocker is a caller of profilePane in src/ that opens and closes a pane, and there is none; profilePane is a pure function from a report to blocks and raises no tier. It arrives with the drawing round. Grep: `grep -rn 'profilePane' src/ | grep -v profiling/`");
 });

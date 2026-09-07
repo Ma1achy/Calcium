@@ -16,6 +16,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { BUDGET, checkBudget, checkLeaks, checkPhases, formatBudget, formatLeaks } from "../../src/testing/index.js";
+import { createProfiler } from "../../src/shell/profiling/recorder.js";
 import { SPAN_SITE } from "../../src/shell/profiling/types.js";
 import type { Histogram, ProfileReport, SpanName, TreeNode } from "../../src/shell/profiling/types.js";
 import { buildSession } from "../support/session.js";
@@ -109,6 +110,45 @@ const row = (b: ReturnType<typeof checkBudget>, name: string) => {
 };
 
 describe("C28 — the budget table", () => {
+  it("T1.10 (C28 I10): a percentile over a ring that dropped frames says so in its own text", () => {
+    // **The qualification travels with the figure, not with the report.** A
+    // reader quoting a p95 is reading this line; `dropped.frames` is two levels
+    // away in a structure they are not looking at. And the direction matters —
+    // a bound drops the oldest first and a tail is what a bound loses, so an
+    // unqualified percentile over a truncated ring is wrong in the direction
+    // that reassures.
+    const hist: Histogram = {
+      count: 40, min: 1, p50: 4, p95: 9, p99: 12, max: 14, sum: 200, mean: 5, error: 1 / 64,
+    };
+    const truncated = report({
+      latency: { work: hist, wait: hist },
+      dropped: { frames: 118, samples: 0, marks: 0, captureBytes: 0 },
+    });
+
+    for (const name of ["median-frame", "p95-frame"] as const) {
+      const r = row(checkBudget(truncated), name);
+      expect(r.state, `${name} is measured`).toBe("measured");
+      if (r.state !== "measured") continue;
+      expect(r.text, `${name} names the window`).toContain("over the window, not the session");
+      // The count, not merely the fact. "Some frames were dropped" and "118 of
+      // 158 were dropped" are different readings of the same p95, and only the
+      // second lets a reader decide whether to believe it.
+      expect(r.text, `${name} says how many`).toContain("118");
+    }
+
+    // **The control, and it is the whole row.** A label appended
+    // unconditionally passes every assertion above and makes every report read
+    // as truncated — which is the same defect pointing the other way, a caveat
+    // that is always there being a caveat nobody reads.
+    const whole = report({ latency: { work: hist, wait: hist } });
+    for (const name of ["median-frame", "p95-frame"] as const) {
+      const r = row(checkBudget(whole), name);
+      expect(r.state).toBe("measured");
+      if (r.state !== "measured") continue;
+      expect(r.text, `${name} is unqualified when the ring held everything`).not.toContain("over the window");
+    }
+  });
+
   it("T1.25 (C28 I37): the bytes row carries its figure and the threshold it was checked against", () => {
     const budget = checkBudget(report({ counters: { "bytes.written": 480 * 1024 }, frames: 12 }));
     const bytes = row(budget, "bytes-per-frame");
@@ -583,5 +623,40 @@ describe("C28 — the leak table", () => {
     // whose caveat only appears in one state is a table nobody reads twice.
     expect(formatLeaks(quiet)).toContain("No collection was observed");
     expect(formatLeaks(held)).toContain("floor of 1");
+  });
+});
+
+describe("C28 I44 — the cheap tier records everything cheap", () => {
+  it("T1.76 (C28 I44): frames are counted at `counters`, and the bytes row is measured rather than refused with a falsehood", () => {
+    const p = createProfiler({ tier: "counters" }, { elapsed: () => 0 });
+    for (let i = 0; i < 12; i += 1) {
+      p.beginFrame("input");
+      p.count("bytes.written", 4000);
+      p.endFrame("frame");
+    }
+    const r = p.report();
+    expect(r.frames, "twelve frames drew, whatever their durations cost to keep").toBe(12);
+
+    // **The other half, and it is where the falsehood was printed.** A repair
+    // that counted frames and left this refusing would satisfy a row asserting
+    // only the count. `needs: "no frame was committed in this session"` was the
+    // one thing the reader was told, and it was false about the session (F894).
+    const bytes = checkBudget(r).rows.find((row) => row.row === "bytes-per-frame");
+    expect(bytes?.state, "the numerator and the denominator are both here").toBe("measured");
+    if (bytes?.state !== "measured") return;
+    expect(bytes.value, "48 000 B over twelve frames").toBeCloseTo(4000, 6);
+
+    p.dispose();
+
+    // **`off` is the control.** A zero there is the true answer, so a repair
+    // that counted unconditionally would be as wrong in the other direction and
+    // this is what says so.
+    const none = createProfiler({ tier: "off" }, { elapsed: () => 0 });
+    for (let i = 0; i < 12; i += 1) {
+      none.beginFrame("input");
+      none.endFrame("frame");
+    }
+    expect(none.report().frames, "nothing is recorded at `off`, so zero is true").toBe(0);
+    none.dispose();
   });
 });

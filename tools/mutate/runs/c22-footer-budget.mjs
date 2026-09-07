@@ -116,13 +116,24 @@ const MUTATIONS = [
     expect: "T4.62",
   },
   {
-    // **T6.101.** A hook over nothing: a `step` header with no body gets a
-    // second run of zero blocks, and the hook row is drawn beneath it.
-    name: "a step header with no body still hangs a hook",
+    // **T6.101, re-aimed — the old form was a no-op** (F897). It dropped
+    // `|| blocks.length < 2` and claimed *a `step` header with no body gets a
+    // second run of zero blocks, and the hook row is drawn beneath it*. It does
+    // not: `cardBody([])` is `[]` and `bodyRuns([])` produces no runs, so a
+    // one-block card walks the card path to a byte-identical result. Measured by
+    // comparing the two layouts, not read off the branch — they `diff` clean.
+    //
+    // So the clause is not observable and the mutation could never be killed,
+    // while reading exactly like the test gap it was taken for since F815. The
+    // clause stays — it is a cheap early-out and a guard keeps its place on
+    // asymmetry — and the mutation moves to the boundary that *is* observable:
+    // at `< 3` a two-block card lays out flush instead of under the hook, which
+    // T1.44, T4.62, T4.63 and T4.28 all catch.
+    name: "a two-block card lays out flush, with no hook",
     file: LAYOUT,
     from: "  if (!isCard(blocks) || blocks.length < 2) {",
-    to: "  if (!isCard(blocks)) {",
-    expect: "T1.41",
+    to: "  if (!isCard(blocks) || blocks.length < 3) {",
+    expect: "T1.44",
   },
   {
     // **T6.102.** The default footer is empty again — `[]` is zero rows, so the

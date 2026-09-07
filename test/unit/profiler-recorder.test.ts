@@ -375,3 +375,310 @@ describe("C28 I43 — leak counting, and the floor it cannot get under", () => {
     p.dispose();
   });
 });
+
+describe("C28 — the frame record, the ring, and the end of a profiler's life", () => {
+  /** A profiler over a clock the caller advances. */
+  const at = (
+    tier: "off" | "counters" | "spans" | "alloc" | "deep",
+    ring?: number,
+  ): Readonly<{ p: ReturnType<typeof createProfiler>; set: (ms: number) => void }> => {
+    let now = 0;
+    return {
+      p: createProfiler(
+        { tier, ...(ring === undefined ? {} : { ring }) },
+        { elapsed: () => now },
+      ),
+      set: (ms: number): void => void (now = ms),
+    };
+  };
+
+  it("T1.3 (C28 I4): a frame is three members and none of them is the sum", () => {
+    const { p, set } = at("spans");
+    set(0);
+    p.commit("input", false);
+    set(97);
+    p.beginFrame("input");
+    set(100);
+    p.endFrame("frame");
+
+    const frame = p.report().worst[0];
+    expect(frame?.work, "rendering, which is the framework's efficiency").toBe(3);
+    expect(frame?.wait, "and the coalescing window, which is its policy").toBe(97);
+    // **No member equals 100**, asserted over every numeric field rather than
+    // against a named one: the defect is a `total` reappearing under *some*
+    // name, and a row naming `total` cannot see it come back as `elapsed`.
+    const numbers = Object.entries(frame ?? {}).filter(([, v]) => typeof v === "number");
+    expect(numbers.map(([k]) => k).filter((k) => (frame as unknown as Record<string, number>)[k] === 100))
+      .toStrictEqual([]);
+
+    p.dispose();
+  });
+
+  it("T1.4 (C28 I5): the wait is measured from the earliest commit still unserved, not the latest", () => {
+    const { p, set } = at("spans");
+    set(0);
+    p.commit("input", false); // the one a reader has been waiting on
+    set(90);
+    p.commit("stream", false); // and a later one, coalesced into the same frame
+    set(100);
+    p.beginFrame("input");
+    p.endFrame("frame");
+
+    // **100, not 10.** Taking the latest reports how long the *last* cause
+    // waited, which is near zero on a busy stream and says the session is
+    // responsive while the first keystroke is still on screen unanswered.
+    expect(p.report().worst[0]?.wait).toBe(100);
+
+    p.dispose();
+  });
+
+  it("T1.5 (C28 I11): below `spans` the report omits the keys rather than zeroing them", () => {
+    const { p } = at("counters");
+    p.count("thing");
+    p.beginFrame("input");
+    p.endFrame("frame");
+
+    const r = p.report();
+    // **`in`, not a truthiness or an emptiness check.** A zeroed histogram is
+    // falsy in none of the ways a reader tests, and `spans: {}` reads as
+    // *measured, and nothing took time* — which is the false statement the
+    // omission exists to avoid.
+    expect("spans" in r, "no spans key at all").toBe(false);
+    expect("latency" in r, "and no latency key").toBe(false);
+    expect(r.counters.thing, "while what this tier does record is there").toBe(1);
+
+    p.dispose();
+  });
+
+  it("T1.6 (C28 I6): a fallback frame is counted and kept out of the durations", () => {
+    const { p, set } = at("spans");
+    set(0);
+    p.beginFrame("input");
+    {
+      using _s = p.span("compose");
+      set(50);
+    }
+    p.endFrame("fallback");
+
+    set(60);
+    p.beginFrame("input");
+    set(63);
+    p.endFrame("frame");
+
+    const r = p.report();
+    expect(r.excluded.fallback, "the composition that failed is counted").toBe(1);
+    // **And absent from the durations**, which is the half that matters: a
+    // fallback is a frame that did not happen, and folding its cost into the
+    // work histogram makes the p95 a statement about failures.
+    expect(r.worst.map((f) => f.work), "only the frame that drew").toStrictEqual([3]);
+    expect(r.latency?.work.count, "one frame in the histogram, not two").toBe(1);
+
+    p.dispose();
+  });
+
+  it("T1.7 (C28 I7): a container is charged its own time and the tree keeps the whole", () => {
+    const { p, set } = at("spans");
+    set(0);
+    p.beginFrame("input");
+    {
+      using _parent = p.element("group", "outer");
+      set(2);
+      // Three children of three each: the parent's own five is what is left
+      // when they are taken out, and the three must differ from it or a row
+      // asserting `self` cannot tell subtraction from a coincidence.
+      for (const [id, closesAt] of [["a", 5], ["b", 8], ["c", 11]] as const) {
+        using _child = p.element("raw", id);
+        set(closesAt);
+      }
+      set(14);
+    }
+    p.endFrame("frame");
+
+    const nodes = p.report().nodes;
+    const parent = nodes.find((n) => n.key === "group#outer");
+    const children = nodes.filter((n) => n.key.startsWith("raw#"));
+
+    // **Self at the container, so `Σ nodes.self` is the frame's real cost.** An
+    // inclusive parent repeats every child and the widest bar is always the
+    // outermost one, which tells a reader nothing.
+    expect(parent?.total, "the whole, from open to close").toBe(14);
+    expect(children.reduce((n, c) => n + c.self, 0), "the children's own").toBe(9);
+    expect(parent?.self, "and the parent keeps only what it did itself").toBe(5);
+
+    p.dispose();
+  });
+
+  it("T1.9 (C28 I9): a ring of eight given twenty frames holds eight and reports twelve dropped, separately", () => {
+    const { p, set } = at("spans", 8);
+    for (let i = 0; i < 20; i += 1) {
+      set(i * 10);
+      p.beginFrame("input");
+      set(i * 10 + 1);
+      p.endFrame("frame");
+    }
+
+    const r = p.report();
+    // **Two assertions, never a total.** *Seen* is satisfied by redistribution:
+    // held and dropped can both be wrong in opposite directions and the sum
+    // still reads correct.
+    expect(r.timeline.length, "the bound is the bound").toBe(8);
+    expect(r.dropped.frames, "and what it discarded is counted, not derived").toBe(12);
+    // The oldest went, not the newest: a ring that dropped the tail would hold
+    // eight records and describe the start of a session nobody is asking about.
+    expect(r.timeline.map((f) => f.seq), "the last eight").toStrictEqual([13, 14, 15, 16, 17, 18, 19, 20]);
+
+    p.dispose();
+  });
+
+  it("T1.12 (C28 I18): raising the tier empties the ring and the report names where", () => {
+    const { p, set } = at("spans");
+    for (let i = 0; i < 3; i += 1) {
+      set(i * 10);
+      p.beginFrame("input");
+      set(i * 10 + 4);
+      p.endFrame("frame");
+    }
+    expect(p.report().timeline.length, "three frames at `spans`").toBe(3);
+
+    set(500);
+    p.setTier("alloc");
+
+    const r = p.report();
+    // Histograms from two tiers must never merge: a `spans` frame and an
+    // `alloc` frame are not measurements of the same thing, and a p95 across
+    // the boundary is a number describing neither.
+    expect(r.timeline, "the ring is empty").toStrictEqual([]);
+    expect(r.regime.ringReset, "and the report says when it was emptied").toBe(500);
+    expect(r.regime.tier, "at the tier now in force").toBe("alloc");
+
+    p.dispose();
+  });
+
+  it("T1.13 (C28 I20): a mark is on the session timeline and inside no frame", () => {
+    const { p, set } = at("spans");
+    set(0);
+    p.beginFrame("input");
+    {
+      using _a = p.span("compose");
+      set(5);
+    }
+    set(7);
+    p.mark("halfway");
+    {
+      using _b = p.span("paint");
+      set(9);
+    }
+    p.endFrame("frame");
+
+    const r = p.report();
+    expect(r.marks, "an instant, at the time it happened").toStrictEqual([{ at: 7, label: "halfway" }]);
+    // **And in no `FrameRecord`.** A mark folded into a frame's spans becomes a
+    // phase with no duration, which every table then divides by something.
+    const frame = r.worst[0];
+    expect(Object.keys(frame?.spans ?? {}), "the frame holds spans and nothing else").toStrictEqual([
+      "compose",
+      "paint",
+    ]);
+
+    p.dispose();
+  });
+
+  it("T1.14 (C28 I22): after dispose everything is a no-op, twice is a no-op, and capture says why", async () => {
+    const { p, set } = at("deep");
+    set(0);
+    p.beginFrame("input");
+    set(3);
+    p.endFrame("frame");
+    const before = p.report();
+
+    p.dispose();
+    p.dispose(); // idempotent — a second close must not throw or double-release
+
+    // Every recording operation, after the fact.
+    {
+      using _s = p.span("compose");
+      set(99);
+    }
+    p.count("thing");
+    p.mark("later");
+    p.track("thing", {});
+    p.beginFrame("input");
+    p.endFrame("frame");
+
+    const after = p.report();
+    expect(after.frames, "no frame was added").toBe(before.frames);
+    expect(after.counters.thing, "no counter appeared").toBeUndefined();
+    expect(after.marks, "no mark was recorded").toStrictEqual([]);
+    expect(after.leaks, "and nothing was tracked").toStrictEqual({});
+
+    // **`capture` throws where the rest are silent, and the difference is the
+    // point**: a no-op capture returns no path, and a caller awaiting a file
+    // would wait for one that was never going to arrive.
+    await expect(p.capture("cpu")).rejects.toThrow(/dispose/u);
+  });
+});
+
+describe("C28 I1 — at `off`, nothing is armed and nothing accumulates", () => {
+  it("T1.1 (C28 I1): a write, a measure and a span at `off` arm no sampler, register nothing, and leave the ring empty", () => {
+    // **Two levels, and this row is the lower one.** At the session level `off`
+    // means no profiler object exists at all — `isRecording` is the gate and
+    // T1.59 is the row, through a callback that never fires. Here the recorder
+    // is built directly and asked to work, which is the case a caller reaches
+    // by asking for `off` explicitly: nothing may accumulate, and nothing that
+    // outlives the call may be armed.
+    let scheduled = 0;
+    const p = createProfiler(
+      { tier: "off" },
+      {
+        elapsed: () => 0,
+        schedule: (_fn, _ms) => {
+          scheduled += 1;
+          return { [Symbol.dispose]: () => undefined };
+        },
+      },
+    );
+
+    p.count("bytes.written", 480);
+    p.gauge("series.length", 200);
+    {
+      using _s = p.span("compose");
+    }
+    {
+      using _e = p.element("table", "t1");
+    }
+    p.beginFrame("input");
+    p.endFrame("frame");
+    p.mark("here");
+
+    // **The sampler is the process-wide handle.** `monitorEventLoopDelay` and a
+    // `PerformanceObserver` outlive every frame, and a profiler that armed them
+    // at `off` would be the leak it exists to find (C28 I21's neighbourhood).
+    expect(scheduled, "no sampler was armed").toBe(0);
+
+    const r = p.report();
+    expect(r.timeline, "and the ring holds nothing").toStrictEqual([]);
+    expect(r.frames, "no frame was counted").toBe(0);
+    expect(r.nodes, "no element was attributed").toStrictEqual([]);
+    expect(r.counters, "and no counter recorded").toStrictEqual({});
+    expect(r.marks).toStrictEqual([]);
+    expect(r.leaks, "nothing registered — T1.73 has the retention half").toStrictEqual({});
+    expect("spans" in r, "with the keys omitted rather than zeroed").toBe(false);
+
+    // **The control.** Every assertion above is satisfied by a recorder that
+    // does nothing at any tier, and that is a defect this file has met before
+    // (F869: a tier named `counters` at which no counter could fire). The same
+    // calls at `counters` must move the same numbers.
+    const on = createProfiler({ tier: "counters" }, { elapsed: () => 0 });
+    on.count("bytes.written", 480);
+    on.beginFrame("input");
+    on.endFrame("frame");
+    on.mark("here");
+    const live = on.report();
+    expect(live.counters["bytes.written"], "the same calls record at `counters`").toBe(480);
+    expect(live.frames, "and a frame is counted").toBe(1);
+    expect(live.marks.length, "and a mark is kept").toBe(1);
+
+    p.dispose();
+    on.dispose();
+  });
+});

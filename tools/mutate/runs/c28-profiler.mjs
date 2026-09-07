@@ -39,6 +39,7 @@ const PAINT = "src/shell/paint.ts";
 const VIEWPORT = "src/viewport/viewport/viewport.ts";
 const LEAKS = "src/shell/profiling/leaks.ts";
 const SCRATCH = "src/shell/render-scratch.ts";
+const PANES = "src/shell/profiling/panes.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -716,6 +717,59 @@ const results = runPass({
       from: '    this.#probe.track("scratch.carrier", owner);',
       to: '    this.#probe.track("scratch.carrier", { key, value });',
       expect: "T1.75",
+    },
+    {
+      // F895, and the axis it is about: the guard reads the tier where the
+      // question is the data. Reverting it is what shipped, so this is the
+      // mutation the defect itself was.
+      name: "OV-TIER-ONLY: the overview asks the tier whether there is data",
+      file: PANES,
+      from: "  } else if (lat.work.count === 0) {",
+      to: "  } else if (false) {",
+      expect: "T1.16",
+    },
+    {
+      name: "ALWAYS-EMPTY: the overview takes the empty branch with data in the ring",
+      file: PANES,
+      // The other direction, and the one T1.16's control exists for: a guard
+      // widened until it refuses everything satisfies every assertion about
+      // the empty case.
+      from: "  } else if (lat.work.count === 0) {",
+      to: "  } else if (true) {",
+      expect: "T1.16c",
+    },
+    {
+      name: "DI-TIER-ONLY: the distribution asks the tier whether there is data",
+      file: PANES,
+      from: "  const out: Block[] = lat.work.count === 0",
+      to: "  const out: Block[] = false",
+      expect: "T1.16",
+    },
+    {
+      // The third instance: the right branch printing the other axis's
+      // sentence. Killed only by the row that reads the notice text — a row
+      // asserting that a notice appears is green on this.
+      name: "FR-ONE-SENTENCE: the frame pane tells a reader on `spans` to raise the tier",
+      file: PANES,
+      from: '        spanning(r)\n          ? "no spans recorded — the tier is high enough and nothing has been measured yet"\n          : "no spans recorded — raise the tier to `spans`",',
+      to: '        "no spans recorded — raise the tier to `spans`",',
+      expect: "T1.16b",
+    },
+    {
+      name: "WINDOW-LABEL-GONE: a percentile over a truncated ring is unqualified",
+      file: BUDGET,
+      from: "    dropped > 0",
+      to: "    false",
+      expect: "T1.10",
+    },
+    {
+      // The caveat that is always there is a caveat nobody reads, and it makes
+      // every whole report describe itself as a window.
+      name: "WINDOW-LABEL-ALWAYS: every report says it is over the window",
+      file: BUDGET,
+      from: "    dropped > 0",
+      to: "    true",
+      expect: "T1.10",
     },
     {
       name: "EAGER-ALS: the async store is built at construction",

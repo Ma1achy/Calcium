@@ -15,6 +15,9 @@
 // COMPONENT_SOURCES entry naming a path that does not exist, because a missing
 // path reads as "not implemented" forever and silently exempts every deferral
 // pointing at it. C28 gains its entry with src/shell/profiling/recorder.ts.
+import { setFlagsFromString } from "node:v8";
+import { runInNewContext } from "node:vm";
+
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -36,7 +39,7 @@ import { RenderCache } from "../../src/shell/render-cache.js";
 import { RenderScratchStore } from "../../src/shell/render-scratch.js";
 import { NO_PROBE, type Probe } from "../../src/data/viewmodel/index.js";
 import { createProfiler } from "../../src/shell/profiling/recorder.js";
-import { createInspector, type CaptureIo } from "../../src/shell/profiling/node.js";
+import { createInspector, createResourceProbe, type CaptureIo } from "../../src/shell/profiling/node.js";
 import type { Profiler } from "../../src/shell/profiling/types.js";
 import { buildGraph, fakeClock } from "../support/session.js";
 import { W, measureSequence, rowsDoc, wrappingDoc } from "../support/viewport.js";
@@ -707,5 +710,78 @@ describe("C28 I43 — the leak counters' call sites", () => {
 
     expect(render.tracked.map((t) => t.name)).toStrictEqual(["render-cache.lines"]);
     expect(render.tracked[0]?.held, "the array, which is the allocation").toBe(lines);
+  });
+});
+
+describe("C28 I8 — a miss says which axis, and whether it bought anything", () => {
+  it("T1.8 (C28 I8): a key differing only in theme reports `theme`, and an identical one that missed reports `nothing-changed`", () => {
+    const cache = new RenderCache();
+    cache.set("e1", 1, 80, "f", "dark", ["x"]);
+
+    // **One axis moved, and it is not the first one checked.** A cache that
+    // reported `rev` for every miss satisfies a hit-rate assertion exactly and
+    // says the opposite thing about whether the cache is working: `rev` is a
+    // content change and the re-render was owed, while `theme` on a screen
+    // where nothing moved is a key churning for nothing.
+    cache.get("e1", 1, 80, "f", "light");
+    expect(cache.misses.theme, "the axis that actually disagreed").toBe(1);
+    expect(cache.misses.rev, "and not the one checked before it").toBe(0);
+    expect(cache.misses["nothing-changed"], "no re-render has been offered back yet").toBe(0);
+
+    // **The other half, and it is a value comparison rather than an axis.** The
+    // axis says what invalidated the slot; this says whether invalidating it
+    // bought anything. A theme switch that produces byte-identical lines is a
+    // full re-render for nothing, and only the two counts together show it.
+    cache.set("e1", 1, 80, "f", "light", ["x"]);
+    expect(cache.misses["nothing-changed"], "the recomputed value equalled the discarded one").toBe(1);
+    expect(cache.misses.theme, "and the axis count did not move again").toBe(1);
+
+    // The reverse, which is what makes the first mean anything: a miss whose
+    // re-render really did produce something different.
+    const moved = new RenderCache();
+    moved.set("e2", 1, 80, "f", "dark", ["x"]);
+    moved.get("e2", 1, 80, "f", "light");
+    moved.set("e2", 1, 80, "f", "light", ["y"]);
+    expect(moved.misses.theme).toBe(1);
+    expect(moved.misses["nothing-changed"], "the work was owed").toBe(0);
+  });
+});
+
+describe("C28 I16 — V8's GC numbers translated at the boundary", () => {
+  it("T1.11 (C28 I16): a real collection lands in a named bucket, and the map is total over the four", async () => {
+    // **Driven by a real collection rather than by reading the table back.** A
+    // row that asserted `GC_KINDS[1] === "minor"` would be the constant
+    // compared with itself; this asks whether V8's number reaches a name at
+    // all, which is the thing that breaks when the detail shape moves.
+    setFlagsFromString("--expose-gc");
+    const gc = runInNewContext("gc") as () => void;
+
+    const probe = createResourceProbe(() => 0);
+    // Make something worth collecting, then drop it: a `gc()` over an idle heap
+    // still emits an entry, but a heap with garbage in it is the case the
+    // observer is watched for.
+    let junk: object[] = [];
+    for (let i = 0; i < 50_000; i += 1) junk.push({ i, pad: `${String(i)}` });
+    junk = [];
+    gc();
+    for (let i = 0; i < 5; i += 1) await new Promise((r) => setImmediate(r));
+
+    const sample = probe.sample(false);
+    const kinds = Object.keys(sample.gc).sort();
+    // **Total over the four, and the type is what makes it so.** A `Record<GcKind, …>`
+    // means a fifth V8 number is a dropped bucket rather than a compile error,
+    // which is why the observer checks `kind !== undefined` before counting —
+    // an unknown number must not become an entry under some other name.
+    expect(kinds, "every kind is a key, present at zero rather than absent").toStrictEqual([
+      "incremental",
+      "major",
+      "minor",
+      "weakcb",
+    ]);
+    const total = Object.values(sample.gc).reduce((a, b) => a + b, 0);
+    expect(total, "and a forced collection reached one of them").toBeGreaterThan(0);
+    expect(sample.gcPauseMs, "with a pause beside the count").toBeGreaterThan(0);
+
+    probe.dispose();
   });
 });

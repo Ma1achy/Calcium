@@ -145,6 +145,8 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
   const waitH = new Hist();
 
   let seq = 0;
+  /** Frames drawn, at every recording tier — never `seq`, which is spans-only (C28 I44). */
+  let framesDrawn = 0;
   let spansOpened = 0;
   let excludedSelf = 0;
   let excludedFallback = 0;
@@ -463,7 +465,18 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
       earliestUnserved = null;
       commitsSinceFrame = 0;
       ownCommitsSinceFrame = 0;
-      if (!spanning() || !inFrame) return;
+      // **The two conditions say different things and are separated for it**
+      // (C28 I44). Below `spans` there is no `beginFrame` state to close and
+      // the frame is still a frame: it drew, it is counted, and `report.frames`
+      // is what a consumer divides by. Folded together, the count sat under the
+      // duration's guard and `counters` published `frames: 0` for a session
+      // that drew twelve — with `counters["frame.input"]` holding the right
+      // number two functions above (F894).
+      if (!spanning()) {
+        framesDrawn += 1;
+        return;
+      }
+      if (!inFrame) return;
       inFrame = false;
       const endedAt = elapsed();
       const work = endedAt - frameStart;
@@ -471,6 +484,7 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
       frameRoot = null;
       contexts.current().parent = null;
       seq += 1;
+      framesDrawn += 1;
 
       // **The tree is built for every frame and kept for few.** Building it is
       // the same allocation the spans already made; keeping it is what is
@@ -608,7 +622,7 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
         // Read here rather than sampled: a snapshot at report time, which is
         // what the question wants — see `ResourceProbe.spaces`.
         heapSpaces: probe?.spaces() ?? Object.freeze([]),
-        frames: seq,
+        frames: framesDrawn,
       });
     },
 

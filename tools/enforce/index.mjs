@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // A03 — the enforcement suite. `make enforce`.
 // Every failure names: the rule, the file, what it prevents, and the spec.
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { checkFindings, checkTriageInventory } from "./findings.mjs";
 import {
   checkExportedArguments,
@@ -95,6 +95,30 @@ const sectionTargets = new Set(
 // SP9's own numbers, computed once and reported beside the gate — the list is
 // the evidence and the count is what a reader watches move.
 const coverage = checkInvariantCoverage(specs, walk("test"));
+
+// **The same gate, run again with deferrals invisible** (F896). SP9 asks whether
+// an invariant is *named*, and `it.todo("T3.6 (C28 I15): …")` is a line that
+// names one — so a deferral is coverage, and an invariant whose only row does
+// not run passes exactly like one with a suite behind it. Twenty were in that
+// state when this was written, two of them (C28 I15, I26) about mechanisms that
+// exist nowhere in `src/`.
+//
+// **Reported, not gated, and the reason is in F896**: most of the twenty are
+// honest deferrals, and a gate red on arrival is a gate edited to fit. What was
+// missing is that the number above cannot tell the two populations apart, so a
+// deferral that has quietly become the only thing behind an invariant is
+// invisible in the figure that exists to say otherwise.
+const deferredOnly = checkInvariantCoverage(
+  specs,
+  walk("test"),
+  // Scoped to `test/`, because the same reader is handed the **specs** — the
+  // coverage check reads both sides — and a filter applied to a spec would be
+  // answering a different question with the same function.
+  (f) =>
+    f.startsWith("test/")
+      ? readFileSync(f, "utf8").split("\n").filter((l) => !/\bit\.todo\(/u.test(l)).join("\n")
+      : readFileSync(f, "utf8"),
+).uncited - coverage.uncited;
 
 // TD1–TD6 — the deferral rules, **in the gate for the first time.** For their
 // whole life the only runner was `test/unit/todo-expiry.test.ts`, which the
@@ -225,7 +249,8 @@ if (violations.length === 0) {
       // verdict — most of it is legitimate — so what it is good for is movement.
       `  ${DIM}invariant coverage · ${String(coverage.uncited)} of ` +
       `${String(coverage.declared)} invariants named by no test row, all listed ` +
-      `(SP9, gated by equality)${RESET}\n` +
+      `(SP9, gated by equality); ${String(deferredOnly)} more are named only by an ` +
+      `it.todo, so nothing that runs stands behind them (F896, reported not gated)${RESET}\n` +
       `  ${DIM}section citations · ${String(sectionsDangling.length)} of ` +
       `${String(sectionRefs.resolved + sectionsDangling.length)} resolve to no section, across ` +
       `${String(sectionTargets)} targets; ${String(sectionsUnowned)} more name no document ` +
