@@ -222,6 +222,11 @@ describe("C28 — the budget table", () => {
   });
 });
 
+describe("C28 — every declared span is opened", () => {
+  it.todo("T1.60 (C28 I39): the shipped SpanName union against the members a scan finds opened under src/ — equal sets, by equality and not by containment, because a member added to the union and never wired is exactly the case this exists for and a subset check passes on it — not deferred on a component: lands with the phase seams");
+  it.todo("T1.61 (C28 I39): a frame composed at tier spans — chrome, overlays, paint and assemble all carry a non-zero count, and the phases sum to within the frame span's own histogram error of frame itself; four spans firing proves they were called and the residue is what says they were called around the work rather than beside it — not deferred on a component: lands with the phase seams");
+});
+
 describe("C28 — the report's way out", () => {
   it("T1.58 (C28 I38): stop() hands the report out exactly once, with the session's frames in it", async () => {
     const reports: ProfileReport[] = [];
