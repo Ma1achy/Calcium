@@ -93,12 +93,16 @@ export {
 export {
   BUDGET,
   checkBudget,
+  checkPhases,
   formatBudget,
+  formatPhases,
   type BudgetOptions,
   type BudgetReport,
   type BudgetResult,
   type BudgetRow,
   type BudgetVerdict,
   type MeasuredRow,
+  type PhaseReport,
+  type PhaseRow,
   type UnansweredRow,
 } from "./profile.js";

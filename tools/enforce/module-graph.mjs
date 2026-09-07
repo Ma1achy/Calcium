@@ -2092,6 +2092,8 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   "MeasuredRow.thresholdText": "C28 I37 — A01's threshold beside the figure, so a verdict a reader can check travels with it; asserted by T1.25",
   "UnansweredRow.thresholdText": "C28 I37 — A01's threshold quoted beside a refusal, so the blank row still says what it was blank against; asserted by T1.26",
   "UnansweredRow.needs": "C28 I37 — what a refused row would require, which is the whole content of a refusal; asserted by T1.26 and T1.27",
+  "PhaseReport.inFrame":
+    "C28 I41 - the spans opened inside a frame, the only population `latency.work` contains. `make profile` reads it and `tools/` is outside this scan; asserted by T1.65 and T1.66",
   "BudgetReport.crossed": "C28 I37 — the crossed rows, for a caller deciding; asserted by T1.28",
   "BudgetReport.unanswered": "C28 I37 — the rows with no answer, which is what makes the verdict `undecided`; asserted by T1.27 and T1.29",
   "ConformanceReport.kindsCovered": "C09 §7 — measurement-conformance coverage, asserted by the harness's own row",

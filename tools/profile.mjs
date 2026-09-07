@@ -13,17 +13,22 @@
 // **Against `dist/`, through the public surface**, for `frame.mjs`'s two
 // reasons. A probe against a stale build gives a wrong negative and nothing
 // revisits a ruled-out candidate; and the expensive path is private, so the only
-// honest way to reach it is to be a consumer. The three imports below are the
-// three subpaths a consumer has — the package root, `@fmx/calcium/testing` and
-// `@fmx/calcium/profiling` — reached by the paths `package.json` maps them to.
+// honest way to reach it is to be a consumer. The imports below reach two of
+// the three subpaths a consumer has — the package root and
+// `@fmx/calcium/testing` — by the paths `package.json` maps them to.
+// `@fmx/calcium/profiling` was the third and is no longer needed: the phase
+// table moved into the harness, because a reading computed in a script is a
+// reading no row can be written against, which is how its negative residue went
+// unasserted (C28 I41, F888).
 //
 // Usage, inside the devcontainer, after `npm run build`:
 //
 //     node tools/profile.mjs [lines] [keystrokes] [tier]
 //
+import { writeFileSync } from "node:fs";
+
 import { b, createTui, defaultTheme } from "../dist/index.js";
-import { checkBudget, formatBudget } from "../dist/testing/index.js";
-import { PHASE_GROUP } from "../dist/shell/profiling/index.js";
+import { checkBudget, checkPhases, formatBudget, formatPhases } from "../dist/testing/index.js";
 import { fakeStdin, fakeStdout, screenRows } from "./bench/fakes.mjs";
 import { liveness } from "./bench/liveness.mjs";
 
@@ -33,6 +38,13 @@ const KEYS = Number(process.argv[3] ?? 30);
 // files, which is a different tool's job. Every row of the appendix is
 // answerable at `spans`.
 const TIER = process.argv[4] ?? "spans";
+// **Transcript entries, which the greeting alone cannot supply.** Two of P11's
+// seven defects are O(entries) — the `entries.find` inside the visible loop
+// (`session.ts:1221`) and the whole-transcript `flatMap` before `transmitImage`
+// (`:799`) — and a document with one entry makes both correct-for-small-n by
+// construction. That is a property of the fixture, not of the code, so their
+// cost here is unmeasured rather than small (F886).
+const ENTRIES = Number(process.argv[5] ?? 1);
 const SIZE = { columns: 200, rows: 50 };
 
 // --- the workload -----------------------------------------------------------
@@ -110,6 +122,49 @@ function workload(lines) {
   };
 }
 
+// --- a second entry-producing verb -------------------------------------------
+//
+// **Through `localHandlers`, which is the public seam for it** (C22 I3a). The
+// transcript grows one entry per submitted command and there is no other way in
+// from outside the package: a consumer never reaches the store. Each entry
+// carries four blocks rather than one, because the `flatMap` at `session.ts:799`
+// is over *blocks in entries*, not over entries.
+
+function benchDoc(n) {
+  return {
+    schema: "tui.view/1",
+    command: `/bench ${String(n)}`,
+    status: "ok",
+    blocks: [
+      b.rule(`entry ${String(n)}`, undefined, { id: `bench-rule-${String(n)}` }),
+      b.kv({ entry: String(n), kind: "bench" }, { id: `bench-kv-${String(n)}` }),
+      b.table({
+        id: `bench-table-${String(n)}`,
+        columns: [b.col("k", "k"), b.col("v", "v")],
+        rows: Array.from({ length: 4 }, (_, i) =>
+          b.row(`b${String(n)}-${String(i)}`, { k: `k${String(i)}`, v: String(i * n) }),
+        ),
+      }),
+      b.spark(
+        Array.from({ length: 20 }, (_, i) => Math.sin((i + n) / 4) * 10 + 10),
+        { id: `bench-spark-${String(n)}` },
+      ),
+    ],
+  };
+}
+
+let submitted = 0;
+const localHandlers = { bench: () => benchDoc((submitted += 1)) };
+const tools = [
+  {
+    name: "bench",
+    local: true,
+    summary: "append one transcript entry",
+    args: [],
+    flags: [],
+  },
+];
+
 // --- the run ----------------------------------------------------------------
 
 const settle = async (turns = 3) => {
@@ -125,7 +180,8 @@ let report = null;
 const tui = createTui({
   name: "profile",
   binary: "/bin/true",
-  manifest: { schema: "tui.manifest/1", binary: "profile", version: "1.0.0", tools: [] },
+  manifest: { schema: "tui.manifest/1", binary: "profile", version: "1.0.0", tools },
+  localHandlers,
   theme: defaultTheme,
   env: { TERM: "xterm-256color", COLORTERM: "truecolor", LANG: "en_GB.UTF-8" },
   stdout,
@@ -140,7 +196,7 @@ const tui = createTui({
   profile: { tier: TIER, sampleMs: 25, onReport: (r) => void (report = r) },
 });
 
-console.log(`# make profile — ${String(LINES)} patch lines + a 40-row table + a 200-point plot`);
+console.log(`# make profile — ${String(LINES)} patch lines + a 40-row table + a 200-point plot, ${String(ENTRIES)} transcript ${ENTRIES === 1 ? "entry" : "entries"}`);
 console.log(`# ${String(SIZE.columns)}x${String(SIZE.rows)}, ${String(KEYS)} keystrokes, tier ${TIER}, node ${process.version}\n`);
 
 await tui.start();
@@ -157,6 +213,26 @@ if (live.dead) {
 }
 console.log(live.line);
 
+// **The submits, before the keystrokes.** Each one appends an entry, so the
+// keystroke frames that follow are composed against the full transcript — which
+// is the state the two O(entries) defects are about. Typing and the newline go
+// as separate chunks with a settle between: a burst carrying `\r` is a *paste*
+// to the decoder (C16 §7) and a pasted newline is content, which leaves the line
+// typed and unsubmitted (`test/e2e/manifest.test.ts` records the same trap).
+for (let i = 1; i < ENTRIES; i += 1) {
+  stdin.emit("/bench");
+  await settle(1);
+  stdin.emit("\r");
+  await settle(2);
+}
+if (ENTRIES > 1 && submitted !== ENTRIES - 1) {
+  console.error(
+    `\nFIXTURE DEAD: ${String(ENTRIES - 1)} submits asked for, ${String(submitted)} handler calls — ` +
+      `the commands did not reach the far side, so every entry count below is the greeting's alone`,
+  );
+  process.exit(1);
+}
+
 for (let i = 0; i < KEYS; i += 1) {
   stdin.emit("x");
   await settle(1);
@@ -170,6 +246,13 @@ if (report === null) {
   process.exit(1);
 }
 
+// **The whole report, when asked for.** `make profile` prints a reading; a
+// question the printed tables do not answer needs the object they were computed
+// from, and writing it is cheaper than adding a table per question.
+if (process.env.PROFILE_JSON !== undefined) {
+  writeFileSync(process.env.PROFILE_JSON, JSON.stringify(report, null, 1));
+}
+
 // --- the appendix -----------------------------------------------------------
 
 console.log(`\n## A01 Appendix B\n`);
@@ -180,66 +263,16 @@ const share = (part, of) => (of === 0 ? "-" : `${((part / of) * 100).toFixed(1)}
 
 // --- where the frame went ---------------------------------------------------
 //
-// **The compute/draw split, which is the question the component exists for.**
-// `spans` is keyed by span name and carries no grouping; `PHASE_GROUP` supplies
-// one, and it is published for exactly this.
+// **Two tables, because there are two populations** (C28 I41). `latency.work`
+// sums the frames' work, so a span opened between frames — `local`, `handler`,
+// `route`, `decode` — is not in it, and a share taken over the union divides
+// one population by another's total. This printed a residue of -460.5 ms the
+// first time a session ran commands, and 1.1% of a reading before that (F888).
+// The check is `checkPhases`, so the assertion lives in a row rather than here.
 
-const spans = report.spans ?? {};
-const groups = new Map();
-let unphased = 0;
-for (const [name, hist] of Object.entries(spans)) {
-  const group = PHASE_GROUP[name];
-  // `frame` is not a phase: it is the *self* time of the frame span, meaning
-  // the shell's own per-frame work outside every other span (C28 I40). It gets
-  // a row below rather than a share of itself.
-  if (group === "total") continue;
-  // A component's own sub-span — `group.place` and its kin, from `ctx.probe`.
-  // `PHASE_GROUP` is total over `SpanName` and these are not members, so they
-  // have no phase and would vanish from a table that skipped them silently.
-  if (group === undefined) {
-    unphased += hist.sum;
-    continue;
-  }
-  groups.set(group, (groups.get(group) ?? 0) + hist.sum);
-}
-// **The whole is `latency.work`, not `spans.frame`** (C28 I40, F885). Every
-// histogram in `spans` carries self time, so `spans.frame` is the frame's work
-// outside every other span — a real number, an order of magnitude smaller, and
-// entirely plausible as a denominator. Dividing by it published `react` at 96%
-// of a frame it is 72% of.
-const whole = report.latency?.work.sum ?? 0;
-const frameSelf = spans.frame?.sum ?? 0;
-
-console.log(`\n## Where the frame went — ${String(report.frames)} frames, ${whole.toFixed(0)} ms of work\n`);
-console.log("| phase | ms | share of work | spans |");
-console.log("|---|---|---|---|");
-for (const [group, ms] of [...groups].sort((a, x) => x[1] - a[1])) {
-  const members = Object.keys(spans)
-    .filter((n) => PHASE_GROUP[n] === group)
-    .sort()
-    .map((n) => `\`${n}\` ${(spans[n]?.sum ?? 0).toFixed(1)}`)
-    .join(", ");
-  console.log(`| ${group} | ${ms.toFixed(1)} | ${share(ms, whole)} | ${members} |`);
-}
-if (unphased > 0) {
-  console.log(
-    `| *no phase* | ${unphased.toFixed(1)} | ${share(unphased, whole)} | a component's own sub-spans, which \`PHASE_GROUP\` does not map |`,
-  );
-}
-console.log(
-  `| *the frame itself* | ${frameSelf.toFixed(1)} | ${share(frameSelf, whole)} | \`frame\`'s self time — per-frame work no other span brackets |`,
-);
-// **Unattributed, printed rather than left as a gap in the arithmetic.** The
-// phases are the spans that exist; what `frame` holds and they do not is the
-// work between them, and a table whose rows do not sum to the whole invites the
-// reader to assume they do.
-const attributed = [...groups.values()].reduce((n, x) => n + x, 0) + unphased + frameSelf;
-if (whole > 0) {
-  const left = whole - attributed;
-  console.log(
-    `| *unaccounted* | ${left.toFixed(1)} | ${share(left, whole)} | work in a frame that no span reaches at all |`,
-  );
-}
+const phases = checkPhases(report);
+console.log();
+console.log(formatPhases(phases));
 
 // --- which component ---------------------------------------------------------
 
@@ -263,7 +296,7 @@ for (const n of worst) {
 const o = report.overhead;
 console.log(
   `\nOverhead: ${String(o.spans)} spans opened, this machine's clock at ${o.clockNs.toFixed(1)} ns, ` +
-    `estimate ${o.estimateMs.toFixed(1)} ms of ${whole.toFixed(0)} ms — an estimate, labelled one (C28 I34). ` +
+    `estimate ${o.estimateMs.toFixed(1)} ms of ${phases.work.toFixed(0)} ms — an estimate, labelled one (C28 I34). ` +
     `Async store ${o.asyncEnabled ? "built" : "not built"}.`,
 );
 console.log(

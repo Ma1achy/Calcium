@@ -27,9 +27,17 @@
  * alone: a `Record<SpanName, Histogram>` carries no grouping, and the mapping
  * that supplies one lived in a module no consumer can import. Same shape, same
  * argument — names, grouped, frozen.
+ *
+ * **`SPAN_SITE` is the third, and it is the one a denominator needs** (I41).
+ * `latency.work` sums the frames' work, so a share taken over every span
+ * divides one population by another's total — measured at a residue of
+ * -460.5 ms once a session opened `local` (F888). The kind column cannot
+ * answer it: `compose` is compute inside a frame and `local` is compute
+ * outside one.
  */
 export {
   PHASE_GROUP,
+  SPAN_SITE,
   TIER_RANK,
   type CaptureKind,
   type CaptureResult,
@@ -49,6 +57,7 @@ export {
   type ResourceProbe,
   type ResourceSample,
   type SpanName,
+  type SpanSite,
   type Tier,
   type TreeNode,
 } from "./types.js";

@@ -15,9 +15,11 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { BUDGET, checkBudget, formatBudget } from "../../src/testing/index.js";
-import type { Histogram, ProfileReport } from "../../src/shell/profiling/types.js";
+import { BUDGET, checkBudget, checkPhases, formatBudget } from "../../src/testing/index.js";
+import { SPAN_SITE } from "../../src/shell/profiling/types.js";
+import type { Histogram, ProfileReport, SpanName, TreeNode } from "../../src/shell/profiling/types.js";
 import { buildSession } from "../support/session.js";
+import { fakeStdin } from "../support/fake-terminal.js";
 
 /** A histogram whose statistics are the ones a row reads, and nothing else. */
 function hist(over: Partial<Histogram> = {}): Histogram {
@@ -273,15 +275,19 @@ describe("C28 — a part is self time and the whole is the frame's work", () => 
   });
 
   it("T1.63 (C28 I40): make profile takes its shares against the work, not against the frame span", () => {
-    // The tool is `dist/`-facing and T5.3 runs it. What is asserted here is the
-    // shape of its arithmetic, from the source, because the defect it encodes is
-    // a denominator and a running tool prints only the quotient.
-    const tool = readFileSync("tools/profile.mjs", "utf8");
-    expect(tool, "the whole is latency.work").toContain("report.latency?.work.sum");
-    expect(tool, "and never the frame span's self time").not.toMatch(
-      /const whole = spans\.frame/,
+    // **The subject moved and this row is how that was noticed.** The table was
+    // computed inside `tools/profile.mjs` until C28 I41; it is `checkPhases` now,
+    // for the reason the budget check is in the harness — a reading computed in
+    // a script is a reading no row can be written against, which is how the
+    // negative residue went unasserted (F888). The arithmetic is asserted from
+    // the source because the defect is a denominator and a running tool prints
+    // only the quotient.
+    const src = readFileSync("src/testing/profile.ts", "utf8");
+    expect(src, "the whole is latency.work").toContain("report.latency?.work.sum");
+    expect(src, "and never the frame span's self time").not.toMatch(
+      /work = .*spans\.frame/,
     );
-    expect(tool, "and the residue is printed rather than absorbed").toContain("*unaccounted*");
+    expect(src, "and the residue is printed rather than absorbed").toContain("unaccounted");
   });
 });
 
@@ -396,5 +402,149 @@ describe("C28 — the report's way out", () => {
     const none = await buildSession({});
     await none.tui.stop("exit");
     expect(called, "and a session with no profile at all cannot have called it").toBe(0);
+  });
+  // --- C28 I41: two populations, one denominator -------------------------------
+
+  it("T1.64 (C28 I41): every span found inside a frame's tree is declared `frame`, and every one opened outside a frame is declared `session`", async () => {
+    // **Both populations in one session.** A keystroke opens `decode`, `route`
+    // and `handler` between frames and then causes one, so a session that types
+    // exercises each side of the partition without a far side or a local verb.
+    const stdin = fakeStdin();
+    let seen: ProfileReport | null = null;
+    const { tui } = await buildSession({
+      stdin: stdin as unknown as NodeJS.ReadStream,
+      profile: {
+        tier: "spans",
+        elapsed: (() => { let t = 0; return () => (t += 1); })(),
+        onReport: (r) => void (seen = r),
+      },
+    });
+    for (let i = 0; i < 4; i += 1) {
+      stdin.emit("x");
+      await new Promise((r) => setImmediate(r));
+    }
+    await tui.stop("exit");
+    const got = seen as ProfileReport | null;
+    if (got === null) throw new Error("no report arrived");
+
+    // **Measured from the trees, not restated from the table.** `frameRoot` is
+    // nulled at frame end, so a span opened between frames roots itself and
+    // cannot appear here — which is what makes this able to disagree.
+    const inTrees = new Set<string>();
+    const walk = (n: TreeNode): void => {
+      inTrees.add(n.name);
+      for (const c of n.children) walk(c);
+    };
+    for (const f of [...got.worst, ...got.timeline]) if (f.tree !== undefined) walk(f.tree);
+    inTrees.delete("frame");
+
+    // `frame` is excluded from both sides, as C28 I41 says: it is the bracket the
+    // other two are measured against, not a member of either. Filed as
+    // `session` here it would be the one name the row is certain about and the
+    // one it would get wrong.
+    const opened = Object.keys(got.spans ?? {}).filter(
+      (n) => n in SPAN_SITE && SPAN_SITE[n as SpanName] !== "frame-itself",
+    );
+    const outside = opened.filter((n) => !inTrees.has(n));
+    const inside = opened.filter((n) => inTrees.has(n));
+
+    // The row cannot pass by having nothing to disagree with: a run that opened
+    // no spans, or that kept no trees, satisfies every assertion below.
+    expect(inside.length, "spans were observed inside a frame").toBeGreaterThan(4);
+    expect(outside.length, "and spans were observed outside one").toBeGreaterThan(0);
+
+    for (const name of inside) {
+      expect(SPAN_SITE[name as SpanName], `${name} was found in a frame's tree`).toBe("frame");
+    }
+    for (const name of outside) {
+      expect(SPAN_SITE[name as SpanName], `${name} was opened but never in a tree`).toBe("session");
+    }
+  });
+
+  it("T1.65 (C28 I41): a report holding both populations → the session spans carry no share and the residue is not negative", () => {
+    // The measured shape of F888, at the ratio that produced it: 755.9 ms of
+    // between-frame work beside 2515.7 ms of in-frame work, against 2946.3 ms.
+    const r = report({
+      frames: 611,
+      latency: { work: hist({ sum: 2946.3 }), wait: hist() },
+      spans: {
+        react: hist({ sum: 1605.0 }),
+        assemble: hist({ sum: 760.7 }),
+        elements: hist({ sum: 71.2 }),
+        chrome: hist({ sum: 24.5 }),
+        measure: hist({ sum: 24.5 }),
+        compose: hist({ sum: 12.4 }),
+        paint: hist({ sum: 9.0 }),
+        overlays: hist({ sum: 5.5 }),
+        write: hist({ sum: 2.9 }),
+        local: hist({ sum: 643.4 }),
+        handler: hist({ sum: 97.0 }),
+        route: hist({ sum: 8.1 }),
+        decode: hist({ sum: 7.4 }),
+        frame: hist({ sum: 102.4 }),
+      },
+    });
+    const phases = checkPhases(r);
+
+    const inFrameSpans = phases.inFrame.flatMap((row) => [...row.spans]);
+    for (const name of ["local", "handler", "route", "decode"]) {
+      expect(inFrameSpans, `${name} is not divided by the frames' work`).not.toContain(name);
+    }
+    for (const row of phases.session) {
+      expect(row.share, `${String(row.group)} carries no share`).toBeNull();
+    }
+
+    // **The sign is the assertion.** Summing the two populations gave -460.5 ms,
+    // and nothing else about the table looked wrong.
+    expect(phases.residue, "the residue is not negative").toBeGreaterThanOrEqual(0);
+    expect(phases.residue, "and is the whole minus the in-frame parts").toBeCloseTo(
+      2946.3 - 2515.7 - 102.4,
+      1,
+    );
+    expect(phases.session.map((row) => row.ms).reduce((a, b) => a + b, 0)).toBeCloseTo(755.9, 1);
+  });
+
+  it("T1.66 (C28 I41): a report whose spans are all in-frame → the residue is exactly work − parts − frame, and the session table is empty rather than absent", () => {
+    // **The other arm.** A partition that files everything as in-frame satisfies
+    // T1.65 — the session list is empty, so its `share === null` loop passes
+    // vacuously and the residue is unchanged. This is the state C28 I41 replaced,
+    // and only asserting both directions separates them.
+    const r = report({
+      frames: 3,
+      latency: { work: hist({ sum: 100 }), wait: hist() },
+      spans: {
+        react: hist({ sum: 40 }),
+        assemble: hist({ sum: 30 }),
+        "group.place": hist({ sum: 5 }),
+        frame: hist({ sum: 10 }),
+      },
+    });
+    const phases = checkPhases(r);
+
+    expect(phases.session, "no span here is opened outside a frame").toEqual([]);
+    expect(phases.residue, "work − (40 + 30 + 5) − 10").toBeCloseTo(15, 6);
+
+    // The component sub-span has no `SPAN_SITE` entry and no phase, and is
+    // in-frame by construction — a definition only renders inside a frame. It
+    // counts towards the parts, or the residue absorbs work that was measured.
+    const noPhase = phases.inFrame.find((row) => row.group === "no phase");
+    expect(noPhase?.ms, "`group.place` is counted, not dropped").toBe(5);
+
+    // **The third arm, and it guards the signal rather than the answer.** The
+    // residue is what made C28 I41 findable, and it did so by going *negative* —
+    // so a `Math.max(0, …)` anywhere on that line would be invisible to both
+    // rows above, which only ever see a well-formed report. A report whose
+    // parts exceed its work is the state a misfiling produces, and the row says
+    // the table reports it rather than absorbing it.
+    const crossed = checkPhases(
+      report({
+        frames: 1,
+        latency: { work: hist({ sum: 10 }), wait: hist() },
+        spans: { react: hist({ sum: 40 }), frame: hist({ sum: 1 }) },
+      }),
+    );
+    expect(crossed.residue, "a residue below zero is reported, not clamped").toBeCloseTo(-31, 6);
+    const row = crossed.inFrame.find((r) => r.group === "unaccounted");
+    expect(row?.note, "and it says what a negative one means").toContain("below zero");
   });
 });

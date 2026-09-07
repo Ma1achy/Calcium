@@ -30,8 +30,8 @@
  * consumer cannot construct a `Profiler` or a `ResourceProbe` and must not need
  * one to read their own budget.
  */
-import { TIER_RANK } from "../shell/profiling/types.js";
-import type { ProfileReport } from "../shell/profiling/types.js";
+import { PHASE_GROUP, SPAN_SITE, TIER_RANK } from "../shell/profiling/types.js";
+import type { PhaseGroup, ProfileReport, SpanName } from "../shell/profiling/types.js";
 
 /** The appendix's rows, in its order. */
 export type BudgetRow =
@@ -381,5 +381,196 @@ export function formatBudget(budget: BudgetReport): string {
   out.push(`M-T6: ${VERDICT_TEXT[budget.verdict]}`);
   out.push("");
   out.push(`Streaming CPU measured over ${budget.window}. Regime: ${budget.regime}.`);
+  return out.join("\n");
+}
+
+// --- where the frame went (C28 I41) -----------------------------------------
+//
+// **Two populations, and only one of them is inside `latency.work`.** The table
+// this replaces divided every span's self time by that whole. `latency.work`
+// sums the *frames'* work, and four of the nineteen names are opened between
+// frames rather than inside one — so a session that ran commands added 755.9 ms
+// of `local`, `handler`, `route` and `decode` to 2515.7 ms of in-frame work and
+// printed a residue of -460.5 ms. The sign is the only thing that made it
+// visible, and at one transcript entry the same error is 1.1% (F888).
+//
+// Here rather than in `tools/profile.mjs` for the reason the budget check is
+// here: a reading computed in a script is a reading no row can be written
+// against, and the negative residue is exactly the assertion that was missing.
+
+/** One phase's total, and the spans that make it up. */
+export type PhaseRow = Readonly<{
+  group: PhaseGroup | "no phase" | "the frame itself" | "unaccounted";
+  ms: number;
+  /** Absent for the rows that are not a `PHASE_GROUP` member. */
+  spans: readonly string[];
+  /** `null` where a share would divide across populations (I41). */
+  share: number | null;
+  note: string;
+}>;
+
+export type PhaseReport = Readonly<{
+  frames: number;
+  /** `latency.work` — the whole the in-frame rows are shares of. */
+  work: number;
+  /** Rows for the spans opened inside a frame, plus the frame's own residue. */
+  inFrame: readonly PhaseRow[];
+  /**
+   * Rows for the spans opened outside a frame, carrying **ms and no share**.
+   * Their time is not in `work`, so every denominator available here would be
+   * one population over another's total.
+   */
+  session: readonly PhaseRow[];
+  /** `work − Σ(in-frame parts) − frame self`. Below zero means a misfiling. */
+  residue: number;
+}>;
+
+/**
+ * The phase breakdown, partitioned by where each span is opened.
+ *
+ * A span name `SPAN_SITE` does not carry is a component's own sub-span — the
+ * `ctx.probe` seam produces `group.place` and its kin — and those are in-frame
+ * by construction, since a definition only renders inside a frame.
+ */
+export function checkPhases(report: ProfileReport): PhaseReport {
+  const spans = report.spans ?? {};
+  const work = report.latency?.work.sum ?? 0;
+
+  const inGroups = new Map<PhaseGroup, number>();
+  const sessionGroups = new Map<PhaseGroup, number>();
+  // **Keyed by site as well as group, because `compute` occurs on both sides.**
+  // Keyed by group alone, the two `compute` rows listed each other's spans —
+  // the in-frame row naming `local` and the between-frames row naming
+  // `compose`. Each number was right and each list was wrong, which is the
+  // shape a reader cannot catch from the table.
+  const members = new Map<string, string[]>();
+  let unphased = 0;
+  let frameSelf = 0;
+  let parts = 0;
+
+  for (const [name, hist] of Object.entries(spans)) {
+    const sum = hist?.sum ?? 0;
+    const site = SPAN_SITE[name as SpanName];
+    if (site === "frame-itself") {
+      frameSelf += sum;
+      continue;
+    }
+    if (site === undefined) {
+      // A component sub-span: no site, no phase, and in-frame by construction.
+      unphased += sum;
+      parts += sum;
+      continue;
+    }
+    const group = PHASE_GROUP[name as SpanName];
+    const into = site === "frame" ? inGroups : sessionGroups;
+    into.set(group, (into.get(group) ?? 0) + sum);
+    const key = `${site}:${group}`;
+    members.set(key, [...(members.get(key) ?? []), name]);
+    if (site === "frame") parts += sum;
+  }
+
+  const rowsOf = (source: Map<PhaseGroup, number>, site: "frame" | "session"): readonly PhaseRow[] =>
+    [...source]
+      .sort((a, b) => b[1] - a[1])
+      .map((entry) => ({
+        group: entry[0],
+        ms: entry[1],
+        spans: Object.freeze([...(members.get(`${site}:${entry[0]}`) ?? [])].sort()),
+        share: site === "frame" && work > 0 ? entry[1] / work : null,
+        note: "",
+      }));
+
+  const inFrame: PhaseRow[] = [...rowsOf(inGroups, "frame")];
+  if (unphased > 0) {
+    inFrame.push({
+      group: "no phase",
+      ms: unphased,
+      spans: Object.freeze([]),
+      share: work > 0 ? unphased / work : null,
+      note: "a component's own sub-spans, which `PHASE_GROUP` does not map",
+    });
+  }
+  inFrame.push({
+    group: "the frame itself",
+    ms: frameSelf,
+    spans: Object.freeze(["frame"]),
+    share: work > 0 ? frameSelf / work : null,
+    note: "`frame`'s self time — per-frame work no other span brackets",
+  });
+
+  // **Printed rather than left as a gap in the arithmetic.** A table whose rows
+  // do not sum to the whole invites the reader to assume they do — and a
+  // *negative* one is the table saying its own denominator is wrong, which is
+  // how I41 was found.
+  const residue = work - parts - frameSelf;
+  inFrame.push({
+    group: "unaccounted",
+    ms: residue,
+    spans: Object.freeze([]),
+    share: work > 0 ? residue / work : null,
+    note:
+      residue < 0
+        ? "**below zero** — a span opened outside a frame is being divided by the frames' work (C28 I41)"
+        : "work in a frame that no span reaches at all",
+  });
+
+  return Object.freeze({
+    frames: report.frames,
+    work,
+    inFrame: Object.freeze(inFrame),
+    session: Object.freeze([...rowsOf(sessionGroups, "session")]),
+    residue,
+  });
+}
+
+/** The two tables, the second carrying no share for the reason it says. */
+const PHASE_GROUPS: readonly PhaseGroup[] = Object.freeze([
+  "compute",
+  "draw",
+  "output",
+  "input",
+  "far side",
+  "total",
+]);
+
+export function formatPhases(phases: PhaseReport): string {
+  const pct = (row: PhaseRow): string =>
+    row.share === null ? "-" : `${(row.share * 100).toFixed(1)}%`;
+  // Named `spansOf` and not `cells`: SS50's pattern is `\bcells\(`, and a
+  // helper that happens to share the name of a display measurement makes the
+  // rule fire on a table of milliseconds. A `// narrow-ok` here would answer a
+  // question nobody asked.
+  const spansOf = (row: PhaseRow): string =>
+    row.note !== ""
+      ? row.note
+      : row.spans.map((n) => `\`${n}\``).join(", ");
+
+  const out: string[] = [];
+  out.push(
+    `## Where the frame went - ${String(phases.frames)} frames, ${phases.work.toFixed(0)} ms of work`,
+  );
+  out.push("");
+  out.push("| phase | ms | share of work | spans |");
+  out.push("|---|---|---|---|");
+  for (const row of phases.inFrame) {
+    // Italic marks a row that is not a `PHASE_GROUP` member, so a reader can
+    // see at a glance which rows are phases and which are the arithmetic.
+    const phase = (PHASE_GROUPS as readonly string[]).includes(row.group);
+    const label = phase ? row.group : `*${row.group}*`;
+    out.push(`| ${label} | ${row.ms.toFixed(1)} | ${pct(row)} | ${spansOf(row)} |`);
+  }
+
+  if (phases.session.length > 0) {
+    out.push("");
+    out.push("## Between frames - work `latency.work` does not contain");
+    out.push("");
+    // **No share column at all**, rather than a share against a different
+    // whole. A percentage beside these numbers is what produced -460.5%.
+    out.push("| phase | ms | spans |");
+    out.push("|---|---|---|");
+    for (const row of phases.session) {
+      out.push(`| ${String(row.group)} | ${row.ms.toFixed(1)} | ${spansOf(row)} |`);
+    }
+  }
   return out.join("\n");
 }

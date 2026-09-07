@@ -53,6 +53,9 @@ export type SpanName =
  */
 export type PhaseGroup = "compute" | "draw" | "output" | "input" | "far side" | "total";
 
+/** I41's partition: `frame` is the bracket, not a member of either side. */
+export type SpanSite = "frame" | "session" | "frame-itself";
+
 /**
  * One async bracket, injected.
  *
@@ -69,6 +72,59 @@ export type PhaseGroup = "compute" | "draw" | "output" | "input" | "far side" | 
  * that is meant to cost nothing at `off`.
  */
 export type TraceFn = <T>(name: SpanName, fn: () => Promise<T>) => Promise<T>;
+
+/**
+ * Where a span is opened: inside a frame, outside one, or as the frame itself
+ * (C28 I41).
+ *
+ * **A second axis, not a repair of `PHASE_GROUP`.** That table says what *kind*
+ * of work a span is — F881 corrected `adapt` from `far side` to `compute` on
+ * exactly that reading — and this says *when* it happens. Both are needed
+ * because a denominator depends on the second: `latency.work` sums the frames'
+ * work, so it contains the `frame` spans and none of the `session` ones, and a
+ * share taken over the union divides one population by another's total.
+ * `compose` is compute inside a frame and `local` is compute outside one; the
+ * kind column cannot separate them.
+ *
+ * **Measured, then declared.** `frameRoot` is nulled at frame end
+ * (`recorder.ts`), so a span opened between frames roots itself and cannot
+ * appear in a frame's tree — which makes the trees the honest source, and T1.64
+ * reads them. It is declared here rather than derived because a tree walk sees
+ * only the names a run happens to open: a fixture with no far side reaches 13
+ * of 19, and `transport`, `adapt`, `stream`, `livefetch` and `completion` would
+ * be filed as `session` by a run that never opened them, which happens to be
+ * right and would be right for no reason. The table is the claim; the walk is
+ * what stops it being satisfied by itself.
+ *
+ * `frame` is neither, for the same reason it is `total` above: it is the
+ * bracket the other two are measured against.
+ */
+export const SPAN_SITE: Readonly<Record<SpanName, SpanSite>> = Object.freeze({
+  frame: "frame-itself",
+
+  // Opened inside `#render`, between `frame`'s ends.
+  compose: "frame",
+  measure: "frame",
+  elements: "frame",
+  chrome: "frame",
+  overlays: "frame",
+  paint: "frame",
+  react: "frame",
+  assemble: "frame",
+  write: "frame",
+
+  // Opened on the input and command paths, which run *between* frames: a
+  // handler commits and the frame follows, so its cost is never inside one.
+  decode: "session",
+  route: "session",
+  handler: "session",
+  completion: "session",
+  local: "session",
+  transport: "session",
+  adapt: "session",
+  stream: "session",
+  livefetch: "session",
+});
 
 export const PHASE_GROUP: Readonly<Record<SpanName, PhaseGroup>> = Object.freeze({
   frame: "total",

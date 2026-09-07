@@ -573,6 +573,34 @@ const results = runPass({
       expect: "T1.2",
     },
     {
+      name: "SITE-ONE-POPULATION: a between-frames span is filed as in-frame",
+      file: TYPES,
+      from: '  local: "session",',
+      to: '  local: "frame",',
+      expect: "T1.64",
+    },
+    {
+      name: "SHARE-ACROSS-POPULATIONS: a session span is given a share of the frames' work",
+      file: BUDGET,
+      from: '        share: site === "frame" && work > 0 ? entry[1] / work : null,',
+      to: "        share: work > 0 ? entry[1] / work : null,",
+      expect: "T1.65",
+    },
+    {
+      name: "RESIDUE-CLAMPED: a residue below zero is reported as zero",
+      file: BUDGET,
+      from: "  const residue = work - parts - frameSelf;",
+      to: "  const residue = Math.max(0, work - parts - frameSelf);",
+      expect: "T1.66",
+    },
+    {
+      name: "SUBSPAN-UNCOUNTED: a component's own span is shown and not counted",
+      file: BUDGET,
+      from: "      unphased += sum;\n      parts += sum;",
+      to: "      unphased += sum;",
+      expect: "T1.66",
+    },
+    {
       name: "EAGER-ALS: the async store is built at construction",
       file: REC,
       // Anchored with `startSampler()` above it: the same line appears again in
