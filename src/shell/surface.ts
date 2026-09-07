@@ -34,8 +34,12 @@ export type SurfaceActionEvent = Readonly<{
   ordinal: number;
 }>;
 
-export type SurfaceContext = ProducerContext &
-  Readonly<{ inputFidelity: SurfaceInputFidelity }>;
+export type SurfaceContext = Omit<ProducerContext, "width" | "height"> &
+  Readonly<{
+    width: number;
+    height: number;
+    inputFidelity: SurfaceInputFidelity;
+  }>;
 
 export type SurfaceFault = Readonly<{
   stage: "render" | "action" | "close";
@@ -86,7 +90,8 @@ export type SurfaceHostOptions = Readonly<{
   overlays: OverlayManager;
   router: InputRouter;
   lifecycle: TerminalLifecycle;
-  context: () => ProducerContext;
+  context: () => Omit<ProducerContext, "width" | "height"> &
+    Readonly<{ width: number; height: number }>;
   now: () => number;
   schedule: Schedule;
   invalidate: () => void;
