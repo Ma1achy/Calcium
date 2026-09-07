@@ -31517,6 +31517,40 @@ Found by reading the table against the paragraph above it while adding a member 
 the same instrument as *read the abstract against its own section before reading the section against
 the code*, applied to a constant.
 
+## F883 — an ordering clause whose mechanism does not exist, and the row written from it agreed ★★★★☆
+
+C28 I38 put `onReport` **before** `this.#profiler?.dispose()` and gave a reason: `report()` reads
+`probe.spaces()` for `heapSpaces`, disposal ends the probe, so the same call one line later returns
+a document correct in every other field with that one silently empty — reading as *this build has
+no heap spaces* rather than as an error. T1.58 was written from it, asserting the call count and
+`heapSpaces.length > 0` as a single row on exactly that argument.
+
+**Swapping the two lines failed nothing.** Eight rows green with the report taken after disposal.
+
+Measured rather than re-read: `report().heapSpaces.length` is **11 before `dispose()` and 11
+after**. `node.ts:74` says so in its own words — `heapSpaces()` is *"a separate function so the read
+has no dependency on a live probe"* — and `ResourceProbe.dispose()` stops the sampler and the GC
+observer, neither of which `spaces()` touches.
+
+**Two things made it read as correct.** The component does have a disposal discipline, so the
+sentence is true of the neighbour: `capture()` throws after dispose. And the ordering *is* the right
+order, so nothing downstream of the reasoning was wrong — only the reasoning.
+
+What survives is the seam, the single call and the position. What changes is why the position is
+kept, and it is the asymmetry rule rather than a mechanism: before-dispose costs nothing, and
+after-dispose depends on `spaces()` answering after its own probe's `dispose()` — a property one
+file documents and the sibling member refuses. Both figures, 11 and 11, measured 2026-09-07.
+
+The row is the other half. `heapSpaces.length > 0` passes whichever order the lines are in, so it
+was a record and not a watch. It is replaced with what can fail: called exactly once, and the report
+carrying the session's frames — which goes red if the call moves to `start()`.
+
+**The class is CLAUDE.md's own, one step earlier than where it was found.** *An artefact can be
+correct about the interaction it found and wrong about a mechanism it assumed existed* was written
+about a walk's ruling (C23 §8a A4). Here it is an invariant's justification, written in the same
+commit as the code it justifies, and **the mutation pass is the only instrument that asked** — the
+sentence reads as correct, the code it produced is correct, and review has nothing to catch.
+
 ## F882 — a decorator manufactures a consumer for every member it wraps ★★★☆☆
 
 `UNCONSUMED_MEMBERS` in `tools/enforce/module-graph.mjs` listed `TransportRouter.busy` with a
