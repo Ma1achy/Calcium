@@ -40,7 +40,7 @@ import type {
 import type { LineEditor } from "../interaction/editor/index.js";
 import type { HistoryStore } from "../interaction/history/index.js";
 import type { ElementAddress, KeyAction } from "../interaction/router/types.js";
-import { resolveFocus } from "../interaction/router/focus.js";
+import { extentOf, resolveFocus } from "../interaction/router/focus.js";
 import type { Action } from "../data/viewmodel/index.js";
 import type { NavElement } from "../presentation/blocks/index.js";
 import type { EntryId } from "../viewport/transcript/index.js";
@@ -89,6 +89,7 @@ export type KeyDeps = Readonly<{
    * together.
    */
   enterCopyMode: () => void;
+  exitCopyMode: () => void;
   /**
    * The fullscreen patch view (C25 §3b, C22 I41).
    *
@@ -129,8 +130,43 @@ export type KeyDeps = Readonly<{
    * its own.
    */
   liveElements: () => readonly PlacedNavElement[];
-  /** The entry those elements belong to, for an action's origin (C23 I37). */
+  /** The live entry's id, for `↓`'s entry from the prompt (C16 I22). */
   liveEntryId: () => EntryId | null;
+  /**
+   * The focused entry's elements, and the entry they belong to (C26 I21, I22).
+   *
+   * **Not `liveElements`, and the split is the ceiling lifting** (C26 §4g).
+   * Every effect that moves, activates or copies used the live entry's list,
+   * so a row in a settled entry could not be reached at all; now the location
+   * names an entry and these two answer for it. `focusedEntryId` is also an
+   * action's origin (C23 I37) — with `liveId` there a settled row's action
+   * would fire against the live entry's document, which is §8b.6's wrong-entry
+   * defect one scope up, and it would not be refused at all.
+   */
+  focusedElements: () => readonly PlacedNavElement[];
+  focusedEntryId: () => EntryId | null;
+  /**
+   * The nearest entry with an element in `direction`, or `null` at the end
+   * (C26 I21). `-1` is older and `1` newer; L4 walks the transcript because
+   * this file knows neither its order nor the registry.
+   */
+  neighbourEntry: (
+    direction: 1 | -1,
+  ) => Readonly<{ entryId: EntryId; first: PlacedNavElement }> | null;
+  /**
+   * Move the focused plot's crosshair one sample (C22 I76, C12 §3s).
+   *
+   * A seam for `pageBlock`'s reason: the ceiling is the sample count and only
+   * L4 holds the block. A no-op where the focused block is not a plot.
+   */
+  cursorBlock: (direction: 1 | -1) => void;
+  /**
+   * Re-run the focused entry's recorded command through C23 §2 (C23 I18).
+   *
+   * **Not `onAction`**, deliberately: an action fires against a document's data
+   * and a frozen entry's is stale; this fires the command text, which is not.
+   */
+  rerunEntry: () => void;
   /**
    * Page the focused container's own window by `direction` (C04 I48, C26 I18).
    *
@@ -143,6 +179,42 @@ export type KeyDeps = Readonly<{
    * Focus does not move, and that is C26 I18 rather than an omission here.
    */
   pageBlock: (direction: 1 | -1) => void;
+  /**
+   * Turn the focused plot's camera one step (C22 I71, C12 I83).
+   *
+   * **A no-op where the focused block declares no camera**, resolved in the
+   * effect rather than in the keymap for `pageBlock`'s own reason: the binding
+   * table is static and cannot see a block.
+   */
+  orbitBlock: (direction: 1 | -1) => void;
+  /**
+   * Tilt the focused plot's camera one step (C22 I75).
+   *
+   * The elevation half of the same family, and unclamped for the reason
+   * `construct.ts` states: the pole is unreachable in floating point, so a
+   * camera past it is a view rather than a corruption.
+   */
+  tiltBlock: (direction: 1 | -1) => void;
+  /**
+   * Dolly the focused plot's camera one step, **multiplicatively** (C22 I75).
+   *
+   * The arithmetic is L4's for `pageBlock`'s reason: the step depends on where
+   * the camera is now, and the store takes a delta and clamps nothing.
+   */
+  dollyBlock: (direction: 1 | -1) => void;
+  /** Restore the focused plot's declared view, leaving the orbit alone (C22 I75). */
+  resetCamera: () => void;
+  /** Start or stop the focused plot turning (C22 I72). Off is the default. */
+  toggleOrbit: () => void;
+  /**
+   * Hide or show series `n` (1-based) of the focused plot (C22 I78, C12 I116).
+   *
+   * A seam for `pageBlock`'s reason: the effective state — the reader's
+   * override, else the block's `hidden` — is known only where the block is, and
+   * the store records what this decides. A no-op where the focused block is not
+   * a plot or has no series `n`.
+   */
+  toggleSeries: (n: number) => void;
   /**
    * C23's dispatcher (C23 I16). Supplied, never constructed here — an action is
    * a submission by another route, and L4's routing component owns routes.
@@ -628,8 +700,27 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       // `liveBlock`, every key would resolve against a target with no bindings,
       // and they would all be dropped.
       const first = elements[0];
-      if (first === undefined) return;
-      deps.focus.enterLiveBlock(addressOf(first));
+      const live = deps.liveEntryId();
+      if (first === undefined || live === null) return;
+      deps.focus.enterLiveBlock(live, addressOf(first));
+    },
+
+    // --- between entries (C26 I21, §4g) ------------------------------------
+    //
+    // **The only two keys that change which entry focus is in.** The arrows
+    // step within the focused entry and stop at its edge (C26 I19); these step
+    // the outer scope and land on the target's first element. It is the same
+    // `focusRow` with a different entry, so the anchor drops and the mode is
+    // navigation (C26 I20) — one rule, not a second one for a different key.
+    entryPrev: () => {
+      const to = deps.neighbourEntry(-1);
+      if (to === null) return;
+      deps.focus.focusRow(to.entryId, addressOf(to.first));
+    },
+    entryNext: () => {
+      const to = deps.neighbourEntry(1);
+      if (to === null) return;
+      deps.focus.focusRow(to.entryId, addressOf(to.first));
     },
 
     // --- the way back, and between rows (C16 I22) ------------------------
@@ -647,7 +738,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // ordinary ones wiped it.
     focusPrompt: () => void deps.focus.toPrompt(),
     rowDown: () => {
-      const elements = deps.liveElements();
+      const elements = deps.focusedElements();
       const current = deps.focus.current;
       if (current.at !== "liveBlock") return;
       // **`resolveFocus`, not `indexOf`** (C26 I10, §8b.7). The old line was
@@ -660,7 +751,20 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       const i = resolveFocus(current.element, elements);
       if (i === null) return;
       const next = elements[i + 1];
-      if (next !== undefined) deps.focus.focusRow(addressOf(next));
+      // **The resolved entry, not the stored one** (C26 I22): after an eviction
+      // the two differ, and writing the stored one back would leave the store
+      // pointing at nothing while the frame highlights the live entry.
+      const entry = deps.focusedEntryId();
+      if (entry === null) return;
+      // **A motion that stops still collapses** (C26 I16, §5c table row g). At
+      // the tail there is no next element and there used to be no store call,
+      // so a selection stood through `↓` — while C17's `move` drops its anchor
+      // before it tests the boundary. `⌃a` puts the head at the tail, which
+      // made this the first unshifted key a reader presses to deselect. The
+      // resolved element is written back rather than `current.element`, so a
+      // stale head is repaired by the same keystroke (I10).
+      const target = next ?? elements[i];
+      if (target !== undefined) deps.focus.focusRow(entry, addressOf(target));
     },
     /**
      * **F21's whole subject: the route from a keystroke to `actions.ts`.**
@@ -683,18 +787,22 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       // Resolved rather than looked up by id (C26 I10). The old form took the
       // bare row id into a second walk that matched the *first* block carrying
       // it, so `⏎` on the second table's `r1` fired the first table's action.
-      const elements = deps.liveElements();
+      const elements = deps.focusedElements();
       const i = resolveFocus(current.element, elements);
       if (i === null) return;
       // `activate` is the element's own, declared by the kind (C26 §5), rather
       // than a row shape this layer would otherwise have to know.
       const action = elements[i]?.element.activate;
-      const from = deps.liveEntryId();
+      // **The focused entry, which is the origin C23 I18 reads** (C26 §4g row
+      // e). A settled row's action arrives here for the first time, and it is
+      // refused there — with `liveId` as the origin it would have fired against
+      // the live entry's document instead and been refused by nothing.
+      const from = deps.focusedEntryId();
       if (action === undefined || from === null) return;
       deps.onAction(action, from);
     },
     rowUp: () => {
-      const elements = deps.liveElements();
+      const elements = deps.focusedElements();
       const current = deps.focus.current;
       if (current.at !== "liveBlock") return;
       const i = resolveFocus(current.element, elements);
@@ -709,11 +817,28 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       // stepping out, and it is the second of the two call sites C26 §8b.2 found
       // wired to C16 I2's append transition.
       if (i === null || i === 0) {
-        deps.focus.toPrompt();
+        // **Only the live entry's head neighbours the prompt** (C26 I21, §4g
+        // row b). At a settled entry's first element `↑` stops, and `Esc` is the
+        // way out from every entry — the neighbour rule unchanged, over
+        // neighbours that are still asymmetric. `null` — nothing to stand on —
+        // leaves regardless, because there is no element to stop at.
+        if (i === null || deps.focusedEntryId() === deps.liveEntryId()) {
+          deps.focus.toPrompt();
+          return;
+        }
+        // **Stopped, so collapse** (C26 I16, §5c table row g). A settled
+        // entry's first element is an end, and an end is not a place a
+        // selection outlives an unshifted key — `rowDown`'s tail rule from the
+        // other direction. Leaving, above, is a collapse already.
+        const entry = deps.focusedEntryId();
+        const first = elements[0];
+        if (entry !== null && first !== undefined) deps.focus.focusRow(entry, addressOf(first));
         return;
       }
       const previous = elements[i - 1];
-      deps.focus.focusRow(previous === undefined ? null : addressOf(previous));
+      const entry = deps.focusedEntryId();
+      if (entry === null) return;
+      deps.focus.focusRow(entry, previous === undefined ? null : addressOf(previous));
     },
     // --- C17 -----------------------------------------------------------
     //
@@ -756,6 +881,35 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // pager does and what makes a reader able to join two screens. The store
     // floors at zero and the renderer bounds the top, so nothing here clamps
     // (C04 §3c cell 4).
+    orbitLeft: () => void deps.orbitBlock(-1),
+    orbitRight: () => void deps.orbitBlock(1),
+    tiltDown: () => void deps.tiltBlock(-1),
+    tiltUp: () => void deps.tiltBlock(1),
+    dollyIn: () => void deps.dollyBlock(1),
+    dollyOut: () => void deps.dollyBlock(-1),
+    cameraReset: () => void deps.resetCamera(),
+    orbitToggle: () => void deps.toggleOrbit(),
+    // **The horizontal pair, and the first writer of `cursorPositions`** (C22
+    // I76, C12 §3s). The vertical pair steps elements; this moves the focused
+    // plot's crosshair and is a no-op on a kind with no horizontal interior.
+    cursorLeft: () => void deps.cursorBlock(-1),
+    cursorRight: () => void deps.cursorBlock(1),
+    // **The digits, and the first writer of `seriesVisibility`** (C22 I78, C12
+    // I116). Nine effects because an effect takes no key; bound by no default
+    // row — the plot's own `keymap` declares the ones it has.
+    toggleSeries1: () => void deps.toggleSeries(1),
+    toggleSeries2: () => void deps.toggleSeries(2),
+    toggleSeries3: () => void deps.toggleSeries(3),
+    toggleSeries4: () => void deps.toggleSeries(4),
+    toggleSeries5: () => void deps.toggleSeries(5),
+    toggleSeries6: () => void deps.toggleSeries(6),
+    toggleSeries7: () => void deps.toggleSeries(7),
+    toggleSeries8: () => void deps.toggleSeries(8),
+    toggleSeries9: () => void deps.toggleSeries(9),
+    // **Re-run the focused entry, through the prompt's own route** (C23 I18).
+    // Not an action: the five kinds are refused from a frozen entry because a
+    // document's data is stale, and the recorded command is not.
+    rerunEntry: () => void deps.rerunEntry(),
     blockPageDown: () => void deps.pageBlock(1),
     blockPageUp: () => void deps.pageBlock(-1),
     scrollTop: () => void deps.viewport.scrollToTop(),
@@ -829,27 +983,47 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // are the store call. No second notion of *which element is next* — the
     // list and the resolver are the ones the unshifted motions use, so a word
     // this pair disagreed about could not exist.
+    //
+    // **After an eviction the store is repaired before it is extended** (C26
+    // I22, §5c table row e; F764). Both halves of a stale selection fall to the
+    // live entry's first element — `y` copies one — and the first `⇧↓` used to
+    // find `stored.entryId !== focusedEntryId()` and hand the store a changed
+    // entry, which `extendRow` answered by dropping the anchor: the reader's
+    // first extension selected nothing. So when the entry changed, `focusRow`
+    // writes the resolved head first — the state the frame already shows — and
+    // the extension then places its anchor there as any first extension does.
+    // `focusRow`, not a third store write, for `selectAllElements`'s reason.
     extendRowDown: () => {
-      const elements = deps.liveElements();
+      const elements = deps.focusedElements();
       const current = deps.focus.current;
       if (current.at !== "liveBlock") return;
       const i = resolveFocus(current.element, elements);
       if (i === null) return;
+      const entry = deps.focusedEntryId();
+      const head = elements[i];
+      if (entry === null || head === undefined) return;
+      if (current.entryId !== entry) deps.focus.focusRow(entry, addressOf(head));
       const next = elements[i + 1];
-      if (next !== undefined) deps.focus.extendRow(addressOf(next));
+      if (next !== undefined) deps.focus.extendRow(entry, addressOf(next));
     },
     extendRowUp: () => {
-      const elements = deps.liveElements();
+      const elements = deps.focusedElements();
       const current = deps.focus.current;
       if (current.at !== "liveBlock") return;
       const i = resolveFocus(current.element, elements);
+      if (i === null) return;
+      const entry = deps.focusedEntryId();
+      const head = elements[i];
+      if (entry === null || head === undefined) return;
+      if (current.entryId !== entry) deps.focus.focusRow(entry, addressOf(head));
       // **Stops at the first element rather than leaving.** `↑` unshifted exits
       // to the prompt (C26 I13, the reader stepping out); extending is a
       // gesture *inside* the block, and one that walked out of it would take
-      // the selection with it and leave nothing to copy.
-      if (i === null || i === 0) return;
+      // the selection with it and leave nothing to copy. The repair above still
+      // ran: a stopped extension is not a reason to leave the store half-fixed.
+      if (i === 0) return;
       const prev = elements[i - 1];
-      if (prev !== undefined) deps.focus.extendRow(addressOf(prev));
+      if (prev !== undefined) deps.focus.extendRow(entry, addressOf(prev));
     },
 
     /**
@@ -869,16 +1043,17 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
      * blank line — it is a place to stand, not empty data.
      */
     copyElement: () => {
-      const elements = deps.liveElements();
+      const elements = deps.focusedElements();
       const current = deps.focus.current;
       if (current.at !== "liveBlock") return;
-      const head = resolveFocus(current.element, elements);
-      if (head === null) return;
-      const anchor = current.anchor === null ? head : resolveFocus(current.anchor, elements);
-      if (anchor === null) return;
+      // **The extent `focusFor` washes, from the one function** (C26 I16, §5c
+      // trace 3): the head through `resolveFocus`, the anchor by exact match, a
+      // stale anchor collapsed to the head (F764). What `y` copies is what the
+      // frame shows selected, by construction rather than by two copies agreeing.
+      const ext = extentOf(current, elements);
+      if (ext === null) return;
 
-      const text = elements
-        .slice(Math.min(anchor, head), Math.max(anchor, head) + 1)
+      const text = ext.extent
         .map((p) => p.element.copy)
         .filter((c): c is string => c !== undefined && c !== "")
         .join("\n");
@@ -886,12 +1061,49 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       deps.editor.copyText(text);
     },
 
+    /**
+     * `⌃a` — every element the focused entry declares (C26 §5c, I16).
+     *
+     * **Anchor on the first, head on the last, through the two primitives the
+     * arrows use** — `focusRow` then `extendRow` — so there is no third store
+     * write that could disagree with them about what an anchor is, and no
+     * branch on the count: a one-element entry gets an anchor equal to its
+     * head, which every reader treats as `null` (§5c's sentinel measurement).
+     * Per entry and never across one (§5c's ruling): the list is the focused
+     * entry's, so the copy cannot depend on what lies between two entries.
+     *
+     * The first write repairs the entry as every move does (C26 I22), which is
+     * why it is not `extendRow` twice.
+     */
+    selectAllElements: () => {
+      const elements = deps.focusedElements();
+      if (deps.focus.current.at !== "liveBlock") return;
+      const first = elements[0];
+      const last = elements.at(-1);
+      const entry = deps.focusedEntryId();
+      if (first === undefined || last === undefined || entry === null) return;
+      deps.focus.focusRow(entry, addressOf(first));
+      deps.focus.extendRow(entry, addressOf(last));
+    },
+
     // --- copy mode (C16 §5b) -----------------------------------------------
     //
     // **Entry only. The exit is the `⌃c` rung**, which is the ladder's and not
     // this table's — a second way out here would give copy mode an order of its
     // own, which is exactly what makes it a target rather than a mode.
-    enterCopyMode: () => void deps.enterCopyMode(),
+    //
+    // **The prompt's region goes first** (C17 I23; F765). Copy mode hands the
+    // screen to the terminal's own selection, and a prompt still washing a
+    // region under it is two selections at once. `collapse()` rather than a
+    // motion, because the caret must stay where the reader left it — and here
+    // rather than in `#setCopyMode`, because this effect is the only way in
+    // (`⌥v` at the prompt and in the block) and T2.14 asks that every C17
+    // operation be reachable from a key.
+    enterCopyMode: () => {
+      deps.editor.collapse();
+      deps.enterCopyMode();
+    },
+    exitCopyMode: () => void deps.exitCopyMode(),
   });
 
   /**

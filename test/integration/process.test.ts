@@ -164,13 +164,13 @@ describe("C21 with C06", () => {
     // *everything*, which is D18's injection path opened for every verb.
     const shell = pipelineHarness();
     shell.pipeline.submit("echo hi");
-    await settled();
+    await settled(shell.pipeline);
     expect(shell.calls, "a shell command is delegated").toContain("spawnShell");
     expect(shell.calls, "and never invoked as a verb").not.toContain("invoke");
 
     const app = pipelineHarness();
     app.pipeline.submit("/ps");
-    await settled();
+    await settled(app.pipeline);
     expect(app.calls, "an app verb goes through the transport").toContain("invoke");
     expect(app.calls, "and never through a shell — D18's whole claim").not.toContain("spawnShell");
   });
@@ -180,7 +180,7 @@ describe("C21 with C06", () => {
     // claim here is that C23 sequences all four calls around them.
     const shell = pipelineHarness();
     shell.pipeline.submit("/tty vim notes.md");
-    await settled();
+    await settled(shell.pipeline);
 
     expect(shell.calls.filter((c) => c !== "resetFocus")).toEqual([
       "suspend",
@@ -201,7 +201,7 @@ describe("C21 with C06", () => {
     // stdout to invoke for.
     const app = pipelineHarness();
     app.pipeline.submit("/edit config.yaml");
-    await settled();
+    await settled(app.pipeline);
 
     expect(app.calls.filter((c) => c !== "resetFocus")).toEqual([
       "suspend",
@@ -223,7 +223,7 @@ describe("C21 with C06", () => {
     // transport assertion.
     const armed = pipelineHarness();
     armed.pipeline.submit("/edit -b config.yaml");
-    await settled();
+    await settled(armed.pipeline);
     expect(armed.calls, "the arm sends it through the transport").toContain("invoke");
     expect(armed.calls, "and nowhere near the terminal").not.toContain("handoff");
     expect(armed.lifecycle).toEqual([]);
@@ -238,7 +238,7 @@ describe("C21 with C06", () => {
     // (F119).
     const invalid = pipelineHarness();
     invalid.pipeline.submit("/edit --nonsense");
-    await settled();
+    await settled(invalid.pipeline);
     expect(invalid.handed, "nothing was spawned").toEqual([]);
     expect(invalid.calls, "and the terminal was never taken").not.toContain("suspend");
     expect(invalid.calls).not.toContain("invoke");
@@ -247,7 +247,7 @@ describe("C21 with C06", () => {
     // `interactive` rather than having replaced the app route.
     const ordinary = pipelineHarness();
     ordinary.pipeline.submit("/ps");
-    await settled();
+    await settled(ordinary.pipeline);
     expect(ordinary.calls).toContain("invoke");
     expect(ordinary.lifecycle, "and never touches the terminal").toEqual([]);
   });
@@ -266,7 +266,7 @@ describe("C21 with C06", () => {
         ),
     });
     h.pipeline.submit("/tty vim");
-    await settled();
+    await settled(h.pipeline);
 
     expect(h.lifecycle, "suspended and resumed, in that order").toEqual(["suspend", "resume"]);
     expect(h.pipeline.inFlight, "and the guard is not stranded").toBeNull();

@@ -9,6 +9,19 @@ export declare function checkModuleGraph(
 
 export declare const MODULE_GRAPH_RULES: readonly string[];
 
+/** MG2 — cycles known and not yet broken, `a <-> b` keys with a reason each; compared by equality. */
+export declare const ACKNOWLEDGED_CYCLES: Readonly<Record<string, string>>;
+/** MG2 — every intra-layer value-import cycle in `files`, as sorted ` <-> `-joined member lists. */
+export declare function layerCycles(
+  files: readonly string[],
+  readFile?: (file: string) => string,
+): string[];
+export declare function checkLayerCycles(
+  files: readonly string[],
+  readFile?: (file: string) => string,
+  acknowledged?: Readonly<Record<string, string>>,
+): Violation[];
+
 /**
  * Which `MODE_OWNERS` rows name an export `escapes.ts` actually has. A row for
  * an absent name cannot fire — the third way a rule comes to have nothing to be
@@ -69,6 +82,18 @@ export declare const UNCONSUMED_FUNCTIONS: Readonly<Record<string, string>>;
  * than as an interface. The allow-list is compared by equality, so an entry that
  * no longer excuses anything is itself a violation.
  */
+/**
+ * MG29 — an exported function whose parameter type is not published (C24 I29).
+ *
+ * `readFile` is a parameter so the fabricated violation can un-publish a type
+ * without touching the tree, which is the only way to drive a rule whose subject
+ * is the entry point's own export list.
+ */
+export declare function checkExportedArguments(
+  files: readonly string[],
+  readFile?: (f: string) => string,
+): Violation[];
+
 export declare function checkFunctionConsumers(
   files: readonly string[],
   readFile?: (f: string) => string,
@@ -87,10 +112,24 @@ export declare function checkBuilderCoverage(
   files: readonly string[],
   readFile?: (f: string) => string,
   omissions?: Readonly<Record<string, string>>,
+  /**
+   * Injected for the same reason `omissions` is: a rule tested only against its
+   * real list tests one of its two arms. This one has two of its own — a builder
+   * that sets a field claimed unbuildable, and an entry naming a field no kind
+   * carries.
+   */
+  never?: Readonly<Record<string, string>>,
 ): Violation[];
 
 /** MG27's reasons, keyed `Kind.field`. */
 export declare const BUILDER_OMISSIONS: Readonly<Record<string, string>>;
+
+/**
+ * MG27's reasons keyed by **field**, for fields carried by an intersected base
+ * and therefore on every kind at once — one entry rather than nineteen copies
+ * of one sentence.
+ */
+export declare const BUILDER_NEVER: Readonly<Record<string, string>>;
 
 /**
  * Roadmap 48 — the public surface by **use**: members of the types

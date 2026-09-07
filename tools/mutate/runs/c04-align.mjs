@@ -10,7 +10,7 @@ import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
-const CMD = "npx vitest run test/contract/sequence.test.ts";
+const CMD = "npx vitest run test/contract/sequence.test.ts test/edge/view-model.test.ts";
 const SRC = "src/presentation/blocks/kinds/containers.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
@@ -29,8 +29,10 @@ const MUTATIONS = [
     // and dropped on the way to the frame.
     name: "align is declared and ignored",
     file: SRC,
-    from: "...(align === undefined ? {} : { justifyContent: DOWN[align] }),",
-    to: "...{},",
+    // Re-anchored 2026-09-05: the axis is a margin read from `groupPlacements`
+    // now (C04 I103), not a Yoga `justifyContent`.
+    from: "              ...(at.top === 0 ? {} : { marginTop: at.top }),",
+    to: "",
     expect: "T3.22",
   },
 ];
@@ -41,8 +43,8 @@ const results = await runPass({
   run,
   control: {
     file: SRC,
-    from: "const align = block.align?.[index];",
-    to: "const align = undefined;",
+    from: "    const placements = groupPlacements(block, width, ctx.measureChild, ctx.widthChild);",
+    to: "    const placements = block.children.map((_c, i) => ({ left: 0, top: 0, width: widths[i] ?? 1 }));",
     why:
       "no child is ever aligned — if this survives, nothing reads the frame a row group " +
       "composes and the mutation below is unearned",

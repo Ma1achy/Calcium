@@ -1,7 +1,7 @@
 // C02 tier 4 — integration.
 //
-// Every test here waits on a component that does not exist yet. Each names its
-// blocker in a greppable form, so when C01 lands `grep "waits on C01"` finds
+// When written, every test here waited on a component that did not exist; at 2026-09-03 C01–C03
+// and L4 are built. Each names its blocker in a greppable form, so `grep "waits on C01"` finds
 // everything that just became unblocked — otherwise someone has to re-read six
 // specs to know what to fill in.
 //

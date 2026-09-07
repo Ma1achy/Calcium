@@ -1,0 +1,4 @@
+── tree · overflow-left-right · 1bit · 40w
+root──render┬─curve──raster
+            ╰─paint
+[1m+4 more · layout · measure · wrap · par…[22m

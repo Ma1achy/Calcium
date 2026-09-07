@@ -8,11 +8,11 @@
     "node": ">=22"
   },
   "bin": {
-    "svc-tui": "./main.ts"
+    "svc-tui": "./bin/svc-tui.js"
   },
   "scripts": {
     "check": "tsc --noEmit",
-    "start": "node main.ts",
+    "start": "NODE_ENV=production node --experimental-strip-types main.ts",
     "test": "vitest run --dir test",
     "test:package": "vitest run --dir test --exclude \"**/repo/**\""
   },

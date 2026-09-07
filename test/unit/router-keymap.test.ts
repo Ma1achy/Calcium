@@ -60,8 +60,8 @@ describe("C16 §6 — precedence, not merely presence", () => {
     const map = createKeymap([bind("liveBlock", "j", "moveDown")]);
     expect(map.resolve("liveBlock", k("j"))?.action).toBe("moveDown");
 
-    map.mergeBlock([{ key: { name: "s" }, action: "sort" }]);
-    expect(map.resolve("liveBlock", k("s"))?.action, "block binding is live").toBe("sort");
+    map.mergeBlock([{ key: { name: "s" }, action: "rowActivate" }]);
+    expect(map.resolve("liveBlock", k("s"))?.action, "block binding is live").toBe("rowActivate");
     expect(map.resolve("liveBlock", k("j"))?.action, "base binding survives the merge").toBe(
       "moveDown",
     );
@@ -69,7 +69,7 @@ describe("C16 §6 — precedence, not merely presence", () => {
 
   it("a withdrawn block keymap stops resolving, and the base is untouched", () => {
     const map = createKeymap([bind("liveBlock", "j", "moveDown")]);
-    const withdraw = map.mergeBlock([{ key: { name: "s" }, action: "sort" }]);
+    const withdraw = map.mergeBlock([{ key: { name: "s" }, action: "rowActivate" }]);
 
     withdraw();
     expect(map.resolve("liveBlock", k("s")), "s does nothing once the block freezes").toBeNull();
@@ -78,36 +78,96 @@ describe("C16 §6 — precedence, not merely presence", () => {
 
   it("a second block replaces the first rather than accumulating", () => {
     const map = createKeymap([]);
-    map.mergeBlock([{ key: { name: "s" }, action: "sortA" }]);
-    map.mergeBlock([{ key: { name: "f" }, action: "filterB" }]);
+    map.mergeBlock([{ key: { name: "s" }, action: "rowUp" }]);
+    map.mergeBlock([{ key: { name: "f" }, action: "rowDown" }]);
 
     expect(map.resolve("liveBlock", k("s")), "the older block's binding is gone").toBeNull();
-    expect(map.resolve("liveBlock", k("f"))?.action).toBe("filterB");
+    expect(map.resolve("liveBlock", k("f"))?.action).toBe("rowDown");
   });
 });
 
-describe("C16 §6 — two checks, two moments", () => {
-  it("a block colliding with a global is refused at commit time, not at startup", () => {
-    // The two paths are separate deliberately: this one runs per committed block
-    // over adapter-produced data while a session is live, and can only run then
-    // because the block does not exist until it is committed. A single check
-    // covering both would have to run at this later moment, letting a duplicate
-    // in the default keymap reach a user's session first.
+describe("C16 §6 — a colliding block key is placed, not refused (I27)", () => {
+  it("T2.4b (I27): a key `global` binds lands at `interaction`, and the global is not shadowed", () => {
+    // **The policy this replaces threw here**, and its first consumer would have
+    // tripped it on every key it has — the widget design binds `↑` `↓` `PgUp`
+    // `PgDn` `Esc`, all built-ins. The mode C26 §4f describes is for exactly
+    // these keys: `interaction` is the one rung where the built-ins are out of
+    // scope, so the key is bound there and fires once the reader has entered
+    // the block, while the global keeps its slot untouched.
     const map = createKeymap([bind("global", "s", "themeSwitch")]);
-    expect(map.resolve("global", k("s"))?.action, "construction was fine").toBe("themeSwitch");
+    map.mergeBlock([{ key: { name: "s" }, action: "rowActivate" }]);
 
-    expect(() => map.mergeBlock([{ key: { name: "s" }, action: "sort" }])).toThrow(KeymapError);
-    expect(map.resolve("liveBlock", k("s")), "and nothing was shadowed").toBeNull();
+    expect(map.resolve("global", k("s"))?.action, "the global is untouched").toBe("themeSwitch");
+    expect(map.resolve("liveBlock", k("s")), "nothing lands at liveBlock for a colliding key").toBeNull();
+    expect(map.resolve("interaction", k("s"))?.action, "the block's key is in interaction").toBe("rowActivate");
   });
 
-  it("the global wins loudly rather than being silently shadowed", () => {
-    const map = createKeymap([bind("global", "q", "quit")]);
-    try {
-      map.mergeBlock([{ key: { name: "q" }, action: "blockQuit" }]);
-      expect.unreachable("the collision must be refused");
-    } catch (e) {
-      expect(String((e as Error).message)).toContain("quit");
-    }
+  it("T2.4c (I27): a key `liveBlock` binds lands at `interaction` too, and a free key at `liveBlock`", () => {
+    // **The fabricated collision, on the real table.** `up` is `rowUp` at
+    // `liveBlock`; a block binding it must not take the arrow away from
+    // navigation, and must still be able to have it once the reader is inside.
+    // `x` is free, so it works from the first `↓` (A01 D4) — the two halves of
+    // one block keymap landing at two targets is the ruling, not an accident.
+    // Both actions are union members no default row binds (I19), so the listing
+    // below is the block's rows and nothing else.
+    const map = createKeymap(defaultKeymap);
+    map.mergeBlock([
+      { key: { name: "up" }, action: "toggleSeries1" },
+      { key: { name: "x" }, action: "toggleSeries2" },
+    ]);
+
+    expect(map.resolve("liveBlock", k("up"))?.action, "navigation keeps the arrow").toBe("rowUp");
+    expect(map.resolve("interaction", k("up"))?.action, "the block has it inside").toBe("toggleSeries1");
+    expect(map.resolve("liveBlock", k("x"))?.action, "a free key needs no mode").toBe("toggleSeries2");
+    expect(map.resolve("interaction", k("x")), "and is not duplicated inside").toBeNull();
+
+    // `/help` lists both, at their targets — nothing silent (I19).
+    const listed = map.entries().filter((b) => b.action === "toggleSeries1" || b.action === "toggleSeries2");
+    expect(listed.map((b) => `${b.target}:${b.action}`).sort()).toEqual(["interaction:toggleSeries1", "liveBlock:toggleSeries2"]);
+  });
+
+  it("T2.4d (I10, I27): the same key twice inside one block keymap is still a construction error", () => {
+    // The refusal that survives: the block's author wrote both and neither can
+    // win. It is raised at commit, because the block does not exist until then.
+    const map = createKeymap([]);
+    expect(() =>
+      map.mergeBlock([
+        { key: { name: "s" }, action: "rowUp" },
+        { key: { name: "s" }, action: "rowDown" },
+      ]),
+    ).toThrow(KeymapError);
+    expect(map.resolve("liveBlock", k("s")), "and a refused merge leaves nothing behind").toBeNull();
+  });
+
+  it("T2.4f (I19): an action outside the union is refused at merge, and a member no default row binds is not", () => {
+    // **The refusal that used to be silent.** `bound()` resolves a block binding
+    // and then looks it up in L4's effect table, so an action outside the union
+    // resolved and did nothing at every press, and nobody saw it. Refused here
+    // instead, naming the key and the action, and leaving nothing behind.
+    const map = createKeymap(defaultKeymap);
+    expect(() => map.mergeBlock([{ key: { name: "s" }, action: "sort" }])).toThrow(
+      /binds s to "sort", which names no built-in action \(C16 I19\)/,
+    );
+    expect(map.resolve("liveBlock", k("s")), "a refused merge leaves nothing behind").toBeNull();
+
+    // **The control, and the case the first cut got wrong.** `toggleSeries1` is
+    // in the union and in the effect table and bound by no default row — it
+    // reaches the keymap only through a plot's `mergeBlock` (C12 I116). A check
+    // against *the actions the rows bind* refuses it; the union does not.
+    map.mergeBlock([{ key: { name: "1" }, action: "toggleSeries1" }]);
+    expect(map.resolve("liveBlock", k("1"))?.action).toBe("toggleSeries1");
+  });
+
+  it("T2.4e (I27): withdrawal takes both halves", () => {
+    const map = createKeymap([bind("global", "s", "themeSwitch")]);
+    const withdraw = map.mergeBlock([
+      { key: { name: "s" }, action: "rowActivate" },
+      { key: { name: "f" }, action: "rowDown" },
+    ]);
+    withdraw();
+    expect(map.resolve("interaction", k("s")), "the colliding half is gone").toBeNull();
+    expect(map.resolve("liveBlock", k("f")), "and the free half").toBeNull();
+    expect(map.resolve("global", k("s"))?.action, "the base survives").toBe("themeSwitch");
   });
 });
 
@@ -121,7 +181,7 @@ describe("C16 §6 — /help renders from the table dispatch uses", () => {
       bind("prompt", "tab", "complete"),
       bind("global", "q", "quit", { ctrl: true }),
     ]);
-    map.mergeBlock([{ key: { name: "s" }, action: "sort" }]);
+    map.mergeBlock([{ key: { name: "s" }, action: "rowActivate" }]);
 
     const listed = map.entries();
     expect(listed.length, "base bindings and the live block's").toBe(3);
@@ -134,11 +194,11 @@ describe("C16 §6 — /help renders from the table dispatch uses", () => {
 
   it("a binding withdrawn from dispatch disappears from help in the same call", () => {
     const map = createKeymap([bind("prompt", "tab", "complete")]);
-    const withdraw = map.mergeBlock([{ key: { name: "s" }, action: "sort" }]);
-    expect(map.entries().some((e) => e.action === "sort")).toBe(true);
+    const withdraw = map.mergeBlock([{ key: { name: "s" }, action: "rowActivate" }]);
+    expect(map.entries().some((e) => e.action === "rowActivate")).toBe(true);
 
     withdraw();
-    expect(map.entries().some((e) => e.action === "sort"), "help cannot outlive dispatch").toBe(
+    expect(map.entries().some((e) => e.action === "rowActivate"), "help cannot outlive dispatch").toBe(
       false,
     );
   });
@@ -199,7 +259,7 @@ describe("§6 — the default table (C17 I12)", () => {
     for (const t of TARGETS) {
       expect(bound.has(t), `${t} has no binding — a name in the union and nothing else`).toBe(true);
     }
-    expect(bound.has("copyMode"), "copyMode's only key is the ladder's (§5)").toBe(false);
+    expect(bound.has("copyMode"), "copyMode binds exactly its own dismissal, `Esc` (C16 §5c, I24)").toBe(true);
   });
 
   it("T1.33 (I24): the pushed view's seven keys resolve, and Esc is viewPop", () => {
@@ -330,6 +390,29 @@ describe("§6 — the default table (C17 I12)", () => {
       "liveBlock s+up": ["\u001b[1;2A"],
       "liveBlock s+down": ["\u001b[1;2B"],
       "liveBlock y": ["y"],
+      // `⌃a` is the byte `0x01`, the same one `prompt c+a` walks above — one
+      // byte, two targets, two actions (C26 §5c).
+      "liveBlock c+a": ["\u0001"],
+      // **A plain printable, and T2.13 is what said the first choice was not.**
+      // The binding was written as a bare key name and this table has no default:
+      // a row with no wire form fails, which is how it was found that nobody
+      // could press it. `[` and `]` are their own bytes, exactly as `y` is —
+      // and this table is what measured that rather than assuming it.
+      "liveBlock [": ["["],
+      "liveBlock ]": ["]"],
+      // **Step 8's five, and the shifted brackets are the reason this table is
+      // the check.** A terminal sends `{` as the byte `{` with no shift flag —
+      // the modifier is the layout's and never reaches the wire — so a binding
+      // written as `{name: "[", shift: true}` would resolve against an event
+      // nothing sends, which is Shift-Enter's defect on a printable. Measured
+      // here rather than assumed, exactly as `[` and `]` were.
+      "liveBlock {": ["{"],
+      "liveBlock }": ["}"],
+      "liveBlock +": ["+"],
+      "liveBlock =": ["="],
+      "liveBlock -": ["-"],
+      "liveBlock r": ["r"],
+      "liveBlock o": ["o"],
 
       // Copy mode's entry, at both targets it is bound to (C16 §5b). The key is
       // provisional — which key enters copy mode is the rebindable-keys row's
@@ -354,6 +437,9 @@ describe("§6 — the default table (C17 I12)", () => {
       "pushedView up": ["\u001b[A", "\u001bOA"],
       "pushedView down": ["\u001b[B", "\u001bOB"],
       "pushedView escape": ["\u001b"],
+      // Copy mode's own dismissal (C16 §5c): the same lone byte, resolved when
+      // `activeTarget` answers `copyMode`.
+      "copyMode escape": ["\u001b"],
 
       // Scrolling (I23). **This is the check the ruling asked for**, and it
       // came out positive: `⌃Home` and `⌃End` reach the decoder in both of the
@@ -383,6 +469,22 @@ describe("§6 — the default table (C17 I12)", () => {
       // same byte `overlay enter` resolves — which is the argument for the key:
       // a reader who has accepted a menu item has already learnt it.
       "liveBlock enter": ["\r"],
+
+      // Between entries (C26 I21, §4g). **`⇧tab` is the row this table refused
+      // on arrival**: `CSI Z` is what every terminal sends for backtab and the
+      // decoder discarded it as well-formed-but-unknown, so the binding named a
+      // key nothing produced — the fourth instance of I17's class and the first
+      // found before the row shipped rather than after. The bare form only; a
+      // parameterised `Z` stays malformed (router-decode T3.13).
+      "liveBlock tab": ["\t"],
+      "liveBlock s+tab": ["\u001b[Z"],
+      // The horizontal pair (C22 I76). The same two wire forms the prompt's
+      // `left`/`right` carry, at the target where they used to be dropped.
+      "liveBlock left": ["\u001b[D", "\u001bOD"],
+      "liveBlock right": ["\u001b[C", "\u001bOC"],
+      // Re-run (C23 I18): the prompt's newline pair, at the other target.
+      "liveBlock s+enter": ["\u001b[13;2u", "\u001b[27;2;13~"],
+      "liveBlock m+enter": ["\u001b\r"],
     };
 
     const keymap = createKeymap(defaultKeymap);

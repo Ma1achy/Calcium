@@ -13,7 +13,7 @@
 // cuts at an arbitrary line offset can invent a row, and the common case — a
 // window landing in context — passes either way.
 import { describe, expect, it } from "vitest";
-import { block } from "../../src/data/viewmodel/index.js";
+import { block, changedRuns } from "../../src/data/viewmodel/index.js";
 import type { Hunk, Patch } from "../../src/data/viewmodel/index.js";
 import {
   clampOffset,
@@ -21,6 +21,8 @@ import {
   totalRows,
   windowPatch,
 } from "../../src/presentation/patch/window.js";
+import { hunkRows, isCollapsed, layoutFor } from "../../src/presentation/patch/height.js";
+import { PATCH_CORPUS } from "../support/blocks.js";
 
 const UNIFIED = 80;
 const SPLIT = 120;
@@ -66,6 +68,109 @@ const THREE = patchOf(
 );
 
 describe("C25 §3c — windowing", () => {
+  it("T1.20b (C25 I19b): a window's cuts fall on `changedRuns`' boundaries, over the whole corpus", () => {
+    // **The characterisation this file owes the de-duplication (F595/P2).** The
+    // row above states the cut rule with a predicate of its own — changed, and
+    // changed before it — which is a *fourth* spelling of the grouping, on one
+    // fixture. This one states it against the single implementation: a window may
+    // begin and end only where `changedRuns` closes a group, and the boundaries
+    // are derived from that function rather than restated here.
+    //
+    // **What it covers, and what it cannot** (the blind spot, stated because an
+    // unrecorded one reads as strength). It fails the moment a *fourth* copy of
+    // the grouping appears in `window.ts` and drifts: reading a run's span as
+    // `max(removes, adds)` — its rows — rather than their sum fails this row and
+    // two others. It does **not** catch a change to `changedRuns` itself, because
+    // the expectation is derived from the same function the code now calls, so a
+    // mutation moves both together. Measured: dropping `changedRuns`' flush at a
+    // context line leaves this row green and fails the two rows below, whose
+    // predicate is independent of it. That is the reason the row below stays —
+    // the two are complementary, one stating the rule and one the agreement, and
+    // deleting either on grounds of duplication loses a mutation.
+    //
+    // Split only, and **`layoutFor` decides that rather than the width** — the
+    // corpus holds `patch-forced-unified`, whose `layout` field wins over a split
+    // width (C25 §3), and reading the layout off the width alone charges a
+    // unified window with a split boundary set. The first run of this row failed
+    // on exactly that fixture and the code was right.
+    //
+    // Unified is not asserted because it gives every line its own unit, so every
+    // index is a boundary and the row would be vacuous there.
+    const boundaries = (lines: Hunk["lines"]): ReadonlySet<number> => {
+      const out = new Set<number>([0]);
+      let at = 0;
+      for (const group of changedRuns(lines)) {
+        at += "kind" in group ? 1 : group.removes.length + group.adds.length; // cells-ok — line counts
+        out.add(at);
+      }
+      return out;
+    };
+
+    let cuts = 0; // cells-ok — a count of assertions made, not a width
+    for (const candidate of PATCH_CORPUS) {
+      if (candidate.kind !== "patch") continue;
+      const patch = candidate;
+      if (layoutFor(patch, SPLIT) !== "split") continue;
+      const total = totalRows(patch, SPLIT);
+      for (let height = 3; height <= 9; height += 1) {
+        for (let offset = 0; offset <= total; offset += 1) {
+          for (const win of windowPatch(patch, SPLIT, offset, height).hunks) {
+            if (win.lines.length === 0) continue;
+            // The window slices the source array, so the lines are the same
+            // objects — an exact index rather than a match on text.
+            const source = patch.hunks.find((h) => h.lines.includes(win.lines[0] as never));
+            if (source === undefined) continue;
+            const from = source.lines.indexOf(win.lines[0] as never);
+            const to = from + win.lines.length; // cells-ok — a line count
+            const bounds = boundaries(source.lines);
+            const where = `${patch.id} h${String(height)} o${String(offset)}`;
+            expect(bounds.has(from), `${where}: opens at line ${String(from)}`).toBe(true);
+            expect(bounds.has(to), `${where}: closes at line ${String(to)}`).toBe(true);
+            if (from > 0) cuts += 1;
+          }
+        }
+      }
+    }
+    // The control: with no window opening past line 0 this asserts only that 0 is
+    // a boundary, which it is by construction.
+    expect(cuts).toBeGreaterThan(0);
+  });
+
+  it("T1.20c (C25 I1, I19b): the window's row model and `measure` agree, row for row", () => {
+    // **Containment is not correctness, and this row is what measured that.** Every
+    // other row here bounds a window from above — it never exceeds its region — and
+    // a unit that *over-states* its height satisfies all of them: it shows less
+    // diff, never more. Restating a unit's rows as its line count rather than
+    // asking `pairedRows` survived the whole patch suite, 99 rows across eight
+    // files (measured 2026-09-04). Nothing said the window had shrunk.
+    //
+    // So this states the equality instead, and it states it across the seam: the
+    // header positions come from `hunkHeaderRows`, which walks `rowsOf` and
+    // therefore `unitsOf`, and the expectation comes from `height.ts`'s `hunkRows`,
+    // which `measure` uses and which never sees a unit. A window that disagreed
+    // with `pairedRows` about what a row is is the drift I1 exists to prevent, and
+    // until now the suite took that agreement on trust.
+    for (const candidate of PATCH_CORPUS) {
+      if (candidate.kind !== "patch") continue;
+      const patch = candidate;
+      for (const width of [UNIFIED, SPLIT]) {
+        const layout = layoutFor(patch, width);
+        const expected: number[] = [];
+        let at = 1; // the path header
+        for (const hunk of patch.hunks) {
+          if (isCollapsed(hunk.collapsedBefore)) at += 1;
+          expected.push(at);
+          at += hunkRows(hunk, layout) - (isCollapsed(hunk.collapsedBefore) ? 1 : 0);
+        }
+        const where = `${patch.id} at ${String(width)}`;
+        expect([...hunkHeaderRows(patch, width)], where).toEqual(expected);
+        expect(at + (isCollapsed(patch.collapsedAfter) ? 1 : 0), `${where}: total`).toBe(
+          totalRows(patch, width),
+        );
+      }
+    }
+  });
+
   it("T1.20 (I19): a window never measures taller than its region, at any offset or width", () => {
     // **The property, asserted over every offset rather than three.** A window
     // that cut inside a changed run would exceed the region exactly where the

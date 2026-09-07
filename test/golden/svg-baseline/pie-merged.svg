@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
+<rect width="100%" height="100%" fill="#1a1a1a"/>
+<rect x="498.4" y="15.2" width="9.6" height="9.6" fill="#e69f00"/>
+<text x="512" y="24.8" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">A 50%</text>
+<rect x="498.4" y="34.4" width="9.6" height="9.6" fill="#56b4e9"/>
+<text x="512" y="44" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">B 25%</text>
+<rect x="498.4" y="53.6" width="9.6" height="9.6" fill="#3cbf9a"/>
+<text x="512" y="63.2" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">C 15%</text>
+<rect x="498.4" y="72.8" width="9.6" height="9.6" fill="#f0e442"/>
+<text x="512" y="82.4" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">D 8%</text>
+<rect x="498.4" y="92" width="9.6" height="9.6" fill="#8fa8ff"/>
+<text x="512" y="101.6" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">E 1%</text>
+<rect x="498.4" y="111.2" width="9.6" height="9.6" fill="#f07a3c"/>
+<text x="512" y="120.8" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">F 1%</text>
+<path d="M288 150.4 L288 12.8 A137.6 137.6 0 0 1 288 288 Z" fill="#e69f00"/>
+<path d="M288 150.4 L288 288 A137.6 137.6 0 0 1 150.4 150.4 Z" fill="#56b4e9"/>
+<path d="M288 150.4 L150.4 150.4 A137.6 137.6 0 0 1 207.121 39.079 Z" fill="#3cbf9a"/>
+<path d="M288 150.4 L207.121 39.079 A137.6 137.6 0 0 1 270.754 13.885 Z" fill="#f0e442"/>
+<path d="M288 150.4 L270.754 13.885 A137.6 137.6 0 0 1 279.36 13.072 Z" fill="#8fa8ff"/>
+<path d="M288 150.4 L279.36 13.072 A137.6 137.6 0 0 1 288 12.8 Z" fill="#f07a3c"/>
+</svg>

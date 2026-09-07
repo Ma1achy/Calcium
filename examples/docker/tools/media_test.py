@@ -134,5 +134,17 @@ case("the 8-bit shot unsets COLORTERM rather than emptying it", depth8.get("COLO
 names = [n for n, *_ in SHOTS]
 case("every shot has its own name", len(names), len(set(names)))
 
+# 8 — F811: the theme statement is cleared before *every* shot's `run`, in the
+#     loop, not once at the top — a shot after `theme-light` is otherwise light.
+#     Source order rather than a call: the helper is trivially right on its own
+#     and the defect was that nothing called it.
+_src = (Path(__file__).resolve().parent / "media.py").read_text(encoding="utf8")
+_loop = _src[_src.index("for name, cols, rows, command, hold, env, still in SHOTS:"):]
+case(
+    "forget_theme() runs inside the shot loop, before run()",
+    0 < _loop.find("forget_theme()") < _loop.find("run(cols, rows, script, raw, hold, env)"),
+    True,
+)
+
 if __name__ == "__main__":
     sys.exit(main("media.py"))

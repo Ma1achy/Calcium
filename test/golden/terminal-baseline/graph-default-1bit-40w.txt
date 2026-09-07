@@ -1,0 +1,10 @@
+── graph · default · 1bit · 40w
+              parse
+                ├─────╮
+              render
+                ├─────┼──╮
+              layout
+                ├─────┴┬─╯
+              paint  cache
+
+[1m1 reversed[22m

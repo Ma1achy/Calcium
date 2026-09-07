@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
+<rect width="100%" height="100%" fill="#1a1a1a"/>
+<line x1="89.6" y1="12.8" x2="89.6" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="89.6" y1="288" x2="486.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="486.4" y1="12.8" x2="486.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="89.6" y1="12.8" x2="486.4" y2="12.8" stroke="#2c2c2c" stroke-width="1"/>
+<text x="89.6" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">0</text>
+<text x="288" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">20</text>
+<text x="486.4" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">40</text>
+<clipPath id="isvgb-0"><rect x="0" y="28.32" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="44.32" text-anchor="end" clip-path="url(#isvgb-0)" font-size="12" font-family="monospace" fill="#626262">alpha</text>
+<clipPath id="isvgb-1"><rect x="0" y="83.36" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="99.36" text-anchor="end" clip-path="url(#isvgb-1)" font-size="12" font-family="monospace" fill="#626262">beta</text>
+<clipPath id="isvgb-2"><rect x="0" y="138.4" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="154.4" text-anchor="end" clip-path="url(#isvgb-2)" font-size="12" font-family="monospace" fill="#626262">gamma</text>
+<clipPath id="isvgb-3"><rect x="0" y="193.44" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="209.44" text-anchor="end" clip-path="url(#isvgb-3)" font-size="12" font-family="monospace" fill="#626262">delta</text>
+<clipPath id="isvgb-4"><rect x="0" y="248.48" width="83.6" height="24"/></clipPath>
+<text x="83.6" y="264.48" text-anchor="end" clip-path="url(#isvgb-4)" font-size="12" font-family="monospace" fill="#626262">epsilon</text>
+<rect x="89.6" y="23.808" width="99.2" height="33.024" fill="#e69f00"/>
+<rect x="89.6" y="78.848" width="248" height="33.024" fill="#56b4e9"/>
+<rect x="89.6" y="133.888" width="148.8" height="33.024" fill="#3cbf9a"/>
+<rect x="89.6" y="188.928" width="297.6" height="33.024" fill="#f0e442"/>
+<rect x="89.6" y="243.968" width="198.4" height="33.024" fill="#8fa8ff"/>
+</svg>

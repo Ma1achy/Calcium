@@ -11,11 +11,13 @@ import { describe, expect, it } from "vitest";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { scrollDefinition } from "../../src/presentation/blocks/kinds/containers.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
+import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { applyPatch, descendants, validateDocument } from "../../src/data/viewmodel/index.js";
 import { b } from "../../src/shell/builders/index.js";
 import { liveParts } from "../../src/testing/live-parts.js";
 import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
-import { DARK_THEME, FULL_CAPS } from "../support/render.js";
+import { ASCII_CAPS, DARK_THEME, FULL_CAPS } from "../support/render.js";
+import { CORPUS } from "../support/blocks.js";
 import type { Block, Scroll, ViewDocument } from "../../src/data/viewmodel/index.js";
 import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
 
@@ -237,7 +239,7 @@ describe("C04 §3c — the frame, read", () => {
     ]);
   });
 
-  it("T2.28b (C04 §3c trace 1, C25 I1): a child taller than the box — the gap, named", () => {
+  it("T2.28b (C04 §3c trace 1, C09 I58, I59): a child taller than the box is sliced, not drawn whole", () => {
     // **A ruling that names an operation the layer below does not have.** §3c
     // trace 1 says a child taller than the box *aligns to its top*, and taking a
     // child's top `n` rows needs a windowing seam: `RenderContext` offers
@@ -250,9 +252,11 @@ describe("C04 §3c — the frame, read", () => {
     // describing a different document than the one it holds. Reading the frame
     // is what said so; the mutation had survived because both readings drew two.
     //
-    // **This row expires by itself.** It asserts the disagreement, so the day
-    // the seam lands and the box windows its children, it fails and has to be
-    // rewritten as the assertion it should have been.
+    // **The row expired, and this is the assertion it should have been.** It
+    // asserted the disagreement on purpose and stayed green for as long as the
+    // defect did — which is what makes it a record and not a watch (F856). C09
+    // I58's `windowChild` is the seam C04 §3c trace 1 named; the box now slices
+    // its child and draws what it measures.
     const tall: Block = {
       kind: "logs",
       id: "tall",
@@ -270,8 +274,8 @@ describe("C04 §3c — the frame, read", () => {
     expect(drawn.at(-1), "and the marker is drawn").toContain("below");
     expect(
       drawn.length, // cells-ok — a row count, not a width
-      "and it draws more than it measures, which is the gap this row holds open",
-    ).toBeGreaterThan(registry.measure(block, 40));
+      "and it draws exactly what it measures, which is C09 I1 through a child taller than the box",
+    ).toBe(registry.measure(block, 40));
   });
 });
 
@@ -492,5 +496,119 @@ describe("C04 §3c cell 5 — refused at parse", () => {
       validateDocument(docWith({ kind: "scroll", id: "s", height: 1, children: [flat("a")] })).ok,
       "and the smallest legal box is accepted, or the rows above pass for a validator that refuses everything",
     ).toBe(true);
+  });
+});
+
+describe("C04 §3c — the residue row's two texts", () => {
+  const render = (block: Scroll, width: number, caps = FULL_CAPS, scrollOffsets: Readonly<Record<string, number>> = {}): readonly string[] =>
+    renderSequenceToLines(registry, [block], width, { theme: DARK_THEME, capabilities: caps, focus: null, scrollOffsets })
+      .map((line) => line.replace(/\u001b\[[0-9;]*m/gu, "").trimEnd());
+
+  it("T2.113 (C04 I104): a collapsed box reads `⋯ +N more`, an open box paged to its middle reads `⋯ N above, M below`, and neither names a key", () => {
+    const children = Array.from({ length: 392 }, (_u, i) => flat(`c${String(i)}`));
+    const folded = { ...scroll(5, children), collapsed: true } as Scroll;
+    for (const width of [80, 20]) {
+      expect(render(folded, width)).toEqual(["⋯ +392 more"]);
+      expect(render(folded, width, ASCII_CAPS)).toEqual(["~ +392 more"]);
+    }
+    const open = scroll(5, children);
+    const paged = render(open, 80, FULL_CAPS, { s: 200 });
+    expect(paged).toHaveLength(6);
+    const m = /^⋯ (\d+) above, (\d+) below$/u.exec(paged[5] ?? "");
+    expect(m, "the open box states both directions").not.toBeNull();
+    expect(Number(m?.[1]) + Number(m?.[2]) + 5, "N + M + interior is the content").toBe(392);
+    for (const row of [...render(folded, 80), ...paged]) {
+      expect(row).not.toContain("⏎");
+      expect(row).not.toMatch(/expand/iu);
+    }
+  });
+});
+
+describe("C09 §6b — the second caller, and the bound it applies", () => {
+  const frame = (block: Scroll, width = 40): readonly string[] =>
+    renderSequenceToLines(registry, [block], width, {
+      theme: DARK_THEME,
+      capabilities: FULL_CAPS,
+      focus: null,
+      scrollOffsets: {},
+    }).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, "").trimEnd());
+
+  it("T2.125 (C09 I58, I59, §6b): a follow box over one 30-line terminal measures 7, paints 7, and shows the tail", () => {
+    // **The measured case, and the frame is the instrument.** As it shipped this
+    // measured 7 and painted 32, opened at line 0, with the residue reading
+    // `25 above, 0 below` — every number self-consistent and the picture wrong
+    // (F855). `follow` is the half nothing recorded: the offset was computed and
+    // never used to choose rows, so a box declaring it opened at its head.
+    const tall: Block = {
+      kind: "terminal",
+      id: "t",
+      cols: 40,
+      screen: "lines",
+      lines: Array.from({ length: 30 }, (_u, i) => ({ text: `build step ${String(i)} of 30`, runs: [] })),
+    } as unknown as Block;
+    const box = { ...scroll(6, [tall]), follow: true } as Scroll;
+
+    const drawn = frame(box, 40);
+
+    expect(registry.measure(box, 40)).toBe(7);
+    expect(drawn.length, "and the paint agrees — C09 I1 through a child taller than the box").toBe(7); // cells-ok
+    expect(drawn.slice(0, 6)).toEqual([
+      "build step 24 of 30",
+      "build step 25 of 30",
+      "build step 26 of 30",
+      "build step 27 of 30",
+      "build step 28 of 30",
+      "build step 29 of 30",
+    ]);
+    expect(drawn[6], "and the residue counts the window that was applied").toBe("⋯ 24 above, 0 below");
+  });
+
+  it("T3.76 (C09 I59, §6b): an atomic child taller than the box still over-draws — the recorded limit, with its number", () => {
+    // **The remainder, named rather than asserted correct.** `plot` declares no
+    // `window` and C12 I1 makes that permanent, so `windowChild` returns `null`
+    // and the box keeps the child whole — 3 measured against 9 painted here.
+    //
+    // **This row is a record and T2.126 is the watch.** F856's lesson is that a
+    // row asserting a disagreement stays green for exactly as long as the defect
+    // does; what stops this one growing quietly is the equality-compared list of
+    // kinds that cannot be sliced. A new unsliceable kind fails there, not here.
+    const withPlot = createBlockRegistry({ defaults: true });
+    withPlot.register(plotDefinition as unknown as BlockDefinition);
+    const atomicChild = {
+      kind: "plot",
+      id: "p",
+      form: "line",
+      height: 8,
+      series: [{ label: "a", values: [1, 4, 2, 8, 5] }],
+    } as unknown as Block;
+    const box: Block = { kind: "scroll", id: "atomic", height: 2, children: [atomicChild] } as unknown as Block;
+
+    const drawn = renderSequenceToLines(withPlot, [box], 40, {
+      theme: DARK_THEME,
+      capabilities: FULL_CAPS,
+      focus: null,
+      scrollOffsets: {},
+    }).map((line) => line.replace(/\u001b\[[0-9;]*m/gu, "").trimEnd());
+
+    expect(withPlot.windowChild(atomicChild, 40, 0, 2), "no slice is available").toBeNull();
+    expect(withPlot.measure(box, 40)).toBe(3);
+    expect(drawn.length, "and it paints the child whole, which is the limit C09 I59 records").toBe(9); // cells-ok
+  });
+
+  it("T3.75 (C09 I59, §6b): the corpus holds a scroll whose child is taller than its interior", () => {
+    // **The corpus is why the headline sweep agreed for as long as it did.**
+    // T2.1 is `measure` against rendered rows over every kind at seven widths,
+    // and its only `scroll` was `height: 2` over three one-row children — so no
+    // fixture had the property the defect needs (F855). A corpus chosen for a
+    // property may not have it, and this row is what says the property is there.
+    const boxes = CORPUS.filter((blk): blk is Scroll => blk.kind === "scroll");
+    expect(boxes.length, "the corpus has scroll fixtures at all").toBeGreaterThan(0); // cells-ok
+    const overfull = boxes.filter((box) =>
+      box.children.some((child) => registry.measure(child, 80) > box.height), // cells-ok — row counts
+    );
+    expect(
+      overfull.map((box) => box.id),
+      "at least one child, on its own, is taller than the box that holds it",
+    ).not.toEqual([]);
   });
 });

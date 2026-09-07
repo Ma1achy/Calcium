@@ -15,7 +15,28 @@
 |---|---|---|---|
 | Calcium | `Calcium/` | C01–C25, the framework | A package to GitHub Packages, private |
 | `docker-tui` | `Calcium/examples/docker/` | R01, the reference app | Nothing — proof, plus an import manifest |
+| `plots-tui` | `Calcium/examples/plots/` | C12's forms in a terminal, built through `b.plot` | Nothing — the one gate that reads a frame rather than comparing bytes |
 | `prism-tui` | its own repository | Prism's adapters, manifest, theme, world, surfaces | Nothing — an internal app |
+
+**`plots-tui` is a third consumer and it exists for what the gates cannot see.** Every instrument
+this repository has compares bytes — golden frames, the collision sweep, the pair sheet, the arm
+disagreement record, the terminal baseline — so none of them can report a flicker, a jump, or a
+colour that reads badly on a real emulator. That is the whole of its subject, and it is why it is
+an application rather than a fixture: a document built and asserted against never calls
+`createTui`, which is the surface F7 was about.
+
+**It builds through `b.plot` deliberately.** The catalogue, every fixture and every golden frame
+use `block({ … })`, the viewmodel constructor, which is transparent to any field — so the
+published builder is the one surface no artefact exercises for these forms, and F335's eight
+missing members were invisible from inside by construction. A row in its own suite asserts that no
+figure reaches past the builder, because the day one does, the example stops being able to find
+this class.
+
+**The examples are discovered rather than listed**, in `make check`, `make test` and `enforce`'s
+by-use population. All three named the two by hand, and two of them carry comments recording that
+they were added *because an example's declared script was invoked by nothing* — so a third example
+arriving unlisted is the same defect one turn later. The population is `examples/*/package.json`
+and the exception is named.
 
 Separate rather than a monorepo because R01 §8's argument generalises: **a workspace path alias proves nothing about the package being a package.** Missing files in `files`, a wrong `exports` map, unresolvable type declarations, a peer dependency that is really a hard one — all invisible from inside a workspace, all immediately visible from outside.
 
@@ -32,7 +53,7 @@ Separate rather than a monorepo because R01 §8's argument generalises: **a work
 
 ## 2. Dependency posture
 
-**Calcium has three runtime dependencies: `react`, `ink` and `lowlight`.**
+**Calcium has six runtime dependencies: `react`, `ink`, `lowlight`, `highlight.js`, `beautiful-mermaid` and `@xterm/headless`.**
 
 It had two for most of the specification, and that was worth saying because **two was a property that fell out of the specs rather than a target we were defending.** Every other candidate had an internal alternative the specs made better: `Intl.Segmenter` over a grapheme splitter, C10's own arithmetic over a colour library, an injected `() => number` over a date library.
 
@@ -51,6 +72,7 @@ Everything else is already in Node or is arithmetic the specs define, and that i
 | Filesystem (C20, C22) | Injected; `node:fs` at the boundary only |
 | Clock (C22) | Injected `() => number` — **no date library, ever** |
 | Terminal escapes (C01, C03) | String literals in one module |
+| Terminal **emulation** (C27) | `@xterm/headless` — the one row of this table that a dependency answers rather than the specs. The distinction: every entry above is arithmetic or a Node builtin, and a vt100 parser is neither |
 
 **The strongest supply-chain control is not having dependencies.** A scanner tells you about a compromised package after it is installed; an absent package cannot be compromised. A short direct-dependency list is a security property before it is an engineering one — which is why the bar for adding one is an argument, not a budget.
 
@@ -341,7 +363,7 @@ The reference app bumping is the release gate. It lives in another repo precisel
 ## 10. Commitments
 
 1. Every package is exercised as a package — by separation where the boundary is ownership, and by a sealed `exports` map plus a pack-and-install gate where it is resolution. `docker-tui` takes the second route (§1); `prism-tui` takes the first.
-2. Calcium has three runtime dependencies; the specs require no more. The count is an outcome of the justification bar, not a target.
+2. Calcium has six runtime dependencies; the specs require no more. The count is an outcome of the justification bar, not a target.
 3. A new dependency needs a justification in `DEPENDENCIES.md`, and A03 asserts the file matches `package.json`.
 4. `--ignore-scripts` from the first commit, for the whole tree. One dev dependency needs a native build, and it is invoked by name from `make install` rather than by re-enabling install scripts; A03 SS32 names it as its single exception.
 5. `npm ci` in CI, lockfile committed and reviewed.

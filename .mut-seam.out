@@ -1,0 +1,79 @@
+caught           U3       THE ARM: every text mark is clipped out of existence
+caught           SB       THE ARM: the absent datum draws, and the outlier does not
+caught           SB       THE ARM: the projector stops reading the figure's orientation
+caught           U6b      THE RUNG: the plot stacks at 8-bit, not at the colour floor
+caught           FD2      THE INTERACTION: a forest plot takes the boxplot's extent
+caught           FD3      THE DEFECT: a forest row with no estimate draws a point anyway
+caught           FD1      a median is emitted under the mean's role
+caught           FD4      a dumbbell's connector is drawn over its own ends
+caught           FT2      every strip lands at the root's depth
+caught           FN1      a tree's identity is read from the graph arm
+caught           FM4      THE INTERACTION: a matrix row takes the positional families' name
+caught           FM3      THE DEFECT: a matrix stops honouring its origin and draws flipped
+caught           FM2      the matrix's reading is inverted, so the ramp runs backwards
+caught           FM2      every matrix row lands on the first one
+caught           golden   the ramp's domain is computed again instead of read back
+caught           FB1      THE INTERACTION: the bar family's identity is the series, as a curve's is
+caught           FB3      THE DEFECT: the bar family's default orientation flips
+caught           FB2      the baseline is the data's floor, so the smallest bar is empty
+caught           FB4      every category's rect lands in the first slot
+caught           FB4      the rect's height is the raw value, not the normalised one
+caught           golden   the column arm nices the figure's range a second time
+caught           FS3      the size channel is normalised against the value series
+caught           FS3      THE DIVERGENCE: the figure quietly stops drawing the size channel
+caught           FS3      a missing size is a zero radius rather than an absence
+caught           U1a3     the tick count is a constant again, as the second arm had it
+caught           FC9      the scale is not passed, so a log axis gets linear ticks
+caught           FC7      THE INTERACTION: the family's orientation is read from the block
+caught           FC2      a run spans the gap a non-finite sample leaves
+caught           FC1      THE INTERACTION: the marks arrive already inverted
+caught           FC3      an annotation's entry leads the legend it is a claim about
+caught           FC6      segments stop replacing the series, so two lists exist again
+caught           FC3      THE DEFECT: the swatch is chosen from slot one, not the series' own
+caught           FC8      the marks carry no series slot, so every curve is series one
+caught           U7b      THE RECORD: an outlier is drawn with the mean's diamond
+caught           baseline THE RUNG: a coincident mean loses its own mark
+caught           baseline THE RUNG: a dumbbell's far end takes the near end's mark
+caught           U7e      THE ARM: a cap spans the whole slot
+caught           baseline THE RECORD: the terminal stops drawing a forest estimate at all
+caught           baseline THE CALL: a histogram draws its samples rather than its bins
+caught           baseline THE CALL: an ecdf draws its samples rather than its cumulative fraction
+caught           baseline THE CALL: a density plot draws its samples rather than its estimate
+caught           SB       THE SEAM: only the terminal derives, which is the state this rule was written about
+caught           baseline THE CALL: a field is drawn with the caller's own row labels, or none
+caught           baseline THE CALL: a quiver has no scalar field, so there is nothing under the arrows
+caught           baseline THE CALL: a calendar renders as the pre-calendar matrix it always drew
+caught           baseline THE SEAM: the field renderer takes the block it was given
+caught           U9       THE ARM: the second arm guesses its ramp again, as it did for the length of the pass
+caught           baseline THE SEAM: a form's default ramp is dropped, so only a declared one survives
+caught           SB       THE ARM: a contour draws its painted field and none of its iso-lines
+caught           SB       THE ARM: the crossings are the cell corners, so every iso-line is a staircase
+caught           SB       THE ARM: a still cell draws an arrow, which `atan2(0, 0)` points east
+caught           SB       THE CHANNEL: every arrow is one colour, so the magnitude is drawn nowhere
+caught           SB       THE RECORD: a matrix's identities go back on the x axis, naming nothing
+caught           baseline THE ARM: a horizon's fold loses its within-band height
+caught           G6       THE ARM: the fold is unclamped, so a pinned sample draws past the area
+caught           SB       THE FOLD: the stack is resampled to one column, so every band is a line
+caught           SB       THE AXIS: the stack takes the series' range rather than the fold's
+caught           SB       THE BASELINE: a waterfall's bars all start at zero, so it is a bar chart
+caught           SB       THE TOTAL: a total bar adds instead of restarting, so the sum is drawn twice
+SURVIVED         T1.102   THE NULL: a reading that is absent moves the running total anyway
+caught           SB       THE CALL: the second arm walks its own fold rather than calling the shared one
+caught           SB       THE ORIGIN: a gantt's tasks all start at the axis floor, so it is a bar chart
+caught           G6       THE FLOOR: a gantt zero-anchors like a bar, so a project starting late starts at zero
+caught           SB       THE CENTRE: a funnel's bars are anchored rather than centred, so it is a bar chart
+caught           SB       THE SHARE: a funnel gets a value axis, and its bars are widths
+caught           U10      THE SLOT: a categorical row takes the series' colour rather than its own
+caught           SB       THE BINS: every categorical row takes its own colour, including a histogram's
+caught           SB       THE PIN: a timeline's marks and its labels come from two ranges
+caught           G6       THE SHARED SCALE: a bullet's rows are put on one axis, which is what the form forbids
+caught           SB       THE TRACK: a timeline's rule stops at its first and last event
+caught           SB       THE DENSITY: a reading with no ramp is dropped, so four bands are one
+caught           U11      THE COLUMN: a refused child collapses the ones after it leftwards
+caught           U11      THE INHERITANCE: a composition refuses when any child does, rather than when none draws
+SURVIVED         SB       THE ID: two facets share a clip path, because the child keeps its own id
+caught           SB       THE GUTTER: a child's gutter is a share of its own column, so its labels clip
+caught           SB       THE FILL: a stacked band is an outline, so the reader integrates two curves
+
+2 survived — a finding about the tests, or about the sentence they were written from
+EXIT=1

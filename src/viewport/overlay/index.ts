@@ -7,6 +7,7 @@
 
 export { createOverlayManager } from "./manager.js";
 export { place, sortLayers } from "./place.js";
+export { takesInput } from "./types.js";
 export { OverlayError } from "./types.js";
 export type {
   DismissReason,

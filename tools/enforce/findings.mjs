@@ -93,8 +93,16 @@ function declared() {
  * `FINDINGS F70`, `(F58b)`, `see F14` — a bare `F1` inside an identifier or a
  * hex string is not one, so the number must be delimited and must not be part of
  * a longer word.
+ *
+ * **`U+F900` is the one hex form the word rule does not reach**, because `+` is
+ * not a word character while the `x` of `0xF900` and the `u` of `\uF900` both
+ * are — so those two were excluded from the day this was written and the Unicode
+ * form was not. It fired on a docstring naming a block of the width property, and
+ * the failure is the loud kind rather than the quiet one: it invents a citation
+ * rather than dropping one. Named as its own lookbehind rather than by adding `+`
+ * to the class, so the exclusion says which form it is about.
  */
-const CITATION = /(?<![A-Za-z0-9_])(F\d+[a-z]?)(?![A-Za-z0-9_])/gu;
+const CITATION = /(?<![A-Za-z0-9_])(?<!U\+)(F\d+[a-z]?)(?![A-Za-z0-9_])/gu;
 
 /**
  * Its own walk, and that is the whole reason this rule works.
@@ -327,6 +335,35 @@ export function checkTriageInventory(io) {
   // The declared total, which is the sentence that went stale. Per-group numbers
   // are not checked — see the limits above — but the total is derivable from the
   // same table and is what the self-check actually asserts.
+  //
+  // **The limit now carries its measurement, because an unrecorded figure reads
+  // as a small gap** (F434). Measured over the tree: **6 of 14 ranking rows
+  // disagree with the ids keyed in their own section**, by −1, +1, −3, +1, +4 and
+  // −1 — and **the total passes because the errors cancel**. So this check is
+  // not merely silent about attribution; it is satisfiable by a document where
+  // six rows are wrong.
+  //
+  // **The failure mode is one move**: write the entry beside the finding it
+  // relates to, increment the count on the group the finding belongs to. Two
+  // groups, one id, and the sum is unchanged. It happened twice in one session.
+  //
+  // **Not gated, and the reason is that "keyed" has no definition strong enough
+  // yet.** The loose reading — any bolded id in the section — counts a mention
+  // in another entry's prose; the strict one, an id opening a paragraph, leaves
+  // 8 ids of 435 owned by nothing and puts 7 of 14 rows out. Closing this means
+  // reconciling the counts first, and several of them carry prose meaning the
+  // column does not ("13 open, 5 closed"). A gate over numbers nobody maintains
+  // would be red on arrival and edited to fit.
+  //
+  // **Reconciled once, 2026-09-04, and the limit stayed.** Re-measured at 8 of 15
+  // rows out (−1, +1, −1, +1, +2, −1, −6, +6), with a fourth shape F434 had not
+  // named: F30 was keyed in two groups, so the per-section counts summed to 736
+  // against 735 distinct — a truthful column and this sum were not both
+  // satisfiable. Ruled one owner per id (F30 → group 4; group 7 cites it unbolded),
+  // §13's four ids moved home from the cohort table under §14, and the column
+  // rewritten from this reader's own count. Still not gated per row, for the
+  // reason above; the figure is here so the next drift is measured against a
+  // reconciled column rather than an unknown one.
   const declared = [...triage.matchAll(/^\|\s*(?:\*\*)?(?:\d+|—)(?:\*\*)?\s*\|[^|]*\|\s*(\d+)\s*\|/gmu)].map(
     (m) => Number(m[1]),
   );

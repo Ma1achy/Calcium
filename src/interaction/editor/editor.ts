@@ -91,6 +91,19 @@ export interface LineEditor {
   /** The degenerate case of a region: the whole buffer (§5b). */
   selectAll(): void;
   /**
+   * Drop the region and move nothing (§5b, I23).
+   *
+   * **The one collapse that is neither a motion nor an edit.** Every other
+   * collapse happens because something moved — `move` collapses by moving the
+   * caret, an edit by replacing the region, `undo` by restoring text. Copy mode
+   * needs the region gone with the caret where it is (F765: `#setCopyMode(true)`
+   * left `selection` standing and nothing here could clear it), so this drops
+   * the anchor and touches nothing else — not the text, not the history, not
+   * the kill run. A version written as `move("charLeft")` is right about the
+   * region and wrong about the caret, which is what T1.42 reads.
+   */
+  collapse(): void;
+  /**
    * The region, or `null` (I21).
    *
    * **`anchor === head` is `null`, not an empty region.** The caret has one
@@ -400,6 +413,14 @@ class Editor implements LineEditor {
     // line, which is what `lineStart`/`lineEnd` would give (T1.27).
     this.#anchor = 0;
     this.#cursor = count(this.#text);
+  }
+
+  collapse(): void {
+    // **No `close()`, no `endKill()`, no snapshot** (I23). Nothing moved and
+    // nothing changed, so there is no boundary to draw: closing the open unit
+    // here would make the first keystroke after copy mode a new undo unit for
+    // no edit the reader made.
+    this.#anchor = null;
   }
 
   /**

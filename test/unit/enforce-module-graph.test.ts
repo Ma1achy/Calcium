@@ -32,7 +32,7 @@ describe("A03 module graph", () => {
     //
     // A true observation promoted to a general claim, and the third instance of
     // a correct sentence justifying a scope it does not reach (F84, F125, F127).
-    // It is also why `make enforce` was green over the edge A03 §262 calls
+    // It is also why `make enforce` was green over the edge A03 §2 calls
     // hardest to undo: the rule worked, half its subject was invisible, and the
     // suite said so on purpose.
     const both = [

@@ -47,7 +47,7 @@ describe("PushedSurface public contract", () => {
     await h.tui.stop("exit");
   });
 
-  it("delivers deterministic legacy press/repeat/release events and restores the terminal mode", async () => {
+  it("delivers deterministic legacy press/repeat/release events", async () => {
     const h = await buildGraph();
     h.graph.lifecycle.acquire();
     const actions: SurfaceActionEvent[] = [];
@@ -57,7 +57,6 @@ describe("PushedSurface public contract", () => {
 
     expect(handle.inputFidelity).toBe("legacy_terminal");
     expect(h.graph.overlays.top?.id).toBe("game");
-    expect(h.stdout.output).toContain("[>11u");
 
     h.stdin.emit("a");
     h.stdin.emit("a");
@@ -70,7 +69,6 @@ describe("PushedSurface public contract", () => {
     expect(actions.map((event) => event.phase)).toEqual(["press", "repeat", "release"]);
     expect(closes).toEqual([{ reason: "application" }]);
     expect(h.graph.overlays.top).toBeNull();
-    expect(h.stdout.output).toContain("[<u");
     h.graph.lifecycle.release();
   });
 

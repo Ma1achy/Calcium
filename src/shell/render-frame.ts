@@ -30,7 +30,8 @@
  * composition; the boundary is where it was.
  */
 import { CURSOR_HOME as HOME, SGR_RESET, cursorTo } from "../terminal/escapes.js";
-import { cursorFor, paint, FrameError, type PaintDeps } from "./paint.js";
+import { cursorFor, paint, type PaintDeps } from "./paint.js";
+import { FrameError } from "./frame-error.js";
 import type { Composed } from "./frame.js";
 import type { TerminalSize } from "../terminal/lifecycle.js";
 

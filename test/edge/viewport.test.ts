@@ -6,6 +6,8 @@ import { describe, expect, it } from "vitest";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { createViewport } from "../../src/viewport/viewport/index.js";
 import { W, emptyDoc, measureSequence, renderEntry, rowsDoc, wrappingDoc } from "../support/viewport.js";
+import { measurable } from "../support/render.js";
+import type { Block } from "../../src/data/viewmodel/index.js";
 
 const mk = (height: number, cap?: number, width = W) => {
   const store = createTranscriptStore(cap === undefined ? {} : { cap });
@@ -252,7 +254,7 @@ describe("C14 edge — the anchor", () => {
 });
 
 describe("C14 edge — the frame agrees with the range", () => {
-  it("T3.19: the rows the range selects are the rows C09 draws, at every offset", () => {
+  it("T3.5b: the rows the range selects are the rows C09 draws, at every offset", () => {
     // The drift check in miniature, and the reason the walk is a step: a range
     // that is arithmetically self-consistent can still select rows that are not
     // the ones on screen. This slices the real render by the real range.
@@ -276,5 +278,45 @@ describe("C14 edge — the frame agrees with the range", () => {
 
       viewport.scrollBy(1);
     }
+  });
+
+  it("T3.19 (I23): a `code` window never opens inside a wrapped source line — the unit is the line", () => {
+    // **Units are source lines, not rows** (C14 §4a, C04 I82). Every line here
+    // is 50 cells and the width is 20, so each wraps to exactly three rows; a
+    // window landing inside one keeps the whole line and pays the surplus in
+    // `skipRows`/`dropRows`, which is `table`'s expanded-row shape one kind over
+    // (C09 I26). Asserted through the registry's `windowSequence` rather than
+    // the definition alone, because that is the seam the transcript takes.
+    const r = measurable();
+    const line = (i: number): string => `const value${String(i)} = "${"x".repeat(35)}";`.slice(0, 50);
+    const block = {
+      kind: "code",
+      id: "wrapped",
+      language: "typescript",
+      wrap: true,
+      text: Array.from({ length: 5 }, (_, i) => line(i)).join("\n"),
+    } as Block;
+    expect(r.measure(block, 20), "five lines of three rows").toBe(15);
+
+    // A window of one row over a block whose every line wraps to three → one
+    // unit, and the two residuals sum to the other two rows.
+    const one = r.window(block, 20, 4, 5);
+    expect(one?.skipRows, "row 4 is the middle row of line 1").toBe(1);
+    expect(one?.dropRows).toBe(1);
+    expect(r.measure(one?.block as Block, 20), "one unit").toBe(3);
+    expect((one?.block as { lineRange?: readonly [number, number] }).lineRange).toEqual([1, 2]);
+
+    // Opening in the middle of a wrapped line: the whole line is kept and the
+    // surplus above `from` is charged to `skipRows`.
+    const mid = r.window(block, 20, 4, 7);
+    expect(mid?.skipRows, "one row of line 1 above the window").toBe(1);
+    expect(mid?.dropRows, "two rows of line 2 past it").toBe(2);
+    expect(r.measure(mid?.block as Block, 20) - (mid?.skipRows ?? 0) - (mid?.dropRows ?? 0), "C09 I26").toBe(3);
+
+    // **And the rows are the ones the whole rendering put there**, so the
+    // arithmetic above is not merely self-consistent (C09 §2a).
+    const full = r.renderToLines(block, 20);
+    const kept = r.renderToLines(mid?.block as Block, 20);
+    expect(kept.slice(mid?.skipRows, kept.length - (mid?.dropRows ?? 0))).toEqual(full.slice(4, 7));
   });
 });

@@ -119,7 +119,10 @@ describe("C17 tier 5 — at a real prompt", () => {
       // holds the block as **one** entry: two hundred submissions would put two
       // hundred command rows on the screen, and the bottom of the frame is a
       // run of the pasted lines rather than a run of prompts.
-      const tail = pty.frame.slice(-6).map((r) => r.trimEnd());
+      // Eight rows, not six: the two rules around the prompt (C22 I81) sit in the
+      // frame's last four with the prompt and the footer, and the claim is about
+      // the output rows above them.
+      const tail = pty.frame.slice(-8).map((r) => r.trimEnd());
       // **`line-` and not `echo line-`**: what fills the tail is the far side's
       // *output*, because the chip resolved to two hundred commands and they
       // ran. The old form looked for the echoed command text, which the chip

@@ -17,6 +17,7 @@ import { describe, expect, it } from "vitest";
 import { block, validateBlock } from "../../src/data/viewmodel/index.js";
 import type { Block, BlockKind } from "../../src/data/viewmodel/index.js";
 import { b } from "../../src/shell/builders/index.js";
+import { liveDeclarations } from "../../src/shell/builders/live.js";
 import type { LiveSpec } from "../../src/shell/builders/types.js";
 import { defaulted, seq, wasDefaulted } from "../../src/shell/builders/seq.js";
 import { checkMeasurement, formatMeasurementReport } from "../../src/testing/index.js";
@@ -146,12 +147,71 @@ const BUILDERS: readonly Readonly<{
   // inside a composition rather than a section heading, and `finish(..., false)`
   // is what the builder passes.
   { name: "scroll", gaps: false, kind: "scroll", make: (o) => b.scroll(2, [b.raw("x")], o) },
+  {
+    name: "image",
+    gaps: false,
+    kind: "image",
+    make: (o) =>
+      b.image({
+        height: 2,
+        alt: "a red square",
+        data:
+          "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEU" +
+          "lEQVQImWO4o6GBFTEMLQkAe3tLAeVPQpUAAAAASUVORK5CYII=",
+        ...o,
+      }),
+  },
+  {
+    // **Returns a `mosaic`, and that is the point** — a composition rather than
+    // a kind (C04 §3h). The enumeration is over builders, so it gets a row
+    // whatever it returns.
+    name: "samples",
+    gaps: false,
+    kind: "mosaic",
+    make: (o) =>
+      b.samples({
+        columns: 2,
+        cellRows: 2,
+        items: [
+          {
+            alt: "a red square",
+            label: "red 1.00",
+            data:
+              "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEU" +
+              "lEQVQImWO4o6GBFTEMLQkAe3tLAeVPQpUAAAAASUVORK5CYII=",
+          },
+        ],
+        ...o,
+      }),
+  },
+  {
+    name: "mosaic",
+    gaps: false,
+    kind: "mosaic",
+    make: (o) => b.mosaic({ height: 2, areas: "AB", children: [b.raw("a"), b.raw("b")], ...o }),
+  },
   { name: "raw", gaps: false, kind: "raw", make: (o) => b.raw("plain text", o) },
   { name: "spinner", gaps: false, kind: "steps", make: (o) => b.spinner("pulling", o) },
+  // **`status` gains a row because T2.9 derives from `b`'s own surface** (C24
+  // I30). The count was a proxy once and went stale — `b.scroll` shipped with no
+  // row — so the enumeration is compared against `Object.keys(b)` by equality and
+  // a builder added without a row fails here. It did.
+  {
+    name: "status",
+    gaps: false,
+    kind: "status",
+    make: (o) => b.status({ message: "the far side is gone" }, null, 1, o),
+  },
+  {
+    name: "terminal",
+    gaps: false,
+    kind: "terminal",
+    make: (o) => b.terminal(40, [{ text: "=== test session starts ===" }], o),
+  },
 ];
 
-describe("C24 §4 — the nineteen builders", () => {
-  it("T2.9: the enumeration covers every block-returning builder, and nineteen is the count", () => {
+describe("C24 §4 — the twenty-four builders", () => {
+  it("T2.9: the enumeration covers every block-returning builder, and twenty-four is the count", () => {
     // The count is asserted so that adding a builder without a row fails here
     // rather than silently going untested — which is exactly how §4's paragraph
     // came to name two builders that did not exist.
@@ -173,6 +233,7 @@ describe("C24 §4 — the nineteen builders", () => {
       error: "cell shorthand", dim: "cell shorthand", meta: "cell shorthand",
       fill: "an Action", exec: "an Action", open: "an Action",
       live: "returns a Panel, and its own fixture is `liveParts` — C24 §7",
+      figure: "returns a FigureBuilder chain, not a Block — .build() produces the Block",
     };
     const blockBuilders = Object.keys(b).filter((k) => !Object.hasOwn(NOT_BLOCKS, k));
 
@@ -322,11 +383,12 @@ describe("C24 T4.2 — the two near-pairs, where only the frame separates them",
     // label. A builder that dropped it renders `100` where `100%` belongs, and
     // the gutter shifts with it.
     const r = kit();
+    // Row 0 is the frame's lid (C12 §3f), so the top label is on row 1.
     const axis = (blk: Block): string =>
       renderSequenceToLines(r.registry, seq([blk]), 40, {
         theme: DARK_THEME,
         capabilities: FULL_CAPS,
-      })[0] ?? "";
+      })[1] ?? "";
 
     const cpu = axis(
       b.plot({
@@ -362,12 +424,26 @@ describe("C24 T4.2 — the two near-pairs, where only the frame separates them",
     // is the code restated — what changed is the picture, and the picture is the
     // reason the field exists.
     const r = kit();
+    // **The y-label gutter, not the whole frame** (C12 I41). This joined the
+    // rendered lines and asked whether `0` appeared anywhere in them — a proxy
+    // for *the y axis reaches zero* that held only while nothing else in the
+    // picture wrote a number. The positional family has an x axis now, whose
+    // first label is the sample index `0`, and the control failed on a frame
+    // whose y axis was correct. The claim was always about the gutter, so that
+    // is what is read: everything left of the axis rule.
     const axis = (blk: Block): string =>
       renderSequenceToLines(r.registry, seq([blk]), 40, {
         theme: DARK_THEME,
         capabilities: FULL_CAPS,
       })
         .map((line) => visible(line))
+        // A row has a gutter only if it has an axis edge to the right of one.
+        // Splitting every row and keeping the head returns the *whole* x-label
+        // row, which carries no box-drawing character at all — so the first
+        // form of this narrowing still read the sample indices it was written
+        // to stop reading.
+        .filter((line) => /[┤│]/u.test(line))
+        .map((line) => line.split(/[┤│]/u)[0] ?? "")
         .join("\n");
 
     const flat = [100.0, 100.2, 100.1, 100.2];
@@ -462,6 +538,22 @@ describe("C24 §4 — the rulings that are not mechanical", () => {
     expect(kit().measure(nested, 60)).toBeGreaterThan(0);
   });
 
+  it("T4.2a (C12 I79, C24 §4): b.plot passes emptyMessage through, and the empty figure says it", () => {
+    // **The builder-side reader `plot-svg-path.test.ts` said was owed.** `b.plot`
+    // has declared and forwarded `emptyMessage` since 6c61593d, and until this
+    // row every test of the message reached the block through `vmBlock`, so the
+    // public door was the one path nothing constructed.
+    const p = b.plot({ id: "p", series: [{ values: [] }], height: 5, emptyMessage: "Waiting for the first epoch" });
+    expect(p.emptyMessage).toBe("Waiting for the first epoch");
+    expect(validateBlock(p).ok).toBe(true);
+    expect(kit().renderToLines(p, 60).map(visible).join("\n")).toContain("Waiting for the first epoch");
+
+    // The control — no message, and the default sentence rather than nothing.
+    const bare = b.plot({ id: "q", series: [{ values: [] }], height: 5 });
+    expect(bare.emptyMessage).toBeUndefined();
+    expect(kit().renderToLines(bare, 60).map(visible).join("\n")).not.toContain("Waiting for the first epoch");
+  });
+
   it("T3.1: b.table with zero columns is valid and renders its empty message", () => {
     const t = b.table({ columns: [], rows: [], emptyMessage: "no containers" });
     expect(validateBlock(t).ok).toBe(true);
@@ -525,10 +617,139 @@ describe("C24 §5 — b.live", () => {
     expect(part.kind).toBe("panel");
     expect(part.title).toBe("activity");
     expect(part.children).toHaveLength(1);
+    // **A `status` at `loading`, not a `notice`** (C23 I51). The notice was
+    // static and this animates — `elapsedMs` gives the box something to say
+    // while it waits, and the spinner says it is still trying.
+    //
+    // **Height 1, and it took two frame reads** (F234, F235). The panel above
+    // already draws the border and holds the title, so 3 spends a row on a
+    // second border; and 2 drew `loading` over `⠋ loading` — the same word
+    // twice, with every count agreeing. C09 I31's one-row rung gives `loading`
+    // the line that moves, because a waiting box has no cause to state.
     expect(part.children[0]?.kind, "the placeholder is there before anything fetches").toBe(
-      "notice",
+      "status",
     );
+    expect(part.children[0], "and it is the waiting state, sized for the panel").toMatchObject({
+      state: "loading",
+      height: 1,
+    });
     expect(validateBlock(part).ok, "and it is a valid block").toBe(true);
+  });
+
+  it("T1.6 (C24 I30, §4b, §8d): b.status builds all three states, and derives what it must", () => {
+    // **The kind the framework returns from three places and no builder made.**
+    // `/faults` in `examples/plots` drew every failure as `b.notice("error", …)`
+    // — a red line of text where the framework draws a bordered box with a tag,
+    // a spinner and a countdown — and the obvious reading, that the demo was
+    // hand-rolling a shipped kind, was wrong. `b` had thirty builders and none
+    // was `status`, `block()` is not exported, and both example apps had made the
+    // same substitution independently. *An overridable rendering that can only
+    // render worse is the contract half-kept.*
+    //
+    // **The parameters are `renderError`'s own, in its own order**, which is what
+    // makes `renderError: b.status` the null override and
+    // `b.group("column", [history, b.status(err, retryInMs, attempt)])` the useful
+    // one — the shape that keeps the data the default replaces outright.
+    const failed = b.status({ message: "the far side is gone" }, null, 1);
+    expect(failed.kind).toBe("status");
+    // **`null` means no retry is coming**, which C23 §3d rule 3 makes true of
+    // every one-shot and every deterministic `render` throw. Mapping it to
+    // `retrying` draws a blank row where the spinner goes (F234).
+    expect(failed, "no countdown, so no activity line to draw").toMatchObject({
+      state: "error",
+      height: 1,
+      message: "the far side is gone",
+    });
+    expect("retryInMs" in failed, "and nothing invented for the absent arm").toBe(false);
+
+    const backing = b.status({ message: "ECONNREFUSED" }, 4000, 3);
+    expect(backing, "the countdown and the attempt are relayed, not computed").toMatchObject({
+      state: "retrying",
+      height: 2,
+      retryInMs: 4000,
+      attempt: 3,
+    });
+
+    const waiting = b.status.loading();
+    expect(waiting, "the third state has no error to be handed, so its own door").toMatchObject({
+      state: "loading",
+      height: 1,
+    });
+
+    // **What stays the framework's, which is the whole of the scoping** (C24 §4b).
+    // MG27 refuses a builder because *the state is observed, never declared*, and
+    // that is right about a consumer **claiming** one. A `renderError` override is
+    // *handed* the error, the countdown and the attempt, so relaying them is not
+    // claiming — and the members that decide geometry are still not parameters.
+    for (const bl of [failed, backing, waiting]) {
+      expect("elapsedMs" in bl, "the clock is the driver's").toBe(false);
+      expect("spinner" in bl, "the frame set is the renderer's, per capability set").toBe(false);
+      // **`framed` is the container's answer and this door never gives it**
+      // (C09 §3a, F406). It is asserted here rather than in `BUILDER_OMISSIONS`
+      // because a builder *in the same file* does set it — `framedStatus`, for
+      // the one caller that puts the box inside `b.live`'s panel — so MG27 reads
+      // the field as reachable and cannot see which door reaches it. A rule that
+      // asks *does the file set this* cannot answer *can a consumer*, and the
+      // difference is the whole of the member.
+      //
+      // What a consumer would be guessing about is furniture it cannot see: a
+      // `renderError` override composing its own `group` is not a container that
+      // draws a border, so an app answering this would be answering for the
+      // panel above it.
+      expect("framed" in bl, "the container's answer, never the consumer's").toBe(false);
+      expect(validateBlock(bl).ok, "and each is a valid block").toBe(true);
+    }
+  });
+
+  it("T1.6a (C24 I30, F234, F235): the height is derived, because it is a frame read", () => {
+    // **The one member the scoping does not reach, and the reason is measured.**
+    // 1 and 2 are not arithmetic: both boxes land inside `b.live`'s own panel, so
+    // three rows spend one on a second border inside the first, and two rows drew
+    // `loading` over `⠋ loading` — the same word twice, with `measure` saying 2,
+    // `render` drawing 2, and no assertion about rows or precedence able to fail.
+    //
+    // A consumer choosing a height reintroduces exactly that, so `height` is not
+    // an argument. Asserted as the **absence of a way to pass one**: the third
+    // positional is the attempt, and `BlockOpts` carries `id` and `gapBefore`.
+    const opts = { id: "mine", gapBefore: true } as const;
+    const withOpts = b.status({ message: "x" }, null, 1, opts);
+    expect(withOpts.id, "the id is the consumer's, as on every builder").toBe("mine");
+    expect(withOpts.height, "the height is not").toBe(1);
+    expect(Object.keys(opts).includes("height"), "BlockOpts has no height to smuggle one in").toBe(
+      false,
+    );
+  });
+
+  it("T1.6b (C24 I30): the framework's default renderError *is* the builder", () => {
+    // **The anti-drift half of the ruling, and the reason the literals came out
+    // of `execution.ts` and `builders/index.ts`.** This kind was constructed in
+    // three places; two of them were a declaration's default, and a copy drifts —
+    // the one that drifts being the one with fewer tests. Now the consumer's
+    // override and the framework's fallback are the same code, so a change to one
+    // is a change to both or a failure here.
+    //
+    // Asserted by **equality of the built blocks** rather than by reading
+    // `execution.ts`, because a source assertion measures the prose.
+    const part = b.live({
+      ...base,
+      every: 1000,
+      fetch: () => Promise.reject(new Error("gone")),
+      render: () => b.raw("x"),
+    });
+    const spec = liveDeclarations([part])[0]?.spec;
+    expect(spec, "the declaration is readable from the side that made it").toBeDefined();
+    // The default is installed by C23 rather than by the builder, so what is
+    // checked here is the shape the builder produces for the same arguments —
+    // T1.40 and T1.40b drive the real default through the pipeline.
+    const err = { message: "gone" };
+    expect(b.status(err, 2000, 2)).toMatchObject({
+      kind: "status",
+      state: "retrying",
+      height: 2,
+      retryInMs: 2000,
+      attempt: 2,
+    });
+    expect(b.status(err, null, 2)).toMatchObject({ kind: "status", state: "error", height: 1 });
   });
 
   it("T1.4b: renderLoading replaces the placeholder and nothing else", () => {

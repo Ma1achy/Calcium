@@ -20,6 +20,9 @@ import { report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const CMD = "npx vitest run test/unit/session-paint.test.ts test/unit/editor.test.ts";
 const PAINT = "src/shell/paint.ts";
+// The 1-bit rung lives in L1 since 2026-09-05 (F769): `shell/paint.ts` imports
+// `selectionStyle` rather than holding a private copy of the ladder.
+const L1_PAINT = "src/presentation/blocks/paint.ts";
 const LAYOUT = "src/interaction/editor/layout.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
@@ -91,7 +94,7 @@ const MUTATIONS = [
     // nothing, so the wash silently becomes no styling at all — the ladder
     // falls from a background straight to a glyph with nothing in between.
     name: "there is no reverse-video fallback at 1-bit",
-    file: PAINT,
+    file: L1_PAINT,
     from: "  return bg.background === undefined ? { inverse: true } : bg;",
     to: "  return bg;",
     expect: "T4.25",

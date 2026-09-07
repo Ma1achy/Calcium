@@ -120,13 +120,14 @@ describe("C10 fail-on-revert", () => {
   it("T6.9 (I13): putting an ANSI index in a token file → T2.5 fails", () => {
     const rule = SCANS.find((s) => s.id === "SS19");
     expect(rule?.scope).toBe("src/presentation/theme/");
-    // The allow-list is one named file. Narrowing the *scope* instead would stop
-    // seeing a new token file the day someone adds one.
-    expect(rule?.allow).toEqual(["src/presentation/theme/four-bit.ts"]);
+    // The rule covers the directory and names no exception — `four-bit.ts`'s
+    // entry never matched and SS53 removed it. Narrowing the *scope* instead
+    // would stop seeing a new token file the day someone adds one.
+    expect(rule?.allow).toEqual([]);
   });
 
   it("T6.10 (I7): C10 calling the scheduler directly → T4.4's spy fails", () => {
-    // Asserted structurally until L4 exists: nothing in `theme/` names the
+    // Asserted structurally (written before L4 existed; L4 is built at 2026-09-03): nothing in `theme/` names the
     // scheduler, so it cannot be calling it.
     const source = SCANS.map((s) => s.id);
     expect(source).toContain("SS28"); // L4 orchestrates; the layers below do not commit

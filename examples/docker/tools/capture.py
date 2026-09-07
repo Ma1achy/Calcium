@@ -36,6 +36,30 @@ import time
 # cheap to notice.
 APP = ["./bin/docker-tui.js"]
 
+# `/theme` persists its statement here (C22 I40), and a statement outlives the
+# session that made it — which is right for a reader and wrong for a recording.
+STATE_THEME = ".calcium/theme"
+
+
+def forget_theme() -> None:
+    """Remove the persisted `/theme` statement before a shot (F811).
+
+    `media.py`'s `theme-light` shot types `/theme light`, the shell writes it to
+    `.calcium/theme`, and **every capture made afterwards opens in the light
+    variant** — the screencast and the whole media set were re-recorded on a
+    light ground three weeks later, from a file born the day of the last light
+    shot. The shell is right: a stated theme is the user's and is honoured on the
+    next start. A recording is not a user, so the statement is cleared before
+    each one rather than after the one that wrote it — an order-dependent
+    cleanup is the same defect one crash away.
+
+    Only the theme. `history` is a transcript's own and the shots do not read it.
+    """
+    try:
+        os.remove(STATE_THEME)
+    except FileNotFoundError:
+        pass
+
 
 def run(
     cols: int,

@@ -8,7 +8,8 @@ import { validateDocument } from "../../src/data/viewmodel/index.js";
 import { doc } from "../support/blocks.js";
 import type { Block, ColumnDef, Table } from "../../src/data/viewmodel/index.js";
 
-const r = measurable({ definitions: [tableDefinition] });
+// The cap (C14 I24) raised: T3.9 and T3.16 are about the table's own arithmetic at 3 001 and 10 001 rows.
+const r = measurable({ definitions: [tableDefinition], maxBlockRows: 20_000 });
 const ascii = measurable({ definitions: [tableDefinition], capabilities: ASCII_CAPS });
 
 function widthsOf(lines: readonly string[]): readonly number[] {

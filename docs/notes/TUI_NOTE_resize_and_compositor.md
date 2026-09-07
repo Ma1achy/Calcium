@@ -71,10 +71,21 @@ rather than on the string.
 
 ## Why the drag case is not the hard one
 
-`SIGWINCH` during a drag fires many times. D31's decision not to debounce means many
-full repaints — and that is affordable precisely because of virtualisation: each
-repaint writes the visible range, roughly forty rows, not the transcript.
+**MEASURED 2026-09-01, and this section reasoned about the half that is cheap** (F423,
+F425). What it says about the *write* is right and stays: virtualisation means a repaint
+writes the visible range, roughly forty rows, not the transcript. What it never mentions
+is the **measure**. C14 selects visible rows, so the render is `O(visible)` — and the
+index needs a height for every entry, so a width change re-measures `O(transcript)`.
+**A width change is the one event whose cost scales with the whole transcript rather
+than the screen, and virtualisation is what makes the two diverge.**
 
-That is worth stating because it is counter-intuitive. Uncoalesced resize sounds
-expensive and is cheap, while a debounced resize would show a stale frame during the
-drag, which is the thing users notice. C01 T5.4's continuous-drag case exists for it.
+So *uncoalesced resize sounds expensive and is cheap* was the conclusion, and the
+measurement is **544 ms of blocking work for a 30-event drag at a thousand entries** —
+of which the Fenwick rebuild the roadmap later named is 0.07%. The reasoning is sound
+about writes and the claim it licensed is about cost.
+
+**What survives is the second sentence, and it is why the fix is a window and not a
+debounce**: a debounced resize shows a stale frame for as long as the drag lasts, which
+is the thing users notice. A fixed 16 ms deadline does not — it draws throughout, at
+most one window behind. D31 is amended to say so, and C01 T5.4's continuous-drag case
+exists for exactly the property the amendment preserves.

@@ -1,0 +1,8 @@
+── heatmap · both-axes-narrow · 1bit · 80w
+[2m eu-west-1-primary-db ┤[22m⠶⠶⠿⠿⠿⠿⡿⣿⣿⣿⣿⣿⣿⣿⡿⡿⠿⠷⠷⠶⠶⠖⠖⠔⠄⠄⠄⠄⠄⠄⠄⠔⠔⠖[2m├ eu-west-1-primary-db [22m
+[2m eu-west-1-replica-db ┤[22m⠿⠿⠿⠿⡿⡿⣿⣿⣿⣿⣿⣿⡿⡿⠿⠿⠷⠶⠶⠖⠖⠔⠔⠄⠄⠄⠄⠄⠄⠔⠔⠖⠖⠶[2m├ eu-west-1-replica-db [22m
+[2m us-east-1-primary-db ┤[22m⠿⠿⡿⡿⣿⣿⣿⣿⣿⣿⣿⡿⠿⠿⠷⠷⠶⠖⠖⠔⠔⠄⠄⠄⠄⠄⠄⠄⠔⠖⠖⠶⠶⠷[2m├ us-east-1-primary-db [22m
+[2m us-east-1-replica-db ┤[22m⡿⡿⣿⣿⣿⣿⣿⣿⣿⡿⡿⠿⠷⠷⠶⠶⠖⠔⠔⠄⠄⠄⠄⠄⠄⠄⠔⠔⠖⠶⠶⠷⠷⠿[2m├ us-east-1-replica-db [22m
+[2map-south-1-primary-db ┤[22m⣿⣿⣿⣿⣿⣿⣿⡿⡿⠿⠿⠷⠶⠶⠖⠖⠔⠄⠄⠄⠄⠄⠄⠄⠔⠔⠖⠖⠶⠷⠷⠿⠿⡿[2m├ ap-south-1-primary-db[22m
+
+[2m-1 ⠄⠔⠖⠶⠷⠿⡿⣿ 1[22m

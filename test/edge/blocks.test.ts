@@ -3,10 +3,14 @@ import { describe, expect, it } from "vitest";
 import { block } from "../../src/data/viewmodel/index.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
+import type { BlockFault, BlockRegistry } from "../../src/presentation/blocks/index.js";
 import { cells } from "../../src/presentation/text.js";
-import { renderToLines } from "../../src/presentation/render-lines.js";
-import { ONE_PER_KIND } from "../support/blocks.js";
-import { ASCII_CAPS, DARK_THEME, FULL_CAPS, measurable, visible } from "../support/render.js";
+import { scrollDefinition } from "../../src/presentation/blocks/kinds/containers.js";
+import { renderSequenceToLines, renderToLines } from "../../src/presentation/render-lines.js";
+import { CORPUS, ONE_PER_KIND } from "../support/blocks.js";
+import { tableDefinition } from "../../src/presentation/table/index.js";
+import { planColumns } from "../../src/presentation/table/plan.js";
+import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LOUD, measurable, visible } from "../support/render.js";
 
 describe("C09 §6 — the transition table's remaining cells", () => {
   it("T3.1: measure before seal works", () => {
@@ -191,19 +195,40 @@ describe("C09 tier 3 — widths", () => {
 });
 
 describe("C09 tier 3 — containment", () => {
-  /** A definition that fails in one half only, so the other's containment is visible. */
-  function broken(part: "measure" | "render") {
+  /**
+   * A definition that fails in one half only, so the other's containment is
+   * visible.
+   *
+   * **The height is a parameter and it did not used to be.** Fixed at 2, every
+   * assertion below could be satisfied by a boundary that answers a constant —
+   * which is what shipped, and what T3.13 read as correct (F223).
+   */
+  function broken(part: "measure" | "render", height = 2) {
     return {
       kind: "broken",
       measure: (): number => {
         if (part === "measure") throw new Error("measurer exploded");
-        return 2;
+        return height;
       },
       render: (): never => {
         throw new Error("renderer exploded");
       },
     };
   }
+
+  /** A registry that records what its containments swallowed (I29). */
+  function recording(definition: unknown, defaults = false) {
+    const faults: BlockFault[] = [];
+    const registry = createBlockRegistry({
+      defaults,
+      onError: (fault) => faults.push(fault),
+    });
+    if (definition !== null) registry.register(definition as never);
+    return { registry, faults };
+  }
+
+  const paint = (registry: BlockRegistry, b: Block, width = 60): readonly string[] =>
+    renderToLines(registry, b, width, { theme: DARK_THEME, capabilities: FULL_CAPS }).map(visible);
 
   it("T3.20 (I21): a rule with no label draws an unbroken line", () => {
     // **Found by reading a frame, and reachable by nothing else here.** The
@@ -223,9 +248,8 @@ describe("C09 tier 3 — containment", () => {
     expect(render("hunk"), "and a labelled rule is unchanged").toMatch(/^── hunk ─+$/u);
   });
 
-  it("T3.13 (I11): a throwing renderer is contained to its block", () => {
-    const registry = createBlockRegistry({});
-    registry.register(broken("render") as never);
+  it("T3.13 (I11): a throwing renderer is contained to its block, at the height it measured", () => {
+    const { registry, faults } = recording(broken("render"), true);
 
     const document = block({
       kind: "group",
@@ -238,24 +262,336 @@ describe("C09 tier 3 — containment", () => {
       ],
     });
 
-    const lines = renderToLines(registry, document, 60, {
+    const lines = paint(registry, document);
+
+    expect(lines[0]).toContain("before");
+    expect(lines[1], "the failure is stated, not hidden").toContain("failed to render");
+    expect(lines[1], "and it carries what was thrown").toContain("renderer exploded");
+    // **`lines[3]`, and the reason is the fixture rather than the code.**
+    // `broken("render")` measures 2, so the sibling sits at 3 the moment the
+    // error block is the height it was measured at. `lines[2]` was the position
+    // the frame took *because* the error block was one row — a number that read
+    // as an assertion about containment and was an assertion about the defect.
+    expect(lines[2]?.trim(), "the second committed row is blank, not borrowed").toBe("");
+    expect(lines[3], "siblings are unaffected in position as well as content").toContain("after");
+
+    expect(faults.map((f) => `${f.kind}.${f.member}`), "the swallow is reported").toEqual([
+      "broken.render",
+    ]);
+  });
+
+  it("T3.14 (I11, I29): a throwing measurer is contained at one row, and the render is replaced", () => {
+    // This one protects virtualisation rather than the frame: C14 sums measured
+    // heights without rendering, so a measurer that throws takes the viewport
+    // with it.
+    const { registry, faults } = recording(broken("measure"), true);
+    const bad = { kind: "broken", id: "bad" } as unknown as Block;
+
+    expect(() => registry.measure(bad, 80)).not.toThrow();
+    expect(registry.measure(bad, 80)).toBe(1);
+
+    // **The render is replaced rather than truncated to the fallback.** The
+    // definition's own renderer throws here too, but the point is which message
+    // arrives: a measurer that gave way is named as one, so a block showing a
+    // fifth of a drawing with nothing saying so is not a state this can reach.
+    const lines = paint(registry, bad);
+    expect(lines, "exactly the contained height").toHaveLength(1);
+    expect(lines[0]).toContain("failed to measure");
+
+    expect(faults.map((f) => f.member), "reported, not merely survived").toContain("measure");
+  });
+
+  it("T3.33 (I11): the error block is exactly the height that was measured, at four of them", () => {
+    // All four, because the defect answered 1 to all four: one height cannot
+    // tell a bound from a constant.
+    for (const height of [1, 2, 5, 20]) {
+      const { registry } = recording(broken("render", height), true);
+      const bad = { kind: "broken", id: "bad" } as unknown as Block;
+
+      expect(registry.measure(bad, 60), `measure at ${String(height)}`).toBe(height);
+      expect(paint(registry, bad), `render at ${String(height)}`).toHaveLength(height);
+    }
+  });
+
+  it("T3.34 (I11): a sequence measures what it renders, and the frame is where it is read", () => {
+    const { registry } = recording(broken("render", 20), true);
+    const sequence: readonly Block[] = [
+      block({ kind: "raw", id: "before", text: "BEFORE" }),
+      { kind: "broken", id: "bad" } as unknown as Block,
+      block({ kind: "raw", id: "after", text: "AFTER" }),
+    ];
+
+    const measured = registry.measureSequence(sequence, 60);
+    const drawn = renderSequenceToLines(registry, sequence, 60, {
       theme: DARK_THEME,
       capabilities: FULL_CAPS,
     }).map(visible);
 
-    expect(lines[0]).toContain("before");
-    expect(lines[1], "the failure is stated, not hidden").toContain("failed to render");
-    expect(lines[2], "siblings are unaffected").toContain("after");
+    // Measured at 22 against 3 before the fix (F223).
+    expect(measured, "the sequence's own arithmetic").toBe(22);
+    expect(drawn, "and what it actually draws").toHaveLength(measured);
+    // **The frame, not the count.** Every count agreed the whole time this was
+    // wrong; only the row the trailing block lands on could disagree.
+    expect(drawn[21], "the last block sits where the measurement put it").toContain("AFTER");
   });
 
-  it("T3.14 (I11): a throwing measurer is contained and the block treated as one row", () => {
-    // This one protects virtualisation rather than the frame: C14 sums measured
-    // heights without rendering, so a measurer that throws takes the viewport
-    // with it.
-    const registry = createBlockRegistry({});
-    registry.register(broken("measure") as never);
+  it("T3.35 (I29): a sink that throws makes a caught error fail the run", () => {
+    const registry = createBlockRegistry({ defaults: true, onError: LOUD });
+    registry.register(broken("render") as never);
 
-    expect(() => registry.measure({ kind: "broken", id: "bad" } as unknown as Block, 80)).not.toThrow();
-    expect(registry.measure({ kind: "broken", id: "bad" } as unknown as Block, 80)).toBe(1);
+    expect(() => paint(registry, { kind: "broken", id: "bad" } as unknown as Block)).toThrow(
+      /containment swallowed/u,
+    );
+
+    // The control: the same registry, the same sink, a block that does not
+    // throw. Without it this row asserts the harness rather than the boundary.
+    expect(() => paint(registry, block({ kind: "raw", id: "ok", text: "fine" }))).not.toThrow();
+  });
+
+  it("T3.36 (I30, C26 I12): a leaf whose `elements` throws loses its own and no other", () => {
+    const { registry, faults } = recording(null);
+    for (const kind of ["good", "bad"]) {
+      registry.register({
+        kind,
+        measure: (): number => 3,
+        render: (): never => ONE_PER_KIND.rule as never,
+        elements: (): unknown => {
+          if (kind === "bad") throw new TypeError("elements exploded");
+          return [{ id: `${kind}-e0`, rows: { from: 0, to: 1 }, cols: { from: 0, to: 1 }, level: "row" }];
+        },
+      } as never);
+    }
+
+    const found = registry.elementsIn(
+      [
+        { kind: "good", id: "g1" },
+        { kind: "bad", id: "b" },
+        { kind: "good", id: "g2" },
+      ] as unknown as Block[],
+      60,
+    );
+
+    expect(found.map((f) => f.blockId), "two of three answer").toEqual(["g1", "g2"]);
+    expect(faults.map((f) => f.member)).toEqual(["elements"]);
+  });
+
+  it("T3.37 (I30): a container whose `elements` throws keeps its children reachable", () => {
+    // **The control is the row.** Both arms must find the children: the defect
+    // answered 0 against the control's 4, and an assertion on the throwing arm
+    // alone passes at either number.
+    const build = (throws: boolean) => {
+      const { registry } = recording(null);
+      registry.register({
+        kind: "kv",
+        measure: (): number => 2,
+        render: (): never => ONE_PER_KIND.rule as never,
+        elements: (): unknown => [
+          { id: "e0", rows: { from: 0, to: 1 }, cols: { from: 0, to: 1 }, level: "row" },
+          { id: "e1", rows: { from: 1, to: 2 }, cols: { from: 0, to: 1 }, level: "row" },
+        ],
+      } as never);
+      registry.register({
+        kind: "scroll",
+        measure: (): number => 6,
+        render: (): never => ONE_PER_KIND.rule as never,
+        ...(throws
+          ? {
+              elements: (): unknown => {
+                throw new TypeError("elements exploded");
+              },
+            }
+          : {}),
+      } as never);
+
+      return registry.elementsIn(
+        [
+          {
+            kind: "scroll",
+            id: "s",
+            children: [
+              { kind: "kv", id: "kid-1" },
+              { kind: "kv", id: "kid-2" },
+            ],
+          },
+        ] as unknown as Block[],
+        60,
+      );
+    };
+
+    const control = build(false).map((f) => f.blockId);
+    expect(control, "the control: a container declaring nothing is descended into").toEqual([
+      "kid-1",
+      "kid-1",
+      "kid-2",
+      "kid-2",
+    ]);
+    expect(
+      build(true).map((f) => f.blockId),
+      "and a container whose `elements` threw is not owned by a member that did not answer",
+    ).toEqual(control);
+  });
+});
+
+describe("C09 §3, I33 — C04's floor, applied by the registry", () => {
+  const kit = measurable();
+  const short = { kind: "notice", id: "n", tone: "info", text: "one" } as unknown as Block;
+  const floored = (rows: number, over: Record<string, unknown> = {}): Block =>
+    ({ ...short, ...over, minHeight: rows }) as unknown as Block;
+
+  it("T3.53 (I33, C04 I67): `measure` is the maximum, and a taller block keeps its own", () => {
+    expect(kit.measure(short, 40)).toBe(1);
+    expect(kit.measure(floored(3), 40)).toBe(3);
+
+    // **The arm a floor-always-wins implementation passes the other rows with.**
+    // A `logs` of four lines measures four; a floor of two must not lower it.
+    const logs = {
+      kind: "logs",
+      id: "l",
+      lines: ["a", "b", "c", "d"].map((m) => ({ ts: "12:00", level: "info", message: m })),
+    } as unknown as Block;
+    const own = kit.measure(logs, 40);
+    expect(own).toBeGreaterThan(2);
+    expect(kit.measure({ ...logs, minHeight: 2 } as unknown as Block, 40)).toBe(own);
+  });
+
+  it("T3.54 (I33, I1): the render pads to the floor and never bounds it", () => {
+    // The pair I1 is about: one number from one field, taken by both sides.
+    expect(kit.renderToLines(floored(3), 40)).toHaveLength(3);
+    expect(kit.measure(floored(3), 40)).toBe(3);
+
+    // **The half that matters, and it is a measurement about Ink rather than
+    // about us.** A box with a fixed `height` holding more rows than it declares
+    // drops its **first** row — `1 2 3 4` in a `height: 3` box renders `2 3 4` —
+    // and `overflowY: "hidden"` does not change it. So a bound here would
+    // silently behead a block that grew, which is the truncation this mechanism
+    // exists to stop, arriving through the mechanism.
+    const logs = {
+      kind: "logs",
+      id: "l",
+      lines: ["FIRST", "b", "c", "d"].map((m) => ({ ts: "12:00", level: "info", message: m })),
+    } as unknown as Block;
+    const drawn = kit.renderToLines({ ...logs, minHeight: 2 } as unknown as Block, 40);
+    expect(drawn).toHaveLength(kit.measure(logs, 40));
+    expect(drawn.join("\n"), "the first row is still there").toContain("FIRST");
+  });
+
+  it("T3.55 (I33, I2): no definition sees the floor", () => {
+    // **`scroll` is the one to ask.** C04 §3c rules its residue row a function of
+    // `(block, width)` and deliberately not of view state, because a box that
+    // shrank as a reader scrolled would jitter — so a floor reaching the
+    // definition would reopen an argument settled two components away.
+    const scroll = {
+      kind: "scroll",
+      id: "s",
+      height: 2,
+      children: [short, { ...short, id: "n2" }, { ...short, id: "n3" }],
+    } as unknown as Block;
+    expect(scrollDefinition.measure(scroll as never, 40, kit.measure)).toBe(
+      scrollDefinition.measure({ ...scroll, minHeight: 9 } as never, 40, kit.measure),
+    );
+  });
+
+  it("T3.52 (C04 I68, I26): a block carrying a floor is not windowed", () => {
+    // **The build sharpened the walk here.** The ruling was *a slice carries no
+    // floor*, which is true and insufficient: `windowSequence` derives its `to`
+    // from the **floored** height, so a `window` reaching only the definition's
+    // own rows breaks I26's identity from outside the definition, where nothing
+    // would look. Kept whole and paid out of `skipRows`, as a kind declaring no
+    // `window` already is.
+    const lines = Array.from({ length: 20 }, (_, i) => ({
+      ts: "12:00",
+      level: "info" as const,
+      message: `line ${String(i)}`,
+    }));
+    const logs = { kind: "logs", id: "l", lines } as unknown as Block;
+    const tall = { ...logs, minHeight: 30 } as unknown as Block;
+
+    const plain = kit.registry.windowSequence([logs], 40, 5, 10);
+    expect(plain.skipRows, "an unfloored block is windowed").toBe(0);
+    expect(kit.measure(plain.blocks[0] as Block, 40)).toBeLessThan(kit.measure(logs, 40));
+
+    const kept = kit.registry.windowSequence([tall], 40, 5, 10);
+    expect(kept.blocks[0], "the floored block is the block").toBe(tall);
+    expect(kept.skipRows, "and its rows are paid out of slack").toBe(5);
+  });
+});
+
+describe("C09 §2c width — the answers (I42–I44)", () => {
+  const kit = measurable({ definitions: [tableDefinition as never] });
+  const w = (b: Block, at: number): number => kit.registry.width(b, at);
+
+  it("T3.67 (C09 I43): a block is the same height at its content width, over the corpus and widths 7…80", () => {
+    const corpus = CORPUS.filter((b) => !["plot", "patch"].includes(b.kind));
+    const failures: string[] = [];
+    for (const b of corpus) {
+      for (let at = 7; at <= 80; at += 1) {
+        const cw = w(b, at);
+        if (cw < 1 || cw > at) failures.push(`${b.kind} ${b.id}: width ${String(cw)} at ${String(at)} is outside [1, ${String(at)}]`);
+        if (kit.measure(b, cw) !== kit.measure(b, at)) {
+          failures.push(`${b.kind} ${b.id}: ${String(kit.measure(b, cw))} rows at ${String(cw)}, ${String(kit.measure(b, at))} at ${String(at)}`);
+        }
+      }
+    }
+    expect(failures).toEqual([]);
+  });
+
+  it("T3.68 (C09 I42, C09 I44): the text kinds answer their edge and the residual-absorbing forms fill", () => {
+    const notice = block({ kind: "notice", id: "n", tone: "info", text: "abcdefghi" });
+    expect(w(notice, 40)).toBe(9);
+    expect(w(notice, 7), "clamped to the cell when it wraps").toBe(7);
+    expect(w(block({ kind: "raw", id: "r", text: "abc\nabcdefghijkl\nabcde" }), 40)).toBe(12);
+    const pills = block({ kind: "pills", id: "p", chips: [{ id: "a", label: "one" }, { id: "b", label: "two" }] });
+    expect(w(pills, 40), "two chips and the gap").toBe(3 + 2 + 3);
+    const bar = block({
+      kind: "keyValue", id: "kv",
+      rows: [{ label: "cpu", value: "50%", bar: { value: 50, max: 100 }, barWidth: 10 }],
+    });
+    expect(w(bar, 40), "a bar absorbs the residual").toBe(40);
+    const plain = block({ kind: "keyValue", id: "kv2", rows: [{ label: "cpu", value: "50%" }, { label: "memory", value: "1.2 GiB" }] });
+    expect(w(plain, 40), "key column, gap, longest value").toBe(6 + 2 + 7);
+
+    const column = { key: "name", label: "Name", align: "left", priority: 10, minWidth: 8, sortable: false } as const;
+    const rows = [{ id: "r1", cells: { name: { text: "row 1" } } }];
+    expect(w(block({ kind: "table", id: "tf", columns: [{ ...column, flex: true }], rows }), 40), "an uncapped flex column takes the residual").toBe(40);
+    const capped = block({ kind: "table", id: "tc", columns: [{ ...column, flex: true, maxWidth: 12 }], rows });
+    expect(w(capped, 40), "a capped flex column stops short, and the plan says where").toBe(12);
+    expect(w(block({ kind: "table", id: "ta", columns: [column], rows, actionBar: true }), 40), "an action bar").toBe(40);
+    expect(w(block({ kind: "table", id: "te", columns: [column], rows: [] }), 40), "no rows").toBe(40);
+    const fixed = block({ kind: "table", id: "tn", columns: [column, { ...column, key: "size", label: "Size" }], rows: [
+      { id: "r1", cells: { name: { text: "row 1" }, size: { text: "12" } } },
+    ] });
+    const plan = planColumns(fixed.columns, 40);
+    const planned = plan.visible.reduce((t, c) => t + c.width, 0) + plan.gap * (plan.visible.length - 1);
+    expect(w(fixed, 40), "the planned columns and gaps").toBe(planned);
+    expect(planned).toBeLessThan(40);
+  });
+
+  it("T3.69 (C09 I44): containers answer only when their layout does not depend on the width", () => {
+    const notice = block({ kind: "notice", id: "n", tone: "info", text: "abcdefghi" });
+    const raw = block({ kind: "raw", id: "r", text: "abcdefghijkl" });
+    const fixed = block({ kind: "group", id: "gf", direction: "row", children: [notice, raw], flex: [{ cells: 9 }, { cells: 12 }] });
+    expect(w(fixed, 40), "fixed shares sum with the gutter").toBe(9 + 1 + 12);
+    const weighted = block({ kind: "group", id: "gw", direction: "row", children: [notice, raw], flex: [1, 1] });
+    expect(w(weighted, 40), "a weighted row fills").toBe(40);
+    const column = block({ kind: "group", id: "gc", direction: "column", children: [notice, raw] });
+    expect(w(column, 40), "the widest child").toBe(12);
+    const aligned = block({ kind: "group", id: "ga", direction: "column", children: [notice, raw], align: ["left", "right"] });
+    expect(w(aligned, 40), "a column with an aligned child fills").toBe(40);
+    const panel = block({ kind: "panel", id: "p", title: "", children: [column] });
+    expect(w(panel, 40), "the widest child plus the border").toBe(14);
+    const titled = block({ kind: "panel", id: "pt", title: "abcdefghijklmnopqrst", children: [column] });
+    const cw = w(titled, 40);
+    // **The furniture is measured rather than counted**: the top border at the
+    // answered width carries the whole title, and one cell narrower it does not.
+    const border = (at: number): string => visible(kit.renderToLines(titled, at)[0] ?? "");
+    expect(border(cw)).toContain("abcdefghijklmnopqrst");
+    expect(border(cw - 1)).not.toContain("abcdefghijklmnopqrst");
+    expect(cw).toBe(25);
+  });
+
+  it("T3.70 (C09 I42): a row at a width that drops its second child answers the first child's width alone", () => {
+    const a = block({ kind: "raw", id: "a", text: "x" });
+    const dropped = block({ kind: "group", id: "gd", direction: "row", children: [a, a], flex: [{ cells: 30 }, { cells: 30 }] });
+    expect(w(dropped, 40)).toBe(30);
   });
 });

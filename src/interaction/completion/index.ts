@@ -12,7 +12,13 @@
  */
 
 export { contextAt, accept } from "./context.js";
-export { createEngine, SPINNER_MS, type CompletionEngine, type EngineOptions } from "./engine.js";
+export {
+  createEngine,
+  createSourceErrorSink,
+  SPINNER_MS,
+  type CompletionEngine,
+  type EngineOptions,
+} from "./engine.js";
 export { contextKey, createCache, type CompletionCache } from "./cache.js";
 export {
   executableSource,

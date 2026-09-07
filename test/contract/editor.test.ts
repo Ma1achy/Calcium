@@ -156,7 +156,8 @@ describe("C17 §7b — the geometry figure", () => {
   it("T2.1 (I3, the headline): every row fits the width it was measured at", () => {
     // The measurement contract from the side that can be checked without L4:
     // no row exceeds its usable width, and the count is the number of rows
-    // produced. T4.7 asserts the other half against the frame when C22 lands.
+    // produced. T4.7 asserts the other half against the frame (C22 is built; this said
+    // *when C22 lands* until 2026-09-03).
     for (const text of CORPUS) {
       const e = createEditor({ text });
       for (let width = 20; width <= 200; width += 1) {

@@ -50,17 +50,31 @@ const MUTATIONS = [
     // column that holds it.
     name: "the sparkline measures the wide ramp instead of swapping it",
     file: RAMP,
-    from: '  return caps.ambiguousWidth === "wide" ? RAMP_BRAILLE : RAMP_UNICODE;',
-    to: "  return RAMP_UNICODE;",
+    // **Re-anchored after `ladderFor` landed, and it was stale for a commit
+    // without the checker seeing it**: `anchors.mjs` matched only double-quoted
+    // `from:` values, and this one is single-quoted. 108 of 465 anchors were in
+    // that blind spot. Run again after re-anchoring rather than trusted — the
+    // mutation kills T2.53 exactly as the old one did.
+    from: "      : caps.ambiguousWidth === \"wide\"\n        ? HEIGHT_BRAILLE\n        : HEIGHT_UNICODE,",
+    to: "      : HEIGHT_UNICODE,",
     expect: "T2.53",
   },
   {
     // The block-elements range dropped from the ambiguous table — which is the
     // one range the shipped defect lives in.
+    //
+    // **Re-anchored when the table was derived from its source, and the first
+    // re-anchor was wrong** (F665). The range moved out of `isAmbiguous`'s body
+    // into `DRAWN_AS_GEOMETRY`, so the obvious re-anchor is that list's row —
+    // and deleting it changes nothing, because `AMBIGUOUS_RANGES` carries
+    // U+2580..U+258F and U+2592..U+2595 from the property itself. Run rather
+    // than typed, which is the only reason that was found: the deletion was
+    // still a valid anchor and had stopped being a mutation. The guard below
+    // is what the row's *name* claims, and it kills T2.52 as the original did.
     name: "block elements are not ambiguous",
     file: TEXT,
-    from: "    (cp >= 0x2580 && cp <= 0x259f) || // block elements — RAMP_UNICODE lives here\n",
-    to: "",
+    from: "function isAmbiguous(cp: number): boolean {\n  return inRanges",
+    to: "function isAmbiguous(cp: number): boolean {\n  if (cp >= 0x2580 && cp <= 0x259f) return false;\n  return inRanges",
     expect: "T2.52",
   },
   {

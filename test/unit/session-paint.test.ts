@@ -11,7 +11,8 @@
 import { describe, expect, it } from "vitest";
 
 import { compose, heightsSum, type Composed } from "../../src/shell/frame.js";
-import { exact, FrameError, paint, type PaintDeps } from "../../src/shell/paint.js";
+import { paint, type PaintDeps } from "../../src/shell/paint.js";
+import { exact, FrameError } from "../../src/shell/frame-error.js";
 import { displayCells } from "../../src/presentation/text.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LIGHT_THEME, measurable } from "../support/render.js";
@@ -20,6 +21,9 @@ import { patchDefinition } from "../../src/presentation/patch/definition.js";
 import { SGR_RESET, sgr } from "../../src/terminal/escapes.js";
 import { resolveBase } from "../../src/presentation/theme/index.js";
 import type { SessionSnapshot } from "../../src/shell/types.js";
+
+/** C09's measurer, for the footer's height (C22 I82). */
+const MEASURE = createBlockRegistry({ defaults: true }).measureSequence;
 
 const SESSION: SessionSnapshot = Object.freeze({
   cwd: "/work",
@@ -56,6 +60,7 @@ function deps(over: Partial<PaintDeps> = {}): PaintDeps {
 function frameAt(columns: number, rows: number, promptRows = 1): Composed {
   return compose({
     chrome: { header: () => [], footer: () => [] },
+    measureSequence: MEASURE,
     session: () => SESSION,
     copyMode: () => false,
     now: () => 1_700_000_000_000,
@@ -163,6 +168,7 @@ describe("C22 §6 — the paint", () => {
 
     const f = compose({
       chrome: { header: () => [], footer: () => [] },
+      measureSequence: MEASURE,
       session: () => SESSION,
       copyMode: () => false,
       now: () => 1_700_000_000_000,
@@ -186,7 +192,7 @@ describe("C22 §6 — the paint", () => {
 
     expect(f.promptRows, "half of 24").toBe(12);
     expect(f.promptWanted, "and what it wanted is kept, so §3 can window").toBe(200);
-    expect(f.region.height, "the viewport keeps the rest").toBe(24 - 1 - 1 - 12);
+    expect(f.region.height, "the viewport keeps the rest").toBe(24 - 1 - 1 - 2 - 12 - 0); // no footer here: `[]` is zero rows (C22 I82); the header's rule takes one (I87)
 
     // **The cursor is named, and it was not** (I62, §6e.4). *The newest rows are
     // shown* was a consequence of the window being anchored on the buffer's end,
@@ -221,11 +227,16 @@ describe("C22 §6 — the paint", () => {
     // window rather than a theoretical one — a resize can arrive between the
     // gate and the frame. That is also what keeps this branch alive under I62
     // (§6e table row 6).
-    const f = frameAt(40, 3, 3);
-    expect(f.promptRows, "half of three, floored").toBe(1);
+    // **Constructed, since `compose` no longer reaches it** (C22 I81): the
+    // chrome is five rows — header, its rule (I87), two rules, a prompt — and a
+    // cap of one needs three, so at three rows the sum is false and the fallback
+    // draws. The cap path in `promptWindow` is still code, so the frame that
+    // exercises it is built by hand with a region of zero rows, and it still sums.
+    const f: Composed = { ...frameAt(40, 5, 3), promptRows: 1, promptWanted: 3, region: { top: 2, height: 0 }, overlayRegion: { width: 40, height: 0 } };
+    expect(f.promptRows, "a cap of one").toBe(1);
 
     const lines = paint(f, deps({ promptRows: () => ["first", "second", "third"] }));
-    const prompt = lines[1 + f.region.height];
+    const prompt = lines[f.region.top + f.region.height + 1]; // below the upper rule (C22 I81)
 
     expect(prompt?.startsWith("❯ first"), "the cursor's row, gutter and all").toBe(true);
     expect(lines.join("").includes("⋯"), "and no marker, because there is no room for one").toBe(
@@ -258,7 +269,7 @@ describe("C22 §6 — the paint", () => {
     // glyph is two cells wide.
     const f = frameAt(80, 24, 3);
     const lines = paint(f, deps({ promptRows: () => ["one", "two", "three"] }));
-    const prompt = lines.slice(1 + f.region.height, 1 + f.region.height + 3);
+    const prompt = lines.slice(f.region.top + f.region.height + 1, f.region.top + f.region.height + 4);
 
     expect(prompt[0]?.startsWith("❯ one")).toBe(true);
     expect(prompt[1]?.startsWith("  two")).toBe(true);
@@ -270,7 +281,7 @@ describe("C22 §6 — the paint", () => {
     // half-full transcript puts a gap between the newest output and the cursor.
     const f = frameAt(40, 20);
     const lines = paint(f, deps({ transcriptRows: () => ["newest"] }));
-    const body = lines.slice(1, 1 + f.region.height);
+    const body = lines.slice(f.region.top, f.region.top + f.region.height);
 
     expect(body.at(-1)?.trimEnd(), "the one row sits at the bottom").toBe("newest");
     expect(body[0]?.trim(), "and the top is blank").toBe("");
@@ -399,7 +410,7 @@ describe("C22 — the selection wash (roadmap entry 23)", () => {
   };
 
   /** The painted index of prompt row `i`: header + viewport, then the prompt. */
-  const promptAt = (f: Composed, i: number): number => f.region.height + 1 + i;
+  const promptAt = (f: Composed, i: number): number => f.region.top + f.region.height + 1 + i; // header, its rule, region, the upper rule
 
   it("T4.22 (C11 I17, I9): the wash is appearance — no row and no cell moves", () => {
     // **The invariant at every step, not a note about this one.** A row of
@@ -468,28 +479,31 @@ describe("C22 — the selection wash (roadmap entry 23)", () => {
     // **The row the mutation pass demanded.** An editor row and a painted row
     // are the same number until the prompt exceeds its cap and windows around
     // its end — and every other row here has an unwindowed prompt, so dropping
-    // the mapping failed nothing. Four editor rows into a cap of two puts the
+    // the mapping failed nothing. Five editor rows into a cap of three puts the
     // elision marker up and shifts everything by one.
-    // Four wanted rows in a five-row terminal: the cap is `floor(rows / 2)`,
-    // which is two, so the prompt windows and the marker takes one of them.
-    const f = frameAt(20, 5, 4);
+    // Five wanted rows in a seven-row terminal: the cap is `floor(rows / 2)`,
+    // which is three, so the prompt windows and the marker takes one of them.
+    // (Four rows into a five-row terminal until the header's rule, C22 I87,
+    // left five rows too few for the chrome.)
+    const f = frameAt(20, 7, 5);
     const rows = paint(
       f,
       deps({
-        promptRows: () => ["aa", "bb", "cc", "dd"],
-        // The last editor row, which is the only content row the window shows.
-        promptSelection: () => [{ row: 3, from: 2, to: 4 }],
+        promptRows: () => ["aa", "bb", "cc", "dd", "ee"],
+        // The last editor row, which is the last content row the window shows.
+        promptSelection: () => [{ row: 4, from: 2, to: 4 }],
         // **The cursor this row was implicitly relying on** (I62, §6e.4). The
         // window follows the cursor, so a fixture that leaves it at row 0 puts
         // the window at the head and drops this span entirely — the mapping
         // this row is about would then be tested by nothing.
-        promptCursor: () => ({ row: 3, col: 4 }),
+        promptCursor: () => ({ row: 4, col: 4 }),
       }),
     );
 
     expect(washedCells(rows[promptAt(f, 0)] ?? ""), "the marker row is untouched").toBe("");
-    expect(washedCells(rows[promptAt(f, 1)] ?? ""), "the wash lands on the shown row").toBe(
-      "dd",
+    expect(washedCells(rows[promptAt(f, 1)] ?? ""), "and so is the shown row above the head").toBe("");
+    expect(washedCells(rows[promptAt(f, 2)] ?? ""), "the wash lands on the shown row").toBe(
+      "ee",
     );
   });
 
@@ -551,9 +565,9 @@ describe("C22 §6g — the theme's background is a base, not a span (C22 I65)", 
       "the fixture must carry a return-to-terminal-default to repair",
     ).toBe(true);
 
-    // Eight rows: one header, one footer, one prompt, and a region that holds
-    // the patch's five without the viewport check refusing it.
-    return paint(frameAt(40, 8), deps({ theme: LIGHT_THEME, transcriptRows: () => rows }));
+    // Nine rows: one header, its rule, two rules, one footer, one prompt, and a
+    // region that holds the patch's five without the viewport check refusing it.
+    return paint(frameAt(40, 9), deps({ theme: LIGHT_THEME, transcriptRows: () => rows }));
   }
 
   it("T1.23 (C22 I65): every reset in a painted row returns to the base, not to the terminal's", () => {

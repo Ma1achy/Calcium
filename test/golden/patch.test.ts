@@ -23,6 +23,7 @@ import { describe, expect, it } from "vitest";
 import { hunkOf, patchOf, THE_ILLUSTRATION } from "../support/blocks.js";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LIGHT_THEME, MONO_CAPS, measurable } from "../support/render.js";
 import { patchDefinition } from "../../src/presentation/patch/index.js";
+import { b } from "../../src/shell/builders/index.js";
 import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 
@@ -68,6 +69,18 @@ const CASES: readonly Readonly<{ label: string; block: Block; mono?: boolean }>[
     block: patchOf({
       id: "lopsided",
       hunks: [hunkOf([" a: 1", "-b: 2", "-c: 3", "-d: 4", "+b: 9", " e: 5"])],
+    }),
+  },
+  // **Through the writer** (C25 I10, C04 I91): every other case bypasses `b.patch`,
+  // so before this one no golden recorded the intra-line diff — finding P1. Unified
+  // at 80 and split at 100+ both underline the digit alone (SGR 4 / 24 around it).
+  {
+    label: "one changed word, underlined",
+    block: b.patch({
+      id: "intraline",
+      path: "deploy.yaml",
+      language: "yaml",
+      hunks: [hunkOf([" spec:", "-  replicas: 2", "+  replicas: 3", "   image: app"])],
     }),
   },
   { label: "context only", block: patchOf({ id: "ctx", hunks: [hunkOf([" a: 1", " b: 2", " c: 3"])] }) },

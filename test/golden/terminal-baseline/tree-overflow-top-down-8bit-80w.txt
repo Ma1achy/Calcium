@@ -1,0 +1,5 @@
+── tree · overflow-top-down · 8bit · 80w
+                                      root
+                                ╭──────┼──────╮
+                              render layout parse
+[38;5;179m+5 more · curve · raster · paint · measure · wrap[39m

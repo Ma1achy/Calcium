@@ -36,9 +36,10 @@
  */
 
 import { renderSequenceToLines } from "../presentation/render-lines.js";
+import type { RenderScratch } from "../presentation/blocks/types.js";
 import { sliceCells } from "../presentation/text.js";
 import { SGR_RESET } from "../terminal/escapes.js";
-import { FrameError, exact } from "./paint.js";
+import { FrameError, exact } from "./frame-error.js";
 import type { Placed } from "../viewport/overlay/index.js";
 import type { BlockRegistry } from "../presentation/blocks/index.js";
 import type { ResolvedTheme } from "../presentation/theme/index.js";
@@ -52,6 +53,16 @@ export type CompositeDeps = Readonly<{
   regionTop: number;
   /** The region C15 placed against — its own coordinates (I28). */
   region: Readonly<{ width: number; height: number }>;
+  /**
+   * The session's render scratch (C12 I107).
+   *
+   * **A layer is the other place a 3D plot renders**, and it is the one the
+   * reference app's `/live` uses. Threading it here and not in `session.ts`
+   * alone is what makes the invariant true of both hosts rather than of the
+   * transcript — the same gap C23 §3b commits about *its* two hosts, one store
+   * along.
+   */
+  scratch?: RenderScratch;
 }>;
 
 /**
@@ -122,6 +133,7 @@ function layerRows(p: Placed, deps: CompositeDeps): readonly string[] {
       : renderSequenceToLines(deps.registry, p.layer.content, p.width, {
           theme: deps.theme,
           capabilities: deps.capabilities,
+          ...(deps.scratch === undefined ? {} : { scratch: deps.scratch }),
         });
 
   const out: string[] = [];

@@ -21,6 +21,7 @@ import { validateDocument } from "../viewmodel/validate.js";
 import { block } from "../viewmodel/construct.js";
 import type { Block, DocumentMeta, ViewDocument, ViewPatch } from "../viewmodel/types.js";
 import { createFallbackAdapter } from "./fallback.js";
+import { withOverflowNotice } from "./overflow.js";
 import { exitCodeOf, mapResult } from "./mapping.js";
 import { createPatchAdapter } from "./stream.js";
 import {
@@ -113,15 +114,18 @@ function lastResortDocument(raw: RawResult, ctx: AdapterContext, detail: string)
     command: ctx.command,
     status: "error",
     error: { message: `Could not render this result: ${detail}`, code: "ADAPT_FAILED" },
-    blocks: [
-      {
-        kind: "notice",
-        id: "adapt-failed",
-        tone: "error",
-        glyph: "error",
-        text: "Could not render this result.",
-      },
-    ],
+    blocks: withOverflowNotice(
+      [
+        {
+          kind: "notice",
+          id: "adapt-failed",
+          tone: "error",
+          glyph: "error",
+          text: "Could not render this result.",
+        },
+      ],
+      raw.overflowed,
+    ),
     meta: authoritativeMeta(undefined, raw, ctx, "last-resort"),
   };
 }
@@ -166,7 +170,23 @@ export function createAdapterRegistry(
     // through, so once C22 I33 drew it the transcript showed `ps --json`, the
     // spawned form with a flag the user never wrote, in place of the line they
     // submitted. Invisible until something displayed it.
-    const validity = validateDocument({ ...candidate, command: ctx.command });
+    // **`from: "farSide"` is asked for here and nowhere else** (C04 I67, F231).
+    // This is the funnel, so it is the one place the question *did this come
+    // from out there* has an answer — the store, the persist reload and every
+    // consumer of the public validator are all handling documents already
+    // inside the system, and a blanket refusal there would drop a restored
+    // entry a reader had expanded.
+    // **The overflow notice is appended here and nowhere else** (§4, I22) —
+    // the funnel is the one place every route passes, so no route can omit it,
+    // and the last resort below rebuilds its blocks and appends it again.
+    const validity = validateDocument(
+      {
+        ...candidate,
+        command: ctx.command,
+        blocks: withOverflowNotice(candidate.blocks, raw.overflowed),
+      },
+      { from: "farSide" },
+    );
     if (validity.ok) return validity.value;
     return lastResortDocument(raw, ctx, validity.error.join("; "));
   }

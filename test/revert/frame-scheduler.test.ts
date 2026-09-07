@@ -104,9 +104,15 @@ describe("C03 fail-on-revert", () => {
   });
 
   it("T6.7 (I7): decoupling resize from invalidation → T1.10 fails", () => {
-    const { scheduler, render, repaint } = harness();
+    const { scheduler, render, repaint, clock } = harness();
 
     scheduler.commit("resize");
+    // **The flag before the frame** (I7, I15). The contamination is what this
+    // row is about and the window is not, so the assertion that matters is the
+    // one above the advance — a revert that set the flag at *flush* rather than
+    // at commit would still repaint here, and only this line would see it.
+    expect(scheduler.contaminated, "set at commit, not at flush").toBe(true);
+    clock.advance(16);
 
     // A diff against a frame drawn at the old dimensions is meaningless.
     expect(repaint).toHaveBeenCalledTimes(1);
@@ -203,10 +209,13 @@ describe("C03 fail-on-revert", () => {
   });
 
   it("T6.14 (C13): passing frame content to `write` rather than through render() → T2.7 fails", () => {
-    const { scheduler, written } = harness({ capabilities: { synchronisedUpdate: true } });
+    const { scheduler, written, clock } = harness({ capabilities: { synchronisedUpdate: true } });
 
     scheduler.commit("input");
     scheduler.commit("resize");
+    // The second write is one window away now (I15), and this row counts writes
+    // rather than timing them — so the advance is what keeps it counting two.
+    clock.advance(16);
 
     // Two markers per write and nothing between them: C03 never sees a frame.
     expect(() => assertSeamNarrow(written)).not.toThrow();

@@ -5,7 +5,10 @@ import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { patchDefinition } from "../../src/presentation/patch/index.js";
 import { pairedRows } from "../../src/presentation/patch/height.js";
 import { hunkOf, PATCH_CORPUS, patchOf, THE_ILLUSTRATION } from "../support/blocks.js";
-import { FULL_CAPS, measurable, visible } from "../support/render.js";
+import { ASCII_CAPS, FULL_CAPS, measurable, visible } from "../support/render.js";
+import { underlinedRuns } from "../support/underline.js";
+import { b } from "../../src/index.js";
+import { INTRALINE_TOKEN_CAP, intralineSpans } from "../../src/data/viewmodel/intraline.js";
 import { readFileSync } from "node:fs";
 import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
 
@@ -180,5 +183,51 @@ describe("C25 fail-on-revert", () => {
     const [left] = (unpaired as string).split("│");
 
     expect(/\[[0-9;]*48;/.test(left as string), "the blank side must be unpainted").toBe(false);
+  });
+
+  it("T6.26 (C25 I10, I7): moving the diff into the renderer → a span-less document paints SGR 4 and this fails", () => {
+    // The revert that reads as a convenience: `textSpans` could diff the pair it
+    // is handed and the frame would look identical. It would run O(n·m) per
+    // changed line per frame, and `render` would stop being pure over the block.
+    // A block constructed without the builder is the instrument: it carries no
+    // spans, so any underline on it came from the renderer.
+    const bare = patchOf({ hunks: [hunkOf(["-k: 1", "+k: 2"])] });
+    expect(kit().renderToLines(bare, 80).map(underlinedRuns)).toEqual([[], [], [], []]);
+    // And the same pair through the builder is underlined — so the row above is
+    // not passing because nothing underlines anything.
+    const built = b.patch({ id: "b", path: "x", language: "", hunks: [{ header: "@@", lines: [{ kind: "remove", text: "k: 1" }, { kind: "add", text: "k: 2" }] }] });
+    expect(kit().renderToLines(built, 80).map(underlinedRuns)).toEqual([[], [], ["1"], ["2"]]);
+  });
+
+  it("T6.27 (C25 I10): letting the truncation marker inherit the last run's attributes → T3.17 fails at both rungs", () => {
+    const patch = b.patch({ id: "t", path: "x", language: "", layout: "unified", hunks: [{ header: "@@", lines: [
+      { kind: "remove", text: "alpha beta gamma", oldNo: 1 }, { kind: "add", text: "alpha bets gamma", newNo: 1 },
+    ] }] });
+    for (const caps of [FULL_CAPS, ASCII_CAPS]) {
+      const rows = measurable({ definitions: [patchDefinition as unknown as BlockDefinition<never>], capabilities: caps }).renderToLines(patch, 15);
+      const marker = caps.unicode === "ascii" ? "~" : "…";
+      for (const row of rows.slice(2)) {
+        expect(visible(row).endsWith(marker)).toBe(true);
+        expect(underlinedRuns(row).join("")).not.toContain(marker);
+      }
+    }
+  });
+
+  it("T6.28 (C25 I10): a second pairing in the builder — the nth remove against the n+1th add — → T2.7 fails", () => {
+    // The signature of the drift: `a0` joins the underline on the left of row 0,
+    // because `a0` against `a1` differs while `a0` against `a0` does not.
+    const patch = b.patch({ id: "d", path: "x", language: "", hunks: [{ header: "@@", lines: [
+      { kind: "remove", text: "a0 common b0", oldNo: 1 }, { kind: "remove", text: "a1 common b1", oldNo: 2 },
+      { kind: "add", text: "a0 common c0", newNo: 1 }, { kind: "add", text: "a1 common c1", newNo: 2 },
+    ] }] });
+    const rows = kit().renderToLines(patch, 120);
+    expect(rows.slice(2).map(underlinedRuns)).toEqual([["b0", "c0"], ["b1", "c1"]]);
+  });
+
+  it("T6.29 (C25 I10): dropping the unrelated rule, the whitespace token or the cap → T1.13, T1.12, T1.11 fail", () => {
+    expect(intralineSpans("foo bar", "baz qux"), "unrelated: nothing").toEqual({ removed: [], added: [] });
+    expect(intralineSpans("  x", "    x").added, "whitespace: the indent").toEqual([{ from: 0, to: 4, underline: true }]);
+    const over = `x${" a".repeat(INTRALINE_TOKEN_CAP / 2)}`;
+    expect(intralineSpans(over, `${over.slice(0, -1)}b`), "cap: nothing").toEqual({ removed: [], added: [] });
   });
 });

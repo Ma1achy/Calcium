@@ -15,7 +15,8 @@
  * whichever width a child happens to wrap. A shared function cannot drift.
  */
 
-import type { Block, Group, MeasureFn, Panel, Share } from "./types.js";
+import type { Align, Block, Group, Halign, MeasureFn, Panel, Valign, WidthFn } from "./types.js";
+import { divideShares, mosaicRects, parseAreas } from "./mosaic.js";
 import type { ContainerBlock } from "./tree.js";
 
 /**
@@ -46,11 +47,6 @@ export const BORDER_INSET = 2;
 
 /** One cell of gutter between each adjacent pair in a `row` group. */
 export const ROW_GUTTER = 1;
-
-/** A share that names cells rather than a proportion (I44). */
-function isCells(share: Share): share is Readonly<{ cells: number }> {
-  return typeof share === "object";
-}
 
 /** `panel` children, and a table row's `detail` blocks (§3). */
 export function insetWidth(width: number): number {
@@ -90,22 +86,13 @@ export function groupChildWidths(block: Group, width: number): readonly number[]
   const gaps = (n - 1) * ROW_GUTTER;
   const shares = block.flex ?? block.children.map(() => 1);
 
-  // **Fixed first, and what remains is what the weights divide** (I44). Any
-  // other order makes a cell count a suggestion, which is the one thing a cell
-  // count is not — the banner's whale is 40 cells and `40 : 61` gives it 41 at
+  // **One implementation, called rather than restated** (I44, I72). The rule —
+  // fixed `{cells: n}` shares off the budget first, then the weights divide what
+  // remains, because any other order makes a cell count a suggestion — lives in
+  // `divideShares` and serves this and both of the mosaic's axes. The banner's
+  // whale is the case it was written for: 40 cells against `40 : 61` gives 41 at
   // 105 columns and 47 at 120.
-  const fixed = shares.reduce<number>((sum, share) => sum + (isCells(share) ? share.cells : 0), 0);
-  const budget = w - gaps - fixed;
-  const weights = shares.reduce<number>((sum, share) => sum + (isCells(share) ? 0 : share), 0);
-
-  return block.children.map((_child, i) => {
-    const share = shares[i] ?? 1;
-    if (isCells(share)) return normaliseWidth(share.cells);
-    // A row of fixed children alone divides nothing: `weights` is 0 and there is
-    // no share to compute, so the floor answers rather than an infinity.
-    if (weights === 0) return normaliseWidth(budget);
-    return normaliseWidth(Math.floor((budget * share) / weights));
-  });
+  return divideShares(shares, w, gaps);
 }
 
 /**
@@ -169,6 +156,18 @@ export function childWidths(block: ContainerBlock, width: number): readonly numb
   if (block.kind === "scroll") {
     return block.children.map(() => atLeastOne(width));
   }
+  // **A mosaic's children take their cell widths** (I72), which is the eighth
+  // enumeration of the container kinds and the second the compiler found rather
+  // than a reader. The rectangles come from the same parse both gates use, so a
+  // grid that measures one way and draws another is not expressible; a spec
+  // string that does not parse gives no cells, and the refusals at both gates
+  // are what keep that unreachable rather than an arm here.
+  if (block.kind === "mosaic") {
+    const parsed = parseAreas(block.areas);
+    if (!parsed.ok) return block.children.map(() => atLeastOne(width));
+    const rects = mosaicRects(parsed.grid, atLeastOne(width), block.height, block.columns, block.rows);
+    return block.children.map((_child, i) => atLeastOne(rects[i]?.width ?? width));
+  }
   return groupChildWidths(block, width);
 }
 
@@ -208,4 +207,92 @@ export function gapRows(blocks: readonly Block[]): number {
   let gaps = 0;
   for (const block of blocks) if (block.gapBefore === true) gaps += 1;
   return gaps;
+}
+
+// --- both axes (C04 §3 *Both axes*, I100–I103) -----------------------------
+
+const VALIGNS: readonly Valign[] = Object.freeze(["top", "middle", "bottom"]);
+const HALIGNS: readonly Halign[] = Object.freeze(["left", "centre", "right"]);
+
+/** The fifteen entries `align` accepts (I100), vertical first in the paired form. */
+export const ALIGN_ENTRIES: readonly Align[] = Object.freeze([
+  ...VALIGNS,
+  ...HALIGNS,
+  ...VALIGNS.flatMap((v) => HALIGNS.map((h): Align => `${v}-${h}`)),
+]);
+
+/** An entry split into its two axes; absent is `top-left` (I100). */
+export type Axes = Readonly<{ h: Halign; v: Valign }>;
+
+export function axesOf(entry: Align | undefined): Axes {
+  if (entry === undefined) return { h: "left", v: "top" };
+  if ((VALIGNS as readonly string[]).includes(entry)) return { h: "left", v: entry as Valign };
+  if ((HALIGNS as readonly string[]).includes(entry)) return { h: entry as Halign, v: "top" };
+  const dash = entry.indexOf("-");
+  return { v: entry.slice(0, dash) as Valign, h: entry.slice(dash + 1) as Halign };
+}
+
+/** The rows a group occupies: its content, or the author's floor if that is taller (I102). */
+export function groupRows(block: Group, content: number): number {
+  return Math.max(content, block.minRows ?? 0);
+}
+
+/**
+ * Where content of `size` starts inside an extent — `0`, the floored middle,
+ * or flush with the end. Odd remainders floor, so `centre` and `middle` are
+ * left- and top-biased: I42's unspent remainder on a new axis (I100 table row 7).
+ */
+export function offsetIn(extent: number, size: number, at: "start" | "middle" | "end"): number {
+  const slack = Math.max(0, extent - size);
+  if (at === "start") return 0;
+  return at === "end" ? slack : Math.floor(slack / 2);
+}
+
+/**
+ * One child's place in its cell (I103). `width` is what the child is rendered
+ * at — the cell for `left`, so an unaligned row is byte for byte what it was,
+ * and the content width otherwise (I101, R2).
+ */
+export type Placement = Readonly<{ left: number; top: number; width: number }>;
+
+/**
+ * Every placed child's placement, computed once and read by the renderer as
+ * margins and by the element walk as offsets (I103). **F816 is why this is one
+ * function**: the renderer used to place a `bottom` child with Yoga and the
+ * element walk placed every child at the row's top, and the offset lived in no
+ * function the walk could call.
+ *
+ * A `row`'s cell is the child's allocation by the group's height (the tallest
+ * child, or `minRows`); a `column`'s cell is the group's width by the child's
+ * own height, so its vertical component has nothing to move inside and is
+ * ignored — `gapBefore`'s rule (§3a) in the mirror. The content width is asked
+ * only where it is needed: a `left` child never calls `widthChild`.
+ */
+export function groupPlacements(
+  block: Group,
+  width: number,
+  measureChild: MeasureFn,
+  widthChild: WidthFn,
+): readonly Placement[] {
+  const w = normaliseWidth(width);
+  const widths = childWidths(block, w);
+  const placed = block.children.slice(0, placeable(block, w));
+  const heights = placed.map((child, i) => measureChild(child, widths[i] ?? 1));
+  let tallest = 0;
+  for (const h of heights) tallest = Math.max(tallest, h);
+  const rowHeight = groupRows(block, tallest);
+
+  return placed.map((child, i) => {
+    const axes = axesOf(block.align?.[i]);
+    const cellWidth = widths[i] ?? 1;
+    const height = heights[i] ?? 1;
+    const contentWidth =
+      axes.h === "left" ? cellWidth : Math.max(1, Math.min(cellWidth, widthChild(child, cellWidth)));
+    const cellHeight = block.direction === "row" ? rowHeight : height;
+    return Object.freeze({
+      left: offsetIn(cellWidth, contentWidth, axes.h === "left" ? "start" : axes.h === "centre" ? "middle" : "end"),
+      top: offsetIn(cellHeight, height, axes.v === "top" ? "start" : axes.v === "middle" ? "middle" : "end"),
+      width: contentWidth,
+    });
+  });
 }

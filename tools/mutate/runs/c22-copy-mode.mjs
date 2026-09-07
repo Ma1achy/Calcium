@@ -78,8 +78,8 @@ const MUTATIONS = [
     // idempotence check answer from a stale set. One record, or two that drift.
     name: "the mouse toggle does not update `held`",
     file: LIFE,
-    from: "    emit(MOUSE.leave);\n    held.delete(\"mouse\");",
-    to: "    emit(MOUSE.leave);",
+    from: "    emit(mouseMode.leave);\n    held.delete(\"mouse\");",
+    to: "    emit(mouseMode.leave);",
     expect: "T1.23",
   },
   {
@@ -102,6 +102,26 @@ const MUTATIONS = [
     from: '      graph.scheduler.commit("input");\n      graph.scheduler.flush();\n      graph.scheduler.suspend();',
     to: '      graph.scheduler.suspend();\n      graph.scheduler.commit("input");\n      graph.scheduler.flush();',
     expect: "T4.30",
+  },
+  {
+    // **The order inside the exit** (C22 T6.91). Resuming first paints a frame
+    // into a terminal whose selection is still the terminal's; T4.31 passes,
+    // because it asks whether both bytes arrived and not which came first.
+    name: "the exit resumes the screen before it takes the mouse back",
+    file: SESSION,
+    from: "    graph.lifecycle.setMouseTracking(true);\n    graph.scheduler.resume();",
+    to: "    graph.scheduler.resume();\n    graph.lifecycle.setMouseTracking(true);",
+    expect: "T4.31b",
+  },
+  {
+    // **Tracking back, screen never** (C22 T6.92). From the reader's chair a
+    // session that has hung with a live mouse; the indicator stays because no
+    // frame is written to remove it.
+    name: "the exit drops resume()",
+    file: SESSION,
+    from: "    graph.lifecycle.setMouseTracking(true);\n    graph.scheduler.resume();",
+    to: "    graph.lifecycle.setMouseTracking(true);",
+    expect: "T4.32",
   },
 ];
 

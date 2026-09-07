@@ -14,7 +14,7 @@
  * oversight.
  */
 
-import type { Action, Block, Cell, ErrorLike, Glyph, Tone } from "../../data/viewmodel/index.js";
+import type { Action, Block, Cell, ColormapName, ErrorLike, Glyph, HeadingLevel, KeyValue, Tone, TextSpan } from "../../data/viewmodel/index.js";
 import type { ProducerContext } from "../../data/adapters/types.js";
 
 /**
@@ -40,6 +40,61 @@ export type BlockOpts = Readonly<{
 }>;
 
 /**
+ * The options of a builder whose block carries text a span can decorate —
+ * `rule`, the `notice` shorthands and `raw` (C04 §3am, C04 I88).
+ *
+ * A separate type rather than a member of `BlockOpts`, because a `spans`
+ * option on `b.table` or `b.plot` would be accepted and ignored — F207's
+ * member, one layer up. `Cell` takes its spans through `CellInput` already.
+ */
+export type TextOpts = BlockOpts &
+  Readonly<{
+    /** Styled runs inside the text, by code-unit offset (C04 I84). */
+    spans?: readonly TextSpan[];
+  }>;
+
+/**
+ * `TextOpts` for the two members that carry a `colormap` — `raw` and `notice`
+ * (C04 I90).
+ *
+ * **Split from `TextOpts` rather than a member of it**, for the reason the
+ * paragraph above gives: `Rule` has no `colormap`, so `b.rule(label, meta,
+ * { colormap })` would build a block carrying a member nothing reads —
+ * F207's shape, at the public door. A narrower type makes supplying one a
+ * compile error where it was a no-op (C04 I76's argument, F85).
+ */
+/**
+ * `TextOpts` for the one member that carries a heading tier — `rule` (C04 I94).
+ *
+ * Split from `TextOpts` on `ValuedTextOpts`' own argument, in the other
+ * direction: `level` on `b.notice` or `b.raw` would be a member accepted and
+ * ignored, which is the shape F207 names and F85 answers with a narrower type.
+ */
+export type RuleOpts = TextOpts &
+  Readonly<{
+    /** Which of the three drawn forms; absent is 2 (C04 I94, C09 I40). */
+    level?: HeadingLevel;
+  }>;
+
+export type ValuedTextOpts = TextOpts &
+  Readonly<{
+    /** The map a valued span reads through (C04 I90). */
+    colormap?: ColormapName;
+  }>;
+
+/**
+ * `ValuedTextOpts` for the one text member that is also a button — `notice`
+ * (C04 §3, arc 6 §5). Split on the same argument again: `action` on `b.raw`
+ * would be a member accepted and ignored (F207), so the option exists only on
+ * the builder whose block reads it (MG27).
+ */
+export type NoticeOpts = ValuedTextOpts &
+  Readonly<{
+    /** The notice's one button — `fill` for a retry, `open` for a log (C04 §3). */
+    action?: Action;
+  }>;
+
+/**
  * A cell, or the string that is one with default tone (§4).
  *
  * `{ family: "digit-classifier" }` and `{ status: b.warn("degraded") }` in the
@@ -61,7 +116,20 @@ export type CellInput = string | Cell;
  * literal carrying a `glyph` is a compile error under excess property checking,
  * which is where that mistake should be caught.
  */
-export type KeyValueInput = Readonly<{ text: string; tone?: Tone }>;
+export type KeyValueInput = Readonly<{
+  text: string;
+  tone?: Tone;
+  /**
+   * A quantity beside the text (C04 I51).
+   *
+   * **Reachable from the builder on the day the field lands**, because a member
+   * a document can hold and a builder cannot is the gap `KeyValueRow` was added
+   * for: eleven builders and a whole application went past that one, and MG27
+   * is what found it rather than a reader.
+   */
+  bar?: KeyValue["rows"][number]["bar"];
+  barWidth?: KeyValue["rows"][number]["barWidth"];
+}>;
 
 /**
  * A `b.kv` row, addressed positionally rather than by key (I18, §4).
@@ -223,7 +291,20 @@ export type LiveSpec = BlockOpts &
      * Additive — an implementation ignoring it is unchanged.
      */
     render: (data: unknown, ctx: ProducerContext) => Block;
-    renderError?: (err: ErrorLike, retryInMs: number | null) => Block;
+    /**
+     * **Three parameters, and the third is a deliberate widening** (C24 §5).
+     *
+     * `attempt` is the source's consecutive failure count, reset by any success
+     * and shared by every part behind one source. An override wanting it would
+     * otherwise keep its own count against a backoff it does not own. Additive,
+     * so an implementation taking two is unchanged.
+     *
+     * **Declaring this takes the part out of the framework's counter.** C23's
+     * elapsed tick fires only where the default is still in place — the block is
+     * yours, and a framework timer writing fields into it would be the guarantee
+     * reaching past its own boundary (C23 I52).
+     */
+    renderError?: (err: ErrorLike, retryInMs: number | null, attempt: number) => Block;
     renderLoading?: () => Block;
     /** Default: twice `every`. Below it, construction throws (C24 T3.6). */
     staleAfter?: number;

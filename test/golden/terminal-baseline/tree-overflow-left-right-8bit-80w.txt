@@ -1,0 +1,4 @@
+── tree · overflow-left-right · 8bit · 80w
+root──render┬─curve──raster
+            ╰─paint
+[38;5;179m+4 more · layout · measure · wrap · parse[39m

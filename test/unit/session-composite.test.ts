@@ -14,13 +14,17 @@ import { describe, expect, it } from "vitest";
 
 import { compose, type Composed } from "../../src/shell/frame.js";
 import { composeFrame, type FrameResult } from "../../src/shell/render-frame.js";
-import { cursorFor, FrameError, paint, type PaintDeps } from "../../src/shell/paint.js";
+import { cursorFor, paint, type PaintDeps } from "../../src/shell/paint.js";
+import { FrameError } from "../../src/shell/frame-error.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { createOverlayManager, type Placed } from "../../src/viewport/overlay/index.js";
 import { displayCells } from "../../src/presentation/text.js";
 import { anchored, registry as measurer, rows as contentRows } from "../support/overlay.js";
 import { DARK_THEME, FULL_CAPS, visible } from "../support/render.js";
 import type { SessionSnapshot } from "../../src/shell/types.js";
+
+/** C09's measurer, for the footer's height (C22 I82). */
+const MEASURE = createBlockRegistry({ defaults: true }).measureSequence;
 
 const SESSION: SessionSnapshot = Object.freeze({
   cwd: "/work",
@@ -38,6 +42,7 @@ const SESSION: SessionSnapshot = Object.freeze({
 function frameAt(columns = 40, rows = 12): Composed {
   return compose({
     chrome: { header: () => [], footer: () => [] },
+    measureSequence: MEASURE,
     session: () => SESSION,
     copyMode: () => false,
     now: () => 1_700_000_000_000,
@@ -56,6 +61,7 @@ function frameAt(columns = 40, rows = 12): Composed {
 function frameWanting(columns: number, rows: number, wanted: number): Composed {
   return compose({
     chrome: { header: () => [], footer: () => [] },
+    measureSequence: MEASURE,
     session: () => SESSION,
     copyMode: () => false,
     now: () => 1_700_000_000_000,
@@ -156,9 +162,10 @@ describe("C22 §6a — compositing", () => {
     expect(f.overlayRegion.height, "the same height as the transcript").toBe(f.region.height);
     expect(f.overlayRegion.width).toBe(f.size.columns);
 
-    // And a layer at the region's first row draws on the frame's second, so the
-    // header survives. This is the conversion where a region row and a terminal
-    // row differ by exactly the header's height.
+    // And a layer at the region's first row draws on the frame's third — below
+    // the header and its rule (C22 I87) — so the header survives. This is the
+    // conversion where a region row and a terminal row differ by exactly the
+    // chrome above the region.
     const overlays = createOverlayManager({ registry: measurer });
     // Anchored to the region's second row and preferring above, so it lands on
     // the region's first — `below` of row 0 is row 1, which would test the
@@ -169,7 +176,8 @@ describe("C22 §6a — compositing", () => {
 
     const lines = paint(f, deps(() => placed));
     expect(lines[0], "the header is untouched").not.toContain("top row 0");
-    expect(lines[1], "and the layer is on the frame's second row").toContain("top row 0");
+    expect(lines[1], "and so is its rule").not.toContain("top row 0");
+    expect(lines[f.region.top], "and the layer is on the region's first row").toContain("top row 0");
   });
 
   it("T1.12b (C22 I29): the lower of two overlapping layers keeps the cells the upper does not cover", () => {
@@ -349,7 +357,7 @@ describe("C22 §6a — the cursor (C15 I19)", () => {
     expect(
       cursorFor(f, inert),
       "a menu that opened by itself: the prompt still holds the keys and the row",
-    ).toEqual({ row: f.region.top + f.region.height, col: 2 });
+    ).toEqual({ row: f.region.top + f.region.height + 1, col: 2 });
 
     overlays.dismiss("menu");
     overlays.push(layerWith("search", { row: 0, col: 5 }));
@@ -368,7 +376,7 @@ describe("C22 §6a — the cursor (C15 I19)", () => {
 
   it("T1.20 (C15 I19): the prompt's cursor when nothing is stacked, and hidden when focus is elsewhere", () => {
     const f = frameAt();
-    const promptRow = f.region.top + f.region.height;
+    const promptRow = f.region.top + f.region.height + 1;
 
     expect(cursorFor(f, deps(() => []))).toEqual({ row: promptRow, col: 2 });
     expect(
@@ -401,7 +409,7 @@ describe("C22 §6a — the cursor (C15 I19)", () => {
 
     for (const row of [0, 1, 2, 3]) {
       expect(cursorFor(f, windowed(row)), `row ${String(row)} is on screen`).toEqual({
-        row: f.region.top + f.region.height,
+        row: f.region.top + f.region.height + 1,
         col: 4,
       });
     }
@@ -476,7 +484,7 @@ describe("C22 §6a — the cursor (C15 I19)", () => {
       ...deps(() => [], "·", f.region.height),
       promptRows: () => ["r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8"],
       promptCursor: () => ({ row: 4, col: 2 }),
-    }).slice(1 + f.region.height, 1 + f.region.height + f.promptRows);
+    }).slice(f.region.top + f.region.height + 1, f.region.top + f.region.height + 1 + f.promptRows);
 
     expect(painted.filter((l) => l.includes("⋯")), "a marker at each end").toHaveLength(2);
     expect(painted[0]?.includes("⋯"), "above").toBe(true);
@@ -492,7 +500,7 @@ describe("C22 §6a — the cursor (C15 I19)", () => {
       ...deps(() => [], "·", f.region.height),
       promptRows: () => ["r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8"],
       promptCursor: () => ({ row: 0, col: 2 }),
-    }).slice(1 + f.region.height, 1 + f.region.height + f.promptRows);
+    }).slice(f.region.top + f.region.height + 1, f.region.top + f.region.height + 1 + f.promptRows);
 
     expect(head[0], "at the head the first row is the command").toContain("r0");
     expect(head.filter((l) => l.includes("⋯")), "and one marker, below").toHaveLength(1);
@@ -514,7 +522,7 @@ describe("C22 §6a — the cursor (C15 I19)", () => {
       promptRows: () => ["r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8"],
       promptCursor: () => ({ row: 4, col: 2 }),
       spinning: () => true,
-    }).slice(1 + f.region.height, 1 + f.region.height + f.promptRows);
+    }).slice(f.region.top + f.region.height + 1, f.region.top + f.region.height + 1 + f.promptRows);
 
     const spinner = painted.filter((l) => /[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/u.test(l));
     expect(spinner, "one row carries it").toHaveLength(1);
@@ -537,7 +545,7 @@ describe("C22 §6a — the cursor (C15 I19)", () => {
       ...deps(() => [], "·", f.region.height),
       promptRows: () => ["r0", "r1", "r2", "r3", "r4", "r5"],
       promptCursor: () => ({ row: 5, col: 2 }),
-    }).slice(1 + f.region.height, 1 + f.region.height + f.promptRows);
+    }).slice(f.region.top + f.region.height + 1, f.region.top + f.region.height + 1 + f.promptRows);
 
     expect(painted[0], "the marker above").toContain("⋯");
     expect(painted.filter((l) => l.includes("⋯")), "and only above").toHaveLength(1);

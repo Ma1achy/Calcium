@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
+<rect width="100%" height="100%" fill="#1a1a1a"/>
+<rect x="498.4" y="15.2" width="9.6" height="9.6" fill="#e69f00"/>
+<text x="512" y="24.8" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">alpha</text>
+<rect x="498.4" y="34.4" width="9.6" height="9.6" fill="#56b4e9"/>
+<text x="512" y="44" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">beta</text>
+<path d="M288 12.8 L356.8 31.235 L407.165 81.6 L425.6 150.4 L407.165 219.2 L356.8 269.565 L288 288 L219.2 269.565 L168.835 219.2 L150.4 150.4 L168.835 81.6 L219.2 31.235 Z" fill="none" stroke="#626262" stroke-width="2"/>
+<path d="M288 122.88 L301.76 126.567 L311.833 136.64 L315.52 150.4 L311.833 164.16 L301.76 174.233 L288 177.92 L274.24 174.233 L264.167 164.16 L260.48 150.4 L264.167 136.64 L274.24 126.567 Z" fill="none" stroke="#626262" stroke-width="2"/>
+<path d="M288 95.36 L315.52 102.734 L335.666 122.88 L343.04 150.4 L335.666 177.92 L315.52 198.066 L288 205.44 L260.48 198.066 L240.334 177.92 L232.96 150.4 L240.334 122.88 L260.48 102.734 Z" fill="none" stroke="#626262" stroke-width="2"/>
+<path d="M288 67.84 L329.28 78.901 L359.499 109.12 L370.56 150.4 L359.499 191.68 L329.28 221.899 L288 232.96 L246.72 221.899 L216.501 191.68 L205.44 150.4 L216.501 109.12 L246.72 78.901 Z" fill="none" stroke="#626262" stroke-width="2"/>
+<path d="M288 40.32 L343.04 55.068 L383.332 95.36 L398.08 150.4 L383.332 205.44 L343.04 245.732 L288 260.48 L232.96 245.732 L192.668 205.44 L177.92 150.4 L192.668 95.36 L232.96 55.068 Z" fill="none" stroke="#626262" stroke-width="2"/>
+<path d="M288 150.4 L288 12.8" fill="none" stroke="#626262" stroke-width="2"/>
+<path d="M288 150.4 L356.8 31.235" fill="none" stroke="#626262" stroke-width="2"/>
+<path d="M288 150.4 L407.165 81.6" fill="none" stroke="#626262" stroke-width="2"/>
+<path d="M288 150.4 L425.6 150.4" fill="none" stroke="#626262" stroke-width="2"/>
+<path d="M288 150.4 L407.165 219.2" fill="none" stroke="#626262" stroke-width="2"/>
+<path d="M288 150.4 L356.8 269.565" fill="none" stroke="#626262" stroke-width="2"/>
+<path d="M288 150.4 L288 288" fill="none" stroke="#626262" stroke-width="2"/>
+<path d="M288 150.4 L219.2 269.565" fill="none" stroke="#626262" stroke-width="2"/>
+<path d="M288 150.4 L168.835 219.2" fill="none" stroke="#626262" stroke-width="2"/>
+<path d="M288 150.4 L150.4 150.4" fill="none" stroke="#626262" stroke-width="2"/>
+<path d="M288 150.4 L168.835 81.6" fill="none" stroke="#626262" stroke-width="2"/>
+<path d="M288 150.4 L219.2 31.235" fill="none" stroke="#626262" stroke-width="2"/>
+<path d="M288 40.32 L329.28 78.901 L395.249 88.48 L343.04 150.4 L371.416 198.56 L325.84 215.941 L288 239.84 L257.04 204.024 L198.626 202 L219.2 150.4 L186.71 91.92 L246.72 78.901 Z" fill="none" stroke="#e69f00" stroke-width="2"/>
+<path d="M288 81.6 L346.48 49.11 L341.624 119.44 L391.2 150.4 L353.541 188.24 L336.16 233.816 L288 205.44 L226.08 257.649 L216.501 191.68 L198.56 150.4 L234.376 119.44 L232.96 55.068 Z" fill="none" stroke="#56b4e9" stroke-width="2"/>
+<text x="288" y="9.2" font-size="12" font-family="monospace" fill="#626262" text-anchor="middle">Speed</text>
+<text x="356.8" y="28.68" font-size="12" font-family="monospace" fill="#626262">Power</text>
+<text x="407.165" y="81.9" font-size="12" font-family="monospace" fill="#626262">Range</text>
+<text x="425.6" y="154.6" font-size="12" font-family="monospace" fill="#626262">Defence</text>
+<text x="407.165" y="227.3" font-size="12" font-family="monospace" fill="#626262">HP</text>
+<text x="356.8" y="280.52" font-size="12" font-family="monospace" fill="#626262">Stealth</text>
+<text x="288" y="300" font-size="12" font-family="monospace" fill="#626262" text-anchor="middle">Luck</text>
+<text x="219.2" y="280.52" font-size="12" font-family="monospace" fill="#626262" text-anchor="end">Armour</text>
+<text x="168.835" y="227.3" font-size="12" font-family="monospace" fill="#626262" text-anchor="end">Reach</text>
+<text x="150.4" y="154.6" font-size="12" font-family="monospace" fill="#626262" text-anchor="end">Wit</text>
+<text x="168.835" y="81.9" font-size="12" font-family="monospace" fill="#626262" text-anchor="end">Grit</text>
+<text x="219.2" y="28.68" font-size="12" font-family="monospace" fill="#626262" text-anchor="end">Poise</text>
+</svg>

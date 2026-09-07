@@ -13,7 +13,7 @@
 // (`test/support/README.md`).
 import { describe, expect, it } from "vitest";
 
-import { createRefreshDriver, STALL_MS } from "../../src/shell/refresh.js";
+import { createRefreshDriver, elapsedNeeded, STALL_MS } from "../../src/shell/refresh.js";
 import type { RefreshHost, ViewRefresh } from "../../src/shell/refresh.js";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { SESSION_BLOCK_CAP } from "../../src/viewport/transcript/cap.js";
@@ -21,12 +21,19 @@ import { block } from "../../src/data/viewmodel/index.js";
 import type { Block, ViewDocument } from "../../src/data/viewmodel/index.js";
 
 import { producerContext } from "../support/producer-context.js";
+import { callHead } from "../../src/shell/documents.js";
+import { spinnerFrames } from "../../src/presentation/blocks/glyphs.js";
+import { FULL_CAPS } from "../support/render.js";
 const SWEEP = STALL_MS / 4;
 
 const raw = (id: string, text: string): Block => block({ kind: "raw", id, text });
 
 const panel = (id: string, title: string, child: Block): Block =>
   block({ kind: "panel", id, title, children: [child] } as never);
+
+/** A column, because a real surface nests its live parts and the harness did not. */
+const column = (id: string, children: readonly Block[]): Block =>
+  block({ kind: "group", id, direction: "column", children } as never);
 
 const docWith = (blocks: readonly Block[]): ViewDocument => ({
   schema: "tui.view/1",
@@ -60,6 +67,7 @@ function harness() {
   const driver = createRefreshDriver({
     transcript,
     clock: () => now,
+    capabilities: FULL_CAPS,
     producerContext: () => producerContext(),
     schedule: (fn, ms) => {
       const t = { fn, at: now + ms, live: true };
@@ -115,6 +123,20 @@ function harness() {
       await Promise.resolve();
     },
     at: () => now,
+    /**
+     * When the next armed timer will fire — **the arming, not the write**.
+     *
+     * A row that advances the clock and sees a new value has proved the sweep's
+     * arithmetic and nothing about `armParts`: the harness fires every live timer
+     * whose time has come, so a timer armed for eight seconds away is fired by a
+     * `tick(8_000)` and by the accumulation of eight `tick(1_000)`s alike. In
+     * production the timer is a real `setTimeout` and a sweep that is not armed
+     * for a second from now does not happen a second from now (F227's class).
+     */
+    nextTimer: (): number | null => {
+      const live = timers.filter((t) => t.live).map((t) => t.at);
+      return live.length === 0 ? null : Math.min(...live);
+    },
   };
 }
 
@@ -124,6 +146,9 @@ const part = (over: Partial<ViewRefresh> & { id: string }): ViewRefresh => ({
   intervalMs: 30_000,
   staleAfterMs: 60_000,
   source: null,
+  // The framework's placeholder is in place unless a row says otherwise, which
+  // is what puts the part in scope of the elapsed counter (C23 I52).
+  renderLoading: null,
   derive: null,
   fetch: () => Promise.resolve("ok"),
   render: (data) => raw(`${over.id}-c`, String(data)),
@@ -1035,5 +1060,450 @@ describe("C23 §3d — a source does not poll while nothing is looking", () => {
     ]);
     await h.tick(1_000);
     expect(calls, "and the next declaration polls on its own interval").toBe(2);
+  });
+});
+
+describe("C23 I52 — `elapsedNeeded`, at the arms the sweep cannot reach", () => {
+  // **The rows that justify the extraction.** Its own comment says it is a
+  // separate function because both refusal arms are nearly unreachable from the
+  // call site — the first needs a block the caller has just checked is a loading
+  // `status`, and the second needs a tick landing inside the same second as the
+  // last write. **A guard whose arms cannot be reached from its call site is a
+  // guard nothing can be wrong about** (A03 §2), and that argument is only paid
+  // for by asking it directly.
+  const loading = (elapsedMs?: number): Block =>
+    block({
+      kind: "status",
+      id: "s",
+      state: "loading",
+      message: "loading",
+      height: 1,
+      ...(elapsedMs === undefined ? {} : { elapsedMs }),
+    } as Block);
+
+  it("T3.55b (I52): nothing that is not a waiting box is written into", () => {
+    expect(elapsedNeeded(null, 4_000), "the panel has gone").toBe(false);
+    expect(elapsedNeeded(raw("s", "text"), 4_000), "not a status at all").toBe(false);
+    expect(
+      elapsedNeeded(
+        block({ kind: "status", id: "s", state: "retrying", message: "x", height: 2 } as Block),
+        4_000,
+      ),
+      "a fetch failed between the arm and the fire (§8a-bis B3)",
+    ).toBe(false);
+  });
+
+  it("T3.55c (I52, F234): the comparison is the rendered figure and never the clock", () => {
+    // **Below one second the figure is empty**, so a fast load flashes nothing —
+    // and 0 to 900 ms is the range where a clock comparison and a figure
+    // comparison disagree most loudly.
+    expect(elapsedNeeded(loading(), 400), "under a second there is no figure yet").toBe(false);
+    expect(elapsedNeeded(loading(), 1_000), "and the first whole second is a write").toBe(true);
+    expect(elapsedNeeded(loading(1_000), 1_900), "the clock moved 900ms and `1s` did not").toBe(
+      false,
+    );
+    expect(elapsedNeeded(loading(1_000), 2_000)).toBe(true);
+    // Past ninety-nine the figure is minutes and seconds — still second-granular,
+    // which is why the write rate never falls of its own accord and F234 had to
+    // measure whether it needed to.
+    expect(elapsedNeeded(loading(100_000), 100_400), "`1m 40s` both times").toBe(false);
+    expect(elapsedNeeded(loading(100_000), 101_000), "`1m 40s` then `1m 41s`").toBe(true);
+  });
+});
+
+describe("C23 I52 — the elapsed counter, and every rule the walk put on it", () => {
+  /**
+   * A part, its host, and the panel already on screen — **the shape `b.live`
+   * actually builds**, which is a `status` at `loading` and not a `raw`.
+   *
+   * The first draft of this used the file's own `raw("a-c", "loading")` fixture,
+   * and all four rows below went green-then-red for the right reason: the guard
+   * refuses to write into anything that is not a loading `status`, so the setup
+   * was asserting against a state it had not constructed. The convenient fixture
+   * is the one where a working counter and a dead one agree.
+   */
+  const loadingBox = (): Block =>
+    block({
+      kind: "status",
+      id: "a-c",
+      state: "loading",
+      message: "loading",
+      height: 1,
+    } as Block);
+
+  const waiting = (over: Partial<ViewRefresh> = {}) => {
+    const h = harness();
+    const id = h.transcript.append(
+      docWith([panel("a", "containers", loadingBox())]),
+      { streaming: true },
+    );
+    h.driver.declare({ kind: "entry", id }, [
+      part({ id: "a", fetch: () => new Promise<never>(() => undefined), ...over }),
+    ]);
+    return { h, id };
+  };
+
+  const loadingIn = (h: ReturnType<typeof harness>, id: string): Block | null => {
+    const p = h.transcript.entries.find((e) => e.id === id)?.doc.blocks.find((b) => b.id === "a");
+    const child = p?.kind === "panel" ? p.children[0] : undefined;
+    return child ?? null;
+  };
+  const elapsedOf = (h: ReturnType<typeof harness>, id: string): number | undefined => {
+    const c = loadingIn(h, id);
+    return c?.kind === "status" ? c.elapsedMs : undefined;
+  };
+  it("T3.56 (I52): the figure advances while the first fetch is in flight", async () => {
+    // **Through `declare` and the sweep, never by calling the writer.** A row
+    // that reached in and computed a duration would pass on the day nothing
+    // armed a timer — which is F227 one layer up, and the reason this drives the
+    // clock and lets `armParts` decide.
+    const { h, id } = waiting();
+    await h.tick(0);
+    expect(elapsedOf(h, id), "a fast load must not flash a counter").toBe(undefined);
+
+    await h.tick(1_000);
+    expect(elapsedOf(h, id)).toBe(1_000);
+    await h.tick(1_000);
+    expect(elapsedOf(h, id), "and it keeps going, so this is a tick and not one write").toBe(2_000);
+  });
+
+  it("T3.57 (I52, F234): a write the figure would not show is not made at all", async () => {
+    // **The guard reads the rendered string and never the clock**, and its
+    // argument is hygiene rather than throughput: measured, the counter beside
+    // its own spinner costs 0.4 frames a second, because C03 folds six writes in
+    // ten into a frame it had already scheduled. What a needless write does cost
+    // is a `rev` bump — C14's height cache invalidated, and the transcript told
+    // a document changed when it did not.
+    //
+    // **Asserted on `rev`, which is the observable**, rather than on a spy.
+    //
+    // **A sibling that polls every 300 ms, and the mutation pass is why.** The
+    // first version simply ticked 300 twice — and the sweep is armed at 1 Hz, so
+    // no sweep ran at all between the two whole seconds. The row passed on the
+    // real code and on a guard that compared the *clock* instead of the figure,
+    // for the same reason in both cases: **nothing asked the guard.** A survivor
+    // that is a finding about the test rather than about the subject.
+    //
+    // With the sibling in place the sweep runs three times a second, so the
+    // counter is considered three times and writes once.
+    const h = harness();
+    const id = h.transcript.append(
+      docWith([
+        panel("a", "containers", loadingBox()),
+        panel("b", "other", raw("b-c", "-")),
+      ]),
+      { streaming: true },
+    );
+    h.driver.declare({ kind: "entry", id }, [
+      part({ id: "a", fetch: () => new Promise<never>(() => undefined) }),
+      part({ id: "b", intervalMs: 300, fetch: () => Promise.resolve("ok") }),
+    ]);
+    await h.tick(1_000);
+    const settled = elapsedOf(h, id);
+    expect(settled, "the counter is running before the assertion below means anything").toBe(1_000);
+
+    await h.tick(300);
+    await h.tick(300);
+    expect(
+      elapsedOf(h, id),
+      "two sweeps ran inside the second and neither moved the figure",
+    ).toBe(1_000);
+
+    await h.tick(400);
+    expect(elapsedOf(h, id), "and it writes on the sweep that crosses the second").toBe(2_000);
+  });
+
+  it("T3.58 (I52, C24 §5): a declarer's own loading block is never written into", async () => {
+    // *Behaviour is fixed, rendering is overridable* — a framework timer writing
+    // fields into a consumer's block is the guarantee reaching past its own
+    // boundary.
+    //
+    // **A `status` at `loading` is not a sufficient test for whose block it is**,
+    // which is why `renderLoading` is threaded to the driver rather than the
+    // block inspected. This row returns exactly the shape the framework builds,
+    // so a guard that inspected the block would pass every other row in this
+    // file and fail only here.
+    const mine = (): Block =>
+      block({ kind: "status", id: "a-c", state: "loading", message: "mine", height: 1 } as Block);
+    const { h, id } = waiting({ renderLoading: mine });
+    await h.tick(4_000);
+    expect(elapsedOf(h, id), "the block is the consumer's").toBe(undefined);
+  });
+
+  it("T3.55c (I35, I52, F408): a part nested in a group is reachable by the sweep", async () => {
+    // **Every row in this file put its panel at the top level of the document,
+    // and no real surface does.** `liveDeclarations` recurses, and says why in
+    // its own comment — *S13's dashboard is five panels inside a `group`, so a
+    // walk over top-level blocks alone finds none of them.* The **read** back
+    // never got the same treatment: `currentPanel` did
+    // `doc.blocks.find(b => b.id === part.spec.id)`, top level only.
+    //
+    // So a nested part declared, rendered, fetched and patched — writes address
+    // a block by id and the transcript resolves those through the tree — and
+    // every sweep that has to *read* the block in place found nothing: the
+    // elapsed counter, the staleness re-title, and the retry countdown.
+    //
+    // **Measured in a real terminal before it was measured here**: 22 seconds of
+    // `/faults`, the spinner advancing every frame and `retrying in 12s` never
+    // moving, and zero `loading (Ns)` anywhere in the capture.
+    const h = harness();
+    const id = h.transcript.append(
+      docWith([column("wrap", [panel("a", "containers", loadingBox())])]),
+      { streaming: true },
+    );
+    h.driver.declare({ kind: "entry", id }, [
+      part({ id: "a", fetch: () => new Promise<never>(() => undefined) }),
+    ]);
+
+    await h.tick(4_000);
+
+    const nested = (): Block | null => {
+      const e = h.transcript.entries.find((x) => x.id === id);
+      const wrap = e?.doc.blocks.find((b) => b.id === "wrap");
+      const p = wrap?.kind === "group" ? wrap.children.find((b) => b.id === "a") : undefined;
+      return (p?.kind === "panel" ? p.children[0] : undefined) ?? null;
+    };
+    const c = nested();
+    expect(c?.kind, "the placeholder is still in place").toBe("status");
+    expect(c?.kind === "status" ? c.elapsedMs : undefined, "and the counter reached it").toBe(4_000);
+  });
+
+  it("T3.60 (I52, F407): the retry countdown ticks down, and does not sit at its opening value", async () => {
+    // **Reported by a reader watching it**, and confirmed over 26 seconds of a
+    // real `/faults`: `retrying in 12s` for a dozen frames and then `24s`.
+    // `retryInMs` was written once, at the failure, and nothing rewrote it — so
+    // the number named the *whole backoff* rather than the time left in it.
+    //
+    // **Every ingredient was already here.** The driver knows `dueAt`, the sweep
+    // runs once a second, the field is a field, and the only arm asked for
+    // `loading`. What was missing was the bit that says whose block it is:
+    // `renderError`'s default was resolved at declaration, so a part that
+    // supplied nothing and a part that supplied the framework's own shape were
+    // identical from here.
+    const h = harness();
+    const id = h.transcript.append(docWith([panel("a", "containers", loadingBox())]), {
+      streaming: true,
+    });
+    h.driver.declare({ kind: "entry", id }, [
+      part({
+        id: "a",
+        intervalMs: 4_000,
+        // **`null` is the whole subject** — the framework's box, which it may
+        // rewrite. T3.60b is the other arm.
+        renderError: null,
+        fetch: () => Promise.reject(new Error("ECONNREFUSED")),
+      }),
+    ]);
+
+    const retryOf = (): number | undefined => {
+      const c = loadingIn(h, id);
+      return c?.kind === "status" ? c.retryInMs : undefined;
+    };
+
+    // The fetch fires and fails; the backoff opens at twice the interval.
+    await h.tick(4_000);
+    const opened = retryOf();
+    expect(opened, "the failure sets a countdown").toBeGreaterThan(0);
+
+    // **The sweep is armed a second out, not at `dueAt`** — and this is the
+    // assertion the first draft of this row did not have. `armParts` walks
+    // sources and arms against `dueAt`, which for a box eight seconds into a
+    // backoff is eight seconds away; without a heartbeat the countdown would be
+    // rewritten once, when the retry fired, which is the defect exactly. The
+    // harness fires every timer whose time has come, so advancing the clock
+    // proves the arithmetic and says nothing about the arming.
+    expect(h.nextTimer(), "a heartbeat, not the retry").toBe(h.at() + 1_000);
+
+    // **A second later it is a second less**, which is the whole assertion — and
+    // it is on the *figure* rather than on the field, because a write that draws
+    // the same second is a `rev` bump for nothing.
+    await h.tick(1_000);
+    expect(retryOf(), "one second on, one second less").toBe((opened ?? 0) - 1_000);
+    await h.tick(1_000);
+    expect(retryOf(), "and again").toBe((opened ?? 0) - 2_000);
+
+    // And it never goes negative: a source overdue is waiting on the fetch.
+    await h.tick(10_000);
+    expect(retryOf() ?? 1, "clamped at zero").toBeGreaterThanOrEqual(0);
+  });
+
+  it("T3.60b (I52, C24 §5, F407): a declarer's own failure block is never written into", async () => {
+    // T3.58's argument on the other state. **A `status` at `retrying` is not a
+    // sufficient test for whose block it is**, so this row returns exactly the
+    // shape the framework builds — a guard that inspected the block would pass
+    // every other row and fail only here.
+    const h = harness();
+    const id = h.transcript.append(docWith([panel("a", "containers", loadingBox())]), {
+      streaming: true,
+    });
+    h.driver.declare({ kind: "entry", id }, [
+      part({
+        id: "a",
+        intervalMs: 4_000,
+        renderError: (err, retryInMs) =>
+          block({
+            kind: "status",
+            id: "a-c",
+            state: "retrying",
+            message: err.message,
+            height: 3,
+            retryInMs: retryInMs ?? 0,
+          } as Block),
+        fetch: () => Promise.reject(new Error("ECONNREFUSED")),
+      }),
+    ]);
+
+    await h.tick(4_000);
+    const c0 = loadingIn(h, id);
+    const held = c0?.kind === "status" ? c0.retryInMs : undefined;
+    await h.tick(2_000);
+    const c1 = loadingIn(h, id);
+    expect(c1?.kind === "status" ? c1.retryInMs : undefined, "the block is the consumer's").toBe(
+      held,
+    );
+  });
+
+  it("T3.59 (I52, I46, F234): nobody looking, nothing written — and it resumes on being heard", async () => {
+    // **§8a-bis B7, and the row the sequence trace was worth.** C22's spinner
+    // ticker disarms when nothing on screen animates, and this driver cannot see
+    // the viewport — so off screen the spinner stops while the counter would go
+    // on writing, and each of those writes is a whole frame rather than the 0.4
+    // that made it free, because there is no spinner frame left to coalesce
+    // into. **The measurement that produced 0.4 was taken with the box on screen
+    // and had no way to name that condition.**
+    const { h, id } = waiting();
+    h.hidden.add(`entry:${id}`);
+    await h.tick(4_000);
+    expect(elapsedOf(h, id)).toBe(undefined);
+
+    h.hidden.delete(`entry:${id}`);
+    // Heard rather than polled, which is I46's own wording.
+    h.driver.visibilityChanged();
+    await h.tick(1_000);
+    expect(elapsedOf(h, id), "and the figure is the whole wait, not the watched part").toBe(5_000);
+  });
+});
+
+describe("C23 I53 — the running card's readout rides the one-second wake", () => {
+  /**
+   * A pending entry whose first block is a tool call's header (`AGENT_TUI_DESIGN`
+   * §9c), registered through `readout` with the same `render` the consumer would
+   * write. **Through the sweep and the clock, never by calling the writer** —
+   * a row that computed a duration itself would pass on the day nothing armed a
+   * timer, which is F227's class and the reason T3.56 drives the clock too.
+   */
+  const call = { name: "run_command", args: "npm test" };
+  // `tick` is the elapsed second and the spinner's frame (C23 I58); `SPIN(n)` is
+  // the frame the head at `n` seconds carries.
+  const FRAMES = spinnerFrames(FULL_CAPS);
+  const SPIN = (second: number): string => FRAMES[second % FRAMES.length] ?? "";
+  const header = (ms: number, tick = 0): Block => callHead({ ...call, elapsedMs: ms, id: "step" }, FULL_CAPS, tick);
+  const running = (h: ReturnType<typeof harness>): string => {
+    const id = h.transcript.append(docWith([header(0)]), { streaming: true });
+    h.driver.readout(id, "step", header);
+    return id;
+  };
+  /**
+   * Whether a wake is armed inside the next second. **Not `nextTimer() === null`**:
+   * the stall detector's thirty-second re-arm is always live, and the first
+   * draft of these rows asserted against it and read the stall timer as a leak.
+   */
+  const wakeWithinASecond = (h: ReturnType<typeof harness>): boolean => {
+    const next = h.nextTimer();
+    return next !== null && next - h.at() <= 1_000;
+  };
+  const headerOf = (h: ReturnType<typeof harness>, id: string): string | undefined => {
+    const blk = h.transcript.entries.find((e) => e.id === id)?.doc.blocks.find((x) => x.id === "step");
+    return blk?.kind === "notice" ? blk.text : undefined;
+  };
+
+  it("T3.61 (I53, I58): the spinner alone at dispatch, `· ⠠ 4s` after four seconds and a wake, and the same after settle", async () => {
+    const h = harness();
+    const id = running(h);
+    await h.tick(0);
+    expect(headerOf(h, id), "below one second the spinner alone, no figure (T2.46)").toBe(`run_command(npm test) · ${SPIN(0)}`);
+    expect(h.nextTimer(), "the wake is armed a second out, by the readout alone").toBe(1_000);
+
+    await h.tick(4_000);
+    expect(headerOf(h, id), "the frame is the fourth: a function of the clock, not of how many sweeps ran").toBe(`run_command(npm test) · ${SPIN(4)} 4s`);
+    const commits = h.commits.length;
+
+    h.driver.settled(id);
+    await h.tick(10_000);
+    expect(headerOf(h, id), "a settled readout writes no more; the route's `finishCard` is what replaces the spinner").toBe(`run_command(npm test) · ${SPIN(4)} 4s`);
+    expect(h.commits.length, "and nothing is committed for it").toBe(commits);
+    expect(wakeWithinASecond(h), "the last readout gone, no one-second wake is armed").toBe(false);
+  });
+
+  it("T3.61b (I53, I52): a wake inside the same second renders nothing, and the guard is the figure", async () => {
+    // **The state has to be constructed** — `armParts` re-arms a whole second
+    // from *now*, so a readout alone never wakes twice in one second and a row
+    // ticking 400 ms fires no sweep at all; the first draft of this passed with
+    // the guard written on the clock. A live part at 250 ms supplies the
+    // sub-second sweeps, and the instrument is `render`'s call log: the correct
+    // guard renders once per figure, the clock guard renders at every sweep.
+    const h = harness();
+    const rendered: number[] = [];
+    const counting = (ms: number, tick: number): Block => {
+      rendered.push(ms);
+      return header(ms, tick);
+    };
+    const id = h.transcript.append(docWith([header(0), panel("a", "containers", raw("a-c", "x"))]), {
+      streaming: true,
+    });
+    h.driver.declare({ kind: "entry", id }, [part({ id: "a", intervalMs: 250 })]);
+    h.driver.readout(id, "step", counting);
+    for (let i = 0; i < 8; i += 1) await h.tick(250);
+
+    expect(headerOf(h, id)).toBe(`run_command(npm test) · ${SPIN(2)} 2s`);
+    expect(rendered.length, "sweeps ran every quarter second and the figure moved twice").toBeGreaterThanOrEqual(2);
+    const figures = rendered.map((ms) => Math.floor(ms / 1000));
+    expect(new Set(figures).size, `one render per figure, never one per sweep: ${String(rendered)}`).toBe(
+      rendered.length,
+    );
+  });
+
+  it("T3.61c (I53, I46): two cards share one timer, and a card nobody is looking at arms none", async () => {
+    const h = harness();
+    const a = running(h);
+    const b2 = running(h);
+    await h.tick(0);
+    expect(h.nextTimer(), "one wake for both").toBe(1_000);
+    await h.tick(3_000);
+    expect(headerOf(h, a)).toBe(`run_command(npm test) · ${SPIN(3)} 3s`);
+    expect(headerOf(h, b2), "written in the same sweep").toBe(`run_command(npm test) · ${SPIN(3)} 3s`);
+
+    // **One hidden, one visible — the cell the two gates share.** `visible` is
+    // read twice in the driver: once to decide whether any card arms the wake,
+    // once per card in the write loop. Hiding *both* cards made the first gate
+    // answer for the second: nothing armed, so nothing wrote, and a mutation
+    // that dropped the per-card gate survived (F784's neighbour, the GIF clamp's
+    // shape). With one card still visible the wake arms, and only the write
+    // gate keeps the hidden card's header where it was.
+    h.hidden.add(`entry:${a}`);
+    h.driver.visibilityChanged();
+    await h.tick(2_000);
+    expect(headerOf(h, a), "hidden while its sibling is not: no write").toBe(`run_command(npm test) · ${SPIN(3)} 3s`);
+    expect(headerOf(h, b2), "the visible sibling keeps counting").toBe(`run_command(npm test) · ${SPIN(5)} 5s`);
+    expect(wakeWithinASecond(h), "the wake stays armed for the visible one").toBe(true);
+
+    h.hidden.add(`entry:${b2}`);
+    h.driver.visibilityChanged();
+    await h.tick(2_000);
+    expect(headerOf(h, a), "off screen, no write").toBe(`run_command(npm test) · ${SPIN(3)} 3s`);
+    expect(wakeWithinASecond(h), "and no one-second wake armed").toBe(false);
+
+    h.hidden.clear();
+    h.driver.visibilityChanged();
+    await h.tick(1_000);
+    expect(headerOf(h, a), "back on screen, the figure catches up").toBe(`run_command(npm test) · ${SPIN(8)} 8s`);
+  });
+
+  it("T3.61d (I53, I21): an entry evicted underneath its readout drops it on the refused patch", async () => {
+    const h = harness();
+    running(h);
+    h.transcript.clear();
+    await h.tick(1_000);
+    expect(wakeWithinASecond(h), "the readout is gone with the entry").toBe(false);
   });
 });

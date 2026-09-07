@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
+<rect width="100%" height="100%" fill="#1a1a1a"/>
+<line x1="89.6" y1="12.8" x2="89.6" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="89.6" y1="288" x2="587.2" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="587.2" y1="12.8" x2="587.2" y2="288" stroke="#2c2c2c" stroke-width="1"/>
+<line x1="89.6" y1="12.8" x2="587.2" y2="12.8" stroke="#2c2c2c" stroke-width="1"/>
+<text x="593.2" y="154.4" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">50</text>
+<text x="593.2" y="16.8" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">100</text>
+<text x="89.6" y="300" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">0</text>
+<text x="140.376" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">5</text>
+<text x="191.151" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">10</text>
+<text x="241.927" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">15</text>
+<text x="292.702" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">20</text>
+<text x="343.478" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">25</text>
+<text x="394.253" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">30</text>
+<text x="445.029" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">35</text>
+<text x="495.804" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">40</text>
+<text x="546.58" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#626262">45</text>
+<text x="587.2" y="300" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">49</text>
+<path d="M89.6 150.4 L99.755 136.663 L109.91 123.063 L120.065 109.736 L130.22 96.816 L140.376 84.431 L150.531 72.705 L160.686 61.756 L170.841 51.692 L180.996 42.614 L191.151 34.614 L201.306 27.77 L211.461 22.151 L221.616 17.814 L231.771 14.802 L241.927 13.145 L252.082 12.859 L262.237 13.947 L272.392 16.399 L282.547 20.189 L292.702 25.281 L302.857 31.622 L313.012 39.151 L323.167 47.791 L333.322 57.456 L343.478 68.05 L353.633 79.467 L363.788 91.593 L373.943 104.306 L384.098 117.479 L394.253 130.982 L404.408 144.679 L414.563 158.432 L424.718 172.106 L434.873 185.562 L445.029 198.668 L455.184 211.291 L465.339 223.305 L475.494 234.592 L485.649 245.037 L495.804 254.536 L505.959 262.995 L516.114 270.329 L526.269 276.464 L536.424 281.34 L546.58 284.908 L556.735 287.132 L566.89 287.989 L577.045 287.472 L587.2 285.585" fill="none" stroke="#e69f00" stroke-width="2"/>
+<text x="593.2" y="289.585" text-anchor="start" font-size="12" font-family="monospace" fill="#e69f00">0.8774</text>
+</svg>

@@ -64,6 +64,28 @@ export declare function checkTestRowIds(
   readFile?: (file: string) => string,
 ): Violation[];
 
+/**
+ * SP10 — every mnemonic row label a spec declares, in document order.
+ *
+ * The complement of `testRowsOf` over one parser, so the two families partition
+ * the rows rather than overlapping.
+ */
+export declare function mnemonicRowsOf(
+  file: string,
+  readFile?: (file: string) => string,
+): string[];
+
+/**
+ * SP10 — a mnemonic test-row label is unique **within one document**.
+ *
+ * Per document deliberately: `IF8` is C09's and C22's, about two different
+ * things, and a mnemonic means something inside the component that draws it.
+ */
+export declare function checkMnemonicRowIds(
+  files: readonly string[],
+  readFile?: (file: string) => string,
+): Violation[];
+
 export declare const OWNERS: readonly Readonly<{ path: string; spec: string }>[];
 export declare const TOPICS: Readonly<Record<string, string>>;
 export declare const REFERENCE_EXCEPTIONS: Readonly<Record<string, string>>;
@@ -106,6 +128,29 @@ export declare function checkReferences(
   readFile?: (file: string) => string,
   exceptions?: Readonly<Record<string, string>>,
 ): { violations: Violation[]; resolved: number };
+
+/**
+ * SP8 — every `§` reference resolves against the document that owns it.
+ *
+ * `checkReferences`' shape, for `Inn`'s question asked of a section, and
+ * `resolved` is here for the same reason: a rule reporting zero over a corpus
+ * it cannot read looks exactly like one reporting zero over a clean one.
+ */
+export declare function checkSectionReferences(
+  files: readonly string[],
+  readFile?: (file: string) => string,
+  exceptions?: Readonly<Record<string, string>>,
+): { violations: Violation[]; resolved: number };
+
+export declare function checkInvariantCoverage(
+  specs: readonly string[],
+  testFiles: readonly string[],
+  readFile?: (file: string) => string,
+  exempt?: readonly string[],
+): { violations: Violation[]; uncited: number; declared: number };
+
+/** Files whose `§` references are deliberately unresolvable, each with why. */
+export declare const SECTION_EXCEPTIONS: Readonly<Record<string, string>>;
 
 /** SP1, SP2, SP3 — so A03 commitment 14b's equality can see the family. */
 export declare const SPEC_RULES: readonly string[];

@@ -17,16 +17,20 @@ import type { BlockRegistryLike, Layer, Placed, Placement, Region } from "./type
 const DEFAULT_MAX_HEIGHT_FRACTION = 0.5;
 
 /**
- * Bottom-first, views before overlays, stable within each (I2).
+ * Bottom-first: views, then peeks, then overlays, stable within each (I2, I23).
  *
- * True by construction of `push` and enforced anyway — see §3. The stable
- * partition preserves nesting order among overlays, which is what makes
- * reverse-i-search sit above the completion menu it was raised over.
+ * The view/overlay half is true by construction of `push` and enforced anyway —
+ * see §3. **The peek band is the one `push` cannot get right by order alone**:
+ * a peek opens beneath whatever is already up and stays beneath whatever opens
+ * later, so a confirm raised over it draws over it (§2a). The stable partition
+ * preserves nesting order among overlays, which is what makes reverse-i-search
+ * sit above the completion menu it was raised over.
  */
 export function sortLayers(stack: readonly Layer[]): readonly Layer[] {
   const views = stack.filter((l) => l.kind === "view");
-  const overlays = stack.filter((l) => l.kind !== "view");
-  return [...views, ...overlays];
+  const peeks = stack.filter((l) => l.kind === "peek");
+  const overlays = stack.filter((l) => l.kind === "overlay");
+  return Object.freeze([...views, ...peeks, ...overlays]);
 }
 
 /** Step 1: the width an overlay actually gets. Never wider than the region (I16). */

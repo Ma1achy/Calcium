@@ -151,7 +151,7 @@ describe("C21 fail-on-revert", () => {
 
   it("T6.10 (I11): skipping killAll at exit → T5.5 leaves orphans", async () => {
     // C21's half of it: `killAll` empties `live` and kills what it holds. That
-    // a session *calls* it is C22's, and C21 T5.5 waits on C22 saying so.
+    // a session *calls* it is C22's, and C21 T5.5 is the row that says so (C22 is built; this said *waits on C22* until 2026-09-03).
     const r = runner();
     r.spawn(scripts.ignoring([]), opts);
     r.spawn(scripts.ignoring([]), opts);

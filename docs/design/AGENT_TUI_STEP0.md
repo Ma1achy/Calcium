@@ -65,7 +65,7 @@ than a seven-way switch:
 -end     settles it
 ```
 
-Which is **C13's live-entry lifecycle exactly** — `putBlock` then `settle`. The mapping is a
+Which is **C13's live-entry lifecycle exactly** — `append` (with `streaming: true`), `patch`, then `settle` (`src/viewport/transcript/types.ts`). This said *`putBlock` then `settle`*; measured 2026-09-03, `putBlock` is `DocumentView.putBlock` in `src/shell/document-view.ts` — the pushed view's total block replace, a different component — and C13 has no verb of that name. The mapping is a
 better fit than the design assumed, and that is worth more than the correction costs: a
 seven-case switch on part type would have been written, and it would have had to grow the
 id-keyed state back by hand.

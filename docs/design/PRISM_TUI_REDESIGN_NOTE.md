@@ -120,12 +120,12 @@ same field.
 ```
 ❯ which of these runs diverged and when?
 
-⏺ /compare run-a run-b run-c --metric val_loss
+⬤ /compare run-a run-b run-c --metric val_loss
   ⎿ ╭─╮      ╭╮
    ╭╯ ╰─╮  ╭─╯╰──╮   ╭──╮
   ╭╯    ╰──╯     ╰───╯  ╰──
 
-⏺ run-c diverges at epoch 7 — the others stay under 0.05.
+⬤ run-c diverges at epoch 7 — the others stay under 0.05.
 ```
 
 **A model that can call `/compare` gets a chart back rather than a table it has to describe.**
@@ -139,7 +139,7 @@ all producing charts.** *Deploy xyz* is rare and deliberate; the analyst is what
 
 **It is not a demo that gets thrown away — it is the implementation prism-cli reuses.** The
 part-to-block mapping, the activity region, the approval popup, the footer's context bar, the
-`⏺`/`⎿` grammar: **all of it is the same code with a different manifest.**
+`⬤`/`⎿` grammar: **all of it is the same code with a different manifest.**
 
 **So the example's build order matters more than an example's normally would**, and the seven
 sections of `AGENT_TUI_DESIGN.md` that are rulings rather than drawings are the ones prism

@@ -1,0 +1,6 @@
+── tree · left-right · 8bit · 80w
+    ╭─render┬─curve────raster
+    │       ╰─paint
+root┼─layout┬─measure
+    │       ╰─wrap
+    ╰─parse

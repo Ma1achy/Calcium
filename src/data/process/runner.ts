@@ -25,7 +25,15 @@ import { accessSync, constants } from "node:fs";
 import { spawn as nodeSpawn } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
 import { createBoundedStream } from "./stream.js";
-import type { ChildHandle, Exit, ProcessRunner, ProcessRunnerDeps, SpawnOptions } from "./types.js";
+import type {
+  ChildHandle,
+  Exit,
+  ProcessRunner,
+  ProcessRunnerDeps,
+  PtyHandle,
+  PtySize,
+  SpawnOptions,
+} from "./types.js";
 
 /** C21 §4. Per stream, not per child. */
 const DEFAULT_MAX_BUFFER_BYTES = 8 * 1024 * 1024;
@@ -37,6 +45,13 @@ type Started = Readonly<{ command: string; args: readonly string[] }>;
 export function createProcessRunner(deps: ProcessRunnerDeps): ProcessRunner {
   const debug = deps.debug ?? ((): void => {});
   const live = new Set<ChildHandle>();
+  /**
+   * PTY children, tracked separately because their handle is a different shape
+   * (C21 §2a) and `live` is `ChildHandle`'s — a published member whose type
+   * cannot widen without a freeze-relevant change. `killAll` empties both
+   * (I11, I17).
+   */
+  const ptyChildren = new Set<PtyHandle>();
 
   /**
    * `$SHELL` when set and executable, otherwise `/bin/sh` (§2).
@@ -217,6 +232,77 @@ export function createProcessRunner(deps: ProcessRunnerDeps): ProcessRunner {
       return start({ command: resolveShell(), args: ["-c", command] }, opts);
     },
 
+    // Read from the deps rather than captured, so a runner reports what it has
+    // (I18). A constant here answers the same for a runner that cannot spawn one.
+    get hasPty(): boolean {
+      return deps.pty !== undefined;
+    },
+
+    spawnPty(command: string, opts: SpawnOptions & PtySize): PtyHandle {
+      // **No fallback** (C21 I16). The message names the field a consumer sets,
+      // because the state it would otherwise describe — *no factory* — is one
+      // the reader cannot act on.
+      const factory = deps.pty;
+      if (factory === undefined) {
+        throw new Error(
+          "spawnPty() with no PTY factory injected — pass one as `TuiConfig.pty` " +
+            "(node-pty satisfies it unchanged). Calcium depends on no PTY package, " +
+            "so a child that needs a terminal needs the consumer's",
+        );
+      }
+
+      const child = factory.spawn(resolveShell(), ["-c", command], {
+        cols: opts.cols,
+        rows: opts.rows,
+        cwd: opts.cwd(),
+        env: { ...deps.env, ...opts.env },
+      });
+
+      let running = true;
+      const exited = new Promise<Exit>((resolve) => {
+        child.onExit(({ exitCode, signal }) => {
+          running = false;
+          ptyChildren.delete(handle);
+          // A terminal child's death arrives as a number; a signal is reported
+          // as one when the platform gives it, and `null` otherwise — the same
+          // shape a piped child resolves with, so a caller reads one `Exit`.
+          resolve({
+            code: exitCode,
+            signal: signal === undefined ? null : `SIG${String(signal)}`,
+          });
+        });
+      });
+
+      const handle: PtyHandle = {
+        get pid(): number | null {
+          return child.pid;
+        },
+        exited,
+        get running(): boolean {
+          return running;
+        },
+        onData: (cb) => {
+          child.onData(cb);
+        },
+        write: (data) => {
+          // C21 §7 — a write after exit is ignored rather than throwing: the
+          // race is normal, and a child may exit between the keystroke and the
+          // delivery.
+          if (running) child.write(data);
+        },
+        resize: (cols, rows) => {
+          if (running) child.resize(cols, rows);
+        },
+        signal: (sig) => {
+          if (!running) return false;
+          child.kill(sig);
+          return true;
+        },
+      };
+      ptyChildren.add(handle);
+      return handle;
+    },
+
     handoff(argv: readonly string[], opts: SpawnOptions): Promise<Exit> {
       // C21 cannot import C01 to verify the terminal was released — L0's two
       // halves — but it can check cheaply, and the message names the missing
@@ -275,9 +361,17 @@ export function createProcessRunner(deps: ProcessRunnerDeps): ProcessRunner {
       // `SIGKILL` outright, no grace period, no timer (I11). C06 owns the
       // escalation ladder and has already had its chance; a second policy here
       // would be the one nobody remembers to keep in step.
+      // **Both sets** (I17): a PTY child is a child, and one left alive by a
+      // `killAll` that only knew about pipes would outlive the session holding
+      // a terminal open.
       const handles = [...live];
+      const ptys = [...ptyChildren];
       for (const handle of handles) handle.signal("SIGKILL");
-      await Promise.all(handles.map((handle) => handle.exited));
+      for (const handle of ptys) handle.signal("SIGKILL");
+      await Promise.all([
+        ...handles.map((handle) => handle.exited),
+        ...ptys.map((handle) => handle.exited),
+      ]);
     },
   };
 }

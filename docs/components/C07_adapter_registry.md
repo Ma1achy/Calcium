@@ -192,13 +192,19 @@ Evaluated top to bottom; **the first match wins**. `cancelled` outranks `timedOu
 
 `ErrorLike` requires only `message` (C04, F3). Where the far side supplies `code`, `stage`, `details` or `remediation` they are carried through; `remediation` naming a runnable command becomes a `fill` action. A failed `promote` and a failed `validate` therefore render identically, because the same code renders both.
 
-### Open: `RawResult.overflowed`
+### Ruled: `RawResult.overflowed` reaches the document as a notice, and never as `meta.truncated`
 
-C21 bounds each stream at 8 MiB and reports `overflowed` when the bound is crossed; C06 carries it as a `RawResult` field. Whether it reaches the document, and under which name, is C07's decision and is not yet made.
+C21 bounds each stream at 8 MiB by default and reports `overflowed` when the bound is crossed; C06 carries it as a `RawResult` field. **It reaches the document as a `notice` block** — tone `warn`, glyph `warn`, appended after every other block the route produced — reading *"Output was cut: the far side emitted more than the runner holds, and only what arrived before the bound is shown."* The registry appends it in `finish`, the funnel every route ends in (I5), so the identity route, an app adapter, the fallback, the `--json` row and the last resort all carry it; C23's `shell` route builds its document without the registry and appends the same block itself, and so does its stream route on the `end` patch — a stream's `RawResult` never passes through `finish`, and until 2026-09-03 nothing read its `overflowed` at all (I22). `meta.truncated` is untouched: it stays `false` unless the fallback capped rows.
+
+**Why a block and not a `meta` field.** `meta` is provenance the framework states (I13), and nothing draws it: measured at HEAD, `meta.truncated` is read by no renderer in `shell/` or `viewport/` — the fallback pairs it with its own *"Showing the first N rows"* notice, and the notice is what the reader sees. A second undrawn field would be a record with no reader, and widening `DocumentMeta` was the wrong repair once already (F58b: the type demanded ten fields and the registry honoured three). The reader needs the sentence, and a `notice` is the block that carries one — the same shape the fallback's cap, the adapter-failure notice and D40's marker already use.
+
+**Why not fold it into `truncated`.** The remedies differ — widen a cap or write an adapter in one case, reconsider what the far side is being asked to emit in the other — and a reader given one flag for two causes has to run the command again to learn which. The paragraph below is kept because it is the reasoning, and the reasoning is easier to re-break than to re-derive.
+
+**The id is the registry's, and it steps aside for a collision.** A far side or adapter may already have used `overflowed` as a block id; C04 I14 makes a duplicate id a validation failure, and a failure in `finish` becomes the last-resort document — so the notice would have replaced the whole result with *"Could not render this result"*. The id is suffixed until it is free.
 
 **An overflowed child is not a truncated document.** `meta.truncated` says the fallback capped rows; `RawResult.overflowed` says the far side emitted more bytes than the runner would hold. The remedies differ — widen a cap or write an adapter in one case, reconsider what the far side is being asked to emit in the other. If both need surfacing, they need two fields, or one field with a reason.
 
-Recorded as a distinction rather than as a task, so whoever takes it starts from the difference instead of rediscovering it. The temptation is to `||` the two together in `authoritativeMeta`, which compiles, passes review, and makes one field mean two things — and I13's line about the three fields the registry cannot know stops being true, because it would then be computing one of them.
+The temptation is to `||` the two together in `authoritativeMeta`, which compiles, passes review, and makes one field mean two things — and I13's line about the three fields the registry cannot know stops being true, because it would then be computing one of them. **That temptation shipped once**: C23's `shell` route wrote `truncated: child.overflowed` for as long as this section read *not yet made*, so a shell command whose output crossed the bound was recorded as a capped fallback document, and nothing drew either. T6.14 is the row that fails if it comes back.
 
 ### Explicit `--json`
 
@@ -352,6 +358,7 @@ The notice is muted rather than an error because the *command* may have succeede
 - **I19** — `capabilities` is C02's **resolved** record, overrides applied (C22 I49) — never a re-detection. An app deriving it from the environment gets the detected record and disagrees with the framework about its own override; measured at three of four locale shapes (F124).
 - **I20** — `measure` is the frame's own measurer, not a second implementation. One answer or the two drift (C09 I1), which is the same argument `cells()` rests on.
 - **I21** — `flags` carries C05's validated flag **values**, not tokens (C05 I21). It is what makes `shellOnly` usable: a flag the shell consumes is absent from `argv` by construction, so an adapter reading `raw.argv` cannot see the thing that selects its own rendering. `userRequestedJson` is this field hardcoded for one flag and stays, because `--json` is transmitted and `--raw` is not — two axes, two fields.
+- **I22** — **An overflowed `RawResult` produces a document carrying an overflow `notice`, on every route, and `meta.truncated` is not how it is recorded.** The block is appended in `finish` so no route can omit it, its id yields to a collision rather than failing validation, and `meta.truncated` keeps I13's meaning — the fallback capped rows — so the two causes stay distinguishable to the reader and to anything that reads `meta`. C23's `shell` route, which does not pass through the registry, appends the same block (§4).
 
 ---
 
@@ -380,6 +387,7 @@ The notice is muted rather than an error because the *command* may have succeede
 21. Capabilities arrive resolved, so an application and the framework cannot disagree about an override the application supplied (I19).
 22. A producer measures with the frame's own measurer, so a split decided in an adapter and the rows drawn on screen are one arithmetic (I20).
 23. `flags` carries validated values, which is what makes a `shellOnly` flag readable by the adapter whose rendering it selects (I21).
+24. An overflowed result says so in a `notice` the reader sees, on every route, and `meta.truncated` goes on meaning what I13 says it means (I22).
 
 ---
 
@@ -409,6 +417,7 @@ Six tiers. Every cell of the §8 transition table is covered.
 - **T1.18** (I13): an adapter returning a document whose `meta` claims `origin: "agent"`, `transport: "local"` and a wrong `argv` → all three are overwritten from the context and the `RawResult`; the adapter's `resultId`, `adapter` and `truncated` survive.
 - **T1.19** (I14): each `meta.exitCode` case — an exit code, `SIGTERM` → 143, an unrecognised signal name → 128, both null → −1.
 - **T1.20** (I14, §4): an invocation aborted before spawn → `partial` with `meta.exitCode` −1, not an error. Same code as a spawn failure, opposite status.
+- **T1.21** (I22): a `RawResult` with `overflowed: true` through the fallback route, the identity route and the last resort → each document carries one `notice` naming the cut and `meta.truncated` is `false`; the same three with `overflowed: false` carry none. An identity document that already uses the id `overflowed` → the notice is appended under a suffixed id and the document is not the last resort.
 
 ### Tier 2 — contract / interface
 
@@ -477,6 +486,7 @@ Six tiers. Every cell of the §8 transition table is covered.
 - **T6.11** (I13): letting an adapter's `meta` through unmodified → T1.18 fails, and provenance becomes whatever a hundred adapters happened to write.
 - **T6.12** (I15): a caller passing a constant `seq` → C23's T1.7b fails on the sequence *and* on the blocks that reached the entry. Named here as well as in C23 because the number is spent here and supplied there: nothing in this component can detect it, since every test constructs its own `StreamContext` and supplies the counter correctly by construction.
 - **T6.13** (I12): dropping the `malformed` patch that precedes `degraded` → T3.19c fails, and every degraded stream loses its first remainder line silently.
+- **T6.14** (I22): recording the overflow as `meta.truncated` instead of the notice, in `finish` or on C23's `shell` route → T1.21 and C23's T3.20 fail, and a cut result reads as a capped one to the only field that records either. Dropping the append on C23's stream route → C23's T3.20a fails — the route that carried the flag and read it nowhere.
 
 ---
 

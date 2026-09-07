@@ -1,8 +1,14 @@
 /**
  * C22 §6 — the frame: chrome, transcript region, prompt.
  *
- * Calcium owns the structure — one chrome row each, fixed, never scrolling —
- * and the app decides what goes in them.
+ * Calcium owns the structure — a one-row header with a rule under it, two rules bounding the
+ * prompt, a footer as tall as its blocks, all fixed and never scrolling — and
+ * the app decides what goes in the header and the footer. **The footer's
+ * height is measured from what the chrome function returns** (I82, §6l), at
+ * the frame's width and through the same `measureSequence` C14 uses, so the
+ * height and the rows are one measurement. §6k's budget is retired; the
+ * transcript is anchored at its tail exactly as it is when the prompt grows,
+ * and a footer that grows by a row moves it the same way (§6l.3 row 1).
  *
  * **Two values are sampled exactly once per frame, and both have a reason with
  * a failure attached.**
@@ -21,10 +27,18 @@
  */
 
 import { cells } from "../presentation/text.js";
-import { PROMPT_GUTTER, PROMPT_SUBSTITUTION } from "./config.js";
+import {
+  DEFAULT_FOOTER_ROWS,
+  HEADER_ROWS,
+  HEADER_RULE_ROWS,
+  MAX_FOOTER_ROWS,
+  PROMPT_GUTTER,
+  PROMPT_SUBSTITUTION,
+  RULE_ROWS,
+} from "./config.js";
 import type { TerminalSize } from "../terminal/lifecycle.js";
 import type { Block } from "../data/viewmodel/index.js";
-import type { ChromeFn, SessionSnapshot } from "./types.js";
+import type { Chrome, SessionSnapshot } from "./types.js";
 
 /** What the frame is, before anything paints it. */
 export type Composed = Readonly<{
@@ -32,6 +46,12 @@ export type Composed = Readonly<{
   now: number;
   header: readonly Block[];
   footer: readonly Block[];
+  /**
+   * Rows the footer occupies — its blocks' measured height, clamped to
+   * `MAX_FOOTER_ROWS`, zero for `[]` (I82). Carried so `heightsSum` and the
+   * painter read one number (I80).
+   */
+  footerRows: number;
   /** Where the transcript sits — C16's `region`, `{ top, height }`. */
   region: Readonly<{ top: number; height: number }>;
   /**
@@ -48,7 +68,7 @@ export type Composed = Readonly<{
 }>;
 
 export type ComposeDeps = Readonly<{
-  chrome: Readonly<{ header: ChromeFn; footer: ChromeFn }>;
+  chrome: Chrome;
   session: () => SessionSnapshot;
   /** Copy mode, for the chrome. A frame property, like `size` (C16 §5b). */
   copyMode: () => boolean;
@@ -56,22 +76,29 @@ export type ComposeDeps = Readonly<{
   size: () => TerminalSize;
   /** C17's `displayRows`, already gutter-aware. C22 passes the gutter (I13). */
   promptRows: (width: number, gutter: typeof PROMPT_GUTTER) => number;
+  /**
+   * C09's `measureSequence`, for the footer's height (I82). **The same function
+   * C14 measures entries with**, so the footer's rows and the footer's height
+   * cannot part company at a wrap the way two measurers would.
+   */
+  measureSequence: (blocks: readonly Block[], width: number) => number;
 }>;
-
-/**
- * One chrome row top, one bottom (§6). Named rather than inlined so the
- * arithmetic below reads as a subtraction of known parts.
- */
-const HEADER_ROWS = 1;
-const FOOTER_ROWS = 1;
 
 export function compose(deps: ComposeDeps): Composed {
   // The two single reads. Everything below takes these values.
   const size = deps.size();
   const now = deps.now();
-
   const session = deps.session();
   const ctx = { session, now, columns: size.columns, copyMode: deps.copyMode() };
+
+  const header = deps.chrome.header(ctx);
+  const footer = deps.chrome.footer(ctx);
+  // **The footer is its content** (I82, §6l.4 B): measured at this frame's
+  // width, clamped to the maximum the size gate can hold, and zero for `[]` —
+  // the lower rule is the prompt's edge, not the footer's head, so a frame
+  // with no footer ends on the rule rather than on a blank row (§6l.2 row 3).
+  const footerRows =
+    footer.length === 0 ? 0 : Math.min(deps.measureSequence(footer, size.columns), MAX_FOOTER_ROWS);
 
   // **The prompt is capped at half the terminal** (S01 §3). Pasting two hundred
   // lines is a real thing people do (C17 T5.2), and an uncapped prompt consumes
@@ -85,14 +112,16 @@ export function compose(deps: ComposeDeps): Composed {
   // enormous one after a subtraction somewhere downstream. The size gate
   // normally prevents this, and normally is not a guarantee — a resize can
   // arrive between the gate and the frame.
-  const height = Math.max(0, size.rows - HEADER_ROWS - FOOTER_ROWS - promptRows);
+  const height = Math.max(0, size.rows - HEADER_ROWS - HEADER_RULE_ROWS - RULE_ROWS - footerRows - promptRows);
 
   return Object.freeze({
     size,
     now,
-    header: deps.chrome.header(ctx),
-    footer: deps.chrome.footer(ctx),
-    region: Object.freeze({ top: HEADER_ROWS, height }),
+    header,
+    footer,
+    footerRows,
+    // Below the header and its rule (I87, §6l.7).
+    region: Object.freeze({ top: HEADER_ROWS + HEADER_RULE_ROWS, height }),
     // **The same height as the transcript region** (I28). It was the whole
     // terminal, and nothing could see it: a layer floats above the four regions
     // rather than taking rows, so `heightsSum` holds at every width with every
@@ -117,15 +146,32 @@ export function compose(deps: ComposeDeps): Composed {
  *
  * A one-row prompt, which is what a session opens with — an empty buffer lays out
  * as one row.
+ *
+ * **The footer is guessed at `DEFAULT_FOOTER_ROWS`** (§6l.2 row 8): no
+ * `ChromeFn` has run yet, so nothing has been measured. The first frame
+ * corrects this by `f − 1` rows (I34, §6l.3 row 3), which T1.37 measures — and
+ * the default footer is one row, so a default session is corrected by nothing.
  */
 export function initialRegionHeight(size: TerminalSize): number {
-  return Math.max(0, size.rows - HEADER_ROWS - FOOTER_ROWS - 1);
+  return Math.max(0, size.rows - HEADER_ROWS - HEADER_RULE_ROWS - RULE_ROWS - DEFAULT_FOOTER_ROWS - 1);
+}
+
+/**
+ * The row the prompt's first line is painted on: below the header, the region
+ * and the upper rule (I81). **One implementation**, read by the painter's
+ * cursor and by anything else that has to name the prompt's row — a caller
+ * spelling `top + height` agrees with this today and puts the cursor on the
+ * rule the day the rule exists, which is the day this was written.
+ */
+export function promptTop(f: Composed): number {
+  return f.region.top + f.region.height + RULE_ROWS / 2;
 }
 
 /**
  * S01 §3's sum, checked **before any output is written**.
  *
- * The four regions must total exactly `rows`. One too many and the frame
+ * The header, its rule, the region, the prompt's two rules, the prompt and the footer must total
+ * exactly `rows`. One too many and the frame
  * scrolls the alternate screen — the failure that corrupts state the
  * application can no longer see or correct — and one too few leaves a row of
  * the previous frame showing through.
@@ -137,7 +183,12 @@ export function initialRegionHeight(size: TerminalSize): number {
  * claim about the frame.
  */
 export function heightsSum(f: Composed): boolean {
-  return HEADER_ROWS + f.region.height + f.promptRows + FOOTER_ROWS === f.size.rows;
+  // **With the budget the frame was composed with** (I80), not a constant: a
+  // constant here would hold at every budget while the painter drew a footer of
+  // a different height, and the sum would agree with itself.
+  return (
+    HEADER_ROWS + HEADER_RULE_ROWS + f.region.height + RULE_ROWS + f.promptRows + f.footerRows === f.size.rows
+  );
 }
 
 /**

@@ -1,0 +1,8 @@
+── tree · default · ascii · 80w
+                                       root
+                             +----------+--+--------+
+                           render        layout   parse
+                          +--+---+      +--+--+
+                        curve  paint measure wrap
+                          |
+                        raster

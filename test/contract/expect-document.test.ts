@@ -103,6 +103,51 @@ describe("C24 §7 — expectDocument", () => {
     expect(() => expectDocument(unicode).degradesToAscii()).toThrow(/non-ASCII/);
   });
 
+  it("AA4 (C12 I54): degradesToAscii passes for a document holding plots", () => {
+    // **F212's own remedy, and F216 is why it matters.** This fixture's document
+    // was a rule, a notice and a table — no plot in it — so the assertion the
+    // framework publishes for a consumer's suite had never been run against the
+    // component with the richest glyph vocabulary in the tree. Put one in and it
+    // failed: a `line` plot survived as `U+256D ╭` and a `contour` as `U+28C0 ⣀`,
+    // and a two-series bar's legend as `U+00B7 ·`.
+    //
+    // Three forms rather than one, because the three were three different
+    // mechanisms — a box-drawing rasteriser, a braille arm chosen from
+    // `plotStyle`, and a separator written as prose.
+    const plots = docOf([
+      b.plot({
+        id: "aa4-line",
+        form: "line",
+        series: [{ label: "a", values: [1, 3, 2, 6, 4, 8, 5, 9] }],
+        height: 5,
+      }),
+      b.plot({
+        id: "aa4-contour",
+        form: "contour",
+        series: [
+          { values: [1, 2, 3, 4, 5, 4] },
+          { values: [2, 4, 6, 5, 3, 2] },
+          { values: [3, 6, 4, 2, 1, 3] },
+          { values: [1, 3, 5, 6, 4, 2] },
+        ],
+        height: 6,
+      }),
+      // **Two series and no `categories`**, because `b.plot` does not publish
+      // that field (MG27's list) — the legend the separator lives in comes from
+      // the labels, which is the part this row is about.
+      b.plot({
+        id: "aa4-bar",
+        form: "bar",
+        series: [
+          { label: "before", values: [3, 5, 2] },
+          { label: "after", values: [4, 2, 6] },
+        ],
+        height: 6,
+      }),
+    ]);
+    expect(() => expectDocument(plots).degradesToAscii()).not.toThrow();
+  });
+
   it("degradesTo1Bit passes when colour is decoration and fails when it is the message", () => {
     const doc = docOf(
       b.seq([b.rule("containers"), b.notice.error("no such verb"), b.steps([{ label: "pull" }])]),

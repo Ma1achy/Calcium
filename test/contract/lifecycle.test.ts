@@ -62,7 +62,6 @@ describe("C01 contract", () => {
       // A method, not a getter (I12a) — so it belongs in this list rather than
       // beside `writer` below, and `typeof === "function"` is what says so.
       "setMouseTracking",
-      "setEnhancedKeyboard",
       "size",
     ]) {
       expect(typeof (lifecycle as unknown as Record<string, unknown>)[member], member).toBe(

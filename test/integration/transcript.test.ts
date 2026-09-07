@@ -2,7 +2,7 @@
 //
 // **Three of these were deferred on C14 and `todo-expiry` expired them when it
 // landed**, which is the notification nobody would otherwise send. What is left
-// waits on C16 and on L4 — assertions about focus and about `/clear`, neither of
+// waited on C16 and on L4 — both built at 2026-09-03 — assertions about focus and about `/clear`, neither of
 // which has a component yet.
 import { describe, expect, it } from "vitest";
 import { pipelineHarness, settled } from "../support/execution.js";
@@ -151,11 +151,11 @@ describe("C13 integration", () => {
     });
 
     h.pipeline.submit("/ps");
-    await settled();
+    await settled(h.pipeline);
     expect(h.transcript.entries.length, "something to clear").toBeGreaterThan(0);
 
     h.pipeline.submit("/clear");
-    await settled();
+    await settled(h.pipeline);
 
     // The `/clear` entry itself is what remains: the command ran and said so.
     expect(
@@ -164,7 +164,7 @@ describe("C13 integration", () => {
     ).toEqual(["/clear"]);
 
     h.pipeline.submit("/history");
-    await settled();
+    await settled(h.pipeline);
     const listing = h.transcript.entries.at(-1);
     expect(
       JSON.stringify(listing?.doc.blocks),

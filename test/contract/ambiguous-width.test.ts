@@ -13,7 +13,7 @@ import { describe, expect, it } from "vitest";
 
 import { detectCapabilities } from "../../src/terminal/capabilities.js";
 import { cells } from "../../src/presentation/text.js";
-import { RAMP_BRAILLE, RAMP_UNICODE, rampFor } from "../../src/presentation/plot/ramp.js";
+import { RAMP_BRAILLE, RAMP_UNICODE, ladderFor } from "../../src/presentation/plot/ramp.js";
 import { sparkline } from "../../src/presentation/plot/index.js";
 import { FULL_CAPS } from "../support/render.js";
 
@@ -75,11 +75,12 @@ describe("C02 I9 — the sparkline, which is the field's first consumer", () => 
     // correctly on a wide terminal pads it to twice the cells and a table column
     // cannot hold it — so the fix is the glyphs, and the measurement is what
     // makes the padding agree with them.
-    expect(rampFor(FULL_CAPS), "narrow keeps the blocks").toBe(RAMP_UNICODE);
-    expect(rampFor(WIDE_CAPS), "wide takes braille").toBe(RAMP_BRAILLE);
-    expect(rampFor({ ...WIDE_CAPS, unicode: "ascii" }), "ASCII is the stronger constraint").toBe(
-      ".:-=+*#@",
-    );
+    expect(ladderFor("height", FULL_CAPS).steps, "narrow keeps the blocks").toBe(RAMP_UNICODE);
+    expect(ladderFor("height", WIDE_CAPS).steps, "wide takes braille").toBe(RAMP_BRAILLE);
+    expect(
+      ladderFor("height", { ...WIDE_CAPS, unicode: "ascii" }).steps,
+      "ASCII is the stronger constraint",
+    ).toBe(".:-=+*#@");
   });
 
   it("T2.54 (C02 I9, C11): the row is exactly `width` cells on both kinds of terminal", () => {

@@ -463,7 +463,9 @@ describe("C01 signals", () => {
     process.emit("SIGWINCH");
     process.emit("SIGWINCH");
 
-    // C01 does not coalesce; that is C03's job (D31 — resize is not debounced).
+    // C01 does not coalesce; that is C03's job, on a fixed 16 ms deadline
+    // (C03 I15). D31 says *not debounced*, which is a different claim and still
+    // holds — a debounce waits for the events to stop, a window does not.
     expect(resized).toHaveBeenCalledTimes(3);
   });
 });

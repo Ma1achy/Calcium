@@ -56,12 +56,17 @@ behind it rather than a prediction.
 several decisions is there and nowhere else. A01 records what was decided; these record
 why the alternatives were rejected. **Where a scratchpad and a spec disagree, the spec wins.**
 
-**`notes/`** — working notes on things not yet specified: resize and a possible
-compositor, image support. **Reference, not work.** A scratchpad is superseded and its
+**`notes/`** — working notes, several on things since specified: resize is C03 I15 / C22 I8 and
+image support is C04 I73 (this line named both as unspecified until 2026-09-03); the audit of every
+note against the tree is `notes/CALCIUM_NOTE_AUDIT.md`. **Reference, not work.** A scratchpad is superseded and its
 conclusions have landed somewhere; a note's have not landed anywhere, because there is
 no component to land them in yet. Neither is authoritative, and the distinction matters
 in one direction: reading a scratchpad tells you why a spec says what it says, and
 reading a note tells you what nobody has decided.
+
+**[`KEYS.md`](KEYS.md)** — the key ladder as one table, **generated** by `npx tsx tools/keymap-table.mjs`
+from `defaultKeymap` (C16 §6) and drift-checked by `test/unit/keymap-table.test.ts`. Not edited by
+hand: regenerate it when a binding changes, and the test says when the file and the keymap disagree.
 
 ---
 
@@ -72,7 +77,7 @@ import each other, so they can be built in parallel.
 
 ```
 terminal    C01 lifecycle → C02 capabilities → C03 scheduler
-data        C04 view model → C05 manifest → C06 transport → C07 adapters → C21 process
+data        C04 view model → C05 manifest → C06 transport → C07 adapters → C21 process → C27 emulator
                     ↓
 presentation        C09 blocks → C10 theme → C11 table → C12 plot → C25 patch
                     ↓

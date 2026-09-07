@@ -21,6 +21,7 @@
  * the condition — it subscribes to nothing and holds no entry ids (C15 I10) — so
  * the watching is here.
  */
+import { descendants } from "../data/viewmodel/index.js";
 import type { Block, Patch } from "../data/viewmodel/index.js";
 import {
   clampOffset,
@@ -44,7 +45,8 @@ export type PatchViewDeps = Readonly<{
 
 export interface PatchView {
   /**
-   * Raise the view over `blockId`, resolved **within `from`'s document**.
+   * Raise the view over `blockId`, resolved **within `from`'s document, at any
+   * depth** (C23 I31).
    *
    * Returns a refusal string, or `null` when the view opened. A string rather
    * than a throw because the caller is C23's action dispatcher, which patches a
@@ -79,12 +81,34 @@ type State = Readonly<{ entry: EntryId; blockId: string; offset: number }>;
 export function createPatchView(deps: PatchViewDeps): PatchView {
   let state: State | null = null;
 
+  /**
+   * A block by id **within one entry, at any depth** (C23 I31, F471).
+   *
+   * Both callers below had `doc.blocks.find(...)`, so a patch inside a `panel`
+   * could not be opened — and the refusal said *no block in this entry* about a
+   * block that is in the entry, which is worse than a no-op: the reader can see
+   * it on screen. `b.live` builds a panel and C23 I34 replaces every refreshed
+   * part with one, so the failing arrangement is the framework's own output.
+   *
+   * **`descendants` and not a fourth walk**, for `tree.ts`'s reason. And note
+   * what that module could not have caught here: it makes a *new container kind*
+   * fail to compile at every site that enumerates the old ones, and this site
+   * enumerated nothing — it did not recurse at all.
+   */
+  function blockIn(entryId: EntryId, blockId: string): Block | null {
+    const entry = deps.transcript.entries.find((e) => e.id === entryId);
+    if (entry === undefined) return null;
+    for (const top of entry.doc.blocks) {
+      if (top.id === blockId) return top;
+      for (const child of descendants(top)) if (child.id === blockId) return child;
+    }
+    return null;
+  }
+
   /** The block as it is **now**, or null if the entry or the block has gone. */
   function live(at: State): Patch | null {
-    const entry = deps.transcript.entries.find((e) => e.id === at.entry);
-    if (entry === undefined) return null;
-    const found = entry.doc.blocks.find((b: Block) => b.id === at.blockId);
-    if (found === undefined || found.kind !== "patch") return null;
+    const found = blockIn(at.entry, at.blockId);
+    if (found === null || found.kind !== "patch") return null;
     return found;
   }
 
@@ -161,8 +185,10 @@ export function createPatchView(deps: PatchViewDeps): PatchView {
       // **Resolved within this entry and nowhere wider** (C04 I34, C23 I31). A
       // free string an adapter supplies, matched against the whole transcript,
       // would let one entry's action fill the screen with another entry's data.
-      const found = entry.doc.blocks.find((b: Block) => b.id === blockId);
-      if (found === undefined) return `no block \`${blockId}\` in this entry`;
+      // **At any depth within it**, which is the other direction and carries
+      // none of that risk — a container is part of the entry that declared it.
+      const found = blockIn(from, blockId);
+      if (found === null) return `no block \`${blockId}\` in this entry`;
       if (found.kind !== "patch") return `\`${blockId}\` is a ${found.kind}, not a patch`;
 
       // C15 throws on a view over a non-empty stack (C15 I1) and this is called

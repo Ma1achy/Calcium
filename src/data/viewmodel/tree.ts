@@ -44,6 +44,7 @@ const CONTAINERS: Readonly<Record<ContainerBlock["kind"], true>> = Object.freeze
   panel: true,
   group: true,
   scroll: true,
+  mosaic: true,
 });
 
 /**

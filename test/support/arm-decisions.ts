@@ -1,0 +1,768 @@
+/**
+ * What each arm **decides**, extracted from what each arm **drew**.
+ *
+ * The unification pass's step 1: *measure the disagreements before designing the
+ * type*. This is the extraction that measurement runs on, and its one rule is
+ * that **both sides come out of output, never out of a copy of the logic**.
+ *
+ * **Why not call the terminal's decision functions.** `axisFor`, `yLabels`,
+ * `legendPlacement` and the rest *are* what the terminal decides, and reading
+ * them would be quicker. But the pass's claim is that a decision made in two
+ * places gets two answers — and a sweep that asks each arm's own function has
+ * asked the same question twice rather than compared two answers. Worse, those
+ * functions are what step 3 moves into `figureOf`; a sweep written against them
+ * would keep passing across the move whatever the frames did. So the terminal
+ * side is a frame read and the SVG side is an element read, and the two cannot
+ * agree by construction.
+ *
+ * **The instrument's own blind spots, stated because an unrecorded limit reads
+ * as strength:**
+ *
+ *   - `numericLabels` does not separate the two axes. A `line` frame yields its
+ *     y ticks and its x ticks in one list. The disagreements this sweep exists
+ *     for are *which numbers* and *how many*, and both survive the merge; a
+ *     per-axis split would need the terminal's own axis functions, which is
+ *     exactly what the paragraph above refuses.
+ *   - A numeric **identity** reads as a value. `autocorrelation` labels its rows
+ *     by lag — `0 1 2 3 4` — and nothing in a frame says those are indices
+ *     rather than readings. The row is still a true record of what was drawn.
+ *   - In-area text is matched by shape, `[A-Za-z]…`, so a form whose *data* is
+ *     letters would be read as labels. No form in the corpus draws letters as
+ *     data; the day one does, this comment is where to look.
+ */
+import { plotToSvg, SVG_DEFAULT_LAYOUT } from "../../src/presentation/plot/svg.js";
+import type { Plot } from "../../src/data/viewmodel/index.js";
+import type { ResolvedTheme } from "../../src/presentation/theme/types.js";
+
+/**
+ * The **vertical** frame edges, both alphabets — what separates gutter from area.
+ *
+ * Vertical only, and that is a fix rather than a simplification. A class holding
+ * the horizontal run as well matches the `-` that opens `-0.5`, so the first
+ * edge on a row whose gutter holds a negative tick is found *inside the label*
+ * and the gutter reads empty. `autocorrelation` labels `-0.5`, so the instrument
+ * would have reported a missing label as a disagreement — evidence manufactured
+ * by the parser, which is the failure this sweep exists to detect rather than
+ * commit.
+ */
+const EDGE = /[│┤├┼|+]/u;
+const TOP = /^\s*[┌+]/u;
+const BOTTOM = /^\s*[└+]/u;
+/** A row that is *only* frame — the border itself, rather than a row with edges. */
+const RULE_ONLY = /^[\s┌┐└┘├┤┬┴┼─│+|-]+$/u;
+/** The glyphs an interior rule is drawn in — **dotted, and only dotted** (F358). */
+const DOTTED_RULE = /[\u2504\u2505\u2506\u2507\u250a\u250b\u2508\u2509\u254c\u254d\u254e\u254f]/u;
+/** A label shaped like a name rather than a reading. */
+const WORD = /[A-Za-z][A-Za-z0-9_.-]*/gu;
+const NUMERIC = /^-?[\d.,]+\s*[%a-zA-Z]{0,3}$/u;
+
+export type ArmDecisions = Readonly<{
+  /** Did the arm put anything on the page at all. */
+  drawn: boolean;
+  /** Every label that reads as a number, in the order drawn. Ticks, mostly. */
+  numericLabels: readonly string[];
+  /** Every label that names something — a category, a series, a node, a tile. */
+  identityLabels: readonly string[];
+  /** Is there a border around the plot area. */
+  border: boolean;
+  /** Rules drawn **across the plot area**, which is not the same as tick stubs on a border. */
+  interiorRules: number;
+  /** Is a legend drawn — entries beside the figure rather than on it. */
+  legend: boolean;
+  /**
+   * Is a **colour ramp** drawn — a continuous key, as against a discrete one.
+   *
+   * **The sixth column, and the record had five** (F316). The paired sheet shows
+   * a ramp under every matrix-family terminal frame and none under any SVG, and
+   * `heatmap.legend` reads `agree` because both arms answer `false` — the SVG
+   * having none, the terminal because its ramp is *coloured spaces* and the
+   * reader took stripped text. **A rule table is exhaustive over the rules you
+   * stated and blind to one you did not**, so this is an axis the record lacked
+   * rather than a reader to widen.
+   */
+  ramp: boolean;
+  /**
+   * Does the frame **say that data was withheld** — a drop, a truncation.
+   *
+   * The seventh column, and its disposition is `legitimate` (F318). The terminal
+   * withholds because a cell is a quantum: a heatmap past its width drops leading
+   * columns and says `· N older not shown`, a form with more rows than it has
+   * says `+N more` (C12 I8). The second arm scales its box across whatever it is
+   * given and has **nothing to drop** — not *has not implemented dropping*. So
+   * the two differ and always will, and the row fails the day the SVG grows a
+   * drop rule of its own, which is the seam leaking the other way.
+   */
+  notice: boolean;
+  /**
+   * The readings a colour **key names**, in reading order.
+   *
+   * **The eighth column, and it exists because the sixth is a boolean** (F338,
+   * §3ak.38). `ramp` asks *is a colour key drawn* and closed on eleven forms;
+   * it is blind by construction to what the key says. The terminal's contour
+   * key named `1.5 … 99 · 20 40 60 80` and this arm's named `1.5 … 99`, both
+   * answered `true`, and the cell read `agree`.
+   *
+   * **The withheld clause is cut out** on the terminal side, because it shares
+   * the row and it is `notice`'s subject — a heatmap at 40w says `· 56 older
+   * not shown` on the same line, and counting its `56` here measures one thing
+   * twice in the way F337's fourth reader did.
+   */
+  keyReadings: readonly string[];
+}>;
+
+const NOTHING: ArmDecisions = Object.freeze({
+  drawn: false, numericLabels: [], identityLabels: [], border: false, interiorRules: 0, legend: false,
+  ramp: false, notice: false, keyReadings: [],
+});
+
+/**
+ * The terminal's decisions, read out of its frame.
+ *
+ * **The bottom border is the seam.** Everything above it is the plot area and
+ * its gutters; everything below is the x-axis row and whatever notice follows. A
+ * form with no border — the heatmap and the treemap draw none — has no seam, and
+ * then every row is area, which is the honest answer rather than a guess.
+ */
+/**
+ * A row that is a **legend** — a run of swatch-and-name pairs.
+ *
+ * **The terminal reader could only see a legend on the right** (F297, fourth
+ * instance and the first on this side). Its whole test was *text past the last
+ * frame edge on a row*, which only `left` and `right` produce: `legend: "above"`
+ * put `alpha beta gamma` into `identityLabels` and reported `legend: false`, and
+ * `legend: "below"` was invisible in both. Measured against the second arm, which
+ * draws all four placements, those two variants could never agree whatever either
+ * renderer did — the reader was reporting different facts about the same figure.
+ *
+ * So both sides now ask the **same** structural question, which is also what a
+ * legend *is* in either medium: a swatch and a name. Here that is a block glyph
+ * followed by a word, repeated; in the SVG it is a square `<rect>` followed by a
+ * `<text>`.
+ *
+ * **Stated limit**: the swatch class is the 24-bit and ASCII alphabet, which is
+ * what this instrument compares at (§2). Below the colour floor `markOf` reaches
+ * for shapes — `▚`, `▞` — and those are in the class; a rung that grew a sixth
+ * mark would need adding, and `U6` is where that would be noticed.
+ */
+const SWATCH = /[\u2588\u28ff#\u259a\u259e\u2593\u2592\u2591\/\\]/u;
+const LEGEND_ROW = /^(?:\s*[\u2588\u28ff#\u259a\u259e\u2593\u2592\u2591\/\\]\s+[A-Za-z][\w.-]*)+\s*$/u;
+
+function isLegendRun(text: string): boolean {
+  const t = text.trim();
+  return t !== "" && SWATCH.test(t) && LEGEND_ROW.test(t);
+}
+
+/**
+ * A legend **beside** a figure, on the same row (F307, F297's fifth instance).
+ *
+ * The two tests above find a legend that **is** a row, or text past a frame
+ * edge. The proportion family has neither: a pie, a radar and a waffle draw no
+ * border at any width and put their key on the same rows as the disc. So
+ * `legend: false` was reported for twenty cells where the terminal draws one,
+ * and the names went into `identityLabels` — the reader inventing a
+ * disagreement in both directions at once, which is what F297 was.
+ *
+ * **`LEGEND_GAP` is the structural signal, and it is the terminal's own.**
+ * `segmentLegend` prefixes every entry with two spaces, so the tail is *at
+ * least two spaces, then swatch-and-name pairs to the end of the row* — where a
+ * figure's own glyphs run edge to edge and its labels are single words.
+ *
+ * **The swatch class cannot be a character list here**, and the radar is why:
+ * its swatch is `dashSwatch`, two braille cells of `⠒`, and adding that
+ * codepoint to `SWATCH` would make every braille curve in the corpus a
+ * candidate. So the tail asks the *shape* — one to three non-word glyphs — and
+ * the two-space gap is what keeps it from matching a figure.
+ *
+ * **Stated limit**: a form drawing a word inside its area, preceded by two
+ * spaces, at the end of a row, is indistinguishable from a one-entry legend.
+ * `AD1` is where that would show, because it compares 46 forms and the cell
+ * would move.
+ */
+const LEGEND_TAIL = /\s{2,}(?:[^\s\w]{1,3}\s+[A-Za-z][\w.\-…]*(?: [A-Za-z][\w.\-…]*)*(?:\s+[\d.]+%?)?\s*)+$/u;
+
+/**
+ * **A frame glyph is never a swatch** (F297, seventh instance).
+ *
+ * `LEGEND_TAIL` asks the *shape* — one to three non-word glyphs, two spaces
+ * before them — because the radar's swatch is braille and a character list could
+ * not hold it. A tree's indented outline has that shape exactly: `│   ├── curve`
+ * is two-plus spaces, three box-drawing glyphs, and a name.
+ *
+ * So the terminal's `tree/outline` reported **`legend: true` and two identity
+ * labels of nine** — `root`, which has no prefix, and `parse`, whose `╰── ` sits
+ * at column 0 with no gap before it. Seven names swallowed and a legend invented,
+ * on a form that draws neither.
+ *
+ * **It was invisible until the second arm stopped refusing the layout** (F310).
+ * A refused pair is never compared, so a refusal hides the *reader* as well as
+ * the arm — and the cell that would have shown it read `silent`.
+ *
+ * The alphabet is `RULE_ONLY`'s, which the reader already holds: a run made
+ * entirely of frame is furniture, whatever follows it.
+ */
+const FRAME_GLYPH = /^[\s┌┐└┘╭╮╰╯├┤┬┴┼─│+|-]+$/u;
+
+function legendTail(line: string): RegExpExecArray | null {
+  const m = LEGEND_TAIL.exec(line);
+  if (m === null) return null;
+  const swatch = /\s{2,}([^\s\w]{1,3})\s/u.exec(m[0]);
+  return swatch !== null && FRAME_GLYPH.test(swatch[1]!) ? null : m;
+}
+
+/**
+ * A **colour ramp**, on either arm: three or more adjacent swatches carrying
+ * different colours, bracketed by the two readings they run between.
+ *
+ * **Bracketed is what makes it a legend rather than the figure.** A heatmap's
+ * own cells are runs of background-coloured spaces too, so *a run of swatches*
+ * matches the picture; what only the key has is a number at each end — Granite's
+ * `Min ▮▮▮▮▮ Max`, and the terminal's own comment says the bounds bracket the bar
+ * so that the two numbers name the two ends they sit against.
+ *
+ * **This reader takes the frame with its colours in it, and that is the whole
+ * finding** (F316, F297's sixth instance). The ramp *is* spaces, so a reader on
+ * stripped text sees `0.19          100 · 16 older not shown` and an entirely
+ * blank figure above it — reporting `false` for a thing plainly on the page, and
+ * `agree` for a cell where one arm draws a key and the other draws nothing.
+ *
+ * **Stated limit**: a figure row of background-coloured cells with a reading at
+ * each end would match. None exists — measured over 362 cells, the eleven forms
+ * that answer `true` are the matrix family plus `contour`, `quiver` and
+ * `horizon`, and every one of them draws a key — and `AD6` holds the case that
+ * would collapse it: the heatmap's own cells, same alphabet, no bounds.
+ */
+const BG = /\x1b\[48;2;(\d+;\d+;\d+)m/gu;
+const BOUND = /-?[\d.,]+\s*[%a-zA-Z]{0,3}/u;
+
+export function terminalRamp(raw: string, least = 3): boolean {
+  BG.lastIndex = 0;
+  const runs: { colours: Set<string>; from: number; to: number }[] = [];
+  let current: { colours: Set<string>; from: number; to: number } | null = null;
+  let m: RegExpExecArray | null;
+  while ((m = BG.exec(raw)) !== null) {
+    // A swatch is the background sequence plus the single cell it paints, so
+    // two swatches are adjacent when the next match begins one cell on.
+    const adjacent = current !== null && m.index === current.to;
+    if (adjacent && current !== null) { current.colours.add(m[1]!); current.to = BG.lastIndex + 1; }
+    else { current = { colours: new Set([m[1]!]), from: m.index, to: BG.lastIndex + 1 }; runs.push(current); }
+  }
+  return runs.some((r) => {
+    if (r.colours.size < least) return false; // cells-ok — a swatch count
+    const before = stripSgr(raw.slice(0, r.from)).trim();
+    const after = stripSgr(raw.slice(r.to)).trim();
+    return BOUND.test(before) && BOUND.test(after);
+  });
+}
+
+/**
+ * The same question of an SVG: a gradient, or three adjacent equal rects in a
+ * progression, with text at both ends.
+ *
+ * **Measured before the column existed: 0 of 181 frames.** The arm has no ramp
+ * at all — no `<linearGradient>`, no `<defs>` — so this returns `false` for the
+ * whole corpus today, which is what makes the cell an open disagreement rather
+ * than a reader defect.
+ */
+export function svgRamp(svg: string): boolean {
+  return svgRampFoot(svg) !== null;
+}
+
+/**
+ * **The same bar, as a baseline** — `y + height` of the key's bar (F338).
+ *
+ * `keyReadings` needs to know which texts belong to the key, and the answer is
+ * *the ones on the bar's own foot*. Written as a second detector it drifted
+ * immediately: it took a run of **two** rects where this takes three, so a
+ * two-band `horizon` — the exact variant §3ak.37 records as under the floor on
+ * both arms — had no ramp and a key at the same time. One finder, two questions.
+ */
+function svgRampFoot(svg: string, least = 3): number | null {
+  // **The gradient names itself by its reference**, and the foot has to come
+  // from the rect that *uses* it rather than from the `<defs>`: a gradient's own
+  // `x1`/`y1` are object-bounding-box coordinates and not page positions, which
+  // is the third of F337's three readers making that mistake.
+  const grad = /<rect\b[^>]*fill="url\(#[^)]*\)"[^>]*\/>/u.exec(svg);
+  if (grad !== null) {
+    const y = /\by="(-?[\d.]+)"/u.exec(grad[0])?.[1];
+    const h = /\bheight="(-?[\d.]+)"/u.exec(grad[0])?.[1];
+    if (y !== undefined && h !== undefined) return Number(y) + Number(h);
+  }
+  // **Bracketing, not adjacency — and the two drafts before this one are why.**
+  //
+  // The first asked for three consecutive `<rect>` of differing fill in document
+  // order. That is a *discrete* key: **96 of 362 cells**, every `line` with a
+  // three-entry legend.
+  //
+  // The second added geometry and reported **0**, which is the right answer for
+  // the wrong reason. A heatmap draws 450 touching rects of differing fill, so it
+  // *is* a run of swatches; what saved the reader was sorting every row's cells
+  // into one list by `x`, which interleaves the rows and breaks every run at its
+  // second element. A single-row matrix would have gone straight through, and a
+  // cell reading `false` because the sort was wrong is indistinguishable from one
+  // reading `false` because the arm has no ramp.
+  //
+  // **What separates a key from a figure is that a key is bracketed by its
+  // bounds** — Granite's `Min ▮▮▮▮▮ Max`, which is the terminal side's own test.
+  // So: a run along one row, and a `<text>` beside each end of it.
+  const swatches = [...svg.matchAll(/<rect\b[^>]*\/?>/gu)].map((r) => r[0]).flatMap((el) => {
+    const num = (k: string): number | null => {
+      const m = new RegExp(`\\b${k}="(-?[\\d.]+)"`, "u").exec(el);
+      return m === null ? null : Number(m[1]);
+    };
+    const fill = /\bfill="([^"]+)"/u.exec(el)?.[1];
+    const x = num("x"), y = num("y"), w = num("width"), h = num("height");
+    return fill === undefined || x === null || y === null || w === null || h === null
+      ? [] : [{ fill, x, y, w, h }];
+  });
+
+  const labels = [...svg.matchAll(/<text\b[^>]*\bx="(-?[\d.]+)"[^>]*\by="(-?[\d.]+)"[^>]*>[^<]+<\/text>/gu)]
+    .map((m) => ({ x: Number(m[1]), y: Number(m[2]) }));
+
+  const byRow = new Map<string, { fill: string; x: number; y: number; w: number; h: number }[]>();
+  for (const sw of swatches) {
+    const key = `${String(Math.round(sw.y))}:${String(Math.round(sw.h))}`;
+    const bucket = byRow.get(key) ?? [];
+    bucket.push(sw);
+    byRow.set(key, bucket);
+  }
+
+  for (const row of byRow.values()) {
+    row.sort((a, b) => a.x - b.x);
+    let from = 0;
+    for (let i = 1; i <= row.length; i += 1) { // cells-ok — an element index
+      const a = row[i - 1]!;
+      const b = row[i];
+      if (b !== undefined
+        && Math.abs(b.x - (a.x + a.w)) <= 1 && Math.abs(a.w - b.w) <= 1 && a.fill !== b.fill) continue;
+      const run = row.slice(from, i);
+      from = i;
+      if (run.length < least) continue; // cells-ok — a swatch count
+      const head = run[0]!;
+      const tail = run[run.length - 1]!;
+      // **Beside the bar, not merely near it.** A bound *names the end it sits
+      // against*, so it is centred on the swatch's own band within one text
+      // line. Measured: with a slack of `2 · h` the `latency` figure fired — 90
+      // touching cells 92 px tall, with `p50 · p90 · p99` a hundred pixels below
+      // them landing inside the window. A key is a bar and a figure is not.
+      const mid = head.y + head.h / 2;
+      const band = (l: { y: number }): boolean => Math.abs(l.y - mid) <= SVG_FONT_ROW;
+      if (labels.some((l) => band(l) && l.x < head.x) && labels.some((l) => band(l) && l.x > tail.x + tail.w)) {
+        return head.y + head.h;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Does the frame say something was withheld — `+N more`, `N older not shown`.
+ *
+ * **One predicate for both halves of the same statement.** C12 I8's notice and the
+ * matrix's drop notice are the same claim in two vocabularies, and a column that
+ * saw only one would report the axis as covered while missing the other.
+ */
+const WITHHELD = /\+\d+\s+more\b|\b\d+\s+older not shown\b/u;
+
+/** A horizon key's `N bands` — the other count that shares a key row (F338). */
+const BANDS = /\b\d+\s+bands?\b/u;
+
+export function saysWithheld(text: string): boolean {
+  return WITHHELD.test(stripSgr(text));
+}
+
+/** Escape sequences out, so a reader that wants text gets text and nothing else. */
+export function stripSgr(s: string): string {
+  return s.replace(/\x1b\[[0-9;]*m/gu, "");
+}
+
+/**
+ * **Takes the frame with its colours in it** (F316). This used to be handed
+ * stripped lines by every caller, which is a decision about what the reader may
+ * see made at the call site — and it cost the ramp column: the heatmap's key is
+ * background-coloured spaces, so stripped text shows a blank figure and no key.
+ * The reader strips what it needs and keeps what it needs.
+ */
+export function terminalDecisions(raw: readonly string[]): ArmDecisions {
+  const rows = raw.filter((l) => stripSgr(l).length > 0);
+  if (rows.length === 0) return NOTHING;
+  // **Two floors, because they are two questions** — and collapsing them into
+  // one finder is what re-opened `horizon.numericLabels` at 2/10 (F338). `ramp`
+  // asks *is a colour ramp drawn*, and three adjacent swatches is what reads as
+  // a progression rather than as two blocks; a two-band horizon key is a
+  // **discrete** key and both arms say `false`. Whether a text *belongs to the
+  // key* is the other question, and a two-swatch key is still a key. One
+  // implementation, one named parameter, and the same two floors on both arms.
+  const ramp = rows.some((l) => terminalRamp(l));
+  const keyRow = rows.find((l) => terminalRamp(l, 2));
+  const notice = rows.some((l) => saysWithheld(l));
+  const lines = rows.map(stripSgr);
+
+  let bottom = -1;
+  for (const [i, l] of lines.entries()) if (BOTTOM.test(l) && RULE_ONLY.test(l)) bottom = i;
+  const border = lines.some((l) => TOP.test(l) && RULE_ONLY.test(l)) && bottom >= 0;
+
+  const area = bottom >= 0 ? lines.slice(0, bottom) : lines;
+  const below = bottom >= 0 ? lines.slice(bottom + 1) : [];
+
+  const numeric: string[] = [];
+  const identity: string[] = [];
+  let legend = false;
+
+  for (const l of area) {
+    if (RULE_ONLY.test(l)) continue;
+    const first = l.search(EDGE);
+    // **A swatch-and-name run is a legend wherever it sits** — above the frame,
+    // below it, or past the right edge (F297).
+    if (isLegendRun(l)) { legend = true; continue; }
+    // **A legend beside the figure is stripped before the identity scan**, or
+    // its names are counted twice — once as a legend and once as the labels the
+    // gutter shows (F307).
+    const tail = legendTail(l);
+    const body = tail === null ? l : l.slice(0, tail.index);
+    if (tail !== null) legend = true;
+    // **An edge glyph at column 0 is content, not a gutter boundary** (F297,
+    // seventh instance). A tree's outline begins every row with `│` or `├`, so
+    // `first` was 0 and `head` the empty string before it — the name after the
+    // connector fell in neither the gutter nor the body scan, and **seven of
+    // nine went unread**. The two that survived were the two with no connector.
+    //
+    // **The condition is the row's own and not the frame's.** Gating on `border`
+    // instead reads correctly here and loses `line/frame-rule`'s gutter: that
+    // form draws a bottom rule and no top one, so `border` is false while
+    // `100 ┤` is plainly a reading in a gutter. A gutter is text *before* the
+    // first edge, which is exactly `first > 0`.
+    //
+    // **Invisible until the second arm stopped refusing the layout** (F310): a
+    // refused pair is never compared, so a refusal hides the reader as well as
+    // the arm.
+    if (first <= 0) {
+      // **A row with no edge is not an empty row.** The tiles family draws its
+      // names inside the figure and frames nothing, so skipping these reported
+      // the terminal's treemap as having no labels while it was drawing six —
+      // a disagreement invented by the parser. Found by reading the extraction
+      // beside the frame it came from.
+      for (const w of body.matchAll(WORD)) identity.push(w[0]);
+      continue;
+    }
+    const head = l.slice(0, first).trim();
+    if (head !== "") (NUMERIC.test(head) ? numeric : identity).push(head);
+
+    // **The last edge is the right frame**, and anything past it is furniture
+    // outside the figure — which is where the terminal puts a vertical legend.
+    //
+    // **Reached only from a row with a gutter**, by the `first <= 0` return
+    // above: `EDGE` matches `├`, so every row of a tree's outline read as *a
+    // figure whose right edge is column 0, with text past it* — a legend, on a
+    // form that draws none (F297, seventh instance).
+    let last = -1;
+    for (let i = l.length - 1; i >= 0; i -= 1) if (EDGE.test(l[i]!)) { last = i; break; }
+    // **What is past the edge has to read as a legend, not merely exist.** The
+    // test was *anything at all*, and the last edge is only the right frame on a
+    // row that ends at one — the nodes family draws `┬` and `├` **inside** its
+    // figure, so `╭─render┬─curve────raster` came back as a right legend naming
+    // `curve raster`. Measured: three of `graph`'s rows and four of `tree`'s.
+    // The remainder is asked the same structural question the rest of the reader
+    // asks — `isLegendRun`, a swatch and a name — and not `legendTail`, whose
+    // two-space gap is what separates a key from a *figure* on a shared row. Past
+    // an edge there is no figure to separate it from, and the terminal writes
+    // `│ █ value` with one space: asking for two lost the legend on `bar`,
+    // `bubble`, `histogram` and `scatter`, which is this fix overshooting by one
+    // predicate and the corpus saying so.
+    if (last >= 0 && isLegendRun(l.slice(last + 1))) legend = true;
+  }
+
+  // **The lines below the border carry a `below` legend**, and they were never
+  // scanned for one (F297). The x row is the first line that is neither frame
+  // nor legend — checking the legend first is what keeps a swatch run from being
+  // read as the abscissa.
+  for (const l of below) if (isLegendRun(l)) legend = true;
+  const xRow = below.find((l) => !RULE_ONLY.test(l) && l.trim() !== "" && !isLegendRun(l));
+  for (const x of xRow === undefined ? [] : xRow.trim().split(/\s{2,}/u)) {
+    if (x === "") continue;
+    if (NUMERIC.test(x)) { numeric.push(x); continue; }
+    // **A group of numbers separated by one space is still numbers** (F360,
+    // C12 §3ak.43, I77). The split on two-or-more spaces is what tells a run of
+    // captions — `first  mid  last` — from a numeric axis, and it assumes a
+    // spacing the renderer does not guarantee: a crowded tick row packs its
+    // labels to a single gap, so `100 200 500` arrived as one caption. **Nineteen
+    // groups across the corpus were already in that state** — `line/aspect-square`,
+    // `stackedarea`, `streamgraph`, four facets each of `smallmultiples` and
+    // `pairplot` — so this is the reader's, not the fixture's that found it.
+    const parts = x.split(/\s+/u);
+    if (parts.length > 1 && parts.every((t) => NUMERIC.test(t))) { numeric.push(...parts); continue; }
+    identity.push(x);
+  }
+
+  return {
+    drawn: true,
+    ramp,
+    notice,
+    // **A count is not a reading, and this row carries two of them.** `100 · 56
+    // older not shown` is a bound and a **column** count; `0.0038 100 3 bands`
+    // is two bounds and a **band** count. Neither sits on the value scale, so
+    // neither is what a key names — and the second arm says the band count in
+    // its own medium anyway, drawing one swatch per band. Cut rather than
+    // filtered, because a bare `56` has a reading's shape and nothing about the
+    // token itself could tell them apart.
+    keyReadings: keyRow === undefined
+      ? []
+      : stripSgr(keyRow).replace(WITHHELD, "").replace(BANDS, "")
+        .split(/\s+/u).filter((t) => NUMERIC.test(t)),
+    numericLabels: numeric,
+    identityLabels: identity,
+    border,
+    // **Interior rules only, and the terminal draws none of the border's.** Its
+    // ticks are stubs *on* the border — `┬` and `┴`, or `+` in ASCII — where the
+    // SVG's are lines spanning the area. Counting the border's stubs here would
+    // report the arms agreeing about a thing neither does the same way, and in
+    // ASCII it would count the corners too.
+    //
+    // **The vocabulary is the whole of it, and the previous one was a different
+    // vocabulary** (F358, §3ak.43). This read `RULE_ONLY` —
+    // `[\s┌┐└┘├┤┬┴┼─│+|-]` — with F334's `> 2` on top, and the terminal draws an
+    // interior rule **dotted**: `┄` across, `┊` down. So a gridded row failed the
+    // predicate outright and a plot row holding two borders plus one `│` of the
+    // *curve* cleared the count. Measured over 364 frames: the old reader
+    // answered `> 0` on 15, the frame held a dotted glyph on 16, and **not one
+    // frame was in both** — `line/frame-grid` holds eight rows of gridlines and
+    // reported zero.
+    //
+    // **F334 is right about what it fixed and could not have found this.** *A
+    // blank row inside a frame is not a rule* — `│` + spaces + `│` is two glyphs,
+    // so `> 2` removed the phantom. The frames it was measured against had no
+    // third glyph, and the third glyph, when it came, was a figure's. Third
+    // instance of one class after F321's edge glyph and F334's blank row, both
+    // closed on the instance.
+    //
+    // **A row and not a glyph count**, which is what the SVG's own reader
+    // measures once the frame's four edges are dropped: one horizontal rule is
+    // one row, and a column of verticals puts a `┊` in every interior row, so a
+    // gridded figure counts its rows in one arm and its `<line>` elements in the
+    // other. The two are not the same quantity and the record says so — every
+    // gridded pair disagrees, in both readers, before and after.
+    interiorRules: area.filter((l) => DOTTED_RULE.test(l) && !TOP.test(l) && !BOTTOM.test(l)).length, // cells-ok — a row count
+    legend,
+  };
+}
+
+/** Every `<text>` element's body, in the order a reader meets it. */
+function texts(svg: string): readonly Readonly<{ body: string; x: number; y: number }>[] {
+  const out: { body: string; y: number; x: number }[] = [];
+  for (const m of svg.matchAll(/<text\s([^>]*)>([^<]*)<\/text>/gu)) {
+    const attrs = m[1] ?? "";
+    // **`clip-path` used to be read here and it is gone** (F326). *A clipped
+    // label names a thing; an unclipped one names a value* — a true observation
+    // about the tiles and nodes families, promoted to the rule that classified
+    // every label this arm draws, and the attribute exists to let a label stop
+    // itself without font metrics. It held until a form's row captions were
+    // **numbers**: `fieldAxes` captions a field's ordinate `0 1 2 3 4 5`, the
+    // gutter clips them like any name, and this reader filed six numerals under
+    // `identityLabels` while the terminal reader — which asks the shape — filed
+    // the same six under `numericLabels`. Both arms drew the same thing and the
+    // matrix reported 26 disagreements plus one on a tile whose label is a
+    // number. Removing it closed all 27 and opened none.
+    out.push({
+      x: Number(/\bx="([-\d.]+)"/u.exec(attrs)?.[1] ?? 0),
+      y: Number(/\by="([-\d.]+)"/u.exec(attrs)?.[1] ?? 0),
+      body: (m[2] ?? "").trim(),
+    });
+  }
+  // **Reading order, because that is the question the other side answers**
+  // (F307, and F297's own ruling one reader along). `terminalDecisions` walks
+  // rows top to bottom and takes what each row holds left to right; document
+  // order here is *emission* order, which for a ring is the category order and
+  // for the terminal is neither. The five names of a radar came back as the same
+  // set in two orders, and the matrix compares arrays.
+  //
+  // **A row is a band, not a line**, since two labels at the same height sit at
+  // different baselines by a pixel or two — the same tolerance the terminal gets
+  // for free from having rows at all.
+  const band = (v: number): number => Math.round(v / SVG_FONT_ROW);
+  return [...out].sort((a, b) => band(a.y) - band(b.y) || a.x - b.x);
+}
+
+/** The height a label's row occupies, for banding two labels onto one line. */
+const SVG_FONT_ROW = 14;
+
+/**
+ * The SVG's decisions, read out of its elements — `svgArm` renders, this reads.
+ *
+ * **Exported so the two arms' readers are symmetric** (F338). `terminalDecisions`
+ * takes a rendered document and this took a `Plot`, so a fabricated violation
+ * could be handed to one reader and not to the other — and `AD11` fabricates on
+ * the terminal side only for exactly that reason. A reader over a document is
+ * testable by handing it a document.
+ */
+export function svgDecisions(svg: string | null): ArmDecisions {
+  if (svg === null) return NOTHING;
+  const all = texts(svg).filter((t) => t.body !== "");
+  const legendNames = svgLegendNames(svg);
+  // **The key's texts are excluded by *where they are*, not by what they say**
+  // — and a body set is what made that necessary rather than tidy. The signed
+  // horizon key names its fold `0`, and `0` is also a tick on the figure above
+  // it, so filtering by body took both and `horizon.numericLabels` opened at
+  // 2/10 with nothing wrong. A geometric reader owes a geometric filter.
+  const foot = svgRampFoot(svg, 2);
+  const onKey = (t: Readonly<{ y: number }>): boolean => foot !== null && Math.abs(t.y - foot) < 0.5;
+  const key = all.filter(onKey).map((t) => t.body);
+  return {
+    drawn: true,
+    ramp: svgRamp(svg),
+    // **Tokenised, because the caption is one element and the terminal's is one
+    // span** — `99 · 20 40 60 80` is a bound and four levels either way, and a
+    // reader that compared elements would be comparing an encoding.
+    keyReadings: key.flatMap((b) => b.split(/\s+/u)).filter((t) => NUMERIC.test(t)),
+    // **`false` for every document this arm can produce, and that is the claim.**
+    // The terminal withholds because a cell is a quantum; this arm scales its box
+    // across whatever it is given and has nothing to drop (F318). Written as a
+    // predicate over the text rather than as a constant, so it answers the day
+    // the arm grows one and the `legitimate` row fails as it should.
+    notice: saysWithheld(svg),
+    // **The legend's names are not identity labels, on the terminal reader's own
+    // terms** (F297). That side puts anything past the last frame edge into
+    // `legend` and never into `identityLabels`, so counting the SVG's legend
+    // entries as identities compared a gutter against a gutter *plus a legend* —
+    // and `line.identityLabels` went **12/70 to 70/70** the moment this arm grew
+    // one. The arm was right and the reader was asymmetric.
+    // **The shape, on both sides** (F326). This asked `clip-path` first, which
+    // is where a label is drawn rather than what it says.
+    numericLabels: all
+      .filter((t) => !legendNames.has(t.body) && !onKey(t) && NUMERIC.test(t.body))
+      .map((t) => t.body),
+    // **The key's texts are excluded from both label readers and not only from
+    // one** (F338). The bounds happened to be numeric so the filter only ever
+    // needed to reach `numericLabels`; a level caption is `99 · 20 40 60 80`,
+    // which `NUMERIC` rejects, so it would have arrived here as an identity —
+    // a name for a category nothing drew. The terminal excludes the whole key
+    // row by construction, its seam being the bottom border.
+    identityLabels: all
+      .filter((t) => !legendNames.has(t.body) && !onKey(t) && !NUMERIC.test(t.body))
+      .map((t) => t.body),
+    // **The ground is not a border.** `<rect width="100%">` paints the page; a
+    // border would be a stroked rectangle round the plot area, and this arm
+    // draws none.
+    border: svgBorder(svg),
+    interiorRules: svgInteriorRules(svg),
+    legend: legendNames.size > 0, // cells-ok — a legend entry count
+  };
+}
+
+/**
+ * Every `<line>` this arm drew, as four numbers.
+ *
+ * **The reader stops guessing an encoding here** (F297). `border` was
+ * `/<rect[^>]*width="100%"[^>]*stroke=/` — a stroked full-page rectangle — which
+ * is what a border *would have been* had this arm ever drawn one, and it never
+ * had. The day it did, drawing four `<line>`s, the reader reported `false` and
+ * the matrix reported the disagreement as open. `interiorRules` counted **every**
+ * `<line>`, so the four border edges arrived as four interior rules and that cell
+ * did not close either.
+ *
+ * **An instrument that anticipates an implementation measures the
+ * anticipation**, which is the frame reader's blind spot one arm along (F285):
+ * that one was calibrated to a capability rung, this one to an encoding nobody
+ * had written yet. Both read as correct until the subject exists.
+ *
+ * So these two ask a **geometric** question instead — where is the line, not what
+ * tag drew it — and the box is the lines' own bounding box rather than a layout
+ * constant, so a different `SvgLayout` cannot silently move the answer.
+ */
+/**
+ * The two readings a colour key is **bracketed by** (F316, §3ak.37).
+ *
+ * **The key's bounds belong to the key, and the `ramp` column is where they are
+ * measured.** Counting them again under `numericLabels` measures one thing
+ * twice — and the terminal reader already excludes them, by construction rather
+ * than by choice: its seam is the bottom border and the key sits below it, so
+ * `terminalDecisions` reports `[]` for a heatmap where this arm reported
+ * `["0.19", "100"]`. Drawing the key closed eleven `ramp` cells and would have
+ * opened six `numericLabels` ones on nothing but that asymmetry.
+ *
+ * **Adjacency in document order, which is `svgLegendNames`' own device** one
+ * shape along: a text, the bar, a text. The bar is either a gradient-filled rect
+ * or a run of swatches sharing a `y` and a `height`, which is what the emitter
+ * writes and what `svgRamp` reads.
+ */
+/**
+ * The names this arm's legend draws — **a swatch and the text beside it**.
+ *
+ * **`legend` was hardcoded `false` here**, so the cell could never have closed
+ * whatever the arm did: the third instance of a reader written before its
+ * subject, in one file (F297). The other two were `border` asking for a stroked
+ * `<rect width="100%">` and `interiorRules` counting every `<line>`.
+ *
+ * **A legend entry is structurally a swatch and a name**, which is what the
+ * terminal draws too — `█ alpha` — so this is the entry's shape rather than a
+ * guess at markup: a small square `<rect>` immediately followed by a `<text>`.
+ * Squareness is the discriminator, because every other `<rect>` this arm emits
+ * is a bar, a tile, a matrix cell or the page ground, and none of those is a
+ * font-sized square by construction.
+ */
+function svgLegendNames(svg: string): ReadonlySet<string> {
+  const out = new Set<string>();
+  const pair = /<rect x="[-\d.]+" y="[-\d.]+" width="([\d.]+)" height="([\d.]+)"[^>]*\/>\s*<text[^>]*>([^<]*)<\/text>/gu;
+  for (const m of svg.matchAll(pair)) {
+    if (m[1] !== m[2]) continue;
+    const body = (m[3] ?? "").trim();
+    if (body !== "") out.add(body);
+  }
+  return out;
+}
+
+function svgLines(svg: string): readonly (readonly [number, number, number, number])[] {
+  const out: (readonly [number, number, number, number])[] = [];
+  for (const m of svg.matchAll(/<line x1="([-\d.]+)" y1="([-\d.]+)" x2="([-\d.]+)" y2="([-\d.]+)"/gu)) {
+    out.push([Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4])] as const);
+  }
+  return out;
+}
+
+/** The bounding box of every line, which is the plot area this arm drew into. */
+function svgBox(ls: readonly (readonly [number, number, number, number])[]): Readonly<{
+  left: number; right: number; top: number; bottom: number;
+}> {
+  const xs = ls.flatMap((l) => [l[0], l[2]]);
+  const ys = ls.flatMap((l) => [l[1], l[3]]);
+  return {
+    left: Math.min(...xs), right: Math.max(...xs),
+    top: Math.min(...ys), bottom: Math.max(...ys),
+  };
+}
+
+/**
+ * A border, on the terminal reader's own terms: **something along the top and
+ * something along the bottom.**
+ *
+ * `terminalDecisions` asks for a `RULE_ONLY` row opening with `┌` and one with
+ * `└`, and `RULE_ONLY` admits spaces — so `   ┌            ┐`, which is the whole
+ * of what `plotFrame: "corners"` draws, counts. Two corner marks are a border
+ * there, so two corner segments are a border here, and the four styles line up:
+ * `box` and `grid` have both edges, `rule` has a bottom and no top, `corners`
+ * has segments at both.
+ */
+function svgBorder(svg: string): boolean {
+  const ls = svgLines(svg);
+  if (ls.length === 0) return false;
+  const b = svgBox(ls);
+  const flat = (l: readonly [number, number, number, number], y: number): boolean =>
+    l[1] === l[3] && l[1] === y;
+  return ls.some((l) => flat(l, b.top)) && ls.some((l) => flat(l, b.bottom));
+}
+
+/**
+ * A rule **across the plot area**, which is not an edge of it — the same
+ * distinction `terminalDecisions` draws when it skips `RULE_ONLY` rows.
+ */
+function svgInteriorRules(svg: string): number {
+  const ls = svgLines(svg);
+  if (ls.length === 0) return 0; // cells-ok — a count of SVG elements
+  const b = svgBox(ls);
+  const onEdge = (l: readonly [number, number, number, number]): boolean =>
+    (l[1] === l[3] && (l[1] === b.top || l[1] === b.bottom)) ||
+    (l[0] === l[2] && (l[0] === b.left || l[0] === b.right));
+  return ls.filter((l) => !onEdge(l)).length; // cells-ok — a count of SVG elements
+}
+
+export function svgArm(block: Plot, theme: ResolvedTheme): ArmDecisions {
+  return svgDecisions(plotToSvg(block, theme, SVG_DEFAULT_LAYOUT));
+}

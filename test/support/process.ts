@@ -17,6 +17,7 @@
 // The rule from `test/support/README.md` applies to everything here: a default
 // differs from the value a test asks for, and a parameter with no observable
 // effect is a finding.
+import { livePids, psGroupArgv } from "./live-pids.mjs";
 import { spawn } from "node:child_process";
 import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -45,23 +46,31 @@ export class HarnessError extends Error {
 }
 
 /**
- * The pids in a process group, as the OS reports them.
+ * The **live** pids in a process group, as the OS reports them.
  *
  * `ps -o pid= -g <pgid>` exits 0 with the members, or 1 with nothing when the
  * group holds no processes. **Any other shape is a broken harness, not an empty
  * group**, and it throws saying so — because the failure it would otherwise
  * cause is an empty array that reads as proof.
+ *
+ * **Zombies are excluded, and that is a portability fix rather than a
+ * loosening.** `sh -c "sleep 30 | cat"` signalled as a group dies whole — both
+ * children take the signal — but the shell exits before reaping them, so they
+ * are reparented to PID 1. On macOS that is `launchd` and they vanish at once;
+ * in a container started without an init, PID 1 is the workload and reaps
+ * nothing, so the two stay in the process table as `Z` for as long as the test
+ * runs. `waitForGroupEmpty` then polls to its bound and reports *the leader was
+ * signalled and the group was not*, which is the opposite of what happened.
+ *
+ * **The parse lives in `live-pids.mjs`**, because `fixture.mjs` asks the same
+ * question from inside the PTY and cannot import TypeScript. Two copies of it
+ * existed and both carried the same premise, so fixing this one left tier 5
+ * failing on the other.
  */
 export async function groupMembers(pgid: number): Promise<readonly number[]> {
-  const ran = await run(["ps", "-o", "pid=", "-g", String(pgid)]);
+  const ran = await run([...psGroupArgv(pgid)]);
 
-  if (ran.code === 0) {
-    return ran.stdout
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line !== "")
-      .map(Number);
-  }
+  if (ran.code === 0) return livePids(ran.stdout);
 
   // The one non-zero status that means what it appears to: nothing matched.
   if (ran.code === 1 && ran.stdout.trim() === "" && ran.stderr.trim() === "") return [];

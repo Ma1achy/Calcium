@@ -35,10 +35,12 @@ export const FULL_CAPABILITIES: TerminalCapabilities = Object.freeze({
   colourDepth: 24,
   unicode: "full",
   ambiguousWidth: "narrow",
+  backgroundPolarity: "unknown",
   synchronisedUpdate: true,
   bracketedPaste: true,
   mouse: true,
   imageProtocol: "none",
+  keyboardProtocol: "none",
   altScreen: true,
 });
 

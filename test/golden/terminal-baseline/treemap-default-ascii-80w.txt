@@ -1,0 +1,13 @@
+── treemap · default · ascii · 80w
+#/ raster \\\\\\\\\\\\\\\\\\\\\\\/ paint xxxxxxxxxxxxxxxxxxxx# parse %%%%%%%%%%%
+#/\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\/xxxxxxxxxxxxxxxxxxxxxxxxxxx#%%%%%%%%%%%%%%%%%%
+#/\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\/xxxxxxxxxxxxxxxxxxxxxxxxxxx#%%%%%%%%%%%%%%%%%%
+#/\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\/xxxxxxxxxxxxxxxxxxxxxxxxxxx#%%%%%%%%%%%%%%%%%%
+#/\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\/xxxxxxxxxxxxxxxxxxxxxxxxxxx#%%%%%%%%%%%%%%%%%%
+#/\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\/xxxxxxxxxxxxxxxxxxxxxxxxxxx#%%%%%%%%%%%%%%%%%%
+#/\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\/xxxxxxxxxxxxxxxxxxxxxxxxxxx#%%%%%%%%%%%%%%%%%%
+o measure vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv wrap ~~~~~~~~~~~~~~o%%%%%%%%%%%%%%%%%%
+ovvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv~~~~~~~~~~~~~~~~~~~~o%%%%%%%%%%%%%%%%%%
+ovvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv~~~~~~~~~~~~~~~~~~~~o%%%%%%%%%%%%%%%%%%
+ovvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv~~~~~~~~~~~~~~~~~~~~o%%%%%%%%%%%%%%%%%%
+ovvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv~~~~~~~~~~~~~~~~~~~~o%%%%%%%%%%%%%%%%%%

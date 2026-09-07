@@ -19,6 +19,7 @@ import type { Tone } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { channels, floorFor, isHex, luminance, ratio } from "./contrast.js";
 import { MUST_STAY_DISTINCT } from "./four-bit.js";
+import { CUBE_LEVELS } from "./colormap.js";
 import {
   NO_STYLE,
   type ColourRef,
@@ -48,7 +49,7 @@ type Caps = Readonly<Pick<TerminalCapabilities, "colourDepth">>;
  * quantising into them would make an 8-bit result depend on a user's terminal
  * configuration while presenting itself as a measured nearest neighbour.
  */
-const CUBE_LEVELS = [0, 95, 135, 175, 215, 255] as const;
+// `CUBE_LEVELS` is `colormap.ts`'s — one definition, three callers (C12 §3y).
 
 function buildCube(): readonly Readonly<{ index: number; hex: string; lab: readonly [number, number, number]; lum: number }>[] {
   const entries: { index: number; hex: string; lab: readonly [number, number, number]; lum: number }[] = [];
@@ -251,6 +252,16 @@ function quantiseSet(slots: Readonly<Record<string, string>>): Readonly<Record<s
   return Object.freeze(out);
 }
 
+/**
+ * A hex to its nearest 256-cube index (C10 I31).
+ *
+ * **Exported for the colormap and for nothing else.** A palette slot is
+ * quantised through `quantiseSet`, which preserves *rank order across a set* —
+ * the property that keeps eight tones distinct from one another. A colormap has
+ * no set: it is a continuum, and its neighbouring samples are *meant* to be
+ * close, so rank preservation has nothing to hold apart and per-sample nearest
+ * neighbour is the right answer here for the reason it is the wrong one there.
+ */
 /** Nearest cube entry satisfying `allowed`, or the nearest overall (I1: total). */
 function nearest(
   lab: readonly [number, number, number],

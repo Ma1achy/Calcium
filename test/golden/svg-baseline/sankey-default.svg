@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
+<rect width="100%" height="100%" fill="#1a1a1a"/>
+<path d="M100.096 115.055 C352 115.055 352 123.055 603.904 123.055 L603.904 240.873 C352 240.873 352 232.873 100.096 232.873 Z" fill="#e69f00" fill-opacity="0.5"/>
+<path d="M100.096 91.491 C352 91.491 352 91.491 603.904 91.491 L603.904 115.055 C352 115.055 352 115.055 100.096 115.055 Z" fill="#e69f00" fill-opacity="0.5"/>
+<path d="M100.096 12.8 C352 12.8 352 20.8 603.904 20.8 L603.904 91.491 C352 91.491 352 83.491 100.096 83.491 Z" fill="#56b4e9" fill-opacity="0.5"/>
+<path d="M100.096 240.873 C352 240.873 352 240.873 603.904 240.873 L603.904 288 C352 288 352 288 100.096 288 Z" fill="#3cbf9a" fill-opacity="0.5"/>
+<rect x="89.6" y="12.8" width="10.496" height="70.691" fill="#56b4e9" stroke="#1a1a1a" stroke-width="1"/>
+<text x="106.096" y="52.145" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round" paint-order="stroke">b</text>
+<rect x="89.6" y="91.491" width="10.496" height="141.382" fill="#e69f00" stroke="#1a1a1a" stroke-width="1"/>
+<text x="106.096" y="166.182" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round" paint-order="stroke">a</text>
+<rect x="89.6" y="240.873" width="10.496" height="47.127" fill="#3cbf9a" stroke="#1a1a1a" stroke-width="1"/>
+<text x="106.096" y="268.436" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round" paint-order="stroke">c</text>
+<rect x="603.904" y="20.8" width="10.496" height="94.255" fill="#8fa8ff" stroke="#1a1a1a" stroke-width="1"/>
+<text x="597.904" y="71.927" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="end">y</text>
+<rect x="603.904" y="123.055" width="10.496" height="164.945" fill="#f0e442" stroke="#1a1a1a" stroke-width="1"/>
+<text x="597.904" y="209.527" font-size="12" font-family="monospace" fill="#d4d4d4" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="end">x</text>
+</svg>

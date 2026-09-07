@@ -121,6 +121,16 @@ function kindOf(rows: readonly TableRow[], key: string): ColumnKind {
  * stale sort key.
  */
 export function sortedRows(block: Table): readonly TableRow[] {
+  // **A window's rows are already in display order** (C11 I19). Sorting them
+  // again is not a no-op: `kindOf` below reads the values *present*, so a slice
+  // that dropped the one non-numeric value in a numeric-looking column
+  // re-classifies it and comes back in a different order — `2 · 10 · abc` sorts
+  // to `10 · 2 · abc` whole and its first two rows re-sort to `2 · 10`, with
+  // every count and every height correct (F429). `sort` itself is kept: the
+  // indicator is drawn from it, and a scrolled table that lost its arrow would
+  // be a visible regression in the one place a reader looks.
+  if (block.presorted === true) return block.rows;
+
   const sort = block.sort;
   if (sort === undefined) return block.rows;
 

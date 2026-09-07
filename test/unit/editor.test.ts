@@ -688,6 +688,39 @@ describe("C17 §5b — selection", () => {
     expect(e.selection).toBeNull();
   });
 
+  it("T1.42 (I23): collapse() drops the region and moves nothing — not the caret, the text or the history", () => {
+    // **The control is the cursor.** `move("charLeft")` also leaves
+    // `selection === null` here, and puts the caret at 1; a collapse is the
+    // one that leaves it at 2. `selection` alone cannot tell the two apart.
+    const e = createEditor({ text: "abcdef", cursor: 0 });
+    e.insert("x"); // an open insert unit, so a `close()` inside collapse would show
+    e.move("bufferStart");
+    e.extend("charRight");
+    e.extend("charRight");
+    expect(e.selection).toEqual({ anchor: 0, head: 2 });
+    const depth = e.undoDepth;
+    const text = e.text;
+
+    e.collapse();
+
+    expect(e.selection, "the region is gone").toBeNull();
+    expect(e.cursor, "and the caret is where the head was, not one left").toBe(2);
+    expect(e.text, "the text is untouched").toBe(text);
+    expect(e.undoDepth, "no unit recorded").toBe(depth);
+
+    // Typing after the collapse is ordinary typing: one more unit, no region
+    // replaced — the collapse did not hand `insert` a `structural` case.
+    e.insert("Q");
+    expect(e.text).toBe("xaQbcdef");
+    expect(e.undoDepth - depth, "one unit for the insert, none for the collapse").toBe(1);
+
+    // On a bare caret it is a no-op with nothing to observe.
+    const bare = createEditor({ text: "ab", cursor: 1 });
+    bare.collapse();
+    expect(bare.selection).toBeNull();
+    expect(bare.cursor).toBe(1);
+  });
+
   it("T1.31 (I22, I16): a region does not survive an undo — and the kill buffer does", () => {
     // **Both in one row, in opposite directions.** A rule that collapses
     // everything satisfies the first half and fails the second; one that

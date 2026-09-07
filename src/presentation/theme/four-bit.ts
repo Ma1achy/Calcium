@@ -88,6 +88,23 @@ export const DARK_FOUR_BIT: FourBitMap = Object.freeze({
   "surface.diffAdd": 2,
   "surface.diffRemove": 1,
 
+  // **The `status` tag's pair, and the ground is not chosen** (C10 I32, F240).
+  // It is `tone.error`'s own index for the same reason the 24-bit ground is
+  // `tone.error`'s own hex: one red by construction, rather than two values in
+  // two places kept in step by eye — which drifted four times in one sitting
+  // when they were two literals.
+  //
+  // **So only the ink is a decision, and it inverts against 24-bit.** There the
+  // tone is `#c62828`, a dark red that needs white on it; here it is index 9,
+  // the bright one, which needs black. The relationship held is *the ink is the
+  // half that reads on the ground* — the colour is its consequence.
+  //
+  // **No ratio is claimed.** I26 rules the floor best-effort at this rung, the
+  // sixteen being the emulator's own values, so this is a curated decision in
+  // the file that exists for curated decisions and not a measurement.
+  "surface.errorGround": 9,
+  "surface.errorInk": 0,
+
 });
 
 export const LIGHT_FOUR_BIT: FourBitMap = Object.freeze({
@@ -132,6 +149,12 @@ export const LIGHT_FOUR_BIT: FourBitMap = Object.freeze({
   // §4a, and the same reasoning as the dark map above.
   "surface.diffAdd": 2,
   "surface.diffRemove": 1,
+
+  // The pair, on the dark map's construction: the ground is this theme's
+  // `tone.error`. Here that is index 1, the plain red, so the ink stays white
+  // and the 24-bit relationship survives the rung unchanged.
+  "surface.errorGround": 1,
+  "surface.errorInk": 15,
 
 });
 
@@ -203,4 +226,11 @@ export const HIGH_CONTRAST_FOUR_BIT: FourBitMap = Object.freeze({
   "surface.borderStrong": 7,
   "surface.diffAdd": 2,
   "surface.diffRemove": 1,
+
+  // The pair, and this theme is where the construction costs nothing at all:
+  // its 24-bit tag is already dark ink on a light ground — `#3d0000` on
+  // `#ff7171` — so taking `tone.error`'s index 9 and black on it reproduces the
+  // inversion rather than giving it up.
+  "surface.errorGround": 9,
+  "surface.errorInk": 0,
 });

@@ -12,6 +12,9 @@ import {
   pathSource,
   verbSource,
 } from "../../src/interaction/completion/index.js";
+// From the module rather than the barrel: `index.ts` is not this change's to
+// edit, and `construct.ts` can import it the same way.
+import { createSourceErrorSink } from "../../src/interaction/completion/engine.js";
 import { fixture } from "../support/manifest.js";
 import { at, CURSOR, fakeClock, fakeDirs } from "../support/completion.js";
 
@@ -269,5 +272,59 @@ describe("C19 §4 — ghost text (I7)", () => {
     const { engine } = engineWith(pathSource(dirs.readDir));
     expect(engine.ghost(at("/deploy sr‸"))).toBeNull();
     expect(dirs.reads()).toEqual([]);
+  });
+});
+
+describe("C19 §3 — the product's source-error sink (I6, T3.6)", () => {
+  // **`onSourceError` was supplied by every test and by nothing in `src/`.**
+  // T3.6 asserted "logged once" against an array the test itself supplied, so
+  // the product dropped every source failure in silence while the row passed.
+  // This is the sink `construct.ts` passes, and its shape is `BlockFaultLog`'s:
+  // a pull, deduplicated, drained at shutdown (C22 I6a).
+  const failing = (id: string, message: string) => ({
+    id,
+    slots: ["flagValue"] as const,
+    dynamic: true as const,
+    complete: () => Promise.reject(new Error(message)),
+  });
+
+  it("T3.6 (I6): a source that fails on every keystroke is one line, with a count", async () => {
+    const clock = fakeClock();
+    const sink = createSourceErrorSink();
+    const engine = createEngine({ now: clock.now, onSourceError: sink.onSourceError });
+    engine.register(failing("cluster", "cluster is down"));
+    const ctx = at(`/ps --status=${CURSOR}`, manifest());
+    // Three Tabs, each past the cache: a failure is not cached (edge T3.6b), so
+    // each request calls the source and each call fails.
+    await engine.request(ctx, 1);
+    await engine.request(ctx, 2);
+    await engine.request(ctx, 3);
+    expect(sink.messages).toEqual(["completion source `cluster` failed ×3: cluster is down"]);
+  });
+
+  it("the first message is the one kept, and a second source is a second line", async () => {
+    const clock = fakeClock();
+    const sink = createSourceErrorSink();
+    const engine = createEngine({ now: clock.now, onSourceError: sink.onSourceError });
+    engine.register(failing("a", "first"));
+    engine.register(failing("b", "other"));
+    await engine.request(at(`/ps --status=${CURSOR}`, manifest()), 1);
+    expect(sink.messages).toEqual([
+      "completion source `a` failed: first",
+      "completion source `b` failed: other",
+    ]);
+    // A non-Error rejection is stringified rather than lost.
+    sink.onSourceError("c", "plain");
+    expect(sink.messages).toContain("completion source `c` failed: plain");
+  });
+
+  it("an engine with no sink drops the failure and nothing else changes", async () => {
+    // The default, stated: the product's silence for the whole life of C19 was
+    // this path. I6 holds either way — the other sources still contribute.
+    const clock = fakeClock();
+    const engine = createEngine({ now: clock.now });
+    engine.register(failing("x", "boom"));
+    const result = await engine.request(at(`/ps --status=${CURSOR}`, manifest()), 1);
+    expect(result.candidates.map((c) => c.value)).not.toContain("boom");
   });
 });

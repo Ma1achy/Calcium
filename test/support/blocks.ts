@@ -26,6 +26,20 @@ export const ONE_PER_KIND: Readonly<Record<BlockKind, Block>> = Object.freeze({
 
   notice: block({ kind: "notice", id: "notice-1", tone: "info", text: "Nothing to do." }),
 
+  // C04 §3i — a child's screen. Two lines, one styled run, a cursor, and no
+  // `dropped`: the representative is the shape a running command has.
+  terminal: block({
+    kind: "terminal",
+    id: "terminal-1",
+    cols: 40,
+    screen: "lines",
+    lines: [
+      { text: "=== test session starts ===" },
+      { text: "..... [ 4%]", runs: [{ from: 0, to: 5, fg: { kind: "ansi16", index: 2 } }] },
+    ],
+    cursor: { line: 1, col: 11 },
+  }),
+
   keyValue: block({
     kind: "keyValue",
     id: "kv-1",
@@ -139,8 +153,51 @@ export const ONE_PER_KIND: Readonly<Record<BlockKind, Block>> = Object.freeze({
     children: [{ kind: "raw", id: "panel-1-raw", text: "two lines\nof text" }],
   }),
 
+  // **`retrying` rather than `error`**, because it is the state composed out of
+  // the other one — the error box plus a spinner line (C09 I32) — so a corpus
+  // entry that draws it exercises both.
+  //
+  // **Seven rows and not six, and the golden frame is what said so.** Six is the
+  // full figure's minimum and it leaves exactly one content row, which the
+  // message wins — so the fixture drew the `error` figure while claiming to
+  // exercise the composition, and the comment above would have been the only
+  // record of an intention nothing carried out. A fixture has to be shown to
+  // respond to the thing under test before it is asserted against
+  // (`test/support/README.md`).
+  status: block({
+    kind: "status",
+    id: "status-1",
+    state: "retrying",
+    message: "connection refused",
+    height: 7,
+    retryInMs: 8000,
+    attempt: 2,
+  }),
   // A bounded region whose content overflows, so the corpus exercises the
   // residue row (C04 I49) rather than only the fitting case.
+  image: {
+    kind: "image",
+    id: "image-1",
+    height: 3,
+    // A real 8x8 PNG from `sharp`, so the corpus exercises the decoder rather
+    // than the `alt` fallback — the first draft was a blob typed from memory
+    // and every row of the suite took the fallback path instead.
+    data: "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEUlEQVQImWO4o6GBFTEMLQkAe3tLAeVPQpUAAAAASUVORK5CYII=",
+    alt: "an eight by eight red square",
+    digest: "00000001",
+  },
+  mosaic: {
+    kind: "mosaic",
+    id: "mosaic-1",
+    height: 4,
+    areas: "AAB/DCB",
+    children: [
+      { kind: "raw", id: "mos-a", text: "A" },
+      { kind: "raw", id: "mos-b", text: "B" },
+      { kind: "raw", id: "mos-d", text: "D" },
+      { kind: "raw", id: "mos-c", text: "C" },
+    ],
+  },
   scroll: block({
     kind: "scroll",
     id: "scroll-1",
@@ -207,6 +264,26 @@ export const ADVERSARIAL: readonly Block[] = Object.freeze([
     emptyMessage: "No data.",
   }),
   block({ kind: "progress", id: "adv-zero-total", label: "Nothing", current: 0, total: 0 }),
+  // **A box whose single child is taller than its interior** (C09 I59, T3.75).
+  //
+  // The corpus's only `scroll` was `height: 2` over three one-row children, so
+  // every child fitted and no fixture had the property T2.1's sweep needed. The
+  // headline `measure` = rendered-rows check agreed for as long as that was
+  // true, while a six-row box over a thirty-line screen measured 7 and painted
+  // 32 (F855). A corpus chosen for a property may not have it.
+  //
+  // Two children rather than one, and the first is short: a sweep whose only
+  // over-tall case is also the only case is one where *slice the child* and
+  // *drop every child but the first* draw the same thing.
+  block({
+    kind: "scroll",
+    id: "adv-overfull-scroll",
+    height: 3,
+    children: [
+      { kind: "raw", id: "adv-overfull-head", text: "head" },
+      { kind: "raw", id: "adv-overfull-tall", text: Array.from({ length: 12 }, (_u, i) => `row ${String(i)}`).join("\n") },
+    ],
+  }),
 ]);
 
 /** Every fixture the contract suite runs over. */

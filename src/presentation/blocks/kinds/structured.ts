@@ -15,6 +15,7 @@ import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
 import type { Comparison, Events, Glyph, KeyValue, Logs, Steps, Tone } from "../../../data/viewmodel/index.js";
 import { cells, stripControl, truncate } from "../../text.js";
 import { glyphFor, glyphs, spinnerFrames } from "../glyphs.js";
+import { valueBar } from "../../plot/bar.js";
 import { clampSpans, pad, paint, rows, tone, type Span } from "../paint.js";
 import type { BlockDefinition, RenderContext, Windowed } from "../types.js";
 
@@ -24,6 +25,9 @@ const KEY_COLUMN_CAP = 20;
 /** Two spaces between columns. One reads as a typo; three wastes a narrow terminal. */
 const COLUMN_GAP = 2;
 
+/** The narrowest detail beside a bar that carries a character as well as an ellipsis. */
+const MIN_DETAIL = 2;
+
 function widest(values: readonly string[], cap: number, ambiguous: AmbiguousWidth = "narrow"): number {
   let widest = 0;
   for (const value of values) widest = Math.max(widest, cells(value, ambiguous));
@@ -32,17 +36,119 @@ function widest(values: readonly string[], cap: number, ambiguous: AmbiguousWidt
 
 // --- keyValue --------------------------------------------------------------
 
+/**
+ * A row's value column — a text, or a bar with the text beside it (C04 I51).
+ *
+ * **The bar takes what it declared and the text takes the rest**, which is the
+ * inverse of `valueBar`'s own rule and is not a contradiction of it: inside the
+ * bar the run is the axis and gives way to its number, while out here the bar is
+ * a declared width in a column that is a remainder. `Cell.bar` needs neither
+ * arm because a table column supplies the width and the cell holds nothing else.
+ *
+ * **Clamped to the column rather than trusted.** A surface declaring twenty
+ * cells in a value column of nine is not a construction error — the same
+ * document is correct at a wider terminal — so the width narrows here and the
+ * bar degrades through `valueBar`'s own rungs.
+ */
+function valueOf(
+  entry: KeyValue["rows"][number],
+  valueWidth: number,
+  ctx: RenderContext,
+): string {
+  // **`barWidth` absent is no bar, and the renderer does not invent one.**
+  // `validateBlock` refuses the pair broken (C04 I51); a renderer that supplied
+  // a default would make the invalid document render, which is the one thing
+  // that keeps a gate from being reached.
+  if (entry.bar === undefined || entry.barWidth === undefined) {
+    return truncate(stripControl(entry.value), valueWidth, ctx.capabilities);
+  }
+
+  const barWidth = Math.min(Math.floor(entry.barWidth), valueWidth);
+  const run = valueBar(entry.bar, barWidth, ctx.capabilities);
+
+  // **The gap belongs to the text, not to the pair.** Added outside the
+  // remainder it would put the row one cell over its width, which is the class
+  // C09 I5 is about: a row the terminal wraps adds a line no measurer counted.
+  // **A one-cell detail is an ellipsis and nothing else** — a mark that says
+  // *there is more* while showing none of it, which is worse than the bar
+  // standing alone. Read from the frame at a width of 24, where the remainder
+  // came to exactly one cell; no arithmetic in this function was wrong.
+  const rest = valueWidth - barWidth - COLUMN_GAP;
+  if (rest < MIN_DETAIL) return run;
+
+  const detail = truncate(stripControl(entry.value), rest, ctx.capabilities);
+  return detail === "" ? run : `${run}${" ".repeat(COLUMN_GAP)}${detail}`;
+}
+
+/**
+ * The key column, derived from the whole block.
+ *
+ * **One function, because two would be the drift.** The window pins what this
+ * returns and the render prefers the pin; a second expression of the same
+ * arithmetic is how a pinned width comes to disagree with the one it was pinned
+ * from — which is the defect the pin exists to prevent, reintroduced one level
+ * down.
+ */
+function keyColumn(block: KeyValue, width: number): number {
+  return widest(
+    block.rows.map((r) => stripControl(r.label)),
+    Math.min(KEY_COLUMN_CAP, Math.max(1, normaliseWidth(width) - 4)),
+  );
+}
+
 export const keyValueDefinition: BlockDefinition<KeyValue> = {
   kind: "keyValue",
 
   measure: (block: KeyValue): number => atLeastOne(block.rows.length), // cells-ok
 
+  // C09 §2c — the key column, the gap and the longest value; a row carrying a
+  // bar fills, because the bar absorbs the residual. The floor of `keyWidth + 4`
+  // is `keyColumn`'s own: it caps the key column at `width − 4`, so a narrower
+  // answer would shrink the column and draw a different block.
+  width: (block: KeyValue, width: number): number => {
+    const w = normaliseWidth(width);
+    if (block.rows.some((row) => row.bar !== undefined)) return w;
+    const keyWidth = block.keyWidth ?? keyColumn(block, w);
+    let longest = 0;
+    for (const row of block.rows) longest = Math.max(longest, cells(stripControl(row.value))); // narrow-ok — `width` is pure in (block, width) as `measure` is (C09 I42), and narrow is the measurer's convention
+    return Math.max(1, Math.min(w, Math.max(keyWidth + 4, keyWidth + COLUMN_GAP + longest)));
+  },
+
+  /**
+   * C09 I25 — rows `[from, to)`, as a smaller `keyValue` with its key column
+   * pinned.
+   *
+   * **This kind was one of the two recorded as still open**, in `logs`' own
+   * window comment below: *`widest` a whole `keyValue` and `tokenise` a whole
+   * code block*. The blocker was real — `widest` walks every label, so a slice
+   * whose keys are short draws a narrower column and every value shifts
+   * sideways as the reader scrolls, which is the drift C14 exists to prevent.
+   *
+   * **It is a width, so it travels** (`KeyValue.keyWidth`, C25 I21a's argument
+   * one kind over): the window says what its parent measured rather than
+   * deriving it again. `tokenise` does not travel, which is why the two
+   * separated instead of landing together — a slice of a code block is a
+   * different *parse*, not a narrower column, and lines inside a block comment
+   * come back as live code (F426).
+   *
+   * Rows are one row each (`measure` is `rows.length`) and nothing here is
+   * derived from rows outside the slice once the width is pinned, so the window
+   * is exact and `skipRows` is 0.
+   */
+  window: (block: KeyValue, width: number, from: number, to: number): Windowed => {
+    const lo = Math.max(0, Math.min(Math.trunc(from), block.rows.length)); // cells-ok
+    const hi = Math.max(lo + 1, Math.min(Math.trunc(to), block.rows.length)); // cells-ok
+    return Object.freeze({
+      block: { ...block, rows: block.rows.slice(lo, hi), keyWidth: keyColumn(block, width) },
+      skipRows: 0,
+      // A row is one row, so the slice ends where the range does (I26).
+      dropRows: 0,
+    });
+  },
+
   render(block: KeyValue, ctx: RenderContext): ReactElement {
     const width = normaliseWidth(ctx.width);
-    const keyWidth = widest(
-      block.rows.map((r) => stripControl(r.label)),
-      Math.min(KEY_COLUMN_CAP, Math.max(1, width - 4)),
-    );
+    const keyWidth = block.keyWidth ?? keyColumn(block, width);
     const valueWidth = Math.max(1, width - keyWidth - COLUMN_GAP);
 
     return rows(
@@ -54,7 +160,7 @@ export const keyValueDefinition: BlockDefinition<KeyValue> = {
           truncate(stripControl(entry.label), keyWidth, ctx.capabilities),
           keyWidth,
         );
-        const value = truncate(stripControl(entry.value), valueWidth, ctx.capabilities);
+        const value = valueOf(entry, valueWidth, ctx);
 
         return paint(
           clampSpans(
@@ -109,12 +215,13 @@ export const logsDefinition: BlockDefinition<Logs> = {
    * slice. **`patch` is the second, and it got there differently**: its gutter
    * *is* derived from the whole block, so its window carries the width pinned
    * rather than deriving it again (C25 I21a) — the layout travels with the
-   * window instead of being independent of it. `widest` a whole `keyValue` and
-   * `tokenise` a whole code block are the two still open, and a layout that
-   * changes with the scroll position is the drift C14 exists to prevent
-   * (C09 §2a). `planColumns` is **not** one of them and was listed here in
-   * error: it reads the column definitions and the width, never the rows
-   * (F134).
+   * window instead of being independent of it. `keyValue` pins `widest` the
+   * same way, and `code` — whose derivation is a *parse* and cannot be pinned
+   * as a number — pins the whole `text` and a `lineRange` instead (C04 I82,
+   * C14 §4a); a layout that changes with the scroll position is the drift C14
+   * exists to prevent (C09 §2a). `planColumns` is **not** one of them and was
+   * listed here in error: it reads the column definitions and the width,
+   * never the rows (F134).
    *
    * `atLeastOne` is why the empty slice is refused rather than returned: a
    * `logs` with no lines measures 1, so a zero-row window would break I26. The
@@ -127,6 +234,8 @@ export const logsDefinition: BlockDefinition<Logs> = {
     return Object.freeze({
       block: { ...block, lines: block.lines.slice(lo, hi) },
       skipRows: 0,
+      // A line is one row, so nothing can hang past `to` (I26).
+      dropRows: 0,
     });
   },
 

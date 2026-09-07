@@ -15,8 +15,8 @@
  * strategies above some threshold.
  */
 import { BRAILLE_DOTS, createGrid, drawColumnSpan, drawLine, foldBraille, foldRamp, RAMP_DOTS } from "./raster.js";
-import { columnsOf, finiteSamples, rowOf, type Range } from "./scale.js";
-import { rampFor } from "./ramp.js";
+import { columnsOf, finiteSamples, rowOf, type Facing, type Range } from "./scale.js";
+import { ladderFor } from "./ramp.js";
 import type { Series } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 
@@ -42,14 +42,15 @@ export function curveRows(
   areaWidth: number,
   areaRows: number,
   caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+  facing: Facing,
 ): readonly string[] {
   const ascii = caps.unicode === "ascii";
   const dots = ascii ? RAMP_DOTS : BRAILLE_DOTS;
   const grid = createGrid(areaWidth * dots.x, areaRows * dots.y);
 
   const samples = finiteSamples(series.values);
-  const columns = columnsOf(samples, series.values.length, grid.dotWidth); // cells-ok — a sample count
-  const y = (v: number): number => rowOf(v, range, grid.dotHeight);
+  const columns = columnsOf(samples, series.values.length, grid.dotWidth, facing); // cells-ok — a sample count
+  const y = (v: number): number => rowOf(v, range, grid.dotHeight, facing);
 
   columns.forEach((column, index) => {
     // I5: the whole vertical extent of what this column held. A single sample
@@ -67,8 +68,10 @@ export function curveRows(
     drawLine(grid, column.x, y(column.last), next.x, y(next.first));
   });
 
-  // `rampFor` is only reached on the ASCII branch here, so the ambiguous arm
+  // `ladderFor` is only reached on the ASCII branch here, so the ambiguous arm
   // cannot apply — the braille fold below is what a unicode terminal gets, and
   // braille is narrow on both kinds.
-  return ascii ? foldRamp(grid, rampFor(caps)) : foldBraille(grid);
+  // **`height`, and this is the declared stand-in** (I21): `RAMP_ASCII` marks
+  // `height` in `substitutes`, because ink weight is being drawn for position.
+  return ascii ? foldRamp(grid, ladderFor("height", caps).steps) : foldBraille(grid);
 }

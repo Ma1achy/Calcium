@@ -234,3 +234,97 @@ describe("C14 unit — scrolling", () => {
     expect(viewport.stats.cacheSize).toBe(before);
   });
 });
+
+describe("C14 unit — entryAtRow (I19)", () => {
+  // **Spec'd in C14 §10 and in no file** for as long as the method existed
+  // (F754). Every row names *which* entry and *which* offset: a non-null answer
+  // one row off passes every assertion about there being an answer.
+
+  /** SS2 bans `Math.random` across `src/`, and a flaky property is worse than none. */
+  const rng = (seed: number): ((n: number) => number) => {
+    let s = seed;
+    return (n: number) => {
+      s = (s * 1103515245 + 12345) % 2147483648;
+      return s % n;
+    };
+  };
+
+  it("T2.11 (I19): over a seeded corpus, entryAtRow agrees with visible() for every region row", () => {
+    const next = rng(19);
+    let checked = 0;
+    for (let trial = 0; trial < 40; trial += 1) {
+      const height = 3 + next(10);
+      const { store, viewport } = mk(height);
+      const n = 1 + next(6);
+      for (let i = 0; i < n; i += 1) store.append(rowsDoc(1 + next(7), `e${String(trial)}-${String(i)}`));
+      viewport.scrollToTop();
+      viewport.scrollBy(next(viewport.scroll.totalRows + 2));
+
+      // Asserted against `visible()`, not a hand-rolled walk: the entry whose
+      // `skipRows`/`takeRows` span covers the row, at `skipRows + (row − start)`.
+      const seen = viewport.visible();
+      let start = 0;
+      for (const v of seen.entries) {
+        for (let row = start; row < start + v.takeRows; row += 1) {
+          expect(viewport.entryAtRow(row), `trial ${String(trial)} row ${String(row)}`).toEqual({
+            id: v.id,
+            rowOffset: v.skipRows + (row - start),
+          });
+          checked += 1;
+        }
+        start += v.takeRows;
+      }
+      // Every row the selection does not fill is nobody's.
+      for (let row = start; row < height; row += 1) expect(viewport.entryAtRow(row)).toBeNull();
+    }
+    expect(checked, "the subject, before the claim").toBeGreaterThan(100);
+  });
+
+  it("T2.12 (I19): a thousand calls leave scroll, anchor and stats identical", () => {
+    const { store, viewport } = mk(4);
+    store.append(rowsDoc(6, "a"));
+    store.append(rowsDoc(6, "b"));
+    viewport.scrollToTop();
+    viewport.scrollBy(3);
+    const scroll = { ...viewport.scroll };
+    const anchor = viewport.anchor === null ? null : { ...viewport.anchor };
+    const stats = { ...viewport.stats };
+    for (let i = 0; i < 1000; i += 1) viewport.entryAtRow(i % 6);
+    expect(viewport.scroll).toEqual(scroll);
+    expect(viewport.anchor).toEqual(anchor);
+    expect(viewport.stats).toEqual(stats);
+  });
+
+  it("T3.1b (I19): empty, negative, and below a short transcript → null, never the last entry", () => {
+    const empty = mk(10);
+    expect(empty.viewport.entryAtRow(0)).toBeNull();
+
+    const { store, viewport } = mk(10);
+    const a = store.append(rowsDoc(2, "a"));
+    expect(viewport.entryAtRow(0), "the first entry's first row").toEqual({ id: a, rowOffset: 0 });
+    expect(viewport.entryAtRow(1), "and its last").toEqual({ id: a, rowOffset: 1 });
+    expect(viewport.entryAtRow(2), "the row past it").toBeNull();
+    expect(viewport.entryAtRow(9), "the region's last row").toBeNull();
+    expect(viewport.entryAtRow(10), "the row past the region").toBeNull();
+    expect(viewport.entryAtRow(-1)).toBeNull();
+    expect(viewport.entryAtRow(0.5), "a fractional row is no row").toBeNull();
+  });
+
+  it("T3.1c (I19): an entry begun above the top edge answers with the rows already scrolled, and the boundary is the next entry's row 0", () => {
+    const { store, viewport } = mk(4);
+    const a = store.append(rowsDoc(6, "a"));
+    const b = store.append(rowsDoc(6, "b"));
+    viewport.scrollToTop();
+    viewport.scrollBy(2);
+    expect(viewport.visible().entries[0]).toMatchObject({ id: a, skipRows: 2, takeRows: 4 });
+
+    expect(viewport.entryAtRow(0), "region row 0 is a's row 2, not its row 0").toEqual({ id: a, rowOffset: 2 });
+    expect(viewport.entryAtRow(3), "region row 3 is a's last row").toEqual({ id: a, rowOffset: 5 });
+    expect(viewport.entryAtRow(4), "past the region, though a document row exists there").toBeNull();
+
+    viewport.scrollBy(2); // topRow 4: a's rows 4–5, then b's 0–1
+    expect(viewport.entryAtRow(1), "a's last row").toEqual({ id: a, rowOffset: 5 });
+    expect(viewport.entryAtRow(2), "the boundary: b's first row, offset 0").toEqual({ id: b, rowOffset: 0 });
+    expect(viewport.entryAtRow(3)).toEqual({ id: b, rowOffset: 1 });
+  });
+});

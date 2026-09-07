@@ -29,9 +29,10 @@ import { withThemeNames } from "../../src/data/manifest/index.js";
 import { doc, localDoc } from "./blocks.js";
 import { result } from "./transport.js";
 import type { RefreshHost } from "../../src/shell/refresh.js";
+import type { ConfirmHost } from "../../src/shell/confirm.js";
 import type { Pipeline, PipelineDeps } from "../../src/shell/types.js";
 import type { RawPatch, RawResult } from "../../src/data/transport/index.js";
-import type { ViewDocument } from "../../src/data/viewmodel/index.js";
+import type { ViewDocument, ViewPatch } from "../../src/data/viewmodel/index.js";
 import type { HistoryEntry } from "../../src/interaction/history/types.js";
 import type { Exit } from "../../src/data/process/types.js";
 
@@ -40,6 +41,8 @@ export type PipelineScript = Readonly<{
   invoke?: () => Promise<RawResult>;
   stream?: () => AsyncIterable<RawPatch>;
   adapt?: () => ViewDocument;
+  /** A scripted patch adapter, as the unit harness has; `null` drops the patch (C07). */
+  adaptPatch?: () => ViewPatch | null;
   spawnShell?: (command: string) => {
     stdout: AsyncIterable<string>;
     exited: Promise<{ code: number | null }>;
@@ -51,10 +54,34 @@ export type PipelineScript = Readonly<{
   handoff?: (argv: readonly string[]) => Promise<Exit>;
   /** C23 I46 — for the rows about the off-screen pause. Everything visible by default. */
   visible?: (host: RefreshHost) => boolean;
+  /** C23 I60's test consumer: which calls need a decision, and what the layer says. */
+  approval?: PipelineDeps["approval"];
+  /**
+   * The PTY arm (C21 I18, C23 I63). `hasPty` is separate from `spawnPty` on
+   * purpose: the route reads the flag and never the method's absence, so a row
+   * can set the flag true with a factory that throws and reach T3.63.
+   */
+  hasPty?: boolean;
+  spawnPty?: (
+    command: string,
+    opts: Readonly<{ cols: number; rows: number }>,
+  ) => Readonly<{
+    pid: number | null;
+    exited: Promise<Exit>;
+    running: boolean;
+    onData: (cb: (chunk: string) => void) => void;
+    write: (data: string) => void;
+    resize: (cols: number, rows: number) => void;
+    signal: (sig: string) => boolean;
+  }>;
+  /** The region the body is measured against, for the resize rows (C23 I65). */
+  region?: () => Readonly<{ width: number; height: number }>;
 }>;
 
 export type PipelineHarness = Readonly<{
   pipeline: Pipeline;
+  /** The real confirm host, so a row can answer the approval layer through its handler. */
+  confirm: ConfirmHost;
   transcript: ReturnType<typeof createTranscriptStore>;
   session: ReturnType<typeof createSessionStore>;
   theme: ThemeStore;
@@ -70,6 +97,8 @@ export type PipelineHarness = Readonly<{
   handed: string[][];
   /** `suspend` / `resume`, interleaved into `calls` and also counted here. */
   lifecycle: string[];
+  /** C23 I64 — holds a frame open, so a row can see what coalescing suppresses. */
+  setPending: (v: boolean) => void;
   /**
    * What reached C20 (C23 I29).
    *
@@ -83,11 +112,46 @@ export type PipelineHarness = Readonly<{
   tick: (ms: number) => void;
 }>;
 
-/** Lets every `void`-ed async route settle before assertions. */
-export const settled = (): Promise<unknown> =>
+const turn = (): Promise<void> =>
   new Promise((r) => {
     setImmediate(r);
   });
+
+/**
+ * Lets every `void`-ed async route settle before assertions.
+ *
+ * **Given a pipeline it waits for the route rather than for a turn.** The
+ * `shell` route awaits the emulator's parser as well as the child's streams
+ * (C27 I3), so how many turns it needs is a property of a dependency and not of
+ * this file — and a count chosen to pass today is the shape a flake takes. The
+ * guard is held for exactly the life of a route (C23 I5), so `inFlight` going
+ * null is the route having finished, from the one witness that cannot be a turn
+ * out of date. Capped, so a route that never releases fails as an assertion
+ * rather than as a timeout with no sentence in it.
+ */
+export const settled = async (p?: { readonly inFlight: unknown }): Promise<void> => {
+  await turn();
+  if (p === undefined) return;
+  // **Wait for the route to take the guard before waiting for it to let go.**
+  // A poll that only watches for `null` is satisfied by the instant *before* the
+  // route starts, which is the reading that made a hundred-chunk screen assert
+  // against sixteen lines and pass on the count it was checking.
+  //
+  // **Bounded by the clock rather than by a turn count**, because the emulator's
+  // parser resolves on a timer of its own: a fixed number of `setImmediate`s is
+  // a guess about a dependency's scheduling, and the guess was wrong by an order
+  // of magnitude. A deadline is a guess about nothing.
+  const wait = (): Promise<void> => new Promise((r) => void setTimeout(r, 0));
+  // Phase one is short on purpose: a route that takes the guard does so within a
+  // turn or two of `submit`, and most routes here never take it at all — waiting
+  // the full deadline for those would be ten seconds a call site.
+  const started = Date.now() + 20;
+  while (p.inFlight === null && Date.now() < started) await wait();
+  const deadline = Date.now() + 10_000;
+  while (p.inFlight !== null && Date.now() < deadline) await wait();
+  await turn();
+  await turn();
+};
 
 export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
   const transcript = createTranscriptStore();
@@ -120,9 +184,11 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
    * `fake-scheduler.ts` documents.
    */
   let now = 0;
+  let schedulerPending = false;
   const timers: { fn: () => void; at: number; live: boolean }[] = [];
 
   const harnessOverlays = createOverlayManager({ registry: overlayRegistry });
+  const harnessConfirm = createConfirmHost({ overlays: harnessOverlays, anchor: () => ({ row: 0, rows: 1 }), overlayRegion: () => ({ width: 80, height: 24 }), invalidate: () => undefined });
   const deps = {
     session: () => session.snapshot,
     writes: session.execution,
@@ -131,7 +197,12 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
       commit: (r: string) => void commits.push(r),
       flush: () => undefined,
       invalidate: () => void calls.push("invalidate"),
-      pending: false,
+      // **Writable, because C23 I64's coalescing reads it.** A constant `false`
+      // makes the route draw on every chunk and the row that counts patches
+      // agrees with a route that has no gate at all.
+      get pending(): boolean {
+        return schedulerPending;
+      },
       contaminated: false,
     },
     transport: {
@@ -150,7 +221,7 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
     },
     adapters: {
       adapt: () => (script.adapt === undefined ? doc({ command: "adapted" }) : script.adapt()),
-      adaptPatch: () => null,
+      adaptPatch: () => (script.adaptPatch === undefined ? null : script.adaptPatch()),
       register: () => undefined,
       seal: () => undefined,
       sealed: true,
@@ -173,7 +244,7 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
     // `blocks` stays the stub above — `measure` is a closure, so a row that
     // reaches it throws loudly rather than measuring wrongly.
     capabilities: FULL_CAPABILITIES,
-    region: () => ({ width: 80, height: 24 }),
+    region: script.region ?? (() => ({ width: 80, height: 24 })),
     // **The real editor, not a stub.** `editor: {} as never` cost a diagnosis
     // once and `{ setText, text }` cost another the day C23 gained
     // `editor.clear()` on the submit path (I28) — a two-method stub is the same
@@ -207,7 +278,8 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
      * answer, so a handler that asks and ignores the reply would pass — and the
      * one test that matters is whether declining stops the command.
      */
-    confirm: createConfirmHost({ overlays: harnessOverlays, anchor: () => ({ row: 0, rows: 1 }), overlayRegion: () => ({ width: 80, height: 24 }), invalidate: () => undefined }),
+    confirm: harnessConfirm,
+    ...(script.approval === undefined ? {} : { approval: script.approval }),
     theme,
     // `append` is real, because C23 I29 records every settled submission
     // through it — a fake without it throws inside the append funnel and the
@@ -231,6 +303,15 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
           }))
         )(command);
       },
+      spawnPty: (command: string, opts: { cwd: () => string; cols: number; rows: number }) => {
+        calls.push("spawnPty");
+        spawned.push({ command, cwd: opts.cwd() });
+        if (script.spawnPty === undefined) {
+          throw new Error("spawnPty() with no PTY factory injected — pass one as `TuiConfig.pty`");
+        }
+        return script.spawnPty(command, { cols: opts.cols, rows: opts.rows });
+      },
+      hasPty: script.hasPty ?? false,
       spawn: () => undefined,
       // **Recorded, not stubbed** (`test/support/README.md`: a fake is shown to
       // respond to the thing under test before it is asserted against). As a
@@ -297,6 +378,7 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
 
   return {
     pipeline,
+    confirm: harnessConfirm,
     transcript,
     session,
     theme,
@@ -308,6 +390,10 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
     lifecycle: lifecycleCalls,
     /** What reached C20 (C23 I29), for the rows that assert the record. */
     recorded,
+    /** C23 I64 — a row holds a frame open and counts what the route does not write. */
+    setPending: (v: boolean) => {
+      schedulerPending = v;
+    },
     tick: (ms: number) => {
       now += ms;
       const due = timers.filter((t) => t.live && t.at <= now);

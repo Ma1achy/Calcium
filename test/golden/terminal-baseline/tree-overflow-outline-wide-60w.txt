@@ -1,0 +1,7 @@
+── tree · overflow-outline · wide · 60w
+root
++-- render
+|   +-- curve
+|   |   +-- raster
+|   +-- paint
+[38;2;212;179;90m+4 more - layout - measure - wrap - parse[39m

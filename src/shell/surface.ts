@@ -230,9 +230,7 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
         emit(
           action,
           key,
-          event.key.phase === "repeat" || event.key.phase === "release"
-            ? event.key.phase
-            : "press",
+          event.event === "repeat" || event.event === "release" ? event.event : "press",
           fidelity,
           elapsedMs,
         );
@@ -279,7 +277,6 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
       routerDisposable.dispose();
       resizeDisposable[Symbol.dispose]();
       layerDisposable[Symbol.dispose]();
-      options.lifecycle.setEnhancedKeyboard(false);
       options.invalidate();
       current = null;
       closeCurrent = null;
@@ -310,7 +307,6 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
     });
     current = handle;
     closeCurrent = beginClose;
-    options.lifecycle.setEnhancedKeyboard(true);
     options.invalidate();
     return handle;
   }

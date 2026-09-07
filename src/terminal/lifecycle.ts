@@ -15,8 +15,9 @@ import {
   BRACKET_PASTE,
   CURSOR,
   CURSOR_SHAPE,
-  ENHANCED_KEYBOARD,
+  KITTY_KEYBOARD,
   MOUSE,
+  MOUSE_ANY,
   cursorTo,
 } from "./escapes.js";
 import type { CursorStyle } from "./escapes.js";
@@ -109,8 +110,6 @@ export interface TerminalLifecycle {
    * predicate answering both is how they come to disagree.
    */
   setMouseTracking(on: boolean): void;
-  /** Request native key phases while an application surface owns input. */
-  setEnhancedKeyboard(on: boolean): void;
   readonly writer: NodeJS.WriteStream;
   readonly acquired: boolean;
   readonly suspended: boolean;
@@ -123,6 +122,13 @@ export type TerminalLifecycleOptions = Readonly<{
   onFatal: (err: unknown) => never;
   beforeRelease?: () => void;
   debug?: (line: string) => void;
+  /**
+   * Step 6 takes 1003 in 1002's place (I21) — every pointer move reported, not
+   * only drags. **An option and not a capability**: nothing detects it, and the
+   * cost is the application's. Default off. `capabilities.mouse` false still
+   * takes neither (I10).
+   */
+  hover?: boolean;
 }>;
 
 /**
@@ -165,7 +171,7 @@ type HeldKey =
   | "rawMode"
   | "bracketedPaste"
   | "mouse"
-  | "enhancedKeyboard";
+  | "keyboardProtocol";
 
 /**
  * §5's transition table, as data. Every cell, including the nine that throw.
@@ -244,6 +250,11 @@ export function terminalSize(stream: Readonly<{ columns: number; rows: number }>
 export function createTerminalLifecycle(opts: TerminalLifecycleOptions): TerminalLifecycle {
   const { stdout, stdin, capabilities, onFatal } = opts;
   const debug = opts.debug ?? ((): void => {});
+  // **One pair, chosen once** (I21). Acquisition, release and the copy-mode
+  // toggle all read this binding, so the mode that leaves is the mode that was
+  // entered — a toggle reading `MOUSE` while acquisition took `MOUSE_ANY` would
+  // emit `1002l` for a 1003 the terminal still holds.
+  const mouseMode = opts.hover === true ? MOUSE_ANY : MOUSE;
 
   let state: LifecycleState = "constructed";
   const held = new Set<HeldKey>();
@@ -279,7 +290,6 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
    * emits nothing at all.
    */
   let shapeUnknown = false;
-  let enhancedKeyboardRequested = false;
 
   // --- raw input delivery (I18) --------------------------------------------
   //
@@ -388,8 +398,8 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
     cursor: () => emit(CURSOR.enter),
     rawMode: () => setRawMode(true),
     bracketedPaste: () => emit(BRACKET_PASTE.enter),
-    mouse: () => emit(MOUSE.enter),
-    enhancedKeyboard: () => emit(ENHANCED_KEYBOARD.enter),
+    mouse: () => emit(mouseMode.enter),
+    keyboardProtocol: () => emit(KITTY_KEYBOARD.enter),
   });
 
   const RELEASE: Readonly<Record<Exclude<HeldKey, "stdout">, () => void>> = Object.freeze({
@@ -397,8 +407,11 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
     cursor: () => emit(CURSOR.leave),
     rawMode: () => setRawMode(false),
     bracketedPaste: () => emit(BRACKET_PASTE.leave),
-    mouse: () => emit(MOUSE.leave),
-    enhancedKeyboard: () => emit(ENHANCED_KEYBOARD.leave),
+    mouse: () => emit(mouseMode.leave),
+    // The pop, never `CSI = 0 u`: the terminal's prior flag set comes back
+    // (C02 §3). Last taken and so first released — the terminal is on legacy
+    // key reporting before the mouse and paste modes leave.
+    keyboardProtocol: () => emit(KITTY_KEYBOARD.leave),
   });
 
   function setRawMode(on: boolean): void {
@@ -429,20 +442,8 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
       take("mouse");
       return;
     }
-    emit(MOUSE.leave);
+    emit(mouseMode.leave);
     held.delete("mouse");
-  }
-
-  function setEnhancedKeyboard(on: boolean): void {
-    enhancedKeyboardRequested = on;
-    if (state !== "acquired") return;
-    if (on === held.has("enhancedKeyboard")) return;
-    if (on) {
-      take("enhancedKeyboard");
-      return;
-    }
-    emit(ENHANCED_KEYBOARD.leave);
-    held.delete("enhancedKeyboard");
   }
 
   // --- the transition guard -------------------------------------------------
@@ -651,7 +652,7 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
       take("rawMode");
       if (capabilities.bracketedPaste) take("bracketedPaste"); // I10
       if (capabilities.mouse) take("mouse"); // I10
-      if (enhancedKeyboardRequested) take("enhancedKeyboard");
+      if (capabilities.keyboardProtocol === "kitty") take("keyboardProtocol"); // I10, C02 I12
     } catch (err) {
       // T3.7 — partial acquisition never leaves partial state.
       unwind();
@@ -772,7 +773,6 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
     // terminal nobody has entered is still the size of the terminal.
     size: snapshotSize,
     setMouseTracking,
-    setEnhancedKeyboard,
     writer,
     // Getters, not stored booleans: two booleans for four states admits two
     // combinations that cannot happen (T2.1).

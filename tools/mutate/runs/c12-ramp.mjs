@@ -103,8 +103,12 @@ const results = runPass({
       // the ramps and the choice between them fail independently.
       name: "the wide arm takes the block ramp again",
       file: RAMP,
-      from: 'return caps.ambiguousWidth === "wide" ? RAMP_BRAILLE : RAMP_UNICODE;',
-      to: "return RAMP_UNICODE;",
+      // Re-anchored onto `LADDERS.height` after `ladderFor` replaced `rampFor`,
+      // and it was stale for a commit unseen — a single-quoted anchor, which is
+      // the 108-of-465 blind spot F173 records. Re-run, not re-anchored and
+      // trusted.
+      from: "      : caps.ambiguousWidth === \"wide\"\n        ? HEIGHT_BRAILLE\n        : HEIGHT_UNICODE,",
+      to: "      : HEIGHT_UNICODE,",
       expect: "T2.53",
     },
   ],

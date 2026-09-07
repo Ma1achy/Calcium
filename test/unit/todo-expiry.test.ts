@@ -553,6 +553,30 @@ describe("todo expiry", () => {
     expect(KIND_OF_COMPONENT).toEqual({ C11: "table", C12: "plot", C25: "patch" });
   });
 
+  it("TD0–TD6 run in `make enforce`, and the call sites are the ones this file exercises", () => {
+    // **A test that calls the mechanism misses the wiring.** Every row in this
+    // file ran the rules against the real tree and passed, and for the whole
+    // life of the family the pre-commit path never invoked one of them:
+    // `index.mjs` did not import `todo-expiry.mjs`. A deferral whose blocker
+    // had landed was caught by whoever next ran the unit tier and by nothing on
+    // the way to a commit. This reads the runner's source rather than calling
+    // the functions, because calling them is what every other row here does
+    // and it is exactly what could not see the gap.
+    const runner = readFileSync("tools/enforce/index.mjs", "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^\s*\/\/.*$/gm, "");
+    expect(runner).toContain('from "./todo-expiry.mjs"');
+    for (const call of ["checkTodoExpiry(", "checkSourceMap(", "checkSurfaceDeferrals(", "backlogKey("]) {
+      expect(runner, `${call} is called on the gate path`).toContain(call);
+    }
+    // TD0's equality, both directions: the runner compares against the
+    // acknowledged list rather than only filtering by it.
+    expect(runner).toContain("ACKNOWLEDGED_BACKLOG");
+    expect(runner).toMatch(/!expiryKeys\.has\(k\)/);
+    // And the runner's result is spliced into the gated list, not printed beside it.
+    expect(runner).toMatch(/\.\.\.deferralViolations,/);
+  });
+
   it("TD4 half (b) has no live subject, and that is stated rather than assumed", () => {
     // **The honest state, asserted.** C25 is the last component that registers a
     // kind, so once its deferrals are written no surface deferral names C11, C12

@@ -30,12 +30,15 @@
  */
 
 import { renderSequenceToLines } from "../presentation/render-lines.js";
-import { cells, fitStyled, hardWrapCells, sliceCells } from "../presentation/text.js";
-import { background, paint as paintSpans, tone } from "../presentation/blocks/paint.js";
+import type { RenderScratch } from "../presentation/blocks/types.js";
+import { cells, hardWrapCells, sliceCells } from "../presentation/text.js";
+import { paint as paintSpans, tone, selectionStyle } from "../presentation/blocks/paint.js";
 import { SGR_RESET, sgr, toTerminalDefault } from "../terminal/escapes.js";
-import { promptFor, PROMPT_GUTTER } from "./config.js";
+import { HEADER_ROWS, HEADER_RULE_ROWS, promptFor, PROMPT_GUTTER } from "./config.js";
+import { glyphs } from "../presentation/blocks/index.js";
 import { composite } from "./composite.js";
-import { gutterMatchesPrompt, heightsSum, type Composed } from "./frame.js";
+import { exact, FrameError } from "./frame-error.js";
+import { gutterMatchesPrompt, heightsSum, promptTop, type Composed } from "./frame.js";
 import type { Block } from "../data/viewmodel/index.js";
 import type { Placed } from "../viewport/overlay/index.js";
 import type { Cell, CellSpan } from "../interaction/editor/index.js";
@@ -65,6 +68,8 @@ export type PaintDeps = Readonly<{
   overlays: () => readonly Placed[];
   /** C17's cursor as a cell in the prompt's own layout (C17 §2). */
   promptCursor: () => Cell;
+  /** The session's render scratch (C12 I107), for a 3D plot inside a layer. */
+  scratch?: RenderScratch;
   /**
    * The selection's cells, in the prompt's own layout (entry 23, C17 I21).
    *
@@ -143,34 +148,21 @@ function spinnerGlyph(caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWid
   return spinnerFrames(caps)[0] ?? "";
 }
 
-export class FrameError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "FrameError";
-  }
-}
+// `FrameError` and `exact` live in `frame-error.ts` (A03 MG2): `composite.ts`
+// needs both and this file needs `composite`, and the cycle that made was the
+// one MG2 found on the day it was implemented.
 
 /**
- * Pad or truncate to exactly `width` **display** cells.
- *
- * **Both directions matter and only one is obvious.** A short line leaves the
- * previous frame's cells showing at the end of the row, which reads as
- * corruption; a long one wraps, which *is* corruption.
- *
- * **`displayCells`, not `cells`, and the difference was a live defect.** These
- * lines come from Ink and carry SGR. `stripControl` drops the ESC byte and
- * keeps `[38;5;241m`, which is printable text — so `cells()` measured every
- * themed chrome row eleven cells too wide per colour change, padded to 80
- * counted-with-escapes, and left a visible row of about 38 with the previous
- * frame showing across the rest. Truncating with it would have been worse: the
- * cut lands inside an escape and the colour bleeds down every row below.
- *
- * Delegated to C09 rather than solved here — that is where display width is
- * decided, and a second answer is C09 I1's divergence in the place that moves
- * the whole frame.
+ * One rule row (C22 I81, I87, §6l.4 A, §6l.7): the `horizontal` glyph across the full
+ * width, in the muted tone at every depth and **plain at 1-bit** — a rule is
+ * geometry, and one that needed colour to read would be F34's class. The glyph
+ * comes from C09's table so the ASCII tier gets `-` from the same place every
+ * other rule in the frame does.
  */
-export function exact(text: string, width: number): string {
-  return fitStyled(text, width, SGR_RESET);
+function rule(width: number, deps: PaintDeps): string {
+  const text = glyphs(deps.capabilities).horizontal.repeat(width);
+  if (deps.capabilities.colourDepth === 1) return text;
+  return paintSpans([{ text, style: tone("muted", deps.theme, deps.capabilities) }]);
 }
 
 /**
@@ -363,7 +355,8 @@ function shows(window: PromptWindow, row: number): boolean {
  * ladder having a hole in the middle.
  */
 function washed(row: string, span: CellSpan, deps: PaintDeps): string {
-  const style = selectionStyle(deps);
+  // L1's ladder, not a private copy: the wash, else `inverse` (C11 I14; F769).
+  const style = selectionStyle(deps.theme, deps.capabilities);
   const before = sliceCells(row, 0, span.from);
   const inside = sliceCells(row, span.from, span.to);
   const after = sliceCells(row, span.to, cells(row, deps.capabilities.ambiguousWidth));
@@ -371,11 +364,6 @@ function washed(row: string, span: CellSpan, deps: PaintDeps): string {
 }
 
 /** The wash, or reverse video where there is no colour to wash with (§4b). */
-function selectionStyle(deps: PaintDeps): Style {
-  const bg = background("surface.selection", deps.theme, deps.capabilities);
-  return bg.background === undefined ? { inverse: true } : bg;
-}
-
 function promptRegion(frame: Composed, deps: PaintDeps, width: number): readonly string[] {
   const cap = frame.promptRows;
   const cursor = deps.promptCursor();
@@ -528,7 +516,8 @@ export function paint(frame: Composed, deps: PaintDeps): readonly string[] {
   if (!heightsSum(frame)) {
     throw new FrameError(
       `frame heights do not sum to ${String(frame.size.rows)} rows: ` +
-        `header 1 + viewport ${String(frame.region.height)} + prompt ${String(frame.promptRows)} + footer 1`,
+        `header ${String(HEADER_ROWS)} + rule ${String(HEADER_RULE_ROWS)} + viewport ${String(frame.region.height)} + ` +
+        `rules 2 + prompt ${String(frame.promptRows)} + footer ${String(frame.footerRows)}`,
     );
   }
 
@@ -575,10 +564,22 @@ export function paint(frame: Composed, deps: PaintDeps): readonly string[] {
   // life of C15 no component drew one at all (S01 §3a).
   const lines = composite(
     [
-      ...region(frame.header, 1, width, deps),
+      ...region(frame.header, HEADER_ROWS, width, deps),
+      // **The header's rule** (I87, §6l.7) — the same row the prompt's two are,
+      // so the header and the region's first row do not read as one block.
+      rule(width, deps),
       ...transcript(frame, deps, width),
+      // **Two rules, always** (I81) — the row above the prompt and the row
+      // below it, whatever the footer holds. The lower one is drawn with a
+      // footer of zero rows too: a frame whose bottom edge moved with whether
+      // the app returned a block would flicker on content (§6l.2 row 3).
+      rule(width, deps),
       ...promptRegion(frame, deps, width),
-      ...region(frame.footer, 1, width, deps),
+      rule(width, deps),
+      // **The composed height, not `1`** (I80, I82). `region()` truncates to it
+      // and pads to it, so a footer taller than `MAX_FOOTER_ROWS` shows its top
+      // (§6l.2 row 5) and one of zero rows takes nothing.
+      ...region(frame.footer, frame.footerRows, width, deps),
     ],
     deps.overlays(),
     {
@@ -587,6 +588,7 @@ export function paint(frame: Composed, deps: PaintDeps): readonly string[] {
       capabilities: deps.capabilities,
       regionTop: frame.region.top,
       region: frame.overlayRegion,
+      ...(deps.scratch === undefined ? {} : { scratch: deps.scratch }),
     },
   );
 
@@ -650,7 +652,24 @@ export function cursorFor(frame: Composed, deps: PaintDeps): Cell | null {
   if (!shows(window, cell.row)) return null;
   const within = cell.row - window.first + window.offset;
 
-  return { row: frame.region.top + frame.region.height + within, col: cell.col };
+  // **Below the upper rule** (I81) — `promptTop` is the one place that adds it.
+  return { row: promptTop(frame) + within, col: cell.col };
+}
+
+/**
+ * The blank rows the composer draws **above** a short transcript (C14 §2, I19).
+ *
+ * Bottom-aligned: a half-full transcript sits above the prompt, not under the
+ * header, because the prompt is where the eye is and content should grow
+ * towards it. **Exported because the pointer has to undo it**: C14 addresses
+ * its rows from the top, so `construct.ts`'s `entryAtRegionRow` subtracts this
+ * from a region row before asking `entryAtRow`. The two used to agree by being
+ * the same expression written twice — the drift the frame path cannot see
+ * until a short session's click lands one row wrong (F755). One function, so a
+ * change to how the frame aligns moves the click with it.
+ */
+export function blankRowsAbove(regionHeight: number, rows: number): number {
+  return Math.max(0, regionHeight - rows);
 }
 
 /** C14 selected these at this width; they are padded, never re-measured. */
@@ -676,10 +695,7 @@ function transcript(frame: Composed, deps: PaintDeps, width: number): readonly s
   }
 
   const out: string[] = [];
-  // Bottom-aligned: a half-full transcript sits above the prompt, not under the
-  // header, because the prompt is where the eye is and content should grow
-  // towards it.
-  const blank = Math.max(0, frame.region.height - rows.length);
+  const blank = blankRowsAbove(frame.region.height, rows.length);
   for (let i = 0; i < blank; i += 1) out.push(" ".repeat(width));
   for (let i = 0; i < frame.region.height - blank; i += 1) {
     out.push(exact(rows[i] ?? "", width));

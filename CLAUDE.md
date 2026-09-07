@@ -329,6 +329,20 @@ Each of these produces code that compiles, passes review, and is wrong.
   reaches them is the one already written down: **when picking up an entry, check what its
   claims resolve to at HEAD rather than trusting the row.**
 
+  **The fourth instance is the other failure of the same rule, and grepping from the satisfier
+  cannot reach it.** `RenderContext`'s missing windowing seam was named in C04 §3c trace 1,
+  measured in C09 §8a D7, partly paid for by C09 I34's four-line cap, and held open by a test
+  that **asserts the disagreement on purpose** — T2.28b, whose comment says it expires the day
+  the seam lands. The condition was never satisfied, so there was no satisfier to grep from;
+  what changed was the load. C27 puts two thousand lines of scrollback in a six-row box, and a
+  corner measured at 4 rows against 8 became a whole entry at 7 against 32, with two symptoms
+  in no entry at all. **A row that expires by asserting a disagreement watches the remedy, not
+  the condition**: it is green for exactly as long as the defect is, and says nothing when the
+  defect gets worse. And the finding was written as new, twice — which is where *ask where a
+  settled claim is written down* points one step earlier: **run it on a finding before writing
+  the number**, because the record is where the last person to read that frame wrote it down
+  (F855, F856).
+
 - **A correct sentence justifying the wrong decision survives being read carefully.**
   MG24 was scoped to `export interface` because *"a type alias is structural and can be
   satisfied without being named"* — which is **true**, about satisfying a type, and

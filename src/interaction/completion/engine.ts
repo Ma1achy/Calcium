@@ -74,7 +74,13 @@ export interface CompletionEngine {
 export type EngineOptions = Readonly<{
   /** Injected; C19 reads no ambient clock (I9). */
   now: () => number;
-  /** One line per failure, not per keystroke (T3.6). */
+  /**
+   * One line per failing source, not per keystroke (T3.6). **Optional, and
+   * absent means dropped in silence** — which is what the product did for the
+   * whole life of C19, because every test supplied one and `construct.ts` did
+   * not. `createSourceErrorSink` is the product's; a test that wants to see the
+   * failures passes its own.
+   */
   onSourceError?: (sourceId: string, error: unknown) => void;
   cache?: CompletionCache;
   /**
@@ -93,6 +99,54 @@ export type EngineOptions = Readonly<{
    */
   recency?: (value: string) => number | null;
 }>;
+
+/**
+ * Where a source failure goes in the product (T3.6's "logged once", I6).
+ *
+ * **`onSourceError` was supplied by every test and by nothing in `src/`**, so for
+ * the whole life of C19 a source that threw was dropped from the request — I6
+ * held — and dropped from the record too: no line anywhere said which source
+ * failed or why. The engine's contract was *the failure is logged once* and the
+ * engine had no log; it had a callback the product never passed.
+ *
+ * This is the sink, in `BlockFaultLog`'s shape (C22 I6a): a pull rather than an
+ * emit, deduplicated, drained at shutdown with the other diagnostics rather than
+ * painted onto the alternate screen where it would be discarded with it.
+ *
+ * **One line per source, not per failure and not per keystroke.** A dynamic
+ * source that is down fails on every `Tab` for as long as it is down, and each
+ * failure may carry a different message — a timeout's elapsed figure, a far
+ * side's request id. Keyed by message that is a flood; keyed by source it is one
+ * line with a count, and the first message, which is the one that says what
+ * went wrong before anything else went wrong because of it.
+ */
+export interface SourceErrorSink {
+  /** Pass as `EngineOptions.onSourceError`. */
+  readonly onSourceError: (sourceId: string, error: unknown) => void;
+  /** One line per failing source: `completion source \`id\` failed ×n: first message`. */
+  readonly messages: readonly string[];
+}
+
+export function createSourceErrorSink(): SourceErrorSink {
+  const seen = new Map<string, { first: string; count: number }>();
+  return {
+    onSourceError: (sourceId, error) => {
+      const entry = seen.get(sourceId);
+      if (entry !== undefined) {
+        entry.count += 1;
+        return;
+      }
+      const text = error instanceof Error ? error.message : String(error);
+      seen.set(sourceId, { first: text, count: 1 });
+    },
+    get messages(): readonly string[] {
+      return [...seen].map(
+        ([id, { first, count }]) =>
+          `completion source \`${id}\` failed${count > 1 ? ` ×${String(count)}` : ""}: ${first}`,
+      );
+    },
+  };
+}
 
 function longestCommonPrefix(values: readonly string[]): string {
   const first = values[0];

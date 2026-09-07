@@ -51,13 +51,14 @@ Fields absent from the envelope are **omitted, not rendered empty**. A queued ru
 ```
 ▌ ── loss · epoch 17 / 40 · 43% ────────────────────────────────────────────────
 ▌
-▌   0.82 │⠉⠒⠢⢄⣀
-▌        │     ⠉⠑⠢⠤⢄⣀⡀
-▌   0.43 │           ⠈⠉⠉⠒⠒⠤⠤⣀⣀
-▌        │                    ⠉⠉⠉⠒⠒⠒⠒⠤⠤⠤⠤⣀⣀⣀⣀
-▌   0.04 │                                   ⠉⠉⠉⠉⠑⠒⠒⠒⠒⠒⠒⠒⠢⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⢄⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀
-▌        └──────────────────────────────────────────────────────────────────────
-▌         epoch 0                        epoch 20                            now
+▌       ┌──────────────────────────────────────────────────────────────────────┐
+▌   1.0 ┤                                                                      │
+▌       │╶─────╮                                                               │
+▌   0.5 ┤      ╰───────────╮                                                   │
+▌       │                  ╰────────────────────────╮                          │
+▌   0.0 ┤                                           ╰─────────────────────────╴│
+▌       └┬─────────────────────────────────┬──────────────────────────────────┬┘
+▌        epoch 0                        epoch 20                            now
 ▌
 ▌   ████████████░░░░░░░░░░░░░░░░  43%
 ▌
@@ -74,7 +75,9 @@ Fields absent from the envelope are **omitted, not rendered empty**. A queued ru
 
 The first two are drawing errors and the tables win; the third is the fifth verdict class in `HEIGHT_AUDIT.md` — a declaration changing because two figures drew the same thing independently.
 
-Height 5, width 76, eighteen epochs from 0.82 to 0.0372 — so the min label is the `loss 0.0372` the metrics row below states, which the old figure's `0.04` only happened to resemble. The three y-labels share one precision, taken from the span (C12 §3).
+Height 5, width 76, eighteen epochs from 0.82 to 0.0372. **The labels are `1.0 · 0.5 · 0.0` and not the data's own ends**, because a derived bound snaps outward to the nice step (C12 I22, C04 I29): loose labelling exists so the ends read round, and the price is that the floor of the axis is not the floor of the series. `loss 0.0372` is the metrics row's job and the axis is a scale — a tick is a mark on one, not the answer (C12 §3d, F175).
+
+**This figure had been stale before the frame arrived**, and by more than a row: it drew `0.82 · 0.43 · 0.04` where the renderer has been drawing `1.0 · 0.5 · 0.0`, and it drew braille where a narrow-ambiguity terminal gets the line-draw curve. Re-rendered from the fixture rather than adjusted, which is what "C12's output, not a drawing" is supposed to mean — and the row-count check in `test/contract/surfaces.test.ts` could not see either error, because it counts rows.
 
 A `plot`, a `progress`, and a **headerless `table`** of headline metrics with direction arrows. Arrows come from the metric's declared direction of improvement, not from the sign of the delta — a rising loss is worse and a rising accuracy is better, and only the far side knows which is which.
 

@@ -1,7 +1,7 @@
 // C01 tier 4 — integration. Real components, still no real terminal.
 //
 // C02 and C03 exist, so T4.1, T4.2, T4.3 and T4.7 run against real components.
-// What remains names its blocker in a greppable form: `grep "waits on L4"`
+// What remains names its blocker in a greppable form: `grep "waits on L4"` — and L4 is built (2026-09-03)
 // finds everything the shell landing would unblock. That is how C03's three
 // were found the day it landed, and C21's nine the day the runner did — the
 // grep is the manual half; `tools/enforce/todo-expiry.mjs` is the half that
@@ -227,20 +227,25 @@ describe("C01 integration", () => {
     // snapshot is coherent per signal (I12) and **C22 is what carries it across
     // the layer** — C14 never reads a dimension and C01 never knows a viewport
     // exists.
-    // **The two dimensions travel by different routes, and this row now covers
-    // one of them** (C22 I34). Width reaches C14 from the signal, because width
-    // is what invalidates every cached height (C14 I8) and C01's snapshot is
-    // where it is known. **Height reaches it from the composed frame** — the
-    // region is `rows − header − footer − promptRows` and the prompt's height is
-    // not a function of the terminal's, so no handler on a terminal event can
-    // compute it.
+    // **Both dimensions travel by the frame now, and this row's claim inverted**
+    // (C22 I34, C03 I15). It used to read *width reaches C14 from the signal,
+    // height from the composed frame* — two routes, one observable here. The
+    // resize handler's `viewport.resize` was the width's route and it was a
+    // second writer of a quantity `render-frame.ts` already sets, whose only
+    // effect was to re-measure the whole transcript per `SIGWINCH` instead of
+    // per frame: **544 ms for a 30-event drag at a thousand entries** (F423).
     //
-    // The height half is therefore unobservable here *by construction*: this
-    // harness stubs `render` with a counter (`test/support/session.ts`), so no
-    // frame is ever composed and nothing pushes a height. It is asserted where a
-    // frame exists — C22 T4.12 against a spy, and C04 T5.2 through a real PTY
-    // resize. Stated rather than left, because a row that quietly stopped
-    // covering half its claim reads exactly like one that still does.
+    // So the row now asserts the **single-owner property**: with no frame
+    // composed, nothing reaches the viewport at all. That is not a weaker
+    // assertion — it is the one that fails if a second writer is ever added
+    // back, which is the defect this replaces. This harness stubs `render` with
+    // a counter (`test/support/session.ts`), so no frame is ever composed, which
+    // is exactly what makes the property observable here.
+    //
+    // **The positive case is where a frame exists**: `session.test.ts`'s T4.12
+    // (C22 I34, with C14) drives a real session, and C04 T5.2 a real PTY resize.
+    // Named rather than left, because a row that quietly stopped covering its
+    // claim reads exactly like one that still does.
     const { graph, resize } = await buildGraph({}, { columns: 200, rows: 30 });
     // **`wrappingDoc`, not `rowsDoc`** — and the support file says why: a `raw`
     // block measures one row at every width, so a resize assertion built on one
@@ -253,9 +258,13 @@ describe("C01 integration", () => {
     const wide = graph.viewport.scroll.totalRows;
     resize({ columns: 20, rows: 30 });
 
-    // The observable is that every height was remeasured, which happens only if
-    // the width arrived: C14 drops the whole cache on a width change (C14 I8).
-    expect(graph.viewport.scroll.totalRows, "remeasured at the new width").toBeGreaterThan(wide);
+    // C14 drops the whole cache on a width change (C14 I8), so a re-measure is
+    // the observable — and it does not happen, because nothing composed a frame.
+    // **One writer of the viewport's size, and it is the frame.**
+    expect(
+      graph.viewport.scroll.totalRows,
+      "no frame composed, so no second writer pushed the width",
+    ).toBe(wide);
   });
   it("T4.7 (with C03): SIGCONT fires onResume, the shell invalidates, the next commit repaints", () => {
     const { scheduler, lifecycle, render, repaint } = wireScheduler();

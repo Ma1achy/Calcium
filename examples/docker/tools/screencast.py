@@ -33,7 +33,7 @@ import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from capture import run  # noqa: E402
+from capture import forget_theme, run  # noqa: E402
 
 COLS, ROWS = 110, 34
 
@@ -256,4 +256,5 @@ if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else "out/demo"
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
     warm_the_logs()
+    forget_theme()  # F811 — a persisted `/theme light` recolours the whole recording
     run(COLS, ROWS, BEATS, out, hold=6.0, env={"LANG": "en_GB.UTF-8", "COLORTERM": "truecolor"})

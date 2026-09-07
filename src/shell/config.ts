@@ -13,6 +13,7 @@
  */
 
 import { createFallbackAdapter } from "../data/adapters/index.js";
+import { DEFAULT_MAX_BLOCK_ROWS } from "../presentation/blocks/index.js";
 import { slashPolicy } from "../interaction/parser/index.js";
 import { createExecutionPipeline } from "./execution.js";
 import { makeDefaultChrome } from "./chrome.js";
@@ -28,6 +29,42 @@ import type { TerminalCapabilities } from "../terminal/capabilities.js";
  */
 export const MIN_COLUMNS = 60;
 export const MIN_ROWS = 16;
+
+/**
+ * §6, §6l — the chrome's rows. The header is one row, a constant: A02 §6 adds
+ * a hook when something needs it and nothing does. **Two rules bound the
+ * prompt** (I81), one above and one below, at every size the gate accepts —
+ * they are geometry, not configuration (§6l.4 F). The footer is as tall as
+ * its blocks (I82); `DEFAULT_FOOTER_ROWS` is the one-row guess the first frame
+ * opens with before any `ChromeFn` has run (§6l.2 row 8), and the default
+ * footer is one `pills` row, so the guess is right for the default session.
+ *
+ * **They live here rather than in `frame.ts`** because the maximum below is
+ * derived from the size gate, and `frame.ts` already imports this file — the
+ * other direction is a cycle inside L4 (MG22).
+ */
+export const HEADER_ROWS = 1;
+/**
+ * The rule under the header (I87, §6l.7). Its own constant rather than a third
+ * counted into `RULE_ROWS`: `promptTop` halves that figure to find the prompt's
+ * first row, and a count that means "the prompt's pair" in one place and "every
+ * rule" in another is one a reader has to divide.
+ */
+export const HEADER_RULE_ROWS = 1;
+export const RULE_ROWS = 2;
+export const DEFAULT_FOOTER_ROWS = 1;
+
+/**
+ * **Derived, not chosen** (I80, §6l.2 row 7). The tallest footer that leaves one
+ * region row at the size gate with the prompt at its cap: at `MIN_ROWS` the
+ * prompt may take `⌊MIN_ROWS / 2⌋` rows (S01 §3), the header takes one and its
+ * rule one more (I87), the prompt's two rules take two, and the region must keep
+ * one. Three today, and it moves when
+ * `MIN_ROWS` moves — a hand-written `3` would still read as correct the day the
+ * gate changed and the region went to zero at a size the gate accepted.
+ */
+export const MAX_FOOTER_ROWS =
+  MIN_ROWS - HEADER_ROWS - HEADER_RULE_ROWS - RULE_ROWS - Math.floor(MIN_ROWS / 2) - 1;
 
 /**
  * §6 — C22 owns the frame, so C22 passes the gutter; C17 must not assume one.
@@ -108,6 +145,18 @@ export function validateConfig(config: TuiConfig): void {
   for (const field of REQUIRED) {
     if (config[field] === undefined || config[field] === null) throw new ConfigError(field);
   }
+  // C14 I24, T2.14 — refused at the call site, before anything is built. A cap
+  // of `0` marks every block and a fraction puts the marker at a row nothing
+  // measured; the registry refuses the same values, and this names the field.
+  const cap = config.maxBlockRows;
+  if (cap !== undefined && (!Number.isInteger(cap) || cap < 1)) {
+    throw new ConfigError("maxBlockRows", `must be a positive integer, got ${String(cap)}`);
+  }
+  // C01 I21 — a boolean or absent; a truthy string here would turn 1003 on for
+  // an app that wrote `hover: "false"`, which is the wrong direction to fail in.
+  if (config.hover !== undefined && typeof config.hover !== "boolean") {
+    throw new ConfigError("hover", `must be a boolean, got ${String(config.hover)}`);
+  }
 }
 
 export type Ambient = Readonly<{
@@ -154,8 +203,13 @@ export function resolveConfig(config: TuiConfig, ambient: Ambient) {
     fallbackAdapter: createFallbackAdapter(),
     commandPolicy: config.commandPolicy ?? slashPolicy,
     completionSources: config.completionSources ?? [],
+    // §6l — the chrome is two functions and nothing else: the footer's height
+    // is what its blocks measure (I82), so there is no budget to resolve here.
     chrome: config.chrome ?? makeDefaultChrome(config.name, config.binary),
     blocks: config.blocks ?? [],
+    // C14 I24 — the registry's default, resolved here so there is one place
+    // the value lives and one constant it is read from (C09 §2b).
+    maxBlockRows: config.maxBlockRows ?? DEFAULT_MAX_BLOCK_ROWS,
     transport: config.transport,
 
     // Absent, nothing is retained. Present without a count, 50 (§2).
@@ -170,6 +224,9 @@ export function resolveConfig(config: TuiConfig, ambient: Ambient) {
     // "the app said nothing" expressible, which is the state that was
     // indistinguishable from "nothing can say anything" for two whole steps.
     capabilities: config.capabilities,
+    // C01 I21 — off unless asked for; resolved here so C22 hands C01 a boolean
+    // and the default lives with the other defaults.
+    hover: config.hover ?? false,
     cwd: config.cwd ?? ambient.cwd,
     clock: config.clock ?? ambient.clock,
     schedule: ambient.schedule,
@@ -180,6 +237,8 @@ export function resolveConfig(config: TuiConfig, ambient: Ambient) {
     openUrl: config.openUrl,
     stdout: config.stdout ?? process.stdout,
     stdin: config.stdin ?? process.stdin,
+    // C22 I91 — carried, never inspected: the root's whole job for it.
+    ...(config.pty === undefined ? {} : { pty: config.pty }),
 
     cluster: config.cluster ?? "",
     version: config.version ?? "",

@@ -5,8 +5,10 @@
 // shell, a pipeline dying whole on Ctrl-C, `vi` taking and returning the
 // terminal, a stream running for a minute without accumulating. They do *not*
 // prove that an application wires `suspend` to `handoff` or `killAll` to exit —
-// C22 does not exist, and the fixture is standing where it will. C21's T5.5
-// (session exit with three children running) waits on it for that reason.
+// that is the composition root's claim, and C22 is built: T5.5 below (session
+// exit with three children running) drives the real session rather than a
+// fixture standing in for one. This header said *C22 does not exist, and the
+// fixture is standing where it will* until 2026-09-03, long after it did.
 //
 // The same bound C02's tier 5 states, for the same reason: a fixture composing
 // the sequence itself can only show that the pieces work when composed, never

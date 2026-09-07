@@ -30,7 +30,9 @@
   // `git clone && npm install && make all` must work without this container.
 
   // node-pty needs a toolchain for C01-C03's tier-5 PTY tests.
-  "onCreateCommand": "sudo apt-get update && sudo apt-get install -y python3 make g++",
+  // `xvfb xdotool xterm kitty`: two tier-5 rows drive a real emulator under Xvfb
+  // (C02 T5.7, C16 T5.9; F808, F810) and skip by name without them.
+  "onCreateCommand": "sudo apt-get update && sudo apt-get install -y python3 make g++ xvfb xdotool xterm kitty",
 
   // **The toolchain was installed and nothing ever used it.** `.npmrc` sets
   // `ignore-scripts=true` (A04 §3 — install scripts are the primary npm attack

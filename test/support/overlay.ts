@@ -58,6 +58,25 @@ export function anchored(
 }
 
 /**
+ * A peek of `height` rows anchored at a span — the layer that takes no keys
+ * (C15 §2a, I21). `dismissable` is carried because the type asks for it and
+ * read by nothing: `pop` never reaches a peek.
+ */
+export function peek(
+  id: string,
+  height: number,
+  at: Readonly<{ row: number; rows?: number; prefer: "above" | "below" }>,
+): Layer {
+  return {
+    id,
+    kind: "peek",
+    placement: { kind: "anchored", row: at.row, prefer: at.prefer, ...(at.rows !== undefined && { rows: at.rows }) },
+    content: rows(height, id),
+    dismissable: true,
+  };
+}
+
+/**
  * **The width defaults to the region's rather than being absent** (C15 I20).
  *
  * A centred layer declares its width or is refused, and the default here is a

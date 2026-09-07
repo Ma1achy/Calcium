@@ -1,0 +1,310 @@
+/**
+ * HB1–HB8 — the half-block rung and the decode refusal (C09 I37, I38 · §4c, §8b).
+ *
+ * **These read the frame in colour, and the reason is the rule itself.** The
+ * half block's whole claim is that the *colour* carries the picture: strip the
+ * SGR and every row is `▀▀▀▀▀`, identical for a photograph and for black. Every
+ * other image test in this directory strips SGR before asserting, which is
+ * correct for an arm whose glyph is the datum and would report this one as a
+ * wall of one character.
+ *
+ * The rows are C09 §8b's table, one apiece where the table has a cell.
+ *
+ * **Stated blind spot: the golden corpus is weaker for this arm than for the
+ * one below it.** `ONE_PER_KIND.image` is *an eight by eight red square* — flat
+ * — and the Bayer threshold varies with position, so braille turned that flat
+ * field into `⠕⠅⠕⠅⠕⠅` and the golden row encoded the **matrix**. A flat field in
+ * half blocks is one colour repeated, so the golden row records one colour pair
+ * and would not move under a transposed sample, a swapped top and bottom, or a
+ * dropped column. **HB2 is what covers that** — red over blue, where the two
+ * halves disagree — and the corpus fixture is deliberately not changed for it:
+ * it is shared by every kind's row, and buying coverage here by perturbing it
+ * would move frames that have nothing to do with this arm.
+ */
+import { describe, expect, it } from "vitest";
+import { createHash } from "node:crypto";
+import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
+import { imageCells } from "../../src/presentation/blocks/kinds/image.js";
+import { renderToLines } from "../../src/presentation/render-lines.js";
+import { HALF_BLOCK, halfBlockEligible, halfBlockRows } from "../../src/presentation/image/index.js";
+import { MAX_PLACEHOLDER_SPAN, PLACEHOLDER } from "../../src/presentation/image/kitty.js";
+import { decodePng } from "../../src/presentation/image/index.js";
+import { rgbPng64 } from "../support/png.js";
+import { DARK_THEME, FULL_CAPS } from "../support/render.js";
+import { b } from "../../src/shell/builders/index.js";
+import type { Image } from "../../src/data/viewmodel/index.js";
+import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
+
+const ESC = String.fromCharCode(27);
+const SGR = new RegExp(ESC + String.raw`\[[0-9;]*m`, "gu");
+
+/** Rows **with** their escapes — see the header. */
+const draw = (
+  block: Image,
+  caps: TerminalCapabilities = FULL_CAPS,
+  w = 20,
+): readonly string[] =>
+  renderToLines(createBlockRegistry(), block, w, { theme: DARK_THEME, capabilities: caps });
+
+const stripped = (rows: readonly string[]): readonly string[] => rows.map((l) => l.replace(SGR, ""));
+
+/**
+ * Half red over half blue — a coarse fixture, and **it cannot see a swap** (F412).
+ *
+ * Kept because HB4, HB5 and HB7 want a picture rather than a gradient, and
+ * renamed in its own comment rather than deleted: at four cell rows every cell
+ * covers two pixel rows of one colour, so `top` and `bottom` agree everywhere.
+ */
+const SPLIT = (h: number): string =>
+  rgbPng64(8, h, (_x, y) => (y < h / 2 ? [255, 0, 0] : [0, 0, 255]));
+
+/** One colour per **pixel row**, so the two halves of every cell disagree. */
+const STEP = (h: number): string => rgbPng64(8, h, (_x, y) => [y * 32, 0, 255 - y * 32]);
+
+const image = (data: string, height: number, extra: Partial<Image> = {}): Image =>
+  ({ ...b.image({ id: "img", data, height, alt: "a caption" }), ...extra }) as Image;
+
+/**
+ * A block **not** built by `b`, which is the only way to reach half of C09 I38.
+ *
+ * `b.image` refuses a bad signature at construction — *a format this cannot draw
+ * rather than an image that is broken* — so `not a PNG` is unreachable through
+ * the builder and perfectly reachable through an adapter's document, which is
+ * where images arrive from over a transport (C04 I73).
+ */
+const raw = (data: string, height: number): Image =>
+  // **A real hash, and the first version was a prefix.** `d-${data.slice(0, 12)}`
+  // is identical for every PNG — the signature and the IHDR length are the first
+  // nine bytes of all of them — so the decode memo, which keys on the digest,
+  // returned the 16-bit refusal for the interlaced block. A collision is a
+  // dropped input, and the frame said `bit depth 16` for a file that is not.
+  ({
+    kind: "image",
+    id: "img",
+    data,
+    height,
+    alt: "a caption",
+    digest: createHash("sha256").update(data).digest("hex").slice(0, 16),
+  }) as Image;
+
+describe("C09 §8b · the glyph axis", () => {
+  it("HB1 (C09 I37): the top rung draws two colours a cell, and both channels are set", () => {
+    const rows = draw(image(SPLIT(8), 4));
+    // The glyph is the same in every cell, which is the point: the picture is
+    // not in the glyph.
+    expect(stripped(rows).every((l) => [...l.trim()].every((c) => c === HALF_BLOCK))).toBe(true);
+    expect(stripped(rows)[0]?.trim().length).toBeGreaterThan(0);
+    // 38 is the foreground and 48 the background — a rung that set only one
+    // would draw the top pixel and let the terminal's background be the bottom,
+    // which is a picture at half the vertical resolution that still looks like
+    // a picture.
+    expect(rows[0]).toContain("38;2;");
+    expect(rows[0]).toContain("48;2;");
+  });
+
+  it("HB2 (C09 I37): the colours are the picture, top over bottom and not the reverse", () => {
+    // **This row was blind and the mutation pass is what said so** (F412).
+    // `SPLIT(8)` is red for `y < 4` and blue after, drawn at four cell rows — so
+    // every cell covers two pixel rows of **one** colour, `top` equals `bottom`
+    // in all four, and exchanging them is a no-op. The comment that stood here
+    // said *the boundary lands between cells, which is what makes the two
+    // extremes unambiguous*: true, and it is the property that made the row
+    // unable to see a transposition. A convenient fixture is the one where both
+    // readings agree.
+    //
+    // `STEP` gives every pixel row its own colour, so the two halves of every
+    // cell differ and a swap moves the frame.
+    const rows = draw(image(STEP(8), 4));
+    // Cell row 0 is pixel rows 0 and 1: (0,0,255) over (32,0,223).
+    expect(rows[0], "the foreground is the UPPER pixel").toContain("38;2;0;0;255");
+    expect(rows[0], "the background is the LOWER pixel").toContain("48;2;32;0;223");
+    // Cell row 3 is pixel rows 6 and 7 — the far end, so a reversed *row* order
+    // fails here even where a per-cell swap would not.
+    expect(rows[3]).toContain("38;2;192;0;63");
+    expect(rows[3]).toContain("48;2;224;0;31");
+    // And the two channels are never equal in any row, which is the property
+    // that makes every assertion above able to fail.
+    for (const [i, row] of rows.entries()) {
+      const fg = /38;2;(\d+;\d+;\d+)/u.exec(row)?.[1];
+      const bg = /48;2;(\d+;\d+;\d+)/u.exec(row)?.[1];
+      expect(fg, `row ${String(i)} carries both channels`).toBeDefined();
+      expect(fg, `row ${String(i)}: the halves must differ or a swap is invisible`).not.toBe(bg);
+    }
+  });
+
+  it("HB3 (C09 I37): each of the three gates demotes on its own, and only its own", () => {
+    // **The set, not its first member.** A gate collapsed onto another — say
+    // `colourDepth >= 8` written as `unicode !== "ascii"` — passes any row that
+    // varies one field, because the eligible case and one demotion agree.
+    const eligible = { caps: FULL_CAPS, overlay: false };
+    expect(halfBlockEligible(eligible.caps, eligible.overlay)).toBe(true);
+
+    const demotions: readonly (readonly [string, boolean])[] = [
+      ["ambiguousWidth: wide", halfBlockEligible({ ...FULL_CAPS, ambiguousWidth: "wide" }, false)],
+      ["colourDepth: 4", halfBlockEligible({ ...FULL_CAPS, colourDepth: 4 }, false)],
+      ["colourDepth: 1", halfBlockEligible({ ...FULL_CAPS, colourDepth: 1 }, false)],
+      ["unicode: ascii", halfBlockEligible({ ...FULL_CAPS, unicode: "ascii" }, false)],
+      ["an overlay", halfBlockEligible(FULL_CAPS, true)],
+    ];
+    expect(demotions.filter(([, v]) => v).map(([n]) => n)).toEqual([]);
+    // And 8 is the floor rather than a synonym for 24 (§8b, the colour gate).
+    expect(halfBlockEligible({ ...FULL_CAPS, colourDepth: 8 }, false)).toBe(true);
+  });
+
+  it("HB4 (C09 I37): the overlay gate is the block's decision, and the frame takes braille", () => {
+    // §8b G5. The terminal honours every rung and the *block* cannot use the
+    // top one, because both colour channels are already the picture.
+    const plain = draw(image(SPLIT(8), 4));
+    const withField = draw(
+      image(SPLIT(8), 4, {
+        overlay: { values: [[0, 1], [1, 0]], colormap: "viridis" },
+      } as Partial<Image>),
+    );
+    // **The fixture responds to the thing under test before it is asserted
+    // against** (`test/support/README.md`). An invalid overlay makes the renderer
+    // throw and the containment box draws ` ERROR ` — which contains no braille
+    // and no `▀`, so both assertions below would have passed on a broken fixture.
+    expect(stripped(withField).join(" "), "the overlay must render, not throw").not.toMatch(/ERROR/u);
+    expect(stripped(plain)[0]).toContain(HALF_BLOCK);
+    expect(stripped(withField)[0]).not.toContain(HALF_BLOCK);
+    // Braille, which still has a free foreground for the field.
+    expect(stripped(withField).join("")).toMatch(/[⠀-⣿]/u);
+  });
+
+  it("HB5 (C09 I37, F409): a refused placement re-enters the ladder at the top, not the bottom", () => {
+    // §8b G3, and the row that had no frame to show it. A kitty terminal is
+    // non-ascii and at least 8-bit **by construction**, so this branch is
+    // reached only by a terminal qualifying for every rung — and it fell to
+    // `ditherBraille`, two rungs down.
+    // **Sized against `imageCells` rather than against the constant.** The first
+    // draft took `MAX_PLACEHOLDER_SPAN + 40` as a *pixel* width, and the derived
+    // column count came out at 253 — under the span, placement accepted, and the
+    // row asserted nothing. A 1000x8 image three rows tall derives 750.
+    const kitty: TerminalCapabilities = { ...FULL_CAPS, imageProtocol: "kitty" };
+    const blk = image(rgbPng64(1000, 8, () => [200, 40, 40]), 3);
+    const rows = draw(blk, kitty, 800);
+    expect(imageCells(blk, 800).cols).toBeGreaterThan(MAX_PLACEHOLDER_SPAN);
+    // The placement really is refused — and the control is `PLACEHOLDER` itself,
+    // not a code point guessed from memory. The first version looked for
+    // U+10FFFD; the placeholder is U+10EEEE, so the assertion held over a frame
+    // made entirely of placeholders.
+    expect(stripped(rows).join("")).not.toContain(PLACEHOLDER);
+    expect(stripped(rows)[0]).toContain(HALF_BLOCK);
+    expect(stripped(rows).join("")).not.toMatch(/[⠀-⣿]/u);
+  });
+
+  it("HB6 (C09 I37): a one-pixel-tall image samples row 0 twice rather than off the end", () => {
+    // C09 §8b G9, **and what it guards is not what the ruling first said**
+    // (F412). `y * 2 + 1` past the last row is a point-sampling implementation's
+    // hazard; this one averages over fractional coordinates and both halves
+    // resolve to row 0 by arithmetic — no clamp fires, measured. The row stays
+    // as the regression guard for exactly that: a future rewrite to point
+    // sampling reintroduces the hazard, and this is what would notice.
+    const px = decodePng(Uint8Array.from(Buffer.from(rgbPng64(4, 1, () => [255, 255, 255]), "base64")));
+    expect(px.ok).toBe(true);
+    if (!px.ok) return;
+    const cells = halfBlockRows(px.pixels, 4, 1, 24);
+    expect(cells).toHaveLength(1);
+    for (const cell of cells[0] ?? []) {
+      expect(cell.top).toEqual({ kind: "rgb", hex: "#ffffff" });
+      expect(cell.bottom).toEqual({ kind: "rgb", hex: "#ffffff" });
+    }
+  });
+
+  it("HB7 (C09 I37): 8-bit is the 24-bit picture quantised, not a second rendering", () => {
+    const px = decodePng(Uint8Array.from(Buffer.from(SPLIT(8), "base64")));
+    expect(px.ok).toBe(true);
+    if (!px.ok) return;
+    const deep = halfBlockRows(px.pixels, 8, 4, 24);
+    const eight = halfBlockRows(px.pixels, 8, 4, 8);
+    // Same geometry, both channels, every cell — only the tag differs.
+    expect(eight).toHaveLength(deep.length);
+    expect(eight[0]).toHaveLength((deep[0] ?? []).length);
+    expect(new Set(eight.flat().map((c) => c.top.kind))).toEqual(new Set(["ansi256"]));
+    expect(new Set(deep.flat().map((c) => c.top.kind))).toEqual(new Set(["rgb"]));
+  });
+});
+
+describe("C09 I38 · a refusal draws the refusal", () => {
+  /** A PNG header with the fields the decoder refuses on, and real IDAT bytes. */
+  const mutated = (field: "interlace" | "depth", w = 4, h = 4): string => {
+    const bytes = Buffer.from(rgbPng64(w, h, () => [10, 20, 30]), "base64");
+    // IHDR body starts at byte 16; depth is +8, interlace is +12 from there.
+    bytes[field === "depth" ? 24 : 28] = field === "depth" ? 16 : 1;
+    return bytes.toString("base64");
+  };
+
+  it("HB8 (C09 I38, F410): each refusal reaches the frame as its own sentence", () => {
+    const cases: readonly (readonly [string, string, RegExp])[] = [
+      ["not a PNG", Buffer.from("plainly not a png at all").toString("base64"), /eight-byte signature/u],
+      ["16-bit", mutated("depth"), /bit depth 16/u],
+      ["interlaced", mutated("interlace"), /Adam7|interlaced/u],
+    ];
+    for (const [name, data, expected] of cases) {
+      const rows = stripped(draw(raw(data, 4), FULL_CAPS, 60));
+      expect(rows.join(" "), `${name} must say which refusal`).toMatch(expected);
+      // **The box, not a bare line.** At four rows the box takes three and C09's
+      // ladder gives it a border and no tag — so the border is what says this is
+      // the framework's `status` here, and the rung below asserts the tag.
+      expect(rows[0], `${name} must draw the box's border`).toMatch(/^┌─+┐$/u);
+      expect(rows.join(" "), `${name} carries the warning mark`).toContain("▲");
+    }
+  });
+
+  it("HB8b (C09 I38): it is a `status` on C09's ladder, so height buys the tag", () => {
+    // The row that makes HB8's border assertion mean something: if the box were
+    // a bespoke frame drawn by the image kind, height would change nothing. Six
+    // rows for the box is `FULL_FIGURE_ROWS`, which is where ` ERROR ` arrives.
+    const bad = Buffer.from("not a png").toString("base64");
+    const short = stripped(draw(raw(bad, 4), FULL_CAPS, 60));
+    const tall = stripped(draw(raw(bad, 7), FULL_CAPS, 60));
+    expect(short.join(" ")).not.toMatch(/ERROR/u);
+    expect(tall.join(" ")).toMatch(/ERROR/u);
+    expect(tall).toHaveLength(7);
+  });
+
+  it("HB10 (C09 I38, C09 §8b G7, F413): the extent survives a refusal, so the geometry does", () => {
+    // **The claim, without predicting the arithmetic.** A PNG this repository
+    // cannot rasterise lays out identically to one it can, at the same pixel
+    // size — because `imageCells` wants `width / height` and `decodePng` fills
+    // the IHDR before it refuses. Comparing against a readable twin is what
+    // makes this an assertion about the *extent* rather than about
+    // `columnsForAspect`'s formula.
+    const refused = raw(mutated("depth", 20, 5), 3);
+    const readable = raw(rgbPng64(20, 5, () => [10, 20, 30]), 3);
+    expect(imageCells(refused, 60)).toEqual(imageCells(readable, 60));
+    // And the control: it really is refused, or the row compares a picture with
+    // itself. `size` is present, `pixels` is not.
+    const d = decodePng(Uint8Array.from(Buffer.from(mutated("depth", 20, 5), "base64")));
+    expect(d.ok).toBe(false);
+    if (!d.ok) expect(d.size).toEqual({ width: 20, height: 5 });
+  });
+
+  it("HB11 (C09 §8b G7, F413): it places at kitty and refuses at the arms that rasterise", () => {
+    // F410 gated the **block**; only the rasterisers need pixels. At `kitty` the
+    // terminal decodes, the payload is the bytes unchanged and the identity is a
+    // hash of them — so the picture is drawn rather than described.
+    const blk = raw(mutated("interlace", 20, 5), 3);
+    const kitty = stripped(draw(blk, { ...FULL_CAPS, imageProtocol: "kitty" }, 60));
+    expect(kitty.join(""), "the placement is emitted").toContain(PLACEHOLDER);
+    expect(kitty.join(" "), "and no box").not.toMatch(/Adam7|ERROR/u);
+
+    // The same block one rung down: the half block genuinely cannot read it.
+    const dither = stripped(draw(blk, FULL_CAPS, 60));
+    expect(dither.join(" ")).toMatch(/Adam7/u);
+    expect(dither.join("")).not.toContain(HALF_BLOCK);
+  });
+
+  it("HB9 (C09 I38): the `alt` is the caption beneath the box, and yields the row at height 1", () => {
+    const bad = Buffer.from("not a png").toString("base64");
+    const tall = stripped(draw(raw(bad, 4), FULL_CAPS, 60));
+    expect(tall.join(" ")).toContain("a caption");
+    expect(tall).toHaveLength(4);
+
+    // At one row there is nothing to caption with: the refusal is the thing a
+    // reader cannot recover any other way, and `alt` is in the document.
+    const flat = stripped(draw(raw(bad, 1), FULL_CAPS, 60));
+    expect(flat).toHaveLength(1);
+    expect(flat.join(" ")).not.toContain("a caption");
+  });
+});

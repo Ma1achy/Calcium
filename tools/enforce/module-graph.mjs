@@ -35,7 +35,7 @@ export function componentOf(file) {
  * the vacuity suite can assert every one of them has been shown to fire; a rule
  * added here without a fabricated violation fails A03 commitment 14.
  */
-export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG14", "MG15", "MG16", "MG17", "MG18", "MG19", "MG20", "MG21", "MG22", "MG23", "MG24", "MG25", "MG26", "MG27"];
+export const MODULE_GRAPH_RULES = ["MG1", "MG2", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG14", "MG15", "MG16", "MG17", "MG18", "MG19", "MG20", "MG21", "MG22", "MG23", "MG24", "MG25", "MG26", "MG27", "MG28", "MG29"];
 
 /**
  * MG6 is a **third kind of rule**, and saying so is the point of this comment.
@@ -393,6 +393,8 @@ const MODE_OWNERS = {
   CURSOR:         "src/terminal/lifecycle.ts",
   BRACKET_PASTE:  "src/terminal/lifecycle.ts",
   MOUSE:          "src/terminal/lifecycle.ts",
+  MOUSE_ANY:      "src/terminal/lifecycle.ts",
+  KITTY_KEYBOARD: "src/terminal/lifecycle.ts",
   SCROLL_REGION:  "src/terminal/frame-scheduler.ts",
   SYNC_UPDATE:    "src/terminal/frame-scheduler.ts",
 };
@@ -554,6 +556,14 @@ function checkForbiddenEdges(files, readFile) {
  * exposed with the wrong shape. Both are the frame-read's job, and neither is
  * why a field goes missing: the measured cases are all a field nobody typed.
  *
+ * **And it reads one of the two builder files** (FINDINGS F181) — this one, not
+ * `figure.ts`. Which is why ten of the entries below say *shorthand lands in
+ * step 11* and are true about `b.plot` while `b.figure(…).setQuartiles([…])`
+ * has been setting the field all along: the sentence is accurate and it is not
+ * the claim this rule enforces, which is *buildable by nothing public*. F180's
+ * shape one door along, and the reason `setOhlc` is absent from the chain
+ * rather than present and inert.
+ *
  * **`plot.yFormat` came off by being built, and the rule took it off** (C04 I41,
  * F31). Its entry read *"`percent` multiplies by 100 and every far side that
  * emits a percentage emits 84, not 0.84"* — accurate about the trap, and it
@@ -567,23 +577,254 @@ function checkForbiddenEdges(files, readFile) {
  * exemption whose reason has expired is indistinguishable from a live one to a
  * reader, and equality comparison is what makes the difference mechanical.
  */
+/**
+ * Fields no builder sets for a reason about the **field**, not about a kind.
+ *
+ * **One entry rather than nineteen.** `BUILDER_OMISSIONS` is keyed `Kind.field`
+ * because its reasons are per kind — *`percent` multiplies by 100 and a CLI's
+ * numbers already are* is a sentence about `plot`. A field carried by an
+ * intersected base type is on every kind at once, so the same reason would be
+ * copied nineteen times, and nobody re-reads nineteen copies of one sentence.
+ * That is the failure mode `UNCONSUMED_MEMBERS` and this list's own
+ * bidirectional arm exist to prevent, arriving through the shape of the key.
+ *
+ * The bidirectional arm applies here too, and harder: if any builder starts
+ * setting one of these, the entry is a violation, because the whole claim is
+ * that no builder *can*.
+ */
+export const BUILDER_NEVER = Object.freeze({
+  capped:
+    "written only by C09's registry when a block exceeds `maxBlockRows` (C14 I24, C09 §2b) — " +
+    "the marker it drives says what the framework cut, and a builder that set it would let a " +
+    "producer claim a cut that never happened",
+  minHeight:
+    "written only by `op: \"reserve\"` (C04 I67, §3d) — it is view state the shell sets " +
+    "after a renderer gave way, and nothing on the far side or in an author's hands knows " +
+    "that happened. A builder for it would be a second writer for a field whose whole " +
+    "argument is that it has one",
+});
+
 export const BUILDER_OMISSIONS = Object.freeze({
-  "plot.xLabels":
-    "C24 §4 — a fixed three-tuple, and no surface has wanted one; a caption sentence does not fit it",
-  "plot.emptyMessage":
-    "C24 §4 — no surface has an empty plot, and `atLeastOne` already floors the height",
+  // **`plot.xLabels` is gone from this list, and a surface is what removed it.**
+  // Its reason had two clauses — *no surface has wanted one* and *a caption
+  // sentence does not fit it* — and the history heatmap wants exactly the fixed
+  // three-tuple: `-N ticks`, nothing, `now`. The second clause is still true and
+  // is why `axisCaption` sits beside the plot rather than in it. **A reason with
+  // two clauses expires one at a time**, and equality comparison cannot see that
+  // — it notices an entry that became unnecessary, never one whose argument did
+  // (FINDINGS F180).
+  // --- `status`: seven fields, and none of them a consumer's to hold ---------
+  //
+  // **The kind exists because its three states are the framework's facts.** A
+  // thrown renderer is the registry's, a first fetch in flight is the builder's,
+  // a backoff counting down is the refresh driver's — and a consumer holds none
+  // of the three. A `b.status()` would let one be claimed rather than observed,
+  // which is the opposite of what the kind is for: a box asserting *retrying* on
+  // a document nothing is retrying is a lie the framework wrote the type for.
+  //
+  // **This is not a deferral and there is no condition to watch.** A consumer
+  // who wants a bordered box with a message has `panel` and `notice`; one who
+  // wants a live part's failure to look different overrides `renderError` or
+  // `renderLoading` and returns any block at all, which is C24 §5's *behaviour
+  // is fixed, rendering is overridable* already working. Both routes exist
+  // today, so nothing here is owed a later step (C09 §3a, C04 I66).
+  // **This reason expired halfway and the half that survives is the one that matters.** It
+  // read *the box is bound by what `measure` committed and cannot be given its own*, which is
+  // true of the containment path and false since C23 I51: the two framework defaults pick 2
+  // and 1, chosen from a frame. What has not changed is that no **consumer** picks one — the
+  // pickers are the registry and the refresh driver, both inside the framework, and a builder
+  // would hand the number to someone with no way to know what will be drawn in it.
+  "status.elapsedMs": "C09 I32, C23 I52 — supplied by whoever holds the clock, which is the refresh driver and never a builder",
+  "status.spinner": "C09 I32 — the frame set is the renderer's, chosen per capability set; a consumer owning a `status` (C24 I30) is handed no frames to name",
+
+  "keyValue.keyWidth":
+    "C09 I25a — the same argument as `patch.numberWidth`, and it had no entry because MG27 " +
+    "could not see the field (F430). It is what a *window* carries so its key column describes " +
+    "the block it came from rather than the slice it shows; a hand-built keyValue setting it " +
+    "would assert a column its own labels do not justify. `window` is the one writer",
+
+  // **`plot.camera` was here and is gone**, on the commit that built
+  // `plot3d`. Its reason was sharper than *not yet built* — a plot declaring
+  // a camera becomes focusable (C12 I85), so exposing it earlier handed callers
+  // a focus stop and no way to draw anything — and the form is what made it
+  // safe. `points3` and `colourBy` landed on `b.plot` beside it rather than
+  // arriving here, because a carrier with a renderer needs no excuse.
+
+  "table.actionBar":
+    "C11 I18 — a presence rather than a width, and not the producer's either. The bar is " +
+    "derived from `rows.some(r => r.actions)`, so a window moves it in both directions and " +
+    "pins what the *parent* derived; a hand-built table setting it would assert two rows its " +
+    "own rows do not justify. `window` is the one writer and it recomputes rather than " +
+    "remembers, so the pin cannot describe the previous document",
+  "table.presorted":
+    "C11 I19 — the same argument one field over, about an order rather than a presence. " +
+    "`sortedRows` is not idempotent under a slice because `kindOf` reads the values present, " +
+    "so a window hands its rows over already ordered; a producer setting it would assert an " +
+    "order nothing can check the block against (FINDINGS F429)",
+
+  "code.lineRange":
+    "C04 I82, C09 I25a — the pin a *window* carries so a slice of a code block is the whole " +
+    "block's parse rather than its own: the text travels whole and the range says which lines " +
+    "are drawn. A hand-built code block setting it would name which of its own lines a reader " +
+    "is looking at, which is view state; `codeDefinition.window` is the one writer and " +
+    "`validateDocument` refuses it from the far side (C04 I67's set, third member)",
+
   "patch.numberWidth":
     "C25 I21a — not the producer's to set. It is what a *window* carries so its gutter " +
     "describes the block it came from rather than the slice it shows, and a hand-built patch " +
     "that set it would be asserting a gutter its own lines do not justify. `windowPatch` is " +
     "the one writer, and a builder exposing it would offer a consumer the drift (F134)",
+
+  // --- plot forms: the eight that are gone, and why the reason outlived itself
+  //
+  // **Seven entries carried one sentence — *no plan owes one* — and a plan had
+  // owed it since F335.** The reason was reworded once, when the step it named
+  // arrived and took `startDate` and `calendarUnit`: the schedule was struck and
+  // the clause replacing it asserted, of the rest, that nothing was owed. That is
+  // a deferral naming a condition with nothing watching it, and the thing that
+  // satisfied the condition was written somewhere else — F335 measured the gap,
+  // the roadmap cited it, and four forms were unconstructible for as long as both
+  // were true (C24 I30, §4b).
+  //
+  // **`emptyMessage`'s was the sharper one**, because it was not a schedule at
+  // all: *no surface has an empty plot*. That is a claim about the surfaces that
+  // existed when it was written, offered as a reason a member cannot be set — and
+  // it makes every app that meets an empty plot hand-compose the state instead,
+  // which is §8d's defect one kind along.
+  //
+  // All eight are set now. The list is shorter rather than reworded, which is
+  // what MG27's bidirectional arm is for.
 });
 
 /** `Kind.field` for every block field, and whether a builder mentions it. */
+/**
+ * MG28 — a closed union field whose builders reach one arm (F180).
+ *
+ * **MG27's subject is narrower than what it reads as covering**, which is F84's
+ * shape one rule along. It asks whether a builder's constructed literal
+ * *mentions* each field, and `form: "line"` mentions `form` — so a closed union
+ * with a hardcoded arm satisfies a check about names while the other arms are
+ * buildable by nothing public. `PlotForm` has three members; `b.plot` wrote
+ * `line` and `b.spark` writes `sparkline`, and `heatmap` shipped with a walk, a
+ * validator arm, a renderer, three golden frames and a mutation pass, reachable
+ * only by reaching past the builder into `block()`.
+ *
+ * **A field is covered if *any* builder for that kind threads a parameter into
+ * it.** The rule is about the kind's public surface as a whole, not per builder:
+ * `b.spark` writing `form: "sparkline"` is a specialised door and correct, and
+ * it is `b.plot` taking the form that opens the others.
+ *
+ * ## What it cannot see, stated because an unrecorded limit reads as strength
+ *
+ * - **Top-level fields only**, as MG27 is. `Steps.steps[].state` and
+ *   `Table.sort.direction` are unions inside a nested shape, and reaching them
+ *   needs a parser rather than a line walk.
+ * - **A union of named types**, rather than of string literals, is skipped. The
+ *   subject is a *vocabulary* a consumer picks from — `"line" | "sparkline"` —
+ *   and `Foo | Bar` is a shape choice the type system already makes.
+ * - **A parameter is trusted.** A builder threading `form` through a variable
+ *   that can only hold one value would pass; nothing in the tree does that, and
+ *   distinguishing it needs flow analysis. **A shorthand property counts as
+ *   one** — `{ state, height }` is a variable by construction — and it did not
+ *   until `b.status` wrote one: the walk read `field:` only, so a field assigned
+ *   by shorthand looked like a field no builder writes, which is the same
+ *   verdict as one arm reached and the opposite of the truth.
+ */
+function checkUnionReach(types, typeNames, fieldsOf, byKind, shared) {
+  const violations = [];
+
+  // A field's declared type text, top-level only — the same walk `fieldsOf`
+  // does, kept separate so MG27's output does not move.
+  const typeOf = (typeName, field) => {
+    const m = new RegExp(`export type ${typeName} = Readonly<\\{([\\s\\S]*?)\\n?\\}>`, "u").exec(types);
+    if (m === null) return null;
+    let depth = 0;
+    for (const line of m[1].split("\n")) {
+      const atTop = depth === 0;
+      for (const ch of line) {
+        if (ch === "(" || ch === "[" || ch === "{") depth += 1;
+        else if (ch === ")" || ch === "]" || ch === "}") depth -= 1;
+      }
+      const f = new RegExp(`^\\s*${field}\\??\\s*:\\s*(.+?);\\s*$`, "u").exec(line);
+      if (f !== null && atTop) return f[1];
+    }
+    return null;
+  };
+
+  // A closed set of string literals, following one level of alias. Anything
+  // else — a named shape, a generic, a template literal — is not this rule's.
+  const membersOf = (text) => {
+    if (text === null) return null;
+    const direct = text.trim();
+    if (/^"[^"]+"(\s*\|\s*"[^"]+")+$/u.test(direct)) {
+      return [...direct.matchAll(/"([^"]+)"/gu)].map((m) => m[1]);
+    }
+    if (!/^\w+$/u.test(direct)) return null;
+    const alias = new RegExp(`export type ${direct} =\\s*([^;]+);`, "u").exec(types);
+    if (alias === null) return null;
+    const body = alias[1].replaceAll("\n", " ").trim();
+    if (!/^\|?\s*"[^"]+"(\s*\|\s*"[^"]+")+$/u.test(body)) return null;
+    return [...body.matchAll(/"([^"]+)"/gu)].map((m) => m[1]);
+  };
+
+  for (const typeName of typeNames) {
+    const kindMatch = new RegExp(
+      `export type ${typeName} = Readonly<\\{[\\s\\S]*?kind: "(\\w+)"`, "u",
+    ).exec(types);
+    if (kindMatch === null) continue;
+    const kind = kindMatch[1];
+    const body = shared + (byKind.get(kind) ?? "");
+    if (body === shared) continue;
+
+    for (const field of fieldsOf(typeName)) {
+      const members = membersOf(typeOf(typeName, field));
+      if (members === null || members.length < 2) continue;
+
+      // Every value this kind's builders write into the field. A bare string
+      // literal is one arm; anything else is a parameter path and opens them
+      // all — which is the state the fix for F180 put `form` into.
+      let parameterised = false;
+      const written = new Set();
+      // **A shorthand property is an assignment and the walk could not see one.**
+      // `{ state, height }` names a variable, which the third limit below already
+      // says is trusted — but `field:` never matches it, so the field read as
+      // written by *nothing*, and that is the same verdict as one arm reached.
+      // Found by `b.status`, which hoists its decision so a tone literal is not
+      // an object-literal value (SS45): the fix for one rule made the field
+      // invisible to another. Anchored to an object-literal position — after `{`
+      // or `,` — so a destructure or a type member is not read as a write.
+      if (new RegExp(`[{,]\\s*${field}\\s*[,}]`, "u").test(body)) parameterised = true;
+      for (const m of body.matchAll(new RegExp(`\\b${field}:\\s*([^,\\n]+)`, "gu"))) {
+        const value = m[1].trim();
+        const literal = /^"([^"]+)"/u.exec(value);
+        if (literal === null) parameterised = true;
+        else written.add(literal[1]);
+      }
+      if (parameterised || written.size === 0) continue;
+      const missing = members.filter((v) => !written.has(v));
+      if (missing.length === 0) continue;
+
+      violations.push({
+        rule: "MG28",
+        file: "src/shell/builders/index.ts",
+        message:
+          `\`${kind}.${field}\` is a closed union of ${String(members.length)} and the ` +
+          `builders write only ${[...written].map((v) => `"${v}"`).join(", ")} — ` +
+          `${missing.map((v) => `"${v}"`).join(", ")} ${missing.length === 1 ? "is" : "are"} ` +
+          `buildable by nothing public. MG27 passes this because the literal *mentions* the ` +
+          `field; a value being reachable is a different question (F180)`,
+        spec: "A03 §3, MG28",
+      });
+    }
+  }
+  return violations;
+}
+
 export function checkBuilderCoverage(
   files,
   readFile = (f) => readFileSync(f, "utf8"),
   omissions = BUILDER_OMISSIONS,
+  never = BUILDER_NEVER,
 ) {
   const typesFile = files.find((f) => f.endsWith("src/data/viewmodel/types.ts"));
   const buildersFile = files.find((f) => f.endsWith("src/shell/builders/index.ts"));
@@ -601,11 +842,32 @@ export function checkBuilderCoverage(
   const typeNames = [...union[1].matchAll(/\|\s*(\w+)/gu)].map((m) => m[1]);
 
   const fieldsOf = (name) => {
-    // `export type Rule = Readonly<{ … }> & Gap;` is one line, and a body regex
-    // written for the multi-line form silently attributed a neighbour's fields
-    // to it. Non-greedy to the first closing brace at column 0, or the line's.
-    const m = new RegExp(`export type ${name} = Readonly<\\{([\\s\\S]*?)\\n?\\}>`, "u").exec(types);
-    if (m === null) return [];
+    // **Brace-matched, and it was a non-greedy regex** (F430). `export type Rule
+    // = Readonly<{ … }> & Gap;` is one line, so the body cannot be taken to the
+    // first `}>` at column 0 — but taking it to the first `}>` *anywhere* ends
+    // the body at the first nested `Readonly<{ … }>` on a line of its own, and
+    // every field declared after one is invisible. Measured: 3 types, 6 fields —
+    // `Table.showHeader`, `.emptyMessage`, `.actionBar`, `.presorted`,
+    // `KeyValue.keyWidth` and `Hunk.collapsedBefore`.
+    //
+    // **The failure read as the inverse.** An invisible field never reaches
+    // `unreached`, so the bidirectional arm below reports its `BUILDER_OMISSIONS`
+    // entry as *stale* — "the builder now sets it" — about a field no builder
+    // mentions at all. And `KeyValue.keyWidth`, the pin `keyValue`'s whole window
+    // rests on, had no entry and was never asked for one.
+    //
+    // Counting braces handles both forms and has no first-closer to pick.
+    const head = new RegExp(`export type ${name} = Readonly<\\{`, "u").exec(types);
+    if (head === null) return [];
+    let end = head.index + head[0].length;
+    let braces = 1;
+    while (end < types.length && braces > 0) {
+      const ch = types[end];
+      if (ch === "{") braces += 1;
+      else if (ch === "}") braces -= 1;
+      end += 1;
+    }
+    const m = [null, types.slice(head.index + head[0].length, end - 1)];
     let depth = 0;
     const out = [];
     for (const line of m[1].split("\n")) {
@@ -622,8 +884,15 @@ export function checkBuilderCoverage(
 
   // Every builder returns through `finish`, which is where `gapBefore` is set,
   // so its body is part of each builder's reachable surface.
+  //
+  // **`export function` and `const … =` are collected too, and were not** (F406).
+  // The walk matched `^function` alone, so an exported helper's body was sliced
+  // into the function *above* it and its writes were attributed there. That is
+  // silent in both directions — a field the helper sets reads as set by its
+  // neighbour, and a neighbour that stopped setting one reads as still setting it.
   const bodies = new Map();
-  const starts = [...builders.matchAll(/^function (\w+)/gmu)].map((m) => [m.index, m[1]]);
+  const starts = [...builders.matchAll(/^(?:export )?(?:function|const) (\w+)/gmu)]
+    .map((m) => [m.index, m[1]]);
   for (const [i, [pos, name]] of starts.entries()) {
     const end = i + 1 < starts.length ? starts[i + 1][0] : builders.length;
     bodies.set(name, builders.slice(pos, end));
@@ -653,7 +922,27 @@ export function checkBuilderCoverage(
   }
 
   const violations = [];
+  /**
+   * The fields a block gets from its intersected bases — `}> & Gap & Floor;`.
+   *
+   * **This was the literal string `"gapBefore"` spelled into the loop below**,
+   * so the rule was exhaustive over the fields declared in a block's own braces
+   * and knew about exactly one of the shared ones by name. `minHeight` arrived
+   * on `Floor` and MG27 had no opinion about nineteen kinds carrying a field no
+   * builder sets — the rule passing for the reason it exists to catch.
+   *
+   * F228's class in an enforcement rule: a hand-maintained list beside a
+   * generated one, where the hand-maintained one reads as authoritative. Derived
+   * now, so a third base type is covered on the day it is written.
+   */
+  const baseFieldsOf = (typeName) => {
+    const m = new RegExp(`export type ${typeName} = Readonly<\\{[\\s\\S]*?\\n?\\}>([^;]*);`, "u").exec(types);
+    if (m === null) return [];
+    return [...m[1].matchAll(/&\s*(\w+)/gu)].flatMap((x) => fieldsOf(x[1]));
+  };
+
   const unreached = new Set();
+  const neverSeen = new Set();
   for (const typeName of typeNames) {
     const kindMatch = new RegExp(
       `export type ${typeName} = Readonly<\\{[\\s\\S]*?kind: "(\\w+)"`, "u",
@@ -661,7 +950,23 @@ export function checkBuilderCoverage(
     if (kindMatch === null) continue;
     const kind = kindMatch[1];
     const body = shared + (byKind.get(kind) ?? "");
-    for (const field of [...fieldsOf(typeName), "gapBefore"]) {
+    for (const field of [...fieldsOf(typeName), ...baseFieldsOf(typeName)]) {
+      // A field the *field* exempts, rather than a kind. Checked before the
+      // per-kind list so one reason covers every kind carrying it.
+      if (never[field] !== undefined) {
+        neverSeen.add(field);
+        if (new RegExp(`\\b${field}\\b`, "u").test(body)) {
+          violations.push({
+            rule: "MG27",
+            file: "tools/enforce/module-graph.mjs",
+            message:
+              `BUILDER_NEVER names \`${field}\`, and the builder mentions it. The entry claims no ` +
+              `builder *can* set it, so a builder that does makes the reason false rather than stale`,
+            spec: "A03 §3, MG27",
+          });
+        }
+        continue;
+      }
       if (new RegExp(`\\b${field}\\b`, "u").test(body)) continue;
       const key = `${kind}.${field}`;
       unreached.add(key);
@@ -678,6 +983,20 @@ export function checkBuilderCoverage(
     }
   }
 
+  // The same arm for the field-level list: an entry naming a field no block
+  // carries is a reason with nothing to be about.
+  for (const field of Object.keys(never)) {
+    if (neverSeen.has(field)) continue;
+    violations.push({
+      rule: "MG27",
+      file: "tools/enforce/module-graph.mjs",
+      message:
+        `BUILDER_NEVER names \`${field}\`, which no block kind carries. An exemption for a ` +
+        `field that does not exist is vacuous, and reads as coverage`,
+      spec: "A03 §3, MG27",
+    });
+  }
+
   // The bidirectional arm, as `UNCONSUMED_MEMBERS` has: an entry that is no
   // longer an omission is itself a violation, or the list stops being read.
   for (const key of Object.keys(omissions)) {
@@ -691,7 +1010,10 @@ export function checkBuilderCoverage(
       spec: "A03 §3, MG27",
     });
   }
-  return violations;
+  return [
+    ...violations,
+    ...checkUnionReach(types, typeNames, fieldsOf, byKind, shared),
+  ];
 }
 
 // --- MG3's type-only arm — the edge the rule could not see ------------------
@@ -812,7 +1134,144 @@ function checkCrossHalfTypes(files, readFile) {
   return violations;
 }
 
+// --- MG2 — no cycle within a layer ------------------------------------------
+//
+// **Inventoried since A03 was written and implemented by nothing until now.**
+// A02 §1's sentence is *never upward, never cyclically within a layer*; MG1 is
+// the first half and this is the second, and for the whole life of the project
+// the second was carried by three named pairs — MG13, MG18, MG22 — each written
+// on the day someone noticed one edge that would close a cycle. Those rows stay:
+// they fire on the edge, one commit before the cycle exists, and this fires on
+// the cycle. CLAUDE.md's *acyclicity is MG1 + MG22* was the honest description of
+// the tree and not of the rule.
+//
+// **Module granularity, value imports only** — the same edges MG1 walks, so the
+// two halves of the sentence read one graph. A type-only edge erases at build
+// and closes no runtime cycle; MG3 counts them and says why it differs.
+//
+// **One real cycle on the first run, in L4**: `shell/paint.ts` imports
+// `composite` from `composite.ts`, which imports `FrameError` and `exact` back
+// from `paint.ts`. Both files are C22's and it works because ESM hoists — which
+// is the shape A02 §1 forbids because it works until the day an initialiser is
+// read before it runs. Acknowledged below rather than exempted: the list is
+// compared by **equality**, so breaking the cycle fails here until the entry is
+// removed, and a second cycle fails on the commit that closes it.
+//
+// **Stated blind spot: a cycle through a barrel is one edge short of visible.**
+// `resolve` follows `./x.js` to `x.ts` and `./dir/index.js` to the barrel; a
+// file importing its own component's barrel, which re-exports it, is a cycle
+// this reports — and correctly, because ESM sees it too. What it cannot see is a
+// cycle closed by a dynamic `import()`, which neither `IMPORT` nor `BARE`
+// matches; none exist in `src/` today and one arriving is a decision worth a
+// row of its own.
+
+/**
+ * Cycles known and not yet broken, keyed by their sorted members joined with ` <-> `.
+ *
+ * **`src/shell/composite.ts <-> src/shell/paint.ts` was here and is gone** —
+ * the one cycle MG2 found on the day it was implemented, broken the same day by
+ * `src/shell/frame-error.ts`, the leaf module its entry named as the fix. The
+ * equality arm is what removed it.
+ */
+export const ACKNOWLEDGED_CYCLES = Object.freeze({});
+
+/** Strongly connected components of the intra-layer value-import graph, Tarjan's walk. */
+export function layerCycles(files, readFile = (f) => readFileSync(f, "utf8")) {
+  const normalised = files.map((f) => f.replaceAll("\\", "/"));
+  const byBare = new Map(normalised.map((f) => [bare(f), f]));
+  const edges = new Map();
+  for (const file of normalised) {
+    const from = layerOf(file);
+    if (!from) continue;
+    const targets = new Set();
+    for (const spec of importsOf(file, readFile)) {
+      const resolved = resolve(file, spec);
+      if (!resolved) continue;
+      const target = byBare.get(bare(resolved)) ?? byBare.get(`${bare(resolved)}/index`);
+      if (target === undefined || target === file) continue;
+      const to = layerOf(target);
+      if (!to || to.prefix !== from.prefix) continue;
+      targets.add(target);
+    }
+    edges.set(file, [...targets]);
+  }
+
+  const index = new Map();
+  const low = new Map();
+  const onStack = new Set();
+  const stack = [];
+  const cycles = [];
+  let counter = 0;
+  const connect = (v) => {
+    index.set(v, counter);
+    low.set(v, counter);
+    counter += 1;
+    stack.push(v);
+    onStack.add(v);
+    for (const w of edges.get(v) ?? []) {
+      if (!index.has(w)) {
+        connect(w);
+        low.set(v, Math.min(low.get(v), low.get(w)));
+      } else if (onStack.has(w)) {
+        low.set(v, Math.min(low.get(v), index.get(w)));
+      }
+    }
+    if (low.get(v) === index.get(v)) {
+      const members = [];
+      let w;
+      do {
+        w = stack.pop();
+        onStack.delete(w);
+        members.push(w);
+      } while (w !== v);
+      if (members.length > 1) cycles.push(members.sort());
+    }
+  };
+  for (const v of edges.keys()) if (!index.has(v)) connect(v);
+  return cycles.map((members) => members.join(" <-> ")).sort();
+}
+
+export function checkLayerCycles(
+  files,
+  readFile = (f) => readFileSync(f, "utf8"),
+  acknowledged = ACKNOWLEDGED_CYCLES,
+) {
+  const violations = [];
+  const found = new Set(layerCycles(files, readFile));
+  for (const cycle of found) {
+    if (acknowledged[cycle] !== undefined) continue;
+    violations.push({
+      rule: "MG2",
+      file: cycle.split(" <-> ")[0],
+      message:
+        `imports CYCLICALLY within ${layerOf(cycle.split(" <-> ")[0])?.label ?? "a layer"}: ` +
+        `${cycle}. A02 §1 — never cyclically within a layer. Break it with a leaf module, ` +
+        `or acknowledge it in ACKNOWLEDGED_CYCLES with a reason`,
+      spec: "A02 §1",
+    });
+  }
+  // The equality arm. A cycle that has been broken leaves an entry excusing
+  // nothing, and a list nobody prunes is one nobody reads.
+  for (const cycle of Object.keys(acknowledged)) {
+    if (found.has(cycle)) continue;
+    violations.push({
+      rule: "MG2",
+      file: "tools/enforce/module-graph.mjs",
+      message:
+        `ACKNOWLEDGED_CYCLES names \`${cycle}\`, which is no longer a cycle — broken, renamed ` +
+        `or gone. Remove the entry; the list is compared by equality on purpose`,
+      spec: "A02 §1",
+    });
+  }
+  return violations;
+}
+
 export function checkModuleGraph(files, readFile = (f) => readFileSync(f, "utf8")) {
+  // MG2 is **not** folded in here, and the reason is its equality arm: run on a
+  // fabricated two-file tree — which is what every MG1 and MG3 fire-test hands
+  // this function — the arm would report the real acknowledged cycle as gone.
+  // `checkOneStorePerComponent` and `checkFunctionConsumers` are separate calls
+  // from `index.mjs` for the same reason, and MG2 joins them.
   const violations = [
     ...checkModeOwnership(files, readFile),
     ...checkCrossHalfTypes(files, readFile),
@@ -1096,6 +1555,190 @@ export function checkOneStorePerComponent(files, readFile = (f) => readFileSync(
 
 /** Members whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_MEMBERS = Object.freeze({
+  // --- C27's structural port, landing with the emulator ---------------------
+  //
+  // **Sixteen members at once, and the count is the argument rather than a
+  // smell.** `CellLike` is not an interface this tree implements; it is the
+  // shape of somebody else's object, written down so the walk can be driven by
+  // a fake and the package can stay in one file. Every member is read by
+  // `styleOf` or `lineOf` in `snapshot.ts` — MG24 asks whether a name appears
+  // *elsewhere in `src/`*, and for a port cut from a dependency the answer is
+  // structurally no and always will be.
+  "CellLike.getChars":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
+  "CellLike.getWidth":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
+  "CellLike.getFgColor":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
+  "CellLike.getBgColor":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
+  "CellLike.isFgRGB":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
+  "CellLike.isBgRGB":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
+  "CellLike.isFgPalette":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
+  "CellLike.isBgPalette":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
+  "CellLike.isFgDefault":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
+  "CellLike.isBgDefault":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
+  "CellLike.isBold":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
+  "CellLike.isDim":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
+  "CellLike.isItalic":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
+  "CellLike.isUnderline":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
+  "CellLike.isInverse":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
+  "CellLike.isStrikethrough":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
+  "LineLike.getCell":
+    "C27 §2 — a structural port cut from `@xterm/headless`'s `IBufferCell`, so the cell walk "
+    + "can be tested against a hand-built buffer and the package stays confined to one file "
+    + "(C27 I11). The consumer is the dependency's own object, which `src/` never names: a "
+    + "member here is *satisfied by* rather than *called from* the tree, which is the one shape "
+    + "MG24 cannot distinguish from a dead export. `styleOf` reads every one of them",
+  "EntryPiece.localFrom":
+    "C22 §6l.4 D — the run-local row a window opens at, carried from `windowEntry` to " +
+    "`renderEntryPieces` in the same file so the hook lands on the body's first row only. " +
+    "The seam is between two functions of one module; `session.ts` holds the pieces without " +
+    "reading this member, and T1.42 reads it through a window that opens inside the body",
+  // **Three \`Basis\` members and five \`project3\` functions left here at once**,
+  // on the commit that built \`plot3d\` — one loan, one symbol, one release,
+  // which is what the equality arm makes possible and a membership check would
+  // not. The entries said *until plot3d* and \`plot3d\` arrived.
+  //
+  // **Two of the eight did not leave, and their reason is a different one.**
+  // \`Basis.forward\` and \`Basis.orthographic\` are read by \`project\` in the same
+  // module, so they are consumed — MG24 asks whether a member is named
+  // *elsewhere in \`src/\`*, and a record whose fields exist for one function is
+  // exactly the shape that answers no. The type is exported because \`basisOf\`
+  // returns it, not because a consumer is expected to read into it: a renderer
+  // branching on \`basis.orthographic\` would be re-deciding what \`project\`
+  // already decided. \`right\`, \`up\`, \`f\` and \`aspect\` are not here because
+  // their names are shared with other owners, which is MG24's own stated blind
+  // spot — so the rule reaches three of the seven fields and the record is one
+  // thing either way.
+  // **Two of the three left on the axis commit, and the third's reason held.**
+  // \`axes3.ts\` reads \`basis.eye\` — the three signs the whole reference frame is
+  // derived from — and \`basis.forward\`, to find where a segment crosses the near
+  // plane. \`orthographic\` stayed: \`project\` picks the arm and a second reader of
+  // that field would be a second place the projection is chosen, which is the
+  // reason the entry was written with rather than a date.
+  "Basis.orthographic": "project() picks the arm, and a second reader of this field would be a second place the projection is chosen",
+  // The tool-call card's streamed body (`AGENT_TUI_DESIGN.md` §9c). `toolCallDoc` reads
+  // it into a follow scroll. **Its producer landed and does not fill it** (C23 I54,
+  // 2026-09-05, Lane P): the shell's pending entry is a `toolCallDoc`, and its body is
+  // the entry's own appended blocks — a `ViewPatch` addresses the top level, and
+  // `scroll.children` is not a patch target — so the follow-scroll body's consumer is
+  // still `examples/agent`, at step 0. `toolCallDoc` and `RefreshDriver.readout` left
+  // this list on the same ruling; this one stayed because the measurement said so.
+  "ToolCallSpec.output": "read by toolCallDoc into a follow scroll (C04 I97); the shell's card body is the entry's appended blocks (C23 I54) and the caller that fills a scroll is the agent example, not yet built",
+
+  // **`Skin` is `Basis`'s shape one carrier along**, and the same reading
+  // applies: a record whose fields exist for one function, exported because
+  // `trianglesOf` returns it on every `Tri3`. `skin.wire` *is* read outside —
+  // `scatter3.ts` owns the paint policy, because it owns `ink`, `mark` and
+  // `glyph` — and `skin.cull` is not, because the only question it answers is
+  // asked inside `drawTri`.
+  //
+  // **A second reader would be a second cull**, which is the failure the sign
+  // exists to prevent: the whole point of orienting from the signed volume is
+  // that one place decides which side is out. And §6i row 14 rules that the
+  // cull changes neither the extent nor the depth span, so the composition
+  // layer has no question this field answers.
+  "Skin.cull":
+    "C12 I95, §6i rows 3 and 14 — `drawTri` asks the only question this answers, " +
+    "and a second reader would be a second place the mesh's orientation is " +
+    "decided, which is what the signed volume exists to make single. The " +
+    "composition layer reads `skin.wire` because it owns the paint policy, and " +
+    "has no use for this: the cull moves neither the extent nor the depth span.",
+
+  // --- published ahead of the value that makes it readable ------------------
+  //
+  // **A single-value union has nothing for a consumer to branch on**, which is
+  // A03 §2's vacuity class arriving in a field rather than in a rule. Reading
+  // `block.graphLayout ?? "layered"` in the renderer would satisfy this gate
+  // exactly and decide nothing — a check that cannot fire, dressed as one that
+  // passes — so the exemption is taken instead of the fake read.
+  "Plot.graphLayout":
+    "C04 I70, C12 §3ai.2 — one value and one default, so nothing can branch on " +
+    "it. The half that is NOT vacuous is the refusal, which `b.plot` enforces on " +
+    "every other form and `validate.ts` on every document, and the compile error " +
+    "it makes of `graphLayout: \"force\"`. It is published ahead of its second " +
+    "value because adding it WITH `force` widens a union that did not exist, and " +
+    "every exhaustive consumer becomes a compile error saying nothing about what " +
+    "moved. **The expiry is a symbol**: `shiftInward` and the label taxonomy, " +
+    "which is what `force` is refused on (F242). Grep it when picking this up.",
+
   // --- consumed, and not from `src/` ----------------------------------------
   //
   // **The first entry of a category the header already counted and had no
@@ -1116,30 +1759,58 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   "SurfaceActionEvent.fidelity":
     "application boundary — the surface consumer visibly distinguishes native " +
     "and reduced-fidelity legacy input",
-  "SurfaceActionEvent.elapsedMs":
-    "application boundary — the game engine consumes the preserved monotonic " +
-    "timestamp; Calcium must not interpret application timing",
-  "SurfaceActionEvent.ordinal":
-    "application boundary — the app detects stale or duplicate action delivery " +
-    "without exposing the internal input router",
+  "SurfaceActionEvent.phase":
+    "application boundary — the surface consumer maps native or synthesized " +
+    "press/repeat/release phases onto application actions",
   "PushedSurface.onClose":
     "application boundary — the surface owner releases its process and model state " +
     "when Calcium reports closure",
   "PushedSurfaceHandle.inputFidelity":
     "application boundary — the app renders the reduced-fidelity disclosure",
-  "PushedSurfaceHandle.closed":
-    "application boundary — the app awaits teardown and typed callback faults",
 
-  // --- a field whose consumer is a ruling away ------------------------------
-  "SgrStyle.italic":
-    "roadmap 50 — `Style.italic` and its SGR-3 twin are the *capability*, and the " +
-    "consumer is span-level styling, which the entry's own ORDER puts behind spans " +
-    "in the view model. **The rule is right and firing for the right reason**: " +
-    "nothing sets italic today. It is recorded rather than deleted because entry " +
-    "11's ruling (c) was reversed for exactly this shape — *no consumer* was true " +
-    "of a field nobody could use because it did not exist, which is not an " +
-    "argument, it is the absence of one. The equality arm is the watch: the day a " +
-    "renderer sets it, this entry fails and is removed",
+  // **The second entry of that category, and it arrived by a satisfier going
+  // away rather than by anything new being published** — which is the shape
+  // worth reading twice.
+  "NavigableRegistry.elementsOf":
+    "C26 §5 — **an inverted seam**: `NavigableRegistry` is the structural shape " +
+    "the conformance suite *takes*, so its implementers are a consumer's own " +
+    "registries and are out of tree by construction. The suite calls the member " +
+    "twice, at lines 116 and 168 of the file that declares it, and MG24 counts " +
+    "names elsewhere in `src/` — the right direction for a published member and " +
+    "the wrong one for a shape somebody else fills in. " +
+    "**It was satisfied until F223 by a name collision.** C09's `BlockRegistry` " +
+    "has an `elementsOf` too, and `registry.ts` called its own — " +
+    "`this.elementsOf(block, atWidth)` inside `elementsIn` — so the walk counted " +
+    "a mention of a different owner's member as a consumer of this one. Folding " +
+    "the two element questions into a single resolution (C09 I30) removed that " +
+    "call, and the exemption that had always been owed became visible in the same " +
+    "commit. **This is F105/F160's recorded blind spot arriving as an instance**: " +
+    "MG24 is exact for 490 of 1418 members and this member is one of the rest, so " +
+    "the rule was reporting *consumed* about a name rather than about a member",
+
+  // --- a field whose consumer is one commit away ----------------------------
+  //
+  // **The blocker is stated as a symbol, so picking this up begins by grepping
+  // it** — a deferral whose condition is prose is one nobody watches. And
+  // MG24's bidirectional arm is what makes this self-expiring rather than a
+  // deferral at all: the day `rainColumns` names `grows`, this entry becomes a
+  // violation in its own right.
+  "Extent.grows":
+    "C12 I34, I21 — **the deferral was discharged and the answer did not move, " +
+    "which is the entry worth keeping.** This said the consumer was " +
+    "`rainColumns`, two commits along; `rainColumns` landed, draws the vertical " +
+    "raincloud's density with it, and MG24 still reports the member — because " +
+    "it calls `extentFor(caps, \"leftward\")` and never touches `.grows`. The " +
+    "condition was named as a symbol, the symbol arrived, and it was not the " +
+    "condition the rule tests. " +
+    "**So this is permanent and it is the rule's documented blind spot rather " +
+    "than a wait**: a member read only inside its declaring file. `extentRun` " +
+    "reads it, and a *renderer* reading it would be branching on direction, " +
+    "which is the exact move the field exists to make unnecessary — the " +
+    "vocabulary carries the direction so that a leftward run cannot be handed " +
+    "rightward glyphs. A consumer outside `ramp.ts` would be evidence the design " +
+    "had failed. T1.88 asserts the five mirrored levels it produces",
+
 
   // --- diagnostics: published to be read by a test, never by a component ----
   "LineEditor.killBuffer":
@@ -1167,6 +1838,25 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   // instance that found the trap. Each is observable state a test asserts and
   // no component reads — the same category as the two above, and each is used
   // only inside its own declaring file.
+  // **A fifth of that category, and the seam it crosses is inside one file.**
+  // MG24 asks whether a component is complete on its own side of a seam with
+  // nothing on the other; `HorizonCell` is the output of `horizonGrid` and the
+  // input of `horizonGlyph`/`horizonSpans`, which are the two halves of
+  // `horizon.ts` — deliberately split so the band and the glyph are resolved by
+  // different things, because computing them together is what let one alphabet
+  // carry both (C12 I52, §3z). `band` and `sign` are named across the file's own
+  // seam by `horizonBandT`; `eighths` is read only by the glyph half, so it is
+  // the one member the rule can see.
+  //
+  // **The bidirectional arm makes this self-expiring**: the day anything outside
+  // `horizon.ts` names `eighths`, this entry becomes a violation of its own.
+  "HorizonCell.eighths":
+    "C12 I52, §3z — sub-cell height, written by `horizonGrid` and read by " +
+    "`horizonGlyph` in the same file, which is the internal seam the two-channel " +
+    "split creates rather than a component boundary. `test/unit/plot-mutations.test.ts` " +
+    "asserts it in HZ5 and T1.52, which is where the claim *a finite reading always " +
+    "draws ink* is actually checkable",
+
   "FrameScheduler.contaminated":
     "C03 diagnostics — whether a frame was composed against a stale width. " +
     "`frame-scheduler.ts` sets and reads it; `test/revert/frame-scheduler.test.ts` " +
@@ -1229,11 +1919,6 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   //
   // This is the same disposal `ACKNOWLEDGED_BACKLOG` uses and it costs a
   // sentence apiece for the same reason.
-  "Keymap.mergeBlock":
-    "C16 §6, I10 — a surface's `BlockKeymap` merges into `liveBlock` while the block " +
-    "is live, so `s` sorts a `/ps` table. Nothing commits a block keymap, so `s` does " +
-    "not sort a `/ps` table. The producer is complete: `mergeBlock` refuses collisions " +
-    "and withdraws on freeze, all of it tested",
   "ThemeStore.applyOverrides":
     "C10 §4 — theme overrides. C10 validates and applies them and `TuiConfig` has no " +
     "field to carry any, so nothing can reach it. Unspecified at the shell rather than " +
@@ -1266,14 +1951,23 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
     "counts seventeen call sites until it, so the tree documents the deletion twice and " +
     "the member is still declared. Kept listed rather than deleted until C06 rules, because " +
     "removing a member two comments describe as removed wants the spec edit first",
-  "CompletionEngine.pending":
-    "C19 diagnostics — whether a dynamic source is in flight, published so the spinner's " +
-    "sequence-as-token-of-validity is assertable. `src/shell` reads the spinner state C19 " +
-    "derives, not this",
-  "FrameScheduler.pending":
-    "C03 diagnostics — whether a commit is scheduled. Sibling of `contaminated` above and " +
-    "listed for the same reason: `frame-scheduler.ts` drives it and a revert test is the " +
-    "only outside reader",
+  // **`FrameScheduler.pending` and `CompletionEngine.pending` both left here on
+  // 2026-09-06, and only one of them for a consumer** (F849). C23's shell route
+  // reads `deps.scheduler.pending` to coalesce its snapshots (C23 I64), which is
+  // a real consumer for the first. The second has none — it went because MG24
+  // resolves a member by its bare name, so one new reader of `pending` anywhere
+  // in `src/` answers for every interface that declares one.
+  //
+  // That is this rule's own stated blind spot (see `Basis.right` above) arriving
+  // from the other side: the header records it as a source of *missed*
+  // violations, and here it forced a true exemption out. Both directions are the
+  // same defect, and neither is fixable without qualifying the member by its
+  // owner — which the rule deliberately does not do, because a member's owner is
+  // a type resolution and this is a scan.
+  //
+  // Left as a comment rather than as an entry: an entry the equality arm refuses
+  // cannot be kept, and a reason with nowhere to live is how the next reader
+  // concludes C19's member was wired.
   "LineEditor.displayRows":
     "C17 diagnostics — the wrapped row count, asserted by the prompt-window tests. The " +
     "shell measures the prompt through C09 rather than asking the editor, which is C17 §1's " +
@@ -1368,8 +2062,12 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   "VerbRatio.recorded": "C08 — provenance tally, asserted in test. **Three siblings are dead: F99**",
   "VerbRatio.flagged": "C08 — as `recorded`",
   "CompletionResult.superseded": "C19 — the token-of-validity outcome; asserted at three tiers and never branched on by a component, which is C19 I13's whole point",
-  "EngineOptions.onSourceError": "C19 — the injected error sink; supplied by tests and defaulted in the engine",
-  "Graph.log": "C22 — the construction log, read by `tools/` and by seven test files. A component reading it would be a second record of construction order",
+  // **`EngineOptions.onSourceError` and `SourceErrorSink.onSourceError` were
+  // here and are gone** — both halves of one seam, unwired in the product until
+  // `construct.ts` passed `createSourceErrorSink().onSourceError` (2026-09-03);
+  // the equality arm removed them the day it did.
+  // **`Graph.log` was here and is gone** — the equality arm removed it the day
+  // it stopped being unconsumed.
   "Identity.user": "C22 — the identity record's fields, asserted by the identity tests. `SessionSnapshot` carries it and no component destructures it",
   "Identity.email": "C22 — as `user`",
   "Identity.groups": "C22 — as `user`",
@@ -1378,7 +2076,6 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   // `shell/paint.ts` names it and the equality arm took the entry out. **Two
   // exemptions expired by one change and only one was predicted** — which is
   // the arm doing the job the prediction could not.
-  "SgrStyle.underline": "C01 — a style slot C10 does not yet emit; T-rows assert the escape it produces",
   "FrameSchedulerOptions.windows": "C03 — per-reason coalescing windows, injected by six test files to drive the scheduler deterministically",
   "Finding.subject": "C09 §7 — boundary-conformance report field, asserted by the suite it exists for",
   "Finding.assertion": "C09 §7 — as `subject`",
@@ -1386,8 +2083,8 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   "ConformanceReport.findings": "C09 §7 — as `subject`",
   "ConformanceReport.skipped": "C09 §7 — as `subject`, and the reference app reads it in five places",
   "ConformanceReport.kindsCovered": "C09 §7 — measurement-conformance coverage, asserted by the harness's own row",
+  "ConformanceReport.exactness": "C09 §2a — how many windows were compared row for row and how many the EXACT_ROWS bound left out. A report, so its consumer is the row that reads it: `block-window.test.ts` asserts `read`, because a bound nobody can see reads as coverage",
   "Failure.check": "C09 §7 — measurement failure record, asserted by the harness",
-  "Failure.expected": "C09 §7 — as `check`",
   "ElementFailure.predicate":
     "C26 §5 — element-conformance failure record, asserted by the harness's own row. " +
     "Same disposal as `Failure.check` above and for the same reason: a conformance " +
@@ -1404,18 +2101,88 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
 
   // --- dead everywhere, and each names its finding --------------------------
   //
-  // **Eleven members named nowhere in `src/`, `test/`, `tools/` or the reference
-  // app.** Gaps, not exemptions — listed so the suite is readable rather than
+  // **Ten members named nowhere in `src/`, `test/`, `tools/` or the reference
+  // app.** `GlyphSet.warning` was the eleventh and `status` consumed it — the
+  // equality arm fired on the commit that wired it, which is the expiry this
+  // list was designed for rather than a maintenance chore. **The count in this
+  // sentence is the fourth hand-maintained number to go stale today** (F228),
+  // and it is here rather than derived because the entries are prose. Gaps, not exemptions — listed so the suite is readable rather than
   // red, and the citation is what makes the entry expire: the equality arm fires
   // the day any of them gains a consumer. FINDINGS F99.
-  "GlyphSet.teeLeft": "**F99** — a declared glyph slot with no drawer. Box-drawing",
-  "GlyphSet.teeRight": "**F99** — as `teeLeft`",
-  "GlyphSet.hollow": "**F99** — as `teeLeft`",
   "GlyphSet.blocked":
     "**F99** — and this one is *semantic* rather than box-drawing, so a theme declaring " +
     "it gets nothing and the absence reads as a theme error rather than a missing renderer",
-  "GlyphSet.warning": "**F99** — as `blocked`, semantic",
-  "GlyphSet.bar": "**F99** — as `teeLeft`",
+  // **`GlyphSet.bar` was here and MG24 can no longer see it.** It is still
+  // unconsumed — nothing reads `g.bar`, the `▌`/`|` pair F99 recorded — but
+  // `Cell.bar` landed and MG24 matches published members **by name**, so a read
+  // of `cell.bar` clears an unrelated `GlyphSet.bar`. The rule reported itself
+  // as *no longer unconsumed* and asked for the entry to be deleted, which is
+  // correct about the entry and wrong about the member.
+  //
+  // This is F105/F160's blind spot arriving as a concrete loss rather than a
+  // statistic: the exactness figure says 391 of 1231 members are uniquely named,
+  // and `bar` left that set the day a second one appeared. Recorded here because
+  // deleting the row is how the fact would otherwise disappear — the rule's own
+  // sentence, *an exemption that outlives its reason is how the list stops being
+  // read*, applied to the thing the exemption was about.
+  //
+  // **`VerbRatio.ratio` is the second instance and it widens the surface.** The
+  // first was a member cleared by another *member* — one real name colliding
+  // with another. This one was cleared by a **function parameter**: adding
+  // `columnsForAspect(rows, ratio)` to `plot/aspect.ts`, a file that publishes
+  // no member called `ratio` and consumes nothing, made this arm demand the
+  // exemption's deletion. So the surface is not *other published members*, it is
+  // *any identifier in `src/`* — and the gated arm asks for a **deletion**,
+  // which is the direction that costs something: a false positive here does not
+  // annoy, it instructs you to remove a guard that is working.
+  //
+  // `construct.ts:403` had already measured the same member matching a `ratio`
+  // in `theme/index.ts` and refused the widened arm because of it. **The
+  // mechanism was known and its effect on the reverse arm was not**, which is
+  // the shape worth naming: a limit recorded about one direction of a rule says
+  // nothing about the other until someone points it there.
+  // **`Colormap.kind` is deliberately not here**, and the staleness arm is what
+  // said so: MG24 matches member names across `src/` without regard to owner
+  // (F136), and `kind` is on nearly every block type, so a `Colormap.kind` entry
+  // is an exemption for something the rule never fires on. The member is real
+  // and has no runtime branch yet — `sequential`, `diverging` and `cyclic` are
+  // three different claims about the data and a diverging map used for
+  // sequential data hides the sign — but that is a fact about the field, not a
+  // reason for a row the list would have to keep forever.
+  // **`Axis.ticks` was here and its exemption named its own expiry**: *it would
+  // gain a consumer the day an x-axis picks its own ticks*. An x-axis now does —
+  // `xAxis()` returns `tickColumns` and `frameBottom` marks the rule with them —
+  // so MG24 reported the entry as outliving its reason, on the commit that met
+  // the condition rather than whenever someone next read the list. That is the
+  // deferral-expiry pattern working for once, and it worked because the entry
+  // stated the blocker as something checkable instead of as "for now".
+  "Ladder.serves":
+    "**consumed by the type checker rather than by a statement.** `LADDERS` is a mapped type " +
+    "over the axis and `LadderOf<E>` reads `Record<E, true>`, so a ladder under the wrong key " +
+    "does not compile — the guarantee is the whole point and MG24 counts names in `src/`, which " +
+    "a type position is not. Verified by trying it: putting the height ladder under `density` " +
+    "is TS2322 (C12 I21, §3c)",
+  "Ladder.substitutes":
+    "**a record with no runtime reader, and that is the state rather than an oversight.** " +
+    "`RAMP_ASCII` *is* density and *stands in for* height, and the distinction cost two defects " +
+    "when it lived in a comment. As a field it is asserted by T1.28 and readable by a person; " +
+    "no renderer branches on it, because none should — a substitution changes what a reader " +
+    "infers, not what the code draws. It gains a consumer the day a legend says *ink weight " +
+    "stands in for position here*, and until then MG24 is correct and this row is the answer",
+  "Extent.encodes":
+    "**`Pair.encodes`' row, for the fourth vocabulary** — the tag that makes an `Extent` " +
+    "self-describing beside a `Pair` and a `Ladder`. Nothing branches on it because nothing " +
+    "should: a renderer names an axis (I21) and the axis picks the vocabulary, so a branch here " +
+    "would be the encoding rule inverted. It earns a consumer the day a second extent vocabulary " +
+    "exists",
+  "Extent.partials":
+    "**as `solid`** — and the one whose direct use would be worst, because the wide arm has one " +
+    "partial where the narrow arm has seven. A caller indexing this itself would be correct on a " +
+    "narrow terminal and off by six steps on a wide one, which is F176's shape",
+  "Pair.encodes":
+    "**the tag that makes a `Pair` self-describing beside a `Ladder`**, and nothing branches on " +
+    "it because there is one pair. Asserted by T1.29 and read by a person; it earns a runtime " +
+    "consumer the day a second fill vocabulary exists, and MG24 is correct until then",
   "VerbRatio.derived":
     "**F99** — three of a five-field record are dead while `recorded` and `flagged` are " +
     "read, so the arithmetic producing them runs on every call and is discarded. A " +
@@ -1423,10 +2190,10 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   "VerbRatio.authored": "**F99** — as `derived`",
   "VerbRatio.ratio": "**F99** — as `derived`, and it is the computed one",
   "EngineOptions.cache": "**F99** — an injectable cache nothing injects; C19 constructs its own",
-  "Grid.dots": "**F99** — C12's raster grid payload, written by nothing that reads it",
   "Failure.actual":
     "**F99** — the measured value beside `expected`, which *is* read. A failure report " +
     "naming what was expected and not what happened is the half that makes it actionable",
+
 });
 
 /**
@@ -1944,6 +2711,161 @@ export function publicSurfaceUseSignal(
   return { members: seen.size, candidates, cleared, ambiguous, testOnly, concentrated };
 }
 
+
+// --- MG29: an exported function whose argument cannot be built ---------------
+
+/**
+ * MG29 — a published function whose parameter type is interior (C24 I29, §8c).
+ *
+ * **A parameter whose type is not published makes the function itself
+ * unusable, whatever the export list says**, and the failure is silent in the
+ * direction that matters: the export *is* there and the signature *does*
+ * resolve, right up to the moment a consumer has to supply the argument.
+ *
+ * `plotToSvg(given: Plot, theme: ResolvedTheme)` is the measured instance —
+ * exported by name, described at the entry point as *the second renderer*, and
+ * uncallable for a year because neither `ResolvedTheme` nor `loadTheme` was
+ * published. It is the third of its class: `CompletionContext` came with
+ * `completionContext` (C24 §8b) and `ProducerContext` with `producerContext`
+ * (I26), each found by a consumer trying to use the thing.
+ *
+ * ## What it cannot see, stated because an unrecorded limit reads as strength
+ *
+ * - **Reachability, not usability, and this is the limit that hid the
+ *   instance.** `ResolvedTheme` *was* reachable — `RenderContext.theme`, and
+ *   `RenderContext` is published — so this rule would have cleared it. The route
+ *   led into a synchronous `render`, which is the one place an SVG cannot be
+ *   rasterised. **A route that exists and does not reach the caller who needs it
+ *   is indistinguishable from a working one at this resolution**, and finding
+ *   that needs a human writing the consumer, which is what §8c records.
+ * - **Named types only.** Inline object literals, unions of literals and
+ *   primitives are constructible by writing them out.
+ * - **One level of reachability.** A type published as a member of a published
+ *   type counts; a member of a member does not, which under-reports rather than
+ *   over-reports.
+ * - **A homonym on the subject side, closed.** The rule once matched
+ *   `export function <name>(` in *every* file under `src/`, so publishing C06's
+ *   `createRouter` reported C16's internal `createRouter` — two rows on
+ *   `router/router.ts` for types that were never on the entry (F510's class,
+ *   one side over). It now resolves each `export { name } from "<path>"` on the
+ *   entry through that path and the barrels it names to the declaring module,
+ *   and reads the signature there alone. What remains: a name published from
+ *   two declaring modules is read in both, which is the right answer for a
+ *   genuine double publication and would be a defect of its own.
+ */
+export function checkExportedArguments(files, readFile = (f) => readFileSync(f, "utf8")) {
+  const violations = [];
+  const strip = (t) =>
+    t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+
+  const entry = files.find((f) => f === "src/index.ts" || f.endsWith("/src/index.ts"));
+  if (entry === undefined) return violations;
+  const src = strip(readFile(entry));
+
+  // The published type names, and the runtime names beside them.
+  const published = new Set();
+  for (const m of src.matchAll(/export\s+(?:type\s*)?\{([^}]*)\}/g)) {
+    for (const part of m[1].split(",")) {
+      const n = part.trim().replace(/^type\s+/, "").split(/\s+as\s+/).pop()?.trim();
+      if (n !== undefined && n !== "") published.add(n);
+    }
+  }
+
+  // One level out: a type named as a member of a published type is constructible
+  // by holding the owner. Under-reports rather than over-reports, deliberately.
+  const sources = new Map(files.map((f) => [f, strip(readFile(f))]));
+  const reachable = new Set(published);
+  for (const text of sources.values()) {
+    for (const m of text.matchAll(/export\s+(?:type|interface)\s+(\w+)/g)) {
+      if (!published.has(m[1])) continue;
+      const at = m.index ?? 0;
+      const body = text.slice(at, at + 4000);
+      for (const f of body.matchAll(/^\s+(?:readonly\s+)?\w+\??:\s*([A-Z]\w+)/gmu)) {
+        reachable.add(f[1]);
+      }
+    }
+  }
+
+  // Every exported function's parameter types, **from the module that declares
+  // it** — resolved through the entry's re-export path and any barrel it names,
+  // rather than matched by name across the tree.
+  const byBare = new Map([...sources.keys()].map((f) => [bare(f), f]));
+  const moduleOf = (from, spec) => {
+    const target = resolve(from, spec);
+    if (target === null) return undefined;
+    return byBare.get(bare(target)) ?? byBare.get(`${bare(target)}/index`);
+  };
+  /** `declaring.get(publishedName)` → the set of files whose `export function` it is. */
+  const declaring = new Map();
+  const follow = (file, localName, publishedName, depth) => {
+    const text = sources.get(file);
+    if (text === undefined || depth > 6) return;
+    if (new RegExp(`export\\s+(?:async\\s+)?function\\*?\\s+${localName}\\s*\\(`).test(text)) {
+      if (!declaring.has(publishedName)) declaring.set(publishedName, new Set());
+      declaring.get(publishedName).add(file);
+      return;
+    }
+    for (const m of text.matchAll(/export\s*\{([^}]*)\}\s*from\s*["']([^"']+)["']/g)) {
+      for (const part of m[1].split(",")) {
+        const [inner, outer = inner] = part.trim().replace(/^type\s+/, "").split(/\s+as\s+/).map((x) => x.trim());
+        if (outer !== localName) continue;
+        const next = moduleOf(file, m[2]);
+        if (next !== undefined) follow(next, inner, publishedName, depth + 1);
+      }
+    }
+    for (const m of text.matchAll(/export\s*\*\s*from\s*["']([^"']+)["']/g)) {
+      const next = moduleOf(file, m[1]);
+      if (next !== undefined) follow(next, localName, publishedName, depth + 1);
+    }
+  };
+  for (const m of src.matchAll(/export\s*\{([^}]*)\}\s*from\s*["']([^"']+)["']/g)) {
+    const from = moduleOf(entry, m[2]);
+    if (from === undefined) continue;
+    for (const part of m[1].split(",")) {
+      const t = part.trim();
+      if (t === "" || t.startsWith("type ")) continue;
+      const [inner, outer = inner] = t.split(/\s+as\s+/).map((x) => x.trim());
+      if (/^[a-z]/.test(outer)) follow(from, inner, outer, 0);
+    }
+  }
+  const declaringFiles = new Set([...declaring.values()].flatMap((set) => [...set]));
+  const publishedFrom = (file) =>
+    new Set([...declaring].filter(([, set]) => set.has(file)).map(([name]) => name));
+
+  const BUILTIN = /^(string|number|boolean|void|unknown|never|any|Promise|Array|Readonly|Partial|Record|Map|Set|URL|Error|Date|RegExp|NodeJS|Buffer|Uint8Array)$/;
+  for (const [file, text] of sources) {
+    if (file === entry || !declaringFiles.has(file)) continue;
+    const names = publishedFrom(file);
+    for (const m of text.matchAll(/export\s+(?:async\s+)?function\s+(\w+)\s*\(([^)]*)\)/g)) {
+      const [, name, params] = m;
+      if (!names.has(name)) continue;
+      for (const p of params.split(",")) {
+        // **The default value is not the parameter's type**, and taking it was
+        // this rule's first defect: `layout: SvgLayout = SVG_DEFAULT_LAYOUT`
+        // reported the constant. Caught on the first run, by reading what it
+        // named rather than counting how many it found.
+        const t = p.split(":").slice(1).join(":").split("=")[0];
+        if (t.trim() === "") continue;
+        for (const named of t.matchAll(/\b([A-Z]\w+)\b/g)) {
+          const ty = named[1];
+          if (BUILTIN.test(ty) || reachable.has(ty)) continue;
+          violations.push({
+            rule: "MG29",
+            file,
+            message:
+              `\`${name}\` is exported and its parameter type \`${ty}\` is not — so the ` +
+              `function resolves, and a consumer cannot supply the argument. Publish the ` +
+              `type and whatever builds one, as \`completionContext\` and \`producerContext\` ` +
+              `already are (C24 I29, §8c)`,
+            spec: "A03 §3, MG29",
+          });
+        }
+      }
+    }
+  }
+  return violations;
+}
+
 // --- MG25 — a free function with no consumer --------------------------------
 //
 // **MG24's blind spot, and MG24's own header is where it was written down.**
@@ -2033,6 +2955,27 @@ export function publicSurfaceUseSignal(
 
 /** Functions whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_FUNCTIONS = Object.freeze({
+  // **`createSourceErrorSink` was here and is gone** — wired by `construct.ts`
+  // on 2026-09-03 (C19 T3.6's *logged once* given a place to log to, drained by
+  // C22 §8 step 3), and the equality arm removed the entry the day it was.
+  // **\`sampleGrid\`, \`unitOf\`, \`basisOf\`, \`createDepth\` and \`writeDepth\` were
+  // here and are gone**, released by \`plot3d\` exactly as their reasons said.
+  // Five entries, one symbol, one commit — and the equality arm is what turned
+  // *the day it arrives* into a rule rather than a promise.
+
+  // **Six entries left here at once, and the equality arm is what removed them.**
+  //
+  // The seven family emitters landed one commit at a time, each with the same
+  // deferral: *the expiry is a symbol — `plotToSvg` walking a figure.* On the
+  // commit that met it, `figureFor` called all seven and this rule refused every
+  // exemption in the same run. That is the deferral discipline working
+  // mechanically rather than by anyone remembering: an entry that excuses
+  // nothing is how the next one gets in unread, so it cannot survive its own
+  // condition being satisfied.
+  //
+  // `matrixFigure` was never here — `heatmapFormRows` consumed it on the day it
+  // landed, and the entry written for it was refused then (C12 §3ak.7).
+
   // `renderToLines` was here and the equality arm removed it on the commit that
   // moved the conformance suites into `src/testing/` — which is the arm working,
   // and also **the rule's known false negative, shared with MG24.**
@@ -2064,6 +3007,16 @@ export const UNCONSUMED_FUNCTIONS = Object.freeze({
     "C12 — `definition.ts` computes `areaWidth` inline across a three-rung ladder with " +
     "`MIN_AREA`, and this helper states the simple case. Two expressions of one width, " +
     "and the helper is the one no renderer calls. C12's to reconcile",
+
+  // --- a refusal that runs at test time by design --------------------------
+  hasEmojiForm:
+    "C09 I45 — a test-time refusal and never a measurement: `cells()` must not count " +
+    "presentation (terminals disagree about it), so no renderer may call this. Its consumers " +
+    "are T2.112, T2.71 and A03 SS57, which parses the same table out of `text.ts` lexically. " +
+    "The day a `src/` caller appears is the day I45's *never a runtime branch* was broken",
+  // **`toolCallDoc` left here on 2026-09-05** (Lane P, C23 I54): the expiry was
+  // *the first `src/` call*, and `execution.ts` step 3 is it — the pending entry
+  // is the card. The entry was self-expiring by the equality arm, as written.
 });
 
 /**
