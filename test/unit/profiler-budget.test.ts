@@ -42,6 +42,7 @@ function report(over: Partial<ProfileReport> = {}): ProfileReport {
     worst: [],
     nodes: [],
     byKind: {},
+    byEntry: {},
     counters: {},
     gauges: {},
     misses: {},

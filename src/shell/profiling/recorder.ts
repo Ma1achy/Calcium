@@ -132,6 +132,7 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
   const gaugeHists = new Map<string, Hist>();
   const byReason = new Map<CommitReason, Hist>();
   const byKind = new Map<string, Hist>();
+  const byEntry = new Map<string, Hist>();
   const counters = new Map<string, number>();
   const misses = new Map<string, Map<MissReason, number>>();
   const hits = new Map<string, number>();
@@ -165,6 +166,22 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
    * not a gap: those are precisely the costs that are *not* in a frame, and
    * folding them into one would be the wait-as-work mistake one level up.
    */
+  /**
+   * The transcript entry whose work is being measured, or `null` (C28 I42).
+   *
+   * **A scope rather than a parameter**, because the thing that knows the entry
+   * and the thing that opens the element span are separated by the whole
+   * registry: the shell iterates entries and the wrapper sees a `Block`. A slot
+   * the shell sets and restores is the only place the two meet without widening
+   * a seam C14 owns — and measured over twenty retained trees, every element
+   * span belonging to an entry opens under `paint > assemble`, inside the loop
+   * that sets it, so the scope covers what it claims to (F892).
+   *
+   * Saved and restored rather than cleared, so a nested scope is correct even
+   * though nothing nests one today.
+   */
+  let currentEntry: string | null = null;
+
   let frameRoot: OpenNode | null = null;
   let frameSpans: Record<string, number> = {};
   let frameStart = 0;
@@ -238,6 +255,7 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
     gaugeHists.clear();
     byReason.clear();
     byKind.clear();
+    byEntry.clear();
     nodes.clear();
     ringResetAt = elapsed() - started;
   };
@@ -267,6 +285,25 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
    * "whatever was on the stack" is what makes an out-of-order close correct
    * instead of dropped, and that is an invariant worth more than 2 ns.
    */
+  /**
+   * The entry scope's close — a restore, not a clear.
+   *
+   * No span, no clock read and no node: an entry is not a region of work, it is
+   * *whose* work the regions inside it are. Bracketing it with a span would put
+   * a name in the tree that no call site has and double-count every element
+   * under it against `frame`.
+   */
+  class EntryHandle {
+    readonly #was: string | null;
+    constructor(id: string) {
+      this.#was = currentEntry;
+      currentEntry = id;
+    }
+    [Symbol.dispose](): void {
+      currentEntry = this.#was;
+    }
+  }
+
   class SpanHandle {
     constructor(
       readonly node: OpenNode,
@@ -282,13 +319,21 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
       readonly node: OpenNode,
       readonly ctx: { parent: OpenNode | null },
       readonly kind: string,
+      readonly entry: string | null,
     ) {}
     [Symbol.dispose](): void {
       const spent = end(this.node, this.ctx);
       // Self time in both, so a container is not charged for its children and
       // `Σ nodes.self` is the frame's real element cost.
       hist(byKind, this.kind).add(spent);
-      nodes.add(this.node.name, spent, this.node.total ?? spent, seq);
+      // **Two partitions of one population, not a sum and a projection.** Every
+      // close lands in exactly one bucket of each, so `Σ byKind` is `Σ nodes.self`
+      // exactly and `Σ byEntry` falls short of it by whatever no entry claimed —
+      // the chrome, the prompt, the overlays. That shortfall is a figure to print,
+      // not a rounding error: a `byEntry` silently omitting the chrome reads as
+      // *the chrome is free* (C28 I42).
+      if (this.entry !== null) hist(byEntry, this.entry).add(spent);
+      nodes.add(this.node.name, this.entry, spent, this.node.total ?? spent, seq);
     }
   }
 
@@ -319,7 +364,12 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
     element(kind: string, id: string): Disposable {
       if (disposed || !spanning()) return NO_SPAN;
       const { node, ctx } = begin(`${kind}#${id}`);
-      return new ElementHandle(node, ctx, kind);
+      return new ElementHandle(node, ctx, kind, currentEntry);
+    },
+
+    entry(id: string): Disposable {
+      if (disposed || !spanning()) return NO_SPAN;
+      return new EntryHandle(id);
     },
 
     async trace<T>(name: string, fn: () => Promise<T>): Promise<T> {
@@ -516,6 +566,7 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
         worst: Object.freeze(worst),
         nodes: nodes.snapshot(),
         byKind: Object.freeze(snapshotAll(byKind)),
+        byEntry: Object.freeze(snapshotAll(byEntry)),
         counters: Object.freeze(Object.fromEntries(counters)),
         gauges: Object.freeze(snapshotAll(gaugeHists)),
         misses: Object.freeze(missOut),

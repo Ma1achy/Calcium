@@ -63,8 +63,16 @@ export type ViewportOptions = Readonly<{
    * C09's registry dispatcher, injected. **`measureSequence`, not `measure`** —
    * the two differ by one row per `gapBefore` (C09 I17), and taking the sequence
    * form as the seam is what stops the summation being written here at all (I1).
+   *
+   * **`entryId` says whose blocks these are** (I29), as `chromeRows` below is
+   * handed the entry itself. C14 reads neither. Block ids are unique within a
+   * document (C04 I14) and a transcript holds many, so a measurer given only
+   * `(blocks, width)` cannot tell one entry's `table#t1` from another's — and a
+   * profiler wrapping this seam then merges two components into one row whose
+   * `calls / frames` is the sum of their numerators over one denominator
+   * (C28 I42, F892). Optional, so a caller that omits it measures as before.
    */
-  measureSequence: (blocks: readonly Block[], width: number) => number;
+  measureSequence: (blocks: readonly Block[], width: number, entryId?: string) => number;
   /**
    * Rows the composer draws *around* an entry, and which therefore belong to its
    * height (I20).

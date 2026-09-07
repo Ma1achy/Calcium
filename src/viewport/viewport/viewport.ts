@@ -421,7 +421,10 @@ class ViewportImpl implements Viewport {
     // self-consistent about a document the frame is not showing.
     const height =
       this.#chromeRows(entry, this.#width) +
-      this.#measureSequence(entry.doc.blocks, this.#width);
+      // **The id goes with the blocks** (I29). Passed rather than declared: a
+      // parameter that exists and is never supplied satisfies the type and is
+      // what the next reader deletes, so T2.15 asserts the ids and not the arity.
+      this.#measureSequence(entry.doc.blocks, this.#width, entry.id);
     this.#cache.set(entry.id, entry.rev, this.#width, height);
     return height;
   }

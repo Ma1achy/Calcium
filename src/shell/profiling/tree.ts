@@ -75,6 +75,18 @@ export function closeNode(node: OpenNode, at: number): number {
 /** One node's totals across the session. */
 export type NodeStat = Readonly<{
   key: string;
+  /**
+   * The transcript entry this element was measured for, absent for chrome
+   * (C28 I42).
+   *
+   * **Part of the identity, not a label.** A block id is unique within its own
+   * document (C04 I14) and a transcript holds many, so `kind#id` alone merges
+   * two components into one row — and the merged row's `calls / frames` is the
+   * sum of their numerators over one denominator, which is the layout-thrash
+   * signal `calls` exists to produce. Measured at 2.3 per frame true against
+   * 5.3 reported (F892).
+   */
+  entry?: string;
   calls: number;
   self: number;
   total: number;
@@ -94,13 +106,17 @@ export type NodeStat = Readonly<{
  */
 export class Aggregate {
   readonly #rows = new Map<string, {
+    key: string; entry: string | null;
     calls: number; self: number; total: number; max: number; frames: number; lastFrame: number;
   }>();
 
-  add(key: string, self: number, total: number, frame: number): void {
-    const row = this.#rows.get(key);
+  add(key: string, entry: string | null, self: number, total: number, frame: number): void {
+    const at = entry === null ? key : `${entry}\u0000${key}`;
+    const row = this.#rows.get(at);
     if (row === undefined) {
-      this.#rows.set(key, { calls: 1, self, total, max: self, frames: 1, lastFrame: frame });
+      this.#rows.set(at, {
+        key, entry, calls: 1, self, total, max: self, frames: 1, lastFrame: frame,
+      });
       return;
     }
     row.calls += 1;
@@ -130,9 +146,11 @@ export class Aggregate {
    */
   snapshot(): readonly NodeStat[] {
     const out: NodeStat[] = [];
-    for (const [key, r] of this.#rows) {
+    for (const r of this.#rows.values()) {
       out.push(Object.freeze({
-        key, calls: r.calls, self: r.self, total: r.total, max: r.max, frames: r.frames,
+        key: r.key,
+        ...(r.entry === null ? {} : { entry: r.entry }),
+        calls: r.calls, self: r.self, total: r.total, max: r.max, frames: r.frames,
       }));
     }
     out.sort((a, b) => b.self - a.self);

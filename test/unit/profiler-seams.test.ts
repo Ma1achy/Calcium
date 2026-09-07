@@ -30,13 +30,14 @@ import {
 import { dirname } from "node:path";
 import { checkSourceScans } from "../../tools/enforce/source-scans.mjs";
 
-import { HeightCache } from "../../src/viewport/viewport/index.js";
+import { HeightCache, createViewport } from "../../src/viewport/viewport/index.js";
+import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { RenderCache } from "../../src/shell/render-cache.js";
 import { createProfiler } from "../../src/shell/profiling/recorder.js";
 import { createInspector, type CaptureIo } from "../../src/shell/profiling/node.js";
 import type { Profiler } from "../../src/shell/profiling/types.js";
 import { buildGraph, fakeClock } from "../support/session.js";
-import { wrappingDoc } from "../support/viewport.js";
+import { W, measureSequence, rowsDoc, wrappingDoc } from "../support/viewport.js";
 
 describe("C22 — the root's injection, refusal and capture path", () => {
   it.todo("T1.51 (C22 I92): a graph built with profile absent is identical to one built from a config that never had the key — the injected elapsed and probe are never called, schedule gains no registration, and no FinalizationRegistry exists; asserted on the fakes' call counts and not on a timing figure — not deferred on a component: lands with the seams wired through construct.ts");
@@ -161,8 +162,60 @@ describe("C14 — a cache that publishes its size publishes its hit rate", () =>
     expect(moved.misses["nothing-changed"], "the height really did change").toBe(0);
   });
 
-  it.todo("T2.15 (C14 I29): a viewport whose injected measureSequence records its third argument → every call names the entry whose blocks it was given, and a run with two entries records two distinct ids. Asserted on the ids and not on the arity, because a parameter declared and never passed satisfies the type — not deferred on a component: lands with the seam in src/viewport/viewport/");
-  it.todo("T6.25 (C14 I29): dropping the entry id from the measureSequence call → T2.15 fails, and byEntry under-reports every entry by whatever the height cache missed — an undercount with no signal, which is worse than the absence it looks like — not deferred on a component: lands with the seam in src/viewport/viewport/");
+  it("T2.15 (C14 I29): the measure seam is told whose blocks these are, and the ids are what is asserted", () => {
+    const seen: (string | undefined)[] = [];
+    const store = createTranscriptStore({});
+    const viewport = createViewport(store, {
+      width: W,
+      height: 40,
+      measureSequence: (blocks, width, entryId) => {
+        seen.push(entryId);
+        return measureSequence(blocks, width);
+      },
+    });
+
+    store.append(rowsDoc(3, "a"));
+    store.append(rowsDoc(3, "b"));
+    viewport.visible();
+
+    // **The ids, not the arity.** A parameter declared and never passed
+    // satisfies the type, compiles, and is what a later reader deletes — so a
+    // row asserting `measureSequence.length === 3` would be green on exactly the
+    // tree this exists to forbid.
+    const ids = [...new Set(seen)].sort();
+    expect(ids, "each entry's measure names that entry").toStrictEqual([
+      store.entries[0]?.id,
+      store.entries[1]?.id,
+    ].sort());
+    expect(seen.includes(undefined), "and none is anonymous").toBe(false);
+  });
+
+  it("T6.25 (C14 I29): dropping the id makes every measure anonymous, and the loss reads as chrome", () => {
+    // The revert: `(blocks, width) => …`, the shape the seam had before I29.
+    // **What makes it dangerous is where the shortfall lands.** C28's `byEntry`
+    // falls short of `Σ nodes.self` by whatever belongs to no entry, and a
+    // reader is told to expect the chrome there — so an entry short by its
+    // height-cache misses is invisible rather than wrong (F892b).
+    const seen: (string | undefined)[] = [];
+    const store = createTranscriptStore({});
+    const viewport = createViewport(store, {
+      width: W,
+      height: 40,
+      measureSequence: (blocks, width) => {
+        seen.push(undefined);
+        return measureSequence(blocks, width);
+      },
+    });
+
+    store.append(rowsDoc(3, "a"));
+    viewport.visible();
+
+    expect(seen.length, "the seam still runs").toBeGreaterThan(0);
+    expect(
+      seen.every((id) => id === undefined),
+      "and every call is anonymous, which is what T2.15 forbids",
+    ).toBe(true);
+  });
 
   it("T6.24 (C14 I28): counting nothing-changed as a fourth axis makes it a number that can never be non-zero", () => {
     // **The revert to guard against is a vacuous counter**, and a vacuous

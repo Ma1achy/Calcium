@@ -715,9 +715,13 @@ export async function constructGraph(
       // **Through the entry's layout** (C22 I83, §6l.4 D): a card's body is
       // measured at `width − 2`, by the same function `visibleRows` renders it
       // through, so the rows C14 counts are the rows the frame draws.
-      // **The measure seam** (A02 §2 Seam 6). Attribution is by kind and by the
-      // entry the blocks belong to; `measureSequence` runs every frame whatever
-      // the cache holds, which is a fact no counter recorded before this.
+      // **The measure seam** (A02 §2 Seam 6), and it runs on a height-cache
+      // **miss**, not every frame. The sentence here used to say the opposite —
+      // *whatever the cache holds* — and measuring it is what found the hole in
+      // C28 I42's first repair: over twenty retained trees this path opened no
+      // element span at all, and three appended entries then opened one each
+      // (F892b). A path that is quiet because a cache is warm and a path that
+      // does not exist produce the same trees.
       //
       // **No attribution here any more, and its removal is the point.** This
       // used to time the whole sequence and hand every block in it
@@ -727,7 +731,16 @@ export async function constructGraph(
       // per-block figures come from the registry wrapper installed at step 4a,
       // which is entered once per block at every depth; this seam is left as
       // the plain call it decorates.
-      measureSequence: (blocks, width) => measureEntry(built.blocks.measureSequence, blocks, width),
+      // **The entry scope for the measure half** (C28 I42, C14 I29). The other
+      // half is `visibleRows`' own loop; this is the path C14 takes on a height
+      // cache miss, which on a resize is every entry. Without it an entry's cost
+      // reads low by whatever the cache missed, and the shortfall lands in the
+      // same bucket as the chrome — where a reader is told to expect one (F892b).
+      measureSequence: (blocks, width, entryId) => {
+        using _entry =
+          entryId === undefined ? NO_SPAN : (deps.profiler?.entry(entryId) ?? NO_SPAN);
+        return measureEntry(built.blocks.measureSequence, blocks, width);
+      },
       // C14 I20 / C22 I33 — the command line is chrome the composer draws, so
       // it is part of the height the index virtualises against. **The same
       // function that draws it**, or the two arithmetics part company and the

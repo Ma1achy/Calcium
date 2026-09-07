@@ -107,8 +107,12 @@ const MUTATIONS = [
     // row taller than C14 believes, and the row below it is the one dropped.
     name: "the measurer wrapper passes the frame's width for the body",
     file: CONSTRUCT,
-    from: "      measureSequence: (blocks, width) => measureEntry(built.blocks.measureSequence, blocks, width),",
-    to: "      measureSequence: (blocks, width) => built.blocks.measureSequence(blocks, width),",
+    // Re-anchored when C14 I29 gave the seam its entry id: the wrapper is a
+    // block now, so the mutable line is the return rather than the arrow. The
+    // mutation is unchanged — bypass `measureEntry` and measure the document
+    // flush while the renderer indents it.
+    from: "        return measureEntry(built.blocks.measureSequence, blocks, width);",
+    to: "        return built.blocks.measureSequence(blocks, width);",
     expect: "T4.62",
   },
   {

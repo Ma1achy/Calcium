@@ -333,6 +333,17 @@ export type ProfileReport = Readonly<{
    */
   nodes: readonly NodeStat[];
   byKind: Readonly<Record<string, Histogram>>;
+  /**
+   * Per transcript entry — *which output on screen is expensive* (C28 I42).
+   *
+   * The **other partition** of the population `byKind` partitions, over the same
+   * closes: an element lands in one bucket of each. So `Σ byKind` is `Σ nodes.self`
+   * exactly, and `Σ byEntry` falls short of it by what belongs to no entry — the
+   * chrome, the prompt, the overlays, all measured every frame. The shortfall is
+   * a reading, not a discrepancy, and a consumer that treats the two sums as
+   * comparable is reading *the chrome is free*.
+   */
+  byEntry: Readonly<Record<string, Histogram>>;
   counters: Readonly<Record<string, number>>;
   /** Sizes rather than events — series length, cell count, cache occupancy. */
   gauges: Readonly<Record<string, Histogram>>;
@@ -401,6 +412,22 @@ export interface Profiler extends Probe {
    * a plot cost* — and `kind#id` identifies the one to fix.
    */
   element(kind: string, id: string): Disposable;
+
+  /**
+   * Whose work the elements measured inside this belong to (C28 I42).
+   *
+   * `using _e = prof.entry(entry.id)` around the shell's per-entry loop. A block
+   * id is unique within its own document (C04 I14) and a transcript holds many,
+   * so without this two entries holding `table#t1` are one row in `nodes` whose
+   * `calls / frames` is the sum of two numerators over one denominator — the
+   * layout-thrash signal, fabricated. Measured 2.3 true against 5.3 reported
+   * (F892).
+   *
+   * **Not on `Probe`**, and that is the layering rather than an oversight: a
+   * transcript entry is a shell concept and no block renderer has one. It sits
+   * beside `element` for the same reason `element` is not on `Probe` either.
+   */
+  entry(id: string): Disposable;
 
   /**
    * Run `fn` and return what it produced beside what it cost.

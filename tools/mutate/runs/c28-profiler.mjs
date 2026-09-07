@@ -20,7 +20,7 @@ import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
 const CMD =
-  "npx vitest run test/unit/profiler-tree.test.ts test/unit/profiler-seams.test.ts test/unit/profiler.test.ts test/unit/profiler-export.test.ts test/unit/profiler-async.test.ts test/unit/profiler-budget.test.ts test/unit/profiler-recorder.test.ts";
+  "npx vitest run test/unit/profiler-tree.test.ts test/unit/profiler-seams.test.ts test/unit/profiler.test.ts test/unit/profiler-export.test.ts test/unit/profiler-async.test.ts test/unit/profiler-budget.test.ts test/unit/profiler-recorder.test.ts test/integration/profiler.test.ts test/revert/profiler.test.ts";
 const REC = "src/shell/profiling/recorder.ts";
 const NODE = "src/shell/profiling/node.ts";
 const SCANS = "tools/enforce/source-scans.mjs";
@@ -36,6 +36,7 @@ const CONSTRUCT = "src/shell/construct.ts";
 const BUDGET = "src/testing/profile.ts";
 const SESSION = "src/shell/session.ts";
 const PAINT = "src/shell/paint.ts";
+const VIEWPORT = "src/viewport/viewport/viewport.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -53,7 +54,7 @@ const results = runPass({
   run,
   control: {
     file: REC,
-    from: "      const { node, ctx } = begin(`${kind}#${id}`);\n      return new ElementHandle(node, ctx, kind);",
+    from: "      const { node, ctx } = begin(`${kind}#${id}`);\n      return new ElementHandle(node, ctx, kind, currentEntry);",
     to: "      return NO_SPAN;",
     why: "no element is ever opened, so the per-element table is empty — a run where this survives cannot see a kill",
   },
@@ -98,8 +99,8 @@ const results = runPass({
       // ordered.
       name: "AGGREGATE-TOTAL: the per-key row records inclusive time as self",
       file: REC,
-      from: "      nodes.add(this.node.name, spent, this.node.total ?? spent, seq);",
-      to: "      nodes.add(this.node.name, this.node.total ?? spent, this.node.total ?? spent, seq);",
+      from: "      nodes.add(this.node.name, this.entry, spent, this.node.total ?? spent, seq);",
+      to: "      nodes.add(this.node.name, this.entry, this.node.total ?? spent, this.node.total ?? spent, seq);",
       expect: "T1.34",
     },
     {
@@ -599,6 +600,65 @@ const results = runPass({
       from: "      unphased += sum;\n      parts += sum;",
       to: "      unphased += sum;",
       expect: "T1.66",
+    },
+    {
+      // **The key, which is F892's whole subject.** A block id is unique within
+      // its document and a transcript holds many; without the entry, two
+      // components are one row and the row's `calls / frames` is the sum of two
+      // numerators over one denominator. Measured on a real session at 2.3 per
+      // frame true against 5.3 reported — and the report stays well-formed,
+      // ordered and plausible throughout, which is this file's whole premise.
+      name: "ENTRY-DROPPED: the aggregate keys by the block id alone",
+      file: REC,
+      from: "      nodes.add(this.node.name, this.entry, spent, this.node.total ?? spent, seq);",
+      to: "      nodes.add(this.node.name, null, spent, this.node.total ?? spent, seq);",
+      expect: "T1.67",
+    },
+    {
+      // The other half: the rows split and the divisor does not. A repair that
+      // fixed only the key would leave this, and it is the figure that misleads.
+      name: "ENTRY-FRAMES-SHARED: the row's frame counter ignores the entry",
+      file: TREE,
+      from: "    const at = entry === null ? key : `${entry}\\u0000${key}`;",
+      to: "    const at = key;",
+      expect: "T1.67",
+    },
+    {
+      // Unattributed work filed under a name, which is the wrong attribution
+      // rather than the absent one — and the shortfall a reader is told to
+      // expect disappears, so nothing looks wrong.
+      name: "CHROME-AS-ENTRY: work belonging to no entry is given one",
+      file: REC,
+      from: "      if (this.entry !== null) hist(byEntry, this.entry).add(spent);",
+      to: '      hist(byEntry, this.entry ?? "chrome").add(spent);',
+      expect: "T1.68",
+    },
+    {
+      // The scope clears instead of restoring. Nothing nests one today, so this
+      // is the row's own subject and T1.70 says as much.
+      name: "ENTRY-CLEARED: the scope's close drops the entry rather than restoring it",
+      file: REC,
+      from: "      currentEntry = this.#was;",
+      to: "      currentEntry = null;",
+      expect: "T1.70",
+    },
+    {
+      // **The wiring, not the mechanism.** Every row above calls `entry()`
+      // itself and would pass on the day nothing in `src/shell/` opened one.
+      name: "SHELL-BRACKET-GONE: the per-entry loop opens no scope",
+      file: SESSION,
+      from: "    using _entry = profiler?.entry(entry.id) ?? NO_SPAN;",
+      to: "    using _entry = NO_SPAN;",
+      expect: "T4.2",
+    },
+    {
+      // The seam's half, which the height cache reaches on a miss. Warm, this
+      // survives — which is why the row that catches it appends entries.
+      name: "SEAM-ID-DROPPED: C14 measures without naming the entry",
+      file: VIEWPORT,
+      from: "      this.#measureSequence(entry.doc.blocks, this.#width, entry.id);",
+      to: "      this.#measureSequence(entry.doc.blocks, this.#width);",
+      expect: "T2.15",
     },
     {
       name: "EAGER-ALS: the async store is built at construction",

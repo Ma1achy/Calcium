@@ -486,12 +486,19 @@ describe("todo expiry", () => {
     // forbids naming a path that does not exist, wrote their condition in prose
     // beside it, and outlived it unwatched (F873).
     //
-    // The two still absent are listed with their reason rather than subtracted
+    // The one still absent is listed with its reason rather than subtracted
     // silently: a row pointing at the wrong file expires deferrals that are
-    // genuinely waiting, so choosing them is a step and not a fill-in.
+    // genuinely waiting, so choosing one is a step and not a fill-in.
+    //
+    // **C27 left this list and the commit that moved it did not run this file.**
+    // Its row landed with `make enforce` green — which reads the map and cannot
+    // see this equality, because the equality lives in a test. An entry present
+    // in both maps is counted twice and only a comparison by equality says so;
+    // a subset check would have passed with C27 named in two places at once,
+    // which is [[compare-exemption-lists-by-equality]] arriving from the other
+    // direction (F891).
     const NO_ROW_YET: Readonly<Record<string, string>> = Object.freeze({
       C26: "navigation is spread across four shell files; which one holds the behaviour is a reading of C26 (F873)",
-      C27: "the emulator has src/data/emulator/, and which file is the behaviour is a reading of C27 (F873)",
     });
 
     const specced = readdirSync("docs/components")

@@ -997,9 +997,20 @@ class Session implements TuiInstance {
       // `size()`. A closure that re-read it is exactly the two-width frame the
       // note names, arriving through the one seam that looks harmless.
       transcriptRows: () =>
-        visibleRows(graph, width, this.#tick, (animated) => {
-          this.#animation = animated;
-        }),
+        visibleRows(
+          graph,
+          width,
+          this.#tick,
+          (animated) => {
+            this.#animation = animated;
+          },
+          // **The `Profiler`, not `graph.probe`, and the difference is the
+          // layering** (C28 I42). `entry()` sits beside `element()` on L4's
+          // interface because a transcript entry is a shell concept: no block
+          // renderer has one, so publishing it at L0 would be a member nothing
+          // below `src/shell/` could ever call.
+          this.#profiler,
+        ),
       promptRows: () => graph.editor.layout(width, PROMPT_GUTTER),
       promptCursor: () => graph.editor.cursorCell(width, PROMPT_GUTTER),
       // **The wash, mapped through the same walk the rows came from** (C17 I18,
@@ -1204,6 +1215,7 @@ function visibleRows(
   width: number,
   tick: number,
   onAnimation: (animated: Animated) => void,
+  profiler: Profiler | null,
 ): readonly string[] {
   const out: string[] = [];
   // **The cadence anything visible wants, reported once per frame.** The session
@@ -1227,6 +1239,18 @@ function visibleRows(
   for (const ve of graph.viewport.visible().entries) {
     const entry = graph.transcript.entries.find((e) => e.id === ve.id);
     if (entry === undefined) continue;
+    // **Whose work the elements below belong to** (C28 I42). A block id is
+    // unique within its own document (C04 I14) and a transcript holds many, so
+    // without this two entries showing a block with the same id are one row in
+    // `nodes` — and the merged row's `calls / frames` is the sum of their
+    // numerators over one denominator, which is exactly the layout-thrash
+    // signal `calls` is kept beside `frames` to give. Measured at 2.3 per frame
+    // true against 5.3 reported (F892).
+    //
+    // Here rather than anywhere else because this is where the id and the work
+    // meet: `windowEntry` and the render below both reach the registry, whose
+    // wrapper sees a `Block` and nothing about where it came from.
+    using _entry = profiler?.entry(entry.id) ?? NO_SPAN;
     // C22 I33 — the command that produced the entry, above it, as chrome. Its
     // rows are part of the entry's height (C14 I20), which is why the slice
     // below is taken over `chrome ++ blocks` rather than over the blocks alone.
