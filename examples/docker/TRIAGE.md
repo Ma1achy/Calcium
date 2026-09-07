@@ -39,7 +39,7 @@ type change.
 | **8** | [Absence indistinguishable from failure](#8) | 29 | **7 open** (7 closed) | partly | real Calcium work · **7 of 10 fixed** — F151 is the class F35 closed in the half an app-side test cannot reach, and **F167 is the class arriving in a *value*: a validator agreeing twice about two different documents** |
 | **9** | [**The instrument was wrong**](#9) | 106 | **17** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
 | **10** | [**A claim carried without a record**](#10) | 70 | **11** | — | **new at F80** · method — six findings disproved, and **F166 unblocked an entry while F168 found what the same row was silent about**; F184 is the first where the unrecorded claim was a *rule* rather than a fact, governing thirty forms from a parameter's doc comment |
-| **11** | [A gate that passes without checking](#11) | 317 | **16** | — | **110 closed · 118 open** of 229 keyed — the heading was out by 66 and this row's count column by 1, which cannot be corrected alone (§11) · four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
+| **11** | [A gate that passes without checking](#11) | 319 | **16** | — | **112 closed · 118 open** of 231 keyed — the heading was out by 66 and this row's count column by 1, which cannot be corrected alone (§11) · four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
 | **12** | [**A time-based assertion under contention**](#12) | 7 | **3** | — | **new at F80** · Calcium's own suite · **F877 is the first that repairs an instrument rather than recording a reading** |
 | **13** | [Text the framework emits](#13) | 6 | **4** | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
 | **14** | [A constant, a channel or a rule that outlived its configuration](#14) | 28 | **13 open** | ⚠ C12 | **new at F492** · real Calcium work — every member reads as deliberate, which is why review found none of them |
@@ -1049,7 +1049,7 @@ through a menu in as many words — as the reason the implementation writes ever
 
 
 **F491** — C12 §3am's refusal of box-drawing joins rests on one *mechanism* among four arguments: a strictly-nearer test refuses the second edge **by construction** at exactly the cell a join needs. **Every clause is true and the consequence is a tenth of what the wording implies.** Built both ways on a cube's twelve edges: **36 corners and 8 tees against 29 and 5** — seven corners and three tees, not a figure coming apart at every vertex. And three fixtures built to make it categorical are *identical* under both rules. The reason is the arm's corner routing, needed for a different problem, which produces corner glyphs from a **single** stroke — so a corner is not evidence of two edges meeting, and the row that counted corners survived its own mutation. **The class: a refusal states a mechanism and a consequence, and only the mechanism is checkable from the armchair.** Both were carried as one claim for four steps; *refused by construction* is a statement about a code path and reads as one about a picture
-## 11 · A gate that passes without checking — **229 keyed · 228 entries: 110 closed, 118 open**
+## 11 · A gate that passes without checking — **231 keyed · 230 entries: 112 closed, 118 open**
 
 **The composition, measured 2026-09-04 at `86d3b191`.** The heading read *157: 96 closed, 61 open*
 and the total was out by **66**. Under SP6's own definition of *keyed* — a bolded id anywhere in the
@@ -1655,6 +1655,8 @@ reads goes through the entry point a user has.
 | **F876** | an invariant vacuous in both directions at once — the barrel published five constructors against C24 I31 with no consumer to be wrong and no subpath for the rule to apply to |
 | **F878** | a branch no caller can reach, and the row written to reach it could not either — the second survival is the finding; `getHeapSnapshot()` yields one chunk of 5.19 MB, so every capture writes the sink once and the branch was redundant with the arm beside it. **Removed** |
 | **F879** | an allow list of one file with no input that could tell it from the directory — a fabricated violation shows the rule fires and a control shows the exemption is exercised; neither shows the exemption is the right size |
+| **F880** | an absence check run against a file that did not exist — the deferral's own sentence named the class and the row then joined it; six `SpanName` members and two widened maps had never reached the spec |
+| **F881** | a phase group contradicting the definition four lines above it — `adapt` filed under `far side` while returning a `ViewDocument`; the mapping is total by construction, so the type proves it complete and nothing checks it is right |
 
 
 

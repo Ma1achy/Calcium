@@ -31453,3 +31453,66 @@ such a figure would go into.
 *fires*; a control shows the exemption *is exercised*. Neither shows the exemption is the *right
 size*, and a scope is a claim with an edge on both sides. **A rule with an allow list owes a third
 input: something the entry does not cover, adjacent to something it does.**
+
+## F880 — the absence check the row warned about, run against a file that did not exist ★★★★☆
+
+C28 §11 deferred the Chrome Trace Event export, and stated its condition unusually carefully:
+
+> *deferred on the span set stopping moving, and the condition is a **log rather than a grep**:
+> `git log -p -- src/shell/profiling/types.ts` shows no change to `SpanName` across C7–C9. A grep
+> asking whether a member was added is an absence check, and an absence check reads as satisfied
+> hardest on the day it stops being true*
+
+The sentence is right about the class and the row then joined it. `git log -S SpanName --
+src/shell/profiling/types.ts` returns **one commit** — `b62b64df`, this round's own backend work.
+The file did not exist across C7–C9, so the log showed no change to `SpanName` because there was no
+`SpanName`, and the condition was satisfied by emptiness. The moment the file was written it
+arrived with **six members the spec has never carried**.
+
+```
+spec    12  adapt assemble compose decode frame handler livefetch measure paint route transport write
+source  18  … + chrome completion elements overlays react stream
+```
+
+**The drift is in three places in §2 and the source is the honest one in all three.** `SpanName`'s
+members; `FrameRecord.spans` and the report's `spans`, which the source widened to
+`Record<string, …>` because a component names its own phases (`plot.area`, `code.tokenise`) and
+those are not members; and `PhaseGroup` together with `PHASE_GROUP`, a published type and a
+published constant the spec did not mention at all.
+
+**A spec and an implementation that disagree is worse than either being wrong alone**, and what
+made this one survive is that every reader had a correct document in front of them: the spec is
+coherent, the source compiles, and nothing resolves one against the other. The rule that reaches it
+is the one already written down — *ask where a settled claim is written down* — pointed at a type
+rather than at a sentence.
+
+The deferral is closed rather than corrected: the export shipped in `716f7905`.
+
+## F881 — a phase group contradicting the definition written above it ★★★☆☆
+
+`PHASE_GROUP` maps every `SpanName` to the kind of work it is, and its own doc comment says what
+the kinds mean:
+
+> *`compute` is geometry and view-model construction, and answers to caching and to doing less per
+> frame.*
+
+`adapt` was mapped to **`far side`**. `AdapterRegistry.adapt(raw, ctx)` returns a `ViewDocument`: it
+is this framework's CPU turning the far side's bytes into a view model, synchronously, in this
+process. It is view-model construction by the definition four lines above it.
+
+**The consequence is the one the grouping exists to prevent.** `far side` is the heading a reader
+scans to decide the cost is not theirs to fix — nothing in this framework can make someone else's
+CLI faster. Filing an in-process adapter there hides the one adaptation cost a user *can* act on,
+inside the single breakdown the profiler was asked for: *is it computing something, or actually
+drawing it?*
+
+**Neither the walk nor the mutation pass reaches this.** A rule-interaction artefact indexes cells
+where two rules overlap, and this is one cell governed by one rule. A mutation that moved `adapt`
+to another group would fail nothing, because no row asserted a group at all — the mapping is total
+by construction (`Record<SpanName, PhaseGroup>`), so TypeScript checks that every name *has* a
+group and nothing checks that it is the right one. **Totality is the vacuity here**: the type system
+proves the table is complete, which reads exactly like proving it is correct.
+
+Found by reading the table against the paragraph above it while adding a member to it — which is
+the same instrument as *read the abstract against its own section before reading the section against
+the code*, applied to a constant.

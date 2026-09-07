@@ -61,8 +61,21 @@ import type { CommitReason } from "../../terminal/frame-scheduler.js";
 export type Tier = "off" | "counters" | "spans" | "alloc" | "deep";
 
 export type SpanName =
-  | "frame" | "compose" | "paint" | "assemble" | "write"
-  | "measure" | "decode" | "route" | "handler" | "transport" | "adapt" | "livefetch";
+  | "frame" | "compose" | "measure" | "elements" | "paint" | "react" | "assemble" | "write"
+  | "decode" | "route" | "handler" | "local" | "transport" | "adapt" | "stream" | "livefetch"
+  | "completion" | "overlays" | "chrome";
+
+/**
+ * What each phase is *doing*, in the terms the question gets asked in: was the
+ * frame computing something, or actually drawing it?
+ *
+ * A span name says where in the code the time went; this says what kind of work
+ * it was, which is what decides the remedy. `compute` answers to caching and to
+ * doing less per frame, `draw` to a smaller diff, `output` to writing fewer
+ * bytes, and `far side` to nothing this framework can change.
+ */
+export type PhaseGroup = "compute" | "draw" | "output" | "input" | "far side" | "total";
+export const PHASE_GROUP: Readonly<Record<SpanName, PhaseGroup>>;
 
 /** Log-linear buckets. `error` is the relative bound, stated because a percentile
  *  quoted without one cannot be compared across runs (I10). */
@@ -81,7 +94,9 @@ export type FrameRecord = Readonly<{
   reason: CommitReason;
   /** Three numbers, never summed (I4). */
   work: number; wait: number; total: number;
-  spans: Readonly<Partial<Record<SpanName, number>>>;
+  /** Keyed by `string`, not `SpanName`: a component names its own phases
+   *  (`plot.area`, `code.tokenise`) and those are not members (I30). */
+  spans: Readonly<Partial<Record<string, number>>>;
   counters: Readonly<Record<string, number>>;
   outcome: "frame" | "fallback";
   cause: Readonly<{ input?: string; replayOffset?: number }>;
@@ -109,7 +124,7 @@ export type ProfileReport = Readonly<{
   }>;
   startup: Readonly<{ importMs: number; firstMeasureMs: number; firstPaintMs: number; firstByteMs: number }>;
   /** Absent, not zeroed, below tier `spans` (I11). */
-  spans?: Readonly<Partial<Record<SpanName, Histogram>>>;
+  spans?: Readonly<Partial<Record<string, Histogram>>>;
   latency?: Readonly<Record<string, Readonly<{ work: Histogram; wait: Histogram; total: Histogram }>>>;
   worst: readonly FrameRecord[];
   counters: Readonly<Record<string, number>>;
@@ -139,7 +154,10 @@ export interface Profiler {
   readonly tier: Tier;
   /** Resets the ring — histograms from two tiers must not merge (I18). */
   setTier(tier: Tier): void;
-  span(name: SpanName): Disposable;
+  /** `string`, because a component's own phase is not a `SpanName` (I30). */
+  span(name: string): Disposable;
+  /** A span that survives an `await` (I33). The async seams' bracket (I36). */
+  trace<T>(name: SpanName, fn: () => Promise<T>): Promise<T>;
   count(name: string, by?: number): void;
   miss(reason: MissReason): void;
   /** An instant on the session timeline, never inside a frame record (I20). */
@@ -252,12 +270,32 @@ root hands down, so the profiler wraps what C22 was going to pass anyway.
 | seam | where | yields |
 |---|---|---|
 | the write | `FrameSchedulerOptions.write` | bytes per frame — A01 Appendix B row 1 |
-| the frame | `composeFrame(deps)` (`render-frame.ts:88`) | `compose`, `paint`, `assemble` |
+| the frame | `composeFrame(deps)` (`shell/render-frame.ts:87`) | `compose`, `paint`, `assemble` |
 | block measurement | A02 Seam 1 `measureChild` | `measure`, by kind, instance and entry |
-| input | the decoder (`construct.ts:2361`) and `deliver` (`:2384`) | `decode`, `route`, `handler`, and `total` |
-| transport | A02 Seam 2 `VerbTransport` | `transport`, bytes in, stream rate |
+| input | the decoder (`construct.ts:2447`) and `deliver` (`:2470`) | `decode`, `route`, `handler`, and `total` |
+| transport | A02 Seam 2 `VerbTransport` | `transport` on `invoke`, `stream` on each `next()` |
+| adaptation | `AdapterRegistry.adapt` and `adaptPatch` | `adapt` — synchronous, and `compute` rather than `far side` |
+| completion | `CompletionEngine.request` | `completion`, concurrent with a route by construction |
 | live parts | `LiveSpec.fetch` (C24 §5) | `livefetch`, and staleness |
+| the local route | C23's local verb handler (`execution.ts:1023`) | `local` |
 | the timer | `Ambient.schedule` | the sampler's cadence — no new timer primitive |
+
+**Two of those are not reachable from the root, and they take an injected `trace` instead.** The
+local registry is built inside `createExecutionPipeline` and a part's `fetch` arrives inside
+`refresh.ts` at declaration time, so there is no object the composition root could have wrapped on
+the way past. Each takes a `trace` function rather than a profiler, so neither file learns that a
+recorder exists — the same narrowing `asProbe()` performs for the synchronous seams.
+
+**`handler` and `local` are two different things and the plan for this round called both of them
+`handler`.** The row above is the input path's: whichever handler `router.dispatch` resolves a key
+to, which is why it groups with `decode` and `route` under `input`. C23's local verb route is
+in-process work that produces a `ViewDocument`, so it is `compute`, and it is `local`.
+
+**`adapt` was `far side` and that contradicted the group's own definition.** `PhaseGroup` says
+`compute` is *geometry and view-model construction*, and `adapt(raw, ctx)` returns a `ViewDocument`
+— it is this framework's CPU turning the far side's bytes into a document, and nothing about it is
+the far side's. Grouped wrongly it put in-process compute under the one heading a reader uses to
+decide that the cost is not theirs to fix (F881).
 
 **The input seam already stamps a time, and the stamp is the wrong one.** `stampInput()`
 (`construct.ts:2422`) writes `lastInputAt = config.clock()` — so the decoration point exists, is
@@ -389,6 +427,7 @@ histograms describes neither, and the report states the point at which it was re
 - **I33** — **A span survives an `await`, and the store that makes that true is constructed lazily.** Closing is per node against its own parent, so an out-of-order close is correct rather than discarded — the previous shape held one pointer and dropped any close that did not match it, which is precisely what interleaving produces, so every async span it could have recorded reported nothing and reported it silently. The `AsyncLocalStorage` is built on the first transition to a tier that records durations and never at import: measured on Node v22.23.2, an `await` costs 38 ns with none constructed and **59 ns with one constructed and never used**, so an eager store taxes every promise in every application by about 55 % to profile one of them.
 - **I34** — **The report prices the instrument.** `overhead` carries the spans opened, this machine's measured `elapsed()` cost, the product as an estimate labelled one, and whether the async store is built. An instrument that does not report its own cost invites a reader to assume zero, and an instrument reporting its own cost *as its subject's* is the failure class this component exists to end.
 - **I35** — **The exported document carries what its shape cannot.** Three things, each of which a well-formed document is happy to omit. A trace event's `ts` is the span's own `startedAt` and never a position computed from its siblings: children do not tile their parent — the gaps are the parent's self time — so a synthesised timeline is well-formed, plausible, and not what happened, and no viewer can tell. The document names `framesInSession` beside `framesWithTrees`, because I32's retention read off the output is a count of the worst frames read as the session's. And neither format carries a sum of `work` and `wait` (I4), because two columns that add up look like a column that is missing.
+- **I36** — **Every seam that crosses a promise is bracketed, and the bracket is decoration at a seam the root already hands down.** `transport` and `stream` on `VerbTransport`, `adapt` on `AdapterRegistry`, `completion` on `CompletionEngine.request`, `livefetch` on `LiveSpec.fetch`, `local` on C23's local verb handler. **`stream` is around each `next()` and not around the loop**, so what it measures is the far side's latency and not the shell's own work between patches — a stream slow because the far side is slow and one slow because we are produce the same total and are different findings. Every bracket forks its context (I33), so N live fetches and a completion racing a route attribute to N parents instead of trampling one.
 
 ---
 
@@ -411,6 +450,7 @@ histograms describes neither, and the report states the point at which it was re
 15. **A span survives an `await`, or the tier that would record it is not on.** Correct across interleaving, and the machinery that costs every promise is built only when something is actually being recorded. (I33)
 16. **The instrument prices itself.** (I34)
 17. **The output is a format that already has readers.** Chrome's Trace Event JSON opens in Perfetto and speedscope, so a flame chart, a sandwich view and a left-heavy view arrive with no renderer written; NDJSON is the appendable form a four-hour session needs and a single JSON document cannot be. What the export owes is the context the format has no field for. (I35)
+18. **The far side is measured apart from the work it causes.** A promise the shell waits on and the CPU it spends on the answer are different columns, and the seam that produces each is decorated rather than instrumented. (I36)
 
 ---
 
@@ -502,6 +542,12 @@ machine noise closes, on a runner measured at 2.7× this host's timings (F809). 
 - **T1.15** (I17): a capture exceeding the cap → the written file stops at the cap and `dropped.captureBytes` reports the excess, asserted separately — a total is satisfied by redistribution.
 - **T1.15d** (I17): a `heap` capture at a 64-byte cap → `bytes` is 64 and `droppedBytes` is over a million, asserted apart because their sum is the snapshot's size however the split falls. `heap` is the kind whose bytes come off a stream rather than a `JSON.stringify`, so it is where the cap has to hold against something the component did not size. The row was first written to reach `capped`'s no-room branch and could not: `getHeapSnapshot()` yields **one chunk of 5 193 967 bytes**, so the sink is written once per capture for every kind and the branch was unreachable — and redundant with the overrun arm, which computes the same thing at `room === 0` (F878).
 - **T1.16** (I23): `setTier("spans")` from `counters`, then the view closes → the tier is `counters` again, not `off`; and a report with an empty ring renders a notice rather than a plot with no series.
+- **T1.18** (I36): a route whose transport takes 40 ms and whose adapt takes 5 → `spans.transport` is 40 and `spans.adapt` is 5, and their groups are `far side` and `compute`. One number covering both is the reading the split exists to end: a slow far side and a slow adapter want opposite remedies, and only one of them is this framework's to apply.
+- **T1.19** (I36, I33): two live parts fetching concurrently, one 10 ms and one 30 → `livefetch` has `count` 2, `max` 30 and `sum` 40, and neither node is the other's child. This is the case the single-pointer shape recorded as nothing, with no error.
+- **T1.20** (I36): a stream of five patches, the far side pausing 20 ms before each and the consumer taking 10 between them → `spans.stream.sum` is about 100 and **not** about 140. The bracket is around `next()`, so the consumer's own work is outside it by construction; a span around the loop reports one number that both a slow far side and a slow shell produce.
+- **T1.21** (I36): the same route at tier `off`, with the seams' own call counts beside the report → no span is recorded **and** each decorated seam is called exactly as often as the undecorated one. An empty `spans` is also what a decorator that swallowed the call looks like, so the count is what separates the two.
+- **T1.22** (I36): a local verb handler taking 12 ms → `spans.local` is 12 and its group is `compute`. This round's plan called it `handler`, which is the input path's name and groups as `input`; one name for both files a document-producing route in the column a reader scans for keystroke latency.
+- **T1.23** (I36, C06 I9): the decorated `stream` yields exactly the patches the undecorated one does, in order, with exactly one `end` last. A decorator that drops, reorders or duplicates a patch is invisible to every timing row above, and it is the only defect here that changes what the user sees.
 - **T1.30** (I30): `NO_PROBE` answers every member of `Probe`, is frozen, returns the shared `NO_SPAN`, and records nothing — the seam a component below `src/shell/` actually holds, so a missing member is a renderer throwing rather than degrading.
 - **T1.31** (I30): a span taken through `asProbe()` reaches the same recorder as one taken on the profiler — a narrowing view, not a second implementation, because two implementations of a span are two things obliged to agree and the disagreement is silent.
 - **T1.32** (I31, **the fabrication control**, real clock): one 200-point plot and fifty rules → the plot's self time is several times a *mean rule's*. Equal division across the sequence gives every block the same figure, so the ratio it produces is exactly 1. Against the *sum* of fifty rules the claim is false and is not made: fifty rules cost more than one plot, which is arithmetic rather than attribution.
@@ -585,7 +631,6 @@ machine noise closes, on a runner measured at 2.7× this host's timings (F809). 
 | Not here | Where |
 |---|---|
 | The terminal's own processing time | deferred. Nothing in `src/terminal/` queries the terminal (design M10), so it needs a new `escapes.ts` export and a reply the decoder does not swallow. Grep `escapes.ts` for a report export |
-| Chrome Trace Event export | deferred on the span set stopping moving, and the condition is a **log rather than a grep**: `git log -p -- src/shell/profiling/types.ts` shows no change to `SpanName` across C7–C9. A grep asking whether a member was *added* is an absence check, and an absence check reads as satisfied hardest on the day it stops being true |
 | Cross-session persistence, and a `calendar` pane with it | the ring is bounded and in-memory; `make profile`'s NDJSON is the durable form. Grep `ProfileReport` for a `sessions` member |
 | Flame graphs of the far side's work | needs a far-side profiling protocol; B1–B8 carry none |
 | Instrumenting inside an L1 or L2 unit | §1's blind spot. Decoration first; if it proves too coarse that is a measurement rather than a guess |
