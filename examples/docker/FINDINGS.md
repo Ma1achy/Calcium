@@ -31517,6 +31517,263 @@ Found by reading the table against the paragraph above it while adding a member 
 the same instrument as *read the abstract against its own section before reading the section against
 the code*, applied to a constant.
 
+## F904 — a line citation is checked for being non-blank, and its symbol against the whole file ★★★★☆
+
+`tools/roadmap-status.mjs` resolves every claim in the roadmap's Order column. For a citation of the
+form `` `path:line` `` it does two things:
+
+    if (c.line > lines.length)                → "the file has N lines"
+    if (lines[c.line - 1].trim() === "")      → "is blank"
+
+and separately it takes each backticked identifier in the same cell and asks whether it occurs
+**anywhere in that file**. Both checks are real and neither compares the two: a citation is
+satisfied by a non-blank line, and its symbol is satisfied by the file, so a line number drifts
+silently for as long as the file grows above it.
+
+Found by an unrelated edit. Adding a comment to `construct.ts` shifted the file by 47 lines and
+roadmap 20's `` `src/shell/construct.ts:1224` `` landed on a blank line — the one condition the gate
+can see. Chasing it, **both of that row's citations were already wrong at HEAD**: it names
+`visible: (host: RefreshHost) => boolean` at `refresh.ts:327`, which is at **344**, and its wiring at
+`construct.ts:1224`, which is at **1352**. The gate had reported *every claim resolves* over both.
+
+Measured over the whole document with a window of six lines:
+
+    citation anchorage · 43/74 line citations carry one of their own cell's symbols within 6 lines
+
+**Thirty-one of seventy-four**, and twenty-nine of the thirty-one are in files this session never
+touched — so the figure is HEAD's, not this session's. Two spot-checks, both at HEAD: roadmap 15
+names `#setCopyMode` at `session.ts:586` and it is at **1096**; the same row names C03's
+`suspend`/`resume` at `frame-scheduler.ts:263` and `suspend()` is at **315**. Off by 510 lines and by
+52, and green.
+
+**Reported, not gated, and the reason is the window.** A symbol declared over four lines of doc
+comment is legitimately cited at any of them, so any radius is a judgement — and a rule that has to
+guess one fails in the direction where people widen it until it says nothing. What this can honestly
+be is a figure a reader compares against the last run, beside the tool's two existing signals.
+
+**Its blind spot, found while writing its own row.** The identifier pattern takes backticked
+single words and excludes anything with spaces — correctly, since a cell writes prose in backticks
+too. Entry 20's only symbol is the multi-word signature `visible: (host: RefreshHost) => boolean`,
+so **the cell that motivated the whole signal contributes nothing to it**: its two citations are not
+in the population, and mutating either moves no counter. A citation whose cell names no single-word
+symbol is unmeasured, and in the report that is indistinguishable from one with nothing adrift. The
+fabricated violation had to be aimed at entry 16 instead, and RS14 says why in as many words —
+an unrecorded limit reads as strength.
+
+**The class is *a gate that passes without checking*, and the shape is the halves.** Two correct
+checks over the same citation, each satisfied by a different fact, with nothing joining them: the
+line is real and the symbol is real and they are in different places. That is the same joint as
+F903's flag one level out — a declaration, a consumer and no edge between them — and neither is
+visible to a reader checking statements one at a time, because every statement is true.
+
+## F903 — the suspended flag had a declaration, a consumer and no writer ★★★★☆
+
+C28 I28: *no CPU figure is reported across a `handoff()` interval — `process.cpuUsage()` excludes the
+child, so an idle reading there is false rather than merely imprecise.* The mechanism is the
+`suspended` flag on each resource sample, which a consumer reads to refuse the reading.
+
+Three parts, and they landed in three different commits:
+
+| part | state at HEAD |
+|---|---|
+| the sample carries the flag | `node.ts:159` — `suspended` on every `ResourceSample` |
+| a consumer refuses to headline a suspended sample | `panes.ts:412` — built this session, F900 |
+| **something sets it** | `recorder.ts:155` — `let suspended = false`, and **no assignment anywhere** |
+
+So every sample in every session said `false`, and the pane's refusal was unreachable outside the
+rows that construct the state by hand. A `handoff()` running `vim` for two minutes produced a series
+of samples reporting a near-idle process, correctly labelled as running.
+
+**This is the sequel to F900 and it is the same invariant.** F900 found the *consumer* missing and
+said so: I27's two clauses *"had different fates and the same appearance"* — one a parameter being
+stored, the other a claim about every consumer. Writing the consumer made the third part findable,
+and the third part is the one that makes the other two mean anything. **A flag with a producer and
+no consumer is a wasted field; a flag with a consumer and no producer is a wrong answer**, and only
+the second is a defect — but the first is what hid it, because the whole mechanism looked
+half-built either way.
+
+**The reason nothing caught it**: `let suspended = false` is a correct declaration, `probe.sample(suspended)`
+is a correct call, and `sample(suspended: boolean)` is a correct signature. Read one at a time, all
+three are right. What is absent is an *edge*, and no assertion about a statement can see a missing
+edge — this is the *step can name an effect and have no mechanism* class, arriving as a variable
+rather than as a table row. The grep that reaches it is the one for an assignment, not a mention:
+`grep -n "suspended" src/shell/profiling/recorder.ts` returns two lines and neither is a write.
+
+**Fixed**: `Profiler.setSuspended(on)` sets it, and `construct.ts` decorates the `lifecycle` handed
+to `execution.ts` so `suspend()` and `resume()` bracket it — the decoration root, so `execution.ts`
+runs a handoff without naming a profiler (C22 I93). The flag is set **before** the terminal is
+released and cleared **after** it is reacquired: the other order leaves a window whose width is
+whatever `suspend()` costs, and a sampler tick inside it takes exactly the reading the invariant
+exists to refuse. Not gated on the tier — a tier raised mid-handoff would otherwise start sampling a
+suspended session while labelling it as running.
+
+## F902 — a stale deferral marker hides two states, and only one of them is a conversion ★★★★☆
+
+The instruction was to convert the profiler's `it.todo` rows that *"carry the no-blocker marker while
+the recorder they name has existed all round"*. Grouping every one of them by the clause after its
+marker gave 38 rows, and 33 named a condition already met. The obvious reading is that 33 rows are
+conversions. **Going to each row's subject rather than to its marker, they are not.**
+
+Two of the 33 name a subject that does not exist:
+
+| row | its marker says | measured at HEAD |
+|---|---|---|
+| T1.10, T6.16 (C24 I32) | *lands with the seams wired through `construct.ts`* | the seams **are** wired — `deps.profiler.asProbe()` at `construct.ts:705, 757, 787, 1241`. And `ChromeContext` is `{ session, now, columns, copyMode }`: **there is no `lastFrame` member**, and `grep -rn lastFrame src/` reaches `session.ts`'s private frame *lines* and `tree.ts`'s frame *index*, neither of which is a cost |
+| T1.54 (C22 I95) | *lands with the deep tier* | the deep tier landed — `capture()`, `createInspector` and `captureDir` all ship. The invariant is unimplemented for a different reason, which is F901 |
+
+So a marker naming a met condition splits into **the row that is now writable** and **the row whose
+real blocker was never stated**. Both look identical from the marker, and the second is the more
+expensive: it reads as ready, and the person who picks it up writes a test against a member that
+was never built.
+
+**The mechanism is the one the deferral rule already names, arriving one level up.** A deferral
+states its blocker where the deferral is, and what satisfies it is written somewhere else. Here the
+blocker was stated *wrongly* — the row was written in the same commit as its neighbours and took the
+neighbours' clause, because at that moment nothing distinguished them: no seam was wired and no
+member existed, so every row was blocked and the shared sentence was true of all of them. **A shared
+blocker is accurate exactly while it is the only one**, and it stops being accurate silently, one
+row at a time, as the shared condition is met and each row's private condition is not.
+
+That is why the count is not the finding. *Thirty-three of thirty-seven markers are stale* was
+measured and correct, and acting on it as a work item would have produced two tests asserting
+members that do not exist. **The instrument is per row: resolve the subject, not the marker.**
+
+**Both were built rather than re-marked.** `ChromeContext.lastFrame` is one optional member fed from
+the record the recorder already keeps, and C24 I32 has committed to it since the spec landed; the
+alternative was a marker naming a symbol nobody had scheduled. F901 is the other.
+
+## F901 — a capture's directory is a literal that agrees with `stateDir` by coincidence ★★★☆☆
+
+C22 I95: *a capture is written under `stateDir`, so I67's self-ignoring directory covers it and no
+consuming project's ignore rules need to have anticipated a heap snapshot.* The reason is exact — a
+heap snapshot is tens of megabytes of a user's process memory, and a project whose `.gitignore`
+never anticipated one commits it.
+
+Measured, with `captureDir` unset — the case the invariant is about:
+
+    captureDir unset  →  .calcium/profile/heap-0-2004.heapsnapshot
+
+which is under `stateDir`, and **not because anything resolved it there**:
+
+    src/shell/profiling/recorder.ts:73    captureDir: ".calcium/profile",
+    src/shell/profiling/recorder.ts:647   const dir = opts.captureDir ?? DEFAULTS.captureDir;
+    grep -rn "stateDir" src/shell/profiling/   →  0 lines
+
+`DEFAULT_STATE_DIR` is `".calcium"` (`config.ts:117`) and the literal begins with the same five
+characters. `session.ts:404` constructs the profiler from `this.config.profile` alone, so
+`config.stateDir` — resolved two lines away — has no path to the recorder at all. **A consumer
+setting `stateDir: "/var/lib/app"` gets its heap snapshots in `./.calcium/profile`**: outside the
+directory it asked its state to live in, and outside the `.gitignore` of `*` that I67 wrote, which
+is the whole of what the invariant promises.
+
+**The row that covers this is T1.54, and its own text names the failure it could not catch**: *the
+two are asserted together, because either alone is satisfied by a path that happens to look right.*
+It was a deferral, marked *lands with the deep tier* — a condition met some time ago (F902) — so the
+row that anticipated the exact defect never ran against it.
+
+**Fixed** at the seam that knows both: `session.ts` resolves `captureDir` to
+`` `${stateDir}/profile` `` when the config leaves it unset, and the recorder's literal stays as the
+last resort for a profiler constructed without a session. The row asserts the two halves together as
+its text always said, and does it at a **non-default `stateDir`** — at the default every wrong
+answer is also the right one, which is how this survived.
+
+## F900 — `suspended` has been on every resource sample since the first commit and no consumer has ever read it ★★★★☆
+
+C28 I27: *a sample taken while the session is suspended carries `suspended: true`, **and no consumer
+reads a suspended sample as an idle figure or draws it as a zero**.* The first clause was built —
+`ResourceProbe.sample(suspended: boolean)` stores it. Measured before the repair below,
+`grep -rn "suspend" src/shell/profiling/panes.ts src/shell/profiling/export.ts` returned **one line,
+and it was a comment**.
+
+The memory pane took every headline figure from `r.samples[r.samples.length - 1]`: loop delay max
+and p50, gc pauses, gc by kind, cpu user and system, user-timing entries. A sample taken while the
+session is suspended has a loop that was not turning and a process that was not working, so its
+zeroes are a **stopped clock** presented as the present state of a running one. **An idle machine
+and a paused one drew the same picture**, which is the reading the invariant names in as many words.
+
+**The invariant's two clauses had different fates and the same appearance.** The first is a
+parameter being stored and could not fail. The second is a claim about *every consumer*, which is
+satisfied trivially while there are no consumers and becomes false the moment there is one — the
+vacuity that arrives with the subject rather than being present from the start. The pane was written
+later, from the sample's fields, and `suspended` reads like one more field.
+
+**Fixed**: the headline comes from the last **running** sample; the caption says how many were
+suspended and that the series is not continuous; a report whose samples are all suspended draws a
+refusal instead of a series, because there is no reading of a running process to headline. Its
+control is a report with nothing suspended, unchanged — a caveat on every report is a caveat nobody
+reads, and it passes both other arms.
+
+**The third pane instance of one class this session**, after F895's two: *a figure whose meaning
+depends on a flag the drawing code does not read*. F895's flag was the tier against the ring, and
+this is `suspended` against the sample. Both were found by writing the row rather than by reading
+the pane, and both were invisible to every fixture because every fixture builds the state where the
+flag does not matter.
+
+## F899 — a fallback frame is recorded whole and reaches no projection, so `outcome` has no observable value but one ★★★☆☆
+
+C28 I6: *a frame whose composition returned `fallback` is counted, carries `outcome: "fallback"`, and
+is excluded from every duration histogram.* All three happen inside the recorder. The record is
+pushed to the ring with its reason, wait, work, spans and outcome.
+
+`report()` then builds
+
+    const drawn = held.filter((f) => f.outcome === "frame" && !f.selfInflicted);
+
+and `drawn` feeds **both** `timeline` and `worst`. Measured — a session with one fallback frame and
+one real one:
+
+    timeline outcomes: ["frame"]
+    worst    outcomes: ["frame"]
+    excluded         : {"selfInflicted":0,"fallback":1}
+
+So the only published trace of the frame that gave up is that it happened once. Which frame, at what
+time, after what wait, with which spans open — recorded, and dropped at the projection. **A fallback
+is the interesting frame**: it is where composition failed, and it is the one a reader opens a
+profiler to find.
+
+**One filter serving two purposes, and only one of them is required.** I6 asks for exclusion from
+**durations**; excluding from the timeline is a consequence of reusing `drawn` for the projection,
+and nothing states it. The cost is that `FrameRecord.outcome` is a published field whose non-`frame`
+value no consumer can ever observe — which is also why no row could have caught this by reading the
+report: the value is not there to disagree with.
+
+**Not repaired here**, because the remedy is a change to a published type's meaning — `timeline`
+either stops being *the frames that drew* or gains a sibling — and that is C24's surface rather than
+a defect to patch. T3.7 asserts the absence, so the day a projection carries a fallback the row fails
+and is rewritten rather than quietly agreeing.
+
+## F898 — a spec row asks for a mechanism its own invariant does not name, and the invariant's remedy is already built ★★★☆☆
+
+C28 T3.3 reads *`resolution` larger than the sampling window → the histogram is **empty rather than
+zero-filled***. Measured, a sample taken with no window behind it:
+
+    resolutionMs : 10
+    max          : 0
+    p50          : 0.000511
+    p99          : 0.000511
+
+Zero-filled, and not empty. The row and the code disagree, and the interesting part is that **I13
+does not ask for what the row asks for**: *a loop-delay figure travels with the `resolutionMs` it was
+sampled at, and no consumer presents its p50 as a delay.* That remedy is built and tested — the
+sample carries the resolution, and the memory pane prints *at resolution 10 ms — a floor, not a
+reading*, which T2.3 asserts over every pane rather than the one that draws it.
+
+So there are two candidate remedies for one problem — **omit the figure**, or **qualify it** — and
+the row names the first while the invariant names the second. This is not F895 (an invariant
+strengthened past its mechanism); it is a **test row** strengthened past its invariant, which is the
+harder direction to see: a row is read as an assertion about the code, so a row the code fails reads
+as a defect in the code.
+
+`max: 0` is the case that keeps this open rather than closing it as a wording slip. A percentile
+below the resolution is honestly a floor and the label says so; a **max** of 0 over an empty
+histogram says *nothing was ever delayed*, which is a statement about the loop and not about the
+instrument, and the resolution beside it does not qualify that reading.
+
+**Open, and deliberately not settled by conforming the row to the code.** T3.3 asserts I13's remedy,
+which is what the invariant requires and what is built. Deciding whether I13 should also require the
+omission is a spec change, and the cheapest moment to make it is with both readings written down
+rather than after one of them has been quietly deleted.
+
 ## F897 — the same mutation run reports SURVIVED twice and CAUGHT once, and one way a kill becomes invisible was seen ★★★★☆
 
 `tools/mutate/runs/c22-footer-budget.mjs` reports `T4.28 · visibleRows bypasses entryLayout` as
@@ -31627,13 +31884,38 @@ SP9 watches a **name**, and a todo supplies one. So both gates were satisfied by
 sentence rather than by anything about its truth, and each was satisfied for a different reason —
 which is why neither reads as a hole.
 
+**The class is larger than the eleven, and its markers were measured rather than assumed.** Grouping
+every profiler `it.todo` by the clause after its marker, measured at the commit before any of them
+were converted:
+
+| the condition the marker names | rows | true at HEAD? |
+|---|---|---|
+| *lands with the recorder in `src/shell/profiling/`* | 11 | no — the recorder shipped |
+| *lands with the seams wired through `construct.ts`* | 11 | no — `deps.profiler.asProbe()` at five call sites |
+| *lands with the module each row names* | 10 | no — every module named exists |
+| *lands with the deep tier* | 1 | no — `deep` is a `Tier` and `capture` requires it |
+| *lands with record and replay* | 4 | **yes** — `grep -rn "replay" src/` is empty |
+
+**Thirty-three of the thirty-seven deferrals carrying one of these five phrasings name a condition that
+has been met**, and each of the four
+phrasings was written once and copied down a file, so a reader checking one is checking all of them
+and a reader checking none is in the same position. The one true blocker is the one that names a
+symbol rather than a milestone — which is the difference the repair turns on: *lands with the
+recorder* cannot be resolved against the tree, and `grep -rn "replay" src/` can.
+
 **The bundle is what makes it invisible, and the eleven are not one thing.** One marker sentence
 covers rows with at least three dispositions: T3.1, T3.2, T3.4, T3.8 and T3.11 have their subjects
 built and are owed now; T3.6 and T3.9 are blocked on mechanisms that do not exist; T3.10 names
 `suspend()`/`resume()` methods that are not there while the `suspended` flag they assert about is.
 *N subjects, N blockers* applied to a file rather than a row.
 
-**The repair is a figure, not a gate.** Twenty-one is not debt to be turned red — most are honest
+**The figure moved on its first day, which is what it is for.** Landing eight of
+`test/edge/profiler.test.ts`'s eleven as real rows took C28 I27 and I29 out of the deferred
+population, and `make enforce` reports **18** where it reported 20. A number that only ever grows is
+a number nobody reads; this one shrinks when the work is done and grows when a row is deferred, and
+neither movement is visible in the 79 beside it.
+
+**The repair is a figure, not a gate.** Twenty is not debt to be turned red — most are honest
 deferrals — and a gate red on arrival is a gate edited to fit. What is missing is that SP9's own
 reported line cannot tell the two populations apart, so a deferral that has quietly become the only
 thing standing behind an invariant is invisible in the number that exists to say otherwise. SP9's
