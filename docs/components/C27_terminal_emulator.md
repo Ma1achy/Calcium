@@ -8,7 +8,7 @@
 | **Depends on** | `@xterm/headless` 6.0.0, wrapped in one file · C04's `Terminal` type |
 | **Consumed by** | L4 (C23's shell route) |
 | **Source** | `docs/notes/CALCIUM_LIVE_TERMINAL_DESIGN.md` §1–§6 · A02 §1 · F840–F844 |
-| **Status** | Spec'd 2026-09-06, unbuilt |
+| **Status** | **Built** — `src/data/emulator/{emulator,snapshot,types}.ts`, 384 lines, landed in `3f3be973` *C27 and the live shell route — bytes in, a screen out*. 12 invariants, 24 test citations across four files. The line above read *spec'd, unbuilt* until F891 went looking. |
 
 ---
 

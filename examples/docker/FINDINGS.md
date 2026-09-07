@@ -31517,6 +31517,44 @@ Found by reading the table against the paragraph above it while adding a member 
 the same instrument as *read the abstract against its own section before reading the section against
 the code*, applied to a constant.
 
+## F891 — two Status lines read as current for a component that shipped, and the stale clause was load-bearing ★★★★☆
+
+`COMPONENT_SOURCES` has a row per component naming the file whose existence means that component
+runs; TD3 forbids naming a path before it exists, because a missing path reads as *not implemented*
+forever and silently exempts every deferral pointing at it. **C26 and C27 have no row**, and the
+map's own comment says why: *their behaviour files are not obvious from outside their specs*.
+
+Going to the specs, both header tables were wrong.
+
+| | said | measured |
+|---|---|---|
+| C26 | *Draft — **design only.** No `src/interaction/navigation/`, no bindings, no keymap rows.* | 24 invariants, **40 test citations across six files**; `keymap.ts:308` binds the transcript's selection under C26 §5c; `src/testing/navigation-conformance.ts` is a **published** conformance suite for C26 §5 |
+| C27 | *Spec'd 2026-09-06, unbuilt* | `src/data/emulator/{emulator,snapshot,types}.ts`, **384 lines**, landed in `3f3be973`; 12 invariants, 24 test citations across four files |
+
+**C26's line is the interesting one, because it is a conjunction and only part of it decayed.**
+Three clauses — no directory, no bindings, no keymap rows — were true together on the day it was
+written, and two of them stopped being true without the sentence being re-read. **A conjunction
+goes stale one clause at a time and still reads as one claim**, which is why nobody checked it: the
+`Draft` at the front is what a reader takes away, and it was answered by the surviving clause.
+
+**And the surviving clause is the load-bearing one**, which is the reason the whole line looked
+harmless. *No `src/interaction/navigation/`* is exactly why C26 can have no `COMPONENT_SOURCES`
+row — not as an omission but as a **refusal with a reason**. C26's behaviour lives in files owned by
+other components: `entry-layout.ts` is C22 §6l.4's, `actions.ts` is C23 §3a's, `keymap.ts` is
+C16's. A row naming any of them expires every C26 deferral on **another component's** birthday, and
+all three of those birthdays are long past.
+
+**So the two halves of the gap resolve in opposite directions.** C27 gets its row —
+`src/data/emulator/emulator.ts`, the behaviour and, by its own header, the one file in `src/` that
+imports the emulation package (C27 I11, MG28). C26 gets a recorded refusal instead, with the
+measurement, so the next reader does not re-derive it from the same three candidates. Until then a
+deferral naming C26 fails TD1 loudly, which is the safe direction and was never the problem.
+
+**The instrument was *ask where a settled claim is written down*, pointed at a header table.** Its
+running total is now four claims disproved and four produced. The map's comment was carried as a
+reason across the round — *not obvious from outside their specs* — and it was true of C26 and
+false of C27, where one `ls` settles it.
+
 ## F890 — P11's seven, resolved: two were not defects, two were free, one is refused with figures ★★★★★
 
 The plan listed seven defects to fix, each with a site. F884 found four of the seven citations do

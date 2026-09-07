@@ -8,7 +8,7 @@
 | **Depends on** | C09 (`BlockDefinition.elements`, `measure`) · C13 (the entry a scope names) · C14 (the visible range, and `#restoreFromAnchor`'s shape) · C11 (`focusableRowIds`, which this generalises) |
 | **Consumed by** | C16 router · L4 |
 | **Source** | `CALCIUM_ROADMAP.md` Order 7 · A02 §2 focus priority · principia-ii `SMART_NAV_IMPLEMENTATION.md` |
-| **Status** | Draft — **design only.** No `src/interaction/navigation/`, no bindings, no keymap rows. |
+| **Status** | **Built, and in no directory of its own.** Three of that sentence's four clauses went stale without being read: the bindings exist (`keymap.ts` §5c and its neighbours), the keymap rows exist, and 24 invariants carry 40 test citations across six files. Only *no `src/interaction/navigation/`* is still true — and it is the clause that matters, because it is why this component has no `COMPONENT_SOURCES` row and can have none: its behaviour lives in files owned by others (`entry-layout.ts` is C22 §6l.4, `actions.ts` is C23 §3a, `keymap.ts` is C16), and a row naming one of those would expire every deferral on C26 on another component's birthday (TD3, F891). |
 
 ---
 
