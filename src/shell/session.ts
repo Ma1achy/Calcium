@@ -658,6 +658,16 @@ class Session implements TuiInstance {
     // find. Beside `pipeline.dispose()` for the same reason: the sampler
     // re-arms itself off the injected timer, so a session that stops between
     // two ticks holds a timer that holds the process open.
+
+    // **The report is taken here and not one line down** (C28 I38) — on
+    // asymmetry, because nothing observable separates the two orders today
+    // (F883). `report()` reads `probe.spaces()`, and taking it after `dispose()`
+    // was expected to empty `heapSpaces`; it does not, 11 spaces either side,
+    // because `node.ts`'s read has no dependency on a live probe. What keeps the
+    // order is that it costs nothing and the alternative rests on a disposed
+    // member still answering — which `capture()`, disposed the same way, refuses.
+    const onReport = this.config.profile?.onReport;
+    if (onReport !== undefined && this.#profiler !== null) onReport(this.#profiler.report());
     this.#profiler?.dispose();
 
     // 2 — release, which runs `beforeRelease` (the cleanup) and then restores

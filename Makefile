@@ -98,6 +98,17 @@ roadmap:            ## the Order column's claims, resolved against the tree
 	@# `enforce` is separable from `all`.
 	node tools/roadmap-status.mjs
 
+profile:            ## A01 Appendix B, filled from a real session (C28 T5.3)
+	@# **Reports, never fails** — `regime`'s disposition, for `regime`'s reason: a
+	@# budget is a claim about a regime and a runner is not the regime it was
+	@# measured in. Four of the appendix's six rows come back measured and two come
+	@# back refused naming what they need, which is the output, not a shortfall.
+	@#
+	@# **Needs `dist/`**, so it builds first: a probe against a stale build gives a
+	@# wrong negative and nothing revisits a ruled-out candidate.
+	npm run build
+	node tools/profile.mjs
+
 regime:             ## what a source-scan pass costs *here*, beside the recorded figures
 	@# **Reports, never fails.** A budget is a claim about a regime and a runner
 	@# is not the regime it was measured in — so the number a foreign run needs

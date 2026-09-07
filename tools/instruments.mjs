@@ -90,6 +90,17 @@ const COVERED = [
   ["tools/terminal-probe/build.mjs", ["npx", "vitest", "run", "test/unit/terminal-probe.test.ts"]],
   ["tools/terminal-read.sh", null], // same fixture — the driver's own claims
   ["tools/proof.sh", ["npx", "vitest", "run", "test/unit/proof-guards.test.ts"]],
+  // **A tier-5 fixture, because the subject is `dist/`.** What this instrument
+  // owes is not arithmetic — `checkBudget` has its own tier-1 rows over report
+  // literals — but that a session driven through the built package's public
+  // surface produces a report the appendix's table can read. T5.3 asserts all
+  // six of A01's labels, that exactly two come back refused, and that the
+  // verdict is never `closed` while two rows are blank.
+  ["tools/profile.mjs", ["npx", "vitest", "run", "--dir", "test/e2e", "profiler"]],
+  // Same fixture, and it is a real exercise rather than a shared file: the
+  // doubles are what `profile.mjs` builds its session on, so a broken stdout is
+  // a dead fixture and T5.3's first assertion is the liveness line.
+  ["tools/bench/fakes.mjs", null],
   // **Both landed without a fixture and this target was not run**, so the gate
   // that exists to catch exactly that sat red for three commits. `catalogue-png`
   // shares the file because the two are one pipeline — frames out, images in —

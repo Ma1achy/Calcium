@@ -2080,6 +2080,20 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   "Finding.means": "C09 §7 — as `subject`",
   "ConformanceReport.findings": "C09 §7 — as `subject`",
   "ConformanceReport.skipped": "C09 §7 — as `subject`, and the reference app reads it in five places",
+  // C28 I37 — A01 Appendix B's rows, filled from a `ProfileReport`. Same
+  // disposal as `Finding.subject` above and for the same reason: this is a
+  // report, so its consumer is the suite that asserts it and the tool that
+  // prints it, neither of which is in `src/`. `formatBudget` reads all four of
+  // the row fields one screen below their declaration; MG24 discounts a
+  // same-file read, correctly, because a component consuming its own member is
+  // not a seam. `test/unit/profiler-budget.test.ts` asserts each of the six.
+  "MeasuredRow.crossed": "C28 I37 — the appendix's verdict per row; asserted by T1.25 and T1.28",
+  "MeasuredRow.marginal": "C28 I37 — whether a crossing is inside the histogram's own error (I13); asserted by T1.28",
+  "MeasuredRow.thresholdText": "C28 I37 — A01's threshold beside the figure, so a verdict a reader can check travels with it; asserted by T1.25",
+  "UnansweredRow.thresholdText": "C28 I37 — A01's threshold quoted beside a refusal, so the blank row still says what it was blank against; asserted by T1.26",
+  "UnansweredRow.needs": "C28 I37 — what a refused row would require, which is the whole content of a refusal; asserted by T1.26 and T1.27",
+  "BudgetReport.crossed": "C28 I37 — the crossed rows, for a caller deciding; asserted by T1.28",
+  "BudgetReport.unanswered": "C28 I37 — the rows with no answer, which is what makes the verdict `undecided`; asserted by T1.27 and T1.29",
   "ConformanceReport.kindsCovered": "C09 §7 — measurement-conformance coverage, asserted by the harness's own row",
   "ConformanceReport.exactness": "C09 §2a — how many windows were compared row for row and how many the EXACT_ROWS bound left out. A report, so its consumer is the row that reads it: `block-window.test.ts` asserts `read`, because a bound nobody can see reads as coverage",
   "Failure.check": "C09 §7 — measurement failure record, asserted by the harness",

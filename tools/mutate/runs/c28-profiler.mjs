@@ -20,7 +20,7 @@ import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
 const CMD =
-  "npx vitest run test/unit/profiler-tree.test.ts test/unit/profiler-seams.test.ts test/unit/profiler.test.ts test/unit/profiler-export.test.ts test/unit/profiler-async.test.ts";
+  "npx vitest run test/unit/profiler-tree.test.ts test/unit/profiler-seams.test.ts test/unit/profiler.test.ts test/unit/profiler-export.test.ts test/unit/profiler-async.test.ts test/unit/profiler-budget.test.ts";
 const REC = "src/shell/profiling/recorder.ts";
 const NODE = "src/shell/profiling/node.ts";
 const SCANS = "tools/enforce/source-scans.mjs";
@@ -33,6 +33,8 @@ const EXPORT = "src/shell/profiling/export.ts";
 const ASYNC = "src/shell/profiling/async-probe.ts";
 const TYPES = "src/shell/profiling/types.ts";
 const CONSTRUCT = "src/shell/construct.ts";
+const BUDGET = "src/testing/profile.ts";
+const SESSION = "src/shell/session.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -460,6 +462,69 @@ const results = runPass({
       from: "        await it.return?.();",
       to: "        void 0;",
       expect: "T1.23",
+    },
+    {
+      // **A refusal rendered as a zero**, which is the whole of I37. The table
+      // still has six rows, the arithmetic still adds up, and the verdict flips
+      // from `undecided` to `closed` — a gate closed on an experiment nobody
+      // ran. Every assertion about the four measured rows stays green.
+      name: "REFUSAL-AS-ZERO: a row nothing measures reports 0",
+      file: BUDGET,
+      from: "function resizeCorruption(report: ProfileReport): UnansweredRow {",
+      to: "function resizeCorruption(report: ProfileReport): UnansweredRow {\n  if (report.frames >= 0) return measured(spec(\"resize-corruption\"), 0, \"0\", 0) as unknown as UnansweredRow;",
+      expect: "T1.27",
+    },
+    {
+      // The same failure one level up, and the sharper one: the rows are still
+      // refused and the *verdict* folds them into a pass. A reader acts on the
+      // verdict.
+      name: "CLOSED-OVER-BLANKS: an unanswered row does not stop `closed`",
+      file: BUDGET,
+      from: "    crossed.length > 0 ? \"justified\" : unanswered.length > 0 ? \"undecided\" : \"closed\";",
+      to: "    crossed.length > 0 ? \"justified\" : \"closed\";",
+      expect: "T1.29",
+    },
+    {
+      // A crossing inside the histogram's own bucketing reported like one four
+      // milliseconds clear of the threshold (C28 I13). Both are `crossed: true`
+      // and the table reads identically.
+      name: "NO-MARGINAL: a crossing is never reported as inside its own error",
+      file: BUDGET,
+      from: "    marginal: Math.abs(value - spec.threshold) <= value * relativeError,",
+      to: "    marginal: false,",
+      expect: "T1.28",
+    },
+    {
+      // The appendix's row is *per frame*. A session total is the same number
+      // with a different unit, it is larger rather than absent, and it crosses
+      // the threshold on a session that was never near it.
+      name: "BYTES-NOT-PER-FRAME: the row reports the session's total",
+      file: BUDGET,
+      from: "  const per = written / report.frames;",
+      to: "  const per = written;",
+      expect: "T1.25",
+    },
+    {
+      // **A tier that records nothing hands out a report anyway.** `off` builds
+      // no profiler, so the callback firing at all means the tier gate went —
+      // which is the defect the plan recorded as *`tier: \"off\"` still
+      // constructs everything*, arriving through the seam that made the report
+      // readable.
+      name: "TIER-OFF-REPORTS: the profiler is built whatever the tier",
+      file: SESSION,
+      from: "if (this.config.profile !== undefined && isRecording(profileTier)) {",
+      to: "if (this.config.profile !== undefined) {",
+      expect: "T1.59",
+    },
+    {
+      // The report handed out twice — once at construction, once at stop. A
+      // consumer appending both records the session twice, and the second one is
+      // right, so nothing downstream looks wrong.
+      name: "REPORT-TWICE: the report is also handed out at construction",
+      file: SESSION,
+      from: "        cpus: cpuCount(),\n      });\n    }",
+      to: "        cpus: cpuCount(),\n      });\n      this.config.profile.onReport?.(this.#profiler.report());\n    }",
+      expect: "T1.58",
     },
     {
       name: "EAGER-ALS: the async store is built at construction",

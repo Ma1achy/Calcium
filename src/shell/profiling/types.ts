@@ -234,6 +234,20 @@ export type ProfileOptions = Readonly<{
   sampleMs?: number;
   captureDir?: string;
   captureBytes?: number;
+  /**
+   * The report's way out of the process (C28 I38).
+   *
+   * **`report()` had exactly one caller** — `PipelineDeps.profile`, and so an
+   * in-app verb — which meant a session could record every span, counter and
+   * sample in the component and nothing outside the process could read any of
+   * it. `make profile`, a consumer's CI and a bug report all had that problem.
+   *
+   * Called once from `stop()`, before the profiler is disposed — on asymmetry
+   * rather than on a mechanism, because nothing observable separates the two
+   * orders (F883). Not called at all when nothing was recorded, so a callback
+   * that never fires means no recording rather than an empty report.
+   */
+  onReport?: (report: ProfileReport) => void;
 }>;
 
 export type ProfileReport = Readonly<{

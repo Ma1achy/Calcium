@@ -21,8 +21,15 @@
  * `TIER_RANK` stays because it is the tier *names*, ordered. Comparing two
  * tiers is the one operation a report's reader has that a type cannot give
  * them, and a frozen lookup table starts nothing.
+ *
+ * **`PHASE_GROUP` is the second, and it is the question the component exists
+ * for.** *Was this frame computing or drawing* is unanswerable from `spans`
+ * alone: a `Record<SpanName, Histogram>` carries no grouping, and the mapping
+ * that supplies one lived in a module no consumer can import. Same shape, same
+ * argument — names, grouped, frozen.
  */
 export {
+  PHASE_GROUP,
   TIER_RANK,
   type CaptureKind,
   type CaptureResult,
@@ -35,6 +42,7 @@ export {
   type MissReason,
   type NodeStat,
   type Overhead,
+  type PhaseGroup,
   type ProfileOptions,
   type ProfileReport,
   type Profiler,
