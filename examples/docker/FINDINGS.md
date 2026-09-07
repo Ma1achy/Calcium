@@ -31556,10 +31556,8 @@ person who wrote the corpus, which is the version that does not announce itself.
 
 **The seam exists and is one line from the id.** Every colliding span was measured, over twenty
 retained trees, to open under `paint > assemble` — inside `visibleRows`, whose loop holds
-`entry.id`; not one opened under `compose > measure`, C14's height loop, whose cache was warm
-throughout. So the repair needs no widening of C14's injected `measureSequence` seam, which is what
-the block-id ambiguity first appeared to demand. **The obstruction was in the aggregate's key, not in
-the layering** — [[right-about-the-layers-wrong-about-who-holds-the-data]].
+`entry.id`; not one opened under `compose > measure`, C14's height loop. **The obstruction was in the
+aggregate's key, not in the layering** — [[right-about-the-layers-wrong-about-who-holds-the-data]].
 
 **What this makes of `byEntry`.** C28's spec declares it in six places (§type block, I24, D3, T1.17,
 T4.2, T6.9) and the implementation has no such member; the standing reading was *a block id is not an
@@ -31568,6 +31566,30 @@ the disposition: the entry is not missing from the report, it is missing from th
 the key carries it `byEntry` is a projection of `nodes` rather than a second accumulator. T1.17 was
 unwritable for the whole round because the member it asserts on does not exist, and the reason it
 does not exist is this defect.
+
+## F892b — a measurement promoted to a general claim, and the repair written from it is what disproved it ★★★★★
+
+The paragraph as first written continued: *so the repair needs no widening of C14's injected
+`measureSequence` seam, which is what the block-id ambiguity first appeared to demand.* That is a
+**measurement promoted to a general claim**, and the thing that disproved it was the repair itself.
+
+With the scope in place the same run came back with four rows carrying no entry — `calls` 3 over
+`frames` 3, one per appended entry — and the stack says `ViewportImpl.measureSequence`, which is
+C14's `#heightOf` on a **cache miss**. The first measurement could not have seen it: the cache was
+warm for the whole of that run, so *the path opened no element spans* and *the path does not exist*
+produce identical trees. Twenty trees agreeing is not evidence about a branch none of them took.
+
+**And the undercount is worse than the absence it resembles.** An entry measured through C14 and
+rendered through the shell would have had the render half attributed and the measure half filed as
+unclaimed, so `byEntry` would read low for every entry, systematically, with the shortfall sitting in
+the same bucket as the chrome — where a reader is told to expect it. Three calls of twenty-six here;
+on a resize it is every entry, which is the axis C14 exists to make cheap.
+
+The repair is C14 I29: `measureSequence` takes the entry's id beside the blocks and the width, as
+`chromeRows` already takes the entry itself. C14 reads neither. The seam widening the first paragraph
+ruled out is one optional parameter, and the reason it looked unnecessary is that the fixture never
+took the branch that needs it — [[a-true-observation-promoted-to-a-general-claim]],
+[[the-implementation-falsifies-the-walk]].
 
 ## F891 — two Status lines read as current for a component that shipped, and the stale clause was load-bearing ★★★★☆
 

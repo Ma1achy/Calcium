@@ -161,6 +161,9 @@ describe("C14 — a cache that publishes its size publishes its hit rate", () =>
     expect(moved.misses["nothing-changed"], "the height really did change").toBe(0);
   });
 
+  it.todo("T2.15 (C14 I29): a viewport whose injected measureSequence records its third argument → every call names the entry whose blocks it was given, and a run with two entries records two distinct ids. Asserted on the ids and not on the arity, because a parameter declared and never passed satisfies the type — not deferred on a component: lands with the seam in src/viewport/viewport/");
+  it.todo("T6.25 (C14 I29): dropping the entry id from the measureSequence call → T2.15 fails, and byEntry under-reports every entry by whatever the height cache missed — an undercount with no signal, which is worse than the absence it looks like — not deferred on a component: lands with the seam in src/viewport/viewport/");
+
   it("T6.24 (C14 I28): counting nothing-changed as a fourth axis makes it a number that can never be non-zero", () => {
     // **The revert to guard against is a vacuous counter**, and a vacuous
     // counter reads as a healthy zero for ever. A slot agreeing on `rev` and
