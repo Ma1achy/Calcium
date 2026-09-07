@@ -1274,6 +1274,49 @@ const UNCITED_INVARIANTS = Object.freeze([
  * is written. Two matchers agreed on the total and disagreed on the members, so
  * the count is not the evidence and the list is.
  */
+/**
+ * Blank every line of an `it.todo(…)` call, not the line the call opens on.
+ *
+ * **The first version filtered lines matching `it.todo(` and nothing else**, so
+ * a call the formatter wrapped —
+ *
+ *     it.todo(
+ *       "T1.77 (C28 I45): … ",
+ *     );
+ *
+ * — kept its title, and the invariant that title names read as covered by a row
+ * that runs. Measured when this was written: **13 of 71 `it.todo` calls are
+ * wrapped**, and every todo long enough to carry TD1's marker is, because that
+ * is what pushes the line past the formatter's width. So the signal built to
+ * separate deferrals from rows could not see the deferrals most likely to be
+ * one (F907).
+ *
+ * Paren depth rather than a regex over the whole call: a title may contain `(`
+ * and `)` — most of them cite `(C28 I45)` — so a lazy match to the first `)`
+ * stops inside the citation and leaves the rest of the title behind.
+ */
+export function withoutTodos(text) {
+  const out = [];
+  let depth = 0;
+  for (const line of text.split("\n")) {
+    const opens = depth > 0 || /\bit\.todo\(/u.test(line);
+    if (!opens) {
+      out.push(line);
+      continue;
+    }
+    const from = depth > 0 ? 0 : line.indexOf("it.todo(") + "it.todo".length;
+    for (let i = from; i < line.length; i++) {
+      if (line[i] === "(") depth++;
+      else if (line[i] === ")") depth--;
+    }
+    // The line is dropped whole. A statement sharing a line with the end of a
+    // todo would go with it; none does, and a formatter that produced one would
+    // be writing `);foo()`.
+    out.push("");
+  }
+  return out.join("\n");
+}
+
 export function checkInvariantCoverage(
   specs,
   testFiles,

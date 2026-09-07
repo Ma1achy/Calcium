@@ -26,6 +26,7 @@ import {
   expectedOrder,
   invariantOrderOf,
   invariantsOf,
+  withoutTodos,
   OWNERS,
   REFERENCE_EXCEPTIONS,
   referenceFiles,
@@ -1493,5 +1494,82 @@ describe("A03 SP4 — Seam 4 and its owners agree, both directions", () => {
       reader(seamDoc([["Command submit", "C99"]]), ownerDoc(["Submit"])),
     );
     expect(renamed, "two names for one row is drift, and is caught").toHaveLength(2);
+  });
+});
+
+// **Assembled rather than written literally.** `collectTodos` walks `test/` for
+// the same marker and cannot tell a fixture from a deferral, so a literal here
+// fails TD6 on a title that is a fragment of a template string. The alternative
+// is the exclusion `todo-expiry.test.ts` already takes — naming the whole file —
+// which blinds the deferral gate to every real todo this file might ever hold,
+// for the sake of four rows. The function under test still receives the exact
+// form: the concatenation is in the fixture's source, not in its value.
+const OPEN = `it.${"todo"}(`;
+
+describe("withoutTodos — the deferral filter behind the coverage signal (F907)", () => {
+  it("EC1: blanks a wrapped it.todo whole, and the one-line form the old filter handled", () => {
+    // **The fabricated violation is the wrapped call**, because it is the form
+    // the previous filter passed: it dropped lines matching the opening and a
+    // formatter puts the title on the next one. Measured when this landed, 13
+    // of 71 calls in `test/` were wrapped, and every todo carrying TD1's marker
+    // is — the marker is what pushes the line past the width.
+    const wrapped = [
+      "describe('x', () => {",
+      `  ${OPEN}`,
+      '    "T9.1 (C99 I7): a thing that does not run yet",',
+      "  );",
+      "  it('T9.2 (C99 I8): a thing that does', () => {});",
+      "});",
+    ].join("\n");
+    const out = withoutTodos(wrapped);
+    expect(out, "the wrapped title is gone").not.toContain("C99 I7");
+    expect(out, "and the running row is untouched").toContain("C99 I8");
+
+    const oneLine = `  ${OPEN}"T9.3 (C99 I9): the single-line form");`;
+    expect(withoutTodos(oneLine), "the form the old filter could see").not.toContain("C99 I9");
+  });
+
+  it("EC2: the control — a file with no todo is returned line-for-line", () => {
+    // **The control the rule owes**: a filter that blanked everything would pass
+    // EC1 completely, and a coverage signal computed over an empty corpus reports
+    // every invariant as uncited, which reads as a very thorough gate.
+    const clean = ["const a = 1;", "it('T9.4 (C99 I10): runs', () => {});", "// it.todoish — a near miss with no paren, which must survive"].join("\n");
+    expect(withoutTodos(clean), "nothing to strip, nothing stripped").toBe(clean);
+  });
+
+  it("EC3: parens inside a title do not end the call early", () => {
+    // A lazy match to the first `)` stops inside `(C99 I11)` and leaves the rest
+    // of the title behind — which is the citation the filter exists to remove.
+    const s = [
+      `  ${OPEN}`,
+      '    "T9.5 (C99 I11): a title with (parentheses) and a cite (C99 I12) in it",',
+      "  );",
+      "  it('T9.6 (C99 I13): after', () => {});",
+    ].join("\n");
+    const out = withoutTodos(s);
+    expect(out, "both citations inside the todo go").not.toMatch(/C99 I11|C99 I12/u);
+    expect(out, "and the row after it stays").toContain("C99 I13");
+  });
+
+  it("EC4: the real corpus — every wrapped todo in test/ is invisible to the old filter and not to this one", () => {
+    // **The row that makes the other three about the tree rather than about a
+    // string.** It asserts the two populations rather than a threshold, so it
+    // stays true as todos are written and converted; what it forbids is the two
+    // filters agreeing, which is what a regression to line-matching would give.
+    const files = walkTests();
+    const oldFilter = (text: string): string =>
+      text
+        .split("\n")
+        .filter((l) => !/\bit\.todo\(/u.test(l))
+        .join("\n");
+    let survivedOld = 0;
+    let survivedNew = 0;
+    for (const f of files) {
+      const text = readFileSync(f, "utf8");
+      if (!/\bit\.todo\(/u.test(text)) continue;
+      survivedOld += (oldFilter(text).match(/\bT\d+\.\d+[a-z]? \(C\d\d I\d+/gu) ?? []).length;
+      survivedNew += (withoutTodos(text).match(/\bT\d+\.\d+[a-z]? \(C\d\d I\d+/gu) ?? []).length;
+    }
+    expect(survivedOld, "the old filter left deferred rows in the corpus").toBeGreaterThan(survivedNew);
   });
 });

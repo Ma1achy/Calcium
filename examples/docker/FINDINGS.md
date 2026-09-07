@@ -31517,6 +31517,111 @@ Found by reading the table against the paragraph above it while adding a member 
 the same instrument as *read the abstract against its own section before reading the section against
 the code*, applied to a constant.
 
+## F907 — the signal that separates deferrals from rows could not see a wrapped deferral ★★★★☆
+
+F896 added a figure beside SP9: *N invariants are named only by an `it.todo`, so nothing that runs
+stands behind them*. SP9 itself counts a todo as coverage — that is its stated behaviour — and this
+second number exists precisely to say how much of the coverage is deferred. It is computed by running
+the same check over a corpus with the deferrals filtered out:
+
+    readFileSync(f, "utf8").split("\n").filter((l) => !/\bit\.todo\(/u.test(l)).join("\n")
+
+**A line filter, over a construct the formatter wraps.** Six `it.todo` rows were added in this
+session and the figure did not move. Every one of them is written
+
+    it.todo(
+      "T1.77 (C28 I45): … — not deferred on a component: lands with the gauges themselves",
+    );
+
+so the line matching `it.todo(` carries no citation, and the line carrying the citation matches
+nothing. The filter removed the opening line and left the title in the corpus, where the coverage
+check read it as a row.
+
+**Measured: 13 of 71 `it.todo` calls in `test/` are wrapped.** It is not a rare shape and it is not
+randomly distributed — a todo long enough to carry TD1's *not deferred on a component* marker is past
+the formatter's width by construction, so **the deferrals most likely to be the only thing behind an
+invariant are exactly the ones the filter cannot see.**
+
+Fixed with a paren-depth walk rather than a wider regex, because a lazy match to the first `)` stops
+inside the `(C28 I45)` the title cites and leaves the rest of it behind — M3 in the mutation pass
+below fails only EC3, which is what that looks like from outside.
+
+**The payout, taken by diffing the two filters' uncited sets through the check's own function:**
+
+| | reported | actually |
+|---|---|---|
+| before the fix | 13 | 16 |
+
+**`C15 I24` and `C26 I23` had nothing running behind them and the signal said otherwise** — an
+approval overlay's shape and a call head's `⏎` fold, both deferred with a `T1.27` and a `T1.47` that
+do not run. The third is `C28 I45`, this session's own, and it uncovered a **second** hole in the same
+signal: with the todos correctly stripped the invariant *still* read as covered, from
+`describe("C28 I45 — per-kind input gauges")`. A describe title is not a row either. The file now
+cites the invariant only inside the todo titles, and says why in a comment.
+
+**The class is the one F906 records one finding earlier, applied to an instrument rather than to a
+subject** — a matcher that sees one encoding. F906's was a scan that found a gauge of the wrong
+subject; this is a filter that finds a todo written one way. Both were built by a reader looking at
+the single-line form, and in both the check's corpus quietly lost the population the check was about.
+**Neither is detectable from the number**: a signal reporting 13 where the answer is 16 is not
+implausible, does not move when it should, and has no control that would notice — which is why the
+fix ships with EC2, a file containing no todo returned line-for-line, since a filter that blanked
+everything would report every invariant as uncited and read as a very thorough gate.
+
+**Three mutations, three catches**: line-matching restored → EC1, EC3, EC4 fail; every line blanked
+→ EC1, EC2, EC3 fail; a lazy `[\s\S]*?\)` → EC3 alone fails.
+
+---
+
+## F906 — the kind had a gauge, and the gauge was of the cache ★★★★☆
+
+Item 1 of four was *the block kinds carrying no probe*, and the list it was built from was measured
+twice. The first measurement mixed C09's block kinds with `plot/definition.ts`'s annotation kinds and
+used a `[a-z.]+` pattern that cannot match `keyValue`; corrected, it read **five uncovered kinds** —
+`notice`, `progress`, `rule`, `status`, `tip`. Five gauges were written, and then the coverage was
+measured a third time, from `DEFAULT_DEFINITIONS` rather than from a list:
+
+    kinds: 19
+    gauged: 18
+    MISSING: image
+
+**`image` was never on either list, because `image.ts` has a gauge.**
+
+    probe?.gauge("decode.entries", DECODED.size);
+
+It is a good gauge and it is F410's — the decode map has no cap, and occupancy is the only figure
+that can show it growing. It is not a gauge of the block. `DECODED` is keyed by digest, so it reports
+**1** for a two-kilobyte PNG and **1** for a two-megabyte one, and it is unmoved by exactly the input
+whose size makes a frame slow.
+
+**Both readings that missed it were keyed on the wrong subject.** A scan of the *files* under
+`kinds/` finds `image.ts` instrumented. A scan of *gauge names* finds the prefix `decode`, which is a
+real gauge whose first segment is not a kind. Neither is a check of the claim, which is about kinds:
+the only measurement that can falsify *every kind gauges its own input* reads the kind names from the
+definitions and the gauge names from the source, and compares the two sets. That is T1.77, and it is
+written that way rather than as a list because **a hand-written list of kinds is written by the same
+reading that missed one**.
+
+**The class is *a matcher that sees one encoding*, arriving from the other side.** The usual form is a
+check reporting absence when a value changes form. This is a check reporting *presence* because a
+different value happens to share the form — the gauge exists, is correct, is in the right file, and
+answers another question. A file-level or name-level scan cannot tell an instrument of the subject
+from an instrument of something the subject uses.
+
+**And it is the third time in one item that a corpus was wrong about the property it was chosen for.**
+Annotation kinds counted as block kinds; a character class that excluded uppercase; a file scan that
+counted a cache gauge as an input gauge. Each was a real reading of a real corpus. The measurement
+that ended it is the one that took its population from the code under test rather than from the
+question — `DEFAULT_DEFINITIONS.map(d => d.kind)` — which is the same move as reading the frames'
+own trees in F888 rather than the table that declares them.
+
+`image` now carries two gauges rather than one, for I45's independent-inputs reason: `image.bytes` on
+the payload the decode and the kitty transmission both walk, and `image.pixels` on the source extent
+the dither walks, recorded on the dither path alone because the protocol arm rasterises nothing. A
+compressed PNG is small and enormous at once, so neither bounds the other.
+
+---
+
 ## F905 — the gate paid out on the day it landed, and the payout went unread ★★★★☆
 
 `make instruments` compares its inventory **by equality** and its own comment states the claim in as

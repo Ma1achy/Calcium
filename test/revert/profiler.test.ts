@@ -344,4 +344,10 @@ describe("C28 — profiler, tier 6 spec-first rows", () => {
     p.dispose();
   });
 
+  it.todo(
+    "T6.13 (C28 I45): moving rule.label's gauge below the truncate → T1.78 fails — not deferred on a component: lands with the gauges themselves",
+  );
+  it.todo(
+    "T6.14 (C28 I45): deleting any one kind's gauge → T1.77 fails and names the kind — not deferred on a component: lands with the gauges themselves",
+  );
 });

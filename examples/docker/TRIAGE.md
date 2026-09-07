@@ -37,7 +37,7 @@ type change.
 | **6** | [Rendered from data that has since moved](#6) | 2 | **2 open** | ⚠ C04 | real Calcium work |
 | **7** | [An artefact describes the world rather than being checked against it](#7) | 113 | **20** | — | artefact discipline — **no code**, and F164 is the first found by an instrument's *population* step rather than by a reader; **F210 is the first where the artefact is a component's own spec and the thing it contradicts is a shipped frame**, and **F233 the first where what it contradicts is a *fix*** — four present-tense statements of a repaired defect, in the two components the repair did not touch |
 | **8** | [Absence indistinguishable from failure](#8) | 30 | **7 open** (7 closed) | partly | real Calcium work · **7 of 10 fixed** — F151 is the class F35 closed in the half an app-side test cannot reach, and **F167 is the class arriving in a *value*: a validator agreeing twice about two different documents** |
-| **9** | [**The instrument was wrong**](#9) | 114 | **17** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
+| **9** | [**The instrument was wrong**](#9) | 116 | **17** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
 | **10** | [**A claim carried without a record**](#10) | 72 | **11** | — | **new at F80** · method — six findings disproved, and **F166 unblocked an entry while F168 found what the same row was silent about**; F184 is the first where the unrecorded claim was a *rule* rather than a fact, governing thirty forms from a parameter's doc comment |
 | **11** | [A gate that passes without checking](#11) | 331 | **16** | — | **114 closed · 120 open** of 235 keyed — the heading was out by 66 and this row's count column by 1, which cannot be corrected alone (§11) · four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
 | **12** | [**A time-based assertion under contention**](#12) | 7 | **3** | — | **new at F80** · Calcium's own suite · **F877 is the first that repairs an instrument rather than recording a reading** |
@@ -897,6 +897,30 @@ worst.** Five files across the tree, one of them an enforcement tool invisible t
 were all legitimate ESCs in escape-sequence tests. The reusable part: **a search returning nothing
 is evidence only if the search could have returned something**, and this is the first instrument
 here about whether the reading happened at all.
+
+**F907** — F896's signal beside SP9 — *N invariants are named only by an `it.todo`* — filters the
+deferrals out with a **line** match on `it.todo(`, and the formatter wraps the call, so the line that
+matches carries no citation and the line that carries one matches nothing. **13 of 71 calls in
+`test/` are wrapped**, and not by accident: a todo long enough to hold TD1's marker is past the
+width by construction, so the deferrals most likely to be the only thing behind an invariant are the
+ones the filter cannot see. Diffing the two filters' uncited sets through the check's own function:
+the figure is **16, reported as 13**, and `C15 I24` and `C26 I23` have had nothing running behind
+them while the signal said otherwise. The same file then showed a second hole — a `describe` title
+naming an invariant is coverage too. **Fixed** — a paren-depth walk in `commitments.mjs`, exported so
+it has rows, with EC2 as the control a blanket filter would fail; three mutations, three catches.
+
+**F906** — *the block kinds carrying no probe* was measured three times and wrong twice. The third
+reading took its population from `DEFAULT_DEFINITIONS.map(d => d.kind)` and returned **19 kinds, 18
+gauged, `image` missing** — a kind neither earlier reading named, because `image.ts` **has** a gauge.
+`decode.entries` counts the decode cache's occupancy, which is F410's finding and a correct figure;
+it is keyed by digest, so it reads 1 for a two-kilobyte PNG and 1 for a two-megabyte one, and is
+unmoved by the input whose size makes the frame slow. **A file scan finds the file instrumented and a
+gauge-name scan finds a prefix that is not a kind** — both are real readings of real corpora, and
+neither is a reading of the claim. The usual form of *a matcher that sees one encoding* reports
+absence when a value changes form; this reports **presence** because a different value shares the
+form, which is the harder direction because nothing looks missing. **Fixed** — C28 I45, and T1.77
+compares the two sets rather than a written list, since a hand-written list of kinds is written by
+the reading that missed one.
 
 ## 10 · A claim carried without a record — **56: ten findings disproved, four refusal premises expired unread (F573–F575, F577), three lane premises measured false (F601, F619, F620), two more from the three lanes — a deliberate divergence nobody wrote down (F640) and a brief's *every gate green* that was red before the lane began (F645), one rule's yield over its whole corpus measured at zero (F657), three from lanes5 — a count restated three times against three authorities (F680), a refusal's cost measured at 7 of 9 stops (F671) and a surface named by §4 and resolved by nothing in `src/` (F677) — five from lanes6 — the dangerous half of a width repair measured instead of argued (F694), a deferral whose named condition had already been met with nothing watching (F696), zero goldens moved where every one was expected to (F702), *every SVG golden moves* measured at 10 of 244 (F706) and a mechanism three documents name that does not exist at one of its two sites (F715) — one from lanes7, a filed finding whose premise the type system makes unconstructible, so the mirrored fix would have changed nothing (F727) — four deferral premises false when written, twenty claims caught before anything was built on them, one rule that governed thirty forms, one reasoned claim that five documents inherited, and one recorded budget that did not reproduce against its own controls, and **F862** — an architecture commitment naming the table its measurements are recorded in, every cell of which is empty — and **F884**, the instrument run over a *plan*: seven defects with a file and a line, four of whose citations do not resolve at HEAD** · new at F80
 

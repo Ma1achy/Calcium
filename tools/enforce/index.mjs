@@ -35,6 +35,7 @@ import {
   checkSectionReferences,
   checkSeamFour,
   checkInvariantCoverage,
+  withoutTodos,
   referenceFiles,
   specFiles,
 } from "./commitments.mjs";
@@ -114,10 +115,7 @@ const deferredOnly = checkInvariantCoverage(
   // Scoped to `test/`, because the same reader is handed the **specs** — the
   // coverage check reads both sides — and a filter applied to a spec would be
   // answering a different question with the same function.
-  (f) =>
-    f.startsWith("test/")
-      ? readFileSync(f, "utf8").split("\n").filter((l) => !/\bit\.todo\(/u.test(l)).join("\n")
-      : readFileSync(f, "utf8"),
+  (f) => (f.startsWith("test/") ? withoutTodos(readFileSync(f, "utf8")) : readFileSync(f, "utf8")),
 ).uncited - coverage.uncited;
 
 // TD1–TD6 — the deferral rules, **in the gate for the first time.** For their
