@@ -386,4 +386,10 @@ describe("C28 — profiler, tier 6 spec-first rows", () => {
     ).toEqual(kinds);
     expect(empty.size, "which is why the row asserts the scan found something").toBe(0);
   });
+  it.todo(
+    "T6.15 (C28 I15): calling the recorded/replayed frame-count difference a divergence → T3.6 fails — not deferred on a component: lands with src/shell/profiling/replay.ts",
+  );
+  it.todo(
+    "T6.16 (C28 I47): recording the capability verdict and replaying it → T1.83 fails — not deferred on a component: lands with src/shell/profiling/replay.ts",
+  );
 });

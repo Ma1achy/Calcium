@@ -31517,6 +31517,41 @@ Found by reading the table against the paragraph above it while adding a member 
 the same instrument as *read the abstract against its own section before reading the section against
 the code*, applied to a constant.
 
+## F908 — a clause that was over-engineering when it was written and load-bearing now ★★★★☆
+
+C28 §5 has said since July that a recording carries *every byte from the terminal · every far-side
+response · **every clock and `elapsed` read** · every schedule callback and when it fired*. Walking
+the component before building it, that clause looked like the expensive half of the design and the
+first candidate to trim: replaying two clocks *positionally* — read *n* returns what read *n*
+returned — is brittle against any change in read order, and the robust-looking alternative is to pin
+the replayed clocks to the event stream, so a read between two events returns the earlier one's
+stamp. That is deterministic, self-consistent, and independent of how many times anything reads a
+clock.
+
+**It is also wrong, and it became wrong three weeks after the clause was written.** C24 I32 landed
+this session and put `last 1.2ms` in the default chrome's footer. A frame now contains a
+**duration**. A replay with pinned clocks reports `work` as zero on every frame, so the footer reads
+`last <0.1ms` throughout — and diverges from every recording taken from a live session, on a cell
+that is byte-identical to itself and to nothing else.
+
+**The instrument is *ask where a settled claim is written down*, pointed at a clause rather than a
+claim.** The question that reached it was not *is this sentence true* — it is, and was — but *what
+consumes it*. In July the answer was the wall-clock time of day and nothing else, and a reader
+trimming *every `elapsed` read* would have been right about the tree in front of them. The clause
+acquired a second consumer, in a different component, in a commit that had no reason to mention it.
+
+**The shape to watch for: a deferral has a condition that something else satisfies elsewhere; this
+is the mirror.** A *requirement* has a justification that something else **strengthens** elsewhere,
+and nothing links the two either. Both halves are correct at every moment and neither knows about
+the other. The habit is the same one the deferral rule already names — when picking up an entry,
+check what its claims resolve to at HEAD rather than trusting the row — and here it is applied to a
+clause about cost rather than to a blocker.
+
+Recorded as I14's second half, with the flattened footer named, because the mutation that produces
+it is the tidier code and would be written by someone reading §5 carefully.
+
+---
+
 ## F907 — the signal that separates deferrals from rows could not see a wrapped deferral ★★★★☆
 
 F896 added a figure beside SP9: *N invariants are named only by an `it.todo`, so nothing that runs

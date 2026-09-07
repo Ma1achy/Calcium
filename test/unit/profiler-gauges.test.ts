@@ -141,3 +141,24 @@ describe("per-kind input gauges", () => {
     expect(g["decode.entries"]?.max, "unmoved by either").toBe(1);
   });
 });
+
+// C28 I46, I47 — record and replay. The rows land with the apparatus; this is
+// the spec commit's half (A03 §7a, F814). The invariants are named only inside
+// the todo titles, so the coverage signal reports them honestly (F907).
+describe("record and replay", () => {
+  it.todo(
+    "T1.81 (C28 I46): one ordered NDJSON over four taps → the input/resize/far subsequence drives and the frame subsequence is compared — not deferred on a component: lands with src/shell/profiling/record.ts",
+  );
+  it.todo(
+    "T1.82 (C28 I46): a replayed stdout answers columns from the recording, updated before each resize is delivered, with the real terminal's width as the control — not deferred on a component: lands with src/shell/profiling/replay.ts",
+  );
+  it.todo(
+    "T1.83 (C28 I47): the detector runs again on replay and its query escapes appear in the replayed writes; a recorded verdict is the fabricated violation — not deferred on a component: lands with src/shell/profiling/replay.ts",
+  );
+  it.todo(
+    "T1.84 (C28 I15): a torn final line parses, is dropped, and the recording reports truncated rather than throwing — not deferred on a component: lands with src/shell/profiling/record.ts",
+  );
+  it.todo(
+    "T1.85 (C28 I14): two replays of one recording give the same footer cost cell, and it is not the flattened <0.1ms a clock pinned to event boundaries produces — not deferred on a component: lands with src/shell/profiling/replay.ts",
+  );
+});
