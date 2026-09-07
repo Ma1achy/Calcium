@@ -27,6 +27,15 @@ median and p95 of frame construction — because no number leaves the process. A
 the M-T6 compositor decision on that table being *measured, not estimated*, so half of it is owed to
 diligence and half of it is owed to this component.
 
+**Filled as of `make profile`, and the partition above turned out to be the right one read the
+wrong way round.** Four rows come back measured — the three that could never be taken from outside,
+plus streaming CPU, which the sampler answers as a rate over its own samples. The two that stay
+refused are the other two of the three named above as reachable from outside: resize corruption
+needs a written frame compared against the terminal after a resize, and the Page Down needs a
+scenario. So the split is not *inside versus outside* but **a counter versus an observation** — a
+report can answer anything it already holds and nothing that requires someone to do a particular
+thing and look. Those two are a PTY row's work, not a field's (I37).
+
 **It is L4, and that is a load-bearing choice rather than a filing decision.** A profiler that
 reached into C09's paint or C14's cache would need a clock in L1 and L2, which SS1 bans across
 `src/` and SS4 bans in `viewport/` with no exception at all. It does not need to: every boundary in
