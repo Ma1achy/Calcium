@@ -31517,6 +31517,41 @@ Found by reading the table against the paragraph above it while adding a member 
 the same instrument as *read the abstract against its own section before reading the section against
 the code*, applied to a constant.
 
+## F885 — a self time read as a whole, in the table built to answer *computing or drawing* ★★★★☆
+
+`make profile`'s phase table divided each phase by `spans.frame.sum` and called the result *share
+of `frame`*. `record` feeds every histogram in `spans` the span's **self** duration, so
+`spans.frame` is the shell's own per-frame work **outside every other span** — a real quantity, and
+not the one a denominator wants.
+
+Measured on one three-frame session:
+
+| quantity | ms |
+|---|---|
+| `latency.work.sum` — the frames' actual work | 40.29 |
+| Σ every span but `frame`, self | 31.13 |
+| `spans.frame.sum`, self | 3.71 |
+| in no span at all | 5.45 |
+
+So `react` was published at **96 % of a frame it is 72 % of**, and the *unattributed* row — the one
+written specifically so the arithmetic could not hide a gap — was computed from the same wrong
+whole and came out at 14.6 % where the real figure is 13.5 % of a number three times larger.
+
+**Both readings are plausible and nothing in the shape says which is which.** `spans` is
+`Record<string, Histogram>`; a histogram of durations under the key `frame` is exactly what a
+reader expects the frame's cost to be. The spec did not say otherwise, so I40 now does.
+
+**How it was found, and it was not by a test.** The suspicion was the opposite defect — that nested
+spans would double-count, because `compose` 2.1 read as exactly `elements` 1.6 + `measure` 0.5.
+That was a coincidence of two rounded numbers; measuring to four places disproved it and turned up
+Σ parts at **9.3×** the denominator instead, which no rounding explains. **The wrong hypothesis is
+what got the numbers printed**, and the ratio is what read them.
+
+**The class is the ceiling-is-not-the-arithmetic one arriving in a denominator.** Every figure in
+the table was individually correct; the composition was false, and no per-row assertion reaches it.
+What reaches it is a residue that must add up — which the table already had, computed against the
+same wrong whole, so it agreed. **A conservation row is only as good as the quantity it conserves.**
+
 ## F884 — seven defects carried in a plan, and four of their citations do not resolve ★★★☆☆
 
 The profiler's plan lists seven defects for P11 to fix, each with a file and a line. They were

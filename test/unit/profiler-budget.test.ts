@@ -222,6 +222,11 @@ describe("C28 — the budget table", () => {
   });
 });
 
+describe("C28 — a part is self time and the whole is the frame's work", () => {
+  it.todo("T1.62 (C28 I40): a session at tier spans with nested spans — spans.frame.sum is strictly less than latency.work.sum by more than the histogram's own error, and spans.frame.sum plus every other span does not exceed it; the strict inequality is the half that bites, because feeding record the node's total instead of its self time makes the two equal and a conservation bound alone is satisfied by that — not deferred on a component: lands with the phase seams");
+  it.todo("T1.63 (C28 I40): make profile's phase table — its shares are taken against latency.work and the residue row is work minus the parts minus frame; a share against spans.frame is larger, sums to more than 100% once the seven dead spans are wired, and is the shape the first version shipped — not deferred on a component: lands with the phase seams");
+});
+
 describe("C28 — every declared span is opened", () => {
   it.todo("T1.60 (C28 I39): the shipped SpanName union against the members a scan finds opened under src/ — equal sets, by equality and not by containment, because a member added to the union and never wired is exactly the case this exists for and a subset check passes on it — not deferred on a component: lands with the phase seams");
   it.todo("T1.61 (C28 I39): a frame composed at tier spans — chrome, overlays, paint and assemble all carry a non-zero count, and the phases sum to within the frame span's own histogram error of frame itself; four spans firing proves they were called and the residue is what says they were called around the work rather than beside it — not deferred on a component: lands with the phase seams");
