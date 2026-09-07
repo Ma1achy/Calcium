@@ -31517,6 +31517,280 @@ Found by reading the table against the paragraph above it while adding a member 
 the same instrument as *read the abstract against its own section before reading the section against
 the code*, applied to a constant.
 
+## F897 — the same mutation run reports SURVIVED twice and CAUGHT once, and one way a kill becomes invisible was seen ★★★★☆
+
+`tools/mutate/runs/c22-footer-budget.mjs` reports `T4.28 · visibleRows bypasses entryLayout` as
+**SURVIVED**. Re-running the same file gives the same verdict. Applying the same mutation by hand
+and running the same command fails `T4.12` — six times of seven.
+
+**The file disagrees with itself.** Five runs of the same mutation, three of them the run file
+unmodified:
+
+| what ran | T4.28 | T1.41 |
+|---|---|---|
+| the run file | SURVIVED | SURVIVED |
+| the run file, again | SURVIVED | SURVIVED |
+| a copy with the atomic writer | CAUGHT ELSEWHERE | SURVIVED |
+| a copy with the run file's plain writer | CAUGHT ELSEWHERE | SURVIVED |
+| **the run file, a third time** | **CAUGHT ELSEWHERE** | SURVIVED |
+
+**Two hypotheses were raised and both were killed by their own controls.** The writer: `mutate.mjs`
+exports an atomic tmp-plus-`renameSync` writer and **150 of 163 run files define a plain
+`writeFileSync` instead, none using the atomic one** — which looked like the whole answer until the
+plain-writer driver caught it too. Order: excluded by swapping the two mutations. And the last row
+kills the framing both hypotheses shared, that *the run file differs from a copy of it*. It does not
+differ from a copy. It differs from itself.
+
+**Two of five runs report a live mutant that is not live**, and the direction is the one the
+harness's preamble calls worse than useless: a survivor reads as a thorough run against a weak test,
+so the cost is a session spent strengthening a row that was already correct. Nothing in the report
+says which kind of run it was.
+
+**T1.41 is a real survivor** — the same verdict in all four — and it is separately a finding about
+the mutation rather than the tests: `entryLayout`'s `|| blocks.length < 2` is redundant, because
+`cardBody([])` returns `[]` and `bodyRuns([])` produces no runs, so a one-block card takes the card
+path to a byte-identical result. The mutation's own comment claims *a second run of zero blocks, and
+the hook row is drawn beneath it*, and that does not happen. A mutation with nothing to be wrong
+about survives exactly like a test gap, and this one has been read as a test gap since F815.
+
+Measured rather than read off the branch: `entryLayout([step], 40)` with the clause and without it
+`diff` clean. **The clause stays** — a cheap early-out, and a guard keeps its place on asymmetry —
+and the mutation moves to the boundary that is observable. At `< 3` a two-block card lays out flush
+instead of under the hook, and **T1.44, T4.62, T4.63 and T4.28 all catch it**: the line was never
+weakly covered, only mutated where it could not be wrong.
+
+**One concrete mechanism was seen once and has not recurred.** In a single run, vitest printed
+
+    ⎯⎯⎯ Failed Tests 1 ⎯⎯⎯
+     FAIL  test/integration/session.test.ts > … T4.12 …
+    Error: [vitest-pool]: Worker forks emitted error.
+          Tests  49 passed (73)
+
+— a failure section, a dead worker, twenty-four tests that never ran, and **a summary with no failed
+count**. `killed()` reads `/Tests\s+\d+ failed/` off that summary, so this run is a survivor to the
+harness while the output above it says otherwise.
+
+**That is the class the harness's own preamble records, arriving a second time.** The header says the
+first version read the same regex against colour codes and *"eight caught mutations were reported as
+uncaught"* — fixed for the ANSI cause, and the summary can lose its failed count for at least one
+other. The remedy suggests itself — read the `Failed Tests` section as well as the summary — and
+**it is not being shipped here**, because the case cannot currently be reproduced and MH1's own
+comment is that testing this function against a string the test wrote itself is the defect, not the
+fix. A rule whose fabricated violation has to be invented is the thing this file warns about.
+
+**What would close it**: real bytes from a crashed run, captured. A pass that teed each run's output
+would have them, and teeing is what both drivers did — which is the one difference left standing
+between a run that caught it and a run that did not, and is itself only a delay. Until then the
+finding is that the verdict is unstable, not that this mechanism explains it.
+
+## F896 — SP9 counts a deferral as coverage, so twenty-one invariants are named by nothing that runs ★★★★☆
+
+SP9 requires every invariant to be **named by at least one test row**, and reads the requirement by
+scanning each line of each test file for `C\d{2}` / `I\d+` tokens. `it.todo("T3.6 (C28 I15): …")` is
+such a line. **A deferral is therefore indistinguishable from a row**, and an invariant whose only
+citation is a todo passes SP9 exactly as one with a suite behind it.
+
+Measured **through SP9 itself**, run twice over the same tree with the same exemption set, differing
+only in whether `it.todo` lines are visible to its reader — so the figure is the gate's own and not
+a second opinion about it:
+
+| | count |
+|---|---|
+| invariants declared | 1035 |
+| uncited, with todos visible — what the gate reports today | 79 |
+| uncited, with todos hidden | 99 |
+| **named only by a deferral** | **20** |
+
+    C28   6   I14 I15 I26 I27 I28 I29
+    C04   4   I110 I111 I112 I113
+    C22   4   I91 I92 I94 I95
+    C21   3   I15 I16 I17
+    C03   1   I16
+    C23   1   I66
+    C24   1   I32
+
+**The first count was 21 and came from a copy of the rule**, which resolved a citation only when a
+`C\d{2}` sat on the same line. SP9 falls back to `ownerOf`, so a bare `I2` in a C04-owned file is
+attributed and mine was not: `C04 I2` is named by a row that runs. Two matchers agreeing on a
+mechanism and disagreeing on a member is the shape SP9's own docblock warns about — *the count is not
+the evidence and the list is* — and it cost one member out of twenty before the second reading.
+
+**Two of C28's six have no subject in `src` at all.** `replay` appears nowhere in
+`src/shell/profiling/`, so I15 — *a recording that ends while a stream is open replays as truncated*
+— is a claim about a mechanism that does not exist. Neither `crossedResize` nor any width on a span
+exists, so I26 is the same. They are vacuous in A03 §2's sense, and every gate reports them covered.
+
+**This is why the eleven `it.todo` rows in `test/edge/profiler.test.ts` never expired.** Their
+deferral says *not deferred on a component: lands with the recorder in `src/shell/profiling/`*. The
+recorder landed. TD1–TD6 watch a **component id**, and a row that names none has nothing to watch;
+SP9 watches a **name**, and a todo supplies one. So both gates were satisfied by the shape of the
+sentence rather than by anything about its truth, and each was satisfied for a different reason —
+which is why neither reads as a hole.
+
+**The bundle is what makes it invisible, and the eleven are not one thing.** One marker sentence
+covers rows with at least three dispositions: T3.1, T3.2, T3.4, T3.8 and T3.11 have their subjects
+built and are owed now; T3.6 and T3.9 are blocked on mechanisms that do not exist; T3.10 names
+`suspend()`/`resume()` methods that are not there while the `suspended` flag they assert about is.
+*N subjects, N blockers* applied to a file rather than a row.
+
+**The repair is a figure, not a gate.** Twenty-one is not debt to be turned red — most are honest
+deferrals — and a gate red on arrival is a gate edited to fit. What is missing is that SP9's own
+reported line cannot tell the two populations apart, so a deferral that has quietly become the only
+thing standing behind an invariant is invisible in the number that exists to say otherwise. SP9's
+docblock states one blind spot already — *this checks an invariant is named, never that the row
+naming it checks it* — and this is the second, one step earlier: it does not check that the row
+**runs**.
+
+## F895 — two panes ask the tier whether there is data, a third asks the data and answers about the tier, and an empty ring at `spans` draws four zero bars ★★★★☆
+
+C28 I23's second clause is *a pane with **no data** draws a notice and never an empty plot, because
+an empty plot reads as* measured, and zero. Two of the four panes implement it against the tier
+instead, which is a different question with the same answer in every case that was tested.
+
+Measured — a profiler at tier `spans`, `report()` taken with nothing recorded:
+
+| pane | guard it reads | notice | plots drawn |
+|---|---|---|---|
+| `overview` | `latency === undefined` — the tier | **no** | `ov-latency` |
+| `frame` | `names.length === 0` — the data | yes, **with the tier's sentence** | — |
+| `distribution` | `latency === undefined` — the tier | **no** | `di-quantiles` |
+| `memory` | `samples.length === 0` — the data | yes | — |
+
+`latency` is emitted whenever `spanning()` holds, so at `spans` with an empty ring it is present
+with `count: 0` and every percentile 0. `overview` draws min/p50/p95/p99/max as four zero bars and
+`distribution` draws five — **the exact picture I11 omits the whole key to avoid one tier lower.**
+
+**The split is by which axis the guard reads, and the two right ones are right by accident of what
+they had to hand.** `frame` and `memory` had no tier-shaped field to test — they reach for
+`spans` and `samples` directly — so they ask about data because that was the only question
+available. Neither was written to a rule the other two broke.
+
+**And one of the two is only right about the branch.** Reading the notices rather than counting
+them — the second pass, and the one that found this — `frame` at tier `spans` with an empty ring
+says
+
+    no spans recorded — raise the tier to `spans`
+
+to a reader who is already on `spans`. It takes the data branch correctly and prints the tier
+answer, so a row asserting *a notice appears* is green on it and a reader following the instruction
+loses a run. **Counting notices is the assertion this defect passes**, which is why the row asserts
+the text. Three of four, not two.
+
+`memory` is the considered non-instance and is left alone: *"the sampler runs on the injected timer
+at tier `spans` and above"* is true at both tiers and instructs nothing — at `counters` it says why
+there is nothing, at `spans` it says the sampler is running and nothing has arrived. One sentence
+covering two states is only a defect when the two states want different actions.
+
+The repaired branch asks `TIER_RANK` rather than listing the three names above `counters`. A list
+of names is a rule with a birthday: correct until a fifth tier exists, then silently answering
+*below `spans`* for it — printing *raise the tier* to someone already above it, which is this
+finding again with a different cause.
+
+**The source explains why.** I23 was derived from the design note's D1, whose condition is *the
+dashboard open at tier `off`* — the tier, and only the tier. I23 restates it as *a pane with no
+data*, which is strictly wider and is the right rule. Nothing implemented the widening, and nothing
+could notice: every test of these panes builds a report by recording frames into it, so the empty
+ring is a state the suite never constructs. **The invariant was strengthened in the writing and the
+strengthening was never anyone's task** — the compression class running in the direction that makes
+a claim truer than its mechanism rather than falser.
+
+**Different sentences for the two cases, deliberately.** The tier notice says *raise the tier*, and
+saying that to a reader already at `spans` is a wrong instruction that costs them a run. The empty
+case says the ring is empty, which is *nothing to draw* rather than *nothing to find*.
+
+**`distribution` replaces the plot and not the pane.** `spans` is fed by every closed span,
+including ones that never fell inside a frame, so its per-phase plot can hold real rows while the
+frame histogram is empty. An early return there would have hidden measured data behind a notice
+about missing data — trading a false picture for a false absence.
+
+Control: the same panes with six recorded frames draw seven plots across three panes, unchanged.
+
+## F894 — the frame count is recorded at `counters` and published from the field that is not, so the budget row refuses with a falsehood ★★★★☆
+
+`ProfileReport.frames` is `seq`, and `seq` increments inside `endFrame` **after** the `spanning()`
+guard. At tier `counters` it is therefore always 0 — while `beginFrame` two functions above has
+already written `counters["frame.input"]` for the same frame. **The count exists and the report
+publishes the field that does not hold it.**
+
+Measured: twelve frames at `counters`, 48 000 bytes counted, `report.frames` **0**, and
+`checkBudget`'s bytes-per-frame row comes back
+
+    state: "unanswerable", needs: "no frame was committed in this session"
+
+Twelve were. The numerator is present, the denominator was recorded under another name, and the one
+thing the reader is told is false.
+
+**C28 T1.26 already rules the correct shape and this row is outside it.** That row requires the two
+frame-construction figures to come back *unanswerable naming the tier* at `counters`, because a zero
+there reads as a frame that took no time. The bytes row is unanswerable for a different reason and
+says something that is not about the tier at all — so the rule was right, was implemented, and did
+not reach the row next to it.
+
+**The repair is not a better refusal.** A frame count is one integer per frame, which is the
+cheapest thing an instrument can record and is what the tier is *named for*; bytes per frame is then
+answerable at `counters`, and it is the single most useful figure a lightweight production tier can
+give. Refusing it was never necessary. This is F869's shape a second time — *a tier named after
+counters shipped with no counter able to fire* — and T1.44 was written for the first instance.
+
+**Found by a control rather than by an assertion.** T1.1 asserts that nothing accumulates at `off`,
+and every one of its assertions is equally satisfied by a recorder that does nothing at any tier —
+so the row carries a control running the same calls at `counters`. The control was written expecting
+`frames` to be 1 and it was 0. Nothing about `off` was wrong; the control was measuring the tier
+above it, which is what a control is for.
+
+## F893 — a `FinalizationRegistry` never reports its most recent registration, and the design row that will be built on says it reports all of them ★★★★☆
+
+`CALCIUM_PROFILER_DESIGN.md` M20 reads *leak counting converges — `FinalizationRegistry` over 1 000
+objects: **1 000 finalised** under `--expose-gc` after two collections*, and names itself the
+falsifying row for the leak counters P8 owes. Re-measured before anything was built on it, in the
+same container and on the same Node:
+
+| N | finalised | never reported |
+|---|---|---|
+| 1 | 0 | `[0]` |
+| 2 | 1 | `[1]` |
+| 10 | 9 | `[9]` |
+| 100 | 99 | `[99]` |
+| 1 000 | **999** | `[999]` |
+| 5 000 | 4 999 | `[4999]` |
+
+**Exactly one survivor, always the last registered, at every size, in every trial.** Eight repeats at
+N = 1 000 gave `999` and `missing: [999]` every time, with and without a deliberate allocation
+afterwards to displace whatever holds it. The residue is not noise and it does not shrink with more
+collections: the second and third `gc()` change nothing, so *after two collections* is wrong in the
+same row as *1 000*.
+
+**Both controls respond, which is what makes the arm mean anything.** Objects dropped with no forced
+collection: **0 finalised**. Objects still referenced with collection forced: **0 finalised**. So the
+count is measuring reachability rather than registration, and the one that stays is the one the
+calling frame has not let go of.
+
+**The floor is one object in the whole report, not one per class.** Three names registered through
+one registry, fifty objects each: `alpha` 50, `beta` 50, `gamma` **49** — 149 of 150, and the short
+one is whichever name registered last. So the caveat cannot be written per row; it belongs to the
+report, and the class it lands on is an accident of registration order rather than a property of that
+class.
+
+**Why it matters more than one object in a thousand.** A leak counter's whole output is
+`live = created − finalised`, and this puts a **floor of one on `live`** that no amount of correct
+code removes. Three consequences, all of which would have been discovered as failures rather than as
+facts:
+
+- A row asserting *everything registered was finalised* is red by exactly one, for ever — and looks
+  like a real leak of one object.
+- A row asserting `live === 0` is unsatisfiable, and is the natural thing to write.
+- A report showing `live: 1` for a class with one instance is reporting **nothing wrong**, and a
+  reader chasing it finds a V8 calling convention.
+
+So the figure is reported with its floor named, and the row asserts `finalised === N - 1` **with the
+reason beside it** — because an unexplained off-by-one is what the next person fixes.
+
+**The instrument here is *ask where a settled claim is written down*, and the answer was a design
+note.** M20 has a file, a figure and a date, which is what a ruling looks like from outside; what it
+did not have was the control its own table's preamble promises every row that could be an artefact of
+its probe. F838's shape exactly — a design measurement is a claim until a row runs — and the cost of
+checking was four minutes.
+
 ## F892 — the per-element table merges four blocks into one row and manufactures the reading it exists to give ★★★★★
 
 `ProfileReport.nodes` is C28 I31's answer to *which element is slow*, keyed `kind#id` and sorted by
