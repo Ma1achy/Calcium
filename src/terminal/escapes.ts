@@ -48,6 +48,9 @@ export const BRACKET_PASTE = mode("\x1b[?2004h", "\x1b[?2004l");
  */
 export const MOUSE = mode("\x1b[?1002h\x1b[?1006h", "\x1b[?1006l\x1b[?1002l");
 
+/** Kitty keyboard protocol: disambiguated keys, event phases, and all keys. */
+export const ENHANCED_KEYBOARD = mode("\x1b[>11u", "\x1b[<u");
+
 /**
  * DECSET 2026 — synchronised update. C03's, and the only mode outside C01's set.
  *

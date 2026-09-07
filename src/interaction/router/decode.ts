@@ -111,7 +111,8 @@ const CSI_TILDE_KEYS: Readonly<Record<string, string>> = Object.freeze({
  * the keymap.
  */
 function modifiersOf(param: string | undefined): Pick<Key, "ctrl" | "meta" | "shift"> {
-  const bits = param === undefined ? 0 : Math.max(0, Number(param) - 1);
+  const encoded = param?.split(":", 1)[0];
+  const bits = encoded === undefined ? 0 : Math.max(0, Number(encoded) - 1);
   return {
     shift: (bits & 1) !== 0,
     meta: (bits & 2) !== 0 || (bits & 8) !== 0,
@@ -123,6 +124,10 @@ function key(
   name: string,
   sequence: string,
   mods: Partial<Pick<Key, "ctrl" | "meta" | "shift">> = {},
+  input: Readonly<{
+    phase?: Key["phase"];
+    encoding?: Key["encoding"];
+  }> = {},
 ): InputEvent {
   return Object.freeze({
     kind: "key",
@@ -132,6 +137,8 @@ function key(
       meta: mods.meta ?? false,
       shift: mods.shift ?? false,
       sequence,
+      ...(input.phase === undefined ? {} : { phase: input.phase }),
+      ...(input.encoding === undefined ? {} : { encoding: input.encoding }),
     }),
   });
 }
@@ -358,9 +365,12 @@ export function createDecoder(options: DecoderOptions): Decoder {
     // as well-formed-but-unknown. Shift-Enter was unreachable in every terminal
     // that sends it, which is every terminal that has it.
     if (final === "u") {
-      const name = otherKeyName(params[0]);
+      const name = otherKeyName(params[0]?.split(":", 1)[0]);
       if (name === null) return consumed;
-      return out.push(key(name, sequence, mods)), consumed;
+      const eventType = params[1]?.split(":", 2)[1];
+      const phase: Key["phase"] =
+        eventType === "2" ? "repeat" : eventType === "3" ? "release" : "press";
+      return out.push(key(name, sequence, mods, { phase, encoding: "csi-u" })), consumed;
     }
 
     if (final === "~") {

@@ -10,7 +10,15 @@
  * to stay acyclic (§2, A03 MG3).
  */
 
-import { ALT_SCREEN, BRACKET_PASTE, CURSOR, CURSOR_SHAPE, MOUSE, cursorTo } from "./escapes.js";
+import {
+  ALT_SCREEN,
+  BRACKET_PASTE,
+  CURSOR,
+  CURSOR_SHAPE,
+  ENHANCED_KEYBOARD,
+  MOUSE,
+  cursorTo,
+} from "./escapes.js";
 import type { CursorStyle } from "./escapes.js";
 import type { TerminalCapabilities } from "./capabilities.js";
 
@@ -101,6 +109,8 @@ export interface TerminalLifecycle {
    * predicate answering both is how they come to disagree.
    */
   setMouseTracking(on: boolean): void;
+  /** Request native key phases while an application surface owns input. */
+  setEnhancedKeyboard(on: boolean): void;
   readonly writer: NodeJS.WriteStream;
   readonly acquired: boolean;
   readonly suspended: boolean;
@@ -148,7 +158,14 @@ function sameStyle(a: CursorStyle | null, b: CursorStyle | null): boolean {
  * C01 never acquires it, and adding it before there is a caller would be an
  * export nothing consumes.
  */
-type HeldKey = "stdout" | "altScreen" | "cursor" | "rawMode" | "bracketedPaste" | "mouse";
+type HeldKey =
+  | "stdout"
+  | "altScreen"
+  | "cursor"
+  | "rawMode"
+  | "bracketedPaste"
+  | "mouse"
+  | "enhancedKeyboard";
 
 /**
  * §5's transition table, as data. Every cell, including the nine that throw.
@@ -262,6 +279,7 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
    * emits nothing at all.
    */
   let shapeUnknown = false;
+  let enhancedKeyboardRequested = false;
 
   // --- raw input delivery (I18) --------------------------------------------
   //
@@ -371,6 +389,7 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
     rawMode: () => setRawMode(true),
     bracketedPaste: () => emit(BRACKET_PASTE.enter),
     mouse: () => emit(MOUSE.enter),
+    enhancedKeyboard: () => emit(ENHANCED_KEYBOARD.enter),
   });
 
   const RELEASE: Readonly<Record<Exclude<HeldKey, "stdout">, () => void>> = Object.freeze({
@@ -379,6 +398,7 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
     rawMode: () => setRawMode(false),
     bracketedPaste: () => emit(BRACKET_PASTE.leave),
     mouse: () => emit(MOUSE.leave),
+    enhancedKeyboard: () => emit(ENHANCED_KEYBOARD.leave),
   });
 
   function setRawMode(on: boolean): void {
@@ -411,6 +431,18 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
     }
     emit(MOUSE.leave);
     held.delete("mouse");
+  }
+
+  function setEnhancedKeyboard(on: boolean): void {
+    enhancedKeyboardRequested = on;
+    if (state !== "acquired") return;
+    if (on === held.has("enhancedKeyboard")) return;
+    if (on) {
+      take("enhancedKeyboard");
+      return;
+    }
+    emit(ENHANCED_KEYBOARD.leave);
+    held.delete("enhancedKeyboard");
   }
 
   // --- the transition guard -------------------------------------------------
@@ -619,6 +651,7 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
       take("rawMode");
       if (capabilities.bracketedPaste) take("bracketedPaste"); // I10
       if (capabilities.mouse) take("mouse"); // I10
+      if (enhancedKeyboardRequested) take("enhancedKeyboard");
     } catch (err) {
       // T3.7 — partial acquisition never leaves partial state.
       unwind();
@@ -739,6 +772,7 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
     // terminal nobody has entered is still the size of the terminal.
     size: snapshotSize,
     setMouseTracking,
+    setEnhancedKeyboard,
     writer,
     // Getters, not stored booleans: two booleans for four states admits two
     // combinations that cannot happen (T2.1).

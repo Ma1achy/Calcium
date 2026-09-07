@@ -113,7 +113,11 @@ export type RouterDeps = Readonly<{
 export type Handler = (e: InputEvent) => boolean;
 
 export interface InputRouter {
-  register(target: FocusTarget, handler: Handler): { dispose(): void };
+  register(
+    target: FocusTarget,
+    handler: Handler,
+    options?: Readonly<{ first?: boolean }>,
+  ): { dispose(): void };
   dispatch(e: InputEvent): boolean;
   resetFocus(): void;
   readonly target: FocusTarget;
@@ -132,9 +136,14 @@ export function createRouter(
   let armedAt: number | null = null;
   let stages: string[] = [];
 
-  function register(target: FocusTarget, handler: Handler): { dispose(): void } {
+  function register(
+    target: FocusTarget,
+    handler: Handler,
+    options: Readonly<{ first?: boolean }> = {},
+  ): { dispose(): void } {
     const list = handlers.get(target) ?? [];
-    list.push(handler);
+    if (options.first === true) list.unshift(handler);
+    else list.push(handler);
     handlers.set(target, list);
     return {
       dispose() {
@@ -349,6 +358,16 @@ export function createRouter(
     }
 
     if (e.kind === "mouse") return routeMouse(e);
+
+    // Native release events exist for application surfaces. Calcium's own
+    // command bindings remain edge-triggered and must never fire on release.
+    if (e.kind === "key" && e.key.phase === "release") {
+      const target = activeTarget(inputs());
+      stages.push(`target:${target}`);
+      if (run(target, e)) return true;
+      stages.push("release-dropped");
+      return false;
+    }
 
     if (isCtrlC(e)) {
       // **A verb waiting for an answer is not a verb to cancel** (I25).

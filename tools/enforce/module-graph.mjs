@@ -1110,6 +1110,25 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
     "subject from the other side**: the rule is scoped to `src/`, and a member " +
     "whose whole purpose is to be called from outside it cannot satisfy that scope " +
     "however many consumers it has",
+  "TuiInstance.openSurface":
+    "application boundary — an embedding app opens its own surface; wiring this " +
+    "from another framework component would make Calcium invent application UI",
+  "SurfaceActionEvent.fidelity":
+    "application boundary — the surface consumer visibly distinguishes native " +
+    "and reduced-fidelity legacy input",
+  "SurfaceActionEvent.elapsedMs":
+    "application boundary — the game engine consumes the preserved monotonic " +
+    "timestamp; Calcium must not interpret application timing",
+  "SurfaceActionEvent.ordinal":
+    "application boundary — the app detects stale or duplicate action delivery " +
+    "without exposing the internal input router",
+  "PushedSurface.onClose":
+    "application boundary — the surface owner releases its process and model state " +
+    "when Calcium reports closure",
+  "PushedSurfaceHandle.inputFidelity":
+    "application boundary — the app renders the reduced-fidelity disclosure",
+  "PushedSurfaceHandle.closed":
+    "application boundary — the app awaits teardown and typed callback faults",
 
   // --- a field whose consumer is a ruling away ------------------------------
   "SgrStyle.italic":

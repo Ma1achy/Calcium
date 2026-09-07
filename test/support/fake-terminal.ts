@@ -215,6 +215,8 @@ export const MODES = {
   mouseSgrOn: "[?1006h",
   mouseOff: "[?1002l",
   mouseSgrOff: "[?1006l",
+  enhancedKeyboardOn: "[>11u",
+  enhancedKeyboardOff: "[<u",
   // C03's, and the only pair here C01 never emits (C01 T6.12).
   syncOn: "[?2026h",
   syncOff: "[?2026l",

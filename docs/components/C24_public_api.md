@@ -14,7 +14,12 @@
 
 ## 1. Purpose
 
-Twenty-three components, and a consumer touches five things: `createTui`, the block builders, an adapter signature, a manifest, and theme tokens. **Eleven of the twenty-three are invisible to them** — terminal, transcript, viewport, overlays, input, editor, parser, completion, history, process runner, frame scheduler — and that is the measure of whether the layering worked.
+Twenty-three components, and an ordinary document consumer touches five things:
+`createTui`, block builders, an adapter signature, a manifest, and theme tokens.
+An interactive application may additionally open one bounded `PushedSurface`.
+**Eleven of the twenty-three remain invisible** — terminal, transcript,
+viewport, overlays, input, editor, parser, completion, history, process runner,
+and frame scheduler. The surface composes those owners; it does not expose them.
 
 C24 is the façade. It exists as a component rather than as an implicit consequence of what happens to be exported, because **every export is a compatibility obligation**, and a surface that accretes by accident cannot be kept.
 
@@ -42,6 +47,12 @@ Three, split by what ships to production.
 // entry
 export function createTui(config: TuiConfig): TuiInstance;
 export type { TuiConfig, TuiInstance, SessionSnapshot, ChromeFn, StopReason };
+export { SurfaceError };
+export type {
+  PushedSurface, PushedSurfaceHandle, SurfaceContext, SurfaceActionEvent,
+  SurfaceInputPhase, SurfaceInputFidelity, SurfaceCloseOutcome,
+  SurfaceFault, SurfaceKeyBinding, SurfaceKeyChord,
+};
 
 // blocks — the type a consumer returns
 export type {
@@ -81,6 +92,17 @@ export type { WorldDriver };
 // utilities a custom block kind needs
 export { cells, truncate, planColumns };
 ```
+
+`TuiInstance.openSurface()` opens one application-owned full-region view. Its
+render callback receives a fresh producer context on every invalidation and
+resize, plus the currently observed input-fidelity mode. Its keymap is data and
+its actions are delivered serially with monotonic timestamps and ordinals.
+Native CSI-u events retain press/repeat/release; legacy bytes use deterministic
+50 ms release synthesis. A second surface, duplicate binding, malformed surface,
+or failed initial render is a typed `SurfaceError`. Later render/action failures
+close the surface and resolve `closed` with a typed fault. Close is idempotent,
+restores enhanced keyboard mode, and removes the pushed view before the session
+releases the terminal.
 
 **`greeting` is how the session's first entry gets there** (C22 I44). S02 specifies
 that entry — *"an ordinary `ViewDocument`, not a screen … appended to the

@@ -14,6 +14,10 @@ export type Key = Readonly<{
   shift: boolean;
   /** The raw bytes, for diagnostics. */
   sequence: string;
+  /** Native terminals report phases; legacy byte streams leave this unphased. */
+  phase?: "press" | "repeat" | "release" | "unphased";
+  /** The wire family that supplied `phase`. */
+  encoding?: "legacy" | "csi-u";
 }>;
 
 /**

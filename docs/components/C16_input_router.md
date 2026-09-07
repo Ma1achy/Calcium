@@ -31,6 +31,8 @@ type Key = Readonly<{
   meta:     boolean;                  // alt
   shift:    boolean;
   sequence: string;                   // the raw bytes, for diagnostics
+  phase?:   "press" | "repeat" | "release" | "unphased";
+  encoding?: "legacy" | "csi-u";
 }>;
 
 type InputEvent =
@@ -70,7 +72,12 @@ of consistent. One constant, one behaviour, one bug report.
 
 `reset()` discards the pending bytes, the paste buffer and the escape window, and **emits nothing**: the flush rule that turns accumulated printables into keys (§7) is about a window closing, and this window did not close, it stopped mattering. The call is the shell's, on resume, because C01 delivers bytes and interprets none and C16 owns no timer — neither of them knows a suspension ended. That makes it C22's orchestration, and §4's ordering is where it is written down.
 
-Terminals send no key-up events and repeat held keys as fresh presses, so there is no chord support beyond modifiers. Saying so prevents someone designing a keymap that cannot work.
+Legacy terminals send no key-up events and repeat held keys as fresh presses,
+so there is no reliable chord support beyond modifiers on that path. Enhanced
+CSI-u input can report press, repeat and release explicitly. Calcium preserves
+those phases for an application surface while its own command bindings remain
+edge-triggered and ignore release. The surface boundary visibly distinguishes
+native events from deterministic legacy release synthesis.
 
 ### `modifiersOf` read three bits of four, and the fourth collapsed onto a live binding
 

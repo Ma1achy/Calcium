@@ -496,3 +496,38 @@ describe("C01 mouse tracking, toggled (copy mode)", () => {
     expect(stdout.output, "nothing is written into a child's terminal").toBe(before);
   });
 });
+
+describe("C01 enhanced keyboard mode, scoped to an application surface", () => {
+  it("T1.28: enables phases on request and releases the mode exactly once", () => {
+    const { lifecycle, stdout } = harness();
+    lifecycle.acquire();
+    const before = stdout.output;
+
+    lifecycle.setEnhancedKeyboard(true);
+    lifecycle.setEnhancedKeyboard(true);
+    expect(stdout.output.slice(before.length).split(MODES.enhancedKeyboardOn)).toHaveLength(2);
+
+    lifecycle.setEnhancedKeyboard(false);
+    lifecycle.setEnhancedKeyboard(false);
+    expect(stdout.output.slice(before.length).split(MODES.enhancedKeyboardOff)).toHaveLength(2);
+
+    const released = stdout.output;
+    lifecycle.release();
+    expect(stdout.output.slice(released.length)).not.toContain(MODES.enhancedKeyboardOff);
+  });
+
+  it("T1.29: remembers the request across suspension without writing into the child", () => {
+    const { lifecycle, stdout } = harness();
+    lifecycle.acquire();
+    lifecycle.setEnhancedKeyboard(true);
+    lifecycle.suspend();
+    const suspended = stdout.output;
+
+    lifecycle.setEnhancedKeyboard(true);
+    expect(stdout.output).toBe(suspended);
+
+    lifecycle.resume();
+    expect(stdout.output.slice(suspended.length)).toContain(MODES.enhancedKeyboardOn);
+    lifecycle.release();
+  });
+});

@@ -72,7 +72,18 @@ describe("C16 §2 — key decoding", () => {
     const { d } = decoder();
 
     expect(feed(d, "[13;2u")).toEqual([
-      { kind: "key", key: { name: "enter", ctrl: false, meta: false, shift: true, sequence: "[13;2u" } },
+      {
+        kind: "key",
+        key: {
+          name: "enter",
+          ctrl: false,
+          meta: false,
+          shift: true,
+          sequence: "[13;2u",
+          phase: "press",
+          encoding: "csi-u",
+        },
+      },
     ]);
     expect(feed(d, "[27;2;13~")).toEqual([
       { kind: "key", key: { name: "enter", ctrl: false, meta: false, shift: true, sequence: "[27;2;13~" } },
@@ -81,8 +92,28 @@ describe("C16 §2 — key decoding", () => {
     // And an ordinary letter through the same branch, so the fix is a codepoint
     // path rather than an Enter special case.
     expect(feed(d, "[97;5u")).toEqual([
-      { kind: "key", key: { name: "a", ctrl: true, meta: false, shift: false, sequence: "[97;5u" } },
+      {
+        kind: "key",
+        key: {
+          name: "a",
+          ctrl: true,
+          meta: false,
+          shift: false,
+          sequence: "[97;5u",
+          phase: "press",
+          encoding: "csi-u",
+        },
+      },
     ]);
+
+    expect(feed(d, "[97;1:2u")[0]).toMatchObject({
+      kind: "key",
+      key: { name: "a", phase: "repeat", encoding: "csi-u" },
+    });
+    expect(feed(d, "[97;1:3u")[0]).toMatchObject({
+      kind: "key",
+      key: { name: "a", phase: "release", encoding: "csi-u" },
+    });
   });
 
   it("T1.3e (C16 §2, I17): xterm's Meta bit is read, so 1;10D and 1;16D are different keys", () => {

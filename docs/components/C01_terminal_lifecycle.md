@@ -98,6 +98,7 @@ shell:  lifecycle.suspend() → runner.handoff(argv) → lifecycle.resume()
 | Handler registrations | disposables | constructor, `release` |
 | Resize subscribers | callback set | `onResize`, disposal |
 | Resume subscribers | callback set | `onResume`, disposal |
+| Enhanced-keyboard request | boolean | `setEnhancedKeyboard` |
 | Saved stdout writer | function | constructor |
 
 `held` is the reason release is correct rather than hopeful: it releases what was taken, in reverse, rather than emitting a fixed sequence and assuming.
@@ -105,10 +106,14 @@ shell:  lifecycle.suspend() → runner.handoff(argv) → lifecycle.resume()
 **The keys are named, not counted.**
 
 ```
-held ⊆ { stdout, altScreen, cursor, rawMode, bracketedPaste, mouse, scrollRegion }
+held ⊆ { stdout, altScreen, cursor, rawMode, bracketedPaste, mouse, enhancedKeyboard, scrollRegion }
 ```
 
-Seven possible; six ever taken at startup, because `scrollRegion` is transactional and C03's (§5). Two of them are not escape sequences at all — `stdout` is the redirection and `rawMode` is a termios call — which is exactly why I8 can release the first while emitting nothing. And `mouse` is one key that emits two sequences, released as two in reverse.
+Eight possible; six are available at ordinary startup, `enhancedKeyboard` is
+taken only while an application surface requests native phases, and
+`scrollRegion` is transactional and C03's (§5). Two are not escape sequences at
+all — `stdout` is the redirection and `rawMode` is a termios call. `mouse` is
+one key that emits two sequences, released as two in reverse.
 
 An earlier draft counted six in three places and meant a different six each time: §5's six acquisition steps, T2.8's six mode sequences, and this row. I6 cannot be implemented against three sets, so the set is now written out.
 
@@ -332,6 +337,11 @@ Fabricated `TerminalCapabilities`, a fake `WriteStream` capturing bytes. No real
 - **T1.26** (I20): `release()` after a shape was set → `CSI 0 SP q` is emitted, and after a session that set none → **nothing**. Both arms, because a reset written unconditionally is the version that overwrites a terminal Calcium never touched — and `held` cannot carry this, so I6's lookup does not cover it.
 - **T1.27** (I20, C22 I63): `resume()` clears the record, so the next frame re-emits an unchanged shape. **The state emit-on-change created**: the record says *already emitted* about a value the child overwrote.
 - **T1.24**: a no-op while suspended, asserted on `setMouseTracking(**true**)`. **The `false` arm proves nothing here and the mutation pass is what found that**: `suspend()` has already unwound every held mode, so the idempotence check returns first and the row passed with the state guard removed. The `true` arm is the one the guard is load-bearing for — without it, `1002h` goes into a terminal a child owns.
+- **T1.28** (I1, I6): `setEnhancedKeyboard(true)` emits the Kitty keyboard
+  request once and `false` emits its inverse once. A disabled request is absent
+  from the later release unwind.
+- **T1.29** (I7): suspension releases enhanced keyboard mode without forgetting
+  the request. A call while suspended emits nothing; resumption reacquires it.
 - **T1.17** (I19): `cursorSequence({row, col})` is a hide, then a move to that cell, then a show, **in that order within the one string**; `cursorSequence(null)` is a hide and no move. The order is the assertion, not the members: all three present in any order passes a set comparison and still drags a visible cursor across the frame on a terminal without synchronised update, which is a capability rather than a guarantee.
 - **T1.16** (I18, C20): bytes reach an `onInput` subscriber only while acquired. Written across the whole transition rather than as four cases, because the subject is the transition: before `acquire()` nothing arrives; after it, a chunk does; after `suspend()` the same chunk does not; after `resume()` it does again; after `release()` it does not. The chunk written during suspension is asserted **absent from the subscriber and not buffered**, which is the half a per-state test would pass while queueing.
 - **T1.16b** (I18a): the fake stdin models Node's `flowing`, so the resumption after `suspend()` is a claim about a stream that can be stopped. `pause()` sets it false, `resume()` true, adding a `data` listener resumes only when it is not already false, and `emit` delivers to nobody while paused. Written as a property of the double rather than as a fifth case of T1.16, because the defect it exposes is one T1.16 already claimed to cover and could not: the double had no state the source could get wrong (§5).
