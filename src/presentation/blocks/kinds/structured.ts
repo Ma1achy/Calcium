@@ -147,6 +147,7 @@ export const keyValueDefinition: BlockDefinition<KeyValue> = {
   },
 
   render(block: KeyValue, ctx: RenderContext): ReactElement {
+    ctx.probe?.gauge("keyValue.rows", block.rows.length); // cells-ok — a count of items, not a display width
     const width = normaliseWidth(ctx.width);
     const keyWidth = block.keyWidth ?? keyColumn(block, width);
     const valueWidth = Math.max(1, width - keyWidth - COLUMN_GAP);
@@ -240,6 +241,7 @@ export const logsDefinition: BlockDefinition<Logs> = {
   },
 
   render(block: Logs, ctx: RenderContext): ReactElement {
+    ctx.probe?.gauge("logs.lines", block.lines.length); // cells-ok — a count of items, not a display width
     const width = normaliseWidth(ctx.width);
 
     return rows(
@@ -282,6 +284,7 @@ export const eventsDefinition: BlockDefinition<Events> = {
   measure: (block: Events): number => atLeastOne(block.events.length), // cells-ok
 
   render(block: Events, ctx: RenderContext): ReactElement {
+    ctx.probe?.gauge("events.events", block.events.length); // cells-ok — a count of items, not a display width
     const width = normaliseWidth(ctx.width);
     const typeWidth = widest(
       block.events.map((e) => stripControl(e.type)),
@@ -404,6 +407,7 @@ export const comparisonDefinition: BlockDefinition<Comparison> = {
   measure: (block: Comparison): number => atLeastOne(block.rows.length + 1), // cells-ok
 
   render(block: Comparison, ctx: RenderContext): ReactElement {
+    ctx.probe?.gauge("comparison.rows", block.rows.length); // cells-ok — a count of items, not a display width
     const width = normaliseWidth(ctx.width);
     // The marker column appears only when a row declares a change, so a block
     // that uses the verdict half alone renders exactly as it did before the
@@ -509,6 +513,7 @@ export const stepsDefinition: BlockDefinition<Steps> = {
   measure: (block: Steps): number => atLeastOne(block.steps.length), // cells-ok
 
   render(block: Steps, ctx: RenderContext): ReactElement {
+    ctx.probe?.gauge("steps.steps", block.steps.length); // cells-ok — a count of items, not a display width
     const g = glyphs(ctx.capabilities);
     const frames = spinnerFrames(ctx.capabilities);
     const width = normaliseWidth(ctx.width);

@@ -50,10 +50,12 @@ import type { Profiler } from "./types.js";
  * `ReturnType<typeof createBlockRegistry>` and this file must not import C09 to
  * name it — the point of the exercise is that no edge is added.
  */
+type Block = { kind: string; id: string };
+
 export type ProbeableRegistry = {
-  measure: (block: { kind: string; id: string }, width: number) => number;
-  render: (block: { kind: string; id: string }, ctx: unknown) => unknown;
-  measureSequence: (blocks: readonly { kind: string; id: string }[], width: number) => number;
+  measure: (block: Block, width: number) => number;
+  render: (block: Block, ctx: unknown) => unknown;
+  measureSequence: (blocks: readonly Block[], width: number) => number;
   /** The slot the registry hands to a definition's `measure` — see above. */
   probe: Probe;
 };
@@ -75,27 +77,57 @@ export function instrumentRegistry(registry: ProbeableRegistry, prof: Profiler):
   const render = registry.render;
   const measureSequence = registry.measureSequence;
 
-  registry.measure = (block, width) => {
-    if (!prof.on) return measure(block, width);
+  // **`using` is kept out of every fast path, and this is not a style choice.**
+  // esbuild and tsc both downlevel a `using` declaration by allocating a
+  // disposable stack at *function entry* and wrapping the whole body in
+  // try/catch/finally — so `finally` runs, and the array is allocated, on the
+  // early return too:
+  //
+  //     registry.measure = (block, width) => {
+  //       var _stack = [];                                  // ← every call
+  //       try { if (!prof.on) return measure(block, width); // ← including this one
+  //       ... } finally { __callDispose(_stack, ...); }     // ← and this
+  //     };
+  //
+  // Measured on 50 rules in two groups, 203 measure calls per pass: a raw pass
+  // is 30.5 µs and the same pass through a wrapper at `tier: "off"` was
+  // **195.6 µs — +541 %, with the profiler disabled.** Splitting the recording
+  // arm into its own function leaves the guard a plain conditional call and the
+  // disabled path allocates nothing. This matters here and not in a block
+  // definition because the subject is 0.6 µs; an array allocation is invisible
+  // beside a 2 ms plot render and dominates a rule's measure.
+  const measured = (block: Block, width: number): number => {
     using _s = prof.element(block.kind, block.id);
     return measure(block, width);
   };
 
-  registry.render = (block, ctx) => {
-    if (!prof.on) return render(block, ctx);
+  const rendered = (block: Block, ctx: unknown): unknown => {
     using _s = prof.element(block.kind, block.id);
     return render(block, ctx);
   };
 
+  const sequenced = (blocks: readonly Block[], width: number): number => {
+    using _s = prof.span("measure");
+    return measureSequence(blocks, width);
+  };
+
+  registry.measure = (block, width) => (prof.on ? measured(block, width) : measure(block, width));
+  registry.render = (block, ctx) => (prof.on ? rendered(block, ctx) : render(block, ctx));
+
   registry.measureSequence = (blocks, width) => {
-    if (!prof.on) return measureSequence(blocks, width);
     // **A count, because the count is the finding.** `measureSequence` runs
     // every frame whatever the cache holds — a fact no counter recorded before
     // this — and the per-block spans below it say nothing about how often the
     // sequence itself was walked.
+    //
+    // **Outside the `prof.on` guard, deliberately.** `on` is *spanning*, so
+    // gating the whole seam on it left `tier: "counters"` recording nothing at
+    // all — a tier named after counters at which no counter here could fire.
+    // `count` and `gauge` carry their own tier guard, and this runs once per
+    // sequence rather than once per block, so the two calls at `off` are a
+    // rounding error against the 203 element calls the same pass makes.
     prof.count("measure.sequences");
     prof.gauge("measure.sequence.blocks", blocks.length);
-    using _s = prof.span("measure");
-    return measureSequence(blocks, width);
+    return prof.on ? sequenced(blocks, width) : measureSequence(blocks, width);
   };
 }

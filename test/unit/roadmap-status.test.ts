@@ -152,7 +152,7 @@ describe("roadmap-status — the Order column's verifier", () => {
     // fails every correct multi-file row.
     const masked = run(
       mutate(
-        "`logs` (`src/presentation/blocks/kinds/structured.ts:217`)",
+        "`logs` (`src/presentation/blocks/kinds/structured.ts:232`)",
         "`logs` (`src/presentation/blocks/kinds/simple.ts:1`)",
       ),
     );

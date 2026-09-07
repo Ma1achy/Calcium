@@ -91,7 +91,7 @@ import { smallMultiplesRows } from "./facet.js";
 import { seriesHidden } from "./visibility.js";
 import { stripHeights } from "./strips.js";
 import type { Annotation, OHLC, QuartileSummary, Plot, PlotForm, Series } from "../../data/viewmodel/index.js";
-import { HAS_HIDEABLE_SERIES } from "../../data/viewmodel/index.js";
+import { HAS_HIDEABLE_SERIES, NO_SPAN } from "../../data/viewmodel/index.js";
 import type { ColourRef, Style } from "../theme/index.js";
 import type { BlockDefinition, BlockKeyBinding, NavElement, RenderContext } from "../blocks/types.js";
 import type { MeasureFn } from "../../data/viewmodel/index.js";
@@ -2228,7 +2228,19 @@ function positionalForm(
   ctx: RenderContext,
   rasterise: Rasteriser,
 ): readonly string[] {
-  const { stacked, bars, axis, layout } = positionalLayout(block, width, ctx);
+  // **Three phases, and they answer different questions.** `layout` is the
+  // scale and the axis decision — a function of the data's range and the box,
+  // and the phase a pinned range makes free. `area` is the raster, which is
+  // where a cell count multiplies. `furniture` is the axes, labels and legend,
+  // which cost per *row* rather than per cell and are the phase a tall thin
+  // plot spends most of its time in.
+  const probe = ctx.probe;
+  let laid;
+  {
+    using _s = probe?.span("plot.layout") ?? NO_SPAN;
+    laid = positionalLayout(block, width, ctx);
+  }
+  const { stacked, bars, axis, layout } = laid;
   // **A pinned range is not a reading.** `seriesRange` answers *what are the
   // bounds*, and with `yMin`/`yMax` given it answers even for an empty series —
   // so `ecdf`, which pins 0..1 to build its block, drew bare axes where every
@@ -2252,9 +2264,14 @@ function positionalForm(
   // — before the furniture exists. Two calls would be two chances for the
   // vertical rule and the `0` caption to land in different cells.
   const xaxis = xRowFor(block, layout.areaWidth, ctx);
-  const area = stacked
-    ? stackedRows(block, range, layout, ctx)
-    : overlaidRows(block, axis, layout, ctx, xaxis, rasterise, candleLayers(bars, range, layout, ctx, positionalDecisions(block).facing), at);
+  let area: readonly string[];
+  {
+    using _s = probe?.span("plot.area") ?? NO_SPAN;
+    area = stacked
+      ? stackedRows(block, range, layout, ctx)
+      : overlaidRows(block, axis, layout, ctx, xaxis, rasterise, candleLayers(bars, range, layout, ctx, positionalDecisions(block).facing), at);
+  }
+  using _f = probe?.span("plot.furniture") ?? NO_SPAN;
   return axed(block, area, layout, ctx, xaxis, marked ? { idx: cursorIdx, at } : null);
 }
 
@@ -3215,7 +3232,28 @@ const render = (block: Plot, ctx: RenderContext): ReactElement => {
   const frame = Math.max(1, Math.floor(ctx.width));
   const drawn = drawnWidth(block, frame);
   const pad = alignPad(block, frame, drawn);
-  const body = FORM_ROWS[block.form](block, drawn, ctx);
+  // **The form, because the forms are not one renderer** (C28 I30). Thirty-odd
+  // of them share this entry and nothing else; a `line` and a `surface` have
+  // different costs, different shapes and different fixes, and one `plot` figure
+  // averaging them says which block to look at and nothing about why.
+  //
+  // The gauges are the half that makes the span mean something. Cost alone says
+  // the plot was slow; cost against sample count says whether it is linear, and
+  // the second is the finding.
+  const probe = ctx.probe;
+  if (probe?.on === true) {
+    probe.gauge("plot.series", block.series.length); // cells-ok — a count of items, not a display width
+    probe.gauge(
+      "plot.samples",
+      block.series.reduce((n, sr) => n + sr.values.length, 0), // cells-ok — a sample count
+    );
+    probe.gauge("plot.area.cells", drawn * plotHeight(block)); // cells-ok — a cell count
+  }
+  let body: readonly string[];
+  {
+    using _form = probe?.span(`plot.form.${block.form}`) ?? NO_SPAN;
+    body = FORM_ROWS[block.form](block, drawn, ctx);
+  }
   // **A row is a string with its SGR already embedded**, so the pad is a leading
   // run of blanks and cannot disturb a colour: a blank carries none (§3ab).
   return rows(pad === 0 ? [...body] : body.map((r) => " ".repeat(pad) + r)); // cells-ok

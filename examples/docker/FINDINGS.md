@@ -30984,3 +30984,259 @@ to the wrong thing.
 
 ---
 
+## F872 — the row asserting the disabled seam was reading the recorder's guard ★★★☆☆
+
+C28's first mutation pass ran fourteen mutations over the profiler and **thirteen were caught**.
+The survivor is the one worth the pass:
+
+```
+SURVIVED  T1.44  OFF-RECORDS: the disabled path takes the recording arm
+```
+
+The mutation deletes the tier guard from the registry seam, so `registry.measure` enters the
+recording arm at every tier:
+
+```ts
+registry.measure = (block, width) => measured(block, width);   // was: prof.on ? … : …
+```
+
+T1.44 asserts that at `tier: "off"` the report holds no element nodes, and it **still passes** —
+because `element()` carries its own tier guard and returns `NO_SPAN`. The report is byte-identical
+with the seam's guard present or absent, so the row was reading the *recorder's* guard while its
+name and its message claimed the seam's.
+
+**What the seam's guard actually buys is not in the report.** Entering `measured()` allocates the
+disposable stack that F867 measured at +541 % — the cost is paid on the call, not on the span. The
+only thing that distinguishes the two states is **whether the call happened**, so the row now counts
+it: a `Proxy` over the profiler tallies `element` invocations, and `off` and `counters` must both be
+zero while `spans` must not.
+
+The general shape is one this repo already names — *a test that calls the mechanism misses the
+wiring* — arriving in its other half: **a test that reads a consequence misses a guard whose only
+effect is upstream of it.** A second guard downstream makes the first one's removal invisible to
+every assertion about output, and two guards for one condition is the ordinary way to write this.
+
+---
+
+## F865 — three fixtures that produced a well-formed block that was not the block under test ★★★★☆
+
+C28's per-element rows were written against a document holding a plot, a table and a code block.
+All three were the wrong block, in three different ways, and **every phase assertion passed on
+them**:
+
+| what the fixture said | what it built | why nothing caught it |
+|---|---|---|
+| `createBlockRegistry({ defaults: true })` | nineteen kinds, **no `plot`, `table` or `patch`** | C11, C12 and C25 register those through the public `register` — that is C09's extension path, and `DEFAULT_DEFINITIONS` names it. A plot block falls to the registry's error block, and **the error block wears the block's id**, so the report carried a node keyed `plot#pl-1` holding the error block's cost |
+| `b.code(source, "typescript", …)` | `code(language, text)` — a one-row block whose *language* was sixty lines of source | both parameters are `string` |
+| `b.notice("info", text, { id: "nt" })` | `notice(tone, text, glyph?, opts?)` — the id typed as a `Glyph` and was dropped | the block built, with a generated id |
+
+**The shape is one shape**: a fixture that still measures, still renders and still records every
+span name the row asks for. T1.40 asserts eight phase names are recorded and passed with the code
+block at one row; T1.32 asserted a ratio and passed against the error block.
+
+`test/support/README.md` already carries the rule — *a fixture must be shown to respond to the
+thing under test before it is asserted against* — and what these three add is **where the check
+goes**. It is in the helper that builds the registry and the document, not in a row, because the
+row is what the wrong fixture satisfies. Two guards, both cheap: every kind under test resolves to
+a definition, and every block measures at least the rows its content implies.
+
+---
+
+## F866 — a plot's `measure` is O(1) by construction, and the plan's cost table was wrong by 60× ★★★★☆
+
+C28's design rested on a measured table of `registry.measure` costs. Re-measured at width 100 in
+the container, warmed:
+
+| | recorded | measured | out by |
+|---|---|---|---|
+| `rule` | 220 ns | 610 ns | 2.8× |
+| `plot`, 200 points | 57 197 ns | **980 ns** | **58×** |
+| `table`, 40×3 | 28 928 ns (at 20×3) | 2 880 ns | 10× |
+
+**A plot cannot be expensive to measure.** C04 §3 refuses a `line` without an explicit height —
+*there is no default, because a defaulted height is wrong silently* — so `measure` reads
+`block.height`, adds the axis furniture and returns. Measure is flat across every kind in the
+registry: **0.16 µs to 8 µs, end to end**, and the most expensive is `notice`, which wraps text.
+
+Two things rested on the wrong figure and both had to move:
+
+- **The overhead argument.** *"A 74 ns span is 0.13 % of a plot measure"* becomes *a span costs
+  more than the measure it brackets, for every kind in the registry*. That is F867 and F868.
+- **The fabrication control.** The plan specified one row — a plot against fifty rules, the plot at
+  ~99 % of measure cost. No document can produce it. The control splits: the measure seam takes a
+  wrapping `notice` (**23.6×** a rule), and the plot moves to the render seam, where
+  `registry.render` is 123 µs for a rule and 15 310 µs for a 2 000-point plot at height 40 —
+  **125×**, and the plot holds 60 % of Σ self on its own.
+
+The claim was carried through the plan and four build steps. Nothing was wrong with the reasoning
+built on it; the input was never re-measured after it was first written down.
+
+---
+
+## F867 — `using` in a hot wrapper is paid on the path that returns before reaching it ★★★★★
+
+The registry decoration guards every wrapper on the tier:
+
+```ts
+registry.measure = (block, width) => {
+  if (!prof.on) return measure(block, width);
+  using _s = prof.element(block.kind, block.id);
+  return measure(block, width);
+};
+```
+
+esbuild and tsc both downlevel a `using` declaration by allocating a disposable stack at **function
+entry** and wrapping the whole body in try/catch/finally:
+
+```js
+registry.measure = (block, width) => {
+  var _stack = [];                                   // ← every call
+  try { if (!prof.on) return measure(block, width);  // ← including this one
+  ... } catch (_) { ... } finally { __callDispose(_stack, _error, _hasError); }
+};
+```
+
+`finally` runs on the early return, so the disabled path allocates an array, enters a try/catch and
+calls the dispose helper — **for a guard that decided not to record**.
+
+Measured on 50 rules in two groups, 203 `measure` calls per pass, at `tier: "off"`:
+
+| | µs per pass |
+|---|---|
+| raw `measureSequence` | 30.5 |
+| through the wrapper, profiler **disabled** | **195.6 — +541 %** |
+
+**The fix is to keep `using` out of the fast path**, not to remove the guard: the recording arm
+becomes its own function and the wrapper is a plain conditional call. `off` and `counters` then sit
+inside the raw baseline's own run-to-run noise (three runs: −3 %, +5 %, +38 % against a baseline
+swinging 16–24 µs).
+
+It matters here and nowhere else in the tree because **the subject is 0.6 µs**. The same `using` in
+a block definition's `render` brackets 2 ms of work and is invisible. A cost that is a rounding
+error at one seam and 5× the subject at another is not a style question, and neither reading is
+available from looking at the source.
+
+---
+
+## F868 — a computed `[Symbol.dispose]` key in an object literal was the majority of a span's cost ★★★★☆
+
+The recorder returned each span's handle as an object literal closing over the node:
+
+```ts
+return { [Symbol.dispose]: () => { const spent = end(node, ctx); … } };
+```
+
+Construct-and-dispose, 500 000 iterations:
+
+| shape | µs |
+|---|---|
+| object literal with a computed symbol key | 0.150 |
+| **class instance, symbol on the prototype** | **0.009** |
+| frozen singleton over a LIFO stack | 0.007 |
+
+**17× for the class**, against two `performance.now()` reads at 0.104 µs — so the handle, not the
+clock, was the largest single item in a span. The literal builds a fresh closure and stores a
+symbol-keyed property per call; a class puts the symbol on the prototype once and the fields in
+slots.
+
+The singleton was **not** taken for 2 ns more: closing through `node.parent` rather than through
+whatever was last on a stack is what makes an out-of-order close correct instead of dropped, and
+that invariant is worth more than the difference.
+
+**Both fixes together, on the production shape** — a frame per pass, 203 element spans:
+
+| | µs per pass | per element span |
+|---|---|---|
+| raw | ~20 | — |
+| `off` / `counters` | ~20 | nil |
+| `spans`, before | 396 | 1.85 µs |
+| `spans`, after | **~215** | **0.96 µs** |
+
+0.96 µs is 13× the 74 ns the plan projected and **1.2 % of a 16 ms frame at 200 elements**. Both
+figures belong in the report: the second is why the tier is usable, and the first is why it is not
+free at a seam whose subject is a microsecond.
+
+---
+
+## F869 — a tier named `counters` at which no counter could fire ★★★★☆
+
+Every registry wrapper was gated on `prof.on`, and `on` is `spanning()` — tier rank 2. At
+`tier: "counters"` the seam took the untouched arm, so `measure.sequences` and
+`measure.sequence.blocks` — the two figures that exist to say how often the sequence is walked —
+recorded **nothing at all**. The tier below the one they need was the tier named after them.
+
+The vacuity is the ordinary kind and the concealment is not: `count()` and `gauge()` carry their own
+tier guard, so the calls are correct and the arm containing them is unreachable. Reading either the
+wrapper or the recorder alone shows nothing wrong.
+
+Fixed by putting the two counters outside the `prof.on` conditional — they run once per *sequence*,
+not once per block, so the two guarded calls at `off` are a rounding error against the 203 element
+calls the same pass makes. T1.44 asserts all three tiers together, because each alone is satisfied
+by the wrong reading: `off` empty is what a broken `counters` looks like, and `counters` non-empty
+is what a `counters` that opens spans looks like.
+
+---
+
+## F870 — the plot's raster is flat in the sample count and linear in the box ★★★☆☆
+
+The first thing C28's phase split produced about a real renderer. `plot.area.cells`, one render
+each, width 100:
+
+| samples | height | cells |
+|---|---|---|
+| 200 | 4 | 700 |
+| 2 000 | 4 | **700** |
+| 20 000 | 4 | **700** |
+| 200 | 40 | 4 300 |
+
+**100× the data rasterises the identical cell.** The downsampler collapses a series onto the box's
+columns before anything is drawn, so the box is the only axis the raster has. Cost follows: at 10×
+on each axis, height moved `plot.area` 4.7–8.9× and samples moved it 1.6–2.7×, height winning within
+every one of six runs by 2.16× at the closest.
+
+The row asserting this had to be written twice, and the first draft asserted the obvious thing —
+ten times the data multiplies the raster. It does not. *The plot is slow because of its height* is
+actionable; *the plot is slow* is not, and the split is the difference.
+
+**A third assertion was removed rather than retuned.** It read *the samples are not free either*
+and failed one run in five. Retuning it would have been wrong at any threshold: it asserts the
+renderer is **worse** than flat in the sample count, so a downsampler that got better at ignoring
+the series would fail it. What it guarded — that the renderer reads the series at all — is already
+exact, in the `plot.samples` gauge.
+
+---
+
+## F871 — 36 of 89 roadmap line citations land on a comment, and the verifier can only see a blank ★★★☆☆
+
+`roadmap-status` resolves a `` `path:line` `` citation by checking the line exists and is not blank.
+That is containment, not correctness: every wrong line inside the file passes.
+
+Six citations point into the four files C28's instrumentation touched. **All six were wrong at
+HEAD**, before this work:
+
+| citation | claimed | pointed at, at HEAD | actually at |
+|---|---|---|---|
+| `structured.ts:125` | `keyValue` declares `window` | a doc-comment line | `:138` |
+| `structured.ts:217` | `logs` declares `window` | a doc-comment line | `:232` |
+| `patch/definition.ts:213` | `patch` declares `window` | `return rows(out);` | `:194` |
+| `table/definition.ts:157` | `table` declares `window` | a doc-comment line | `:181` |
+| `table/definition.ts:399` | `rowCopyText`'s source text | a doc-comment line | `:447` |
+| `structured.ts:403` | `steps` animates off `ctx.tick` | the `comparison` block's `measure` | `:532` |
+
+**One was caught, and only because five inserted lines pushed it onto a blank.** The offsets are
++13, +15, −19, +24, +48 and +129 — they rotted independently over time, not in one edit.
+
+Across the whole roadmap: **89 distinct `src/*.ts:N` citations — 52 land on code, 36 on a comment
+line, 1 on a blank.** Forty per cent.
+
+A citation in this table always names code, so *the cited line must not be blank or a comment* is
+mechanical, sound, and would have caught four of these six at HEAD. It is not landable as a gate
+until the 36 are corrected, which is its own step — the number is here so the step has one.
+
+Entry 38's own second column already describes this class from the inside: *"both line citations
+were already wrong before they were corrected, and `roadmap-status` only noticed when an unrelated
+edit pushed one onto a blank line."* It was recorded as a property of two citations. It is a
+property of forty per cent of them.
+
+---
+

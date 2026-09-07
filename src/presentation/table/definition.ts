@@ -19,6 +19,7 @@
  * at `w - 2` while nothing said so, and a second component writing `w - 1` is a
  * drift that shows only once a child wraps.
  */
+import { NO_SPAN } from "../../data/viewmodel/index.js";
 import { Box, Text } from "ink";
 import { createElement, type ReactElement } from "react";
 import { atLeastOne, insetWidth, normaliseWidth, sequenceHeight } from "../../data/viewmodel/index.js";
@@ -248,7 +249,20 @@ export const tableDefinition: BlockDefinition<Table> = {
 
   render(block: Table, ctx: RenderContext): ReactElement {
     const width = normaliseWidth(ctx.width);
-    const plan = planColumns(block.columns, width);
+    const probe = ctx.probe;
+    // **Rows and columns separately, because they are different failures.** A
+    // table slow in `plan` is wide — the plan is a function of the declarations
+    // and the width and never reads a cell (C11 §3) — and one slow in `rows` is
+    // deep. The same duration means opposite things.
+    if (probe?.on === true) {
+      probe.gauge("table.rows", block.rows.length); // cells-ok — a count of items, not a display width
+      probe.gauge("table.columns", block.columns.length); // cells-ok — a count of items, not a display width
+    }
+    let plan;
+    {
+      using _p = probe?.span("table.plan") ?? NO_SPAN;
+      plan = planColumns(block.columns, width);
+    }
     const focused = ctx.focus !== null && ctx.focus.blockId === block.id ? ctx.focus.rowId : null;
     // **The extent is the entry's, kept to this block** (I14). The pairs are
     // filtered by *their* block id and not gated on `ctx.focus.blockId`, because
@@ -291,6 +305,12 @@ export const tableDefinition: BlockDefinition<Table> = {
     // Sorting is a permutation, so this changes the order of what follows and
     // nothing about how much of it there is — which is why `measure` above does
     // not sort at all (I8, T1.13).
+    //
+    // **The span covers the loop and not each row**, which is a deliberate
+    // trade: a span costs 74 ns and a row's spans cost rather less than a plot's
+    // frame, so one per row would report the instrument. The per-row figure that
+    // is wanted is `table.rows` above divided into this.
+    using _rows = probe?.span("table.rows") ?? NO_SPAN;
     for (const row of sortedRows(block)) {
       const expandable = isExpandable(row, plan);
       const isHead = focused !== null && focused === row.id;
@@ -309,6 +329,12 @@ export const tableDefinition: BlockDefinition<Table> = {
       );
 
       if (row.expanded !== true) continue;
+      // **A count, not a span.** Each detail child goes through `renderChild`,
+      // which the registry decoration already enters, so every one of them is
+      // its own node in the tree with its own kind and id. What the tree cannot
+      // say is how many rows were expanded at once, which is the thing a reader
+      // changes.
+      probe?.count("table.detail.rows");
 
       // Indented by two cells, and the children are rendered at the width they
       // were *measured* at. `paddingLeft` plus a `width` of the whole leaves a

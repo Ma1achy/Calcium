@@ -43,8 +43,10 @@ const results = await runPass({
   run,
   control: {
     file: SRC,
-    from: "    const placements = groupPlacements(block, width, ctx.measureChild, ctx.widthChild);",
-    to: "    const placements = block.children.map((_c, i) => ({ left: 0, top: 0, width: widths[i] ?? 1 }));",
+    // Re-anchored when C28's `group.place` span put the call in a block — the
+    // placement is one indent deeper and assigns rather than declares.
+    from: "      placements = groupPlacements(block, width, ctx.measureChild, ctx.widthChild);",
+    to: "      placements = block.children.map((_c, i) => ({ left: 0, top: 0, width: widths[i] ?? 1 }));",
     why:
       "no child is ever aligned — if this survives, nothing reads the frame a row group " +
       "composes and the mutation below is unearned",

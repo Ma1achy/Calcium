@@ -30,20 +30,20 @@ type change.
 | rank | mechanism | ids keyed | consumers | ⚠ | disposition |
 |---|---|---|---|---|---|
 | **1** | [The consumer cannot reach a fact the framework holds](#1) | 19 | **11 open** | ⚠ C07 · C24 | real Calcium work, with consumers |
-| **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 78 | **5 open** (9 closed) | ⚠ C04 · C23 | real Calcium work · **7 of 13 fixed** — and F165 is the first found by roadmap 48's residue rather than by a consumer reaching for something |
+| **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 79 | **5 open** (9 closed) | ⚠ C04 · C23 | real Calcium work · **7 of 13 fixed** — and F165 is the first found by roadmap 48's residue rather than by a consumer reaching for something |
 | **3** | [A block cannot express what the surface needs](#3) | 9 | **4 open** | ⚠ C04 | mixed — two absorbed |
 | **4** | [A change axis distinct from `Tone`](#4) | 5 | **4 open** | ⚠ C04 · C09 · C10 | real Calcium work · needs a ruling |
 | **5** | [The far side's shape is not the framework's contract](#5) | 10 | **2 open** | ⚠ C05 | mostly app-side · one shim |
 | **6** | [Rendered from data that has since moved](#6) | 2 | **2 open** | ⚠ C04 | real Calcium work |
 | **7** | [An artefact describes the world rather than being checked against it](#7) | 112 | **20** | — | artefact discipline — **no code**, and F164 is the first found by an instrument's *population* step rather than by a reader; **F210 is the first where the artefact is a component's own spec and the thing it contradicts is a shipped frame**, and **F233 the first where what it contradicts is a *fix*** — four present-tense statements of a repaired defect, in the two components the repair did not touch |
 | **8** | [Absence indistinguishable from failure](#8) | 29 | **7 open** (7 closed) | partly | real Calcium work · **7 of 10 fixed** — F151 is the class F35 closed in the half an app-side test cannot reach, and **F167 is the class arriving in a *value*: a validator agreeing twice about two different documents** |
-| **9** | [**The instrument was wrong**](#9) | 103 | **17** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
-| **10** | [**A claim carried without a record**](#10) | 69 | **11** | — | **new at F80** · method — six findings disproved, and **F166 unblocked an entry while F168 found what the same row was silent about**; F184 is the first where the unrecorded claim was a *rule* rather than a fact, governing thirty forms from a parameter's doc comment |
-| **11** | [A gate that passes without checking](#11) | 309 | **16** | — | **105 closed · 117 open** of 223 keyed — the heading was out by 66 and this row's count column by 1, which cannot be corrected alone (§11) · four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
+| **9** | [**The instrument was wrong**](#9) | 106 | **17** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
+| **10** | [**A claim carried without a record**](#10) | 70 | **11** | — | **new at F80** · method — six findings disproved, and **F166 unblocked an entry while F168 found what the same row was silent about**; F184 is the first where the unrecorded claim was a *rule* rather than a fact, governing thirty forms from a parameter's doc comment |
+| **11** | [A gate that passes without checking](#11) | 311 | **16** | — | **105 closed · 117 open** of 223 keyed — the heading was out by 66 and this row's count column by 1, which cannot be corrected alone (§11) · four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F173 is the group's own instrument, blind to 23% of what it counted** |
 | **12** | [**A time-based assertion under contention**](#12) | 6 | **3** | — | **new at F80** · Calcium's own suite |
 | **13** | [Text the framework emits](#13) | 6 | **4** | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
 | **14** | [A constant, a channel or a rule that outlived its configuration](#14) | 28 | **13 open** | ⚠ C12 | **new at F492** · real Calcium work — every member reads as deliberate, which is why review found none of them |
-| — | [Singles](#singles) | 83 | 1 each | — | see each · **F176 is the one to read twice**: the instrument had the evidence in a committed snapshot and the reading step was skipped |
+| — | [Singles](#singles) | 84 | 1 each | — | see each · **F176 is the one to read twice**: the instrument had the evidence in a committed snapshot and the reading step was skipped |
 
 **Four groups are new since F55** — 9, 10, 12, and F81's arrival in 4. Group 9 is the one
 that changes the picture, and it is the only group whose subject is the apparatus rather
@@ -248,6 +248,7 @@ mechanism.
 | **F129** | a `view` verb that is also `local` appends an entry and opens nothing |
 | **F132** | the grant is untestable from the side that consumes it |
 | **F141** | `b.logs` is reached by one test fixture, and S12 composes `raw` |
+| **F869** | a tier named `counters` at which no counter could fire — every registry wrapper gated on `on`, which is *spanning* |
 
 
 ## 3 · A block cannot express what the surface needs — **4 open, 1 ruled** ⚠
@@ -851,6 +852,9 @@ says a demo of a plot should have a shape.
 | **F120** | the mutation harness reported one pre-existing error six times |
 | **F130** | the grant's own tests could not see it, because the double was narrower |
 | **F321** | **two predicates keyed on a glyph the figure also draws** | `terminalDecisions` splits a row at its first `EDGE` — gutter before, area after — and calls anything past its last one a legend. **Both hold for a bordered figure and neither holds for a figure whose content is box-drawing.** A tree's indented outline begins every row with `│` or `├`, so `first` was 0, `head` was empty, and **seven of nine names went unread**, while each row read as *a figure whose right edge is column 0 with text past it* — `legend: true` on `tree` and on all four of `graph`'s pairs, forms that draw none. **Found by removing a refusal, not by reading a frame**: the outline was refused by the second arm, and a `silent` cell records nothing about the reader — so every refusal is a place the instrument is not being checked. **Two conditions tried and rejected by the corpus**: `border` lost `line/frame-rule`'s gutter (a bottom rule and no top one), and `legendTail` past the edge lost the legends on `bar`, `bubble`, `histogram` and `scatter` (its two-space gap separates a key from a *figure*, and past an edge there is none). The right condition is the row's own — `first > 0`, and `isLegendRun` on the remainder. `line.legend` 16/70 → 8/70, `graph` and `tree` → `agree`, open cells 55 → 53. **Stated limit**: a LEFT legend sits before the first edge and this reader has never seen one. **Fixed**, AD9 |
+| **F865** | three fixtures that produced a well-formed block that was not the block under test — a missing renderer, a swapped pair of strings, an id typed as a glyph |
+| **F867** | `using` in a hot wrapper is paid on the path that returns before it — the disposable stack is allocated at function entry, +541 % at `tier: "off"` |
+| **F868** | a computed `[Symbol.dispose]` key in an object literal cost 17× a class instance, and was the largest single item in a span |
 
 
 **F237** is the group's own harness damaging the tree it tests. `runPass` restores each file with
@@ -1027,6 +1031,7 @@ through a menu in as many words — as the reason the implementation writes ever
 | **F248** | **the three measurements images phase 1 rests on** | **All three came back the way the plan needed, each with a control.** *A partial row rewrite*: Ink re-emits the **full frame** — 96 of 96 placeholders on a one-row change of twelve, 12 cursor-ups, 13 erase-lines — so an image is cheap and the grid never has to survive being written a row at a time. **The first run reported `NOTHING re-emitted` and that was the harness**: a fake stdout without `isTTY` makes Ink write nothing at all, so a zero was indistinguishable from a full frame of nothing. *Truncation and the window*: no cluster split at any width 1-12 at either unicode arm, and a windowed row still names its own row — safe for two different reasons, `truncate` being grapheme-aware and each cell naming row **and** column. **This is the failure mode no other kind has** — every other block degrades by losing content and this one would degrade by addressing a different part of the image. *The decoder*: an 8x4 PNG from `sharp` reads back as `IHDR pHYs IDAT IEND`, and `pHYs` is the useful part — a decoder skips ancillary chunks rather than assuming `IDAT` follows `IHDR` | **shape holds** |
 | **F309** | **a new tool: `svg-catalogue.mjs`, phase-catalogue widened to the full corpus** | **It exists**, as `tools/svg-baseline.mjs` — one `.svg` per form·variant over the whole of `CATALOGUE_FORMS`, 178 frames, into a **tracked** directory rather than a gitignored one, with a derived expected count (F256) and **a placard already written for every refusal**. That is §2 almost word for word, and the plan named it NEW two lines under its own instruction *extend the existing tools rather than writing a third*. **The condition was written where the deferral is and the satisfier somewhere else** — CLAUDE.md's table, a fourth row, and reached from the satisfier rather than by anything watching the condition. **The narrower true statement changes the build**: the SVG corpus is text and a paired sheet needs pixels, so what is owed is a compose pass over two already-gated corpora and **no `svg-catalogue.mjs` at all**. The same reading retires the plan's third digest — a hash over *derived* pixels moves whenever either input moves and says which of the two only by not saying, over corpora whose own gates name the frame |
 | **F318** | **a `drops` member on `Figure`, named in the design and absent from the tree** | **The tree is right and the design was wrong**, which is the reverse of how a declared-but-missing member reads. `dropped = Math.max(0, longest - layout.areaWidth)` — `longest` is a sample count and **`areaWidth` is cells**. §3aj hazard 3 is *anything measured in cells stays in cells*, and `G1`/`G1b` assert the shared layer's side **by arity**: `niceAxis(range, maxTicks, pin)` and `seriesRange(series, pin, bars)`, neither with a width. `notice` carries the count in its string, so both halves fail for one reason. **And the difference it was reaching for is legitimate** — the terminal drops leading columns because a cell is a quantum; the second arm scales 640 px and has nothing to drop, which is not *has not implemented dropping*. The row belongs in §2's closed list as *they differ and always will*, and fails the day the SVG grows a drop rule. **The ramp half stands and is open.** C23 §8a A4's shape in a type sketch: nine of ten members are properties of the block, so the tenth read as one |
+| **F866** | a plot's `measure` is O(1) by construction and the design's cost table said 57 µs — the overhead argument rested on a figure 58× out |
 
 
 
@@ -1642,6 +1647,8 @@ reads goes through the entry point a user has.
 | **F133** | tier 5 was 44 failed at session start, and the prompt never draws |
 | **F136** | MG24 matches a record's members by name and not by owner |
 | **F142** | a derived count is derived once, and nothing re-derives it |
+| **F872** | a row asserting the disabled seam read the recorder's guard — a second guard downstream makes the first one's removal invisible to every assertion about output |
+| **F871** | a roadmap line citation resolves on non-blankness — 36 of 89 land on a comment, and all six into one change's files were wrong at HEAD |
 
 
 
@@ -1877,6 +1884,7 @@ written as one. Every member reads as deliberate, which is why none was found by
 | **F122** | the framework holds apps to a rule it exempts itself from |
 | **F137** | a fold runs on a version, so an attempt that failed is not counted |
 | **F140** | a refusal that leaves a constructed graph |
+| **F870** | the plot's raster is flat in the sample count and linear in the box — 100× the data rasterises the identical 700 cells |
 
 
 ## What this triage cannot see

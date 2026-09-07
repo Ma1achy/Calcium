@@ -575,6 +575,7 @@ export const pillsDefinition: BlockDefinition<Pills> = {
   elements: pillsElements,
 
   render(block: Pills, ctx: RenderContext): ReactElement {
+    ctx.probe?.gauge("pills.chips", block.chips.length); // cells-ok — a count of items, not a display width
     const byLabel = new Map(block.chips.map((chip) => [stripControl(chip.label), chip]));
     // **Focus, and it read `ctx.focus` nowhere before this** (C11 I14, F764's
     // neighbour): a focused chip drew as an unfocused one in every frame, so a
@@ -669,6 +670,7 @@ export const rawDefinition: BlockDefinition<Raw> = {
   },
 
   render(block: Raw, ctx: RenderContext): ReactElement {
+    ctx.probe?.gauge("raw.lines", block.text.split("\n").length); // cells-ok — a count of items, not a display width
     const width = normaliseWidth(ctx.width);
     // The runs cut per line, as `rawLines` cuts the text — one `\n` rule for
     // both halves. A truncated line keeps the runs inside `kept` and paints the

@@ -14,6 +14,7 @@
  *   - **An unregistered language renders as plain text, not an error** — the
  *     same principle as C07's fallback adapter.
  */
+import { NO_SPAN } from "../../../data/viewmodel/index.js";
 import type { ReactElement } from "react";
 import { createLowlight } from "lowlight";
 import type { LanguageFn } from "highlight.js";
@@ -388,12 +389,26 @@ export const codeDefinition: BlockDefinition<Code> = {
 
   render(block: Code, ctx: RenderContext): ReactElement {
     const width = normaliseWidth(ctx.width);
+    const probe = ctx.probe;
     const source = expandTabs(stripControl(block.text));
-    const perLine = tokenLines(tokenise(source, block.language, ctx.probe));
+    // **Tokenise and paint, because they scale with different things.**
+    // Tokenising is a whole-block parse memoised on `(language, text)` — paid
+    // once and then free — and painting is per *visible* row, paid every frame.
+    // A block slow for the first reason wants the memo looked at; one slow for
+    // the second wants the window. The single figure they used to share could
+    // not tell them apart, and the memo's hit rate beside this says which.
+    let perLine;
+    {
+      using _t = probe?.span("code.tokenise") ?? NO_SPAN;
+      perLine = tokenLines(tokenise(source, block.language, probe));
+    }
     const defaultStyle = tone("default", ctx.theme, ctx.capabilities);
 
+    using _p = probe?.span("code.paint") ?? NO_SPAN;
+    const drawn = codeRows(block, width);
+    probe?.gauge("code.rows", drawn.length); // cells-ok — a count of items, not a display width
     return rows(
-      codeRows(block, width).map((row) => {
+      drawn.map((row) => {
         // Every rendered row is an exact slice of its source line, so the
         // tokens — which are offsets into that line — slice against it.
         const { kept, suffix } = truncateParts(row.text, width, ctx.capabilities);

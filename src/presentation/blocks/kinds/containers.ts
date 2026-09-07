@@ -12,6 +12,7 @@
  * the same paragraph and writing `w - 1` is a drift that only shows once a child
  * wraps (C04 §3).
  */
+import { NO_SPAN } from "../../../data/viewmodel/index.js";
 import { Box, Text } from "ink";
 import { createElement, type ReactElement } from "react";
 import {
@@ -79,6 +80,9 @@ export const panelDefinition: BlockDefinition<Panel> = {
   },
 
   render(block: Panel, ctx: RenderContext): ReactElement {
+    // The child count, which is what a container's cost is proportional to and
+    // what no duration states. Each child is its own node; this is how many.
+    ctx.probe?.gauge("panel.children", block.children.length); // cells-ok — a count of items, not a display width
     const g = glyphs(ctx.capabilities);
     const width = normaliseWidth(ctx.width);
     const inner = insetWidth(width);
@@ -390,6 +394,9 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
    */
 
   render(block: Scroll, ctx: RenderContext): ReactElement {
+    // The child count, which is what a container's cost is proportional to and
+    // what no duration states. Each child is its own node; this is how many.
+    ctx.probe?.gauge("scroll.children", block.children.length); // cells-ok — a count of items, not a display width
     const width = normaliseWidth(ctx.width);
     const interior = interiorOf(block);
     const content = contentHeight(block, width, ctx.measureChild);
@@ -570,6 +577,9 @@ export const mosaicDefinition: BlockDefinition<Mosaic> = {
   },
 
   render(block: Mosaic, ctx: RenderContext): ReactElement {
+    // The child count, which is what a container's cost is proportional to and
+    // what no duration states. Each child is its own node; this is how many.
+    ctx.probe?.gauge("mosaic.children", block.children.length); // cells-ok — a count of items, not a display width
     const width = normaliseWidth(ctx.width);
     const parsed = parseAreas(block.areas);
     // **A grid that does not parse is refused at both gates**, so this arm is
@@ -675,6 +685,8 @@ export const groupDefinition: BlockDefinition<Group> = {
 
   render(block: Group, ctx: RenderContext): ReactElement {
     const width = normaliseWidth(ctx.width);
+    const probe = ctx.probe;
+    probe?.gauge("group.children", block.children.length); // cells-ok — a count of items, not a display width
     const widths = childWidths(block, width);
     // **One placement, read here as margins** (C04 I103). `left` renders at the
     // cell and moves nothing, so an unaligned row is byte for byte what it was;
@@ -682,7 +694,16 @@ export const groupDefinition: BlockDefinition<Group> = {
     // (C04 I101). The vertical offset is against the row's height — the tallest
     // child or `minRows` — and zero in a column, where the cell is the child's own
     // height and there is nothing to move inside.
-    const placements = groupPlacements(block, width, ctx.measureChild, ctx.widthChild);
+    // **The container's own work, and the only part of it the tree cannot
+    // already see.** Every child is a node in its own right, because
+    // `renderChild` and `measureChild` both go through the registry. This does
+    // not draw a child — it asks each one's width and height to decide where it
+    // goes — so its cost lands in the group's self time with nothing naming it.
+    let placements;
+    {
+      using _p = probe?.span("group.place") ?? NO_SPAN;
+      placements = groupPlacements(block, width, ctx.measureChild, ctx.widthChild);
+    }
 
     const children = block.children
       .slice(0, placeable(block, width))

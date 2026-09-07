@@ -107,13 +107,15 @@ const results = runPass({
       // height, with the right number of rows and the right width.
       name: "THE SWITCH: form dispatch falls back to the line arm",
       file: DEF,
-      // Re-anchored when `render` grew the narrowing seam (C12 §3ab); the
-      // dispatch is the same line, one variable along.
-      from: "  const body = FORM_ROWS[block.form](block, drawn, ctx);",
+      // Re-anchored twice: once when `render` grew the narrowing seam (C12
+      // §3ab), and again when C28's `plot.form.<form>` span put the dispatch in
+      // a block so the timing covers the form and not the surrounding setup.
+      // The dispatch is the same call both times.
+      from: "    body = FORM_ROWS[block.form](block, drawn, ctx);",
       to:
-        "  const body = block.form === \"sparkline\"\n"
-        + "    ? FORM_ROWS.sparkline(block, drawn, ctx)\n"
-        + "    : FORM_ROWS.line(block, drawn, ctx);",
+        "    body = block.form === \"sparkline\"\n"
+        + "      ? FORM_ROWS.sparkline(block, drawn, ctx)\n"
+        + "      : FORM_ROWS.line(block, drawn, ctx);",
       expect: "T1.17",
     },
     {

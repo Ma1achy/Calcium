@@ -155,6 +155,7 @@ export const terminalDefinition: BlockDefinition<Terminal> = {
   },
 
   render(block: Terminal, ctx: RenderContext): ReactElement {
+    ctx.probe?.gauge("terminal.lines", block.lines.length); // cells-ok — a count of items, not a display width
     const width = normaliseWidth(ctx.width);
     const painted: string[] = [];
 

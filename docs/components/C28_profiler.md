@@ -170,12 +170,40 @@ already its only entry.
 |---|---|---|---|
 | `off` | nothing | — | one `undefined` check per seam (I1) |
 | `counters` | integers only: frames by `CommitReason`, bytes written, cells painted, blocks measured by kind, instance and entry, cache misses by reason, commits coalesced, live polls, entries appended and evicted | an increment | nothing |
-| `spans` | the above, plus `work`/`wait`/`total` per frame, the span set, the N worst frames whole, and periodic `ResourceSample`s | two `elapsed()` reads per span — **50.8 ns** each, so ten spans is about **1 µs** a frame (design M15) | nothing |
+| `spans` | the above, plus `work`/`wait` per frame, the span set, the N worst frames whole, and periodic `ResourceSample`s | **0.96 µs per element span**, measured — see below | nothing (F867) |
 | `alloc` | the above, plus V8 sampling allocation attributed to stacks | light enough for a live session: **78 KB** and **36 ms** for a whole start→stop cycle (design M22) | nothing |
 | `deep` | the above, plus CPU profiles and heap snapshots written to `.calcium/profile/` (C22 I67) | large — a heap snapshot is **5.4 MB** and **314 ms** on a near-empty process (design M21), so it pauses the session | nothing |
 
 A tier is raised by `TuiConfig.profile`, by `/profile`, or by opening the view (which raises it and
 lowers it again on close, so a pane never draws an empty plot that reads as *measured, and zero*).
+
+### 3a. What a span costs, measured rather than derived
+
+This row read *two `elapsed()` reads per span — 50.8 ns each, so ten spans is about 1 µs a frame
+(design M15)*. The clock figure is right and the inference from it is not, in both of its terms.
+
+**A span is not two clock reads.** It is a node object and its child list, a handle, a `kind#id` key,
+a parent link, a histogram update and an aggregate update. Measured on 50 rules in two groups —
+203 element spans per pass — at `tier: "spans"` with a frame per pass:
+
+| | µs per pass | per element span |
+|---|---|---|
+| raw `measureSequence` | ~20 | — |
+| `off` / `counters` | ~20 | nil, inside the baseline's own noise |
+| `spans` | ~215 | **0.96 µs** |
+
+**And a frame is not ten spans.** The element tree opens one per block per measure call, and the
+registry measures a block about four times per sequence pass, so a fifty-block document is ~200
+spans and not ten. The 1 µs estimate was out by 200× in the count and 10× in the unit.
+
+**0.96 µs is two figures and both belong here**, because either alone misleads: it is **1.2 % of a
+16 ms frame** at 200 elements, which is why the tier is usable, and it is **more than the `measure`
+call it brackets** for every kind in the registry — measure is 0.16–8 µs end to end (F866) — which
+is why the tier is not free and why `off` had to be made genuinely free (F867, F868).
+
+The two defects behind the difference between 0.96 µs and the 1.85 µs this first measured are in
+the findings: a `using` declaration in a hot wrapper is paid on the path that returns before
+reaching it, and a computed `[Symbol.dispose]` key in an object literal costs 17× a class instance.
 
 **Churn and retention are different instruments.** `alloc` says what was *allocated, and where*;
 `deep`'s snapshot says what is *retained, now*. `CALCIUM_ROADMAP.md`'s parked question — per-frame
