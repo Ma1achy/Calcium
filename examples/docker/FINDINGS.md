@@ -31915,6 +31915,13 @@ population, and `make enforce` reports **18** where it reported 20. A number tha
 a number nobody reads; this one shrinks when the work is done and grows when a row is deferred, and
 neither movement is visible in the 79 beside it.
 
+**And again, to 13.** Converting the twelve rows whose marker named a met condition — C22 I92, I93
+and I95, C03 I16, C24 I32, C28 I1, I4, I27 and I28 — took the count from 18 to **13**, and the five
+milestone phrasings are gone from the tree: every remaining profiler deferral names a symbol and a
+grep. Two of the twelve needed a mechanism built rather than a row written (F901, F903), which is the
+distinction F902 is about — the marker cannot tell those two cases apart, and this figure cannot
+either. What it can say is how many invariants are standing on nothing that runs, which is 13.
+
 **The repair is a figure, not a gate.** Twenty is not debt to be turned red — most are honest
 deferrals — and a gate red on arrival is a gate edited to fit. What is missing is that SP9's own
 reported line cannot tell the two populations apart, so a deferral that has quietly become the only
