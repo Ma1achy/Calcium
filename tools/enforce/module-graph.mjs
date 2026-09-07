@@ -1941,12 +1941,14 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
     "C08 — the integer draw beneath the fixture generators. `rng.ts` uses it internally " +
     "and `test/unit/corpus.test.ts` asserts the stream is reproducible, which is the only " +
     "place a deterministic RNG is observable at all",
-  "TransportRouter.busy":
-    "C06 diagnostics — whether a route is in flight. **F83's own evidence, and it survived " +
-    "its own removal**: `router.ts` records that a guard replaced it and `construct.ts` " +
-    "counts seventeen call sites until it, so the tree documents the deletion twice and " +
-    "the member is still declared. Kept listed rather than deleted until C06 rules, because " +
-    "removing a member two comments describe as removed wants the spec edit first",
+  // **`TransportRouter.busy` left this list on 2026-09-07, and not because
+  // anything wanted it** (F882). C28's transport decorator re-exposes every
+  // member `TransportRouter` declares — it has to, to be a `TransportRouter` —
+  // so wrapping the seam manufactured a reader for `busy` and MG24 stopped
+  // reporting it. The entry's own question is untouched: `router.ts` records
+  // that a guard replaced the member and `construct.ts` counts seventeen call
+  // sites until it, so the tree still documents the deletion twice and C06 still
+  // owes the ruling. What changed is that the rule can no longer ask.
   // **`FrameScheduler.pending` and `CompletionEngine.pending` both left here on
   // 2026-09-06, and only one of them for a consumer** (F849). C23's shell route
   // reads `deps.scheduler.pending` to coalesce its snapshots (C23 I64), which is

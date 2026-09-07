@@ -1020,7 +1020,15 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         );
         return;
       }
-      const produced = await handler(argv, {
+      // **`local`, not `handler`** (C28 I36). `handler` is the input path's
+      // name — whichever key handler `router.dispatch` resolves to — and groups
+      // as `input`; this route produces a `ViewDocument` in this process, so it
+      // is `compute`. This round's plan called both of them `handler`.
+      //
+      // Called directly when unprofiled rather than through a no-op wrapper:
+      // the wrapper is an allocation and a promise hop on the path that is
+      // meant to cost nothing at `off`.
+      const invoke = async () => handler(argv, {
         // **`null`, and C07 §3a cell B records that it is right by accident.**
         // The local route cannot open a view — C18 classifies on `tool.local`
         // first and `isViewInvocation` is read only on the `app` route — so a
@@ -1036,6 +1044,11 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         ...(deps.profile === undefined ? {} : { profile: deps.profile }),
         args,
       });
+      // A local handler may return synchronously, and `trace` brackets a
+      // promise seam — so `invoke` is `async` and the profiled path costs one
+      // microtask more than the bare one. Once per command, against a route
+      // that has already awaited.
+      const produced = await (deps.trace === undefined ? invoke() : deps.trace("local", invoke));
       // **C23 states the command, not the handler** (I15, C22 I33) — the same
       // argument as C07 I16 makes for `doc.command` on the adapter side, and the
       // same one I13 makes for `meta`: the framework knows what was submitted
@@ -2167,6 +2180,10 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
   const refresh = createRefreshDriver({
     transcript: deps.transcript,
     clock: deps.clock,
+    // Passed through rather than re-derived: this pipeline was handed one
+    // bracket and the driver needs the same one, so a `livefetch` span nests
+    // under whatever route opened it (C28 I36).
+    ...(deps.trace === undefined ? {} : { trace: deps.trace }),
     capabilities: deps.capabilities,
     schedule: deps.schedule,
     commit: (reason) => void deps.scheduler.commit(reason),

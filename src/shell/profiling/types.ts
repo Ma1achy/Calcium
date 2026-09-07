@@ -35,7 +35,7 @@ export const TIER_RANK: Readonly<Record<Tier, number>> = Object.freeze({
  */
 export type SpanName =
   | "frame" | "compose" | "measure" | "elements" | "paint" | "react" | "assemble" | "write"
-  | "decode" | "route" | "handler" | "transport" | "adapt" | "stream" | "livefetch"
+  | "decode" | "route" | "handler" | "local" | "transport" | "adapt" | "stream" | "livefetch"
   | "completion" | "overlays" | "chrome";
 
 /**
@@ -53,6 +53,23 @@ export type SpanName =
  */
 export type PhaseGroup = "compute" | "draw" | "output" | "input" | "far side" | "total";
 
+/**
+ * One async bracket, injected.
+ *
+ * **The narrowest thing a seam the root cannot wrap needs** (C28 I36). Two
+ * seams are built inside the module that uses them — the local registry inside
+ * `createExecutionPipeline`, and a live part's `fetch` when the part is
+ * declared — so there is no object the composition root could have decorated on
+ * the way past. They take this instead of a `Profiler`, so neither file learns
+ * that a recorder exists; it is the same narrowing `asProbe()` performs for the
+ * synchronous seams.
+ *
+ * Absent means unprofiled, and the call site's fallback is `fn()` — not a
+ * no-op wrapper, because a wrapper is an allocation and a promise hop on a path
+ * that is meant to cost nothing at `off`.
+ */
+export type TraceFn = <T>(name: SpanName, fn: () => Promise<T>) => Promise<T>;
+
 export const PHASE_GROUP: Readonly<Record<SpanName, PhaseGroup>> = Object.freeze({
   frame: "total",
   compose: "compute",
@@ -68,8 +85,20 @@ export const PHASE_GROUP: Readonly<Record<SpanName, PhaseGroup>> = Object.freeze
   route: "input",
   handler: "input",
   completion: "input",
+  // **The local route is work, not input.** `handler` above is whichever key
+  // handler `router.dispatch` resolves to, which is why it sits with `decode`
+  // and `route`; C23's local verb route produces a `ViewDocument` in this
+  // process. Two different things, and this round's plan called both `handler`.
+  local: "compute",
   transport: "far side",
-  adapt: "far side",
+  // **`compute`, and it was `far side`** (F881). `adapt(raw, ctx)` returns a
+  // `ViewDocument` — view-model construction by the definition at the top of
+  // this comment block, synchronous and in this process. `far side` is the
+  // heading a reader scans to decide a cost is not theirs to fix, so an
+  // in-process adapter filed there hides the one adaptation cost they can act
+  // on. Nothing checked it: the mapping is total by construction, so the type
+  // proves the table complete, which reads exactly like proving it correct.
+  adapt: "compute",
   stream: "far side",
   livefetch: "far side",
 });
@@ -293,7 +322,7 @@ export interface Profiler extends Probe {
    * instead of trampling a shared pointer. This is the call that constructs the
    * async store, and it is the only one that does.
    */
-  trace<T>(name: string, fn: () => Promise<T>): Promise<T>;
+  trace<T>(name: SpanName, fn: () => Promise<T>): Promise<T>;
 
   /**
    * A span for one block instance, recorded by kind as well as by node.

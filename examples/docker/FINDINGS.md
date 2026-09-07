@@ -31516,3 +31516,31 @@ proves the table is complete, which reads exactly like proving it is correct.
 Found by reading the table against the paragraph above it while adding a member to it — which is
 the same instrument as *read the abstract against its own section before reading the section against
 the code*, applied to a constant.
+
+## F882 — a decorator manufactures a consumer for every member it wraps ★★★☆☆
+
+`UNCONSUMED_MEMBERS` in `tools/enforce/module-graph.mjs` listed `TransportRouter.busy` with a
+careful reason: `router.ts` records that a guard replaced the member, `construct.ts` counts
+seventeen call sites until it, so the tree documents the deletion twice while the member is still
+declared — *kept listed rather than deleted until C06 rules*.
+
+Adding C28's transport bracket cleared the entry. MG24 stopped reporting `busy` as unconsumed, and
+nothing wanted it: the decorator has to *be* a `TransportRouter`, so it re-exposes every member the
+interface declares.
+
+```ts
+get busy(): boolean { return router.busy; }
+```
+
+**That is a read, and it is circular evidence.** The member is consumed only because it exists;
+delete it from the interface and the consumer disappears with it. MG24 asks *is this published
+member read by anything*, and a forwarding wrapper answers yes for every member of every interface
+it decorates — so the rule goes quiet on exactly the seams the profiler touches.
+
+The entry is removed, because leaving a stale exemption is how the list stops being read. What is
+not removed is the question: C06 still owes the ruling on whether `busy` should be declared at all,
+and it is now recorded in the list's own comment rather than in a row a gate can check.
+
+**The general form**: a rule counting *readers* is blind to a reader that exists to satisfy the
+declaration it is reading. The same shape reaches any pass-through — a proxy, an adapter, a
+re-export — and the tell is an exemption that clears in a commit that added no use of the thing.

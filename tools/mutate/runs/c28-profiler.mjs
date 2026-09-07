@@ -20,7 +20,7 @@ import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
 const CMD =
-  "npx vitest run test/unit/profiler-tree.test.ts test/unit/profiler-seams.test.ts test/unit/profiler.test.ts test/unit/profiler-export.test.ts";
+  "npx vitest run test/unit/profiler-tree.test.ts test/unit/profiler-seams.test.ts test/unit/profiler.test.ts test/unit/profiler-export.test.ts test/unit/profiler-async.test.ts";
 const REC = "src/shell/profiling/recorder.ts";
 const NODE = "src/shell/profiling/node.ts";
 const SCANS = "tools/enforce/source-scans.mjs";
@@ -30,6 +30,9 @@ const HCACHE = "src/viewport/viewport/cache.ts";
 const RCACHE = "src/shell/render-cache.ts";
 const PLOT = "src/presentation/plot/definition.ts";
 const EXPORT = "src/shell/profiling/export.ts";
+const ASYNC = "src/shell/profiling/async-probe.ts";
+const TYPES = "src/shell/profiling/types.ts";
+const CONSTRUCT = "src/shell/construct.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -371,6 +374,92 @@ const results = runPass({
       from: "        work: frame.work,\n        wait: frame.wait,",
       to: "        work: frame.work,\n        wait: frame.wait,\n        total: frame.work + frame.wait,",
       expect: "T1.48",
+    },
+    {
+      // **The async seams' six, and the first is the one the whole file is
+      // for.** `trace` was written, tested against interleaving, and had no
+      // caller in `src/` — so every mutation below was unreachable until the
+      // decorators landed. MG25 is what said so.
+      // **The call site, not the function.** Every row in `profiler-async` but
+      // T1.24 calls a decorator directly, so all of them stay green on the day
+      // the root stops handing the bracket down. MG25 says a decorator is named
+      // somewhere in `src/`; it cannot say the right profiler reached it.
+      name: "UNWIRED: the root builds the bracket and hands down nothing",
+      file: CONSTRUCT,
+      from: "        : { trace: deps.profiler.trace.bind(deps.profiler) as TraceFn }),",
+      to: "        : {}),",
+      expect: "T1.24",
+    },
+    {
+      name: "NO-FORK: a traced span runs in the caller's context",
+      file: REC,
+      // Without the fork, two concurrent traces share the sync box: the second
+      // opens inside the first, and the report gives the same `count` with
+      // self time instead of two independent durations.
+      from: "      return contexts.fork(async () => {",
+      to: "      return (async () => {",
+      expect: "T1.19",
+      also: [
+        {
+          file: REC,
+          from: "          record(node, end(node, ctx));\n        }\n      });",
+          to: "          record(node, end(node, ctx));\n        }\n      })();",
+        },
+      ],
+    },
+    {
+      // The span around the loop rather than around `next()`, which is the
+      // reading a total gives: one number a slow far side and a slow shell both
+      // produce, and they want opposite fixes.
+      name: "STREAM-AROUND-LOOP: the wait and the work are one span",
+      file: ASYNC,
+      from: "          const step = await prof.trace(\"stream\", () => it.next());",
+      to: "          const step = await it.next();",
+      expect: "T1.20",
+      also: [
+        {
+          file: ASYNC,
+          from: "      const it = src[Symbol.asyncIterator]();\n      try {",
+          to: "      const it = src[Symbol.asyncIterator]();\n      using _whole = prof.span(\"stream\");\n      try {",
+        },
+      ],
+    },
+    {
+      // F881, restored. In-process view-model construction filed under the one
+      // heading a reader uses to decide a cost is not theirs to fix.
+      name: "ADAPT-FAR-SIDE: the adapter is the far side again",
+      file: TYPES,
+      from: '  adapt: "compute",',
+      to: '  adapt: "far side",',
+      expect: "T1.18",
+    },
+    {
+      // The local verb route filed with the keystroke path, which is the
+      // conflation this round's plan carried: two different things called
+      // `handler`.
+      name: "LOCAL-IS-INPUT: a document-producing route groups as input",
+      file: TYPES,
+      from: '  local: "compute",',
+      to: '  local: "input",',
+      expect: "T1.22",
+    },
+    {
+      // A decorator that changes what the user reads. Every timing row stays
+      // green; only the patch sequence says otherwise.
+      name: "PATCH-DROPPED: the stream swallows its first patch",
+      file: ASYNC,
+      from: "          if (step.done === true) return;\n          yield step.value;",
+      to: "          if (step.done === true) return;\n          if (step.value.kind !== \"data\") yield step.value;",
+      expect: "T1.23",
+    },
+    {
+      // The abandoned generator, which leaves the source's reader attached and
+      // moves no number in the report.
+      name: "NO-CLOSE: an early break leaves the source open",
+      file: ASYNC,
+      from: "        await it.return?.();",
+      to: "        void 0;",
+      expect: "T1.23",
     },
     {
       name: "EAGER-ALS: the async store is built at construction",

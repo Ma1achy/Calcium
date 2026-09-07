@@ -31,6 +31,7 @@ import type { TerminalCapabilities } from "../terminal/capabilities.js";
 import { b, framedStatus } from "./builders/index.js";
 import type { ProducerContext } from "../data/adapters/types.js";
 import type { EntryId, TranscriptStore } from "../viewport/transcript/index.js";
+import type { TraceFn } from "./profiling/types.js";
 
 /** C23 §3b — a stream silent for this long gets a notice, never an error (C23 I25). */
 export const STALL_MS = 120_000;
@@ -279,6 +280,19 @@ export function backoffOf(intervalMs: number, consecutiveFailures: number): numb
 export type RefreshDeps = Readonly<{
   transcript: TranscriptStore;
   clock: () => number;
+  /**
+   * One async bracket for a live part's fetch (C28 I36).
+   *
+   * **A part's `fetch` arrives when the part is declared**, so there is no
+   * object the composition root could have decorated on the way past — every
+   * other async seam is wrapped at the root. One function rather than a
+   * `Profiler`, so this module never learns a recorder exists.
+   *
+   * N sources can be in flight at once, and that is the case the bracket is for:
+   * each `trace` forks its own context, so two concurrent fetches attribute to
+   * two parents instead of nesting one inside the other (C28 I33).
+   */
+  trace?: TraceFn;
   /** The arm the stale title's separator resolves against (C09 I49, F828). */
   capabilities: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">;
   schedule: (fn: () => void, ms: number) => Disposable;
@@ -688,8 +702,16 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
     src.inFlight = true;
     const started = deps.clock();
 
-    void src
-      .fetch()
+    // Bracketed here rather than around the whole chain: what `livefetch`
+    // measures is the far side's latency, and `.then` is this shell's work on
+    // the answer — a different column, and one a reader is deciding a remedy
+    // from. Called directly when unprofiled, because a no-op wrapper is an
+    // allocation and a promise hop on a path that polls.
+    const fetched = deps.trace === undefined
+      ? src.fetch()
+      : deps.trace("livefetch", () => src.fetch());
+
+    void fetched
       .then(
         (data) => {
           // **§8c C2 — nothing failed, so nothing backs off.** A resolution whose

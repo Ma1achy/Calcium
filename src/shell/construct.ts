@@ -78,8 +78,13 @@ import { openHistory, SEARCH_ID } from "../interaction/history/index.js";
 import { detectCapabilities, type TerminalCapabilities } from "../terminal/capabilities.js";
 import { glyphs } from "../presentation/blocks/index.js";
 import { createFrameScheduler, type CommitReason } from "../terminal/frame-scheduler.js";
-import type { Profiler, ProfileReport } from "./profiling/types.js";
+import type { Profiler, ProfileReport, TraceFn } from "./profiling/types.js";
 import { instrumentRegistry, type ProbeableRegistry } from "./profiling/registry-probe.js";
+import {
+  instrumentAdapters,
+  instrumentCompletion,
+  instrumentTransport,
+} from "./profiling/async-probe.js";
 import type { Probe } from "../data/viewmodel/index.js";
 import {
   createTerminalLifecycle,
@@ -559,6 +564,10 @@ export async function constructGraph(
     for (const definition of config.blocks) blocks.register(definition);
 
     const adapters = createAdapterRegistry(config.adapters);
+    // `adapt` and `adaptPatch`, bracketed at the seam rather than at the two
+    // call sites in `execution.ts` — the root built this registry, so it is
+    // the root that wraps it (C22 I93, C28 I36).
+    if (deps.profiler !== undefined) instrumentAdapters(adapters, deps.profiler);
 
     const manifest = createManifestStore();
 
@@ -615,6 +624,9 @@ export async function constructGraph(
       completion.register(source);
     }
     for (const source of config.completionSources) completion.register(source);
+    // After the sources, because `request` is what is replaced and
+    // registration does not go through it (C28 I36).
+    if (deps.profiler !== undefined) instrumentCompletion(completion, deps.profiler);
 
     return { blocks, adapters, manifest, completion, blockFaults, completionFaults };
   })().catch((cause: unknown) => {
@@ -1280,7 +1292,18 @@ export async function constructGraph(
       ...(deps.profiler === undefined
         ? {}
         : { profile: (): ProfileReport => deps.profiler?.report() as ProfileReport }),
-      transport: config.transport ?? defaultTransport(config, runner, session),
+      // `for(verb)` is the seam and not the two `invoke` calls, because
+      // `VerbTransport` is what execution holds — wrapping the lookup reaches
+      // `invoke` and `stream` without either call site changing (C28 I36).
+      transport: ((r) => (deps.profiler === undefined ? r : instrumentTransport(r, deps.profiler)))(
+        config.transport ?? defaultTransport(config, runner, session),
+      ),
+      // C23's local verb route, which the root cannot decorate: the registry
+      // is built inside `createExecutionPipeline`. The narrowest thing that
+      // works is one function, so `execution.ts` never names a profiler.
+      ...(deps.profiler === undefined
+        ? {}
+        : { trace: deps.profiler.trace.bind(deps.profiler) as TraceFn }),
       adapters: built.adapters,
       manifest: built.manifest,
       blocks: built.blocks,

@@ -10,7 +10,7 @@
  * C23 satisfies it structurally when it lands.
  */
 
-import type { ProfileOptions, ProfileReport } from "./profiling/types.js";
+import type { ProfileOptions, ProfileReport, TraceFn } from "./profiling/types.js";
 import type { ConfirmHost } from "./confirm.js";
 import type { Adapter, AdapterRegistry, ProducerContext } from "../data/adapters/index.js";
 import type { ManifestDocument, ManifestStore } from "../data/manifest/index.js";
@@ -354,6 +354,18 @@ export type PipelineDeps = Readonly<{
   confirm: ConfirmHost;
   /** C28's report, when a profiler exists (C22 I93). Absent otherwise. */
   profile?: () => ProfileReport;
+  /**
+   * One async bracket for C23's local verb route (C28 I36).
+   *
+   * **The registry is built in here**, so there is no object the composition
+   * root could have decorated on the way past — every other async seam is
+   * wrapped at the root. One function rather than a `Profiler`, so this module
+   * never learns a recorder exists. Absent means unprofiled, and the call site
+   * falls back to calling the handler directly rather than through a no-op
+   * wrapper: a wrapper is an allocation and a promise hop on the path that is
+   * meant to cost nothing at `off`.
+   */
+  trace?: TraceFn;
   /**
    * Whether a call needs a decision before it runs, and what the layer says
    * (C23 I60). `null` runs the call; a record puts the card in `waiting`, asks
