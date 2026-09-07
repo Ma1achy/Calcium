@@ -182,6 +182,13 @@ export const imageDefinition: BlockDefinition<Image> = {
 
   render(block: Image, ctx: RenderContext): ReactElement {
     const { cols, rows } = imageCells(block, ctx.width, ctx.probe);
+    // C28 I45 — the payload, which the decode and the kitty transmission both
+    // walk in full, and which `cols * rows` cannot stand in for: the drawn cell
+    // count is clamped to the width and a two-megabyte PNG in a 20×10 box is the
+    // same figure as a two-kilobyte one. **`decode.entries` is not this gauge**
+    // — it counts what the cache holds, so a file that grew reads identically
+    // (F906).
+    ctx.probe?.gauge("image.bytes", block.data.length); // cells-ok — an input size, not a display width
 
     // **The protocol arm comes first, and that is the F413 ordering.** It used
     // to sit below the decode gate, so a PNG this repository cannot rasterise
@@ -221,6 +228,15 @@ export const imageDefinition: BlockDefinition<Image> = {
     // arm above transmitted every frame once and the terminal is animating it,
     // so the index is read only by the arms that draw a glyph per cell.
     const px = pixelsOf(block, ctx.frames?.[block.id] ?? 0, ctx.probe);
+    // **The second input, and it is independent of the first** (C28 I45): a
+    // compressed PNG is small and enormous at once, so `image.bytes` bounds the
+    // decode and this bounds the dither. Recorded here rather than beside it
+    // because only this path walks the source pixels — the protocol arm above
+    // hands the bytes to the terminal and rasterises nothing, and a gauge that
+    // fired there would report a cost the frame did not pay.
+    if (px !== null) {
+      ctx.probe?.gauge("image.pixels", px.width * px.height); // cells-ok — a source pixel count
+    }
 
     // **A block whose bytes do not decode draws the refusal, with the reason**
     // (I38, F410). It drew `alt` for every one of them, and the ruling that put

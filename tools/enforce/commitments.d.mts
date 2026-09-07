@@ -142,6 +142,12 @@ export declare function checkSectionReferences(
   exceptions?: Readonly<Record<string, string>>,
 ): { violations: Violation[]; resolved: number };
 
+/**
+ * Blank every line of an `it.todo(…)` call, so a coverage scan can ask what is
+ * left. Paren-depth rather than a line match — see the implementation (F907).
+ */
+export declare function withoutTodos(text: string): string;
+
 export declare function checkInvariantCoverage(
   specs: readonly string[],
   testFiles: readonly string[],

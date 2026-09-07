@@ -1,28 +1,143 @@
-import { describe, it } from "vitest";
+// C28 I45 — a block kind's own data as a measured input.
+//
+// **The gauge names what the render walks in full, before the clamp.** `measure`
+// returns rows, rows are clamped to the viewport, and every downstream figure is
+// therefore a constant in the one variable a caller controls. A `rule` with a
+// four-thousand-character label and a `rule` with a two-character one measure 1
+// apiece, cost different amounts, and are one row in `nodes`.
+//
+// The coverage row is the one that found something. It is written as a
+// comparison of two sets — the kinds from `DEFAULT_DEFINITIONS`, the gauge names
+// from the source — rather than as a list, because **a hand-written list of
+// kinds is written by the same reading that missed one**: `image` was called
+// covered twice by scans keyed on the file and on a gauge's prefix, and its
+// gauge is of the decoder's cache (F906).
+import { readdirSync, readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+
+import { b } from "../../src/shell/builders/index.js";
+import { createProfiler } from "../../src/shell/profiling/recorder.js";
+import { DEFAULT_DEFINITIONS } from "../../src/presentation/blocks/index.js";
+import { fullRegistry } from "../../src/testing/expect-document.js";
+import { instrumentRegistry } from "../../src/shell/profiling/registry-probe.js";
+import type { ProbeableRegistry } from "../../src/shell/profiling/registry-probe.js";
+import type { BlockRegistry } from "../../src/presentation/blocks/index.js";
+import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
+import { DARK_THEME, FULL_CAPS } from "../support/render.js";
+import { rgbPng64 } from "../support/png.js";
+import type { Block } from "../../src/data/viewmodel/index.js";
+import type { ProfileReport } from "../../src/shell/profiling/types.js";
 
 /**
- * A block kind's own data as a measured input.
+ * One document rendered through the real registry with a real probe.
  *
- * The rows land with the gauges themselves; this file is the spec commit's half,
- * so the invariant is named by something before the code that satisfies it
- * exists (A03 §7a, F814).
- *
- * **The invariant is deliberately not cited outside the `it.todo` titles.** The
- * coverage signal strips the todos and then asks whether anything still names
- * it; a citation in a `describe` title or in this comment answers *yes* while
- * nothing runs, which is the state the signal exists to report (F907).
+ * `spans` rather than `counters` only because `report()` is read whole; the
+ * gauges themselves are recorded wherever counting is on (C28 I44).
  */
+/**
+ * One document rendered the way `construct.ts` renders one.
+ *
+ * **The registry is instrumented as well as the context given a probe**, and the
+ * first draft did only the second. `RenderContext.probe` reaches `render`; a
+ * definition's `measure` takes its probe from the registry's own slot, which is
+ * L4's seam and not L1's. So the draft recorded every render-path gauge and no
+ * measure-path one — and `image` decodes in `measure`, so the row read two cache
+ * hits, no miss, and no `decode.entries` at all. Nothing about the figures said
+ * so: they were all correct, and the one that was missing looks the same as a
+ * gauge nobody wrote.
+ */
+function gaugesOf(doc: readonly Block[], width = 80): ProfileReport["gauges"] {
+  const prof = createProfiler({ tier: "spans" }, { elapsed: () => 0, node: "v22.0.0", cpus: 4 });
+  const registry = fullRegistry();
+  instrumentRegistry(registry as unknown as ProbeableRegistry, prof);
+  renderSequenceToLines(registry as BlockRegistry, doc, width, {
+    theme: DARK_THEME,
+    capabilities: FULL_CAPS,
+    probe: prof.asProbe(),
+  });
+  return prof.report().gauges;
+}
+
+/** Every `.ts` under a directory, read whole. */
+function sourceUnder(dir: string, out: string[] = []): string[] {
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const p = `${dir}/${e.name}`;
+    if (e.isDirectory()) sourceUnder(p, out);
+    else if (p.endsWith(".ts")) out.push(readFileSync(p, "utf8"));
+  }
+  return out;
+}
+
 describe("per-kind input gauges", () => {
-  it.todo(
-    "T1.77 (C28 I45): every kind in DEFAULT_DEFINITIONS against the first segment of every gauge name under src/presentation/ → the sets agree, and the count is asserted too — not deferred on a component: lands with the gauges themselves",
-  );
-  it.todo(
-    "T1.78 (C28 I45): a rule with a 4 000-character label at width 80 → rule.label is 4 000 while measure is 1 — not deferred on a component: lands with the gauges themselves",
-  );
-  it.todo(
-    "T1.79 (C28 I45): a 1-row notice with 200 spans against a 200-row notice with none → notice.spans separates them and notice.rows does not, and the converse — not deferred on a component: lands with the gauges themselves",
-  );
-  it.todo(
-    "T1.80 (C28 I45): an image with a 40 000-character payload on a terminal with no image protocol → image.bytes, image.pixels and decode.entries as the control — not deferred on a component: lands with the gauges themselves",
-  );
+  it("T1.77 (C28 I45): every default kind names a gauge, measured against the definitions", () => {
+    const kinds = DEFAULT_DEFINITIONS.map((d) => d.kind).sort();
+    const source = sourceUnder("src/presentation").join("\n");
+    const prefixes = new Set(
+      [...source.matchAll(/\bgauge\(\s*"([A-Za-z0-9]+)\./gu)].map((m) => m[1] ?? ""),
+    );
+
+    // **The count is asserted as well as the difference.** A scan whose pattern
+    // matched nothing finds no disagreement either, and reports a clean sweep —
+    // which is the shape F906's second reading had, with `[a-z.]+` unable to
+    // match `keyValue`.
+    expect(kinds.length, "the fixture is the whole default set").toBeGreaterThanOrEqual(19);
+    expect(prefixes.size, "and the scan found gauges to compare them against").toBeGreaterThan(15);
+    expect(kinds.filter((k) => !prefixes.has(k)), "every kind gauges its own input").toEqual([]);
+  });
+
+  it("T1.78 (C28 I45): the label is gauged before the truncate, not after", () => {
+    const label = "x".repeat(4000);
+    const g = gaugesOf(
+      [
+        b.rule(label, undefined, { id: "r" }),
+        b.progress({ id: "p", label, current: 1, total: 2 }),
+      ],
+      80,
+    );
+
+    // **Both halves.** The second is the argument: a gauge taken after the clamp
+    // reports the width at every label, which is indistinguishable from a kind
+    // nobody instrumented.
+    expect(g["rule.label"]?.max, "the whole label stripControl walks").toBe(4000);
+    expect(g["progress.label"]?.max, "and the same clamp on progress").toBe(4000);
+    expect(
+      fullRegistry().measure(b.rule(label, undefined, { id: "r" }), 80),
+      "while the row count is 1",
+    ).toBe(1);
+  });
+
+  it("T1.79 (C28 I45): two independent inputs need two gauges", () => {
+    const wide = gaugesOf([
+      b.notice("info", "z".repeat(220), undefined, {
+        id: "n",
+        spans: Array.from({ length: 200 }, (_, i) => ({ from: i, to: i + 1, tone: "muted" as const })),
+      }),
+    ]);
+    // 200 rows of content at width 80, wrapped rather than declared — the rows
+    // gauge is taken from what `noticeRows` produced, so the fixture has to
+    // actually wrap.
+    const tall = gaugesOf([b.notice("info", "y".repeat(80 * 200), undefined, { id: "n" })]);
+
+    // **Written as a pair, because a single gauge passes either arm alone.** The
+    // rule under test is that a kind with two growable inputs gets two, and only
+    // the case where one of them is flat can show it.
+    expect(wide["notice.spans"]?.max, "the spans arm").toBe(200);
+    expect(tall["notice.spans"]?.max ?? 0, "which the tall document does not have").toBeLessThan(200);
+    expect(tall["notice.rows"]?.max ?? 0, "the rows arm").toBeGreaterThan(100);
+    expect(wide["notice.rows"]?.max ?? 0, "which the wide document does not have").toBeLessThan(100);
+  });
+
+  it("T1.80 (C28 I45): an image gauges its payload and its pixels, and decode.entries is the control", () => {
+    // A real 6×4 PNG from the suite's own encoder, so the row measures the
+    // decode rather than a base64 string someone typed.
+    const png = rgbPng64(6, 4, (x, y) => [x * 40, y * 60, 10]);
+    const g = gaugesOf([b.image({ id: "i", data: png, height: 4, alt: "a" })]);
+
+    expect(g["image.bytes"]?.max, "the payload the decode walks").toBe(png.length);
+    expect(g["image.pixels"]?.max, "and the source extent the dither walks").toBe(24);
+    // **The control**: this is the gauge that was already there, it is the
+    // occupancy of a digest-keyed map, and it reads 1 for a file of any size —
+    // which is how the kind read as covered (F906).
+    expect(g["decode.entries"]?.max, "unmoved by either").toBe(1);
+  });
 });

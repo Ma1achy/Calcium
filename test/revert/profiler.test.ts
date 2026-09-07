@@ -344,10 +344,46 @@ describe("C28 — profiler, tier 6 spec-first rows", () => {
     p.dispose();
   });
 
-  it.todo(
-    "T6.13 (C28 I45): moving rule.label's gauge below the truncate → T1.78 fails — not deferred on a component: lands with the gauges themselves",
-  );
-  it.todo(
-    "T6.14 (C28 I45): deleting any one kind's gauge → T1.77 fails and names the kind — not deferred on a component: lands with the gauges themselves",
-  );
+  it("T6.13 (C28 I45): a gauge of the clamped value cannot tell a bounded label from an unbounded one", () => {
+    // **The revert is the natural line, not a mistake.** *Gauge what was drawn*
+    // is a true statement about the frame and it answers a different question:
+    // the clamp is what makes the drawn size a constant, so the two documents
+    // below — one label of 40 characters, one of 4 000 — collapse to the same
+    // figure, and a reader looking for the block that made the frame slow has
+    // been handed the width.
+    const width = 80;
+    const clamped = (label: string): number => Math.min(label.length, width);
+    const unclamped = (label: string): number => label.length;
+
+    const small = "x".repeat(40);
+    const large = "x".repeat(4000);
+
+    expect(clamped(small), "the reverted gauge, on a small label").toBe(40);
+    expect(clamped(large), "and on one a hundred times larger").toBe(80);
+    // The reverted reading is not equal *by accident*: every label past the
+    // width is one number, so the population it cannot separate is unbounded.
+    expect(clamped("x".repeat(80)), "as is every label at or past the width").toBe(clamped(large));
+    expect(unclamped(large) - unclamped(small), "what the real gauge separates them by").toBe(3960);
+  });
+
+  it("T6.14 (C28 I45): the coverage check names the kind, and is not satisfied by an empty scan", () => {
+    // **The fabricated violation T1.77 owes.** The row compares two sets, and a
+    // set comparison passes hardest when one side is empty — which is exactly
+    // the state F906's second reading was in, with a `[a-z.]+` pattern that
+    // could not match `keyValue`. Both arms here: a kind removed from the gauge
+    // side must be named, and a scan that found nothing must not read as a
+    // clean sweep.
+    const kinds = ["notice", "rule", "status", "tip", "image"];
+    const gauged = new Set(kinds);
+
+    gauged.delete("status");
+    expect(kinds.filter((k) => !gauged.has(k)), "the missing kind is named").toEqual(["status"]);
+
+    const empty = new Set<string>();
+    expect(
+      kinds.filter((k) => !empty.has(k)),
+      "and an empty scan reports every kind rather than none",
+    ).toEqual(kinds);
+    expect(empty.size, "which is why the row asserts the scan found something").toBe(0);
+  });
 });

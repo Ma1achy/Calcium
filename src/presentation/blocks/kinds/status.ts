@@ -402,6 +402,11 @@ export const statusDefinition: BlockDefinition<Status> = {
     const width = normaliseWidth(ctx.width);
     const g = glyphs(ctx.capabilities);
     const height = Math.max(1, Math.floor(block.height)); // cells-ok — a row count
+    // C28 I45 — the rows it was given, which is what the rung selection and the
+    // fill both scale with. Taken after the floor, because a fractional or
+    // negative height draws one row and gauging the declared value would report
+    // a cost nothing paid.
+    ctx.probe?.gauge("status.rows", height); // cells-ok — a count of rows, not a display width
     const rung = widthRung(width, heightRung(height, block.state !== "loading", block.framed === true));
     const frame = rung.frame;
     const tagFit = rung.tag;

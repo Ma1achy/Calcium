@@ -20,7 +20,7 @@ import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
 const CMD =
-  "npx vitest run test/unit/profiler-tree.test.ts test/unit/profiler-seams.test.ts test/unit/profiler.test.ts test/unit/profiler-export.test.ts test/unit/profiler-async.test.ts test/unit/profiler-budget.test.ts test/unit/profiler-recorder.test.ts test/edge/profiler.test.ts test/integration/profiler.test.ts test/revert/profiler.test.ts";
+  "npx vitest run test/unit/profiler-gauges.test.ts test/unit/profiler-tree.test.ts test/unit/profiler-seams.test.ts test/unit/profiler.test.ts test/unit/profiler-export.test.ts test/unit/profiler-async.test.ts test/unit/profiler-budget.test.ts test/unit/profiler-recorder.test.ts test/edge/profiler.test.ts test/integration/profiler.test.ts test/revert/profiler.test.ts";
 const REC = "src/shell/profiling/recorder.ts";
 const NODE = "src/shell/profiling/node.ts";
 const SCANS = "tools/enforce/source-scans.mjs";
@@ -43,6 +43,9 @@ const PANES = "src/shell/profiling/panes.ts";
 const RING = "src/shell/profiling/ring.ts";
 const LEAKSRC = "src/shell/profiling/leaks.ts";
 const CHROME = "src/shell/chrome.ts";
+const SIMPLE = "src/presentation/blocks/kinds/simple.ts";
+const STATUS = "src/presentation/blocks/kinds/status.ts";
+const IMAGE = "src/presentation/blocks/kinds/image.ts";
 const SCHED = "src/terminal/frame-scheduler.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
@@ -981,6 +984,60 @@ const results = runPass({
       from: "live: created - finalised",
       to: "live: finalised",
       expect: "T6.12",
+    },
+    // C28 I45 — the per-kind input gauges. **Every one of these keeps the report
+    // well-formed**: a gauge of the clamped value is a real number about a real
+    // frame, and a deleted gauge is indistinguishable from a kind nobody
+    // instrumented. That is the whole reason T1.77 compares two sets rather than
+    // reading a list (F906).
+    {
+      name: "RULE-LABEL-CLAMPED: the label gauged after the truncate",
+      file: SIMPLE,
+      from: '    ctx.probe?.gauge("rule.label", block.label.length);',
+      to: '    ctx.probe?.gauge("rule.label", Math.min(block.label.length, normaliseWidth(ctx.width)));',
+      expect: "T1.78",
+    },
+    {
+      name: "PROGRESS-LABEL-CLAMPED: the same clamp on progress",
+      file: SIMPLE,
+      from: '    ctx.probe?.gauge("progress.label", block.label.length);',
+      to: '    ctx.probe?.gauge("progress.label", Math.min(block.label.length, Math.max(0, Math.floor(width / 3))));',
+      expect: "T1.78",
+    },
+    {
+      name: "NOTICE-SPANS-GONE: one gauge for two independent inputs",
+      file: SIMPLE,
+      from: '    ctx.probe?.gauge("notice.spans", block.spans?.length ?? 0);',
+      to: "",
+      expect: "T1.79",
+    },
+    {
+      name: "NOTICE-ROWS-AS-WIDTH: the first row's length in place of the count",
+      file: SIMPLE,
+      from: '    ctx.probe?.gauge("notice.rows", wrapped.length);',
+      to: '    ctx.probe?.gauge("notice.rows", wrapped[0]?.length ?? 0);',
+      expect: "T1.79",
+    },
+    {
+      name: "TIP-ROWS-GONE: a kind with no gauge at all",
+      file: SIMPLE,
+      from: '    ctx.probe?.gauge("tip.rows", wrapped.length);',
+      to: "",
+      expect: "T1.77",
+    },
+    {
+      name: "STATUS-ROWS-GONE: the coverage row is what catches this",
+      file: STATUS,
+      from: '    ctx.probe?.gauge("status.rows", height);',
+      to: "",
+      expect: "T1.77",
+    },
+    {
+      name: "IMAGE-PIXELS-AS-CELLS: the drawn size in place of the source extent",
+      file: IMAGE,
+      from: '      ctx.probe?.gauge("image.pixels", px.width * px.height);',
+      to: '      ctx.probe?.gauge("image.pixels", cols * rows);',
+      expect: "T1.80",
     },
     {
       name: "EAGER-ALS: the async store is built at construction",
