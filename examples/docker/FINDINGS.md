@@ -31517,6 +31517,55 @@ Found by reading the table against the paragraph above it while adding a member 
 the same instrument as *read the abstract against its own section before reading the section against
 the code*, applied to a constant.
 
+## F888 — the phase table sums two populations and divides by one, and the residue went negative ★★★★★
+
+`make profile`'s *Where the frame went* divides every span's self time by `latency.work`. That is
+the sum of the **frames'** work, and four of the nineteen spans are never opened inside a frame at
+all. Run with 200 transcript entries instead of one:
+
+```
+| *unaccounted* | -460.5 | -17.4% | work in a frame that no span reaches at all |
+```
+
+**A negative residue is the table saying its own denominator is wrong**, and it is the only reason
+anyone looked.
+
+**Measured, from the frames' own trees rather than declared.** `frameRoot` is nulled at frame end
+(`recorder.ts:409`), so a span opened between frames roots itself and cannot appear in a frame's
+tree. Walking the 20 trees the report keeps:
+
+| opened inside a frame | ms | opened outside one | ms |
+|---|---|---|---|
+| `react` 1605.0, `assemble` 760.7, `elements` 71.2 | | `local` | 643.4 |
+| `chrome` 24.5, `measure` 24.5, `compose` 12.4 | | `handler` | 97.0 |
+| `paint` 9.0, `overlays` 5.5, `write` 2.9 | | `route` | 8.1 |
+| **Σ 2515.7**, plus `frame`'s own 102.4 | | `decode` | 7.4 |
+| against `latency.work` **2946.3** → residue **+328.2 (11.1%)** | | **Σ 755.9** | |
+
+So the arithmetic is fine once the two populations are separated. What the table did was add
+755.9 ms of work that happens *between* frames to a total of work that happens *inside* them.
+
+**It was invisible for the whole round because the fixture held the count at zero.** With one
+transcript entry no command is ever run, `local` never fires, and the out-of-frame spans are
+`decode`, `route` and `handler` alone — 3.3 ms against 303, an error of **1.1%**, comfortably
+inside a residue nobody would question. At 200 entries the same error is **25.7%** and changes the
+sign. This is *a defect proportional to a small count* exactly as F886 predicted for two of P11's
+seven, arriving instead in the instrument built to measure them.
+
+**And `PHASE_GROUP` cannot answer it, because it is about a different axis.** F881 corrected which
+*kind* of work `adapt` is; nothing records *when* it happens. `compose` is compute inside a frame
+and `local` is compute outside one, and the table has one column for both — so a mapping that is
+total by construction, and now correct about kind, is still silent about the thing the denominator
+depends on. **A second axis, not a repair of the first.**
+
+**Why a declared table and not the tree walk.** The walk above is the honest measurement and it is
+fixture-dependent: a span that never appears in the frames a run happens to keep would be filed as
+out-of-frame silently, and the profile fixture reaches 13 of the 19 names — `/bin/true` is not a
+far side, so `transport`, `adapt`, `stream`, `livefetch` and `completion` are never opened. So
+`SPAN_SITE` is declared beside `PHASE_GROUP`, and the tree walk becomes the mechanism that can
+falsify it — the same pairing as I39 and MG30, where the union is the claim and the scan is what
+stops it being satisfied by itself.
+
 ## F887 — a counter clock makes a span and an adjacency record the same number ★★★★☆
 
 `OVERLAYS-BESIDE` moved `paint.ts`'s overlay span so it closed *before* the call it names, and the
