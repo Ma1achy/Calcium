@@ -31517,6 +31517,56 @@ Found by reading the table against the paragraph above it while adding a member 
 the same instrument as *read the abstract against its own section before reading the section against
 the code*, applied to a constant.
 
+## F905 — the gate paid out on the day it landed, and the payout went unread ★★★★☆
+
+`make instruments` compares its inventory **by equality** and its own comment states the claim in as
+many words: *an instrument added without a fixture fails here on the day it lands*. Two entries in
+`COVERED` record the claim paying out before — `scan-cost.mjs` at 17 found / 16 with a fixture,
+`roadmap-status.mjs` at 19 / 18.
+
+Run for an unrelated reason at the end of this session:
+
+    instruments — 45 found, 40 with a fixture
+
+    NO FIXTURE   tools/capture-foreign-record.mjs
+    NO FIXTURE   tools/capture-foreign.cursor-control.mjs
+    NO FIXTURE   tools/capture-foreign.dump.mjs
+    NO FIXTURE   tools/capture-foreign.mjs
+    NO FIXTURE   tools/capture-foreign.runs.mjs
+
+**All five arrived in one commit, `8ed2ccde`, whose message is about `byEntry` and C28 I42** — 697
+lines of a foreign-PTY capture tool inside a commit about per-entry attribution, with the message
+naming none of it. So the gate did exactly what it promises, went red at that commit, and stayed red
+because nothing between then and now ran it. The rule worked; the reading step did not.
+
+**This is the fifth form of *a gate that exists and is not run*, and the one where the gate is
+right.** The other four are a gate green on the wrong corpus, a gate green because it did not run, a
+gate red on CI for thirteen days unread, and a gate whose scope stops a layer above its subject.
+This one is a correct gate producing a correct failure that nobody looked at — and it was found by
+*an untouched file appearing in a diff*, one level out: a target listing five files whose names I did
+not recognise from a session that had not touched them.
+
+**Why the disposition took measuring rather than a list.** Read as five instruments it is five
+fixtures; read against the tree it is one instrument in five files, and each file wants a different
+answer:
+
+| file | what it is | disposition |
+|---|---|---|
+| `capture-foreign.mjs` | the instrument — three pure exports and a driver | a fixture, six rows |
+| `.dump.mjs`, `.runs.mjs` | thin drivers importing those three exports | `null` — the same fixture |
+| `-record.mjs` | the recording half, whose target is an authenticated `claude` on the **host** | `null` with the reason: the container has no route to it, and what a fixture could assert is `node-pty`'s claim rather than this file's |
+| `.cursor-control.mjs` | eleven lines writing known escapes to stdout | `NOT_INSTRUMENTS` — a control, measured against rather than measuring |
+
+**The fixture goes at the three exports because that is where a wrong answer stops looking wrong.**
+The tool's whole claim is *what you are looking at is what the program drew*: a boundary splitting a
+CSI paints a colour change as five glyphs, a strip that takes `\x1b` leaves the payload behind as
+ink, a cursor translation off by one draws every row on the last. Each produces a picture that reads
+as a measurement. Mutated on landing — the boundary taken at the first escape rather than the last,
+the bare-control range widened to swallow `\x1b`, `CUP` emitted zero-based — and **each was caught by
+the row covering it**, the second by two rows.
+
+Now **44 instruments, every one with a fixture · 555 rows · all green**.
+
 ## F904 — a line citation is checked for being non-blank, and its symbol against the whole file ★★★★☆
 
 `tools/roadmap-status.mjs` resolves every claim in the roadmap's Order column. For a citation of the

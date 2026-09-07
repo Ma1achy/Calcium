@@ -44,6 +44,22 @@ const COVERED = [
   ["tools/bench/patch-window.mjs", null], // same fixture — `gutter`
   ["tools/bench/liveness.mjs", null], // the guard itself, covered by its own rows
   ["tools/waitfor.mjs", ["npx", "vitest", "run", "test/unit/waitfor.test.ts"]],
+  // **This target was red from the commit that landed these and nobody ran it**
+  // (F905). Five files, 697 lines, inside a commit whose message is about
+  // `byEntry` and C28 I42 — so the equality comparison paid out exactly as it
+  // claims to, `45 found, 40 with a fixture`, and the payout went unread for a
+  // day. The fixture covers the three pure exports the whole family shares:
+  // where the chunk splits, what is stripped, and where the cursor is.
+  ["tools/capture-foreign.mjs", ["npx", "vitest", "run", "test/unit/capture-foreign.test.ts"]],
+  ["tools/capture-foreign.dump.mjs", null], // a thin driver over the three exports — same fixture
+  ["tools/capture-foreign.runs.mjs", null], // the same, plus `catalogue-png.mjs`'s own parser
+  // **The recording half, and it cannot run here.** Its target is an
+  // authenticated `claude` on the *host*; the container has no route to it, so
+  // it is `node-pty` and nothing else by construction. What a fixture could
+  // assert is that it spawns and writes bytes, which is `node-pty`'s claim and
+  // not this file's. The expiry is a symbol: the day it grows a parser, that
+  // parser gets rows. Grep: `grep -n "export" tools/capture-foreign-record.mjs`.
+  ["tools/capture-foreign-record.mjs", null],
   // **This target caught it on the day it landed**, which is the claim the
   // equality comparison above makes and this is the first time it has been paid
   // out: `scan-cost.mjs` was added, `make instruments` went from 16/16 to
@@ -171,6 +187,10 @@ const NOT_INSTRUMENTS = {
   "tools/enforce": "the enforcement suite — gated by `make enforce`, with five fixtures of its own under test/unit/enforce-*",
   "tools/mutate/runs": "mutation configurations, not instruments: each is an input to `mutate.mjs`, which is covered — and their anchors are swept by `tools/mutate/anchors.mjs`, because *not an instrument* left them unwatched",
   "tools/instruments.mjs": "this runner",
+  // A control, not an instrument: eleven lines writing known escapes to stdout
+  // so `trackAndTranslateCursor` can be checked against a placement nobody
+  // guessed. It measures nothing; it is measured against.
+  "tools/capture-foreign.cursor-control.mjs": "a control script for capture-foreign's cursor translation — it writes known escapes and reads nothing",
   "examples/docker/tools/_fixture.py": "the fixtures' own four-line harness",
   "examples/docker/tools/registry.mjs": "the shared registry, covered by probes_test.mjs",
   "examples/docker/tools/__pycache__": "not a file",
