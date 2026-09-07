@@ -96,13 +96,30 @@ export const COMPONENT_SOURCES = Object.freeze({
   // barrel: TD3's rule is that a row names the file holding the *behaviour*,
   // and the barrel is now types-only by C24 I31.
   //
-  // **C26 and C27 have no row either**, and the comment above makes that a gap
-  // rather than an omission — every component nameable as a blocker needs one.
-  // Their behaviour files are not obvious from outside their specs (C26 is
-  // spread across four shell files; C27 has `src/data/emulator/`), and a row
-  // pointing at the wrong file expires deferrals that are genuinely waiting.
-  // Chosen deliberately or not at all — see FINDINGS F873.
   C28: "src/shell/profiling/recorder.ts",
+  // The emulator, and by its own header the one file in `src/` that imports the
+  // terminal emulation package (C27 I11, MG28) — the behaviour rather than
+  // `types.ts` or the barrel, as TD3 requires. This said *C27 has
+  // `src/data/emulator/`* as a reason it could not be chosen, while C27's own
+  // spec header said *spec'd, unbuilt*; the directory has held 384 lines since
+  // `3f3be973` and one `ls` settles it (F891).
+  C27: "src/data/emulator/emulator.ts",
+
+  // **C26 has no row, and that is a refusal rather than a gap.** Measured
+  // rather than assumed (F891): the component is *built* — 24 invariants, 40
+  // test citations across six files, keymap rows under §5c, and a published
+  // conformance suite in `src/testing/navigation-conformance.ts` — and it lives
+  // in **no directory of its own**. Its three candidate files each belong to
+  // someone else: `entry-layout.ts` is C22 §6l.4's, `actions.ts` is C23 §3a's,
+  // `keymap.ts` is C16's. A row naming any of them expires every deferral on
+  // C26 on **another component's** birthday, and all three are long past —
+  // which is the failure TD3 exists to prevent, arriving through the door
+  // marked *every component nameable as a blocker needs one*.
+  //
+  // So a todo naming C26 fails TD1 with "no entry in COMPONENT_SOURCES". That
+  // is the safe direction and was never the problem; the row lands the day
+  // `src/interaction/navigation/` does, and its absence is C26's Status line's
+  // one surviving clause.
 });
 
 /**
@@ -428,7 +445,12 @@ export function checkTodoExpiry(
           file,
           message:
             `todo waits on "${id}", which has no entry in COMPONENT_SOURCES — ` +
-            `an unmapped blocker never expires, so a typo exempts a test forever`,
+            `an unmapped blocker never expires, so a typo exempts a test forever. ` +
+            `If it is not a typo, read the map: a component with no row may have ` +
+            `none deliberately, because it lives in no file of its own and every ` +
+            `candidate belongs to someone else (C26, F891). Adding a row there ` +
+            `expires this deferral on another component's birthday — restate what ` +
+            `it is actually waiting for instead`,
           spec: "A03 commitment 14",
         });
         continue;
