@@ -5,7 +5,7 @@
 | **Type** | Component |
 | **Package** | `@fmx/calcium` · report types also at `@fmx/calcium/profiling`, whose `exports` target is `./dist/shell/profiling/index.js` and not `./dist/profiling/` — the subpath is flat and the source is not, which is R14's one visible consequence. `./testing` and `./fixtures` are the precedent |
 | **Layer** | L4 shell — `src/shell/profiling/` |
-| **Depends on** | nothing new. Node builtins in one file (`node.ts`), gated by SS-P |
+| **Depends on** | nothing new. Node builtins in one file (`node.ts`), gated by SS58 |
 | **Consumed by** | C22 (the composition root injects it), C24 (`TuiConfig.profile`, `ChromeContext.lastFrame`), `tools/profile.mjs` |
 | **Source** | `docs/notes/CALCIUM_PROFILER_DESIGN.md` · A02 §7 · A01 Appendix B · F395, F853, F862–F864 |
 | **Status** | Spec'd 2026-09-06, unbuilt |
@@ -172,10 +172,42 @@ already its only entry.
 | `counters` | integers only: frames by `CommitReason`, bytes written, cells painted, blocks measured by kind, instance and entry, cache misses by reason, commits coalesced, live polls, entries appended and evicted | an increment | nothing |
 | `spans` | the above, plus `work`/`wait` per frame, the span set, the N worst frames whole, and periodic `ResourceSample`s | **0.96 µs per element span**, measured — see below | nothing (F867) |
 | `alloc` | the above, plus V8 sampling allocation attributed to stacks | light enough for a live session: **78 KB** and **36 ms** for a whole start→stop cycle (design M22) | nothing |
-| `deep` | the above, plus CPU profiles and heap snapshots written to `.calcium/profile/` (C22 I67) | large — a heap snapshot is **5.4 MB** and **314 ms** on a near-empty process (design M21), so it pauses the session | nothing |
+| `deep` | the above, plus CPU profiles and heap snapshots written to `.calcium/profile/` (C22 I67) | large, and the recorded figure is a **floor** — see §3b | nothing |
 
 A tier is raised by `TuiConfig.profile`, by `/profile`, or by opening the view (which raises it and
 lowers it again on close, so a pane never draws an empty plot that reads as *measured, and zero*).
+
+### 3b. What a capture costs, and why the recorded figure was the floor
+
+This table read *a heap snapshot is 5.4 MB and 314 ms on a near-empty process (design M21)*. It
+reproduces — 5.32 MB and 138 ms, measured in the container on Node v22.23.2, 2026-09-07 — and a
+near-empty process is not the case a capture is taken in.
+
+| capture | duration | bytes |
+|---|---|---|
+| CPU profile, 100 µs sampling, 250 ms window | 341 ms | 8.7 KB |
+| allocation sampling, 300 ms, **nothing allocating** | 330 ms | **153 bytes** |
+| allocation sampling, 300 ms, 20 000 objects per tick | 330 ms | 43.6 KB |
+| heap snapshot, near-empty process | 138 ms | 5.32 MB |
+| heap snapshot, **200 000 objects held** | **2 621 ms** | **60.56 MB** |
+
+**The last row is the argument for I17's cap**: a session holding a transcript pays 11× the bytes
+and 19× the pause of the recorded figure, and 2.6 s is a visible stall in a terminal that is meant
+to be running. The default cap is 8 MB — it keeps a floor-sized snapshot whole and truncates the
+case the capture is taken for, which is the right way round: a truncated 60 MB snapshot still says
+*the heap is large* on its first line.
+
+**The second row is a different hazard and it is in the file rather than the tier.** A valid
+allocation profile over an idle window is 153 bytes with no children, which is indistinguishable
+from a capture where sampling never started. Both figures are in `node.ts` beside the interval, so
+a reader holding a small `.heapprofile` can tell which they have.
+
+**The output formats are V8's own**, so a capture opens in Chrome DevTools and speedscope with
+nothing written to render it: `Profiler.stop` returns exactly the `.cpuprofile` shape. The
+extension is part of that — the same bytes named `.json` are refused by both tools — which is why
+`EXTENSIONS` is a table in the recorder and a mutation over it is one of C28's rows.
+
+---
 
 ### 3a. What a span costs, measured rather than derived
 
@@ -243,7 +275,7 @@ six components that F863 found unread, which the snapshot **reads** rather than 
 `process.memoryUsage`, `process.cpuUsage`, `monitorEventLoopDelay`, `PerformanceObserver`,
 `node:inspector` or `node:v8`.
 
-**SS-P has two arms and they have different scopes, which is the part a single rule would get
+**SS58 has two arms and they have different scopes, which is the part a single rule would get
 wrong.** The first is scoped to `src/` with `node.ts` allow-listed — the symbols above are legitimate
 in exactly one file (I21). The second is `performance.mark` and `performance.measure`, scoped to
 `src/` with **`allow: []`**, because F853's leak is in the buffer those two write to and `node.ts` has
@@ -340,7 +372,7 @@ histograms describes neither, and the report states the point at which it was re
 - **I16** — GC kinds are translated from V8's numeric constants at the boundary, totally over the four (`MINOR=1`, `MAJOR=4`, `INCREMENTAL=8`, `WEAKCB=16`), so a fifth kind is a compile error rather than a silently dropped bucket.
 - **I17** — A `deep` capture is size-capped and reports the bytes it dropped; it is written under `.calcium/profile/`, which needs no `.gitignore` change because the directory is ignored twice over — the repository's own `.gitignore:11`, and C22 I67's rule that `stateDir` is created holding a `.gitignore` of `*` regardless of the consuming project's ignore rules.
 - **I18** — `setTier` resets the ring, and the report names the reset point; histograms from two tiers never merge.
-- **I19** — The user-timing entry count is read at most once per sampler interval and never per frame.
+- **I19** — The user-timing entry count is read at most once per sampler interval and never per frame, and **nothing under `src/` writes that buffer** — `node.ts` included. SS59 is the second arm of SS58 and carries an empty allow list for exactly that reason: written as one rule with one list, the profiler would have been exempted from the leak it exists to find.
 - **I20** — `mark` records an instant on the session timeline and never inside a `FrameRecord`.
 - **I21** — `src/shell/profiling/node.ts` is the only file under `src/` naming `process.memoryUsage`, `process.cpuUsage`, `monitorEventLoopDelay`, `PerformanceObserver`, `node:inspector` or `node:v8`.
 - **I22** — `dispose` is idempotent; after it every operation is a no-op except `capture`, which throws.
@@ -356,6 +388,7 @@ histograms describes neither, and the report states the point at which it was re
 - **I32** — **A span tree is built for every frame and retained only for the frames kept as worst.** The tree is the allocation the spans already made; retention is what is unbounded, and which frames are worst is not knowable until the session ends — so the decision is made at report time and the record for an ordinary frame carries no `tree` member at all rather than an empty one.
 - **I33** — **A span survives an `await`, and the store that makes that true is constructed lazily.** Closing is per node against its own parent, so an out-of-order close is correct rather than discarded — the previous shape held one pointer and dropped any close that did not match it, which is precisely what interleaving produces, so every async span it could have recorded reported nothing and reported it silently. The `AsyncLocalStorage` is built on the first transition to a tier that records durations and never at import: measured on Node v22.23.2, an `await` costs 38 ns with none constructed and **59 ns with one constructed and never used**, so an eager store taxes every promise in every application by about 55 % to profile one of them.
 - **I34** — **The report prices the instrument.** `overhead` carries the spans opened, this machine's measured `elapsed()` cost, the product as an estimate labelled one, and whether the async store is built. An instrument that does not report its own cost invites a reader to assume zero, and an instrument reporting its own cost *as its subject's* is the failure class this component exists to end.
+- **I35** — **The exported document carries what its shape cannot.** Three things, each of which a well-formed document is happy to omit. A trace event's `ts` is the span's own `startedAt` and never a position computed from its siblings: children do not tile their parent — the gaps are the parent's self time — so a synthesised timeline is well-formed, plausible, and not what happened, and no viewer can tell. The document names `framesInSession` beside `framesWithTrees`, because I32's retention read off the output is a count of the worst frames read as the session's. And neither format carries a sum of `work` and `wait` (I4), because two columns that add up look like a column that is missing.
 
 ---
 
@@ -377,6 +410,7 @@ histograms describes neither, and the report states the point at which it was re
 14. **An element's cost is measured, never apportioned.** Per block, at every depth, with the call count beside the duration so thrash and expense are different readings. (I31, I32)
 15. **A span survives an `await`, or the tier that would record it is not on.** Correct across interleaving, and the machinery that costs every promise is built only when something is actually being recorded. (I33)
 16. **The instrument prices itself.** (I34)
+17. **The output is a format that already has readers.** Chrome's Trace Event JSON opens in Perfetto and speedscope, so a flame chart, a sandwich view and a left-heavy view arrive with no renderer written; NDJSON is the appendable form a four-hour session needs and a single JSON document cannot be. What the export owes is the context the format has no field for. (I35)
 
 ---
 
@@ -477,6 +511,16 @@ machine noise closes, on a runner measured at 2.7× this host's timings (F809). 
 - **T1.37** (I33): two `trace` calls interleaved across an `await` → both report their own duration and the two are distinguishable. This is the case the single-pointer shape recorded as nothing, with no error.
 - **T1.38** (I33): `off` and `counters` → `overhead.asyncEnabled` is false; `spans` → true before any `trace` runs. The tier is the line, not the first trace: deferring construction to the first call would put the cost of every `await` in the process starting inside whichever call happened to be first.
 - **T1.39** (I34): five spans → `overhead` carries the count, this machine's measured `elapsed()` cost, and the product as an estimate labelled one. `clockNs` is measured against the *injected* clock, so the row asserts it was taken rather than what it came to — asserting a duration here asserts the host.
+- **T1.40** (I30): a rendered document holding a plot, a table and a code block → each kind's phases appear under its own names — `plot.layout`, `plot.area`, `plot.furniture`, `plot.form.<form>`, `table.plan`, `table.rows`, `code.tokenise`, `code.paint`. The registry seam can only see that a block was measured; a phase is a component naming what it did.
+- **T1.41** (I30): the same render → `plot.samples`, `plot.series`, `table.rows`, `table.columns` and `code.rows` carry the size each phase's duration is against. A duration alone says a plot was slow; the pair says whether it is linear, which is the difference between a figure and a finding.
+- **T1.42** (I30, **the control for the split**): `plot.area.cells` at 200, 2 000 and 20 000 samples in a 4-row box → **700 in all three**, and 4 300 at height 40. A renderer attributing everything to one phase satisfies T1.40 and T1.41 exactly, so only a comparison separates the phases — and the comparison is the box rather than the data, because the downsampler collapses a series onto the area's columns before anything is drawn. Two configurations differing by 100× in data give an equality where every timing assertion would give a threshold.
+- **T1.43** (I31, **the fabrication control, on the render seam**): a document holding one 2 000-point plot and fifty rules → the plot is the largest node and its self time is more than 20× the median leaf's. `registry.render` costs 123 µs for a rule against 15 310 µs for that plot, so the spread is the reading the element table exists to produce; the apportioning shape reported the plot at one fifty-second of the total, which is a census of what was on screen wearing a cost's units.
+- **T1.44** (I31): one measured sequence at `off`, `counters` and `spans`, with the seam's own call count beside each → `off` asks the profiler nothing, `counters` records `measure.sequences` and its block gauge while opening no element, `spans` opens elements. The three are asserted together because each alone is satisfied by the wrong reading, and the call count is what separates a seam that declined from a recorder that refused — `nodes.length` is 0 either way, which is how a tier named after counters shipped with no counter able to fire.
+- **T1.45** (I35): a retained tree whose parent has self time between two children → the second child's `ts` exceeds the first's `ts + dur` by that gap, and neither child's `ts` is a function of its sibling. Laying children end to end inside their parent produces a document a viewer draws without complaint.
+- **T1.46** (I35): a span of 5 ms → `dur` is 5 000. Microseconds against this component's milliseconds is the one conversion in the file, and applying it twice is a factor of a thousand that still opens as a profile.
+- **T1.47** (I35): eight frames at `worst: 2` → `otherData.framesInSession` is 8 and `framesWithTrees` is 2. Counting the drawn trees is I32's retention policy read as a measurement.
+- **T1.48** (I35, I4): three frames as NDJSON → three lines, each parsing on its own, and no key on any of them equal to `work + wait`.
+- **T1.49** (I35): a tree holding both an element node and a phase span → their `cat` values differ. One category collapses the two feeds a reader has to tell apart — a block instance the registry seam measured, and a span a component opened inside itself — into one colour.
 - **T1.17** (I24): a frame with `work: 3`, `wait: 97` attributed to entry `e1` → `byEntry.e1.sum` is 3. The 97 appears in no entry and in no kind.
 
 ### Tier 2 — contract
@@ -484,7 +528,7 @@ machine noise closes, on a runner measured at 2.7× this host's timings (F809). 
 - **T2.1** (I2, the instrument's own fixture, **real clock**): a span wrapping a deliberate 5 ms busy-wait reports **≥ 4 ms**; a counter incremented 1 000 times reports exactly 1 000; a probe returning a rising then falling heap is reported rising then falling. The counter and the probe assert exactly, the duration asserts a floor, and the row prints all three.
 - **T2.2** (I2, **the negative control**, real clock): an empty span reports **≤ 10 µs** — the span machinery's own cost, and not its subject's. Without this row T2.1 is satisfied by an instrument that reports the same figure for any input, which is the five-of-five class arriving in the tool built to end it. The two bounds are 400× apart and both are printed beside the assertion.
 - **T2.3** (I13): a sample at `resolution: 10` → `loopDelay.resolutionMs` is 10, and no consumer of the report reads `loopDelay.p50` as a delay.
-- **T2.4** (I21): the source scan SS-P over `src/`, with `node.ts` allow-listed; the allow-listed file is shown to still trigger the pattern, so the exemption is exercised.
+- **T2.4** (I21): the source scan SS58 over `src/`, with `node.ts` allow-listed; the allow-listed file is shown to still trigger the pattern, so the exemption is exercised.
 - **T2.5** (I19): a 60-second run at 60 fps → `getEntries` is read at most once per sampler interval, asserted by counting probe calls rather than by timing.
 - **T2.6** (I12): a frame raised by one profiler commit and one real commit → `selfInflicted` is false.
 - **T2.7** (I25): the report's timing-entry figure → a count, with no site, and carrying the label that says the profiler raises no marks of its own.
