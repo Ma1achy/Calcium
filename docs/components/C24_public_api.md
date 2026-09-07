@@ -1113,7 +1113,7 @@ the renderer's, and the reason has to say so on its own rather than by counting 
 
 ### Tier 1 — unit
 
-- **T1.9** (I31): every runtime value exported from `@fmx/calcium/profiling` → `Tier`'s members and nothing callable; importing the module constructs no recorder, registers no timer and touches no process figure. Asserted on the module's own exports rather than on a written list, because a list is satisfied by the list.
+- **T1.9** (I31): every runtime value exported from `@fmx/calcium/profiling` → two frozen lookup tables and nothing callable; importing the module constructs no recorder, registers no timer and touches no process figure. Asserted on the module's own exports rather than on a written list, because a list is satisfied by the list. **The two tables are the operations a report's reader has that a type cannot give them**: `TIER_RANK` compares two tiers, and `PHASE_GROUP` groups a span into `compute` / `draw` / `output` / `input` / `far side` — which is the *is it computing or drawing* question, unanswerable from `spans` alone because a `Record<SpanName, Histogram>` carries no grouping. A frozen table starts nothing, which is the whole of why either is here.
 - **T1.10** (I32): a chrome called at tier `off` → `lastFrame` is `undefined`; at `spans`, the first frame's is `undefined` and the second's is the first's cost, not the second's.
 
 - **T1.1**: each builder produces a block passing `validateBlock` — twenty cases.

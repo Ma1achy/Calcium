@@ -621,7 +621,7 @@ machine noise closes, on a runner measured at 2.7× this host's timings (F809). 
 
 - **T5.1** (I14): a recorded PTY session that types, submits, streams, scrolls and resizes → replayed, the frames are **byte-identical** to the recording's.
 - **T5.2** (I14): the same recording replayed twice → the two runs' frames are identical to each other.
-- **T5.3** (A01 Appendix B): `make profile` against `dist/` through the public surface → the six budget figures and the three Appendix B rows, each with its regime.
+- **T5.3** (I37, A01 Appendix B): `make profile` against `dist/` through the public surface → all six Appendix B rows — **four measured and two refused** — with the verdict and the regime beside them. This row said *three* until the appendix was actually filled; four are answerable from a report and the count was written before anything computed it.
 - **T5.4** (I8): the T5.1 recording replayed → `misses["nothing-changed"]` is **0**. On a replayed input the count is deterministic, which is the only regime in which asserting it is honest (D2).
 
 ### Tier 6 — fail-on-revert
