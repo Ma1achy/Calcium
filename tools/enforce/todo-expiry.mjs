@@ -89,6 +89,20 @@ export const COMPONENT_SOURCES = Object.freeze({
   C23: "src/shell/execution.ts",
   C24: "src/index.ts",
   C25: "src/presentation/patch/definition.ts",   // the definition, not the barrel — and `blocks/patch.ts` never existed (TD3, third instance)
+  // The recorder, now that it exists. C28 had no row at all while its path did
+  // not exist, which TD3 requires — and the seven tier-2 todos deferred on
+  // "the recorder in src/shell/profiling/" were therefore watched by nothing
+  // and outlived their condition. The recorder rather than `types.ts` or the
+  // barrel: TD3's rule is that a row names the file holding the *behaviour*,
+  // and the barrel is now types-only by C24 I31.
+  //
+  // **C26 and C27 have no row either**, and the comment above makes that a gap
+  // rather than an omission — every component nameable as a blocker needs one.
+  // Their behaviour files are not obvious from outside their specs (C26 is
+  // spread across four shell files; C27 has `src/data/emulator/`), and a row
+  // pointing at the wrong file expires deferrals that are genuinely waiting.
+  // Chosen deliberately or not at all — see FINDINGS F873.
+  C28: "src/shell/profiling/recorder.ts",
 });
 
 /**

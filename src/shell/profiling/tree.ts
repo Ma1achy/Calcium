@@ -143,6 +143,17 @@ export class Aggregate {
 /** A closed node, as a report carries it. */
 export type TreeNode = Readonly<{
   name: string;
+  /**
+   * When the span opened, on the session's `elapsed` axis.
+   *
+   * **Carried rather than derived, and that is what it is for.** A parent's
+   * children do not tile it — the gaps between them are the parent's own self
+   * time — so a consumer laying them out end to end inside the parent produces
+   * a timeline that is well-formed, plausible and not what happened. The trace
+   * exporter is the caller, and a viewer cannot tell a fabricated layout from a
+   * measured one.
+   */
+  startedAt: number;
   self: number;
   total: number;
   children: readonly TreeNode[];
@@ -161,6 +172,7 @@ export function freezeTree(node: OpenNode, endedAt: number): TreeNode {
   const self = node.self ?? Math.max(0, total - node.childTime);
   return Object.freeze({
     name: node.name,
+    startedAt: node.startedAt,
     self,
     total,
     children: Object.freeze(node.children.map((c) => freezeTree(c, endedAt))),

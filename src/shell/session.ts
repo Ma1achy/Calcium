@@ -14,7 +14,8 @@
  */
 
 import { availableParallelism } from "node:os";
-import { appendFileSync } from "node:fs";
+import { dirname } from "node:path";
+import { appendFileSync, closeSync, mkdirSync, openSync, writeSync } from "node:fs";
 import {
   appendFile,
   mkdir,
@@ -32,7 +33,7 @@ import { commandRows, type PaintDeps } from "./paint.js";
 import { transmitImage, type SentImages } from "./transmit-image.js";
 import { composeFrame } from "./render-frame.js";
 import { createProfiler, isRecording, isSpanning } from "./profiling/recorder.js";
-import { createResourceProbe } from "./profiling/node.js";
+import { createInspector, createResourceProbe, type CaptureIo } from "./profiling/node.js";
 import type { CommitReason, Profiler } from "./profiling/types.js";
 import { focusKey } from "./render-cache.js";
 import { reserveNeeded } from "./block-faults.js";
@@ -92,6 +93,35 @@ const nodeFileSystem: FileSystem = {
       directory: e.isDirectory(),
     })),
 };
+
+/**
+ * Where a `deep` capture's bytes land. The same boundary argument as
+ * `nodeFileSystem` above, and a separate seam because the shapes differ: a
+ * capture is a stream of chunks with a cap on it, not a document.
+ *
+ * **A file descriptor and synchronous writes**, because the alternative at the
+ * measured sizes is worse in both directions. A 60 MB heap snapshot buffered
+ * into a string is 60 MB of the heap of a process the capture exists to
+ * examine; the same 60 MB through `appendFileSync` is one `open`/`close` pair
+ * per chunk. `writeSync` on a held descriptor is neither.
+ *
+ * **The directory needs no `.gitignore` of its own** (C28 I17): `.calcium/` is
+ * ignored by this repository's `.gitignore` and, for a consuming project,
+ * C22 I67 creates `stateDir` holding a `.gitignore` of `*` regardless of what
+ * that project ignores.
+ */
+const captureIo = (): CaptureIo => ({
+  open(path: string) {
+    mkdirSync(dirname(path), { recursive: true });
+    const fd = openSync(path, "w");
+    return {
+      write: (chunk: string): void => void writeSync(fd, chunk),
+      close: (): void => {
+        closeSync(fd);
+      },
+    };
+  },
+});
 
 /**
  * What the reader has to go and edit, for gate 3b's refusal (I61, F8).
@@ -362,12 +392,22 @@ class Session implements TuiInstance {
     // The probe is constructed only at a tier that samples, for the same
     // reason one level down: below `spans` nothing reads it, and enabling a
     // histogram nobody snapshots is cost with no reader.
+    //
+    // **The inspector is constructed only at `deep`**, one rung above the probe
+    // and for the sharper version of the same reason: connecting an inspector
+    // session is cheap, and a session that exists can be posted to. A capture
+    // is a 2.6-second stall and a 60 MB file at the sizes measured in
+    // `node.ts`, so the apparatus that can take one is not present at a tier
+    // that did not ask for it.
     const profileTier = this.config.profile?.tier ?? "counters";
     if (this.config.profile !== undefined && isRecording(profileTier)) {
       this.#profiler = createProfiler(this.config.profile, {
         elapsed: this.config.elapsed,
         ...(isSpanning(profileTier)
           ? { probe: createResourceProbe(this.config.elapsed) }
+          : {}),
+        ...(profileTier === "deep"
+          ? { inspector: createInspector(this.config.elapsed, captureIo()) }
           : {}),
         schedule: this.config.schedule,
         node: process.version,

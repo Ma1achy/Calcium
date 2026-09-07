@@ -324,6 +324,19 @@ export interface Profiler extends Probe {
   /** A capture the inspector produced, recorded so the report can name it. */
   addCapture(capture: CaptureResult): void;
 
+  /**
+   * Take a CPU profile, an allocation profile or a heap snapshot (I17).
+   *
+   * **The one feed that needs no seam**, and therefore the only one that
+   * reaches inside a function nobody instrumented — the registry decoration and
+   * `ctx.probe` both measure a unit from outside. `ms` is the sampling window
+   * for `cpu` and `alloc` and is ignored by `heap`, which is an instant.
+   *
+   * Refused below tier `deep`, naming the tier: the alternative is a 0-byte
+   * file at `counters` and a reader concluding the process has no heap.
+   */
+  capture(kind: CaptureKind, ms?: number): Promise<CaptureResult>;
+
   report(): ProfileReport;
   dispose(): void;
 }

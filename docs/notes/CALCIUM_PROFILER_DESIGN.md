@@ -240,6 +240,6 @@ this repository has recorded four times, on a runner already measured at 2.7× t
 in A02, C22, C03, C14, C24 · `C1` `src/shell/profiling/` (R14) · `C2` seams wired · **`C3` record and replay,
 before the panes, because a number that is not reproducible is not worth drawing and a dashboard
 built on irreproducible numbers teaches wrong conclusions with a picture's authority** · `C4`
-samplers, `alloc`, `deep`, SS-P · `C5` the headless face and `make profile` · `C6` Appendix B
+samplers, `alloc`, `deep`, SS58 · `C5` the headless face and `make profile` · `C6` Appendix B
 filled · `C7` the panes and the three surfaces · `C8` the terminal round trip · `C9` mutation,
 frames, docs sweep.

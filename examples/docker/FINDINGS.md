@@ -31240,3 +31240,216 @@ property of forty per cent of them.
 
 ---
 
+
+## F873 — the no-blocker marker is where a deferral goes to stop being watched ★★★★☆
+
+Seven `it.todo` rows in `test/contract/profiler.test.ts` carried this condition:
+
+> *not deferred on a component: lands with the recorder in `src/shell/profiling/`, and T2.4 with
+> SS58*
+
+Both halves had been true for some time. The recorder is 1 400 lines and has a mutation pass over
+it; SS58 is in the scan table with a fabricated violation and a control; and **T2.4 had already
+been written**, in `test/unit/profiler-seams.test.ts`, so the file was holding a duplicate of an
+implemented row plus six rows whose blocker had gone.
+
+**The marker is the mechanism.** `tools/enforce/todo-expiry.mjs` expires a deferral by resolving
+the component it names against `COMPONENT_SOURCES` — and TD3 forbids a row naming a path that does
+not exist, because a missing path reads as *not implemented* forever and silently exempts every
+deferral pointing at it. C28 had no row while `src/shell/profiling/` did not exist. So the rows
+could not name C28, took the explicit **no-blocker marker** instead, and wrote their real condition
+in prose beside it.
+
+That is the escape hatch TD3 requires, and it is a hole in the shape of the rule: the marker
+asserts *nothing is watching this*, and the sentence after it states a condition. The two are one
+line apart and neither is wrong.
+
+**Three components had no row: C26, C27, C28.** The doc comment above `COMPONENT_SOURCES` says
+every component nameable as a blocker needs one whether or not anything waits on it, so this is a
+gap rather than an omission. C28's is added here — `src/shell/profiling/recorder.ts`, the file
+holding the behaviour, since the barrel is types-only by C24 I31. C26's and C27's are not: C26 is
+spread across four shell files and C27 has `src/data/emulator/`, and a row pointing at the wrong
+file expires deferrals that are genuinely waiting. Choosing them is a step of its own.
+
+**The class, fifth instance.** The four before it were a deferral whose condition was satisfied
+somewhere else — `cursorCell` read forty lines below the comment excusing its absence, `height:
+"fill"`, C04 §3's `weights`, and `RenderContext`'s windowing seam. This one is the other failure of
+the same rule: not a condition met elsewhere, but a deferral that opted out of the watching
+mechanism because the mechanism had no entry for its subject yet. **The habit reaches it and no
+gate does** — grep the condition when picking the entry up.
+
+## F874 — a bound with no statistic is satisfied by whichever reading its writer had in mind ★★★☆☆
+
+C28 §10's T2.2 read:
+
+> *an empty span reports **≤ 10 µs** — the span machinery's own cost, and not its subject's*
+
+Written from that row, the test measured two hundred empty spans and asserted on `max`. It failed
+at **55 µs**, then 60, then 21 — the figure moves every run, because the worst of two hundred spans
+is set by whichever scheduling hiccup landed inside them and is a reading about the host.
+
+On `p50` it measures **1.00 µs** and the row holds with an order of magnitude to spare. That figure
+is also §3a's independently measured **0.96 µs per element span**, arriving from a second
+direction, which is the corroboration the row is worth having.
+
+**And the row cannot see below its own resolution.** `Hist.indexOf` rounds milliseconds to whole
+microseconds, so 1.00 µs is the histogram's floor: the row cannot distinguish 600 ns from 1.4 µs
+and is not evidence about anything under it. Worth saying in the row, because a reader comparing
+1.00 µs against §3a's 0.96 µs would otherwise take the agreement as precision.
+
+**The class is F838's**: a design measurement is a claim until a row runs, and the row written from
+it is the first thing that can disprove it. Here the number survived and the *statistic* did not,
+which is the cheaper half — the fix is four words in the spec rather than a ruling reversed.
+
+## F875 — a negative claim in a spec row, already false when written ★★★☆☆
+
+The same tier-2 pass, the row beside it. C28 §10's T2.3 read:
+
+> *`loopDelay.resolutionMs` is 10, and **no consumer of the report reads `loopDelay.p50` as a
+> delay***
+
+The second clause is a negative claim, and it was false in its literal reading before the row was
+written: `panes.ts:375` draws the figure, as
+
+```
+loop delay p50: 0.00 ms at resolution 10 ms — a floor, not a reading
+```
+
+which is exactly what C28 I13 wants — the resolution travelling with the figure — and exactly what
+the row forbids. A test written literally from that sentence asserts an absence, finds the string,
+and fails on correct code; a test written from the *intent* asserts something the sentence does not
+say.
+
+**A negative claim passes hardest the day it becomes false**, and this one had nothing to resolve
+against in either direction. The row now says what is actually checked: every pane that draws the
+p50 draws the resolution and the qualifier with it — and it runs over **all four panes** rather
+than the one that draws it, because a row naming `memory` goes green on the day a second pane
+starts printing the figure alone, which is precisely when the invariant first has something to be
+wrong about.
+
+## F876 — the orphan barrel: an invariant vacuous in both directions at once ★★★☆☆
+
+C24 I31 says `@fmx/calcium/profiling` publishes types, `Tier`, and nothing that runs. The barrel at
+`src/shell/profiling/index.ts` exported **five runtime values** — `createProfiler`,
+`createResourceProbe`, `Hist`, `Ring`, `profilePane` — for as long as it existed.
+
+Nothing caught it, and the reason is that it was un-catchable from both sides:
+
+- **No consumer.** Nothing under `src/` or `test/` imported the barrel; every internal caller takes
+  the concrete file (`session.ts` imports `createProfiler` from `./profiling/recorder.js`). So no
+  seam check, no module-graph edge and no unconsumed-member scan had anything to look at.
+- **No subpath.** `package.json` had no `./profiling` entry, so the module the invariant is *about*
+  was not published at all. A rule over a published surface resolves against nothing when the
+  surface is not published.
+
+It became live in the same commit that added the subpath, and trimming it broke nothing — which is
+the tell. **An invariant is vacuous until its subject exists, and the day it stops being vacuous is
+the day it is usually already false**, because the thing it governs has been growing unwatched.
+
+T1.9 now asserts the subpath resolves *and* that no export is callable, over the module's own
+namespace rather than a written list — a list is satisfied by the list, so adding `createProfiler`
+back and adding it to the list keeps such a row green. The control imports `recorder.js` through
+the same path and finds callables there, because an empty namespace passes the predicate exactly.
+
+## F877 — the same row recorded failing three times, and the instrument never repaired ★★★☆☆
+
+`test/edge/editor.test.ts`'s T3.15 asserts that `displayRows` is linear: twice the text, and *not
+four times the work*. Linear is a ratio of 2, quadratic is 4, and the bound sits at 3 — the middle,
+which is the right place for it.
+
+It failed again in this session's suite at **3.17**, and twice more at **3.03** when run alone. It
+is not new. F73 already carries it:
+
+> *C17 T3.15 read 6.0 against a limit of 3 on a 1 MB paste. **Read 4.05 again on 2026-08-15***
+
+**Three recorded failures, and each time what was recorded was the reading.** The disposition was
+right — a busy machine, and a row whose verdict is a function of load — and it stopped there. The
+number was written down, the class was named, and the instrument that produced the number was never
+looked at.
+
+**One timing of each size is the whole defect.** The row measured `half.displayRows` once and
+`e.displayRows` once, so a single descheduled slice anywhere inside the larger call is the entire
+reading. The minimum of five is the least-contended estimate of a deterministic computation and
+costs four extra calls; after it, five consecutive runs read **2.18, 2.49, 1.99, 1.73, 2.11**.
+
+**The bound is unchanged**, and that is the point: nothing about the threshold was wrong, so
+raising it — the repair a load explanation invites — would have widened the gap the row exists to
+see, from "linear or quadratic" towards "quadratic or worse".
+
+**Wrong in one direction, which is the shape to watch for.** The first reading of this blamed
+`Date.now()`'s millisecond quantisation, and the figures refuse it: the measurements are 320–390 ms
+and 645–880 ms, where a millisecond is 0.3 % and cannot move a ratio to 3.17. `performance.now()`
+stays because it costs nothing, not because it fixed anything — and a comment claiming it did is a
+justification the next person checks and cannot reproduce.
+
+**The general form**: a finding that correctly classifies a failure closes the question of *why it
+failed* and quietly closes the question of *whether the measurement was any good*. Group 12 has
+four entries and every one of them records a reading. This is the first that changes an instrument.
+
+## F878 — a branch no caller can reach, and the row written to reach it could not either ★★★★☆
+
+`capped()` in `src/shell/profiling/node.ts` bounds a capture's size and reports what it dropped. It
+had three arms:
+
+```ts
+const room = capBytes - written;
+if (room <= 0) { dropped += chunk.length; return; }     // no room at all
+if (chunk.length <= room) { sink.write(chunk); … }      // fits
+sink.write(chunk.slice(0, room)); dropped += chunk.length - room;   // overruns
+```
+
+Deleting `dropped += chunk.length` from the first arm **survived the mutation pass** with every
+capture row green — including T1.15, which asserts `result.droppedBytes` is greater than zero.
+
+**The first reading was that only `heap` streams, and it was wrong twice.** T1.15d was written from
+it: capture `heap` at a 64-byte cap, expect hundreds of chunks to arrive with no room, and assert
+`droppedBytes` over a million. The row passes. **The mutation survived it anyway**, which is what
+sent the question back to a measurement:
+
+```
+chunks 1 · total 5193967 · first 5193967 · max 5193967
+```
+
+`getHeapSnapshot()` yields the whole 5.19 MB snapshot in **one chunk**. So the streaming loop runs
+once, the third arm drops 5 193 903 bytes on its own, and the row's figure came from the arm it was
+written to bypass. `cpu` and `alloc` are one `JSON.stringify` and one `write`, so **no capture kind
+reaches the first arm at all** — the sink is written exactly once per capture, whatever the cap.
+
+**And the branch was redundant, not defensive.** `written` grows by `chunk.length` only where that
+is within `room`, and by `room` otherwise, so it never passes `capBytes` and `room` is never
+negative. At `room === 0` the third arm writes `chunk.slice(0, 0)` and counts `chunk.length - 0` —
+**exactly what the first arm did**, minus a zero-length write. It was a fast path duplicating the
+arithmetic beside it, and deleting it changes no behaviour and leaves nothing to mutate.
+
+**The instructive part is the order.** The mutation surviving was read as a gap in the tests, a row
+was written to close it, the row went green, and **the mutation survived the second pass too**.
+That second survival is the finding: a row that passes without killing the mutation it was written
+for has not reached its subject, and the only thing that settles which is a measurement of the
+thing the row assumed — here, how many chunks a snapshot actually arrives in.
+
+The replacement mutation targets the arm that does run: the excess counted as the amount kept
+(`dropped += room`), which T1.15d sees as 64 rather than five million.
+
+## F879 — an allow list of one file and a corpus that cannot tell it from the directory ★★★☆☆
+
+SS58 confines every process and V8 figure to `src/shell/profiling/node.ts`. Widening its `allow`
+entry from the file to `src/shell/profiling/` **survived the mutation pass**, and T2.4 has three
+assertions covering exactly this rule:
+
+- the tree as it stands produces no violation,
+- a fabricated read in `src/viewport/viewport/viewport.ts` produces two,
+- the same read in `src/shell/profiling/node.ts` produces none.
+
+Every input is either outside the directory or is the allow-listed file itself, so **no verdict in
+the row changes** when the entry becomes the directory. The rule's precision — the thing that makes
+an allow list of one file different from an allow list of a directory — had no input that could see
+it.
+
+The missing input is a sibling: `recorder.ts` reading `process.memoryUsage()`, which must still be
+caught. It is also the plausible one, because the recorder is the file that assembles the report
+such a figure would go into.
+
+**The class is the fabricated violation's own blind spot.** A fabricated violation shows the rule
+*fires*; a control shows the exemption *is exercised*. Neither shows the exemption is the *right
+size*, and a scope is a claim with an edge on both sides. **A rule with an allow list owes a third
+input: something the entry does not cover, adjacent to something it does.**

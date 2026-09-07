@@ -101,6 +101,43 @@ export const SCANS = [
     scope: "src/interaction/history/", allow: [],
     why: "the filesystem and the state directory are injected (I11, I12): C20 writes through `HistoryFs`, and any hardcoded dot-directory path makes standalone development write beside a real install" },
 
+  // **SS58, and it is two rules because the two halves have different scopes.**
+  //
+  // Cited by `node.ts:4`, `types.ts` and C28 §1, I21 and T2.4 from the day C28
+  // was specified, and absent from this file until now — which is the shape
+  // *ask where a settled claim is written down* exists for. `node.ts`'s own
+  // opening comment says *SS58 bans these everywhere else*, and nothing banned
+  // anything.
+  //
+  // **The first arm** is the process reads: legitimate in exactly one file, and
+  // nowhere else in `src/`. Scoped to `src/` with `node.ts` allow-listed.
+  //
+  // **The second arm** is `performance.mark` and `performance.measure`, scoped
+  // to `src/` with **`allow: []`** — including `node.ts`. The user-timing buffer
+  // those two write to is unbounded and reading it costs 3 µs at zero entries
+  // and 449 µs at 10 000 (C28 I19), so the profiler has no more business filling
+  // it than any other file. **Written as one rule with one allow list it would
+  // have exempted the profiler from the defect it exists to find**, which is
+  // the reason worth carrying rather than the scope.
+  //
+  // **Corpus, measured before the rule was written** (2026-09-07, `src/`, comment
+  // lines excluded as `lineFires` excludes them): arm 1 matches 24 lines in
+  // `node.ts` and **nothing else** — the hits in `types.ts` and `session.ts` are
+  // all prose. Arm 2 matches nothing at all, in code or comment, `node.ts`
+  // included. So arm 1's allowance is exercised (SS53) and arm 2 is a rule over
+  // an empty corpus, which is the state a fabricated violation exists to make
+  // meaningful.
+  { id: "SS58", spec: "C28 I21 · C28 T2.4",
+    pattern:
+      /\b(?:process\.(?:memoryUsage|cpuUsage|resourceUsage)|getActiveResourcesInfo|monitorEventLoopDelay|eventLoopUtilization|PerformanceObserver|getHeapStatistics|getHeapSpaceStatistics|getHeapSnapshot)\b|from\s+["\']node:(?:v8|inspector)["\']/,
+    scope: "src/", allow: ["src/shell/profiling/node.ts"],
+    why: "the process is read in one file and injected everywhere else (C28 I21) — a component that reads memory or the loop directly cannot be unit-tested against a fake, and nothing ambient sits between the reading and the report" },
+
+  { id: "SS59", spec: "C28 I19 · C28 T2.4",
+    pattern: /\bperformance\.(?:mark|measure)\b/,
+    scope: "src/", allow: [],
+    why: "nothing under src/ writes the user-timing buffer, node.ts included — it is unbounded and reading it costs 449 µs at 10 000 entries, so the profiler is not exempt from the leak it exists to find" },
+
   { id: "SS4", spec: "C13 I9 · C13 T2.2 · C14 T2.4",
     pattern: /\b(?:Date\.now|new Date|performance\.now|process\.hrtime|Date)\b/,
     scope: "src/viewport/", allow: [],

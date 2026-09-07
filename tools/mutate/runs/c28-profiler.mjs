@@ -20,13 +20,16 @@ import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
 const CMD =
-  "npx vitest run test/unit/profiler-tree.test.ts test/unit/profiler-seams.test.ts test/unit/profiler.test.ts";
+  "npx vitest run test/unit/profiler-tree.test.ts test/unit/profiler-seams.test.ts test/unit/profiler.test.ts test/unit/profiler-export.test.ts";
 const REC = "src/shell/profiling/recorder.ts";
+const NODE = "src/shell/profiling/node.ts";
+const SCANS = "tools/enforce/source-scans.mjs";
 const TREE = "src/shell/profiling/tree.ts";
 const SEAM = "src/shell/profiling/registry-probe.ts";
 const HCACHE = "src/viewport/viewport/cache.ts";
 const RCACHE = "src/shell/render-cache.ts";
 const PLOT = "src/presentation/plot/definition.ts";
+const EXPORT = "src/shell/profiling/export.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -215,6 +218,161 @@ const results = runPass({
       // `AsyncLocalStorage` taxes every `await` in the process by 55 % — used
       // or not — so an app at `tier: "off"` pays for a profiler it disabled.
       // Nothing observable changes except the tax.
+      name: "CAP-INERT: the cap admits everything",
+      file: NODE,
+      // **The silent-truncation class inverted.** Nothing is refused, so a
+      // 60 MB heap snapshot lands whole on the disk of a process suspected of
+      // leaking — and every field of the result agrees with itself: `bytes` is
+      // the profile's size, `dropped` is 0, `truncated` is false. Correct,
+      // consistent, and describing a cap that did not happen.
+      from: "      const room = capBytes - written;",
+      to: "      const room = Number.MAX_SAFE_INTEGER;",
+      expect: "T1.15",
+    },
+    {
+      // The excess stops being counted while the cap still bites. The file is
+      // right and `droppedBytes` reads 0 — so 8 MB written of 61 is
+      // indistinguishable from 8 of 8, which is the difference between a cap
+      // that is working and one that is wrong.
+      // **What replaced DROPPED-UNCOUNTED**, which survived two passes. That
+      // mutation deleted the counter from `capped`'s no-room branch, and the
+      // branch turned out to be unreachable: every capture writes the sink once
+      // — `getHeapSnapshot()` measured one chunk of 5.19 MB — so nothing a test
+      // can construct gets there. The branch is gone (F878) and this takes its
+      // place on the arm that does run: the excess counted as the amount kept.
+      name: "DROPPED-IS-KEPT: the overrun reports what was written, not what was refused",
+      file: NODE,
+      from: "      dropped += chunk.length - room;",
+      to: "      dropped += room;",
+      expect: "T1.15d",
+    },
+    {
+      // `truncated` derived from nothing. A reader holding only the file cannot
+      // see the cap, which is the whole reason the flag is on the result — so
+      // this is the field's own vacuity class.
+      name: "NEVER-TRUNCATED: the flag is a constant",
+      file: NODE,
+      from: "        truncated: dropped > 0,",
+      to: "        truncated: false,",
+      expect: "T1.15",
+    },
+    {
+      // **The tier refusal removed.** A capture at `counters` posts to an
+      // inspector the session never connected — or, with one, takes a 2.6-second
+      // stall a tier below the one that asked for it.
+      name: "ANY-TIER: a capture is allowed at every tier",
+      file: REC,
+      from: "      if (TIER_RANK[tier] < TIER_RANK.deep) {",
+      to: "      if (TIER_RANK[tier] < TIER_RANK.off) {",
+      expect: "T3.4",
+    },
+    {
+      // The file lands with an extension neither tool opens. Every byte is
+      // correct and the capture is unreadable by the two programs it was
+      // written for, which no assertion about bytes can see.
+      name: "WRONG-EXTENSION: a capture is named .json",
+      file: REC,
+      from: '  cpu: "cpuprofile",',
+      to: '  cpu: "json",',
+      expect: "T1.15",
+    },
+    {
+      // The capture happens and the report does not name it. A file on disk the
+      // report is silent about is a file nobody finds, and `dropped.captureBytes`
+      // reads 0 for a session that dropped megabytes.
+      name: "UNRECORDED: the capture is returned and not recorded",
+      file: REC,
+      from: "      self.addCapture(result);",
+      to: "",
+      expect: "T1.15",
+    },
+    {
+      // **SS58's allow list widened to the directory.** Every file under
+      // `src/shell/profiling/` may then read the process, which is the rule
+      // reading as present and covering three files less than it says.
+      name: "SSP-WIDE: the allow list names the directory",
+      file: SCANS,
+      from: '    scope: "src/", allow: ["src/shell/profiling/node.ts"],',
+      to: '    scope: "src/", allow: ["src/shell/profiling/"],',
+      expect: "T2.4",
+    },
+    {
+      // **The two arms folded into one**, which is the mistake the rule's own
+      // `why` names: SS59 gains SS58's allow list, and the profiler is exempted
+      // from the user-timing leak it exists to find.
+      name: "SSPU-EXEMPT: the user-timing arm allows node.ts",
+      file: SCANS,
+      from: '    pattern: /\\bperformance\\.(?:mark|measure)\\b/,\n    scope: "src/", allow: [],',
+      to: '    pattern: /\\bperformance\\.(?:mark|measure)\\b/,\n    scope: "src/", allow: ["src/shell/profiling/node.ts"],',
+      expect: "T2.4b",
+    },
+    {
+      // **The exporter's five, and every one of them opens.** A trace viewer
+      // validates a schema and nothing else, so each mutation below produces a
+      // document Perfetto draws without complaint — which is the reason these
+      // rows exist rather than a snapshot of the JSON.
+      name: "TILED: children are laid end to end inside their parent",
+      file: EXPORT,
+      // The layout a reader would write if `startedAt` were not carried: each
+      // child begins where the last one ended, inside the parent. Every bar
+      // keeps its width, the nesting is right, and the parent's self time —
+      // the only thing that says where the frame actually went — vanishes.
+      from: "      ts: Math.round(node.startedAt * MS_TO_US),",
+      to: "      ts: Math.round((depth === 0 ? node.startedAt : tiled) * MS_TO_US),",
+      expect: "T1.45",
+      also: [
+        {
+          file: EXPORT,
+          from: "function walk(node: TreeNode, out: TraceEvent[], depth: number): void {",
+          to: "let tiled = 0;\nfunction walk(node: TreeNode, out: TraceEvent[], depth: number): void {\n  const here = tiled;",
+        },
+        {
+          file: EXPORT,
+          from: "  for (const child of node.children) walk(child, out, depth + 1);",
+          to: "  tiled = depth === 0 ? node.startedAt : here;\n  for (const child of node.children) {\n    walk(child, out, depth + 1);\n    tiled += child.total;\n  }",
+        },
+      ],
+    },
+    {
+      // The conversion dropped on one field rather than applied twice, because
+      // dropping it is the half a proportional picture hides: every bar shrinks
+      // by the same thousand and the flame chart is unchanged.
+      name: "HALF-CONVERTED: dur stays in milliseconds",
+      file: EXPORT,
+      from: "      dur: Math.round(node.total * MS_TO_US),",
+      to: "      dur: Math.round(node.total),",
+      expect: "T1.46",
+    },
+    {
+      // I32's retention read as a measurement — the count a reader would take
+      // from the document if the field were not there, written into the field.
+      name: "DRAWN-AS-SESSION: the session's frame count is the number of trees",
+      file: EXPORT,
+      from: "      framesInSession: String(report.frames),",
+      to: "      framesInSession: String(withTrees.length),",
+      expect: "T1.47",
+    },
+    {
+      // One colour for both feeds. A block instance and a phase inside it are
+      // the two readings the element table separates, and a viewer colours by
+      // this field alone.
+      name: "ONE-CATEGORY: an element and a phase are the same kind",
+      file: EXPORT,
+      from: '      cat: node.name.includes("#") ? "element" : "phase",',
+      to: '      cat: "phase",',
+      expect: "T1.49",
+    },
+    {
+      // C28 I4, in the format where it is most tempting: a line-oriented record
+      // that a reader will `jq` a column out of, and a column that adds up is
+      // what a missing column looks like.
+      name: "THE-SUM: NDJSON publishes work + wait",
+      file: EXPORT,
+      from: "        work: frame.work,\n        wait: frame.wait,",
+      to: "        work: frame.work,\n        wait: frame.wait,\n        total: frame.work + frame.wait,",
+      expect: "T1.48",
+    },
+    {
       name: "EAGER-ALS: the async store is built at construction",
       file: REC,
       // Anchored with `startSampler()` above it: the same line appears again in

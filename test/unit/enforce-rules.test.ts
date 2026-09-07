@@ -110,6 +110,28 @@ const FABRICATED: readonly Fabrication[] = [
   },
   { rule: "SS23", file: "src/presentation/blocks/text.ts", source: "const w = label.length;" },
   {
+    // Copied from the real call site, per the standing rule: this is the line
+    // `node.ts` legitimately holds, placed in a file that may not hold it.
+    rule: "SS58",
+    file: "src/viewport/viewport/viewport.ts",
+    source: "const mem = process.memoryUsage();",
+  },
+  {
+    // The import half, which the accessor pattern does not cover — a file can
+    // name `node:inspector` and call nothing on it yet.
+    rule: "SS58",
+    file: "src/shell/execution.ts",
+    source: 'import { Session } from "node:inspector";',
+  },
+  {
+    // **Fabricated inside the file SS58 excuses**, which is the only placement
+    // that distinguishes the two arms: anywhere else both fire, and here only
+    // this one does. SS59's allow list is empty for the reason its `why` gives.
+    rule: "SS59",
+    file: "src/shell/profiling/node.ts",
+    source: 'performance.mark("frame");',
+  },
+  {
     // SS40's own violation, and the reason it is not SS23 widened. The same
     // expression in the editor wants a different answer: `cells()` is a display
     // width and the cursor needs a grapheme index, so one rule would give one of

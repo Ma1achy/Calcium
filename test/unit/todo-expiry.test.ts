@@ -478,7 +478,31 @@ describe("todo expiry", () => {
     // `src/presentation/blocks/index.ts` can never fire, whatever gets built.
     const ids = Object.keys(COMPONENT_SOURCES);
 
-    expect(ids, "twenty-five components, C01 through C25").toHaveLength(25);
+    // **An equality against the specs, not a count.** This asserted a length of
+    // 25 and passed for as long as C26, C27 and C28 had no row — a count cannot
+    // name what is missing, and the doc comment above the map says every
+    // component nameable as a blocker needs one whether or not anything waits.
+    // C28's seven tier-2 deferrals took the no-blocker marker because TD3
+    // forbids naming a path that does not exist, wrote their condition in prose
+    // beside it, and outlived it unwatched (F873).
+    //
+    // The two still absent are listed with their reason rather than subtracted
+    // silently: a row pointing at the wrong file expires deferrals that are
+    // genuinely waiting, so choosing them is a step and not a fill-in.
+    const NO_ROW_YET: Readonly<Record<string, string>> = Object.freeze({
+      C26: "navigation is spread across four shell files; which one holds the behaviour is a reading of C26 (F873)",
+      C27: "the emulator has src/data/emulator/, and which file is the behaviour is a reading of C27 (F873)",
+    });
+
+    const specced = readdirSync("docs/components")
+      .map((f) => /^(C\d\d)_/.exec(f)?.[1])
+      .filter((id): id is string => id !== undefined)
+      .sort();
+
+    expect(
+      [...ids, ...Object.keys(NO_ROW_YET)].sort(),
+      "every component with a spec has a row, or is named above with why it does not",
+    ).toEqual(specced);
     for (const [id, path] of Object.entries(COMPONENT_SOURCES)) {
       expect(path, `${id} must name a path under src/`).toMatch(/^src\/.+\.ts$/);
     }

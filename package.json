@@ -22,6 +22,10 @@
     "./fixtures": {
       "types": "./dist/fixtures/index.d.ts",
       "default": "./dist/fixtures/index.js"
+    },
+    "./profiling": {
+      "types": "./dist/shell/profiling/index.d.ts",
+      "default": "./dist/shell/profiling/index.js"
     }
   },
   "repository": {

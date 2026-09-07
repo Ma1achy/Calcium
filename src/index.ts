@@ -470,6 +470,20 @@ export { planColumns } from "./presentation/table/index.js";
  * safe to publish: it composes the same builders an application already has.
  */
 export { profilePane, paneTitle, PANES } from "./shell/profiling/panes.js";
+
+/**
+ * **The exporters, and they run — which is not a contradiction of C24 I31.**
+ * `@fmx/calcium/profiling` publishes types and nothing that runs; these are on
+ * the *root*, where behaviour lives, and they are pure functions from a report
+ * to a string. Neither constructs a recorder, so importing one cannot start a
+ * profiler, which is what C24 I31's rule is about.
+ *
+ * They exist because a flame chart is a solved problem: `toTraceEvents` writes
+ * the format Perfetto and speedscope read, so the picture arrives with nothing
+ * rendered here, and `toNdjson` writes the one shape a four-hour session can be
+ * appended to and read back with `jq`.
+ */
+export { toNdjson, toTraceEvents } from "./shell/profiling/export.js";
 export type { PaneName } from "./shell/profiling/panes.js";
 export type {
   FrameRecord,

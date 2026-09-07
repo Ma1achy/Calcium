@@ -29,16 +29,44 @@ describe("C17 §6 — large input", () => {
     expect(insertMs, "one paste, one edit").toBeLessThan(2000);
 
     const half = createEditor({ text: text.slice(0, Math.floor(text.length / 2)) }); // graphemes-ok
-    const smallStart = Date.now();
-    const smallRows = half.displayRows(80, G);
-    const smallMs = Math.max(1, Date.now() - smallStart);
 
-    const bigStart = Date.now();
-    const bigRows = e.displayRows(80, G);
-    const bigMs = Math.max(1, Date.now() - bigStart);
+    // **The ratio is the assertion, so the measurement has to be quieter than
+    // the gap it has to see.** Linear is 2 and quadratic is 4; the bound sits at
+    // 3, in the middle, which is right. What was wrong was the instrument: one
+    // timing of each size, so a single descheduled slice anywhere in the larger
+    // one is the whole reading. The row failed at **3.03 and 3.17** and passed
+    // two runs in three — inside the noise, not outside the budget.
+    //
+    // **The minimum of five is the repair, and the clock is not.** The first
+    // reading of this blamed `Date.now()`'s millisecond quantisation, and the
+    // figures say otherwise: these measurements are 320–390 ms and 645–880 ms,
+    // where one millisecond is 0.3 % and cannot move a ratio to 3.17. The
+    // minimum of N is the least-contended estimate of a deterministic
+    // computation, which is what removes the tail. `performance.now()` stays
+    // because it costs nothing, not because it fixed anything.
+    //
+    // Five runs after: 2.18, 2.49, 1.99, 1.73, 2.11. The bound is unchanged,
+    // because the bound was never the thing that was wrong.
+    const best = (fn: () => number): { rows: number; ms: number } => {
+      let rows = 0;
+      let ms = Number.POSITIVE_INFINITY;
+      for (let i = 0; i < 5; i += 1) {
+        const start = performance.now();
+        rows = fn();
+        ms = Math.min(ms, performance.now() - start);
+      }
+      return { rows, ms };
+    };
 
-    expect(bigRows / smallRows, "twice the text, twice the rows").toBeCloseTo(2, 0);
-    expect(bigMs / smallMs, "and not four times the work").toBeLessThan(3);
+    const small = best(() => half.displayRows(80, G));
+    const big = best(() => e.displayRows(80, G));
+
+    console.log(
+      `T3.15 · ${small.ms.toFixed(2)} ms → ${big.ms.toFixed(2)} ms, ratio ${(big.ms / small.ms).toFixed(2)} against a bound of 3`,
+    );
+
+    expect(big.rows / small.rows, "twice the text, twice the rows").toBeCloseTo(2, 0);
+    expect(big.ms / small.ms, "and not four times the work").toBeLessThan(3);
   });
 
   it("T3.16: a lone surrogate never reaches the segmenter intact", () => {

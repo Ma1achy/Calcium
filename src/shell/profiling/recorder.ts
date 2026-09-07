@@ -32,8 +32,10 @@ import { createContexts } from "./async-context.js";
 import { Hist, HISTOGRAM_ERROR } from "./histogram.js";
 import { Ring } from "./ring.js";
 import { Aggregate, closeNode, freezeTree, openNode, type OpenNode } from "./tree.js";
+import type { Inspector } from "./node.js";
 import {
   TIER_RANK,
+  type CaptureKind,
   type CaptureResult,
   type CommitReason,
   type FrameOutcome,
@@ -51,12 +53,49 @@ import {
 type Deps = Readonly<{
   elapsed: () => number;
   probe?: ResourceProbe;
+  /**
+   * The `node:inspector` face (C28 I17). Absent means captures are refused —
+   * the recorder never constructs one, so a profiler in a unit test has no
+   * inspector session and no way to acquire one.
+   */
+  inspector?: Inspector;
   schedule?: (fn: () => void, ms: number) => Disposable;
   node?: string;
   cpus?: number;
 }>;
 
-const DEFAULTS = { ring: 512, worst: 10, sampleMs: 1000, marks: 512 } as const;
+const DEFAULTS = {
+  ring: 512,
+  worst: 10,
+  sampleMs: 1000,
+  marks: 512,
+  captureDir: ".calcium/profile",
+  /**
+   * 8 MB. The measured heap snapshot is **5.32 MB near-empty and 60.56 MB
+   * holding 200 000 objects**, so this keeps a floor-sized snapshot whole and
+   * truncates the case the capture exists for — which is the right way round:
+   * a truncated 60 MB snapshot says *the heap is large* on its first line, and
+   * an untruncated one costs 60 MB of the disk of a process suspected of
+   * leaking. `truncated` and `droppedBytes` say which happened.
+   */
+  captureBytes: 8 * 1024 * 1024,
+  /** The window a `cpu` or `alloc` capture samples over, unless asked. */
+  captureMs: 1000,
+} as const;
+
+/**
+ * The extensions the two tools that read these look for.
+ *
+ * `.cpuprofile` and `.heapprofile` open in Chrome DevTools by drag-and-drop and
+ * in speedscope by name; `.heapsnapshot` is the Memory tab's. Naming a capture
+ * `.json` produces a file both tools refuse to open, so the extension is part
+ * of the format rather than decoration.
+ */
+const EXTENSIONS: Readonly<Record<CaptureKind, string>> = Object.freeze({
+  cpu: "cpuprofile",
+  alloc: "heapprofile",
+  heap: "heapsnapshot",
+});
 
 /**
  * This machine's `elapsed()` cost, measured once at construction (C28 I34).
@@ -504,6 +543,39 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
         heapSpaces: probe?.spaces() ?? Object.freeze([]),
         frames: seq,
       });
+    },
+
+    async capture(kind: CaptureKind, ms?: number): Promise<CaptureResult> {
+      // **The tier refusal is first and it names the tier**, because the
+      // alternative is a capture that returns a 0-byte file at `counters` and
+      // a reader concluding the process has no heap (C28 I17, T3.4).
+      if (TIER_RANK[tier] < TIER_RANK.deep) {
+        throw new Error(
+          `capture("${kind}") needs tier "deep"; this profiler is at "${tier}"`,
+        );
+      }
+      if (disposed) throw new Error(`capture("${kind}") after dispose`);
+      const inspector = deps.inspector;
+      if (inspector === undefined) {
+        throw new Error(`capture("${kind}") has no inspector — none was injected`);
+      }
+
+      // The name carries the kind and the moment, so two captures in one
+      // session do not overwrite each other and a directory of them sorts into
+      // the order they were taken.
+      const dir = opts.captureDir ?? DEFAULTS.captureDir;
+      const path = `${dir}/${kind}-${String(seq)}-${String(Math.round(elapsed()))}.${EXTENSIONS[kind]}`;
+      const result = await inspector.capture(
+        kind,
+        path,
+        opts.captureBytes ?? DEFAULTS.captureBytes,
+        ms ?? DEFAULTS.captureMs,
+      );
+      // Recorded on the profiler rather than returned only, so `report()` names
+      // every capture the session took — a file on disk that the report does
+      // not mention is a file nobody finds.
+      self.addCapture(result);
+      return result;
     },
 
     dispose(): void {
