@@ -94,6 +94,25 @@ describe("PushedSurface public contract", () => {
     h.graph.lifecycle.release();
   });
 
+  it("treats unphased CSI-u as reduced-fidelity input with a synthesized release", async () => {
+    const h = await buildGraph();
+    h.graph.lifecycle.acquire();
+    const actions: SurfaceActionEvent[] = [];
+    const fidelities: SurfaceInputFidelity[] = [];
+    const handle = h.graph.surface.open(surface(actions, fidelities, []));
+
+    h.stdin.emit("\u001b[97;1u");
+    await tick();
+    expect(handle.inputFidelity).toBe("legacy_terminal");
+    expect(actions.map((event) => event.phase)).toEqual(["press"]);
+    expect(actions[0]?.fidelity).toBe("legacy_terminal");
+
+    await handle.close();
+    expect(actions.map((event) => event.phase)).toEqual(["press", "release"]);
+    expect(actions.every((event) => event.fidelity === "legacy_terminal")).toBe(true);
+    h.graph.lifecycle.release();
+  });
+
   it("rejects a second surface and closes a throwing action with a typed fault", async () => {
     const h = await buildGraph();
     h.graph.lifecycle.acquire();

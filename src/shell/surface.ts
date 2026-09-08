@@ -228,7 +228,7 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
       const key = publicKey(event.key);
       const elapsedMs = Math.max(0, options.now() - openedAt);
 
-      if (event.key.encoding === "csi-u") {
+      if (event.key.encoding === "csi-u" && event.event !== undefined) {
         releaseLegacy(keyId, elapsedMs);
         if (fidelity !== "native_enhanced_terminal") {
           fidelity = "native_enhanced_terminal";
@@ -237,11 +237,16 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
         emit(
           action,
           key,
-          event.event === "repeat" || event.event === "release" ? event.event : "press",
+          event.event,
           fidelity,
           elapsedMs,
         );
         return true;
+      }
+
+      if (fidelity !== "legacy_terminal") {
+        fidelity = "legacy_terminal";
+        invalidate();
       }
 
       const active = held.get(keyId);
