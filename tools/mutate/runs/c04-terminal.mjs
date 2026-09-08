@@ -18,7 +18,7 @@ import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
 const CMD =
-  "npx vitest run test/unit/emulator.test.ts test/contract/emulator.test.ts test/edge/emulator.test.ts test/revert/emulator.test.ts";
+  "npx vitest run test/unit/emulator.test.ts test/contract/emulator.test.ts test/edge/emulator.test.ts test/integration/emulator.test.ts test/revert/emulator.test.ts";
 const VALIDATE = "src/data/viewmodel/validate.ts";
 const KIND = "src/presentation/blocks/kinds/terminal.ts";
 
@@ -87,6 +87,26 @@ const results = runPass({
       from: "    atLeastOne(block.lines.length + (block.dropped === undefined ? 0 : 1)), // cells-ok",
       to: "    atLeastOne(block.lines.length + (block.dropped === undefined ? 0 : 1) + (block.cursor === undefined ? 0 : 1)), // cells-ok",
       expect: "T3.78",
+    },
+    {
+      // **The ladder skipped.** The block names a colour and C10 resolves it —
+      // passing the run's own colour straight through is correct at 24-bit and
+      // emits a truecolour SGR into a sixteen-colour terminal at every rung
+      // below, where it is either ignored or drawn as something else entirely.
+      name: "the run's colour bypasses the ladder",
+      file: KIND,
+      from: "  const fg = run.fg === undefined ? undefined : degradeColour(run.fg, ctx.capabilities);",
+      to: "  const fg = run.fg;",
+      expect: "T4.2",
+    },
+    {
+      // C09 I56 — the cursor is the one thing drawn `inverse` at *every* arm,
+      // because at 1-bit it is the only channel left to say where it is.
+      name: "the cursor is not marked at 1-bit",
+      file: KIND,
+      from: '    marked.push({ text: " ", style: { inverse: true } });',
+      to: '    marked.push({ text: " ", style: {} });',
+      expect: "T4.1",
     },
     {
       // The off-by-one a bounds check invites: a caret one cell beyond the

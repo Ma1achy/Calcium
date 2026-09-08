@@ -10,6 +10,8 @@ import { describe, expect, it } from "vitest";
 import { createEmulator } from "../../src/data/emulator/emulator.js";
 import { validateDocument } from "../../src/data/viewmodel/validate.js";
 import { createProcessRunner } from "../../src/data/process/runner.js";
+import { pipelineHarness, settled } from "../support/execution.js";
+import { BODY_INDENT } from "../../src/shell/entry-layout.js";
 import { containText, lineOf, type LineLike } from "../../src/data/emulator/snapshot.js";
 import { tickIntervalOf } from "../../src/presentation/blocks/animation.js";
 import { terminalDefinition } from "../../src/presentation/blocks/kinds/terminal.js";
@@ -282,11 +284,193 @@ describe("C21 — the PTY port, spec-first rows", () => {
   });
 });
 
+
+/**
+ * A PTY child the C23 rows drive, and **nothing it is not told to do**.
+ *
+ * `exited` settles from `signal` rather than on its own: a fake that resolved
+ * by itself would let a route which never signals still settle `cancelled`,
+ * which is exactly the defect T6.95 names.
+ */
+function ptyChild(): {
+  spawnPty: () => never;
+  send: (text: string) => Promise<void>;
+  finish: (e: { code: number | null; signal: string | null }) => void;
+  signals: string[];
+  resizes: [number, number][];
+} {
+  let emit: ((c: string) => void) | null = null;
+  let done: ((e: { code: number | null; signal: string | null }) => void) | null = null;
+  const signals: string[] = [];
+  const resizes: [number, number][] = [];
+  return {
+    spawnPty: (() => ({
+      pid: 1,
+      exited: new Promise((r) => {
+        done = r as (e: { code: number | null; signal: string | null }) => void;
+      }),
+      running: true,
+      onData: (cb: (c: string) => void) => {
+        emit = cb;
+      },
+      write: () => undefined,
+      resize: (c: number, r: number) => resizes.push([c, r]),
+      signal: (sig: string) => {
+        signals.push(sig);
+        done?.({ code: null, signal: sig });
+        return true;
+      },
+    })) as never,
+    send: async (text: string) => {
+      emit?.(text);
+      for (let i = 0; i < 40; i += 1) await new Promise((r) => void setTimeout(r, 0));
+    },
+    finish: (e) => done?.(e),
+    signals,
+    resizes,
+  };
+}
+
 describe("C23 — the shell route as a live screen, spec-first rows", () => {
-  it.todo("T6.93 (C23 I64): snapshotting per chunk → T1.51 counts 100 patches and a 2,000-line value enters the store per write — not deferred on a component: lands with the route's snapshot seam");
-  it.todo("T6.94 (C23 I65): resizing the emulator first → T4.64's call order fails and one frame is drawn from the old grid — not deferred on a component: lands with the route's resize");
-  it.todo("T6.95 (C23 I66): dropping the cancel registration → T3.62 fails, which is the defect F844 records as shipped — not deferred on a component: lands with the route's cancel");
-  it.todo("T6.96 (C23 I67): keeping the cursor on settle → T2.47 fails and a settled block draws a cursor nobody is writing at — not deferred on a component: lands with the route's settle");
-  it.todo("T6.98 (C23 I64): dropping the readout registration → T1.53's tail arm fails and a child's last lines wait for a chunk that never comes — not deferred on a component: lands with the route's snapshot seam");
-  it.todo("T6.97 (C23 I63): falling back to the pipe arm when spawnPty throws → T3.63 fails and a configuration error becomes a child that quietly lost its colours — not deferred on a component: lands with the route's arm choice");
+  it("T6.93 (C23 I64): snapshotting per chunk → a 2,000-line value enters the store per write", async () => {
+    const child = ptyChild();
+    const h = pipelineHarness({ hasPty: true, spawnPty: child.spawnPty });
+    let patches = 0;
+    h.transcript.subscribe((c) => {
+      if (c.kind === "patch") patches += 1;
+    });
+    h.pipeline.submit("seq 100");
+    await settled();
+
+    h.setPending(true);
+    const before = patches;
+    for (let i = 0; i < 40; i += 1) await child.send(`line ${String(i)}\r\n`);
+    // The count is the whole row: a route with no gate is correct on screen and
+    // writes the entire screen into C13 once per chunk.
+    expect(patches - before, "forty chunks inside one frame window").toBe(0);
+    h.setPending(false);
+    await child.send("line 40\r\n");
+    expect(patches - before, "and one replace for the window").toBe(1);
+
+    child.finish({ code: 0, signal: null });
+    await settled(h.pipeline);
+  });
+
+  it("T6.94 (C23 I65): the child told the region's width while the emulator takes the body's → the two differ by BODY_INDENT", async () => {
+    // **Not an order.** The deferral this replaces asked for the child to be
+    // resized *before* the emulator, and C23 I65 rules that claim vacuous: the
+    // child's repaint arrives on the write queue, which resolves after both
+    // calls return, so no write can land between them however they are
+    // sequenced — three ordering mutations survived the row written to catch
+    // them (F852). What can be wrong is the **figure**, and it is wrong by
+    // exactly `BODY_INDENT`: a child wrapping four columns late puts every line
+    // after the first in the wrong place.
+    const child = ptyChild();
+    let width = 100;
+    const h = pipelineHarness({
+      hasPty: true,
+      spawnPty: child.spawnPty,
+      region: () => ({ width, height: 24 }),
+    });
+    h.pipeline.submit("top");
+    await settled();
+    await child.send("running\r\n");
+
+    width = 64;
+    h.pipeline.resized();
+    await child.send("still running\r\n");
+
+    // **Two spies, because one cannot see an agreement.** The child's number
+    // alone is satisfied by an emulator told anything at all.
+    child.finish({ code: 0, signal: null });
+    await settled(h.pipeline);
+
+    // **Read the box rather than copy its constant.** The height the child is
+    // told is the scroll's own, which `execution.ts` builds from the same value
+    // — asserting the agreement needs no second record of the number, and a
+    // second record is what drifts.
+    const scroll = h.transcript.entries[0]?.doc.blocks[0] as { height: number };
+    expect(child.resizes, "the child was told once, for one signal").toEqual([
+      [64 - BODY_INDENT, scroll.height],
+    ]);
+
+    const text = JSON.stringify(h.transcript.entries[0]?.doc.blocks);
+    const cols = /"cols":(\d+)/u.exec(text)?.[1];
+    expect(Number(cols), "and the emulator holds the same number").toBe(64 - BODY_INDENT);
+    expect(scroll.height, "the box a resize does not move").toBe(6);
+  });
+
+  it("T6.95 (C23 I66): dropping the cancel registration → the rung finds nothing to call", async () => {
+    const child = ptyChild();
+    const h = pipelineHarness({ hasPty: true, spawnPty: child.spawnPty });
+    h.pipeline.submit("!sleep 100");
+    await settled();
+    await child.send("working\r\n");
+    h.pipeline.cancel();
+    await settled(h.pipeline);
+    // The defect F844 records as shipped: everything about the screen is right
+    // and only the press does nothing, so the entry sits pending forever.
+    expect(child.signals, "the rung reached the child").toEqual(["SIGINT"]);
+    expect(h.pipeline.inFlight, "and the guard was released").toBeNull();
+    expect(JSON.stringify(h.transcript.entries[0]?.doc.blocks)).toContain("Cancelled.");
+  });
+
+  it("T6.96 (C23 I67): keeping the cursor on settle → a settled block draws a cursor nobody is writing at", async () => {
+    const child = ptyChild();
+    const h = pipelineHarness({ hasPty: true, spawnPty: child.spawnPty });
+    h.pipeline.submit("sh");
+    await settled();
+    await child.send("prompt> \u001b[3;9H");
+    child.finish({ code: 0, signal: null });
+    await settled(h.pipeline);
+
+    const scroll = h.transcript.entries[0]?.doc.blocks[0] as { children: readonly unknown[] };
+    const screen = scroll.children[0] as Record<string, unknown>;
+    expect(screen["kind"]).toBe("terminal");
+    // **The key, not the value**: C04 I85 refuses an unknown key, so
+    // `cursor: undefined` is a document the validator rejects and
+    // `toBeUndefined` passes on it.
+    expect(Object.keys(screen), "no cursor survives the settle").not.toContain("cursor");
+  });
+
+  it("T6.97 (C23 I63): falling back to the pipe arm when spawnPty throws → the cause is lost", async () => {
+    const h = pipelineHarness({ hasPty: true });
+    h.pipeline.submit("pytest");
+    await settled(h.pipeline);
+    const doc = h.transcript.entries[0]?.doc;
+    expect(doc?.status, "a configuration error is reported").toBe("error");
+    expect(doc?.error?.message ?? "", "naming what a consumer sets").toContain("pty");
+    // A fallback would run the command successfully and leave the reader with a
+    // child that quietly lost its colours and no cause anywhere.
+    expect(h.calls, "and the other arm is never tried").not.toContain("spawnShell");
+  });
+
+  it("T6.98 (C23 I64): dropping the readout registration → a quiet tail waits for a chunk that never comes", async () => {
+    const child = ptyChild();
+    const h = pipelineHarness({ hasPty: true, spawnPty: child.spawnPty });
+    h.pipeline.submit("make");
+    await settled();
+    await child.send("first\r\n");
+
+    // The tail: a chunk suppressed by a pending frame, then silence. Nothing is
+    // left to trigger the catch-up, so the 1 Hz readout is the only thing that
+    // can draw it — and a route that registers none is correct until a child
+    // goes quiet.
+    h.setPending(true);
+    await child.send("the last line\r\n");
+    h.setPending(false);
+    expect(
+      JSON.stringify(h.transcript.entries[0]?.doc.blocks),
+      "still unrendered with no chunk to carry it",
+    ).not.toContain("the last line");
+
+    h.tick(1000);
+    for (let i = 0; i < 40; i += 1) await new Promise((r) => void setTimeout(r, 0));
+    expect(JSON.stringify(h.transcript.entries[0]?.doc.blocks), "the readout drew it").toContain(
+      "the last line",
+    );
+
+    child.finish({ code: 0, signal: null });
+    await settled(h.pipeline);
+  });
 });

@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import { b } from "../../src/shell/builders/index.js";
 import { validateDocument } from "../../src/data/viewmodel/validate.js";
 import { createProcessRunner } from "../../src/data/process/runner.js";
+import { pipelineHarness, settled } from "../support/execution.js";
 import { terminalDefinition } from "../../src/presentation/blocks/kinds/terminal.js";
 import type { MeasureFn } from "../../src/data/viewmodel/index.js";
 import {
@@ -342,7 +343,64 @@ describe("C21 — the PTY port, spec-first rows", () => {
 });
 
 describe("C23 — the shell route as a live screen, spec-first rows", () => {
-  it.todo("T3.62 (C23 I66): a running shell command then the ladder's first rung → the child receives SIGINT, the card settles cancelled, and the block holds the lines written before the press — the row F844 was written for — not deferred on a component: lands with the route's cancel");
+  it("T3.62 (C23 I66): the ladder's first rung signals the child, and the screen survives the cancel", async () => {
+    // **The row F844 was written for.** The defect it records is a route that
+    // registers no cancel: the rung finds nothing to call, the child keeps
+    // running, and the entry sits pending with no way back. What makes it hard
+    // to see is that everything else about the screen is correct — the lines are
+    // there, the card is drawn, and only the press does nothing.
+    let emit: ((c: string) => void) | null = null;
+    let settleChild: ((e: { code: number | null; signal: string | null }) => void) | null = null;
+    const signals: string[] = [];
+    const h = pipelineHarness({
+      hasPty: true,
+      spawnPty: () => ({
+        pid: 4242,
+        exited: new Promise((r) => {
+          settleChild = r as (e: { code: number | null; signal: string | null }) => void;
+        }),
+        running: true,
+        onData: (cb) => {
+          emit = cb;
+        },
+        write: () => undefined,
+        resize: () => undefined,
+        // A real child dies *because* of the signal, so the fake settles from
+        // here rather than from the row — a fake that resolved `exited` on its
+        // own would let a route that never signals still settle cancelled.
+        signal: (sig) => {
+          signals.push(sig);
+          settleChild?.({ code: null, signal: sig });
+          return true;
+        },
+      }),
+    });
+
+    h.pipeline.submit("!sleep 100");
+    await settled();
+    const send = async (text: string): Promise<void> => {
+      (emit as unknown as (c: string) => void)(text);
+      for (let i = 0; i < 40; i += 1) await new Promise((r) => void setTimeout(r, 0));
+    };
+    await send("Collecting 128 items\r\n");
+    await send("running ...\r\n");
+
+    expect(signals, "nothing signalled while it runs").toEqual([]);
+    expect(h.pipeline.inFlight, "and the route is holding the guard").not.toBeNull();
+
+    h.pipeline.cancel();
+    await settled(h.pipeline);
+
+    expect(signals, "the rung reached the child").toEqual(["SIGINT"]);
+    const entry = h.transcript.entries[0];
+    expect(entry?.doc.status, "the card settles failed").toBe("error");
+    const text = JSON.stringify(entry?.doc.blocks);
+    expect(text, "naming the cancel rather than a code").toContain("Cancelled.");
+    // **The screen survives it**, which is the half a signal assertion misses: a
+    // route that settled an empty document would satisfy every line above.
+    expect(text, "the lines written before the press").toContain("Collecting 128 items");
+    expect(text, "including the last of them").toContain("running ...");
+  });
   // **T3.63 is written and running in `test/unit/emulator.test.ts`**, asserting
   // both halves the deferral asked for — the card settles `error` naming `pty`,
   // and `spawnShell` is never called. The deferral said *lands with the route's

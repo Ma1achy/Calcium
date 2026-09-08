@@ -12,6 +12,7 @@ import type { IPty } from "node-pty";
 import type { PtyFactory, PtyProcess } from "../../src/data/process/types.js";
 import { resolveConfig } from "../../src/shell/config.js";
 import { buildGraph, fakeAmbient, MANIFEST } from "../support/session.js";
+import { pipelineHarness, settled } from "../support/execution.js";
 import { defaultTheme } from "../../src/presentation/theme/index.js";
 
 import { createEmulator } from "../../src/data/emulator/emulator.js";
@@ -326,7 +327,66 @@ describe("C23 — the shell route as a live screen, spec-first rows", () => {
   // rather than work waiting on a component, and the distinction is the whole
   // of the closes/reframes/partial test — a deferral that says *partial* is the
   // only one of the three that leaves a residue named.
-  it.todo("T2.47 (C23 I67): the settled screen carries no cursor at EVERY cursor position, not only the one test/unit/emulator.test.ts builds — not deferred on a component: the route's settle has landed and the row is written narrower than this asked");
+  it("T2.47 (C23 I67): a settled terminal carries no cursor from any position, and the snapshot precedes the dispose", async () => {
+    // **Every position, because the one an ad-hoc script leaves is the easy
+    // one.** A `delete final.cursor` and a `cursor: { line: 0, col: 0 }` guard
+    // agree wherever the child happens to stop at the origin, and C04 I112
+    // admits the key — so a settled block drawing an inverse cell at 0,0 passes
+    // every existing assertion.
+    const parks: readonly [string, string][] = [
+      ["at the origin", "\u001b[H"],
+      ["mid-line", "abcdef\u001b[3G"],
+      ["at the last column", "\u001b[80G"],
+      ["on the last row", "\u001b[24;1H"],
+      ["after a bare carriage return", "half a line\r"],
+      ["where the child hid it", "\u001b[?25l\u001b[5;7H"],
+      ["where the child left it visible", "\u001b[?25h\u001b[2;2H"],
+    ];
+
+    for (const [where, escape] of parks) {
+      const h = pipelineHarness({
+        hasPty: true,
+        spawnPty: () => ({
+          pid: 1,
+          exited: Promise.resolve({ code: 0, signal: null }),
+          running: false,
+          onData: (cb) => {
+            cb(`kept ${where}\r\n${escape}`);
+          },
+          write: () => undefined,
+          resize: () => undefined,
+          signal: () => true,
+        }),
+      });
+      h.pipeline.submit("pytest");
+      await settled(h.pipeline);
+
+      const doc = h.transcript.entries[0]?.doc;
+      const found: unknown[] = [];
+      const walk = (v: unknown): void => {
+        if (Array.isArray(v)) return void v.forEach(walk);
+        if (v === null || typeof v !== "object") return;
+        const o = v as Record<string, unknown>;
+        if (o["kind"] === "terminal") found.push(o);
+        Object.values(o).forEach(walk);
+      };
+      walk(doc?.blocks);
+
+      expect(found, `${where}: one terminal block`).toHaveLength(1);
+      const block = found[0] as Record<string, unknown>;
+      // **The key, not its value.** C04 I85 refuses an unknown key and
+      // `cursor: undefined` is a key, so `toBeUndefined` passes on a document
+      // the validator would reject.
+      expect(Object.keys(block), where).not.toContain("cursor");
+      expect(errs(block), `${where}: and the whole document validates`).toEqual([]);
+
+      // **The dispose is after the snapshot, read from the only side a test
+      // has.** C27 I12 makes a snapshot taken after `dispose` refuse, so a
+      // settled block that still holds what the child wrote is the ordering —
+      // and an empty one would be the reversed pair, not an empty child.
+      expect(JSON.stringify(block), `${where}: the snapshot came first`).toContain(`kept ${where}`);
+    }
+  });
 });
 
 function srcFiles(dir: string, out: string[] = []): string[] {

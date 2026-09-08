@@ -1,26 +1,26 @@
-// C23 §3c — the shell route as a live screen, mutated.
+// C23 I63–I67 — the shell route as a live screen, mutated.
 //
-// **What this run replaces.** Its first version was written against a route that
-// drained both streams into a string and appended one `raw` block; three of its
-// five mutations named lines that no longer exist. A run whose anchors have gone
-// is not a weaker run, it is a run that tests nothing — `anchors.mjs` is the
-// only thing that says so, and it said so here.
+// **Five of the six are correct on screen.** That is what makes this route the
+// one worth mutating: a snapshot per chunk draws the right picture and writes a
+// two-thousand-line value into C13 a hundred times; a missing cancel leaves the
+// lines, the card and the frame exactly right and only the keypress does
+// nothing; a kept cursor is one inverse cell. None of them is visible in a
+// screenshot, and each is a real defect this repo has shipped or nearly did.
 //
-// The mutations below are the ways the live route is quietly wrong: an arm
-// chosen by trying rather than asking, a coalescing gate that draws anyway, a
-// settle that reads the screen before the parser has it, a cursor left on a
-// screen nobody is writing to, and a resize that reaches the emulator first.
+// **The one that is not here is an ordering claim.** C23 I65 rules it vacuous —
+// the child's repaint arrives on the write queue, which resolves after both
+// calls return, so no write lands between them however they are sequenced, and
+// three ordering mutations survived the row written to catch them (F852). What
+// replaces it is `WIDTH-IS-THE-REGIONS`, which moves the figure by
+// `BODY_INDENT` and is caught by two spies that have to agree.
 import { readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
-
 import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
 const CMD =
-  "npx vitest run test/unit/execution.test.ts test/unit/emulator.test.ts " +
-  "test/contract/notice-family.test.ts";
-const FILE = "src/shell/execution.ts";
-const RUNNER = "src/data/process/runner.ts";
+  "npx vitest run test/unit/emulator.test.ts test/contract/emulator.test.ts test/edge/emulator.test.ts test/revert/emulator.test.ts";
+const EXEC = "src/shell/execution.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -37,147 +37,85 @@ const results = runPass({
   write,
   run,
   control: {
-    file: FILE,
-    from: "      const failed = cancelled || exit.code !== 0 || exit.signal !== null;",
-    to: "      const failed = false;",
-    why:
-      "a route that never fails cannot satisfy a row about failing — T3.17 asserts the entry, " +
-      "its status and its error field, so a pass where this survives is a pass that saw no kill",
+    file: EXEC,
+    from: "      const usePty = deps.runner.hasPty;",
+    to: "      const usePty = false;",
+    why: "T1.52's PTY arm and T3.63 both fail; a run where this survives is not executing the shell route at all",
   },
   mutations: [
     {
-      // **The measured instance**, in the shape it had for the life of the
-      // build: the status set from the exit code and no `error` beside it. It
-      // reads as correct — the status is right — and it is the one combination
-      // C04 I3 forbids.
-      name: "status \"error\" composed with no error field, as it shipped",
-      file: FILE,
-      from: "          ...(failed\n            ? {\n                error: {",
-      to: "          ...(false\n            ? {\n                error: {",
-      expect: "T3.17",
-    },
-    {
-      // A route that calls every exit a failure passes every assertion about
-      // the error path. The control arm in T3.18 is the only thing that asks.
-      name: "every exit is a failure, including a clean one",
-      file: FILE,
-      from: "      const failed = cancelled || exit.code !== 0 || exit.signal !== null;",
-      to: "      const failed = true;",
-      expect: "T3.18",
-    },
-    {
-      // A signal reported as an exit code says `code 1` for a command the user
-      // killed, which is the wrong sentence about the right event.
-      name: "a signal is reported as an exit code",
-      file: FILE,
-      from: "        : exit.signal !== null\n          ? `Killed by ${exit.signal}.`",
-      to: "        : false\n          ? `Killed by ${String(exit.signal)}.`",
-      expect: "T3.18",
-    },
-    {
-      // **The arm chosen by trying rather than asking** (C23 I63, C21 I18). The
-      // flag exists so a configuration error is not indistinguishable from a
-      // child that failed to start; hard-coding it true is the half that fails
-      // on a runner with no factory, which is the ordinary case.
-      name: "the PTY arm is taken whether or not a factory was injected",
-      file: FILE,
-      from: "      const usePty = deps.runner.hasPty;",
-      to: "      const usePty = true;",
-      expect: "T1.52",
-    },
-    {
-      // The other direction, and the one that reads as conservative: never
-      // taking the terminal arm loses the child's colours with no cause.
-      name: "the pipe arm is always taken",
-      file: FILE,
-      from: "      const usePty = deps.runner.hasPty;",
-      to: "      const usePty = false;",
-      expect: "T1.52",
-    },
-    {
-      // `hasPty` answering from anywhere but the deps. The flag and the throw
-      // then disagree, which is the state T1.13 was written against.
-      name: "hasPty is a constant rather than a report",
-      file: RUNNER,
-      from: "    get hasPty(): boolean {\n      return deps.pty !== undefined;\n    },",
-      to: "    hasPty: true,",
-      expect: "T1.13",
-    },
-    {
-      // **The coalescing gate removed** (C23 I64). Every frame it draws is
-      // correct — a hundred times over — which is C03's own defect shape and
-      // the reason this row counts patches rather than reading one.
-      name: "every chunk draws, whatever the scheduler is holding",
-      file: FILE,
+      // The cost C03 exists to prevent. The screen is identical either way —
+      // only the store's write count moves, from one per window to one per
+      // chunk, carrying the whole screen each time.
+      name: "a snapshot per chunk",
+      file: EXEC,
       from: "        if (!deps.scheduler.pending) draw();",
       to: "        draw();",
-      expect: "T1.51",
+      expect: "T6.93",
     },
     {
-      // The gate inverted into a suppression with no catch-up: the tail of a
-      // quiet child then waits for a chunk that never comes, and the readout is
-      // the only thing that would have rendered it.
-      name: "the readout registration is dropped",
-      file: FILE,
-      from: "    refresh.readout(pendingId, scrollId, () => snapshot());",
-      to: "    void snapshot;",
-      expect: "T1.53",
+      // The figure, not the order (C23 I65, F852). Four columns of drift puts every
+      // line after the first in the wrong place, and only in a box narrower
+      // than the region — which is every box.
+      name: "the child is told the region's width",
+      file: EXEC,
+      from: "          const next = Math.max(20, deps.region().width - BODY_INDENT);",
+      to: "          const next = Math.max(20, deps.region().width);",
+      expect: "T6.94",
     },
     {
-      // **The accept gate, back where it does not close the window** (F850's
-      // second instance). `finished` is set after the drain, so a chunk accepted
-      // while `writes` is awaited chains onto it past the await and writes to a
-      // disposed emulator. One scheduler turn wide: it reproduced on CI and not
-      // on the machine that wrote it.
-      name: "the accept gate closes after the drain rather than before it",
-      file: FILE,
-      from: "      accepting = false;\n      // **Before anything reads the screen**",
-      to: "      // **Before anything reads the screen**",
-      expect: "T3.64",
+      // F844's shipped defect: the rung finds nothing to call, and everything
+      // else about the screen is right.
+      name: "the PTY arm registers no cancel",
+      file: EXEC,
+      from:
+        "        dropResize = onResize((c, r) => child.resize(c, r));\n" +
+        "        cancelInFlight = (): void => {\n" +
+        "          cancelled = true;\n" +
+        '          child.signal("SIGINT");\n' +
+        "        };",
+      to: "        dropResize = onResize((c, r) => child.resize(c, r));",
+      expect: "T6.95",
     },
     {
-      // **The settle reading a screen the parser has not caught up with**
-      // (C27 I3). Measured: a command whose whole output was one line settled
-      // blank, and every assertion about its exit code passed.
-      name: "the writes in flight are not awaited before the final snapshot",
-      file: FILE,
-      from: "      await writes;\n      dropResize();",
-      to: "      dropResize();",
-      expect: "T3.17",
-    },
-    {
-      // A cursor left on a settled screen draws a caret nobody is writing at.
-      name: "the cursor survives the settle",
-      file: FILE,
+      // **Not `final.cursor = undefined`**, which C04 I85 refuses as an unknown
+      // key — this is the defect as a reader would write it, by leaving the
+      // snapshot alone.
+      name: "the settle keeps the cursor",
+      file: EXEC,
       from: "      delete final.cursor;",
       to: "",
-      expect: "T2.47",
+      expect: "T6.96",
     },
     {
-      // **The child told a width the emulator does not have** (C23 I65).
-      //
-      // The rule here was an ordering claim twice, and three mutations of the
-      // order survived a row written to catch them — a repaint reaches the
-      // emulator through the write queue, so no write can land between the two
-      // calls however they are sequenced (F852). What can be wrong is the
-      // figure: the region is four columns wider than the body.
-      name: "the child is told the region's width rather than the body's",
-      file: FILE,
-      from: "          resizeChild?.(next, rows);",
-      to: "          resizeChild?.(deps.region().width, rows);",
-      expect: "T4.64",
+      // The fallback I63 forbids, one layer up from C21 I16's. It makes a
+      // failing session run, which is why someone writes it.
+      name: "a throwing spawnPty falls back to the pipe arm",
+      file: EXEC,
+      from: "        const child = deps.runner.spawnPty(command, { cwd: () => deps.session().cwd, env, cols, rows });",
+      to:
+        "        let child;\n" +
+        "        try {\n" +
+        "          child = deps.runner.spawnPty(command, { cwd: () => deps.session().cwd, env, cols, rows });\n" +
+        "        } catch {\n" +
+        "          const piped = deps.runner.spawnShell(command, { cwd: () => deps.session().cwd, env });\n" +
+        "          child = { ...piped, onData: () => undefined, resize: () => undefined, write: () => undefined };\n" +
+        "        }",
+      expect: "T6.97",
     },
     {
-      // A `spawnPty` that throws, caught and retried on pipes. A configuration
-      // error becomes a child that merely lost its colours.
-      name: "a failed PTY spawn falls back to the pipe arm",
-      file: FILE,
-      from: "      const usePty = deps.runner.hasPty;",
-      to: "      const usePty = deps.runner.hasPty && command !== command;",
-      expect: "T3.63",
+      // The backstop for a quiet tail. Correct until a child stops writing,
+      // which is the last thing every child does.
+      name: "no readout is registered",
+      file: EXEC,
+      from: "    refresh.readout(pendingId, scrollId, () => snapshot());",
+      to: "",
+      expect: "T6.98",
     },
   ],
 });
 
 console.log(report(results));
-process.exit(results.some((r) => !r.killed) ? 1 : 0);
+
+const unexpected = results.filter((r) => !r.killed);
+process.exit(unexpected.length > 0 ? 1 : 0);
