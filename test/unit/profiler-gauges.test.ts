@@ -400,19 +400,32 @@ describe("record and replay", () => {
     // The harness's stream sees more than the recording's: C01's acquire
     // prologue is written before the writer the frames are tapped at exists.
     // Here that is three extra writes, plus the two startup frames.
+    // **The frame arrives after a tick, not inside the call that caused it.**
+    // A session that answers synchronously is a session the drive never has to
+    // wait for, so a row built on one passes with the wait loop deleted — which
+    // is what the mutation pass said when `PACE-BY-NOTHING` survived. A real
+    // session draws on a scheduler, and the whole point of the pacing is that
+    // the drive holds the next event until that happens.
     let writes = 5;
+    let owed = 0;
     const sent: string[] = [];
     const out = await driveRecording(
       rec,
       {
         input: (chunk) => {
           sent.push(Buffer.from(chunk).toString("utf8"));
-          // The session answers the keystroke with one frame.
-          writes += 1;
+          owed += 1;
         },
         resize: () => undefined,
         frames: () => writes,
-        tick: () => Promise.resolve(),
+        // The frame the keystroke earned lands one tick later.
+        tick: () => {
+          if (owed > 0) {
+            owed -= 1;
+            writes += 1;
+          }
+          return Promise.resolve();
+        },
       },
       { ticks: 20 },
     );
@@ -467,12 +480,32 @@ describe("record and replay", () => {
     expect(elided.divergence?.at, "the divergence is named").toBe(1);
     expect(elided.elided, "and read as an elision").toBe(true);
 
-    // The control: the same recorded frame against a replay that painted
-    // something. A frame that differs for any other reason is not excused.
-    const painted = [Buffer.from("\u001b[?25l\u001b[H\u001b[0mready"), Buffer.from("\u001b[26;1Hlast   8.8mX")];
+    // **Two controls, one per half of the predicate.** The mutation pass found
+    // that one is not enough: dropping the clock-derived half and keeping only
+    // the cursor-only test survived a suite that had only ever contrasted a
+    // cursor-only replay with a painting one.
+    //
+    // A — the replay painted something. Not cursor-only, so not an elision
+    // whichever half is asked.
+    const painted = [
+      Buffer.from("\u001b[?25l\u001b[H\u001b[0mready"),
+      Buffer.from("\u001b[26;1Hlast   8.8mX"),
+    ];
     const real = compareFrames(rec, painted);
     expect(real.divergence?.at, "still a divergence").toBe(1);
     expect(real.elided, "and not an elision").toBe(false);
+
+    // B — the replay is cursor-only and the **recorded** frame carries no cell
+    // drawn from a clock. A frame the recording drew for a real reason and the
+    // replay did not draw at all is a divergence, not something to excuse, and
+    // only the clock-derived half of the predicate can say so.
+    const content = recording([
+      "\u001b[?25l\u001b[H\u001b[0mready",
+      "\u001b[26;1H12 containers running",
+    ]);
+    const missed = compareFrames(content, cursorOnly);
+    expect(missed.divergence?.at, "the replay missed a frame").toBe(1);
+    expect(missed.elided, "and no clock-derived cell excuses it").toBe(false);
   });
 
   it("T1.87 (C28 I14): the header's clock is masked, and a duration elsewhere is not", () => {
