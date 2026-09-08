@@ -1231,22 +1231,19 @@ export function scanSections(file, src, options = {}) {
  * one would under-report, silently.
  */
 const UNCITED_INVARIANTS = Object.freeze([
-  "C01 I15", "C01 I16", "C01 I17", "C03 I11", "C04 I18", "C04 I20", "C04 I21", "C04 I22", "C04 I24",
-  "C04 I32", "C04 I33", "C04 I66", "C05 I13", "C05 I14", "C06 I21", "C06 I22", "C06 I23",
+  "C01 I15", "C01 I16", "C01 I17", "C03 I11", "C05 I13", "C05 I14", "C06 I21", "C06 I22", "C06 I23",
   "C07 I16", "C07 I17", "C07 I21", "C08 I16", "C09 I15", "C09 I16", "C10 I18", "C10 I19",
   "C10 I20", "C11 I12", "C14 I11", "C14 I13", "C14 I15", "C14 I16", "C14 I22",
   "C16 I1", "C16 I16", "C17 I10", "C17 I14", "C18 I11", "C18 I13", "C18 I23",
   "C18 I6", "C19 I12", "C20 I11", "C20 I25", "C21 I7", "C22 I16", "C22 I39", "C22 I4a",
   "C22 I53", "C22 I57", "C23 I13", "C23 I14", "C23 I23", "C23 I24",
-  // **C24's two survivors are claims about another repository**, and they stay
-  // for that reason rather than as debt: I1 is *every export is used by the
-  // union of `prism-tui` and the reference app*, and I11 says the reference app
-  // lives in its own repository and the scan is a reported signal rather than a
-  // build gate. Nothing in this tree can hold the other side of either. The
-  // twelve that went with them were rows — ten written, and two that existed
-  // under a rule's name with no citation a row could carry (C24 T2.10, T2.18).
-  "C23 I41", "C24 I1", "C24 I11", "C25 I11", "C25 I14", "C25 I15", "C25 I16", "C25 I17", "C25 I19a", "C25 I20a", "C25 I20b",
-  "C26 I1", "C26 I11", "C26 I15", "C26 I8",
+  // **C24 is empty, and its last two were the ones ruled unclosable.** I1 and
+  // I11 name another repository, which is true and is not the whole of either:
+  // I1's checkable half is that the scan is over a *union* — a member named by
+  // only one of two apps is cleared — and I11's is the disposition, *reported,
+  // never gated*, which enforce demonstrates every run by exiting 0 with a
+  // residue in the hundreds. Ruling a claim unclosable is worth doing twice.
+  "C23 I41", 
 ]);
 
 /**

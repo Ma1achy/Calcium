@@ -21,7 +21,7 @@
 // about. The fabricated violation catches the first, the scope check the
 // second, the existence check the third; no one of them catches the others,
 // which is why all three are here (A03 §2, commitment 14).
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, globSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -1054,6 +1054,77 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       read: (f: string) => all[f] ?? "",
     };
   };
+
+  it("T2.2 (C24 I1): the scan is over the UNION of consumers, not over either alone", () => {
+    /**
+     * **Neither consumer alone exercises the whole surface** — the docker app
+     * touches no `spectrum`, no `WorldDriver` and only part of the manifest
+     * schema — so a signal computed against one would list a member the other
+     * needs and someone would remove it. The union is the claim, and it is the
+     * one property none of the five rows below reaches: every one of them
+     * passes a single app.
+     */
+    const { src, examples, read } = surfaceFiles(
+      'export type { Panel } from "./a.js";\n',
+      {
+        "src/a.ts":
+          "export type Panel = Readonly<{ width: number; footer: string; spectrum: string }>;\n",
+      },
+      {
+        "examples/docker/main.ts": "const p = { width: 40 };\n",
+        "examples/plots/main.ts": "const q = { footer: 'x' };\n",
+      },
+    );
+
+    const s = publicSurfaceUseSignal(src, examples, read);
+    expect(s.candidates.sort(), "named by either app is named — only `spectrum` is named by neither").toEqual([
+      "Panel.spectrum",
+    ]);
+
+    // **The control that makes it the union and not the first app.** Drop the
+    // second consumer and `footer` becomes a candidate — which is the removal a
+    // one-app scan would have argued for.
+    const alone = publicSurfaceUseSignal(src, ["examples/docker/main.ts"], read);
+    expect(alone.candidates.sort(), "one app alone lists what the other uses").toEqual([
+      "Panel.footer",
+      "Panel.spectrum",
+    ]);
+  });
+
+  it("T2.20 (C24 I11): the surface signal is reported and never gated", () => {
+    /**
+     * **A reported signal, not a build gate**, because the other side of the
+     * union lives in another repository and is refreshed on a version bump —
+     * so a red build here would depend on a tree this one does not contain.
+     *
+     * The proof is in the runner rather than in a fixture: `index.mjs` computes
+     * the signal after the violation set is closed and never adds to it, and
+     * enforce exits 0 today with a residue in the hundreds. A row asserting
+     * only "the function returns candidates" would pass equally on a gate.
+     */
+    const runner = readFileSync("tools/enforce/index.mjs", "utf8")
+      .replace(/\/\*[\s\S]*?\*\//gu, "")
+      .replace(/(^|[^:])\/\/.*$/gmu, "$1");
+
+    const call = runner.indexOf("publicSurfaceUseSignal(");
+    expect(call, "the signal is computed").toBeGreaterThan(0);
+    expect(runner.indexOf("if (violations.length === 0)"), "after the violation set is closed").toBeGreaterThan(call);
+
+    const assigned = /const (\w+) = publicSurfaceUseSignal\(/u.exec(runner)?.[1];
+    expect(assigned, "and held in a local").toBeDefined();
+    expect(
+      runner.match(new RegExp(`violations\\.push\\([^)]*\\b${assigned ?? "?"}\\b`, "gu")),
+      "which never reaches `violations`",
+    ).toBeNull();
+
+    // **And the residue is non-empty**, so the absence above is a decision
+    // rather than a tree with nothing to report — the vacuity this file's own
+    // rules are written against.
+    const files = globSync("src/**/*.ts").filter((f) => !f.endsWith(".d.ts"));
+    const apps = globSync("examples/**/*.ts").filter((f) => !f.endsWith(".d.ts"));
+    expect(apps.length, "both consumers are here to be read").toBeGreaterThan(10);
+    expect(publicSurfaceUseSignal(files, apps).candidates.length, "a residue enforce stays green with").toBeGreaterThan(0);
+  });
 
   it("48: a name collision can only CLEAR, so the residue under-reports and cannot over-report", () => {
     // **The founding cell, and it is F160 inverted.** MG24's verdict is
