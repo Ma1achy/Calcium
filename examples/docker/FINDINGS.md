@@ -31517,6 +31517,123 @@ Found by reading the table against the paragraph above it while adding a member 
 the same instrument as *read the abstract against its own section before reading the section against
 the code*, applied to a constant.
 
+## F913 — the row read a cache name's slot as a reason's ★★★☆☆
+
+C28 T5.4 asserts that a replayed input gives a deterministic `nothing-changed` count, and the
+fixture read it as `report.misses["nothing-changed"]`. The report's shape is
+`cache → reason → count`, so that read asks for a *cache* named `nothing-changed` and gets
+`undefined` on every run. The row asserted `toBeTypeOf("number")` against it and failed loudly,
+which is the only reason it was found — written the other way round, as *is it zero*, `undefined ?? 0`
+would have passed for ever.
+
+**The spec carried the same reading**, in §10's row text, so the fix is a spec edit as well as a
+test one. Two documents agreeing about a shape is not evidence about the shape; the report is.
+
+The corrected row is stronger than the original: determinism is asserted over the **whole** map with
+`toStrictEqual`, which holds whatever the counts are, and `nothing-changed` is then asserted absent
+per cache — absence rather than zero, because the recorder omits a reason that never fired rather
+than writing a zero for it (C28 I13).
+
+## F912 — five defects between a recording and its replay, and four were the harness ★★★★★
+
+A recorded PTY session would not replay. The divergence moved five times, and only the last one was
+in the subject.
+
+| what diverged | the cause | where it lived |
+|---|---|---|
+| frame 5 drew a spinner where the recording drew the answer | the driver emitted every recorded input in one synchronous loop, so `^D` arrived before the far side answered and the session exited mid-request | the harness |
+| frame 3 was a whole repaint against a three-row difference | the initial size was recorded as a `resize` and the driver delivered every resize as a `SIGWINCH`, so the replay was resized to the width it already had, and C03 treats that as contamination | the format |
+| all eight frame waits stalled, and six frames still came out identical | the pacing baseline absorbed the three frames a session draws during `start()` as well as C01's acquire prologue | the harness |
+| frame 1 drew `last 51.8ms` where the recording drew a cursor move | the replay hard-coded `tier: "spans"` while the regime had carried the recorded tier since it was written — a recorded field with no reader, exactly as `binary` had been | the harness |
+| the last frame was a footer redraw against a cursor move | **the recording's clock stream ran out**, so the replayed session's cost and time-of-day held still, the chrome row carrying one had no delta, and the frame was never composed | the recorder |
+
+**Only the fifth is a finding about Calcium, and it is the one that reads as a law of nature.** The
+first four wear the shape of an impossibility result: *a frame that reports its own cost cannot be
+replayed byte-identically*. That sentence is true and it was the wrong diagnosis. The clock ran out
+because C01's `signalExit` calls `process.exit` directly, so a session ended by a signal never
+reaches `stop()` — and `recording.end()`, which flushes the batched clock reads, lives there. The
+tail was lost on every recording taken.
+
+Flushing from `process.on("exit")` — the one hook that catches signal, fault and clean stop alike —
+made the clock outlast the session, and six runs across two tiers then came out **identical over
+every frame, nothing truncated, nothing stalled, nothing elided**. The remedy is nine lines and it
+was reachable at any point; what stood in its way was a plausible impossibility claim that no
+measurement had ever been asked for.
+
+**The instrument that broke it was reading the two event orders side by side.** Every intermediate
+diagnosis was consistent with the frames — the frames are where a divergence *appears*, and four
+different causes produced the same appearance. The orders disagreed structurally: an extra `resize`
+in one, a missing `end` in the other, and neither is visible in any frame.
+
+**A harness's own defects present as the subject's, and they present as the subject's most
+convincingly when the harness is new.** Four of five here, and the ratio is the argument for
+reporting the drive's counters — `stalled`, `delivered`, `exhaustedAt` — beside the comparison's.
+`stalled: 0` is what proved the pacing worked; the frames had come out byte-identical while all
+eight waits stalled, because a stall is a 500 ms pause and a pause is what the sleep-driven harness
+did anyway.
+
+**And the deferral it closed was already false.** `SELF_MEASURED` was named for its first and only
+member, C24 I32's `last N.Nms` — the run reporting its own cost. Pacing the drive exposed the second
+member and it is not self-measurement at all: the header's time-of-day, which is ambient. The set is
+`CLOCK_DERIVED`, and the property both share is that their value comes from a clock rather than from
+the recorded inputs. A sentence true of a set's first member absorbs the second without anyone
+noticing.
+
+The widening then had to be narrowed, by the row written to check it: an optional-seconds pattern
+matched `took 12:30 to build` on both sides, so the mask covers `HH:MM:SS` only and the narrow form
+`formatClock` draws under 80 columns is a **stated blind spot** — a mask that eats a document's own
+text hides divergences everywhere, and this one only fails to excuse a frame in one regime.
+
+## F911 — a frame that measures the run drawing it, and the cell's width moved with its value ★★★★☆
+
+C24 I32 draws the previous frame's cost in the footer, so a frame carries a measurement of the run
+that produced it and cannot be byte-identical across two runs. That much was expected; the mask
+`CLOCK_DERIVED` exists for it.
+
+What was not expected is that masking the value left the frames still unequal. `formatFrameCost`
+produced `last 9.6ms` and `last <0.1ms` — ten cells and eleven — so the **padding beside the cell**
+differed by one, and every cell after it shifted. A mask cannot absorb that: the padding sits after
+the cell's SGR reset, and swallowing an escape would hide a real divergence.
+
+The fix is in the chrome rather than in the mask — `padStart(5)` on the figure, so the cell is a
+constant width by construction and the mask matches a constant width too. **A measurement drawn at a
+width that tracks its value is a measurement that moves everything beside it**, which is a rendering
+defect independent of replay: the footer's right-hand cell jittered by one column whenever the
+frame cost crossed 10 ms.
+
+## F910 — the two sides of a comparison were captured at different points ★★★★☆
+
+The first replay compared frames recorded at `lifecycle.writer` against frames taken from the
+replay's fake `stdout`. Frame 0 diverged immediately: the replay's held `\x1b[?1049h`, the
+recording's did not, because C01 writes the alternate-screen enter before it hands over its writer.
+
+Two populations, and every downstream figure was about the difference between them rather than about
+the framework. The fix is that **the replay records itself to a mirror path**, so both sides come
+from the same tap in the same code — and the comparison is then between two recordings rather than
+between a recording and a stream.
+
+That falsified C22 I94, which said `profile.record` and `profile.replay` may not be *set together*.
+They must be: a replay that does not record cannot be compared. What the gate should refuse is the
+**same path** — a session cannot be driven by a recording it is overwriting — and that is what it
+refuses now.
+
+**The asymmetry came back once more, in the pacing signal**, where the harness counted every write
+on its `stdout` while the recording counted only the writer's. Same shape, different consumer, and
+it did not look like the same finding until the counters were read (F912).
+
+## F909 — the recording tapped a stream C01 had already replaced ★★★★☆
+
+With recording on, a session under a PTY drew **nothing at all**. Not a wrong frame — no bytes.
+
+C01 I9 captures `stdout.write` at construction and replaces it with a debug redirect; `lifecycle.writer`
+is the only handle that still reaches the terminal. The recorder's frame tap wrapped
+`config.stdout`, which by then is the redirect, so every frame went to the debug sink.
+
+**Silent and total, and the configuration that produced it reads as obviously correct** — tap the
+stream the frames are written to. The finding is that C01's ownership of `stdout` is not a fact a
+reader of `config.ts` can see, and the tap belongs at `lifecycle.writer`, which is C01's own
+definition of the renderer.
+
 ## F908 — a clause that was over-engineering when it was written and load-bearing now ★★★★☆
 
 C28 §5 has said since July that a recording carries *every byte from the terminal · every far-side
@@ -31791,6 +31908,25 @@ checks over the same citation, each satisfied by a different fact, with nothing 
 line is real and the symbol is real and they are in different places. That is the same joint as
 F903's flag one level out — a declaration, a consumer and no edge between them — and neither is
 visible to a reader checking statements one at a time, because every statement is true.
+
+### A second instance, measured, and it says what the ungated signal is worth
+
+Roadmap entry 52 cited `src/shell/construct.ts:1426` for *the orbit bindings*. At HEAD that line held
+
+    clock: config.clock,
+
+`orbitBlock` is at **1884**, and has been throughout. The citation was wrong when it was written and
+the gate said nothing for as long as the line it named held code — it only failed when an unrelated
+edit five lines above shifted `1426` onto whitespace. **A wrong citation is caught by this gate only
+when something else moves it onto a blank line**, which is not a property of the citation.
+
+**The anchorage signal listed it the whole time.** F904's own remedy — does the cited line carry one
+of its cell's symbols within six lines — had this entry in its adrift list, and the gate that
+actually failed was the blank-line check. So the instrument that could see it was reporting and the
+one that was gated could not, which is the case for gating anchorage rather than an argument that it
+needs building. It is still a judgement (the window is six lines), and the number moved 42 → 43 when
+this was fixed, so what it costs to gate is a decision about that window rather than about the
+signal.
 
 ## F903 — the suspended flag had a declaration, a consumer and no writer ★★★★☆
 
