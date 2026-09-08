@@ -33288,3 +33288,58 @@ where it disagrees, fix the spec first and say which direction it drifted. Two o
 were only visible because the row was *written* — T2.8's second half by `tsc` refusing, T2.100's
 count by running the grep the sentence describes. Reading the rows would have found neither.
 
+## F924 — every successful PTY command settles as an error, and nine fakes agreed it did not ★★★★★
+
+Writing T5.21 — a real 200-line child through the shell route — put a frame on the screen that
+said:
+
+```
+✗ Killed by SIG0.
+  /bin/sh: 1: !sh: not found
+```
+
+The second line was the row's own quoting mistake. The first is C21's, and it is shipped.
+
+**`node-pty` reports the signal as a number and uses `0` for none.** C21 maps it with
+
+```ts
+signal: signal === undefined ? null : `SIG${String(signal)}`,
+```
+
+and `0 !== undefined`. Measured on the real package:
+
+| child | node-pty's `onExit` | C21's `Exit` | should be |
+|---|---|---|---|
+| `echo hi; exit 0` | `{exitCode: 0, signal: 0}` | `{code: 0, signal: "SIG0"}` | `{code: 0, signal: null}` |
+| `exit 3` | `{exitCode: 3, signal: 0}` | `{code: 3, signal: "SIG0"}` | `{code: 3, signal: null}` |
+| `kill -TERM $$` | `{exitCode: 0, signal: 15}` | `{code: 0, signal: "SIG15"}` | `{code: 0, signal: "SIGTERM"}` |
+
+**Two defects, and the first is total.** C23's route computes `failed = cancelled || exit.code !== 0
+|| exit.signal !== null`, so **every command on the PTY arm settles as an error**, with a status
+card reading *Killed by SIG0.* above a perfectly correct screen. The happy path of the arm the
+whole port exists to provide has never worked.
+
+The second is the form. A piped child resolves with Node's own `"SIGTERM"`; a PTY child resolved
+with `"SIG15"`. `runner.ts`'s comment states the goal — *the same shape a piped child resolves
+with, so a caller reads one `Exit`* — and the two arms produce different strings for the same
+death, which nothing downstream normalises again.
+
+**Why nine passing tests said otherwise, which is the reusable half.** Every PTY row in this
+repository hands the runner a fake, and every fake resolves `exited` with `{code: 0, signal:
+null}` — the *correct* value, written by hand. **The fixture was supplying the behaviour under
+test**, and it supplied the one the real package does not produce. The port's own type is what
+made it easy: `PtyProcess.onExit` declares `signal?: number`, so a fake omitting the field is
+well-typed, and omitting it is exactly the case the code handles correctly.
+
+This is what a tier-5 row with the real package is for, and it is the same argument the deferral
+made for T5.6 — *a fact a fake cannot have*. The fact turned out not to be the tty's name.
+
+**The fix is at the port**, where the number arrives: `0` becomes `null`, and a number becomes its
+name through `os.constants.signals` inverted (first name wins for the aliased numbers — 6 is
+`SIGABRT` and `SIGIOT`, 29 is `SIGIO` and `SIGPOLL`), with `SIG${n}` kept as the fallback so an
+unknown number loses nothing. C21 I19, commitment 15, T2.9 and T6.19.
+
+**And a note on where it was found.** Not by a test written to look for it, and not by the frame
+either — by a frame that was on screen for a *different* reason, with the real defect above the
+one being debugged. The row's own bug is what put a real child's exit on the screen at all.
+

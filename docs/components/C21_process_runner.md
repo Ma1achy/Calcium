@@ -247,6 +247,7 @@ Per child handle.
 - **I16** — `spawnPty` with no factory injected throws naming `pty`, and never falls back to a pipe.
 - **I17** — A PTY child is signalled by group, counted by `killAll`, and ignores writes after exit, exactly as a piped child is.
 - **I18** — `hasPty` is true exactly when a PTY factory was injected, so an arm can be chosen without calling `spawnPty` and catching.
+- **I19** — **A PTY child's `Exit` has the same shape a piped child's does: `signal` is `null` when no signal killed it, and the signal's *name* when one did.** A PTY port reports the signal as a number and uses **0 for none**, so the two facts a caller reads — *did it die of a signal* and *which one* — both arrive in a form the pipe arm never produces. Every reader downstream compares `signal !== null`, so a clean exit reported as `SIG0` makes every successful command on this arm an error, and a `SIGTERM` reported as `SIG15` makes the two arms disagree about a string nobody normalises again (F924).
 
 ---
 
@@ -267,6 +268,7 @@ Per child handle.
 12. `killAll` sends `SIGKILL` with no grace period, so C21 holds no timing policy anywhere (I11).
 13. `exited` always resolves, spawn failure included (I13).
 14. The environment, the raw-mode probe and the warning sink are injected, so I6 can be asserted without a test mutating the terminal it runs in (I14).
+15. A PTY child's `Exit` is normalised to the piped child's shape at the port, so no caller has to know which arm produced it (I19).
 
 ---
 
@@ -302,6 +304,7 @@ Six tiers. Every cell of the §7 table is covered. Tiers 1–3 use real short-li
 - **T2.6** (I13): across a hundred spawns including failures, `exited` resolves every time.
 - **T2.7** (I14): a source scan finds no `process.env`, no `console.` and no reference to the real `process.stdin` in `process/`. The environment arrives as a record and the probe as an object.
 - **T2.8** (I15): a source scan finds no `node-pty` import anywhere in `src/`, and a compile-level test asserts **both halves of I15** — that `node-pty`'s `IPty` satisfies `PtyProcess`, *and* that the package's own module namespace satisfies `PtyFactory`. The second half is the one that found F920, and its absence is why the first half read as coverage: I15 names two types, the row named one, and a reader checking the citation sees a row against I15. The `import type` is erased, so no runtime dependency is created; `node-pty` is a devDependency the container builds by name, so there is no installed-or-not arm to skip on — a graceful skip here would be a branch nothing can enter, and its absence is recorded rather than written.
+- **T2.9** (I19): the port's three `onExit` shapes — `{exitCode: 0, signal: 0}`, `{exitCode: 0, signal: 15}` and `{exitCode: 3}` — resolve to `{code: 0, signal: null}`, `{code: 0, signal: "SIGTERM"}` and `{code: 3, signal: null}`, which is the pipe arm's own vocabulary. **The number-to-name map is Node's**, inverted from `os.constants.signals`, first name wins for the aliased numbers, and an unknown number falls back to `SIG${n}` so nothing is lost.
 
 ### Tier 3 — edge cases
 
@@ -365,6 +368,7 @@ Six tiers. Every cell of the §7 table is covered. Tiers 1–3 use real short-li
 - **T6.17** (I18): `hasPty` hard-coded to `true` → T1.13's no-factory arm fails, and the shell route chooses the PTY arm on a runner that cannot spawn one.
 - **T6.16** (I15): importing `node-pty` in `runner.ts` → T2.8's scan fails and the package becomes a runtime dependency by accident.
 - **T6.18** (I15): restoring `readonly` to `PtyFactory.spawn`'s `args` → T2.8's factory half fails, and the port refuses the one package it was cut from while every test in this repo keeps passing, because each builds a fresh array (F920).
+- **T6.19** (I19): passing the port's `signal` through as `SIG${n}` → T5.6's clean-exit arm reports `SIG0`, every successful PTY command settles as an error, and the two arms disagree about a name nothing normalises again (F924).
 
 ---
 
