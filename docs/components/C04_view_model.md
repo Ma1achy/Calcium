@@ -236,7 +236,7 @@ type BarSpec = Readonly<{
 | `code` | language, text, `wrap`; `lineRange` (view state, §3d) | lines when truncating; `Σ ceil(len / w)` when wrapping — over the lines in `lineRange` when a window set one |
 | `comparison` | field / a / b rows | rows + header |
 | `patch` | path, language, hunks, optional `layout` | 1 header + `Σ` over hunks of (1 hunk header + lines + 1 per collapsed region) |
-| `pills` | chips with actions | `ceil(totalWidth / w)` — one logical row that may wrap |
+| `pills` | chips with actions | rows of a **first-fit packing** at `w`, gap `2` — a chip is never split, so this is not `ceil(totalWidth / w)` (F928) |
 | `tip` | text with fill actions | `ceil(len / w)` |
 | `panel` | title, footer, children | children measured at `w - 2`, + 2 |
 | `group` | direction, children | `column` → `Σ` children at `w`; `row` → `max` of children at the split width |
@@ -369,7 +369,9 @@ Because the floor rule below gives every child at least 1, a `row` group at a wi
 
 This is a rule about a degenerate width rather than a layout feature: above `2n - 1` columns every child fits and nothing is dropped. It is written down because the alternative to writing it down is each half choosing separately, and the two choices differ by exactly one row.
 
-A `pills` block is **one logical row**. Prism's two-row filter layout (kind row, then status row) is two `pills` blocks, not one block that wraps — wrapping is overflow behaviour, not a layout choice.
+A `pills` block is **one logical row**, and the claim is about **authorship**: the author writes one sequence of chips and does not choose where it breaks — the width does. Prism's two-row filter layout (kind row, then status row) is two `pills` blocks for that reason, not one block trusted to break in the right place.
+
+**What it is not is a claim about height** (F928). The measured height is the row count of a **first-fit packing**: chips are placed whole, `CHIP_GAP` apart, and a row breaks before a chip that would not fit. Six 10-wide chips are two rows at `w = 40` and six at `w = 20`; `ceil(totalWidth / w)` says two and three. The two formulas agree only when no chip lands on a boundary, which is precisely the case `simple.ts`'s own comment says the kind exists to get right — *"a `pills` block whose measurer counted cells while its renderer packed chips would disagree at exactly the widths where a chip lands on a boundary"*. Both halves read `chipRows`, so I7 holds; it is the arithmetic in this document that did not.
 
 ### Weights, walked by hand — roadmap 38
 
@@ -3121,7 +3123,7 @@ persisted document rests on.
 - **I17** — Every measurer returns at least 1 for a present block (§5). Only an empty container measures 0.
 - **I18** — Any view state that affects height is a field of the block. Nothing outside the document can change how tall it is, which is what makes `measure` a pure function of block and width (I7) rather than of block, width and wherever the expansion flag happened to live.
 - **I19** — `fill` is the default action and `exec` is reserved for reversible operations. An action a user has not read before it runs is the one thing this vocabulary will not produce by default, and D52's approval story is that default rather than a mechanism built on top of it.
-- **I20** — A `pills` block is exactly one logical row. Multi-row pill layouts are multiple blocks, so height stays declared rather than emerging from how many pills happened to fit.
+- **I20** — A `pills` block is exactly one logical row, and **that is a claim about who chooses the breaks rather than about height** (F928). The author writes one sequence of chips; the width decides where it wraps, so a multi-row pill *layout* is multiple blocks — the only way to put a chip on a chosen line. The height is the row count of a first-fit packing at the width (§3), and the sentence this replaces said it *stays declared rather than emerging from how many pills happened to fit*, which is exactly what it does: `Pills` has no height field, and six 10-wide chips are two rows at 40 and six at 20. **Measure and render read one layout** — `chipRows`, called by both — which is the half that was always true and the half I7 depends on.
 - **I21** — `merge` never deletes a row. A table sheds one through `replace`, and the adapter decides which it means — a merge that could delete would make a dropped row and an unmentioned row indistinguishable in the payload.
 - **I22** — `replace` is wholesale: view state is not carried across it. It is the exact complement of I9, and the pair is the whole of the update model — `merge` preserves, `replace` does not.
 - **I23** — Container widths are declared, not negotiated: `panel` and table detail at `w - 2`, a `column` group at `w`, a `row` group at an equal split. A weights field arrives when a surface needs one and not before.
@@ -3448,6 +3450,14 @@ The generic suite. **These run against every registered block kind, including ap
 - **T2.118** (I110, §5a): a `terminal` carrying every run field and both modes round-trips through `JSON.parse(JSON.stringify(...))` deep-equal, and `TERMINAL_KEYS` refuses a **tenth** block key and `TERMINAL_RUN_KEYS` an eleventh run key by name.
   The count was written as *a seventh* when the kind had six members and was three behind by the time the row
   was implemented — the row asserts the measured sizes (9 and 10) so the number cannot drift again unread.
+- **T2.119** (I18): every view-state field that changes a height is enumerated and each is shown to move the measurement — `TableRow.expanded` 3 → 4, `Scroll.collapsed` 5 → 1, `Floor.minHeight` 1 → 7, `Patch.collapsedAfter` 4 → 5 — compared **by equality**, so a fifth arriving outside the block fails here. With the complement measured rather than argued: the same block measured twice, an unrelated block measured between, gives the same number, so nothing accumulated anywhere else. `Gap.gapBefore` is deliberately not in the set — it is composition's, and `measure` returns 1 either way, which is what makes the list a measurement rather than a list of optional fields.
+- **T2.120** (I20): six 10-wide chips are **two rows at `w = 40` and six at `w = 20`**, and `ceil(totalWidth / w)` says two and three — so the row is asserted against the packing and not against the formula this document used to carry (F928). A chip wider than the width gets its own row rather than being split, which is the observable difference between a packing and a wrap, and the frame is read beside the number so the two cannot drift.
+- **T2.121** (I21): a merge naming one row of two leaves the other **reference-identical**, and `MergeRow` is `Omit<TableRow, "expanded">` — no arm of it can remove a row. The structural half is what makes the behavioural half a rule rather than a sample: a delete marker would make a dropped row and an unmentioned row indistinguishable in the payload, and there is no marker to add.
+- **T2.122** (I22, I9): `replace` drops `expanded` and `merge` keeps it, asserted in one row because the pair **is** the update model and either alone reads as a sample. The merge arm also shows the incoming row cannot forge it: `stripViewState` removes `expanded` from the payload before it lands, so view state survives only where it already was.
+- **T2.123** (I24): a `form: "line"` plot with no `height` is refused **naming the field**, and the same block with `height: 6` validates — the second half is the non-vacuity guard, since a validator refusing both would pass the first assertion.
+- **T2.124** (I32): `role` is on `ColumnDef` and on no row type, and a merge leaves `columns` **reference-identical** — so it travels with the schema and is outside what I9 protects, which is the whole of the claim. Identity rather than deep equality: a rebuilt-but-equal column array is a second record of the schema, and the day it diverges nothing would say so.
+- **T2.125** (I33): neither kind validates as the other — a `comparison` carrying `patch`'s `path`/`language`/`hunks` is refused, and a `patch` carrying `comparison`'s `rows` is refused naming all three missing fields. The required sets are disjoint, which is what *never merge* means at the type level; a merged kind's height would depend on which mode it was in, and I7 cannot bend.
+- **T2.126** (I66): an empty `message` and a non-positive `height` are refused naming the field, an absent `height` the same, and the three numbers are optional — with a source scan that `status`'s renderer never reads `tick`, because *supplied rather than derived* is a claim about where the value comes from and no value assertion can see it.
 
 ### Tier 3 — edge cases
 

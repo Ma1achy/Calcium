@@ -33467,3 +33467,77 @@ all.** F926's shape a second time in one session, and this one had no wrong answ
 only an unwritten exception. The remedy is naming it: I10 carries `b` with the reason, and T2.6
 compares the reaching set against `{ createTui, b }` **by equality**, so a third is a failure and
 a retired second is one too.
+
+## F928 — a `pills` block's height is a packing, and three statements said otherwise ★★★☆☆
+
+C04 I20: *"A `pills` block is exactly one logical row. Multi-row pill layouts are multiple blocks,
+so **height stays declared rather than emerging from how many pills happened to fit**."* The row
+written to name it measured the height instead.
+
+| chips | width | measured | `ceil(totalWidth / w)` |
+|---|---|---|---|
+| 6 × 10 wide | 40 | **2** | 2 |
+| 6 × 10 wide | 20 | **6** | 3 |
+| 12 × 14 wide | 60 | **4** | 3 |
+| 2 × 30 wide | 20 | **2** | 3 |
+
+**`Pills` has no height field.** Nothing declares it; the height is the row count of a first-fit
+packing, which is *exactly* how many pills happened to fit. And the formula the spec's own §3
+table gives is a different wrong answer: it is a **wrap**, and the implementation **packs** — a
+chip is placed whole and a row breaks before one that would not fit, so a 30-wide chip at width
+20 keeps its own row rather than being split across two.
+
+The frame settles it:
+
+```
+w=40   |ccccccccc0  ccccccccc1  ccccccccc2|
+       |ccccccccc3  ccccccccc4  ccccccccc5|
+w=20   |ccccccccc0|
+       |ccccccccc1|   … six rows
+```
+
+**The code was right, and it says so.** `simple.ts`'s `chipRows` carries the argument this
+document lost: *"a `pills` block whose measurer counted cells while its renderer packed chips
+would disagree at exactly the widths where a chip lands on a boundary."* Both halves call
+`chipRows`, so I7 holds — measured height equals rendered height. It is the arithmetic in C04
+that never did.
+
+**What survives, and it is not nothing.** *One logical row* is a true and useful claim, and it is
+about **authorship**: the author writes one sequence of chips and does not choose where it breaks
+— the width does. Prism's two-row filter layout is two `pills` blocks for that reason, not because
+one block would be too tall. So the invariant's subject was right and its justification clause was
+a mechanism that does not exist, which is F925's shape in a spec rather than in a checker: three
+statements — §3's formula, §4a's *wrapping is overflow behaviour*, and I20's *height stays
+declared* — none of which a reader can falsify without measuring, and all three of which read as
+corroboration of each other.
+
+## F929 — `make instruments` fails a different profiler row each time it is red ★★☆☆☆
+
+Four runs of `make instruments` across one session, unchanged tree:
+
+| run | when | result |
+|---|---|---|
+| 1 | straight after `make e2e` | **FAIL** — `tools/profile.mjs` 0 rows; `test/e2e/profiler.test.ts` **T5.1b** *"at `counters` the same session replays identically"* → `identical: expected false to be true` |
+| 2 | re-run, nothing else in flight | green · **562 rows** |
+| 3 | straight after `make e2e` | **FAIL** — `tools/profile.mjs` 0 rows; **T1.83** *"the replay re-derives its capabilities from the recorded environment"* |
+| 4 | re-run, nothing else in flight | green · **562 rows** |
+
+**The changed member is the whole of the evidence.** A row that fails identically on every red
+run is a defect in that row; a *different* row each time, in the same file, with the instrument
+reporting **0 rows** rather than a failure count, says the subject is the harness. The red runs
+report **556** rows and the green ones **562** — the six `tools/profile.mjs` contributes.
+
+Run alone, `T5.1b` passes twice and the whole file passes as a file. `make instruments` starts no
+load generator; what both red runs share is a preceding gate chain, so the likeliest reading is
+contention against the profiler's replay, whose assertions are **byte identity** rather than
+timings — which is why this is recorded rather than diagnosed. *A time-based assertion under
+contention* is the group and not yet the cause.
+
+**Recorded so the next reader does not debug the row.** Someone meeting T1.83 red will read a
+replay-divergence assertion and go looking at capability derivation; the first thing to do is run
+it again and see whether the member moves.
+
+**What would settle it**: run `make instruments` under a deliberate load with the profiler file
+isolated, and read whether `tools/profile.mjs` reports 0 rows because its child was starved or
+because the row genuinely diverged — the harness cannot currently tell those apart, which is the
+half worth fixing whatever the cause turns out to be.
