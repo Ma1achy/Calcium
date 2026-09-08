@@ -21,6 +21,8 @@ const CMD =
   "npx vitest run test/unit/emulator.test.ts test/contract/emulator.test.ts test/edge/emulator.test.ts test/revert/emulator.test.ts";
 const RUNNER = "src/data/process/runner.ts";
 const TYPES = "src/data/process/types.ts";
+const ROOT_CONFIG = "src/shell/config.ts";
+const CONSTRUCT = "src/shell/construct.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -157,6 +159,27 @@ const results = runPass({
       from: "    get hasPty(): boolean {\n      return deps.pty !== undefined;\n    },",
       to: "    get hasPty(): boolean {\n      return true;\n    },",
       expect: "T6.17",
+    },
+    {
+      // **C22 I91's two forwards, mutated one at a time.** A root that wrapped
+      // the factory satisfies every behavioural assertion — the wrapper
+      // forwards — so what catches it is the identity read at the first hop and
+      // the spread's shape at the second.
+      name: "the root wraps the consumer's factory",
+      file: ROOT_CONFIG,
+      from: "    ...(config.pty === undefined ? {} : { pty: config.pty }),",
+      to: "    ...(config.pty === undefined ? {} : { pty: { spawn: (...a) => config.pty.spawn(...a) } }),",
+      expect: "T2.100",
+    },
+    {
+      // The forward that is simply not made: `hasPty` then answers false on a
+      // session a consumer configured for a terminal, and C23 takes the pipe
+      // arm without saying so.
+      name: "the runner is built without the factory",
+      file: CONSTRUCT,
+      from: "      ...(config.pty === undefined ? {} : { pty: config.pty }),",
+      to: "",
+      expect: "T2.100",
     },
     {
       // **The one no fake can catch** (F920). Restoring the modifier makes the

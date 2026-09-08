@@ -6,6 +6,13 @@ export declare function ran(output: string): boolean;
 /** The harness's own marker for *the suite did not return* — see mutate.mjs. */
 export declare function timedOut(output: string): boolean;
 
+/**
+ * Did the run's suites load? `Test Files N failed` with no failing test — see
+ * mutate.mjs for why the disagreement between the two summary lines is the
+ * signal and the transform error above them is not (F922).
+ */
+export declare function unbuilt(output: string): boolean;
+
 export declare class AnchorError extends Error {
   constructor(file: string, from: string);
 }
@@ -32,6 +39,8 @@ export type Outcome = Readonly<{
   anchorMissed?: boolean;
   /** The run produced no summary line — the harness went blind mid-pass. */
   noSummary?: boolean;
+  /** The suites did not load — the mutation did not compile, so nothing was measured. */
+  unbuilt?: boolean;
 }>;
 
 export declare function apply(

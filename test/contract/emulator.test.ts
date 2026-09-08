@@ -10,6 +10,9 @@ import type * as nodePty from "node-pty";
 import type { IPty } from "node-pty";
 
 import type { PtyFactory, PtyProcess } from "../../src/data/process/types.js";
+import { resolveConfig } from "../../src/shell/config.js";
+import { buildGraph, fakeAmbient, MANIFEST } from "../support/session.js";
+import { defaultTheme } from "../../src/presentation/theme/index.js";
 
 import { createEmulator } from "../../src/data/emulator/emulator.js";
 import { ANIMATES, tickIntervalOf } from "../../src/presentation/blocks/animation.js";
@@ -246,7 +249,71 @@ describe("C21 · C22 — the PTY port, spec-first rows", () => {
     // all along — a skip here would be a branch nothing can enter, which is the
     // vacuity class this row is otherwise about.
   });
-  it.todo("T2.100 (C22 I91): TuiConfig.pty reaches the runner's deps by object identity, and config.pty is read at exactly one site in src/shell/ — not deferred on a component: lands with TuiConfig.pty");
+  it("T2.100 (C22 I91): the consumer's factory reaches the runner unwrapped, through two pure forwards", async () => {
+    // **The object, not a shape like it.** A root that wrapped the factory —
+    // to log a spawn, to default a size — would satisfy every behavioural
+    // assertion here and be the second place the port's shape is known, which
+    // is the thing I91 forbids.
+    const spawned: unknown[][] = [];
+    const factory = {
+      spawn: (...args: unknown[]) => {
+        spawned.push(args);
+        return { pid: 909, onData: () => {}, onExit: () => {}, write: () => {}, resize: () => {}, kill: () => {} };
+      },
+    };
+
+    // Hop one, by identity. `resolveConfig` reads the *consumer's* config.
+    const resolved = resolveConfig(
+      {
+        name: "prism",
+        binary: "prism",
+        manifest: MANIFEST,
+        theme: defaultTheme,
+        stateDir: "/state",
+        env: { TERM: "xterm-256color", LANG: "en_GB.UTF-8" },
+        pty: factory as never,
+      },
+      fakeAmbient(),
+    );
+    expect(resolved.pty, "the same object, not a copy of it").toBe(factory);
+
+    // Hop two, through the runner the root actually built. The factory's own
+    // `spawn` is the only thing that returns pid 909, so a wrapper that
+    // reconstructed the port would be visible in `spawned` — which is empty
+    // until the runner calls through.
+    const { graph } = await buildGraph({ pty: factory as never });
+    expect(graph.runner.hasPty, "the seam C23 reads before choosing an arm").toBe(true);
+    const handle = graph.runner.spawnPty("sleep 1", { cwd: () => "/w", cols: 80, rows: 6 });
+    expect(spawned, "the consumer's own spawn was called").toHaveLength(1);
+    expect(handle.pid, "and its child came back").toBe(909);
+
+    // And the absent arm, so the row does not pass on a runner that would
+    // answer `true` regardless.
+    const { graph: bare } = await buildGraph();
+    expect(bare.runner.hasPty, "no factory, no arm").toBe(false);
+
+    // **The source half — and the count is two, not one.** The spec's row said
+    // *exactly one site*, which is a grep, and the grep gives two: `config.ts`
+    // copies the consumer's field onto the resolved config, `construct.ts`
+    // hands the resolved one to the runner. Each comment says *the one site*
+    // and each is right about its own `config` object; the number is only wrong
+    // when read as a scan of `src/shell/` (F923). What C22 I91 actually forbids is
+    // a read that is not a forward, so that is what is asserted.
+    const sites = ["src/shell/config.ts", "src/shell/construct.ts"].map((f) => ({
+      file: f,
+      hits: [...readFileSync(f, "utf8").matchAll(/config\.pty/gu)].length,
+      forward: readFileSync(f, "utf8").includes(
+        "...(config.pty === undefined ? {} : { pty: config.pty })",
+      ),
+    }));
+    expect(sites.map((s) => s.hits), "two mentions per site — the guard and the value").toEqual([2, 2]);
+    expect(sites.every((s) => s.forward), "each is the same spread, with nothing between").toBe(true);
+
+    const elsewhere = srcFiles("src/shell").filter(
+      (f) => !f.endsWith("config.ts") && !f.endsWith("construct.ts") && readFileSync(f, "utf8").includes("config.pty"),
+    );
+    expect(elsewhere, "and nowhere else in src/shell/ reads it at all").toEqual([]);
+  });
 });
 
 describe("C23 — the shell route as a live screen, spec-first rows", () => {

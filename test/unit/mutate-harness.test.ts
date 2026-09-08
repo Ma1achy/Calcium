@@ -17,6 +17,7 @@ import {
   report,
   runPass,
   strip,
+  unbuilt,
 } from "../../tools/mutate/mutate.mjs";
 
 /** vitest's real summary line, colours and all. */
@@ -201,6 +202,75 @@ describe("mutation harness", () => {
       "const x = 1;",
       "const y = 2;",
     ]);
+  });
+
+  it("MH8: a mutation that does not compile is not a survivor", () => {
+    // **The third state that read as a survivor, and the real bytes that did
+    // it.** `c21-pty`'s wrapped-error row opened a `try` it never closed. Three
+    // of four suites failed to collect, the fourth ran green, and the two
+    // summary lines disagreed:
+    const BROKEN =
+      "\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m3 failed\u001b[39m\u001b[22m" +
+      "\u001b[2m | \u001b[22m\u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (4)\u001b[39m\n" +
+      "\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m10 passed\u001b[39m\u001b[22m" +
+      "\u001b[2m | \u001b[22m\u001b[90m2 todo\u001b[39m\u001b[90m (12)\u001b[39m";
+
+    // A summary exists, so the blindness check passes; no test failed, so
+    // `killed` is false. Both true, and together they said SURVIVED.
+    expect(killed(BROKEN), "no test failed").toBe(false);
+    expect(unbuilt(BROKEN), "and the suites did not load").toBe(true);
+
+    // **The controls, because a predicate that answers true to everything reads
+    // the same as one that works.** A real kill and a real survivor must both
+    // come back false, or every row in every pass changes state.
+    expect(unbuilt(FAILED), "a genuine kill is not a build failure").toBe(false);
+    expect(unbuilt(PASSED), "and neither is a genuine survivor").toBe(false);
+
+    const rows = report([
+      { name: "broke", expect: "T1.1", killed: false, unbuilt: true },
+      { name: "lived", expect: "T1.2", killed: false },
+    ]);
+    expect(rows, "the row says which").toContain("DID NOT BUILD");
+    expect(rows, "and the count excludes it").toContain("1 survived");
+    expect(rows, "with the reader sent to the mutation").toContain("Fix the `to`");
+
+    // **And the wiring, because the two rows above only exercise the pieces.**
+    // A branch deleted from `runPass` leaves `unbuilt` correct, `report`
+    // correct, and every row back to reading SURVIVED — the shape where a test
+    // calls the mechanism and misses the call site.
+    const files = new Map([["a.ts", "const x = 1;"]]);
+    const answers = () => {
+      const src = files.get("a.ts") as string;
+      if (src.includes("BROKEN")) return " Tests  1 failed | 5 passed";
+      if (src.includes("2")) return " Test Files  3 failed | 1 passed (4)\n      Tests  10 passed (10)";
+      return " Tests  6 passed";
+    };
+    const live = runPass({
+      mutations: [{ name: "m", file: "a.ts", from: "1", to: "2", expect: "T1.1" }],
+      control: { file: "a.ts", from: "const x", to: "const BROKEN", why: "renames the export" },
+      read: (f) => files.get(f) as string,
+      write: (f, v) => void files.set(f, v),
+      run: answers,
+    });
+    expect(live[0]?.unbuilt, "the pass says the mutation did not build").toBe(true);
+    expect(live[0]?.killed, "and does not call it a kill").toBe(false);
+    expect(report(live), "with no survivor claimed").toContain("no survivors among the rows that ran");
+  });
+
+  it("MH8b: a tree whose suites do not load refuses before the first mutation", () => {
+    // The same disagreement in the *clean* run. `ran` is true — there is a
+    // summary — so the existing gate passes it, and then every mutation covered
+    // by the file that will not load comes back a survivor.
+    const files = new Map([["a.ts", "const x = 1;"]]);
+    expect(() =>
+      runPass({
+        mutations: [{ name: "m", file: "a.ts", from: "1", to: "2", expect: "T1.1" }],
+        control: { file: "a.ts", from: "const x", to: "const BROKEN", why: "renames the export" },
+        read: (f) => files.get(f) as string,
+        write: (f, s) => void files.set(f, s),
+        run: () => " Test Files  3 failed | 1 passed (4)\n      Tests  10 passed (10)",
+      }),
+    ).toThrow(/does not load/);
   });
 
   it("MH6: a live harness reports kills and survivors apart", () => {

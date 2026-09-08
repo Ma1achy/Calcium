@@ -55,9 +55,19 @@ const results = runPass({
       // that reads as thoroughness.
       name: "a run with no summary is counted as a survivor again",
       file: FILE,
-      from: "      outcome = ran(output)",
-      to: "      outcome = true",
+      from: "      outcome = !ran(output)",
+      to: "      outcome = false",
       expect: "MH4c",
+    },
+    {
+      // **The third state, and the branch is where it can be lost.** `unbuilt`
+      // stays correct, `report` stays correct, and every mutation that takes a
+      // suite down reads SURVIVED again — which is the whole of F922.
+      name: "a mutation that does not compile is counted as a survivor again",
+      file: FILE,
+      from: "        : unbuilt(output)",
+      to: "        : false",
+      expect: "MH8",
     },
     {
       // `ran` answering `killed`'s question. The two differ on exactly one

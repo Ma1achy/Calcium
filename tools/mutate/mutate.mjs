@@ -57,6 +57,31 @@ export function ran(output) {
 }
 
 /**
+ * Did the run's **suites** load?
+ *
+ * **The third state that reads as a survivor, and the one this file did not
+ * have.** A mutation can break the parse of a module the suites import: three of
+ * four files then fail to collect, the fourth runs green, and vitest prints
+ *
+ *     Test Files  3 failed | 1 passed (4)
+ *          Tests  10 passed | 2 todo (12)
+ *
+ * — a summary, so `ran` is true; no failing *test*, so `killed` is false. The row
+ * reads `SURVIVED` and the summary tells the reader to go and look at the tests.
+ * The diagnosis is inverted: the finding is about the mutation, which did not
+ * compile, and nothing was measured at all. Measured on `c21-pty`'s
+ * wrapped-error row, whose `to` opened a `try` it never closed.
+ *
+ * **The signal is the disagreement between the two lines**, not the transform
+ * error above them — that wording is esbuild's and would miss a module that
+ * throws at import, which fails the same way for the same reason.
+ */
+export function unbuilt(output) {
+  const s = strip(output);
+  return /Test Files\s+\d+ failed/.test(s) && !/Tests\s+\d+ failed/.test(s);
+}
+
+/**
  * The harness's own vocabulary for *the suite did not return*.
  *
  * **A timeout is the strongest possible failure and vitest cannot report it**,
@@ -173,6 +198,13 @@ export function runPass({ mutations, control, read, write, run }) {
   // preamble above says why — *a run that never finished and a run that
   // finished green are the same `false`, and they mean opposite things*.
   const clean = run();
+  if (ran(clean) && unbuilt(clean)) {
+    throw new BlindHarnessError(
+      "a suite in the unmutated tree does not load — its tests never ran, and a mutation they " +
+        "cover would come back a survivor. The summary says so in two lines that disagree: " +
+        "`Test Files N failed` with no failing test. Fix the build first",
+    );
+  }
   if (!ran(clean)) {
     throw new BlindHarnessError(
       "the unmutated suite did not reach a summary — it did not compile, did not start, or was " +
@@ -207,14 +239,16 @@ export function runPass({ mutations, control, read, write, run }) {
       }
       for (const [f, src] of staged) write(f, src);
       const output = run();
-      outcome = ran(output)
-        ? {
-            name: m.name,
-            expect: m.expect,
-            killed: killed(output),
-            byNamedTest: output.includes(m.expect),
-          }
-        : { name: m.name, expect: m.expect, killed: false, noSummary: true };
+      outcome = !ran(output)
+        ? { name: m.name, expect: m.expect, killed: false, noSummary: true }
+        : unbuilt(output)
+          ? { name: m.name, expect: m.expect, killed: false, unbuilt: true }
+          : {
+              name: m.name,
+              expect: m.expect,
+              killed: killed(output),
+              byNamedTest: output.includes(m.expect),
+            };
     } catch (err) {
       if (!(err instanceof AnchorError)) throw err;
       outcome = { name: m.name, expect: m.expect, killed: false, anchorMissed: true };
@@ -232,6 +266,8 @@ export function report(results) {
   const lines = results.map((r) => {
     const state = r.noSummary
       ? "NO SUMMARY      "
+      : r.unbuilt
+      ? "DID NOT BUILD   "
       : r.anchorMissed
       ? "ANCHOR MISSED   "
       : r.killed
@@ -257,19 +293,31 @@ export function report(results) {
   //
   // Both still fail the gate. What changes is what the one line says happened.
   const stale = results.filter((r) => r.anchorMissed);
-  const survivors = results.filter((r) => !r.killed && !r.noSummary && !r.anchorMissed);
+  // **The third row that is not a survivor**, and the newest. A `to` that does
+  // not parse takes the suites down with it, so nothing was measured — the
+  // finding is about the mutation and not about the tests it names.
+  const broke = results.filter((r) => r.unbuilt);
+  const survivors = results.filter((r) => !r.killed && !r.noSummary && !r.anchorMissed && !r.unbuilt);
   const staleNote =
     stale.length === 0
       ? ""
       : `\n${stale.length} anchor(s) did not match — those rows ran nothing and are not survivors`;
+  const brokeNote =
+    broke.length === 0
+      ? ""
+      : `\n${broke.length} mutation(s) did not compile — the suites failed to load, so nothing ` +
+        `was measured. Fix the \`to\`, not the test it names`;
   lines.push(
     blind.length > 0
       ? `\n${blind.length} run(s) produced no summary — the harness went blind mid-pass. ` +
           `Nothing above those rows means anything`
       : (survivors.length === 0
-          ? "\nevery mutation was caught"
+          ? stale.length + broke.length === 0
+            ? "\nevery mutation was caught"
+            : "\nno survivors among the rows that ran"
           : `\n${survivors.length} survived — a finding about the tests, or about the sentence they were written from`) +
-        staleNote,
+        staleNote +
+        brokeNote,
   );
   return lines.join("\n");
 }
