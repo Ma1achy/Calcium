@@ -3523,7 +3523,8 @@ The generic suite. **These run against every registered block kind, including ap
 - **T4.49** (I67, I68, with C09 and C22): **a `rule` whose renderer throws draws one row, then three, and the block after it is on the frame in both.** Read from a session's frame rather than from a count — the second frame is the whole subject and no arithmetic shows it.
 - **T4.55** (I68): a far-side patch replacing the block between the frame and the request **discards the request**. Without it the shell floors a block that never threw, addressed by an id the far side has just reused.
 - **T4.6** (with C10): the same document rendered under both themes produces identical line counts.
-- **T4.56** (with C09, C10): a `terminal` inside a `scroll` of height 6 with 40 lines renders the tail six rows and the residue reads `⋯ 34 above`; with `dropped: 12` present, the marker row is row 0 of the content and the residue reads `⋯ 34 above` still — the marker is counted as content, and the two numbers are asserted separately.
+- **T4.56** (with C09, C10): a `terminal` inside a `scroll` of height 6 with 40 lines renders the tail six rows and the residue reads `⋯ 35 above, 0 below`; with `dropped: 12` present the marker row is row 0 of the content, so a three-line screen fits the box whole and draws **no** residue at all — the marker is counted as content, and the two numbers are asserted separately because one number cannot say which mechanism produced it.
+  The count was written as 34 and is 35: forty writes leave forty-one lines, the last being the empty one the cursor sits on. And the second half asked for a residue that a capped screen short enough to fit does not have (F923).
 
 ### Tier 5 — e2e
 

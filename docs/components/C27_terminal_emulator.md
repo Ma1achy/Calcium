@@ -243,7 +243,8 @@ literal: `src/data/emulator/` writes none (A03's escape rule is about `src/`).
 
 ### Tier 4 — integration
 
-- **T4.1** (with C04, C09): a snapshot inside `scroll({ height: 6, follow: true, children: [terminal] })` renders six rows of the tail at 24-bit with the run's colours as `38;2;…` SGR, and the residue row reads `⋯ N above`.
+- **T4.1** (with C04, C09): a snapshot inside `scroll({ height: 6, follow: true, children: [terminal] })` renders **seven** rows — six of content and the residue on top of the box (C04 I47, C04 I49) — at 24-bit with the run's colours as `38;2;…` SGR, and the residue reads `⋯ 36 above, 0 below`.
+  Three figures here were written before they were measured. The row is seven rows, not six; the residue names **both** directions; and the sixth content row is the **cursor's**, an inverse cell on the line the child stopped on, which counts against the box (F923).
 - **T4.2** (with C09): the same document at 4-bit carries the `rgb` run as `nearestAnsi16`'s index, and at 1-bit carries no colour and keeps `inverse`.
 - **T4.3** (with C04): a hand-built `Terminal` whose text carries `\x1b[31m` is refused by `validateDocument` naming the line — the second gate, independent of I2's first.
 
