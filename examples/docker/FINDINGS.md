@@ -33752,3 +33752,130 @@ a retarget fails. Dropping `C09 I4` costs nothing — `test/contract/blocks.test
 duplicated source of truth with no reconciliation* — and prescribes one source rather than two that
 are checked against each other. The table's Declared column should be generated from the rules, and
 that is a separate piece of work from any of the five rulings above.
+
+## F935 — an invariant's measurement outlived its own test by three days ★★☆☆☆
+
+**C28 I39** — *every `SpanName` is opened somewhere, or it is removed* — carried a figure:
+
+> **Seven of nineteen are in that state, measured 2026-09-07** — `chrome`, `overlays`, `paint`,
+> `assemble`, `decode`, `route`, `handler` — which leaves `draw` with one opener of three and
+> `input` with one of four, and it is the same fact as `make profile` reporting **14.6 % of
+> `frame` attributed to no phase at all**.
+
+All seven were wired within the day. `make profile` on 2026-09-08 measures every one of them —
+`assemble` at 358.2 ms, `chrome` 2.3, `overlays` 0.9, `paint` 0.4, `decode` 0.7, `route` 1.0,
+`handler` 4.1 — and attributes **3.3 %** to no phase, not 14.6 %.
+
+**Two tests in the same repository already said so.** `T1.60` asserts **by equality** that no
+declared member is unopened, and `T1.61` is titled *the four frame-path spans fire* and names
+`chrome`, `overlays`, `paint`, `assemble` — the very four. Both were green throughout. So the
+paragraph was not merely stale, it was **contradicted by its own component's suite**, and nothing
+could see it: the rule is enforced and the *figure beside the rule* is prose.
+
+**The date is what makes this interesting rather than sloppy.** The sentence says *measured
+2026-09-07*, so it is honest — and it still reads as a description of the present, because a
+reader meets *seven of nineteen are in that state* before meeting the date, and a figure in an
+invariant is exactly where one looks for the current state. Corrected in place, with the original
+kept and marked as the reading it was.
+
+## F936 — the profiler's largest number was the one it could not decompose ★★★☆☆
+
+`make profile` exists to rank what to fix. Run to re-derive the round's own defect list, it
+reported:
+
+| span | self ms | share of 613 ms |
+|---|---|---|
+| `assemble` | **358.2** | **58.4 %** |
+| `react` | 151.9 | 24.8 % |
+| `paint` | 0.4 | 0.1 % |
+
+**The plan predicted the opposite.** Its P4 said splitting Ink's `renderToString` from the element
+build *"gives Calcium element-tree time vs React+Yoga time and is almost certainly where the frame
+goes"*. React is real and it is second, by 2.4×.
+
+**And the first entry was unusable**, because `assemble` was one span over row-building,
+compositing and the SGR base pass — its own comment says so deliberately, and correctly, about the
+*name*. What the name being right did not settle is whether the span should have children. A span
+holding 58 % of the work with nothing under it **names the file and not the work**, and a ranking
+built on it has a hole where its first row should be.
+
+P4 had specified the split — `composite` + `based` + `body` — and that half never landed. Doing it:
+
+| span | self ms | share |
+|---|---|---|
+| `body` | **409.7** | 48.0 % |
+| `react` | 293.1 | 34.3 % |
+| `assemble` | **0.8** | 0.1 % |
+| `composite` | 0.7 | 0.1 % |
+| `based` | 0.3 | 0.0 % |
+
+So `assemble` **was** `body`, and the two parts the plan named alongside it are a thousandth of it
+each. `based` at 0.3 ms is also the epitaph for the old P11 item *a regex `.replace` per row per
+frame*: fixed, and now measured as nothing.
+
+**One split was not enough, and that is the general point.** `body` held 48 % with nothing under
+it, so the same question applied again — `visible` (C14 selecting and C09 rendering the transcript)
+against `transcript` (what remains, which is `exact()`). Two runs:
+
+| span | run A · 533 ms | run B · 710 ms |
+|---|---|---|
+| `transcript` | 289.6 · **54.3 %** | 372.8 · **52.5 %** |
+| `react` | 154.4 · 29.0 % | 183.8 · 25.9 % |
+| `visible` | 27.9 · 5.2 % | 31.6 · 4.4 % |
+| `body` | 3.3 · 0.6 % | 26.9 · 3.8 % |
+
+The transcript *render* is 5 %; fitting its rows to the width is **53 %**. That is F937.
+
+**Read shares, never absolutes.** Four runs of one fixture on one tree measured 533, 613, 710 and
+854 ms of work — a 60 % spread, on the machine F929 already records as contended. Every ratio here
+is stable across them and no absolute is.
+
+**The reusable half: a span's granularity is a claim about what a reader will be able to act on.**
+`assemble` was accurate, cheap, correctly named and useless for its one purpose, and nothing in the
+suite could say so — C28's rules ask whether a span is *opened* (I39) and *when* (I41), never
+whether it is *divisible*. Three levels were needed to reach an actionable line, and the tell each
+time was the same: one span holding half the work.
+
+## F937 — every row of every frame walks a quadratic cursor ★★★★☆
+
+`exact(text, width)` — `fitStyled` in `presentation/text.ts` — is applied to **every row of every
+frame**, 1700 times in the profiling fixture, and it is **53 % of all frame work**. The cause is
+one line:
+
+    const ch = [...text.slice(i)][0] ?? "";
+
+Per character, that allocates **a copy of the rest of the string** and then **an array of every
+remaining code point**, to read one. The walk is O(n²) in the row's length with two allocations a
+character. Measured against the O(1) read (`String.fromCodePoint(text.codePointAt(i))`):
+
+| row | slice-spread | `codePointAt` | ratio |
+|---|---|---|---|
+| 40 | 0.0112 ms | 0.0037 ms | 3× |
+| 80 | 0.0352 ms | 0.0021 ms | **17×** |
+| 200 | 0.2055 ms | 0.0009 ms | **219×** |
+| 400 | 0.7360 ms | 0.0007 ms | **1081×** |
+
+The indexed read is flat; the current one is not. `fitStyled` tracks it — 0.0242, 0.0264, 0.1451,
+0.6483 ms per call at those four widths — so the frame gets more expensive per row as the terminal
+gets wider, which is the axis a full-screen TUI is least able to avoid.
+
+**And the fast path does not save it, because padding takes the walk too.** Line 181 returns early
+when a row is already exactly `width`:
+
+| case | ms/call at 200 cells |
+|---|---|
+| already exactly `width` | **0.0208** |
+| one cell short — pads | 0.1271 |
+| one cell over — truncates | 0.1576 |
+
+A row that needs nothing but spaces appended pays the whole quadratic walk to discover it, at 6×
+the fast path. Rows arrive from Ink short of the terminal width, so this is the ordinary case, not
+the edge — and the profiler agrees: `transcript`'s self time is **0.21–0.27 ms per row** across
+~1360 rows, which is the walk and not the early return.
+
+**Why nothing saw it.** It is not wrong, it has no failing case, and every test of `fitStyled`
+passes: it is a *cost*, and the only instrument that reads costs is the one that had to be split
+three times to point at it (F936). The old P11 list had *a regex `.replace` per row per frame* one
+function away — that was found by reading, fixed, and now measures 0.3 ms — while the much larger
+per-row pass beside it was never looked at, because reading finds what looks expensive and
+measuring finds what is.
