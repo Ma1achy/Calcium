@@ -33343,3 +33343,127 @@ unknown number loses nothing. C21 I19, commitment 15, T2.9 and T6.19.
 either — by a frame that was on screen for a *different* reason, with the real defect above the
 one being debugged. The row's own bug is what put a real child's exit on the screen at all.
 
+## F925 — two of the four kinds that hold blocks could not be swept at all ★★★★☆
+
+C24 I13 is *`@fmx/calcium/testing` ships the document assertions, so no consumer reimplements
+them*, and `degradesTo1Bit` is the one it says earns the module. Writing T2.12 — the row that
+names the invariant — meant building a document and running the sweep over it. A `scroll` around
+a notice was the shape chosen, because a flat document exercises the assertion and not the walk.
+
+It refused the document.
+
+```
+expectDocument: block kind "scroll" is exempt from the D29 sweep on the premise that it
+carries no meaning-bearing field (a box and a residue row whose meaning is in its numbers,
+and the children are swept as blocks in their own right), and this one carries a tone —
+the premise has expired and the kind needs an arm, not an entry (C04 I37, F102)
+```
+
+**The reason names a mechanism this file does not have.** `visit` recurses for `panel` and
+`group`, and for a `table` row's `detail`. A `scroll` reached `default`, `assertNothingToCheck`
+returned, and the subtree was never read. The same sentence — *the children are swept as blocks in
+their own right* — closes the `mosaic` entry, and `mosaic` is the fourth kind holding
+`children: readonly Block[]`. Four containers, two arms.
+
+**What kept it from being silent is the half worth keeping.** `carriesATone` is deep by design —
+*"Any `tone` anywhere in a block, at any depth. The premise, falsifiable."* — so F102's guard saw
+the *descendant's* tone and threw. Measured, all four:
+
+| document | before | after |
+|---|---|---|
+| `panel` › compliant toned notice | passes | passes |
+| `panel` › bare toned notice | reports the notice | reports the notice |
+| `scroll` › compliant toned notice | **refused**, premise expired | passes |
+| `scroll` › bare toned notice | **refused**, naming the scroll | reports the notice |
+| `mosaic` › compliant toned notice | **refused**, premise expired | passes |
+
+So it was wrong in both directions from one cause: a **legitimate** document containing a scroll
+with any toned descendant could not be swept, and a **real** offence was reported against the
+container rather than the offender.
+
+**The guard was written for leaves, and applied to a container it measures the wrong subject.** A
+leaf's own fields *are* its whole subtree, so a deep scan and an own-fields scan are the same
+measurement there. For a container they are not, and the difference is exactly the children an arm
+sweeps. The repair is an arm for all four that recurses, with the premise kept and scoped to the
+container's own fields — which also gives `panel` and `group` a premise check they never had,
+having had an arm instead.
+
+**Why nothing had run into it.** `degradesTo1Bit` has three call sites in the repository, all in
+`test/contract/expect-document.test.ts`, and none builds a container other than a `panel`. C24's
+**T5.5** — *`degradesTo1Bit` run over every document the reference app produces* — is specified
+and not written, and R01 R2.2 says the same thing about the app's own suite. The exemption
+entries were added, read as reasonable, and never executed.
+
+## F926 — the testing fake reimplemented the shell's default-choice rule, and inverted it ★★★★☆
+
+C24 I26 says `localContext` *"adds `ask`, defaulting to the **decline** path — C23 I36's own
+semantics, so a handler tested without a scripted answer takes the route `Esc` takes rather than a
+stub's."* The row that names the invariant reads the code:
+
+```ts
+ask: (opts) => Promise.resolve((opts.choices.find((c) => c.default) ?? opts.choices[0])?.key ?? ""),
+```
+
+*The marked one, else the **first**.* The shell's rule, `choice-selection.ts`:
+
+```ts
+export function defaultStart(choices) {
+  const marked = choices.findIndex((c) => c.default === true);
+  return marked < 0 ? choices.length - 1 : marked;                 // else the LAST
+}
+```
+
+with its reason stated: *"For a destructive verb the safe option is conventionally last (`yes`,
+`no`), and a default that silently means the first thing offered is the wrong way for this to
+fail."* So on `[{yes},{no}]` unmarked, the shell answers `no` and the fake answered **yes**.
+
+**The justification is true and answers a different question.** The fake's comment reads: *"A
+handler with no `default` in its choices gets the first, because `ask` resolving with nothing is
+the second representation of nothing happened that C23 I36 exists to refuse."* Correct — and an
+argument against returning `""`, not for the first choice over the last. This is the class
+CLAUDE.md names: *a correct sentence justifying the wrong decision survives being read carefully*,
+because review checks whether a justification is true and this one is.
+
+**And the divergence is aimed at exactly the population it hurts.** `defaultStart`'s own note says
+*"Every caller in this repository marks a default, so this only runs for one that forgot"* — so
+inside this repo the two records agree and nothing can notice. The callers who forget are
+consumers, and `src/testing/` exists for consumers. A handler tested here deleted where a user
+pressing `Esc` would have cancelled.
+
+`confirm.ts` had already written the rule for this, about its own two copies: *"two records of one
+fact disagree eventually. They must agree by construction: a question that opens on `no` and
+escapes to `yes` is the worst possible pair."* The fake calls `defaultStart` now.
+
+## F927 — `b` does I/O from the runtime entry, and I10 had no row to say so ★★★☆☆
+
+C24 I10: *"The runtime entry exports no function that performs I/O except `createTui`."* T2.6 is
+specified as *"a source scan finds no I/O in the runtime entry outside `createTui`"*, and was
+never written.
+
+**As specified it would have passed on any tree.** `src/index.ts` is a barrel: 497 lines, 44
+`export` statements, no executable statement at all. A scan *of* it finds no I/O whatever the
+surface does — A03 §2's vacuity class, in a row nobody had run. The question I10 asks is what a
+consumer can *call*, so the row resolves each of the 31 value exports to its defining module and
+scans that.
+
+Two modules come back: `shell/session.ts`, which is `createTui`, and `shell/builders/index.ts`,
+which is `b`.
+
+```ts
+const bytes = data ?? readFileSync(path ?? "").toString("base64");
+```
+
+`b.image({ path })` reads the file synchronously at construction. It is a published convenience
+rather than an oversight — the alternative is every consumer reading the bytes itself — and the
+comment above it is a good one:
+
+> **`path` is read here and nowhere below.** `node:fs` appears in `shell/` and `data/process/` and
+> never in `presentation/` — a renderer that opened a file would be doing I/O at frame cadence in
+> the layer forbidden it, and `measure` and `render` would disagree the moment the file changed
+> between them.
+
+**It argues where the read belongs, and the invariant asks whether the surface may do it at
+all.** F926's shape a second time in one session, and this one had no wrong answer behind it —
+only an unwritten exception. The remedy is naming it: I10 carries `b` with the reason, and T2.6
+compares the reaching set against `{ createTui, b }` **by equality**, so a third is a failure and
+a retired second is one too.
