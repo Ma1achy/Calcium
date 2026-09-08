@@ -266,6 +266,36 @@ describe("C21 — the PTY port, spec-first rows", () => {
     expect(make({ spawn: () => ({}) }).hasPty, "a factory").toBe(true);
   });
 
+  it("T6.19 (C21 I19): passing the port's signal through as SIG${n} → every clean PTY exit is an error", async () => {
+    // The whole of F924 in one assertion: `0` is the port's word for *none*, and
+    // C23 computes `failed = … || exit.signal !== null`. Read as a cast, the
+    // arm's happy path never worked.
+    let fire: ((e: unknown) => void) | null = null;
+    const runner = createProcessRunner({
+      env: {},
+      stdin: {},
+      pty: {
+        spawn: () => ({
+          pid: 1,
+          onData: () => {},
+          onExit: (cb: (e: unknown) => void) => {
+            fire = cb;
+          },
+          write: () => {},
+          resize: () => {},
+          kill: () => {},
+        }),
+      } as never,
+    });
+    const handle = runner.spawnPty("echo hi", { cwd: () => "/w", cols: 80, rows: 6 });
+    (fire as unknown as (e: unknown) => void)({ exitCode: 0, signal: 0 });
+    const exit = await handle.exited;
+    expect(exit.signal, "a clean exit died of no signal").toBeNull();
+    // The reader that decides: C23's own expression, written out so the row
+    // fails on the thing the defect actually broke rather than on a field.
+    expect(exit.code !== 0 || exit.signal !== null, "so the route calls it a success").toBe(false);
+  });
+
   it("T6.18 (C21 I15): restoring readonly to PtyFactory.spawn's args → the port refuses node-pty (F920)", () => {
     // **The gate for this is `tsc`, and it lives in T2.8** — that row assigns
     // `typeof import("node-pty")` to `PtyFactory` and is an error the moment the

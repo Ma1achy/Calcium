@@ -13,6 +13,7 @@ import type { PtyFactory, PtyProcess } from "../../src/data/process/types.js";
 import { resolveConfig } from "../../src/shell/config.js";
 import { buildGraph, fakeAmbient, MANIFEST } from "../support/session.js";
 import { pipelineHarness, settled } from "../support/execution.js";
+import { createProcessRunner } from "../../src/data/process/runner.js";
 import { defaultTheme } from "../../src/presentation/theme/index.js";
 
 import { createEmulator } from "../../src/data/emulator/emulator.js";
@@ -250,6 +251,64 @@ describe("C21 · C22 — the PTY port, spec-first rows", () => {
     // all along — a skip here would be a branch nothing can enter, which is the
     // vacuity class this row is otherwise about.
   });
+  it("T2.9 (C21 I19): the port's numeric signal arrives in the pipe arm's vocabulary", async () => {
+    // **`0` is the port's word for *none*, and it is not `undefined`.** Passed
+    // through as `SIG${n}` it read `SIG0` for every clean exit, and C23's
+    // `exit.signal !== null` made every successful command on the PTY arm an
+    // error under a correct screen (F924). Nine rows agreed it did not, because
+    // every one of them hands a fake that resolves `{code: 0, signal: null}` by
+    // hand — the fixture supplying the behaviour under test.
+    const exitWith = async (e: Record<string, number>): Promise<unknown> => {
+      let fire: ((e: unknown) => void) | null = null;
+      const runner = createProcessRunner({
+        env: {},
+        stdin: {},
+        pty: {
+          spawn: () => ({
+            pid: 1,
+            onData: () => {},
+            onExit: (cb: (e: unknown) => void) => {
+              fire = cb;
+            },
+            write: () => {},
+            resize: () => {},
+            kill: () => {},
+          }),
+        } as never,
+      });
+      const handle = runner.spawnPty("x", { cwd: () => "/w", cols: 80, rows: 6 });
+      (fire as unknown as (e: unknown) => void)(e);
+      return await handle.exited;
+    };
+
+    // The three shapes a real port produces, measured on `node-pty` 1.1.0.
+    expect(await exitWith({ exitCode: 0, signal: 0 }), "a clean exit").toEqual({
+      code: 0,
+      signal: null,
+    });
+    expect(await exitWith({ exitCode: 3, signal: 0 }), "a non-zero exit is still not a signal").toEqual({
+      code: 3,
+      signal: null,
+    });
+    expect(await exitWith({ exitCode: 0, signal: 15 }), "and a signal is named, not numbered").toEqual({
+      code: 0,
+      signal: "SIGTERM",
+    });
+
+    // A port that omits the field entirely — the shape the type allows and
+    // every fake in this repository takes.
+    expect(await exitWith({ exitCode: 0 }), "an absent field is no signal").toEqual({
+      code: 0,
+      signal: null,
+    });
+
+    // **The fallback, so an unknown number is reported rather than swallowed.**
+    expect(await exitWith({ exitCode: 0, signal: 199 }), "nothing is lost").toEqual({
+      code: 0,
+      signal: "SIG199",
+    });
+  });
+
   it("T2.100 (C22 I91): the consumer's factory reaches the runner unwrapped, through two pure forwards", async () => {
     // **The object, not a shape like it.** A root that wrapped the factory —
     // to log a spawn, to default a size — would satisfy every behavioural

@@ -182,6 +182,27 @@ const results = runPass({
       expect: "T2.100",
     },
     {
+      // **F924, and it shipped.** `0` is the port's word for *none* and it is
+      // not `undefined`; read as a cast this returns `SIG0` for every clean
+      // exit, and C23's `exit.signal !== null` makes every successful command
+      // on the PTY arm an error under a correct screen.
+      name: "the port's `0` is read as a signal",
+      file: RUNNER,
+      from: "  if (signal === undefined || signal === 0) return null;",
+      to: "  if (signal === undefined) return null;",
+      expect: "T6.19",
+    },
+    {
+      // The other half: a piped child resolves with Node's `SIGTERM` and this
+      // arm resolved with `SIG15`, for the same death, in a field nothing
+      // downstream normalises again.
+      name: "the signal is numbered rather than named",
+      file: RUNNER,
+      from: "  return SIGNAL_NAMES.get(signal) ?? `SIG${String(signal)}`;",
+      to: "  return `SIG${String(signal)}`;",
+      expect: "T2.9",
+    },
+    {
       // **The one no fake can catch** (F920). Restoring the modifier makes the
       // port refuse `node-pty` — `Readonly<>` rewrites the method into a
       // function-typed property, so `strictFunctionTypes` applies and
