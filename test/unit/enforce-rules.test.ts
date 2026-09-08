@@ -68,6 +68,18 @@ import { COMPONENT_SOURCES, defaultIsImplemented } from "../../tools/enforce/tod
 type Fabrication = { rule: string; file: string; source: string };
 
 /**
+ * Rules that are a specific invariant's mechanical form — **C24 T2.19 (I25)**.
+ *
+ * A `spec` string on the rule's registration is where these already lived, and
+ * it is data rather than a row: SP9 asks whether an invariant is *named by a
+ * test row*, and the answer for both of these was no while the check was
+ * complete. Compared by equality in the row below.
+ */
+const RULE_INVARIANTS: Readonly<Record<string, string>> = {
+  SS48: "C22 I54 · C24 I25",
+};
+
+/**
  * One per implemented scan and module-graph rule. Each source is the smallest
  * thing that is genuinely the violation — not a string engineered to match the
  * regex, which would test the regex against itself.
@@ -1306,7 +1318,7 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     ).toBe(true);
   });
 
-  it("MG27 fires: a block field no builder sets, and the reason list expires", () => {
+  it("T2.18 (C24 I20): MG27 fires — a block field no builder sets, and the reason list expires", () => {
     // **Fabricated from the real first run**, where the three below came back:
     // `patch.collapsedAfter` (filed as F41 by a consumer who wanted it),
     // `patch.actions` and `table.sort` (found by this rule and nothing else).
@@ -1480,7 +1492,11 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     expect(violations[0]?.message).toContain("vacuous rather than satisfied");
   });
 
-  it("MG25 fires: an exported function no other file in src/ names", () => {
+  // **C24 T2.10's row, and it was already here** — the rule the spec names as
+  // I16's mechanical form, fabricated violation and equality arm and all. What
+  // was missing was the citation: SP9 asks whether an invariant is *named* by a
+  // row, and a row that checks it perfectly under another name answers no.
+  it("T2.10 (C24 I16): MG25 fires — an exported function no other file in src/ names", () => {
     // **Fabricated from the real first run**, where 7 of 281 came back and the
     // two shapes below were both in it: a producer with no driver
     // (`assignOffsets`) and a name that appears only inside a comment
@@ -1562,6 +1578,18 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     const fired = violations.filter((v) => v.rule === rule);
     expect(fired, `${rule} matched nothing — it would pass on a real violation`).toHaveLength(1);
     expect(fired[0]!.spec, `${rule} must name the spec that declared it`).toBeTruthy();
+
+    // **The citation, where SP9 can read it.** A rule that *is* an invariant's
+    // mechanical form covers it perfectly and names it nowhere a row can be
+    // seen — SP9 strips comments and `describe` titles, so the coverage was
+    // real and the answer to *which row names C24 I25* was none. Asserted by
+    // equality against what the rule declares, so a rule retargeted at a
+    // different spec fails here rather than drifting from the invariant it was
+    // written for.
+    const owed = RULE_INVARIANTS[rule];
+    if (owed !== undefined) {
+      expect(fired[0]!.spec, `${rule} is ${owed}'s mechanical form`).toBe(owed);
+    }
   });
 
   it("SS51's vocabulary list equals `ramp.ts`'s, both directions", () => {

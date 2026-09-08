@@ -1238,9 +1238,14 @@ const UNCITED_INVARIANTS = Object.freeze([
   "C16 I1", "C16 I16", "C17 I10", "C17 I14", "C18 I11", "C18 I13", "C18 I23",
   "C18 I6", "C19 I12", "C20 I11", "C20 I25", "C21 I7", "C22 I16", "C22 I39", "C22 I4a",
   "C22 I53", "C22 I57", "C23 I13", "C23 I14", "C23 I23", "C23 I24",
-  "C23 I41", "C24 I1", "C24 I10", "C24 I11", "C24 I13", "C24 I14", "C24 I16", "C24 I19",
-  "C24 I20", "C24 I22", "C24 I25", "C24 I26", "C24 I28", "C24 I6", "C24 I7",
-  "C25 I11", "C25 I14", "C25 I15", "C25 I16", "C25 I17", "C25 I19a", "C25 I20a", "C25 I20b",
+  // **C24's two survivors are claims about another repository**, and they stay
+  // for that reason rather than as debt: I1 is *every export is used by the
+  // union of `prism-tui` and the reference app*, and I11 says the reference app
+  // lives in its own repository and the scan is a reported signal rather than a
+  // build gate. Nothing in this tree can hold the other side of either. The
+  // twelve that went with them were rows — ten written, and two that existed
+  // under a rule's name with no citation a row could carry (C24 T2.10, T2.18).
+  "C23 I41", "C24 I1", "C24 I11", "C25 I11", "C25 I14", "C25 I15", "C25 I16", "C25 I17", "C25 I19a", "C25 I20a", "C25 I20b",
   "C26 I1", "C26 I11", "C26 I15", "C26 I8",
 ]);
 

@@ -167,6 +167,84 @@ describe("C24 §7 — expectDocument", () => {
     expect(() => expectDocument(colourOnly).degradesTo1Bit()).toThrow(/colour/i);
   });
 
+  it("degradesTo1Bit sweeps every kind that holds blocks, and its own fields are the premise", () => {
+    const doc = (blocks: unknown[]) =>
+      ({
+        schema: "tui.view/1", command: "x", status: "ok",
+        meta: {
+          verb: null, adapter: "shell", stderr: "", exitCode: 0, durationMs: 1,
+          truncated: false, argv: ["x"], transport: "subprocess", origin: "user",
+        },
+        blocks,
+      }) as never;
+
+    // The violation the sweep exists for, and the same block made compliant.
+    const bad = { kind: "notice", id: "n", tone: "error", text: "" };
+    const good = { kind: "notice", id: "n", tone: "error", text: "the build failed" };
+
+    const CONTAINERS: readonly [string, Record<string, unknown>][] = [
+      ["group", { kind: "group", id: "g", direction: "column" }],
+      ["panel", { kind: "panel", id: "p", title: "t" }],
+      ["scroll", { kind: "scroll", id: "s", height: 4 }],
+      ["mosaic", { kind: "mosaic", id: "m", height: 3, areas: "a" }],
+    ];
+
+    /**
+     * **All four, because two of them could not be swept at all** (F925).
+     *
+     * `scroll` and `mosaic` sat in `KINDS_WITH_NOTHING_TO_CHECK`, each with a
+     * reason ending *"the children are swept as blocks in their own right"*.
+     * Nothing swept them — `visit` reached `default` and returned. What made it
+     * visible rather than silent is that `carriesATone` is deep: F102's guard
+     * fired on a *descendant's* tone, so a document holding a properly toned
+     * notice inside a scroll was **refused**, and one holding a real offence was
+     * refused with the container named instead of the offender.
+     *
+     * A row per kind, because a row over `panel` alone is a restatement of
+     * `panel`'s arm. The two that were broken are the two nobody had built a
+     * fixture for, and C24's T5.5 — `degradesTo1Bit` over every document the
+     * reference app produces — is not written.
+     */
+    for (const [kind, shell] of CONTAINERS) {
+      expect(
+        () => expectDocument(doc([{ ...shell, children: [good] }])).degradesTo1Bit(),
+        `${kind}: a compliant child passes`,
+      ).not.toThrow();
+
+      expect(
+        () => expectDocument(doc([{ ...shell, children: [bad] }])).degradesTo1Bit(),
+        `${kind}: an offending child is reported`,
+      ).toThrow(/colour carries meaning alone/u);
+
+      // And **reported against the offender**, not the container it sat in — the
+      // half a `toThrow(/colour/)` cannot tell apart from the old behaviour.
+      expect(
+        () => expectDocument(doc([{ ...shell, children: [bad] }])).degradesTo1Bit(),
+        `${kind}: naming the notice`,
+      ).toThrow(/notice "n" is toned error/u);
+    }
+
+    // Nested two deep, so the recursion is a walk rather than one level.
+    expect(
+      () =>
+        expectDocument(
+          doc([{ kind: "scroll", id: "s", height: 4, children: [{ kind: "panel", id: "p", title: "t", children: [bad] }] }]),
+        ).degradesTo1Bit(),
+      "a scroll around a panel around the offence",
+    ).toThrow(/notice "n" is toned error/u);
+
+    // **The premise, still falsifiable.** F102's guard survives the change,
+    // scoped to the container's own fields: a tone appearing on a `scroll`
+    // itself is a new field the arm does not check, and it says so.
+    expect(
+      () =>
+        expectDocument(
+          doc([{ kind: "scroll", id: "s", height: 4, tone: "error", children: [good] }]),
+        ).degradesTo1Bit(),
+      "a tone outside the children expires the premise",
+    ).toThrow(/the premise has expired and the arm needs a check/u);
+  });
+
   it("degradesTo1Bit accepts a renderer that changes layout to keep the information", () => {
     // **The case that proved frame comparison was the wrong property.** A
     // two-series plot lays out as stacked strips at `colourDepth: 1` — C12

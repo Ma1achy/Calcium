@@ -125,15 +125,6 @@ const KINDS_WITH_NOTHING_TO_CHECK: ReadonlyMap<BlockKind, Exemption> = new Map<
     },
   ],
   [
-    "scroll",
-    {
-      premise: "no-field",
-      why:
-        "a box and a residue row whose meaning is in its numbers, and the children are swept " +
-        "as blocks in their own right",
-    },
-  ],
-  [
     "image",
     {
       premise: "no-field",
@@ -155,15 +146,6 @@ const KINDS_WITH_NOTHING_TO_CHECK: ReadonlyMap<BlockKind, Exemption> = new Map<
         "carry meaning by colour, and these are not ours",
     },
   ],
-  [
-    "mosaic",
-    {
-      premise: "no-field",
-      why:
-        "pure geometry — a grid string, a height and two share arrays, none of which can carry " +
-        "a meaning that colour alone conveys; the children are swept as blocks in their own right",
-    },
-  ],
 ]);
 
 /** Any `tone` anywhere in a block, at any depth. The premise, falsifiable. */
@@ -173,6 +155,48 @@ function carriesATone(value: unknown): boolean {
   const record = value as Record<string, unknown>;
   if (typeof record["tone"] === "string") return true;
   return Object.values(record).some(carriesATone);
+}
+
+/**
+ * The four kinds that hold blocks — **and why two of them were exemptions**
+ * (F925).
+ *
+ * `scroll` and `mosaic` sat in `KINDS_WITH_NOTHING_TO_CHECK`, each with a `why`
+ * ending *"the children are swept as blocks in their own right"*. Nothing swept
+ * them: `visit` reached `default`, `assertNothingToCheck` returned, and the
+ * subtree was never read. The reason named a mechanism this file does not have.
+ *
+ * It did not fail silently, which is the half worth keeping and the half that
+ * made it visible: `carriesATone` is deep, so F102's guard fired on a
+ * *descendant's* tone. What that produced was a **false refusal** — a `scroll`
+ * holding a properly toned notice, text and all, could not be swept at all —
+ * and, on a real offence, the container named where the offender should be.
+ *
+ * **The guard was written for leaves.** A leaf's own fields are its whole
+ * subtree, so a deep scan and an own-fields scan are the same measurement
+ * there; for a container they are not, and the difference is exactly the
+ * children an arm sweeps. So the premise survives, scoped to the container's
+ * own fields — and it now covers `panel` and `group` too, which had an arm and
+ * therefore no premise check at all.
+ */
+const CONTAINER_PREMISE: ReadonlyMap<BlockKind, string> = new Map<BlockKind, string>([
+  ["group", "a direction, shares and alignments"],
+  ["panel", "a title, a footer and a live flag"],
+  ["scroll", "a box and a residue row whose meaning is in its numbers"],
+  ["mosaic", "pure geometry — a grid string, a height and two share arrays"],
+]);
+
+/** `carriesATone` over a container's **own** fields, its children excluded. */
+function assertContainerPremise(block: Block & { children: readonly Block[] }): void {
+  const { children: _children, ...own } = block;
+  if (!carriesATone(own)) return;
+  throw new Error(
+    `expectDocument: block kind "${block.kind}" is swept as a container on the premise that ` +
+      `its own fields carry no meaning colour alone could convey ` +
+      `(${CONTAINER_PREMISE.get(block.kind) ?? "?"}), and this one carries a tone outside its ` +
+      `children — the premise has expired and the arm needs a check, not a recursion ` +
+      `(C04 I37, F102, F925)`,
+  );
 }
 
 /**
@@ -535,6 +559,9 @@ export function expectDocument(doc: ViewDocument): DocumentAssertions {
             break;
           case "panel":
           case "group":
+          case "scroll":
+          case "mosaic":
+            assertContainerPremise(block);
             for (const child of block.children) visit(child);
             break;
           /**
