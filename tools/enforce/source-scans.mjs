@@ -588,7 +588,12 @@ export const SCANS = [
   //
   // The pattern names the declarations rather than the calls, so importing
   // either owner is fine and writing a second is not.
-  { id: "SS30", spec: "C18 I11 · C18 T2.3 · C18 T2.10 · C19 T2.4 · C05 I18 · C05 T2.9",
+  { id: "SS30", spec: "C18 I11 · C18 I23 · C18 T2.3 · C18 T2.10 · C19 T2.4 · C05 I18 · C05 T2.9",
+    // **`C18 I23` was missing and the `why` below already named it.** The rule
+    // began as the tokeniser rule and grew a quoter and a distance-2 suggester;
+    // the pattern grew with it and the citation did not, so I23 — *there is
+    // exactly one implementation, as there is exactly one tokeniser* — was
+    // enforced completely by a rule that named its sibling and not it (F930).
     pattern:
       /^(?:export\s+)?(?:async\s+)?function\s+(?:tokenis[ez]e?|lex|shellSplit|quoteArg|shellQuote|quote|levenshtein|editDistance|distance)\b/m,
     scope: "src/",
@@ -759,7 +764,19 @@ export const SCANS = [
   // **The lookbehind is narrower than a file exemption and that is the point.**
   // Allowing `svg.ts` would blind the rule to a real `color=` in the file most
   // likely to grow one.
-  { id: "SS37", spec: "C09 I4 · C09 T2.17",
+  // **This was ruled on, and the ruling never reached here** (F934). A03's
+  // table has said `C09 I15, T2.17` since the audit's third-kind pass, and
+  // `COMMITMENT_INVARIANT_AUDIT.md` §"A third kind of A03 defect" states it in
+  // words — *SS37 declared C09 I4 while its behaviour is C09 I15* — and names
+  // the class: *both fire correctly and always did; both were mislabelled, and
+  // every previous check read the label rather than the target.* The prose was
+  // corrected in two documents and the `spec` string this line holds was not,
+  // because nothing joins A03's Declared column to it. I4 is *no renderer
+  // emits a colour directly; styling comes from `resolve` against a declared
+  // palette slot*, a claim about where a colour comes from; I15 is *no
+  // renderer sets an Ink colour prop*, which is this pattern word for word,
+  // and it is what the `why` below describes.
+  { id: "SS37", spec: "C09 I15 · C09 T2.17",
     pattern: /(?<![\w-])(?:color|backgroundColor)\s*=/,
     scope: "src/presentation/", allow: [],
     why: "renderers emit SGR from terminal/escapes.ts; an Ink colour prop discards the depth tag" },

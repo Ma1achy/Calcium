@@ -358,7 +358,7 @@ describe("C09 contract — the source rules", () => {
     }
   });
 
-  it("T2.17 (§3): the SGR edge is the only one, and no Ink colour prop exists", () => {
+  it("T2.17 (I15, §3): the SGR edge is the only one, and no Ink colour prop exists", () => {
     const violations = checkSourceScans(files).filter((v) => v.rule === "SS37");
     expect(violations, "an Ink colour prop discards the depth tag").toEqual([]);
     expect(checkModuleGraph(files).filter((v) => v.rule === "MG21")).toEqual([]);

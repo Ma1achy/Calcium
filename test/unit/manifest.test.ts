@@ -197,7 +197,7 @@ describe("C05 findTool", () => {
     expect(findTool(fixture(), [])).toBeNull();
   });
 
-  it("T1.15: a hidden tool is absent from visibleTools and still resolves", () => {
+  it("T1.15 (I14): a hidden tool is absent from visibleTools and still resolves", () => {
     // Asserted together. Split into two tests both pass while the intent —
     // invocable, not offered — goes missing between them.
     const m = fixture();

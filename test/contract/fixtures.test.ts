@@ -326,3 +326,122 @@ describe("A01 §6 — the boundary conformance suite", () => {
     expect(checkResult("ps", result({ exitCode: 130, cancelled: true }))).toEqual([]);
   });
 });
+
+describe("C08 §4 — a mutating verb's answer has a recording behind it", () => {
+  const fixtureWith = (over: Partial<Fixture>): Fixture =>
+    ({
+      id: "f1",
+      verb: "start",
+      argv: ["start", "web"],
+      provenance: "recorded",
+      capturedAt: "2026-01-01T00:00:00Z",
+      cliVersion: "1.0.0",
+      result: {
+        argv: ["start", "web"],
+        exitCode: 0,
+        signal: null,
+        stdout: { ok: true },
+        stdoutRaw: '{"ok":true}',
+        stderr: "",
+        durationMs: 1,
+        parseError: null,
+        cancelled: false,
+        timedOut: false,
+      },
+      ...over,
+    }) as Fixture;
+
+  it("T2.12 (I16, I10): the three provenances owe three different things, and that is the claim", () => {
+    // **This is *derived from a recording rather than composed*, enforced.** The
+    // asymmetry is not about notes, which is what it looked like from the spec:
+    //
+    //   derived   → must carry a `capturedAt` — "a recording knows when it was taken"
+    //   authored  → must carry a note, and must NOT carry a `capturedAt`
+    //   recorded  → owes neither; `record()` supplies both
+    //
+    // So the timestamp is the recording's fingerprint and it is exactly what a
+    // composed answer cannot produce. A model asking the same of all three
+    // would forbid nothing, and every fixture would read as having a source.
+    expect(
+      checkProvenance([fixtureWith({ provenance: "derived" })]),
+      "a derived fixture stands on the recording it came from",
+    ).toEqual([]);
+
+    const composed = checkProvenance([
+      fixtureWith({ provenance: "derived", capturedAt: null }),
+    ]);
+    expect(composed.length, "derived with nothing behind it is refused").toBe(1);
+    expect(composed[0]!.message).toMatch(/derived without a capturedAt/u);
+
+    // And a note does not buy its way out — the two currencies are not
+    // interchangeable, which is what makes them two rules rather than one.
+    expect(
+      checkProvenance([
+        fixtureWith({ provenance: "derived", capturedAt: null, note: "from the world" }),
+      ]).length,
+      "a note is not a recording",
+    ).toBe(1);
+
+    const authored = checkProvenance([fixtureWith({ provenance: "authored", capturedAt: null })]);
+    expect(authored.length, "authored without a note is refused").toBe(1);
+    expect(authored[0]!.message).toMatch(/authored without a note/u);
+
+    // The other direction of the same asymmetry: authoring cannot claim a
+    // capture, because nothing captured it.
+    const claiming = checkProvenance([fixtureWith({ provenance: "authored", note: "why" })]);
+    expect(claiming.length, "authored but carrying a capturedAt is refused").toBe(1);
+    expect(claiming[0]!.message).toMatch(/nothing captured it/u);
+
+    expect(checkProvenance([fixtureWith({})]), "and a recording owes neither").toEqual([]);
+  });
+
+  it("T2.12b (I16): `record()` is the only thing in C08 that produces `recorded`", () => {
+    // The half that makes the three-valued model mean anything. If any other
+    // site could stamp `recorded`, a composed answer could claim a recording it
+    // never had, and every row above would still pass.
+    const files = readdirSync("src/data/fixtures")
+      .filter((f) => f.endsWith(".ts"))
+      .map((f) => `src/data/fixtures/${f}`);
+    const sites: string[] = [];
+    for (const f of files) {
+      const stripped = readFileSync(f, "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/^\s*\/\/.*$/gm, "");
+      if (/provenance:\s*"recorded"/.test(stripped)) sites.push(f);
+    }
+    expect(sites, "one producer, and it is `record`").toEqual(["src/data/fixtures/record.ts"]);
+    expect(files.length, "the corpus is not empty").toBeGreaterThan(5);
+  });
+
+  it("T2.12c (I16): the mutating half is app-side, and the seam that keeps it there holds", () => {
+    // **A watch, not coverage.** §5's W tier names `prism-tui` and `docker-tui`
+    // as the owners of *that a particular world advances, mutates and refuses
+    // as its domain requires* — so I16's first clause has no subject in this
+    // repository, and a row asserting it here would be asserting a fixture of
+    // its own making. What is checkable is that the seam stayed a seam: C08
+    // declares `WorldDriver` and implements it nowhere, so the day a world
+    // lands in `src/` this row fails and the clause becomes testable here.
+    const files = readdirSync("src/data/fixtures")
+      .filter((f) => f.endsWith(".ts"))
+      .map((f) => `src/data/fixtures/${f}`);
+    // Matched on *construction*, not on the name: `handler.ts` declares
+    // `world?: WorldDriver` as an option and is a consumer, not an implementer.
+    // A pattern reading the name alone reports the seam's one legitimate caller.
+    const implementers = files.filter((f) =>
+      /:\s*WorldDriver\s*=|satisfies\s+WorldDriver\b|implements\s+WorldDriver\b/.test(
+        readFileSync(f, "utf8")
+          .replace(/\/\*[\s\S]*?\*\//g, "")
+          .replace(/^\s*\/\/.*$/gm, ""),
+      ),
+    );
+    expect(implementers, "declared here, implemented nowhere here (I9)").toEqual([]);
+    expect(
+      /:\s*WorldDriver\s*=/.test("const world: WorldDriver = { query, advance, reset };"),
+      "the pattern can fire",
+    ).toBe(true);
+    expect(
+      readFileSync("src/data/fixtures/world.ts", "utf8"),
+      "and the declaration is still here to be implemented elsewhere",
+    ).toMatch(/export interface WorldDriver\b/u);
+  });
+});

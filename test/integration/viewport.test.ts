@@ -60,7 +60,7 @@ describe("C14 integration", () => {
     }
   });
 
-  it("T4.3 (with C13): each Change produces the documented invalidation", () => {
+  it("T4.3 (I15, with C13): each Change produces the documented invalidation", () => {
     const store = createTranscriptStore();
     const viewport = createViewport(store, { width: 80, height: 10, measureSequence });
 

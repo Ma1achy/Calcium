@@ -43,7 +43,7 @@ const ADVERSARIAL: readonly Readonly<{ label: string; text: string }>[] = [
 
 describe("C09 T2.16 — cells() and Ink agree on width", () => {
   for (const { label, text } of ADVERSARIAL) {
-    it(`T2.16 (§3): ${label}`, () => {
+    it(`T2.16 (I16, §3): ${label}`, () => {
       expect(
         cells(text),
         `cells() and Ink disagree on ${JSON.stringify(text)} — ` +
@@ -52,7 +52,7 @@ describe("C09 T2.16 — cells() and Ink agree on width", () => {
     });
   }
 
-  it("T2.16b (§3): the agreement holds for every glyph in the substitution table", () => {
+  it("T2.16b (I16, §3): the agreement holds for every glyph in the substitution table", () => {
     // I5 says a fallback is 1:1 by cell count. That claim is made against
     // `cells()`, so it means nothing unless Ink counts the same way — a
     // fallback that is one cell to us and two to Ink shifts the layout by one

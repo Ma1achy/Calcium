@@ -731,3 +731,89 @@ describe("C16 §4a row t — a hover is not an input that disarms", () => {
     }
   });
 });
+
+describe("C16 §5 — Ctrl-D, and the one thing C16 stores", () => {
+  const ctrlD = key("d", { ctrl: true });
+
+  it("T1.90 (I16): Ctrl-D with text is consumed and discarded — never EOF, never a delete", () => {
+    // **A keystroke that sometimes ends the session and sometimes edits the
+    // line is one nobody presses twice**, so the row asserts both halves of the
+    // discard: no exit confirm is raised, and the prompt is not touched. The
+    // second is the one that would go unnoticed — a delete-forward here looks
+    // like a working editor until the day the buffer is empty.
+    const h = harness({ promptHasText: () => true });
+    expect(h.router.dispatch(ctrlD), "consumed").toBe(true);
+    expect(h.calls, "no exit, and the buffer untouched").toEqual([]);
+  });
+
+  it("T1.90b (I16): Ctrl-D on an empty prompt opens a confirm rather than exiting", () => {
+    // Dispatched only when the buffer is empty — and what it dispatches *to* is
+    // a confirm. A route that exited here would satisfy "dispatched only when
+    // empty" exactly, which is why the two clauses are one row.
+    // Two presses inside the window, as Ctrl-C takes: the arming machine is
+    // shared, which is the half worth asserting — C16's own walk found an
+    // arming machine that answered for one event kind of three, and a
+    // per-key copy is exactly what that looks like from outside.
+    const h = harness({ promptHasText: () => false });
+    expect(h.router.dispatch(ctrlD), "consumed").toBe(true);
+    expect(h.calls, "the first press arms and does not exit").toEqual([]);
+    h.advance(100);
+    expect(h.router.dispatch(ctrlD), "consumed").toBe(true);
+    expect(h.calls, "a confirm, not an exit").toEqual(["exitConfirm"]);
+  });
+
+  it("T1.90c (I16): Ctrl-D never cancels a stream, where Ctrl-C does", () => {
+    // The asymmetry that keeps them two keys. Ctrl-C's subscription rung
+    // outranks a half-typed line; Ctrl-D has never been a cancel, and a rung
+    // that took both would be invisible to every row above.
+    let cancels = 0;
+    const h = harness({
+      promptHasText: () => false,
+      liveStreams: () => 1,
+      cancelNewestStream: () => {
+        cancels += 1;
+        return true;
+      },
+    });
+    h.router.dispatch(ctrlD);
+    expect(cancels, "Ctrl-D is not a cancel").toBe(0);
+
+    const c = harness({
+      promptHasText: () => false,
+      liveStreams: () => 1,
+      cancelNewestStream: () => {
+        cancels += 1;
+        return true;
+      },
+    });
+    c.router.dispatch(ctrlC);
+    expect(cancels, "and Ctrl-C is, on the same state").toBe(1);
+  });
+
+  it("T1.91 (I1): focus is one stored location, and everything else is derived per dispatch", () => {
+    // **`StoredFocus` is a *location*, not a resolved element**, and that is
+    // the whole of the invariant: C15, C14 and C13 are consulted on every
+    // dispatch, so a store holding anything resolved would be a second source
+    // that goes stale exactly when the transcript changes underneath it.
+    const h = harness();
+    const stored = h.focus.current;
+    expect(Object.keys(stored), "a location, and nothing else").toEqual(["at"]);
+    expect(stored.at).toBe("prompt");
+
+    // Derived, shown by changing what the *deps* answer and reading focus
+    // again with nothing stored having changed. A cached resolution would give
+    // the old answer here and no assertion above would notice.
+    const before = h.focus.current;
+    h.layer.top = { id: "L1" } as unknown as Placed["layer"];
+    expect(h.focus.current, "the store did not move").toEqual(before);
+
+    // And the structural half: one stored field, over the declaration, so a
+    // second one cannot be added without this failing.
+    const types = readFileSync("src/interaction/router/types.ts", "utf8");
+    const union = /export type StoredFocus =([\s\S]*?)\n\n/.exec(types);
+    expect(union, "StoredFocus' declaration").not.toBeNull();
+    const body = union![1]!.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    expect(body, "every arm is a location keyed by `at`").toMatch(/at:\s*"prompt"/u);
+    expect(body).toMatch(/at:\s*"liveBlock"/u);
+  });
+});

@@ -250,3 +250,57 @@ describe("T2.4, T2.5, T2.6, T2.10 — the source scan, from C20's side", () => {
     }
   });
 });
+
+describe("C20 §7b — every rule reaches inside every compound", () => {
+  const SECRET_TOKEN = "ghp_16C7e42F292c6912E7710c838347Ae178B4a";
+
+  /**
+   * **The grid, because *every rule* is a claim about a set** (I25). Three rules
+   * × two compounds. Rows asserting one cell pass while the other five leak,
+   * and that is not hypothetical: five of the six leaked when this was written,
+   * and the one that did not was incidental (F931).
+   */
+  const GRID: readonly (readonly [string, string, Rule])[] = [
+    ["P1 · quoted compound", `sh -c "curl --api-key=${SECRET_TOKEN} https://x"`, "P1"],
+    ["P2 · quoted compound", `sh -c "TOKEN=${SECRET_TOKEN} run"`, "P2"],
+    ["E · quoted compound", `sh -c "curl -H 'PRIVATE-TOKEN: ${SECRET_TOKEN}'"`, "E"],
+    ["P1 · URL query", `curl "https://x/y?--api-key=${SECRET_TOKEN}&a=1"`, "P1"],
+    ["P2 · URL query", `curl https://x/y?token=${SECRET_TOKEN}`, "P2"],
+    ["E · URL query", `curl https://x/y?q=${SECRET_TOKEN}`, "E"],
+  ];
+
+  for (const [name, command, rule] of GRID) {
+    it(`T2.13 (I25): ${name} — the secret is gone, and by the right rule`, () => {
+      const done = fired(command);
+      expect(done.text, "the secret survived the compound").not.toContain(SECRET_TOKEN);
+      // **The rule, not only the outcome** — a right answer through the wrong
+      // rule is a redactor about to give a wrong one, which is why `fired`
+      // exists at all.
+      expect(done.rules, "and through the rule this cell is about").toContain(rule);
+    });
+  }
+
+  it("T2.13b (I25): the fragment is a compound too, and the path is deliberately not", () => {
+    // The scope, stated where it can be checked rather than left to a comment.
+    // A URL's query and fragment are scanned by their pieces; its **path** is
+    // not, because that is the part `isPath` already rules on and a rooted path
+    // is exempt whether or not a scheme precedes it — so the two behave the
+    // same, which is what makes the exemption a policy rather than an oversight.
+    expect(fired(`curl https://x/y#${SECRET_TOKEN}`).text).not.toContain(SECRET_TOKEN);
+    expect(fired(`curl https://x/y?a=1&q=${SECRET_TOKEN}&b=2`).text).not.toContain(SECRET_TOKEN);
+
+    const inUrlPath = fired(`curl https://x/${SECRET_TOKEN}`).text.includes(SECRET_TOKEN);
+    const inBarePath = fired(`cat /var/${SECRET_TOKEN}`).text.includes(SECRET_TOKEN);
+    expect(inUrlPath, "a URL path segment follows the path policy").toBe(inBarePath);
+  });
+
+  it("T2.13c (I25): one redaction reports one rule — the two passes do not both count it", () => {
+    // The regression the fix nearly introduced: the token-level splice and the
+    // text-level pass can both see the same assignment, and a doubled entry
+    // reports two redactions where one happened. The text was right in both
+    // worlds, so only the rule list can tell them apart.
+    const done = fired(`curl 'https://host/api?private_token=abc123&page=2'`);
+    expect(done.rules).toEqual(["P2"]);
+    expect(done.text).toBe(`curl 'https://host/api?private_token=[REDACTED]&page=2'`);
+  });
+});

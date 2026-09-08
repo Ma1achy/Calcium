@@ -1231,19 +1231,20 @@ export function scanSections(file, src, options = {}) {
  * one would under-report, silently.
  */
 const UNCITED_INVARIANTS = Object.freeze([
-  "C01 I15", "C01 I16", "C01 I17", "C03 I11", "C05 I13", "C05 I14", "C06 I21", "C06 I22", "C06 I23",
-  "C07 I16", "C07 I17", "C07 I21", "C08 I16", "C09 I15", "C09 I16", "C10 I18", "C10 I19",
-  "C10 I20", "C11 I12", "C14 I11", "C14 I13", "C14 I15", "C14 I16", "C14 I22",
-  "C16 I1", "C16 I16", "C17 I10", "C17 I14", "C18 I11", "C18 I13", "C18 I23",
-  "C18 I6", "C19 I12", "C20 I11", "C20 I25", "C21 I7", "C22 I16", "C22 I39", "C22 I4a",
-  "C22 I53", "C22 I57", "C23 I13", "C23 I14", "C23 I23", "C23 I24",
-  // **C24 is empty, and its last two were the ones ruled unclosable.** I1 and
-  // I11 name another repository, which is true and is not the whole of either:
-  // I1's checkable half is that the scan is over a *union* — a member named by
-  // only one of two apps is cleared — and I11's is the disposition, *reported,
-  // never gated*, which enforce demonstrates every run by exiting 0 with a
-  // residue in the hundreds. Ruling a claim unclosable is worth doing twice.
-  "C23 I41", 
+  // **Empty, and the empty list is the assertion.** SP9 compares by equality, so
+  // this cannot silently re-fill: an invariant added without a row naming it
+  // fails on the commit that adds it, and the entry a contributor writes here to
+  // get past that is the entry a reviewer sees.
+  //
+  // What the 80 turned out to be, closed over three passes: **thirty-two were
+  // already covered** by a row that named the mechanism rather than the
+  // invariant — a rule's fabricated violation, a differently-titled row, or a
+  // T-number the spec itself named — and wanted a citation, not a test. The rest
+  // wanted rows, and four of those are **watches** rather than coverage, because
+  // their subject does not exist yet: C25 I14–I16's `maxExpandHeight`, C26 I15's
+  // arrow and escape policies, and C08 I16's world, which is app-side by
+  // construction. Each asserts the absence and fails the day the subject lands.
+
 ]);
 
 /**

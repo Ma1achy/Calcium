@@ -19,7 +19,9 @@
 // the entry ending in the *other* arm's state.
 import { createEditor } from "../../src/interaction/editor/index.js";
 import { createConfirmHost } from "../../src/shell/confirm.js";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { checkOneStorePerComponent } from "../../tools/enforce/module-graph.mjs";
 import { createExecutionPipeline } from "../../src/shell/execution.js";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { createSessionStore } from "../../src/shell/state.js";
@@ -2381,3 +2383,124 @@ describe("C23 §4 — the submit row's two other steps", () => {
     expect(h.recorded.map((r) => r.command), "and now it is in C20").toContain("/ps --mine");
   });
 });
+
+describe("C23 §2, §3 — what the pipeline may not do", () => {
+  it("T1.60 (I41): `height` is non-null on the view route and null on every other", () => {
+    // **Decided from `isViewInvocation` before step 3** — the decision is
+    // already read there because after step 3 it is too late (C23 I3 appends
+    // the pending entry before the transport is invoked, and C13 has no
+    // delete). What this row asserts is the *partition*: a route that handed
+    // down the region's height everywhere would satisfy every assertion about
+    // a view's producer and quietly tell a transcript entry it is bounded.
+    const src = readFileSync("src/shell/execution.ts", "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^\s*\/\/.*$/gm, "");
+    // To the end of the call, not to the first `)` — `deps.region().height`
+    // carries one of its own, and truncating there makes the two arms read alike.
+    const calls = [...src.matchAll(/producerContext\((.*)\),?\s*$/gmu)].map((m) => m[1]!.trim());
+    expect(calls.length, "the corpus is not empty").toBeGreaterThan(3);
+
+    // **A tally, not a set** (F932). Two arguments and no third — `null`, or the
+    // region's height — and *how many of each*, compared by equality. The set of
+    // distinct answers is blind to the one change this row exists to catch: a
+    // route moving from `null` to the height leaves both answers present, so the
+    // vocabulary is unchanged while the partition is not. Measured, not supposed
+    // — the mutation that hands the height to a non-view route survived the set
+    // and is caught by this tally. A route added here must be classified
+    // deliberately, which is the point: I41 is a claim about *which routes*, not
+    // about which words appear somewhere in the file.
+    const tally: Record<string, number> = {};
+    for (const c of calls) tally[c] = (tally[c] ?? 0) + 1;
+    expect(tally, "two answers, and the partition between them").toEqual({
+      null: 5,
+      "deps.region().height": 2,
+    });
+
+    // And the region's height is a real bound rather than a stand-in for the
+    // terminal's — the distinction I41 turns on (C07 I18).
+    expect(src, "the view route reads the region").toMatch(/deps\.region\(\)\.height/u);
+  });
+
+  it("T1.61 (I24): C23 inserts no vertical spacing of its own", () => {
+    // **The rule has teeth in one direction only**: C23 may not *add* rhythm.
+    // A composition root that put a blank row between top-level blocks would
+    // make a document's height depend on where it was rendered — so the height
+    // C14 virtualises against and the height the frame draws would be computed
+    // by different code with no reason to agree, and it would be invisible to
+    // `measure`, the one place the system checks anything about height.
+    const files = ["src/shell/execution.ts", "src/shell/refresh.ts"];
+    for (const f of files) {
+      const stripped = readFileSync(f, "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/^\s*\/\/.*$/gm, "");
+      // A blank `raw` block is the shape a spacer takes: an empty text, or a
+      // lone newline, appended between blocks that declare their own gaps.
+      const spacers = [...stripped.matchAll(/kind:\s*"raw"[^}]*text:\s*("(?:\\n|\s*)")/gu)];
+      expect(spacers.map((m) => m[1]), `${f} composes a spacer`).toEqual([]);
+    }
+
+    // The control: the pattern finds a spacer when one is written, so an empty
+    // result is a reading of these files rather than of a dead regex.
+    expect(
+      /kind:\s*"raw"[^}]*text:\s*("(?:\\n|\s*)")/u.test('block({ kind: "raw", id: "gap", text: "" })'),
+      "the pattern can fire",
+    ).toBe(true);
+
+    // And the positive half, so *no rhythm of its own* is not read as *no
+    // rhythm*: the declared gap is what survives, which is C04 I25's field
+    // doing the work C23 is forbidden to do. It is set where documents are
+    // *composed* — the local handlers — and nowhere in the routing itself,
+    // which is the division the invariant describes.
+    expect(readFileSync("src/shell/local/handlers.ts", "utf8"), "declared, block by block").toMatch(
+      /gapBefore:\s*true/u,
+    );
+  });
+
+  it("T1.62 (I23): `/debug` reads an entry's meta and reaches no transport", () => {
+    // **It never re-runs anything.** A `/debug` that re-invoked would produce a
+    // document that agrees with itself and disagrees with the entry it claims
+    // to describe — and every assertion about its *contents* would pass.
+    const handlers = readFileSync("src/shell/local/handlers.ts", "utf8");
+    // Anchored on the handler's own arrow and closed at its `return`, so the
+    // slice is `/debug` and not whatever follows it in the record.
+    const body = /\n    debug: \(argv\) => \{([\s\S]*?)\n      return doc\("\/debug", blocks\);/.exec(
+      handlers,
+    );
+    expect(body, "the debug handler").not.toBeNull();
+    const stripped = body![0]!.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+    // **A reach, not the word.** The handler reads `m.transport` and prints
+    // `transport` as a row label — so a pattern matching the noun reports the
+    // one thing I23 says it *should* do. What is forbidden is going back to a
+    // far side, which looks like `deps.transport`, an `invoke`, a `stream` or
+    // a resubmission.
+    const reach = /deps\.transport\b|\.invoke\(|\.stream\(|\.submit\(|\brerun\b/u;
+    expect(reach.test(stripped), "no re-run").toBe(false);
+    expect(stripped, "it reads the entry's meta instead").toMatch(/entry\.doc\.meta/u);
+    expect(
+      reach.test('const r = await deps.transport.for("ps").invoke(inv);'),
+      "the pattern can fire",
+    ).toBe(true);
+  });
+
+  it("T1.63 (I13): no component under C23 reaches a store another component owns", () => {
+    // I13's mechanical form is MG23 — *one store per component* — and it is
+    // asserted in `enforce-rules.test.ts` on a fabrication. What is owed here
+    // is that the rule is **live on the real tree**, because a rule that fires
+    // on a fabrication and is scoped to nothing reports zero for both reasons.
+    const violations = checkOneStorePerComponent(srcFiles("src/shell"), (f) =>
+      readFileSync(f, "utf8"),
+    );
+    expect(violations.filter((v) => v.rule === "MG23"), "the tree honours it").toEqual([]);
+  });
+});
+
+/** The walker MG23 is given, kept beside its one caller. */
+function srcFiles(dir: string, out: string[] = []): string[] {
+  for (const entry of readdirSync(dir)) {
+    const path = `${dir}/${entry}`;
+    if (statSync(path).isDirectory()) srcFiles(path, out);
+    else if (/\.tsx?$/.test(entry) && !/\.d\.ts$/.test(entry)) out.push(path);
+  }
+  return out;
+}

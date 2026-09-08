@@ -204,3 +204,146 @@ describe("T2.7 (I11) — no adapter is required for a verb to be usable", () => 
     }
   });
 });
+
+describe("C07 §3 — what the registry owns and what a producer is told", () => {
+  it("T2.8 (I16): every route takes `doc.command` from the context, including identity", () => {
+    // **The identity route is the one that regressed**, and it regressed
+    // silently: the transcript drew `ps --json`, the spawned form carrying a
+    // flag D16 appends and the user never wrote. So the row drives a far side
+    // that supplies its own `command` and asserts it loses on every route.
+    const registry = createAdapterRegistry();
+    const forged = "ps --json --forged-by-the-far-side";
+
+    for (const row of ROWS) {
+      const raw = resultOf({ ...row.over }, { command: forged, items: [] }, "{}");
+      const doc = registry.adapt(raw, { ...CTX, command: "/ps" });
+      expect(doc.command, `${row.name} took the far side's command`).toBe("/ps");
+    }
+
+    // **The identity route by name**, because it is the one that regressed and
+    // it is not among the rows above: a far side returning a whole document
+    // passes straight through, which is exactly where a `command` of its own
+    // used to survive.
+    //
+    // **The route is asserted, not assumed** (F933). `identityDocument`
+    // *validates* rather than sniffs, so a payload short of a whole document —
+    // this one carried no `status` and no `meta` — is refused, and the result
+    // comes back through the fallback, which assigns `command` at its own site.
+    // Both readings answer `/ps`, so the row agreed with itself while never
+    // reaching the route it names, and the mutation removing I16's assignment
+    // from the funnel survived it. `meta.adapter` is what tells them apart: I13
+    // carries the far side's across on this route and on no other.
+    const identity = resultOf(
+      { exitCode: 0 },
+      {
+        schema: "tui.view/1",
+        command: forged,
+        status: "ok",
+        blocks: [{ kind: "raw", id: "r", text: "x" }],
+        meta: {
+          verb: "ps",
+          adapter: "far-side",
+          exitCode: 0,
+          durationMs: 1,
+          truncated: false,
+          argv: ["prism", "ps"],
+          stderr: "",
+          transport: "subprocess",
+          origin: "user",
+        },
+      },
+      "{}",
+    );
+    const adapted = registry.adapt(identity, { ...CTX, command: "/ps" });
+    expect(adapted.meta.adapter, "the identity route did not run").toBe("far-side");
+    expect(adapted.command, "the identity route kept the far side's command").toBe("/ps");
+
+    // And over the file, because the behavioural half can only reach the routes
+    // it enumerated: provenance is the framework's to state (I13), so *every*
+    // assignment of `command` in the registry reads the context.
+    const src = readFileSync("src/data/adapters/registry.ts", "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^\s*\/\/.*$/gm, "");
+    const assignments = [...src.matchAll(/(?<![.\w])command:\s*([^,\n]+)/g)].map((m) => m[1]!.trim());
+    expect(assignments.length, "the corpus is not empty").toBeGreaterThan(3);
+    // **A tally, not a set** (F932). One source for `command` and it is the
+    // context — but a set of the distinct sources is satisfied by *four* sites
+    // where there were five, and the funnel's assignment is exactly the one a
+    // route can lose while every remaining site still spells `ctx.command`.
+    // Compared as a list, so a removal moves the length and an addition from
+    // somewhere else moves a member.
+    expect(assignments, "one source for command, at every site that has one").toEqual(
+      Array<string>(5).fill("ctx.command"),
+    );
+  });
+
+  it("T2.9 (I17): a producer is told four facts and no placement", () => {
+    // Compared **by equality** against the four. The invariant's own note says
+    // omission did not enforce this — it produced five duplicated modules and a
+    // sniff wrong on three of four locale shapes — so a fifth field arriving is
+    // the event this row exists to catch, whatever it is called.
+    const types = readFileSync("src/data/adapters/types.ts", "utf8");
+    const declaration = /export type ProducerContext = Readonly<\{([\s\S]*?)\n\}>;/.exec(types);
+    expect(declaration, "ProducerContext's declaration").not.toBeNull();
+    const body = declaration![1]!.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    const fields = [...body.matchAll(/^\s{2}([a-zA-Z_$][\w$]*)\??:/gm)].map((m) => m[1]);
+    expect(fields.sort(), "authority, not knowledge").toEqual([
+      "capabilities",
+      "height",
+      "measure",
+      "width",
+    ]);
+
+    // The named failure, as a property rather than a list: layout is C11's and
+    // the frame is C22's, so a producer that positions loses on the next resize.
+    const placement = /\b(?:x|y|top|left|row|column|col|origin|at|offset|position)\??:/;
+    expect(placement.test(body), "a producer owns no placement").toBe(false);
+    expect(placement.test("  top: number;"), "the pattern can fire").toBe(true);
+  });
+
+  it("T2.10 (I21): `flags` carries validated values, and `userRequestedJson` is a second axis", () => {
+    // Two axes, two fields — the half that makes `shellOnly` usable. A flag the
+    // shell consumes is absent from `argv` by construction, so an adapter
+    // reading `raw.argv` cannot see the thing that selects its own rendering.
+    let seen: AdapterContext | null = null;
+    const registry = createAdapterRegistry({
+      ps: {
+        schema: "tui.view/1",
+        adapt: (_r, ctx) => {
+          seen = ctx;
+          return {
+            schema: "tui.view/1" as const,
+            command: ctx.command,
+            status: "ok" as const,
+            blocks: [{ kind: "raw" as const, id: "r", text: "x" }],
+          };
+        },
+      },
+    });
+    // `--raw` is `shellOnly`, so it is absent from argv by construction — the
+    // whole reason the field exists. `--json` is transmitted and C06 appends it.
+    const raw = resultOf({ exitCode: 0, argv: ["prism", "ps", "--json"] }, { a: 1 }, '{"a":1}');
+    registry.adapt(raw, { ...CTX, flags: { raw: true, since: "1h" } });
+
+    const ctx = seen as AdapterContext | null;
+    expect(ctx, "the adapter ran").not.toBeNull();
+    // **Values, not tokens**: `args.raw` is `true`, not `"--raw"`.
+    expect(ctx!.flags).toEqual({ raw: true, since: "1h" });
+    expect(ctx!.flags["raw"], "a value, not the token that carried it").not.toBe("--raw");
+    // The shellOnly asymmetry, measured on this very invocation: `--raw` never
+    // reached argv, and `--json` did, which is why an adapter reading `raw.argv`
+    // cannot see the flag that selects its own rendering.
+    expect(raw.argv).not.toContain("--raw");
+    expect(raw.argv).toContain("--json");
+
+    // **The second axis, shown to be one.** `userRequestedJson` is this field
+    // hardcoded for a flag that is *transmitted*, and the two are not one field
+    // because they do different things: with it set, the adapter does not run
+    // at all. A single field meaning both would make `--raw` do this too.
+    seen = null;
+    const shown = registry.adapt(raw, { ...CTX, flags: { raw: true }, userRequestedJson: true });
+    expect(seen, "the registered adapter is bypassed for the user's own --json").toBeNull();
+    expect(shown.blocks.length, "and something is still drawn").toBeGreaterThan(0);
+  });
+
+});

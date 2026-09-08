@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildSession, fakeFs } from "../support/session.js";
+import { SessionStateError } from "../../src/shell/types.js";
 import type { TuiConfig } from "../../src/shell/types.js";
 import { createExecutionPipeline } from "../../src/shell/execution.js";
 import { fakeStdin } from "../support/fake-terminal.js";
@@ -1213,5 +1214,79 @@ describe("C22 — copy mode: the order inside the exit, and the far side under t
 
     expect(stdout.output.slice(before), "tracking back on Esc").toContain(MOUSE.enter);
     expect(screen().rows[0], "the indicator goes with the mode").not.toContain("COPY");
+  });
+});
+
+describe("C22 §4 — the greeting's context, and where `stopped` leads", () => {
+  it("T3.9e (I53): the greeting is a producer and is handed the producer context", async () => {
+    // **It returns a document and was told nothing**, which is the same
+    // omission the local route had at four other sites: a producer told nothing
+    // decides anyway, from a worse copy of the fact. So the assertion is on
+    // what it receives, not on what it draws — a greeting that renders
+    // correctly at the width it guessed is exactly the failure this forbids.
+    // The document, inline: `doc` in the step-7 describe above is scoped to it,
+    // and a different one is in scope here — which is how this row first drew
+    // nothing while every assertion about the context passed.
+    const greetDoc = (text: string) => ({
+      schema: "tui.view/1" as const,
+      command: "",
+      status: "ok" as const,
+      blocks: [{ kind: "raw" as const, id: "greet", text }],
+      meta: {
+        verb: null,
+        adapter: "greeting",
+        exitCode: 0,
+        durationMs: 0,
+        truncated: false,
+        argv: [] as readonly string[],
+        stderr: "",
+        transport: "local" as const,
+        origin: "user" as const,
+      },
+    });
+
+    let seen: Record<string, unknown> | null = null;
+    const { tui, stdout } = await buildSession(
+      {
+        greeting: (ctx) => {
+          seen = ctx as unknown as Record<string, unknown>;
+          return Promise.resolve(greetDoc("welcome aboard"));
+        },
+      },
+      { columns: 100, rows: 30 },
+    );
+    // `buildSession` starts it; `settle` is what lets the async greeting land,
+    // as T3.9b's control does.
+    await settle();
+
+    expect(seen, "the greeting ran").not.toBeNull();
+    // C07 I17's four facts, by equality: a fifth arriving, or one going
+    // missing on this route alone, fails here.
+    expect(Object.keys(seen!).sort(), "the producer context, entire").toEqual([
+      "capabilities",
+      "height",
+      "measure",
+      "width",
+    ]);
+    // And it is *this* session's width rather than a default — the fact a
+    // producer told nothing would have had to guess.
+    expect(seen!["width"], "the frame's width, handed down").toBe(100);
+    expect(stdout.chunks.join(""), "and it still drew").toContain("welcome aboard");
+    await tui.stop("exit");
+  });
+
+  it("T3.9f (C22 I16): `stopped` is terminal — a stopped session cannot be started again", async () => {
+    // Matching C01's released state: a second session constructs a new
+    // instance. The failure this forbids is a caller finding a half-started
+    // one, so the row asserts both that `start` refuses and that it refuses by
+    // *naming the state* rather than by throwing something a retry loop would
+    // swallow.
+    const { tui } = await buildSession();
+    await tui.stop("exit");
+
+    await expect(tui.start()).rejects.toThrow(SessionStateError);
+    // And it stays terminal: a second attempt is refused the same way, so the
+    // state did not move on the way through.
+    await expect(tui.start()).rejects.toThrow(SessionStateError);
   });
 });

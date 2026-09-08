@@ -1096,3 +1096,48 @@ describe("C26 §5c — the call's head under ⏎ and y, owed at the spec commit"
     "T1.47 (C26 I23, §5c h1–h4): ⏎ on a running card's head toggles the body scroll's collapsed and submits nothing, twice; y on the head yields the command and ⌃a y yields the command then the body's sources; ⇧⏎ is refused while running and re-runs once settled — not deferred on a component: the head element lands with C2–C4 of the call grammar",
   );
 });
+
+describe("C22 §6 — a keystroke cancels a pending completion (I39)", () => {
+  it("T1.13c (C22 I39): typing after Tab cancels the request rather than letting it land", async () => {
+    // **C19 held the whole mechanism and nothing in `src/shell` was the
+    // caller.** `cancel()` invalidates the token and a superseded request
+    // already resolves with no candidates (C19 I13) — so typing after a `Tab`
+    // on a slow source left the request live, and a menu opened a second and a
+    // half later for a prefix the user had moved past.
+    //
+    // Not covered by the effect table's `mine !== seq` guard, which is why that
+    // guard looked like the mechanism: it compares the shell's *own* sequence,
+    // and a printable keystroke does not advance it.
+    const { graph, stdin } = await buildGraph({}, { columns: 100, rows: 30 });
+    graph.lifecycle.acquire();
+
+    const cancel = vi.spyOn(graph.completion, "cancel");
+
+    stdin.emit("/hel");
+    const afterTyping = cancel.mock.calls.length;
+    expect(afterTyping, "every printable keystroke supersedes").toBeGreaterThan(0);
+
+    stdin.emit("\t");
+    const afterTab = cancel.mock.calls.length;
+
+    // The keystroke *after* the request is the case the invariant is about.
+    stdin.emit("p");
+    expect(
+      cancel.mock.calls.length,
+      "a keystroke during a pending request cancels it",
+    ).toBeGreaterThan(afterTab);
+  });
+
+  it("T1.13d (C22 I39): a paste cancels too — the printable path is not the only caller", async () => {
+    // Both call sites, because one of them is enough to make the row pass and
+    // a paste is the one that arrives as a block of text rather than a key.
+    const { graph, stdin } = await buildGraph({}, { columns: 100, rows: 30 });
+    graph.lifecycle.acquire();
+
+    stdin.emit("\t");
+    const cancel = vi.spyOn(graph.completion, "cancel");
+    stdin.emit("\u001b[200~pasted\u001b[201~");
+
+    expect(cancel, "a paste supersedes a pending request as a keystroke does").toHaveBeenCalled();
+  });
+});

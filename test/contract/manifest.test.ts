@@ -1,6 +1,7 @@
 // C05 tier 2 — contract. The properties C18, C19, C06 and L4 are written
 // against, plus the two that are structural: exhaustiveness over ArgType and
 // the module graph.
+import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { checkModuleGraph } from "../../tools/enforce/module-graph.mjs";
 import { checkSourceScans, SCANS } from "../../tools/enforce/source-scans.mjs";
@@ -471,5 +472,68 @@ describe("C05 as C19 will read it", () => {
     expect(ps?.flags.map((f) => f.name)).toContain("status");
     expect(ps?.flags.find((f) => f.name === "status")?.values).toEqual(["running", "failed", "queued"]);
     expect(m.tools.map((t) => t.name)).toContain("serving scale");
+  });
+});
+
+describe("C05 §3 — the version is reported, never enforced", () => {
+  const manifestAt = (version: string): unknown => ({
+    schema: "tui.manifest/1",
+    binary: "widget",
+    version,
+    tools: [{ name: "ps", summary: "list", local: false, args: [], flags: [] }],
+  });
+
+  it("T2.23 (I13): every version parses, including one that is not a version", () => {
+    // A far side that dropped one verb is still a far side worth talking to,
+    // so the refusal this forbids is the one nobody would think to test for:
+    // C05 has no supported range to fall outside of. `not-a-version` is in the
+    // set because a parser that validated the *shape* would refuse it while
+    // still refusing nothing for being too old, and the two read alike.
+    for (const version of ["0.0.1", "99.99.99", "2.0.0-rc.1+build.7", "not-a-version"]) {
+      const parsed = parseManifest(manifestAt(version));
+      expect(parsed.ok, `version ${version} was refused`).toBe(true);
+      expect(parsed.ok && parsed.value.version, "exposed for skew reporting").toBe(version);
+    }
+
+    // **The one refusal that mentions `version` is about presence**, measured
+    // rather than assumed: an empty string is rejected because the field must
+    // be there for skew reporting, which is the opposite of enforcing a range.
+    const empty = parseManifest(manifestAt(""));
+    expect(empty.ok).toBe(false);
+    expect(!empty.ok && empty.error.map((e) => e.path)).toEqual(["version"]);
+  });
+
+  it("T2.23b (I13): an undeclared verb degrades at the point of use, not at parse", () => {
+    // The complement, and the half that makes the first one a rule rather than
+    // a tolerance: *not enforced* has to leave something that still says no.
+    // It says no where the verb is looked up, one verb at a time.
+    const parsed = parseManifest(manifestAt("1.0.0"));
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+
+    expect(findTool(parsed.value, ["ps"])?.tool.name, "the declared verb resolves").toBe("ps");
+    expect(findTool(parsed.value, ["images"]), "not available here").toBeNull();
+  });
+
+  it("T2.23c (I13): nothing in C05 compares a version to anything", () => {
+    // The absence claim, over the component, with a control — a behavioural row
+    // can only show the versions it thought to try, and *never enforced* is a
+    // statement about the ones it did not.
+    const files = readdirSync("src/data/manifest")
+      .filter((f) => f.endsWith(".ts"))
+      .map((f) => `src/data/manifest/${f}`);
+    const comparison = /\bsemver\b|\bcompareVersions?\b|version\s*(?:<|>|<=|>=)|(?:<|>|<=|>=)\s*\w*[Vv]ersion\b/;
+    const offenders = files.filter((f) =>
+      comparison.test(
+        readFileSync(f, "utf8")
+          .replace(/\/\*[\s\S]*?\*\//g, "")
+          .replace(/^\s*\/\/.*$/gm, ""),
+      ),
+    );
+    expect(offenders, "a version comparison is an enforcement").toEqual([]);
+    expect(files.length, "the corpus is not empty").toBeGreaterThan(4);
+    // And the control: the same pattern fires on a comparison, so an empty
+    // result reads the tree rather than a pattern that never matches anything.
+    expect(comparison.test("if (m.version < MIN) return null;"), "the pattern can fire").toBe(true);
   });
 });

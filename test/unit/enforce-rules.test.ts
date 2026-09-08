@@ -77,6 +77,13 @@ type Fabrication = { rule: string; file: string; source: string };
  */
 const RULE_INVARIANTS: Readonly<Record<string, string>> = {
   SS48: "C22 I54 · C24 I25",
+  SS37: "C09 I15 · C09 T2.17",
+  SS13: "C14 I11 · C14 T2.4",
+  MG15: "C17 I10 · C17 I14 · C17 T2.6",
+  SS30: "C18 I11 · C18 I23 · C18 T2.3 · C18 T2.10 · C19 T2.4 · C05 I18 · C05 T2.9",
+  MG17: "C19 I12 · C19 T2.5",
+  SS9: "C20 I11 · C20 I12 · C20 T2.4",
+  MG23: "C23 §2 · C23 I14 · A02 Seam 4",
 };
 
 /**

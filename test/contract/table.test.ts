@@ -213,3 +213,53 @@ describe("C11 tier 2 — planColumns as an interface", () => {
     }
   });
 });
+
+describe("C11 §3 — priority is declared, never inferred", () => {
+  it("T2.10 (I12): the same data under two declarations drops in two different orders", () => {
+    // **The falsification, and it is the only shape that reaches this.** Rows
+    // asserting *columns drop lowest-priority-first* pass identically whether
+    // the number came from the surface or from a heuristic over the data — the
+    // data is the same in both worlds. Two declarations over one dataset are
+    // not: an engine inferring priority would give the same answer twice.
+    const base = psColumns();
+    const cols = base.slice(0, 4);
+    const reversed = cols.map((c, i) => ({ ...c, priority: cols[cols.length - 1 - i]!.priority }));
+
+    // `dropped` is already the keys, in original column order.
+    const dropped = (list: readonly ColumnDef[]): readonly string[] => planColumns(list, 24).dropped;
+
+    const asDeclared = dropped(cols);
+    const asReversed = dropped(reversed);
+
+    expect(asDeclared.length, "the width is tight enough to drop something").toBeGreaterThan(0);
+    expect(asReversed.length, "and under the other declaration too").toBeGreaterThan(0);
+    expect(asDeclared, "the drop order followed the declaration, not the data").not.toEqual(
+      asReversed,
+    );
+  });
+
+  it("T2.10b (I12): nothing in C11 computes a priority — every read is the column's", () => {
+    // The structural half, because the behavioural one is blind to a heuristic
+    // that happens to agree with the declaration on this corpus. A table engine
+    // guessing which column matters would guess differently as data changed,
+    // and the drop order would stop being reviewable.
+    const files = readdirSync("src/presentation/table")
+      .filter((f) => f.endsWith(".ts"))
+      .map((f) => `src/presentation/table/${f}`);
+    const writes: string[] = [];
+    for (const f of files) {
+      const stripped = readFileSync(f, "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/^\s*\/\/.*$/gm, "");
+      // An assignment *to* a priority is the inference; a read of
+      // `column.priority` is the declaration being honoured.
+      if (/(?<!\.)\bpriority\s*[:=](?!\s*(?:number|undefined))/.test(stripped)) writes.push(f);
+    }
+    expect(writes, "a priority is read, never written").toEqual([]);
+    expect(files.length, "the corpus is not empty").toBeGreaterThan(2);
+    expect(
+      /(?<!\.)\bpriority\s*[:=](?!\s*(?:number|undefined))/.test("const priority = rank(rows);"),
+      "the pattern can fire",
+    ).toBe(true);
+  });
+});

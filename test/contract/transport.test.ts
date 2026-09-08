@@ -438,3 +438,76 @@ describe("C06 as C07 will read it", () => {
     expect(Object.keys(r)).not.toContain("ok");
   });
 });
+
+describe("C06 §3 — the world stays app-side, behind a function", () => {
+  it("T2.12 (I23): the handler is a closure, and the transport holds none of what it closes over", async () => {
+    // The property, driven rather than declared: `createEmulatedTransport` is
+    // given a function, and everything that function knows — a mutable world,
+    // a counter, an app's own vocabulary — lives on the caller's side of it.
+    // This is what lets `prism-tui` and `docker-tui` each have one without the
+    // framework knowing either exists.
+    const world = { containers: ["a"] };
+    const seen: string[] = [];
+    const transport = publicEmulated((inv) => {
+      seen.push(inv.argv.join(" "));
+      world.containers.push("b");
+      return {
+        argv: inv.argv,
+        exitCode: 0,
+        signal: null,
+        stdout: { items: [...world.containers] },
+        stdoutRaw: JSON.stringify({ items: world.containers }),
+        stderr: "",
+        durationMs: 0,
+        parseError: null,
+        cancelled: false,
+        timedOut: false,
+        overflowed: false,
+      };
+    });
+
+    const first = await transport.invoke(invocation({ argv: ["ps"] }));
+    const second = await transport.invoke(invocation({ argv: ["ps"] }));
+
+    // The mutation the handler made is visible on the *caller's* object and on
+    // the second reply — so the state is the app's, and the transport is the
+    // thing with nowhere to put it.
+    expect(world.containers).toEqual(["a", "b", "b"]);
+    expect((first.stdout as { items: string[] }).items).toEqual(["a", "b"]);
+    expect((second.stdout as { items: string[] }).items).toEqual(["a", "b", "b"]);
+    expect(seen).toEqual(["ps", "ps"]);
+  });
+
+  it("T2.12b (I23): `FixtureHandler` names only C06's own types, and C06 names no app", () => {
+    // The structural half. The behavioural row above would pass just as well
+    // beside an import of an app's world type, because a closure that happens
+    // to be generic looks exactly like a seam that is.
+    const types = readFileSync("src/data/transport/types.ts", "utf8");
+    const declaration = /export type FixtureHandler = ([^;]+);/.exec(types);
+    expect(declaration, "the seam's declaration").not.toBeNull();
+    const named = [...declaration![1]!.matchAll(/\b([A-Z][A-Za-z0-9]*)\b/g)].map((m) => m[1]);
+    expect([...new Set(named)].sort(), "only C06's own vocabulary").toEqual([
+      "AsyncIterable",
+      "Invocation",
+      "RawPatch",
+      "RawResult",
+    ]);
+
+    // And over the directory: no app is named anywhere in C06, in an import or
+    // in a literal. Compared by equality so a new file cannot slip past.
+    const files = readdirSync("src/data/transport")
+      .filter((f) => f.endsWith(".ts"))
+      .map((f) => `src/data/transport/${f}`);
+    const apps = /\b(?:prism|docker[-_]?tui|dockerTui|PrismWorld|DockerWorld)\b/i;
+    const offenders = files.filter((f) =>
+      apps.test(
+        readFileSync(f, "utf8")
+          .replace(/\/\*[\s\S]*?\*\//g, "")
+          .replace(/^\s*\/\/.*$/gm, ""),
+      ),
+    );
+    expect(offenders, "C06 references no app type").toEqual([]);
+    expect(files.length, "the corpus is not empty").toBeGreaterThan(3);
+    expect(apps.test('import type { DockerWorld } from "../../world.js";'), "the pattern can fire").toBe(true);
+  });
+});

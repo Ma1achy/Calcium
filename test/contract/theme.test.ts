@@ -6,6 +6,7 @@ import { SCAN_BUDGET_MS } from "../support/budget.js";
 
 import {
   defaultTheme,
+  loadTheme,
   decorationTextPairs,
   diffPairs,
   errorTagPairs,
@@ -408,7 +409,7 @@ describe("C10 contract", () => {
     }
   });
 
-  it("T2.4 (I3): every shipped theme clears every floor on bg and bgElev", () => {
+  it("T2.4 (I3, I19, I20): every shipped theme clears every floor on bg and bgElev, recomputed", () => {
     // Recomputed from the shipped token, not read from A01 A.1's recorded
     // figure. That is what makes the catalogue an assertion this test upholds
     // rather than a record of what someone intended.
@@ -820,5 +821,25 @@ describe("C10 contract", () => {
         }
       }
     }
+  });
+});
+
+describe("C10 §2 — the shipped default is a working value", () => {
+  it("T2.37 (I18): `defaultTheme` loads with no overrides, and every variant clears every floor", () => {
+    // **T2.4 is the contrast half and it is over `SHIPPED`, which *is*
+    // `defaultTheme`** — so what is owed here is the other clause: that the one
+    // required config field has a working value to fill it with. A framework
+    // whose only required field has no working value is a framework nobody
+    // starts, and no assertion about ratios can see that.
+    for (const [variant] of SHIPPED) {
+      const loaded = loadTheme(defaultTheme, variant as keyof typeof defaultTheme);
+      expect(loaded.ok, `${variant} did not load`).toBe(true);
+      expect(loaded.ok && loaded.value.current, `${variant} loaded empty`).toBeTruthy();
+    }
+
+    // And it is one line to fill because it is one value: the whole set is a
+    // single frozen export, not a builder the caller has to assemble.
+    expect(Object.isFrozen(defaultTheme), "handed over ready to use").toBe(true);
+    expect(SHIPPED.length, "and it carries more than one variant").toBeGreaterThan(1);
   });
 });

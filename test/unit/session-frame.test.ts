@@ -7,6 +7,8 @@
 import { describe, expect, it } from "vitest";
 
 import { compose, gutterMatchesPrompt } from "../../src/shell/frame.js";
+import { composeFrame } from "../../src/shell/render-frame.js";
+import { FrameError } from "../../src/shell/frame-error.js";
 import { PROMPT_GUTTER } from "../../src/shell/config.js";
 import type { ChromeContext, SessionSnapshot } from "../../src/shell/types.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
@@ -177,5 +179,57 @@ describe("C22 §6 — the frame", () => {
     expect(f.overlayRegion).toEqual({ width: 100, height: 25 });
     expect(f.region).toEqual({ top: 2, height: 25 });
     expect(f.overlayRegion.height, "one number, not two").toBe(f.region.height);
+  });
+});
+
+describe("C22 §6 — the height the viewport is given", () => {
+  it("T4.11f (C14 I22, C22 I34): the region's height reaches the viewport, not the terminal's", () => {
+    // **The failure is silent in both directions**, which is why this is a row
+    // rather than a comment. It was `size.rows` in the resize handler: three
+    // rows too tall from the first frame, so `#maxTop()` stopped short by the
+    // chrome and the last rows of a tall entry were unreachable by `End`,
+    // `PageDown` or `↓` — while the surplus rows `visible()` selected were
+    // discarded by the paint, so no count downstream was ever surprised.
+    //
+    // The fixture makes the two numbers differ by construction: a header and a
+    // footer row apiece, plus the prompt, so `region.height` is strictly less
+    // than `rows` and an assertion cannot pass on both readings at once.
+    const frame = compose({
+      chrome: {
+        header: () => [{ kind: "raw", id: "h", text: "header" }],
+        footer: () => [{ kind: "raw", id: "f", text: "footer" }],
+      },
+      measureSequence: MEASURE,
+      session: () => SESSION,
+      copyMode: () => false,
+      now: () => 1000,
+      size: () => ({ columns: 100, rows: 30 }),
+      promptRows: () => 1,
+    });
+
+    expect(frame.region.height, "the chrome and prompt cost rows").toBeLessThan(frame.size.rows);
+
+    // `composeFrame` hands the viewport its height before it paints, so the
+    // resize is observable without a paint. The paint is not this row's
+    // subject, and its failure path is C22 I56's.
+    const given: { width: number; height: number }[] = [];
+    composeFrame({
+      composed: () => frame,
+      paintDeps: () => {
+        // A `FrameError` takes the documented fallback; anything else is
+        // rethrown, which is the narrowing that makes this substitution honest
+        // rather than a way of swallowing a real failure.
+        throw new FrameError("paint is not this row's subject");
+      },
+      resizeViewport: (size) => given.push({ ...size }),
+      cursorSequence: () => "",
+      cursorShape: () => "",
+      previous: () => null,
+    });
+
+    expect(given, "one resize per frame").toHaveLength(1);
+    expect(given[0]!.height, "the region's, not the terminal's").toBe(frame.region.height);
+    expect(given[0]!.height, "and the two are not the same number here").not.toBe(frame.size.rows);
+    expect(given[0]!.width).toBe(frame.size.columns);
   });
 });

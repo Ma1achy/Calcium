@@ -167,6 +167,46 @@ function atomsIn(line: string, from: number, to: number): readonly Slot[] {
   return out;
 }
 
+/**
+ * A URL's **query and fragment**, split into its `key=value` pieces (I25, F931).
+ *
+ * `isExempt` exempts a whole URL for the same reason it exempts a path: it names
+ * a resource. The justification attached to it — *the part of one that carries a
+ * secret is an assignment the text scan already catches* — is **true of a named
+ * secret and false of an unnamed one**, which is the correct-sentence-for-the-
+ * wrong-decision shape. `?token=` is caught by the text scan; `?q=` is not a
+ * secret keyword, so only the entropy net could catch it, and the net was
+ * outside the exemption. Six of seven URL shapes leaked a 4.14-bit-per-character
+ * token in full, into the file on disk.
+ *
+ * The split is scoped to what follows `?` or `#` and no further: a **path**
+ * segment stays exempt, because that is the part of a URL that names a resource
+ * and `isPath` already rules on it. This is the same treatment a quoted compound
+ * gets — *the compound is scanned by its pieces* — arriving at the one compound
+ * that has no whitespace to split on.
+ */
+function queryAtomsIn(line: string, slot: Slot): readonly Slot[] {
+  // **Over the source range, not over `slot.text`.** `tokenise` hands back a
+  // token whose text has been unquoted while its `start` still indexes the
+  // quoted line, so offsets taken from the text are short by the quote and the
+  // splice lands one character early. `atomsIn` solved this already; this is
+  // the same treatment with a different separator.
+  const inner = line.slice(slot.start, slot.end);
+  const cut = inner.search(/[?#]/u);
+  if (cut === -1) return [];
+
+  const out: Slot[] = [];
+  const re = /[^&;?#'"`]+/g;
+  const tail = inner.slice(cut + 1);
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(tail)) !== null) {
+    const start = slot.start + cut + 1 + m.index;
+    out.push({ text: m[0], start, end: start + m[0].length });
+  }
+  return out;
+}
+
+
 /** The positional and entropy rules as they apply to one atom, with no adjacency. */
 function atomRule(line: string, atom: Slot): Splice | null {
   const assign = FLAG_ASSIGN.exec(atom.text) ?? ENV_ASSIGN.exec(atom.text);
@@ -231,6 +271,25 @@ function redactLine(line: string): Redaction {
         if (splice !== null) splices.push(splice);
       }
       return;
+    }
+
+    // **The other compound, and it has no whitespace to split on** (I25, F931).
+    // A URL is exempt as a whole, so the rules below and the net inside
+    // `atomRule` both decline it — and a high-entropy value in its query is
+    // then written to disk in full. The pieces after `?` or `#` are scanned the
+    // way a quoted compound's are; the path is left alone, which is the part
+    // the exemption was actually about.
+    const query = queryAtomsIn(line, slot);
+    if (query.length > 0) {
+      let hit = false;
+      for (const atom of query) {
+        const splice = atomRule(line, atom);
+        if (splice !== null) {
+          splices.push(splice);
+          hit = true;
+        }
+      }
+      if (hit) return;
     }
 
     const flagged = FLAG_ASSIGN.exec(slot.text);
