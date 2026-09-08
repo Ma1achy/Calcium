@@ -372,6 +372,11 @@ function washed(row: string, span: CellSpan, deps: PaintDeps): string {
 
 /** The wash, or reverse video where there is no colour to wash with (§4b). */
 function promptRegion(frame: Composed, deps: PaintDeps, width: number): readonly string[] {
+  // **Inside `body`, and separate from it** (C28 §2). `deps.promptRows()` and
+  // `deps.promptCursor()` below are both `editor.layout(width, gutter)` behind
+  // a thunk with no memo, so the prompt's cost is the one part of `body` a
+  // reader has a specific question about and no span could answer.
+  using _s = deps.probe?.span("prompt") ?? NO_SPAN;
   const cap = frame.promptRows;
   const cursor = deps.promptCursor();
   const window = promptWindow(frame, deps.promptRows(), cursor.row, deps.capabilities);
@@ -598,8 +603,16 @@ export function paint(frame: Composed, deps: PaintDeps): readonly string[] {
   // the region calls below are arguments and run inside it either way. Naming it
   // for the narrower half would put the wider cost under a name that denies it.
   using _assemble = deps.probe?.span("assemble") ?? NO_SPAN;
-  const lines = composite(
-    [
+
+  // **The parts, named** (C28 §2, F936). `assemble` was 58 % of a frame's work
+  // with nothing under it, which is a measurement that names the file and not
+  // the work. The arguments below are hoisted into locals for no reason but
+  // that: an argument evaluated inside a call cannot be bracketed separately
+  // from it, so the split is what makes the three costs distinguishable at all.
+  let rows: readonly string[];
+  {
+    using _body = deps.probe?.span("body") ?? NO_SPAN;
+    rows = [
       ...region(frame.header, HEADER_ROWS, width, deps),
       // **The header's rule** (I87, §6l.7) — the same row the prompt's two are,
       // so the header and the region's first row do not read as one block.
@@ -616,19 +629,27 @@ export function paint(frame: Composed, deps: PaintDeps): readonly string[] {
       // and pads to it, so a footer taller than `MAX_FOOTER_ROWS` shows its top
       // (§6l.2 row 5) and one of zero rows takes nothing.
       ...region(frame.footer, frame.footerRows, width, deps),
-    ],
-    placedLayers(deps),
-    {
+    ];
+  }
+
+  let lines: readonly string[];
+  {
+    using _composite = deps.probe?.span("composite") ?? NO_SPAN;
+    lines = composite(rows, placedLayers(deps), {
       registry: deps.registry,
       theme: deps.theme,
       capabilities: deps.capabilities,
       regionTop: frame.region.top,
       region: frame.overlayRegion,
       ...(deps.scratch === undefined ? {} : { scratch: deps.scratch }),
-    },
-  );
+    });
+  }
 
-  const painted = based(lines, baseSequence(deps));
+  let painted: readonly string[];
+  {
+    using _based = deps.probe?.span("based") ?? NO_SPAN;
+    painted = based(lines, baseSequence(deps));
+  }
 
   if (painted.length !== frame.size.rows) {
     throw new FrameError(
@@ -710,7 +731,17 @@ export function blankRowsAbove(regionHeight: number, rows: number): number {
 
 /** C14 selected these at this width; they are padded, never re-measured. */
 function transcript(frame: Composed, deps: PaintDeps, width: number): readonly string[] {
-  const rows = deps.transcriptRows();
+  // **Two spans, because splitting `assemble` left 48 % sitting in `body`**
+  // (C28 §2, F936). `visible` is the work — C14 selecting and C09 rendering —
+  // and this function's own self time is then the `exact()` loop below, which
+  // is a styled-width fit per row per frame and had never been measured apart
+  // from what it pads.
+  using _t = deps.probe?.span("transcript") ?? NO_SPAN;
+  let rows: readonly string[];
+  {
+    using _v = deps.probe?.span("visible") ?? NO_SPAN;
+    rows = deps.transcriptRows();
+  }
 
   // **More rows than the region has is refused, not trimmed** (I35). The trim was
   // `rows[0 … height)` — the *top* of the selection — so a viewport that thought

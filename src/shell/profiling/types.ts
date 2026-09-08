@@ -34,8 +34,21 @@ export const TIER_RANK: Readonly<Record<Tier, number>> = Object.freeze({
  * point of the seam. This union is what `src/shell/` uses for the frame's own
  * phases, so those stay spelled one way across the tree.
  */
+/**
+ * **`body`, `prompt`, `composite` and `based` are `assemble`'s parts** (C28 §2).
+ *
+ * Added because `assemble` was **58 % of a frame's work with no breakdown** —
+ * 358.2 ms of self time over 34 frames against `react`'s 151.9 ms, in the run
+ * whose job was to rank what to fix. A span that large with nothing under it
+ * names the file and not the work, and a ranking built on it has a hole where
+ * its first entry should be (F936).
+ *
+ * All four group as `draw`, like the bracket they sit in, so the phase total is
+ * unchanged and only the breakdown improves.
+ */
 export type SpanName =
   | "frame" | "compose" | "measure" | "elements" | "paint" | "react" | "assemble" | "write"
+  | "body" | "prompt" | "composite" | "based" | "transcript" | "visible"
   | "decode" | "route" | "handler" | "local" | "transport" | "adapt" | "stream" | "livefetch"
   | "completion" | "overlays" | "chrome";
 
@@ -112,6 +125,13 @@ export const SPAN_SITE: Readonly<Record<SpanName, SpanSite>> = Object.freeze({
   paint: "frame",
   react: "frame",
   assemble: "frame",
+  // `assemble`'s parts, so necessarily where `assemble` is.
+  body: "frame",
+  prompt: "frame",
+  composite: "frame",
+  based: "frame",
+  transcript: "frame",
+  visible: "frame",
   write: "frame",
 
   // Opened on the input and command paths, which run *between* frames: a
@@ -137,6 +157,18 @@ export const PHASE_GROUP: Readonly<Record<SpanName, PhaseGroup>> = Object.freeze
   paint: "draw",
   react: "draw",
   assemble: "draw",
+  // **`draw`, with `assemble`, and that is the point.** They are its children,
+  // so grouping them anywhere else would move cost between phases and make the
+  // split look like a regression in `compute`. Rows of cells and escape
+  // sequences on every one of them.
+  body: "draw",
+  prompt: "draw",
+  composite: "draw",
+  based: "draw",
+  // `body`'s two: rendering the transcript's rows, and fitting every row of the
+  // frame to the width. Both are cells and escape sequences.
+  transcript: "draw",
+  visible: "draw",
   write: "output",
   decode: "input",
   route: "input",
