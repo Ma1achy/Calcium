@@ -411,6 +411,7 @@ Proves the interface A02 §2 promises, so C03 and the shell can be written again
 
   **The rule is keyed on the receiver**, and the reason is worth recording: a bare `.columns` also matches `block.columns` in `table/` and `plan.columns` in its planner — nine sites with nothing to do with a terminal — and annotating them would put a claim about terminal width on lines about table columns. The residual gap is stated rather than left to be found: a handle stored under a name outside the list escapes, and what closes that is the per-frame snapshot rather than a cleverer pattern.
 
+- **T2.11** (I17): the three shutdown signals are driven and their codes read **as a set** — 130, 143, 129 — each checked against `os.constants.signals` rather than against a literal table, because a table compared with a table agrees with itself whatever the mapping is. Two rows already assert one code each and a single shutdown code satisfies both; **SIGHUP was asserted nowhere at all**, which is the member that would have gone. The three are also asserted distinct, which is D54's failure as a property: one shutdown *path* is worth having, one shutdown *code* misreports a supervisor's SIGTERM as a user pressing Ctrl-C.
 ### Tier 3 — edge cases
 
 Where the real defects live.

@@ -298,6 +298,8 @@ Six tiers. No state machine — C11 is pure over the block.
 - **T2.6** (I11): a source scan finds no mutable module state in `table/` (A03 SS24).
 - **T2.7** (I7, I11): calling `planColumns` twice on the same input returns deeply equal plans that are **not the same object** — the absence of a cache, asserted rather than assumed. A memo added later fails this, which is the point: it is a decision to revisit deliberately, not to reach for.
 
+- **T2.10** (I12): one dataset under **two declarations** drops in two different orders. This is the only shape that reaches the invariant: rows asserting *columns drop lowest-priority-first* pass identically whether the number came from the surface or from a heuristic over the data, because the data is the same in both worlds — and an engine inferring priority would give the same answer twice.
+- **T2.10b** (I12): nothing under `src/presentation/table/` **writes** a priority; every mention is a read of `column.priority`. The behavioural row is blind to a heuristic that happens to agree with the declaration on this corpus, and a guessing engine would guess differently as data changed, so the drop order would stop being reviewable.
 ### Tier 3 — edge cases
 
 - **T3.1**: zero columns → renders the empty message; does not throw.

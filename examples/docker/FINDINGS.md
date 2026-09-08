@@ -33521,6 +33521,8 @@ Four runs of `make instruments` across one session, unchanged tree:
 | 2 | re-run, nothing else in flight | green · **562 rows** |
 | 3 | straight after `make e2e` | **FAIL** — `tools/profile.mjs` 0 rows; **T1.83** *"the replay re-derives its capabilities from the recorded environment"* |
 | 4 | re-run, nothing else in flight | green · **562 rows** |
+| 5 | straight after `make e2e` and `make enforce` | **FAIL** — `tools/profile.mjs` 0 rows; **T1.83** again |
+| 6 | re-run, nothing else in flight | green · **562 rows** |
 
 **The changed member is the whole of the evidence.** A row that fails identically on every red
 run is a defect in that row; a *different* row each time, in the same file, with the instrument
@@ -33541,3 +33543,212 @@ it again and see whether the member moves.
 isolated, and read whether `tools/profile.mjs` reports 0 rows because its child was starved or
 because the row genuinely diverged — the harness cannot currently tell those apart, which is the
 half worth fixing whatever the cause turns out to be.
+
+**Runs 5 and 6 answer half of that and undercut this entry's own title.** The starvation branch is
+now the measured one: run 5 reported **0 rows** and **556**, run 6 reported **6** and **562**, on an
+unchanged tree minutes apart, so `tools/profile.mjs` is being starved rather than diverging — the
+6 rows exist and are green when the machine is quiet. What does not survive is *a different row
+each time*: three red runs have now produced **T5.1b once and T1.83 twice**, so the member moves
+but does not have to. The argument the entry rests on is weaker than the heading claims — a
+changed member is evidence, and two of three being the same row is not the same evidence as three
+of three differing. The reading it still supports is the narrower one: **0 rows is a starved child,
+not a failure count**, and that is the half worth fixing.
+
+## F930 — SS30's pattern grew a second invariant and its citation did not ★★☆☆☆
+
+`SS30` is the *one implementation* rule. Its `spec` field named **C18 I11** — *the tokeniser is
+shared with C19; there is exactly one implementation* — and its pattern is
+
+    function (tokenis[ez]e?|lex|shellSplit|quoteArg|shellQuote|quote|levenshtein|editDistance|distance)
+
+which is three primitives, not one. Its own `why` says so: *"one tokeniser, one quoter, one
+distance-2 suggester — a second agrees today and diverges where it is least visible."*
+
+**C18 I23** is *the distance-2 suggester is C05's; there is exactly one implementation, as there
+is exactly one tokeniser.* It was on the uncited list, and it was enforced completely, by this
+rule, which named its sibling and not it.
+
+**The rule began as one thing and became three.** The pattern grew each time — a quoter, then a
+suggester — and the `spec` string, which is what a reader resolves a citation *from*, did not.
+Nothing catches that: SP9 asks whether an invariant is named by a row, and MG rules check the
+tree; **no instrument compares a rule's declared subject against what its pattern actually
+matches**, and the `why` line that would have settled it is prose.
+
+**The tell is in the `why`, one line below.** A rule whose justification enumerates three things
+and whose `spec` names one is describing a growth nobody re-read.
+
+**A second rule looked like the same class and is not — see F934.** `SS37` also declares an
+invariant its pattern does not match, and the difference is where the right answer lives: SS30's
+was **written nowhere**, and SS37's was **written twice and never applied**. The instrument that
+separates them is *ask where a settled claim is written down*, run on the finding before the
+number — which is what turned a second instance of this into a different finding. Fixed by widening the `spec`
+to `C18 I11 · C18 I23 · …`; the equality-compared `RULE_INVARIANTS` map in
+`enforce-rules.test.ts` now holds the widened string, so a retarget fails rather than drifting.
+
+## F931 — a secret in a URL query was never scanned, because the whole URL was exempt ★★★★☆
+
+**C20 I25**: *Every rule reaches inside a quoted compound and into URL query values, not only
+bare tokens: the compound is scanned by its pieces.*
+
+Writing the row for it — three rules × two compounds — measured **five of six cells leaking**,
+and the sixth was incidental. `curl https://x/y?q=<40-char token>` wrote the token to the
+history file **in full**, at 4.14 bits per character.
+
+| shape | before | after |
+|---|---|---|
+| `?q=<secret>` | **LEAKED** | clean |
+| `?a=1&q=<secret>` | clean *(incidental)* | clean |
+| `?q=<secret>&a=1` | **LEAKED** | clean |
+| `#<secret>` | **LEAKED** | clean |
+| `:8080/y?q=<secret>` | **LEAKED** | clean |
+| `ftp://x/y?q=<secret>` | **LEAKED** | clean |
+
+**The cause is a correct sentence attached to the wrong decision** — F84's class, in a comment:
+
+> *A URL, exempt for the same reason a path is: it names a resource, and the part of one that
+> carries a secret is an assignment the text scan already catches.*
+
+True of a **named** secret: `?token=` and `?api_key=` are caught by `ENV_IN_TEXT`, whose guard is
+`SECRET.test(name)`. False of an **unnamed** one: `q` is not a secret keyword, so only the
+entropy net could catch it — and the net lives in `atomRule` behind `!isExempt(whole)`, which the
+URL exemption had already answered. **The sentence is true and it is about the other rule.**
+
+**Why no row saw it.** The compound split runs on `if (/\s/.test(slot.text))` — a *quoted* compound
+has whitespace to split on and a URL does not, so the one compound that cannot be split by the
+existing mechanism is the one nobody wrote a row for. T5.4 found the quoted case; the URL case
+has no whitespace and looked like a token.
+
+**The fix** splits a URL's **query and fragment** into `key=value` pieces and runs the same rules
+over them — *the compound is scanned by its pieces*, arriving at the compound that has no
+whitespace. Scoped deliberately: a URL's **path** stays exempt, and a path segment leaks whether
+or not a scheme precedes it, so the two now agree rather than one being a special case.
+
+**And the fix's own defect, caught by the existing suite.** The first version took offsets from
+`slot.text`, which `tokenise` has already unquoted, while `slot.start` indexes the quoted line —
+so every splice landed one character early. The **text came out right** and `fired` gained a
+duplicate `P2`, which C20's contract row compares by equality and refused. A doubled entry
+reports two redactions where one happened, and *"a right answer through the wrong rule is a
+redactor about to give a wrong one"* is why that list is asserted at all. `atomsIn` had solved
+the same problem already; the repair is its treatment with a different separator.
+
+
+## F932 — a tally is not a set: two rows blind to a call site changing buckets ★★★☆☆
+
+Both survivors of the forty-six's mutation pass are one mechanism, in two rows written the same
+day by the same hand and passing sixteen and fourteen assertions respectively.
+
+| row | the corpus | the assertion | what the mutation did |
+|---|---|---|---|
+| **C07 T2.8** (I16) | every `command:` assignment in `registry.ts` | `[...new Set(a)]` equals `["ctx.command"]` | **5 sites → 4**, all still `ctx.command` |
+| **C23 T1.60** (I41) | every `producerContext(...)` argument in `execution.ts` | `[...new Set(c)].sort()` equals `["deps.region().height", "null"]` | **5 null / 2 height → 4 / 3** |
+
+**A set records the vocabulary and reads as though it records the assignment.** It fires when a
+*new* value appears and when a bucket *empties*. It cannot see one site moving from one bucket to
+the other — which is the whole of C07 I16 (*every route takes `command` from the context*) and of
+C23 I41 (*non-null on the view route and `null` everywhere else*), because both are claims about
+**which sites**, not about which words occur somewhere in the file.
+
+**Both rows had a second half and neither reached it.** T2.8's behavioural half is F933 and did
+not run the route it names; T1.60 has no behavioural half at all — I41 is a partition of routes,
+and the only place a partition is legible is the source. So the source half was load-bearing in
+both, and in both it was the half that could not fail.
+
+**The sweep, because a class is worth its extent.** Thirty rows in `test/` compare a `new Set`
+against an expected set. Every other one asks *how many distinct* — a `.size` against a length,
+which is the tally-aware form — or *which names occur*, where a name appearing twice changes
+nothing and a new name is exactly what must fail. `test/contract/transport.test.ts`'s T2.12b is
+the closest sibling and is correct: *only C06's own vocabulary* is a claim about names. Only
+these two are claims about how sites divide, and a set is blind to precisely that.
+
+Fixed: both compare a **tally** by equality — the value *and* the count at every site — and both
+now fail on the mutation they passed. The cost is that a route added to either file must be
+classified deliberately, which is the point.
+
+## F933 — the row that named the regression never reached the route that regressed ★★★☆☆
+
+C07 T2.8 exists for one regression, and says so: *the identity route is the one that regressed,
+and it regressed silently — the transcript drew `ps --json`, the spawned form carrying a flag D16
+appends and the user never wrote.* It then drives the route by name:
+
+    const identity = resultOf({ exitCode: 0 },
+      { schema: "tui.view/1", command: forged, blocks: [{ kind: "raw", id: "r", text: "x" }] }, "{}");
+    expect(registry.adapt(identity, { ...CTX, command: "/ps" }).command).toBe("/ps");
+
+**`identityDocument` validates rather than sniffs** — deliberately, and I5 is the reason: *a
+payload with a `schema` field and nothing else would otherwise take the identity path and render
+as an invalid document*. So this payload, carrying no `status` and no `meta`, is **refused**;
+`adapt` falls through to the fallback, and the fallback assigns `command` at its own site.
+
+**Both readings answer `/ps`.** The row agreed with itself while never reaching the route it
+names, and the mutation removing I16's assignment from `finish` — the single funnel — survived it.
+Measured with `meta.adapter`, which is the field that tells the routes apart because I13 carries
+the far side's across on the identity route and on no other:
+
+| payload | route taken | `command` |
+|---|---|---|
+| `{schema, command, blocks}` | `fallback` | `/ps` |
+| `+ status` | `fallback` | `/ps` |
+| `+ status, + partial meta` | `fallback` | `/ps` |
+| `+ status, + all nine meta fields` | **`far`** | `/ps` |
+
+Only the last reaches it. Fixed by carrying a whole document and **asserting the route**, not the
+answer: `expect(adapted.meta.adapter).toBe("far-side")` before the claim about `command`, so a
+payload that stops validating fails here rather than quietly measuring the fallback again.
+
+**The shape to carry.** A row whose subject is *which of N paths ran* must assert the path. The
+paths agree on the field under test — that is usually why the invariant exists — so the field
+cannot distinguish them, and the setup that fails to select the path is the setup that looks
+simplest. This is *a test must construct the state it claims* with the reason named: the
+convenient payload is the one both readings answer alike.
+
+## F934 — a ruling recorded in two documents and never applied to the rule it ruled on ★★★★☆
+
+Widening `SS30`'s `spec` (F930) made the next rule along worth reading. `SS37` — pattern
+`(?:color|backgroundColor)\s*=`, scope `src/presentation/` — declared **`C09 I4 · C09 T2.17`**,
+while I4 is *no renderer emits a colour directly; styling comes from `resolve` against a declared
+palette slot* and **I15** is *no renderer sets an Ink colour prop*, which is that pattern word for
+word. It reads exactly like F930's shape, and writing it up as a second instance was one edit away.
+
+**Asking where the claim was written down is what stopped it.** `docs/architecture/A03_enforcement_suite.md`'s
+rule table has said `C09 I15, T2.17` for some time, and `docs/COMMITMENT_INVARIANT_AUDIT.md`
+states it in words under *A third kind of A03 defect*:
+
+> Not vacuous, not unimplemented — **pointing at the wrong invariant.** SS37 declared C09 I4
+> while its behaviour is C09 I15 … Both fire correctly and always did; both were mislabelled,
+> and every previous check read the label rather than the target.
+
+So this is not a rule whose spec failed to grow. **It is a ruling that landed in the prose and
+never reached the code**, in the one repository whose standing rule is *a ruling lands as a spec
+edit immediately* — and A03 §"Two things belong here" says the quiet part itself: *a rule's
+"Declared" column is as citable-and-wrong as a test's parenthetical.* The document that names the
+failure mode is the half that was updated.
+
+**And the drift is general, because nothing joins the two records.** A03's table has a *Declared*
+column; each rule in `source-scans.mjs` / `module-graph.mjs` carries a `spec` string. They are two
+records of one fact with no reconciliation. Measured over the 45 rules that appear in both,
+normalising A03's implied-prefix notation (`C01 I1, T2.5`) against the code's (`C01 I1 · C01 T2.5`):
+
+| | count | shape |
+|---|---|---|
+| agree | 28 | — |
+| **code names more than A03** | 12 | SS2, SS3, SS9, SS10, SS11, SS13, SS20, SS21, SS24, SS25, SS30, SS37 — one-directional: a rule grew and the table did not |
+| **genuine contradiction** | 5 | below |
+
+The five, each of which needs a ruling rather than a merge, and all of which stay **open**:
+
+| rule | A03 says | the code says |
+|---|---|---|
+| `SS33` | `C01 I9`, `A04 §2` | `C01 I8`, `A04` |
+| `SS35` | `C04 I26` | `C04 §4 · C05 §2` |
+| `SS48` | adds `FINDINGS F126` | omits it |
+| `SS56` | `FINDINGS F739` | `C23 I61` |
+| `SS59` | `C28 T2.4b` | `C28 T2.4` |
+
+**Only SS37 is fixed here**, because only SS37 has a ruling already on the record to apply; it now
+reads `C09 I15 · C09 T2.17`, matching A03, and is in the equality-compared `RULE_INVARIANTS` map so
+a retarget fails. Dropping `C09 I4` costs nothing — `test/contract/blocks.test.ts`'s T2.8 names it.
+
+**The closer is not a reconciling gate.** A03 §701 already names this class — *the signature of a
+duplicated source of truth with no reconciliation* — and prescribes one source rather than two that
+are checked against each other. The table's Declared column should be generated from the rules, and
+that is a separate piece of work from any of the five rulings above.

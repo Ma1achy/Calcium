@@ -1132,6 +1132,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.25** (I33): at depth 1, `ok` with a bold span resolves to exactly `{ bold: true }` — the same object the tone alone gives — `default` with a bold span to `{ bold: true }`, and `muted` with a bold span to `{ dim: true, bold: true }`, painted as `1;2` in `sgr()`'s numeric order.
 - **T2.36** (I38): `degradeColour`'s signature takes no theme, asserted at compile time; and a source scan finds no theme reference in its module.
 
+- **T2.37** (I18): every variant of `defaultTheme` loads with no overrides and yields a current palette. T2.4 is the contrast half and it is already over `SHIPPED`, which *is* `defaultTheme` — what is owed here is the other clause, that the one required config field has a working value to fill it with, which no assertion about ratios can see. A framework whose only required field has no working value is a framework nobody starts.
 ### Tier 3 — edge cases
 
 - **T3.1**: an override naming an unknown tone → ignored, no throw.

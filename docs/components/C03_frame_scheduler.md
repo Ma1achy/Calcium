@@ -298,6 +298,7 @@ Fake `schedule`, spy `render`/`repaint`, fabricated capabilities.
 - **T2.6** (A02 §1): the module graph contains no import from `data/`.
 - **T2.7** (C13): across the whole tier-1 and tier-3 corpus, every string passed to `write` is the synchronised-update open or close marker. Nothing else, ever — a third string means frame content has moved into C03.
 
+- **T2.9, T2.9b** (I11): a scheduler given a `schedule` never calls the ambient `setTimeout` or `setInterval`, asserted on the **absence of the call**. The coalescing rows drive the injected seam and prove the window is a counter rather than a sleep, and every one of them passes just as well beside a duplicate timer firing at the same moment — the property here is that there is no second timer to fire. T2.9b is over the file, because the first is blind to a path it did not drive: exactly one ambient timer exists in `frame-scheduler.ts` and its enclosing function is `defaultSchedule`, which exists so an app need not supply one.
 ### Tier 3 — edge cases
 
 - **T3.1**: `flush()` from idle → no-op, no callback, no throw.

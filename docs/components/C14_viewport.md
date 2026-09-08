@@ -525,6 +525,8 @@ Fake heights, no rendering.
 - **T2.13** (I25, C09 I26): over every `[from, to)` of a capped `logs` and a capped `table`, `measure(piece) − skipRows − dropRows === to − from` with the marker counted, and the rows kept equal the capped rendering's rows at those offsets — the identity and the frame, because containment is not correctness.
 - **T2.14** (I24): `createBlockRegistry({ maxBlockRows })` refuses `0`, a negative, a fraction and `NaN` at construction, and `createTui` refuses the same values as a `ConfigError` naming `maxBlockRows` before anything is built.
 
+- **T2.16** (I13): the eviction marker is measured, counted in `totalRows` and drawn at the head like any other entry — and, over `src/viewport/viewport/`, C14 never names `MARKER_ID`, `isMarker` or the id itself. The behavioural half alone would pass beside a branch that rendered it specially, which is the thing the invariant forbids; the marker is C13's (C13 I14) and C14 holding a second opinion about it is how the two come to disagree.
+- **T2.17** (I16): a counting `measureSequence` over a document three times the viewport's height records **nothing** on a scroll — the entries the window can reach were already in the index and none beyond it is pulled in to be ready. **Adding overscan is a measurable change against M-T3's baseline rather than a default nobody chose**, and this is the row that makes it measurable.
 ### Tier 3 — edge cases
 
 - **T3.1**: empty transcript → empty range, `topRow` 0, no throw.

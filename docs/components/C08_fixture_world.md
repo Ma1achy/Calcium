@@ -294,6 +294,9 @@ This is not a deferral list. A **W** row is not a test Calcium is failing to run
 - **H** — **T2.10** (I9): the harness references no app type — `WorldDriver` is declared kit-side and every harness module is expressed in C06's and C05's vocabulary alone. Same caveat as T2.6 about what can be asserted from one repo.
 - **H** — **T2.11** (I17): a corpus file with no `schema`, or with an unrecognised one, fails to load and the error names what it needed. A corpus is not parsed on the assumption that its shape is current.
 
+- **T2.12** (I16, I10): the three provenances owe three different things, and the asymmetry is the claim — `derived` must carry a `capturedAt` (*a recording knows when it was taken*), `authored` must carry a note and must **not** carry a `capturedAt`, `recorded` owes neither. **That is *derived from a recording rather than composed*, enforced**: the timestamp is the recording's fingerprint and is exactly what a composed answer cannot produce. A note does not buy its way out, which is what makes them two rules rather than one.
+- **T2.12b** (I16): `record()` is the only site in `src/data/fixtures/` that produces `provenance: "recorded"`. If any other could stamp it, a composed answer could claim a recording it never had and every row above would still pass.
+- **T2.12c** (I16): **a watch, not coverage.** §5's W tier names `prism-tui` and `docker-tui` as the owners of *that a particular world advances, mutates and refuses as its domain requires*, so I16's first clause has no subject in this repository and a row asserting it here would assert a fixture of its own making. What is checkable is that the seam stayed one: `WorldDriver` is declared here and constructed nowhere here, and the row fails the day a world lands in `src/`.
 ### Tier 3 — edge cases
 
 - **H** — **T3.1**: `advance(0)` → the driver is not called, and the world value is unchanged.

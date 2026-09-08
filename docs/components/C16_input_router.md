@@ -960,6 +960,8 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T1.14** (I5): Ctrl-C with focus in the live block and text in the prompt → focus returns to `{at: "prompt"}` and **the buffer is unchanged**. The buffer assertion is the one that matters: without the rung this passes the focus half by accident and clears the input, which is a side effect on a surface the user is not looking at.
 - **T1.14b**: a second Ctrl-C after T1.14 → clears the input, exactly as rung 8 would have from the prompt. The rung defers the prompt behaviour rather than replacing it.
 
+- **T1.90, T1.90b, T1.90c** (I16): Ctrl-D with text present is consumed and **the prompt is not touched** — never EOF, never a delete-forward, which is the half that would go unnoticed, since a delete here looks like a working editor until the day the buffer is empty. On an empty prompt it takes the **shared arming machine**: the first press arms and does not exit, the second inside the window raises the confirm. C16's own walk found an arming machine that answered for one event kind of three, and a per-key copy is exactly what that looks like from outside. T1.90c is the asymmetry that keeps them two keys — Ctrl-D never cancels a stream where Ctrl-C does, on the same state.
+- **T1.91** (I1): `StoredFocus` is a **location** — one key, `at` — and everything else is derived per dispatch from C15, C14 and C13. A store holding anything resolved would be a second source going stale exactly when the transcript changes underneath it, and the declaration is read so a second stored field cannot arrive unread.
 ### Tier 2 — contract / interface
 
 - **T2.1** (I1): a spy proves `activeTarget` is recomputed on every dispatch, never cached across events.

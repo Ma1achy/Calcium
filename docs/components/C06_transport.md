@@ -341,6 +341,7 @@ Six tiers. Every cell of the §6 transition table is covered. `ProcessRunner` is
 - **T2.5**: `AsyncIterable` contract — early `break` by the consumer terminates the child and still settles.
 - **T2.6** (I13): after a hundred invocations across every settlement path, `busy` is false.
 
+- **T2.12, T2.12b** (I23): the handler is driven as a closure over an app's own mutable world — the mutation lands on the caller's object and on the second reply, so the state is the app's and the transport is the thing with nowhere to put it. T2.12b is the structural half, because a closure that happens to be generic looks exactly like a seam that is: `FixtureHandler`'s declaration names `Invocation`, `RawResult`, `RawPatch` and `AsyncIterable` and nothing else, compared **by equality**, and no file under `src/data/transport/` names an app in an import or a literal.
 ### Tier 3 — edge cases
 
 - **T3.1**: `invoke` while busy → rejects with an error naming the in-flight verb; the running invocation is unaffected.
