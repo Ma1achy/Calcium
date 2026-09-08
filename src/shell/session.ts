@@ -912,7 +912,7 @@ class Session implements TuiInstance {
   #raiseReserves(graph: Graph): void {
     let raised = false;
     for (const req of graph.blockFaults.drain()) {
-      const entry = graph.transcript.entries.find((e) => e.id === req.entryId);
+      const entry = entryById(graph.transcript.entries, req.entryId);
       const held = entry === undefined ? undefined : blockById(entry.doc.blocks, req.blockId);
       if (!reserveNeeded(entry, held, req)) continue;
 
@@ -1256,6 +1256,35 @@ class Session implements TuiInstance {
 }
 
 /**
+ * One entry by id, in constant time (F914, P11 defect 3).
+ *
+ * **The array's identity is the revision**, which is what makes a `WeakMap`
+ * keyed on it correct rather than a cache someone must remember to clear. C13's
+ * store never mutates `#entries` in place — every append, patch, settle and
+ * evict rebuilds the frozen array through `map` — so a new array is exactly the
+ * moment the index goes stale, and an entry patched in place keeps its id and
+ * its slot.
+ *
+ * The scan it replaces was O(entries) inside a loop over the *visible* entries,
+ * run once per frame: measured at 400 entries × 3 visible × 1231 frames, which
+ * is 1.5M comparisons a session for a lookup the store could answer in one.
+ * The cost is invisible to the span table because the scan is not a phase — it
+ * is the loop body's first line, and `visibleRows` has no span of its own.
+ */
+const ENTRY_INDEX = new WeakMap<object, ReadonlyMap<string, Entry>>();
+
+type Entry = Graph["transcript"]["entries"][number];
+
+function entryById(entries: readonly Entry[], id: string): Entry | undefined {
+  let index = ENTRY_INDEX.get(entries);
+  if (index === undefined) {
+    index = new Map(entries.map((e) => [e.id, e]));
+    ENTRY_INDEX.set(entries, index);
+  }
+  return index.get(id);
+}
+
+/**
  * The visible transcript, as rows, at the frame's width.
  *
  * C14 chose the range and the `skipRows`/`takeRows` slice; this renders exactly
@@ -1290,7 +1319,7 @@ function visibleRows(
   const frames: { entryId: string; blockId: string; delays: readonly number[] }[] = [];
   const rasterising = graph.capabilities.imageProtocol !== "kitty";
   for (const ve of graph.viewport.visible().entries) {
-    const entry = graph.transcript.entries.find((e) => e.id === ve.id);
+    const entry = entryById(graph.transcript.entries, ve.id);
     if (entry === undefined) continue;
     // **Whose work the elements below belong to** (C28 I42). A block id is
     // unique within its own document (C04 I14) and a transcript holds many, so

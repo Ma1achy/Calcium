@@ -915,4 +915,88 @@ describe("C17 §5b — the region's cells (roadmap entry 23)", () => {
       to: 10,
     });
   });
+
+  it("T1.43 (I24): the memo agrees with a fresh walk, and moves when the buffer, the width or the gutter does", () => {
+    // **A memo passes a same-answer test by returning anything stale**, so the
+    // agreement rows are the cheap half and the three invalidations are the row.
+    // §7b's buffer is the fixture because it is the one drawn in full — 89 cells
+    // then 8 — so 80, 40 and 30 do not wrap the same way and the two gutters do
+    // not either.
+    const BUF =
+      "/run train --dataset=imagenet --epochs=90 --batch-size=256 --lr=0.1 --wd=1e-4 --seed=1234\n--resume";
+    const GUTTERS = [
+      { first: 2, cont: 2 },
+      { first: 0, cont: 0 },
+    ] as const;
+
+    for (const width of [80, 40, 30, 120]) {
+      for (const gutter of GUTTERS) {
+        const memoised = createEditor({ text: BUF, cursor: 0 });
+        memoised.layout(width, gutter); // prime the memo, then ask again
+        const fresh = createEditor({ text: BUF, cursor: 0 });
+        const walked = fresh.layout(width, gutter);
+        expect(memoised.layout(width, gutter), `w=${width} gutter=${gutter.first}`).toEqual(walked);
+        expect(memoised.displayRows(width, gutter), "displayRows is layout().length").toBe(
+          walked.length,
+        );
+        // **The hazard the memo creates.** Before it every call returned a fresh
+        // array, so a caller mutating the rows hurt only itself; a shared
+        // reference makes the same mutation poison every later answer, and
+        // `readonly` is erased at run time.
+        expect(Object.isFrozen(walked), "the rows are frozen, not merely readonly").toBe(true);
+      }
+    }
+
+    // **Invalidation 1 — an edit.** The memo has already answered for this
+    // buffer at this width, which is the state a key missing `text` serves from.
+    const edited = createEditor({ text: BUF, cursor: 0 });
+    const before = edited.layout(80, G);
+    edited.insert("x".repeat(200));
+    expect(edited.layout(80, G), "an edit between two calls changes the answer").not.toEqual(before);
+
+    // **Invalidation 2 — a second width**, and the return trip, which is what
+    // says the memo holds one answer rather than the first one for ever.
+    const widened = createEditor({ text: BUF, cursor: 0 });
+    const at80 = widened.layout(80, G);
+    expect(widened.layout(40, G), "a second width").not.toEqual(at80);
+    expect(widened.layout(80, G), "and back to the first width").toEqual(at80);
+
+    // **Invalidation 3 — the gutter, one figure at a time.** Written as
+    // `{2,2}` against `{0,0}` this row passed with `first` missing from the key,
+    // because `cont` differed too and caught it — a mutation survived that the
+    // row read as covering. Each figure now moves alone: `first` changes the
+    // first row's usable width and `cont` every row after it, at the same buffer
+    // and the same terminal width.
+    //
+    // §7b's buffer will not do for the `cont` half: its continuation rows carry
+    // `--seed=1234` and `--resume`, eleven cells and eight, which fit whatever
+    // `cont` is — so the assertion written against it passes for a reason that
+    // has nothing to do with the key. A single long line makes every row after
+    // the first a full one.
+    //
+    // **One editor per figure**, because the memo holds one entry: asking the
+    // same editor for `{4,2}` and then `{2,4}` makes the second call miss on
+    // `first` against the answer the *first* call stored, so `cont` is never the
+    // deciding term and its mutation survives a row that reads as covering it.
+    const LONG = "x".repeat(300);
+    const gutterMoves = (g: { first: number; cont: number }, why: string): void => {
+      const e = createEditor({ text: LONG, cursor: 0 });
+      const base = e.layout(80, G);
+      expect(e.layout(80, g), why).not.toEqual(base);
+    };
+    gutterMoves({ first: 4, cont: 2 }, "the first row's gutter alone");
+    gutterMoves({ first: 2, cont: 4 }, "the continuation gutter alone");
+
+    // **The precondition I24 rests on**, rather than the key term it rejected:
+    // the chip table is out of the key because `insertChip` moves the buffer in
+    // the same call, so a chip can never be registered behind a buffer the memo
+    // has already answered for. This watches the writer that exists — a second
+    // writer that registered a chip without inserting its sentinel would leave
+    // the memo stale, and nothing here would see it. The limit is I24's, stated.
+    const chipped = createEditor();
+    chipped.insert("read ");
+    const beforeChip = chipped.text;
+    chipped.insertChip({ label: "[#1 parse.ts \u00b7 184L]", content: "line one" });
+    expect(chipped.text, "insertChip moves the buffer in the same call").not.toBe(beforeChip);
+  });
 });

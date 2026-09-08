@@ -25,7 +25,7 @@ import type { Block, ViewDocument, TerminalCapabilities } from "@fmx/calcium";
 import { CATALOGUE, everyVariant, FORMS, refusals, variantsOf } from "../src/catalogue.ts";
 import type { Entry } from "../src/catalogue.ts";
 import {
-  adaptSample, compare, everyForm, faults, formFull, greetingDocument, barStyles, images, liveFor, monitor, mosaics, rungs, spinners, unknown,
+  adaptSample, compare, everyForm, faults, formFull, greetingDocument, barStyles, images, liveFor, monitor, mosaics, profileBlocks, rungs, spinners, unknown,
 } from "../src/commands.ts";
 import { manifest } from "../src/manifest.ts";
 
@@ -367,6 +367,19 @@ describe("every command composes a document the transcript would accept", () => 
     image: () => [as("image", [images()])],
     spinners: () => [as("spinners", [spinners()])],
     bars: () => [as("bars", [barStyles()])],
+    // **The arm a document test can construct** — and the one every app that
+    // does not configure a profiler sees. `ProfileReport` is reachable only
+    // through `ctx.profile()`: there is no constructor on the public surface and
+    // none in `@fmx/calcium/testing`, so the present arm needs a live session
+    // (F917). It is not uncovered — `profilePane` is exercised across every pane
+    // by the framework's own `test/unit/profiler.test.ts`; what this row adds is
+    // that the command composes a document the transcript accepts.
+    // `FULL` is declared below and closed over rather than repeated: these
+    // entries are thunks, so nothing here runs until an `it` does. The absent
+    // arm ignores capabilities entirely — it is passed because the signature
+    // takes it, and a second capability record in this file would be one more
+    // thing to keep in step.
+    profile: () => [as("profile", profileBlocks(undefined, [], FULL))],
   };
 
   it("T-doc1: the coverage table names every command the manifest declares", () => {
@@ -391,10 +404,12 @@ describe("every command composes a document the transcript would accept", () => 
     }
     expect(bad).toEqual([]);
     // 46 forms twice, plus /all, /faults, /monitor, /rungs, /mosaic, /image,
-    // /spinners, /bars and sample's two — ten singletons. The count is asserted
-    // so a document appearing or vanishing has to be attributed rather than
-    // noticed: `/image` moved this from seven, the two galleries from eight.
-    expect(checked, "documents built").toBe(FORMS.length * 2 + 10);
+    // /spinners, /bars, /profile and sample's two — eleven singletons. The count
+    // is asserted so a document appearing or vanishing has to be attributed
+    // rather than noticed: `/image` moved this from seven, the two galleries
+    // from eight, and `/profile` from ten — which is the row working, since the
+    // command had been in the manifest and in no coverage row since `b62b64df`.
+    expect(checked, "documents built").toBe(FORMS.length * 2 + 11);
   });
 
   it("T-doc3: an unknown form is a document too", () => {

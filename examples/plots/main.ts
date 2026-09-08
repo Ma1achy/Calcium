@@ -29,7 +29,7 @@ import { b, createTui, defaultTheme, PANES, profilePane } from "@fmx/calcium";
 import type { Adapter, Block, LocalHandler, PaneName } from "@fmx/calcium";
 import {
   adaptSample, barStyles, compare, everyForm, faults, formFull, formIn, greetingDocument, images, liveFor,
-  monitor, mosaics, rungs, spinners, unknown,
+  monitor, mosaics, profileBlocks, rungs, spinners, unknown,
 } from "./src/commands.ts";
 import { faultyDefinition } from "./src/faulty.ts";
 import { manifest } from "./src/manifest.ts";
@@ -100,26 +100,12 @@ const tui = createTui({
     /**
      * **The framework profiling itself, drawn with the framework's own plots.**
      *
-     * `ctx.profile` is `undefined` unless `TuiConfig.profile` was set, so the
-     * absent arm is real rather than defensive — and it is what every app that
-     * does not ask for a profiler sees.
+     * The builder is in `commands.ts` beside every other one, so the coverage
+     * table can call the same code this handler does rather than a second copy
+     * of it (F917).
      */
-    profile: ((argv, ctx) => {
-      const report = ctx.profile?.();
-      if (report === undefined) {
-        return doc(ctx.command, [
-          b.notice("warn", "no profiler on this session — set `profile` in the config", undefined, {
-            id: "prof-off",
-          }),
-        ]);
-      }
-      const asked = (argv[0] ?? "overview") as PaneName;
-      const pane: PaneName = PANES.includes(asked) ? asked : "overview";
-      return doc(ctx.command, [
-        b.notice("info", `pane \`${pane}\` · ${PANES.join(" · ")}`, undefined, { id: "prof-nav" }),
-        ...profilePane(report, pane, ctx.capabilities),
-      ]);
-    }) satisfies LocalHandler,
+    profile: ((argv, ctx) =>
+      doc(ctx.command, profileBlocks(ctx.profile?.(), argv, ctx.capabilities))) satisfies LocalHandler,
 
     rungs: ((_argv, ctx) => doc(ctx.command, [rungs()])) satisfies LocalHandler,
 
