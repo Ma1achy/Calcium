@@ -33212,3 +33212,79 @@ instrument, and building one is still the thing the audit argues against. Record
 the two rules in this repo with that property (SP3, and SP9's equality gate) were both justified on
 something narrower.
 
+## F922 — a mutation that does not compile reads as a survivor, and sends the reader to the tests ★★★☆☆
+
+`c21-pty.mjs`'s wrapped-error row reported **SURVIVED**, and the summary said what it always says:
+*a finding about the tests, or about the sentence they were written from*. Neither was true. The
+mutation's `to` opened a `try` it never closed, so `runner.ts` did not parse.
+
+**Three of four suites failed to collect; the fourth ran green.** vitest printed two lines that
+disagree:
+
+```
+ Test Files  3 failed | 1 passed (4)
+      Tests  10 passed | 2 todo (12)
+```
+
+`ran()` looks for a `Tests` line and found one. `killed()` looks for a failing test and found none.
+Both predicates answered correctly and the conclusion was wrong, because **nothing asked whether
+the suites had loaded**. The reader is then sent to the one place the defect is not.
+
+**The third instance of a class this file has already grown twice.** `NO SUMMARY` was added when a
+`grep -q` under `pipefail` cut the buffer; `ANCHOR MISSED` was added when a mutation's anchor was
+rewritten by the change it was written for, and the summary said *1 survived* over a row that ran
+nothing. Both are the same shape: **a state that is not a kill, is not a survivor, and had no name**
+— so it was counted as the only other thing available. `DID NOT BUILD` is the third, and the count
+line no longer claims *every mutation was caught* when any row did not run.
+
+**The signal is the disagreement, not the transform error.** `Error: Transform failed` sits above
+those lines and is esbuild's wording; a module that throws at import fails identically and prints
+nothing of the sort. Two summary lines that contradict each other is the general form, and it is
+what `unbuilt()` reads.
+
+**Where the fake had to be the real bytes.** MH8 is built from the captured output rather than a
+written-out string — the file's own rule, and MH1 exists because a hand-written fixture had no ANSI
+codes in it and agreed with a regex the tree did not. Its controls are the other half: a real kill
+and a real survivor must both answer false, or every row in every pass changes state.
+
+And the same gap sat one level up. The clean-tree check calls `ran(clean)` — a tree with one suite
+that will not load passes it, and every mutation that suite covers then comes back a survivor. That
+is now refused before the first mutation runs (MH8b).
+
+**Two files caught nothing and four did**, which is worth the sentence: with only suites that import
+the broken module, *all* of them fail, no `Tests` line is printed, and `NO SUMMARY` already covered
+it. The new state exists exactly in the middle — enough of the suite still runs to look like a
+result. A probe that had used the smaller command would have concluded the harness was already
+right.
+
+## F923 — three deferred rows, and each was wrong in its own assertion rather than in its blocker ★★★☆☆
+
+F919 resolved forty-four `it.todo` rows against HEAD and found every blocker built. Converting them
+turns up the half that pass did not look at: **the row's own text**. Three of the first eighteen
+were wrong about what they assert, and none of the three is wrong about what it is waiting for.
+
+| row | what it said | what is true |
+|---|---|---|
+| C04 T2.118 | `TERMINAL_KEYS` refuses **a seventh** block key | it has **nine**; the count was written when the kind had six |
+| C21 T2.8 | a compile check that `IPty` is assignable to `PtyProcess` | I15 names **two** types, and the second one did not compile (F920) |
+| C22 T2.100 | `config.pty` is read at **exactly one site** in `src/shell/` | **two**, and both are pure forwards |
+
+**They fail in three different directions, which is why no single check reaches them.** T2.118's is
+a number that drifted while its subject grew. T2.8's is a subject narrower than the invariant it
+cites — the row would have passed. T2.100's is a claim that is true of each site's own `config`
+object and false as the grep the row describes; `construct.ts`'s comment says *the one site that
+reads it* and is correct about the resolved config, which is F92's shape exactly.
+
+**The common cause is that a deferred row's text is never executed.** A running row's assertions are
+checked against the tree on every commit; an `it.todo` is a sentence, and a sentence about a count,
+a type or a scan drifts silently for as long as the deferral lasts. TD1–TD6 watch whether the
+*blocker* still stands, SP9 watches whether an invariant is *named*, and nothing at all reads what
+the row claims — so the longer a row waits, the more likely it is that converting it means
+rewriting it.
+
+**What this changes about converting the rest.** The deferral's text is a starting point, not a
+specification: resolve every number, type and path in it against HEAD before writing the row, and
+where it disagrees, fix the spec first and say which direction it drifted. Two of the three above
+were only visible because the row was *written* — T2.8's second half by `tsc` refusing, T2.100's
+count by running the grep the sentence describes. Reading the rows would have found neither.
+
