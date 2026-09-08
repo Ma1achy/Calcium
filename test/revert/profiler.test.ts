@@ -16,6 +16,7 @@ import { describe, expect, it } from "vitest";
 import { createProfiler } from "../../src/shell/profiling/recorder.js";
 import { createResourceProbe } from "../../src/shell/profiling/node.js";
 import { profilePane } from "../../src/shell/profiling/panes.js";
+import { compareFrames, parseRecording } from "../../src/shell/profiling/replay.js";
 import type { ProfileReport, ResourceSample } from "../../src/shell/profiling/types.js";
 
 /** A report carrying nothing but the samples under test (as tier 3's). */
@@ -232,7 +233,35 @@ describe("C28 — profiler, tier 6 spec-first rows", () => {
     p.dispose();
   });
 
-  it.todo("T6.8 (C28 I15): reporting a truncated recording as a divergence → T3.6 fails, and the failure names the false-positive it would have caused — not deferred on a component: the blocker is that record and replay do not exist, so there is no truncation to misreport and T3.6 is deferred on the same absence. Grep: `grep -rn 'replay' src/`");
+  it("T6.8 (C28 I15): a truncated recording reported as a divergence — the false positive, and what it costs", () => {
+    // **The revert**: fold `truncated` into `divergence`, which is the tidier's
+    // move because both are *the replay did not match the recording* and one
+    // field reads simpler than two. It is the wrong simplification, and the
+    // direction matters: a recording that stops early is a **prefix**, and a
+    // replay that agrees over every frame the prefix holds has passed. Called a
+    // divergence it fails, and the failure points at the subject — so the
+    // recorder being killed mid-write reads as the session having changed.
+    //
+    // Deferred until this session on *record and replay do not exist*; they do
+    // (F919), and the claim is checkable from the parse alone.
+    const frames = ["a", "b"].map((f) => Buffer.from(f, "utf8"));
+    const cut = parseRecording(
+      `${frames.map((f, i) => JSON.stringify({ t: "frame", n: i, b64: f.toString("base64") })).join("\n")}\n`,
+    );
+
+    // The state the row is about, asserted rather than assumed.
+    expect(cut.truncated, "no `end` line, so the recording is a prefix").toBe(true);
+
+    const r = compareFrames(cut, frames);
+    // **Three fields, and the revert collapses the first two.** `truncated` says
+    // the recording stopped; `divergence` says the frames disagreed; `identical`
+    // is the verdict. A reader handed one flag cannot tell a killed recorder
+    // from a changed session, which is the distinction C28 I15 exists to keep.
+    expect(r.truncated, "the prefix is reported").toBe(true);
+    expect(r.divergence, "and it is not a disagreement").toBeNull();
+    expect(r.identical, "so the gate passes on a prefix that agrees").toBe(true);
+  });
+
   it("T6.9 (C28 I24): an attribution table with a latency in it reads as more complete, not less true", () => {
     // **The revert is a tidier's move.** `byEntry` sums to less than the frame,
     // visibly, and folding the wait in makes the columns add up — which is the
@@ -386,10 +415,39 @@ describe("C28 — profiler, tier 6 spec-first rows", () => {
     ).toEqual(kinds);
     expect(empty.size, "which is why the row asserts the scan found something").toBe(0);
   });
+  it("T6.15 (C28 I15): the frame-count difference called a divergence — the same false positive, from the other side", () => {
+    // **The revert**: `identical = recorded.length === replayed.length && …`.
+    // It is the natural guard and it is wrong in both directions at once. A
+    // replay that ran on past a truncated recording has *more* frames, and
+    // those are not a divergence — nothing recorded them to disagree with. The
+    // surplus is reported as a count so a reader can see how far past the end
+    // the replay went, which is a different question from whether it matched.
+    //
+    // Deferred on `src/shell/profiling/replay.ts`, which now exists (F919).
+    const recorded = ["a", "b"].map((f) => Buffer.from(f, "utf8"));
+    const cut = parseRecording(
+      `${recorded.map((f, i) => JSON.stringify({ t: "frame", n: i, b64: f.toString("base64") })).join("\n")}\n`,
+    );
+    const replayed = ["a", "b", "c", "d"].map((f) => Buffer.from(f, "utf8"));
+    const r = compareFrames(cut, replayed);
+
+    expect(r.compared, "only the frames the recording holds").toBe(2);
+    expect(r.surplus, "and the two beyond it, counted rather than judged").toBe(2);
+    expect(r.divergence, "which is not a disagreement").toBeNull();
+    expect(r.identical, "so a longer replay of a prefix still passes").toBe(true);
+  });
+  // **Reframed rather than converted, and the residue is named** (F919). Its
+  // blocker was `src/shell/profiling/replay.ts`, which now exists — so the
+  // deferral has expired and the row still cannot be written *here*. T1.83 is a
+  // tier-5 row: it re-derives the capabilities from a real PTY's replies, and
+  // the revert — recording the verdict and handing it back — is only observable
+  // against a detector that ran. A tier-6 row asserting the *absence* of a
+  // capabilities field on `Recording` is what a unit file could hold, and it is
+  // the assert-the-artefact-not-a-proxy shape this repo has already been wrong
+  // about: the field's absence is structural and TypeScript checks it, so the
+  // row would be vacuous. What is owed is the tier-5 revert, and it is owed by
+  // the e2e file rather than by this one.
   it.todo(
-    "T6.15 (C28 I15): calling the recorded/replayed frame-count difference a divergence → T3.6 fails — not deferred on a component: lands with src/shell/profiling/replay.ts",
-  );
-  it.todo(
-    "T6.16 (C28 I47): recording the capability verdict and replaying it → T1.83 fails — not deferred on a component: lands with src/shell/profiling/replay.ts",
+    "T6.16 (C28 I47): recording the capability verdict and replaying it → T1.83 fails — not deferred on a component: the blocker was replay.ts and it is met; what remains is that T1.83 is tier 5, so the revert belongs in test/e2e/profiler.test.ts and not here",
   );
 });

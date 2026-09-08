@@ -247,6 +247,81 @@ describe("C22 — the root's injection, refusal and capture path", () => {
     ).not.toThrow();
   });
 
+  it("T1.91 (C28 I48, F912): the recording flushes from `process.on(\"exit\")`, and the clock batch is what would be lost", async () => {
+    // **The witness NO-EXIT-FLUSH did not have.** F912's whole diagnosis rests
+    // on this hook — C01's `signalExit` calls `process.exit` directly, so
+    // `Session.#runStop`, where `recording.end()` lives, never runs and the clock
+    // reads still in the batch go with it. Its only witness was T5.1, a tier-5
+    // row the mutation harness cannot run: tier 5 executes against `dist/`, so a
+    // mutation to `src/` is invisible to it without a build per mutation, and
+    // the mutation was carried as an absence with a reason rather than a false
+    // anchor.
+    //
+    // This runs at tier 1 by calling the **listener**, never `process.exit` —
+    // which would take the runner with it — and by driving the resolved
+    // `elapsed`/`clock`, which are the recording's own wrappers. `FLUSH_EVERY`
+    // is 512, so ten reads are a batch that has not been written.
+    const fs = fakeFs();
+    await fs.mkdir("/state");
+    const base = {
+      name: "prism",
+      binary: "prism",
+      manifest: MANIFEST,
+      theme: defaultTheme,
+      stateDir: "/state",
+      env: {},
+      cwd: "/work",
+      clock: () => 0,
+      fs,
+      greeting: async () => ({ blocks: [] }),
+    } as unknown as TuiConfig;
+    const ambient = fakeAmbient();
+
+    // **The control, and it is the half the invariant states**: the listener
+    // exists only when a recording does. Without it a row asserting *one was
+    // added* passes on any process that happens to have an `exit` listener.
+    const bare = process.listeners("exit").length;
+    resolveConfig({ ...base }, ambient);
+    expect(process.listeners("exit").length, "no recording, no listener").toBe(bare);
+
+    const before = process.listeners("exit");
+    const resolved = resolveConfig(
+      { ...base, profile: { record: "/state/r.ndjson", tier: "spans" } },
+      ambient,
+    );
+    const added = process.listeners("exit").filter((l) => !before.includes(l));
+    expect(added, "exactly one listener, added by the recording").toHaveLength(1);
+
+    try {
+      const kinds = async (): Promise<readonly string[]> =>
+        String(await fs.readFile("/state/r.ndjson"))
+          .split("\n")
+          .filter((l) => l !== "")
+          .map((l) => (JSON.parse(l) as { t: string }).t);
+
+      // The regime is written at construction and nothing else is — asserted, so
+      // the batch below is shown to be pending rather than assumed to be.
+      expect(await kinds(), "the regime, and only the regime").toEqual(["regime"]);
+
+      for (let i = 0; i < 10; i += 1) {
+        resolved.elapsed();
+        resolved.clock();
+      }
+      expect(await kinds(), "ten reads, still unwritten").toEqual(["regime"]);
+
+      // The exit code the runtime would pass; the listener ignores it.
+      added[0]!(0);
+
+      const after = await kinds();
+      expect(after, "the batch reached the sink").toContain("clock");
+      expect(after.at(-1), "and `end` closed the file").toBe("end");
+    } finally {
+      // The listener outlives this test otherwise, and `resolveConfig` is called
+      // with a recording by three other rows in this file.
+      process.off("exit", added[0]!);
+    }
+  });
+
   it("T1.54 (C22 I95): an unset captureDir resolves under stateDir, and that is the directory the .gitignore of * was written into", async () => {
     // **At a stateDir that is not the default, deliberately.** `DEFAULT_STATE_DIR`
     // is `.calcium` and the recorder's fallback literal is `.calcium/profile`,

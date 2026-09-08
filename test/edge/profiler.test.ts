@@ -258,7 +258,10 @@ describe("C28 — profiler, tier 3 spec-first rows", () => {
     expect(r.captures.some((c) => c.abandoned), "and nothing is marked abandoned").toBe(false);
     expect(r.dropped.captures, "with no loss counted").toBe(0);
   });
-  it.todo("T3.6 (C28 I15): a recording truncated mid-stream → replay reports truncated, and no divergence is raised — not deferred on a component: the blocker is that record and replay do not exist. `grep -rn 'replay' src/` returns nothing, so I15 is a claim about a mechanism with no subject and this row is what would first have something to be wrong about. Grep: `grep -rn 'replay' src/`");
+  // **T3.6 is written and running in `test/unit/profiler-gauges.test.ts`.** The
+  // deferral for it stood here as well, saying *record and replay do not exist*
+  // — and they do, and the row had been written against them. Two records of one
+  // row, and the deferral is the one that reads as the state of the work (F919).
   it("T3.7 (C28 I6): a composition that throws with two spans open closes both, and the frame is excluded", () => {
     // **A throw mid-frame is the case where a span leaks**, and a leaked span
     // is worse than a missing one: it stays open, `freezeTree` gives it the

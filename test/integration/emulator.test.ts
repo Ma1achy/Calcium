@@ -19,6 +19,12 @@ describe("C09 · C10 — the terminal block at the arms, spec-first rows", () =>
 });
 
 describe("C23 — the shell route as a live screen, spec-first rows", () => {
-  it.todo("T4.64 (C23 I65, with C27): a width change mid-run resizes the child before the emulator, asserted by call order on one spy, and the next frame matches the reflow — not deferred on a component: lands with the route's resize");
+  // **Partial, not deferred** (F919). `test/unit/emulator.test.ts` holds a
+  // running T4.64 (C23 I65) asserting that the child and the emulator are told
+  // the same width — one of the three things this asked for. The **order** and
+  // the **reflowed frame** are not covered, and the order is the half the
+  // invariant is about: resizing the emulator first draws one frame from the old
+  // grid, which agrees on the width and is wrong about the picture.
+  it.todo("T4.64 (C23 I65, with C27): the child is resized BEFORE the emulator — call order on one spy — and the next frame matches the reflow; test/unit/emulator.test.ts covers only that the two are told the same width — not deferred on a component: the route's resize has landed and the row is written narrower than this asked");
   it.todo("T4.65 (C23 I63, C23 I67, with C21, C27): one byte script on both arms — the PTY arm carries the child's colours, the pipe arm does not, and both settle with the same text — not deferred on a component: lands with the route's arms");
 });

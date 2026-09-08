@@ -183,5 +183,9 @@ describe("C21 — the PTY port, spec-first rows", () => {
 
 describe("C23 — the shell route as a live screen, spec-first rows", () => {
   it.todo("T3.62 (C23 I66): a running shell command then the ladder's first rung → the child receives SIGINT, the card settles cancelled, and the block holds the lines written before the press — the row F844 was written for — not deferred on a component: lands with the route's cancel");
-  it.todo("T3.63 (C23 I63): a spawnPty that throws → the card settles failed naming the error and spawnShell is never called — not deferred on a component: lands with the route's arm choice");
+  // **T3.63 is written and running in `test/unit/emulator.test.ts`**, asserting
+  // both halves the deferral asked for — the card settles `error` naming `pty`,
+  // and `spawnShell` is never called. The deferral said *lands with the route's
+  // arm choice*; it landed, and this second record of the row outlived it
+  // (F919).
 });

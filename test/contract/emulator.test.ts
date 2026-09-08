@@ -130,5 +130,14 @@ describe("C21 · C22 — the PTY port, spec-first rows", () => {
 });
 
 describe("C23 — the shell route as a live screen, spec-first rows", () => {
-  it.todo("T2.47 (C23 I67): a settled terminal document carries no cursor at any position, and dispose is called after snapshot, asserted by call order — not deferred on a component: lands with the route's settle");
+  // **Partial, not deferred** (F919). The blocker — *lands with the route's
+  // settle* — landed, and `test/unit/emulator.test.ts` holds a running T2.47
+  // asserting both halves: a settled screen carries no cursor, and a dispose
+  // before the snapshot would have thrown C27's refusal, so `status: "ok"` is
+  // the ordering. What is not covered is the corpus: *at any position* against
+  // the one position that row builds. That is owed coverage on built code
+  // rather than work waiting on a component, and the distinction is the whole
+  // of the closes/reframes/partial test — a deferral that says *partial* is the
+  // only one of the three that leaves a residue named.
+  it.todo("T2.47 (C23 I67): the settled screen carries no cursor at EVERY cursor position, not only the one test/unit/emulator.test.ts builds — not deferred on a component: the route's settle has landed and the row is written narrower than this asked");
 });

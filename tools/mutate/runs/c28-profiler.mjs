@@ -1067,13 +1067,54 @@ const results = runPass({
       to: '      case "geometry":\n        geometry = e;\n        timeline.push({ ...e, t: "resize" });\n        break;',
       expect: "T1.84",
     },
-    // **`NO-EXIT-FLUSH` is not here, and the absence is the finding.** Deleting
-    // the `process.on("exit")` flush in `config.ts` is the mutation F912's
-    // whole diagnosis rests on, and its only witness is T5.1 — a tier-5 row
-    // this harness cannot run: tier 5 executes against `dist/`, so a mutation
-    // to `src/` is invisible to it without a build per mutation. Listing it
-    // with a `T5.1` expectation would make MA4 red on a row that runs; listing
-    // it against a unit row it does not actually reach would be worse.
+    // **`NO-EXIT-FLUSH` was carried here as an absence with a reason**, because
+    // its only witness was T5.1 — a tier-5 row this harness cannot run, since
+    // tier 5 executes against `dist/` and a `src/` mutation is invisible to it
+    // without a build per mutation. The absence was the honest form and it was
+    // not the end of it: the flush had no invariant either, which is the same
+    // gap seen from the spec's side. C28 I48 and T1.91 now give it a tier-1
+    // witness, and the two mutations below are killed by different assertions —
+    // the deleted hook by the listener count, the emptied one by the flush.
+    {
+      // **The mutation F912's whole diagnosis rests on.** Without the hook a
+      // signal exit loses the clock batch and writes no `end` line, and a reader
+      // cannot tell that from a recording killed mid-write.
+      name: "NO-EXIT-FLUSH: the recording ends only from `stop()`",
+      file: CONFIG,
+      from: '    process.on("exit", () => void recording.end());\n',
+      to: "",
+      expect: "T1.91",
+    },
+    {
+      // The other half, and the one a reader skims past: the hook is present,
+      // registered, visible in a diff — and does nothing. A row asserting only
+      // that a listener was added is green under it.
+      name: "EXIT-HOOK-EMPTY: the hook is installed and flushes nothing",
+      file: CONFIG,
+      from: '    process.on("exit", () => void recording.end());',
+      to: "    process.on(\"exit\", () => {});",
+      expect: "T1.91",
+    },
+    {
+      // **A prefix is not a disagreement.** Folding `truncated` into the verdict
+      // is the tidier's move — both are *the replay did not match* — and it
+      // makes a recorder killed mid-write read as a session that changed.
+      name: "TRUNCATED-IS-DIVERGENCE: a recording that stopped early fails the comparison",
+      file: REPLAY,
+      from: "    identical: !shortfall || rec.truncated,",
+      to: "    identical: !shortfall && !rec.truncated,",
+      expect: "T6.8",
+    },
+    {
+      // The same false positive from the other side: a replay that ran on past
+      // a truncated recording has more frames, and nothing recorded them to
+      // disagree with. The surplus is counted, not judged.
+      name: "COUNT-IS-DIVERGENCE: a frame-count difference is a divergence whatever the recording",
+      file: REPLAY,
+      from: "    identical: !shortfall || rec.truncated,",
+      to: "    identical: !shortfall,",
+      expect: "T6.15",
+    },
     {
       name: "PACE-BY-NOTHING: the drive fires every event without waiting",
       file: REPLAY,
