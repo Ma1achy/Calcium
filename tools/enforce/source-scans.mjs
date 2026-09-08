@@ -168,7 +168,20 @@ export const SCANS = [
   // (C16 T2.9). One file allowed, one file to check.
   { id: "SS14", spec: "C01 I1 · C01 T2.5",
     pattern: /\\x1b|\\u001b|\u001b/,
-    scope: "src/", allow: ["src/terminal/escapes.ts", "src/interaction/router/decode.ts"],
+    scope: "src/",
+    allow: [
+      "src/terminal/escapes.ts",
+      "src/interaction/router/decode.ts",
+      // The replay comparison's recogniser: it matches bytes a recording already
+      // holds and emits nothing, which is the inverse direction this rule was
+      // never about. Composing the pattern from `escapes.ts` was tried first and
+      // is the better argument — one table, no drift — but MG20 refuses the
+      // edge, because `lifecycle.ts` owns the cursor mode and a second reader of
+      // it is what that rule exists to stop. Two rules each right and impossible
+      // together, exactly as for `decode.ts`. If this file ever writes to a
+      // stream, that is the write path and this entry would hide it.
+      "src/shell/profiling/replay.ts",
+    ],
     why: "escape literals live in one module on the write path; recognising arriving bytes is the inverse direction" },
 
   // A C0 control character written literally into source. An escape, or not at

@@ -37,7 +37,7 @@ function reportWith(samples: readonly ResourceSample[]): ProfileReport {
     byReason: {}, timeline: [], worst: [], nodes: [], byKind: {}, byEntry: {}, leaks: {},
     counters: {}, gauges: {}, misses: {}, hits: {}, marks: [], samples, captures: [],
     excluded: { selfInflicted: 0, fallback: 0 },
-    dropped: { frames: 0, samples: 0, marks: 0, captureBytes: 0 },
+    dropped: { frames: 0, samples: 0, marks: 0, captureBytes: 0, captures: 0 },
     overhead: { spans: 0, clockNs: 0, estimateMs: 0, asyncEnabled: false },
     heapSpaces: [], frames: 0,
   };
@@ -174,7 +174,90 @@ describe("C28 — profiler, tier 3 spec-first rows", () => {
     }
   });
 
-  it.todo("T3.5 (C28 I17): shutdown with a capture in flight → bounded wait, then abandonment, with the dropped bytes reported — not deferred on a component: the blocker is that there is no in-flight set and no bounded wait. `dispose()` is synchronous, returns void, disposes the sampler and returns; an abandoned capture never reaches `addCapture`, so its bytes are in no total — `dropped.captureBytes` sums `droppedBytes` over captures that completed. Grep: `grep -n 'dispose(): void' src/shell/profiling/types.ts`");
+  it("T3.5 (C28 I17): a capture still running at shutdown is waited for, bounded, then recorded as abandoned", async () => {
+    // A clock the test drives, so the bound is a number of ticks rather than a
+    // wall-clock second — and an inspector whose capture never settles, which
+    // is the state the row is about and the one a real inspector reaches only
+    // under a heap snapshot of a large process.
+    let now = 0;
+    const pending = new Promise<never>(() => undefined);
+    let scheduled = 0;
+    const p = createProfiler(
+      { tier: "deep", captureDir: "/tmp/none" },
+      {
+        elapsed: () => now,
+        schedule: (fn, _ms) => {
+          scheduled += 1;
+          now += 10;
+          queueMicrotask(fn);
+          return { [Symbol.dispose]: () => undefined };
+        },
+        inspector: {
+          capture: () => pending,
+          dispose: () => undefined,
+        },
+      },
+    );
+
+    // Started and never awaited: the row is about shutdown, not about the
+    // caller. The rejection is caught so the test does not fail on it.
+    void p.capture("cpu").catch(() => undefined);
+
+    // **The wait is bounded and it says what it gave up on.** An unbounded one
+    // is a shell that will not exit; the return value is what the caller
+    // reports instead of guessing.
+    const still = await p.drain(50);
+    expect(still, "the capture is still running when the bound expires").toBe(1);
+    expect(scheduled, "and the bound was reached by waiting, not by returning").toBeGreaterThan(0);
+
+    p.dispose();
+    const r = p.report();
+    const abandoned = r.captures.filter((c) => c.abandoned);
+    expect(abandoned.length, "the abandoned capture is named").toBe(1);
+    expect(abandoned[0]?.path, "with the path the report had promised").toContain("cpu-");
+    expect(abandoned[0]?.bytes, "no bytes were written").toBe(0);
+    // **A count, not a byte figure.** How much an abandoned capture would have
+    // written is unknowable, and a `droppedBytes` of 0 reads as *nothing was
+    // lost* — the shape C28 I13 exists to forbid.
+    expect(r.dropped.captures, "and the count says one was lost").toBe(1);
+    expect(r.dropped.captureBytes, "while the byte total stays honest at zero").toBe(0);
+  });
+
+  it("T3.5b (C28 I17): a capture that finishes inside the bound is not abandoned", async () => {
+    // **The control.** Without it the row above passes on a `drain` that never
+    // waits and a `dispose` that marks everything abandoned.
+    let now = 0;
+    const p = createProfiler(
+      { tier: "deep", captureDir: "/tmp/none" },
+      {
+        elapsed: () => now,
+        schedule: (fn) => {
+          now += 10;
+          queueMicrotask(fn);
+          return { [Symbol.dispose]: () => undefined };
+        },
+        inspector: {
+          capture: (kind, path) =>
+            Promise.resolve({
+              kind,
+              path,
+              bytes: 128,
+              truncated: false,
+              droppedBytes: 0,
+              durationMs: 1,
+              abandoned: false,
+            }),
+          dispose: () => undefined,
+        },
+      },
+    );
+    await p.capture("cpu");
+    expect(await p.drain(50), "nothing is in flight").toBe(0);
+    p.dispose();
+    const r = p.report();
+    expect(r.captures.some((c) => c.abandoned), "and nothing is marked abandoned").toBe(false);
+    expect(r.dropped.captures, "with no loss counted").toBe(0);
+  });
   it.todo("T3.6 (C28 I15): a recording truncated mid-stream → replay reports truncated, and no divergence is raised — not deferred on a component: the blocker is that record and replay do not exist. `grep -rn 'replay' src/` returns nothing, so I15 is a claim about a mechanism with no subject and this row is what would first have something to be wrong about. Grep: `grep -rn 'replay' src/`");
   it("T3.7 (C28 I6): a composition that throws with two spans open closes both, and the frame is excluded", () => {
     // **A throw mid-frame is the case where a span leaks**, and a leaked span
@@ -262,7 +345,36 @@ describe("C28 — profiler, tier 3 spec-first rows", () => {
     );
   });
 
-  it.todo("T3.9 (C28 I26): a resize delivered between a span opening and closing → the span carries the opening width and the crossed-resize tag — not deferred on a component: the blocker is that a span carries no width at all. `OpenNode` is name, parent, startedAt, childTime, self, total, children, and neither `crossedResize` nor any width appears in src/shell/profiling/. The tag needs a field before it can need a rule. Grep: `grep -rn 'crossedResize' src/`");
+  it("T3.9 (C28 I26): a span open across a resize keeps its opening width and is tagged", () => {
+    let now = 0;
+    const p = createProfiler({ tier: "spans" }, { elapsed: () => (now += 1) });
+    p.resized(100);
+    p.beginFrame("input");
+
+    // One span that spans the resize, and one opened after it. The second is
+    // the control: without it the row passes on an implementation that tags
+    // every span and pins every width to the first one it saw.
+    const crossing = p.span("measure");
+    p.resized(60);
+    crossing[Symbol.dispose]();
+    // **Opened after the crossing one closes, so the two are siblings.** Opened
+    // inside it they nest, and the assertion below would be reading a child of
+    // the span it is contrasting with rather than a peer.
+    const after = p.span("paint");
+    after[Symbol.dispose]();
+    p.endFrame("frame");
+
+    const tree = p.report().worst[0]?.tree;
+    const byName = new Map((tree?.children ?? []).map((c) => [c.name, c]));
+    expect(byName.get("measure")?.width, "the width it opened at, not the one it closed at").toBe(
+      100,
+    );
+    expect(byName.get("measure")?.crossedResize, "and the tag that says so").toBe(true);
+    expect(byName.get("paint")?.width, "a span opened after the resize carries the new width").toBe(
+      60,
+    );
+    expect(byName.get("paint")?.crossedResize, "and is not tagged").toBe(false);
+  });
   it("T3.10 (C28 I27): a suspended sample is carried, and no pane draws one as the present state", () => {
     // **`suspended` was on `ResourceSample` from the first commit and no
     // consumer read it** (F900). A sample taken while the session is suspended

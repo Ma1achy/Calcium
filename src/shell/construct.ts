@@ -80,6 +80,7 @@ import { glyphs } from "../presentation/blocks/index.js";
 import { createFrameScheduler, type CommitReason } from "../terminal/frame-scheduler.js";
 import type { Profiler, ProfileReport, TraceFn } from "./profiling/types.js";
 import { instrumentRegistry, type ProbeableRegistry } from "./profiling/registry-probe.js";
+import { recordWriter, recordTransport, type Recording } from "./profiling/record.js";
 import {
   instrumentAdapters,
   instrumentCompletion,
@@ -109,6 +110,29 @@ import { createSessionStore, type SessionStore } from "./state.js";
  * Delegating through the prototype rather than copying: `acquired` is a getter
  * over live state, and every other member is C01's to answer.
  */
+/**
+ * C28 I46 — the frame tap, over C01's `writer`.
+ *
+ * **Here and not on `config.stdout`**, because C01 replaces `stdout.write` with
+ * a debug redirect at construction and keeps the original only on `writer`
+ * (C01 I9). A tap on the stream is inside that redirect: it forwards every
+ * frame into the debug sink and the session draws nothing, silently (F909).
+ * `writer` is C01's own definition of the renderer, which makes it the only
+ * handle on which *every frame this session drew* is true.
+ *
+ * `Object.create` rather than a spread, so the accessors C01 publishes stay
+ * live — the same reason `suspendAware` below takes a prototype view.
+ */
+function frameRecording<T extends { readonly writer: NodeJS.WriteStream }>(
+  lifecycle: T,
+  recording: Recording | null,
+): T {
+  if (recording === null) return lifecycle;
+  const view = Object.create(lifecycle) as { writer: NodeJS.WriteStream };
+  Object.defineProperty(view, "writer", { value: recordWriter(lifecycle.writer, recording) });
+  return view as T;
+}
+
 function suspendAware<T extends { suspend(): void; resume(): void }>(
   lifecycle: T,
   profiler: Profiler | undefined,
@@ -1124,7 +1148,7 @@ export async function constructGraph(
   // caller learning to suspend without learning to tell the profiler is exactly
   // how F903 happened the first time.
   const lifecycle = at("lifecycle", () =>
-    suspendAware(createTerminalLifecycle({
+    frameRecording(suspendAware(createTerminalLifecycle({
       stdout: config.stdout,
       stdin: config.stdin,
       capabilities: detection.capabilities,
@@ -1134,7 +1158,7 @@ export async function constructGraph(
       onFatal: deps.onFatal,
       beforeRelease: makeBeforeRelease(runner, stores.history, [stores.transcriptWriter]),
       ...(deps.debug === undefined ? {} : { debug: deps.debug }),
-    }), deps.profiler),
+    }), deps.profiler), config.recording),
   );
 
   // --- 8. the frame scheduler -----------------------------------------------
@@ -1157,13 +1181,19 @@ export async function constructGraph(
     return Object.freeze({
       ...inner,
       commit: (reason: CommitReason) => {
-        // **`own` is `false` here and that is a stated gap, not a measurement**
-        // (C28 I12). A frame raised by the profiler's own live refresh reaches
-        // this seam as an ordinary `stream` commit and nothing at this level can
-        // tell it from the reader's — the block id that would distinguish them
-        // is C23's and does not travel with a commit. So the exclusion is not
-        // claimed: the report carries zero and the pane says the detection is
-        // not wired, rather than printing a zero that reads as measured.
+        // **`false` here is what this seam knows, and it is no longer the whole
+        // answer** (C28 I12). A frame raised by the profiler's own surface
+        // reaches this seam as an ordinary `stream` commit and nothing at this
+        // level can tell it from the reader's — the block id that would
+        // distinguish them is C23's and does not travel with a commit. The
+        // origin travels with the *call* instead: a surface brackets its
+        // refresh in `profiler.own`, and `commit` reads the bracket.
+        //
+        // Nothing in `src/` brackets one yet, because there is no profiler
+        // surface to do the refreshing — `profilePane` is a pure function from
+        // a report to blocks and has no caller here. That is the drawing
+        // round's, and the blocker is a symbol rather than a description:
+        // `grep -rn 'profilePane' src/ | grep -v profiling/`.
         prof.commit(reason, false);
         inner.commit(reason);
       },
@@ -1199,6 +1229,37 @@ export async function constructGraph(
   let refreshAnchors: () => void = () => undefined;
 
   at("resize", () => {
+    // C28 I46 — **the resize tap, here rather than on the `stdout` stream.** The
+    // recorder's first draft compared `stdout.columns` against the size it saw
+    // last, which is a dimension read outside `lifecycle.ts` (SS42) and records
+    // a width before the session has adopted one. C01 owns when a size becomes
+    // true, and this is where it says so.
+    //
+    // **The initial size is taken here and not from a first event**, because
+    // `onResize` fires on `SIGWINCH` and on nothing else — the draft's comment
+    // claimed it fired once on acquire, and a recording of a session nobody
+    // resized would then have carried no size at all.
+    //
+    // It is written as `geometry` and not as the first `resize`: a replay
+    // delivers resizes as signals, and a signal for the size the session
+    // already has contaminates a frame the recording drew as a difference
+    // (F912). See `RecordedEvent`'s `geometry` arm.
+    if (config.recording !== null) {
+      const rec = config.recording;
+      rec.geometry(lifecycle.size());
+      lifecycle.onResize((size) => void rec.resize(size));
+    }
+
+    // **The profiler is told the width from the same place** (C28 I26, SS42).
+    // The initial one is `lifecycle.size()` for the same reason the recording's
+    // is: `onResize` fires on `SIGWINCH` and on nothing else, so a session
+    // nobody resized would leave every span carrying a null width.
+    const prof = deps.profiler;
+    if (prof !== undefined) {
+      prof.resized(lifecycle.size().columns);
+      lifecycle.onResize((size) => void prof.resized(size.columns));
+    }
+
     lifecycle.onResize(() => {
       // **The viewport is not resized here, and that is where the 544 ms was**
       // (C03 I15, F423). The comment this replaces said *the width, and not the
@@ -1361,8 +1422,14 @@ export async function constructGraph(
       // `for(verb)` is the seam and not the two `invoke` calls, because
       // `VerbTransport` is what execution holds — wrapping the lookup reaches
       // `invoke` and `stream` without either call site changing (C28 I36).
-      transport: ((r) => (deps.profiler === undefined ? r : instrumentTransport(r, deps.profiler)))(
-        config.transport ?? defaultTransport(config, runner, session),
+      // C28 I46 — the recording tap sits **outside** the profiler's, so a
+      // recording holds what the far side actually returned rather than what
+      // the instrumented wrapper handed on. The two are the same value today;
+      // ordering them deliberately is what stops that being an accident.
+      transport: ((r) => (config.recording === null ? r : recordTransport(r, config.recording)))(
+        ((r) => (deps.profiler === undefined ? r : instrumentTransport(r, deps.profiler)))(
+          config.transport ?? defaultTransport(config, runner, session),
+        ),
       ),
       // C23's local verb route, which the root cannot decorate: the registry
       // is built inside `createExecutionPipeline`. The narrowest thing that

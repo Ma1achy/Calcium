@@ -397,6 +397,9 @@ export function createInspector(elapsed: () => number, io: CaptureIo): Inspector
         truncated: dropped > 0,
         droppedBytes: dropped,
         durationMs: elapsed() - at,
+        // A capture that returned is not an abandoned one; only `dispose` sets
+        // this, and only for a capture it did not wait out (C28 I17).
+        abandoned: false,
       });
     },
 

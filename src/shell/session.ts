@@ -251,6 +251,20 @@ const ORBIT_MS_TORN = 100;
  */
 const ORBIT_RATE = (2 * Math.PI) / 12_000;
 
+/**
+ * How long `stop()` waits for a capture still running (C28 I17).
+ *
+ * **250 ms, and the figure rests on an asymmetry rather than on odds.** A `deep`
+ * capture is a `node:inspector` write this component does not control; waiting
+ * without a bound makes a shell that will not exit on Ctrl-C, and not waiting
+ * loses a file `report()` has already named. A quarter second is long enough
+ * for a capture that is finishing and short enough that a reader pressing an
+ * exit key does not notice — and what is still open past it is recorded as
+ * abandoned rather than dropped, so the cost of the bound being too short is a
+ * marked file rather than a missing one.
+ */
+const CAPTURE_DRAIN_MS = 250;
+
 class Session implements TuiInstance {
   #state: SessionState = "created";
   #graph: Graph | null = null;
@@ -633,16 +647,30 @@ class Session implements TuiInstance {
     return this.#stopping;
   }
 
-  #runStop(reason: StopReason): Promise<number> {
+  // **`async`, and the synchronous prefix is preserved rather than lost.** An
+  // async function runs to its first `await` synchronously, and the only one is
+  // the capture drain below — after the state changes and the spinner's
+  // disposal, before the report. So `stop()` still returns with the session
+  // already marked stopped, which is what C23 checks before accepting a
+  // submission (C28 I17).
+  async #runStop(reason: StopReason): Promise<number> {
     const code = EXIT_CODES[reason];
     const graph = this.#graph;
+
+    // C28 I15 — **the `end` line, written on every stop path including the one
+    // where nothing was constructed.** Its `open` count is what tells a replay
+    // that a stream was still running, and a recording with no `end` at all is
+    // the other half of the same signal: both read as truncated, because both
+    // are, and a recorder that only writes `end` on the clean path makes an
+    // orderly shutdown indistinguishable from a kill.
+    this.config.recording?.end();
 
     // T1.9, T3.15 — nothing acquired, no cleanup, and **no flag says so**:
     // there is no lifecycle to release, because construction never reached
     // step 7. The absence is structural rather than recorded (§8a).
     if (graph === null) {
       this.#state = "stopped";
-      return Promise.resolve(code);
+      return code;
     }
 
     // 1 — C23 refuses further submissions. Before the release, so a submission
@@ -680,6 +708,13 @@ class Session implements TuiInstance {
     // because `node.ts`'s read has no dependency on a live probe. What keeps the
     // order is that it costs nothing and the alternative rests on a disposed
     // member still answering — which `capture()`, disposed the same way, refuses.
+    // **The bounded wait comes before the report, not before the release**
+    // (C28 I17, T3.5). A capture still running holds a file the report has
+    // already promised a path to, so waiting after `report()` would name a file
+    // whose contents were still arriving. The bound is what stops a shell that
+    // will not exit; what is still open past it is abandoned and *recorded* as
+    // abandoned, so the reader is told which file to disbelieve.
+    if (this.#profiler !== null) await this.#profiler.drain(CAPTURE_DRAIN_MS);
     const onReport = this.config.profile?.onReport;
     if (onReport !== undefined && this.#profiler !== null) onReport(this.#profiler.report());
     this.#profiler?.dispose();

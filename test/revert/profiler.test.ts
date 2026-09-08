@@ -25,7 +25,7 @@ function reportWith(samples: readonly ResourceSample[]): ProfileReport {
     byReason: {}, timeline: [], worst: [], nodes: [], byKind: {}, byEntry: {}, leaks: {},
     counters: {}, gauges: {}, misses: {}, hits: {}, marks: [], samples, captures: [],
     excluded: { selfInflicted: 0, fallback: 0 },
-    dropped: { frames: 0, samples: 0, marks: 0, captureBytes: 0 },
+    dropped: { frames: 0, samples: 0, marks: 0, captureBytes: 0, captures: 0 },
     overhead: { spans: 0, clockNs: 0, estimateMs: 0, asyncEnabled: false },
     heapSpaces: [], frames: 0,
   };

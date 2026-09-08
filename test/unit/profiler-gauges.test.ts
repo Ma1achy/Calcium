@@ -25,6 +25,14 @@ import type { BlockRegistry } from "../../src/presentation/blocks/index.js";
 import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
 import { DARK_THEME, FULL_CAPS } from "../support/render.js";
 import { rgbPng64 } from "../support/png.js";
+import { createRecording, recordWriter } from "../../src/shell/profiling/record.js";
+import {
+  compareFrames,
+  driveRecording,
+  parseRecording,
+  replayClocks,
+} from "../../src/shell/profiling/replay.js";
+import { replayStdout } from "../../src/testing/replay.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 import type { ProfileReport } from "../../src/shell/profiling/types.js";
 
@@ -142,23 +150,353 @@ describe("per-kind input gauges", () => {
   });
 });
 
-// Record and replay. The rows land with the apparatus; this is
-// the spec commit's half (A03 §7a, F814). The invariants are named only inside
-// the todo titles, so the coverage signal reports them honestly (F907).
+// Record and replay. The invariants are named only inside the row titles, so
+// the coverage signal reports them honestly (F907).
 describe("record and replay", () => {
-  it.todo(
-    "T1.81 (C28 I46): one ordered NDJSON over four taps → the input/resize/far subsequence drives and the frame subsequence is compared — not deferred on a component: lands with src/shell/profiling/record.ts",
-  );
-  it.todo(
-    "T1.82 (C28 I46): a replayed stdout answers columns from the recording, updated before each resize is delivered, with the real terminal's width as the control — not deferred on a component: lands with src/shell/profiling/replay.ts",
-  );
-  it.todo(
-    "T1.83 (C28 I47): the detector runs again on replay and its query escapes appear in the replayed writes; a recorded verdict is the fabricated violation — not deferred on a component: lands with src/shell/profiling/replay.ts",
-  );
-  it.todo(
-    "T1.84 (C28 I15): a torn final line parses, is dropped, and the recording reports truncated rather than throwing — not deferred on a component: lands with src/shell/profiling/record.ts",
-  );
-  it.todo(
-    "T1.85 (C28 I14): two replays of one recording give the same footer cost cell, and it is not the flattened <0.1ms a clock pinned to event boundaries produces — not deferred on a component: lands with src/shell/profiling/replay.ts",
-  );
+  /** A sink that keeps the lines, so a row reads the stream rather than a file. */
+  function sink(): { lines: string[]; append: (line: string) => void } {
+    const lines: string[] = [];
+    return { lines, append: (line) => void lines.push(...line.split("\n").filter((l) => l !== "")) };
+  }
+
+  /** The narrowest thing `recordWriter` needs, with a settable size. */
+  function fakeOut(columns = 80, rows = 24): NodeJS.WriteStream & { written: string[] } {
+    const written: string[] = [];
+    return {
+      columns,
+      rows,
+      written,
+      write(chunk: string | Uint8Array): boolean {
+        written.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8"));
+        return true;
+      },
+    } as unknown as NodeJS.WriteStream & { written: string[] };
+  }
+
+  it("T1.81 (C28 I46): four taps, one order, and the frames are the answer rather than an input", () => {
+    const s = sink();
+    const rec = createRecording(s.append);
+    const out = fakeOut();
+    const tapped = recordWriter(out, rec);
+
+    rec.input("a");
+    tapped.write("frame-1");
+    // **The resize comes from `lifecycle.onResize`, not from the stream.** C01
+    // owns when a size becomes true (SS42), so the root subscribes and the tap
+    // records frames only — see F909 for the other half of why this stream is
+    // not where a recorder listens.
+    rec.resize({ columns: 100, rows: 24 });
+    tapped.write("frame-2");
+    rec.far("run", { kind: "end" });
+    tapped.write("frame-3");
+    rec.end();
+
+    const kinds = s.lines.map((l) => (JSON.parse(l) as { t: string }).t);
+    // **Asserted as one sequence and not four**, because four correctly ordered
+    // logs merge to any order at all — and the frame a resize produces depends
+    // on which patches preceded it.
+    expect(kinds, "the order events happened in").toEqual([
+      "input",
+      "frame",
+      "resize",
+      "frame",
+      "far",
+      "frame",
+      "end",
+    ]);
+
+    const parsed = parseRecording(`${s.lines.join("\n")}\n`);
+    expect(parsed.drive.map((e) => e.t), "what a replay drives").toEqual(["input", "resize", "far"]);
+    expect(parsed.frames.map((f) => Buffer.from(f).toString("utf8")), "and what it is compared against").toEqual([
+      "frame-1",
+      "frame-2",
+      "frame-3",
+    ]);
+  });
+
+  it("T1.82 (C28 I46): the stdout tap answers columns as well as recording writes", () => {
+    const s = sink();
+    const rec = createRecording(s.append);
+    const out = fakeOut(80, 24);
+    const tapped = recordWriter(out, rec);
+
+    // **The resize is recorded before the frame that follows it**, which is the
+    // only ordering a replay can use: the size is read when a frame is composed.
+    rec.resize({ columns: 120, rows: 26 });
+    tapped.write("after");
+    const kinds = s.lines.map((l) => (JSON.parse(l) as { t: string }).t);
+    expect(kinds, "resize first, then the frame it changed").toEqual(["resize", "frame"]);
+
+    // **The size still reads through the tap**, which is what lets the replay's
+    // own stdout answer `columns` from the recording rather than from the
+    // terminal it happens to be running in.
+    expect(tapped.columns, "and the size still reads through").toBe(80);
+    // **The replay's starting width is the `geometry` line, not the first
+    // `resize`.** A resize is a signal a replay delivers; delivering one for the
+    // size the session already has contaminates a frame the recording drew as a
+    // difference, and the whole repaint that came back was byte-different,
+    // correct on both sides, and entirely the harness's (F912).
+    rec.geometry({ columns: 132, rows: 40 });
+    const replayed = replayStdout(parseRecording(`${s.lines.join("\n")}\n`));
+    expect(replayed.columns, "the replay starts at the recorded geometry").toBe(132);
+    expect(
+      parseRecording(`${s.lines.join("\n")}\n`).drive.filter((e) => e.t === "resize").length,
+      "and the geometry is not among the events it delivers",
+    ).toBe(1);
+  });
+
+  it("T1.84 (C28 I15): a torn final line is dropped and the recording reports truncated", () => {
+    const whole = ['{"t":"input","n":0,"b64":"YQ=="}', '{"t":"end","n":1,"open":0}'].join("\n");
+    expect(parseRecording(`${whole}\n`).truncated, "a recording that finished").toBe(false);
+
+    // A process killed mid-write leaves a partial object. **Not an error**: a
+    // parser that throws turns the recorder's death into the replayer's, and
+    // the reader is told nothing about either.
+    const torn = `{"t":"input","n":0,"b64":"YQ=="}\n{"t":"fra`;
+    const parsed = parseRecording(torn);
+    expect(parsed.torn, "the last line did not parse").toBe(true);
+    expect(parsed.truncated, "which is one of the three ways to be truncated").toBe(true);
+    expect(parsed.drive, "and what did parse is kept").toHaveLength(1);
+
+    // The control: a bad line that is *not* last is a corrupted file, and
+    // calling that truncation lets a real corruption replay as a short session.
+    expect(() => parseRecording(`{"t":"fra\n{"t":"end","n":1,"open":0}\n`)).toThrow(/not the last/u);
+
+    // The third cause, with nothing torn and an `end` present.
+    expect(parseRecording(`{"t":"end","n":0,"open":2}\n`).truncated, "a stream still open").toBe(true);
+
+    // **Two sessions in one file are refused by name.** The sink appends, so a
+    // rerun into the same path concatenates; taking the last regime and merging
+    // the events would give a replay that is wrong about everything and
+    // complains about nothing. Seven probe runs produced exactly this while the
+    // apparatus was being built.
+    const twice = [
+      '{"t":"regime","node":"v22","tier":"spans","env":{}}',
+      '{"t":"end","n":0,"open":0}',
+      '{"t":"regime","node":"v22","tier":"spans","env":{}}',
+      '{"t":"end","n":0,"open":0}',
+      "",
+    ].join("\n");
+    expect(() => parseRecording(twice)).toThrow(/more than one session/u);
+  });
+
+  it("T1.85 (C28 I14): the clocks are served by index, and a pinned clock is the control", () => {
+    const s = sink();
+    const rec = createRecording(s.append);
+    let real = 0;
+    const elapsed = rec.mono(() => (real += 1.5));
+    // Two reads a frame — the bracket's open and close, which is how a duration
+    // is taken.
+    for (let i = 0; i < 6; i += 1) void elapsed();
+    rec.end();
+
+    const parsed = parseRecording(`${s.lines.join("\n")}\n`);
+    expect(parsed.mono, "every read, in order").toEqual([1.5, 3, 4.5, 6, 7.5, 9]);
+
+    const clocks = replayClocks(parsed);
+    const replayed = [clocks.elapsed(), clocks.elapsed(), clocks.elapsed()];
+    expect(replayed, "read n returns what read n returned").toEqual([1.5, 3, 4.5]);
+    // **A frame's cost survives.** The tidier alternative — pin the replayed
+    // clock to the event stream, so a read between two events returns the
+    // earlier one's stamp — makes every one of these differences zero, so C24
+    // I32's footer reads `last <0.1ms` on every frame (F908).
+    expect(replayed[1]! - replayed[0]!, "so a duration is a duration").toBe(1.5);
+
+    // **`overrun` is the honest half**: a replay reading more than was recorded
+    // is not a function of its inputs, which is the finding the gate exists for.
+    expect(clocks.overrun().mono, "nothing over yet").toBe(0);
+    for (let i = 0; i < 5; i += 1) void clocks.elapsed();
+    expect(clocks.overrun().mono, "two reads past the end of the recording").toBe(2);
+  });
+
+  /** A whole recording of the given frames — an `end` line, so no truncation. */
+  const recording = (frames: readonly string[]): ReturnType<typeof parseRecording> =>
+    parseRecording(
+      [
+        ...frames.map((f, i) =>
+          JSON.stringify({ t: "frame", n: i, b64: Buffer.from(f, "utf8").toString("base64") }),
+        ),
+        JSON.stringify({ t: "end", n: frames.length, open: 0 }),
+        "",
+      ].join("\n"),
+    );
+
+  it("T3.6 (C28 I15): a truncated recording compares as a prefix, and raises no divergence", () => {
+    const frames = ["a", "b"].map((f) => Buffer.from(f, "utf8"));
+    const cut = parseRecording(
+      `${frames.map((f, i) => JSON.stringify({ t: "frame", n: i, b64: f.toString("base64") })).join("\n")}\n`,
+    );
+    expect(cut.truncated, "no end line at all").toBe(true);
+
+    // The replay ran on and produced two more frames the recorder never saw.
+    const replayed = ["a", "b", "c", "d"].map((f) => Buffer.from(f, "utf8"));
+    const r = compareFrames(cut, replayed);
+    expect(r.divergence, "the frames it holds all agree").toBeNull();
+    expect(r.identical, "so the gate passes").toBe(true);
+    expect(r.truncated, "and says why the counts differ").toBe(true);
+    expect(r.surplus, "with the shortfall reported as a number").toBe(2);
+    expect(r.compared, "over the prefix the recording holds").toBe(2);
+  });
+
+  it("T3.6b (C28 I14): a whole recording that comes up short is a divergence", () => {
+    // **The other arm, and the one T3.6 would otherwise delete.** A prefix
+    // comparison that never fails on a count is a comparison that cannot see a
+    // frame the framework failed to produce.
+    const whole = parseRecording(
+      [
+        JSON.stringify({ t: "frame", n: 0, b64: Buffer.from("a").toString("base64") }),
+        JSON.stringify({ t: "frame", n: 1, b64: Buffer.from("b").toString("base64") }),
+        JSON.stringify({ t: "end", n: 2, open: 0 }),
+        "",
+      ].join("\n"),
+    );
+    expect(whole.truncated, "this one finished").toBe(false);
+    expect(compareFrames(whole, [Buffer.from("a")]).identical, "one frame short").toBe(false);
+    expect(compareFrames(whole, [Buffer.from("a"), Buffer.from("b")]).identical, "and whole").toBe(true);
+
+    const differs = compareFrames(whole, [Buffer.from("a"), Buffer.from("x")]);
+    expect(differs.divergence?.at, "a byte difference names its index").toBe(1);
+    expect(differs.divergence?.recorded, "with both sides").toBe("b");
+    expect(differs.divergence?.replayed).toBe("x");
+  });
+
+  it("T1.90 (C01 I1, SS14): the replay comparison recognises escapes and writes none", () => {
+    // **The row the allow entry is paired with.** SS14 lets this module hold
+    // escape literals because it *recognises* bytes a recording already holds
+    // — and an allow entry is precisely what would hide it if the module ever
+    // wrote one. C16's decoder carries the same assertion (C16 T2.9); A03 §
+    // says every allowed file does.
+    const src = readFileSync(
+      new URL("../../src/shell/profiling/replay.ts", import.meta.url),
+      "utf8",
+    );
+    // Comments first: prose about writing is not writing, and the
+    // best-documented file fails a source assertion hardest.
+    const code = src.replace(/\/\*[\s\S]*?\*\//gu, "").replace(/^\s*\/\/.*$/gmu, "");
+    for (const sink of [".write(", "process.stdout", "process.stderr", "writeFileSync"]) {
+      expect(code, `no ${sink} on the recognising side`).not.toContain(sink);
+    }
+    // And the control: the pattern the rule is about is really here, so the
+    // assertion above is over a file that could have failed it.
+    expect(src, "the escapes it recognises are in the file").toMatch(/\\u001b/u);
+  });
+
+  it("T1.89 (C28 I46): the drive waits for each recorded frame, and its baseline is the prologue only", async () => {
+    // A recording with two frames drawn before the first keystroke, then an
+    // input, then a third — the shape every session has, because a session
+    // draws while it starts.
+    const rec = parseRecording(
+      [
+        JSON.stringify({ t: "geometry", n: 0, columns: 80, rows: 24 }),
+        JSON.stringify({ t: "frame", n: 1, b64: "YQ==" }),
+        JSON.stringify({ t: "frame", n: 2, b64: "Yg==" }),
+        JSON.stringify({ t: "input", n: 3, b64: "eA==" }),
+        JSON.stringify({ t: "frame", n: 4, b64: "Yw==" }),
+        JSON.stringify({ t: "end", n: 5, open: 0 }),
+        "",
+      ].join("\n"),
+    );
+
+    // The harness's stream sees more than the recording's: C01's acquire
+    // prologue is written before the writer the frames are tapped at exists.
+    // Here that is three extra writes, plus the two startup frames.
+    let writes = 5;
+    const sent: string[] = [];
+    const out = await driveRecording(
+      rec,
+      {
+        input: (chunk) => {
+          sent.push(Buffer.from(chunk).toString("utf8"));
+          // The session answers the keystroke with one frame.
+          writes += 1;
+        },
+        resize: () => undefined,
+        frames: () => writes,
+        tick: () => Promise.resolve(),
+      },
+      { ticks: 20 },
+    );
+
+    expect(sent, "the input went out").toEqual(["x"]);
+    expect(out.stalled, "and every recorded frame was matched").toBe(0);
+    expect(out.awaited, "all three of them").toBe(3);
+
+    // **The control, and the defect it names.** A baseline of `deps.frames()`
+    // absorbs the two startup frames as well as the prologue, so every wait
+    // sits two frames ahead of anything that will arrive — and the replay still
+    // produced byte-identical frames while all eight waits stalled, because a
+    // stall is a pause and a pause is what a sleep-driven driver does anyway
+    // (F912). The counter is what says so; the frames do not.
+    let starved = 5;
+    const stalledRun = await driveRecording(
+      rec,
+      {
+        input: () => undefined,
+        resize: () => undefined,
+        frames: () => starved,
+        tick: () => {
+          starved += 0;
+          return Promise.resolve();
+        },
+      },
+      { ticks: 3 },
+    );
+    // **Exactly one, and the number is the whole assertion.** The recording's
+    // two startup frames were already drawn when the drive began, so the
+    // baseline credits them and only the third — the answer to the keystroke
+    // this session never gives — is missing. A baseline of `deps.frames()`
+    // absorbs those two as well and reports three, which is the defect: every
+    // wait sits two frames ahead of anything that will arrive, and the replay
+    // still produced byte-identical frames while all eight waits stalled,
+    // because a stall is a pause and a pause is what a sleep-driven driver
+    // does anyway (F912). The counter is what says so; the frames do not.
+    expect(stalledRun.stalled, "only the frame the session never drew").toBe(1);
+  });
+
+  it("T1.86 (C28 I14, I15): an elision is a clock-derived redraw against a write that paints nothing", () => {
+    // **The condition the e2e can no longer construct.** With the recording's
+    // tail flushed the clock outlasts the session, so nothing is elided — and a
+    // truncated recording, which I15 exists for, still can be: past the end of
+    // the clock stream a replayed session's cost and time-of-day hold still,
+    // the chrome row carrying one has no delta, and the frame is never
+    // composed. Both halves are asserted, because either alone is satisfied by
+    // an ordinary divergence.
+    const rec = recording(["\u001b[?25l\u001b[H\u001b[0mready", "\u001b[26;1Hlast   8.8ms"]);
+    const cursorOnly = [Buffer.from("\u001b[?25l\u001b[H\u001b[0mready"), Buffer.from("\u001b[?25l\u001b[24;3H\u001b[?25h")];
+    const elided = compareFrames(rec, cursorOnly);
+    expect(elided.divergence?.at, "the divergence is named").toBe(1);
+    expect(elided.elided, "and read as an elision").toBe(true);
+
+    // The control: the same recorded frame against a replay that painted
+    // something. A frame that differs for any other reason is not excused.
+    const painted = [Buffer.from("\u001b[?25l\u001b[H\u001b[0mready"), Buffer.from("\u001b[26;1Hlast   8.8mX")];
+    const real = compareFrames(rec, painted);
+    expect(real.divergence?.at, "still a divergence").toBe(1);
+    expect(real.elided, "and not an elision").toBe(false);
+  });
+
+  it("T1.87 (C28 I14): the header's clock is masked, and a duration elsewhere is not", () => {
+    // **The set is `CLOCK_DERIVED`, not self-measurement.** It began as one
+    // pattern — the run reporting its own cost — and the second member is
+    // ambient: `formatClock`'s time of day. A sentence true of the first
+    // absorbs the second without anyone noticing, so both are asserted here,
+    // together with the thing the widened pattern must not swallow.
+    const rec = recording(["at 23:27:10", "took 12:30 to build"]);
+    const same = compareFrames(rec, [Buffer.from("at 09:04:55"), Buffer.from("took 12:30 to build")]);
+    expect(same.identical, "two times of day compare equal").toBe(true);
+    expect(same.masked, "with both sides masked, and nothing else").toBe(2);
+
+    // **The blind spot, asserted rather than left to be discovered.** The
+    // narrow `HH:MM` form `formatClock` draws under 80 columns is
+    // indistinguishable from a duration in a document, so the mask does not
+    // cover it — and the first draft, which did, swallowed this line on both
+    // sides. A mask that eats a document's own text hides divergences
+    // everywhere; this one only fails to excuse a frame in one regime.
+    const differs = compareFrames(rec, [
+      Buffer.from("at 23:27:10"),
+      Buffer.from("took 19:45 to build"),
+    ]);
+    expect(differs.identical, "a duration is content, and content is compared").toBe(false);
+    expect(differs.divergence?.at, "named at its frame").toBe(1);
+  });
 });

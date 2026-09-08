@@ -53,7 +53,7 @@ function report(over: Partial<ProfileReport> = {}): ProfileReport {
     samples: [],
     captures: [],
     excluded: { selfInflicted: 0, fallback: 0 },
-    dropped: { frames: 0, samples: 0, marks: 0, captureBytes: 0 },
+    dropped: { frames: 0, samples: 0, marks: 0, captureBytes: 0, captures: 0 },
     overhead: { spans: 0, clockNs: 0, estimateMs: 0, asyncEnabled: false },
     heapSpaces: [],
     frames: 0,
@@ -122,7 +122,7 @@ describe("C28 — the budget table", () => {
     };
     const truncated = report({
       latency: { work: hist, wait: hist },
-      dropped: { frames: 118, samples: 0, marks: 0, captureBytes: 0 },
+      dropped: { frames: 118, samples: 0, marks: 0, captureBytes: 0, captures: 0 },
     });
 
     for (const name of ["median-frame", "p95-frame"] as const) {

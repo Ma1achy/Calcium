@@ -138,6 +138,15 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
   const misses = new Map<string, Map<MissReason, number>>();
   const hits = new Map<string, number>();
   const captures: CaptureResult[] = [];
+  /**
+   * Captures started and not yet returned (C28 I17).
+   *
+   * **A set rather than a counter**, because `dispose` has to *name* what it
+   * abandoned: the report already promises a path for every capture the session
+   * took, and a file the report does not mention is a file nobody finds. A
+   * counter would say one was lost and not which.
+   */
+  const inFlight = new Map<string, { kind: CaptureKind; startedAt: number }>();
   const nodes = new Aggregate();
   const leaks = new Leaks();
 
@@ -160,6 +169,17 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
   /** The earliest commit still unserved (C28 I5) — not the latest. */
   let earliestUnserved: number | null = null;
   let commitsSinceFrame = 0;
+  let ownDepth = 0;
+  let abandonedCaptures = 0;
+  /**
+   * The width every span opens at, and `null` until the root reports one.
+   *
+   * **Held here rather than read**, because SS42 puts the terminal's dimensions
+   * in `lifecycle.ts` and hands them down (C01 I13). The profiler is told.
+   */
+  let width: number | null = null;
+  /** Every span open right now, so a resize can tag all of them at once. */
+  const openSpans = new Set<OpenNode>();
   let ownCommitsSinceFrame = 0;
 
   /**
@@ -221,8 +241,9 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
   /** Open a span in the current context and return its close. */
   const begin = (name: string): { node: OpenNode; ctx: ReturnType<typeof contexts.current> } => {
     const ctx = contexts.current();
-    const node = openNode(name, ctx.parent ?? frameRoot, elapsed());
+    const node = openNode(name, ctx.parent ?? frameRoot, elapsed(), width);
     ctx.parent = node;
+    openSpans.add(node);
     spansOpened += 1;
     return { node, ctx };
   };
@@ -235,6 +256,7 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
    */
   const end = (node: OpenNode, ctx: { parent: OpenNode | null }): number => {
     const self = closeNode(node, elapsed());
+    openSpans.delete(node);
     ctx.parent = node.parent;
     return self;
   };
@@ -469,8 +491,36 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
       leaks.track(name, held);
     },
 
+    resized(columns: number): void {
+      // **Every span open right now is tagged, and the new width does not
+      // reach them** (C28 I26). A span opened at 100 columns and closed at 60
+      // measured the work 100 columns implied; filing it under 60 is a cost
+      // attributed to geometry that did not produce it, and it is silent
+      // because both the number and the duration are real. The tag is what
+      // says the figure has a caveat rather than a wrong width.
+      for (const node of openSpans) node.crossedResize = true;
+      width = columns;
+    },
+
+    own<T>(fn: () => T): T {
+      // **`try`/`finally` and not a decrement after the call.** A surface that
+      // throws mid-refresh would otherwise leave the depth raised, and every
+      // frame the reader caused afterwards would be excluded from the
+      // histograms as the profiler's own — a measurement that quietly stops
+      // measuring, which is the failure class this component exists to end.
+      ownDepth += 1;
+      try {
+        return fn();
+      } finally {
+        ownDepth -= 1;
+      }
+    },
+
     commit(reason: CommitReason, own: boolean): void {
       if (disposed || !counting()) return;
+      // The bracket and the flag are an *or*: the seam passes what it knows and
+      // the marker adds what only the call site knew.
+      own = own || ownDepth > 0;
       counters.set(`commit.${reason}`, (counters.get(`commit.${reason}`) ?? 0) + 1);
       commitsSinceFrame += 1;
       if (own) ownCommitsSinceFrame += 1;
@@ -489,7 +539,7 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
       // Self-inflicted only if EVERY commit that raised the frame was ours.
       frameSelf = commitsSinceFrame > 0 && ownCommitsSinceFrame === commitsSinceFrame;
       frameSpans = {};
-      frameRoot = openNode("frame", null, frameStart);
+      frameRoot = openNode("frame", null, frameStart, width);
       contexts.current().parent = frameRoot;
     },
 
@@ -649,6 +699,7 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
           samples: samples.dropped,
           marks: marks.dropped,
           captureBytes: captures.reduce((n, c) => n + c.droppedBytes, 0),
+          captures: abandonedCaptures,
         }),
         overhead: Object.freeze({
           spans: spansOpened,
@@ -685,12 +736,21 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
       // the order they were taken.
       const dir = opts.captureDir ?? DEFAULTS.captureDir;
       const path = `${dir}/${kind}-${String(seq)}-${String(Math.round(elapsed()))}.${EXTENSIONS[kind]}`;
-      const result = await inspector.capture(
-        kind,
-        path,
-        opts.captureBytes ?? DEFAULTS.captureBytes,
-        ms ?? DEFAULTS.captureMs,
-      );
+      inFlight.set(path, { kind, startedAt: elapsed() });
+      let result: CaptureResult;
+      try {
+        result = await inspector.capture(
+          kind,
+          path,
+          opts.captureBytes ?? DEFAULTS.captureBytes,
+          ms ?? DEFAULTS.captureMs,
+        );
+      } finally {
+        // `finally`, so a capture that throws leaves the set as well. Otherwise
+        // `dispose` reports it abandoned for ever and `drain` waits out its
+        // whole bound on something that is already over.
+        inFlight.delete(path);
+      }
       // Recorded on the profiler rather than returned only, so `report()` names
       // every capture the session took — a file on disk that the report does
       // not mention is a file nobody finds.
@@ -698,9 +758,43 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
       return result;
     },
 
+    async drain(ms: number): Promise<number> {
+      // **Polled on the injected `schedule`, not on a timer of its own** (SS1).
+      // The wait is bounded by the session's own clock, so a test driving a
+      // fake one is not held for a real second.
+      const until = elapsed() + Math.max(0, ms);
+      while (inFlight.size > 0 && elapsed() < until) {
+        const schedule = deps.schedule;
+        if (schedule === undefined) break;
+        await new Promise<void>((resolve) => {
+          schedule(() => resolve(), 1);
+        });
+      }
+      return inFlight.size;
+    },
+
     dispose(): void {
       if (disposed) return;
       disposed = true;
+      // **What was still running is recorded, not dropped silently** (I17,
+      // T3.5). `bytes` is 0 because none were written and `abandoned` says why
+      // — a `droppedBytes` figure here would be a guess, and a zero would read
+      // as *nothing was lost*.
+      for (const [path, { kind, startedAt }] of inFlight) {
+        captures.push(
+          Object.freeze({
+            kind,
+            path,
+            bytes: 0,
+            truncated: true,
+            droppedBytes: 0,
+            durationMs: elapsed() - startedAt,
+            abandoned: true,
+          }),
+        );
+      }
+      abandonedCaptures += inFlight.size;
+      inFlight.clear();
       sampler?.[Symbol.dispose]();
       sampler = null;
       probe?.dispose();

@@ -20,6 +20,8 @@ import { runInNewContext } from "node:vm";
 
 import { describe, expect, it, vi } from "vitest";
 
+import { formatFrameCost } from "../../src/shell/chrome.js";
+
 import {
   closeSync,
   mkdirSync,
@@ -41,7 +43,10 @@ import { NO_PROBE, type Probe } from "../../src/data/viewmodel/index.js";
 import { createProfiler } from "../../src/shell/profiling/recorder.js";
 import { createInspector, createResourceProbe, type CaptureIo } from "../../src/shell/profiling/node.js";
 import type { Profiler, ProfileReport } from "../../src/shell/profiling/types.js";
-import { buildGraph, buildSession, fakeAmbient, fakeClock } from "../support/session.js";
+import { resolveConfig } from "../../src/shell/config.js";
+import { defaultTheme } from "../../src/presentation/theme/index.js";
+import type { TuiConfig } from "../../src/shell/types.js";
+import { MANIFEST, buildGraph, buildSession, fakeAmbient, fakeClock, fakeFs } from "../support/session.js";
 import { harness } from "../support/fake-scheduler.js";
 import { W, measureSequence, rowsDoc, wrappingDoc } from "../support/viewport.js";
 
@@ -173,15 +178,21 @@ describe("C22 — the root's injection, refusal and capture path", () => {
     expect(corpus.filter((f) => below(f.path)).length, "the five layers are in the corpus").toBeGreaterThan(100);
     expect(offenders(corpus), "no component below src/shell/ imports the profiler").toEqual([]);
 
-    // **The two edges above L4, compared by equality and not by containment.**
-    // A subset check lets a third appear unread, and a third would be the
-    // interesting one: these two are the surface and the harness, and any other
-    // file naming the profiler outside `src/shell/` is a component that learnt
-    // about it by a route this row was written to close.
+    // **The edges above L4, compared by equality and not by containment.** A
+    // subset check lets a new one appear unread, and the new one is always the
+    // interesting one: these are the surface and two harness modules, and any
+    // other file naming the profiler outside `src/shell/` is a component that
+    // learnt about it by a route this row was written to close.
+    //
+    // `src/testing/replay.ts` is the third and it arrived the way the comment
+    // predicted — by a harness needing `parseRecording` and `compareFrames`,
+    // which are the replay model rather than the recorder. It is listed rather
+    // than excused: `src/testing/` is where a consumer's harness lives, and
+    // C22 I93's subject is the layers *below* L4.
     expect(
       corpus.filter((f) => !f.path.startsWith("src/shell/") && IMPORTS_PROFILING.test(f.text)).map((f) => f.path).sort(),
       "the profiler is named above L4 in exactly two places, both by design",
-    ).toEqual(["src/index.ts", "src/testing/profile.ts"]);
+    ).toEqual(["src/index.ts", "src/testing/profile.ts", "src/testing/replay.ts"]);
 
     // The fabricated violation: one file below L4 given the edge the rule
     // forbids. A rule that cannot name this is a rule that names nothing.
@@ -197,7 +208,44 @@ describe("C22 — the root's injection, refusal and capture path", () => {
     ]);
   });
 
-  it.todo("T1.53 (C22 I94): record and replay both set is refused at the gate and the message names both fields — a refusal naming one reads as that field being invalid — not deferred on a component: the blocker is that neither field exists. ProfileOptions has no `record` or `replay` field and there is no recording apparatus to refuse a second of — every hit for `replay` in src/ is C06's fixture transport, which replays a captured process invocation and not a session's input. Grep: `grep -n \"record\\?:\\|replay\\?:\" src/shell/profiling/types.ts`");
+  it("T1.53 (C22 I94): record and replay both set is refused, and the message names both fields", () => {
+    const base = {
+      name: "prism",
+      binary: "prism",
+      manifest: MANIFEST,
+      theme: defaultTheme,
+      stateDir: "/state",
+      env: {},
+      cwd: "/work",
+      clock: () => 0,
+      fs: fakeFs(),
+      greeting: async () => ({ blocks: [] }),
+    } as unknown as TuiConfig;
+    const ambient = fakeAmbient();
+
+    // **The message names both**, because a refusal naming one reads as that
+    // field being invalid and neither is: the pair is what cannot be held, and
+    // a reader told `profile.record is invalid` goes and checks the path.
+    let message = "";
+    try {
+      resolveConfig({ ...base, profile: { record: "/state/r.ndjson", replay: "/state/r.ndjson" } }, ambient);
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err);
+    }
+    expect(message, "record is named").toMatch(/profile\.record/u);
+    expect(message, "and replay is named beside it").toMatch(/profile\.replay/u);
+
+    // **Both controls, because a gate that refuses everything reads the same.**
+    // Neither field takes precedence and each alone is a whole configuration.
+    expect(
+      () => resolveConfig({ ...base, profile: { record: "/state/r.ndjson" } }, ambient),
+      "recording alone",
+    ).not.toThrow();
+    expect(
+      () => resolveConfig({ ...base, profile: { replay: "/state/r.ndjson" } }, ambient),
+      "replaying alone",
+    ).not.toThrow();
+  });
 
   it("T1.54 (C22 I95): an unset captureDir resolves under stateDir, and that is the directory the .gitignore of * was written into", async () => {
     // **At a stateDir that is not the default, deliberately.** `DEFAULT_STATE_DIR`
@@ -994,9 +1042,31 @@ describe("C24 — the public surface", () => {
 
     // At `spans` it is there, it says which frame it describes, and it carries a
     // unit. The figure itself is the machine's and is not asserted.
+    // **The cell is padded to a constant width** (F911). `formatFrameCost`
+    // produced `last 9.6ms` and `last <0.1ms` — ten cells and eleven — so the
+    // footer's right-hand cell moved by a column whenever the cost crossed
+    // 10 ms, and every cell after it shifted. The `\s*` here is that padding,
+    // and the constant width is what lets a replay mask the cell at all.
     expect(await footerOf("spans"), "at spans the footer carries the previous frame's cost").toMatch(
-      /last (?:<0\.1|\d+\.\d)ms/u,
+      /last\s+(?:<0\.1|\d+\.\d)ms/u,
     );
+  });
+
+  it("T1.10c (C24 I32): the cost cell is a constant width, whatever the figure", () => {
+    // **A measurement drawn at a width that tracks its value moves everything
+    // beside it** (F911). `last 9.6ms` and `last <0.1ms` were ten cells and
+    // eleven, so the footer's right-hand cell jittered by a column whenever the
+    // cost crossed 10 ms — a rendering defect on its own terms, and the reason
+    // a replay could not mask the cell: the mask cannot absorb the padding
+    // beside it, because that sits after the SGR reset and swallowing an escape
+    // would hide a real divergence.
+    const widths = new Set(
+      [0, 0.04, 0.05, 9.6, 10, 123.4, 999.9].map((ms) => formatFrameCost(ms).length),
+    );
+    expect([...widths], "every figure draws at one width").toEqual([
+      formatFrameCost(0).length,
+    ]);
+    expect(formatFrameCost(9.6), "and the narrow ones are padded, not trimmed").toContain("last ");
   });
 
   it("T6.16 (C24 I32): a member filled with the frame being composed reports a number that frame cannot have", () => {

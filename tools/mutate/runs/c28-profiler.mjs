@@ -25,6 +25,9 @@ const REC = "src/shell/profiling/recorder.ts";
 const NODE = "src/shell/profiling/node.ts";
 const SCANS = "tools/enforce/source-scans.mjs";
 const TREE = "src/shell/profiling/tree.ts";
+const REPLAY = "src/shell/profiling/replay.ts";
+const RECORD = "src/shell/profiling/record.ts";
+const CONFIG = "src/shell/config.ts";
 const SEAM = "src/shell/profiling/registry-probe.ts";
 const HCACHE = "src/viewport/viewport/cache.ts";
 const RCACHE = "src/shell/render-cache.ts";
@@ -946,9 +949,20 @@ const results = runPass({
     {
       name: "CHROME-COST-UNLABELLED: the number without the word that says which frame",
       file: CHROME,
-      from: "return ms < 0.05 ? \"last <0.1ms\" : `last ${ms.toFixed(1)}ms`;",
-      to: "return ms < 0.05 ? \"<0.1ms\" : `${ms.toFixed(1)}ms`;",
+      from: "return `last ${figure.padStart(5, \" \")}ms`;",
+      to: "return `${figure.padStart(5, \" \")}ms`;",
       expect: "T1.10b",
+    },
+    {
+      name: "COST-CELL-RAGGED: the figure is drawn at its own width",
+      file: CHROME,
+      // F911: `last 9.6ms` and `last <0.1ms` are ten cells and eleven, so the
+      // cell moves by a column whenever the cost crosses 10 ms and every cell
+      // after it shifts. The replay comparison is what found it, and this is
+      // the mutation that stops it coming back.
+      from: 'return `last ${figure.padStart(5, " ")}ms`;',
+      to: "return `last ${figure}ms`;",
+      expect: "T1.10c",
     },
     {
       name: "SUSPEND-UNSET: the writer writes the constant it replaced",
@@ -1038,6 +1052,97 @@ const results = runPass({
       from: '      ctx.probe?.gauge("image.pixels", px.width * px.height);',
       to: '      ctx.probe?.gauge("image.pixels", cols * rows);',
       expect: "T1.80",
+    },
+    {
+      name: "GEOMETRY-AS-RESIZE: the initial size becomes an event a replay delivers",
+      file: RECORD,
+      from: '      write({ t: "geometry", n: n++, columns: size.columns, rows: size.rows });',
+      to: '      write({ t: "resize", n: n++, columns: size.columns, rows: size.rows });',
+      expect: "T1.84",
+    },
+    {
+      name: "GEOMETRY-DRIVEN: the initial size is delivered as a signal",
+      file: REPLAY,
+      from: '      case "geometry":\n        geometry = e;\n        break;',
+      to: '      case "geometry":\n        geometry = e;\n        timeline.push({ ...e, t: "resize" });\n        break;',
+      expect: "T1.84",
+    },
+    // **`NO-EXIT-FLUSH` is not here, and the absence is the finding.** Deleting
+    // the `process.on("exit")` flush in `config.ts` is the mutation F912's
+    // whole diagnosis rests on, and its only witness is T5.1 — a tier-5 row
+    // this harness cannot run: tier 5 executes against `dist/`, so a mutation
+    // to `src/` is invisible to it without a build per mutation. Listing it
+    // with a `T5.1` expectation would make MA4 red on a row that runs; listing
+    // it against a unit row it does not actually reach would be worse.
+    {
+      name: "PACE-BY-NOTHING: the drive fires every event without waiting",
+      file: REPLAY,
+      from: "      while (deps.frames() - base < expected && spun < bound) {",
+      to: "      while (false && deps.frames() - base < expected && spun < bound) {",
+      expect: "T1.89",
+    },
+    {
+      name: "BASE-ABSORBS-FRAMES: the pacing baseline swallows the startup frames",
+      file: REPLAY,
+      from: "  const base = Math.max(0, deps.frames() - leading);",
+      to: "  const base = deps.frames();",
+      expect: "T1.89",
+    },
+    {
+      name: "ELIDED-ONE-HALF: a cursor-only replay excuses any recorded frame",
+      file: REPLAY,
+      from: "        elided:\n          mask.some((re) => new RegExp(re.source, re.flags.replace(\"g\", \"\")).test(recorded)) &&\n          CURSOR_ONLY.test(Buffer.from(b).toString(\"utf8\")),",
+      to: '        elided: CURSOR_ONLY.test(Buffer.from(b).toString("utf8")),',
+      expect: "T1.86",
+    },
+    {
+      name: "CLOCK-MASK-WIDE: the mask takes an HH:MM as well, and eats a duration",
+      file: REPLAY,
+      from: "  /\\b[0-2]\\d:[0-5]\\d:[0-5]\\d\\b/gu,",
+      to: "  /\\b[0-2]\\d:[0-5]\\d(?::[0-5]\\d)?\\b/gu,",
+      expect: "T1.87",
+    },
+    {
+      name: "OWN-STICKY: the bracket is not restored when the surface throws",
+      file: REC,
+      from: "      ownDepth += 1;\n      try {\n        return fn();\n      } finally {\n        ownDepth -= 1;\n      }",
+      to: "      ownDepth += 1;\n      const out = fn();\n      ownDepth -= 1;\n      return out;",
+      expect: "T1.88",
+    },
+    {
+      name: "OWN-ANY: a frame is the profiler's if any commit was its own",
+      file: REC,
+      from: "      frameSelf = commitsSinceFrame > 0 && ownCommitsSinceFrame === commitsSinceFrame;",
+      to: "      frameSelf = ownCommitsSinceFrame > 0;",
+      expect: "T1.88",
+    },
+    {
+      name: "DRAIN-UNBOUNDED-NOT: the drain returns before waiting at all",
+      file: REC,
+      from: "      while (inFlight.size > 0 && elapsed() < until) {",
+      to: "      while (false && inFlight.size > 0 && elapsed() < until) {",
+      expect: "T3.5",
+    },
+    {
+      name: "ABANDON-SILENT: a capture still running is dropped rather than recorded",
+      file: REC,
+      from: "      abandonedCaptures += inFlight.size;",
+      to: "      abandonedCaptures += 0;",
+      expect: "T3.5",
+    },
+    {
+      name: "WIDTH-AT-CLOSE: the resize overwrites the width every open span holds",
+      file: REC,
+      from: "      for (const node of openSpans) node.crossedResize = true;\n      width = columns;",
+      to: "      for (const node of openSpans) node.crossedResize = true;\n      width = columns;\n      for (const node of openSpans) (node as { width: number | null }).width = columns;",
+      expect: "T3.9",
+    },
+    {
+      name: "TAG-EVERY-SPAN: a span is tagged whether or not it crossed one",
+      file: TREE,
+      from: "    crossedResize: false,",
+      to: "    crossedResize: true,",
+      expect: "T3.9",
     },
     {
       name: "EAGER-ALS: the async store is built at construction",

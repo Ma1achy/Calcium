@@ -97,9 +97,17 @@ describe("C01 fail-on-revert", () => {
     // component cannot be built as specified. The allowance is paired with C16
     // T2.9, which asserts the decoder reaches no stream — because this entry is
     // precisely what would hide it if it ever did.
+    // **The third entry is the same case one layer up.** C28's replay
+    // comparison recognises a cursor-only write in bytes a recording already
+    // holds; it emits nothing, and composing the pattern from `escapes.ts` —
+    // the better argument, one table and no drift — is refused by MG20, which
+    // owns the cursor mode to `lifecycle.ts`. Two rules each right and
+    // impossible together, exactly as for the decoder, so it takes the same
+    // remedy rather than a wider scope (F912).
     expect(ss14!.allow).toEqual([
       "src/terminal/escapes.ts",
       "src/interaction/router/decode.ts",
+      "src/shell/profiling/replay.ts",
     ]);
     expect(ss14!.scope).toBe("src/");
     expect(ss14!.pattern.test("const x = \"\\x1b[0m\";")).toBe(true);

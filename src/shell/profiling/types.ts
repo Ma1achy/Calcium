@@ -264,6 +264,16 @@ export type CaptureResult = Readonly<{
   truncated: boolean;
   droppedBytes: number;
   durationMs: number;
+  /**
+   * The session shut down while this capture was still running (I17).
+   *
+   * **A field rather than `droppedBytes: 0`.** How much a capture would have
+   * written is not knowable once it is abandoned, and a zero there says
+   * *nothing was dropped* — the absence-indistinguishable-from-failure shape
+   * C28 I13 exists to forbid. `bytes` is 0 because none were written; this is
+   * what says why.
+   */
+  abandoned: boolean;
 }>;
 
 /**
@@ -291,6 +301,25 @@ export type ProfileOptions = Readonly<{
   sampleMs?: number;
   captureDir?: string;
   captureBytes?: number;
+  /**
+   * Write an NDJSON recording of this session's inputs to this path (I46).
+   *
+   * **Not a boolean and not a directory**: one session is one recording, and a
+   * path names the artefact a bug report attaches. The four taps are decorators
+   * over seams `TuiConfig` already injects, so a session that sets neither of
+   * these holds nothing recorder-shaped.
+   */
+  record?: string;
+  /**
+   * Drive this session from the recording at this path instead of from the
+   * terminal (I14).
+   *
+   * **Set with `record`, both are refused at the configuration gate** (C22 I94),
+   * with a message naming both fields — neither takes precedence, because both
+   * silent resolutions produce a session that looks correct and an artefact
+   * that is empty.
+   */
+  replay?: string;
   /**
    * The report's way out of the process (C28 I38).
    *
@@ -378,7 +407,14 @@ export type ProfileReport = Readonly<{
    * registered last (F893). Read the shape over a session, not the instant.
    */
   leaks: Readonly<Record<string, LeakStat>>;
-  dropped: Readonly<{ frames: number; samples: number; marks: number; captureBytes: number }>;
+  dropped: Readonly<{
+    frames: number;
+    samples: number;
+    marks: number;
+    captureBytes: number;
+    /** Captures still running at `dispose` — a count, because bytes are unknowable (I17). */
+    captures: number;
+  }>;
   overhead: Overhead;
   /** Empty below tier `spans`, where there is no resource probe to ask. */
   heapSpaces: readonly HeapSpace[];
@@ -475,6 +511,33 @@ export interface Profiler extends Probe {
    */
   timed<T>(fn: () => T): readonly [T, number];
 
+  /**
+   * The terminal's width changed (I26).
+   *
+   * **Told rather than read**: SS42 keeps the dimensions in `lifecycle.ts` and
+   * C01 I13 hands them down. Every span open when this is called is tagged as
+   * having crossed a resize, and spans opened after it carry the new width.
+   */
+  resized(columns: number): void;
+
+  /**
+   * Run `fn` with every commit it raises marked as the profiler's own (I12).
+   *
+   * **A marker rather than a parameter, because the seam is not the call site.**
+   * A frame the profiler's own surface raises reaches the scheduler as an
+   * ordinary `stream` commit, and the decorator that wraps `commit` cannot tell
+   * it from the reader's — the id that would distinguish them is C23's and does
+   * not travel with a commit. So the origin travels with the *call*: the
+   * surface brackets its refresh, and the seam reads the bracket.
+   *
+   * **Synchronous and depth-counted, deliberately.** A commit is synchronous
+   * from the call that raises it, so a counter is exact and an
+   * `AsyncLocalStorage` would tax every `await` in the process for a case that
+   * never crosses one (C28 §5's measurement: 59 ns against 38 for a bare await,
+   * merely by constructing one).
+   */
+  own<T>(fn: () => T): T;
+
   /** Seams. The root wraps what it was going to hand down anyway (I93). */
   commit(reason: CommitReason, own: boolean): void;
   beginFrame(reason: CommitReason): void;
@@ -510,6 +573,17 @@ export interface Profiler extends Probe {
    * file at `counters` and a reader concluding the process has no heap.
    */
   capture(kind: CaptureKind, ms?: number): Promise<CaptureResult>;
+  /**
+   * Wait up to `ms` for the captures still running, and report how many are not
+   * done (I17).
+   *
+   * **Bounded, and it returns rather than throws.** A capture is a `node:inspector`
+   * call this component does not control; waiting for one without a bound makes
+   * a shell that will not exit, and killing one without waiting loses a file the
+   * report has already promised. The bound is the trade, and the return value is
+   * what the caller reports instead of guessing.
+   */
+  drain(ms: number): Promise<number>;
 
   report(): ProfileReport;
   dispose(): void;

@@ -925,10 +925,198 @@ switch (mode) {
         "debug dump": (_argv, ctx) => Promise.resolve(sessionNotice(ctx, "internal state")),
       },
       ...(completionSources.length === 0 ? {} : { completionSources }),
+      // C28 I46 — **an env var rather than an argv slot**, because slots 3 and
+      // 4 are already the far side and the manifest variant, and a row that
+      // records has to be able to choose both.
+      ...(process.env["CALCIUM_RECORD"] === undefined
+        ? {}
+        : {
+            profile: {
+              // **The tier is a knob because it decides what the chrome draws.**
+              // C24 I32's `last N.Nms` is absent below `spans`, and a frame
+              // whose only delta is that cell is a frame drawn to report the
+              // run's own cost — which is what F912 turns on.
+              tier: process.env["CALCIUM_RECORD_TIER"] ?? "spans",
+              record: process.env["CALCIUM_RECORD"],
+            },
+          }),
     });
 
     await tui.start();
     break;
+  }
+
+  /**
+   * C28 I14 — drive a recording back through a real session.
+   *
+   * **The same `createTui` the `session` mode calls**, with four of its inputs
+   * built from the recording instead of from the terminal: stdin, stdout, the
+   * transport, and both clocks. Nothing about the session knows it is being
+   * replayed, which is the whole of what the gate is asserting.
+   *
+   * The comparison goes to stderr as JSON, because stdout is the replay's own
+   * captured stream and writing a verdict into it would put the verdict inside
+   * the thing being compared.
+   */
+  case "replay": {
+    const path = process.argv[3];
+    const { createTui } = await import("../../dist/shell/session.js");
+    const { parseManifest } = await import("../../dist/data/manifest/index.js");
+    const { defaultTheme: theme } = await import("../../dist/presentation/theme/index.js");
+    const {
+      checkReplay,
+      driveRecording,
+      parseRecording,
+      replayClocks,
+      replayStdin,
+      replayStdout,
+      replayTransport,
+    } = await import("../../dist/testing/index.js");
+    const { readFileSync, mkdtempSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+
+    // The escapes C02 writes to ask the terminal what it is: primary and
+    // secondary device attributes, a mode report, and kitty's graphics probe.
+    const QUERY = /\u001b\[c|\u001b\[>[0-9]*c|\u001b\[\?[0-9]+\$p|\u001b_G/u;
+    const rec = parseRecording(readFileSync(path, "utf8"));
+    const mirror = join(mkdtempSync(join(tmpdir(), "calcium-mirror-")), "replay.ndjson");
+    const clocks = replayClocks(rec);
+    const stdin = replayStdin();
+    const stdout = replayStdout(rec);
+    const document = JSON.parse(
+      readFileSync(new URL("./manifest.fixture.json", import.meta.url), "utf8"),
+    );
+    void parseManifest;
+
+    let report = null;
+    const tui = createTui({
+      // **From the recording, not from this file.** The chrome draws the app's
+      // name and binary, so they are inputs to a frame; hard-coding them made
+      // the first replay diverge at byte 43 of frame 0.
+      name: rec.regime?.name ?? "prism",
+      binary: rec.regime?.binary ?? "widget",
+      manifest: document,
+      theme,
+      // **`replay` is set as well as the streams**, so the field the gate
+      // refuses beside `record` is the field a replay actually carries (C22
+      // I94). A configuration that drives a replay through the streams alone
+      // would make the gate's subject a member nothing sets.
+      // **The replay records too, and that is the whole comparison** (C22 I94,
+      // F910). The recorded and replayed byte streams must be captured by the
+      // same code at the same point — `lifecycle.writer`, which is C01's
+      // definition of the renderer — or the two sides are different
+      // populations: the first draft compared frames taken at the writer
+      // against frames taken at the raw stream, and diverged on the alt-screen
+      // enter that only one side had.
+      profile: {
+        // **The tier comes from the regime, and it is not a preference.** It
+        // decides what the chrome draws: C24 I32's `last N.Nms` is absent below
+        // `spans`, so a recording taken at `counters` and replayed at `spans`
+        // diverges at the first frame — the replay drawing a cost cell the
+        // recorded session never had. The regime has carried `tier` since it
+        // was written and nothing read it, which is how `binary` diverged at
+        // byte 43 too (F912).
+        tier: rec.regime?.tier ?? "spans",
+        replay: path,
+        record: mirror,
+        onReport: (r) => void (report = r),
+      },
+      transport: replayTransport(rec),
+      // **The environment from the recording, not this process's** (C28 I47). The
+      // capabilities are re-derived from it and from the replies the recording
+      // holds as ordinary input, so C02 runs again rather than being replayed.
+      // `CALCIUM_REPLAY_ENV` overrides entries on top of the recorded ones, and
+      // it exists for T1.83's fabricated violation: if the capability verdict
+      // were replayed rather than re-derived, changing the environment would
+      // change nothing.
+      env: {
+        ...(rec.regime?.env ?? {}),
+        ...JSON.parse(process.env["CALCIUM_REPLAY_ENV"] ?? "{}"),
+      },
+      clock: clocks.clock,
+      elapsed: clocks.elapsed,
+      stdin,
+      stdout,
+      stateDir: mkdtempSync(join(tmpdir(), "calcium-replay-")),
+      // **The same two local verbs the `session` mode registers.** C23 I27
+      // refuses a manifest verb marked `local` with no handler, so a replay
+      // without them fails at construction — which is the right refusal and the
+      // wrong session to compare against.
+      localHandlers: {
+        guide: (_argv, ctx) => Promise.resolve(sessionNotice(ctx, "the app's own local verb")),
+        "debug dump": (_argv, ctx) => Promise.resolve(sessionNotice(ctx, "internal state")),
+      },
+    });
+
+    await tui.start();
+    // **Paced by the recording, not by a sleep** (C28 I46). The events go out
+    // in the recorded order and each recorded frame is waited for before the
+    // next one is sent, so the `^D` that ended the recording arrives after the
+    // command's answer has been drawn — which is when it arrived the first
+    // time. Firing both chunks at once exited the session mid-request and
+    // reported the missing answer as a transport divergence (F912).
+    const drive = await driveRecording(rec, {
+      input: (chunk) => void stdin.feed(chunk),
+      resize: (columns, rows) => {
+        stdout.setSize(columns, rows);
+        process.emit("SIGWINCH");
+      },
+      frames: () => stdout.frames.length,
+      tick: () => new Promise((r) => setTimeout(r, 1)),
+      exhausted: () => clocks.overrun().mono > 0,
+    });
+    await tui.stop("exit");
+
+    const { createHash } = await import("node:crypto");
+    const back = parseRecording(readFileSync(mirror, "utf8"));
+    const hash = createHash("sha256");
+    for (const f of back.frames) hash.update(f);
+
+    const result = checkReplay(rec, back.frames);
+    process.stderr.write(
+      `${JSON.stringify({
+        ...result,
+        overrun: clocks.overrun(),
+        // **Where the replayed bytes are.** A divergence prints two frames and
+        // the question is always what the other forty look like; without the
+        // path the only way to see them is to re-run with an edited fixture.
+        mirror,
+        // **The drive's own verdict, beside the comparison's.** A stall means
+        // every later event met a state the recording never held, so a
+        // divergence after one is the harness's rather than the subject's.
+        stalled: drive.stalled,
+        delivered: drive.delivered,
+        exhaustedAt: drive.exhaustedAt,
+        frameHash: hash.digest("hex"),
+        frames: back.frames.length,
+        masked: result.masked,
+        // **The whole `misses` map, keyed by cache.** The first draft read
+        // `report.misses["nothing-changed"]`, which is a reason where a cache
+        // name belongs — the map is `cache → reason → count`, so the read was
+        // `undefined` on every run and the row it fed asserted a shape the
+        // report has never had (F913). C28's T5.4 carried the same reading.
+        //
+        // **`?? null` and not `?? {}`.** A replay at a tier that records
+        // nothing and one that recorded no miss are different answers, and one
+        // value for both is the shape C28 I13 exists to forbid — which is also
+        // why the recorder omits a reason that never fired rather than writing
+        // a zero for it.
+        misses: report?.misses ?? null,
+        // **C02 ran again rather than being replayed** (C28 I47). The queries
+        // are written before C01 hands over its writer, so they are in neither
+        // recording's frames — both counts are reported, because the second is
+        // what makes the first mean anything: a query found among the raw
+        // writes and none among the frames says the detector ran outside the
+        // population the comparison covers, so byte-identity is not what made
+        // this pass.
+        queries: {
+          writes: stdout.frames.filter((f) => QUERY.test(Buffer.from(f).toString("utf8"))).length,
+          frames: back.frames.filter((f) => QUERY.test(Buffer.from(f).toString("utf8"))).length,
+        },
+      })}\n`,
+    );
+    process.exit(result.identical ? 0 : 1);
   }
 
   default:

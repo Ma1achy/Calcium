@@ -587,6 +587,18 @@ export type TuiConfig = Readonly<{
   /** The session's starting directory. Defaults to the process's. */
   cwd?: string;
   clock?: () => number;
+  /**
+   * The monotonic clock, overridable for the same reason `clock` is (C28 I14).
+   *
+   * **The asymmetry this removes was not a decision.** `clock` has been
+   * injectable since C22 and `elapsed` was not, because nothing outside the
+   * process had a reason to supply one — the profiler takes its own through
+   * `ProfileOptions.elapsed` and everything else reads the wall clock. A replay
+   * is the first consumer that needs both: a frame carries a time of day *and*,
+   * since C24 I32, a duration, so pinning one and not the other reproduces half
+   * a frame.
+   */
+  elapsed?: () => number;
   fs?: FileSystem;
   /** Default `.calcium`, beside the project. The **app** resolves its own variable (I20). */
   stateDir?: string;

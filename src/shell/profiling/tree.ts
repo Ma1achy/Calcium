@@ -37,10 +37,27 @@ export type OpenNode = {
   /** Set at close; `null` means it never closed (a throw, or a live capture). */
   self: number | null;
   total: number | null;
+  /**
+   * The terminal width when the span opened, or `null` before one is known.
+   *
+   * **The width it opened at, and never the one it closed at** (C28 I26). Width
+   * is the axis that decides how much work a measure or a paint does, so a span
+   * attributed to the width in force when it finished is a cost filed against
+   * geometry that did not produce it — and it is silent, because the number is
+   * a plausible width and the duration is real.
+   */
+  readonly width: number | null;
+  /** A resize was delivered between this span opening and closing (C28 I26). */
+  crossedResize: boolean;
   readonly children: OpenNode[];
 };
 
-export function openNode(name: string, parent: OpenNode | null, at: number): OpenNode {
+export function openNode(
+  name: string,
+  parent: OpenNode | null,
+  at: number,
+  width: number | null = null,
+): OpenNode {
   const node: OpenNode = {
     name,
     parent,
@@ -48,6 +65,8 @@ export function openNode(name: string, parent: OpenNode | null, at: number): Ope
     childTime: 0,
     self: null,
     total: null,
+    width,
+    crossedResize: false,
     children: [],
   };
   if (parent !== null) parent.children.push(node);
@@ -174,6 +193,10 @@ export type TreeNode = Readonly<{
   startedAt: number;
   self: number;
   total: number;
+  /** The width the span opened at, `null` if none was known (C28 I26). */
+  width: number | null;
+  /** A resize arrived while it was open, so `width` is not the whole story. */
+  crossedResize: boolean;
   children: readonly TreeNode[];
 }>;
 
@@ -193,6 +216,8 @@ export function freezeTree(node: OpenNode, endedAt: number): TreeNode {
     startedAt: node.startedAt,
     self,
     total,
+    width: node.width,
+    crossedResize: node.crossedResize,
     children: Object.freeze(node.children.map((c) => freezeTree(c, endedAt))),
   });
 }

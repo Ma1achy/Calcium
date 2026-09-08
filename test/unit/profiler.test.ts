@@ -111,5 +111,47 @@ describe("C28 — profiler, tier 1 spec-first rows", () => {
     expect(plotIds(profilePane(report, "distribution"))).toEqual(["di-quantiles", "di-spans", "di-worst"]);
   });
 
+  it("T1.88 (C28 I12): a commit inside `own` is the profiler's, and a mixed frame is not", () => {
+    const report = (build: (p: ReturnType<typeof createProfiler>) => void) => {
+      const p = createProfiler({ tier: "spans" }, { elapsed: counterClock() });
+      build(p);
+      return p.report();
+    };
+
+    // Every commit bracketed → the frame is the profiler's own and excluded.
+    const mine = report((p) => {
+      p.own(() => p.commit("stream", false));
+      p.beginFrame("stream");
+      p.endFrame("frame");
+    });
+    expect(mine.excluded.selfInflicted, "a frame only the profiler raised").toBe(1);
+
+    // **The mutation this row exists for.** C28 I12 says *every* commit that raised
+    // it, and a rule reading *any* is satisfied by the first — so a frame the
+    // reader also asked for must not be excluded, or the histograms lose the
+    // frames a reader actually waited on.
+    const mixed = report((p) => {
+      p.own(() => p.commit("stream", false));
+      p.commit("input", false);
+      p.beginFrame("input");
+      p.endFrame("frame");
+    });
+    expect(mixed.excluded.selfInflicted, "one the reader also raised").toBe(0);
+
+    // And the bracket is not sticky: a throw inside it restores the depth, so
+    // the next frame is the reader's.
+    const after = report((p) => {
+      expect(() =>
+        p.own(() => {
+          throw new Error("a surface failed mid-refresh");
+        }),
+      ).toThrow("mid-refresh");
+      p.commit("input", false);
+      p.beginFrame("input");
+      p.endFrame("frame");
+    });
+    expect(after.excluded.selfInflicted, "after a throw inside the bracket").toBe(0);
+  });
+
   it.todo("T1.16d (C28 I23): setTier('spans') from counters, then the view closes → the tier is counters again, not off — not deferred on a component: the blocker is a caller of profilePane in src/ that opens and closes a pane, and there is none; profilePane is a pure function from a report to blocks and raises no tier. It arrives with the drawing round. Grep: `grep -rn 'profilePane' src/ | grep -v profiling/`");
 });

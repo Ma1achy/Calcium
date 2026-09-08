@@ -131,9 +131,21 @@ export function foldHome(cwd: string, home: string | undefined): string {
  * tight one and everything below it is noise a reader would have to ignore.
  * `<0.1ms` rather than `0.0ms` for a frame too fast to resolve, because a
  * rounded zero reads as *not measured* and that is the one thing it is not.
+ *
+ * **Fixed width, and that is not tidiness** (F911). The figure is redrawn every
+ * frame and it sits in a cluster with cells after it, so a cell whose width
+ * tracks its value moves everything to its right on every frame a session gets
+ * faster or slower — `last 9.6ms` against `last <0.1ms` is a one-column shift,
+ * once per frame, for as long as the profiler is on. It was found by a replay
+ * comparison, where the shift showed up as the padding differing rather than
+ * the number; the number was already known to differ and was already masked.
+ * Five is the width of `123.4`, which covers a frame up to a second; anything
+ * past that overflows the pad and is a session with a larger problem than its
+ * footer's alignment.
  */
 export function formatFrameCost(ms: number): string {
-  return ms < 0.05 ? "last <0.1ms" : `last ${ms.toFixed(1)}ms`;
+  const figure = ms < 0.05 ? "<0.1" : ms.toFixed(1);
+  return `last ${figure.padStart(5, " ")}ms`;
 }
 
 const footer = (ctx: ChromeContext): readonly Block[] => [

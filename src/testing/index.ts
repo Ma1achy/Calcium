@@ -110,3 +110,17 @@ export {
   type PhaseRow,
   type UnansweredRow,
 } from "./profile.js";
+export {
+  checkReplay,
+  compareFrames,
+  formatReplay,
+  parseRecording,
+  replayClocks,
+  driveRecording,
+  formatDrive,
+  replayStdin,
+  replayStdout,
+  replayTransport,
+  CLOCK_DERIVED,
+} from "./replay.js";
+export type { DriveOutcome, Recording, ReplayResult } from "./replay.js";
