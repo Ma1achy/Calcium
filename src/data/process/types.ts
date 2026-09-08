@@ -104,10 +104,22 @@ export interface PtyProcess {
   kill(signal?: string): void;
 }
 
+/**
+ * The factory a consumer injects (C21 §2a, I15).
+ *
+ * **`args` is mutable, and the one word is the port's whole purpose** (F920).
+ * `Readonly<>` is a homomorphic mapped type: it rewrites the method into a
+ * property with a function type, which turns off method bivariance and puts the
+ * parameter under `strictFunctionTypes`. `node-pty` declares `args: string[] |
+ * string`, so a `readonly string[]` here refuses the very package this shape was
+ * cut from — and the remedy a consumer reaches for is the adapter the port
+ * exists to avoid. Nothing is protected by tightening it: the only caller builds
+ * `["-c", command]` inline and drops it. T2.8 holds the claim.
+ */
 export type PtyFactory = Readonly<{
   spawn(
     file: string,
-    args: readonly string[],
+    args: string[],
     opts: PtySize & Readonly<{ cwd: string; env: Readonly<NodeJS.ProcessEnv> }>,
   ): PtyProcess;
 }>;

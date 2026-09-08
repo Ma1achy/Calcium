@@ -6,6 +6,10 @@ import { cells } from "../../src/presentation/text.js";
 import { readFileSync } from "node:fs";
 
 import { b } from "../../src/shell/builders/index.js";
+import { validateDocument } from "../../src/data/viewmodel/validate.js";
+import { createProcessRunner } from "../../src/data/process/runner.js";
+import { terminalDefinition } from "../../src/presentation/blocks/kinds/terminal.js";
+import type { MeasureFn } from "../../src/data/viewmodel/index.js";
 import {
   ASCII_CAPS,
   FULL_CAPS,
@@ -126,8 +130,97 @@ describe("C27 terminal emulator — tier 3", () => {
 });
 
 describe("C04 — the terminal kind, spec-first rows", () => {
-  it.todo("T3.78 (C04 I112): a terminal measures the same with cursor present and absent at every position; a cursor naming a missing line or a column at cols is refused — not deferred on a component: lands with the Terminal type");
-  it.todo("T3.79 (C04 I110): text ending mid-surrogate is refused as malformed; a line of only styled blanks is admitted — not deferred on a component: lands with the Terminal type");
+  /** The errors, or an empty list — so a row reads the same on either arm. */
+  const errs = (block: unknown): readonly string[] => {
+    const v = validateDocument({
+      schema: "tui.view/1",
+      command: "!pytest",
+      status: "ok",
+      meta: {
+        verb: null, adapter: "shell", stderr: "", exitCode: 0, durationMs: 12,
+        truncated: false, argv: ["pytest"], transport: "subprocess", origin: "user",
+      },
+      blocks: [block],
+    });
+    return v.ok ? [] : v.error;
+  };
+  const noChildren: MeasureFn = () => 0;
+
+  it("T3.78 (C04 I112): the cursor changes no height at any position, and one outside the screen is refused", () => {
+    // **Appearance, never geometry.** The cursor moves on every keystroke the
+    // child receives, so a height that moved with it would reflow the frame on
+    // each one — the class C04 keeps `measure` free of animated inputs for. The
+    // sweep is every position rather than one, because a `measure` that read the
+    // cursor would most likely read it only at an edge.
+    const lines = [{ text: "alpha" }, { text: "beta" }, { text: "" }];
+    const bare = terminalDefinition.measure(b.terminal(8, lines), 8, noChildren);
+    expect(bare, "three lines, three rows").toBe(3);
+
+    for (let line = 0; line < lines.length; line += 1) {
+      for (let col = 0; col < 8; col += 1) {
+        const at = b.terminal(8, lines, { cursor: { line, col } });
+        expect(
+          terminalDefinition.measure(at, 8, noChildren),
+          `cursor at ${String(line)},${String(col)}`,
+        ).toBe(bare);
+        expect(errs(at), "and every one of them validates").toEqual([]);
+      }
+    }
+
+    // **It still has to point at something.** A cursor is appearance and a
+    // dangling one is a producer's bug that draws a caret in empty space.
+    expect(errs(b.terminal(8, lines, { cursor: { line: 3, col: 0 } })).join(" "), "one line past the end").toContain(
+      "must index a line that exists",
+    );
+    // `col === cols` is the off-by-one, and the one a bounds check written as
+    // `col > cols` would admit — a caret one cell beyond the painted width.
+    expect(errs(b.terminal(8, lines, { cursor: { line: 0, col: 8 } })).join(" "), "a column at cols").toContain(
+      '"col" must be within "cols"',
+    );
+    expect(errs(b.terminal(8, lines, { cursor: { line: 0, col: 7 } })), "and the last real column").toEqual([]);
+  });
+
+  it("T3.79 (C04 I110): text ending mid-surrogate is refused, and a line of styled blanks is admitted", () => {
+    // **A lone surrogate is malformed rather than merely odd.** It survives a
+    // JSON round trip, so a far side that sliced a buffer by code unit sends one
+    // and every downstream measurer disagrees about its width. Two positions,
+    // because a check written for the last unit and one written for any unit
+    // read identically against a string that ends with the break.
+    const high = "\ud83d"; // the leading half of an astral pair
+    const low = "\ude00"; // the trailing half
+    expect(errs(terminalWith(`ok${high}`)).join(" "), "a high surrogate at the end").toContain(
+      "unpaired surrogate",
+    );
+    expect(errs(terminalWith(`${low}ok`)).join(" "), "a low surrogate at the start").toContain(
+      "unpaired surrogate",
+    );
+    expect(errs(terminalWith(`ok${high}x`)).join(" "), "a high surrogate followed by a BMP char").toContain(
+      "unpaired surrogate",
+    );
+
+    // The control: the pair itself is one grapheme and entirely ordinary.
+    expect(errs(terminalWith(`ok${high}${low}`)), "a well-formed pair is text").toEqual([]);
+
+    // **A line of only styled blanks is content, not emptiness.** A child that
+    // painted a background across an empty row means it, and a gate that took
+    // "no visible glyphs" for "nothing here" would drop the row and shorten the
+    // screen by one.
+    expect(
+      errs({
+        kind: "terminal",
+        id: "t1",
+        cols: 80,
+        screen: "lines",
+        lines: [{ text: "    ", runs: [{ from: 0, to: 4, bg: { kind: "ansi256", index: 17 } }] }],
+      }),
+      "four blanks under a background run",
+    ).toEqual([]);
+  });
+
+  /** One terminal around one line of text, for the gate's own rows. */
+  function terminalWith(text: string): unknown {
+    return { kind: "terminal", id: "t1", cols: 80, screen: "lines", lines: [{ text }] };
+  }
 });
 
 describe("C09 · C10 — the terminal block and a literal colour", () => {
@@ -178,7 +271,74 @@ describe("C09 · C10 — the terminal block and a literal colour", () => {
 });
 
 describe("C21 — the PTY port, spec-first rows", () => {
-  it.todo("T3.19 (C21 I16): spawnPty throwing leaves no child, no handle and no listener, with the factory spy never called — not deferred on a component: lands with spawnPty");
+  it("T3.19 (C21 I16): a spawnPty that throws leaves no handle, no listener and nothing to kill", async () => {
+    // **Two ways to throw, and the leak is only reachable on the second.** With
+    // no factory the refusal is a guard before any work; with a factory that
+    // fails, a child object exists and the question is whether the runner kept a
+    // half-built handle for it. `killAll` is where a kept one would show, since
+    // it signals every registered PTY and awaits its `exited` — a handle for a
+    // child that never started would hang there rather than fail an assertion.
+
+    const bare = createProcessRunner({ env: {}, stdin: {} });
+    expect(() => bare.spawnPty("sleep 5", { cwd: () => "/w", cols: 80, rows: 6 })).toThrow(/TuiConfig\.pty/u);
+    expect(bare.live, "and no pipe child was started instead").toEqual([]);
+    await bare.killAll();
+
+    // A factory that builds its child and *then* fails — the shape a real one
+    // takes when `openpty` runs out of devices.
+    const listeners: string[] = [];
+    const killed: string[] = [];
+    const child = {
+      pid: 77,
+      onData: () => listeners.push("onData"),
+      onExit: () => listeners.push("onExit"),
+      write: () => {},
+      resize: () => {},
+      kill: (sig: string) => killed.push(sig),
+    };
+    const boom = new Error("openpty: no ptys available");
+    let built = 0;
+    const runner = createProcessRunner({
+      env: {},
+      stdin: {},
+      pty: {
+        spawn: () => {
+          built += 1;
+          throw boom;
+        },
+      } as never,
+    });
+
+    let caught: unknown = null;
+    try {
+      runner.spawnPty("sleep 5", { cwd: () => "/w", cols: 80, rows: 6 });
+    } catch (err) {
+      caught = err;
+    }
+    // **The error propagates unchanged** — not wrapped, and not turned into a
+    // handle. The pipe route does the opposite by design (C21 I13): a mistyped
+    // binary comes back as a `ChildHandle` whose `stderr` carries the message,
+    // because there a caller has somewhere to read it. `spawnPty` has no such
+    // place, so the two routes differ and the contrast is asserted below rather
+    // than left as a claim.
+    expect(caught, "the factory's own error, unchanged").toBe(boom);
+    expect(built, "the factory was reached exactly once").toBe(1);
+    expect(listeners, "and its child was never wired").toEqual([]);
+    expect(runner.live, "no pipe child appeared instead").toEqual([]);
+
+    await runner.killAll();
+    expect(killed, "nothing was registered, so nothing was signalled").toEqual([]);
+    expect(child.pid, "the child object is untouched, not adopted").toBe(77);
+
+    // The contrast, run last because it touches the OS: a binary that does not
+    // exist gives a handle rather than a throw.
+    const failed = runner.spawn(["definitely-not-a-binary-\u0135x"], { cwd: () => process.cwd() });
+    expect(typeof failed.exited.then, "the pipe route answers with a handle").toBe("function");
+    expect(await failed.exited, "settled rather than pending (C21 I13)").toEqual({ code: null, signal: null });
+    let said = "";
+    for await (const chunk of failed.stderr) said += chunk;
+    expect(said, "with the cause where a caller already looks").not.toBe("");
+  });
 });
 
 describe("C23 — the shell route as a live screen, spec-first rows", () => {

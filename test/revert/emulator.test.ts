@@ -3,9 +3,13 @@
 // Each row names the change that makes it fail. They are assertions about the
 // rows above: what the mutation pass checks mechanically, stated so a reader can
 // see which row dies for which defect.
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import { createEmulator } from "../../src/data/emulator/emulator.js";
+import { validateDocument } from "../../src/data/viewmodel/validate.js";
+import { createProcessRunner } from "../../src/data/process/runner.js";
 import { containText, lineOf, type LineLike } from "../../src/data/emulator/snapshot.js";
 import { tickIntervalOf } from "../../src/presentation/blocks/animation.js";
 import { terminalDefinition } from "../../src/presentation/blocks/kinds/terminal.js";
@@ -105,11 +109,68 @@ describe("C27 terminal emulator — tier 6", () => {
 });
 
 describe("C04 — the terminal kind, spec-first rows", () => {
-  it.todo("T6.96 (C04 I110): dropping the control check from the gate → T1.31 admits an escape and T4.56's frame gains a real one — not deferred on a component: lands with the Terminal validator");
-  it.todo("T6.97 (C04 I111): admitting adjacent equal-styled runs → T1.32's last row passes and two snapshots of one screen stop comparing equal — not deferred on a component: lands with the Terminal validator");
-  it.todo("T6.98 (C04 I113): allowing dropped: 0 → T1.33 admits it and the marker row draws zero lines dropped — not deferred on a component: lands with the Terminal validator");
-});
+  const term = (over: Record<string, unknown> = {}): unknown => ({
+    kind: "terminal",
+    id: "t1",
+    cols: 80,
+    screen: "lines",
+    lines: [{ text: "ok" }],
+    ...over,
+  });
+  const errs = (block: unknown): readonly string[] => {
+    const v = validateDocument({
+      schema: "tui.view/1",
+      command: "!pytest",
+      status: "ok",
+      meta: {
+        verb: null, adapter: "shell", stderr: "", exitCode: 0, durationMs: 12,
+        truncated: false, argv: ["pytest"], transport: "subprocess", origin: "user",
+      },
+      blocks: [block],
+    });
+    return v.ok ? [] : v.error;
+  };
 
+  it("T6.96 (C04 I110): dropping the control check admits an escape, and the escape reaches the outer terminal", () => {
+    // **The revert**: take C27 I2 as sufficient. It is true that the emulator
+    // replaces controls at the cell walk, and it is the wrong reason to drop
+    // this — a `terminal` can arrive from a far side that never ran C27, which
+    // is the whole case the second gate is for. The failure is not a rendering
+    // defect: a terminal line is emitted *without stripping*, so `\x1b[31m` in
+    // one would leave the block and colour the rest of the session's screen.
+    expect(errs(term({ lines: [{ text: "red\u001b[31mhere" }] })).join(" "), "refused today").toContain(
+      "control character",
+    );
+    // The half that says the rule is about controls: the same shape without one.
+    expect(errs(term({ lines: [{ text: "red[31mhere" }] })), "and the ordinary text is not").toEqual([]);
+  });
+
+  it("T6.97 (C04 I111): admitting adjacent equal-styled runs makes two snapshots of one screen stop comparing equal", () => {
+    // **The revert** reads as tidying — an adjacency check is not obviously a
+    // correctness rule, and merging costs the producer something. What it costs
+    // the consumer is diff stability: `[0,3)` + `[3,6)` bold and `[0,6)` bold
+    // paint identically and are different values, so an unchanged screen
+    // snapshotted twice compares unequal and every frame redraws.
+    expect(
+      errs(term({ lines: [{ text: "abcdef", runs: [{ from: 0, to: 3, bold: true }, { from: 3, to: 6, bold: true }] }] })).join(" "),
+      "adjacent and equal is refused",
+    ).toContain("adjacent runs share a style");
+    // The control the revert would leave passing: adjacency alone is fine.
+    expect(
+      errs(term({ lines: [{ text: "abcdef", runs: [{ from: 0, to: 3, bold: true }, { from: 3, to: 6, italic: true }] }] })),
+      "adjacent and different is maximal",
+    ).toEqual([]);
+  });
+
+  it("T6.98 (C04 I113): allowing dropped: 0 draws a marker row reading zero lines dropped", () => {
+    // **The revert**: `dropped < 0` instead of `dropped < 1`, which is the
+    // natural bound for a count. `dropped` is declared **by presence**, so zero
+    // is not *none* — it is a marker row above the scrollback saying nothing was
+    // lost, which is the one thing a marker never needs to say.
+    expect(errs(term({ dropped: 0 })).join(" "), "zero is refused").toContain("positive integer");
+    expect(errs(term({ dropped: 1 })), "and one is the smallest thing worth drawing").toEqual([]);
+  });
+});
 describe("C09 · C10 — the terminal block and a literal colour", () => {
   it("T6.99 (C09 I55): a wrapped measure → T1.29's long row measures more than one", () => {
     // The row that dies: a 200-character line at width 80 is one row, and a
@@ -144,13 +205,85 @@ describe("C09 · C10 — the terminal block and a literal colour", () => {
 });
 
 describe("C21 — the PTY port, spec-first rows", () => {
-  it.todo("T6.15 (C21 I16): falling back to spawnShell when no factory is injected → T1.11's throw becomes a handle and a caller that asked for a terminal gets a pipe with no cause — not deferred on a component: lands with spawnPty");
-  it.todo("T6.16 (C21 I15): importing node-pty in runner.ts → T2.8's scan fails and the package becomes a runtime dependency by accident — not deferred on a component: lands with the PtyFactory port");
+  it("T6.15 (C21 I16): falling back to spawnShell when no factory is injected → the throw becomes a handle", () => {
+    // The fallback's signature is not that `spawnPty` stops throwing — it is
+    // that **a child appears**. So the assertion is on `live`, which is the one
+    // place a silently substituted pipe would be visible.
+    const runner = createProcessRunner({ env: {}, stdin: {} });
+    expect(() => runner.spawnPty("sleep 5", { cwd: () => "/w", cols: 80, rows: 6 })).toThrow();
+    expect(runner.live, "no pipe was started in its place").toEqual([]);
+
+    // And the second half of the deferral — *with no cause*. A fallback that
+    // also logged would still fail this: the caller holds the message.
+    let said = "";
+    try {
+      runner.spawnPty("sleep 5", { cwd: () => "/w", cols: 80, rows: 6 });
+    } catch (err) {
+      said = err instanceof Error ? err.message : String(err);
+    }
+    expect(said, "the field a consumer sets").toContain("TuiConfig.pty");
+  });
+
+  it("T6.16 (C21 I15): importing node-pty in runner.ts → the package becomes a runtime dependency", () => {
+    // T2.8 scans all of `src/`; this row names the file the revert names, and
+    // adds the half a source scan cannot see — **which section of the manifest
+    // the package sits in**. An import in `runner.ts` with the dependency still
+    // in `devDependencies` is a clean clone that installs and then throws
+    // `ERR_MODULE_NOT_FOUND` on first use, which is F840's requirement failing
+    // in the one way no test of `src/` reaches.
+    //
+    // **The matcher looks for an import, not a mention**, and the first draft of
+    // this row did not: `runner.ts`'s throw message says *"(node-pty satisfies it
+    // unchanged)"* in a string literal, so a bare `not.toMatch(/node-pty/)` fails
+    // on the file's own documentation. Stripping comments is not enough — a
+    // string is neither a comment nor an import, and it is the encoding a
+    // comment-stripper is built not to see.
+    const code = readFileSync("src/data/process/runner.ts", "utf8")
+      .replace(/\/\*[\s\S]*?\*\//gu, "")
+      .replace(/\/\/[^\n]*/gu, "");
+    expect(code, "the runner imports no PTY package").not.toMatch(
+      /(?:from|require\()\s*["'][^"']*node-pty/u,
+    );
+    expect(code, "and the mention that is not one is still there").toMatch(/node-pty satisfies/u);
+
+    const manifest = JSON.parse(readFileSync("package.json", "utf8")) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    expect(Object.keys(manifest.dependencies ?? {}), "and it is not a runtime dependency").not.toContain("node-pty");
+    expect(Object.keys(manifest.devDependencies ?? {}), "it is a devDependency the container builds").toContain("node-pty");
+  });
+
+  it("T6.17 (C21 I18): hasPty hard-coded true → the arm is chosen on a runner that cannot spawn one", () => {
+    // **Both arms from one call site**, because a constant satisfies either one
+    // alone. The getter reads `deps` rather than a captured value, so two
+    // runners built the same way disagree exactly when their deps do.
+    const make = (pty?: unknown) =>
+      createProcessRunner({ env: {}, stdin: {}, ...(pty === undefined ? {} : { pty: pty as never }) });
+    expect(make().hasPty, "no factory").toBe(false);
+    expect(make({ spawn: () => ({}) }).hasPty, "a factory").toBe(true);
+  });
+
+  it("T6.18 (C21 I15): restoring readonly to PtyFactory.spawn's args → the port refuses node-pty (F920)", () => {
+    // **The gate for this is `tsc`, and it lives in T2.8** — that row assigns
+    // `typeof import("node-pty")` to `PtyFactory` and is an error the moment the
+    // modifier comes back. This row is the source-level pin, so the change is
+    // caught by `test` as well as by `check`, and so the *reason* sits where
+    // someone tightening the type will read it.
+    //
+    // `Readonly<>` is homomorphic: it rewrites the method into a property with a
+    // function type, method bivariance is off, and `readonly string[]` is
+    // refused against node-pty's `string[] | string`. Nothing is protected — the
+    // only caller builds `["-c", command]` inline and drops it.
+    const port = readFileSync("src/data/process/types.ts", "utf8");
+    const factory = port.slice(port.indexOf("export type PtyFactory"));
+    const args = /^\s*args: (.+),$/mu.exec(factory);
+    expect(args?.[1], "the parameter node-pty has to satisfy").toBe("string[]");
+  });
 });
 
 describe("C23 — the shell route as a live screen, spec-first rows", () => {
   it.todo("T6.93 (C23 I64): snapshotting per chunk → T1.51 counts 100 patches and a 2,000-line value enters the store per write — not deferred on a component: lands with the route's snapshot seam");
-  it.todo("T6.17 (C21 I18): hasPty hard-coded true → T1.13's no-factory arm fails and the route chooses the PTY arm on a runner that cannot spawn one — not deferred on a component: lands with hasPty");
   it.todo("T6.94 (C23 I65): resizing the emulator first → T4.64's call order fails and one frame is drawn from the old grid — not deferred on a component: lands with the route's resize");
   it.todo("T6.95 (C23 I66): dropping the cancel registration → T3.62 fails, which is the defect F844 records as shipped — not deferred on a component: lands with the route's cancel");
   it.todo("T6.96 (C23 I67): keeping the cursor on settle → T2.47 fails and a settled block draws a cursor nobody is writing at — not deferred on a component: lands with the route's settle");
