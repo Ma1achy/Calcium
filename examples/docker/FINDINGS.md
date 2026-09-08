@@ -31517,6 +31517,91 @@ Found by reading the table against the paragraph above it while adding a member 
 the same instrument as *read the abstract against its own section before reading the section against
 the code*, applied to a constant.
 
+## F919 — the guard against deferrals outliving their reasons is green over the set it cannot see ★★★★★
+
+Forty-four `it.todo` rows, resolved one at a time against HEAD rather than read.
+
+**Every blocker the emulator rows name is built.** `spawnPty`, `hasPty` and `spawnShell` are
+implemented in `src/data/process/runner.ts` and consumed at `src/shell/execution.ts:805-817`;
+`PtyFactory` is a port at `src/data/process/types.ts:107`; `terminalDefinition` is 198 lines in
+`src/presentation/blocks/kinds/terminal.ts`. Thirty-seven rows say *lands with spawnPty*, *lands
+with the PtyFactory port*, *lands with the Terminal type*, *lands with the route's settle / arm
+choice / resize*, and all of it landed.
+
+**And four of them are second records of rows that are written and running.**
+
+| deferral | its counterpart | verdict |
+|---|---|---|
+| C28 T3.6, `edge/profiler.test.ts` | `unit/profiler-gauges.test.ts` | **closes** — same claim, running |
+| C23 T3.63, `edge/emulator.test.ts` | `unit/emulator.test.ts` | **closes** — both halves asserted |
+| C23 T2.47, `contract/emulator.test.ts` | `unit/emulator.test.ts` | **partial** — one cursor position, not *any* |
+| C23 T4.64, `integration/emulator.test.ts` | `unit/emulator.test.ts` | **partial** — same width, not the *order* |
+
+The two partials are the ones worth the distinction. T4.64 asked for three things — the child
+resized **before** the emulator, asserted by call order, and the next frame matching the reflow —
+and the written row covers the one that is not the invariant's subject. Resizing the emulator first
+draws a frame from the old grid, which **agrees on the width** and is wrong about the picture, so
+the row that exists is green under the defect the deferral was written about. Both are reframed to
+name their residue rather than deleted, which is the closes/reframes/partial test with the residue
+kept.
+
+**The guard that exists for exactly this is green.** `tools/enforce/todo-expiry.mjs` has six arms
+and every one is keyed on a component id: a deferral naming `C_n` expires when
+`COMPONENT_SOURCES[C_n]` exists. A deferral carrying `not deferred on a component` — which all
+forty-four do — is exempt from all six, and its blocker is prose. `ACKNOWLEDGED_BACKLOG` is empty
+and TD0 passes by equality, so **the mechanism built to stop deferrals outliving their reasons
+reports compliance over the set it cannot see.** That is A03 §2's vacuity class inside the guard,
+and it is the same shape as SS26 scoping itself to a directory that did not exist — which is the
+lesson `todo-expiry.test.ts`'s own header cites.
+
+CLAUDE.md argues against automating this, and it is right about the case it names: matching *until
+X is threaded through* against *X exists* is the citation-resolves-against-the-wrong-thing class.
+**But not every blocker is prose.** Two profiler reverts named `src/shell/profiling/replay.ts` — a
+**file path** — and one named a **grep**, `grep -rn 'replay' src/` returns nothing. A path that
+exists and a grep that returns 102 lines are checkable with no prose matching at all, and both had
+been false since the file landed earlier in this session. T6.8 and T6.15 are now real rows, each
+verified by mutating `compareFrames` and watching it fail; T6.16 is reframed, because its blocker is
+met and its witness is tier 5, so the revert belongs in the e2e file rather than the unit one.
+
+**A last defect in the instrument, found in it rather than by it.** The first scan for
+*deferred-and-also-written* matched bare T-numbers and reported 38 duplicates. Thirty-one were
+collisions: T-numbers are per-component, so `unit/editor.test.ts`'s T1.11 is C17's and
+`unit/emulator.test.ts`'s is C21's. Keyed on the component cited in the row's own title it is seven,
+and reading the seven titles it is four. **Numbers also collide inside a component** — C04 has two
+T4.1s, C09 three T4.2s, C23 two T4.64s — so the key has to be component, number *and* subject, and
+the last one only a reader supplies.
+
+Forty-four rows to forty; 5,665 running to 5,668.
+
+## F918 — the mutation had no anchor because the flush had no invariant ★★★★☆
+
+`NO-EXIT-FLUSH` was carried in `c28-profiler.mjs` as an absence with a reason, and the reason was
+true: deleting the `process.on("exit")` flush is the mutation F912's whole diagnosis rests on, its
+only witness was T5.1, and the harness cannot run tier 5 — tier 5 executes against `dist/`, so a
+`src/` mutation is invisible to it without a build per mutation. Recording that beat both
+alternatives, a `T5.1` expectation that would make MA4 red and a unit anchor the row does not
+actually reach.
+
+**It was also one step short, and the step is visible from the spec's side rather than the
+harness's.** The hook had a fifteen-line comment in `config.ts` explaining exactly why it exists and
+**no invariant anywhere**. A03 SP1 pairs a commitment to an invariant and catches the missing
+invariant when a commitment is written down; this commitment was written in a code comment, where no
+rule looks. So the absence of a mutation and the absence of a tier-1 row and the absence of an
+invariant are one absence seen three times, and the recorded reason named the third-order symptom.
+
+With C28 I48 written, the row is sixty lines at tier 1: capture `process.listeners("exit")` across a
+`resolveConfig`, call the **listener** — never `process.exit`, which takes the runner with it — and
+assert a pending clock batch reaches the sink with `end` last. It needs no PTY, no build and no
+`dist/`. Two mutations now anchor to it and **they are killed by different assertions**: deleting the
+hook fails the listener count, and emptying it — `() => {}`, present in a diff and doing nothing —
+fails the flush. A row asserting only that a listener was added is green under the second, which is
+why both are there.
+
+**The reusable part is the question.** *Why can no test reach this?* was answered with a fact about
+the harness, and the fact was correct. *What claim would a test be written from?* had no answer at
+all, and that is the one that moved. When a mutation is recorded as unanchorable, ask which
+artefact is missing before accepting which tier is unreachable.
+
 ## F917 — the command shipped, the coverage row did not, and the gate had been red since ★★★★☆
 
 `b62b64df` added `/profile` to the plots example: a manifest entry, a `LocalHandler` in `main.ts`,
