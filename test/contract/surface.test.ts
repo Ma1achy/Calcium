@@ -107,6 +107,10 @@ describe("PushedSurface public contract", () => {
     expect(actions.map((event) => event.phase)).toEqual(["press"]);
     expect(actions[0]?.fidelity).toBe("legacy_terminal");
 
+    await new Promise<void>((resolve) => setTimeout(resolve, 75));
+    await tick();
+    expect(actions.map((event) => event.phase)).toEqual(["press", "release"]);
+
     await handle.close();
     expect(actions.map((event) => event.phase)).toEqual(["press", "release"]);
     expect(actions.every((event) => event.fidelity === "legacy_terminal")).toBe(true);
