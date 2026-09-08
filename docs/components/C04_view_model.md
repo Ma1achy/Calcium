@@ -3445,7 +3445,9 @@ The generic suite. **These run against every registered block kind, including ap
 - **T2.117** (I106, I109): `RAMP_KEYS` has six members and a seventh key is refused by name; `animate: "sweep"` is refused with a message naming the six; a document carrying a ramped span on every carrier and a ramped `progress` satisfies §5a's round trip.
 - **T2.114** (I105, I107): `TEXT_SPAN_KEYS` has nine members and admits `elide` and `ramp`; a `notice` under `info` with an `elide` span measures and renders identically to the same block without it at every width of the sweep; on a `step` notice the marked run ends in the marker at a width that cannot hold the row, and the runs outside it are byte-identical to the unfitted text.
 - **T2.34** (§3am): the same translation on a list item and on a blockquote lands the spans on the `notice`, on a heading on the `rule`'s `label`, and on a pipe-table cell on the `Cell` — the four members of I88 — and on a fenced block **does not** run: `**` inside a fence is seven characters.
-- **T2.118** (I110, §5a): a `terminal` carrying every run field and both modes round-trips through `JSON.parse(JSON.stringify(...))` deep-equal, and `TERMINAL_KEYS` refuses a seventh block key and an eleventh run key by name.
+- **T2.118** (I110, §5a): a `terminal` carrying every run field and both modes round-trips through `JSON.parse(JSON.stringify(...))` deep-equal, and `TERMINAL_KEYS` refuses a **tenth** block key and `TERMINAL_RUN_KEYS` an eleventh run key by name.
+  The count was written as *a seventh* when the kind had six members and was three behind by the time the row
+  was implemented — the row asserts the measured sizes (9 and 10) so the number cannot drift again unread.
 
 ### Tier 3 — edge cases
 

@@ -83,7 +83,7 @@ interface PtyProcess {
 type PtyFactory = Readonly<{
   spawn(
     file: string,
-    args: readonly string[],
+    args: string[],
     opts: PtySize & Readonly<{ cwd: string; env: Readonly<NodeJS.ProcessEnv> }>,
   ): PtyProcess;
 }>;
@@ -98,6 +98,22 @@ spawnPty(command: string, opts: SpawnOptions & PtySize): PtyHandle;
 **The port is structural and names no package** (I15). Its members are the ones `node-pty`'s
 `IPty` already has, so a consumer passes `node-pty` itself and nothing is adapted — and C21
 imports nothing, which is what keeps the framework installable.
+
+**`args` is a mutable `string[]`, and the one word is the whole of the port's purpose** (F920).
+Every other array in this spec is `readonly`, and that is right: a `readonly` parameter says *the
+callee will not write to this*, which is a promise worth making. Here it is a promise made **to
+the wrong party**. `PtyFactory` is wrapped in `Readonly<>`, and a homomorphic mapped type rewrites
+a method into a property with a function type — which is what turns off method bivariance and
+subjects the parameter to `strictFunctionTypes`. `node-pty` declares `args: string[] | string`,
+and `readonly string[]` is not assignable to `string[]`, so the package the port was cut from
+**could not be passed to it**, and the fix a consumer would reach for is an adapter — the one
+thing the port exists to make unnecessary.
+
+Nothing is lost. The only caller builds `["-c", command]` inline and drops it, so there is no
+array a factory could corrupt; the type was describing a hazard that does not exist here and
+refusing the case it was designed for. **The producer could not see it**, because every internal
+caller holds a freshly built array and a fresh `string[]` satisfies both spellings — it is
+visible only from a consumer, and only from one holding the real package.
 
 **`node-pty` cannot be a runtime dependency, and the reason is a requirement rather than a
 preference** (F840). It ships prebuilds for darwin and win32 only; on Linux the toolchain
@@ -285,7 +301,7 @@ Six tiers. Every cell of the §7 table is covered. Tiers 1–3 use real short-li
 - **T2.5** (I1): `spawn` has no parameter that could carry a shell string; `spawnShell` has no argv form. A compile-level test.
 - **T2.6** (I13): across a hundred spawns including failures, `exited` resolves every time.
 - **T2.7** (I14): a source scan finds no `process.env`, no `console.` and no reference to the real `process.stdin` in `process/`. The environment arrives as a record and the probe as an object.
-- **T2.8** (I15): a source scan finds no `node-pty` import anywhere in `src/`, and a compile-level test asserts `node-pty`'s `IPty` is assignable to `PtyProcess` — the port's shape is checked against the package it was cut from without depending on it. The row is skipped when `node-pty` is not installed, and the skip is reported rather than silent.
+- **T2.8** (I15): a source scan finds no `node-pty` import anywhere in `src/`, and a compile-level test asserts **both halves of I15** — that `node-pty`'s `IPty` satisfies `PtyProcess`, *and* that the package's own module namespace satisfies `PtyFactory`. The second half is the one that found F920, and its absence is why the first half read as coverage: I15 names two types, the row named one, and a reader checking the citation sees a row against I15. The `import type` is erased, so no runtime dependency is created; `node-pty` is a devDependency the container builds by name, so there is no installed-or-not arm to skip on — a graceful skip here would be a branch nothing can enter, and its absence is recorded rather than written.
 
 ### Tier 3 — edge cases
 
@@ -348,6 +364,7 @@ Six tiers. Every cell of the §7 table is covered. Tiers 1–3 use real short-li
 - **T6.15** (I16): falling back to `spawnShell` when no factory is injected → T1.11's throw becomes a handle, and a caller that asked for a terminal gets a pipe with no cause.
 - **T6.17** (I18): `hasPty` hard-coded to `true` → T1.13's no-factory arm fails, and the shell route chooses the PTY arm on a runner that cannot spawn one.
 - **T6.16** (I15): importing `node-pty` in `runner.ts` → T2.8's scan fails and the package becomes a runtime dependency by accident.
+- **T6.18** (I15): restoring `readonly` to `PtyFactory.spawn`'s `args` → T2.8's factory half fails, and the port refuses the one package it was cut from while every test in this repo keeps passing, because each builds a fresh array (F920).
 
 ---
 

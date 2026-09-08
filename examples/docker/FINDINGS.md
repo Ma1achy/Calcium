@@ -33142,3 +33142,73 @@ and it is now recorded in the list's own comment rather than in a row a gate can
 **The general form**: a rule counting *readers* is blind to a reader that exists to satisfy the
 declaration it is reading. The same shape reaches any pass-through — a proxy, an adapter, a
 re-export — and the tell is an exemption that clears in a commit that added no use of the thing.
+
+## F920 — the port refused the one package it was cut from, and only a consumer could see it ★★★★☆
+
+`PtyFactory` exists so that Calcium depends on no PTY package and a consumer passes theirs. Two
+documents say so in the same words — `types.ts`'s *"a consumer passes that package itself with
+nothing adapted"* and the throw message's *"(node-pty satisfies it unchanged)"*. Writing T2.8, the
+row deferred to check exactly this, measured it:
+
+```
+error TS2322: Type 'typeof import("node-pty")' is not assignable to type PtyFactory
+  Types of parameters 'args' and 'args' are incompatible.
+    Type 'readonly string[]' is not assignable to type 'string | string[]'.
+```
+
+**One word, and it was the `readonly`.** `PtyFactory` is wrapped in `Readonly<>`, which is a
+homomorphic mapped type: it rewrites `spawn(...)` from a **method** into a **property with a
+function type**. Method parameters are bivariant; function-typed properties are not, so
+`strictFunctionTypes` applies and `readonly string[]` fails against `node-pty`'s `string[] |
+string`. Dropping the modifier makes the exact promised call — `import * as pty from "node-pty";
+createTui({ pty })` — compile, and the whole repo still passes `check`.
+
+**Nothing was being protected.** The only caller builds `["-c", command]` inline and never reads
+it again, so there is no array a factory could corrupt. The `readonly` described a hazard that
+does not exist at this seam, and in exchange refused the one case the seam was designed for.
+
+**Why the producer could not see it, which is the reusable half.** Every internal caller holds a
+freshly built array, and a fresh `string[]` satisfies both spellings. There is no test the
+framework can write from the inside that distinguishes them — the variance is only observable
+from a consumer, and only from one holding the real package. Nine tests exercise `spawnPty` and
+all nine pass under either type.
+
+**And why the deferral is the other half.** I15 names **two** types: *every member of `PtyProcess`
+and `PtyFactory` is satisfied by `node-pty`'s own shape*. T2.8's spec text asked for a compile-level
+check that *`IPty` is assignable to `PtyProcess`* — the first half only. `IPty` **does** satisfy
+`PtyProcess`; the row as written would have passed and been cited against I15, and a reader
+checking the citation would find a row that names the invariant and covers half of it. The row was
+`it.todo`, so even that never ran. **A test row citing a two-part invariant is not coverage of it,
+and the citation is what makes the gap invisible** — this is *assert the artefact, not a proxy*
+arriving at a spec's own test list, where nothing checks that a row's subject is the whole of the
+invariant it names.
+
+The third clause of the deferral — *skipped with a reported reason when `node-pty` is absent* —
+had no state to describe. `node-pty` is a devDependency built by name in `make install`, and
+`test/support/pty.ts` has imported it unconditionally all along; a skip arm would be a branch
+nothing can enter. Recorded rather than written, on the vacuity argument.
+
+## F921 — a rule aimed at ambiguity made the occasion for finding a wrong citation ★★☆☆☆
+
+CLAUDE.md names *a citation resolving against the wrong invariant* as the class no mechanism
+catches, and `docs/COMMITMENT_INVARIANT_AUDIT.md` §Fourth pass argues one should not be built. That
+is still right. What happened is one step to the side of it, and worth the paragraph.
+
+A comment written for T1.32 read *"the addition to I83's bounds gate"*. `make enforce` failed on
+**SP3** — a bare invariant number with nothing before it naming the owning spec — and answering it
+meant going to find which spec owns I83. C04 I83 is about **spans**: a parallel decoration that
+carries no text. The gate the comment is attached to is C04 **I111**, the terminal run list. The
+citation was wrong, and it was fixed because the rule made someone resolve it.
+
+**SP3 did not catch the wrong citation and cannot.** `C04 I83` — qualified and wrong — passes SP3,
+which checks that the reference resolves, not that it resolves to the right thing. What the rule
+supplies is the **occasion**: a bare number can be written without deciding anything, and a
+qualified one cannot. The resolution step is where a reader notices, and SP3 is what forces the
+step to happen at all.
+
+Its reach is exactly the bare citations, which are a minority and shrinking — this is not an
+instrument, and building one is still the thing the audit argues against. Recorded for the shape:
+**a rule can be worth more than its stated subject when what it really costs is a decision**, and
+the two rules in this repo with that property (SP3, and SP9's equality gate) were both justified on
+something narrower.
+
