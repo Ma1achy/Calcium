@@ -31517,6 +31517,142 @@ Found by reading the table against the paragraph above it while adding a member 
 the same instrument as *read the abstract against its own section before reading the section against
 the code*, applied to a constant.
 
+## F917 — the command shipped, the coverage row did not, and the gate had been red since ★★★★☆
+
+`b62b64df` added `/profile` to the plots example: a manifest entry, a `LocalHandler` in `main.ts`,
+and no row in `plots.test.ts`'s `DOCUMENTS`. That table is asserted **by equality** against the
+manifest precisely so a command added to one and not the other fails — and it did, from the commit
+that landed it. It went unread because the session that landed it reported the suite green from a
+run that did not include `examples/plots`, which is *run the whole suite, not a chosen subset*
+arriving as a workspace boundary rather than a directory list.
+
+**The sixth form of the gate-not-run class, and the first where the gate is in a different
+workspace from the change that broke it.** The other five: a wrong corpus, a gate that did not run,
+thirteen days red on CI unread, a scope stopping a layer above its subject, and F905's — the gate
+correct and nobody running it. This one is F905's again with the workspace as the reason.
+
+Fixing it produced the second half. The builder was inline in `main.ts`, so the coverage row could
+only be written by **re-typing the handler's body** — the two-records defect the table exists to
+prevent, in the test that prevents it. Extracted to `commands.ts` beside every sibling builder, so
+the row and the handler now read one implementation.
+
+**And a real gap underneath:** the row can construct the *absent* arm and not the present one,
+because `ProfileReport` is reachable only through `ctx.profile()`. There is no constructor on the
+public surface and none in `@fmx/calcium/testing`, which publishes `checkBudget(report, …)`,
+`checkPhases` and `checkLeaks` — three functions that **take** a report to a consumer who has no way
+to make one outside a live session. `profilePane`'s own doc comment calls it *a pure function from a
+report to blocks*, which is true and is exactly why the missing half is invisible: the function is
+testable and its input is not. Recorded here rather than fixed, because the remedy is a surface
+decision (a report builder, or a recorded fixture in `testing`) and not a repair.
+
+## F916 — the memo hit three times in four and bought 59 nanoseconds a hit ★★★★☆
+
+P11's defect 2 — *a `group` measures every child 3×* — was real, and the obvious remedy was a memo
+in C09's registry keyed on `(block, width)`, which C09 I2 licenses by saying `measure` is a function
+of exactly those. Built, it reached a **75% hit rate**: 577,071 hits against 188,258 misses over a
+12,031-frame session, every miss `absent` and not one `width`. That is the number a cache is
+usually kept on.
+
+It bought **34 ms**, and the session's total span time is 49,811 ms.
+
+| | without the memo | with it |
+|---|---|---|
+| `measure` calls | 144,202 | **144,202** |
+| `measure` sum | 497 ms | 463 ms |
+| session total, 3 runs | 49,316 / 52,183 / 54,562 | 48,671 / 50,542 / 50,219 |
+
+Two things settle it. The call count does not move at all, because the span brackets `#measured` and
+the memo returns from inside it — so the *bracket* survives every hit and only the walk is saved.
+And 577,071 hits against 34 ms is **59 ns per avoided walk**, which is the cost of a `WeakMap.get`
+and change. The whole-session difference is 4.2% against a without-arm spread of 5,246 ms; three
+runs each side cannot separate the arms.
+
+**Reverted.** A cache in C09 is 52 lines, an invalidation on `register()` and a new coherence hazard
+in the layer everything above it draws through, and the measured return is 0.07% of the session on
+the one span that can see it. This is *a fix that changes nothing indicts the diagnosis* pointed at
+the diagnosis rather than the fix: the defect was correctly identified as repeated work and wrongly
+assumed to be expensive work. **A hit rate is a property of the access pattern, not of the saving** —
+it is what the cache is asked, never what the answer was worth — and reporting one without the
+second figure beside it is how a cache earns its place on the wrong number.
+
+## F915 — a memo's key term that no input can make differ ★★★★☆
+
+I24's first draft keyed C17's layout memo on the buffer, the width, both gutter figures **and the
+size of the chip table**, and justified the last one carefully: `drawAs` resolves a sentinel
+through `#chips`, §5a never prunes it, so its size moves exactly when an answer could. Every clause
+is true. The term is dead.
+
+`insertChip` is the table's only writer, and it mints a fresh sentinel and inserts it in the same
+call — so the table can never grow while the buffer stands still, and `chips.size` can never differ
+on a comparison where `text` matches. A key term that no input can make differ is A03 §2's vacuity
+class wearing a memo's clothes: it passes review because the sentence explaining it is correct, and
+it constrains nothing.
+
+**What found it was writing the row that had to construct the state.** The spec had already
+committed T1.43 to *a chip registered with the buffer untouched changes the answer*, and there is
+no way to reach that state through the public surface. A row that cannot be written is the
+strongest signal a spec sentence is wrong, and it arrives before any code — the same argument
+*walk the component by hand* rests on, applied to a test that had been specified and not yet typed.
+
+**The remedy is not a smaller key but a stated blind spot.** The precondition the memo now rests on
+is a property of the *writer*, not of the key: a second writer that registered a chip without
+inserting its sentinel would leave the memo stale, and nothing in C17 would see it. T1.43's last row
+pins the precondition for the writer that exists and says so; it cannot watch one that does not.
+Recording the limit is the honest form, and it is what the vacuous term was pretending to do.
+
+**The mutation pass then found the same failure twice more, in the row rather than the key.** Both
+survivors were `T1.43` reading as though it covered a term it never reached. The gutter row was
+written as `{2, 2}` against `{0, 0}` — moving *both* figures — so `cont` caught the
+mutation and `first` was never the deciding term; split into one figure at a time, `cont` then
+survived too, because the memo holds **one** entry and the second call on the same editor missed on
+`first` before `cont` could decide. And the `cont` half needs a buffer whose continuation rows are
+full: §7b's carry eleven cells and eight and fit whatever `cont` is, so the assertion passed for a
+reason unrelated to the key.
+
+Three defects, one shape — **a row that names a term and cannot reach it** — and the vacuous key
+term is the fourth instance of it, one layer up. None is visible from a green run, and the agreement
+half of the row is green under every one of them, which is what *a memo passes a same-answer test by
+returning anything stale* means in practice.
+
+## F914 — seven defects found by counting calls, and counting calls found the cheap ones ★★★★★
+
+P11 listed seven measured defects from the profiler's first pass. Resolved against HEAD and then
+measured, three had already been fixed or were never defects, three were real and cost 1.2% between
+them, and the one that mattered did not appear on the span table at all.
+
+| P11's claim | at HEAD | measured |
+|---|---|---|
+| `editor.layout` runs 4× per frame, no memo | 4.97×/frame, 6121 calls | **30 ms of 4986 — 0.6%** |
+| a `group` measures every child 3× | `group.place` 2.0×/frame | **18 ms — 0.4%** |
+| O(entries) scan per visible entry per frame | present, `session.ts:1293` | **absent from the table** |
+| overlay `place()` runs twice per frame | 2.0×/frame, already documented in `paint.ts` | **8 ms — 0.16%** |
+| whole-transcript `flatMap`, dead on non-kitty | **already fixed** — F889, the guard is asked before the argument is built | — |
+| `#form` measures twice for a capped block | both answers are used: `total` decides the cap, `shown` is the windowed block | **not a defect** |
+| a regex `.replace` per row per frame | **already fixed** — `based()` builds one regexp per call | — |
+
+The three top costs are `react` at 44.9%, `assemble` at 25.3% and `local` at 18.5%, and **none of
+the seven is in any of them.** A list built by asking *what runs more often than once* finds the
+things that run often, which is not the same set as the things that cost.
+
+**The one that mattered was invisible to the instrument that found the others.** The `entries.find`
+scan has no span, because it is a loop body's first line rather than a phase, so a table sorted by
+cost could not show it however long it ran. It was found by resolving a claim against the tree —
+reading the entry and checking its premises at HEAD — and the same reading is what retired the two
+already-fixed rows and the one that was never a defect.
+
+**And it was invisible to the fixture too, which is the reusable half.** At the profile's default
+400 entries the two fixes together move the median frame from 2.48 ms to 2.30 ms with the run
+spreads overlapping — inside the noise, three runs each side, indistinguishable from doing nothing.
+At 4000 entries the same two fixes move it from **4.22 ms ± 0.07 to 2.41 ms ± 0.04**, three runs on
+each side with no overlap at all, and total span time from **69.8 s to 49.8 s (−28.6%)** — `assemble`
+halved, `local` down 38%, `react` untouched. **The entry count was the whole of the disagreement.**
+A defect proportional to a count is correct-for-small-*n* at the fixture's convenience, and the
+fixture chose 400 because that is what the tool's default argument says.
+
+Nearly all of the gain is the index; the `layout` memo is the 0.6% and is kept because 4.97 walks a
+frame of a buffer that changed on none of them is wrong at any size, not because it was measured to
+pay. Saying which of two changes carried the number is the part a combined before/after hides.
+
 ## F913 — the row read a cache name's slot as a reason's ★★★☆☆
 
 C28 T5.4 asserts that a replayed input gives a deterministic `nothing-changed` count, and the

@@ -393,6 +393,7 @@ Store-level: at most one entry is `live` at any moment, and it is always the las
 - **I18** — C13 imports nothing from `terminal/` or `presentation/`.
 - **I19** — Readers take `TranscriptView`, never `TranscriptStore`. The mutators and the §5a payload window are reachable only from L4, so no consumer above can append, clear, or see a debug buffer it was never given.
 - **I20** — **An entry reaches disk only if its verb declared persistence and the entry has settled** (§5b). Both halves are load-bearing and each answers a different failure. *Settled* makes the file append-only **in fact rather than by assumption**: a transcript entry is patched and settled after a history entry would already have been immutable, so a row written earlier is a row that disagrees with memory — and a missing last entry is recovered by running the command again where a divergent file is not recovered at all. *Declared* is because **the framework never redacts and cannot**: C20's redactor works on a tokenised command line, a rendered document has eighteen kinds and no tokens, and a redactor wrong about one kind is worse than none because it is switched on. The verb is the unit because that is where the knowledge is — the same ground C05 I19 already gives `handoff`, *the app author is the only party who can know this*. Off by default, since a missing feature is visible on the first resume and **a leaked secret is not visible at all** (F168).
+- **I21** — **Every mutation replaces `entries` with a new array, and a read never copies one.** The array's identity is therefore the store's revision, which is what lets a reader index it: `session.ts` holds a `WeakMap` keyed on exactly this array and answers `entryById` from it, in place of the O(entries) scan it ran once per visible entry per frame (F914). Both halves are load-bearing and fail in opposite directions — a mutation that wrote through the array it had already handed out would leave that index serving an entry the store no longer holds, and a getter that returned a fresh copy would miss on every read and be correct while buying nothing. The store already had the first property, by building each new list through `map`; what it did not have was anywhere saying a consumer may rely on it.
 
 ---
 
@@ -416,6 +417,7 @@ Store-level: at most one entry is `live` at any moment, and it is always the las
 16. An invalid document raises rather than returning; a failed patch returns rather than raising (I8, I10).
 17. Readers get `TranscriptView`; only L4 holds the store, so nothing above can mutate the transcript or read a retained payload (I19).
 18. **Persistence is declared per verb and writes settled entries only**, the framework redacts nothing, and an app that declares nothing persists nothing (I20, §5b).
+19. `entries` is replaced by every mutation and copied by no read, so its identity is the revision a reader may cache against — the property L4's entry index is keyed on (I21).
 
 ---
 
@@ -438,6 +440,7 @@ Six tiers. Every cell of the §7 transition table is covered.
 - **T1.37** (I20): an absent file is an empty resume, not an error.
 - **T1.38** (I20, §5b.5): a duplicated row collapses on load, which is what makes `drain` safe.
 - **T1.39** (I20, §5b.5): a resumed session continues the file's sequence rather than restarting it, so the newest entry does not sort to the top.
+- **T1.40** (I21): `entries` read twice with nothing between returns the **same array**, and a different one after each of `append`, `patch`, `settle`, an eviction and `clear` — the five mutators, by identity rather than by content, because a mutation that produced an equal-but-new array and one that wrote in place are indistinguishable to every other row in this file. The stale half is then shown rather than argued: an index built from the first read, a `patch`, and the index still holding the entry the store has replaced.
 
 Tier 4 — integration (the arc, not the mechanism)
 
@@ -531,6 +534,7 @@ Tier 4 — integration (the arc, not the mechanism)
 - **T6.10** (I8): absorbing a patch to a settled entry → T3.5 fails, hiding a caller bug.
 - **T6.11** (I13): failing to bump `rev` on patch → C14's cache serves a stale height and the viewport drifts.
 - **T6.12** (I15): sweeping only on `append` → T3.7b fails, and after a stream settles L4 warns about an overshoot that no longer exists.
+- **T6.13** (I21): `patch` writing the replacement into the existing array rather than building a new one → T1.40 fails on identity, and L4's entry index serves a document the store has already replaced. `get entries` returning `[...this.#entries]` → T1.40 fails on the *same-array* half, which is the direction no other row here looks.
 
 ---
 
