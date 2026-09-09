@@ -32,7 +32,7 @@ import { compose, type Composed } from "./frame.js";
 import { commandRows, type PaintDeps } from "./paint.js";
 import { transmitImage, transmits, type SentImages } from "./transmit-image.js";
 import { composeFrame } from "./render-frame.js";
-import { createProfiler, isRecording, isSpanning } from "./profiling/recorder.js";
+import { createProfiler, DEFAULT_TIER, isRecording, isSpanning } from "./profiling/recorder.js";
 import { createInspector, createResourceProbe, type CaptureIo } from "./profiling/node.js";
 import type { CommitReason, Profiler } from "./profiling/types.js";
 import { focusKey } from "./render-cache.js";
@@ -424,7 +424,8 @@ class Session implements TuiInstance {
     // literal for a profiler constructed without a session; a session supplies
     // the resolved path, so the two cannot disagree about which directory the
     // ignore rule covers.
-    const profileTier = this.config.profile?.tier ?? "counters";
+    // The default is the recorder's, read rather than restated (F967).
+    const profileTier = this.config.profile?.tier ?? DEFAULT_TIER;
     if (this.config.profile !== undefined && isRecording(profileTier)) {
       this.#profiler = createProfiler({
         ...this.config.profile,

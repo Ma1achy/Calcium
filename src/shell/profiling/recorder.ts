@@ -120,7 +120,7 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
   const elapsed = opts.elapsed ?? deps.elapsed;
   const probe = opts.probe ?? deps.probe;
 
-  let tier: Tier = opts.tier ?? "counters";
+  let tier: Tier = opts.tier ?? DEFAULT_TIER;
   let disposed = false;
 
   const contexts = createContexts();
@@ -808,6 +808,19 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
 export function isSpanning(tier: Tier): boolean {
   return TIER_RANK[tier] >= TIER_RANK.spans;
 }
+
+/**
+ * **The tier an options object gets when it names none** — and the only place
+ * that default lives. `resolveConfig` leaves `profile` unresolved on purpose
+ * (every member's default is applied here), so the root's gate on whether to
+ * build a recorder at all reads this rather than restating it. C22 §2c's
+ * listing said `default "off"` while two sites in the root said
+ * `?? "counters"` (F967): an empty options object is a caller asking for a
+ * profiler, and `counters` is the tier §3a measures at nil. An *absent*
+ * `profile` is `off` — that is C28 T4.1, and it is decided by the gate, not
+ * here.
+ */
+export const DEFAULT_TIER: Tier = "counters";
 
 /** Whether a tier records anything at all. */
 export function isRecording(tier: Tier): boolean {

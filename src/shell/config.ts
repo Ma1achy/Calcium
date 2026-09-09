@@ -18,6 +18,7 @@ import { slashPolicy } from "../interaction/parser/index.js";
 import { createExecutionPipeline } from "./execution.js";
 import { makeDefaultChrome } from "./chrome.js";
 import { createRecording, recordStdin } from "./profiling/record.js";
+import { DEFAULT_TIER } from "./profiling/recorder.js";
 import { ConfigError, type FileSystem, type TuiConfig } from "./types.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
 
@@ -275,7 +276,7 @@ export function resolveConfig(config: TuiConfig, ambient: Ambient) {
       // down (SS42), so the initial one arrives as the first `resize` event
       // from `lifecycle.onResize`, wired in the root. Reading `stdout.columns`
       // here would record a width before the session had adopted one.
-      tier: config.profile?.tier ?? "counters",
+      tier: config.profile?.tier ?? DEFAULT_TIER,
       name: config.name,
       binary: config.binary,
       // **Only the defined entries.** `ProcessEnv` admits `undefined` and JSON
@@ -318,7 +319,10 @@ export function resolveConfig(config: TuiConfig, ambient: Ambient) {
     // Absent, nothing is retained. Present without a count, 50 (§2).
     retainPayloads: config.debug === undefined ? 0 : (retain ?? DEFAULT_RETAIN_PAYLOADS),
     // C28, unresolved on purpose: every member has a default and the recorder
-    // is where they are applied, so the root does not hold a second copy.
+    // is where they are applied, so the root does not hold a second copy —
+    // the two places the root needs the tier before a recorder exists (the
+    // regime line above, the gate in `session.ts`) read the recorder's
+    // `DEFAULT_TIER` rather than restating it (F967).
     profile: config.profile,
     // C28 I14, F908 — **wrapped, so read `n` can return what read `n` returned.**
     // The tidier-looking alternative is to pin a replayed clock to the event

@@ -227,6 +227,41 @@ describe("C28 — profiler, tier 4 spec-first rows", () => {
     expect(absent.length, "and the fixture wrote a real frame").toBeGreaterThan(100);
   });
 
+  it("C22 T4.85 (C22 §2c, C28 I1): `profile: {}` builds a recorder at `counters` — the recorder's default, read by the root rather than restated", async () => {
+    // **The spec's listing said `default "off"` and two sites in the root said
+    // `?? "counters"`** (F967). An empty options object is a caller asking for a
+    // profiler, and `counters` is the tier C28 §3a measures at nil, so the code
+    // was right and the listing was not; what was wrong in the code was the
+    // default living twice. It lives once now — `DEFAULT_TIER` in the recorder,
+    // where every other member's default is applied — and the gate reads it.
+    // Observed from where an application sees it: `LocalContext.profile`, which
+    // is present exactly when a recorder exists (C22 I93).
+    const seen: { present: boolean; tier: string | null }[] = [];
+    const probe: NonNullable<TuiConfig["localHandlers"]> = {
+      emit: (argv, ctx) => {
+        seen.push({ present: ctx.profile !== undefined, tier: ctx.profile?.().regime.tier ?? null });
+        return HANDLERS.emit!(argv, ctx);
+      },
+    };
+    const run = async (overrides: Partial<TuiConfig>): Promise<{ present: boolean; tier: string | null } | null> => {
+      const stdin = fakeStdin();
+      const { tui } = await buildSession({ ...overrides, manifest: MANIFEST, localHandlers: probe, stdin: stdin as never });
+      await settle();
+      stdin.emit("/emit");
+      await settle();
+      stdin.emit("\r");
+      await settle();
+      await tui.stop("exit");
+      return seen.pop() ?? null;
+    };
+    expect(await run({ profile: {} }), "an empty options object asks for a profiler, at counters").toEqual({
+      present: true,
+      tier: "counters",
+    });
+    expect(await run({ profile: { tier: "off" } }), "an explicit off builds none").toEqual({ present: false, tier: null });
+    expect(await run({}), "and absent is off").toEqual({ present: false, tier: null });
+  });
+
   it("T4.3 (C28 I4): wait tracks the coalescing window and work does not", async () => {
     // **The two are separate figures because they answer different questions**
     // (C28 I4): `work` is how long composing took, `wait` is how long the
