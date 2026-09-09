@@ -38,8 +38,10 @@ const results = runPass({
   run,
   control: {
     file: FILE,
-    from: "  if (isWide(base)) return 2;",
-    to: "  if (isWide(base)) return 1;",
+    // Re-anchored when `clusterCells` became a sum over the cluster (F978):
+    // the same arm, now `cp` inside the loop, and the same mutation.
+    from: "    if (isWide(cp)) total += 2;",
+    to: "    if (isWide(cp)) total += 1;",
     why: "T1.13, T1.24 and T1.28 assert CJK and Wide emoji at two cells in dozens of rows; a run where this survives cannot see a kill at all",
   },
   mutations: [

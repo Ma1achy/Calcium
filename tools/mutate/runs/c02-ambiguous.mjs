@@ -82,8 +82,10 @@ const MUTATIONS = [
     // row that only ever asks for one of the two answers.
     name: "ambiguous is wide whatever the caller said",
     file: TEXT,
-    from: '  return ambiguous === "wide" && isAmbiguous(base) ? 2 : 1;',
-    to: "  return isAmbiguous(base) ? 2 : 1;",
+    // Re-anchored when `clusterCells` became a sum over the cluster (F978):
+    // the same arm, now `cp` inside the loop, and the same mutation.
+    from: "    else if (ambiguous === \"wide\" && isAmbiguous(cp)) total += 2;",
+    to: "    else if (isAmbiguous(cp)) total += 2;",
     expect: "T2.52",
   },
 ];
@@ -94,8 +96,9 @@ const results = await runPass({
   run,
   control: {
     file: TEXT,
-    from: "  if (isWide(base)) return 2;",
-    to: "  if (isWide(base)) return 1;",
+    // Re-anchored with `clusterCells`'s sum (F978): the same arm, now `cp`.
+    from: "    if (isWide(cp)) total += 2;",
+    to: "    if (isWide(cp)) total += 1;",
     why:
       "a genuinely wide glyph measures one cell — if this survives, nothing here measures at " +
       "all and every kill below is unearned",
