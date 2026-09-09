@@ -1911,6 +1911,89 @@ than replacing with *the layer owning the most dots*: the radar's order is a rul
 polygons over frame, because a word a polygon runs through is unreadable — and reading it off dot
 counts would put the frame above a polygon wherever the frame happened to be denser.
 
+### The cell, and what the join lost
+
+`pointLabelRows` builds a cell array per row — a cluster in one cell, `""` in the cells a wide one
+occupies after it, the array `chargrid.ts`'s writer lays out (I118) — and hands it on as
+`rows.map((r) => r.join(""))`, because a `Layer`'s rows are strings. `mergedRow` then read every
+layer at column `x` as `[...(layer.glyphRows[rowIndex] ?? "")][x]`: a code-point index into a
+string that no longer carried the cells, and a whole-row spread per column. A `""` contributes no
+code point, so a two-cell glyph was one column to the walk and the cells after it were read one
+early; a family's five code points were five columns, so the cells after it were read three late.
+`behind()` walked the finished spans the same way — one code point, `x += 1` — and laid its
+gridline at the same drifted column. F977's frame, a `line` plot with `plotFrame: "grid"` at 40,
+row 6 with no label, with a family at sample 1, and with `図表`:
+
+```
+none    |    │┊ ╭────╮   │    ┊    │    │   │  ┊│| 40
+family  |    │┊ ╭────👨‍👩‍👧    ┊    │    │   │  ┊│| 37
+cjk     |    │┊ ╭────図表  │    ┊    │    │   │ …| 40
+```
+
+Read right of the slot: without a label `┊@21 │@26 │@31 │@35 ┊@38 │@39`; with the family every
+cell three to the left and the row three cells short, the frame's edge at 36; with `図表` every
+cell two to the right and the frame's edge clamped off. The name itself survived both, because
+the walk appended the code points it took in order — which is why F976's rows could see it whole
+while the row around it was wrong, and why TL13's `/[│|]$/` filter skipped the one row its
+fixture was written for.
+
+**A layer meets the merge as cells, and the cell array is derived where the width lives** (I119).
+`rowCells(text, ambiguous)` in `text.ts` is the join's inverse — each cluster at its first cell,
+`""` in the cells a wide one occupies after it, a cluster measuring nothing on the cell that owns
+the cluster before it or dropped at the head — measured by `cells()` per cluster, the writer's own
+measure, so the two cannot disagree about a cell (C09 I63, C09 I65, C09 §5). `mergedRow` derives
+every layer's row once, above the column loop, and indexes the arrays; a `""` is the cluster
+before it — the cell goes to that layer, nothing is OR-ed or substituted into it, and the run
+receives nothing for it, because the cluster already carries the cells it measures. Every other
+rule of the merge — the braille union within a kind, first-wins across kinds, the contested-cell
+turn — is as it was. The rows a rasteriser draws are split without a segmenter: printable ASCII
+at either mode, and at `narrow` arrows, box drawing and block elements, braille and the sextants,
+which is every alphabet a curve, a frame or a marker uses. That set is `CELL_PER_UNIT_RANGES`,
+and C09 T1.40 asserts each member measures one cell at the mode it is admitted in and is not
+zero-width, so the fast path is a checked claim rather than a table.
+
+**`behind()` is folded into the merge and gone.** Its two rules are the merge's now: a blank
+cell — `" "` or U+2800 — takes the grid's glyph at its column, and a run no layer inked that took
+a gridline is styled muted while a gridline inside a styled run keeps the run's colour. The grid
+is indexed by cell and the cell index is the only index, so a name no longer moves the dashes.
+Byte-identical on every frame without a wide or multi-code-point label, by construction: a cell
+no layer inked has no ref, so *wholly blank and holding a gridline* is *no ref and gridded*, which
+is `behind()`'s `wasBlank && run.trim() !== ""` said in the merge's own terms, and the spans the
+merge emits are the spans `behind()` rebuilt; the golden set is the check, four wide arms among it.
+
+After, the same rows:
+
+```
+none    |    │┊ ╭────╮   │    ┊    │    │   │  ┊│| 40
+family  |    │┊ ╭────👨‍👩‍👧  │    ┊    │    │   │  ┊│| 40
+cjk     |    │┊ ╭────図表│    ┊    │    │   │  ┊│| 40
+```
+
+Every cell right of the slot is the unlabelled row's, at both widths (T1.135).
+
+**The cost, in F955's bench form** — best of five 20 ms batches, `plotDefinition` rendering a
+`line` plot with three series of 400 samples and `plotFrame: "grid"`, height 20, through `tsx`
+against `src/`; two samples before and three after, the best of each:
+
+| | 80 columns | 200 columns | 200 ⁄ 80 |
+|---|---|---|---|
+| the definition's render, before | 2.51 ms | 7.70 ms | 3.06 |
+| after | **1.72 ms** | **2.91 ms** | **1.69** |
+| through Ink, before | 9.66 ms | 18.07 ms | 1.87 |
+| after | 8.79 ms | 13.00 ms | 1.48 |
+
+The per-column spread was a copy of every layer's row per cell — the width squared per row — and
+at 200 columns it was some three fifths of the definition's render; the ratio between the widths
+falls from three to below the 2.5 the width alone accounts for, because the spread was the only
+term that grew faster than the row. `field.ts`'s merge had the same spread and no text ever
+reaches it (F976); it is hoisted the same way and nothing else about it changes.
+
+**Not claimed.** A label beginning with a bare spacing mark after an inked cell — `ः` at the head
+of a name — joins the segmenter's cluster to the cell before it, so the gap cell is owned by the
+label rather than transparent: one cell of ownership, and no other. And the radar's category
+writer, `circle.ts`'s `labelRows`, is not `chargrid.ts`'s and writes one code point per slot,
+which `rowCells` re-expands correctly for a wide glyph and cannot for a family (F982).
+
 ---
 
 ## 3v. More than one histogram, and the edges they have to share
@@ -2466,7 +2549,7 @@ there rather than leaving a reader to infer it from a frame.
 **The half of the old refusal that survives**, and the half nobody restated: *the labels are
 worse than the lines.* A contour label sits **in** the line it names, in a gap cut for it, and
 there is no gap-cutting vocabulary here. A label written over a contour is the contour with a
-hole in it — `behind()`'s argument for gridlines, one layer up, and at one cell per crossing the
+hole in it — the merge's argument for gridlines (§3u), one layer up, and at one cell per crossing the
 hole *is* the crossing. So the levels go in the legend, each in its own colour, and I27 already
 sizes a vertical legend from its content.
 
@@ -3651,7 +3734,10 @@ about a *callout* — so a reader indexing by label kind never reaches it.
 `definition.ts` that hand it the names — and I55 is written in cells: a free-cell single pass, a
 one-cell `+` at a survivor. The name itself is laid into the row by `chargrid.ts`'s shared writer,
 cluster by cluster (I118, §3n); `pointlabels.ts` carried a private copy of the per-code-point loop
-until F976. The second arm reads none of it, and until now nothing said whether that
+until F976, and the overlay meets the merge as cells (I119, §3u) — the join hands `mergedRow`
+strings and `rowCells` gives the writer's array back, so a wide or multi-code-point name shifts
+nothing after it, which it did until F977 (F981). The second arm reads none of it, and until now
+nothing said whether that
 was a decision. I81 already made the split this needs, for `yCallout`: *three things were in one
 function and one of them crosses*. The same split, applied:
 
@@ -9501,7 +9587,7 @@ has landed (C22 I76), the mouse column with C16 §4a and the hover with C01 I21;
 ### Two marks, because either alone fails in the case that motivates it
 
 **A dashed vertical behind the data**, at the cursor's column, composited through the same
-`behind()` path the gridlines use — so it never overwrites a sample and shows in the gaps.
+merge's gridline pass (§3u) — so it never overwrites a sample and shows in the gaps.
 `dashedVertical` is already the slot for *a reference line drawn beside data*, and its comment
 gives the reason: a solid rule through a figure reads as part of it.
 
@@ -10718,6 +10804,7 @@ would have to be re-run rather than extended.
 - **I116** — **A hidden series is a layer that is not rasterised, with its index kept, its legend entry kept under `glyphs.hollow`, its callout, readout and point labels withheld, and the axis unmoved — and the plot declares the digits that toggle it.** `overlaidRows` and the stacked arm skip the layer and keep the slot (`refOf(s, index)` colours the rest); the legend keeps the label and the slot colour and puts `hollow` in the swatch, a mark rather than a tone because colour is never the only channel (I6) and one bit is where the toggle must still read. `seriesRange` runs over every series so the remaining curves do not move on the toggle and the gutter does not resize. Every series hidden draws the frame, axis and legend with a blank area, never *No data.*. `RenderContext.seriesVisibility` is read before `Series.hidden` (C22 I78). `keymap(block)` declares `1` … `min(9, n)` → `toggleSeriesN`, merged at `liveBlock` because no digit is a built-in — measured — and withdrawn with focus (C16 I27, A01 D4); the SVG arm honours the member and cannot see the store (→ C04 I99, C22 I78, §3aq).
 - **I117** — **The legend's hit test is its placement inverted by search, never a second formula.** `legendEntryAt` lays the entries out with the functions that drew them — `legendCell` for a vertical legend's row, `legendRowLayout` for a horizontal one — and answers the series index whose cells contain the pointer: the swatch and the label, not the leading blank, the separator or the `+n` tail. Only a `series` slot answers, and only where `HAS_HIDEABLE_SERIES` holds. `legendHitAt` reaches the legend's origin through `positionalLayout`, `alignPad` and `frameOf` — the three the frame was composed with — so a left legend's column, a right one's, a lid and an alignment pad are right for free, as `sampleIndexAt`'s candles are (→ C16 §4a, C22 I78, §3aq).
 - **I118** — **A label writer places a grapheme cluster whole, in the cells it measures, and a cluster measuring none owns no cell.** `chargrid.ts`'s `write` is the one writer: the treemap's names, `tree`'s and `graph`'s labels, the sankey's node labels and the point labels all lay text into a cell row through it, and it walks `graphemes(body)` rather than code points — each cluster into the cell where it starts, the `cells(cluster) − 1` cells after it set to `""` so the row keeps its count and no fill, edge or ribbon is drawn into the second half of a glyph, and a cluster that measures nothing dropped with the column unmoved. Four writers wrote one code point per cell and lost every zero-width piece to the code point after it — a family as three faces, a keycap as a bare digit, `café` as `cafe` (F969) — and the fix is one function rather than four because that is how the four arrived (§3n, §3ag, §3ai.4 G11, §3ap.4 K3; → C09 I64, C09 §5a; F976).
+- **I119** — **A layer meets the merge as cells: each row is derived once by cluster, a cluster owning the cells it measures, so a name shifts nothing after it and the gridlines land in the cells the data left blank.** `mergedRow` derives every layer's row through `rowCells` before its column loop — each cluster at its first cell, `""` in the cells a wide one occupies after it, measured by `cells()` per cluster as the writer measured (I118) — and indexes the arrays by cell; a `""` is the cluster before it, so the cell goes to that layer, nothing is OR-ed or substituted into it, and the run receives nothing for it. The gridlines are the merge's own pass: a blank cell takes the grid's glyph at its column, a run no layer inked that took one is muted, and a gridline inside a styled run keeps the run's colour — `behind()`'s two rules with the cell index as the only index, byte-identical wherever no label holds a wide or multi-code-point cluster. The rows a rasteriser draws are split one unit per cell without a segmenter, and that set is checked rather than tabled (C09 T1.40). A joined label row read by code point put a family at five columns and `図表` at two, shifting every cell after the name three left or two right (§3u; → C09 I63, C09 I65, C09 §5; F977, F981).
 
 ## 8. Commitments
 
@@ -10842,6 +10929,7 @@ would have to be re-run rather than extended.
 117. **A legend that clicks finds its entry by searching the map that drew it** (I117). The swatch and the label hit, the blanks between do not, and the answer is a series index or nothing — never an annotation's, a candle's, or a form's whose series cannot be hidden.
 115. **A conflict with nothing to decide it usually has nothing to decide** (I115). F726 read the callout striking the legend as two invariants that cannot both hold, and the remedy it named — *the legend's placement* — was recorded and not given. The frame says otherwise: `area()` subtracts the column's reserve **and** the legend's band from one edge, and then the column, the callout and the legend all anchor on that edge, so 52.8 px of reserved canvas stands empty outside a legend the column is drawn on top of. Nothing has to give. Ordering the band outward from the box moves **2 of 244** frames, and F726's fourth interaction — a right-hand tick colliding with the legend on its own — **is not drawn at all**, because I114 suppresses that tick 2.415 px from the callout (§3ak.50f).
 118. **A name reaches the frame as the clusters it was given, through one writer for every form that lays text into a cell row** (I118). The treemap, `tree`, `graph`, the sankey and the point labels call `chargrid.ts`'s `write`; a cluster lands whole in the cells it measures, the continuation cells stay `""`, and a cluster measuring nothing owns no cell. Four private per-code-point loops were how a keycap became a digit and a family three faces (F969, F976).
+119. **A layer meets the merge as cells, derived once per row by cluster** (I119). `rowCells` is the label writer's join inverted, the merge reads every layer by cell index and lays the gridlines in the same pass, and a name shifts nothing after it: F977's rows are the unlabelled rows cell for cell, the fast set is a checked claim, and `behind()` is gone (F981).
 
 ## 9. Tests
 
@@ -11075,6 +11163,10 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T1.132** (I118, I110): the sankey through `sankeyArea` — a label's cell holds the whole cluster and the cell after it `""` — and through the public render, both shapes whole. In `test/unit/plot-sankey.test.ts`.
 - **T1.133** (I118, I55): the point labels through `pointLabelRows` — the cluster in one cell, `""` behind it — and through the public render, both shapes whole. In `test/unit/plot-point-labels.test.ts`.
 - **T1.134** (I118, I58): `graph` through the public render with a family and a keycap as node ids, both whole. In `test/unit/plot-graph-gate.test.ts`.
+- **T1.135** (I119): F977's probe as a row — a `line` plot, `plotFrame: "grid"`, `axes: true`, eight samples, at 40 and at 80, with no label and with a family, `図表`, `aः`, `1️⃣` and `peak` at sample 1: every visible cell right of the label's slot — the text's cells and the reserved cell — is the unlabelled frame's cell at the same column, compared by cell position through the cluster walk and never by string index; every cell left of the gap likewise; the row measures exactly the width by `cells()`; and the frame's right edge stands at the last column. In `test/unit/plot-label-merge.test.ts`.
+- **T1.136** (I119): the gridlines land in the cells the data left blank and nowhere else on a labelled row — the same fixture with `plotFrame: "box"` beside it: every inked cell of the box row is the grid row's cell, every blank one is blank or a gridline, no gridline inside the label's cells and no cell at all behind `図`; and read as spans, every gridline carries the muted tone, the label's run the series colour, and no styled run holds a gridline or a blank — the run-colour rule kept from `behind()` has no blank to fire on, because a cell no layer inked has no ref. In `test/unit/plot-label-merge.test.ts`.
+- **T1.137** (I119): the stacked one-bit arm — `colourDepth: 1` with unicode, two series so the form stacks and `strip.names` carries the labels — at the same shapes: the row holding a family label and the row holding `図表` are the unlabelled frame's rows cell for cell outside the slot, exactly the width, edge at the last column. In `test/unit/plot-label-merge.test.ts`.
+- **T1.138** (I119, F977): TL13's fixture — `図表` at 70 on the scatter — every row but the caption measures 70, the label's row that TL13's `/[│|]$/` filter skipped included; TL13 itself asserts every row by position now. In `test/unit/plot-label-merge.test.ts`.
 - **T2.9** (I56): **`HAS_X_TITLE` is re-measured rather than trusted** — every `true` renders its title and keeps `measure === rendered`, every `false` is refused at the gate, and the count of drawing forms is asserted at 26 so the sweep cannot pass against an all-`false` record. This is the row that makes the record safe to edit.
 - **T2.10** (I34) — `PD1`–`PD3`: every form with no ladder refuses `plotDetail` at **both** gates, for all three values, with the count asserted at **42** so the row cannot pass against an all-`true` record; `boxplot` and `violin` still accept all three; **absent is accepted everywhere**, which is the row that says why the defect was invisible; and `HAS_DETAIL_RUNGS` agrees with `RUNG_FORMS` form for form, read from `definition.ts` rather than restated, so the two halves cannot both be a copy of one mistake.
 - **T2.11** (I57, I34): `TR12` — `plotDetail` is refused on `tree` at both gates and `HAS_DETAIL_RUNGS.tree` is `false` — B1's record answering its first new question, and answering it in the negative.
@@ -11283,6 +11375,9 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T6.95** (I118): the writer returned to one code point per cell → **T1.130 fails on the keycap** — a bare digit in the cell — and C09 T2.129's `NOT_WHOLE` gains the four kinds back. In `test/revert/plot.test.ts`; the mutation is `tools/mutate/runs/c12-label-writers.mjs`, with the treemap's and the sankey's calls each replaced by a local per-code-point loop beside it.
 - **T6.96** (I118): the zero-width drop removed → a lone mark is written into a cell, and **T1.130's mark-only body fails**; a zero-width cluster given a cell of its own → **T1.130's leading-mark case fails** on the column. The leading-mark case cannot see the first mutation, because the next cluster overwrites the cell either way — which is why the row carries both. In `test/revert/plot.test.ts` and `c12-label-writers.mjs`.
 - **T6.97** (I118, I57): the continuation cells left unfilled → **T1.124/`TR11` fails** — `描画` with a blank between its halves and `raster` measured at the wrong column — and `TM5` fails on the row's width. In `test/revert/plot.test.ts` and `c12-label-writers.mjs`.
+- **T6.98** (I119): the label layer indexed by code point — `[...row][x]` over the overlay `pointLabelRows` hands the merge — → **T1.135 fails on the family row**: five columns for the name, the reserved cell read three columns late, the composed row 31 cells of 34. In `test/revert/plot.test.ts`; the mutation is `tools/mutate/runs/c12-label-merge.mjs`.
+- **T6.99** (I119): the continuation cell treated as blank — `isBlank("")` asked before the continuation rule — → **T1.136 fails with a gridline behind `図`**, four cells in three columns. In `test/revert/plot.test.ts` and `c12-label-merge.mjs`.
+- **T6.100** (I119, C09 I63): the fast set widened to a wide code point — a row of `日` split one unit per cell — → **C09 T1.40 fails** on the member that measures two. In `test/revert/plot.test.ts` and `c12-label-merge.mjs`.
 
 ## 10. Out of scope
 

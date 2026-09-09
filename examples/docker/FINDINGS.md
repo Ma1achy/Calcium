@@ -35878,3 +35878,244 @@ been caught.
 mutation for the reason the run states — the pass says caught, not why. **What would falsify
 this**: the sankey K3 mutation surviving SK12, which would mean a third guard had reached the
 fixture; or `c12-graph` exiting 0 with a fourth survivor, which the map cannot admit.
+
+## F981 — a layer meets the merge as cells: `rowCells` inverts the label writer's join where the width lives, `mergedRow` reads every row by cell index with the gridlines folded in, and `behind()` is gone — F977 closed, and the definition's render 2.6× cheaper at 200 columns ★★☆☆☆
+
+**F977, closed.** C12 I119, commitment 119, §3u's *The cell, and what the join lost*; C09 §5's
+`rowCells` paragraph, C09 T1.40; C12 T1.135–T1.138, T6.98–T6.100; `tools/mutate/runs/c12-label-merge.mjs`.
+
+**The ruling.** A row meets the merge as cells, and the cell array is derived where the width
+lives. `rowCells(text, ambiguous)` in `text.ts` is the inverse of `chargrid.ts`'s join (C12 I118):
+each grapheme cluster at its first cell, `""` in the cells a wide one occupies after it, and a
+cluster measuring nothing appended to the cell that owns the cluster before it — past any `""`,
+so a mark after a wide glyph rides on the glyph and the glyph's second cell stays what the merge
+reads as its own — or dropped at the head, where no cell precedes it. It measures by `cells()`
+per cluster, the writer's own measure, so the two cannot disagree about a cell; it lives in
+`text.ts` because a second derivation in `plot/` would be the reimplemented rule C09 I6 refuses.
+`mergedRow` derives every layer's row once, above its column loop, and indexes the arrays; a `""`
+is the cluster before it — the cell goes to that layer, nothing is OR-ed or substituted into it,
+and the run receives nothing for it, because the cluster already carries the cells it measures.
+Every other rule of the merge — the braille union within a kind, first-wins across kinds, the
+contested-cell turn — is as it was. `field.ts`'s merge hoists its spread the same way, for the
+cost alone: no text reaches it (F976).
+
+**The mechanism that was.** `pointLabelRows` built the right cell array and joined it, because a
+`Layer`'s rows are strings; `mergedRow` then read every layer at column `x` as
+`[...(layer.glyphRows[rowIndex] ?? "")][x]` — a code-point index into a string that no longer
+carried the cells, and a whole-row spread per column, the width squared per row — and `behind()`
+walked the finished spans per code point with `x += 1`, laying its gridline at the same drifted
+column. F977's frame — a `line` plot, `plotFrame: "grid"`, `axes: true`, eight samples, at 40,
+row 6 — before and after (`out/lane1-probe-walks.log`, `out/f981-probe-walks-after.log`, lane 1's
+probe re-run unchanged):
+
+```
+before   none    |    │┊ ╭────╮   │    ┊    │    │   │  ┊│| 40
+         family  |    │┊ ╭────👨‍👩‍👧    ┊    │    │   │  ┊│| 37
+         cjk     |    │┊ ╭────図表  │    ┊    │    │   │ …| 40
+after    family  |    │┊ ╭────👨‍👩‍👧  │    ┊    │    │   │  ┊│| 40
+         cjk     |    │┊ ╭────図表│    ┊    │    │   │  ┊│| 40
+```
+
+Right of the slot, before: without a label `┊@21 │@26 │@31 │@35 ┊@38 │@39`; with the family
+`┊@18 │@23 │@28 │@32 ┊@35 │@36`; with `図表` `│@18 ┊@23 │@28 │@33 │@37 …@39`. After, the three
+lists are one list, at 40 and at 80.
+
+**The fast set is a checked claim, not a table.** A row whose every code unit is printable ASCII
+is one cell per unit on every path, the equality `cells()` already proves; at `narrow` a row of
+arrows, box drawing and block elements, braille, or sextants — `CELL_PER_UNIT_RANGES`, U+2190–21FF,
+U+2500–259F, U+2800–28FF, U+1FB00–1FBFF — is split one unit (one surrogate pair) per cell without a
+segmenter, which is every alphabet a curve, a frame or a marker is drawn in. The three BMP ranges
+are East-Asian Ambiguous in part (braille is Neutral), so they are admitted at `narrow` only: at
+`wide` a box-drawing glyph measures two (C09 I65), the row takes the cluster walk, and `glyphs()`
+has fallen the furniture back to ASCII there in any case (C09 §4). C09 T1.40 reads the constant
+the function reads — 784 code points — and asserts each measures one cell at `narrow` and is not
+zero-width, printable ASCII one at either mode, with `日` at two and U+0301 at none as the
+controls the check refuses; so a revision of the width tables that made a member wide or
+combining fails that row rather than a frame. The row's other half is the equality with the
+cluster walk over a corpus that reaches both arms, at both modes.
+
+**`behind()` folded in, and the byte-identity argument.** Its two rules are the merge's now: a
+blank cell — `" "` or U+2800 — takes the grid's glyph at its column, and a run no layer inked that
+took a gridline is styled muted while a gridline inside a styled run keeps the run's colour. The
+merge tracks per run whether a gridline landed in a blank cell; a run with no ref is blank by
+construction — a cell no layer inked is `" "` — so *wholly blank and holding a gridline* is *no
+ref and gridded*, which is `behind()`'s `wasBlank && run.trim() !== ""` said in the merge's own
+terms, and the spans the merge emits are the spans `behind()` rebuilt. The grid is indexed by
+cell — `[...grid]` once, every furniture glyph being one cell — and the cell index is the only
+index, which is the whole of why a name no longer moves the dashes. The check is the golden set:
+**407 frames, four wide arms among them, byte-identical**, `npx vitest run test/golden` with no
+snapshot written. One rule is kept and cannot fire: a U+2800 inside a *styled* run would take the
+gridline in the run's colour exactly as `behind()` gave it, and the merge never emits a blank
+with a ref — a cell is inked or it is `" "` — so T1.136 asserts the consequence (no styled run
+holds a blank or a gridline) rather than constructing a state the merge cannot produce.
+
+**The cost, F955's bench form** — best of five 20 ms batches, `plotDefinition` rendering a `line`
+plot with three series of 400 samples and `plotFrame: "grid"`, height 20, `out/bench-f981.ts`
+through `tsx` against `src/`, two samples before and three after, the best of each
+(`out/bench-f981-before.log`, `out/bench-f981-after.log`; the spread across samples is in them —
+200 columns read 9.32 and 7.70 before, 3.11, 2.91 and 3.09 after):
+
+| | 80 columns | 200 columns | 200 ⁄ 80 |
+|---|---|---|---|
+| the definition's render, before | 2.51 ms | 7.70 ms | 3.06 |
+| after | **1.72 ms** | **2.91 ms** | **1.69** |
+| through Ink, before | 9.66 ms | 18.07 ms | 1.87 |
+| after | 8.79 ms | 13.00 ms | 1.48 |
+
+The spread was a copy of every layer's row per cell, and at 200 columns it was some three fifths
+of the definition's render; the ratio between the widths falls from three to below the 2.5 the
+width alone accounts for, because the spread was the only term growing faster than the row. Not
+its own finding: it is F977's mechanism costed, and the fix is the same line.
+
+**The rows.** T1.135 is the probe as a test — five shapes (a family, `図表`, `aः`, `1️⃣`, `peak`)
+at 40 and at 80, every cell outside the slot compared by cell position through `graphemes` and
+`cells` and never by string index, the row exactly the width, the edge at the last column, and a
+row that says the slot is where the difference is. T1.136 reads the same fixture against
+`plotFrame: "box"` — inked cells equal, blank cells blank or a gridline, no gridline inside the
+name and no cell at all behind `図` — and then the spans: every gridline muted, the name in its
+series' colour, no styled run holding a blank or a gridline, the muted colour read off the caption
+row rather than written down. T1.137 is the stacked one-bit arm with two series, so the form
+stacks and `strip.names` carries the label. T1.138 is TL13's fixture with every row but the
+caption asserted, and TL13 itself now asserts by position — its `/[│|]$/` filter skipped the one
+row its fixture was written for, because that row ended in the clamp's `…` (F977). C09 T1.40 is
+above. T6.98–T6.100 construct the three reverted states: the overlay read by code point — five
+columns for the name, the reserved cell three late, the composed row 31 cells of 34; the
+continuation cell taken as blank — a gridline behind `図`, four cells in three columns; the fast
+set widened to `日` — one cell for two. Eighteen, two and three rows; 108 green across the four
+files, 407 golden.
+
+**The mutations** (`c12-label-merge.mjs`, each anchor read to match once; the pass **not run**
+this round, on the coordinator's rule): the label layer indexed by code point → T1.135; the
+continuation cell treated as blank → T1.136; the grid substitution dropped → T1.136; the muted
+styling dropped for a wholly blank run → T1.136; the fast set widened to `日` → T1.40; and
+`field.ts`'s hoist reverted to the per-column spread, **expected to survive** and listed in
+`EXPECTED_SURVIVORS` with its reason — no text reaches that merge, so the spread draws every
+field row exactly as the hoist does, and nothing in the set measures cost; the pass fails the day
+it is caught. The control is `rowCells` answering no cells at all. The anchors checker counts the
+run: 180 runs, 1863 anchors, none drifted. Of the existing runs anchored on the four files, none
+lost an anchor — the stacked arm's `mergedRow(...)` line `c12-point-labels.mjs` mutates is
+unchanged, because `grid` is a defaulted fifth parameter and only the two sites that called
+`behind()` pass it. One pre-existing miss is recorded and not touched: `c12-layer-merge.mjs`'s
+`PICK` names `peers[x % peers.length]`, which the counter turn replaced before this round — and
+the checker cannot see it, because it reads quoted and `${CONST}`-expanded anchors and skips a bare
+identifier (`anchors.mjs`, its own stated limit), so that run throws at that mutation the day it is
+run. Found by reading; left for whoever runs the pass, on the list's own rule.
+
+**Not claimed.** A label beginning with a bare spacing mark after an inked cell — `ः` at the head
+of a name — joins the segmenter's cluster to the cell before it, so the gap cell is owned by the
+label rather than transparent: one cell of ownership, recorded and not corrected. A wide cluster
+in a layer *below* one that inked its second cell would be overdrawn there; no such layer exists —
+labels are topmost at every call site — and the merge treats the `""` under an inked cell as any
+occluded candidate. The radar's category labels are a sixth writer with the same defect and its
+own reader, unchanged by this — F982. And the spacing mark's width against Ink is C09's (F978).
+
+**What would falsify this**: a point label with a wide or multi-code-point name whose row is not
+the unlabelled row cell for cell outside the slot — T1.135 reads that at five shapes and two
+widths; a golden frame moving without a wide or multi-code-point label in it; a member of
+`CELL_PER_UNIT_RANGES` measuring other than one at `narrow` — T1.40; or the field survivor being
+caught, which would mean a field row reaches the merge with a `""` in it and the hoist changed a
+frame after all.
+
+## F982 — the radar's category labels are a sixth writer, one code point per slot, and both of its arms read them by code point: a family shifts the label sharing its row three cells left, `図表` two right, and the line arm clamps ★★☆☆☆
+
+**Open.** Found by F981's check of which layers carry text — `annotationRows` carries none, the
+point labels are F977's, and `radar.labels` is the third `kind: "label"` — and it is F977's class
+on a writer F976 did not name.
+
+**The frame.** A six-category radar, one series, 60 columns, row 4 — the row the sixth category
+and `east` share — with the sixth category `west`, a family, and `図表`, on both arms
+(`out/f981-probe-radar.log`):
+
+```
+braille  west    |              west ⢸⠒⢠⡔⠒⠊⠉⠒⠉ ⣀⣇⡀⠈⠑⠈⠉⠒⢢⡄⠒⡇east| 45
+         family  |                👨‍👩‍👧 ⢸⠒⢠⡔⠒⠊⠉⠒⠉ ⣀⣇⡀⠈⠑⠈⠉⠒⢢east| 42
+         cjk     |              図表 ⢸⠒⢠⡔⠒⠊⠉⠒⠉ ⣀⣇⡀⠈⠑⠈⠉⠒⢢⡄⠒⡇  east| 47
+line     west    |              west ▐▚▗▄▄▀▀▀▀▀▄▙▀▀▀▀▀▄▄▖▞▌east| 45
+         family  |                👨‍👩‍👧▗▄▄▀▀▀▀▀▄▙▀▀▀▀▀▄▄▖▞▌east| 42
+         cjk     |              図表   ▐▚▗▄▄▀▀▀▀▀▄▙▀▀▀▀▀▄▄▖▞▌east            …| 60
+```
+
+With the family, `east` stands three cells left and covers the disc's last three glyphs on the
+braille arm and its first two on the line arm; with `図表`, two cells right on the braille arm and
+the line arm's row runs to the width and ends in the clamp's `…`.
+
+**The mechanism.** `circle.ts`'s `labelRows` places each category by `cells()` — `textW`, `start`
+— and then writes `[...text]` one code point per slot from `start`: a family is five slots for a
+two-cell reservation and overruns three it did not reserve; `図表` is two slots for a four-cell
+reservation and leaves two blank slots inside it. The braille arm's rows go through `mergedRow`,
+which now re-derives the cells (C12 I119): the family comes back as two cells and every slot after
+it is three cells early; `図表`'s two blank slots become two extra cells and everything after is
+two late. Before F981 the per-code-point read produced the same two shifts by the other route —
+five columns drawn as two, two columns drawn as four — so F981 changed nothing here, by the
+mechanism; the before frames were not measured. The quadrant arm, `radarQuadFigure`, reads
+`[...(labels[cy] ?? "")][cx]` directly — F977's read, one line, `circle.ts` — so a family is five
+columns there, `図表` two, and the row is two cells over and clamped. C09 T2.129 renders a radar
+with a family category and stays green for the reason F977 gave for the point labels: the join
+keeps the cluster's code points contiguous, so the shape reaches the frame whole while the row
+around it is wrong.
+
+**What it would take, not ruled here.** The writer through `chargrid.ts`'s `write` — I118 names
+five writers and this is the sixth; the treemap's arrival is the shape, and I118's list grows by
+one — and the quadrant arm's read through `rowCells`. Two lines and a spec edit. Not done in
+F981's round because I118's list is a ruling and the radar is not F977's subject; the row that
+would see it is this frame as a test, `east` at its column with a family beside it, on both arms.
+
+**What would falsify this**: a radar whose shared row keeps the other label at its column with a
+family as a category — which would mean the writer or the reader had been changed by something
+this entry does not name.
+
+## F983 — C28 T1.42's timing half was carried by the merge, not the raster: a ratio between two axes measured a third thing, and it fell to 3.9× against 4.0× under the suite's load the day the merge became linear ★★☆☆☆
+
+**Where it was found.** The gate chain on F981's tree: 5,906 rows green and one red — C28 T1.42,
+*the raster tracks the box, not the sample count* — `at 10× each: height 3.9× against samples
+4.0×: expected 3.87 to be greater than 3.96`. The row asserts that ten times the box's height
+moves the `plot.area` span at least 1.5× harder than ten times the samples, and its comment
+records the six cold runs it was measured on: height 4.7–8.9×, samples 1.6–2.7×, the closest run
+clearing the margin by 44 %.
+
+**What carried it.** `plot.area` brackets the merge, and `mergedRow` spread every layer's row per
+column — `[...(layer.glyphRows[rowIndex] ?? "")][x]` — a cost quadratic in the width and linear in
+the rows (F977, F981). Ten times the height was ten times a quadratic term; ten times the samples
+was one linear pass. The ratio the row asserted was between those two, and the raster was not
+the larger of them. Measured in its own process on both trees, six runs of the row's own
+interleaved shape at width 100:
+
+| | height 10× | samples 10× | samples 100× |
+|---|---|---|---|
+| before F981 (HEAD 446626ae, pristine export) | 5.3–7.4× | 1.4–2.1× | 4.9–6.5× |
+| after F981 | 4.5–6.0× | 2.1–2.6× | 9.8–12.4× |
+
+Alone, the row still passes on the new tree — 2.1× at the closest against the 1.5 asserted. Under
+the suite's load, with the merge no longer inflating the height axis, the two axes read the same
+and the row failed. The row's own comment had already met this class twice: *adding an unrelated
+test before this one moved the samples axis from 1.0–3.8× to 6.0×*, and *a third assertion stood
+here and was removed rather than retuned*.
+
+**Removed rather than retuned, and replaced by what it was guarding.** The comparison existed for
+`c28-profiler.mjs`'s ONE-PHASE mutation — `plot.area` opened around the whole of the form so the
+layout and the furniture nest inside it, every name still recorded, every gauge unchanged. That is
+exact on the kept frame's tree, where a clock had been standing in for a structure: `plot.area`
+holds neither `plot.layout` nor `plot.furniture`, and the three are siblings. The half a clock
+still has to answer — *equal cells is not equal work*; a renderer could visit all 20 000 samples
+per cell and leave the gauge table unchanged — is a bound rather than a ratio between axes: a
+hundred times the samples reads the area under 40×, where a renderer visiting the samples per
+cell at 700 cells reads fifty or more, and one linear pass read 4.9–12.4× across both trees. The
+base configuration cannot get faster under load, so contention moves the figure away from the
+bound, not toward it. The cells half — 700 at 200, 2 000 and 20 000 samples, 4 300 at height 40 —
+is untouched. C28 §9's row says all three halves.
+
+**Observed on the way, not claimed.** A hundred times the samples costs ten times the area on the
+new tree — about 1.2–1.7 µs a sample in the downsampling pass, before and after. That is a
+figure about C12's `columnsOf` and `finiteSamples`, measured once here and not investigated.
+
+**The chain that followed, for the record.** The test gate run again on the same tree with T1.42
+rewritten: 5,906 green and one red — C17 T3.15, F877's row, the 1 MB paste's linearity ratio at
+**8.81** against its bound of 3, where F73 had recorded 6.0 as its worst; green alone at once, and
+green in the run after that with the machine quiet (313 files, 5,907 rows). Two runs of one tree,
+two different timing rows, each green alone: the failing set under the suite's own parallelism is
+not stable, and a rerun that passes is a reading of the load, not of the tree. Both readings are
+here so the next one has something to be compared with.
+
+**What would falsify this**: ONE-PHASE surviving the rewritten row, which would mean the tree does
+not carry the nesting the row reads; or the 100× bound failing on a quiet machine, which would
+mean a per-sample cost this entry did not measure.
