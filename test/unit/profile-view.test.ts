@@ -18,11 +18,13 @@
 import { describe, expect, it } from "vitest";
 
 import * as api from "../../src/index.js";
-import type { Block, KeyValue, Notice } from "../../src/data/viewmodel/index.js";
+import type { Block, KeyValue, Notice, Table } from "../../src/data/viewmodel/index.js";
 import { createProfiler } from "../../src/shell/profiling/recorder.js";
 import { PANES, paneTitle, profilePane } from "../../src/shell/profiling/panes.js";
 import type { PaneName } from "../../src/shell/profiling/panes.js";
-import type { ProfileReport, Profiler, Tier } from "../../src/shell/profiling/types.js";
+import type { CommitReason, ProfileReport, Profiler, Tier } from "../../src/shell/profiling/types.js";
+import { plotDefinition } from "../../src/presentation/plot/index.js";
+import { tableDefinition } from "../../src/presentation/table/index.js";
 import {
   createProfileView,
   PROFILE_VIEW_ID,
@@ -32,8 +34,31 @@ import type { ProfileView } from "../../src/shell/profile-view.js";
 import { createOverlayManager } from "../../src/viewport/overlay/index.js";
 import type { OverlayChange, OverlayManager } from "../../src/viewport/overlay/index.js";
 import type { GlyphCaps } from "../../src/presentation/blocks/index.js";
-import { centred, registry } from "../support/overlay.js";
-import { ASCII_CAPS, FULL_CAPS } from "../support/render.js";
+import { centred } from "../support/overlay.js";
+import { ASCII_CAPS, FULL_CAPS, measurable } from "../support/render.js";
+
+/**
+ * The registry the rows measure with: C09's defaults plus `table` and `plot`,
+ * registered as `construct.ts` registers them (F959).
+ *
+ * `test/support/overlay.ts`'s `registry` had neither when this was written, and
+ * through it a plot or a table fell to `raw` and measured as the wrapped lines
+ * of its own JSON — the overview read 26 rows at twelve frames there and was
+ * 40 through this one, so every window the rows here asserted was a window on
+ * the JSON. That fixture carries the three definitions now (F959); a row about
+ * what fits has to measure what is drawn, and T1.100 builds a bare registry of
+ * its own as the control that shows the difference.
+ */
+const kit = measurable({ capabilities: FULL_CAPS, definitions: [tableDefinition, plotDefinition] });
+// **The control's registry, built bare here on purpose.** It used to borrow
+// `test/support/overlay.ts`'s, which was bare when this row was written and
+// carries the three definitions since F959 — so the control went equal to its
+// subject the day the fixture was repaired. A control has to own its defect.
+const bareRegistry = measurable({ capabilities: FULL_CAPS }).registry;
+const registry = {
+  measureSequence: (blocks: readonly Block[], width: number): number =>
+    kit.registry.measureSequence(blocks, width),
+};
 
 /** A counter clock. Every row here asks *what was drawn*, never *how long*. */
 const counterClock = (): (() => number) => {
@@ -72,6 +97,54 @@ const readerFrame = (p: Profiler): void => {
   p.endFrame("frame");
 };
 
+/**
+ * Every commit reason, from the type rather than a list with a birthday: a
+ * member added to `CommitReason` fails the `satisfies` here instead of leaving
+ * T1.100 measuring a smaller overview than the pane can be.
+ */
+const ALL_REASONS = Object.keys({
+  input: true, completion: true, resize: true, stream: true, spinner: true,
+} satisfies Record<CommitReason, true>) as readonly CommitReason[];
+
+/** One frame under `reason`; `measured` adds three spans, a counter and two caches. */
+const frameOf = (p: Profiler, reason: CommitReason, measured: boolean): void => {
+  p.commit(reason, false);
+  // A second commit in the same window, so *saved by coalescing* is a non-zero
+  // figure somewhere in the table and not a column of zeroes.
+  if (reason === "stream") p.commit(reason, false);
+  p.beginFrame(reason);
+  if (measured) {
+    {
+      using _a = p.span("compose");
+      {
+        using _b = p.span("measure");
+      }
+    }
+    {
+      using _c = p.span("paint");
+    }
+    p.count("bytes.written", 4000);
+    p.hit("height");
+    p.miss("height", "width");
+    p.hit("layout");
+  }
+  p.endFrame("frame");
+};
+
+/** The four reports C28 §3c's table walks, as seeds for the rig. */
+const seeds: Readonly<Record<"empty" | "twelve" | "full" | "reasons", (p: Profiler) => void>> = {
+  empty: () => undefined,
+  twelve: (p) => {
+    for (let i = 0; i < 12; i += 1) frameOf(p, "input", false);
+  },
+  full: (p) => {
+    for (let i = 0; i < 12; i += 1) frameOf(p, "input", true);
+  },
+  reasons: (p) => {
+    for (let i = 0; i < 20; i += 1) frameOf(p, ALL_REASONS[i % ALL_REASONS.length] as CommitReason, true);
+  },
+};
+
 const rig = (
   opts: Readonly<{
     tier?: Tier;
@@ -79,6 +152,8 @@ const rig = (
     region?: { width: number; height: number };
     /** `null` builds the view with no profiler — the C23 I68 arm. */
     profiler?: null;
+    /** Frames to record before the view opens, so a row can open on a report of its choosing. */
+    seed?: (p: Profiler) => void;
   }> = {},
 ): Rig => {
   const changes: OverlayChange[] = [];
@@ -88,6 +163,7 @@ const rig = (
   const region = opts.region ?? { width: 80, height: 24 };
 
   const real = createProfiler({ tier: opts.tier ?? "spans" }, { elapsed: counterClock() });
+  opts.seed?.(real);
   // A spy that delegates: `tier` and `own` are closure-backed getters on the
   // recorder, so a prototype view reads them live and only the two members a
   // row counts are shadowed.
@@ -345,7 +421,9 @@ describe("C28 §3c — the profiler's view", () => {
 
   it("T1.98 (C28 I51, C15 I8): a pane taller than the region is windowed at block boundaries, and a block taller than the region is shown under a notice", () => {
     // A region of eight over the overview: the header and the pane together
-    // do not fit, so the layer holds the blocks that do and no more.
+    // do not fit even on an empty ring — nine rows in four blocks through the
+    // registry that draws them — so the layer holds the blocks that do and no
+    // more.
     const r = rig({ region: { width: 80, height: 8 } });
     r.view.open();
     const first = r.content();
@@ -356,36 +434,131 @@ describe("C28 §3c — the profiler's view", () => {
     expect(first, "block boundaries, from the top").toEqual(full.slice(0, first.length));
     expect(measure([...first, full[first.length] as Block]), "one more block would not fit").toBeGreaterThan(8);
 
-    // `pageDown` moves the window by the blocks that were showing; `top` returns.
-    const page = first.length;
+    // On the empty ring the tail from the second block fits a page, so
+    // `pageDown` clamps to the last offset that still fills the region — the
+    // document view's clamp — rather than turning a page. Asserted, because a
+    // motion that overshot into a short last page would pass the arm below.
     expect(r.view.move("pageDown")).toBe(true);
-    expect(r.content()[0]?.id, "the window starts where the last one ended").toBe(full[page]?.id);
+    expect(r.content()[0]?.id, "clamped to the last offset whose tail fills the region").toBe(full[1]?.id);
     expect(measure(r.content())).toBeLessThanOrEqual(8);
-    expect(r.view.move("top")).toBe(true);
-    expect(r.content()).toEqual(first);
+    expect(r.view.move("pageDown"), "and no further").toBe(false);
+
+    // `pageDown` moves the window by the blocks that were showing; `top`
+    // returns. Over the largest report the type allows (T1.100's), whose tail
+    // is more than a page at eight rows.
+    const paged = rig({ region: { width: 80, height: 8 }, seed: seeds.reasons });
+    paged.view.open();
+    const firstPage = paged.content();
+    const whole: readonly Block[] = [firstPage[0] as Block, ...profilePane(lastReport(paged), "overview", FULL_CAPS)];
+    expect(measure(whole), "the fixture responds: three pages at eight rows").toBeGreaterThan(16);
+    const page = firstPage.length;
+    expect(paged.view.move("pageDown")).toBe(true);
+    expect(paged.content()[0]?.id, "the window starts where the last one ended").toBe(whole[page]?.id);
+    expect(measure(paged.content())).toBeLessThanOrEqual(8);
+    expect(paged.view.move("top")).toBe(true);
+    expect(paged.content()).toEqual(firstPage);
 
     // `n` switches pane and resets the offset to 0 — the view's own unit.
-    r.view.move("pageDown");
-    expect(r.view.switchPane(1)).toBe(true);
-    expect(r.view.pane).toBe("frame");
-    const head = r.content()[0];
+    paged.view.move("pageDown");
+    expect(paged.view.switchPane(1)).toBe(true);
+    expect(paged.view.pane).toBe("frame");
+    const head = paged.content()[0];
     expect(head?.kind).toBe("rule");
     expect(head?.kind === "rule" ? head.label : "").toContain(paneTitle("frame"));
     expect(head?.kind === "rule" ? head.meta : "").toBe("2/4");
 
-    // A region of one row over the two-row header: that block alone, under a
+    // A region of one row: the header is one row and fits alone, with no
+    // notice — the gap C28 I52 took off it was a blank first row on every page.
+    // Then `pageDown` to the four-row regime block: that block alone, under a
     // notice that counts the hidden rows and does **not** say *n/p move by
     // block*, because here they do not (§9b B5).
     const tiny = rig({ region: { width: 80, height: 1 } });
     tiny.view.open();
+    const alone = tiny.content();
+    expect(alone.map((x) => x.kind), "the one-row header fits a one-row region by itself").toEqual(["rule"]);
+    expect(measure(alone)).toBe(1);
+    expect(tiny.view.move("pageDown")).toBe(true);
     const shown = tiny.content();
-    expect(shown.map((x) => x.kind)).toEqual(["notice", "rule"]);
+    expect(shown.map((x) => x.kind)).toEqual(["notice", "keyValue"]);
     const notice = shown[0] as Notice;
-    const header = shown[1] as Block;
-    expect(measure([header]), "the fixture responds: the header alone is taller than the region").toBeGreaterThan(1);
-    const hidden = measure([header]) - Math.max(0, 1 - measure([notice]));
+    const tall = shown[1] as Block;
+    expect(tall.id).toBe("ov-regime");
+    expect(measure([tall]), "the fixture responds: the regime block alone is taller than the region").toBeGreaterThan(1);
+    const hidden = measure([tall]) - Math.max(0, 1 - measure([notice]));
     expect(notice.text).toBe(`${String(hidden)} more rows — this block is taller than the screen`);
     expect(notice.text).not.toMatch(/n\/p/u);
+  });
+
+  it("T1.100 (C28 I52): the overview measures at most 23 rows at 80 columns for every report, met by moving and not by dropping, and the four walked figures hold", () => {
+    // **The fixture that bounds the claim is the type's, not a convenient one.**
+    // The coalescing table has one row per `CommitReason`, so the largest
+    // overview the type allows records every reason — `seeds.reasons`, over
+    // `ALL_REASONS`, which the type checks.
+    const shapes = seeds;
+    // §3c's table, header included, at 80 columns — asserted so the table
+    // cannot outlive its measurement (F935). The bound is the rule; this is
+    // the record beside it, and it is what sees a block grow by two rows
+    // inside the slack the bound leaves.
+    const walked: Readonly<Record<string, number>> = { empty: 9, twelve: 17, full: 18, reasons: 22 };
+
+    const measured: Record<string, number> = {};
+    for (const [name, seed] of Object.entries(shapes)) {
+      const r = rig({ region: { width: 80, height: 24 }, seed });
+      expect(r.view.open(), `${name}: opened`).toBeNull();
+      const content = r.content();
+      const pane = profilePane(lastReport(r), "overview", FULL_CAPS);
+      // Through the view at the region the harness has: every block of the
+      // pane is on the layer and none is windowed off.
+      expect(content.slice(1), `${name}: the whole pane is on the layer`).toEqual(pane);
+      for (const width of [80, 120]) {
+        expect(measure(pane, width), `${name} at ${String(width)}: the pane within the budget`).toBeLessThanOrEqual(23);
+        expect(measure(content, width), `${name} at ${String(width)}: with the header, within the region`).toBeLessThanOrEqual(24);
+      }
+      measured[name] = measure(content, 80);
+    }
+    expect(measured, "the four walked figures, header included, at 80").toEqual(walked);
+
+    // **The fixture responds, and the ceiling is met by moving, not dropping.**
+    // The largest report's overview holds a coalescing row per reason and the
+    // latency plot; the two tables no type bounds are on `frame`, whole, and
+    // the overview says so with the counts.
+    const r = rig({ seed: shapes.reasons });
+    r.view.open();
+    const report = lastReport(r);
+    const ov = profilePane(report, "overview", FULL_CAPS);
+    const coalesce = ov.find((x): x is Table => x.kind === "table" && x.id === "ov-coalesce");
+    expect(coalesce?.rows.map((row) => row.id), "one coalescing row per reason").toEqual(ALL_REASONS);
+    const stream = coalesce?.rows.find((row) => row.id === "stream")?.cells;
+    expect(
+      [stream?.commits?.text, stream?.frames?.text, stream?.saved?.text],
+      "the difference the caption used to ask for is a column",
+    ).toEqual(["8", "4", "4"]);
+    expect(ov.some((x) => x.kind === "plot" && x.id === "ov-latency"), "and the latency plot").toBe(true);
+    expect(ov.filter((x) => x.kind === "table").map((x) => x.id), "no table the type does not bound").toEqual(["ov-coalesce"]);
+    const pointer = ov.find((x): x is Notice => x.kind === "notice" && x.id === "ov-elsewhere");
+    expect(pointer?.text).toBe("1 counter and 2 caches are on the frame pane — press n");
+
+    const fr = profilePane(report, "frame", FULL_CAPS);
+    const counters = fr.find((x): x is Table => x.kind === "table" && x.id === "fr-counters");
+    const cache = fr.find((x): x is Table => x.kind === "table" && x.id === "fr-cache");
+    const recorded = Object.keys(report.counters).filter((k) => !k.startsWith("commit.") && !k.startsWith("frame."));
+    expect(recorded, "the fixture responds: a counter was recorded").toEqual(["bytes.written"]);
+    expect(counters?.rows.map((row) => row.id), "every counter, on frame").toEqual(recorded);
+    expect(cache?.rows.map((row) => row.id), "every cache, on frame").toEqual(["height", "layout"]);
+    // And on the empty ring there is nothing to point at, so no pointer.
+    expect(profilePane(createProfiler({ tier: "spans" }, { elapsed: counterClock() }).report(), "overview", FULL_CAPS).some((x) => x.id === "ov-elsewhere"), "no pointer at an empty table").toBe(false);
+
+    // **The harness's registry has no `plot`** (F959). Through it the
+    // twelve-frame pane measures as the wrapped JSON of its plot and reads as
+    // shorter than it draws — the instrument F947's figure came from. The
+    // empty ring holds no plot and the two agree there, which is the control
+    // on the control.
+    const twelve = createProfiler({ tier: "spans" }, { elapsed: counterClock() });
+    shapes.twelve?.(twelve);
+    const drawn = profilePane(twelve.report(), "overview", FULL_CAPS);
+    expect(bareRegistry.measureSequence(drawn, 80), "a plot measured as its JSON is shorter than the plot").toBeLessThan(measure(drawn, 80));
+    const none = profilePane(createProfiler({ tier: "spans" }, { elapsed: counterClock() }).report(), "overview", FULL_CAPS);
+    expect(bareRegistry.measureSequence(none, 80), "and agrees where there is no plot to measure").toBe(measure(none, 80));
   });
 
   it("T1.99 (C28 I50, C15 I1): `open` while open is refused, pushes nothing, and does not overwrite the remembered tier", () => {

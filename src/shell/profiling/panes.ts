@@ -17,6 +17,14 @@
  * **`wait` and `work` are never summed** (C28 I4). They appear as two series of
  * a stacked bar, which shows the sum visually without producing a number that
  * claims to be one thing.
+ *
+ * **The overview fits the region it opens in** (C28 I52): at most 23 rows at
+ * 80 columns for every report — a 24-row terminal minus the view's header —
+ * because it is the pane a reader opens first and the one that must not page.
+ * Every block on it is bounded by a closed set, and the two that are not, the
+ * counters table and the cache table, are drawn on `frame` with one overview
+ * row saying so. The heights were walked by hand before the cut and are in
+ * C28 §3c; T1.100 holds them to the measurement.
  */
 import { b } from "../builders/index.js";
 import { glyphs } from "../../presentation/blocks/index.js";
@@ -47,19 +55,25 @@ const mib = (v: number): number => Number((v / 1024 ** 2).toFixed(1));
 
 const caption = (text: string, id: string): Block => b.rule(text, undefined, { id });
 
-/** The header every pane carries: the regime, and what the figures cannot say. */
+/**
+ * The header every pane carries: the regime, and what the figures cannot say.
+ *
+ * **Four rows, not six** (C28 I52): the tier, the frame count and the elapsed
+ * time are one line a reader takes in at once, and the overview has 23 rows to
+ * spend. `histogram`, `excluded` and `dropped` keep their own rows — each is a
+ * figure's qualifier (I10, I12, I18), and T1.96 and T4.9 read `excluded` by
+ * its label.
+ */
 function regimeRow(r: ProfileReport, id: string, sep: string): Block {
   const pct = (r.regime.histogramError * 100).toFixed(1);
   return b.kv(
     {
-      tier: r.regime.tier,
-      frames: String(r.frames),
-      elapsed: `${ms(r.regime.durationMs)} ms`,
+      regime: `tier ${r.regime.tier}${sep}${String(r.frames)} frames${sep}${ms(r.regime.durationMs)} ms elapsed`,
       histogram: `log-linear, +/-${pct}% relative`,
       excluded: `${String(r.excluded.selfInflicted)} self-inflicted${sep}${String(r.excluded.fallback)} fallback`,
       dropped: `${String(r.dropped.frames)} frames past the ring`,
     },
-    { id },
+    { id, gapBefore: false },
   );
 }
 
@@ -79,17 +93,102 @@ function reasons(r: ProfileReport): readonly CommitReason[] {
   );
 }
 
-/** Pane 1 — the shape of the session at a glance. */
+/** Every counter that is not the coalescing pair — `commit.*` and `frame.*` are `ov-coalesce`'s. */
+const counterEntries = (r: ProfileReport): readonly (readonly [string, number])[] =>
+  Object.entries(r.counters).filter(([k]) => !k.startsWith("commit.") && !k.startsWith("frame."));
+
+const cacheNames = (r: ProfileReport): readonly string[] =>
+  [...new Set([...Object.keys(r.hits), ...Object.keys(r.misses)])].sort();
+
+/**
+ * The counters table — on `frame`, not on the overview (C28 I52, §9b B9).
+ *
+ * **No type bounds its rows**: any component may `count` under any name, so a
+ * pane holding it cannot promise a height. The overview promises one, so the
+ * table is drawn here, whole, where the pane already pages, and the overview
+ * says how many rows are here. A cap with an *N of M* marker on the overview
+ * was the other option and it drops exactly the figures a reader opened the
+ * pane for.
+ */
+function countersTable(r: ProfileReport): readonly Block[] {
+  const counters = counterEntries(r);
+  if (counters.length === 0) return [];
+  return [
+    caption("counters — every count the session recorded, at every tier that counts", "fr-cap-counters"),
+    b.table({
+      id: "fr-counters",
+      columns: [b.col("counter", { minWidth: 22 }), b.col("value", { align: "right", minWidth: 10 })],
+      rows: counters.map(([k, v]) => b.row(k, { counter: k, value: String(v) })),
+    }),
+  ];
+}
+
+/**
+ * Per cache, and the reason beside the count: a hit rate says whether holding
+ * it was worth anything, and only the reason says whether a miss was
+ * legitimate. On `frame` for `countersTable`'s reason.
+ */
+function cacheTable(r: ProfileReport): readonly Block[] {
+  const caches = cacheNames(r);
+  if (caches.length === 0) return [];
+  return [
+    caption("cache — hits, misses and why; a miss with a reason is work the cache could not save", "fr-cap-cache"),
+    b.table({
+      id: "fr-cache",
+      columns: [
+        b.col("cache", { minWidth: 14 }),
+        b.col("hits", { align: "right", minWidth: 8 }),
+        b.col("misses", { align: "right", minWidth: 8 }),
+        b.col("rate", { align: "right", minWidth: 6 }),
+        b.col("reasons", { minWidth: 24 }),
+      ],
+      rows: caches.map((name) => {
+        const hit = r.hits[name] ?? 0;
+        const why = r.misses[name] ?? {};
+        const missed = Object.values(why).reduce<number>((n, v) => n + (v ?? 0), 0);
+        const looked = hit + missed;
+        return b.row(name, {
+          cache: name,
+          hits: String(hit),
+          misses: String(missed),
+          rate: looked === 0 ? "-" : `${((hit / looked) * 100).toFixed(0)}%`,
+          reasons: Object.entries(why)
+            .sort((a, x) => (x[1] ?? 0) - (a[1] ?? 0))
+            .map(([k, v]) => `${k} ${String(v)}`)
+            .join(" "),
+        });
+      }),
+    }),
+  ];
+}
+
+/**
+ * A caption with no gap — the overview's (C28 I52).
+ *
+ * `caption` carries a blank row before it, which reads well in a pane that
+ * pages and costs a row the overview does not have: six captions' gaps were a
+ * quarter of the region.
+ */
+const tightCaption = (text: string, id: string): Block =>
+  b.rule(text, undefined, { id, gapBefore: false });
+
+/**
+ * Pane 1 — the shape of the session at a glance.
+ *
+ * **At most 23 rows at 80 columns, for every report** (C28 I52; F947). Each
+ * block is bounded by a closed set: four regime rows, four latency categories
+ * in four area rows, one coalescing row per `CommitReason`, two rows of the
+ * instrument's own cost, one row pointing at `frame`. The counters and cache
+ * tables — the two blocks no type bounds — are `countersTable` and
+ * `cacheTable`, on `frame`. Walked by hand in C28 §3c: 8, 16, 17 and 21 pane
+ * rows on an empty ring, twelve frames, twelve with spans, a counter and two
+ * caches, and every commit reason; T1.100 holds the figures.
+ */
 function overview(r: ProfileReport, sep: string): readonly Block[] {
   const lat = r.latency;
   const rs = reasons(r);
-  const commits = rs.map((k) => r.counters[`commit.${k}`] ?? 0);
-  const drawn = rs.map((k) => r.counters[`frame.${k}`] ?? 0);
 
-  const out: Block[] = [
-    caption("regime — and what these figures cannot say", "ov-cap-regime"),
-    regimeRow(r, "ov-regime", sep),
-  ];
+  const out: Block[] = [regimeRow(r, "ov-regime", sep)];
 
   if (lat === undefined) {
     out.push(
@@ -114,97 +213,89 @@ function overview(r: ProfileReport, sep: string): readonly Block[] {
     );
   } else {
     out.push(
-      caption(`latency${sep}work is the framework's efficiency, wait is its policy — never summed`, "ov-cap-lat"),
+      tightCaption(`latency${sep}work is efficiency, wait is policy — never summed`, "ov-cap-lat"),
+      // Four categories in four area rows: the height was 6, and the two spare
+      // rows drew nothing (C28 I52). The lid, the axis rule and the x-labels
+      // are three more, and they are the plot's own furniture.
       b.plot({
-        id: "ov-latency", form: "bar", height: 6, axes: true, orientation: "horizontal",
+        id: "ov-latency", form: "bar", height: 4, axes: true, orientation: "horizontal",
         layout: "stacked",
         categories: ["p50", "p95", "p99", "max"],
         series: [
           { values: [lat.work.p50, lat.work.p95, lat.work.p99, lat.work.max].map((v) => Number(ms(v))), label: "work" },
           { values: [lat.wait.p50, lat.wait.p95, lat.wait.p99, lat.wait.max].map((v) => Number(ms(v))), label: "wait" },
         ],
+        gapBefore: false,
       }),
     );
   }
 
   if (rs.length > 0) {
+    // One row per reason, bounded by the union (C28 I52, §9b B10). The grouped
+    // bar this replaced drew two rows per reason under a height of one per
+    // reason — right at the one reason every fixture had, and at the type's
+    // five it put `stream` and `spinner` behind a `+4 more` marker (F960).
+    // *The difference is what coalescing saved* was the caption's instruction
+    // to the reader; here it is the column.
     out.push(
-      caption("commits against frames — the difference is what coalescing saved", "ov-cap-coal"),
-      b.plot({
-        id: "ov-coalesce", form: "bar", height: Math.max(4, rs.length + 2), axes: true,
-        orientation: "horizontal",
-        categories: [...rs],
-        series: [
-          { values: commits, label: "commits" },
-          { values: drawn, label: "frames" },
-        ],
-      }),
-    );
-  }
-
-  const counters = Object.entries(r.counters).filter(([k]) => !k.startsWith("commit.") && !k.startsWith("frame."));
-  if (counters.length > 0) {
-    out.push(
-      caption("counters", "ov-cap-counters"),
       b.table({
-        id: "ov-counters",
-        columns: [b.col("counter", { minWidth: 22 }), b.col("value", { align: "right", minWidth: 10 })],
-        rows: counters.map(([k, v]) => b.row(k, { counter: k, value: String(v) })),
+        id: "ov-coalesce",
+        columns: [
+          b.col("reason", { minWidth: 10 }),
+          b.col("commits", { align: "right", minWidth: 8 }),
+          b.col("frames", { align: "right", minWidth: 8 }),
+          b.col("saved", { label: "saved by coalescing", align: "right", minWidth: 20 }),
+        ],
+        rows: rs.map((k) => {
+          const commits = r.counters[`commit.${k}`] ?? 0;
+          const drawn = r.counters[`frame.${k}`] ?? 0;
+          return b.row(k, {
+            reason: k,
+            commits: String(commits),
+            frames: String(drawn),
+            saved: String(commits - drawn),
+          });
+        }),
+        gapBefore: false,
       }),
     );
   }
 
   // **The instrument prices itself** (C28 I34). A profiler that does not report
   // its own cost invites a reader to assume zero, and every figure above is a
-  // figure this had a hand in producing.
+  // figure this had a hand in producing. Two rows: the estimate with the three
+  // figures it is the product of, labelled an estimate; and the async store.
   const ov = r.overhead;
   out.push(
-    caption("the instrument's own cost — an estimate, and labelled one", "ov-cap-oh"),
     b.kv(
       {
-        spans: `${String(ov.spans)} opened`,
-        clock: `${ov.clockNs.toFixed(1)} ns per read, measured on this machine`,
-        estimate: `${ms(ov.estimateMs)} ms — spans × 2 reads × clock; the true figure needs a second instrument, and that one a third`,
+        // The word that says what the figure is comes first, because the value
+        // truncates from the right at 80 columns once the numbers grow.
+        "own cost": `${ms(ov.estimateMs)} ms estimated from ${String(ov.spans)} spans × 2 reads × ${ov.clockNs.toFixed(1)} ns per measured read`,
         "async store": ov.asyncEnabled
           ? "built — every await in this process pays for it"
           : "not built — nothing here has taxed a promise",
       },
-      { id: "ov-oh" },
+      { id: "ov-oh", gapBefore: false },
     ),
   );
 
-  // Per cache, and the reason beside the count: a hit rate says whether holding
-  // it was worth anything, and only the reason says whether a miss was legitimate.
-  const caches = [...new Set([...Object.keys(r.hits), ...Object.keys(r.misses)])].sort();
-  if (caches.length > 0) {
+  // The two blocks no type bounds are on `frame` (C28 I52, §9b B9); this row
+  // says so, with the counts, and only when there is something there to see —
+  // a pointer at an empty table is a wrong instruction.
+  const counters = counterEntries(r).length;
+  const caches = cacheNames(r).length;
+  if (counters > 0 || caches > 0) {
+    const named = [
+      counters > 0 ? `${String(counters)} counter${counters === 1 ? "" : "s"}` : "",
+      caches > 0 ? `${String(caches)} cache${caches === 1 ? "" : "s"}` : "",
+    ].filter((x) => x !== "");
     out.push(
-      caption("cache", "ov-cap-cache"),
-      b.table({
-        id: "ov-cache",
-        columns: [
-          b.col("cache", { minWidth: 14 }),
-          b.col("hits", { align: "right", minWidth: 8 }),
-          b.col("misses", { align: "right", minWidth: 8 }),
-          b.col("rate", { align: "right", minWidth: 6 }),
-          b.col("reasons", { minWidth: 24 }),
-        ],
-        rows: caches.map((name) => {
-          const hit = r.hits[name] ?? 0;
-          const reasons = r.misses[name] ?? {};
-          const missed = Object.values(reasons).reduce<number>((n, v) => n + (v ?? 0), 0);
-          const looked = hit + missed;
-          return b.row(name, {
-            cache: name,
-            hits: String(hit),
-            misses: String(missed),
-            rate: looked === 0 ? "-" : `${((hit / looked) * 100).toFixed(0)}%`,
-            reasons: Object.entries(reasons)
-              .sort((a, x) => (x[1] ?? 0) - (a[1] ?? 0))
-              .map(([k, v]) => `${k} ${String(v)}`)
-              .join(" "),
-          });
-        }),
-      }),
+      b.notice(
+        "info",
+        `${named.join(" and ")} ${counters + caches === 1 ? "is" : "are"} on the frame pane — press n`,
+        undefined, { id: "ov-elsewhere" },
+      ),
     );
   }
 
@@ -221,8 +312,7 @@ function frame(r: ProfileReport, sep: string): readonly Block[] {
     // with an empty ring this told a reader to *raise the tier to `spans`* —
     // the tier they were already on. This pane reads the data axis, which is
     // the right axis, and its message was still answering the tier one.
-    return [
-      ...out,
+    out.push(
       b.notice(
         "info",
         spanning(r)
@@ -230,99 +320,105 @@ function frame(r: ProfileReport, sep: string): readonly Block[] {
           : "no spans recorded — raise the tier to `spans`",
         undefined, { id: "fr-none" },
       ),
-    ];
-  }
-
-  out.push(
-    b.plot({
-      id: "fr-spans", form: "bar", height: Math.max(5, names.length + 2), axes: true,
-      orientation: "horizontal",
-      categories: [...names],
-      series: [
-        { values: p50, label: "p50 ms" },
-        { values: p95, label: "p95 ms" },
-      ],
-    }),
-  );
-
-  if (r.worst.length > 0) {
-    out.push(
-      caption("the worst frames, kept whole — a p95 says a tail exists and nothing about what is in it", "fr-cap-worst"),
-      b.table({
-        id: "fr-worst",
-        columns: [
-          b.col("seq", { align: "right", minWidth: 5 }),
-          b.col("reason", { minWidth: 10 }),
-          b.col("work", { align: "right", minWidth: 8 }),
-          b.col("wait", { align: "right", minWidth: 8 }),
-          b.col("phases", { minWidth: 28 }),
-        ],
-        rows: r.worst.map((f) =>
-          b.row(`w${String(f.seq)}`, {
-            seq: String(f.seq),
-            reason: f.reason,
-            work: `${ms(f.work)} ms`,
-            wait: `${ms(f.wait)} ms`,
-            phases: Object.entries(f.spans)
-              .sort((x, y) => (y[1] ?? 0) - (x[1] ?? 0))
-              .slice(0, 3)
-              .map(([k, v]) => `${k} ${ms(v ?? 0)}`)
-              .join(sep),
-          }),
-        ),
-      }),
     );
-  }
-
-  if (r.nodes.length > 0) {
+  } else {
     out.push(
-      caption(
-        "per element — self time, so a container is not credited with its children's work",
-        "fr-cap-nodes",
-      ),
-      b.table({
-        id: "fr-nodes",
-        columns: [
-          b.col("element", { minWidth: 20 }),
-          b.col("self", { align: "right", minWidth: 9 }),
-          b.col("max", { align: "right", minWidth: 8 }),
-          b.col("calls", { align: "right", minWidth: 6 }),
-          b.col("frames", { align: "right", minWidth: 7 }),
-          // **The column that turns a duration into a defect.** Above 1 means
-          // the element was measured or rendered more than once inside a single
-          // frame, which is repeated work whatever it cost — and it is not
-          // visible in any of the four columns to its left, because a node
-          // measured four times cheaply and one measured once expensively can
-          // carry the same self time.
-          b.col("per frame", { align: "right", minWidth: 10 }),
-        ],
-        rows: r.nodes.slice(0, 20).map((n) =>
-          b.row(n.key, {
-            element: n.key,
-            self: `${ms(n.self)} ms`,
-            max: `${ms(n.max)} ms`,
-            calls: String(n.calls),
-            frames: String(n.frames),
-            "per frame": n.frames === 0 ? "-" : (n.calls / n.frames).toFixed(1),
-          }),
-        ),
-      }),
-    );
-  }
-
-  const kinds = Object.entries(r.byKind).filter(([, h]) => h.count > 0);
-  if (kinds.length > 0) {
-    out.push(
-      caption("cost by block kind — which renderer to look at", "fr-cap-kind"),
       b.plot({
-        id: "fr-kinds", form: "bar", height: Math.max(4, Math.min(kinds.length, 10) + 2), axes: true,
+        id: "fr-spans", form: "bar", height: Math.max(5, names.length + 2), axes: true,
         orientation: "horizontal",
-        categories: kinds.slice(0, 10).map(([k]) => k),
-        series: [{ values: kinds.slice(0, 10).map(([, h]) => Number(h.sum.toFixed(2))), label: "total ms" }],
+        categories: [...names],
+        series: [
+          { values: p50, label: "p50 ms" },
+          { values: p95, label: "p95 ms" },
+        ],
       }),
     );
+
+    if (r.worst.length > 0) {
+      out.push(
+        caption("the worst frames, kept whole — a p95 says a tail exists and nothing about what is in it", "fr-cap-worst"),
+        b.table({
+          id: "fr-worst",
+          columns: [
+            b.col("seq", { align: "right", minWidth: 5 }),
+            b.col("reason", { minWidth: 10 }),
+            b.col("work", { align: "right", minWidth: 8 }),
+            b.col("wait", { align: "right", minWidth: 8 }),
+            b.col("phases", { minWidth: 28 }),
+          ],
+          rows: r.worst.map((f) =>
+            b.row(`w${String(f.seq)}`, {
+              seq: String(f.seq),
+              reason: f.reason,
+              work: `${ms(f.work)} ms`,
+              wait: `${ms(f.wait)} ms`,
+              phases: Object.entries(f.spans)
+                .sort((x, y) => (y[1] ?? 0) - (x[1] ?? 0))
+                .slice(0, 3)
+                .map(([k, v]) => `${k} ${ms(v ?? 0)}`)
+                .join(sep),
+            }),
+          ),
+        }),
+      );
+    }
+
+    if (r.nodes.length > 0) {
+      out.push(
+        caption(
+          "per element — self time, so a container is not credited with its children's work",
+          "fr-cap-nodes",
+        ),
+        b.table({
+          id: "fr-nodes",
+          columns: [
+            b.col("element", { minWidth: 20 }),
+            b.col("self", { align: "right", minWidth: 9 }),
+            b.col("max", { align: "right", minWidth: 8 }),
+            b.col("calls", { align: "right", minWidth: 6 }),
+            b.col("frames", { align: "right", minWidth: 7 }),
+            // **The column that turns a duration into a defect.** Above 1 means
+            // the element was measured or rendered more than once inside a single
+            // frame, which is repeated work whatever it cost — and it is not
+            // visible in any of the four columns to its left, because a node
+            // measured four times cheaply and one measured once expensively can
+            // carry the same self time.
+            b.col("per frame", { align: "right", minWidth: 10 }),
+          ],
+          rows: r.nodes.slice(0, 20).map((n) =>
+            b.row(n.key, {
+              element: n.key,
+              self: `${ms(n.self)} ms`,
+              max: `${ms(n.max)} ms`,
+              calls: String(n.calls),
+              frames: String(n.frames),
+              "per frame": n.frames === 0 ? "-" : (n.calls / n.frames).toFixed(1),
+            }),
+          ),
+        }),
+      );
+    }
+
+    const kinds = Object.entries(r.byKind).filter(([, h]) => h.count > 0);
+    if (kinds.length > 0) {
+      out.push(
+        caption("cost by block kind — which renderer to look at", "fr-cap-kind"),
+        b.plot({
+          id: "fr-kinds", form: "bar", height: Math.max(4, Math.min(kinds.length, 10) + 2), axes: true,
+          orientation: "horizontal",
+          categories: kinds.slice(0, 10).map(([k]) => k),
+          series: [{ values: kinds.slice(0, 10).map(([, h]) => Number(h.sum.toFixed(2))), label: "total ms" }],
+        }),
+      );
+    }
+
   }
 
+  // **The two tables no type bounds, moved here from the overview** (C28 I52,
+  // §9b B9). Counts exist at every tier that counts (I44), so they draw under
+  // the *raise the tier* notice too — `frame` pages, and the overview says
+  // they are here.
+  out.push(...countersTable(r), ...cacheTable(r));
   return out;
 }
 

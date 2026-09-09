@@ -110,7 +110,11 @@ describe("C28 — profiler, tier 1 spec-first rows", () => {
     const report = p.report();
     expect(report.latency?.work.count, "six frames are in the ring").toBe(6);
 
-    expect(plotIds(profilePane(report, "overview"))).toEqual(["ov-latency", "ov-coalesce"]);
+    // One plot on the overview since C28 I52: the coalescing block is a table,
+    // asserted as one so a plot coming back — and its two rows per reason
+    // under a height of one per reason (F960) — is seen here.
+    expect(plotIds(profilePane(report, "overview"))).toEqual(["ov-latency"]);
+    expect(profilePane(report, "overview").find((x) => x.id === "ov-coalesce")?.kind, "the coalescing block is drawn, as a table").toBe("table");
     expect(plotIds(profilePane(report, "frame"))).toEqual(["fr-spans"]);
     expect(plotIds(profilePane(report, "distribution"))).toEqual(["di-quantiles", "di-spans", "di-worst"]);
   });

@@ -23,14 +23,20 @@
  * every figure it draws by the cost of drawing it, which is the reading I12
  * exists to end. On the timer and on a key alike.
  *
- * **A window, because the pane is not a screen's worth** (C28 I51, F947). The
- * overview measures 28 rows against a bare 12-frame fixture, over the 24-row
- * region the harness has, and C15 clips what does not fit without drawing
- * anything to say so (C15 I8). The projection is `document-view.ts`'s written a
- * second time — block boundaries, the registry's `measureSequence` over the
- * candidate sequence, at least one block — and the duplication is recorded in
- * C28 §3c rather than resolved, because extracting it edits a file this round
- * does not own.
+ * **A window, because a pane is not a screen's worth** (C28 I51, F947). The
+ * overview as first built measured 40 rows at twelve frames through the
+ * registry that draws it — the 28 F947 recorded was a bare registry measuring
+ * a plot as its JSON (F959) — over the 24-row region the harness has, and C15
+ * clips what does not fit without drawing anything to say so (C15 I8). The
+ * projection is `document-view.ts`'s written a second time — block boundaries,
+ * the registry's `measureSequence` over the candidate sequence, at least one
+ * block — and the duplication is recorded in C28 §3c rather than resolved,
+ * because extracting it edits a file this round does not own.
+ *
+ * **And the overview no longer needs the window at 24 rows** (C28 I52): it
+ * measures 23 rows or fewer at 80 columns for every report, which is this
+ * region minus the header below. The header carries no gap for the same
+ * reason — it drew a blank first row on every page of every pane.
  */
 import type { Block } from "../data/viewmodel/index.js";
 import { glyphs } from "../presentation/blocks/index.js";
@@ -137,6 +143,9 @@ export function createProfileView(deps: ProfileViewDeps): ProfileView {
     return Object.freeze([
       b.rule(`profiler ${sep} ${paneTitle(pane)}`, `${String(i + 1)}/${String(PANES.length)}`, {
         id: HEADER_ID,
+        // One row, not two: the builder's default gap is a blank row above the
+        // first thing on the screen (C28 I52).
+        gapBefore: false,
       }),
       ...profilePane(profiler.report(), pane, deps.capabilities),
     ]);

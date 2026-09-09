@@ -1,4 +1,4 @@
-// C28 §3c — the profiler's view, mutated (C28 I49, I50, I51; C15 I25; C24 I33).
+// C28 §3c — the profiler's view, mutated (C28 I49, I50, I51, I52; C15 I25; C24 I33).
 //
 // **Every mutation here was applied by hand on the day the rows landed, and
 // the counts below are from that pass, not estimated.** Two rows were rewritten
@@ -24,6 +24,7 @@ const CMD =
   "test/integration/profiler.test.ts test/unit/local-profile.test.ts";
 
 const VIEW = "src/shell/profile-view.ts";
+const PANES = "src/shell/profiling/panes.ts";
 const FRAMEWORK = "src/data/manifest/framework.ts";
 const HANDLERS = "src/shell/local/handlers.ts";
 
@@ -148,6 +149,56 @@ const results = runPass({
       file: VIEW,
       from: "    const from = Math.max(0, Math.min(offset, blocks.length - 1));",
       to: "    return blocks;\n    const from = Math.max(0, Math.min(offset, blocks.length - 1));",
+      expect: "T1.98",
+    },
+    {
+      // C28 I52, §9b B9 — the move reverted: the counters and cache tables drawn
+      // on the overview again, where no type bounds their rows. The largest
+      // report the type allows then measures 32 against the budget of 23, and
+      // T1.100's bound is what fails; the fixture with one reason would have
+      // read 23 and passed, which is why the row records every reason.
+      // Hand pass 2026-09-09: T1.100 alone, on the bound.
+      name: "the counters and cache tables come back to the overview",
+      file: PANES,
+      from:
+        "  const counters = counterEntries(r).length;\n" +
+        "  const caches = cacheNames(r).length;\n" +
+        "  if (counters > 0 || caches > 0) {",
+      to:
+        "  out.push(...countersTable(r), ...cacheTable(r));\n" +
+        "  const counters = counterEntries(r).length;\n" +
+        "  const caches = cacheNames(r).length;\n" +
+        "  if (counters > 0 || caches > 0) {",
+      expect: "T1.100",
+    },
+    {
+      // C28 I52 — the latency plot's area back to six rows, the two spare ones
+      // drawing nothing. Two rows more sits inside the slack the bound leaves
+      // (21 against 23), so the bound passes and the walked figures are what
+      // fail: the record beside the rule, which is why the row keeps both.
+      // Hand pass 2026-09-09: T1.100 and T1.98, the second because the page
+      // boundaries over the largest report moved with the plot.
+      name: "the latency plot is six area rows again",
+      file: PANES,
+      from: '        id: "ov-latency", form: "bar", height: 4, axes: true, orientation: "horizontal",',
+      to: '        id: "ov-latency", form: "bar", height: 6, axes: true, orientation: "horizontal",',
+      expect: "T1.100",
+    },
+    {
+      // C28 I52 — the header's gap back: a blank first row on every page of
+      // every pane, which is the builder's default and reads as deliberate.
+      // T1.98's one-row region is the arm that sees it, before the walked
+      // figures do.
+      // Hand pass 2026-09-09: T1.98 and T1.100 — the one-row region, then the
+      // four totals each one high.
+      name: "the view's header carries its gap again",
+      file: VIEW,
+      from:
+        "        id: HEADER_ID,\n" +
+        "        // One row, not two: the builder's default gap is a blank row above the\n" +
+        "        // first thing on the screen (C28 I52).\n" +
+        "        gapBefore: false,\n",
+      to: "        id: HEADER_ID,\n",
       expect: "T1.98",
     },
     {
