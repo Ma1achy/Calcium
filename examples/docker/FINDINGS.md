@@ -36397,7 +36397,7 @@ replaced; two entries whose ids repeat across a session, which would put S1 back
 **F952's class, closed by an instrument.** A run with no row that can see its mutation reads
 exactly like a run whose rows catch it — both print nothing and both leave the tree as they found
 it — and the only thing that tells them apart is running the pass. `tools/mutate/runs/` holds
-**181** of them and no gate ran any: `make all` builds, checks, enforces, tests and proves, and a
+**182** of them and no gate ran any: `make all` builds, checks, enforces, tests and proves, and a
 mutation pass is a thing a person remembers to do. F980 is what that costs — two runs found rotted
 at once, one of them exiting 1 on three disposed survivors since F243 — and the anchors debt list
 already carried **35 stale anchors across 16 runs**, two of them controls, which is a run that
@@ -36413,7 +36413,7 @@ cannot fail.
 - **red** — anything else, and the sweep exits 1 naming the runs.
 
 **Sharded round-robin rather than by directory order**, because runs are not equal in cost and a
-contiguous split puts the four expensive ones in one shard: `--shard 1/6` takes 31 of 181. The
+contiguous split puts the four expensive ones in one shard: `--shard 1/6` takes 31 of 182. The
 weekly CI job (`mutation-sweep.yml`, Sunday 03:00 UTC, and on dispatch with an `--only` filter)
 runs the six shards in parallel; `make mutate SHARD=k/n ONLY=substr` is the same driver locally.
 
@@ -36423,6 +36423,9 @@ sharding rather than after, so a filtered sweep is not one shard of a different 
 list's total equals what the anchors sweep prints; and the reader counts a synthetic report — the
 one place a fabricated input is the whole point, since a reader written before its subject measures
 its own guess (F297).
+
+**Smoked end to end on one run**: `make mutate ONLY=c12-radar` reads green in 33 s, 7 caught
+and 1 expected survivor, with `src/` restored byte for byte.
 
 **Its blind spot, stated**: a run that exits 0 having caught nothing is green here. The sweep
 watches whether a pass still *runs*, not whether its rows still *see* — that is the anchors

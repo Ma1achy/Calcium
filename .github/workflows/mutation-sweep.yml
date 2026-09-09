@@ -1,0 +1,47 @@
+name: mutation-sweep
+
+# Every mutation run under `tools/mutate/runs/`, weekly and on demand (F952,
+# F990). A run with no row that sees its mutation reads exactly like one that
+# does until the pass is run; by hand a pass is a session per component, which
+# is how 18 of 283 anchors went stale with two controls among them (F980).
+# Six shards, round-robin over the sorted list, so one shard is about an hour.
+# The anchors sweep runs first in every shard and a red one runs nothing.
+# The runs drive vitest over tiers 1-4 and a few over tier 5, so the job
+# carries the same terminals `full` installs and a build for `dist/`.
+
+on:
+  schedule:
+    - cron: "0 3 * * 0" # Sunday 03:00 UTC
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "run only the files whose name contains this (for example c12-)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: make install
+      - run: sudo apt-get update -q && sudo apt-get install -y -q xvfb xdotool xterm kitty
+      - run: npm run build
+      - run: node tools/mutate/sweep.mjs --shard ${{ matrix.shard }}/6 ${{ inputs.only != '' && format('--only {0}', inputs.only) || '' }}
+        env:
+          TERM: xterm-256color
+      # The per-run logs and `summary.json` under `out/mutate-sweep/` are in
+      # the job log above; nothing is uploaded, so no artifact action version
+      # is a thing this workflow can be wrong about.

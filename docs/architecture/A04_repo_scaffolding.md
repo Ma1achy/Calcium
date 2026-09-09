@@ -238,6 +238,7 @@ install → check → enforce → audit → test → golden → e2e → [repo-sp
 |---|---|
 | Every push to a branch | `install → check → enforce → audit → test` — under two minutes |
 | **Pull request**, push to `main`, and tags | The above plus `golden → e2e → [repo-specific]` |
+| **Weekly** (Sunday 03:00 UTC), and on dispatch | `mutation-sweep` — every run under `tools/mutate/runs/` through `tools/mutate/sweep.mjs`, six shards, the anchors sweep first. A survivor, a stale exemption, an anchor miss off the debt list or a run that leaves the tree mutated is red where nobody was running the pass by hand (F952, F990) |
 
 `enforce` stays on every push regardless: it costs five seconds and catches the violations that become load-bearing fastest.
 

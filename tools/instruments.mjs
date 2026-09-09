@@ -107,6 +107,11 @@ const COVERED = [
   // source that moves. Eighteen had rotted when the sweep was first run, one of
   // them a **control**, which makes its whole run unstartable.
   ["tools/mutate/anchors.mjs", ["npx", "vitest", "run", "test/unit/mutate-anchors.test.ts"]],
+  // The sweep that runs every one of those configurations on a schedule, so
+  // a mutation that went vacuous is dated by a machine (F952, F990). Its
+  // fixture owes the planner and the reader; the executing half is the CI
+  // job `mutation-sweep`, which is what closes the class.
+  ["tools/mutate/sweep.mjs", ["npx", "vitest", "run", "test/unit/mutate-sweep.test.ts"]],
   // **The terminal read's two halves that a container can check.** Neither's
   // *verdict* is reachable from here — that is the whole reason the probe exists
   // — but the properties that make a verdict readable are: that the bytes are
