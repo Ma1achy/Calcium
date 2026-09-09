@@ -194,6 +194,8 @@ type ProfileOptions = Readonly<{
                             // default "counters" — the recorder's DEFAULT_TIER, read by the root's
                             // gate rather than restated; an absent `profile` is "off" (C28 T4.1, F967)
   elapsed?: () => number;   // monotonic, sub-millisecond; default performance.now
+  sampleClock?: () => number; // the sampler's stamp, off the recorded channel; default the untapped
+                            // `elapsed`, which the root threads by identity (C28 I53, F971)
   probe?: ResourceProbe;    // default the one file allowed to read the process (C28 I21)
   ring?: number;            // frames held; default 512
   worst?: number;           // whole frames kept beside the histograms; default 10

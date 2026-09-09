@@ -84,7 +84,7 @@ interface TransportRouter {
 }
 
 type Clock = Readonly<{
-  now:      () => number;                                   // durationMs
+  elapsed:  () => number;                                   // durationMs — monotonic, never the wall clock (I19)
   schedule: (fn: () => void, ms: number) => Disposable;     // the §4 ladder
 }>;
 
@@ -125,6 +125,8 @@ function createRouter(opts: {
 `overflowed` is C21's fact, reported and not interpreted — the far side emitted more bytes than the runner would hold, so `stdoutRaw` is a prefix of what it wrote rather than the whole of it. **It is not `meta.truncated`.** That field says the fallback adapter capped rows (C07 I13), and the two claims share nothing but a shape: one is about blocks the adapter chose not to build, the other about bytes that never reached it. C07 §4 rules that it reaches the document as a `notice` block appended on every route (C07 I22); C06's part is to say it happened.
 
 `clock` is injected for the same reason C03's `schedule` is. `durationMs` needs the time twice and the §4 ladder needs two 2 s timers, and both are ambient reads that SS1 permits only in `src/shell/session.ts`. Injected, T3.5 asserts each rung of the ladder against a counter instead of sleeping through four seconds per case.
+
+**And the time it needs twice is `elapsed`, the monotonic clock, not the wall clock** (F972). A duration is a difference of two readings, and a wall clock can be stepped between them; under C28's positional replay the wall channel is also the one the header's second hand is served from, so the transport's pair sat on the channel where a stale position shows (F963). The root hands it `config.elapsed`, and the stand-in that mirrors the pair (`src/testing/replay.ts`) reads `elapsed` at the same two positions.
 
 ### `Fixture`
 
@@ -265,7 +267,7 @@ Settling covers success, failure, cancellation and timeout alike — every path 
 - **I16** — `FixtureTransport` reads no clock and holds no world state; it replays a corpus and nothing else.
 - **I17** — The test runner selects `fixture`. Nothing in the test suite selects `emulated` *as a source of expected values*: `EmulatedTransport` is constructed only over a fixed handler, to assert interface parity (I15), and C08's world never appears in a test path (C08 I14). The qualifier is load-bearing — without it I17 and I15 contradict each other, since parity cannot be asserted for an implementation no test may construct.
 - **I18** — C06 reads no environment. `createTransport` takes `mode` as a parameter, and no module under `src/` resolves `PRISM_TUI_TRANSPORT`.
-- **I19** — Time enters C06 only through injected `now` and `schedule`. No ambient clock, no ambient timer.
+- **I19** — Time enters C06 only through injected `elapsed` and `schedule`, and `durationMs` is the difference of two `elapsed` readings — the monotonic clock, never the wall clock (F972). No ambient clock, no ambient timer.
 - **I20** — **No transport rewrites a result it did not construct.** `createFixtureTransport` replays a stored `RawResult` verbatim, `argv` included; `createEmulatedTransport` reports what its handler produced. Synthesis is confined to results C06 builds itself — a cancellation, an abort before dispatch — where there is nothing to report and the argv describes an invocation happening now. Whoever produces a result owns its `argv`; the transport carrying it does not.
 - **I21** — `timeoutMs: 0` schedules no timer at all. Not a very large timeout — none, asserted on the absence of the `schedule` call, because a timer armed with 0 and cleared later satisfies the weaker reading and kills every live view.
 - **I22** — `cwd` is read at spawn, never captured at construction. A captured string spawns every subsequent verb in the directory the session started in, which is the one bug a pass-through `cd` is guaranteed to produce.
@@ -294,7 +296,7 @@ Settling covers success, failure, cancellation and timeout alike — every path 
 16. Line buffering is bounded at 1 MB (I11).
 17. All three implementations are substitutable in every test that does not concern spawning (I15).
 18. The fixture transport replays and nothing else — no clock, no world state (I16).
-19. Time enters only through injected `now` and `schedule` (I19).
+19. Time enters only through injected `elapsed` and `schedule`, and a duration is two monotonic readings apart (I19).
 20. Replay reports what was recorded, verbatim (I20). `meta.argv` is a historical fact about the data — what actually ran — not a reproduction hint, so a corpus recorded against one binary says so even when the app now spawns another. `meta.transport` disambiguates; the two fields together are honest.
 21. The parity suite compares the complete `RawResult` (I24). A suite that picks fields is a suite with holes exactly where nobody looked.
 
@@ -318,6 +320,7 @@ Six tiers. Every cell of the §6 transition table is covered. `ProcessRunner` is
 - **T1.10** (I14): `for("ps")` with an override returns it; `for("unmapped")` returns the default.
 - **T1.11**: exit 2 → reported as 2 with no interpretation; no envelope is constructed.
 - **T1.12**: killed by signal → `exitCode` null, `signal` set.
+- **T1.13** (I19): 150 ms ticked on the injected `elapsed` between spawn and close → `durationMs` 150 — the injected monotonic clock and nothing else. The run in `tools/mutate/runs/c06-transport-clock.mjs` is written against this row alone (T6.17).
 
 ### Tier 2 — contract / interface
 
@@ -407,7 +410,7 @@ Real subprocesses.
 - **T6.10** (I15): a fixture-only or subprocess-only behaviour → T2.1 fails on the shared suite.
 - **T6.15** (I15): narrowing the shared suite from three transports to two → T2.1 fails on the missing case, rather than passing with less covered.
 - **T6.16** (I18): reading `process.env` in `createTransport` → T2.9 and SS10 fail.
-- **T6.17** (I19): reading `Date.now()` for `durationMs` → SS1 fails, and T3.5's ladder assertions become four-second sleeps.
+- **T6.17** (I19): reading `Date.now()` for `durationMs` → SS1 fails, and T3.5's ladder assertions become four-second sleeps; taking `durationMs` from one reading → T1.13 fails, 0 against the 150 ms ticked between the two. The root handing the transport the wall clock is above C06 and invisible here — C28 T5.1c is what sees it, by parity on both channels (F972).
 - **T6.11** (I14): making transport selection global → T3.20 fails, and with it the incremental-migration property.
 - **T6.12**: capturing `cwd` at construction → T3.22 fails.
 - **T6.13** (I11): removing the line cap → T3.16b fails on unbounded growth.

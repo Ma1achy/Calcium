@@ -35195,3 +35195,331 @@ run passed clean when written, and nothing re-ran it until another lane renamed 
 it and the serial phase put it in the pass list.
 
 **What would falsify this**: the mutation surviving T2.42 with the group child in place.
+
+## F969 — the walk's corner is closed by a check over the corpus, not by a second measure: 201,104 escapes over 39,828 lines and none inside a cluster; three painters that split one; four writers that keep none whole; and a spacing mark the measurer counts as nothing ★★☆☆☆
+
+**The ruling.** C09 §5a's cursor has one corner it does not resolve as the measurer does: an SGR
+*inside* a grapheme cluster — between a base and its combining mark, between the halves of a flag,
+between a pictograph and its joiner (F957's eight cases). Ruled in §5a and I64, with commitment 56:
+the walk will not measure the row twice. The layer above promises never to paint one — C04 I84 snaps
+a span boundary to a cluster end and C07 T3.14 strips a far side's own escapes — and a promise the
+walk rests on is checked over the corpus rather than restated. T2.127–T2.132 are the check; T6.110
+is what breaks it.
+
+**The instrument** (`test/support/cluster-escapes.ts`). Strip the CSI sequences — F966's grammar —
+recording each one's index in the *stripped* row, segment the stripped row with `Intl.Segmenter`,
+and report an escape whose index is strictly inside a cluster. Stripped first because a segmenter
+run over the styled row sees an escape's final `m` as a letter and joins a following mark to it,
+which is the confusion the walk's tail rule exists for. Shown to respond before anything is read
+with it (T2.127b: seven shapes, each reported at its index with its cluster; two escapes in one
+family are two reports; an erase inside a cluster counts as an SGR does) and shown to stay quiet
+where every renderer puts an escape (T2.127c: before a base, after a mark, between clusters, at the
+row's ends; a bare ESC that opens no sequence is a control the segmenter breaks on, GB4/GB5).
+
+**The corpus.** Every golden snapshot — 10 files, 395 frames, 8,728 lines, 33,954 escapes — and
+every frame of the terminal baseline — 2,440 files, 31,100 lines, 167,150 escapes: no escape inside
+a cluster. The row holds itself to at least 5,000 / 10,000 and 2,000 / 20,000 / 100,000, and each
+snapshot file's parsed frame count to its own `exports[` count, so a parser that matches nothing
+cannot pass by reading nothing.
+
+**What the corpus could not see, and where the painter rows had to look instead.** The corpus is
+ASCII, box-drawing, braille and sextants: not one combining mark, flag or joiner in 39,828 lines. A
+corpus chosen for its escapes had none of the shapes the corner is about, so a green T2.127 says
+only that nothing shipped has been split — and it would have said the same on the tree that held
+three painters splitting clusters. T2.128–T2.132 feed six shapes — `café` decomposed, `1️⃣`, `🇬🇧`,
+`👨‍👩‍👧`, `؀1` (a Prepend, GB9b), `aः` (a spacing mark) — to every painter that styles far-side
+text under four capability arms and two widths. Span painting at every code-unit boundary, the
+gradient ramp, a tone opened inside a keycap and closed inside a flag, fourteen kinds, the table,
+and the line, bar, radar, pie, waffle, heatmap and flame plots: no hit and every shape whole. Three
+painters split a cluster — F970. Four writers keep none whole — below.
+
+**Ink drops a zero-width code point that opens a span.** Measured through a synthetic kind: `caf` +
+inverse `e` + `́x` renders as `cafESC[7meESC[27mx`; the same row with the whole cluster inside the
+span keeps the mark. So a base and its mark split by an SGR reach a frame as a base *without* its
+mark, never as an escape inside a cluster — and the corpus row is blind to the class by
+construction. The painter rows read the painter's own bytes before Ink where a painter offers them
+(T2.128 through `paintRuns`, T2.132 through `plot3dRows`) and compare the visible row to its source
+where it does not (T2.130, T2.131). The comparison is what T2.131's mutation fails on: `caféx` with
+the cursor at column 3 comes back `cafex`.
+
+**Four label writers keep no cluster whole (open).** treemap, tree, graph and sankey write one code
+point per cell, advancing by `cells()`, so a zero-width piece is overwritten by what follows: a
+family arrives as three faces, a keycap as a bare digit, and in the treemap `café` as `cafe`. They
+paint no escape inside a cluster because no cluster survives to be split. T2.129 pins the lost
+shapes per kind by equality — a writer fixed must leave the list and a new one must join it. Not
+fixed here: it is a drop and not a split, the four share the `chargrid` and `pointlabels` writers,
+and the fix is theirs.
+
+**A spacing mark is nothing to the measurer and a cell to everyone else (open).** `aः` measures 1
+to `cells()`, 2 to `string-width`, and 2 to xterm (`aः|` leaves the cursor at column 3). So a
+`raw` row padded to the width is one cell over by Ink's measure, Ink wraps it into a second row the
+measurer never counted — `raw` at 40 and at 80 renders two rows for a one-row block — and
+`wrap-ansi` normalises to NFC before it cuts, so `café` arrives composed. Neither is a boundary
+defect; both sit in T2.129's comment and its NFC comparison, and the first is the width class the
+Never list is about. Also measured on the way: xterm-headless gives U+0600 a cell of its own and
+drops it from the line, and gives a keycap one cell against `cells()`'s two (C27 I6's residue), so
+the emulator is not a reference for any of these shapes.
+
+**Not claimed**: a child's own boundaries. An SGR a far side writes between a flag's halves reaches
+the frame as the child's boundary (I56), and the emulator flag case reports a hit at 2 by design.
+
+**What would falsify this**: a shipped frame with an escape inside a cluster that T2.127 reads and
+does not report; a shape lost by one of the four writers that T2.129's record does not list; or a
+`raw` block whose measured height matches Ink's row count with `aः` in it, which would mean the
+width finding has been fixed somewhere this entry does not name.
+
+## F970 — three painters took a boundary in code units against a cluster the segmenter joins — a token's end, a cursor's cell, a 3-D label's cells — and every one was invisible after Ink ★★☆☆☆
+
+**One class, three instances, found by feeding six shapes to every painter (F969).**
+
+1. **The syntax painters** (`code`, and `patch` through `tokenise`). highlight.js ends a `number`
+   token at `\b\d+`; a Prepend before that digit is a cluster GB9b joins, and a keycap's digit is
+   a cluster's base. With the tokens used as cut, `؀1` was split in the ten grammars that tokenise
+   a bare digit outside a comment — css, dockerfile, go, java, javascript, json, python, rust, sql,
+   typescript — and in css, dockerfile, python and sql the keycap in a `//` comment with it, because
+   those grammars have no such comment: 120 hits across the kinds sweep, none in bash, diff, ini,
+   markdown, xml or yaml. Fix: `wholeClusters` in `code.ts` moves a token's end on to the cluster's
+   end — `runsOf`'s `to` rule (C04 I84) applied to the token stream — with every width preserved;
+   `clusterEnds` answers `[]` only for printable ASCII and source has newlines, so a block pays one
+   segmentation of its text, once, through the tokeniser's memo. T2.130 over
+   every default grammar and the patch in typescript and yaml.
+2. **The `terminal` cursor.** `spansOf` took one code unit at `cursorCol`, which is a cell column
+   (C27 I4) indexed into a code-unit string: half a surrogate pair `inverse` on `🇬🇧x` at columns
+   0–3 with a lone surrogate in the frame, the mark alone on `caféx` at column 4 and the mark
+   dropped at column 3 once Ink saw it open a span, and a cell to the right of the child's after
+   any wide glyph (`日x`). Fix: walk `graphemes(line.text)` measuring each; the cluster covering
+   the column is re-split out of whichever spans hold it, each part keeping its own style (I56)
+   and gaining `inverse`; past the end, a gap of `col − cells(text)` spaces and an inverse space.
+   T2.131: every column 0–5 on five lines under four arms, the inverse cell equal to the cluster
+   covering the column by the measurer's own walk.
+3. **`plot3d` axis names with a tone.** `overlay` wrote one span per code point with an SGR on
+   each, so a joiner and a selector each sat in a span of their own — visible only before Ink
+   (`plot3dRows`), because Ink dropped the zero-width pieces and showed a family of three faces
+   with every later column shifted by the pieces it had. Fix: cluster by cluster, the cluster
+   owning the cells it measures and the cells after its first emptied so the row keeps its count.
+   T2.132 at 60 and 100.
+
+**Why none was found before.** Each was hidden by the layer above it: Ink drops a zero-width code
+point that opens a span, so the frame showed a plausible wrong thing — a bare digit, a family of
+three, `cafex` — and no assertion about escapes could reach it; the golden corpus holds no shape
+that could be split; and the walk's own rows (T1.36) record the corner rather than resolve it, by
+ruling. The restoring mutations are in `tools/mutate/runs/cluster-escapes.mjs`, each applied by
+hand, run, restored and compared by digest: T2.130 fails first on css, T2.131 on `caféx` at column
+3 reading `cafex`, T2.132 on the family in five spans at width 60; the helper blinded fails
+T2.127b alone with the corpus row green, which is why the fabricated violation exists.
+
+**What would falsify this**: T2.130, T2.131 or T2.132 green with its restoring mutation applied;
+or a fourth painter that styles far-side text per code unit and that T2.129's sweep does not
+reach.
+
+## F971 — the mono residue was the sampler, one read per second of session, and a periodic reader cannot sit on a positional channel: the stamp moves to a clock the recording never wraps ★★★☆☆
+
+F963 left `consumed.mono` reported and not asserted, and its comment guessed at the `^D` path:
+*the live session's `^D` handling takes one mono read more than the replay's in some recordings
+and not others.* Measured instead. Every mono read was tagged with its caller — a wrapper on the
+fixture's `elapsed` in both modes, one line per read, written at exit (`CALCIUM_MONO_TRACE`) —
+and the two tallies compared reader by reader.
+
+| session | recorded mono | consumed mono | the one reader that differed |
+|---|---|---|---|
+| 3 053 ms, 1 000 ms pause | 2 905 | 2 903 | `sample@shell/profiling/node.js:116` — 2 live, 0 replay |
+| 5 634 ms, 3 000 ms hold | 2 908 | 2 903 | the same — 5 live, 0 replay |
+
+Every other reader agreed to the count: the cost measurement's 2 000-read loop and its two
+bracket reads, the start stamp (construction is 2 003 on both sides, deterministic), each span's
+pair (438 / 438), each frame's three (8 / 8 / 8), the route's two, the readout's one. The live tag
+total equals the recorded count exactly, so the tap sees every read and nothing else. The
+replay's own `drain` and `report` reads — one each — land after the drive-end snapshot and are on
+neither ledger; they are the `overrun.mono: 2` the verdict carries, and T5.1c's count is taken
+when the drive finishes, so a reader that lands after it is not a parity failure and cannot be
+made one by counting.
+
+So it was the resource probe's `at: elapsed()`, taken on the sampler's tick — the injected
+timer's, one read per second of session. That is not one read too many; it is a read at a
+position no replay reproduces. A recording is served by index, the tick lands between two of the
+session's reads wherever the timer put it, and every read after it is served one place stale.
+Even at equal counts the positions differ, which is why *the replay disagrees by one* was never
+the right description. **A periodic reader cannot sit on a positional channel.**
+
+**The seam.** The sampler's stamp comes from `sampleClock`, resolved in the recorder as
+`opts.sampleClock ?? opts.elapsed ?? deps.sampleClock ?? deps.elapsed`; the root's
+`ResolvedConfig.sampleClock` is the *untapped* `elapsed` — the same function the app injected, by
+identity, taken before `recording.mono()` wraps it — and `session.ts` hands it down beside the
+probe. The recorder stamps the sample, `probe.sample(suspended, sampleClock())`, so `node.ts`, the
+one file that reads the process, reads no clock at all. Nothing under `src/` reads
+`performance.now()` anew — SS1's list is unchanged. The replay fixture passes its own
+`profile.sampleClock: () => performance.now()`, because a replay's untapped `elapsed` is the
+positional array itself. C28 I53, commitment 34, §5a table and trace row 6; C22 §2c lists the
+option.
+
+**Measured after the seam**, same probe: a 2.8 s session records 2 908 and consumes 2 908; a 5.5 s
+session with a 3 s hold records 2 908 and consumes 2 908; a 3.1 s session behind a 1.3 s far side
+records 2 998 and consumes 2 998 — identical in all three. The sampler still reads 2, 5 and 2
+times live, and the live tag total is the recorded count plus exactly those: off the channel, and
+the fidelity kept.
+
+**Rows.** T1.102 drives the real tap over a counting clock with a probe that echoes its stamp:
+three ticks take no recorded read, each `at` is the sampler clock's, and the recording holds
+construction's 2 003 and nothing more; its control is the tree's old state — no `sampleClock`,
+one recorded read per tick. T1.104 resolves a config with a recording on: `sampleClock` is the
+given `elapsed` **by identity**, two reads through it leave the batch empty, one through
+`elapsed` puts its value there. T5.1c now asserts `consumed.mono === recorded.mono` beside wall,
+green twice on the same `dist/`. By hand, each restored from a `.good` copy and confirmed by
+md5: the tick back on `elapsed` → T1.102, T5.1c and T5.1d red (and a TS6133 on the unused
+`sampleClock` — the build exits 2 and still emits, so the exit and not the output is the tell);
+`session.ts` handing the tapped `elapsed` → T5.1c and T5.1d red, and T1.104 cannot see it,
+which is why `c28-profiler.mjs`'s row expects `C28 T5.1c` and `anchors.mjs` lists the debt;
+`config.ts` resolving to `ambient.elapsed` or to the tap → T1.104 red on identity and on the
+batch respectively.
+
+**What would falsify this**: a recording whose `consumed.mono` differs from `recorded.mono`
+with the sampler on `sampleClock` — which would name a second periodic reader; or a sample
+whose `at` is not monotonic with its neighbours', which would say the untapped clock and the
+tapped one are not the same clock.
+
+## F972 — C06's `durationMs` was a difference of two wall-clock readings; `Clock.now` becomes `Clock.elapsed`, the stand-in mirrors the pair on mono, and two consumers the change list did not name ★★☆☆☆
+
+F963 fixed the transport stand-in to read the clock where C06 does, on the wall channel, because
+that is where C06 read it. A duration does not belong there: the wall clock is a time of day the
+world can step between two readings, and under C28's positional replay the wall channel is the
+one the header's second hand is served from — so the transport's pair sat on exactly the channel
+where a stale position shows (F963's second boundary).
+
+**The change.** `Clock` in `src/data/transport/types.ts` is `{ elapsed, schedule }`; `now` had no
+other reader and is gone. `subprocess.ts` reads `clock.elapsed()` at five sites — the start read
+and `durationMs` on the settle path, the spawn-failure path, and the stream's pair.
+`construct.ts`'s default transport takes `config.elapsed`. `src/testing/replay.ts`'s stand-in
+reads `elapsed` at the same two positions, before the turn and after. `test/support/transport.ts`'s
+`clockOf` returns `elapsed`; T1.13's title says which clock. C06's listing, the injection
+paragraph, I19, commitment 19 and T6.17 say `elapsed`, and a T1.13 row is in the spec, which it
+was not.
+
+**Two consumers the list did not name**, found by `tsc` rather than by grep:
+`src/data/fixtures/handler.ts` typed an option as `Clock["now"]` — a wall-time hook for a
+fixture handler, never C06's clock, and now typed as the `() => number` it is with a sentence
+saying so; and `test/unit/support-harness.test.ts` called `clock.now()` twice against the
+harness's own clock. A type rename finds its consumers where a change list finds the ones its
+author remembered.
+
+**Checked.** Construct handing the transport `config.clock` → T5.1c and T5.1d red: live takes two
+wall reads the replay does not, the replay two mono reads live did not, both counts disagree. The
+stand-in taking no reads → T1.103, T5.1c and T5.1d red. `durationMs` from one reading, at all
+three sites or at the settle site alone → T1.13 red at 0 against 150. Each restored by copy and
+md5. Runs: `c28-profiler.mjs` carries the wiring mutation (expecting `C28 T5.1c`, listed) and the
+stand-in's two; `c06-transport-clock.mjs` is new — a control that drops the payload (T1.6, T1.10
+red) and the one-read mutation (T1.13). One thing not reproduced: the construct mutation's build
+exited 2 inside the driver and 0 on a second build of the same mutation, its log overwritten by
+the next build before it was read; the verdict was taken on the emitted `dist/` either way.
+
+**What would falsify this**: a `durationMs` that differs between live and replay on a whole
+recording — the pair would be off the channel it mirrors; or a consumer of `Clock.now` that
+`tsc` did not reach, which would be a `Clock` built behind a cast.
+
+## F973 — the running card and the readouts took their figures from the wall clock; `deps.elapsed` joins the pipeline's and the refresh driver's deps, and the deadlines stay where they were ★★☆☆☆
+
+`execution.ts` took `startedAt = deps.clock()` at dispatch and `deps.clock() - startedAt` at every
+`cardOver`; `refresh.ts` registered readouts and parts with `startedAt: deps.clock()` and drew
+`since = now - startedAt` on the one-second wake. Both are durations on a time-of-day clock —
+wrong for the same reason as F972, and the only *unmasked* clock-derived figure a frame carries,
+which is what makes them T5.1d's subject.
+
+**The change.** `PipelineDeps.elapsed` and `RefreshDeps.elapsed`, wired from `config.elapsed` in
+`construct.ts` and passed through by the pipeline to its refresh driver. The card's `startedAt`,
+the approval restart and all five `cardOver` reads are `deps.elapsed()`; the readouts' and parts'
+`startedAt`, both `since`, `titleOf`'s figure, `lastOk` and the stale age are on it too, with
+`sweepParts` taking one `mono` read beside its `now`. **What stays on `deps.clock`, deliberately**:
+a retry's `dueAt` and its countdown, the sweep's `now >= dueAt`, and the stall watch's `last` and
+threshold with the notice's whole-minute figure — deadlines compared with the timer's own axis,
+and a C23 I19 ruling this change did not reopen. C23's counter and readout prose, I19, I54,
+commitment 56, the §8f row and T4.53's wording say `elapsed`; the stall figure is named here as
+the residue.
+
+**Harnesses.** `pipelineHarness` and the refresh contract's `harness()` gained a `mono` counter
+and `skew(ms)`, which moves the wall clock alone; `tick` moves both. That is the whole of the
+row design: under `tick` the two clocks agree and every existing card and readout row is green on
+either axis, so nothing there could see the change. T3.64 skews four seconds between two wakes
+and asserts nothing drawn, then two monotonic seconds and `2s` rather than `6s`; T4.68 holds an
+invoke, skews three, ticks two, and asserts `· ⠙ 2s` running and `ps · 2s` settled. A third
+harness found the seam the hard way: `test/unit/execution.test.ts` builds its own `PipelineDeps`
+literal behind `as unknown as PipelineDeps`, so the new required field was silently absent and 37
+rows failed at once on `deps.elapsed is not a function` — a fake that omits a field the type
+requires, hidden by the cast that let it omit any.
+
+**Checked**, each restored by copy and md5: the card on `deps.clock()` at all eight sites, and at
+the two the invoke route uses, → T4.68 red on the settled figure; the readouts on `deps.clock()`
+at all five sites, and at the two the readout path uses, → T3.64 red. `c23-running-card.mjs` and
+`refresh-readout.mjs` carry those two-site mutations with `also`, and their three existing
+anchors on `deps.clock()` are re-pointed at `deps.elapsed()`. And the card mutation's other
+result is F975.
+
+**What would falsify this**: a running head or a settled figure that moves under `skew` — a
+site still reading `deps.clock` for a duration; or a deadline row (retry countdown, stall) that
+moves under `skew` differently from before, which would mean a deadline was moved by accident.
+
+## F974 — T5.1d could not pass on items 1–3 alone: a far side slower than the readout's wake leaves a frame in the recording ahead of the `far` line, and a stand-in that answers when asked never draws it ★★★☆☆
+
+The brief's expectation: before F971 lands T5.1d cannot pass, after F971–F973 it must. Measured
+on the tree before any of them with a 1 385 ms far side (`CALCIUM_FARSIDE` wrapper, `sleep 1.3`
+then the real far side): the recording holds a 476-byte wake frame — `⏺︎ ps(--limit 20) · ⠙ 1s` —
+*before* the `far:ps` line, and the settled head reads `⏺︎ ps(--limit 20) · 1s · 20 rows`. The
+replay served the answer the moment the session asked, the card settled before the one-second
+wake could fire, the wake frame was never drawn, and the comparison diverged at frame 5 with
+three stalls, wall 54 against 59 and mono 2 906 against 2 994. Items 1–3 change none of that:
+the frame is missing for a reason about *when*, not about which clock.
+
+**The recording already had the answer.** The recorder writes the `far` line when the value
+reaches the session, so every frame before it in the timeline was drawn before the answer
+arrived. `driveRecording` was pacing inputs and resizes by the frames recorded before them and
+skipping `far` events with a comment. It now calls `deps.far?.(n)` when it reaches one — after
+the frames before it have been waited for, or counted as stalled — and `replayTransport(rec,
+elapsed, released)` awaits its turn before serving; `farGate()` in `src/testing/replay.ts` is the
+pair between them, and the fixture wires it. One bound and one stall counter serve inputs and
+answers alike. The fixture's tick bound rises from the default to 3 000, because the default's
+~500 one-millisecond ticks gave up before a one-second wake could fire, which read as a stall.
+
+**Two harness facts on the way.** `interactivePty` builds the child's environment from scratch —
+`TERM`, `LANG`, `PATH` and what the caller passes — so a delay set in the harness's own
+environment never reached a wrapper reading one, and the first "1.3 s far side" measured 335 ms;
+the wrapper carries the sleep baked in, written beside the recording. And the row asserts the
+fixture responded before it asserts anything else: `took.answer > 1 000`, the wake frame present,
+the whole-second figure present and matched by no `CLOCK_DERIVED` member.
+
+**Rows.** T1.103 constructs a recording with a `far` line after two frames and asserts the answer
+is not served before its turn, is served after the frame ahead of it (write count at settlement
+= prologue 3 + 2), and the stand-in reads mono exactly twice; its control is the ungated stand-in
+serving at once. T5.1d records through the 1 200 ms far side and asserts identical, `stalled` 0,
+both channels at parity, and the figure unmasked — green twice on the same `dist/`, 4.7 s each.
+The stand-in serving without awaiting → T1.103 red and T5.1d red with T5.1c green, which is the
+point: a fast far side answers inside one frame, so only the slow-far-side row can see pacing.
+C28 §5a trace row 7, T6.18.
+
+**What would falsify this**: a whole recording with a `far` line preceded by a frame that
+replays identical with the gate removed — the frame would have to be drawn by something other
+than the wake; or a recording where releasing at the `far` line is too *late* — a value the
+session needed before a frame it drew — which would say the recorder writes `far` after the
+value reached the pipeline rather than when.
+
+## F975 — the card on the wall clock survives T5.1d, measured: a positional channel reproduces whatever is computed from it, so the row for a wrong axis is the one that skews one clock alone ★★☆☆☆
+
+The brief expected the card's duration put back on the wall clock to make T5.1d red under the
+slow far side. Applied — `startedAt` and every `cardOver` on `deps.clock()`, built, run — T5.1c
+and T5.1d are **green**, 2 passed; T4.68 is red. The same at the two sites the invoke route uses.
+
+The reason is F963's own mechanism read the other way. The wall channel is positional too: the
+card's reads land at the same indexes live and replayed, so `wall[m] − wall[k]` is the same
+number on both sides and the figure reproduces. Replay fidelity was never the argument for
+moving the card to `elapsed`; the argument is that a wall clock is stepped by the world and a
+difference of two of its readings is not a duration, and the only row that can see that is one
+that moves the wall clock without moving time — `skew`, T3.64 and T4.68. The brief's claim was
+carried from F963's list of candidates, where it was a plausible next reader; asked where it was
+written down as a measurement, nowhere.
+
+**What T5.1d does prove** is narrower and still worth having: the sampler off the channel (F971),
+the transport's pair mirrored on mono (F972) and the answer served in turn (F974) each fail it
+alone, so it is the one row that holds the three seams together against an unmasked figure. C28
+T5.1d's spec row says what it does not catch and names the row that does; `c23-running-card.mjs`'s
+mutation says the same beside its `expect: "T4.68"`.
+
+**What would falsify this**: the card-on-wall mutation making T5.1d red on some recording —
+which would mean the wall channel had acquired a periodic reader and F971's class had a second
+member.
