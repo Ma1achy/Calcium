@@ -27,6 +27,9 @@
  */
 const GRAPHEMES = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 
+/** What `segment` returns: the clusters of one string, asked one at a time by `containing`. */
+type Segments = ReturnType<Intl.Segmenter["segment"]>;
+
 /**
  * Control characters, stripped before anything is measured or drawn (C09 I18).
  *
@@ -134,12 +137,103 @@ export function cells(text: string, ambiguous: AmbiguousWidth = "narrow"): numbe
   }
   if (ascii) return text.length; // cells-ok — proven equal to the walk above
 
+  // **The segmenter is asked only where a cluster can be longer than one code
+  // unit** (I63, F955). A row holding one box-drawing glyph among a hundred
+  // and forty ASCII characters used to be segmented whole — a segment object
+  // per character, forty of the sixty microseconds a transcript row cost —
+  // when every run of printable ASCII in it is one cluster per unit by the
+  // argument above. So a run is counted by its length and the segmenter is
+  // handed only what follows one; `plainRun` leaves a run's last character to
+  // it when the next unit could extend that character, so the two paths never
+  // disagree about where a cluster ends.
+  const clean = stripControl(text);
   let total = 0;
-  for (const { segment } of GRAPHEMES.segment(stripControl(text))) {
-    total += clusterCells(segment, ambiguous);
+  let segments: Segments | null = null;
+  let i = 0;
+  while (i < clean.length) {   // cells-ok: a cursor, not a width
+    const run = plainRun(clean, i);
+    if (run > i) {
+      total += run - i;   // cells-ok — one cell per unit, by the path above
+      i = run;
+      continue;
+    }
+    segments ??= GRAPHEMES.segment(clean);
+    const cluster = clusterAt(segments, i);
+    if (cluster === "") break;
+    total += clusterCells(cluster, ambiguous);
+    i += cluster.length;   // cells-ok: advancing the cursor past what was consumed
   }
   return total;
 }
+
+/** Printable ASCII — one cluster of one cell per code unit, on every path (§5). */
+function isPlain(c: number): boolean {
+  return c >= 0x20 && c <= 0x7e;
+}
+
+/**
+ * The end of the run of printable ASCII beginning at `i`, shortened so that
+ * every character in it is a whole cluster — or `i` when there is no run.
+ *
+ * A printable ASCII character is a cluster of its own unless what follows it
+ * extends it: a combining mark, a joiner, a spacing mark, all of which lie at
+ * U+00A0 or above. A control breaks a cluster on both sides (UAX #29 GB4 and
+ * GB5), so a run ending at an escape or a tab is whole and costs the segmenter
+ * nothing — which is what every styled row is made of. Only a run followed by
+ * a non-control outside ASCII gives up its last character, and the segmenter
+ * then answers for that character and its extension together.
+ */
+function plainRun(text: string, i: number): number {
+  let end = i;
+  while (end < text.length && isPlain(text.charCodeAt(end))) end += 1;   // cells-ok: a code-unit cursor
+  if (end > i && end < text.length && text.charCodeAt(end) >= 0xa0) end -= 1;   // cells-ok: a code-unit cursor
+  return end;
+}
+
+/**
+ * The cluster beginning at code-unit offset `i`, read in place — the cursor's
+ * step in the measurer and in both styled walks (I63), or `""` past the end.
+ *
+ * `containing` answers for one cluster from one position and allocates that
+ * cluster alone, which is what keeps the walk linear (I60): its cost is the
+ * cluster's and not the remainder's, measured at 50 against 400 cells beside
+ * the iterator (F955). The walks ask only at a boundary — after a run, after an
+ * escape, after a cluster — with one exception. An escape's final `m` is a
+ * letter, and a combining mark or a joiner placed directly after an escape
+ * joins it in the segmenter's eyes; the cluster found then begins before `i`,
+ * and the piece is its tail from `i` — the mark alone, zero cells — so an
+ * escape is never inside a cluster. C04 I84 keeps a renderer from painting an
+ * escape inside a cluster in the first place, which makes this a corner and
+ * not a path.
+ */
+function clusterAt(segments: Segments, i: number): string {
+  const found = segments.containing(i);
+  if (found === undefined) return "";
+  return found.index < i ? found.segment.slice(i - found.index) : found.segment;
+}
+
+/**
+ * A cluster's width on the styled walks: the measurer's answer, whatever the
+ * cluster is.
+ *
+ * A control character is a cluster of its own and `cells` strips it (I18), so
+ * it has no width, and the walks carry it through unmeasured rather than
+ * dropping it. The test here is only *which* clusters to ask `cells` about —
+ * the C0, DEL and C1 ranges the filter is defined over — and the rule itself is
+ * applied by `stripControl`, not restated.
+ */
+function pieceCells(cluster: string, first: number, ambiguous: AmbiguousWidth): number {
+  return first < 0x20 || (first >= 0x7f && first <= 0x9f)
+    ? cells(cluster, ambiguous)
+    : clusterCells(cluster, ambiguous);
+}
+
+/**
+ * The escape byte as a code unit, read from `escapes.ts` rather than written
+ * here (C01 I1, SS14). The walks ask *is this an escape* of a code unit before
+ * they ask the sticky regex, so a run of plain characters pays no regex call.
+ */
+const ESC_UNIT = SGR_RESET.charCodeAt(0);
 
 /**
  * Display width of a string that already carries SGR, and the safe truncation
@@ -159,35 +253,43 @@ export function cells(text: string, ambiguous: AmbiguousWidth = "narrow"): numbe
  * Here rather than in C22 because this is where display width is decided, and
  * two answers to "how wide is this line" is C09 I1's divergence in the one
  * place that moves the whole frame.
+ *
+ * **The printable-ASCII path, with escapes** (I63, F955). For a row whose every
+ * code unit is printable ASCII or inside an SGR sequence, the width is the
+ * count of the printable units: stripping the escapes leaves printable ASCII,
+ * which `cells` measures as its length. That is the path every styled ASCII
+ * row takes, in one scan of its code units and no allocation — `replace` used
+ * to build the stripped row for every row of every frame before `cells` saw it.
+ * Anything else falls through to the stripped measure, so the two paths can
+ * only agree.
  */
 export function displayCells(text: string, ambiguous: AmbiguousWidth = "narrow"): number {
-  return cells(text.replace(sgrPattern(), ""), ambiguous);
-}
-
-/**
- * The one code point at code-unit offset `i`, read in place — the cursor's step
- * in `fitStyled` and `sliceCells` (C09 I60), or `""` past the end.
- *
- * **`[...text.slice(i)][0]` answered the same string and allocated the rest of
- * the row to do it** (F937, F938): a copy of everything after the cursor and
- * then an array of every remaining code point, to read one, on every character
- * of every row of every frame. Quadratic in the row — 3× this read at 40 cells,
- * 1081× at 400 — and 53 % of all frame work, in a function whose tests all
- * passed because a cost has no failing case. SS60 is what keeps the spread out.
- *
- * Same answer in every case the walk can reach: a surrogate pair is one code
- * point from both, and a lone surrogate comes back as itself from both —
- * `String.fromCodePoint` throws only above U+10FFFF, and `codePointAt` never
- * yields that. The caller advances by `.length`, which is 1 or 2.
- */
-function pointAt(text: string, i: number): string {
-  const cp = text.codePointAt(i);
-  return cp === undefined ? "" : String.fromCodePoint(cp);
+  const sgr = sgrAt();
+  let total = 0;
+  let i = 0;
+  while (i < text.length) {   // cells-ok: a cursor, not a width
+    const c = text.charCodeAt(i);
+    if (isPlain(c)) {
+      total += 1;
+      i += 1;
+      continue;
+    }
+    if (c === ESC_UNIT) {
+      sgr.lastIndex = i;
+      const m = sgr.exec(text);
+      if (m !== null && m.index === i) {
+        i = sgr.lastIndex;
+        continue;
+      }
+    }
+    return cells(text.replace(sgrPattern(), ""), ambiguous);
+  }
+  return total;
 }
 
 /**
  * `sgrPattern` as a **sticky** regex — a match at `lastIndex` or nothing — for
- * the same two cursors (C09 I60).
+ * the measurer and the two cursors (C09 I60).
  *
  * **The third instance of the class, found by the bench beside the other two
  * and not by the finding** (F938). The walk asks *is there an escape at the
@@ -201,8 +303,12 @@ function pointAt(text: string, i: number): string {
  * change at all did not.
  *
  * Built from `sgrPattern`'s source rather than written, so the escape byte stays
- * in the one file C01 I1 allows it (SS14); the callers' `m.index === i` check is
- * kept, and is now always true when `m` is not null.
+ * in the one file C01 I1 allows it (SS14). The callers now test the code unit
+ * at the cursor against `ESC_UNIT` first, so the regex runs once per escape
+ * rather than once per character; the sticky flag is still what makes the
+ * question the one the code asks, and the callers' `m.index === i` check is
+ * kept — always true under it, and what keeps a forward search a cost rather
+ * than a walk that skips to the next escape.
  */
 function sgrAt(): RegExp {
   return new RegExp(sgrPattern().source, "y");
@@ -211,10 +317,19 @@ function sgrAt(): RegExp {
 /**
  * Pad or truncate to exactly `width` display cells, preserving escapes.
  *
- * Escapes are copied through and cost nothing; a grapheme that would straddle
- * the boundary is dropped and the gap padded, rather than halved. A truncated
- * line is closed with `SGR_RESET` **only if it was cut**, so an unstyled line
- * gains no bytes and a cut one cannot bleed.
+ * Escapes are copied through and cost nothing; a cluster that would straddle
+ * the boundary is dropped whole and the gap padded, rather than halved (I9). A
+ * truncated line is closed with `SGR_RESET` **only if it was cut**, so an
+ * unstyled line gains no bytes and a cut one cannot bleed.
+ *
+ * **The cursor steps by cluster, as the measurer counts** (I63, F939). It
+ * stepped by code point and asked `cells` of each, and a cluster whose width is
+ * not the sum of its parts — a ZWJ family at 2 + 0 + 2 + 0 + 2 + 0 + 2, `⚠️` at
+ * 1 + 0, a flag at 2 + 2 — was counted wrong: a 14-cell row holding a family,
+ * fitted to 20, was padded by nothing, and `⚠️x` fitted to 2 came back three
+ * cells wide. Three kinds of piece now, and the plain one is taken as a run: an
+ * escape, copied through; a run of printable ASCII, cut wherever the width
+ * lands; and otherwise one cluster from the segmenter, kept whole or not at all.
  */
 export function fitStyled(
   text: string,
@@ -225,6 +340,7 @@ export function fitStyled(
   if (displayCells(text, ambiguous) === width) return text;
 
   const sgr = sgrAt();
+  let segments: Segments | null = null;
   let out = "";
   let used = 0;
   let cut = false;
@@ -233,29 +349,49 @@ export function fitStyled(
 
   // `i` is a code-unit index into the string, not a measure of it — the walk
   // needs a position and `cells()` answers a different question. Every width
-  // decision below goes through `cells`.
+  // decision below goes through `cells`'s own cluster arithmetic.
   while (i < text.length) {   // cells-ok: a cursor, not a width
-    sgr.lastIndex = i;
-    const m = sgr.exec(text);
-    if (m !== null && m.index === i) {
-      out += m[0];
-      styled = true;
-      i = sgr.lastIndex;
+    const c = text.charCodeAt(i);
+    if (c === ESC_UNIT) {
+      sgr.lastIndex = i;
+      const m = sgr.exec(text);
+      if (m !== null && m.index === i) {
+        out += m[0];
+        styled = true;
+        i = sgr.lastIndex;
+        continue;
+      }
+    }
+
+    // A run of one-cell characters, taken as a substring and cut wherever the
+    // width lands — no cell of it can straddle the boundary.
+    const run = plainRun(text, i);
+    if (run > i) {
+      const room = Math.max(0, width - used);
+      if (run - i > room) {
+        out += text.slice(i, i + room);
+        used += room;
+        cut = true;
+        break;
+      }
+      out += text.slice(i, run);
+      used += run - i;   // cells-ok — one cell per unit, by `cells`'s ASCII path
+      i = run;
       continue;
     }
 
-    // One code point, read in place; the step is a code point and not a
-    // cluster, which is §5a's other half (F939, T3.79).
-    const ch = pointAt(text, i);
-    if (ch === "") break;
-    const w = cells(ch, ambiguous);
+    // One cluster, whole or not at all (I9, I63).
+    segments ??= GRAPHEMES.segment(text);
+    const cluster = clusterAt(segments, i);
+    if (cluster === "") break;
+    const w = pieceCells(cluster, c, ambiguous);
     if (used + w > width) {
       cut = true;
       break;
     }
-    out += ch;
+    out += cluster;
     used += w;
-    i += ch.length;   // cells-ok: advancing the cursor past what was consumed
+    i += cluster.length;   // cells-ok: advancing the cursor past what was consumed
   }
 
   // Only a cut that carried style needs closing. An unstyled truncation gaining
@@ -289,6 +425,11 @@ export function fitStyled(
  * The result is exactly `to - from` cells, or fewer only when the line itself
  * ends first. Nothing is padded here — the caller knows whether a short tail
  * should be filled, and `paint` does.
+ *
+ * The same three pieces as `fitStyled`'s walk (I63): an escape, a run of
+ * printable ASCII — whose part inside the window is a substring, since no cell
+ * of it can straddle an edge — and otherwise one cluster, which is where the
+ * two rules above do their work.
  */
 export function sliceCells(
   text: string,
@@ -301,6 +442,7 @@ export function sliceCells(
   if (end === start) return "";
 
   const sgr = sgrAt();
+  let segments: Segments | null = null;
   // The style in effect at `start`, accumulated across everything skipped. A
   // reset in the prefix clears it, so the tail opens with what the terminal
   // would actually have been showing rather than with every escape ever seen.
@@ -312,25 +454,53 @@ export function sliceCells(
   let styled = false;
 
   while (i < text.length) {   // cells-ok: a cursor, not a width
-    sgr.lastIndex = i;
-    const m = sgr.exec(text);
-    if (m !== null && m.index === i) {
-      const esc = m[0];
-      if (started) {
-        out += esc;
-        styled = true;
-      } else {
-        carried = esc === SGR_RESET ? "" : carried + esc;
+    const c = text.charCodeAt(i);
+    if (c === ESC_UNIT) {
+      sgr.lastIndex = i;
+      const m = sgr.exec(text);
+      if (m !== null && m.index === i) {
+        const esc = m[0];
+        if (started) {
+          out += esc;
+          styled = true;
+        } else {
+          carried = esc === SGR_RESET ? "" : carried + esc;
+        }
+        i = sgr.lastIndex;
+        continue;
       }
-      i = sgr.lastIndex;
+    }
+
+    // A run of one-cell characters. Wholly before the window it is skipped;
+    // otherwise the window opens at its first cell inside, and the part inside
+    // is the substring between the two edges.
+    const run = plainRun(text, i);
+    if (run > i) {
+      const n = run - i;   // cells-ok — one cell per unit, by `cells`'s ASCII path
+      if (used + n <= start) {
+        used += n;
+        i = run;
+        continue;
+      }
+      if (!started) {
+        started = true;
+        out += carried;
+        if (carried !== "") styled = true;
+      }
+      if (used >= end) break;
+      const lo = Math.max(used, start);
+      const hi = Math.min(used + n, end);
+      out += text.slice(i + (lo - used), i + (hi - used));
+      if (used + n > end) break;
+      used += n;
+      i = run;
       continue;
     }
 
-    // The same read as `fitStyled`'s, for the same reason (F938): the second
-    // site F937 did not name, on the tail window `composite` takes of every row.
-    const ch = pointAt(text, i);
-    if (ch === "") break;
-    const w = cells(ch, ambiguous);
+    segments ??= GRAPHEMES.segment(text);
+    const cluster = clusterAt(segments, i);
+    if (cluster === "") break;
+    const w = pieceCells(cluster, c, ambiguous);
 
     // Straddling the left edge or the right: blanked in both directions, so the
     // window measures `to - from` either way. The left case is a separate path
@@ -343,7 +513,7 @@ export function sliceCells(
       }
       out += " ".repeat(used + w - start);
       used += w;
-      i += ch.length;   // cells-ok: advancing the cursor past what was consumed
+      i += cluster.length;   // cells-ok: advancing the cursor past what was consumed
       continue;
     }
 
@@ -359,9 +529,9 @@ export function sliceCells(
       break;
     }
 
-    if (started) out += ch;
+    if (started) out += cluster;
     used += w;
-    i += ch.length;   // cells-ok: advancing the cursor past what was consumed
+    i += cluster.length;   // cells-ok: advancing the cursor past what was consumed
   }
 
   // Only a window that carried style needs closing, for `fitStyled`'s reason:
@@ -413,12 +583,14 @@ export function clusterWidth(cluster: string): number {
  * two glyphs of two.
  */
 function clusterCells(cluster: string, ambiguous: AmbiguousWidth = "narrow"): number {
-  const points = [...cluster];
-  const base = points[0]?.codePointAt(0);
+  const base = cluster.codePointAt(0);
   if (base === undefined) return 0;
   if (isZeroWidth(base)) return 0;
 
-  if (points.some((p) => p.codePointAt(0) === 0xfe0f)) return 2;
+  // U+FE0F is one code unit and never half of a surrogate pair, so a substring
+  // search is the code-point test without spreading the cluster into an array
+  // — which this function did once per cluster of every measured string (F955).
+  if (cluster.includes("\ufe0f")) return 2;
   if (isRegionalIndicator(base)) return 2;
 
   if (isWide(base)) return 2;

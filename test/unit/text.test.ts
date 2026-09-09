@@ -354,14 +354,15 @@ describe("fitStyled (C09 §5a)", () => {
     expect(fitted.match(SGR)).toEqual([RED, SGR_RESET]);
   });
 
-  it("T1.31 (I60, I20, §5a): the cursor steps one code point, in both walks", () => {
-    // **The step is a code point, not a code unit and not a cluster.** An
-    // astral character is two UTF-16 units and one step; a combining mark is
-    // its own zero-width step, so it stays with its base at the cut; a lone
-    // surrogate is one one-cell step, exactly as the string iterator walked it
-    // before the read was replaced (F938). The fabricated violation is
-    // `i += 1`: the low half of every astral pair then re-enters the walk as a
-    // character of its own, one cell wide, and lands in the output.
+  it("T1.31 (I60, I20, I63, §5a): the cursor steps whole characters, in both walks", () => {
+    // **The step is a cluster, never a code unit** (I63). An astral character
+    // is two UTF-16 units and one step; a combining mark travels with its base
+    // as one piece, so it stays with it at the cut; a lone surrogate is one
+    // one-cell step, exactly as the string iterator walked it before the read
+    // was replaced (F938). Every answer here was the code-point walk's too —
+    // the rows a cluster step changes are T3.79's. The fabricated violation is
+    // a code-unit step: the low half of every astral pair then re-enters the
+    // walk as a character of its own, one cell wide, and lands in the output.
     expect(fitStyled("a\u{1F44D}bc", 4, SGR_RESET), "cut after an astral pair").toBe("a\u{1F44D}b");
     expect(fitStyled("\u{1F44D}", 4, SGR_RESET), "padded after an astral pair").toBe("\u{1F44D}  ");
     expect(fitStyled("e\u0301xy", 1, SGR_RESET), "the mark stays with its base").toBe("e\u0301");
@@ -371,8 +372,8 @@ describe("fitStyled (C09 §5a)", () => {
 
     // And over a corpus whose clusters are additive — every cluster's width is
     // the sum of its code points' — both walks hit `width` exactly and never
-    // manufacture a lone surrogate. (The non-additive clusters are T3.79's
-    // record, F939.)
+    // manufacture a lone surrogate. (The non-additive clusters are T3.79's,
+    // F939.)
     const corpus = ["plain ascii", "日本語のテキスト", "a\u{1F44D}b\u{1F600}c", "e\u0301 o\u0308 u\u0300", `${RED}x\u{1F44D}${SGR_RESET}y\u{1F600}`];
     for (const line of corpus) {
       const whole = displayCells(line);
@@ -389,6 +390,68 @@ describe("fitStyled (C09 §5a)", () => {
         }
       }
     }
+  });
+});
+
+describe("C09 §5a — the three pieces, and where the segmenter is asked (I63)", () => {
+  const ESC = String.fromCharCode(27);
+  const RED = `${ESC}[31m`;
+  const SGR = new RegExp(`${ESC}\\[[0-9;]*m`, "g");
+
+  it("T1.36 (I63, §5a): a row of printable ASCII and escapes is measured in one scan, and everything else is measured as it was", () => {
+    // **The reference is the definition the fast path replaced** — the escapes
+    // stripped and the rest handed to `cells` — not the function under test.
+    // The corpus reaches both arms: rows the scan answers alone, and rows that
+    // fall through at a tab, a control, a bare escape or a glyph.
+    const rows = [
+      "", "plain", `${RED}styled${SGR_RESET}`, `${RED}${SGR_RESET}`, "a\tb", `a${String.fromCharCode(7)}b`,
+      `a${ESC}b`, `${RED}a${ESC}[b`, "日本", `${RED}│${SGR_RESET} x`, "e\u0301", "\u{1F44D}", "1\ufe0f\u20e3", "a\u0903",
+    ];
+    for (const row of rows) {
+      expect(displayCells(row), JSON.stringify(row)).toBe(cells(row.replace(SGR, "")));
+    }
+    const fast = rows.filter((r) => /^[\x20-\x7e]*$/.test(r.replace(SGR, "")) && !r.includes(`${ESC}b`) && !r.includes(`${ESC}[b`));
+    expect(fast.length, "rows the scan answers alone").toBeGreaterThan(3);
+    expect(rows.length - fast.length, "and rows that fall through").toBeGreaterThan(5);
+
+    // **The run gives up its last character when what follows could extend
+    // it** — a keycap is a digit, a selector and an enclosing mark, two cells
+    // as one cluster and one cell as a digit beside a zero-width tail; a
+    // spacing mark after a letter is the letter's cell, not a second one.
+    expect(cells("1\ufe0f\u20e3"), "keycap: one cluster of two cells").toBe(2);
+    expect(cells("a\u0903"), "a spacing mark stays with its base").toBe(1);
+    expect(cells("\u06001"), "a Prepend joins the digit after it").toBe(1);
+    expect(fitStyled("\u06001x", 1, SGR_RESET), "and the walk keeps that cluster whole").toBe("\u06001");
+  });
+
+  it("T1.36 (I63, §5a): the corners — a control is carried at no width, and an escape is never inside a piece", () => {
+    // A control character is a cluster of its own and has no width (I18): the
+    // walks carry it through and the measurer strips it, so the row measures
+    // what is drawn either way. A bare escape is one.
+    const bel = String.fromCharCode(7);
+    expect(fitStyled(`a${bel}b`, 3, SGR_RESET)).toBe(`a${bel}b `);
+    expect(sliceCells(`a${bel}b`, 1, 2)).toBe(`${bel}b`);
+    expect(fitStyled(`a${ESC}b`, 3, SGR_RESET)).toBe(`a${ESC}b `);
+    expect(fitStyled("a\tb", 4, SGR_RESET), "a tab is one cell, as `cells` counts it").toBe("a\tb ");
+
+    // **An escape's final `m` is a letter, and a mark placed directly after an
+    // escape joins it in the segmenter's eyes.** The piece is the mark alone,
+    // zero cells, and the escape is whole — never repeated, never split — so
+    // the row still measures what the terminal draws. C04 I84 keeps a renderer
+    // from painting an escape inside a cluster; this is the corner it leaves.
+    const marked = `x${RED}\u0301y`;
+    expect(displayCells(marked)).toBe(2);
+    expect(fitStyled(marked, 4, SGR_RESET)).toBe(`${marked}  `);
+    expect(displayCells(fitStyled(marked, 4, SGR_RESET))).toBe(4);
+    expect(sliceCells(marked, 1, 2)).toBe(`${RED}\u0301y${SGR_RESET}`);
+
+    // **A combining mark at a window's right edge stays with its base** (F956).
+    // The code-point walk broke at the edge before the mark — `[0, 2)` over
+    // `ae\u0301b` came back `ae` — and no width could see it, because a base
+    // without its mark measures what the base does.
+    expect(sliceCells("ae\u0301b", 0, 2)).toBe("ae\u0301");
+    expect(sliceCells("ae\u0301b", 0, 2).length, "two cells, three code units").toBe(3); // cells-ok — a code-unit count, deliberately
+    expect(sliceCells(`${RED}ae\u0301${SGR_RESET}b`, 0, 2)).toBe(`${RED}ae\u0301${SGR_RESET}${SGR_RESET}`);
   });
 });
 

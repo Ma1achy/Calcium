@@ -1701,7 +1701,7 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     // about spreads.** Three spreads the tree legitimately holds, each of which
     // a looser pattern would report: a spread of a slice into a longer literal
     // (`paint.ts:299`, copied), a spread of a single cluster whose array is
-    // then read whole (`clusterCells`, copied — the rule's stated blind spot,
+    // then read whole (the shape `clusterCells` held until F958 — the rule's stated blind spot,
     // and the reason it is a blind spot rather than a violation), and two
     // statements on one line where the second indexes something else, which is
     // what the `[^;\n]` bound is for.

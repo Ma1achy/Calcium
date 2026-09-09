@@ -12,8 +12,16 @@
 // the first. Neither alone is the claim.
 //
 // **The read and the step are separate claims**, which T6.105 says in prose and
-// the last two mutations say in code: `i += 1` walks the low half of every
+// the code-unit mutations say in code: `i += 1` walks the low half of every
 // astral pair as a character of its own, and nothing about the read notices.
+//
+// **And the step is a cluster, not a code point** (C09 I63, F939, F955). The walk
+// takes three kinds of piece — an escape, a run of printable ASCII, one cluster
+// from the segmenter — and each has a mutation: the cluster arm reverted to a
+// code point, the run admitting a joiner, the run not giving up its last
+// character before an extender, the tail rule removed, the remainder segmented
+// to reach the cursor (the quadratic by the mechanism SS60 cannot see, which
+// T3.84 sees), and the measure's scan counting an escape as a cell.
 //
 // **What the timing rows cannot see is stated rather than left**: a spread put
 // back at one site leaves the other row green — which is why each site has a
@@ -61,52 +69,59 @@ const results = runPass({
   },
   mutations: [
     {
-      // **F937 as it shipped, at the site it named.** The read allocates the
-      // rest of the row on every character; the pad path walks the whole row;
-      // T3.77's ratio goes from ~8× to ~48×. SS60 fires on the line too, under
-      // `make enforce`, which this run does not execute.
-      name: "FIT-SPREAD: the spread restored at the fitStyled site",
+      // **The quadratic by the mechanism SS60 cannot see** (F938's stated
+      // blind spot, F955, F958). The remainder of the row is *materialised* per
+      // cluster — every cluster after the cursor built to read the first — and
+      // no spread is written, so the scan is silent. The styled ASCII rows of
+      // T3.77 and T3.78 never reach the cluster arm, so both stay green;
+      // T3.84's CJK row is the one that sees it, on the pad path. **Measured
+      // first with `GRAPHEMES.segment(text.slice(i))` in place of this, which
+      // survived**: a slice is a view in V8 and `containing` is lazy, so that
+      // spelling is linear and was a vacuous fabrication (F958).
+      name: "FIT-REMAINDER: the fitStyled cluster arm builds every cluster after the cursor",
       file: TEXT,
       from:
-        "    const ch = pointAt(text, i);\n" +
-        "    if (ch === \"\") break;\n" +
-        "    const w = cells(ch, ambiguous);\n" +
+        "    segments ??= GRAPHEMES.segment(text);\n" +
+        "    const cluster = clusterAt(segments, i);\n" +
+        "    if (cluster === \"\") break;\n" +
+        "    const w = pieceCells(cluster, c, ambiguous);\n" +
         "    if (used + w > width) {",
       to:
-        "    const ch = [...text.slice(i)][0] ?? \"\";\n" +
-        "    if (ch === \"\") break;\n" +
-        "    const w = cells(ch, ambiguous);\n" +
+        "    segments ??= GRAPHEMES.segment(text);\n" +
+        "    const cluster = graphemes(text.slice(i))[0] ?? \"\";\n" +
+        "    if (cluster === \"\") break;\n" +
+        "    const w = pieceCells(cluster, c, ambiguous);\n" +
         "    if (used + w > width) {",
-      expect: "T3.77",
+      expect: "T3.84",
     },
     {
-      // **The second site, which F937 did not name** (F938). T3.77 stays green
-      // — it never calls `sliceCells` — and that is the argument for two rows.
-      name: "SLICE-SPREAD: the spread restored at the sliceCells site",
+      // The same at the window's cluster arm: T3.84's tail ratio.
+      name: "SLICE-REMAINDER: the sliceCells cluster arm builds every cluster after the cursor",
       file: TEXT,
       from:
-        "    const ch = pointAt(text, i);\n" +
-        "    if (ch === \"\") break;\n" +
-        "    const w = cells(ch, ambiguous);\n" +
+        "    segments ??= GRAPHEMES.segment(text);\n" +
+        "    const cluster = clusterAt(segments, i);\n" +
+        "    if (cluster === \"\") break;\n" +
+        "    const w = pieceCells(cluster, c, ambiguous);\n" +
         "\n" +
         "    // Straddling the left edge or the right",
       to:
-        "    const ch = [...text.slice(i)][0] ?? \"\";\n" +
-        "    if (ch === \"\") break;\n" +
-        "    const w = cells(ch, ambiguous);\n" +
+        "    segments ??= GRAPHEMES.segment(text);\n" +
+        "    const cluster = graphemes(text.slice(i))[0] ?? \"\";\n" +
+        "    if (cluster === \"\") break;\n" +
+        "    const w = pieceCells(cluster, c, ambiguous);\n" +
         "\n" +
         "    // Straddling the left edge or the right",
-      expect: "T3.78",
+      expect: "T3.84",
     },
     {
       // **The third instance, put back** (F938): the `g` regex scans to the
-      // next escape anywhere after the cursor, so an unstyled row is walked
-      // once per character. Bounded by a colour change every twenty cells on
-      // the styled rows the timing rows use, so this is expected to **survive
-      // both timing rows** and is listed to say so: the bench is what saw it
-      // (15.7× against 7.9× at 400/50 on a plain row), and no row in the suite
-      // measures a plain row. A survivor here is the recorded blind spot, not a
-      // finding about the tests. Measured: 41 of 41 rows green with it applied.
+      // next escape anywhere after the cursor. The reason it survives moved:
+      // the regex is asked only where the code unit at the cursor is the
+      // escape byte, and the callers' `m.index === i` check is kept, so a
+      // forward search costs a scan only from a bare escape and can never skip
+      // text. Listed to say so: a survivor here is the recorded blind spot, not
+      // a finding about the tests.
       name: "STICKY-OFF: the escape match is a forward search again",
       file: TEXT,
       from: "  return new RegExp(sgrPattern().source, \"y\");",
@@ -114,43 +129,159 @@ const results = runPass({
       expect: "(none — expected to survive)",
     },
     {
-      // **The step, not the read** (T6.105). The low half of every astral pair
-      // re-enters the walk as a one-cell character and lands in the output.
-      // Measured: T1.31 and T3.79 fail, T1.30 and T1.16c stay green.
-      name: "FIT-UNIT: the fitStyled cursor advances one code unit",
+      // **The step, not the read** (T6.105). The cursor advances one code unit
+      // past a cluster; the next ask finds the same cluster beginning before
+      // the cursor and the tail rule yields its remainder as a piece, so the
+      // low half of every astral pair lands in the output on its own.
+      name: "FIT-UNIT: the fitStyled cursor advances one code unit past a cluster",
       file: TEXT,
       from:
-        "    out += ch;\n" +
+        "    out += cluster;\n" +
         "    used += w;\n" +
-        "    i += ch.length;   // cells-ok: advancing the cursor past what was consumed\n" +
-        "  }\n" +
-        "\n" +
-        "  // Only a cut that carried style needs closing.",
+        "    i += cluster.length;   // cells-ok: advancing the cursor past what was consumed",
       to:
-        "    out += ch;\n" +
+        "    out += cluster;\n" +
         "    used += w;\n" +
-        "    i += 1;   // cells-ok: advancing the cursor past what was consumed\n" +
-        "  }\n" +
-        "\n" +
-        "  // Only a cut that carried style needs closing.",
+        "    i += 1;   // cells-ok: advancing the cursor past what was consumed",
       expect: "T1.31",
     },
     {
       // The same in the window's main path. **T1.16c stays green** — measured,
       // and it is F939's own mechanism: the composition law is arithmetic over
-      // pieces that are each wrong by the same amount, so only a row that reads
-      // the output, not a sum, sees the step. That is why T1.31 exists.
-      name: "SLICE-UNIT: the sliceCells cursor advances one code unit",
+      // pieces, so only a row that reads the output, not a sum, sees the step.
+      name: "SLICE-UNIT: the sliceCells cursor advances one code unit past a cluster",
       file: TEXT,
       from:
-        "    if (started) out += ch;\n" +
+        "    if (started) out += cluster;\n" +
         "    used += w;\n" +
-        "    i += ch.length;   // cells-ok: advancing the cursor past what was consumed",
+        "    i += cluster.length;   // cells-ok: advancing the cursor past what was consumed",
       to:
-        "    if (started) out += ch;\n" +
+        "    if (started) out += cluster;\n" +
         "    used += w;\n" +
         "    i += 1;   // cells-ok: advancing the cursor past what was consumed",
       expect: "T1.31",
+    },
+    {
+      // **The cluster step reverted to a code point** at the fitStyled site
+      // (C09 I63, F939): the family is walked as seven pieces again, so the row it
+      // sits in is padded by nothing. T1.36's Prepend row sees it too.
+      name: "FIT-POINT: the fitStyled cluster arm takes one code point",
+      file: TEXT,
+      from:
+        "    const cluster = clusterAt(segments, i);\n" +
+        "    if (cluster === \"\") break;\n" +
+        "    const w = pieceCells(cluster, c, ambiguous);\n" +
+        "    if (used + w > width) {",
+      to:
+        "    const cluster = String.fromCodePoint(text.codePointAt(i) ?? 0x20);\n" +
+        "    if (cluster === \"\") break;\n" +
+        "    const w = pieceCells(cluster, c, ambiguous);\n" +
+        "    if (used + w > width) {",
+      expect: "T3.79",
+    },
+    {
+      // The same at the window: the joiner between two blanks comes back.
+      name: "SLICE-POINT: the sliceCells cluster arm takes one code point",
+      file: TEXT,
+      from:
+        "    const cluster = clusterAt(segments, i);\n" +
+        "    if (cluster === \"\") break;\n" +
+        "    const w = pieceCells(cluster, c, ambiguous);\n" +
+        "\n" +
+        "    // Straddling the left edge or the right",
+      to:
+        "    const cluster = String.fromCodePoint(text.codePointAt(i) ?? 0x20);\n" +
+        "    if (cluster === \"\") break;\n" +
+        "    const w = pieceCells(cluster, c, ambiguous);\n" +
+        "\n" +
+        "    // Straddling the left edge or the right",
+      expect: "T3.79",
+    },
+    {
+      // **The plain run admitting the joiner.** A family still measures 2 —
+      // it begins with a pictograph, so `containing` takes the whole cluster
+      // and the run never lands on its joiners — and T1.13 stays green;
+      // what the run takes is a joiner standing alone, `cells("\\u200d")` at
+      // 1 for 0, which T3.79's record of the per-code-point sums sees.
+      // Measured: T3.79 alone.
+      name: "RUN-ZWJ: the plain set admits U+200D",
+      file: TEXT,
+      from: "  return c >= 0x20 && c <= 0x7e;\n}",
+      to: "  return (c >= 0x20 && c <= 0x7e) || c === 0x200d;\n}",
+      expect: "T3.79",
+    },
+    {
+      // **`cells()`'s own fast path admitting the joiner.** A family still
+      // leaves the path at its first pictograph and measures 2, so T1.13
+      // stays green here too; a joiner standing alone is eleven-elevenths
+      // printable and measures 1 for 0, which T3.79's record sees. Measured:
+      // T3.79 alone — both joiner mutations are thin, and say so.
+      name: "FAST-ZWJ: the printable-ASCII path admits U+200D",
+      file: TEXT,
+      from:
+        "  for (let i = 0; i < text.length; i += 1) {  // cells-ok — a code-unit cursor, not a width\n" +
+        "    const c = text.charCodeAt(i);\n" +
+        "    if (c < 0x20 || c > 0x7e) {",
+      to:
+        "  for (let i = 0; i < text.length; i += 1) {  // cells-ok — a code-unit cursor, not a width\n" +
+        "    const c = text.charCodeAt(i);\n" +
+        "    if ((c < 0x20 || c > 0x7e) && c !== 0x200d) {",
+      expect: "T3.79",
+    },
+    {
+      // **The run keeping its last character before an extender**: a keycap
+      // becomes a digit beside a zero-width tail (one cell for two) and a
+      // spacing mark a cell of its own (two for one). A combining mark is zero
+      // cells either way, which is why T1.31 stays green and T1.36 holds the
+      // keycap.
+      name: "RUN-GREEDY: the plain run does not give up its last character",
+      file: TEXT,
+      from: "  if (end > i && end < text.length && text.charCodeAt(end) >= 0xa0) end -= 1;   // cells-ok: a code-unit cursor\n",
+      to: "",
+      expect: "T1.36",
+    },
+    {
+      // **The tail rule removed**: a mark placed directly after an escape
+      // joins the escape's `m`, and the whole cluster is emitted from the
+      // cursor — so the `m` is repeated in the output.
+      name: "TAIL-OFF: the cluster found before the cursor is emitted whole",
+      file: TEXT,
+      from: "  return found.index < i ? found.segment.slice(i - found.index) : found.segment;",
+      to: "  return found.segment;",
+      expect: "T1.36",
+    },
+    {
+      // **The measure's scan counting an escape as a cell**: a styled row is
+      // no longer already `width`, and T1.30's first styled row is cut.
+      name: "COUNT-ESCAPE: displayCells's scan counts an escape as one cell",
+      file: TEXT,
+      from:
+        "      const m = sgr.exec(text);\n" +
+        "      if (m !== null && m.index === i) {\n" +
+        "        i = sgr.lastIndex;\n" +
+        "        continue;\n" +
+        "      }\n" +
+        "    }\n" +
+        "    return cells(text.replace(sgrPattern(), \"\"), ambiguous);",
+      to:
+        "      const m = sgr.exec(text);\n" +
+        "      if (m !== null && m.index === i) {\n" +
+        "        total += 1;\n" +
+        "        i = sgr.lastIndex;\n" +
+        "        continue;\n" +
+        "      }\n" +
+        "    }\n" +
+        "    return cells(text.replace(sgrPattern(), \"\"), ambiguous);",
+      expect: "T1.30",
+    },
+    {
+      // **The window's run arm taking the run from its start** rather than
+      // from `start`: the cells before the window's left edge come back.
+      name: "WINDOW-LO: the window's run arm ignores the left edge",
+      file: TEXT,
+      from: "      const lo = Math.max(used, start);",
+      to: "      const lo = used;",
+      expect: "T1.16",
     },
     {
       // **T1.30's own subject**: a pad is not a cut, and four bytes on every

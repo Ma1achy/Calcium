@@ -751,8 +751,11 @@ function transcript(frame: Composed, deps: PaintDeps, width: number): readonly s
   // **Two spans, because splitting `assemble` left 48 % sitting in `body`**
   // (C28 §2, F936). `visible` is the work — C14 selecting and C09 rendering —
   // and this function's own self time is then the `exact()` loop below, which
-  // is a styled-width fit per row per frame and had never been measured apart
-  // from what it pads.
+  // is a styled-width fit per row per frame. Measured apart from what it pads
+  // at last: 69 ms of self time over 34 frames after F938, 60 µs a row, and
+  // the row was the reason — one `│` in every patch gutter sent the whole
+  // row through the segmenter; 14 ms once C09 I63 asked it only for clusters
+  // (F955).
   using _t = deps.probe?.span("transcript") ?? NO_SPAN;
   let rows: readonly string[];
   {

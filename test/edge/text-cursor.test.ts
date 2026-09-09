@@ -9,8 +9,11 @@
 // rule, with the two guards that group demands — each operand does at least
 // 20 ms of calls so the clock's floor cannot produce the ratio (F8), and the
 // bound sits midway between what a linear walk gives and what the shipped
-// quadratic gave. T3.79 is the other half of the walk: what the cursor's step
-// being a code point *and not a cluster* does to the frame (F939).
+// quadratic gave. T3.79 is the other half of the walk: the cursor steps by
+// cluster, as the measurer counts, so the four shapes the code-point step
+// counted wrong come out right (I63, F939). T3.84 and T3.85 are F955's rows:
+// the cluster step is linear too, and a row holding one glyph is not
+// segmented whole for it.
 import { describe, expect, it } from "vitest";
 import { cells, displayCells, fitStyled, sliceCells } from "../../src/presentation/text.js";
 import { SGR_RESET } from "../../src/terminal/escapes.js";
@@ -105,54 +108,138 @@ describe("C09 §5a — the walk is linear in the row (C09 I60)", () => {
   });
 });
 
-describe("C09 §5a — a code point is not a cluster (F939)", () => {
-  // **The record, in T3.76's form: this row pins the walk as it stands, and it
-  // is the walk's defect that it pins.** `cells()` asks the segmenter, so a
-  // cluster is measured whole; the cursor asks each code point, so a cluster
-  // whose width is not the sum of its parts is counted wrong — a ZWJ family at
-  // 2 + 0 + 2 + 0 + 2 + 0 + 2, an emoji-presentation `⚠️` at 1 + 0, a flag at
-  // 2 + 2, a skin tone at 2 + 2. The consequences below are what a frame gets.
-  //
-  // The fix the brief that found this ruled out — F938 replaces the read and
-  // keeps the step — is a cursor that steps by cluster, and it changes the
-  // pieces I20 composes (T1.16c's family row among them). When it lands, every
-  // assertion here fails and is rewritten to the cluster answer; until then a
-  // change to the read that moved any of these would be a change to the walk.
+describe("C09 §5a — the cursor steps by cluster, as the measurer counts (C09 I63, F939)", () => {
+  // **This row pinned the defect until the cluster cursor landed, and now pins
+  // the claim.** `cells()` asks the segmenter, so a cluster is measured whole;
+  // the cursor asked each code point, so a cluster whose width is not the sum
+  // of its parts was counted wrong — a ZWJ family at 2 + 0 + 2 + 0 + 2 + 0 + 2,
+  // an emoji-presentation `⚠️` at 1 + 0, a flag at 2 + 2, a skin tone at 2 + 2.
+  // The `walked` sums below are kept as the record of what the code-point step
+  // added up; the walk no longer adds anything up, and every consequence that
+  // followed is asserted the other way round.
   const FAMILY = `\u{1F468}${ZWJ}\u{1F469}${ZWJ}\u{1F467}${ZWJ}\u{1F466}`;
   const WARNING = "⚠️";
   const FLAG = "\u{1F1EC}\u{1F1E7}";
   const TONED = "\u{1F44D}\u{1F3FD}";
 
-  /** What the cursor adds up for a cluster: one `cells()` answer per code point. */
+  /** What the code-point cursor added up for a cluster: one `cells()` answer per code point (F939). */
   const walked = (cluster: string): number => Array.from(cluster).reduce((n, cp) => n + cells(cp), 0);
 
-  it("T3.79 (C09 §5a, F939): four cluster shapes the walk counts wrong, and what each does to a row", () => {
-    // The disagreement itself, per shape. The measurer is right about all four
-    // (T1.13); the walk over-counts three and under-counts one.
-    expect([displayCells(FAMILY), walked(FAMILY)], "ZWJ family: measured, walked").toEqual([2, 8]);
-    expect([displayCells(WARNING), walked(WARNING)], "emoji presentation: measured, walked").toEqual([2, 1]);
-    expect([displayCells(FLAG), walked(FLAG)], "regional-indicator pair: measured, walked").toEqual([2, 4]);
-    expect([displayCells(TONED), walked(TONED)], "skin-tone modifier: measured, walked").toEqual([2, 4]);
+  it("T3.79 (C09 I63, §5a, F939): four cluster shapes the code-point walk counted wrong, and each row comes out at its width", () => {
+    // The disagreement the row was written about, still true of the sums and
+    // no longer of the walk: the measurer is right about all four (T1.13), and
+    // the per-code-point sum over-counts three and under-counts one.
+    expect([displayCells(FAMILY), walked(FAMILY)], "ZWJ family: measured, summed per code point").toEqual([2, 8]);
+    expect([displayCells(WARNING), walked(WARNING)], "emoji presentation: measured, summed").toEqual([2, 1]);
+    expect([displayCells(FLAG), walked(FLAG)], "regional-indicator pair: measured, summed").toEqual([2, 4]);
+    expect([displayCells(TONED), walked(TONED)], "skin-tone modifier: measured, summed").toEqual([2, 4]);
 
-    // **Over-count: a row that fits is cut, and a row that needs padding gets
-    // none.** Fourteen cells by the measurer; the walk believes twenty.
+    // **A row that fits is kept, and a row that needs padding gets it.**
+    // Fourteen cells by the measurer, and fourteen by the walk.
     const row = `abc ${FAMILY} defghij`;
     expect(displayCells(row)).toBe(14);
-    expect(fitStyled(row, 15, SGR_RESET), "fitted to 15, a row of 14 loses five characters").toBe(`abc ${FAMILY} de`);
-    expect(displayCells(fitStyled(row, 15, SGR_RESET)), "and comes back nine cells wide, not fifteen").toBe(9);
-    expect(fitStyled(row, 20, SGR_RESET), "fitted to 20, it is padded by nothing").toBe(row);
-    expect(displayCells(fitStyled(row, 20, SGR_RESET)), "so six cells of the previous frame show through").toBe(14);
+    expect(fitStyled(row, 15, SGR_RESET), "fitted to 15, a row of 14 keeps its cell to spare").toBe(`${row} `);
+    expect(displayCells(fitStyled(row, 15, SGR_RESET))).toBe(15);
+    expect(fitStyled(row, 20, SGR_RESET), "fitted to 20, it is padded to 20").toBe(`${row}${" ".repeat(6)}`);
+    expect(displayCells(fitStyled(row, 20, SGR_RESET)), "so nothing of the previous frame shows through").toBe(20);
 
-    // **Under-count: a row comes back wider than `width`**, which is the wrap
-    // that scrolls the alternate screen — the hazard C01 and C02 both name.
-    expect(fitStyled(`${WARNING}x`, 2, SGR_RESET)).toBe(`${WARNING}x`);
-    expect(displayCells(fitStyled(`${WARNING}x`, 2, SGR_RESET)), "three cells in a two-cell slot").toBe(3);
+    // **A cut inside the family drops it whole and blanks its cells** (C09 I9):
+    // at 5 the family would need cells 5 and 6, so the row is `abc ` and a
+    // blank, never a joiner between two halves of a picture.
+    expect(fitStyled(row, 5, SGR_RESET)).toBe("abc  ");
+    expect(fitStyled(row, 6, SGR_RESET), "and at 6 it fits exactly").toBe(`abc ${FAMILY}`);
 
-    // **A flag is halved**: C09 I9's rule, broken by the walk that was written to
-    // keep it — the first regional indicator is kept as a glyph of its own.
-    expect(fitStyled(`${FLAG}x`, 2, SGR_RESET)).toBe("\u{1F1EC}");
+    // **No under-count: a row never comes back wider than `width`**, which is
+    // the wrap that scrolls the alternate screen — the hazard C01 and C02 both
+    // name. `⚠️x` fitted to 2 is the warning alone, two cells.
+    expect(fitStyled(`${WARNING}x`, 2, SGR_RESET)).toBe(WARNING);
+    expect(displayCells(fitStyled(`${WARNING}x`, 2, SGR_RESET))).toBe(2);
+    expect(fitStyled(`${WARNING}x`, 1, SGR_RESET), "and at 1 the warning is dropped whole and its cell blanked").toBe(" ");
 
-    // And the window: a joiner survives on its own between two blanks.
-    expect(sliceCells(`x${FAMILY}y`, 2, 4)).toBe(` ${ZWJ} `);
+    // **A flag is whole or nothing** (C09 I9): never its first regional indicator
+    // as a letter-in-a-box glyph of its own.
+    expect(fitStyled(`${FLAG}x`, 2, SGR_RESET)).toBe(FLAG);
+    expect(fitStyled(`${FLAG}x`, 1, SGR_RESET)).toBe(" ");
+    expect(fitStyled(`${TONED}x`, 2, SGR_RESET), "and a skin-toned hand keeps its tone").toBe(TONED);
+    expect(fitStyled(`${TONED}x`, 3, SGR_RESET)).toBe(`${TONED}x`);
+
+    // And the window: a family straddling the left edge is blanked whole, and
+    // no joiner survives on its own between two blanks.
+    expect(sliceCells(`x${FAMILY}y`, 2, 4)).toBe(" y");
+    expect(sliceCells(`x${FAMILY}y`, 1, 3), "a window holding exactly the family").toBe(FAMILY);
+    expect(sliceCells(`x${FAMILY}y`, 0, 2), "straddling the right edge").toBe("x ");
+    expect(sliceCells(`x${FAMILY}y`, 2, 4).includes(ZWJ)).toBe(false);
+
+    // The composition law (C09 I20) over every split of a row holding every shape,
+    // now with pieces that are each right rather than each wrong by the same
+    // amount — which is the case T1.16c could not tell apart.
+    const mixed = `${FLAG}a${WARNING}${TONED}b${FAMILY}`;
+    const whole = displayCells(mixed);
+    expect(whole).toBe(10);
+    for (let a = 0; a <= whole; a += 1) {
+      const left = sliceCells(mixed, 0, a);
+      const right = sliceCells(mixed, a, whole);
+      expect(displayCells(left) + displayCells(right), `split at ${String(a)}`).toBe(whole);
+      expect(displayCells(fitStyled(mixed, a, SGR_RESET)), `fitted to ${String(a)}`).toBe(a);
+      expect(fitStyled(mixed, a, SGR_RESET).includes(ZWJ) && !fitStyled(mixed, a, SGR_RESET).includes(FAMILY), "a joiner only inside a whole family").toBe(false);
+    }
+  });
+});
+
+describe("C09 §5a — the cluster step is linear, and one glyph does not segment the row (C09 I60, I63, F955)", () => {
+  /** A row of `n` cells of CJK: every cluster reaches the segmenter. */
+  const cjkRow = (n: number): string => "日".repeat(n / 2);
+  /** A row of `n` cells holding one box-drawing glyph among ASCII — the patch gutter's shape (F955). */
+  const gutterRow = (n: number): string => `${SGR}│${SGR_RESET} ${"x".repeat(n - 2)}`;
+
+  it("T3.84 (C09 I60, I63): the cluster walk's cost from 50 to 400 cells is nearer 8× than 64×, on a row where every cluster reaches the segmenter", () => {
+    // T3.77's form over the arm T3.77 cannot reach: its styled rows are ASCII
+    // and never ask the segmenter. `containing` answers for one cluster from
+    // one position; a reader that segmented the remainder of the row to reach
+    // it would be F937's quadratic by another mechanism, and this is the row
+    // that would see it. Measured on the fix: 7.2× for the pad path and 6.6×
+    // for the tail window.
+    const small = cjkRow(50);
+    const large = cjkRow(400);
+    const smallMs = perCall(() => fitStyled(small, 51, SGR_RESET));
+    const largeMs = perCall(() => fitStyled(large, 401, SGR_RESET));
+    const ratio = largeMs / smallMs;
+    expect(largeMs, `400 cells took ${largeMs.toFixed(4)} ms against ${smallMs.toFixed(4)} at 50`).toBeGreaterThan(smallMs);
+    expect(
+      ratio,
+      `fitStyled over CJK at 400 cells cost ${ratio.toFixed(1)}× its cost at 50 (${largeMs.toFixed(4)} ms against ${smallMs.toFixed(4)}); linear is 8× and the bound is 24×`,
+    ).toBeLessThan(LINEAR_AT_8X_WITH_MARGIN);
+
+    const smallTail = perCall(() => sliceCells(small, 10, 50));
+    const largeTail = perCall(() => sliceCells(large, 10, 400));
+    const tailRatio = largeTail / smallTail;
+    expect(largeTail).toBeGreaterThan(smallTail);
+    expect(
+      tailRatio,
+      `sliceCells over CJK at 400 cells cost ${tailRatio.toFixed(1)}× its cost at 50 (${largeTail.toFixed(4)} ms against ${smallTail.toFixed(4)}); the bound is 24×`,
+    ).toBeLessThan(LINEAR_AT_8X_WITH_MARGIN);
+  });
+
+  it("T3.85 (C09 I63, F955): a 200-cell row holding one glyph fits in under a sixth of the time a 200-cell CJK row does", () => {
+    // **The transcript's 60 µs a row, as a ratio a loaded machine can still
+    // reproduce.** Every patch row carries one `│` in its gutter, and that one
+    // glyph sent the whole row through the segmenter — a segment object per
+    // ASCII character, forty of the sixty microseconds (F955). The CJK row
+    // beside it is the row that *must* segment every cluster, so the ratio
+    // between them is the number of clusters that reach the segmenter: one
+    // against a hundred. Measured: 2.8× before the fix, 12× after; the bound
+    // at 6 sits between. Each operand is a batch of at least 20 ms (F8), and
+    // the control is that the CJK row costs more at all.
+    const gutter = gutterRow(200);
+    const cjk = cjkRow(200);
+    const gutterMs = perCall(() => fitStyled(gutter, 201, SGR_RESET));
+    const cjkMs = perCall(() => fitStyled(cjk, 201, SGR_RESET));
+    const ratio = cjkMs / gutterMs;
+    expect(cjkMs, `CJK took ${cjkMs.toFixed(4)} ms against ${gutterMs.toFixed(4)} for the gutter row`).toBeGreaterThan(gutterMs);
+    expect(
+      ratio,
+      `a 200-cell CJK row cost ${ratio.toFixed(1)}× a 200-cell row holding one glyph (${cjkMs.toFixed(4)} ms against ${gutterMs.toFixed(4)}); ` +
+        "a row segmented whole for its one glyph measured 2.8×, the fix 12×, and the bound is 6×",
+    ).toBeGreaterThan(6);
   });
 });

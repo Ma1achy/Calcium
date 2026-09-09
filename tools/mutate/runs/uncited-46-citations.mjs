@@ -123,7 +123,7 @@ const results = runPass({
       // once, which is why the invariant says *asserted, never assumed*.
       name: "every cluster is one cell wide",
       file: TEXT,
-      from: "    total += clusterCells(segment, ambiguous);",
+      from: "    total += clusterCells(cluster, ambiguous);",
       to: "    total += 1;",
       expect: "T2.16",
     },
