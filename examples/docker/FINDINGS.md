@@ -35523,3 +35523,358 @@ mutation says the same beside its `expect: "T4.68"`.
 **What would falsify this**: the card-on-wall mutation making T5.1d red on some recording —
 which would mean the wall channel had acquired a periodic reader and F971's class had a second
 member.
+
+## F976 — four label writers were one loop written four times, and the loop's unit was the code point: one cluster writer in `chargrid.ts` for the treemap, `tree`, `graph`, the sankey and the point labels, and T2.129's record of lost shapes is empty ★★☆☆☆
+
+**F969's first residue, closed.** F969 recorded that treemap, tree, graph and sankey keep no
+cluster whole, pinned the lost shapes per kind in C09 T2.129's `NOT_WHOLE` by equality, and left
+the fix to the writers. This is the fix, and it is one function: C12 I118, commitment 118, §3n.
+
+**The ruling.** A label writer places a grapheme cluster whole, in the cells it measures, and a
+cluster measuring none owns no cell. `chargrid.ts`'s `write` is the one writer — `(row: (string |
+undefined)[], at, body, ambiguous)` — and the treemap's names (`definition.ts`), `tree`, `graph`,
+the sankey's node labels and the point labels all lay text into a cell row through it. It walks
+`graphemes(body)`: each cluster into the cell where it starts, the `cells(cluster) − 1` cells after
+it set to `""` — the continuation the four already kept, so a two-cell character is not one an
+edge, a fill or a ribbon can walk into and the row keeps its count — and a cluster that measures
+nothing dropped with the column unmoved. A lone leading combining mark or a bare joiner has no cell
+to own; attaching it to a neighbour would put a mark on an edge glyph or on a tile's colour ring,
+which is worse than losing a mark that had no base. `scatter3.ts`'s `overlay` is the precedent
+(F970) and stays a writer of its own, because its cells are spans carrying an ink rather than
+strings.
+
+**What the four did.** `chargrid.ts` (tree and graph), a private duplicate in `pointlabels.ts`,
+the treemap's loop in `definition.ts` and the sankey's in `sankey.ts` were the same eight lines:
+`for (const ch of body) { row[col] = ch; w = cells(ch); fill k < w with ""; col += w }`. A
+zero-width code point was written into the cell and the column did not move, so the next code
+point overwrote it — a family `👨‍👩‍👧` became three faces in three cells, a keycap `1️⃣` a bare
+digit, `café` decomposed `cafe`. They painted no escape inside a cluster because no cluster
+survived to be split, which is why F969 could only record them.
+
+**The measurement, before and after.** C09 T2.129 at HEAD's row against the new writer, before
+the row was touched — the row's own failure is the measurement:
+
+```
+- Expected                                   + Received
+- { "plot-graph":   ["KEYCAP", "FAMILY"],    + {}
+-   "plot-sankey":  ["KEYCAP", "FAMILY"],
+-   "plot-tree":    ["KEYCAP", "FAMILY"],
+-   "plot-treemap": ["NFD", "KEYCAP", "FAMILY"] }
+```
+
+So every shape the four lose reaches the 80-column frame whole under full capabilities, in every
+kind, and `NOT_WHOLE` is now `{}` — kept as an equality comparison so a new writer losing a shape
+must join it. The point labels were never in the record: the line plot's names reached that frame
+whole before, because Ink was handed the pieces in adjacent cells and drew them side by side; the
+overlay read before Ink is where their loss was visible, and T1.133 reads it there.
+
+**Why one writer and not four fixes.** `chargrid.ts`'s own docstring argued for it when the file
+was extracted from `tree.ts` rather than copied into `graph.ts` — *four independent gutter
+implementations already exist in this directory and each was reasonable when it was written; that
+is how they arrived and how they would return.* The four were reasonable one at a time, and the
+defect was in the thing they shared. The signature widened to `(string | undefined)[]` so the
+treemap's grid and the sankey's line use it without a copy; a `string[]` row is assignable and the
+other three pass one. The bounds check stays — a cluster that would start outside the row stops
+the write — so a caller that placed by measurement cannot write past the row.
+
+**The rows.** C12 T1.130 (`plot-tree.test.ts`): the writer at F969's six shapes, each cluster in
+one cell with `""` behind the wide ones and the column advanced by `cells()` of the cluster rather
+than a literal — so C09's re-founding of the spacing mark's width, landing beside this, moves
+nothing here; the six as one label reading back as the label with one occupied cell per cluster
+and the row measuring its length; a lone leading mark and a bare joiner dropped with the column
+unmoved, a body that is only one writing nothing; nothing past the row's end, a negative start
+writing nothing; a `(string | undefined)` row keeping `undefined` elsewhere; and `tree` through
+the public render in all three layouts. T1.131 treemap, T1.132 sankey (`sankeyArea`'s cells
+before Ink, then the frame), T1.133 point labels (`pointLabelRows` before Ink, then the frame),
+T1.134 graph — each with a family and a keycap, compared in NFC as T2.129 compares. Seven files,
+123 rows green. T6.95–T6.97 in `test/revert/plot.test.ts` construct the three reverted states —
+the per-code-point loop verbatim, the guard removed and the cluster given a cell, the
+continuation unfilled on a grid whose mask carries an edge under the glyph's second cell — and
+show which assertion each fails.
+
+**The mutations** (`tools/mutate/runs/c12-label-writers.mjs`, anchors checked to match once):
+the writer over `[...body]`; the guard removed; the cluster given `Math.max(1, w)`; the
+continuation fill removed; the treemap's, the sankey's and the point labels' calls each replaced
+by the private loop they carried. The control is the writer writing nothing. **The guard's
+removal is invisible to a leading mark**, because the next cluster overwrites the cell either way
+— only a body that is nothing but a mark shows it — and the cluster given a cell of its own is
+what the leading-mark case sees; T1.130 carries both cases and T6.96 says why. `c12-tile-labels.mjs`'s
+continuation mutation moved with the loop to `chargrid.ts`; the other five existing runs' anchors
+were checked and still match once each.
+
+**Not claimed.** `field.ts`'s `overlayGlyphs` walks a field row per code point with `x += 1`, and
+no label reaches it: every field form refuses `pointLabels` (`HAS_CALLOUT`), and its `glyphs`
+argument is the contour's or the quiver's marker string, never a name. `definition.ts`'s `behind()`
+and `mergedRow` do reach a point label, and what they do with a wide or multi-code-point one is
+F977 — a shift in the columns after the label on its own row, which this change did not introduce
+for wide glyphs and changed the sign of for clusters. The spacing mark's width — `aः` to
+`cells()` against the terminal — is F969's second residue and is C09's, not this.
+
+**What would falsify this**: a kind in T2.129's sweep losing a shape while `NOT_WHOLE` stays
+empty, which would mean a fifth writer this entry did not name; or one of the seven mutations
+surviving the run, which would mean a call site went round the writer.
+
+## F977 — `mergedRow` indexes a point-label overlay by code point, so a wide or multi-code-point name shifts every cell after it on its row: `図表` two cells right with the frame clamped off, a family three cells left with the row 37 of 40 — and TL13 skips the one row it was written for ★★☆☆☆
+
+**Open.** Found by F976's item 7 — the measurement asked of `behind()` and `field.ts` — and the
+walk it found is a third one, upstream of both.
+
+**The frame.** A `line` plot, `plotFrame: "grid"`, `axes: true`, eight samples, at 40 columns;
+row 6 with no label, with a family at sample 1, and with `図表` at sample 1:
+
+```
+none    |    │┊ ╭────╮   │    ┊    │    │   │  ┊│| 40
+family  |    │┊ ╭────👨‍👩‍👧    ┊    │    │   │  ┊│| 37
+cjk     |    │┊ ╭────図表  │    ┊    │    │   │ …| 40
+ascii   |    │┊ ╭────peak│    ┊    │    │   │  ┊│| 40
+```
+
+Read as cells right of the label's slot — the glyph and the cell it sits in: without a label
+`┊@21 │@26 │@31 │@35 ┊@38 │@39`; with the family `┊@18 │@23 │@28 │@32 ┊@35 │@36`, every cell
+three to the left and the row three cells short, the frame's right edge at 36; with `図表`
+`│@18 ┊@23 │@28 │@33 │@37 …@39`, every cell two to the right and the row clamped at the width
+with the frame's edge gone. With `peak` the two lists are identical. The same at 80: 77 cells for
+the family, the clamp for `図表`, the tail shifted by the same three and two.
+
+**The mechanism.** `pointLabelRows` builds a cell array per row — a cluster in one cell, `""` in
+the cells behind it — and hands it on as a string, `rows.map((r) => r.join(""))`. `mergedRow`
+then reads the layer at column `x` as `[...(layer.glyphRows[rowIndex] ?? "")][x]`: a code-point
+index into a string that no longer carries the cells. A `""` contributes no code point, so a
+two-cell glyph is one column to the walk and the cells after it are read one early; a family's
+five code points are five columns, so the cells after it are read three late. `behind()` walks
+the merged spans the same way — `for (const ch of span.text) … x += 1` — and reads its gridline
+at the same drifted `x`, which is why the dashes move with the curve rather than against it. The
+label itself survives both: `mergedRow` appends the code points it takes in order, and the label
+layer wins every one of them, so the cluster is contiguous in the output and F976's rows can see
+it whole while the row around it is wrong.
+
+**Two halves, and one is older than F976.** The wide-glyph half — `図表` shifting the tail two
+right — is the shipped behaviour of every point label with a wide glyph in it, and TL13's fixture
+is exactly that: `図表` at 70 columns on a scatter. Rendered: row 6 ends in the clamp's `…`
+rather than the frame's `│`, and TL13 asserts the width only on rows matching `/[│|]$/` — so the
+one row the fixture was written to exercise is the one row the assertion does not read, and the
+row is green. The cluster half changed sign with F976: the old writer's three faces in three cells
+made a family six cells and three code points, so the tail drifted three *right* and the row was
+clamped; the cluster writer makes it two cells and five code points, so the tail drifts three
+*left* and the row is short. Both are wrong; neither is the writer's, and the writer cannot fix it
+— it produces the correct cell array, and the cells are lost at the join.
+
+**Not reached.** `field.ts`'s `overlayGlyphs` — no field form takes `pointLabels`, and its
+`glyphs` argument is never a name. The stacked one-bit arm takes `strip.names` through the same
+`mergedRow` and has the same shift.
+
+**What it would take, not ruled here.** The overlay crossing as cells rather than a joined string
+— `Layer.glyphRows` is the seam, and every other layer is one glyph per cell by construction — or
+`mergedRow` and `behind()` walking clusters by `cells()`, which is the walk `write` already does.
+Either way the fix is the merge's, in `definition.ts`, and the row that would see it is one that
+reads the label's row at a cell right of the slot against the same row without the label: the
+probe's comparison, as a test. A row asserting today's disagreement would watch the remedy, not
+the condition, and is not written.
+
+**What would falsify this**: a point label with a wide glyph whose row keeps the frame's edge at
+the width — which would mean the join or the walk had been changed by something this entry does
+not name.
+
+## F978 — a cluster measures as the terminal advances: a spacing mark is a cell, the sum ends at a joiner, and the zero-width set is derived from the property — F969's second residue, closed ★★☆☆☆
+
+**The ruling.** `clusterCells` gave every cluster the width of its base code point alone — a
+nonspacing mark folds into its base, a selector promotes it, a regional-indicator pair is one
+flag — and that is true of everything the tree had measured and false of a **spacing mark**: `aः`
+(a + U+0903, category `Mc`) measured 1 to `cells()`, 2 to string-width and 2 to xterm, so a `raw`
+row padded to the width was one cell over by Ink's measure and Ink wrapped it into a second row
+the measurer never counted (F969). Ruled and landed as C09 I65, commitment 57. After the two rules
+that are about the whole cluster — which did not move — a cluster is walked by code point and each
+contributes what the terminal draws it as: nothing for one in `Mn`, `Me` or `Cf`, nothing for an
+emoji modifier after a base, the sum ended by U+200D, otherwise two where the property says Wide
+(or, at wide, Ambiguous) and one else. And the zero-width set is `ZERO_WIDTH_RANGES`: every `Mn`,
+`Me` and `Cf` code point of the Unicode Node's ICU carries (17.0, ICU 78.2, Node 22.23) minus
+U+00AD — **375 ranges over 2,241 code points** — re-derived at test time and compared by equality
+(T1.38), so it is checked rather than recorded.
+
+**Measured against three references, before and after.** string-width 8.2.2 as Ink 7.1.1
+resolves it; `@xterm/headless` 6.0.0, the cursor column after writing the string at column 0;
+Unicode 17.0 in the container.
+
+| shape | before | after | string-width | xterm |
+|---|---|---|---|---|
+| `café` (NFD) | 4 | 4 | 4 | 4 |
+| `1️⃣` | 2 | 2 | 2 | 1 |
+| `🇬🇧` | 2 | 2 | 2 | 2 |
+| `👨‍👩‍👧` | 2 | 2 | 2 | 3 |
+| `؀1` (U+0600, Prepend) | 1 | 1 | 1 | 2 |
+| `aः` (Mc) | **1** | **2** | 2 | 2 |
+| `कि` (U+0915 U+093F, Mc) | **1** | **2** | 2 | 2 |
+| `กา` (U+0E01 U+0E32, two clusters) | **1** | **2** | 2 | 2 |
+| `กำ` (U+0E33, Lo, GCB SpacingMark) | **1** | **2** | 1 | 2 |
+| `בְ` (Mn) | 1 | 1 | 1 | 1 |
+| `a­` (soft hyphen, Cf) | 2 | 2 | 1 | 2 |
+| lone `ः` | 1 | 1 | 1 | 1 |
+| lone `́` (U+0301) | 0 | 0 | 0 | 1 |
+| `a​b` (ZWSP) | 2 | 2 | 2 | 2 |
+| `கொ` (Tamil, Mc) | **1** | **2** | 2 | 2 |
+| `কা` (Bengali, Mc) | **1** | **2** | 2 | 2 |
+| `हिन्दी` | **2** | **5** | 4 | 5 |
+| `日́` | 2 | 2 | 2 | 2 |
+| `👋🏽` | 2 | 2 | 2 | 2 |
+| `🏴󠁧󠁢󠁥󠁮󠁧󠁿` (a flag and six tags) | 2 | 2 | 2 | 1 |
+| `‍` alone | 0 | 0 | 0 | 1 |
+| `1⃣` (no selector) | 1 | 1 | 2 | 1 |
+| `🏻` alone | 2 | 2 | 2 | 1 |
+| `a🏻` | 1 | 1 | 1 | 2 |
+| `゙` (U+3099, Mn and Wide) alone | **2** | **0** | 0 | 1 |
+| `가` decomposed (U+1100 U+1161) | 2 | **3** | 2 | 2 |
+
+**The property sweep, re-run in its own method.** C09 §5's table said 748 and 1,324 after the
+Wide table, 722 of each *zero-width*. Reproduced exactly — from U+0000; F682's sweep began at
+U+0080 and gives 691 — and the 722 is the hand table's 659 members whole (two Thai letters and 22
+unassigned code points among them) plus 63 C0 and C1 controls `cells` strips rather than measures.
+After the change: **narrow 0 under, 26 over, 2,304 zero (2,330); wide 0 under, 602 over, 2,304
+zero (2,906)** — the 2,304 being the derived 2,241 and the same 63 controls. Seven `Mn` code
+points the property calls Wide (U+302A..U+302D, U+3099, U+309A, U+16FE4) measure zero alone now,
+as string-width measures them; T1.28's run over the iteration marks stops at U+16FE3 for that
+reason, with the reason on the row.
+
+**The Ink sweep, which is the direction that wraps.** Every single code point and every `a` +
+`Mc` pair against string-width 8.2.2 at narrow, `cells()` under and over separately:
+
+| corpus | before | after |
+|---|---|---|
+| single, **under** | **24** — 22 unassigned of U+1ADE..U+1AFF and the two Thai letters, 0 against 1 | **0** |
+| single, over | 5,408 — 1,425 `Mn`, 166 `Cf`, 3 `Me` at 1 against 0; 3,769 unassigned default-ignorables; 26 lone regional indicators; U+115F U+1160 U+3164 U+FFA0; tab and newline | 3,802 — the 3,769 default-ignorables the property does not call marks; the 26 regional indicators; U+00AD; the four Hangul fillers; tab and newline |
+| `a` + `Mc`, 471 pairs | **440 under** — 436 at 1 against 2, four at 1 against 3 where the mark is Wide | **0** — all 471 agree |
+
+An over-count pads short and cannot wrap; every disagreement that remains is one, and each is
+named. The frame that decides it is T2.133 — a `raw` block holding `aः` and `कि`, padded to the
+width, through the registry and Ink at 40 and 80: **two rows on the unmodified `clusterCells`**
+(the file restored by copy and compared by digest, `615c9ead…`), one after. T2.134 is the
+control, a family and a keycap in the same row, one row on both trees.
+
+**The cost, F955's bench.** Per call, best of five 20 ms batches, both versions imported into one
+process and interleaved: a 200-cell box-drawing row 0.0519 → 0.0542 ms and 0.0456 → 0.0472 on the
+second round; a 200-cell CJK row 0.0269 → 0.0277 and 0.0231 → 0.0239; a 200-cell row of `कि` —
+two code points a cluster — 0.0271 → 0.0297; ASCII 0.0005 either way. Three to six per cent on the
+rows every cluster of which reaches the segmenter, which is one `codePointAt` and a loop test per
+cluster, and within the bench's own spread between rounds. No fast path for the one-code-point
+cluster: a second copy of the width arms would be a reimplemented rule with its own birthday
+clauses, for thirteen nanoseconds a cluster. The walk is by index with `codePointAt` — no spread,
+no slice (F955, SS60).
+
+**Two corners the ruling's reason decides, stated because the letter would decide them the other
+way.** The ruling zeroes an emoji modifier because *it recolours the base's glyph*; a modifier with
+nothing before it recolours nothing, string-width and the property both make it two, and zeroing
+it would have put five new under-counts into the sweep above — so it is skipped only once
+something in the cluster has taken a cell. And the old code's `isZeroWidth(base)` ran before the
+selector test, so a lone U+FE0F — which the walks' tail rule can hand over alone — measured
+nothing; kept, by promoting only a selector with something before it.
+
+**Not claimed.** A lone combining mark, which xterm-headless draws in a cell (`́` alone is 0 here
+and to string-width, 1 there). The Hangul conjoining jamo, which `wcwidth` zeroes and this table
+does not: a decomposed `가` measures three against xterm's and string-width's two, one cell over
+per decomposed syllable in the direction that pads, recorded as a limit in `ZERO_WIDTH_RANGES`'s
+docstring and T1.38. `؀1`, the keycap, the family, the England flag and `a🏻`, where xterm-headless
+is not a reference (C27 I6's residue). And U+00AD beside a letter under the wide convention, which
+the property calls Ambiguous and so measures three — the property's answer, over-counting.
+
+**Where.** `src/presentation/text.ts` (`clusterCells`, `isZeroWidth`, `isEmojiModifier`,
+`ZERO_WIDTH_RANGES`); C09 §5's new subsection, I65, commitment 57, T1.36–T1.39, T2.133–T2.134,
+T6.111–T6.114; `test/unit/text.test.ts`, `test/contract/text-width.test.ts`,
+`test/revert/text-width.test.ts`; `tools/mutate/runs/c09-text-zero-width.mjs`, with
+`c09-text-wide.mjs`, `c09-text-ambiguous.mjs` and `c02-ambiguous.mjs` re-anchored to the sum's
+lines without changing what they mutate. F969's second residue, closed; the first was F976's.
+
+**What would falsify this**: a `raw` row holding a spacing mark whose measured height differs from
+the rows Ink renders (T2.133 red); a code point in `Mn`, `Me` or `Cf` measuring a cell alone, or one
+outside them measuring none, other than U+00AD and the controls (T1.38 red); a cluster on which a
+walk and `cells()` disagree (T1.39); or T1.37 green with the base-only sum restored, which is the
+run's first row.
+
+## F979 — the zero-width table was the third hand-written Unicode table in `text.ts` with the disease C09 §5 records twice, and a unit row had asserted its defect as the rule: two Thai letters inside it, 1,607 marks and format characters outside it, and *a spacing mark stays with its base* green for as long as the defect was ★★☆☆☆
+
+**The class.** C09 §5 records it for `isAmbiguous` (F665, F682: a hand table beginning at
+U+2010 with the omission called deliberate, 138,132 code points one cell where the property says
+two) and for `isWide` (F693: seventeen coarse blocks, 8,619 under and 369 over), and closes each by
+deriving the table from `EastAsianWidth-17.0.0.txt` with a row comparing it to its source.
+`isZeroWidth` was the third: sixteen ranges, 659 code points, a hand-written recollection of where
+combining marks live, never checked against anything. Measured against `\p{Mn}`, `\p{Me}` and
+`\p{Cf}` on Unicode 17.0, in both directions:
+
+- **1,607 marks and format characters lay outside it** — 1,441 `Mn`/`Me` (Hebrew points past
+  U+05BD, Arabic marks past U+065F, every Indic virama and nonspacing vowel sign, Cyrillic
+  Extended, all of plane 1's marks) and 166 `Cf` (the bidi controls, the Arabic number signs, the
+  tag characters, the musical-symbol formatting). Each measured **one cell** alone; 1,606 join
+  the derived table and the 1,607th, U+00AD, is kept out with its reason.
+- **24 code points inside it are not marks** — U+0E32 and U+0E33, two Thai *letters* (`า` `ำ`,
+  `Lo`) the coarse `0x0e31..0x0e3a` swallowed, so `กา` measured **one cell for two**, and 22
+  unassigned code points of U+1ADE..U+1AFF. Those 24 were the only under-counts against Ink in
+  the single-code-point sweep (F978), and the under-count is the direction that wraps.
+
+**Why its errors were the smaller half.** The table was consulted for a cluster's base alone, so
+a mark outside it cost one cell only when the mark stood alone or led a cluster; the larger
+defect — a spacing mark, `Mc`, 471 code points, none in the table and none ever meant to be —
+was in the sum that never happened, and no table could have carried it (F978).
+
+**The test that asserted the defect.** T1.36 read `expect(cells("aः"), "a spacing mark stays with
+its base").toBe(1)` — a sentence that reads as a rule and was the finding, written into a test's
+reason. It was green for exactly as long as the defect was, which is T2.28b's shape (F855, F856)
+in a unit row: a row that asserts the disagreement watches the remedy and not the condition, and
+says nothing when the defect gets worse. Nothing in the suite could have found it; what did was
+the frame — F969 read `raw` at 40 rendering two rows for a one-row block — and the coordinator's
+measurement of the same string against string-width and xterm. The row now asserts 2 with the
+terminal's answer as its reason, and the reason it used to give is recorded beside it.
+
+**Closed by derivation, not by patching.** Adding U+093F to the old table would have been wrong
+twice over — a spacing mark is a cell, not none — and adding the 1,607 by hand would have been
+the same table a year later. The three tables now share one method and each has a row that
+compares it with its source by equality (T1.27, T1.28, T1.38); `ZERO_WIDTH_RANGES`'s docstring
+carries both directions with the figures, the two deliberate exclusions, and the Unicode revision
+it was derived on, so the day the runtime's Unicode moves T1.38 goes red rather than the table
+going quietly stale. Close the class, not the instance.
+
+**Where.** `src/presentation/text.ts`, `test/unit/text.test.ts` T1.36 and T1.38, C09 §5.
+
+**What would falsify this**: a Unicode range list in `text.ts` whose docstring names no source
+and which no row compares to one (`EMOJI_VARIATION_BASES` and `DRAWN_AS_GEOMETRY` remain and were
+not examined here); a T1.38 that passes with U+00AD or a Thai letter admitted, which is T6.114 and
+the run's sixth row; or a unit row elsewhere whose reason sentence names a defect as a rule — the
+grep for one is *a … stays with …* and its relatives, and this was the only instance read.
+
+## F980 — two mutation runs rotted unwatched: the sankey's fit-test mutation survives at HEAD because the overlap guard reached the fixture first, and the graph run has exited 1 on three disposed survivors since F243 ★★☆☆☆
+
+**Where it was found.** This round's serial phase ran every mutation run whose anchors the two
+lanes touched — twelve passes — and two exited 1: `c12-sankey` with one survivor, `c12-graph`
+with three. Neither lane's change was the cause, and the two are different things.
+
+**The sankey's K3 mutation survives, and the pristine control says it did before this round.**
+`a label is written wherever its bar is` removes the fit test — `if (col < lo || col + w > hi)
+continue;` — and expected SK5 to fail: *`rate-limiter` runs under `upstream-service` at 40
+columns and the row reads both names.* Applied by hand to lane 1's `sankey.ts`, SK5 passed; applied
+to HEAD's `sankey.ts` on the same tree, passed; applied inside a pristine `git archive HEAD`
+export, passed — so the survivor predates the round. Rendered with and without the mutation, the
+`long-labels` frames are **byte-identical at 40 and at 80**. The mechanism is the order the
+labels are written in: outside-in, so the sink's `upstream-service` (sixteen cells, left-placed
+at `x − 1 − w` = 22) is written before the middle `rate-limiter` (twelve cells, right-placed at
+`x + 2` = 22), and the overlap guard — *every cell of the slot free* — drops the middle name
+whether the fit test ran or not. The fixture was written when the fit test was the only guard,
+and the guard added beside it covered the same cells on the same fixture. A mutation that fails
+nothing is a finding about the tests: SK5 stayed a correct row and stopped being the row that
+sees K3.
+
+**SK12 makes the fit test the only guard.** Three layers, the first name thirty cells against a
+gap of seventeen at 40 columns, nothing written in its way: dropped whole, never cut, the middle
+bar standing in column 20 of every row, the middle label keeping its cells, and the name fitting
+at 80 so the fixture is shown to respond. Under the mutation the name is written across the
+middle bar and takes the middle label's cells — red on *dropped whole*, and on the bar column and
+the middle label behind it; green with the source restored, checksummed. The run's K3 mutation
+expects SK12; T6.81 says why SK5 cannot.
+
+**The graph run's three survivors were recorded and disposed of in F243** — deduplication is a
+no-op under a mask that ORs, the corpus cannot reach the sweep-trace defect, the drop's guard is
+doubled downstream — and the run has exited 1 on them at every pass since, which in a summary
+reads exactly as a new survivor does. It now declares them in `c19-menu-window.mjs`'s form, prints
+each as expected or as a stale exemption, and exits 0 unless a survivor is new or an exemption has
+been caught.
+
+**Not claimed**: that the other ten runs of this round were green because their rows see every
+mutation for the reason the run states — the pass says caught, not why. **What would falsify
+this**: the sankey K3 mutation surviving SK12, which would mean a third guard had reached the
+fixture; or `c12-graph` exiting 0 with a fourth survivor, which the map cannot admit.
