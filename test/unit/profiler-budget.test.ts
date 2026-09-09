@@ -378,7 +378,7 @@ describe("C28 — every declared span is opened", () => {
     // **What this harness can and cannot say.** `profiled()` injects a counter
     // clock — `() => (t += 1)` — which advances once per *read*, not per unit of
     // work. Under it every leaf span records exactly 1 whether it brackets its
-    // subject or closes beside it: `overlays` here is count 6, sum 6, max 1. So
+    // subject or closes beside it: `overlays` here is count 3, sum 3, max 1. So
     // no sum asserted from this session distinguishes a span from an adjacency,
     // and an earlier version of this row claimed one did. Bracketing is T1.2's
     // row, over a clock the callee advances.
@@ -390,14 +390,17 @@ describe("C28 — every declared span is opened", () => {
     const parts = Object.entries(spans).reduce((n, [, h]) => n + (h?.sum ?? 0), 0);
     expect(parts, "every span together fits inside the frames' work").toBeLessThanOrEqual(work);
 
-    // `paint()` and `cursorFor()` both lay the overlays out, and both go through
-    // one wrapper so that the second is measured rather than invisible. Two per
-    // frame is the defect P11 names; the row is here so that a call site
-    // reaching `deps.overlays()` directly cannot go unnoticed either way.
+    // **One layout per frame** (C22 I96). `renderFrame` lays the overlays out
+    // once through the one wrapper and hands the layout to both `paint()` and
+    // `cursorFor()`. This row asserted `2 * frames` on purpose for as long as
+    // each function took its own — a row asserting a disagreement is green for
+    // exactly as long as the defect is (F941) — so it now counts the remedy: a
+    // second call site reaching the wrapper, or `deps.overlays()` directly,
+    // fails here either way.
     expect(
       spans.overlays?.count ?? 0,
-      "both overlay layouts go through the measured wrapper",
-    ).toBe(2 * report.frames);
+      "one overlay layout per frame, through the measured wrapper",
+    ).toBe(report.frames);
   });
 });
 

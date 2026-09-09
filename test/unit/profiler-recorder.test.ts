@@ -6,7 +6,9 @@
 // recorded sums under `buildSession`'s injected clock, and that clock is a
 // counter: `() => (t += 1)`, advancing once per *read*. Under it every leaf span
 // records exactly 1, whether it wraps a millisecond of work or nothing at all.
-// Measured, on the session T1.61 builds: `overlays` count 6, sum 6, max 1.
+// Measured, on the session T1.61 builds: `overlays` count 6, sum 6, max 1 —
+// count 3, sum 3 since C22 I96 laid the overlays out once per frame (F941),
+// and the argument is unchanged: every leaf reads 1 under a counter clock.
 //
 // So the sentence in T1.61 — *only the sum says they were called around the work
 // rather than beside it* — named a mechanism that harness does not have. It is

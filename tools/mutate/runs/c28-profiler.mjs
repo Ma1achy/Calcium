@@ -39,6 +39,7 @@ const CONSTRUCT = "src/shell/construct.ts";
 const BUDGET = "src/testing/profile.ts";
 const SESSION = "src/shell/session.ts";
 const PAINT = "src/shell/paint.ts";
+const RENDER_FRAME = "src/shell/render-frame.ts";
 const VIEWPORT = "src/viewport/viewport/viewport.ts";
 const LEAKS = "src/shell/profiling/leaks.ts";
 const SCRATCH = "src/shell/render-scratch.ts";
@@ -573,10 +574,14 @@ const results = runPass({
       // or not, so the report is byte-identical either way. Bracketing is now
       // T1.2's row over a stepping clock; what a counter clock still sees is the
       // wiring, so this mutation takes the second call site out of the wrapper.
-      name: "WRAPPER-BYPASSED: the second overlay layout is not measured",
-      file: PAINT,
-      from: "  const placed = placedLayers(deps);",
-      to: "  const placed = deps.overlays();",
+      // Since C22 I96 there is one layout per frame and it happens in
+      // `renderFrame`, which hands it to `paint()` and `cursorFor()`; the
+      // bypass a counter clock can still see is that one call going round
+      // the wrapper, so T1.61's `exactly once` reads zero.
+      name: "WRAPPER-BYPASSED: the frame's one overlay layout is not measured",
+      file: RENDER_FRAME,
+      from: "    placed = placedLayers(painting);",
+      to: "    placed = painting.overlays();",
       expect: "T1.61",
     },
     {

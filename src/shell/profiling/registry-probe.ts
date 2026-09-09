@@ -7,10 +7,12 @@
  * `windowSequence`, `renderSequence`, `windowChild`, `render` — so each is an
  * *own property of the instance*, not a prototype method. Reassigning one from
  * out here replaces the property that the class's own `this.measure` and
- * `this.render` resolve through, and those are also exactly what the registry
- * hands down as `measureChild` and `renderChild`. So a wrapper installed here
- * is entered again for every child, at every depth, without one line changing
- * in `src/presentation/`.
+ * `this.render` resolve through. `renderChild` is `this.render` exactly;
+ * `measureChild` is the registry's `#measureChild` since C09 I61, which reads
+ * the call's height memo first and reaches `this.measure` only on a miss — so
+ * a wrapper installed here is entered for every child that had to be
+ * *answered*, at every depth, and the `calls` column counts questions rather
+ * than reads (F940). Not one line changes in `src/presentation/`.
  *
  * MG1 is what makes that safe rather than clever: `src/shell/profiling/` is
  * rank 4, nothing below it can import it, and the registry never learns a

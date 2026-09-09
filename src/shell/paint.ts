@@ -527,13 +527,21 @@ function based(lines: readonly string[], base: string): readonly string[] {
 /**
  * C15's placed layers, bracketed (C28 I39).
  *
- * **One wrapper for both call sites**, so `spans.overlays.count` is the number
- * of times the layout actually ran. It runs twice per frame today — once here
- * for the composite and once in `cursorFor` — and a per-call-site span would
- * report two names each firing once, which is the same fact written so that
- * nobody notices it.
+ * **One layout per frame, shared by the rows and the cursor** (C22 I96). The
+ * caller lays the overlays out once and hands the result to both `paint` and
+ * `cursorFor`; each defaults to laying them out itself only so a caller holding
+ * one and not the other still gets an answer. It used to run twice per frame —
+ * once for the composite and once for the cursor — which C28 T1.61 asserted on
+ * purpose as the disagreement P11 named, and the two layouts were of the same
+ * region against the same overlay set, so the second could only ever agree
+ * with the first or be a defect.
+ *
+ * **One wrapper for every call site**, so `spans.overlays.count` is the number
+ * of times the layout actually ran: a per-call-site span would report two
+ * names each firing once, which is the same fact written so that nobody
+ * notices it.
  */
-function placedLayers(deps: PaintDeps): readonly Placed[] {
+export function placedLayers(deps: PaintDeps): readonly Placed[] {
   using _s = deps.probe?.span("overlays") ?? NO_SPAN;
   return deps.overlays();
 }
@@ -544,7 +552,11 @@ function baseSequence(deps: PaintDeps): string {
   return sgr(resolveBase(deps.theme, deps.capabilities));
 }
 
-export function paint(frame: Composed, deps: PaintDeps): readonly string[] {
+export function paint(
+  frame: Composed,
+  deps: PaintDeps,
+  placed: readonly Placed[] = placedLayers(deps),
+): readonly string[] {
   // **The `draw` phase, and `using` is fine here** (C28 I39). F867's argument
   // against `using` is about a wrapper entered once per block — an array
   // allocation is invisible beside a 2 ms plot and dominates a rule's 220 ns
@@ -635,7 +647,7 @@ export function paint(frame: Composed, deps: PaintDeps): readonly string[] {
   let lines: readonly string[];
   {
     using _composite = deps.probe?.span("composite") ?? NO_SPAN;
-    lines = composite(rows, placedLayers(deps), {
+    lines = composite(rows, placed, {
       registry: deps.registry,
       theme: deps.theme,
       capabilities: deps.capabilities,
@@ -677,8 +689,13 @@ export function paint(frame: Composed, deps: PaintDeps): readonly string[] {
  * A cursor above the window is hidden rather than clamped to its edge: it
  * genuinely is not on the screen, and a clamped one would claim otherwise.
  */
-export function cursorFor(frame: Composed, deps: PaintDeps): Cell | null {
-  const placed = placedLayers(deps);
+export function cursorFor(
+  frame: Composed,
+  deps: PaintDeps,
+  placed: readonly Placed[] = placedLayers(deps),
+): Cell | null {
+  // **The layout the rows were composited from** (C22 I96) — the top layer
+  // here is the top layer `composite` drew, by identity and not by agreement.
   const top = placed[placed.length - 1];
   if (top !== undefined) {
     if (top.cursor !== undefined) {

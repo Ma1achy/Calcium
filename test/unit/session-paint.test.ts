@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
 import { compose, heightsSum, type Composed } from "../../src/shell/frame.js";
-import { paint, type PaintDeps } from "../../src/shell/paint.js";
+import { cursorFor, paint, placedLayers, type PaintDeps } from "../../src/shell/paint.js";
 import { exact, FrameError } from "../../src/shell/frame-error.js";
 import { displayCells } from "../../src/presentation/text.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
@@ -22,6 +22,11 @@ import { patchDefinition } from "../../src/presentation/patch/definition.js";
 import { SGR_RESET, sgr } from "../../src/terminal/escapes.js";
 import { resolveBase } from "../../src/presentation/theme/index.js";
 import type { SessionSnapshot } from "../../src/shell/types.js";
+import { createOverlayManager } from "../../src/viewport/overlay/index.js";
+import type { Placed } from "../../src/viewport/overlay/index.js";
+import type { ProfileReport } from "../../src/shell/profiling/types.js";
+import { registry as measurer, rows as contentRows } from "../support/overlay.js";
+import { buildSession } from "../support/session.js";
 
 /** C09's measurer, for the footer's height (C22 I82). */
 const MEASURE = createBlockRegistry({ defaults: true }).measureSequence;
@@ -667,5 +672,129 @@ describe("C22 §6g — the theme's background is a base, not a span (C22 I65)", 
       /const toDefault = toTerminalDefault\(\);[\s\S]*\.map\(/,
     );
     expect(body, "the map uses the bound one").toMatch(/line\.replace\(toDefault,/);
+  });
+});
+
+describe("C22 §4a — one overlay layout per frame, shared by the rows and the cursor (C22 I96)", () => {
+  /** A layer with a cursor of its own, from the real manager and the real placer. */
+  function cursorLayer(id: string) {
+    return {
+      id,
+      kind: "overlay" as const,
+      placement: { kind: "anchored" as const, row: 6, prefer: "above" as const },
+      content: contentRows(1, id),
+      dismissable: true,
+      width: 20,
+      cursor: { row: 0, col: 5 },
+    };
+  }
+
+  it("T1.58 (C22 I96): handed one layout, `paint` and `cursorFor` lay nothing out; handed none, each lays out for itself", () => {
+    const f = frameAt(40, 12);
+    let laid = 0;
+    const d = deps({
+      overlays: () => {
+        laid += 1;
+        return [];
+      },
+    });
+
+    // **The shared form** — the layout taken once and read twice, through the
+    // same wrapper `render-frame.ts` uses. `laid` is the count `spans.overlays`
+    // reports per frame in the real graph (C28 T1.61), and it was two for as
+    // long as each function took its own.
+    const placed: readonly Placed[] = placedLayers(d);
+    expect(laid, "the wrapper reaches the thunk — the counter can see a layout").toBe(1);
+    paint(f, d, placed);
+    cursorFor(f, d, placed);
+    expect(laid, "neither function laid the overlays out again").toBe(1);
+
+    // **The control, and the shape this replaced.** Without a layout in hand
+    // each function must take its own, so the thunk is reached once more per
+    // call — which is what says the counter can see a layout at all.
+    paint(f, d);
+    expect(laid, "`paint` alone lays out once").toBe(2);
+    cursorFor(f, d);
+    expect(laid, "`cursorFor` alone lays out once").toBe(3);
+  });
+
+  it("T1.59 (C22 I96): the cursor is placed from the layout the rows were composited from, not from a second one", () => {
+    // **Two records of one frame.** A thunk that answers differently on its
+    // second call is what a stack changing between two layouts looks like; with
+    // one layout the rows and the cursor agree by construction, and with two the
+    // frame would show a layer whose cursor is the prompt's.
+    const f = frameAt(40, 12);
+    const overlays = createOverlayManager({ registry: measurer });
+    overlays.push(cursorLayer("cur"));
+    const withLayer = overlays.layout(f.overlayRegion);
+    const top = withLayer[0];
+    if (top === undefined) throw new Error("the fixture placed nothing");
+
+    let calls = 0;
+    const d = deps({
+      overlays: () => {
+        calls += 1;
+        return calls === 1 ? withLayer : [];
+      },
+    });
+
+    const placed = placedLayers(d);
+    const lines = paint(f, d, placed);
+    const cursor = cursorFor(f, d, placed);
+    expect(displayCells(lines[f.region.top + top.top] ?? "") > 0 && (lines[f.region.top + top.top] ?? "").includes("cur row 0"), "the rows carry the layer").toBe(true);
+    expect(cursor, "and the cursor is the layer's, offset into frame coordinates").toEqual({
+      row: f.region.top + top.top,
+      col: top.left + 5,
+    });
+    expect(calls, "the thunk answered once for both").toBe(1);
+  });
+
+  it("T4.64 (C09 I61, C22 I86; C28 I31): a real session's chrome children are measured once per registry call — header 2.0 calls per frame, footer one more for compose's own call", async () => {
+    let seen: ProfileReport | null = null;
+    const { tui } = await buildSession({
+      profile: {
+        tier: "spans",
+        elapsed: (() => {
+          let t = 0;
+          return () => (t += 1);
+        })(),
+        onReport: (r) => void (seen = r),
+      },
+    });
+    await tui.stop("exit");
+    const report = seen as ProfileReport | null;
+    if (report === null) throw new Error("no report arrived");
+    expect(report.frames, "the session painted").toBeGreaterThan(0);
+
+    const node = (kind: string, id: string) => {
+      const found = report.nodes.find((n) => n.key === `${kind}#${id}`);
+      if (found === undefined) throw new Error(`no node ${kind}#${id} — the default chrome did not draw`);
+      return found;
+    };
+
+    // **`calls` counts the registry seam — one measure and one render is the
+    // floor for a rendered block** (C28 I31). The header's children read 3.0 and
+    // the footer's 4.0 before the registry answered a `(block, width)` once per
+    // call (F940): the group's `measure` asked, its `render`'s placements asked
+    // again, and the child's own render committed a third.
+    const header = node("group", "chrome.header");
+    const headerLeft = node("pills", "chrome.header.left");
+    const headerRight = node("pills", "chrome.header.right");
+    expect(header.calls, "the header group is rendered once per frame and measured by nobody").toBe(header.frames);
+    expect(headerLeft.calls, "one measure and one render per frame").toBe(2 * headerLeft.frames);
+    expect(headerRight.calls, "one measure and one render per frame").toBe(2 * headerRight.frames);
+
+    // **The footer is one call more, and the call is compose's** (C22 I82):
+    // `footerRows` is measured through `measureSequence` before the frame is
+    // painted, which is a registry call of its own and therefore a scope of its
+    // own (I61's bound is the call). The difference is asserted as exactly that
+    // one call rather than as a ceiling, so the row says where the extra ask
+    // lives instead of tolerating it.
+    const footer = node("group", "chrome.footer");
+    const footerLeft = node("pills", "chrome.footer.left");
+    const footerRight = node("pills", "chrome.footer.right");
+    expect(footer.calls, "compose's measure and paint's render").toBe(2 * footer.frames);
+    expect(footerLeft.calls, "the header's two plus compose's one").toBe(3 * footerLeft.frames);
+    expect(footerRight.calls, "the header's two plus compose's one").toBe(3 * footerRight.frames);
   });
 });

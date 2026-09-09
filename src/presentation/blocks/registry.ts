@@ -174,6 +174,77 @@ class Registry implements BlockRegistry {
    */
   probe: Probe = NO_PROBE;
 
+  /**
+   * The heights answered so far in the call the registry is inside, or `null`
+   * between calls (I61).
+   *
+   * **One slot per block, and `(block, width)` is a validity predicate rather
+   * than a map key** — `HeightCache`'s shape, at the seam. A container asks the
+   * same question of the same child several times inside one call: `group`
+   * measures its children in `measure` and again in `render`'s placements, the
+   * child's own `render` commits a third, and `scroll` asks for its content's
+   * height, its ranges and its drawn total in turn. Every one is the same
+   * `(block, width)` and I2 says every one has the same answer, so the second
+   * and later asks are read from here. Measured before this existed, on the
+   * default chrome: `pills#chrome.header.left` at **3.0** calls per frame and
+   * `pills#chrome.footer.left` at **4.0** (F940).
+   *
+   * **The lifetime is the call, and that is the whole of the ruling.** F914
+   * refused *a cache across `measure` and `render`* on C11 I11's ground — a
+   * kind's plan memoised on `(columns, width)` outlives the document that made
+   * it and is where correctness defects live. This is not that: it is opened by
+   * the outermost public member and dropped when that member returns, so no
+   * answer ever meets a block from a later document, and no definition can see
+   * it (I2, as I33's floor). Between calls it is `null`, not empty — an empty
+   * map left behind would be the cache that was refused.
+   *
+   * Keyed on the block **object**, never its id: two blocks sharing an id are
+   * two questions (T3.82). Only an `ok` answer is kept; a throwing measurer is
+   * asked again on every ask, because the render-time ask is the one that
+   * carries the fitted request (I34) and a memoised fault would leave every
+   * report at `rows: 0`.
+   */
+  #memo: Map<Block, Readonly<{ width: number; rows: number }>> | null = null;
+
+  /**
+   * Run `work` inside the current call's memo, opening one if this is the
+   * outermost public member and closing it on the way out — **on the throw path
+   * too**, or a loud sink's throw would leave the map open for the next call to
+   * read from (T3.80).
+   */
+  #scoped<T>(work: () => T): T {
+    if (this.#memo !== null) return work();
+    this.#memo = new Map();
+    try {
+      return work();
+    } finally {
+      this.#memo = null;
+    }
+  }
+
+  /**
+   * The child seam handed to every definition and walk — `measureChild`
+   * (A02 Seam 1, I7) — reading the call's memo before it reaches `measure`.
+   *
+   * **A hit never reaches the `measure` property**, which is what C28's
+   * decoration wraps (`registry-probe.ts`), so the profiler's `calls` column
+   * counts the questions the registry had to answer and not the ones it read
+   * back: one measure and one render per block per call is the floor a rendered
+   * block now sits at (C28 I31). A miss goes through the property exactly as
+   * every ask did before, so the tree the profiler builds is unchanged where
+   * there is work in it.
+   */
+  #measureChild = (block: Block, width: number): number => {
+    const w = normaliseWidth(width);
+    const held = this.#memo?.get(block);
+    if (held !== undefined && held.width === w) {
+      this.probe.hit("measure");
+      return held.rows;
+    }
+    this.probe.miss("measure", held === undefined ? "absent" : "width");
+    return this.measure(block, w);
+  };
+
   constructor(
     definitions: readonly BlockDefinition[],
     onError: (fault: BlockFault) => void,
@@ -234,6 +305,12 @@ class Registry implements BlockRegistry {
     // In both arms rather than only the successful one: a floor is about the
     // block, not about which half of its definition gave way, and a measurer
     // that threw is exactly the case where the rows are most needed.
+    // **Answered already in this call** (I61): the parent's `measure` asked
+    // through `#measureChild`, and this is the child's own `render` committing
+    // its height. The memo holds the floored figure this function returned, so
+    // it is the same number by construction and not by agreement.
+    const held = this.#memo?.get(block);
+    if (held !== undefined && held.width === width) return { ok: true, rows: held.rows };
     const floor = floorOf(block);
     try {
       // **The capped form, and the marker is a row** (C14 I24). Cap first and
@@ -241,9 +318,11 @@ class Registry implements BlockRegistry {
       // and a floored block over the cap takes `max(shown + 1, floor)`.
       const form = this.#form(block, width);
       const rows =
-        form.definition.measure(form.block, width, this.measure, this.probe) +
+        form.definition.measure(form.block, width, this.#measureChild, this.probe) +
         (form.capped === null ? 0 : 1);
-      return { ok: true, rows: Math.max(rows, floor) };
+      const floored = Math.max(rows, floor);
+      this.#memo?.set(block, Object.freeze({ width, rows: floored }));
+      return { ok: true, rows: floored };
     } catch (error) {
       // I11 — a throwing measurer is contained and the block treated as one
       // row. This protects virtualisation: C14 sums measured heights without
@@ -309,7 +388,7 @@ class Registry implements BlockRegistry {
       const form = this.#form(block, width);
       const declared = form.definition.elements;
       if (declared === undefined) return NO_ELEMENTS;
-      return { elements: declared(form.block, width, this.measure), owned: true };
+      return { elements: declared(form.block, width, this.#measureChild), owned: true };
     } catch (error) {
       this.#report(block, "elements", error);
       return NO_ELEMENTS;
@@ -400,17 +479,26 @@ class Registry implements BlockRegistry {
     if (held !== null) return { ...resolved, capped: held };
     const windowable = resolved.definition.window;
     if (windowable === undefined) return { ...resolved, capped: null };
-    const total = resolved.definition.measure(resolved.block, width, this.measure, this.probe);
+    const total = resolved.definition.measure(resolved.block, width, this.#measureChild, this.probe);
     if (!(total > this.#cap)) return { ...resolved, capped: null };
-    // `this.measure` is the child seam (I26a), as `windowSequence` hands it.
-    const out = windowable(resolved.block, width, 0, this.#cap, this.measure);
-    const shown = resolved.definition.measure(out.block, width, this.measure, this.probe);
+    // `#measureChild` is the child seam (I26a), as `windowSequence` hands it.
+    const out = windowable(resolved.block, width, 0, this.#cap, this.#measureChild);
+    // **Two measures, two questions, two blocks** (I62, F942). `total` above is
+    // the block's own rows and decided the cap; this is the *window's* rows,
+    // and it is what the marker says is on screen. Neither is the other read
+    // twice — P11 listed the pair as repeated work, and it is not. What I26
+    // does make derivable is this one: `shown = cap + skipRows + dropRows`
+    // holds for every kind declaring `window`, so the measure could be replaced
+    // by the identity. It is measured instead, so the marker names what the
+    // form measures rather than what an identity predicts, and the cost is one
+    // measure of a block already bounded at the cap.
+    const shown = resolved.definition.measure(out.block, width, this.#measureChild, this.probe);
     const capped: Capped = Object.freeze({ shown, total });
     return { definition: resolved.definition, block: withCapped(out.block, capped), capped };
   }
 
   /**
-   * `#form`, contained — for `windowSequence`, whose `this.measure` call has
+   * `#form`, contained — for `windowSequence`, whose `#measureChild` ask has
    * already reported a throwing measurer (I11) and must not report it twice or
    * take the sequence with it. `null` means *keep the block whole*, which is
    * the answer a kind declaring no `window` gets anyway.
@@ -441,7 +529,11 @@ class Registry implements BlockRegistry {
     return rows([paint(clampSpans([{ text, style }], width, ctx.capabilities))]);
   }
 
-  measure = (block: Block, width: number): number => this.#measured(block, normaliseWidth(width)).rows;
+  // **Every public member opens the call's memo** (I61) — this one included,
+  // because a `group` measured from L4 asks its children through the seam and
+  // the seam reads the memo this call opened.
+  measure = (block: Block, width: number): number =>
+    this.#scoped(() => this.#measured(block, normaliseWidth(width)).rows);
 
   /**
    * A block's content width at `width` (§2c, I42) — the definition's answer,
@@ -454,7 +546,7 @@ class Registry implements BlockRegistry {
    * through `onError` rather than silently clamped — the clamp still happens,
    * because a width is needed either way.
    */
-  width = (block: Block, width: number): number => {
+  width = (block: Block, width: number): number => this.#scoped((): number => {
     const w = normaliseWidth(width);
     const form = this.#formContained(block, w) ?? this.#resolve(block);
     const answer = form.definition.width;
@@ -468,7 +560,7 @@ class Registry implements BlockRegistry {
       this.#report(block, "width", error);
       return w;
     }
-  };
+  });
 
   /**
    * A sequence's rows: the blocks' heights plus one per `gapBefore` (C04 §3a).
@@ -479,7 +571,7 @@ class Registry implements BlockRegistry {
    * inserted a row would make a document's height unknowable from the document.
    */
   measureSequence = (blocks: readonly Block[], width: number): number =>
-    sequenceHeight(blocks, normaliseWidth(width), this.measure);
+    this.#scoped(() => sequenceHeight(blocks, normaliseWidth(width), this.#measureChild));
 
   /**
    * What one block offers to keyboard and pointer, `measureChild` supplied
@@ -502,7 +594,7 @@ class Registry implements BlockRegistry {
    * why they cannot disagree rather than why they happen not to.
    */
   elementsOf = (block: Block, width: number): readonly NavElement[] =>
-    this.#elements(block, normaliseWidth(width)).elements;
+    this.#scoped(() => this.#elements(block, normaliseWidth(width)).elements);
 
   /**
    * Every element in a **sequence**, block-local rows lifted into
@@ -578,7 +670,7 @@ class Registry implements BlockRegistry {
           // every child at the row's top, so a chip drawn on row 3 answered
           // `rows [0, 1)`. A child is placed at its content width when it is
           // aligned off `left` (C04 I101) — the width the renderer draws it at.
-          const placements = groupPlacements(block, atWidth, this.measure, this.width);
+          const placements = groupPlacements(block, atWidth, this.#measureChild, this.width);
           if (block.direction === "column") {
             // A sequence still — the gap is the run's (C04 §3a) and the step is
             // the child's height at the column's width, which its content width
@@ -588,7 +680,7 @@ class Registry implements BlockRegistry {
               if (child.gapBefore === true) row += 1;
               const at = placements[i];
               place(child, row + (at?.top ?? 0), left + (at?.left ?? 0), at?.width ?? widths[0] ?? 1);
-              row += this.measure(child, widths[0] ?? 1);
+              row += this.#measureChild(child, widths[0] ?? 1);
             });
             return;
           }
@@ -635,12 +727,17 @@ class Registry implements BlockRegistry {
       for (const block of seq) {
         if (block.gapBefore === true) row += 1;
         place(block, row, left, atWidth);
-        row += this.measure(block, atWidth);
+        row += this.#measureChild(block, atWidth);
       }
     };
 
-    sequence(blocks, 0, 0, normaliseWidth(width));
-    return Object.freeze(out);
+    // Inside the call's memo (I61): the placements measure every child and the
+    // row cursor asked each of them again — the element walk's own copy of the
+    // repeat `render` had (T1.34).
+    return this.#scoped(() => {
+      sequence(blocks, 0, 0, normaliseWidth(width));
+      return Object.freeze(out);
+    });
   };
 
   /**
@@ -662,7 +759,7 @@ class Registry implements BlockRegistry {
     width: number,
     from: number,
     to: number,
-  ): Readonly<{ blocks: readonly Block[]; skipRows: number }> => {
+  ): Readonly<{ blocks: readonly Block[]; skipRows: number }> => this.#scoped(() => {
     const w = normaliseWidth(width);
     const lo = Math.max(0, Math.trunc(from));
     const hi = Math.max(lo, Math.trunc(to));
@@ -673,7 +770,7 @@ class Registry implements BlockRegistry {
 
     for (const block of blocks) {
       const gap = block.gapBefore === true ? 1 : 0;
-      const height = this.measure(block, w);
+      const height = this.#measureChild(block, w);
       const top = row + gap;
       const bottom = top + height;
       row = bottom;
@@ -729,12 +826,12 @@ class Registry implements BlockRegistry {
         const reachesMarker = capped !== null && localTo > contentRows;
         const wFrom = Math.min(localFrom, Math.max(0, contentRows - 1));
         const wTo = Math.max(wFrom + 1, Math.min(localTo, contentRows));
-        // **`this.measure` is the child seam** (C09 I26a), the same one
+        // **`#measureChild` is the child seam** (C09 I26a), the same one
         // `#elements` hands over four members up: a kind whose unit boundaries
         // depend on a child's height — a table row's detail — cannot compute
         // them from `(block, width)` alone, and a window that guessed would
         // slice at the wrong row while I26's arithmetic still balanced.
-        const out = windowable(stripCapped(source), w, wFrom, wTo, this.measure);
+        const out = windowable(stripCapped(source), w, wFrom, wTo, this.#measureChild);
         piece = reachesMarker && capped !== null ? withCapped(out.block, capped) : stripCapped(out.block);
         dropped = out.skipRows + (localFrom - wFrom);
       }
@@ -747,9 +844,9 @@ class Registry implements BlockRegistry {
     }
 
     return Object.freeze({ blocks: Object.freeze(kept), skipRows: Math.max(0, skipRows) });
-  };
+  });
 
-  renderSequence = (blocks: readonly Block[], ctx: RenderContext): ReactElement => {
+  renderSequence = (blocks: readonly Block[], ctx: RenderContext): ReactElement => this.#scoped(() => {
     const width = normaliseWidth(ctx.width);
     const children: ReactElement[] = [];
 
@@ -767,7 +864,7 @@ class Registry implements BlockRegistry {
     });
 
     return createElement(Box, { flexDirection: "column", width }, children);
-  };
+  });
 
   /**
    * The other half of C04's floor: the element, padded to it (I33).
@@ -805,39 +902,42 @@ class Registry implements BlockRegistry {
    * subtree cannot do to a child's.
    *
    * The window is taken over `#form`'s block, as `windowSequence` takes it, so
-   * the rows are the same ones `measure` counted (I26a's seam, `this.measure`).
+   * the rows are the same ones `measure` counted (I26a's seam, `#measureChild`).
    */
-  windowChild = (block: Block, width: number, from: number, to: number): Windowed | null => {
+  windowChild = (block: Block, width: number, from: number, to: number): Windowed | null => this.#scoped(() => {
     const w = normaliseWidth(width);
     if (floorOf(block) > 0) return null;
     const form = this.#formContained(block, w);
     if (form === null || form.capped !== null) return null;
     const windowable = form.definition.window;
     if (windowable === undefined) return null;
-    const out = windowable(form.block, w, from, to, this.measure);
+    const out = windowable(form.block, w, from, to, this.#measureChild);
     if (out.skipRows !== 0 || out.dropRows !== 0) return null;
     return out;
-  };
+  });
 
-  render = (block: Block, ctx: RenderContextInput): ReactElement => {
+  render = (block: Block, ctx: RenderContextInput): ReactElement => this.#scoped(() => {
     const width = normaliseWidth(ctx.width);
     const childContext: RenderContext = {
       ...ctx,
       width,
-      measureChild: this.measure,
+      measureChild: this.#measureChild,
       widthChild: this.width,
       renderChild: (child: Block, childWidth: number): ReactElement =>
         this.render(child, { ...ctx, width: childWidth }),
       windowChild: this.windowChild,
     };
 
-    // **The height is committed before anything is drawn** (I11). One extra
-    // `measure` per render, and the two reasons it is affordable are that L4
-    // caches rendered lines per entry (C22 I58) so this is not a per-frame cost,
-    // and that `windowSequence` has already measured the same blocks on the way
-    // here. The alternative — measuring only inside the catch — cannot see a
-    // *measurer* that gave way while the renderer succeeded, which is the case
-    // that drew a fifth of a figure and said nothing.
+    // **The height is committed before anything is drawn** (I11). It used to be
+    // one extra `measure` per render, excused because L4 caches rendered lines
+    // per entry (C22 I58) — which is true of the transcript and false of the
+    // chrome, drawn every frame — and because `windowSequence` had already
+    // measured the same blocks on the way here. Now it is a read of the call's
+    // memo whenever a parent asked first (I61), and a measure only for a block
+    // rendered at the top of a call. The alternative — measuring only inside
+    // the catch — cannot see a *measurer* that gave way while the renderer
+    // succeeded, which is the case that drew a fifth of a figure and said
+    // nothing.
     const committed = this.#measured(block, width, childContext.capabilities);
 
     if (!committed.ok) {
@@ -884,7 +984,7 @@ class Registry implements BlockRegistry {
       );
       return this.#floored(block, this.#errorBlock(text, committed.rows, childContext));
     }
-  };
+  });
 }
 
 /**
