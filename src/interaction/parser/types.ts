@@ -21,7 +21,7 @@ export const BUILTINS: readonly Builtin[] = Object.freeze(["cd", "export", "pwd"
  *
  * It is not a `Builtin` — those are session-state effects with arguments of
  * their own, and this has no effect at all; it modifies how the rest of the
- * line is run. And it is not a manifest tool: the framework's six are
+ * line is run. And it is not a manifest tool: the framework's verbs are
  * `local: true` and C23 I27 fails construction for a local verb with no
  * handler, while this has no handler because it never reaches a route.
  */

@@ -187,6 +187,9 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       history: () => deps.history.entries,
       bindings: () => deps.bindings(),
       stop: deps.stop,
+      // C28 §3c's view, for `/profile` (C23 I68) — the row is in
+      // `FRAMEWORK_TOOLS`, so a handler missing here is what `seal()` refuses.
+      profileView: deps.profileView,
     }),
   )) {
     local.register(verb, handler);

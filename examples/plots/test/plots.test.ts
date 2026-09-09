@@ -379,7 +379,7 @@ describe("every command composes a document the transcript would accept", () => 
     // arm ignores capabilities entirely — it is passed because the signature
     // takes it, and a second capability record in this file would be one more
     // thing to keep in step.
-    profile: () => [as("profile", profileBlocks(undefined, [], FULL))],
+    report: () => [as("report", profileBlocks(undefined, [], FULL))],
   };
 
   it("T-doc1: the coverage table names every command the manifest declares", () => {
@@ -404,10 +404,10 @@ describe("every command composes a document the transcript would accept", () => 
     }
     expect(bad).toEqual([]);
     // 46 forms twice, plus /all, /faults, /monitor, /rungs, /mosaic, /image,
-    // /spinners, /bars, /profile and sample's two — eleven singletons. The count
+    // /spinners, /bars, /report and sample's two — eleven singletons. The count
     // is asserted so a document appearing or vanishing has to be attributed
     // rather than noticed: `/image` moved this from seven, the two galleries
-    // from eight, and `/profile` from ten — which is the row working, since the
+    // from eight, and `/report` (then named `/profile`, F953) from ten — which is the row working, since the
     // command had been in the manifest and in no coverage row since `b62b64df`.
     expect(checked, "documents built").toBe(FORMS.length * 2 + 11);
   });

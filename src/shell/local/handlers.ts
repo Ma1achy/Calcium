@@ -21,6 +21,9 @@ import type { HistoryEntry } from "../../interaction/history/types.js";
 import type { ThemeStore } from "../../presentation/theme/index.js";
 import { b } from "../builders/index.js";
 import { blockId, compose, warnNotice } from "../documents.js";
+import { PANES } from "../profiling/panes.js";
+import type { PaneName } from "../profiling/panes.js";
+import type { ProfileView } from "../profile-view.js";
 import type { LocalHandler } from "./registry.js";
 import type { StopReason } from "../types.js";
 
@@ -46,7 +49,57 @@ export type HandlerDeps = Readonly<{
   /** Every binding C16 will dispatch, for `/help` (C23 I26). */
   bindings: () => readonly Readonly<{ keys: string; does: string }>[];
   stop: (reason: StopReason) => Promise<number>;
+  /**
+   * C28 §3c's view, for `/profile` (C23 I68) — the way `stop` is for `/exit`.
+   *
+   * **Required, because the row is.** `FRAMEWORK_TOOLS` declares seven verbs
+   * and C23 I27 refuses a row without a handler at every startup, so the view
+   * has to arrive whether or not a profiler does: the root always builds one,
+   * and a view with no recorder behind it refuses through the route rather than
+   * vanishing (T4.67). This was optional, with the handler included only when a
+   * view was handed in, while the row and `execution.ts`'s call site were
+   * outside the round that wrote it (T1.64's second arm watched that).
+   */
+  profileView: ProfileView;
 }>;
+
+const isPane = (x: unknown): x is PaneName =>
+  typeof x === "string" && (PANES as readonly string[]).includes(x);
+
+/**
+ * `/profile [pane]` — open C28's view (C23 I68, I69).
+ *
+ * **It appends a notice and never the report.** The panes are drawn in the
+ * layer the view refreshes; a document holding them would freeze one report
+ * into the transcript's record and read as current on every later frame, which
+ * is I18's stale-data shape with the framework's own figures inside it.
+ *
+ * **The pane comes from `ctx.args`, never from `argv[0]`** (C22 I66), for
+ * `/theme`'s reason: C05 parsed and enum-checked it, and a second reader of one
+ * fact drifts from the first. `argv` is read on the failure arm alone — `args`
+ * is empty there, because a local verb is not gated on validation — to quote
+ * the token that was typed, and to tell *no argument* from *a bad one*.
+ *
+ * Every refusal is a document on this route rather than a throw (C23 I2): the
+ * view's own strings for *no profiler* and *something is open*, and a usage
+ * line for a pane that is not one of C28's four.
+ */
+const profileHandler = (view: ProfileView): LocalHandler => (argv, ctx) => {
+  const wanted = ctx.args["pane"];
+  const pane: PaneName | null = isPane(wanted) ? wanted : argv.length === 0 ? "overview" : null;
+  if (pane === null) {
+    return doc("/profile", [
+      warnNotice(`usage: /profile [${PANES.join("|")}] — got \`${argv[0] ?? ""}\``, blockId("profile-usage")),
+    ]);
+  }
+  const refused = view.open(pane);
+  if (refused !== null) {
+    return doc("/profile", [warnNotice(refused, blockId("profile-refused"))]);
+  }
+  return doc("/profile", [
+    b.notice("muted", `profiler: ${pane}`, undefined, { id: blockId("profile") }),
+  ]);
+};
 
 /**
  * **`origin` and `transport` left off since F13** — the shell fills both, along
@@ -295,5 +348,8 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
         b.notice("muted", "exiting", undefined, { id: blockId("exit") }),
       ]);
     },
+
+    // The seventh (C23 §2, I68).
+    profile: profileHandler(deps.profileView),
   };
 }

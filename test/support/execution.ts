@@ -30,6 +30,7 @@ import { doc, localDoc } from "./blocks.js";
 import { result } from "./transport.js";
 import type { RefreshHost } from "../../src/shell/refresh.js";
 import type { ConfirmHost } from "../../src/shell/confirm.js";
+import type { ProfileView } from "../../src/shell/profile-view.js";
 import type { Pipeline, PipelineDeps } from "../../src/shell/types.js";
 import type { RawPatch, RawResult } from "../../src/data/transport/index.js";
 import type { ViewDocument, ViewPatch } from "../../src/data/viewmodel/index.js";
@@ -76,6 +77,13 @@ export type PipelineScript = Readonly<{
   }>;
   /** The region the body is measured against, for the resize rows (C23 I65). */
   region?: () => Readonly<{ width: number; height: number }>;
+  /**
+   * C28 §3c's view, for `/profile` (C23 I68). Defaults to a view with no
+   * recorder behind it — the one every session built without `TuiConfig.profile`
+   * gets — whose `open` refuses naming that option, so a row that wants the
+   * accepting arm hands its own in (C23 T4.66).
+   */
+  profileView?: ProfileView;
 }>;
 
 export type PipelineHarness = Readonly<{
@@ -152,6 +160,22 @@ export const settled = async (p?: { readonly inFlight: unknown }): Promise<void>
   await turn();
   await turn();
 };
+
+/**
+ * The view a session with no profiler gets: `open` refuses with C28 T1.97's
+ * string and nothing is ever open. What `construct.ts` builds when
+ * `TuiConfig.profile` is absent, reduced to the seam `/profile` reaches.
+ */
+const refusingProfileView = (): ProfileView => ({
+  open: () => "no profiler to show — this session was built without `TuiConfig.profile`",
+  switchPane: () => false,
+  move: () => false,
+  pop: () => false,
+  dispose: () => undefined,
+  get pane() {
+    return null;
+  },
+});
 
 export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
   const transcript = createTranscriptStore();
@@ -366,10 +390,12 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
     setSuppressBackground: (next: boolean) => void suppressed.push(next),
     binary: "widget",
     commandPolicy: slashPolicy,
+    // Required since the seventh row landed: C23 I27 refuses `profile` without a handler.
+    profileView: script.profileView ?? refusingProfileView(),
   } as unknown as PipelineDeps;
 
   const pipeline = createExecutionPipeline(deps);
-  // The fixture manifest's own local verbs. The framework's six register
+  // The fixture manifest's own local verbs. The framework's seven register
   // themselves; `seal()` reconciles both (C23 I27), so omitting either fails
   // construction rather than producing a verb nothing can route to.
   pipeline.register("guide", () => localDoc({ command: "/guide" }));

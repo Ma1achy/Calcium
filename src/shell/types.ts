@@ -20,6 +20,7 @@ import type { Action, Block, ViewDocument } from "../data/viewmodel/index.js";
 import type { EntryId } from "../viewport/transcript/index.js";
 import type { DocumentView } from "./document-view.js";
 import type { PatchView } from "./patch-view.js";
+import type { ProfileView } from "./profile-view.js";
 import type { RefreshHost } from "./refresh.js";
 import type { CompletionSource } from "../interaction/completion/index.js";
 import type { FocusTarget } from "../interaction/router/types.js";
@@ -370,6 +371,15 @@ export type PipelineDeps = Readonly<{
   /** C28's report, when a profiler exists (C22 I93). Absent otherwise. */
   profile?: () => ProfileReport;
   /**
+   * C28 §3c's view, for `/profile`'s handler (C23 I68).
+   *
+   * **Supplied by the root, always** — a session built without `TuiConfig.profile`
+   * still gets a view, whose `open` refuses naming that option (C28 T1.97). The
+   * row is in `FRAMEWORK_TOOLS`, `execution.ts` hands this to `shippedHandlers`,
+   * and C23 I27 refuses the pair in either half's absence (T4.66, T4.67).
+   */
+  profileView: ProfileView;
+  /**
    * One async bracket for C23's local verb route (C28 I36).
    *
    * **The registry is built in here**, so there is no object the composition
@@ -439,7 +449,7 @@ export type TuiConfig = Readonly<{
    * The app's own verbs, or a path to a JSON document containing them.
    *
    * **A `ManifestDocument`, not a `Manifest`** (C22 I23a). A `Manifest` is what
-   * `parseManifest` returns — it carries `appTools` and the framework's six
+   * `parseManifest` returns — it carries `appTools` and the framework's own
    * verbs, both derived — so asking for one was asking for the parser's output
    * before the call, and the only function that produces it is exported nowhere.
    * Construction parses whichever arm arrives.

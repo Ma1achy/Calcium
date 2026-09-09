@@ -283,6 +283,20 @@ export function createDocumentView(deps: DocumentViewDeps): DocumentView {
     return 0;
   };
 
+  // **Torn down by whichever caller removed the layer** (C15 I25, F944). C16's
+  // ⌃c ladder answers a pushed view with `overlays.pop()` and asks no owner,
+  // so `openFor` kept naming its command over an empty stack and `keys.ts`
+  // routed the view keys to a view that was not there. The change carries the
+  // id, synchronously, so this runs before the ladder's call returns; filtered
+  // on the id, because a menu or a confirm popped above the view carries its
+  // own. `pop()` below dismisses through the same manager and so reaches this
+  // line too — one teardown, three callers (C28 §3c's shape).
+  deps.overlays.subscribe((change) => {
+    if ((change.kind === "pop" || change.kind === "dismiss") && change.id === DOCUMENT_VIEW_ID) {
+      state = null;
+    }
+  });
+
   return {
     get openFor() {
       return state?.command ?? null;

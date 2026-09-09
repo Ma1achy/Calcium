@@ -49,6 +49,7 @@ import type { OverlayManager } from "../viewport/overlay/index.js";
 import type { FocusStore } from "../interaction/router/focus.js";
 import type { DocumentView, DocumentViewMotion } from "./document-view.js";
 import type { PatchView, PatchViewMotion } from "./patch-view.js";
+import type { ProfileView, ProfileViewMotion } from "./profile-view.js";
 
 /** The prompt's own extent, for anchoring (C19 §6, C20 §5). */
 export type PromptAnchor = Readonly<{ row: number; rows: number }>;
@@ -104,6 +105,22 @@ export type KeyDeps = Readonly<{
    * so at most one of these is open and the keymap needs no third target.
    */
   documentView: DocumentView;
+  /**
+   * C28 §3c's view — the third owner of the one `pushedView` target.
+   *
+   * Its unit is the pane: `n`/`p` switch panes where a patch moves by hunk and
+   * a document by block, and the four page keys and `g`/`G` move its window.
+   * No binding is added for it, so `/help keys` is unchanged (C23 I26).
+   *
+   * **Optional for the harness that builds these deps by hand and required in
+   * effect**: the root always supplies it (`construct.ts`), and a deps literal
+   * without it exercises the two older owners exactly as before this one
+   * existed. `session-keys.test.ts` is that harness: its graph-backed literal
+   * passes it, and its three stub literals (`editor: {}`) do not — so this stays
+   * optional until those three grow a stub view, which is what making it
+   * required costs and not one line.
+   */
+  profileView?: ProfileView;
   /** C22 I46 — the pop releases the view's parts, rather than a later fetch doing it. */
   releaseView: () => void;
   /**
@@ -929,16 +946,22 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // which is S3's footer read literally: *n/p scroll*. The two are the same
     // gesture over each view's own unit, which is what makes one binding right
     // rather than a compromise.
-    viewNextHunk: () => void onView("nextHunk", "down"),
-    viewPrevHunk: () => void onView("prevHunk", "up"),
-    viewTop: () => void onView("top", "top"),
-    viewBottom: () => void onView("bottom", "bottom"),
-    viewPageUp: () => void onView("pageUp", "pageUp"),
-    viewPageDown: () => void onView("pageDown", "pageDown"),
+    viewNextHunk: () => void onView("nextHunk", "down", 1),
+    viewPrevHunk: () => void onView("prevHunk", "up", -1),
+    viewTop: () => void onView("top", "top", "top"),
+    viewBottom: () => void onView("bottom", "bottom", "bottom"),
+    viewPageUp: () => void onView("pageUp", "pageUp", "pageUp"),
+    viewPageDown: () => void onView("pageDown", "pageDown", "pageDown"),
     // `Esc` is the view's own dismissal and deliberately not `dismiss`, which
     // pops whatever layer is on top: this one knows it is closing *its* view and
     // drops its offset with it (A01 D7).
     viewPop: () => {
+      // **The profiler view first** (C28 §3c). Its `pop` restores the tier it
+      // raised; sending its `Esc` to another owner would leave that tier up.
+      if (deps.profileView !== undefined && deps.profileView.pane !== null) {
+        void deps.profileView.pop();
+        return;
+      }
       // **Released here, which is the trigger C23 I33's set did not have** (I46).
       // The order matters: release first, so a fetch that resolves during the
       // pop finds no registration rather than a half-dismissed view.
@@ -1116,10 +1139,23 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
    * rather than hidden in a table that would have to be read to know whether a
    * key does the same thing in both.
    */
-  const onView = (patch: PatchViewMotion, document: DocumentViewMotion): boolean =>
-    deps.documentView.openFor !== null
+  const onView = (
+    patch: PatchViewMotion,
+    document: DocumentViewMotion,
+    // The profiler view's reading of the same key: a pane step for `n`/`p`,
+    // a window motion for the rest (C28 §3c).
+    profile: ProfileViewMotion | 1 | -1,
+  ): boolean => {
+    const profileView = deps.profileView;
+    if (profileView !== undefined && profileView.pane !== null) {
+      return typeof profile === "number"
+        ? profileView.switchPane(profile)
+        : profileView.move(profile);
+    }
+    return deps.documentView.openFor !== null
       ? deps.documentView.move(document)
       : deps.patchView.move(patch);
+  };
 
   /**
    * The actions after which the as-you-type menu is recomputed (C19 §6a).

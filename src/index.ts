@@ -352,7 +352,8 @@ export type { TerminalCapabilities } from "./terminal/capabilities.js";
  *
  * Published because `profilePane` takes one, and a consumer with no name for a
  * parameter's type cannot supply it. A whole `TerminalCapabilities` satisfies
- * it, which is what every caller inside the framework hands over.
+ * it, which is what the one caller inside the framework — C28 §3c's view, which
+ * hands over `detection.capabilities` whole — does.
  */
 export type { GlyphCaps } from "./presentation/blocks/index.js";
 
@@ -468,6 +469,9 @@ export { planColumns } from "./presentation/table/index.js";
  *
  * `profilePane` is a pure function from a report to blocks, which is why it is
  * safe to publish: it composes the same builders an application already has.
+ * The framework's own view (`/profile`, C28 §3c) draws with these three through
+ * the same exports and nothing that opens it is published (C24 I33) —
+ * `paneTitle` had no consumer anywhere until that view (F945).
  */
 export { profilePane, paneTitle, PANES } from "./shell/profiling/panes.js";
 

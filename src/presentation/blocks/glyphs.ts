@@ -306,7 +306,9 @@ export const SUBSTITUTIONS: readonly (readonly [string, string])[] = Object.free
  * **Named rather than written inline**, because `glyphs` is not the only caller
  * any more: `profilePane` takes one and is exported, and MG29 is right that a
  * consumer with no name for a parameter's type cannot supply it. Every existing
- * caller hands over a whole capability record, which this still accepts.
+ * caller hands over a whole capability record, which this still accepts — the
+ * in-tree caller is `shell/profile-view.ts`, handing `detection.capabilities`
+ * whole, since the drawing round (C28 §3c).
  */
 export type GlyphCaps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">;
 

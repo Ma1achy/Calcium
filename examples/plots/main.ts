@@ -63,7 +63,7 @@ const tui = createTui({
   // above two rows.
   blocks: [faultyDefinition],
   // **C28, on and at the tier that records durations.** A demo is exactly the
-  // case the profiler was built for: every figure `/profile` draws below is
+  // case the profiler was built for: every figure `/report` draws below is
   // measured off this session's own frames, so the numbers move when the
   // terminal is resized, a plot is scrolled, or `/all` draws thirty-six forms.
   profile: { tier: "spans", sampleMs: 500 },
@@ -100,11 +100,17 @@ const tui = createTui({
     /**
      * **The framework profiling itself, drawn with the framework's own plots.**
      *
+     * `/report`, not `/profile`: the framework ships `/profile` as its seventh
+     * verb (C05 §3) and an app declaring the name cannot start (C05 I6). This
+     * one draws the same panes as a document in the transcript — the shape
+     * C23 I69 refuses for the framework's own verb, and a consumer drawing its
+     * own from `profilePane` is exactly what C24 I33 says the exports are for.
+     *
      * The builder is in `commands.ts` beside every other one, so the coverage
      * table can call the same code this handler does rather than a second copy
      * of it (F917).
      */
-    profile: ((argv, ctx) =>
+    report: ((argv, ctx) =>
       doc(ctx.command, profileBlocks(ctx.profile?.(), argv, ctx.capabilities))) satisfies LocalHandler,
 
     rungs: ((_argv, ctx) => doc(ctx.command, [rungs()])) satisfies LocalHandler,

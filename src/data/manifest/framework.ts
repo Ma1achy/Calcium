@@ -122,6 +122,27 @@ export const FRAMEWORK_TOOLS: readonly ToolDef[] = Object.freeze([
     args: [],
     flags: [],
   }),
+  // **The seventh, and the one whose handler needs the root** (C23 §2, C23 I68).
+  // `/profile` opens C28's view; the pane is an `enum` so C05 parses and checks
+  // it before the handler sees it, and `/profile foo` reaches the handler with
+  // `args` empty and answers a usage notice (C22 I66's reason: one reader of
+  // one fact). The four values are C28's `PANES` written down at L0, because
+  // this file may not import L4 — C23 T1.67 holds the two lists equal.
+  Object.freeze({
+    name: "profile",
+    local: true,
+    summary: "open the profiler's view; `/profile frame` opens it on that pane",
+    args: [
+      Object.freeze({
+        name: "pane",
+        type: "enum" as const,
+        required: false,
+        values: Object.freeze(["overview", "frame", "distribution", "memory"]),
+        summary: "`overview`, `frame`, `distribution` or `memory`; default `overview`",
+      }),
+    ],
+    flags: [],
+  }),
 ] satisfies readonly ToolDef[]);
 
 /** The names, for the collision message and for tests that must not derive them. */

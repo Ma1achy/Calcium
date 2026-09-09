@@ -280,10 +280,19 @@ function harness(script: Scripted = {}) {
     // what `as unknown as PipelineDeps` buys and costs — `overlays` and `confirm`
     // are the two the comment above already records.
     visible: () => true,
+    // The seventh shipped verb's seam (C23 I68); `seal()` refuses the row without it.
+    profileView: {
+      open: () => "no profiler to show — this session was built without `TuiConfig.profile`",
+      switchPane: () => false,
+      move: () => false,
+      pop: () => false,
+      dispose: () => undefined,
+      pane: null,
+    },
   } as unknown as PipelineDeps;
 
   const pipeline = createExecutionPipeline(deps);
-  // The app's own local verbs. The framework's six register themselves; these
+  // The app's own local verbs. The framework's seven register themselves; these
   // are the fixture manifest's, and `seal()` reconciles both (C23 I27).
   pipeline.register("guide", () =>
     script.localLive === undefined

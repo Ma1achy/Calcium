@@ -73,6 +73,8 @@ import { createDecoder } from "../interaction/router/decode.js";
 import { createKeyEffects } from "./keys.js";
 import { createDocumentView } from "./document-view.js";
 import { createPatchView } from "./patch-view.js";
+import { createProfileView } from "./profile-view.js";
+import type { ProfileView } from "./profile-view.js";
 import type { FocusTarget, InputEvent, Key, KeyAction } from "../interaction/router/types.js";
 import { openHistory, SEARCH_ID } from "../interaction/history/index.js";
 import { detectCapabilities, type TerminalCapabilities } from "../terminal/capabilities.js";
@@ -165,6 +167,41 @@ function suspendAware<T extends { suspend(): void; resume(): void }>(
     // nothing was reacquired, so the session is still not the foreground.
     lifecycle.resume();
     profiler.setSuspended(false);
+  };
+  return view;
+}
+
+/**
+ * C28 §3c — the profiler view's timer is disposed when the terminal is released.
+ *
+ * **The same decoration as `suspendAware`, one method over.** `stop()` calls
+ * `graph.lifecycle.release()` after the report is taken and the profiler
+ * disposed (C28 I38, `session.ts`), and that is the moment the view's timer
+ * must stop: the scheduler drops a commit while unacquired (C03 I1), so a tick
+ * after release draws nothing — what it would do is hold the process open for
+ * up to `VIEW_REFRESH_MS` and call `report()` on a disposed recorder. A signal
+ * exit takes C01's `releaseInternal` and then `process.exit`, which takes the
+ * timer with it.
+ *
+ * `dispose` is read at release rather than captured, because the lifecycle is
+ * built at step 7 and the view at step 10: the root hands the wrapper a thunk
+ * over a slot it fills later, which is `lastInputAt`'s pattern for a value one
+ * step writes and an earlier step's closure reads.
+ *
+ * Gated on the profiler as `suspendAware` is: without one the view never arms a
+ * timer — `open` refuses — and *off is free* (C22 I92) includes a wrapper the
+ * unprofiled session would otherwise carry.
+ */
+function disposingOnRelease<T extends { release(): void }>(
+  lifecycle: T,
+  profiler: Profiler | undefined,
+  dispose: () => void,
+): T {
+  if (profiler === undefined) return lifecycle;
+  const view = Object.create(lifecycle) as T;
+  view.release = (): void => {
+    dispose();
+    lifecycle.release();
   };
   return view;
 }
@@ -446,6 +483,18 @@ export type Graph = Readonly<{
    */
   scratch: RenderScratchStore;
   overlays: ReturnType<typeof createOverlayManager>;
+  /**
+   * C28 §3c's view, on the graph so a row can open it without a verb.
+   *
+   * The other two owners are not here, and the difference is who can reach
+   * them: a patch view opens from an action and a document view from a verb's
+   * declaration, and both are driven end to end through the pipeline. This one
+   * is reached by `/profile`, whose manifest row lands with `execution.ts`'s
+   * pass (C23 T4.66); the rows about the bracket, the tier and the ladder need
+   * the view before that lands, and they need it on a real graph — the commit
+   * seam under test is this file's (C28 T4.4, T4.6–T4.9).
+   */
+  profileView: ProfileView;
   history: Awaited<ReturnType<typeof openHistory>>;
   editor: ReturnType<typeof createEditor>;
   theme: ThemeStore;
@@ -640,7 +689,7 @@ export async function constructGraph(
     // **Both arms are parsed here, and that is the whole of I23** (C22 §3a).
     //
     // The object arm used to be taken as already-parsed and refused when it
-    // lacked Calcium's six verbs — which no author could supply, because
+    // lacked Calcium's own verbs — which no author could supply, because
     // `parseManifest` derives them and is exported from no entry point. The path
     // arm handed `readFile`'s **string** to a function that requires a record,
     // with no `JSON.parse` between them, so it had never run. `createTui` could
@@ -1147,8 +1196,11 @@ export async function constructGraph(
   // the terminal belongs to somebody else whatever asked for it, and a second
   // caller learning to suspend without learning to tell the profiler is exactly
   // how F903 happened the first time.
+  // The profiler view is built at step 10 and its timer must stop at release
+  // (C28 §3c, §9b S5); the slot is filled there and read by the wrapper below.
+  let profileViewRef: ProfileView | null = null;
   const lifecycle = at("lifecycle", () =>
-    frameRecording(suspendAware(createTerminalLifecycle({
+    frameRecording(disposingOnRelease(suspendAware(createTerminalLifecycle({
       stdout: config.stdout,
       stdin: config.stdin,
       capabilities: detection.capabilities,
@@ -1158,7 +1210,7 @@ export async function constructGraph(
       onFatal: deps.onFatal,
       beforeRelease: makeBeforeRelease(runner, stores.history, [stores.transcriptWriter]),
       ...(deps.debug === undefined ? {} : { debug: deps.debug }),
-    }), deps.profiler), config.recording),
+    }), deps.profiler), deps.profiler, () => profileViewRef?.dispose()), config.recording),
   );
 
   // --- 8. the frame scheduler -----------------------------------------------
@@ -1189,11 +1241,12 @@ export async function constructGraph(
         // origin travels with the *call* instead: a surface brackets its
         // refresh in `profiler.own`, and `commit` reads the bracket.
         //
-        // Nothing in `src/` brackets one yet, because there is no profiler
-        // surface to do the refreshing — `profilePane` is a pure function from
-        // a report to blocks and has no caller here. That is the drawing
-        // round's, and the blocker is a symbol rather than a description:
-        // `grep -rn 'profilePane' src/ | grep -v profiling/`.
+        // `profile-view.ts` is the one surface that brackets — every redraw
+        // it raises, on the timer and on a key, runs inside `profiler.own`
+        // (C28 I49) — so this line is unchanged from the day it passed `false`
+        // unconditionally and now means what it says: the seam's own answer,
+        // with the bracket's read on top. C28 T4.4 drives it through this
+        // scheduler; T1.92 asserts it at the view.
         prof.commit(reason, false);
         inner.commit(reason);
       },
@@ -1388,6 +1441,36 @@ export async function constructGraph(
   });
 
   /**
+   * The profiler's view — C28 §3c, and the third owner of a `kind: "view"` layer.
+   *
+   * Built beside the other two and for their reason: `/profile`'s handler is
+   * registered inside the pipeline and closes over this. **Always built, and
+   * given `null` when there is no profiler**, so the verb exists in every
+   * session and refuses in a document rather than vanishing (C23 I68); without
+   * a profiler it arms no timer and pushes no layer, so *off is free* holds.
+   *
+   * **The commit is the decorated `scheduler`'s and the bracket is the view's**
+   * (C28 I49). The seam eight steps up passes `false` for what it knows; the
+   * view wraps `update` and this call in `profiler.own`, and the seam reads the
+   * bracket. Nothing about the seam changed for this — which was the point of
+   * writing it that way.
+   *
+   * `detection.capabilities` whole (C09 I49, F828): `profilePane`'s ASCII
+   * default is for a caller with no terminal, and this one has the resolved
+   * record — after C22 I49's overrides, as every other consumer here takes it.
+   */
+  const profileView = createProfileView({
+    overlays: stores.overlays,
+    profiler: deps.profiler ?? null,
+    capabilities: detection.capabilities,
+    measureSequence: (blocks, width) => built.blocks.measureSequence(blocks, width),
+    region: deps.frame.overlayRegion,
+    schedule: config.schedule,
+    redraw: (reason) => void scheduler.commit(reason),
+  });
+  profileViewRef = profileView;
+
+  /**
    * `--no-bg`, for as long as the invocation that set it is the last `/theme`
    * (C22 I66).
    *
@@ -1449,6 +1532,11 @@ export async function constructGraph(
       overlays: stores.overlays,
       patchView,
       documentView,
+      // C28 §3c — for `/profile`'s handler, the way `stop` reaches `/exit`.
+      // Read by `execution.ts` when it hands `shippedHandlers` the view; until
+      // then `shippedHandlers` includes no `profile` handler, so the manifest's
+      // six and the registry's six still reconcile (C23 I27, T1.64).
+      profileView,
       /**
        * C23 I46 — whether anyone is looking at a live part's host.
        *
@@ -2118,6 +2206,7 @@ export async function constructGraph(
     overlayRegion: deps.frame.overlayRegion,
     patchView,
     documentView,
+    profileView,
     releaseView: () => void pipeline.releaseView(),
     focus,
     // The entry half of B1's pair; the exit is already on the `⌃c` rung below.
@@ -2784,6 +2873,7 @@ export async function constructGraph(
     manifest: built.manifest,
     completion: built.completion,
     ...stores,
+    profileView,
     runner,
     lifecycle,
     scheduler,

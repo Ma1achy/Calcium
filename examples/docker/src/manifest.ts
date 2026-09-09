@@ -6,7 +6,7 @@
  * docker's help output instead.
  *
  * **A `ManifestDocument`, not a `Manifest`** (C22 I23a). The app supplies its own
- * verbs; construction parses the document and adds the framework's six. Neither
+ * verbs; construction parses the document and adds the framework's seven. Neither
  * arm of `TuiConfig.manifest` worked until this app tried to start — see
  * FINDINGS F7 — and the typed arm is used here deliberately, because it is the
  * one a reader reaches for first and the one that was impossible.
@@ -24,7 +24,6 @@ import { DESTRUCTIVE_TOOLS } from "./manifest/destructive.ts";
 import { REGISTRY_TOOLS } from "./manifest/registry.ts";
 import { RESOURCE_TOOLS } from "./manifest/resources.ts";
 import { EXEC_TOOLS } from "./manifest/exec.ts";
-import { PROFILING_TOOLS } from "./manifest/profiling.ts";
 
 /**
  * F1's shim, not `docker`.
@@ -41,6 +40,13 @@ export const BINARY = new URL("../bin/docker-json", import.meta.url).pathname;
  * **This is the only exporter**, so a family is added by writing its file and
  * spreading it here — one line, in one place, and the seal (C23 I27) checks the
  * result against the registered handlers.
+ *
+ * **No family may declare one of the framework's seven** (C05 I6). `profile`
+ * lived here as a local verb with no handler from the profiler's spec-first
+ * round until the framework shipped `/profile` as its seventh; the app's copy
+ * then made the manifest a parse error at construction, nine rows red in the
+ * proof gate and nothing red before it (F953). The framework's verb serves
+ * this app now, and it answers with `TuiConfig.profile` unset by refusing.
  */
 export function buildManifest(engineVersion: string): ManifestDocument {
   return {
@@ -54,7 +60,6 @@ export function buildManifest(engineVersion: string): ManifestDocument {
       ...REGISTRY_TOOLS,
       ...RESOURCE_TOOLS,
       ...EXEC_TOOLS,
-      ...PROFILING_TOOLS,
     ],
   };
 }

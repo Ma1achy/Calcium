@@ -18,8 +18,12 @@ import { describe, expect, it } from "vitest";
 
 import { createProfiler } from "../../src/shell/profiling/recorder.js";
 import { PANES, profilePane } from "../../src/shell/profiling/panes.js";
+import { createProfileView } from "../../src/shell/profile-view.js";
+import { createOverlayManager } from "../../src/viewport/overlay/index.js";
 import type { Block, Notice } from "../../src/data/viewmodel/index.js";
-import type { Tier } from "../../src/shell/profiling/types.js";
+import type { Profiler, Tier } from "../../src/shell/profiling/types.js";
+import { registry } from "../support/overlay.js";
+import { FULL_CAPS } from "../support/render.js";
 
 /** A counter clock. Every row here asks *what was drawn*, never *how long*. */
 const counterClock = (): (() => number) => {
@@ -153,5 +157,35 @@ describe("C28 — profiler, tier 1 spec-first rows", () => {
     expect(after.excluded.selfInflicted, "after a throw inside the bracket").toBe(0);
   });
 
-  it.todo("T1.16d (C28 I23): setTier('spans') from counters, then the view closes → the tier is counters again, not off — not deferred on a component: the blocker is a caller of profilePane in src/ that opens and closes a pane, and there is none; profilePane is a pure function from a report to blocks and raises no tier. It arrives with the drawing round. Grep: `grep -rn 'profilePane' src/ | grep -v profiling/`");
+  it("T1.16d (C28 I23, C28 I50): the view opened at `counters` raises to `spans`, and closing restores `counters` — not `off`", () => {
+    // **Live since the drawing round.** This was deferred for as long as
+    // `profilePane` had no caller in `src/` that opens and closes a pane; the
+    // view in `src/shell/profile-view.ts` is that caller. The spy is what makes
+    // *exactly twice* an assertion rather than an inference from the tier: a
+    // close that called `setTier` on every path would read the same tier here
+    // and reset the ring on the way (I18).
+    const real = createProfiler({ tier: "counters" }, { elapsed: counterClock() });
+    const calls: Tier[] = [];
+    const profiler = Object.create(real) as Profiler;
+    profiler.setTier = (tier: Tier): void => {
+      calls.push(tier);
+      real.setTier(tier);
+    };
+    const overlays = createOverlayManager({ registry });
+    const view = createProfileView({
+      overlays,
+      profiler,
+      capabilities: FULL_CAPS,
+      measureSequence: (blocks, width) => registry.measureSequence(blocks, width),
+      region: () => ({ width: 80, height: 24 }),
+      schedule: () => ({ [Symbol.dispose]: () => undefined }),
+      redraw: () => undefined,
+    });
+
+    expect(view.open(), "opened").toBeNull();
+    expect(profiler.tier, "raised while open").toBe("spans");
+    expect(view.pop(), "closed").toBe(true);
+    expect(profiler.tier, "restored to what was found, not to `off`").toBe("counters");
+    expect(calls, "exactly twice, once each way").toEqual(["spans", "counters"]);
+  });
 });

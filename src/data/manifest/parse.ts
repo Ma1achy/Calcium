@@ -609,7 +609,7 @@ export function parseManifest(raw: unknown): Result<Manifest, readonly ManifestE
     fail(e, "tools", `"tools" must be an array`);
   } else {
     const seen = new Map<string, number>();
-    // **Seeded with the framework's six** (C05 §3), so an app declaring its own
+    // **Seeded with the framework's verbs** (C05 §3), so an app declaring its own
     // `clear` collides at parse rather than silently overriding a verb
     // Calcium's handlers depend on. I6 already refuses duplicates; this is
     // that rule reaching the rows the app did not write.
@@ -650,7 +650,7 @@ export function parseManifest(raw: unknown): Result<Manifest, readonly ManifestE
 
   return {
     ok: true,
-    // **The framework's six, appended** (C05 §3). Appended rather than prepended
+    // **The framework's verbs, appended** (C05 §3). Appended rather than prepended
     // so no index an app could read is shifted: `fail` reports `tools[3]`, and a
     // parse error pointing at a row nobody wrote is worse than no path at all.
     value: deepFreeze({
@@ -671,7 +671,8 @@ export function parseManifest(raw: unknown): Result<Manifest, readonly ManifestE
         Object.freeze({ ...t, flags: Object.freeze([...t.flags, ...FRAMEWORK_FLAGS]) }),
       ),
       // What the app wrote (§3). `serialise` emits this, so the round-trip
-      // property holds exactly: parse re-derives the framework's six.
+      // property holds exactly: parse re-derives the framework's verbs (C05 §3
+      // holds the count; nothing here repeats it — F954).
       appTools: tools,
     }),
   };

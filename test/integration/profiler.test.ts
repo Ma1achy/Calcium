@@ -18,10 +18,24 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { ProfileReport, TuiConfig } from "../../src/index.js";
-import { buildGraph, buildSession } from "../support/session.js";
+import type { Block, KeyValue } from "../../src/data/viewmodel/index.js";
+import type { CommitReason } from "../../src/terminal/frame-scheduler.js";
+import { defaultTheme } from "../../src/presentation/theme/index.js";
+import { resolveConfig, type Ambient } from "../../src/shell/config.js";
+import { constructGraph } from "../../src/shell/construct.js";
+import { PROFILE_VIEW_ID, VIEW_REFRESH_MS } from "../../src/shell/profile-view.js";
+import type { Profiler } from "../../src/shell/profiling/types.js";
+import {
+  buildGraph,
+  buildSession,
+  fakeAmbient,
+  fakeClock,
+  FRAME,
+  MANIFEST as EMPTY_MANIFEST,
+} from "../support/session.js";
 import { createProfiler } from "../../src/shell/profiling/recorder.js";
 import { createResourceProbe } from "../../src/shell/profiling/node.js";
-import { fakeStdin } from "../support/fake-terminal.js";
+import { fakeStdin, fakeStdout } from "../support/fake-terminal.js";
 
 const settle = async (turns = 3): Promise<void> => {
   for (let i = 0; i < turns; i += 1) await new Promise((r) => setImmediate(r));
@@ -50,6 +64,59 @@ const HANDLERS: NonNullable<TuiConfig["localHandlers"]> = {
     ],
   }),
 };
+
+/** The view's layer content, or a throw — a row reading a missing layer is about nothing. */
+const viewContent = (stack: readonly { id: string; content: readonly Block[] }[]): readonly Block[] => {
+  const layer = stack.find((l) => l.id === PROFILE_VIEW_ID);
+  if (layer === undefined) throw new Error("the profiler view is not on the stack");
+  return layer.content;
+};
+
+/**
+ * `buildGraph`, with the frame bracket `session.ts` supplies around `render`.
+ *
+ * The harness stubs `render` with a counter, so no frame is ever begun there
+ * and a row about *which frames are excluded* would be about nothing. This one
+ * brackets every render in `beginFrame`/`endFrame`, which is what the session
+ * does at its three render sites, and hands the profiler down the same edge.
+ */
+async function framedGraph(
+  profiler: Profiler,
+  overrides: Partial<TuiConfig> = {},
+): Promise<{ graph: Awaited<ReturnType<typeof buildGraph>>["graph"]; stdin: ReturnType<typeof fakeStdin> }> {
+  const size = { columns: 100, rows: 30 };
+  const stdout = fakeStdout(size);
+  const stdin = fakeStdin();
+  const config = resolveConfig(
+    {
+      name: "prism",
+      binary: "prism",
+      manifest: EMPTY_MANIFEST,
+      theme: defaultTheme,
+      stateDir: "/state",
+      env: { TERM: "xterm-256color", LANG: "en_GB.UTF-8" },
+      stdout: stdout as unknown as NodeJS.WriteStream,
+      stdin,
+      ...overrides,
+    },
+    fakeAmbient(fakeClock()),
+  );
+  const frame = (reason: CommitReason): void => {
+    profiler.beginFrame(reason);
+    profiler.endFrame("frame");
+  };
+  const graph = await constructGraph(config, {
+    stop: () => Promise.resolve(0),
+    render: frame,
+    repaint: frame,
+    frame: FRAME,
+    onFatal: (err) => {
+      throw err;
+    },
+    profiler,
+  });
+  return { graph, stdin };
+}
 
 describe("C28 — profiler, tier 4 spec-first rows", () => {
   it("T4.2 (C28 I7, C28 I8, C28 I24, C28 I42): a real session, entries sharing block ids, and the attribution is per entry", async () => {
@@ -205,7 +272,162 @@ describe("C28 — profiler, tier 4 spec-first rows", () => {
     p.dispose();
   });
 
-  it.todo("T4.4 (C28 I12): the profiler view open → its own frames are excluded and excluded.selfInflicted is non-zero — not deferred on a component: two blockers, and neither is the seams. `construct.ts` passes `own: false` unconditionally at the commit seam and says so in a comment — the block id that would distinguish a self-raised frame is C23's and does not travel with a commit — and there is no profiler view to open: `profilePane` is a pure function with no caller in src/ outside profiling/. Both arrive with the drawing round. Grep: `grep -n 'prof.commit' src/shell/construct.ts` and `grep -rn 'profilePane' src/ | grep -v profiling/`");
+  it("T4.4 (C28 I12, C28 I49): the view opened through a real graph excludes the frames its refresh raises, and a keystroke's frame is kept", async () => {
+    // **Live since the drawing round.** The origin travels with the *call*:
+    // the view brackets its refresh in `profiler.own`, and the commit seam in
+    // `construct.ts` — unchanged from the day it passed `false` unconditionally
+    // — reads the bracket. T1.88 asserts the mechanism at the recorder, T1.92 at
+    // the view, and this row through the root's decorated scheduler, with the
+    // frame bracket `session.ts` supplies around `render`.
+    const profiler = createProfiler({ tier: "spans" }, { elapsed: () => performance.now() });
+    const { graph, stdin } = await framedGraph(profiler);
+    graph.lifecycle.acquire();
+    const before = profiler.report();
+    expect(before.excluded.selfInflicted).toBe(0);
+
+    expect(graph.profileView.open(), "opened through the graph").toBeNull();
+    const opened = profiler.report();
+    expect(opened.frames, "the open drew a frame through the decorated scheduler").toBeGreaterThan(before.frames);
+    expect(opened.excluded.selfInflicted, "and it is excluded").toBeGreaterThan(0);
+    expect(opened.latency?.work.count ?? 0, "in no histogram").toBe(before.latency?.work.count ?? 0);
+
+    // A redraw in place — the path the timer and the keys share — is the view's
+    // frame too. `open` brackets its own push; a row that stopped there passed
+    // with the redraw's bracket removed (measured on T1.92's first form).
+    expect(graph.profileView.switchPane(1)).toBe(true);
+    const switched = profiler.report();
+    expect(switched.frames).toBeGreaterThan(opened.frames);
+    expect(switched.excluded.selfInflicted, "the redraw's frame is excluded too").toBeGreaterThan(
+      opened.excluded.selfInflicted,
+    );
+    expect(switched.latency?.work.count ?? 0).toBe(before.latency?.work.count ?? 0);
+
+    // **The control is a keystroke.** A byte through stdin raises a frame the
+    // reader waited on — `deliver` commits `input` outside any bracket — and
+    // `excluded.selfInflicted` does not move for it. `x` rather than `n`: `n`
+    // is the view's own pane switch and would be bracketed.
+    stdin.emit("x");
+    const typed = profiler.report();
+    expect(typed.frames, "the key drew a frame").toBeGreaterThan(switched.frames);
+    expect(typed.excluded.selfInflicted, "self-inflicted did not move for the reader's key").toBe(
+      switched.excluded.selfInflicted,
+    );
+    expect(typed.latency?.work.count ?? 0, "and the histogram gained the reader's frame").toBeGreaterThan(
+      switched.latency?.work.count ?? 0,
+    );
+
+    expect(graph.profileView.pop()).toBe(true);
+    profiler.dispose();
+  });
+
+  it("T4.6 (C28 I50, C15 I25, with C16): `⌃c` as bytes pops the view through the ladder, and the tier comes back", async () => {
+    // **Driven through the decoder and the router.** The ladder's `pushedView`
+    // rung calls `overlays.pop()` and asks no owner; the restore reaches the
+    // view through C15's change stream or not at all (F944).
+    const profiler = createProfiler({ tier: "counters" }, { elapsed: () => performance.now() });
+    const { graph, stdin } = await buildGraph({}, undefined, profiler);
+    graph.lifecycle.acquire();
+    expect(graph.profileView.open()).toBeNull();
+    expect(profiler.tier, "raised").toBe("spans");
+    expect(graph.overlays.top?.id, "the view is what the ladder sees").toBe(PROFILE_VIEW_ID);
+
+    stdin.emit("\x03");
+    expect(graph.overlays.stack, "the stack is empty").toEqual([]);
+    expect(graph.profileView.pane, "the owner knows").toBeNull();
+    expect(profiler.tier, "the tier is `counters` again").toBe("counters");
+    profiler.dispose();
+  });
+
+  it("T4.7 (C28 I50, C28 I51, with C16): `n` then `Esc` as bytes switch the pane and reach this owner's `pop`", async () => {
+    const profiler = createProfiler({ tier: "counters" }, { elapsed: () => performance.now() });
+    const { graph, stdin, clock } = await buildGraph({}, undefined, profiler);
+    graph.lifecycle.acquire();
+    expect(graph.profileView.open()).toBeNull();
+    expect(graph.profileView.pane).toBe("overview");
+
+    // `n` — the keymap's `viewNextHunk`, which `keys.ts` routes to this owner
+    // while its pane is open; the layer's content is the next pane's.
+    stdin.emit("n");
+    expect(graph.profileView.pane).toBe("frame");
+    const header = viewContent(graph.overlays.stack)[0];
+    expect(header?.kind).toBe("rule");
+    expect(header?.kind === "rule" ? header.meta : "").toBe("2/4");
+
+    // `Esc` — C16's 50 ms window, then `viewPop`, which asks this owner first.
+    // A real wait, as `session-keys.test.ts` does: the harness injects a real
+    // `schedule`, and the window is a constant rather than a race.
+    stdin.emit("\u001b");
+    expect(graph.profileView.pane, "nothing before the window closes").toBe("frame");
+    clock.advance(80);
+    await new Promise((r) => setTimeout(r, 80));
+
+    expect(graph.overlays.stack, "popped").toEqual([]);
+    expect(graph.profileView.pane).toBeNull();
+    expect(profiler.tier, "restored").toBe("counters");
+    profiler.dispose();
+  });
+
+  it("T4.8 (C28 I50): `release()` — the cleanup the session runs at `stop()` — disposes the view's timer and leaves the tier", async () => {
+    // The timer is held, so *no later tick changes the layer* is a fact about
+    // the disposable and not about how long the row waited. Every scheduled
+    // callback is kept, and the view's is the one armed at its cadence.
+    const armed = new Map<() => void, number>();
+    const disposed = new Set<() => void>();
+    const clock = fakeClock();
+    const ambient: Ambient = {
+      ...fakeAmbient(clock),
+      schedule: (fn, ms) => {
+        armed.set(fn, ms);
+        return { [Symbol.dispose]: () => void disposed.add(fn) };
+      },
+    };
+    const profiler = createProfiler({ tier: "counters" }, { elapsed: () => performance.now() });
+    const { graph } = await buildGraph({}, undefined, profiler, ambient);
+    graph.lifecycle.acquire();
+    expect(graph.profileView.open()).toBeNull();
+    const tick = [...armed].find(([, ms]) => ms === VIEW_REFRESH_MS)?.[0];
+    expect(tick, "the fixture responds: the view armed its refresh").toBeDefined();
+    if (tick === undefined) return;
+    expect(disposed.has(tick)).toBe(false);
+    const shown = viewContent(graph.overlays.stack);
+
+    graph.lifecycle.release();
+    expect(disposed.has(tick), "the timer was disposed by the cleanup").toBe(true);
+    tick();
+    expect(viewContent(graph.overlays.stack), "a stale tick changes nothing").toEqual(shown);
+    expect(profiler.tier, "the tier is left raised — the report was taken before this").toBe("spans");
+    expect(graph.profileView.pop(), "and the owner holds nothing").toBe(false);
+    profiler.dispose();
+  });
+
+  it("T4.9 (C28 I51, C09 I49, with C22 I49): the view draws with `detection.capabilities`, after the overrides", async () => {
+    const excluded = (stack: readonly { id: string; content: readonly Block[] }[]): string | undefined =>
+      viewContent(stack)
+        .filter((x): x is KeyValue => x.kind === "keyValue" && x.id === "ov-regime")[0]
+        ?.rows.find((r) => r.label === "excluded")?.value;
+
+    const ascii = await buildGraph(
+      { capabilities: { unicode: "ascii" } },
+      undefined,
+      createProfiler({ tier: "spans" }, { elapsed: () => performance.now() }),
+    );
+    ascii.graph.lifecycle.acquire();
+    expect(ascii.graph.profileView.open()).toBeNull();
+    expect(excluded(ascii.graph.overlays.stack), "the ASCII arm").toBe("0 self-inflicted : 0 fallback");
+    ascii.graph.profileView.pop();
+
+    const unicode = await buildGraph(
+      {},
+      undefined,
+      createProfiler({ tier: "spans" }, { elapsed: () => performance.now() }),
+    );
+    unicode.graph.lifecycle.acquire();
+    expect(unicode.graph.profileView.open()).toBeNull();
+    expect(excluded(unicode.graph.overlays.stack), "the terminal's arm, never the default").toBe(
+      "0 self-inflicted · 0 fallback",
+    );
+    unicode.graph.profileView.pop();
+  });
 
   it("T4.5 (C28 I28): a real session suspending marks its samples, and the CPU figure across the interval is refused", async () => {
     // **The wiring, and it had no writer at all until F903.** `suspended` was

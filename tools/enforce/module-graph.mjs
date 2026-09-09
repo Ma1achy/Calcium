@@ -1856,11 +1856,6 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
     "total to it at close and subtracts it to get self time; `OpenNode` is exported " +
     "because the recorder holds one, and this field is that file's arithmetic rather " +
     "than a seam. Nothing outside should read a span mid-flight",
-  "Profiler.setTier":
-    "C28 I18, I23 — the runtime tier change, and the ring reset that goes with it. " +
-    "The specified consumer is the profiler surface's own tier control; the panes " +
-    "render a report and do not yet change what is recorded. T1.12 and T1.16 are the " +
-    "rows written against it",
   "Rng.fork":
     "C08 — a child stream for a nested generator. The fixture recorder is the " +
     "specified consumer and records linearly today, so `fork` is a capability the " +

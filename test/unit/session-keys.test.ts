@@ -262,6 +262,8 @@ describe("C22 §3 step 11 — the effect table", () => {
 
     const effects = createKeyEffects({
       editor: spy,
+      // The third owner of `pushedView`, as the root wires it (C28 §3c).
+      profileView: graph.profileView,
       pageBlock: graph.pageBlock,
       orbitBlock: graph.orbitBlock,
       tiltBlock: graph.tiltBlock,

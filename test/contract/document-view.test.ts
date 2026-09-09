@@ -321,6 +321,24 @@ describe("C22 §13a — the document view", () => {
     expect(view.pop(), "and popping nothing is false, not a throw").toBe(false);
     expect(view.putBlock("a", chunk("a", "x")), "a late tick finds no host").toBe(false);
   });
+
+  it("T4.65 (C15 I25, C22 §13a): the ⌃c ladder's `overlays.pop()` tears the owner down — `openFor` is null before the call returns, a motion is a no-op, and the next open is clean", () => {
+    // F944, measured: after the ladder's `pop()` — which calls no owner — the
+    // stack was empty and `openFor` still named the command, so `keys.ts`
+    // routed the view keys to a view that was not there and `releaseView()`
+    // ran for nothing. The owner now tears down from C15's change stream,
+    // whichever caller removed the layer.
+    expect(view.open("/watch api")).toBeNull();
+    expect(view.openFor).toBe("/watch api");
+    expect(overlays.pop()?.id, "the ladder's call, not the owner's").toBe(DOCUMENT_VIEW_ID);
+    expect(overlays.top).toBeNull();
+    expect(view.openFor, "torn down before `pop()` returned").toBeNull();
+    expect(view.move("down")).toBe(false);
+    expect(view.pop(), "nothing left for the owner's own pop to do").toBe(false);
+    expect(view.open("/watch db"), "the next open is not a second open over stale state").toBeNull();
+    expect(view.openFor).toBe("/watch db");
+    expect(overlays.stack.map((l) => l.id)).toEqual([DOCUMENT_VIEW_ID]);
+  });
 });
 
 /**

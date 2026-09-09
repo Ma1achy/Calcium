@@ -411,4 +411,19 @@ describe("C25 §3b — what the view may read, and where its motions land", () =
     h.view.move("bottom");
     expect(shown(), "the document is taller than its region").not.toBe(atTop);
   });
+
+  it("T2.15 (C15 I25, C25 §8a A7): the ⌃c ladder's `overlays.pop()` reaches the owner — its own `pop()` then has nothing to do, and a fresh open is accepted", () => {
+    const h = harness();
+    const entry = h.transcript.append(docWith([PATCH("p1")]));
+    expect(h.view.open(entry, "p1")).toBeNull();
+    expect(h.overlays.pop()?.id, "the ladder's call, not the owner's").toBe(PATCH_VIEW_ID);
+    expect(h.overlays.top).toBeNull();
+    // F944's shape: the entry and offset outlived the layer, so `pop()` would
+    // have dismissed an id that had gone and answered true for nothing, and a
+    // motion would have re-clamped against a layer that was not there.
+    expect(h.view.pop()).toBe(false);
+    expect(h.view.move("pageDown")).toBe(false);
+    expect(h.view.open(entry, "p1"), "clean after the ladder").toBeNull();
+    expect(h.overlays.stack.map((l) => l.id)).toEqual([PATCH_VIEW_ID]);
+  });
 });
