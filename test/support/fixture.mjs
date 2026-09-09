@@ -7,6 +7,8 @@
 // Each mode is one of the exit paths C01 owns. The two shell-driven paths —
 // `/exit` and Ctrl-D confirm — are B01 B1.6's, because they are C22 and C16
 // driving the same `release()`.
+import { writeFileSync } from "node:fs";
+
 import { detectCapabilities, isUsable } from "../../dist/terminal/capabilities.js";
 import { createBlockRegistry } from "../../dist/presentation/blocks/index.js";
 import { defaultTheme, loadTheme } from "../../dist/presentation/theme/index.js";
@@ -62,6 +64,44 @@ const make = (caps = detectCapabilities(process.env).capabilities) =>
 
 /** Paint something, so a frame that left a trace would be visible (T5.2). */
 const paint = (lifecycle) => lifecycle.writer.write("FRAME-CONTENT");
+
+/**
+ * **`CALCIUM_MONO_TRACE` — every `elapsed` read, tagged with its caller, to a
+ * file** (C28 I14, F971). A recording holds the mono reads as a positional
+ * stream and no stamp says who took each one, so a count that disagrees between
+ * a live session and its replay — 2904 recorded against 2903 consumed — cannot
+ * be attributed from the two files. The tag is the first stack frame outside
+ * this file and the recording tap, kept in memory and flushed on `exit`, because
+ * a file write per read would put an append on every span. Both modes wrap the
+ * same way, so the two tallies are one instrument over two populations.
+ */
+const monoTracePath = process.env["CALCIUM_MONO_TRACE"];
+const monoTags = [];
+const tagMonoRead = () => {
+  const frames = (new Error().stack ?? "").split("\n").slice(1);
+  const own = frames.find((f) => !/fixture\.mjs|profiling\/record\.js/u.test(f)) ?? "?";
+  const named = /at (?:async )?(\S+) \((.*?):(\d+):\d+\)/u.exec(own);
+  const bare = /at (.*?):(\d+):\d+/u.exec(own);
+  const short = (file) => file.replace(/^.*\/dist\//u, "");
+  monoTags.push(
+    named !== null
+      ? `${named[1]}@${short(named[2])}:${named[3]}`
+      : bare !== null
+        ? `<anon>@${short(bare[1])}:${bare[2]}`
+        : own.trim(),
+  );
+};
+if (monoTracePath !== undefined) {
+  process.on("exit", () => void writeFileSync(monoTracePath, `${monoTags.join("\n")}\n`));
+}
+/** Wraps a mono clock so each read is tagged when the trace is on; the clock itself is untouched. */
+const monoTraced = (read) =>
+  monoTracePath === undefined
+    ? read
+    : () => {
+        tagMonoRead();
+        return read();
+      };
 
 switch (mode) {
   case "release": {
@@ -479,7 +519,7 @@ switch (mode) {
 
     const transport = createSubprocessTransport({
       binary: "node",
-      clock: { now: () => performance.now(), schedule: () => ({ [Symbol.dispose]: () => {} }) },
+      clock: { elapsed: () => performance.now(), schedule: () => ({ [Symbol.dispose]: () => {} }) },
       runner: createProcessRunner({ env: process.env, stdin: process.stdin }),
     });
 
@@ -872,7 +912,7 @@ switch (mode) {
             binary: `${process.cwd()}/test/support/farside.mjs`,
             runner: createProcessRunner({ env: process.env, stdin: process.stdin }),
             clock: {
-              now: () => performance.now(),
+              elapsed: () => performance.now(),
               schedule: () => ({ [Symbol.dispose]: () => {} }),
             },
             env: process.env,
@@ -931,6 +971,11 @@ switch (mode) {
         "debug dump": (_argv, ctx) => Promise.resolve(sessionNotice(ctx, "internal state")),
       },
       ...(completionSources.length === 0 ? {} : { completionSources }),
+      // **The traced mono clock goes in as `elapsed`, so the recording tap wraps
+      // it** (F971): every read the recording holds passed through the tag, and
+      // the live tally is the recorded population exactly. Absent the trace,
+      // the ambient clock is left alone.
+      ...(monoTracePath === undefined ? {} : { elapsed: monoTraced(() => performance.now()) }),
       // C28 I46 — **an env var rather than an argv slot**, because slots 3 and
       // 4 are already the far side and the manifest variant, and a row that
       // records has to be able to choose both.
@@ -972,6 +1017,7 @@ switch (mode) {
     const {
       checkReplay,
       driveRecording,
+      farGate,
       parseRecording,
       replayClocks,
       replayStdin,
@@ -990,6 +1036,7 @@ switch (mode) {
     const clocks = replayClocks(rec);
     const stdin = replayStdin();
     const stdout = replayStdout(rec);
+    const gate = farGate();
 
     // **`CALCIUM_REPLAY_TRACE` — wall-clock stamps on stderr, above the
     // verdict.** A recording orders its events and stamps none of them, so
@@ -1022,10 +1069,12 @@ switch (mode) {
       return v;
     };
     const monoRaw = clocks.elapsed;
-    const elapsed = () => {
+    // Tagged under `CALCIUM_MONO_TRACE` the same way the live side is, so the
+    // two tallies are comparable reader by reader (F971).
+    const elapsed = monoTraced(() => {
       consumed.mono += 1;
       return monoRaw();
-    };
+    });
     if (traceOn) {
       const untraced = stdout.write.bind(stdout);
       stdout.write = (chunk) => {
@@ -1093,12 +1142,20 @@ switch (mode) {
         replay: path,
         record: mirror,
         onReport: (r) => void (report = r),
+        // **The sampler's own clock, because here `elapsed` *is* the
+        // recording's stream** (C28 I53, F971). Live, the root hands the
+        // sampler the untapped `elapsed`; a replay's untapped `elapsed` is the
+        // positional array above, and a sampler ticking on it would consume
+        // positions the live session never recorded.
+        sampleClock: () => performance.now(),
       },
-      // **The wall clock goes to the transport too** (C28 I14, F963): C06 reads
-      // it twice per invocation and the stand-in must consume the same reads,
-      // or every later positional read is served two places stale. Against a
-      // `dist/` built before that parameter existed the argument is ignored.
-      transport: traced(replayTransport(rec, clock)),
+      // **The mono clock goes to the transport too** (C28 I14, F963, F972): C06
+      // reads `elapsed` twice per invocation and the stand-in must consume the
+      // same reads, or every later positional read is served two places stale.
+      // **And the far side's turn** (F974): the drive releases each recorded
+      // answer when it reaches it, so a frame the recording drew before the
+      // answer — the readout's wake under a slow far side — is drawn first.
+      transport: traced(replayTransport(rec, elapsed, gate.wait)),
       // **The environment from the recording, not this process's** (C28 I47). The
       // capabilities are re-derived from it and from the replies the recording
       // holds as ordinary input, so C02 runs again rather than being replayed.
@@ -1146,6 +1203,19 @@ switch (mode) {
       frames: () => stdout.frames.length,
       tick: () => new Promise((r) => setTimeout(r, 1)),
       exhausted: () => clocks.overrun().mono > 0,
+      far: (n) => {
+        trace(`release far#${String(n)}`);
+        gate.release(n);
+      },
+    }, {
+      // **3 000 ticks rather than the default 500** (F974). A frame the
+      // recording drew on a timer — the readout's one-second wake under a slow
+      // far side — is drawn by the replay on the same real timer, so waiting
+      // for it is a real second and the default bound (~600 ms of 1 ms ticks)
+      // gave up first, counted a stall, and released the answer early. The
+      // bound stays a count of ticks and not a time; a frame that never comes
+      // is still a stall, three seconds later than it was.
+      ticks: 3_000,
     });
     trace("drive done");
     // **Snapshotted before the stop**, because the recording's arrays end at

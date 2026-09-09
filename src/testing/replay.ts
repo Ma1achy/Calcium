@@ -96,51 +96,74 @@ export function replayStdout(rec: Recording): NodeJS.WriteStream & {
  * a wrong one.
  *
  * **And it reads the clock where C06 does** (I14, F963). The subprocess
- * transport reads `clock.now()` before it spawns and again for `durationMs`
- * once the child has answered — two wall reads per invocation, and the same
- * pair around a stream. A stand-in that served the recorded value and read
- * nothing left every later positional read two places behind: the resize
- * repaint's header was handed the answer frame's *last* stamp, some thirty
- * milliseconds before the one the live session read, and a wall-clock second
- * boundary in that gap put `:13` on one side and `:14` on the other — on a
- * quiet machine, once in twenty-five recordings, and oftener as the machine
- * slows, which is why the row was red only inside a full tier run. The value
- * already carries its `durationMs`; these reads are taken for their position
- * and the figure is discarded. The `await` between them is load-bearing: on the
- * live side the answer is a later turn, so the frame the key handler writes
- * inline lands between the two reads, and it has to land there here.
+ * transport reads `clock.elapsed()` before it spawns and again for `durationMs`
+ * once the child has answered — two reads per invocation, and the same pair
+ * around a stream. A stand-in that served the recorded value and read nothing
+ * left every later positional read two places behind: the resize repaint's
+ * header was handed the answer frame's *last* stamp, some thirty milliseconds
+ * before the one the live session read, and a wall-clock second boundary in
+ * that gap put `:13` on one side and `:14` on the other — on a quiet machine,
+ * once in twenty-five recordings, and oftener as the machine slows, which is
+ * why the row was red only inside a full tier run. The value already carries
+ * its `durationMs`; these reads are taken for their position and the figure is
+ * discarded. The `await` between them is load-bearing: on the live side the
+ * answer is a later turn, so the frame the key handler writes inline lands
+ * between the two reads, and it has to land there here.
  *
- * **Clock-read parity is asserted, not assumed** — T5.1c compares the wall
- * positions the replay consumed with the reads the recording holds (counted at
- * the seam that serves them, since these reads bypass the session's own clock
- * and the mirror never sees them), so the next tap whose stand-in reads
- * differently is a red row and not a flake.
+ * **The channel is `elapsed` now, because C06's is** (F972): a duration was
+ * taken from the wall clock and belongs on the monotonic one, so the pair this
+ * mirrors moved from the wall stream to the mono stream, and T5.1c's parity
+ * covers both channels.
+ *
+ * **And it serves an answer where the recording has it** (I46, F974). The
+ * recorder writes a `far` line when the answer reaches the session, so every
+ * frame before it in the timeline was drawn before the answer arrived — the
+ * frame the readout's one-second wake draws while a far side is slow, for one.
+ * Served the moment the session asked, a 1.4 s far side settled its card before
+ * the wake could fire, the `· ⠙ 1s` frame the recording holds was never drawn,
+ * and the replay diverged at it. `released` is the drive's own pacing handed
+ * over — `driveRecording` releases each `far` event when it reaches it, after
+ * the frames before it — so one bound and one stall counter serve inputs and
+ * answers alike. Absent, an answer is served after one turn, as before.
+ *
+ * **Clock-read parity is asserted, not assumed** — T5.1c compares the positions
+ * the replay consumed with the reads the recording holds, on both channels
+ * (counted at the seam that serves them, since these reads bypass the session's
+ * own clock and the mirror never sees them), so the next tap whose stand-in
+ * reads differently is a red row and not a flake.
  */
-export function replayTransport(rec: Recording, clock: () => number): TransportRouter {
-  const byVerb = new Map<string, unknown[]>();
+export function replayTransport(
+  rec: Recording,
+  elapsed: () => number,
+  released?: (n: number) => Promise<void>,
+): TransportRouter {
+  const byVerb = new Map<string, { n: number; value: unknown }[]>();
   for (const e of rec.drive) {
     if (e.t !== "far") continue;
     const q = byVerb.get(e.verb) ?? [];
-    q.push(e.value);
+    q.push({ n: e.n, value: e.value });
     byVerb.set(e.verb, q);
   }
-  const take = (verb: string): unknown => byVerb.get(verb)?.shift();
+  const take = (verb: string): { n: number; value: unknown } | undefined => byVerb.get(verb)?.shift();
+  const turn = (n: number | undefined): Promise<void> =>
+    released === undefined || n === undefined ? Promise.resolve() : released(n);
   return {
     for(verb: string) {
       return {
         invoke: async (_inv: Invocation): Promise<RawResult> => {
-          const started = clock();
-          const value = take(verb) as RawResult;
-          await Promise.resolve();
-          void (clock() - started);
-          return value;
+          const started = elapsed();
+          const next = take(verb);
+          await turn(next?.n);
+          void (elapsed() - started);
+          return next?.value as RawResult;
         },
         stream: (_inv: Invocation): AsyncIterable<RawPatch> => ({
           async *[Symbol.asyncIterator]() {
-            const started = clock();
+            const started = elapsed();
             for (;;) {
               const next = take(verb);
               if (next === undefined) return;
+              await turn(next.n);
               // C06 takes `durationMs` **before** it yields its terminal patch,
               // so the end read precedes the last recorded value rather than
               // following the consumer's last turn — a `finally` after the loop
@@ -148,8 +171,8 @@ export function replayTransport(rec: Recording, clock: () => number): TransportR
               // has no terminal patch and its live side never took this read;
               // the comparison there is a prefix (I15) and parity is asserted
               // on whole recordings only.
-              if ((byVerb.get(verb)?.length ?? 0) === 0) void (clock() - started);
-              yield next as RawPatch;
+              if ((byVerb.get(verb)?.length ?? 0) === 0) void (elapsed() - started);
+              yield next.value as RawPatch;
             }
           },
         }),
@@ -162,6 +185,36 @@ export function replayTransport(rec: Recording, clock: () => number): TransportR
       return null;
     },
   };
+}
+
+/**
+ * The far side's turn, shared between the drive and the stand-in (I46, F974).
+ *
+ * `driveRecording` calls `release(n)` when it reaches the `far` event numbered
+ * `n` — after the frames recorded before it have been waited for, or counted as
+ * stalled — and `replayTransport` awaits `wait(n)` before serving that event's
+ * value. A release before its wait resolves the wait at once; one consumer per
+ * event, because a recorded far value is served exactly once.
+ */
+export function farGate(): Readonly<{
+  release: (n: number) => void;
+  wait: (n: number) => Promise<void>;
+}> {
+  const released = new Set<number>();
+  const waiting = new Map<number, () => void>();
+  return Object.freeze({
+    release: (n: number): void => {
+      released.add(n);
+      waiting.get(n)?.();
+      waiting.delete(n);
+    },
+    wait: (n: number): Promise<void> =>
+      released.has(n)
+        ? Promise.resolve()
+        : new Promise<void>((resolve) => {
+            waiting.set(n, resolve);
+          }),
+  });
 }
 
 /**

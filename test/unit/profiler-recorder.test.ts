@@ -27,6 +27,9 @@ import { describe, expect, it } from "vitest";
 
 import { Leaks } from "../../src/shell/profiling/leaks.js";
 import { createProfiler } from "../../src/shell/profiling/recorder.js";
+import { createRecording } from "../../src/shell/profiling/record.js";
+import { parseRecording } from "../../src/shell/profiling/replay.js";
+import type { ResourceProbe, ResourceSample } from "../../src/shell/profiling/types.js";
 
 describe("C28 — the recorder's span, over a clock its subject advances", () => {
   it("T1.2 (C28 I3): a span over a callee advancing the clock 5 ms records 5; the same span closed beside that callee records 0", () => {
@@ -682,5 +685,80 @@ describe("C28 I1 — at `off`, nothing is armed and nothing accumulates", () => 
 
     p.dispose();
     on.dispose();
+  });
+});
+
+describe("C28 I53 — the sampler's stamp is off the recorded channel", () => {
+  /** A probe that echoes the stamp it was handed, so the axis is observable. */
+  const echoing = (): ResourceProbe => ({
+    sample: (suspended, at) => ({ at, suspended }) as unknown as ResourceSample,
+    spaces: () => [],
+    dispose: () => undefined,
+  });
+
+  it("T1.102 (C28 I53): a tick reads `sampleClock` and not the recorded `elapsed`; with no `sampleClock` it reads `elapsed`, and the recording sees every tick", () => {
+    // **A periodic reader cannot sit on a positional channel** (F971). Measured
+    // live against replay with every mono read tagged by its caller: every
+    // reader agreed to the count except the resource probe's stamp — 2 against
+    // 0 over a three-second session, 5 against 0 over a six-second one — and
+    // even at equal counts the tick lands between two of the session's reads
+    // at a position a replay cannot reproduce. So the stamp comes from a clock
+    // the recording never wraps, and this row drives the real tap rather than a
+    // counter standing in for it.
+    const lines: string[] = [];
+    const rec = createRecording((line) => void lines.push(line));
+    let reads = 0;
+    const elapsed = rec.mono(() => (reads += 1) * 1.5);
+    let stamps = 0;
+    const sampleClock = (): number => 1_000 + (stamps += 1);
+    let tick: (() => void) | null = null;
+    const hold = (fn: () => void): Disposable => {
+      tick = fn;
+      return { [Symbol.dispose]: () => void (tick = null) };
+    };
+    const fire = (): void => {
+      const fn = tick;
+      if (fn === null) throw new Error("the sampler is not armed");
+      fn();
+    };
+
+    const p = createProfiler({ tier: "spans" }, { elapsed, sampleClock, probe: echoing(), schedule: hold });
+    // Construction is on the recorded channel and deterministic: the 2 002
+    // reads of the clock-cost measurement and the start stamp — equal on both
+    // sides of a replay, and stated so the figure below is the ticks' alone.
+    const atConstruction = reads;
+    expect(atConstruction, "the cost measurement and the start stamp").toBe(2_003);
+
+    fire();
+    fire();
+    fire();
+    expect(reads - atConstruction, "three ticks, and not one read on the recorded clock").toBe(0);
+    expect(p.report().samples.map((x) => x.at), "each sample stamped from the sampler's own clock").toEqual([
+      1_001, 1_002, 1_003,
+    ]);
+    p.dispose();
+    rec.end();
+    expect(parseRecording(lines.join("")).mono.length, "the recording holds exactly what the tap saw").toBe(reads);
+
+    // **The control: the state the tree was in.** With no sampler clock the
+    // tick stamps from `elapsed`, one recorded read per tick — so the row above
+    // is shown to be able to see the channel, and the default for a profiler
+    // built without a recording is still the spans' own axis.
+    const bareLines: string[] = [];
+    const bare = createRecording((line) => void bareLines.push(line));
+    let bareReads = 0;
+    const bareElapsed = bare.mono(() => (bareReads += 1) * 1.5);
+    const q = createProfiler({ tier: "spans" }, { elapsed: bareElapsed, probe: echoing(), schedule: hold });
+    const built = bareReads;
+    fire();
+    fire();
+    expect(bareReads - built, "the control: two ticks, two recorded reads").toBe(2);
+    expect(q.report().samples.map((x) => x.at), "stamped from `elapsed` itself").toEqual([
+      (built + 1) * 1.5,
+      (built + 2) * 1.5,
+    ]);
+    q.dispose();
+    bare.end();
+    expect(parseRecording(bareLines.join("")).mono.length, "and the recording carries them").toBe(bareReads);
   });
 });

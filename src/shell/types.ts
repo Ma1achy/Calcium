@@ -425,6 +425,15 @@ export type PipelineDeps = Readonly<{
   stop: (reason: StopReason) => Promise<number>;
   /** C22's injected clock — §3b's three mechanisms and nothing else (C23 I19). */
   clock: () => number;
+  /**
+   * C22's monotonic clock, for every duration a frame draws (C23 I52, I53,
+   * I54, F973): the card's figure, the readouts, a part's age. `clock` is the
+   * wall clock — a time of day, steppable, and drawn as one by the chrome — so
+   * a duration taken from it was a difference between two readings of the
+   * wrong instrument, and under C28's positional replay it sat on the channel
+   * the header's second hand is served from.
+   */
+  elapsed: () => number;
   /** C22's ambient `setTimeout`, for §3b's timers. Nothing else schedules. */
   schedule: (fn: () => void, ms: number) => Disposable;
   /** Scheme-checked by C23 before use (C23 I17). */

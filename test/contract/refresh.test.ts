@@ -61,12 +61,15 @@ function harness() {
   const commits: string[] = [];
   const views = new Map<string, Block[]>();
   let now = 0;
+  /** The monotonic clock: advanced with `now` by `tick`, left behind by `skew` (F973). */
+  let mono = 0;
   const timers: { fn: () => void; at: number; live: boolean }[] = [];
   const hidden = new Set<string>();
 
   const driver = createRefreshDriver({
     transcript,
     clock: () => now,
+    elapsed: () => mono,
     capabilities: FULL_CAPS,
     producerContext: () => producerContext(),
     schedule: (fn, ms) => {
@@ -110,9 +113,17 @@ function harness() {
     commits,
     views,
     hidden,
+    /**
+     * Advance the wall clock alone — no timer fires and `elapsed` stands still.
+     * The instrument for which axis a figure is taken from (C23 I52, I53, F973).
+     */
+    skew(ms: number): void {
+      now += ms;
+    },
     /** Advance and fire what is due, once each — one turn. */
     async tick(ms = SWEEP): Promise<void> {
       now += ms;
+      mono += ms;
       for (const t of timers.filter((x) => x.live && x.at <= now)) {
         t.live = false;
         t.fn();
@@ -1433,6 +1444,26 @@ describe("C23 I53 — the running card's readout rides the one-second wake", () 
     expect(headerOf(h, id), "a settled readout writes no more; the route's `finishCard` is what replaces the spinner").toBe(`run_command(npm test) · ${SPIN(4)} 4s`);
     expect(h.commits.length, "and nothing is committed for it").toBe(commits);
     expect(wakeWithinASecond(h), "the last readout gone, no one-second wake is armed").toBe(false);
+  });
+
+  it("T3.64 (I53, F973): the figure is `elapsed`'s and not the wall clock's — four seconds of wall skew draw nothing, and the figure that follows is the monotonic two", async () => {
+    // **The axis a duration is taken from.** `startedAt` and `since` were on
+    // `deps.clock`, the wall clock — a time of day that can be stepped between
+    // two reads, and under C28's positional replay the channel the header's
+    // second hand is served from. Under `tick` the two clocks agree, so every
+    // row above passes on either axis; `skew` moves the wall clock alone.
+    const h = harness();
+    const id = running(h);
+    await h.tick(0);
+    h.skew(4_000);
+    await h.tick(0);
+    expect(headerOf(h, id), "the wall clock moved four seconds and the figure did not").toBe(
+      `run_command(npm test) · ${SPIN(0)}`,
+    );
+    await h.tick(2_000);
+    expect(headerOf(h, id), "the monotonic clock's two seconds, not the wall clock's six").toBe(
+      `run_command(npm test) · ${SPIN(2)} 2s`,
+    );
   });
 
   it("T3.61b (I53, I52): a wake inside the same second renders nothing, and the guard is the figure", async () => {

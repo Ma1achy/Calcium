@@ -144,7 +144,7 @@ export function fakeClock(): { now: () => number; advance: (ms: number) => void 
 export function fakeAmbient(clock = fakeClock()): Ambient {
   return {
     clock: clock.now,
-    elapsed: () => 0,   // profiling is off in this fixture; never read
+    elapsed: () => 0,   // profiling is off in this fixture; read for durations, which stay at zero (C23 I54)
     cwd: "/work",
     fs: fakeFs(),
     schedule: (fn, ms) => {
@@ -201,7 +201,7 @@ export async function buildSession(
     env: { TERM: "xterm-256color", LANG: "en_GB.UTF-8" },
     cwd: "/work",
     clock: clock.now,
-    elapsed: () => 0,   // profiling is off in this fixture; never read
+    elapsed: () => 0,   // profiling is off in this fixture; read for durations, which stay at zero (C23 I54)
     fs: fakeFs(),
     stdout: stdout as unknown as NodeJS.WriteStream,
     stdin: fakeStdin(),

@@ -363,6 +363,14 @@ export async function driveRecording(
     readonly tick: () => Promise<void>;
     /** True once the recorded clock stream has been read past its end. */
     readonly exhausted?: () => boolean;
+    /**
+     * A `far` event's turn has come (I46, F974): the frames recorded before it
+     * have been waited for, so a stand-in holding its value may serve it now.
+     * Nothing is delivered for the event itself — the transport serves it when
+     * the session asks — but *when* is the recording's to say, and this is how
+     * it says it.
+     */
+    readonly far?: (n: number) => void;
   },
   opts: { readonly ticks?: number } = {},
 ): Promise<DriveOutcome> {
@@ -411,7 +419,14 @@ export async function driveRecording(
     }
     // A `far` event is served by the transport when the session asks for it;
     // there is nothing to deliver here, and delivering would be a second copy.
-    if (e.t === "far") continue;
+    // **Its turn is delivered, though** (F974): the frames before it have been
+    // waited for by now, so a stand-in holding the answer until this release
+    // serves it where the recording has it — after the frame a slow far side
+    // let the readout's wake draw, and not before.
+    if (e.t === "far") {
+      deps.far?.(e.n);
+      continue;
+    }
     if (e.t === "resize") deps.resize(e.columns, e.rows);
     else deps.input(Buffer.from(e.b64, "base64"));
     delivered++;

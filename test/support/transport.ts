@@ -31,7 +31,7 @@ import { fakeClock, type FakeClock } from "./fake-scheduler.js";
 export function clockOf(fake: FakeClock): Clock & { tick(ms: number): void } {
   let now = 0;
   return {
-    now: (): number => now,
+    elapsed: (): number => now,
     schedule: fake.schedule,
     tick: (ms: number): void => {
       now += ms;

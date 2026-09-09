@@ -38,6 +38,7 @@ const TYPES = "src/shell/profiling/types.ts";
 const CONSTRUCT = "src/shell/construct.ts";
 const BUDGET = "src/testing/profile.ts";
 const SESSION = "src/shell/session.ts";
+const TREPLAY = "src/testing/replay.ts";
 const PAINT = "src/shell/paint.ts";
 const RENDER_FRAME = "src/shell/render-frame.ts";
 const VIEWPORT = "src/viewport/viewport/viewport.ts";
@@ -61,6 +62,34 @@ const run = () => {
     return `${e.stdout ?? ""}${e.stderr ?? ""}`;
   }
 };
+
+/**
+ * Survivors with a reason, and a staleness arm — the `c19-menu-window.mjs` form.
+ *
+ * Two wirings the unit corpus cannot see, one file below the seam T1.104
+ * resolves, and the row that counts for both is tier 5's parity on both
+ * channels (C28 T5.1c), which this run does not execute. Each was applied by
+ * hand from a copy, `dist/` rebuilt, T5.1c and T5.1d watched go red, and the
+ * source restored by digest (F971, F972). `anchors.mjs`'s `CROSS_TIER` names
+ * the expectation so the sweep accepts it; this map is what keeps the pass
+ * honest about it — a listed name that is caught after all fails the pass.
+ */
+const EXPECTED_SURVIVORS = new Map([
+  [
+    "ROOT-HANDS-TAPPED: the session gives the sampler the tapped elapsed",
+    "`resolveConfig` is right and `session.ts` hands the sampler `this.config.elapsed` — the " +
+      "tapped clock — instead of `sampleClock`. No unit row constructs a recording session " +
+      "around the root; tier 5's T5.1c counts mono reads consumed against recorded and is red " +
+      "(2 903 against 2 905 at three seconds), T5.1d with it. By hand, restored by digest (F971)",
+  ],
+  [
+    "C06-ON-WALL: the root hands the transport the wall clock",
+    "`construct.ts` hands C06 `config.clock` for `elapsed` while the stand-in mirrors mono: the " +
+      "live side takes two wall reads per call the replay does not, the replay two mono reads the " +
+      "live side did not, and only tier 5's parity row sees both counts disagree — T5.1c and " +
+      "T5.1d red by hand, restored by digest (F972)",
+  ],
+]);
 
 const results = runPass({
   read,
@@ -1210,8 +1239,81 @@ const results = runPass({
       to: "  /\\b[0-2]\\d:[0-5]\\d:[0-5]\\d\\b/gu,",
       expect: "T1.101",
     },
+    // --- C28 I53 — the sampler is off the recorded channel (F971) -------------
+    {
+      // **The natural line rather than a mistake**: the tick stamps from the
+      // clock every other read uses. It compiles to a TS6133 on the now-unused
+      // `sampleClock` and still emits, so the build's exit is the only tell.
+      name: "SAMPLER-ON-CHANNEL: the tick stamps from the recorded elapsed",
+      file: REC,
+      from: "samples.push(probe.sample(suspended, sampleClock()));",
+      to: "samples.push(probe.sample(suspended, elapsed()));",
+      expect: "T1.102",
+    },
+    {
+      // The root hands the sampler the tap. `resolveConfig` is right and
+      // `session.ts` is wrong, one file below T1.104's reach; the row that sees
+      // it is tier 5's parity count, listed in anchors.mjs's CROSS_TIER.
+      name: "ROOT-HANDS-TAPPED: the session gives the sampler the tapped elapsed",
+      file: SESSION,
+      from: "sampleClock: this.config.sampleClock,",
+      to: "sampleClock: this.config.elapsed,",
+      expect: "C28 T5.1c",
+    },
+    {
+      name: "CONFIG-HANDS-AMBIENT: the sampler's clock is performance.now and not the injected one",
+      file: CONFIG,
+      from: "    sampleClock: rawElapsed,",
+      to: "    sampleClock: ambient.elapsed,",
+      expect: "T1.104",
+    },
+    {
+      name: "CONFIG-HANDS-TAPPED: the sampler's clock is the tap",
+      file: CONFIG,
+      from: "    sampleClock: rawElapsed,",
+      to: "    sampleClock: recording === null ? rawElapsed : recording.mono(rawElapsed),",
+      expect: "T1.104",
+    },
+    // --- C28 I14, I46 — the stand-in's reads and its turn (F972, F974) ---------
+    {
+      name: "STAND-IN-READS-NOTHING: the transport stand-in serves without the mono pair",
+      file: TREPLAY,
+      from: "          const started = elapsed();\n          const next = take(verb);\n          await turn(next?.n);\n          void (elapsed() - started);\n          return next?.value as RawResult;",
+      to: "          const next = take(verb);\n          await turn(next?.n);\n          return next?.value as RawResult;",
+      expect: "T1.103",
+    },
+    {
+      name: "STAND-IN-SERVES-AT-ONCE: the answer is served when asked, not where it was recorded",
+      file: TREPLAY,
+      from: "          await turn(next?.n);\n          void (elapsed() - started);",
+      to: "          await Promise.resolve();\n          void (elapsed() - started);",
+      expect: "T1.103",
+    },
+    {
+      // C06 on the wall clock while the stand-in mirrors mono: live takes two
+      // wall reads the replay does not, the replay two mono reads live did not.
+      // Both counts disagree, and only the parity row counts (C06 T6.17).
+      name: "C06-ON-WALL: the root hands the transport the wall clock",
+      file: CONSTRUCT,
+      from: "clock: { elapsed: config.elapsed, schedule: config.schedule },",
+      to: "clock: { elapsed: config.clock, schedule: config.schedule },",
+      expect: "C28 T5.1c",
+    },
   ],
 });
 
 console.log(report(results));
-process.exit(results.some((r) => !r.killed) ? 1 : 0);
+
+for (const r of results) {
+  const why = EXPECTED_SURVIVORS.get(r.name);
+  if (why === undefined) continue;
+  console.log(
+    r.killed
+      ? `\nEXEMPTION IS STALE  ${r.name}\n  now caught — remove it from EXPECTED_SURVIVORS`
+      : `\nEXPECTED SURVIVOR   ${r.name}\n  ${why}`,
+  );
+}
+
+const unexpected = results.filter((r) => !r.killed && !EXPECTED_SURVIVORS.has(r.name));
+const stale = results.filter((r) => r.killed && EXPECTED_SURVIVORS.has(r.name));
+process.exit(unexpected.length + stale.length > 0 ? 1 : 0);

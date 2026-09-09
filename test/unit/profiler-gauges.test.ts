@@ -32,7 +32,7 @@ import {
   parseRecording,
   replayClocks,
 } from "../../src/shell/profiling/replay.js";
-import { replayStdout } from "../../src/testing/replay.js";
+import { farGate, replayStdout, replayTransport } from "../../src/testing/replay.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 import type { ProfileReport } from "../../src/shell/profiling/types.js";
 
@@ -464,6 +464,86 @@ describe("record and replay", () => {
     // because a stall is a pause and a pause is what a sleep-driven driver
     // does anyway (F912). The counter is what says so; the frames do not.
     expect(stalledRun.stalled, "only the frame the session never drew").toBe(1);
+  });
+
+  it("T1.103 (C28 I14, I46): a far value recorded after a frame is served only once that frame is drawn, and the stand-in reads the mono clock twice per answer", async () => {
+    // **The recording has the answer's position and the first stand-in ignored
+    // it** (F974). A far side slower than the readout's one-second wake leaves a
+    // frame in the recording *before* the `far` line — `⏺︎ ps(--limit 20) · ⠙ 1s`
+    // — and a stand-in serving the answer the moment the session asked settled
+    // the card before that wake could fire, so the replay never drew the frame
+    // and diverged at it. The drive already paces inputs on the frames before
+    // them; it releases each far event when it reaches it, and the stand-in
+    // waits for its turn.
+    const rec = parseRecording(
+      [
+        JSON.stringify({ t: "geometry", n: 0, columns: 80, rows: 24 }),
+        JSON.stringify({ t: "frame", n: 1, b64: "YQ==" }),
+        JSON.stringify({ t: "input", n: 2, b64: "eA==" }),
+        JSON.stringify({ t: "frame", n: 3, b64: "Yg==" }),
+        JSON.stringify({ t: "far", n: 4, verb: "ps", value: { answer: 1 } }),
+        JSON.stringify({ t: "frame", n: 5, b64: "Yw==" }),
+        JSON.stringify({ t: "end", n: 6, open: 0 }),
+        "",
+      ].join("\n"),
+    );
+
+    const gate = farGate();
+    let reads = 0;
+    const transport = replayTransport(rec, () => (reads += 1), gate.wait);
+    // The session asks at once, as it does live; the harness's stream has the
+    // prologue (three writes) and the one startup frame by then.
+    let writes = 4;
+    let owed = 0;
+    let servedAt: number | null = null;
+    let answered: unknown = null;
+    void transport
+      .for("ps")
+      .invoke({} as never)
+      .then((v) => {
+        answered = v;
+        servedAt = writes;
+        owed += 1;
+      });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(answered, "not served before its turn").toBeNull();
+    expect(reads, "the start read is taken at the call, where C06 takes it").toBe(1);
+
+    const out = await driveRecording(
+      rec,
+      {
+        input: () => void (owed += 1),
+        resize: () => undefined,
+        frames: () => writes,
+        tick: () => {
+          if (owed > 0) {
+            owed -= 1;
+            writes += 1;
+          }
+          return Promise.resolve();
+        },
+        far: (n) => gate.release(n),
+      },
+      { ticks: 20 },
+    );
+    expect(out.stalled, "every frame arrived in turn").toBe(0);
+    expect(answered, "the recorded value was served").toEqual({ answer: 1 });
+    // The prologue's three plus the two frames recorded before the `far` line:
+    // the answer waited for the frame the keystroke earned.
+    expect(servedAt, "served after the frame recorded ahead of it, and not before").toBe(5);
+    expect(reads, "and the end read followed it — two per answer, as C06's pair").toBe(2);
+
+    // **The control: the stand-in without a turn to wait for** — the state the
+    // tree was in — serves after one turn with nothing drawn.
+    let early: unknown = null;
+    void replayTransport(rec, () => 0)
+      .for("ps")
+      .invoke({} as never)
+      .then((v) => void (early = v));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(early, "the control: served at once").toEqual({ answer: 1 });
   });
 
   it("T1.86 (C28 I14, I15): an elision is a clock-derived redraw against a write that paints nothing", () => {

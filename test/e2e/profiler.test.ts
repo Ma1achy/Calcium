@@ -16,7 +16,7 @@
 // Generated from the spec's own §10 rows, so the two cannot drift apart by
 // transcription; a row edited here and not there is a diff a reader can see.
 import { execFileSync, spawnSync } from "node:child_process";
-import { appendFileSync, mkdtempSync, readFileSync } from "node:fs";
+import { appendFileSync, chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { loadavg, tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -69,7 +69,7 @@ type Recorded = Readonly<{
  * terminal supplies inputs the real one would not.
  */
 async function record(
-  opts: { readonly tier?: string; readonly pause?: number } = {},
+  opts: { readonly tier?: string; readonly pause?: number; readonly farSideDelayMs?: number } = {},
 ): Promise<Recorded> {
   const tier = opts.tier ?? "spans";
   // **The pause between the answer and the resize is a knob because it is the
@@ -80,11 +80,20 @@ async function record(
   // stamp, taken `pause` ago. At 200 ms a wall-clock second boundary lands in
   // the gap one recording in thirty; at 1 000 ms it lands in every one.
   const pause = opts.pause ?? 200;
-  const path = join(mkdtempSync(join(tmpdir(), "calcium-rec-")), "session.ndjson");
+  const dir = mkdtempSync(join(tmpdir(), "calcium-rec-"));
+  const path = join(dir, "session.ndjson");
+  // **A far side slower than the readout's wake, when a row asks for one**
+  // (F973, F974). `CALCIUM_FARSIDE` names any executable; this one sleeps and
+  // then execs the real far side. Written beside the recording with the delay
+  // baked in, because the PTY builds the child's environment from scratch —
+  // a variable set in this process never reaches a wrapper that reads one,
+  // and the first probe of a "1.3 s far side" measured a 335 ms one.
+  const farSide =
+    opts.farSideDelayMs === undefined ? {} : { CALCIUM_FARSIDE: slowFarSide(dir, opts.farSideDelayMs) };
   const pty = interactivePty(`${FIXTURE} session subprocess`, {
     cols: 100,
     rows: 30,
-    env: { CALCIUM_RECORD: path, CALCIUM_RECORD_TIER: tier },
+    env: { CALCIUM_RECORD: path, CALCIUM_RECORD_TIER: tier, ...farSide },
   });
   const t0 = Date.now();
   let prompt = 0;
@@ -132,6 +141,17 @@ async function record(
     .map((r) => `+${String(r.at - submittedAt)}:${String(r.bytes)}`)
     .join(" ");
   return { path, took: { prompt, answer, exit, reads } };
+}
+
+/** A far side that sleeps `ms` and then execs the real one — an executable, as C06 spawns one. */
+function slowFarSide(dir: string, ms: number): string {
+  const script = join(dir, "farside-slow.sh");
+  writeFileSync(
+    script,
+    `#!/bin/sh\nsleep ${(ms / 1000).toFixed(3)}\nexec "${process.cwd()}/test/support/farside.mjs" "$@"\n`,
+  );
+  chmodSync(script, 0o755);
+  return script;
 }
 
 /**
@@ -468,7 +488,7 @@ describe("C28 — profiler, tier 5 spec-first rows", () => {
   );
 
   it(
-    "T5.1c (C28 I14): the replay consumes exactly the recorded clock reads — a transport stand-in reads the clock where the live one does",
+    "T5.1c (C28 I14, I53): the replay consumes exactly the recorded clock reads on both channels — a transport stand-in reads the clock where the live one does, and the sampler is off the channel",
     async () => {
       // **Read parity, as a count, because a positional clock is only as good
       // as an alignment nothing checked.** C06's subprocess transport reads the
@@ -494,14 +514,70 @@ describe("C28 — profiler, tier 5 spec-first rows", () => {
       expect(out.consumed.wall, `wall positions consumed equal wall reads recorded\n${why}`).toBe(
         out.recorded.wall,
       );
-      // **Mono is reported and not asserted here.** The live session's `^D`
-      // handling takes one mono read more than the replay's in some recordings
-      // and not others — a read in the stop path that lands before or after the
-      // `end` line by timing — and it is masked in effect: the only cell it
-      // reaches is C24 I32's `last N.Nms`.
+      // **Mono too** (C28 I53, F971). It was reported and not asserted while
+      // its only frame-reaching consumer was a masked cell, and the comment
+      // here guessed at the `^D` path; measured with every mono read tagged by
+      // its caller, every reader agreed to the count except the resource
+      // probe's stamp — the sampler, a periodic reader on a positional channel,
+      // one read per second of session. Off the channel now, and the card's
+      // figure (T5.1d) is the unmasked consumer that makes this count
+      // load-bearing.
+      expect(out.consumed.mono, `mono positions consumed equal mono reads recorded\n${why}`).toBe(
+        out.recorded.mono,
+      );
       expect(out.identical, `so the header's second hand agrees, deterministically\n${why}`).toBe(
         true,
       );
+    },
+    120_000,
+  );
+
+  it(
+    "T5.1d (C28 I14): a far side slower than the readout's wake — the wake's frame and the card's whole-second figure are both reproduced, unmasked, with every clock read consumed where it was recorded",
+    async () => {
+      // **The falsifier for three seams at once** (F971, F972, F973, F974). A
+      // 1.2 s far side puts two things in the recording a fast one never does:
+      // the frame the readout's one-second wake drew while the call ran —
+      // `· ⠙ 1s` — and a settled head carrying a whole-second figure, `· 1s ·
+      // 20 rows`. The figure is a duration the frame draws *unmasked*. Taken
+      // from the wall clock it sat on the channel the header's second hand is
+      // served from; taken from `elapsed` it is reproduced only if every mono
+      // read before it is consumed where it was recorded — the sampler off the
+      // channel (I53), the transport's pair mirrored on mono (F972). And the
+      // wake's frame is reproduced only if the answer is served where the
+      // recording has it, after that frame (F974). On the tree before these
+      // landed, the replay diverged at frame 5 with three stalls: wall 54
+      // against 59, mono 2 906 against 2 994.
+      const recd = await record({ farSideDelayMs: 1_200 });
+      const rec = parseRecording(readFileSync(recd.path, "utf8"));
+      const plain = (f: Uint8Array): string =>
+        Buffer.from(f).toString("utf8").replace(/\u001b\[[0-9;?]*[A-Za-z]/gu, "");
+      const frames = rec.frames.map(plain);
+      // **The fixture is shown to respond**: the far side really was slow, so
+      // the recording holds both the wake's frame and the settled figure.
+      expect(recd.took.answer, "the far side took over a second").toBeGreaterThan(1_000);
+      expect(rec.truncated, "and the recording is whole").toBe(false);
+      expect(
+        frames.some((f) => /ps\(--limit 20\) · \S+ 1s/u.test(f)),
+        `the wake drew the running head with its figure\n${timeline(rec)}`,
+      ).toBe(true);
+      const head = " · 1s · 20 rows";
+      expect(
+        frames.some((f) => f.includes(`ps(--limit 20)${head}`)),
+        `and the settled head carries the whole-second figure\n${timeline(rec)}`,
+      ).toBe(true);
+      // **And no mask excuses it**: byte-identity here is over the figure.
+      for (const pattern of CLOCK_DERIVED) {
+        expect(head.replace(new RegExp(pattern.source, pattern.flags), "▮"), `not excused by ${pattern.source}`).toBe(head);
+      }
+
+      const out = replay(recd.path);
+      const why = explain("T5.1d", recd, out);
+      expect(out.stalled, `the wake's frame was drawn before the answer was served\n${why}`).toBe(0);
+      expect(out.consumed.wall, `wall parity\n${why}`).toBe(out.recorded.wall);
+      expect(out.consumed.mono, `mono parity\n${why}`).toBe(out.recorded.mono);
+      expect(out.compared, `every recorded frame compared\n${why}`).toBe(rec.frames.length);
+      expect(out.identical, `and the figure is reproduced, not excused\n${why}`).toBe(true);
     },
     120_000,
   );

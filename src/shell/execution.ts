@@ -1000,13 +1000,13 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     // `line` is read throughout; `settle` carries where its document goes.
     const { line } = settle;
     guard.take("local", verb);
-    const startedAt = deps.clock();
+    const startedAt = deps.elapsed();
     // **A local verb is a call** (I55, §8g row 12; the design's §18 — *the tools
     // are the manifest*), so it settles as a card like the adapter route: the
     // header over the handler's blocks. `argv` here is already the arguments —
     // the caller sliced the verb off — so it is the header's `args` as it stands.
     const call = { name: verb, args: argv.join(" ") };
-    const carded = (doc: ViewDocument): ViewDocument => cardOver(doc, call, deps.clock() - startedAt, deps.capabilities);
+    const carded = (doc: ViewDocument): ViewDocument => cardOver(doc, call, deps.elapsed() - startedAt, deps.capabilities);
     try {
       const handler = local.get(verb);
       if (handler === undefined) {
@@ -1077,7 +1077,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         command: line,
         verb,
         argv,
-        durationMs: deps.clock() - startedAt,
+        durationMs: deps.elapsed() - startedAt,
       });
       appendAndCommit(carded(doc), settle);
       // A02 Seam 4's theme row: `theme.setTheme` → `scheduler.invalidate`.
@@ -1369,11 +1369,15 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         deps.capabilities,
         tick,
       );
-    // The card's clock. C23's own (`deps.clock`, C22-injected), never `tick`:
-    // C03 coalesces and drops that under load (C04 I66, C09 I32). `let`,
-    // because an approval restarts it (I60, §8f P1): the figure counts from
-    // when the tool starts, not from when the question was asked.
-    let startedAt = deps.clock();
+    // The card's clock. C23's own (`deps.elapsed`, C22-injected), never `tick`:
+    // C03 coalesces and drops that under load (C04 I66, C09 I32). **`elapsed`
+    // and not `clock`** (F973): the figure is a duration, the wall clock is a
+    // time of day that can be stepped between the two reads, and under C28's
+    // positional replay a wall-derived figure sat on the channel the header's
+    // second hand is served from. `let`, because an approval restarts it (I60,
+    // §8f P1): the figure counts from when the tool starts, not from when the
+    // question was asked.
+    let startedAt = deps.elapsed();
 
     // **A deferred submission already has one, and this is the site the compiler
     // could not check** (roadmap 33). `into` type-checks at every one of the
@@ -1419,7 +1423,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     const finishCard = (outcome: string): void => {
       deps.transcript.patch(
         pendingId,
-        { op: "replace", blockId: call.id, block: header(deps.clock() - startedAt, outcome) },
+        { op: "replace", blockId: call.id, block: header(deps.elapsed() - startedAt, outcome) },
         "shell",
       );
     };
@@ -1446,7 +1450,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         guard.release();
         return;
       }
-      startedAt = deps.clock();
+      startedAt = deps.elapsed();
       // The word goes with the wait: the head reads the spinner alone until the
       // readout's first wake brings the figure — the readout's own first write
       // is a second away, and a head still saying `waiting` while the tool runs
@@ -1535,7 +1539,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       // this the settle replaced the card wholesale and `❯ /ps` over a table
       // was what a finished listing read — §9c's settled state on this route
       // was reached by no path.
-      settleWithDocument(pendingId, cardOver(doc, call, deps.clock() - startedAt, deps.capabilities));
+      settleWithDocument(pendingId, cardOver(doc, call, deps.elapsed() - startedAt, deps.capabilities));
       recordHistory(line, doc); // I29 — the app route's settlement.
 
       // C23 I7 — declared, never inferred. A verb declaring none leaves `$_`
@@ -1554,7 +1558,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       );
       // I55, §8g row 11 — the status box is the body and the verdict is the
       // header's: two statements of one fact, and the header is the one 1-bit keeps.
-      settleWithDocument(pendingId, cardOver(failed, call, deps.clock() - startedAt, deps.capabilities));
+      settleWithDocument(pendingId, cardOver(failed, call, deps.elapsed() - startedAt, deps.capabilities));
       recordHistory(line, failed); // I29 — a failure is a settlement.
       deps.scheduler.commit("completion");
     } finally {
@@ -2183,6 +2187,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
   const refresh = createRefreshDriver({
     transcript: deps.transcript,
     clock: deps.clock,
+    elapsed: deps.elapsed,
     // Passed through rather than re-derived: this pipeline was handed one
     // bracket and the driver needs the same one, so a `livefetch` span nests
     // under whatever route opened it (C28 I36).

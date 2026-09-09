@@ -117,6 +117,7 @@ export {
   parseRecording,
   replayClocks,
   driveRecording,
+  farGate,
   formatDrive,
   replayStdin,
   replayStdout,

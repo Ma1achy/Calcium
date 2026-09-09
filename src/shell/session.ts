@@ -432,8 +432,13 @@ class Session implements TuiInstance {
         captureDir: this.config.profile.captureDir ?? `${this.config.stateDir}/profile`,
       }, {
         elapsed: this.config.elapsed,
+        // **The untapped `elapsed`, for the sampler's stamp** (C28 I53, F971).
+        // `config.elapsed` is the recording tap when one is on; the sampler is
+        // the one periodic reader in the process, and a periodic read on the
+        // positional channel lands at a position the replay never reaches.
+        sampleClock: this.config.sampleClock,
         ...(isSpanning(profileTier)
-          ? { probe: createResourceProbe(this.config.elapsed) }
+          ? { probe: createResourceProbe() }
           : {}),
         ...(profileTier === "deep"
           ? { inspector: createInspector(this.config.elapsed, captureIo()) }

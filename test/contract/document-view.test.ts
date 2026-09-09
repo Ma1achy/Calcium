@@ -370,6 +370,7 @@ describe("C22 §13a — a live part hosted by a pushed view", () => {
     const driver = createRefreshDriver({
       transcript,
       clock: () => now,
+      elapsed: () => now,
       capabilities: FULL_CAPS,
       schedule: (fn, ms) => {
         const t = { fn, at: now + ms, live: true };

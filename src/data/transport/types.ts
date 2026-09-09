@@ -84,9 +84,17 @@ export interface TransportRouter {
  * asserts each rung against a counter rather than sleeping four seconds a case —
  * the same shape C03 takes its `schedule` in, so `fakeClock()` drives it
  * unchanged.
+ *
+ * **`elapsed`, not the wall clock** (F972). A duration is a difference between
+ * two reads, and the wall clock is the one that can be stepped between them;
+ * C22 injects a monotonic `elapsed` beside `clock` and that is the axis a
+ * duration belongs on. The member was `now` — C22's wall clock — for as long as
+ * nothing compared the two: C28's replay serves clock reads by position, and a
+ * transport reading the wall channel put the only two non-chrome reads on the
+ * clock the chrome draws a time of day from (F963).
  */
 export type Clock = Readonly<{
-  now: () => number;
+  elapsed: () => number;
   schedule: (fn: () => void, ms: number) => Disposable;
 }>;
 

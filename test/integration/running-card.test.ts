@@ -325,6 +325,27 @@ describe("C23 I54 — the pending entry is the running card", () => {
   // The card kept on settlement — C23 I55/I56, ruled 2026-09-05. Before these
   // rows the invoke route's `settle(id, doc)` replaced the card wholesale, and
   // `❯ /ps` over a table was what a finished listing read.
+  it("T4.68 (C23 I54, F973): the card's figure is the monotonic clock's — three seconds of wall skew between dispatch and settle leave it at the two seconds `elapsed` moved", async () => {
+    // **The axis, at the route** (T3.64 is the readout's). The card's
+    // `startedAt` and every `cardOver` were `deps.clock()`, the wall clock; a
+    // figure taken there is a difference between two readings of a time of
+    // day, and under C28's positional replay it sat on the channel the
+    // header's second hand is served from. `skew` moves the wall clock alone.
+    const held: { release: (() => void) | null } = { release: null };
+    const h = pipelineHarness({
+      invoke: () => new Promise((r) => { held.release = () => r(result({ exitCode: 0 })); }),
+      adapt: () => doc({ command: "adapted", blocks: [b.raw("x", { id: "r1" })] }),
+    });
+    h.pipeline.submit("/ps");
+    await settled(h.pipeline);
+    h.skew(3_000);
+    seconds(h, 2);
+    expect(headerOf(h.transcript.entries[0]?.doc.blocks ?? [])?.text, "running: the readout's two seconds").toBe(`ps · ${SPIN(2)} 2s`);
+    held.release?.();
+    await settled(h.pipeline);
+    expect(headerOf(h.transcript.entries[0]?.doc.blocks ?? [])?.text, "settled: two seconds on `elapsed`; the wall clock's five are not the call's").toBe("ps · 2s");
+  });
+
   it("T4.47 (C23 I55): the invoke route, a throwing adapter and a local verb each settle to the card's header over the result's blocks, and the persisted document carries it", async () => {
     // The invoke route: `ps · 2s · ok` over the adapted blocks.
     const held: { release: (() => void) | null } = { release: null };
@@ -641,7 +662,7 @@ describe("C23 — the call grammar's head states", () => {
       child("search", "c", { elapsedMs: 3_000, outcome: "12 matches", settled: true, result: "…" }),
     ]);
     expect(validateDocument(oneDone).ok).toBe(true);
-    expect(heads(oneDone.blocks)[0], "running: spinner, wall clock, `k of N`").toBe(`agent(review) · ${SPIN(0)} 8s · 1 of 3`);
+    expect(heads(oneDone.blocks)[0], "running: spinner, its own clock, `k of N`").toBe(`agent(review) · ${SPIN(0)} 8s · 1 of 3`);
     const cards = oneDone.blocks.filter((blk) => blk.kind === "group");
     expect(cards.map((g) => g.kind === "group" && heads(g.children)[0]), "dispatch order, the settled one still last").toEqual([
       `search(a) · ${SPIN(0)}`,

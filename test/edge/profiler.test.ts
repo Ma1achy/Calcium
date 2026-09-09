@@ -127,9 +127,9 @@ describe("C28 — profiler, tier 3 spec-first rows", () => {
     // conforming the row to the code: this asserts I13, and the wording is
     // settled in the spec, not here.
     const { createResourceProbe } = await import("../../src/shell/profiling/node.js");
-    const probe = createResourceProbe(() => 0);
+    const probe = createResourceProbe();
     try {
-      const s = probe.sample(false);
+      const s = probe.sample(false, 0);
       expect(s.loopDelayResolutionMs, "the resolution is on the sample").toBe(10);
       for (const [name, v] of [
         ["max", s.loopDelayMax], ["p50", s.loopDelayP50], ["p99", s.loopDelayP99],
@@ -385,10 +385,10 @@ describe("C28 — profiler, tier 3 spec-first rows", () => {
     // zeroes are a stopped clock, and the memory pane took every headline
     // figure from the newest sample whatever its flag. An idle machine and a
     // paused one produce the same picture, which is the reading I27 names.
-    const probe = createResourceProbe(() => 0);
+    const probe = createResourceProbe();
     try {
-      const running = probe.sample(false);
-      const paused = probe.sample(true);
+      const running = probe.sample(false, 0);
+      const paused = probe.sample(true, 0);
 
       // The first clause, and it is the parameter coming back — asserted so the
       // second clause has something to be about.

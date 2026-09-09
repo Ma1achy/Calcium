@@ -108,7 +108,7 @@ describe("C22 — the root's injection, refusal and capture path", () => {
         {
           elapsed: ambient.elapsed,
           schedule: ambient.schedule,
-          probe: createResourceProbe(ambient.elapsed),
+          probe: createResourceProbe(),
         },
       );
       const profilerUnderControl = profiler;
@@ -319,6 +319,58 @@ describe("C22 — the root's injection, refusal and capture path", () => {
       // The listener outlives this test otherwise, and `resolveConfig` is called
       // with a recording by three other rows in this file.
       process.off("exit", added[0]!);
+    }
+  });
+
+  it("T1.104 (C28 I53): with a recording on, the resolved `sampleClock` is the given `elapsed` itself and `elapsed` is the tap over it — a read through one reaches the batch and a read through the other does not", async () => {
+    // **The wiring the recorder row cannot see** (F971). T1.102 shows the
+    // recorder stamps from whatever `sampleClock` it is handed; what this row
+    // shows is that the root hands it the clock *before* the tap, threaded
+    // rather than read anew — the same function, by identity — so the
+    // sampler's tick is off the recorded channel in a real session.
+    const given = (): number => 42;
+    const fs = fakeFs();
+    // The sink appends and the fake refuses a write into a directory nothing
+    // created (F96); the session's startup makes it, and this row is upstream.
+    await fs.mkdir("/state");
+    const base = {
+      name: "prism",
+      binary: "prism",
+      manifest: MANIFEST,
+      theme: defaultTheme,
+      stateDir: "/state",
+      env: {},
+      cwd: "/work",
+      clock: () => 0,
+      elapsed: given,
+      fs,
+      greeting: async () => ({ blocks: [] }),
+    } as unknown as TuiConfig;
+    const before = process.listeners("exit");
+    const resolved = resolveConfig({ ...base, profile: { record: "/state/r.ndjson", tier: "spans" } }, fakeAmbient());
+    const added = process.listeners("exit").filter((l) => !before.includes(l));
+    try {
+      expect(resolved.sampleClock, "the untapped clock is the one the app gave, by identity").toBe(given);
+      expect(resolved.elapsed, "and `elapsed` is not — it is the tap").not.toBe(given);
+      expect(resolved.sampleClock(), "the same clock underneath").toBe(42);
+
+      const mono = async (): Promise<number[]> =>
+        String(await fs.readFile("/state/r.ndjson"))
+          .split("\n")
+          .filter((l) => l !== "")
+          .map((l) => JSON.parse(l) as { t: string; mono?: number[] })
+          .flatMap((e) => (e.t === "clock" ? (e.mono ?? []) : []));
+
+      resolved.sampleClock();
+      resolved.sampleClock();
+      resolved.recording?.flush();
+      expect(await mono(), "two reads through `sampleClock`: nothing in the batch").toEqual([]);
+
+      resolved.elapsed();
+      resolved.recording?.flush();
+      expect(await mono(), "one read through `elapsed`: the batch holds it").toEqual([42]);
+    } finally {
+      for (const l of added) process.off("exit", l);
     }
   });
 
@@ -1301,7 +1353,7 @@ describe("C28 I16 — V8's GC numbers translated at the boundary", () => {
     setFlagsFromString("--expose-gc");
     const gc = runInNewContext("gc") as () => void;
 
-    const probe = createResourceProbe(() => 0);
+    const probe = createResourceProbe();
     // Make something worth collecting, then drop it: a `gc()` over an idle heap
     // still emits an entry, but a heap with garbage in it is the case the
     // observer is watched for.
@@ -1311,7 +1363,7 @@ describe("C28 I16 — V8's GC numbers translated at the boundary", () => {
     gc();
     for (let i = 0; i < 5; i += 1) await new Promise((r) => setImmediate(r));
 
-    const sample = probe.sample(false);
+    const sample = probe.sample(false, 0);
     const kinds = Object.keys(sample.gc).sort();
     // **Total over the four, and the type is what makes it so.** A `Record<GcKind, …>`
     // means a fifth V8 number is a dropped bucket rather than a compile error,

@@ -252,6 +252,8 @@ function harness(script: Scripted = {}) {
     },
     stop: () => Promise.resolve(0),
     clock: () => now,
+    // The card's duration axis (C23 I54, F973); one counter with `clock` here.
+    elapsed: () => now,
     schedule: (fn: () => void, ms: number) => {
       const t = { fn, at: now + ms, live: true };
       timers.push(t);

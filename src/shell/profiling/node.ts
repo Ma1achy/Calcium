@@ -8,12 +8,15 @@
  * between* — and because a fake probe is what makes a memory assertion
  * deterministic in a unit test.
  *
- * **The clock is injected here too, and that is SS1 rather than tidiness.**
- * This file used to read `performance.now()` for the sample's `at`, which SS1
- * refuses outside `session.ts` and which `make enforce` was failing on. Taking
- * `elapsed` closes it without widening the allow list — and the allow list not
- * growing is the claim `config.ts:133` makes about a two-file version being
- * "the smaller diff and the worse one".
+ * **No clock here at all, and that is two rulings rather than tidiness.** This
+ * file used to read `performance.now()` for the sample's `at`, which SS1
+ * refuses outside `session.ts` and which `make enforce` was failing on; taking
+ * an injected `elapsed` closed that without widening the allow list. Then the
+ * injected read turned out to be the profiler's one periodic reader on the
+ * recording's positional channel — one read per second of session, and a
+ * replay served every later read one place off (C28 I53, F971). So the stamp
+ * is the recorder's now, handed in with the sample call: the probe reads the
+ * process, and only the process.
  *
  * **The loop-delay p50 is not a reading, and this is where that is known.**
  * Measured 2026-09-06: idle reads p50 2.00 ms at `resolution: 1`, 13.00 at
@@ -89,12 +92,13 @@ export function heapSpaces(): readonly HeapSpace[] {
 }
 
 /**
- * `elapsed` is the session's monotonic clock, so a sample's `at` is on the same
- * axis as every span. A probe with a clock of its own would put the two on
- * different origins, and nothing downstream could put a GC pause beside the
- * frame it landed in.
+ * The stamp is the recorder's (`sample(suspended, at)`), so a sample's `at` is
+ * on the same axis as every span. A probe with a clock of its own would put the
+ * two on different origins, and nothing downstream could put a GC pause beside
+ * the frame it landed in — and a probe reading the *session's* clock put its
+ * tick on the recording (C28 I53, F971).
  */
-export function createResourceProbe(elapsed: () => number): ResourceProbe {
+export function createResourceProbe(): ResourceProbe {
   const loop = monitorEventLoopDelay({ resolution: RESOLUTION_MS });
   loop.enable();
 
@@ -119,7 +123,7 @@ export function createResourceProbe(elapsed: () => number): ResourceProbe {
   let disposed = false;
 
   return {
-    sample(suspended: boolean): ResourceSample {
+    sample(suspended: boolean, at: number): ResourceSample {
       const mem = process.memoryUsage();
       const cpu = process.cpuUsage(base);
       const usage = process.resourceUsage();
@@ -132,7 +136,7 @@ export function createResourceProbe(elapsed: () => number): ResourceProbe {
       for (const h of process.getActiveResourcesInfo()) handles[h] = (handles[h] ?? 0) + 1;
 
       return Object.freeze({
-        at: elapsed(),
+        at,
         rss: mem.rss,
         heapUsed: mem.heapUsed,
         heapTotal: mem.heapTotal,

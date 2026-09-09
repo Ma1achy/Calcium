@@ -535,13 +535,13 @@ describe("harness parameters — blocks, render, theme, manifest, ink", () => {
     const clock = clockOf(fake);
     const ran = vi.fn();
 
-    expect(clock.now()).toBe(0);
+    expect(clock.elapsed()).toBe(0);
     clock.schedule(ran, 40);
     expect(fake.armed, "the adapter armed a different clock").toEqual([40]);
 
     clock.tick(40);
     expect(ran).toHaveBeenCalledOnce();
-    expect(clock.now()).toBe(40);
+    expect(clock.elapsed()).toBe(40);
   });
 
   it("toolNamed(name) and mutable(variant): each argument selects what it says", () => {

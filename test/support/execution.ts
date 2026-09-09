@@ -118,6 +118,13 @@ export type PipelineHarness = Readonly<{
    */
   recorded: { command: string; exitCode: number }[];
   tick: (ms: number) => void;
+  /**
+   * Advances the wall clock alone — `clock` moves, `elapsed` does not, and no
+   * timer fires. The instrument for the axis a duration is taken from (C23
+   * I54, F973): under `tick` the two clocks agree and a figure taken from
+   * either reads the same.
+   */
+  skew: (ms: number) => void;
 }>;
 
 const turn = (): Promise<void> =>
@@ -208,6 +215,8 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
    * `fake-scheduler.ts` documents.
    */
   let now = 0;
+  /** The monotonic clock, advanced with `now` by `tick` and left behind by `skew`. */
+  let mono = 0;
   let schedulerPending = false;
   const timers: { fn: () => void; at: number; live: boolean }[] = [];
 
@@ -372,6 +381,7 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
       return 0;
     },
     clock: () => now,
+    elapsed: () => mono,
     schedule: (fn: () => void, ms: number) => {
       const t = { fn, at: now + ms, live: true };
       timers.push(t);
@@ -422,11 +432,15 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
     },
     tick: (ms: number) => {
       now += ms;
+      mono += ms;
       const due = timers.filter((t) => t.live && t.at <= now);
       for (const t of due) {
         t.live = false;
         t.fn();
       }
+    },
+    skew: (ms: number) => {
+      now += ms;
     },
   };
 }

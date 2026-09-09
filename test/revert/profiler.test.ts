@@ -66,9 +66,9 @@ describe("C28 — profiler, tier 6 spec-first rows", () => {
     // instrument would then be the largest contributor to the number it exists
     // to watch, and the reading rises with the profiling rather than with the
     // application. T1.2 fails on the entry count, not on the duration.
-    const probe = createResourceProbe(() => 0);
+    const probe = createResourceProbe();
     try {
-      const before = probe.sample(false).timingEntries;
+      const before = probe.sample(false, 0).timingEntries;
       let now = 0;
       const p = createProfiler({ tier: "spans" }, { elapsed: () => now });
       p.beginFrame("input");
@@ -77,7 +77,7 @@ describe("C28 — profiler, tier 6 spec-first rows", () => {
         now += 1;
       }
       p.endFrame("frame");
-      const after = probe.sample(false).timingEntries;
+      const after = probe.sample(false, 0).timingEntries;
 
       expect(p.report().spans?.paint?.count, "two hundred spans really were recorded").toBe(200);
       expect(after - before, "and not one of them reached the timing buffer").toBe(0);
@@ -88,7 +88,7 @@ describe("C28 — profiler, tier 6 spec-first rows", () => {
       // and the count has to move, which is the only thing separating *the
       // spans stayed out of the buffer* from *the buffer is not being read*.
       performance.mark("t6.2-control");
-      expect(probe.sample(false).timingEntries - after, "the counter does respond").toBe(1);
+      expect(probe.sample(false, 0).timingEntries - after, "the counter does respond").toBe(1);
       performance.clearMarks("t6.2-control");
       p.dispose();
     } finally {
@@ -330,10 +330,10 @@ describe("C28 — profiler, tier 6 spec-first rows", () => {
     // the present state they say the process is idle — so a paused session and
     // a quiet one produce the same picture, and the one figure that separates
     // them was on the sample the whole time. T3.10 is what fails.
-    const probe = createResourceProbe(() => 0);
+    const probe = createResourceProbe();
     try {
-      const running = probe.sample(false);
-      const paused = probe.sample(true);
+      const running = probe.sample(false, 0);
+      const paused = probe.sample(true, 0);
       const drawn = JSON.stringify(profilePane(reportWith([running, paused]), "memory"));
       expect(drawn, "the series is declared discontinuous").toContain("1 of them suspended");
       expect(drawn, "and the reader is told why that matters").toContain("not continuous");

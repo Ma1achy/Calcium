@@ -1579,6 +1579,8 @@ export async function constructGraph(
       resetFocus: () => router.resetFocus(),
       stop: deps.stop,
       clock: config.clock,
+      // The card's and the readouts' durations (C23 I52, I53, I54, F973).
+      elapsed: config.elapsed,
       schedule: config.schedule,
       openUrl: config.openUrl ?? defaultOpener(config.platform, runner, session),
 
@@ -3016,7 +3018,9 @@ function defaultTransport(
       mode: "subprocess",
       binary: config.binary,
       runner,
-      clock: { now: config.clock, schedule: config.schedule },
+      // **`elapsed`, because `durationMs` is a duration** (C06 I19, F972): the
+      // wall clock is C22's time of day and the one the chrome draws.
+      clock: { elapsed: config.elapsed, schedule: config.schedule },
       env: config.env,
       cwd: session.cwd,
     }),

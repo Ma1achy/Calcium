@@ -288,6 +288,10 @@ export function resolveConfig(config: TuiConfig, ambient: Ambient) {
     });
   }
 
+  // The one `elapsed` the session has, held before the tap so the two members
+  // below are the same clock with and without a recording.
+  const rawElapsed = config.elapsed ?? ambient.elapsed;
+
   return Object.freeze({
     name: config.name,
     binary: config.binary,
@@ -329,7 +333,14 @@ export function resolveConfig(config: TuiConfig, ambient: Ambient) {
     // stream; it flattens every duration to zero, and C24 I32 put a duration in
     // the default footer, so it diverges on every frame of every recording
     // taken from a live session.
-    elapsed: ((e) => (recording === null ? e : recording.mono(e)))(config.elapsed ?? ambient.elapsed),
+    elapsed: recording === null ? rawElapsed : recording.mono(rawElapsed),
+    // C28 I53, F971 — **the same function, before the tap, for the sampler's
+    // stamp.** A periodic reader on the positional channel is unreplayable: its
+    // tick lands between two of the session's reads at a position the replay
+    // cannot reproduce, so the sampler stamps from the clock the recording never
+    // sees. Threaded rather than read anew, which is what keeps SS1's allow-list
+    // at one file.
+    sampleClock: rawElapsed,
 
     env: config.env ?? {},
     // **Undefined, not `{}`** (C22 I49). C02 distinguishes an absent overrides

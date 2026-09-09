@@ -77,6 +77,11 @@ const CROSS_TIER = {
   // corpus cannot see it; `test/e2e/completion.test.ts` can, and this run does
   // not execute tier 5.
   "c19-menu-window.mjs": ["C19 T5.1"],
+  // Two wirings the unit corpus cannot see: `session.ts` handing the sampler
+  // the tapped `elapsed` (C28 I53) and `construct.ts` handing the transport the
+  // wall clock (C06 I19). Both are one file below the seam T1.104 resolves, and
+  // the row that counts is tier 5's parity on both channels (F971, F972).
+  "c28-profiler.mjs": ["C28 T5.1c"],
 };
 
 /**

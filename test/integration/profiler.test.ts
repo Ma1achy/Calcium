@@ -485,7 +485,7 @@ describe("C28 — profiler, tier 4 spec-first rows", () => {
       { tier: "spans" },
       {
         elapsed: () => performance.now(),
-        probe: createResourceProbe(() => performance.now()),
+        probe: createResourceProbe(),
         schedule: holdTimer,
       },
     );
@@ -537,7 +537,7 @@ describe("C28 — profiler, tier 4 spec-first rows", () => {
       { tier: "spans" },
       {
         elapsed: () => performance.now(),
-        probe: createResourceProbe(() => performance.now()),
+        probe: createResourceProbe(),
         schedule: (fn: () => void): Disposable => {
           bareTick = fn;
           return { [Symbol.dispose]: () => void (bareTick = null) };

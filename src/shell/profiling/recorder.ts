@@ -53,6 +53,12 @@ import {
 
 type Deps = Readonly<{
   elapsed: () => number;
+  /**
+   * The sampler's stamp, off the recorded channel (C28 I53, F971). The root
+   * hands the `elapsed` the recording tap has not wrapped; absent, the sampler
+   * stamps from `elapsed`, which is right for a profiler built without one.
+   */
+  sampleClock?: () => number;
   probe?: ResourceProbe;
   /**
    * The `node:inspector` face (C28 I17). Absent means captures are refused —
@@ -118,6 +124,14 @@ function clockCostNs(elapsed: () => number): number {
 
 export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
   const elapsed = opts.elapsed ?? deps.elapsed;
+  // **A periodic reader cannot sit on a positional channel** (C28 I53). The
+  // sampler's tick lands between two of the session's reads at a position no
+  // replay reproduces — measured, the count differed by one per second of
+  // session, and equal counts would still misalign every read after the tick
+  // (F971) — so its stamp comes from a clock the recording never wraps. An
+  // `elapsed` given on the options is already off the tap and keeps the sample
+  // on the spans' axis.
+  const sampleClock = opts.sampleClock ?? opts.elapsed ?? deps.sampleClock ?? deps.elapsed;
   const probe = opts.probe ?? deps.probe;
 
   let tier: Tier = opts.tier ?? DEFAULT_TIER;
@@ -268,7 +282,7 @@ export function createProfiler(opts: ProfileOptions, deps: Deps): Profiler {
     const every = opts.sampleMs ?? DEFAULTS.sampleMs;
     const tick = (): void => {
       if (disposed) return;
-      samples.push(probe.sample(suspended));
+      samples.push(probe.sample(suspended, sampleClock()));
       sampler = deps.schedule?.(tick, every) ?? null;
     };
     sampler = deps.schedule(tick, every);

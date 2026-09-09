@@ -178,7 +178,7 @@ describe("C06 reporting", () => {
     expect(r.signal).toBe("SIGKILL");
   });
 
-  it("T1.13: durationMs comes from the injected clock, not an ambient one", async () => {
+  it("T1.13 (I19): durationMs comes from the injected monotonic clock, not an ambient one", async () => {
     const fake = fakeClock();
     const clock = clockOf(fake);
     const child = fakeChild({ ignores: [] });

@@ -327,6 +327,18 @@ export type Overhead = Readonly<{
 export type ProfileOptions = Readonly<{
   tier?: Tier;
   elapsed?: () => number;
+  /**
+   * The clock the sampler stamps a `ResourceSample.at` from (C28 I53, F971).
+   *
+   * **Off the recorded channel by default.** The root hands the recorder the
+   * session's `elapsed` *before* the recording tap wraps it — the same
+   * function, threaded, never a clock read anew (SS1) — because a periodic
+   * reader cannot sit on a positional channel: even at equal counts its tick
+   * lands between two of the session's reads at a position no replay can
+   * reproduce, and every read after it is served one place off. A replay
+   * supplies its own here, since its `elapsed` *is* the recording's stream.
+   */
+  sampleClock?: () => number;
   probe?: ResourceProbe;
   ring?: number;
   worst?: number;
@@ -458,7 +470,16 @@ export type ProfileReport = Readonly<{
  * `monitorEventLoopDelay` must be started to mean anything (C28 I2).
  */
 export interface ResourceProbe {
-  sample(suspended: boolean): ResourceSample;
+  /**
+   * One sample, stamped `at` by the caller (C28 I53).
+   *
+   * **The probe reads the process and never a clock.** The stamp arrives from
+   * the recorder, which owns `elapsed` and — when a recording is on — the
+   * sampler's off-channel clock; a probe stamping from a clock of its own put
+   * one read per tick onto the recorded stream (F971), and one on a different
+   * origin would put a GC pause beside the wrong frame.
+   */
+  sample(suspended: boolean, at: number): ResourceSample;
   /**
    * V8's per-space occupancy, read at the moment it is asked (C28 I21).
    *

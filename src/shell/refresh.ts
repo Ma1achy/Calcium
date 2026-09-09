@@ -279,7 +279,15 @@ export function backoffOf(intervalMs: number, consecutiveFailures: number): numb
 
 export type RefreshDeps = Readonly<{
   transcript: TranscriptStore;
+  /** The wall clock — deadlines, offsets and the stall watch (C23 I19, I20). */
   clock: () => number;
+  /**
+   * The monotonic clock — every duration a sweep writes into a frame (C23 I52,
+   * I53, F973): a readout's figure, a loading box's counter, a stale title's
+   * age. A duration is a difference between two reads, and the wall clock is
+   * the one that can be stepped between them.
+   */
+  elapsed: () => number;
   /**
    * One async bracket for a live part's fetch (C28 I36).
    *
@@ -623,7 +631,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
    */
   const titleOf = (part: Part): string => {
     if (!part.stale) return part.spec.title;
-    const secs = Math.max(0, Math.round((deps.clock() - (part.lastOk ?? 0)) / 1000));
+    const secs = Math.max(0, Math.round((deps.elapsed() - (part.lastOk ?? 0)) / 1000));
     return `${part.spec.title} ${glyphs(deps.capabilities).separator} ${String(secs)}s ago`;
   };
 
@@ -681,7 +689,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
       put(part.host, part, errorArm(part)(shown, null, src.failures));
       return true;
     }
-    part.lastOk = deps.clock();
+    part.lastOk = deps.elapsed();
     part.stale = false;
     if (put(part.host, part, child)) return true;
     release(part.host);
@@ -773,6 +781,9 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
   const sweepParts = (): void => {
     if (deps.stopping()) return;
     const now = deps.clock();
+    // The durations below — a box's counter, a title's age, a card's figure —
+    // are differences on the monotonic clock (F973); `now` stays the deadlines'.
+    const mono = deps.elapsed();
 
     // **Retirement is the sweep's and not `release`'s** (C23 I45, §8c C3). C23 I33a
     // settles by release-then-declare, both synchronous, so a source retired the
@@ -795,7 +806,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
       for (const part of src.parts) {
         if (!deps.visible(part.host)) continue;
         if (part.stale || part.lastOk === null) continue;
-        if (now - part.lastOk < part.spec.staleAfterMs) continue;
+        if (mono - part.lastOk < part.spec.staleAfterMs) continue;
         part.stale = true;
         const current = currentChild(part.host, part);
         if (current !== null && put(part.host, part, current)) deps.commit("stream");
@@ -830,7 +841,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
         // `retrying`, and `elapsedNeeded` says no to anything that is not a
         // loading `status` (§8a-bis B3).
         const shown = currentChild(part.host, part);
-        const since = now - part.startedAt;
+        const since = mono - part.startedAt;
         if (!elapsedNeeded(shown, since)) continue;
         if (put(part.host, part, { ...(shown as Status), elapsedMs: since })) ticked = true;
       }
@@ -876,7 +887,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
     let read = false;
     for (const [id, r] of [...readouts]) {
       if (!deps.visible({ kind: "entry", id })) continue;
-      const since = now - r.startedAt;
+      const since = mono - r.startedAt;
       const figure = elapsed(since);
       if (figure === r.last) continue;
       // **The tick is the elapsed second** (C23 I58): the spinner's frame is a
@@ -1205,7 +1216,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
     },
 
     readout: (id, blockId, render) => {
-      readouts.set(id, { blockId, render, startedAt: deps.clock(), last: elapsed(0) });
+      readouts.set(id, { blockId, render, startedAt: deps.elapsed(), last: elapsed(0) });
       armParts();
     },
 
@@ -1279,7 +1290,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
             // source is `done` — but the field is `readonly` and a refused part
             // is still a `Part`. Set from the same clock as the other arm, so
             // the two are not two answers to one question (I43).
-            startedAt: deps.clock(),
+            startedAt: deps.elapsed(),
             lastOk: null,
             stale: false,
           };
@@ -1318,7 +1329,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
           // **When the box appeared, which is when this part was declared** —
           // not when its source was created, which a shared fetch makes a
           // different moment (C23 I52).
-          startedAt: deps.clock(),
+          startedAt: deps.elapsed(),
           lastOk: null,
           stale: false,
         };
