@@ -24,7 +24,7 @@ import { assertPictureGlyph } from "../theme/picture.js";
 import { halfBlockEligible } from "../image/index.js";
 import { paint, slot, type Span } from "../blocks/paint.js";
 import { arrows3, glyphs, MARKER3_COLUMNS, markerColumn, markers3 } from "../blocks/glyphs.js";
-import { cells } from "../text.js";
+import { cells, graphemes } from "../text.js";
 import { glyphForMask, LINE_DOWN, LINE_LEFT, LINE_RIGHT, LINE_UP, QUADRANTS } from "./linedraw.js";
 import { BRAILLE_DOTS, createGrid, foldBraille, setDot } from "./raster.js";
 import {
@@ -1226,7 +1226,7 @@ export function plot3dArea(
   // **`w` and not `grid.width`, which were the same number until this arm.**
   // Both call sites read the sample grid where they meant the cell width, and
   // both were right by coincidence on every rung that existed (F489).
-  return overlay(composed, labels, frameInk, w); // cells-ok — a cell width
+  return overlay(composed, labels, frameInk, w, ctx.capabilities.ambiguousWidth); // cells-ok — a cell width
 }
 
 /**
@@ -1939,24 +1939,37 @@ function overlay(
   labels: readonly Placed[],
   colour: ColourValue | undefined,
   w: number,
+  ambiguous: "narrow" | "wide",
 ): readonly (readonly Span[])[] {
   if (labels.length === 0) return composed; // cells-ok — a label count
   const rows = composed.map((line) => [...line]);
   for (const l of labels) {
     const line = rows[l.row];
     if (line === undefined) continue;
-    const chars = [...l.text];
     // **The label's own ink where its axis set one** (C12 I98, §6l row 2). This
     // pass took one colour for every label, which is the one place in the frame
     // where the colour is a property of the *pass* rather than of the thing
     // drawn — so a per-axis tone is the first property it could not carry.
     const own = l.ink ?? colour;
-    for (let i = 0; i < chars.length; i += 1) { // cells-ok — a character index
-      const c = l.col + i; // cells-ok — a column index
-      if (c < 0 || c >= w) continue; // cells-ok — a column index
-      line[c] = own === undefined
-        ? { text: chars[i] as string }
-        : { text: chars[i] as string, style: { colour: own } };
+    // **Written cluster by cluster, each advancing by its width** (C09 I64,
+    // F970). This wrote one code point per cell: a keycap's selector and
+    // enclosing mark and a family's joiners each took a cell of their own, with
+    // an SGR each where the axis had a tone — an escape inside the cluster,
+    // which Ink then hid by dropping the zero-width piece — and every column
+    // after the label drifted by the pieces it had. A cluster owns the cells it
+    // measures; the cells after its first are emptied so the row keeps its
+    // count and `paint` skips them, and a cluster measuring nothing owns none.
+    let c = l.col; // cells-ok — a column index
+    for (const cluster of graphemes(l.text)) {
+      const wide = cells(cluster, ambiguous);
+      if (wide === 0) continue;
+      if (c >= 0 && c < w) { // cells-ok — a column index
+        line[c] = own === undefined ? { text: cluster } : { text: cluster, style: { colour: own } };
+      }
+      for (let k = 1; k < wide; k += 1) { // cells-ok — a cell count
+        if (c + k >= 0 && c + k < w) line[c + k] = { text: "" }; // cells-ok — a column index
+      }
+      c += wide;
     }
   }
   return rows;

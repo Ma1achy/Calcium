@@ -10,7 +10,7 @@ import type { ReactElement } from "react";
 
 import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
 import type { Terminal, TerminalLine } from "../../../data/viewmodel/index.js";
-import { cells, truncate } from "../../text.js";
+import { cells, graphemes, truncate } from "../../text.js";
 import { degradeColour } from "../../theme/colormap.js";
 import { NO_STYLE } from "../../theme/index.js";
 import type { Style } from "../../theme/types.js";
@@ -74,32 +74,60 @@ function spansOf(
   push(line.text.slice(at), NO_STYLE);
   if (cursorCol === null) return out;
 
-  // The cursor's cell, re-split out of whichever span holds it. A cell past the
-  // end of the text is a space: a child that has just returned is writing at a
-  // column no character occupies yet.
+  // **The column is a cell column and the text is code units** (C27 I4, C04
+  // I111), so the cursor's cell is found by walking the line's clusters and
+  // measuring each — never by indexing the column into the string. That took
+  // one code unit at the column's index: half a surrogate pair `inverse` on
+  // `🇬🇧x` with the other half after it, the mark alone on `caféx` at column 4,
+  // which Ink then dropped, and a cell to the right of the child's after any
+  // wide glyph (C09 I64, F970). A cell past the end of the text is a space: a
+  // child that has just returned is writing at a column no character occupies
+  // yet, and the gap to it is measured in cells for the same reason.
+  const ambiguous = ctx.capabilities.ambiguousWidth;
+  let unit = 0; // cells-ok — the code-unit offset of the cluster under the cursor
+  let cell = 0; // cells-ok — its first cell
+  let cluster = "";
+  for (const piece of graphemes(line.text)) {
+    const w = cells(piece, ambiguous);
+    if (cell + w > cursorCol) {
+      cluster = piece;
+      break;
+    }
+    unit += piece.length; // cells-ok — a code-unit cursor
+    cell += w;
+  }
+  if (cluster === "") {
+    const gap = cursorCol - cell;
+    if (gap > 0) out.push({ text: " ".repeat(gap), style: NO_STYLE });
+    out.push({ text: " ", style: { inverse: true } });
+    return out;
+  }
+
+  // The cluster's code units, re-split out of whichever spans hold them. A run
+  // boundary the child put inside the cluster is the child's (I56) and stays:
+  // each part keeps its own style and gains `inverse`.
+  const from = unit;
+  const to = unit + cluster.length; // cells-ok — a code-unit offset
+  const styled = (text: string, style: Style | undefined): Span =>
+    style === undefined ? { text } : { text, style };
   const marked: Span[] = [];
   let offset = 0;
-  let placed = false;
   for (const span of out) {
     const start = offset;
-    const end = offset + span.text.length; // cells-ok — a code-unit offset: the cursor's column indexes the emulator's cells and the runs are code-unit addressed (C04 I111)
+    const end = offset + span.text.length; // cells-ok — a code-unit offset
     offset = end;
-    if (placed || cursorCol < start || cursorCol >= end) {
+    const lo = Math.max(start, from);
+    const hi = Math.min(end, to);
+    if (hi <= lo) {
       marked.push(span);
       continue;
     }
-    const before = span.text.slice(0, cursorCol - start); // cells-ok — code units, as above
-    const cell = span.text.slice(cursorCol - start, cursorCol - start + 1);
-    const after = span.text.slice(cursorCol - start + 1);
-    if (before !== "") marked.push(span.style === undefined ? { text: before } : { text: before, style: span.style });
-    marked.push({ text: cell, style: { ...(span.style ?? {}), inverse: true } });
-    if (after !== "") marked.push(span.style === undefined ? { text: after } : { text: after, style: span.style });
-    placed = true;
-  }
-  if (!placed) {
-    const gap = cursorCol - offset;
-    if (gap > 0) marked.push({ text: " ".repeat(gap), style: NO_STYLE });
-    marked.push({ text: " ", style: { inverse: true } });
+    const before = span.text.slice(0, lo - start);
+    const within = span.text.slice(lo - start, hi - start);
+    const after = span.text.slice(hi - start);
+    if (before !== "") marked.push(styled(before, span.style));
+    marked.push({ text: within, style: { ...(span.style ?? {}), inverse: true } });
+    if (after !== "") marked.push(styled(after, span.style));
   }
   return marked;
 }

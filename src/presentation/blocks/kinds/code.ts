@@ -36,7 +36,7 @@ import xml from "highlight.js/lib/languages/xml";
 import yaml from "highlight.js/lib/languages/yaml";
 import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
 import type { Code, Probe } from "../../../data/viewmodel/index.js";
-import { cells, expandTabs, hardWrapCells, stripControl, truncateParts } from "../../text.js";
+import { cells, clusterEnds, expandTabs, hardWrapCells, stripControl, truncateParts } from "../../text.js";
 import { sliceRuns } from "../../runs.js";
 import { paint, rows, slot, tone, type Span } from "../paint.js";
 import type { BlockDefinition, RenderContext, Windowed } from "../types.js";
@@ -171,9 +171,10 @@ export function tokenise(text: string, language: string, probe?: Probe): readonl
   // disagree on, and that is a property of the key rather than an omission.
   probe?.miss("tokens", "absent");
 
-  const tokens = lowlight.registered(language)
+  const parsed = lowlight.registered(language)
     ? flatten(lowlight.highlight(language, text) as HastNode, null)
     : [{ text, slot: null }];
+  const tokens = wholeClusters(parsed, text);
 
   if (memo.size >= MEMO_CAP) {
     // **A cliff, not an eviction** — the cap clears all 256 at once, so the
@@ -187,6 +188,49 @@ export function tokenise(text: string, language: string, probe?: Probe): readonl
   memo.set(key, tokens);
   probe?.gauge("tokens.memo.size", memo.size);
   return tokens;
+}
+
+/**
+ * Token boundaries moved off cluster interiors (C09 I64, C04 I84, F970).
+ *
+ * A grammar's regexes see code units. `\b\d+` ends a `number` at its digits
+ * and never learns that the U+0600 before them is a Prepend the segmenter joins
+ * to the first one (UAX #29 GB9b), so `؀1` painted as a plain `؀` and a
+ * coloured `1` — an escape inside a cluster, the one piece the styled walk does
+ * not resolve (C09 §5a), in every grammar that tokenises a digit. A span reaches
+ * the painter through `runsOf`, which snaps it; a token never did.
+ *
+ * The rule is the one `runsOf` applies to a `to`: a boundary strictly inside a
+ * cluster moves on to the cluster's end, so the earlier token grows by the tail
+ * of the cluster and the later one loses its head — and is dropped when nothing
+ * is left of it. Width-preserving by construction, since the cluster is painted
+ * whole either way; what moves is which slot paints it, and `؀1` takes the
+ * Prepend's. `clusterEnds` answers `[]` only for printable ASCII, and source
+ * has newlines, so a block pays one segmentation of its text — once, through
+ * the memo above, since the key is the whole input. A control breaks a cluster
+ * on both sides (GB4, GB5), so no boundary crosses a newline and `tokenLines`
+ * is unaffected.
+ * A single token has no interior boundary, so the unregistered fallback pays
+ * nothing.
+ */
+function wholeClusters(tokens: readonly Token[], text: string): readonly Token[] {
+  if (tokens.length < 2) return tokens; // cells-ok — a token count
+  const ends = clusterEnds(text);
+  if (ends.length === 0) return tokens; // cells-ok — an array count
+  const out: Token[] = [];
+  let e = 0; // cells-ok — an index into the cluster ends
+  let from = 0; // cells-ok — a code-unit offset
+  let end = 0; // cells-ok — a code-unit offset
+  for (const token of tokens) {
+    end += token.text.length; // cells-ok — a code-unit offset
+    while (e < ends.length && (ends[e] as number) < end) e += 1; // cells-ok — an index into the cluster ends
+    const to = e < ends.length ? (ends[e] as number) : end; // cells-ok — the cluster end at or after the boundary
+    if (to > from) {
+      out.push({ text: text.slice(from, to), slot: token.slot });
+      from = to;
+    }
+  }
+  return out;
 }
 
 /**

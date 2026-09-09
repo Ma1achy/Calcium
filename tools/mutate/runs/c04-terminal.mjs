@@ -102,10 +102,21 @@ const results = runPass({
     {
       // C09 I56 — the cursor is the one thing drawn `inverse` at *every* arm,
       // because at 1-bit it is the only channel left to say where it is.
+      // Re-anchored when the cursor went by cluster (C09 I64, F970): the cell
+      // past the text is the `out.push` and the cell on a cluster is the
+      // `marked.push`, and both are unmarked here — T4.1's cursor sits past an
+      // empty line, so a mutation of the cluster branch alone would survive it.
       name: "the cursor is not marked at 1-bit",
       file: KIND,
-      from: '    marked.push({ text: " ", style: { inverse: true } });',
-      to: '    marked.push({ text: " ", style: {} });',
+      from: '    out.push({ text: " ", style: { inverse: true } });',
+      to: '    out.push({ text: " ", style: {} });',
+      also: [
+        {
+          file: KIND,
+          from: "    marked.push({ text: within, style: { ...(span.style ?? {}), inverse: true } });",
+          to: "    marked.push({ text: within, style: { ...(span.style ?? {}) } });",
+        },
+      ],
       expect: "T4.1",
     },
     {
